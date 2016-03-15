@@ -53,9 +53,6 @@ class CurrentOpCommand : public Command {
 public:
     CurrentOpCommand() : Command("currentOp") {}
 
-    bool isWriteCommandForConfigServer() const final {
-        return false;
-    }
 
     bool slaveOk() const final {
         return true;

@@ -78,9 +78,6 @@ public:
     virtual bool adminOnly() const {
         return false;
     }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {}  // No auth required
@@ -113,9 +110,6 @@ public:
         help << "a way to check that the server is alive. responds immediately even if server is "
                 "in a db lock.";
     }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {}  // No auth required
@@ -138,9 +132,6 @@ public:
     }
     virtual bool slaveOk() const {
         return true;
-    }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
@@ -173,9 +164,6 @@ public:
         return true;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     virtual void help(stringstream& help) const {
         help << "returns information about the daemon's host";
@@ -219,9 +207,6 @@ public:
 class LogRotateCmd : public Command {
 public:
     LogRotateCmd() : Command("logRotate") {}
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual bool slaveOk() const {
         return true;
     }
@@ -255,9 +240,6 @@ public:
         help << "get a list of all db commands";
     }
     ListCommandsCmd() : Command("listCommands", false) {}
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual bool slaveOk() const {
         return true;
     }
@@ -359,9 +341,6 @@ public:
     virtual bool slaveOk() const {
         return true;
     }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {}  // No auth required
@@ -383,9 +362,6 @@ public:
 
     virtual bool slaveOk() const {
         return true;
-    }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
     }
     virtual bool adminOnly() const {
         return true;
@@ -453,9 +429,6 @@ public:
     CmdGetCmdLineOpts() : Command("getCmdLineOpts") {}
     void help(stringstream& h) const {
         h << "get argv";
-    }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
     }
     virtual bool adminOnly() const {
         return true;

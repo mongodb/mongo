@@ -164,9 +164,6 @@ public:
         return false;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     virtual void help(std::stringstream& help) const {
         help << "Runs the sharded map/reduce command";

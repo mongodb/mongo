@@ -65,9 +65,6 @@ public:
     virtual bool slaveOk() const {
         return false;
     }
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
     virtual Status checkAuthForCommand(ClientBasic* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {

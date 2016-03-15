@@ -71,9 +71,6 @@ public:
     virtual bool slaveOk() const {
         return true;
     }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual bool adminOnly() const {
         return true;
     }

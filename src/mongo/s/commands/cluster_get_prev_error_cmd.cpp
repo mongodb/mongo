@@ -42,9 +42,6 @@ class GetPrevErrorCmd : public Command {
 public:
     GetPrevErrorCmd() : Command("getPrevError", false, "getpreverror") {}
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     virtual bool slaveOk() const {
         return true;

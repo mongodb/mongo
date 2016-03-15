@@ -140,9 +140,6 @@ bool PlanCacheCommand::run(OperationContext* txn,
     return true;
 }
 
-bool PlanCacheCommand::isWriteCommandForConfigServer() const {
-    return false;
-}
 
 bool PlanCacheCommand::slaveOk() const {
     return false;

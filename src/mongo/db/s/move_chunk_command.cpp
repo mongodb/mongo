@@ -106,9 +106,6 @@ public:
         return true;
     }
 
-    bool isWriteCommandForConfigServer() const override {
-        return false;
-    }
 
     Status checkAuthForCommand(ClientBasic* client,
                                const std::string& dbname,

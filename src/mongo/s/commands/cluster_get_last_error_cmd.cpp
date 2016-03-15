@@ -45,9 +45,6 @@ class GetLastErrorCmd : public Command {
 public:
     GetLastErrorCmd() : Command("getLastError", false, "getlasterror") {}
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     virtual bool slaveOk() const {
         return true;

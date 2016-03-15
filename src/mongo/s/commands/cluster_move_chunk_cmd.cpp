@@ -68,9 +68,6 @@ public:
         return true;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     virtual void help(std::stringstream& help) const {
         help << "Example: move chunk that contains the doc {num : 7} to shard001\n"

@@ -73,9 +73,6 @@ public:
         return false;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     virtual Status checkAuthForCommand(ClientBasic* client,
                                        const std::string& dbname,

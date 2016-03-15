@@ -214,9 +214,6 @@ public:
     bool slaveOk() const override {
         return false;
     }
-    bool isWriteCommandForConfigServer() const override {
-        return true;
-    }
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,
                                std::vector<Privilege>* out) override {

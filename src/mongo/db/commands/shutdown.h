@@ -54,9 +54,6 @@ public:
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out);
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
 protected:
     static void shutdownHelper();

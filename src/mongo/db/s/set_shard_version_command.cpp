@@ -72,9 +72,6 @@ public:
         return true;
     }
 
-    bool isWriteCommandForConfigServer() const override {
-        return false;
-    }
 
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,

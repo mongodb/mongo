@@ -123,17 +123,6 @@ public:
                          const rpc::RequestInterface& request,
                          rpc::ReplyBuilderInterface* replyBuilder);
 
-
-    /**
-     * This designation for the command is only used by the 'help' call and has nothing to do
-     * with lock acquisition. The reason we need to have it there is because
-     * SyncClusterConnection uses this to determine whether the command is update and needs to
-     * be sent to all three servers or just one.
-     *
-     * Eventually when SyncClusterConnection is refactored out, we can get rid of it.
-     */
-    virtual bool isWriteCommandForConfigServer() const = 0;
-
     /* Return true if only the admin ns has privileges to run this command. */
     virtual bool adminOnly() const {
         return false;

@@ -119,9 +119,6 @@ class StageDebugCmd : public Command {
 public:
     StageDebugCmd() : Command("stageDebug") {}
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     bool slaveOk() const {
         return false;
     }

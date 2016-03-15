@@ -48,9 +48,6 @@ public:
         return true;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     virtual void help(std::stringstream& help) const {
         help << " shows status/reachability of servers in the cluster";

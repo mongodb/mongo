@@ -81,9 +81,6 @@ public:
                      BSONObjBuilder& result);
 
     virtual void help(stringstream& help) const;
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual bool slaveOk() const {
         return true;
     }
@@ -109,9 +106,6 @@ public:
                      BSONObjBuilder& result);
 
     virtual void help(stringstream& help) const;
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual bool slaveOk() const {
         return true;
     }

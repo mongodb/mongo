@@ -57,9 +57,6 @@ public:
         return true;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     virtual void help(std::stringstream& help) const {
         help << " example: { getShardVersion : 'alleyinsider.foo'  } ";

@@ -40,9 +40,6 @@ class CmdIsMaster : public Command {
 public:
     CmdIsMaster() : Command("isMaster", false, "ismaster") {}
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     virtual bool slaveOk() const {
         return true;

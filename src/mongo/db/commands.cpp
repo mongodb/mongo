@@ -143,11 +143,7 @@ void Command::htmlHelp(stringstream& ss) const {
         ss << "</a>";
     ss << "</td>\n";
     ss << "<td>";
-    if (isWriteCommandForConfigServer()) {
-        ss << "W ";
-    } else {
-        ss << "R ";
-    }
+    ss << "UNUSED ";
     if (slaveOk())
         ss << "S ";
     if (adminOnly())
@@ -398,7 +394,6 @@ void Command::generateHelpResponse(OperationContext* txn,
     ss << "help for: " << command.name << " ";
     command.help(ss);
     helpBuilder.append("help", ss.str());
-    helpBuilder.append("lockType", command.isWriteCommandForConfigServer() ? 1 : 0);
 
     replyBuilder->setCommandReply(helpBuilder.done());
     replyBuilder->setMetadata(rpc::makeEmptyMetadata());

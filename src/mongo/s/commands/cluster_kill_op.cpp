@@ -55,9 +55,6 @@ class ClusterKillOpCommand : public Command {
 public:
     ClusterKillOpCommand() : Command("killOp") {}
 
-    bool isWriteCommandForConfigServer() const final {
-        return false;
-    }
 
     bool slaveOk() const final {
         return true;

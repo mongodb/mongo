@@ -45,9 +45,6 @@ public:
     virtual bool slaveOk() const {
         return true;
     }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual void help(stringstream& help) const {
         help << "{ _isSelf : 1 } INTERNAL ONLY";
     }

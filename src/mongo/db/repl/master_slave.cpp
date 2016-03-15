@@ -355,9 +355,6 @@ public:
         h << "internal";
     }
     HandshakeCmd() : Command("handshake") {}
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual bool slaveOk() const {
         return true;
     }

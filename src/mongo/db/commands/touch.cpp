@@ -57,9 +57,6 @@ using std::stringstream;
 
 class TouchCmd : public Command {
 public:
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual bool adminOnly() const {
         return false;
     }

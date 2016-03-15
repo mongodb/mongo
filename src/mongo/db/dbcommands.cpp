@@ -179,9 +179,6 @@ public:
         out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
 
     CmdDropDatabase() : Command("dropDatabase") {}
 
@@ -238,9 +235,6 @@ public:
         help << "repair database.  also compacts. note: slow.";
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
 
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
@@ -314,9 +308,6 @@ public:
         help << "http://docs.mongodb.org/manual/reference/command/profile/#dbcmd.profile";
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
 
     virtual Status checkAuthForCommand(ClientBasic* client,
                                        const std::string& dbname,
@@ -406,9 +397,6 @@ public:
              "monitoring#MonitoringandDiagnostics-DatabaseRecord%2FReplay%28diagLoggingcommand%29";
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
 
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
@@ -473,9 +461,6 @@ public:
         help << "drop a collection\n{drop : <collectionName>}";
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
 
     virtual bool run(OperationContext* txn,
                      const string& dbname,
@@ -513,9 +498,6 @@ public:
         return false;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
 
     virtual void help(stringstream& help) const {
         help << "create a collection explicitly\n"
@@ -571,9 +553,6 @@ public:
         help << " example: { filemd5 : ObjectId(aaaaaaa) , root : \"fs\" }";
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
         std::string collectionName = cmdObj.getStringField("root");
@@ -745,9 +724,6 @@ public:
     virtual bool slaveOk() const {
         return true;
     }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual void help(stringstream& help) const {
         help << "determine data size for a set of data in a certain range"
                 "\nexample: { dataSize:\"blog.posts\", keyPattern:{x:1}, min:{x:10}, max:{x:55} }"
@@ -894,9 +870,6 @@ public:
     virtual bool slaveOk() const {
         return true;
     }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual void help(stringstream& help) const {
         help
             << "{ collStats:\"blog.posts\" , scale : 1 } scale divides sizes e.g. for KB use 1024\n"
@@ -1004,9 +977,6 @@ public:
     virtual bool slaveOk() const {
         return false;
     }
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
     virtual void help(stringstream& help) const {
         help << "Sets collection options.\n"
                 "Example: { collMod: 'foo', usePowerOf2Sizes:true }\n"
@@ -1039,9 +1009,6 @@ public:
 
     virtual bool slaveOk() const {
         return true;
-    }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
     }
     virtual void help(stringstream& help) const {
         help << "Get stats on a database. Not instantaneous. Slower for databases with large "
@@ -1130,9 +1097,6 @@ public:
     virtual bool slaveOk() const {
         return true;
     }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual void help(stringstream& help) const {
         help << "{whatsmyuri:1}";
     }
@@ -1156,9 +1120,6 @@ public:
 
     virtual bool slaveOk() const {
         return true;
-    }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
     }
     virtual Status checkAuthForCommand(ClientBasic* client,
                                        const std::string& dbname,

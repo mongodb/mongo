@@ -1286,9 +1286,6 @@ public:
         help << "http://dochub.mongodb.org/core/mapreduce";
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
@@ -1589,9 +1586,6 @@ public:
     }
     virtual bool slaveOverrideOk() const {
         return true;
-    }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,

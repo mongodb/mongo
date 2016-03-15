@@ -67,9 +67,6 @@ public:
     CmdServerStatus()
         : Command("serverStatus", true), _started(curTimeMillis64()), _runCalled(false) {}
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual bool slaveOk() const {
         return true;
     }

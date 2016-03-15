@@ -61,9 +61,6 @@ public:
         helpOut << "v3.0 disallowed internal command, present for compatibility only";
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     //
     // Same as v2.6 settings

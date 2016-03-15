@@ -69,9 +69,6 @@ public:
         return true;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     virtual bool adminOnly() const {
         return true;

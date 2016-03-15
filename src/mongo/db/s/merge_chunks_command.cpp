@@ -79,9 +79,6 @@ public:
     virtual bool slaveOk() const {
         return false;
     }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     // Required
     static BSONField<string> nsField;

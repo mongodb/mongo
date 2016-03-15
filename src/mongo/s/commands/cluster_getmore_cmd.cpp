@@ -50,9 +50,6 @@ class ClusterGetMoreCmd final : public Command {
 public:
     ClusterGetMoreCmd() : Command("getMore") {}
 
-    bool isWriteCommandForConfigServer() const final {
-        return false;
-    }
 
     bool slaveOk() const final {
         return true;

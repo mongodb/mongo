@@ -144,9 +144,6 @@ bool IndexFilterCommand::run(OperationContext* txn,
     return true;
 }
 
-bool IndexFilterCommand::isWriteCommandForConfigServer() const {
-    return false;
-}
 
 bool IndexFilterCommand::slaveOk() const {
     return false;

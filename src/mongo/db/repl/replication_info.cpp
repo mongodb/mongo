@@ -210,9 +210,6 @@ public:
                 "--slave in simple master/slave setups.\n";
         help << "{ isMaster : 1 }";
     }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {}  // No auth required

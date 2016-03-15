@@ -75,9 +75,6 @@ public:
     virtual bool slaveOverrideOk() const {
         return true;
     }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     bool supportsReadConcern() const final {
         return true;
     }

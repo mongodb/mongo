@@ -56,9 +56,6 @@ class BasicDriverHelper : public Command {
 public:
     BasicDriverHelper(const char* name) : Command(name) {}
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual bool slaveOk() const {
         return true;
     }

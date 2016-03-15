@@ -137,9 +137,6 @@ public:
     }
 
     // all grid commands are designed not to lock
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
 protected:
     bool passthrough(OperationContext* txn,
@@ -1526,9 +1523,6 @@ public:
 
     virtual bool slaveOk() const {
         return true;
-    }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
     }
     virtual Status checkAuthForCommand(ClientBasic* client,
                                        const std::string& dbname,

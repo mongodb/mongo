@@ -41,9 +41,6 @@ class KillCursorsCmdBase : public Command {
 public:
     KillCursorsCmdBase() : Command("killCursors") {}
 
-    bool isWriteCommandForConfigServer() const final {
-        return false;
-    }
 
     bool slaveOk() const final {
         return true;

@@ -69,9 +69,6 @@ public:
     virtual bool slaveOk() const {
         return false;
     }
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
 
     ApplyOpsCmd() : Command("applyOps") {}
     virtual void help(stringstream& help) const {

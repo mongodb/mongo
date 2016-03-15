@@ -73,9 +73,6 @@ class FindCmd : public Command {
 public:
     FindCmd() : Command("find") {}
 
-    bool isWriteCommandForConfigServer() const override {
-        return false;
-    }
 
     bool slaveOk() const override {
         return false;

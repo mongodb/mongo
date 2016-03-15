@@ -151,9 +151,6 @@ public:
     virtual bool adminOnly() const {
         return false;
     }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     virtual void help(stringstream& help) const {
         help << "list collections for this db";

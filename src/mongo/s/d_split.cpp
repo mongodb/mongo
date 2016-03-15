@@ -79,9 +79,6 @@ public:
     virtual bool slaveOk() const {
         return false;
     }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual void help(stringstream& help) const {
         help << "Internal command.\n";
     }
@@ -232,9 +229,6 @@ class SplitVector : public Command {
 public:
     SplitVector() : Command("splitVector", false) {}
     virtual bool slaveOk() const {
-        return false;
-    }
-    virtual bool isWriteCommandForConfigServer() const {
         return false;
     }
     virtual void help(stringstream& help) const {
@@ -554,9 +548,6 @@ public:
     }
     virtual bool adminOnly() const {
         return true;
-    }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
     }
     virtual Status checkAuthForCommand(ClientBasic* client,
                                        const std::string& dbname,

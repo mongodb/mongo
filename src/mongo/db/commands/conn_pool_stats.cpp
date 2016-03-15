@@ -52,9 +52,6 @@ public:
         help << "stats about connections between servers in a replica set or sharded cluster.";
     }
 
-    bool isWriteCommandForConfigServer() const override {
-        return false;
-    }
 
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,

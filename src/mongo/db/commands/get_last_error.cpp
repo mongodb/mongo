@@ -56,9 +56,6 @@ using std::stringstream;
 */
 class CmdResetError : public Command {
 public:
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual bool slaveOk() const {
         return true;
     }
@@ -83,9 +80,6 @@ public:
 class CmdGetLastError : public Command {
 public:
     CmdGetLastError() : Command("getLastError", false, "getlasterror") {}
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual bool slaveOk() const {
         return true;
     }
@@ -289,9 +283,6 @@ public:
 
 class CmdGetPrevError : public Command {
 public:
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual void help(stringstream& help) const {
         help << "check for errors since last reseterror commandcal";
     }

@@ -56,9 +56,6 @@ class CmdExplain : public Command {
 public:
     CmdExplain() : Command("explain") {}
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     /**
      * Running an explain on a secondary requires explicitly setting slaveOk.

@@ -54,9 +54,6 @@ using std::stringstream;
  */
 class CmdCount : public Command {
 public:
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     CmdCount() : Command("count") {}
     virtual bool slaveOk() const {
         // ok on --slave setups

@@ -62,9 +62,6 @@ class GeoHaystackSearchCommand : public Command {
 public:
     GeoHaystackSearchCommand() : Command("geoSearch") {}
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     bool slaveOk() const {
         return true;
     }

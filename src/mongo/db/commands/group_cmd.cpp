@@ -52,10 +52,6 @@ public:
     GroupCommand() : Command("group") {}
 
 private:
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
-
     virtual bool maintenanceOk() const {
         return false;
     }

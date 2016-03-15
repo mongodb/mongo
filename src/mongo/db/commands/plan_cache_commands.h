@@ -64,8 +64,6 @@ public:
              std::string& errmsg,
              BSONObjBuilder& result);
 
-    virtual bool isWriteCommandForConfigServer() const;
-
     virtual bool slaveOk() const;
 
     virtual bool slaveOverrideOk() const;

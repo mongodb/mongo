@@ -63,9 +63,6 @@ public:
     bool adminOnly() const override {
         return false;
     }
-    bool isWriteCommandForConfigServer() const override {
-        return false;
-    }
 
     // The StringData contains the shard ident.
     // This can be used to create an instance of Shard

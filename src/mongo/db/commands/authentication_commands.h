@@ -43,9 +43,6 @@ public:
     virtual bool slaveOk() const {
         return true;
     }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual void help(std::stringstream& ss) const {
         ss << "internal";
     }

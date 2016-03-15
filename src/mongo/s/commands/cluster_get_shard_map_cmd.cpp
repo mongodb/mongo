@@ -42,9 +42,6 @@ class CmdGetShardMap : public Command {
 public:
     CmdGetShardMap() : Command("getShardMap") {}
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     virtual bool slaveOk() const {
         return true;

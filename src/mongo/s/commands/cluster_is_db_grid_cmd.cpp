@@ -38,9 +38,6 @@ class IsDbGridCmd : public Command {
 public:
     IsDbGridCmd() : Command("isdbgrid") {}
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     virtual bool slaveOk() const {
         return true;

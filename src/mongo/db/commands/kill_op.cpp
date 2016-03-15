@@ -49,9 +49,6 @@ class KillOpCommand : public Command {
 public:
     KillOpCommand() : Command("killOp") {}
 
-    bool isWriteCommandForConfigServer() const final {
-        return false;
-    }
 
     bool slaveOk() const final {
         return true;

@@ -608,9 +608,6 @@ public:
         return false;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
 
     virtual void help(stringstream& ss) const {
         ss << "Adds a user to the system" << endl;
@@ -753,9 +750,6 @@ public:
         return false;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
 
     virtual void help(stringstream& ss) const {
         ss << "Used to update a user, for example to change its password" << endl;
@@ -870,9 +864,6 @@ public:
         return false;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
 
     virtual void help(stringstream& ss) const {
         ss << "Drops a single user." << endl;
@@ -942,9 +933,6 @@ public:
         return false;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
 
     virtual void help(stringstream& ss) const {
         ss << "Drops all users for a single database." << endl;
@@ -1004,9 +992,6 @@ public:
         return false;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
 
     virtual void help(stringstream& ss) const {
         ss << "Grants roles to a user." << endl;
@@ -1079,9 +1064,6 @@ public:
         return false;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
 
     virtual void help(stringstream& ss) const {
         ss << "Revokes roles from a user." << endl;
@@ -1156,9 +1138,6 @@ public:
         return true;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     CmdUsersInfo() : Command("usersInfo") {}
 
@@ -1310,9 +1289,6 @@ public:
         return false;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
 
     virtual void help(stringstream& ss) const {
         ss << "Adds a role to the system" << endl;
@@ -1424,9 +1400,6 @@ public:
         return false;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
 
     virtual void help(stringstream& ss) const {
         ss << "Used to update a role" << endl;
@@ -1523,9 +1496,6 @@ public:
         return false;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
 
     virtual void help(stringstream& ss) const {
         ss << "Grants privileges to a role" << endl;
@@ -1631,9 +1601,6 @@ public:
         return false;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
 
     virtual void help(stringstream& ss) const {
         ss << "Revokes privileges from a role" << endl;
@@ -1747,9 +1714,6 @@ public:
         return false;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
 
     virtual void help(stringstream& ss) const {
         ss << "Grants roles to another role." << endl;
@@ -1842,9 +1806,6 @@ public:
         return false;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
 
     virtual void help(stringstream& ss) const {
         ss << "Revokes roles from another role." << endl;
@@ -1931,9 +1892,6 @@ public:
         return false;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
 
     virtual void help(stringstream& ss) const {
         ss << "Drops a single role.  Before deleting the role completely it must remove it "
@@ -2085,9 +2043,6 @@ public:
         return false;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
 
     virtual void help(stringstream& ss) const {
         ss << "Drops all roles from the given database.  Before deleting the roles completely "
@@ -2208,9 +2163,6 @@ public:
         return true;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     CmdRolesInfo() : Command("rolesInfo") {}
 
@@ -2283,9 +2235,6 @@ public:
         return true;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     CmdInvalidateUserCache() : Command("invalidateUserCache") {}
 
@@ -2322,9 +2271,6 @@ public:
         return true;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     CmdGetCacheGeneration() : Command("_getUserCacheGeneration") {}
 
@@ -2369,9 +2315,6 @@ public:
         return false;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
 
     virtual bool adminOnly() const {
         return true;
@@ -2954,9 +2897,6 @@ public:
         return true;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
 
     virtual void help(stringstream& ss) const {
         ss << "Upgrades the auth data storage schema";

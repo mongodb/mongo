@@ -79,9 +79,6 @@ class GetMoreCmd : public Command {
 public:
     GetMoreCmd() : Command("getMore") {}
 
-    bool isWriteCommandForConfigServer() const override {
-        return false;
-    }
 
     bool slaveOk() const override {
         return true;

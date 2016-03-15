@@ -160,9 +160,6 @@ public:
              << "Evaluate javascript at the server.\n"
              << "http://dochub.mongodb.org/core/serversidecodeexecution";
     }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {

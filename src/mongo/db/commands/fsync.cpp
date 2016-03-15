@@ -103,9 +103,6 @@ public:
         locked = false;
         pendingUnlock = false;
     }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual bool slaveOk() const {
         return true;
     }
@@ -187,9 +184,6 @@ class FSyncUnlockCommand : public Command {
 public:
     FSyncUnlockCommand() : Command("fsyncUnlock") {}
 
-    bool isWriteCommandForConfigServer() const override {
-        return false;
-    }
 
     bool slaveOk() const override {
         return true;

@@ -188,9 +188,6 @@ public:
         return Status::OK();
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     // Input
     static BSONField<string> nsField;

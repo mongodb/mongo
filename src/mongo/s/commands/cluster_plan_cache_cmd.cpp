@@ -61,9 +61,6 @@ public:
         return true;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     void help(stringstream& ss) const {
         ss << _helpText;

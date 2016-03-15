@@ -44,9 +44,6 @@ class CmdShardingResetError : public Command {
 public:
     CmdShardingResetError() : Command("resetError", false, "reseterror") {}
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     virtual bool slaveOk() const {
         return true;

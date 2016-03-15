@@ -91,9 +91,6 @@ bool WriteCmd::slaveOk() const {
     return false;
 }
 
-bool WriteCmd::isWriteCommandForConfigServer() const {
-    return false;
-}
 
 Status WriteCmd::checkAuthForCommand(ClientBasic* client,
                                      const std::string& dbname,

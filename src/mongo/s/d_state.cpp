@@ -65,9 +65,6 @@ public:
         help << "internal";
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     virtual bool adminOnly() const {
         return true;
@@ -105,9 +102,6 @@ public:
         help << " example: { getShardVersion : 'alleyinsider.foo'  } ";
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     virtual bool slaveOk() const {
         return false;
@@ -188,9 +182,6 @@ class ShardingStateCmd : public Command {
 public:
     ShardingStateCmd() : Command("shardingState") {}
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
 
     virtual bool slaveOk() const {
         return false;

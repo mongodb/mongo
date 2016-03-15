@@ -52,9 +52,6 @@ public:
     virtual bool adminOnly() const {
         return true;
     }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual void help(std::stringstream& help) const {
         help << "usage by collection, in micros ";
     }

@@ -70,9 +70,6 @@ public:
         return true;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
 
     virtual void help(std::stringstream& help) const {
         help << " example: { moveprimary : 'foo' , to : 'localhost:9999' }";

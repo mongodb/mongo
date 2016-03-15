@@ -63,9 +63,6 @@ class Geo2dFindNearCmd : public Command {
 public:
     Geo2dFindNearCmd() : Command("geoNear") {}
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     bool slaveOk() const {
         return true;
     }

@@ -154,9 +154,6 @@ public:
     PipelineCommand() : Command(Pipeline::commandName) {}  // command is called "aggregate"
 
     // Locks are managed manually, in particular by DocumentSourceCursor.
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual bool slaveOk() const {
         return false;
     }

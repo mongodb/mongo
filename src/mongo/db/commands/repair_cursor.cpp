@@ -48,9 +48,6 @@ class RepairCursorCmd : public Command {
 public:
     RepairCursorCmd() : Command("repairCursor") {}
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
     virtual bool slaveOk() const {
         return true;
     }

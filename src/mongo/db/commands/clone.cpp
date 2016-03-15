@@ -59,9 +59,6 @@ public:
         return false;
     }
 
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
 
     virtual void help(stringstream& help) const {
         help << "clone this database from an instance of the db on another host\n";
