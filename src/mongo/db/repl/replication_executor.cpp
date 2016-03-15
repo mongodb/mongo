@@ -274,6 +274,7 @@ StatusWith<ReplicationExecutor::CallbackHandle> ReplicationExecutor::onEvent(
         queue = &event->_waiters;
     } else {
         queue = &_readyQueue;
+        _networkInterface->signalWorkAvailable();
     }
     return enqueueWork_inlock(queue, work);
 }
@@ -382,6 +383,7 @@ StatusWith<ReplicationExecutor::CallbackHandle> ReplicationExecutor::scheduleWor
         ++insertBefore;
     _sleepersQueue.splice(insertBefore, temp, temp.begin());
     ++_counterScheduledWorkAts;
+    _networkInterface->signalWorkAvailable();
     return cbHandle;
 }
 
