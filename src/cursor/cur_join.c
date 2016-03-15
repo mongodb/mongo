@@ -27,12 +27,12 @@ __curjoin_entry_iter_init(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	const char *def_cfg[] = { WT_CONFIG_BASE(
 	    session, WT_SESSION_open_cursor), NULL };
 	const char *urimain, **config;
-	char *mainbuf, *urimin;
+	char *mainbuf, *uri;
 	WT_CURSOR_JOIN_ITER *iter;
 	size_t size;
 
 	iter = NULL;
-	mainbuf = urimin = NULL;
+	mainbuf = uri = NULL;
 	to_dup = entry->ends[0].cursor;
 
 	if (F_ISSET((WT_CURSOR *)cjoin, WT_CURSTD_RAW))
@@ -40,10 +40,10 @@ __curjoin_entry_iter_init(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	else
 		config = &def_cfg[0];
 
+	size = strlen(to_dup->internal_uri) + 3;
+	WT_ERR(__wt_calloc(session, size, 1, &uri));
+	snprintf(uri, size, "%s()", to_dup->internal_uri);
 	urimain = cjoin->table->name;
-	size = strlen(to_dup->uri) + 3;
-	WT_ERR(__wt_calloc(session, size, 1, &urimin));
-	snprintf(urimin, size, "%s()", to_dup->uri);
 	if (cjoin->projection != NULL) {
 		size = strlen(urimain) + strlen(cjoin->projection) + 1;
 		WT_ERR(__wt_calloc(session, size, 1, &mainbuf));
@@ -52,7 +52,7 @@ __curjoin_entry_iter_init(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	}
 
 	WT_ERR(__wt_calloc_one(session, &iter));
-	WT_ERR(__wt_open_cursor(session, urimin, (WT_CURSOR *)cjoin, config,
+	WT_ERR(__wt_open_cursor(session, uri, (WT_CURSOR *)cjoin, config,
 	    &iter->cursor));
 	WT_ERR(__wt_cursor_dup_position(to_dup, iter->cursor));
 	WT_ERR(__wt_open_cursor(session, urimain, (WT_CURSOR *)cjoin, config,
@@ -69,7 +69,7 @@ __curjoin_entry_iter_init(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 err:		__wt_free(session, iter);
 	}
 	__wt_free(session, mainbuf);
-	__wt_free(session, urimin);
+	__wt_free(session, uri);
 	return (ret);
 }
 
@@ -332,8 +332,7 @@ __curjoin_init_bloom(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 				goto done;
 			WT_ERR(ret);
 		} else
-			/* There should not be any other cases */
-			WT_ASSERT(session, false);
+			WT_ERR(__wt_illegal_value(session, NULL));
 	}
 	collator = (entry->index == NULL) ? NULL : entry->index->collator;
 	while (ret == 0) {
