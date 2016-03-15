@@ -172,7 +172,8 @@ main(int argc, char *argv[])
 	 * Allocate arrays for connection handles, sessions, statistics
 	 * cursors and, if needed, data cursors.
 	 */
-	if ((connections = calloc((size_t)dbs, sizeof(WT_CONNECTION *))) == NULL)
+	if ((connections = calloc(
+	    (size_t)dbs, sizeof(WT_CONNECTION *))) == NULL)
 		testutil_die(ENOMEM, "connection array malloc");
 	if ((sessions = calloc(
 	    (size_t)dbs, sizeof(WT_SESSION *))) == NULL)
