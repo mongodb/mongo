@@ -32,6 +32,8 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/db/query/collation/collation_index_key.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -65,21 +67,6 @@ BtreeKeyGenerator::BtreeKeyGenerator(std::vector<const char*> fieldNames,
 void BtreeKeyGenerator::getKeys(const BSONObj& obj,
                                 BSONObjSet* keys,
                                 MultikeyPaths* multikeyPaths) const {
-    if (_isIdIndex) {
-        // we special case for speed
-        BSONElement e = obj["_id"];
-        if (e.eoo()) {
-            keys->insert(_nullKey);
-        } else {
-            int size = e.size() + 5 /* bson over head*/ - 3 /* remove _id string */;
-            BSONObjBuilder b(size);
-            b.appendAs(e, "");
-            keys->insert(b.obj());
-            invariant(keys->begin()->objsize() == size);
-        }
-        return;
-    }
-
     // '_fieldNames' and '_fixed' are passed by value so that they can be mutated as part of the
     // getKeys call.  :|
     getKeysImpl(_fieldNames, _fixed, obj, keys, multikeyPaths);
@@ -104,6 +91,21 @@ void BtreeKeyGeneratorV0::getKeysImpl(std::vector<const char*> fieldNames,
                                       const BSONObj& obj,
                                       BSONObjSet* keys,
                                       MultikeyPaths* multikeyPaths) const {
+    if (_isIdIndex) {
+        // we special case for speed
+        BSONElement e = obj["_id"];
+        if (e.eoo()) {
+            keys->insert(_nullKey);
+        } else {
+            int size = e.size() + 5 /* bson over head*/ - 3 /* remove _id string */;
+            BSONObjBuilder b(size);
+            b.appendAs(e, "");
+            keys->insert(b.obj());
+            invariant(keys->begin()->objsize() == size);
+        }
+        return;
+    }
+
     BSONElement arrElt;
     unsigned arrIdx = ~0;
     unsigned numNotFound = 0;
@@ -216,8 +218,11 @@ void BtreeKeyGeneratorV0::getKeysImpl(std::vector<const char*> fieldNames,
 
 BtreeKeyGeneratorV1::BtreeKeyGeneratorV1(std::vector<const char*> fieldNames,
                                          std::vector<BSONElement> fixed,
-                                         bool isSparse)
-    : BtreeKeyGenerator(fieldNames, fixed, isSparse), _emptyPositionalInfo(fieldNames.size()) {
+                                         bool isSparse,
+                                         CollatorInterface* collator)
+    : BtreeKeyGenerator(fieldNames, fixed, isSparse),
+      _emptyPositionalInfo(fieldNames.size()),
+      _collator(collator) {
     for (const char* fieldName : fieldNames) {
         size_t pathLength = FieldRef{fieldName}.numParts();
         invariant(pathLength > 0);
@@ -287,6 +292,23 @@ void BtreeKeyGeneratorV1::getKeysImpl(std::vector<const char*> fieldNames,
                                       const BSONObj& obj,
                                       BSONObjSet* keys,
                                       MultikeyPaths* multikeyPaths) const {
+    if (_isIdIndex) {
+        // we special case for speed
+        BSONElement e = obj["_id"];
+        if (e.eoo()) {
+            keys->insert(_nullKey);
+        } else {
+            BSONObjBuilder b;
+            CollationIndexKey::collationAwareIndexKeyAppend(e, _collator, &b);
+            keys->insert(b.obj());
+        }
+
+        // The {_id: 1} index can never be multikey because the _id field isn't allowed to be an
+        // array value. We therefore always set 'multikeyPaths' as [ [ ] ].
+        multikeyPaths->resize(1);
+        return;
+    }
+
     if (multikeyPaths) {
         multikeyPaths->resize(fieldNames.size());
     }
@@ -371,7 +393,7 @@ void BtreeKeyGeneratorV1::getKeysImplWithArray(
         }
         BSONObjBuilder b(_sizeTracker);
         for (std::vector<BSONElement>::iterator i = fixed.begin(); i != fixed.end(); ++i) {
-            b.appendAs(*i, "");
+            CollationIndexKey::collationAwareIndexKeyAppend(*i, _collator, &b);
         }
         keys->insert(b.obj());
     } else if (arrElt.embeddedObject().firstElement().eoo()) {

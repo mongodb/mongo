@@ -55,7 +55,9 @@ BtreeAccessMethod::BtreeAccessMethod(IndexCatalogEntry* btreeState, SortedDataIn
     if (0 == _descriptor->version()) {
         _keyGenerator.reset(new BtreeKeyGeneratorV0(fieldNames, fixed, _descriptor->isSparse()));
     } else if (1 == _descriptor->version()) {
-        _keyGenerator.reset(new BtreeKeyGeneratorV1(fieldNames, fixed, _descriptor->isSparse()));
+        // TODO SERVER-23092: change nullptr to the appropriate CollatorInterface*.
+        _keyGenerator.reset(
+            new BtreeKeyGeneratorV1(fieldNames, fixed, _descriptor->isSparse(), nullptr));
     } else {
         massert(16745, "Invalid index version for key generation.", false);
     }
