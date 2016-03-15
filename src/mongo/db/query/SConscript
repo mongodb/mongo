@@ -305,6 +305,7 @@ env.CppUnitTest(
         "planner_ixselect_test.cpp"
     ],
     LIBDEPS=[
+        "collation/collator_interface_mock",
         "query_planner",
     ],
 )

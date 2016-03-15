@@ -39,6 +39,7 @@
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_text.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/query_planner_common.h"
@@ -70,6 +71,57 @@ static bool twoDWontWrap(const Circle& circle, const IndexEntry& index) {
     bool ret = circle.center.x + xscandist < 180 && circle.center.x - xscandist > -180 &&
         circle.center.y + yscandist < 90 && circle.center.y - yscandist > -90;
     return ret;
+}
+
+static bool collatorsMatch(const CollatorInterface* lhs, const CollatorInterface* rhs) {
+    if (lhs == nullptr && rhs == nullptr) {
+        return true;
+    }
+    if (lhs == nullptr || rhs == nullptr) {
+        return false;
+    }
+    return (*lhs == *rhs);
+}
+
+// Checks whether 'node' contains any string comparison. We assume 'node' is bounds-generating or is
+// a recursive child of a bounds-generating node, i.e. it does not contain AND, OR,
+// ELEM_MATCH_OBJECT, or NOR.
+static bool boundsGeneratingNodeContainsStringComparison(MatchExpression* node) {
+    invariant(node->matchType() != MatchExpression::AND &&
+              node->matchType() != MatchExpression::OR &&
+              node->matchType() != MatchExpression::NOR &&
+              node->matchType() != MatchExpression::ELEM_MATCH_OBJECT);
+
+    if (Indexability::isEqualityOrInequality(node)) {
+        const ComparisonMatchExpression* expr = static_cast<const ComparisonMatchExpression*>(node);
+        return expr->getData().type() == BSONType::String;
+    }
+
+    if (node->matchType() == MatchExpression::MATCH_IN) {
+        const InMatchExpression* expr = static_cast<const InMatchExpression*>(node);
+        for (auto const& equality : expr->getData().equalities()) {
+            if (equality.type() == BSONType::String) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    if (node->matchType() == MatchExpression::NOT) {
+        invariant(node->numChildren() == 1U);
+        return boundsGeneratingNodeContainsStringComparison(node->getChild(0));
+    }
+
+    if (node->matchType() == MatchExpression::ELEM_MATCH_VALUE) {
+        for (size_t i = 0; i < node->numChildren(); ++i) {
+            if (boundsGeneratingNodeContainsStringComparison(node->getChild(i))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    return false;
 }
 
 // static
@@ -123,7 +175,14 @@ void QueryPlannerIXSelect::findRelevantIndices(const unordered_set<string>& fiel
 // static
 bool QueryPlannerIXSelect::compatible(const BSONElement& elt,
                                       const IndexEntry& index,
-                                      MatchExpression* node) {
+                                      MatchExpression* node,
+                                      const CollatorInterface* collator) {
+    // String comparisons require the collators to match.
+    if (boundsGeneratingNodeContainsStringComparison(node) &&
+        !collatorsMatch(collator, index.collator)) {
+        return false;
+    }
+
     // Historically one could create indices with any particular value for the index spec,
     // including values that now indicate a special index.  As such we have to make sure the
     // index type wasn't overridden before we pay attention to the string in the index key
@@ -306,7 +365,8 @@ bool QueryPlannerIXSelect::compatible(const BSONElement& elt,
 // static
 void QueryPlannerIXSelect::rateIndices(MatchExpression* node,
                                        string prefix,
-                                       const vector<IndexEntry>& indices) {
+                                       const vector<IndexEntry>& indices,
+                                       const CollatorInterface* collator) {
     // Do not traverse tree beyond logical NOR node
     MatchExpression::MatchType exprtype = node->matchType();
     if (exprtype == MatchExpression::NOR) {
@@ -332,12 +392,12 @@ void QueryPlannerIXSelect::rateIndices(MatchExpression* node,
         for (size_t i = 0; i < indices.size(); ++i) {
             BSONObjIterator it(indices[i].keyPattern);
             BSONElement elt = it.next();
-            if (elt.fieldName() == fullPath && compatible(elt, indices[i], node)) {
+            if (elt.fieldName() == fullPath && compatible(elt, indices[i], node, collator)) {
                 rt->first.push_back(i);
             }
             while (it.more()) {
                 elt = it.next();
-                if (elt.fieldName() == fullPath && compatible(elt, indices[i], node)) {
+                if (elt.fieldName() == fullPath && compatible(elt, indices[i], node, collator)) {
                     rt->notFirst.push_back(i);
                 }
             }
@@ -356,11 +416,11 @@ void QueryPlannerIXSelect::rateIndices(MatchExpression* node,
             prefix += node->path().toString() + ".";
         }
         for (size_t i = 0; i < node->numChildren(); ++i) {
-            rateIndices(node->getChild(i), prefix, indices);
+            rateIndices(node->getChild(i), prefix, indices, collator);
         }
     } else if (node->isLogical()) {
         for (size_t i = 0; i < node->numChildren(); ++i) {
-            rateIndices(node->getChild(i), prefix, indices);
+            rateIndices(node->getChild(i), prefix, indices, collator);
         }
     }
 }
