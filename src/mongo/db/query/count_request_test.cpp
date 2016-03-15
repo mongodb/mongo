@@ -98,7 +98,7 @@ TEST(CountRequest, FailParseMissingNS) {
     const auto countRequestStatus =
         CountRequest::parseFromBSON("TestDB", BSON("query" << BSON("a" << BSON("$gte" << 11))));
 
-    ASSERT_EQUALS(countRequestStatus.getStatus(), ErrorCodes::BadValue);
+    ASSERT_EQUALS(countRequestStatus.getStatus(), ErrorCodes::InvalidNamespace);
 }
 
 TEST(CountRequest, FailParseBadSkipValue) {
@@ -113,7 +113,7 @@ TEST(CountRequest, FailParseBadSkipValue) {
 }
 
 TEST(CountRequest, ToBSON) {
-    CountRequest countRequest("TestDB.TestColl", BSON("a" << BSON("$gte" << 11)));
+    CountRequest countRequest(NamespaceString("TestDB.TestColl"), BSON("a" << BSON("$gte" << 11)));
     countRequest.setLimit(100);
     countRequest.setSkip(1000);
     countRequest.setHint(BSON("b" << 5));

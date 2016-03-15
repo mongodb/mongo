@@ -234,7 +234,7 @@ protected:
 class QueryStageCountNoChangeDuringYield : public CountStageTest {
 public:
     void run() {
-        CountRequest request(ns(), BSON("x" << LT << kDocuments / 2));
+        CountRequest request(NamespaceString(ns()), BSON("x" << LT << kDocuments / 2));
 
         testCount(request, kDocuments / 2);
         testCount(request, kDocuments / 2, true);
@@ -244,7 +244,7 @@ public:
 class QueryStageCountYieldWithSkip : public CountStageTest {
 public:
     void run() {
-        CountRequest request(ns(), BSON("x" << GTE << 0));
+        CountRequest request(NamespaceString(ns()), BSON("x" << GTE << 0));
         request.setSkip(2);
 
         testCount(request, kDocuments - 2);
@@ -255,7 +255,7 @@ public:
 class QueryStageCountYieldWithLimit : public CountStageTest {
 public:
     void run() {
-        CountRequest request(ns(), BSON("x" << GTE << 0));
+        CountRequest request(NamespaceString(ns()), BSON("x" << GTE << 0));
         request.setSkip(0);
         request.setLimit(2);
 
@@ -268,7 +268,7 @@ public:
 class QueryStageCountInsertDuringYield : public CountStageTest {
 public:
     void run() {
-        CountRequest request(ns(), BSON("x" << 1));
+        CountRequest request(NamespaceString(ns()), BSON("x" << 1));
 
         testCount(request, kInterjections + 1);
         testCount(request, kInterjections + 1, true);
@@ -285,7 +285,7 @@ public:
     void run() {
         // expected count would be 99 but we delete the second record
         // after doing the first unit of work
-        CountRequest request(ns(), BSON("x" << GTE << 1));
+        CountRequest request(NamespaceString(ns()), BSON("x" << GTE << 1));
 
         testCount(request, kDocuments - 2);
         testCount(request, kDocuments - 2, true);
@@ -312,7 +312,7 @@ public:
     void run() {
         // expected count would be kDocuments-2 but we update the first and second records
         // after doing the first unit of work so they wind up getting counted later on
-        CountRequest request(ns(), BSON("x" << GTE << 2));
+        CountRequest request(NamespaceString(ns()), BSON("x" << GTE << 2));
 
         testCount(request, kDocuments);
         testCount(request, kDocuments, true);
@@ -335,7 +335,7 @@ public:
 class QueryStageCountMultiKeyDuringYield : public CountStageTest {
 public:
     void run() {
-        CountRequest request(ns(), BSON("x" << 1));
+        CountRequest request(NamespaceString(ns()), BSON("x" << 1));
         testCount(request, kDocuments + 1, true);  // only applies to indexed case
     }
 
