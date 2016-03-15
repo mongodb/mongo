@@ -458,7 +458,7 @@ long long Helpers::removeRange(OperationContext* txn,
                 warning(LogComponent::kSharding) << "replication to secondaries for removeRange at "
                                                     "least 60 seconds behind";
             } else {
-                massertStatusOK(replStatus.status);
+                uassertStatusOK(replStatus.status);
             }
             millisWaitingForReplication += replStatus.duration;
         }
