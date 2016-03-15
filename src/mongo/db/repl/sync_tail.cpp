@@ -56,6 +56,7 @@
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/minvalid.h"
+#include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -432,7 +433,7 @@ void prefetchOp(const BSONObj& op) {
 }
 
 // Doles out all the work to the reader pool threads and waits for them to complete
-void prefetchOps(const std::deque<OplogEntry>& ops, OldThreadPool* prefetcherPool) {
+void prefetchOps(const MultiApplier::Operations& ops, OldThreadPool* prefetcherPool) {
     invariant(prefetcherPool);
     for (auto&& op : ops) {
         prefetcherPool->schedule(&prefetchOp, op.raw);
@@ -441,16 +442,13 @@ void prefetchOps(const std::deque<OplogEntry>& ops, OldThreadPool* prefetcherPoo
 }
 
 // Doles out all the work to the writer pool threads and waits for them to complete
-void applyOps(const std::vector<std::vector<OplogEntry>>& writerVectors,
+void applyOps(const std::vector<MultiApplier::Operations>& writerVectors,
               OldThreadPool* writerPool,
-              SyncTail::MultiSyncApplyFunc func,
-              SyncTail* sync) {
+              SyncTail::MultiSyncApplyFunc func) {
     TimerHolder timer(&applyBatchStats);
-    for (std::vector<std::vector<OplogEntry>>::const_iterator it = writerVectors.begin();
-         it != writerVectors.end();
-         ++it) {
-        if (!it->empty()) {
-            writerPool->schedule(func, stdx::cref(*it), sync);
+    for (auto&& ops : writerVectors) {
+        if (!ops.empty()) {
+            writerPool->schedule(func, stdx::cref(ops));
         }
     }
 }
@@ -486,8 +484,8 @@ private:
 };
 
 void fillWriterVectors(OperationContext* txn,
-                       const std::deque<OplogEntry>& ops,
-                       std::vector<std::vector<OplogEntry>>* writerVectors) {
+                       const MultiApplier::Operations& ops,
+                       std::vector<MultiApplier::Operations>* writerVectors) {
     const bool supportsDocLocking =
         getGlobalServiceContext()->getGlobalStorageEngine()->supportsDocLocking();
     const uint32_t numWriters = writerVectors->size();
@@ -500,24 +498,12 @@ void fillWriterVectors(OperationContext* txn,
         StringMapTraits::HashedKey hashedNs(op.ns);
         uint32_t hash = hashedNs.hash();
 
-        const char* opType = op.opType.rawData();
-
         // For doc locking engines, include the _id of the document in the hash so we get
         // parallelism even if all writes are to a single collection. We can't do this for capped
         // collections because the order of inserts is a guaranteed property, unlike for normal
         // collections.
-        if (supportsDocLocking && isCrudOpType(opType) && !isCapped(txn, hashedNs)) {
-            BSONElement id;
-            switch (opType[0]) {
-                case 'u':
-                    id = op.o2.Obj()["_id"];
-                    break;
-                case 'd':
-                case 'i':
-                    id = op.o.Obj()["_id"];
-                    break;
-            }
-
+        if (supportsDocLocking && op.isCrudOpType() && !isCapped(txn, hashedNs)) {
+            BSONElement id = op.getIdElement();
             const size_t idHash = BSONElement::Hasher()(id);
             MurmurHash3_x86_32(&idHash, sizeof(idHash), hash, &hash);
         }
@@ -539,50 +525,17 @@ void fillWriterVectors(OperationContext* txn,
 // Applies a batch of oplog entries, by using a set of threads to apply the operations and then
 // writes the oplog entries to the local oplog.
 OpTime SyncTail::multiApply(OperationContext* txn, const OpQueue& ops) {
-    invariant(_applyFunc);
-
-    if (getGlobalServiceContext()->getGlobalStorageEngine()->isMmapV1()) {
-        // Use a ThreadPool to prefetch all the operations in a batch.
-        prefetchOps(ops.getDeque(), &_prefetcherPool);
-    }
-
-    std::vector<std::vector<OplogEntry>> writerVectors(replWriterThreadCount);
-
-    fillWriterVectors(txn, ops.getDeque(), &writerVectors);
-    LOG(2) << "replication batch size is " << ops.getDeque().size() << endl;
-    // We must grab this because we're going to grab write locks later.
-    // We hold this mutex the entire time we're writing; it doesn't matter
-    // because all readers are blocked anyway.
-    stdx::lock_guard<SimpleMutex> fsynclk(filesLockedFsync);
-
-    // stop all readers until we're done
-    Lock::ParallelBatchWriterMode pbwm(txn->lockState());
-
-    ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-    if (replCoord->getMemberState().primary() && !replCoord->isWaitingForApplierToDrain()) {
-        severe() << "attempting to replicate ops while primary";
-        fassertFailed(28527);
-    }
-
-    applyOps(writerVectors, &_writerPool, _applyFunc, this);
-
-    OpTime lastOpTime;
-    {
-        ON_BLOCK_EXIT([&] { _writerPool.join(); });
-        std::vector<BSONObj> raws;
-        raws.reserve(ops.getDeque().size());
-        for (auto&& op : ops.getDeque()) {
-            raws.emplace_back(op.raw);
+    auto convertToVector = ops.getDeque();
+    auto status = repl::multiApply(
+        txn, MultiApplier::Operations(convertToVector.begin(), convertToVector.end()), _applyFunc);
+    if (!status.isOK()) {
+        if (status == ErrorCodes::InterruptedAtShutdown) {
+            return OpTime();
+        } else {
+            fassertStatusOK(34437, status);
         }
-        lastOpTime = writeOpsToOplog(txn, raws);
     }
-
-    if (inShutdownStrict()) {
-        log() << "Cannot apply operations due to shutdown in progress";
-        return OpTime();
-    }
-    // We have now written all database writes and updated the oplog to match.
-    return lastOpTime;
+    return status.getValue();
 }
 
 namespace {
@@ -1013,7 +966,7 @@ static void initializeWriterThread() {
 }
 
 // This free function is used by the writer threads to apply each op
-void multiSyncApply(const std::vector<OplogEntry>& ops, SyncTail* st) {
+void multiSyncApply(const std::vector<OplogEntry>& ops) {
     std::vector<OplogEntry> oplogEntries(ops.begin(), ops.end());
     std::vector<OplogEntry*> oplogEntryPointers(oplogEntries.size());
     for (size_t i = 0; i < oplogEntries.size(); i++) {
@@ -1130,7 +1083,7 @@ void multiSyncApply(const std::vector<OplogEntry>& ops, SyncTail* st) {
 }
 
 // This free function is used by the initial sync writer threads to apply each op
-void multiInitialSyncApply(const std::vector<OplogEntry>& ops, SyncTail* st) {
+void multiInitialSyncApply(const std::vector<OplogEntry>& ops) {
     initializeWriterThread();
 
     OperationContextImpl txn;
@@ -1146,14 +1099,17 @@ void multiInitialSyncApply(const std::vector<OplogEntry>& ops, SyncTail* st) {
         try {
             const Status s = SyncTail::syncApply(&txn, it->raw, convertUpdatesToUpserts);
             if (!s.isOK()) {
+                /* TODO (dannenberg) fix this part. SERVER-23308
                 if (st->shouldRetry(&txn, it->raw)) {
                     const Status s2 = SyncTail::syncApply(&txn, it->raw, convertUpdatesToUpserts);
                     if (!s2.isOK()) {
-                        severe() << "Error applying operation (" << it->raw.toString()
-                                 << "): " << s2;
-                        fassertFailedNoTrace(15915);
-                    }
-                }
+                        */
+                severe() << "Error applying operation (" << it->raw.toString() << "): " << s;
+                fassertFailedNoTrace(15915);
+                /*
+            }
+        }
+*/
 
                 // If shouldRetry() returns false, fall through.
                 // This can happen if the document that was moved and missed by Cloner
@@ -1170,6 +1126,59 @@ void multiInitialSyncApply(const std::vector<OplogEntry>& ops, SyncTail* st) {
             fassertFailedNoTrace(16361);
         }
     }
+}
+
+StatusWith<OpTime> multiApply(OperationContext* txn,
+                              const MultiApplier::Operations& ops,
+                              MultiApplier::ApplyOperationFn applyOperation) {
+    invariant(applyOperation);
+
+    OldThreadPool workerPool(MultiApplier::kReplWriterThreadCount, "repl writer worker ");
+
+    if (getGlobalServiceContext()->getGlobalStorageEngine()->isMmapV1()) {
+        // Use a ThreadPool to prefetch all the operations in a batch.
+        prefetchOps(ops, &workerPool);
+    }
+
+    std::vector<std::vector<OplogEntry>> writerVectors(MultiApplier::kReplWriterThreadCount);
+
+    fillWriterVectors(txn, ops, &writerVectors);
+    LOG(2) << "replication batch size is " << ops.size();
+    // We must grab this because we're going to grab write locks later.
+    // We hold this mutex the entire time we're writing; it doesn't matter
+    // because all readers are blocked anyway.
+    stdx::lock_guard<SimpleMutex> fsynclk(filesLockedFsync);
+
+    // stop all readers until we're done
+    Lock::ParallelBatchWriterMode pbwm(txn->lockState());
+
+    auto replCoord = ReplicationCoordinator::get(txn);
+    if (replCoord->getMemberState().primary() && !replCoord->isWaitingForApplierToDrain()) {
+        severe() << "attempting to replicate ops while primary";
+        return {ErrorCodes::CannotApplyOplogWhilePrimary,
+                "attempting to replicate ops while primary"};
+    }
+
+    applyOps(writerVectors, &workerPool, applyOperation);
+
+    OpTime lastOpTime;
+    {
+        ON_BLOCK_EXIT([&] { workerPool.join(); });
+        std::vector<BSONObj> raws;
+        raws.reserve(ops.size());
+        for (auto&& op : ops) {
+            raws.emplace_back(op.raw);
+        }
+        lastOpTime = writeOpsToOplog(txn, raws);
+    }
+
+    if (inShutdownStrict()) {
+        log() << "Cannot apply operations due to shutdown in progress";
+        return {ErrorCodes::InterruptedAtShutdown,
+                "Cannot apply operations due to shutdown in progress"};
+    }
+    // We have now written all database writes and updated the oplog to match.
+    return lastOpTime;
 }
 
 }  // namespace repl

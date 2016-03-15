@@ -182,9 +182,12 @@ ReplicationCoordinator::Mode getReplicationModeFromSettings(const ReplSettings& 
 
 DataReplicatorOptions createDataReplicatorOptions(ReplicationCoordinator* replCoord) {
     DataReplicatorOptions options;
-    options.applierFn = [](OperationContext*, const OplogEntry&) -> Status { return Status::OK(); };
+    options.applierFn = [](const MultiApplier::Operations&) {};
+    options.multiApplyFn =
+        [](OperationContext*, const MultiApplier::Operations&, MultiApplier::ApplyOperationFn)
+            -> OpTime { return OpTime(); };
     options.rollbackFn =
-        [](OperationContext*, const OpTime&, const HostAndPort&) { return Status::OK(); };
+        [](OperationContext*, const OpTime&, const HostAndPort&) -> Status { return Status::OK(); };
     options.prepareReplSetUpdatePositionCommandFn =
         [replCoord](ReplicationCoordinator::ReplSetUpdatePositionCommandStyle commandStyle)
             -> StatusWith<BSONObj> {

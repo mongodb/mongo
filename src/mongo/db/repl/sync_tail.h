@@ -32,6 +32,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/stdx/functional.h"
@@ -52,8 +53,7 @@ class OpTime;
  */
 class SyncTail {
 public:
-    using MultiSyncApplyFunc =
-        stdx::function<void(const std::vector<OplogEntry>& ops, SyncTail* st)>;
+    using MultiSyncApplyFunc = stdx::function<void(const std::vector<OplogEntry>& ops)>;
 
     /**
      * Type of function to increment "repl.apply.ops" server status metric.
@@ -178,9 +178,23 @@ private:
     OldThreadPool _prefetcherPool;
 };
 
+/**
+ * Applies the opeartions described in the oplog entries contained in "ops" using the
+ * "applyOperation" function.
+ *
+ * Returns ErrorCode::InterruptedAtShutdown if the node enters shutdown while applying ops,
+ * ErrorCodes::CannotApplyOplogWhilePrimary if the node has become primary, and the OpTime of the
+ * final operation applied otherwise.
+ *
+ * Shared between here and MultiApplier.
+ */
+StatusWith<OpTime> multiApply(OperationContext* txn,
+                              const MultiApplier::Operations& ops,
+                              MultiApplier::ApplyOperationFn applyOperation);
+
 // These free functions are used by the thread pool workers to write ops to the db.
-void multiSyncApply(const std::vector<OplogEntry>& ops, SyncTail* st);
-void multiInitialSyncApply(const std::vector<OplogEntry>& ops, SyncTail* st);
+void multiSyncApply(const std::vector<OplogEntry>& ops);
+void multiInitialSyncApply(const std::vector<OplogEntry>& ops);
 
 }  // namespace repl
 }  // namespace mongo

@@ -62,12 +62,38 @@ bool OplogEntry::isCommand() const {
     return opType[0] == 'c';
 }
 
+bool OplogEntry::isCrudOpType() const {
+    switch (opType[0]) {
+        case 'd':
+        case 'i':
+        case 'u':
+            return opType[1] == 0;
+    }
+    return false;
+}
+
 bool OplogEntry::hasNamespace() const {
     return !ns.empty();
 }
 
 int OplogEntry::getVersion() const {
     return version.eoo() ? 1 : version.Int();
+}
+
+BSONElement OplogEntry::getIdElement() const {
+    invariant(isCrudOpType());
+    switch (opType[0]) {
+        case 'u':
+            return o2.Obj()["_id"];
+        case 'd':
+        case 'i':
+            return o.Obj()["_id"];
+    }
+    MONGO_UNREACHABLE;
+}
+
+OpTime OplogEntry::getOpTime() const {
+    return fassertStatusOK(34436, OpTime::parseFromOplogEntry(raw));
 }
 
 Seconds OplogEntry::getTimestampSecs() const {
