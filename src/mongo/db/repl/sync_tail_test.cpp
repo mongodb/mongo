@@ -124,7 +124,7 @@ void SyncTailTest::tearDown() {
 
 TEST_F(SyncTailTest, Peek) {
     BackgroundSyncMock bgsync;
-    SyncTail syncTail(&bgsync, [](const std::vector<OplogEntry>& ops, SyncTail* st) {});
+    SyncTail syncTail(&bgsync, [](const std::vector<OplogEntry>& ops) {});
     BSONObj obj;
     ASSERT_FALSE(syncTail.peek(&obj));
 }

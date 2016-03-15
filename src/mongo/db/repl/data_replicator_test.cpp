@@ -102,7 +102,11 @@ public:
      * clear/reset state
      */
     void reset() {
-        _applierFn = [](OperationContext*, const OplogEntry&) -> Status { return Status::OK(); };
+        _applierFn = [](const MultiApplier::Operations&) -> Status { return Status::OK(); };
+        _multiApplyFn = [](OperationContext*,
+                           const MultiApplier::Operations& ops,
+                           MultiApplier::ApplyOperationFn)
+                            -> StatusWith<OpTime> { return ops.back().getOpTime(); };
         _rollbackFn = [](OperationContext*, const OpTime&, const HostAndPort&)
                           -> Status { return Status::OK(); };
         _setMyLastOptime = [this](const OpTime& opTime) { _myLastOpTime = opTime; };
@@ -181,9 +185,11 @@ protected:
         launchExecutorThread();
         DataReplicatorOptions options;
         options.initialSyncRetryWait = Milliseconds(0);
-        options.applierFn = [this](OperationContext* txn, const OplogEntry& operation) {
-            return _applierFn(txn, operation);
-        };
+        options.applierFn = [this](const MultiApplier::Operations& ops) { return _applierFn(ops); };
+        options.multiApplyFn =
+            [this](OperationContext* txn,
+                   const MultiApplier::Operations& ops,
+                   MultiApplier::ApplyOperationFn func) { return _multiApplyFn(txn, ops, func); };
         options.rollbackFn = [this](OperationContext* txn,
                                     const OpTime& lastOpTimeWritten,
                                     const HostAndPort& syncSource) -> Status {
@@ -214,7 +220,8 @@ protected:
         // Executor may still invoke callback before shutting down.
     }
 
-    Applier::ApplyOperationFn _applierFn;
+    MultiApplier::ApplyOperationFn _applierFn;
+    MultiApplier::MultiApplyFn _multiApplyFn;
     DataReplicatorOptions::RollbackFn _rollbackFn;
     DataReplicatorOptions::SetMyLastOptimeFn _setMyLastOptime;
     OpTime _myLastOpTime;
@@ -452,15 +459,17 @@ TEST_F(InitialSyncTest, Complete) {
     verifySync();
 }
 
-TEST_F(InitialSyncTest, MissingDocOnApplyCompletes) {
+TEST_F(InitialSyncTest, MissingDocOnMultiApplyCompletes) {
     DataReplicatorOptions opts;
     int applyCounter{0};
-    _applierFn = [&](OperationContext* txn, const OplogEntry& op) {
-        if (++applyCounter == 1) {
-            return Status(ErrorCodes::NoMatchingDocument, "failed: missing doc.");
-        }
-        return Status::OK();
-    };
+    _multiApplyFn =
+        [&](OperationContext*, const MultiApplier::Operations& ops, MultiApplier::ApplyOperationFn)
+            -> StatusWith<OpTime> {
+                if (++applyCounter == 1) {
+                    return Status(ErrorCodes::NoMatchingDocument, "failed: missing doc.");
+                }
+                return ops.back().getOpTime();
+            };
 
     const std::vector<BSONObj> responses = {
         // get latest oplog ts
@@ -870,12 +879,14 @@ TEST_F(SteadyStateTest, PauseDataReplicator) {
     unittest::Barrier barrier(2U);
     Timestamp lastTimestampApplied;
     BSONObj operationApplied;
-    _applierFn = [&](OperationContext* txn, const OplogEntry& op) {
-        stdx::lock_guard<stdx::mutex> lock(mutex);
-        operationApplied = op.raw;
-        barrier.countDownAndWait();
-        return Status::OK();
-    };
+    _multiApplyFn =
+        [&](OperationContext*, const MultiApplier::Operations& ops, MultiApplier::ApplyOperationFn)
+            -> StatusWith<OpTime> {
+                stdx::lock_guard<stdx::mutex> lock(mutex);
+                operationApplied = ops.back().raw;
+                barrier.countDownAndWait();
+                return ops.back().getOpTime();
+            };
     DataReplicatorOptions::SetMyLastOptimeFn oldSetMyLastOptime = _setMyLastOptime;
     _setMyLastOptime = [&](const OpTime& opTime) {
         oldSetMyLastOptime(opTime);
@@ -952,12 +963,14 @@ TEST_F(SteadyStateTest, ApplyOneOperation) {
     unittest::Barrier barrier(2U);
     Timestamp lastTimestampApplied;
     BSONObj operationApplied;
-    _applierFn = [&](OperationContext* txn, const OplogEntry& op) {
-        stdx::lock_guard<stdx::mutex> lock(mutex);
-        operationApplied = op.raw;
-        barrier.countDownAndWait();
-        return Status::OK();
-    };
+    _multiApplyFn =
+        [&](OperationContext*, const MultiApplier::Operations& ops, MultiApplier::ApplyOperationFn)
+            -> StatusWith<OpTime> {
+                stdx::lock_guard<stdx::mutex> lock(mutex);
+                operationApplied = ops.back().raw;
+                barrier.countDownAndWait();
+                return ops.back().getOpTime();
+            };
     DataReplicatorOptions::SetMyLastOptimeFn oldSetMyLastOptime = _setMyLastOptime;
     _setMyLastOptime = [&](const OpTime& opTime) {
         oldSetMyLastOptime(opTime);
