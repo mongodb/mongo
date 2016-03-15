@@ -287,7 +287,8 @@ struct __wt_cursor_join_iter {
 	WT_SESSION_IMPL		*session;
 	WT_CURSOR_JOIN		*cjoin;
 	WT_CURSOR_JOIN_ENTRY	*entry;
-	WT_CURSOR		*cursor;
+	WT_CURSOR		*cursor;	/* has null projection */
+	WT_CURSOR		*main;		/* main table with projection */
 	WT_ITEM			*curkey;
 	bool			 positioned;
 	bool			 isequal;	/* advancing means we're done */
