@@ -21,9 +21,9 @@
 
     // While development, there was a bug which caused an error with $dateToString if the order of
     // %V and %G changed, so I added this test to prevent regression.
-    testOp('$dateToString', { date: new Date("1900-12-31T23:59:59Z"), format: "%V-%G"}, "01-1901")
+    testOp('$dateToString', {date: new Date("1900-12-31T23:59:59Z"), format: "%V-%G"}, "01-1901");
     // This was failing, but it shouldn't as it is the same as above, only rotated.
-    testOp('$dateToString', { date: new Date("1900-12-31T23:59:59Z"), format: "%G-%V"}, "1901-01")
+    testOp('$dateToString', {date: new Date("1900-12-31T23:59:59Z"), format: "%G-%V"}, "1901-01");
 
 
     // 1900 is special because it's devisible by 4 and by 100 but not 400 so it's not a leap year.
@@ -55,8 +55,8 @@
             1993, // Starting and ending on Friday.
             2005, // Starting and ending on Saturday.
             2017, // Starting and ending on Sunday.
-        ]
-    }
+        ],
+    };
 
     var MONDAY = 1;
     var TUESDAY = 2;
@@ -134,7 +134,7 @@
             // In leap years staring on Thursday, the birthday is in week 28, every year else it is
             // in week 27.
             if (type === 'leap' && day === THURSDAY) {
-                testOp('$isoWeek', birthday, 28)
+                testOp('$isoWeek', birthday, 28);
             } else {
                 testOp('$isoWeek', birthday, 27);
             }
@@ -265,4 +265,4 @@
         });
     });
     assert.eq(testOpCount, 485, 'Expected 485 tests to run');
-})()
+})();
