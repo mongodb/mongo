@@ -80,10 +80,10 @@ extern char *__wt_optarg;
 
 void (*custom_die)(void) = NULL;
 
-WT_CONNECTION **conn = NULL;
-WT_CURSOR **cursor = NULL;
+WT_CONNECTION **connections = NULL;
+WT_CURSOR **cursors = NULL;
 WT_RAND_STATE rnd;
-WT_SESSION **session = NULL;
+WT_SESSION **sessions = NULL;
 
 static int
 get_stat(WT_SESSION *stat_session, int stat_field, uint64_t *valuep)
@@ -124,9 +124,9 @@ run_ops(int dbs)
 		printf("Write to database %" PRIu32 "\n", db);
 		for (key = 0; key < MAX_KV; ++key) {
 			data.size = __wt_random(&rnd) % MAX_VAL;
-			cursor[db]->set_key(cursor[db], key);
-			cursor[db]->set_value(cursor[db], &data);
-			testutil_check(cursor[db]->insert(cursor[db]));
+			cursors[db]->set_key(cursors[db], key);
+			cursors[db]->set_value(cursors[db], &data);
+			testutil_check(cursors[db]->insert(cursors[db]));
 		}
 	}
 	return (0);
@@ -172,14 +172,15 @@ main(int argc, char *argv[])
 	 * Allocate arrays for connection handles, sessions, statistics
 	 * cursors and, if needed, data cursors.
 	 */
-	if ((conn = calloc((size_t)dbs, sizeof(WT_CONNECTION *))) == NULL)
+	if ((connections = calloc(
+	    (size_t)dbs, sizeof(WT_CONNECTION *))) == NULL)
 		testutil_die(ENOMEM, "connection array malloc");
-	if ((session = calloc(
+	if ((sessions = calloc(
 	    (size_t)dbs, sizeof(WT_SESSION *))) == NULL)
 		testutil_die(ENOMEM, "session array malloc");
 	if ((cond_reset_orig = calloc((size_t)dbs, sizeof(uint64_t))) == NULL)
 		testutil_die(ENOMEM, "orig stat malloc");
-	if (!idle && ((cursor = calloc(
+	if (!idle && ((cursors = calloc(
 	    (size_t)dbs, sizeof(WT_CURSOR *))) == NULL))
 		testutil_die(ENOMEM, "cursor array malloc");
 	memset(cmd, 0, sizeof(cmd));
@@ -205,14 +206,14 @@ main(int argc, char *argv[])
 		else
 			wt_cfg = WT_CONFIG2;
 		testutil_check(wiredtiger_open(
-		    hometmp, NULL, wt_cfg, &conn[i]));
-		testutil_check(conn[i]->open_session(conn[i],
-		    NULL, NULL, &session[i]));
+		    hometmp, NULL, wt_cfg, &connections[i]));
+		testutil_check(connections[i]->open_session(connections[i],
+		    NULL, NULL, &sessions[i]));
 		if (!idle) {
-			testutil_check(session[i]->create(session[i],
+			testutil_check(sessions[i]->create(sessions[i],
 			    uri, "key_format=Q,value_format=u"));
-			testutil_check(session[i]->open_cursor(session[i],
-			    uri, NULL, NULL, &cursor[i]));
+			testutil_check(sessions[i]->open_cursor(sessions[i],
+			    uri, NULL, NULL, &cursors[i]));
 		}
 	}
 
@@ -223,7 +224,7 @@ main(int argc, char *argv[])
 	 * activity during the creation period.
 	 */
 	for (i = 0; i < dbs; ++i)
-		testutil_check(get_stat(session[i],
+		testutil_check(get_stat(sessions[i],
 		    WT_STAT_CONN_COND_AUTO_WAIT_RESET, &cond_reset_orig[i]));
 	for (i = 0; i < MAX_IDLE_TIME; i += IDLE_INCR) {
 		if (!idle)
@@ -232,9 +233,9 @@ main(int argc, char *argv[])
 		sleep(IDLE_INCR);
 	}
 	for (i = 0; i < dbs; ++i) {
-		testutil_check(get_stat(session[i],
+		testutil_check(get_stat(sessions[i],
 		    WT_STAT_CONN_COND_AUTO_WAIT_RESET, &cond_reset));
-		testutil_check(get_stat(session[i],
+		testutil_check(get_stat(sessions[i],
 		    WT_STAT_CONN_COND_AUTO_WAIT, &cond_wait));
 		/*
 		 * On an idle workload there should be no resets of condition
@@ -249,8 +250,15 @@ main(int argc, char *argv[])
 			testutil_die(ERANGE, "connection %d condvar reset %"
 			    PRIu64 " exceeds 5%% of %" PRIu64,
 			    i, cond_reset, cond_wait);
-		testutil_check(conn[i]->close(conn[i], NULL));
+		testutil_check(connections[i]->close(connections[i], NULL));
 	}
+
+	/* Cleanup allocated memory. */
+	free(connections);
+	free(sessions);
+	free(cond_reset_orig);
+	if (!idle)
+		free(cursors);
 
 	return (EXIT_SUCCESS);
 }
