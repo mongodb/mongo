@@ -210,6 +210,9 @@ env.Library(
     source=[
             'oplog_entry.cpp',
     ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
 )
 
 env.Library(
