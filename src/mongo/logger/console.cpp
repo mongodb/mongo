@@ -31,6 +31,8 @@
 
 #include <iostream>
 
+#include "mongo/base/init.h"
+
 #ifdef _WIN32
 #include <io.h>
 #endif
@@ -225,10 +227,30 @@ std::ostream* getWindowsOutputStream() {
 std::ostream* windowsOutputStream = getWindowsOutputStream();
 #endif  // defined(_WIN32)
 
+// This initializer causes a Console object to be constructed, which,
+// in turn, causes std::ios_base::Init::Init to be called from a
+// single threaded context, ensuring that std::cout is prepared in a
+// single threaded context and available for all TUs. This is safe
+// even for TUs that do not include <iostream>, since either the call
+// to Console() here is the first call to that constructor, or the
+// first logging call writing via the Console will happen elsewhere in
+// the initalizer chain.
+MONGO_INITIALIZER(EnsureIosBaseInitConstructed)(InitializerContext*) {
+    Console();
+    return Status::OK();
+}
+
 }  // namespace
 
 Console::Console() : _consoleLock() {
-    const std::ios_base::Init initializeCout;
+    // Don't get clever and make this non-static. At least when using
+    // libc++, ios::base::Init::Init is not thread safe (see
+    // SERVER-22974). Instead, rely on C++11 magic statics to ensure
+    // that we create this at the right time. Some systems (like
+    // VS2013 and older), don't actually implement magic statics
+    // yet. But that is OK! We ensure that this is called from
+    // single-threaded context via a mongo initializer above.
+    static const std::ios_base::Init initializeCout;
 
     if (consoleMutex) {
         stdx::unique_lock<stdx::mutex> lk(*consoleMutex);
