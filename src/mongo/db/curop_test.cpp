@@ -28,12 +28,12 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/init.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_noop.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
@@ -45,10 +45,6 @@ namespace {
 const long long intervalLong = 2000 * 1000;  // 2s in micros
 const long long intervalShort = 10 * 1000;   // 10ms in micros
 
-//
-// Before executing the TimeHasExpired suite, spawn a dummy listener thread to be the
-// process time tracker (the tests rely on Listener::_timeTracker being available).
-//
 
 class TestListener : public Listener {
 public:
@@ -56,26 +52,33 @@ public:
     virtual void acceptedMP(MessagingPort* mp) {}
 };
 
-void timeTrackerSetup() {
-    TestListener listener;
-    listener.setAsTimeTracker();
-    listener.setupSockets();
-    listener.initAndListen();
-}
+AtomicUInt32 threadInitialized(0);
 
-MONGO_INITIALIZER(CurOpTest)(InitializerContext* context) {
-    stdx::thread t(timeTrackerSetup);
-    t.detach();
-
-    // Wait for listener thread to start tracking time.
-    while (Listener::getElapsedTimeMillis() == 0) {
-        sleepmillis(10);
+class TestListenerFixtureClass : public mongo::unittest::Test {
+protected:
+    /**
+     * This will start the global listener thread, t, if it hasn't been initialized yet.
+     */
+    void setUp() {
+        if (threadInitialized.fetchAndAdd(1) > 0) {
+            return;
+        }
+        stdx::thread t = stdx::thread([this]() {
+            TestListener listener;
+            listener.setAsTimeTracker();
+            listener.setupSockets();
+            listener.initAndListen();
+        });
+        t.detach();
+        // Wait for listener thread to start tracking time.
+        while (Listener::getElapsedTimeMillis() == 0) {
+            sleepmillis(10);
+        }
     }
-    return Status::OK();
-}
+};
 
 // Long operation + short timeout => time should expire.
-TEST(TimeHasExpired, PosSimple) {
+TEST_F(TestListenerFixtureClass, TimeHasExpiredPosSimple) {
     auto service = stdx::make_unique<ServiceContextNoop>();
     auto client = service->makeClient("CurOpTest");
     OperationContextNoop txn(client.get(), 100);
@@ -87,7 +90,7 @@ TEST(TimeHasExpired, PosSimple) {
 }
 
 // Short operation + long timeout => time should not expire.
-TEST(TimeHasExpired, NegSimple) {
+TEST_F(TestListenerFixtureClass, TimeHasExpiredNegSimple) {
     auto service = stdx::make_unique<ServiceContextNoop>();
     auto client = service->makeClient("CurOpTest");
     OperationContextNoop txn(client.get(), 100);
