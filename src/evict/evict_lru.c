@@ -796,11 +796,11 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
 	 * The no-eviction flag can be set permanently, in which case we never
 	 * increment the no-eviction count.
 	 */
-	__wt_spin_lock(session, &btree->evict_lock);
+	__wt_spin_lock(session, &cache->evict_walk_lock);
 	if (F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
 		if (btree->evict_disabled != 0)
 			++btree->evict_disabled;
-		__wt_spin_unlock(session, &btree->evict_lock);
+		__wt_spin_unlock(session, &cache->evict_walk_lock);
 		return (0);
 	}
 	++btree->evict_disabled;
@@ -837,7 +837,7 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
 err:		--btree->evict_disabled;
 		F_CLR(btree, WT_BTREE_NO_EVICTION);
 	}
-	__wt_spin_unlock(session, &btree->evict_lock);
+	__wt_spin_unlock(session, &cache->evict_walk_lock);
 	return (ret);
 }
 
@@ -849,8 +849,10 @@ void
 __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
+	WT_CACHE *cache;
 
 	btree = S2BT(session);
+	cache = S2C(session)->cache;
 
 	/*
 	 * We have seen subtle bugs with multiple threads racing to turn
@@ -865,10 +867,10 @@ __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session)
 	 * The no-eviction flag can be set permanently, in which case we never
 	 * increment the no-eviction count.
 	 */
-	__wt_spin_lock(session, &btree->evict_lock);
+	__wt_spin_lock(session, &cache->evict_walk_lock);
 	if (btree->evict_disabled > 0 && --btree->evict_disabled == 0)
 		F_CLR(btree, WT_BTREE_NO_EVICTION);
-	__wt_spin_unlock(session, &btree->evict_lock);
+	__wt_spin_unlock(session, &cache->evict_walk_lock);
 }
 
 /*
@@ -1174,14 +1176,14 @@ retry:	while (slot < max_entries && ret == 0) {
 		 * waiting on this thread to acknowledge that action.
 		 */
 		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION) &&
-		    !__wt_spin_trylock(session, &btree->evict_lock)) {
+		    !__wt_spin_trylock(session, &cache->evict_walk_lock)) {
 			if (!F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
 				cache->evict_file_next = dhandle;
 				WT_WITH_DHANDLE(session, dhandle,
 				    ret = __evict_walk_file(session, &slot));
 				WT_ASSERT(session, session->split_gen == 0);
 			}
-			__wt_spin_unlock(session, &btree->evict_lock);
+			__wt_spin_unlock(session, &cache->evict_walk_lock);
 		}
 
 		/*
