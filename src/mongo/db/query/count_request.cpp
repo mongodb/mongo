@@ -43,8 +43,8 @@ const char kHintField[] = "hint";
 
 }  // namespace
 
-CountRequest::CountRequest(NamespaceString nss, BSONObj query)
-    : _nss(std::move(nss)), _query(query.getOwned()) {}
+CountRequest::CountRequest(const std::string& fullNs, BSONObj query)
+    : _nss(fullNs), _query(query.getOwned()) {}
 
 void CountRequest::setHint(BSONObj hint) {
     _hint = hint.getOwned();
@@ -76,13 +76,13 @@ StatusWith<CountRequest> CountRequest::parseFromBSON(const std::string& dbname,
     BSONElement firstElt = cmdObj.firstElement();
     const std::string coll = (firstElt.type() == BSONType::String) ? firstElt.str() : "";
 
-    NamespaceString nss(dbname, coll);
-    if (!nss.isValid()) {
-        return Status(ErrorCodes::InvalidNamespace, "invalid collection name");
+    const std::string ns = str::stream() << dbname << "." << coll;
+    if (!nsIsFull(ns)) {
+        return Status(ErrorCodes::BadValue, "invalid collection name");
     }
 
     // We don't validate that "query" is a nested object due to SERVER-15456.
-    CountRequest request(std::move(nss), cmdObj.getObjectField(kQueryField));
+    CountRequest request(ns, cmdObj.getObjectField(kQueryField));
 
     // Limit
     if (cmdObj[kLimitField].isNumber()) {

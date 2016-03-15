@@ -48,7 +48,7 @@ public:
     /**
      * Construct an empty request.
      */
-    CountRequest(NamespaceString nss, BSONObj query);
+    CountRequest(const std::string& fullNs, BSONObj query);
 
     const NamespaceString& getNs() const {
         return _nss;
