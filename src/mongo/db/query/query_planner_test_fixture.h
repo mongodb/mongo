@@ -63,7 +63,7 @@ protected:
 
     void addIndex(BSONObj keyPattern, MultikeyPaths multikeyPaths);
 
-    void addIndex(BSONObj keyPattern, std::unique_ptr<CollatorInterface> collator);
+    void addIndex(BSONObj keyPattern, CollatorInterface* collator);
 
     //
     // Execute planner.
@@ -201,9 +201,6 @@ protected:
     std::unique_ptr<CanonicalQuery> cq;
     QueryPlannerParams params;
     OwnedPointerVector<QuerySolution> solns;
-
-private:
-    std::vector<std::unique_ptr<CollatorInterface>> _collators;
 };
 
 }  // namespace mongo

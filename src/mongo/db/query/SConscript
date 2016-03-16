@@ -354,6 +354,17 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target="query_planner_collation_test",
+    source=[
+        "query_planner_collation_test.cpp",
+    ],
+    LIBDEPS=[
+        "collation/collator_interface_mock",
+        "query_planner_test_fixture",
+    ],
+)
+
+env.CppUnitTest(
     target="query_solution_test",
     source=[
         "query_solution_test.cpp",
