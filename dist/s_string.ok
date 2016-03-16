@@ -467,6 +467,7 @@ comparep
 compat
 concat
 cond
+condvar
 conf
 confchk
 config
