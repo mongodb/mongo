@@ -127,8 +127,7 @@ public:
     }
 
     virtual void close() {}
-
-} dummyHandler;
+};
 
 // TODO: Take this out and make it as a reusable class in a header file. The only
 // thing that is preventing this from happening is the dependency on the inShutdown
@@ -162,7 +161,7 @@ public:
      * @param messageHandler the message handler to use for this server. Ownership
      *     of this object is passed to this server.
      */
-    void run(MessageHandler* messsageHandler) {
+    void run(std::shared_ptr<MessageHandler> messsageHandler) {
         if (_server != NULL) {
             return;
         }
@@ -175,7 +174,7 @@ public:
             shuttingDown = false;
         }
 
-        _server.reset(createServer(options, messsageHandler));
+        _server.reset(createServer(options, std::move(messsageHandler)));
         _serverThread = stdx::thread(runServer, _server.get());
     }
 
@@ -234,7 +233,8 @@ public:
         _maxPoolSizePerHost = globalConnPool.getMaxPoolSize();
         _dummyServer = new DummyServer(TARGET_PORT);
 
-        _dummyServer->run(&dummyHandler);
+        auto dummyHandler = std::make_shared<DummyMessageHandler>();
+        _dummyServer->run(std::move(dummyHandler));
         DBClientConnection conn;
         Timer timer;
 

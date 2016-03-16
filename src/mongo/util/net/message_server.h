@@ -76,5 +76,6 @@ public:
 };
 
 // TODO use a factory here to decide between port and asio variations
-MessageServer* createServer(const MessageServer::Options& opts, MessageHandler* handler);
+MessageServer* createServer(const MessageServer::Options& opts,
+                            std::shared_ptr<MessageHandler> handler);
 }
