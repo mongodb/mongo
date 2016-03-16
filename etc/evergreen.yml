@@ -3667,8 +3667,6 @@ buildvariants:
   - name: replicasets_WT
   - name: replication
   - name: replication_WT
-  - name: sharding
-  - name: sharding_WT
   - name: slow1
   - name: slow1_WT
   - name: serial_run
@@ -3762,8 +3760,6 @@ buildvariants:
   - name: replicasets_WT
   - name: replication
   - name: replication_WT
-  - name: sharding
-  - name: sharding_WT
   - name: slow1
   - name: slow1_WT
   - name: serial_run
@@ -3812,8 +3808,6 @@ buildvariants:
   - name: replicasets_WT
   - name: replication
   - name: replication_WT
-  - name: sharding
-  - name: sharding_WT
   - name: tool
   - name: tool_WT
   - name: unittests
