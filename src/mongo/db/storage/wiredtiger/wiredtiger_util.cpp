@@ -70,6 +70,8 @@ Status wtRCToStatus_slow(int retCode, const char* prefix) {
         return Status(ErrorCodes::BadValue, s);
     }
 
+    uassert(ErrorCodes::ExceededMemoryLimit, s, retCode != WT_CACHE_FULL);
+
     // TODO convert specific codes rather than just using UNKNOWN_ERROR for everything.
     return Status(ErrorCodes::UnknownError, s);
 }
