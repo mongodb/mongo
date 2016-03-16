@@ -372,7 +372,7 @@ public:
     void switchMode(bool jsMode);
     void bailFromJS();
 
-    Collection* getCollectionOrUassert(Database* db, StringData ns);
+    static Collection* getCollectionOrUassert(Database* db, StringData ns);
 
     const Config& _config;
     DBDirectClient _db;
