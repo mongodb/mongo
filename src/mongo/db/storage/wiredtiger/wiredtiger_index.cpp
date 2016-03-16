@@ -267,8 +267,7 @@ void WiredTigerIndex::fullValidate(OperationContext* txn,
                                    long long* numKeysOut,
                                    ValidateResults* fullResults) const {
     if (fullResults && !WiredTigerRecoveryUnit::get(txn)->getSessionCache()->isEphemeral()) {
-        int err =
-            WiredTigerUtil::verifyTable(txn, _uri, fullResults ? &(fullResults->errors) : NULL);
+        int err = WiredTigerUtil::verifyTable(txn, _uri, &(fullResults->errors));
         if (err == EBUSY) {
             const char* msg = "verify() returned EBUSY. Not treating as invalid.";
             warning() << msg;
