@@ -99,7 +99,7 @@ get_stat(WT_SESSION *stat_session, int stat_field, uint64_t *valuep)
 		return (ret);
 
 	ret = statc->get_value(statc, &desc, &pvalue, valuep);
-	statc->close(statc);
+	testutil_check(statc->close(statc));
 	return (ret);
 }
 
@@ -244,10 +244,10 @@ main(int argc, char *argv[])
 		 */
 		if (idle && cond_reset != cond_reset_orig[i])
 			testutil_die(ERANGE,
-			    "condvar reset on idle connection %d of %" PRIu64,
+			    "condition reset on idle connection %d of %" PRIu64,
 			    i, cond_reset);
 		if (!idle && cond_reset > cond_wait / 20)
-			testutil_die(ERANGE, "connection %d condvar reset %"
+			testutil_die(ERANGE, "connection %d condition reset %"
 			    PRIu64 " exceeds 5%% of %" PRIu64,
 			    i, cond_reset, cond_wait);
 		testutil_check(connections[i]->close(connections[i], NULL));

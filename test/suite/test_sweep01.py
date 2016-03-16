@@ -40,7 +40,7 @@ import wttest
 class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
     tablebase = 'test_sweep01'
     uri = 'table:' + tablebase
-    numfiles = 50
+    numfiles = 30
     numkv = 1000
     conn_config = 'file_manager=(close_handle_minimum=0,' + \
                   'close_idle_time=6,close_scan_interval=2),' + \
@@ -105,13 +105,27 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         c = self.session.open_cursor(uri, None)
         k = 0
         sleep = 0
-        while sleep < 16:
+        max = 60
+        last_nfile = nfile1
+        while sleep < max:
             self.session.checkpoint()
             k = k+1
             c[k] = 1
             sleep += 2
             time.sleep(2)
+            # Give slow machines time to process files.  As long as progress
+            # is made, keep going.
+            stat_cursor = self.session.open_cursor('statistics:', None, None)
+            this_nfile = stat_cursor[stat.conn.file_open][2]
+            stat_cursor.close()
+            self.pr("==== loop " + str(sleep))
+            self.pr("last_nfile " + str(last_nfile))
+            self.pr("this_nfile " + str(this_nfile))
+            if this_nfile == last_nfile and this_nfile < nfile1:
+                break
+            last_nfile = this_nfile
         c.close()
+        self.pr("Sweep loop took " + str(sleep))
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         close2 = stat_cursor[stat.conn.dh_sweep_close][2]
