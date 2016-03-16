@@ -157,9 +157,12 @@ static int
 __lsm_tree_set_name(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree, const char *uri)
 {
-	if (lsm_tree->name != NULL)
-		__wt_free(session, lsm_tree->name);
-	WT_RET(__wt_strdup(session, uri, &lsm_tree->name));
+	void *p;
+
+	WT_RET(__wt_strdup(session, uri, &p));
+
+	__wt_free(session, lsm_tree->name);
+	lsm_tree->name = p;
 	lsm_tree->filename = lsm_tree->name + strlen("lsm:");
 	return (0);
 }
@@ -950,8 +953,8 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 
 err:	if (locked)
 		WT_TRET(__wt_lsm_tree_writeunlock(session, lsm_tree));
-	if (old != NULL)
-		__wt_free(session, old);
+	__wt_free(session, old);
+
 	/*
 	 * Discard this LSM tree structure. The first operation on the renamed
 	 * tree will create a new one.

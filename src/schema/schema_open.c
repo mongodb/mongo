@@ -109,8 +109,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 
 err:	__wt_scr_free(session, &buf);
 	__wt_schema_destroy_colgroup(session, &colgroup);
-	if (cgconfig != NULL)
-		__wt_free(session, cgconfig);
+	__wt_free(session, cgconfig);
 	return (ret);
 }
 
