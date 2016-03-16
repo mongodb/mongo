@@ -62,11 +62,11 @@
         assert.writeOK(coll.update({_id: {$all: [ObjectId()]}}, {$set: {x: 1}}, {multi: false}));
         assert.writeOK(coll.update({$or: [{_id: ObjectId()}]}, {$set: {x: 1}}, {multi: false}));
         assert.writeOK(coll.update({$and: [{_id: ObjectId()}]}, {$set: {x: 1}}, {multi: false}));
+        assert.writeOK(coll.update({_id: {$in: [ObjectId()]}}, {$set: {x: 1}}, {multi: false}));
 
         // Invalid extraction of exact _id from query
         assert.writeError(coll.update({}, {$set: {x: 1}}, {multi: false}));
         assert.writeError(coll.update({_id: {$gt: ObjectId()}}, {$set: {x: 1}}, {multi: false}));
-        assert.writeError(coll.update({_id: {$in: [ObjectId()]}}, {$set: {x: 1}}, {multi: false}));
         assert.writeError(coll.update(
             {$or: [{_id: ObjectId()}, {_id: ObjectId()}]}, {$set: {x: 1}}, {multi: false}));
         assert.writeError(coll.update(
@@ -76,6 +76,7 @@
         // Make sure we can extract exact shard key from certain queries
         assert.writeOK(coll.update({key: ObjectId()}, {$set: {x: 1}}, {multi: false}));
         assert.writeOK(coll.update({key: {$eq: ObjectId()}}, {$set: {x: 1}}, {multi: false}));
+        assert.writeOK(coll.update({key: {$in: [ObjectId()]}}, {$set: {x: 1}}, {multi: false}));
         assert.writeOK(coll.update({key: {$all: [ObjectId()]}}, {$set: {x: 1}}, {multi: false}));
         assert.writeOK(coll.update({$or: [{key: ObjectId()}]}, {$set: {x: 1}}, {multi: false}));
         assert.writeOK(coll.update({$and: [{key: ObjectId()}]}, {$set: {x: 1}}, {multi: false}));
@@ -83,7 +84,6 @@
         // Invalid extraction of exact key from query
         assert.writeError(coll.update({}, {$set: {x: 1}}, {multi: false}));
         assert.writeError(coll.update({key: {$gt: ObjectId()}}, {$set: {x: 1}}, {multi: false}));
-        assert.writeError(coll.update({key: {$in: [ObjectId()]}}, {$set: {x: 1}}, {multi: false}));
         assert.writeError(coll.update(
             {$or: [{key: ObjectId()}, {key: ObjectId()}]}, {$set: {x: 1}}, {multi: false}));
         assert.writeError(coll.update(

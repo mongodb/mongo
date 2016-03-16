@@ -1015,7 +1015,7 @@ TEST_F(QueryPlannerTest, OrWithExactAndInexact3) {
         "{fetch: {filter: null, node: {or: {nodes: ["
         "{ixscan: {filter: {$or:[{a:{$in:[/z/, /x/]}}, {a:'w'}]}, "
         "pattern: {a: 1}}}, "
-        "{fetch: {filter: {$or:[{b:{$exists:false}}, {b:{$in:['p']}}]},"
+        "{fetch: {filter: {$or:[{b:{$exists:false}}, {b:{$eq:'p'}}]},"
         "node: {ixscan: {filter: null, pattern: {b: 1}}}}}]}}}}");
 }
 
@@ -1662,7 +1662,7 @@ TEST_F(QueryPlannerTest, InSparseIndex) {
     runQuery(fromjson("{a: {$in: [null]}}"));
 
     assertNumSolutions(1U);
-    assertSolutionExists("{cscan: {dir: 1, filter: {a: {$in: [null]}}}}");
+    assertSolutionExists("{cscan: {dir: 1, filter: {a: {$eq: null}}}}");
 }
 
 TEST_F(QueryPlannerTest, InCompoundIndexFirst) {

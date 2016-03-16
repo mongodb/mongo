@@ -48,13 +48,13 @@
     assert.eq(1, upsertedXVal({x: 1}, {$set: {a: 1}}));
     assert.eq(1, upsertedXVal({x: {$eq: 1}}, {$set: {a: 1}}));
     assert.eq(1, upsertedXVal({x: {$all: [1]}}, {$set: {a: 1}}));
+    assert.eq(1, upsertedXVal({x: {$in: [1]}}, {$set: {a: 1}}));
     assert.eq(1, upsertedXVal({$and: [{x: {$eq: 1}}]}, {$set: {a: 1}}));
     assert.eq(1, upsertedXVal({$or: [{x: {$eq: 1}}]}, {$set: {a: 1}}));
 
     // shard key not extracted
     assert.writeError(upsertedResult({}, {$set: {a: 1, x: 1}}));
     assert.writeError(upsertedResult({x: {$gt: 1}}, {$set: {a: 1, x: 1}}));
-    assert.writeError(upsertedResult({x: {$in: [1]}}, {$set: {a: 1, x: 1}}));
 
     // Shard key type errors
     assert.writeError(upsertedResult({x: undefined}, {$set: {a: 1}}));

@@ -33,6 +33,7 @@
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/index_tag.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -607,6 +608,31 @@ TEST(CanonicalQueryTest, NormalizeQueryTree) {
     // $and absorbs $and children.
     testNormalizeQuery("{$and: [{$and: [{a: 1}, {b: 1}]}, {c: 1}]}",
                        "{$and: [{a: 1}, {b: 1}, {c: 1}]}");
+    // $in with one argument is rewritten as an equality or regex predicate.
+    testNormalizeQuery("{a: {$in: [1]}}", "{a: {$eq: 1}}");
+    testNormalizeQuery("{a: {$in: [/./]}}", "{a: {$regex: '.'}}");
+    // $in with 0 or more than 1 argument is not modified.
+    testNormalizeQuery("{a: {$in: []}}", "{a: {$in: []}}");
+    testNormalizeQuery("{a: {$in: [/./, 3]}}", "{a: {$in: [/./, 3]}}");
+}
+
+TEST(CanonicalQueryTest, NormalizeWithInPreservesTags) {
+    unique_ptr<MatchExpression> matchExpression(parseMatchExpression(fromjson("{x: {$in: [1]}}")));
+    matchExpression->setTag(new IndexTag(2U, 1U, false));
+    matchExpression.reset(CanonicalQuery::normalizeTree(matchExpression.release()));
+    IndexTag* tag = dynamic_cast<IndexTag*>(matchExpression->getTag());
+    ASSERT(tag);
+    ASSERT_EQ(2U, tag->index);
+}
+
+TEST(CanonicalQueryTest, NormalizeWithInAndRegexPreservesTags) {
+    unique_ptr<MatchExpression> matchExpression(
+        parseMatchExpression(fromjson("{x: {$in: [/a.b/]}}")));
+    matchExpression->setTag(new IndexTag(2U, 1U, false));
+    matchExpression.reset(CanonicalQuery::normalizeTree(matchExpression.release()));
+    IndexTag* tag = dynamic_cast<IndexTag*>(matchExpression->getTag());
+    ASSERT(tag);
+    ASSERT_EQ(2U, tag->index);
 }
 
 TEST(CanonicalQueryTest, CanonicalizeFromBaseQuery) {

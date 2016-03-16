@@ -435,6 +435,34 @@ MatchExpression* CanonicalQuery::normalizeTree(MatchExpression* root) {
         for (size_t i = 0; i < root->getChildVector()->size(); ++i) {
             (*root->getChildVector())[i] = normalizeTree(root->getChild(i));
         }
+    } else if (MatchExpression::MATCH_IN == root->matchType()) {
+        std::unique_ptr<InMatchExpression> in(static_cast<InMatchExpression*>(root));
+
+        ArrayFilterEntries* inArrayEntries = in->getArrayFilterEntries();
+        if (inArrayEntries->size() != 1) {
+            return in.release();
+        }
+
+        // We contain either a single $regex, or we are equivalent to a $eq.
+        if (inArrayEntries->numRegexes()) {
+            RegexMatchExpression* childRe = inArrayEntries->regex(0);
+            invariant(!childRe->getTag());
+
+            // Create a new RegexMatchExpression, because 'childRe' does not have a path.
+            auto re = stdx::make_unique<RegexMatchExpression>();
+            re->init(in->path(), childRe->getString(), childRe->getFlags());
+            if (in->getTag()) {
+                re->setTag(in->getTag()->clone());
+            }
+            return normalizeTree(re.release());
+        }
+
+        auto eq = stdx::make_unique<EqualityMatchExpression>();
+        eq->init(in->path(), *(inArrayEntries->equalities().begin()));
+        if (in->getTag()) {
+            eq->setTag(in->getTag()->clone());
+        }
+        return eq.release();
     }
 
     return root;
