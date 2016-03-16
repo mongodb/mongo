@@ -15,14 +15,10 @@
 static int
 __config_err(WT_CONFIG *conf, const char *msg, int err)
 {
-	/*
-	 * Cast the string offset to uintmax_t because the %td format to print
-	 * a type ptrdiff_t isn't supported under MSVC.
-	 */
 	WT_RET_MSG(conf->session, err,
-	    "Error parsing '%.*s' at offset %" PRIuMAX ": %s",
+	    "Error parsing '%.*s' at offset %" WT_PTRDIFFT_FMT ": %s",
 	    (int)(conf->end - conf->orig), conf->orig,
-	    (uintmax_t)(conf->cur - conf->orig), msg);
+	    conf->cur - conf->orig, msg);
 }
 
 /*
