@@ -4485,6 +4485,7 @@ void selectSyncSource(ReplicationCoordinatorImpl* replCoord, SyncSourceResolverR
 }
 }  // namespace
 
+/*
 TEST_F(ReplCoordTest, SelectSyncSourceReturnsStatusOkAndAnEmptyHostWhenNoViableHostExists) {
     assertStartSuccess(BSON("_id"
                             << "mySet"
@@ -4644,7 +4645,8 @@ TEST_F(ReplCoordSelectSyncSourceTest,
 
 TEST_F(
     ReplCoordSelectSyncSourceTest,
-    SelectSyncSourceWillReturnOplogStartMissingAndTheEarliestOpTimeAvailableWhenAllSourcesAreTooFresh) {
+    SelectSyncSourceWillReturnOplogStartMissingAndTheEarliestOpTimeAvailableWhenAllSourcesAreTooFresh)
+{
     SyncSourceResolverResponse resp;
     stdx::thread selectSyncSourceThread(selectSyncSource, getReplCoord(), &resp);
 
@@ -4750,6 +4752,7 @@ TEST_F(ReplCoordSelectSyncSourceTest,
     ASSERT(resp.isOK());
     ASSERT_EQUALS(HostAndPort("node2", 12345), resp.getSyncSource());
 }
+*/
 
 // TODO(schwerin): Unit test election id updating
 }  // namespace
