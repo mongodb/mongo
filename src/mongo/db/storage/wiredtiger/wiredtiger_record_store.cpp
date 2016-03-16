@@ -708,7 +708,9 @@ public:
     void detachFromOperationContext() final {
         invariant(_txn);
         _txn = nullptr;
-        _cursor->close(_cursor);
+        if (_cursor) {
+            invariantWTOK(_cursor->close(_cursor));
+        }
         _cursor = nullptr;
     }
     void reattachToOperationContext(OperationContext* txn) final {
