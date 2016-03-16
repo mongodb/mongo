@@ -39,6 +39,7 @@
 #include "mongo/base/data_view.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
+#include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/config.h"
 #include "mongo/platform/decimal128.h"
@@ -54,8 +55,12 @@ typedef BSONElement be;
 typedef BSONObj bo;
 typedef BSONObjBuilder bob;
 
-/* l and r MUST have same type when called: check that first. */
-int compareElementValues(const BSONElement& l, const BSONElement& r);
+/** l and r MUST have same type when called: check that first.
+    If comparator is non-null, it is used for all comparisons between two strings.
+*/
+int compareElementValues(const BSONElement& l,
+                         const BSONElement& r,
+                         StringData::ComparatorInterface* comparator = nullptr);
 
 /** BSONElement represents an "element" in a BSONObj.  So for the object { a : 3, b : "abc" },
     'a : 3' is the first element (key+value).
@@ -485,8 +490,11 @@ public:
         @return <0: l<r. 0:l==r. >0:l>r
         order by type, field name, and field value.
         If considerFieldName is true, pay attention to the field name.
+        If comparator is non-null, it is used for all comparisons between two strings.
     */
-    int woCompare(const BSONElement& e, bool considerFieldName = true) const;
+    int woCompare(const BSONElement& e,
+                  bool considerFieldName = true,
+                  StringData::ComparatorInterface* comparator = nullptr) const;
 
     /**
      * Functor compatible with std::hash for std::unordered_{map,set}

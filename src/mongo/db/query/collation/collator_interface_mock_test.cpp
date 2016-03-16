@@ -30,6 +30,8 @@
 
 #include "mongo/db/query/collation/collator_interface_mock.h"
 
+#include "mongo/db/jsobj.h"
+#include "mongo/db/json.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -82,5 +84,47 @@ TEST(CollatorInterfaceMockSelfTest, AlwaysEqualMockComparisonKeysAlwaysCompareEq
     ASSERT_EQ(keyABC.getKeyData().compare(keyEFG.getKeyData()), 0);
     ASSERT_EQ(keyEFG.getKeyData().compare(keyABC.getKeyData()), 0);
     ASSERT_EQ(keyABC.getKeyData().compare(keyABC.getKeyData()), 0);
+}
+
+TEST(CollatorInterfaceMockSelfTest, WoCompareStringsWithMockCollator) {
+    BSONObj left = BSON("a"
+                        << "a"
+                        << "b"
+                        << "xyz"
+                        << "c"
+                        << "c");
+    BSONObj right = BSON("a"
+                         << "a"
+                         << "b"
+                         << "zyx"
+                         << "c"
+                         << "c");
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    ASSERT_GT(left.woCompare(right, BSONObj(), true, &collator), 0);
+    ASSERT_LT(right.woCompare(left, BSONObj(), true, &collator), 0);
+}
+
+TEST(CollatorInterfaceMockSelfTest, WoCompareNestedObjectsWithMockCollator) {
+    BSONObj left = mongo::fromjson("{a: {a: 'a', b: 'xyz', c: 'c'}}");
+    BSONObj right = mongo::fromjson("{a: {a: 'a', b: 'zyx', c: 'c'}}");
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    ASSERT_GT(left.woCompare(right, BSONObj(), true, &collator), 0);
+    ASSERT_LT(right.woCompare(left, BSONObj(), true, &collator), 0);
+}
+
+TEST(CollatorInterfaceMockSelfTest, WoCompareNestedArraysWithMockCollator) {
+    BSONObj left = mongo::fromjson("{a: ['a', 'xyz', 'c']}");
+    BSONObj right = mongo::fromjson("{a: ['a', 'zyx', 'c']}");
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    ASSERT_GT(left.woCompare(right, BSONObj(), true, &collator), 0);
+    ASSERT_LT(right.woCompare(left, BSONObj(), true, &collator), 0);
+}
+
+TEST(CollatorInterfaceMockSelfTest, WoCompareNumbersWithMockCollator) {
+    BSONObj left = BSON("a" << 1);
+    BSONObj right = BSON("a" << 2);
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    ASSERT_LT(left.woCompare(right, BSONObj(), true, &collator), 0);
+    ASSERT_GT(right.woCompare(left, BSONObj(), true, &collator), 0);
 }
 };

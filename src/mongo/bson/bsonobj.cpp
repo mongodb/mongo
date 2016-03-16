@@ -118,7 +118,10 @@ bool BSONObj::valid() const {
     return validateBSON(objdata(), objsize()).isOK();
 }
 
-int BSONObj::woCompare(const BSONObj& r, const Ordering& o, bool considerFieldName) const {
+int BSONObj::woCompare(const BSONObj& r,
+                       const Ordering& o,
+                       bool considerFieldName,
+                       StringData::ComparatorInterface* comparator) const {
     if (isEmpty())
         return r.isEmpty() ? 0 : -1;
     if (r.isEmpty())
@@ -139,7 +142,7 @@ int BSONObj::woCompare(const BSONObj& r, const Ordering& o, bool considerFieldNa
 
         int x;
         {
-            x = l.woCompare(r, considerFieldName);
+            x = l.woCompare(r, considerFieldName, comparator);
             if (o.descending(mask))
                 x = -x;
         }
@@ -151,7 +154,10 @@ int BSONObj::woCompare(const BSONObj& r, const Ordering& o, bool considerFieldNa
 }
 
 /* well ordered compare */
-int BSONObj::woCompare(const BSONObj& r, const BSONObj& idxKey, bool considerFieldName) const {
+int BSONObj::woCompare(const BSONObj& r,
+                       const BSONObj& idxKey,
+                       bool considerFieldName,
+                       StringData::ComparatorInterface* comparator) const {
     if (isEmpty())
         return r.isEmpty() ? 0 : -1;
     if (r.isEmpty())
@@ -183,7 +189,7 @@ int BSONObj::woCompare(const BSONObj& r, const BSONObj& idxKey, bool considerFie
                         x = _stricmp(l.valuestr(), r.valuestr());
                     }
                     else*/ {
-            x = l.woCompare(r, considerFieldName);
+            x = l.woCompare(r, considerFieldName, comparator);
             if (ordered && o.number() < 0)
                 x = -x;
         }

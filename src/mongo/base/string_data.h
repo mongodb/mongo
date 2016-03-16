@@ -59,6 +59,9 @@ class StringData {
     StringData(const char* c, size_t len, TrustedInitTag) : _data(c), _size(len) {}
 
 public:
+    // Declared in string_data_comparator_interface.h.
+    class ComparatorInterface;
+
     /** Constructs an empty StringData. */
     StringData() = default;
 

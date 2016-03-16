@@ -39,6 +39,7 @@
 #include "mongo/base/data_type.h"
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
+#include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
@@ -397,18 +398,24 @@ public:
     /**wo='well ordered'.  fields must be in same order in each object.
        Ordering is with respect to the signs of the elements
        and allows ascending / descending key mixing.
+       If comparator is non-null, it is used for all comparisons between two strings.
        @return  <0 if l<r. 0 if l==r. >0 if l>r
     */
-    int woCompare(const BSONObj& r, const Ordering& o, bool considerFieldName = true) const;
+    int woCompare(const BSONObj& r,
+                  const Ordering& o,
+                  bool considerFieldName = true,
+                  StringData::ComparatorInterface* comparator = nullptr) const;
 
     /**wo='well ordered'.  fields must be in same order in each object.
        Ordering is with respect to the signs of the elements
        and allows ascending / descending key mixing.
+       If comparator is non-null, it is used for all comparisons between two strings.
        @return  <0 if l<r. 0 if l==r. >0 if l>r
     */
     int woCompare(const BSONObj& r,
                   const BSONObj& ordering = BSONObj(),
-                  bool considerFieldName = true) const;
+                  bool considerFieldName = true,
+                  StringData::ComparatorInterface* comparator = nullptr) const;
 
     bool operator<(const BSONObj& other) const {
         return woCompare(other) < 0;

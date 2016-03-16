@@ -379,7 +379,9 @@ std::vector<BSONElement> BSONElement::Array() const {
 /* wo = "well ordered"
    note: (mongodb related) : this can only change in behavior when index version # changes
 */
-int BSONElement::woCompare(const BSONElement& e, bool considerFieldName) const {
+int BSONElement::woCompare(const BSONElement& e,
+                           bool considerFieldName,
+                           StringData::ComparatorInterface* comparator) const {
     int lt = (int)canonicalType();
     int rt = (int)e.canonicalType();
     int x = lt - rt;
@@ -390,7 +392,7 @@ int BSONElement::woCompare(const BSONElement& e, bool considerFieldName) const {
         if (x != 0)
             return x;
     }
-    x = compareElementValues(*this, e);
+    x = compareElementValues(*this, e, comparator);
     return x;
 }
 
@@ -849,7 +851,9 @@ std::string escape(const std::string& s, bool escape_slash) {
 /**
  * l and r must be same canonicalType when called.
  */
-int compareElementValues(const BSONElement& l, const BSONElement& r) {
+int compareElementValues(const BSONElement& l,
+                         const BSONElement& r,
+                         StringData::ComparatorInterface* comparator) {
     int f;
 
     switch (l.type()) {
@@ -946,9 +950,10 @@ int compareElementValues(const BSONElement& l, const BSONElement& r) {
             return memcmp(l.value(), r.value(), OID::kOIDSize);
         case Code:
         case Symbol:
-        case String:
-            /* todo: a utf sort order version one day... */
-            {
+        case String: {
+            if (comparator) {
+                return comparator->compare(l.valueStringData(), r.valueStringData());
+            } else {
                 // we use memcmp as we allow zeros in UTF8 strings
                 int lsz = l.valuestrsize();
                 int rsz = r.valuestrsize();
@@ -959,9 +964,15 @@ int compareElementValues(const BSONElement& l, const BSONElement& r) {
                 // longer std::string is the greater one
                 return lsz - rsz;
             }
+        }
         case Object:
         case Array:
-            return l.embeddedObject().woCompare(r.embeddedObject());
+            // woCompare parameters: r, ordering, considerFieldName, comparator.
+            // r: the BSONObj to compare with.
+            // ordering: the sort directions for each key.
+            // considerFieldName: whether field names should be considered in comparison.
+            // comparator: used for all string comparisons, if non-null.
+            return l.embeddedObject().woCompare(r.embeddedObject(), BSONObj(), true, comparator);
         case DBRef: {
             int lsz = l.valuesize();
             int rsz = r.valuesize();
@@ -988,7 +999,16 @@ int compareElementValues(const BSONElement& l, const BSONElement& r) {
             if (cmp)
                 return cmp;
 
-            return l.codeWScopeObject().woCompare(r.codeWScopeObject());
+            return l.codeWScopeObject().woCompare(
+                // woCompare parameters: r, ordering, considerFieldName, comparator.
+                // r: the BSONObj to compare with.
+                // ordering: the sort directions for each key.
+                // considerFieldName: whether field names should be considered in comparison.
+                // comparator: used for all string comparisons, if non-null.
+                r.codeWScopeObject(),
+                BSONObj(),
+                true,
+                comparator);
         }
         default:
             verify(false);

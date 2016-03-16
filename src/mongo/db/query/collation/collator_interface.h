@@ -32,6 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
+#include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/db/query/collation/collation_spec.h"
 
 namespace mongo {
@@ -44,7 +45,7 @@ namespace mongo {
  *
  * Does not throw exceptions.
  */
-class CollatorInterface {
+class CollatorInterface : public StringData::ComparatorInterface {
     MONGO_DISALLOW_COPYING(CollatorInterface);
 
 public:
