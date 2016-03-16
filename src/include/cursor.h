@@ -289,7 +289,8 @@ struct __wt_cursor_join_iter {
 	WT_CURSOR_JOIN_ENTRY	*entry;
 	WT_CURSOR		*cursor;	/* has null projection */
 	WT_CURSOR		*main;		/* main table with projection */
-	WT_ITEM			*curkey;
+	WT_ITEM			*curkey;	/* primary key */
+	WT_ITEM			 idxkey;
 	bool			 positioned;
 	bool			 isequal;	/* advancing means we're done */
 };
