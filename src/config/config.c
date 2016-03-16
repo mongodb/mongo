@@ -15,14 +15,14 @@
 static int
 __config_err(WT_CONFIG *conf, const char *msg, int err)
 {
-	uint64_t offset;
-
-	/* Cast because printing a pointer diff isn't platform portable */
-	offset = (uint64_t)(conf->cur - conf->orig);
-
+	/*
+	 * Cast the string offset to uintmax_t because the %td format to print
+	 * a type ptrdiff_t isn't supported under MSVC.
+	 */
 	WT_RET_MSG(conf->session, err,
-	    "Error parsing '%.*s' at offset %" PRIu64 ": %s",
-	    (int)(conf->end - conf->orig), conf->orig, offset, msg);
+	    "Error parsing '%.*s' at offset %" PRIuMAX ": %s",
+	    (int)(conf->end - conf->orig), conf->orig,
+	    (uintmax_t)(conf->cur - conf->orig), msg);
 }
 
 /*
