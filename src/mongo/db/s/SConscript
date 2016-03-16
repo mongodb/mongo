@@ -32,6 +32,18 @@ env.Library(
 )
 
 env.Library(
+    target='type_shard_identity',
+    source=[
+        'type_shard_identity.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/s/common',
+    ],
+)
+
+env.Library(
     target='sharding',
     source=[
         'chunk_move_write_concern_options.cpp',
@@ -87,6 +99,16 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'migration_types',
+    ]
+)
+
+env.CppUnitTest(
+    target='type_shard_identity_test',
+    source=[
+        'type_shard_identity_test.cpp'
+    ],
+    LIBDEPS=[
+        'type_shard_identity',
     ]
 )
 
