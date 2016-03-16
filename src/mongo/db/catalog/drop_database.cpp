@@ -50,6 +50,9 @@
 namespace mongo {
 
 Status dropDatabase(OperationContext* txn, const std::string& dbName) {
+    uassert(ErrorCodes::IllegalOperation,
+            "Cannot drop a database in read-only mode",
+            !storageGlobalParams.readOnly);
     // TODO (Kal): OldClientContext legacy, needs to be removed
     {
         CurOp::get(txn)->ensureStarted();
