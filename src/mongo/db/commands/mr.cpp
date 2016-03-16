@@ -1408,18 +1408,22 @@ public:
                 }
                 std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-                Database* db = scopedAutoDb->getDb();
-                Collection* coll = state.getCollectionOrUassert(db, config.ns);
-                invariant(coll);
+                unique_ptr<PlanExecutor> exec;
+                {
+                    Database* db = scopedAutoDb->getDb();
+                    Collection* coll = State::getCollectionOrUassert(db, config.ns);
+                    invariant(coll);
 
-                auto statusWithPlanExecutor =
-                    getExecutor(txn, coll, std::move(cq), PlanExecutor::YIELD_AUTO);
-                if (!statusWithPlanExecutor.isOK()) {
-                    uasserted(17239, "Can't get executor for query " + config.filter.toString());
-                    return 0;
+                    auto statusWithPlanExecutor =
+                        getExecutor(txn, coll, std::move(cq), PlanExecutor::YIELD_AUTO);
+                    if (!statusWithPlanExecutor.isOK()) {
+                        uasserted(17239,
+                                  "Can't get executor for query " + config.filter.toString());
+                        return 0;
+                    }
+
+                    exec = std::move(statusWithPlanExecutor.getValue());
                 }
-
-                unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
                 Timer mt;
 
@@ -1464,17 +1468,12 @@ public:
                         scopedXact.reset(new ScopedTransaction(txn, MODE_IS));
                         scopedAutoDb.reset(new AutoGetDb(txn, nss.db(), MODE_S));
 
-                        exec->restoreState();
-
-                        // Need to reload the database, in case it was dropped after we
-                        // released the lock
-                        db = scopedAutoDb->getDb();
-                        if (db == NULL) {
-                            // Database was deleted after we freed the lock
-                            StringBuilder sb;
-                            sb << "Database " << nss.db()
-                               << " was deleted in the middle of the reduce job.";
-                            uasserted(28523, sb.str());
+                        if (!exec->restoreState()) {
+                            return appendCommandStatus(
+                                result,
+                                Status(ErrorCodes::OperationFailed,
+                                       str::stream() << "Executor killed during mapReduce command: "
+                                                     << WorkingSetCommon::toStatusString(o)));
                         }
 
                         reduceTime += t.micros();
@@ -1499,6 +1498,8 @@ public:
                 // Record the indexes used by the PlanExecutor.
                 PlanSummaryStats stats;
                 Explain::getSummaryStats(*exec, &stats);
+                Collection* coll = scopedAutoDb->getDb()->getCollection(config.ns);
+                invariant(coll);  // 'exec' hasn't been killed, so collection must be alive.
                 coll->infoCache()->notifyOfQuery(txn, stats.indexesUsed);
                 CurOp::get(txn)->debug().fromMultiPlanner = stats.fromMultiPlanner;
                 CurOp::get(txn)->debug().replanned = stats.replanned;
