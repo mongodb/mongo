@@ -1694,6 +1694,7 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "fileops",		WT_VERB_FILEOPS },
 		{ "log",		WT_VERB_LOG },
 		{ "lsm",		WT_VERB_LSM },
+		{ "lsm_manager",	WT_VERB_LSM_MANAGER },
 		{ "metadata",		WT_VERB_METADATA },
 		{ "mutex",		WT_VERB_MUTEX },
 		{ "overflow",		WT_VERB_OVERFLOW },
