@@ -4548,8 +4548,8 @@ buildvariants:
   - name: sharding_op_query_WT
   - name: slow1
   - name: slow1_WT
-  - name: slow2
-  - name: slow2_WT
+  - name: serial_run
+  - name: serial_run_WT
   - name: snmp
   - name: snmp_WT
   - name: ssl
