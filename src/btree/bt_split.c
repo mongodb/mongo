@@ -151,8 +151,7 @@ __wt_split_stash_discard_all(
 	for (i = 0, stash = session->split_stash;
 	    i < session->split_stash_cnt;
 	    ++i, ++stash)
-		if (stash->p != NULL)
-			__wt_free(session_safe, stash->p);
+		__wt_free(session_safe, stash->p);
 
 	__wt_free(session_safe, session->split_stash);
 	session->split_stash_cnt = session->split_stash_alloc = 0;
