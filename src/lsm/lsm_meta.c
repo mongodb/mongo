@@ -159,15 +159,6 @@ __lsm_meta_read_v0(
 		 */
 	}
 	WT_ERR_NOTFOUND_OK(ret);
-
-	/*
-	 * If the default merge_min was not overridden, calculate it now.  We
-	 * do this here so that trees created before merge_min was added get a
-	 * sane value.
-	 */
-	if (lsm_tree->merge_min < 2)
-		lsm_tree->merge_min = WT_MAX(2, lsm_tree->merge_max / 2);
-
 err:	return (ret);
 }
 
@@ -349,7 +340,6 @@ __lsm_meta_read_v1(
 	 * Ignore any other values: the metadata entry might have been
 	 * created by a future release, with unknown options.
 	 */
-
 err:	__wt_scr_free(session, &buf);
 	return (ret);
 }
@@ -424,6 +414,7 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
 	char *lsmconf;
+	bool upgrade;
 
 	/* LSM trees inherit the merge setting from the connection. */
 	if (F_ISSET(S2C(session), WT_CONN_LSM_MERGE))
@@ -431,17 +422,29 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	WT_RET(__wt_metadata_search(session, lsm_tree->name, &lsmconf));
 
+	upgrade = false;
 	ret = __wt_config_getones(session, lsmconf, "file_config", &cval);
 	if (ret == 0) {
 		ret = __lsm_meta_read_v0(session, lsm_tree, lsmconf);
 		__wt_free(session, lsmconf);
 		WT_RET(ret);
-		return (__lsm_meta_upgrade_v1(session, lsm_tree));
+		upgrade = true;
 	} else if (ret == WT_NOTFOUND) {
 		lsm_tree->config = lsmconf;
-		return (__lsm_meta_read_v1(session, lsm_tree, lsmconf));
+		ret = 0;
+		WT_RET(__lsm_meta_read_v1(session, lsm_tree, lsmconf));
 	}
-
+	/*
+	 * If the default merge_min was not overridden, calculate it now.
+	 */
+	if (lsm_tree->merge_min < 2)
+		lsm_tree->merge_min = WT_MAX(2, lsm_tree->merge_max / 2);
+	/*
+	 * If needed, upgrade the configuration.  We need to do this after
+	 * we have fixed the merge_min value.
+	 */
+	if (upgrade)
+		WT_RET(__lsm_meta_upgrade_v1(session, lsm_tree));
 	return (ret);
 }
 
