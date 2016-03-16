@@ -15,13 +15,14 @@
 static int
 __config_err(WT_CONFIG *conf, const char *msg, int err)
 {
-	ptrdiff_t d;
+	uint64_t offset;
 
-	d = conf->cur - conf->orig;
+	/* Cast because printing a pointer diff isn't platform portable */
+	offset = (uint64_t)(conf->cur - conf->orig);
 
 	WT_RET_MSG(conf->session, err,
-	    "Error parsing '%.*s' at offset %td: %s",
-	    (int)(conf->end - conf->orig), conf->orig, d, msg);
+	    "Error parsing '%.*s' at offset %" PRIu64 ": %s",
+	    (int)(conf->end - conf->orig), conf->orig, offset, msg);
 }
 
 /*
