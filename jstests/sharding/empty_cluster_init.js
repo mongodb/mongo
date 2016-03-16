@@ -51,17 +51,23 @@ for (var i = 0; i < 3; i++) {
     mongoses.push(mongos);
 }
 
-// Eventually connect to a host
-assert.soon(function() {
-    try {
-        mongosConn = new Mongo(mongoses[mongoses.length - 1].host);
-        return true;
-    } catch (e) {
-        print("Waiting for connect...");
-        printjson(e);
-        return false;
-    }
-}, "Later mongos " + mongoses[mongoses.length - 1].host + " did not start.", 5 * 60 * 1000);
+var connectToMongos = function(host) {
+    // Eventually connect to a host
+    assert.soon(function() {
+        try {
+            mongosConn = new Mongo(host);
+            return true;
+        } catch (e) {
+            print("Waiting for connect to " + host);
+            printjson(e);
+            return false;
+        }
+    }, "mongos " + host + " did not start.", 5 * 60 * 1000);
+};
+
+for (var i = 0; i < mongoses.length; i++) {
+    connectToMongos(mongoses[i].host);
+}
 
 // Shut down our mongoses now that we've tested them
 for (var i = 0; i < mongoses.length; i++) {
