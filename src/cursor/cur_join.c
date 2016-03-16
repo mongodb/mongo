@@ -1127,8 +1127,7 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		    cindex->iface.key_format);
 	}
 
-err:	if (main_uri != NULL)
-		__wt_free(session, main_uri);
+err:	__wt_free(session, main_uri);
 	return (ret);
 }
 

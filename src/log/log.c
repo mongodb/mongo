@@ -1252,10 +1252,8 @@ __log_has_hole(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, bool *hole)
 		}
 	}
 
-err:	if (buf != NULL)
-		__wt_free(session, buf);
-	if (zerobuf != NULL)
-		__wt_free(session, zerobuf);
+err:	__wt_free(session, buf);
+	__wt_free(session, zerobuf);
 	return (ret);
 }
 

@@ -212,8 +212,7 @@ __ckpt_last_name(
 		if (found && a.val < found)
 			continue;
 
-		if (*namep != NULL)
-			__wt_free(session, *namep);
+		__wt_free(session, *namep);
 		WT_ERR(__wt_strndup(session, k.str, k.len, namep));
 		found = a.val;
 	}
@@ -221,7 +220,7 @@ __ckpt_last_name(
 		ret = WT_NOTFOUND;
 
 	if (0) {
-err:		__wt_free(session, namep);
+err:		__wt_free(session, *namep);
 	}
 	return (ret);
 }
