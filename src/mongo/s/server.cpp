@@ -339,8 +339,8 @@ static ExitCode runMongosServer() {
     opts.port = serverGlobalParams.port;
     opts.ipList = serverGlobalParams.bind_ip;
 
-    ShardedMessageHandler handler;
-    MessageServer* server = createServer(opts, &handler);
+    auto handler = std::make_shared<ShardedMessageHandler>();
+    MessageServer* server = createServer(opts, std::move(handler));
     server->setAsTimeTracker();
     if (!server->setupSockets()) {
         return EXIT_NET_ERROR;

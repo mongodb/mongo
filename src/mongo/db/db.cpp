@@ -458,7 +458,8 @@ static void _initAndListen(int listenPort) {
     options.port = listenPort;
     options.ipList = serverGlobalParams.bind_ip;
 
-    MessageServer* server = createServer(options, new MyMessageHandler());
+    auto handler = std::make_shared<MyMessageHandler>();
+    MessageServer* server = createServer(options, std::move(handler));
     server->setAsTimeTracker();
 
     // This is what actually creates the sockets, but does not yet listen on them because we
