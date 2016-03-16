@@ -461,6 +461,8 @@ void removeOldJournalFile(boost::filesystem::path p) {
                         f.truncate(DataLimitPerJournalFile);
                         f.fsync();
                     }
+                    log() << "old journal file " << p.string() << " will be reused as "
+                          << filepath.string();
                     boost::filesystem::rename(temppath, filepath);
                     return;
                 }
@@ -474,6 +476,7 @@ void removeOldJournalFile(boost::filesystem::path p) {
 
     // already have 3 prealloc files, so delete this file
     try {
+        log() << "old journal file will be removed: " << p.string() << endl;
         boost::filesystem::remove(p);
     } catch (const std::exception& e) {
         log() << "warning exception removing " << p.string() << ": " << e.what() << endl;
@@ -712,7 +715,6 @@ void Journal::removeUnneededJournalFiles() {
         if (f.lastEventTimeMs + ExtraKeepTimeMs < _lastFlushTime.load()) {
             // eligible for deletion
             boost::filesystem::path p(f.filename);
-            log() << "old journal file will be removed: " << f.filename << endl;
             removeOldJournalFile(p);
         } else {
             break;
