@@ -83,10 +83,11 @@ static bool collatorsMatch(const CollatorInterface* lhs, const CollatorInterface
     return (*lhs == *rhs);
 }
 
-// Checks whether 'node' contains any string comparison. We assume 'node' is bounds-generating or is
-// a recursive child of a bounds-generating node, i.e. it does not contain AND, OR,
-// ELEM_MATCH_OBJECT, or NOR.
-static bool boundsGeneratingNodeContainsStringComparison(MatchExpression* node) {
+// Checks whether 'node' contains any comparison to an element of type 'type'. Nested objects and
+// arrays are not checked recursively. We assume 'node' is bounds-generating or is a recursive child
+// of a bounds-generating node, i.e. it does not contain AND, OR, ELEM_MATCH_OBJECT, or NOR.
+// TODO SERVER-23172: Check nested objects and arrays.
+static bool boundsGeneratingNodeContainsComparisonToType(MatchExpression* node, BSONType type) {
     invariant(node->matchType() != MatchExpression::AND &&
               node->matchType() != MatchExpression::OR &&
               node->matchType() != MatchExpression::NOR &&
@@ -94,13 +95,13 @@ static bool boundsGeneratingNodeContainsStringComparison(MatchExpression* node) 
 
     if (Indexability::isEqualityOrInequality(node)) {
         const ComparisonMatchExpression* expr = static_cast<const ComparisonMatchExpression*>(node);
-        return expr->getData().type() == BSONType::String;
+        return expr->getData().type() == type;
     }
 
     if (node->matchType() == MatchExpression::MATCH_IN) {
         const InMatchExpression* expr = static_cast<const InMatchExpression*>(node);
         for (auto const& equality : expr->getData().equalities()) {
-            if (equality.type() == BSONType::String) {
+            if (equality.type() == type) {
                 return true;
             }
         }
@@ -109,12 +110,12 @@ static bool boundsGeneratingNodeContainsStringComparison(MatchExpression* node) 
 
     if (node->matchType() == MatchExpression::NOT) {
         invariant(node->numChildren() == 1U);
-        return boundsGeneratingNodeContainsStringComparison(node->getChild(0));
+        return boundsGeneratingNodeContainsComparisonToType(node->getChild(0), type);
     }
 
     if (node->matchType() == MatchExpression::ELEM_MATCH_VALUE) {
         for (size_t i = 0; i < node->numChildren(); ++i) {
-            if (boundsGeneratingNodeContainsStringComparison(node->getChild(i))) {
+            if (boundsGeneratingNodeContainsComparisonToType(node->getChild(i), type)) {
                 return true;
             }
         }
@@ -177,8 +178,16 @@ bool QueryPlannerIXSelect::compatible(const BSONElement& elt,
                                       const IndexEntry& index,
                                       MatchExpression* node,
                                       const CollatorInterface* collator) {
+    // Nested object or array comparisons require the query collator to be null.
+    // TODO SERVER-23172: remove this check.
+    if (collator != nullptr &&
+        (boundsGeneratingNodeContainsComparisonToType(node, BSONType::Object) ||
+         boundsGeneratingNodeContainsComparisonToType(node, BSONType::Array))) {
+        return false;
+    }
+
     // String comparisons require the collators to match.
-    if (boundsGeneratingNodeContainsStringComparison(node) &&
+    if (boundsGeneratingNodeContainsComparisonToType(node, BSONType::String) &&
         !collatorsMatch(collator, index.collator)) {
         return false;
     }
