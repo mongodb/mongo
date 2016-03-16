@@ -191,22 +191,6 @@ __lsm_meta_read_v1(
 
 	chunk = NULL;			/* -Wconditional-uninitialized */
 
-	/*
-	 * Set up the config for each chunk.
-	 *
-	 * Make the memory_page_max double the chunk size, so application
-	 * threads don't immediately try to force evict the chunk when the
-	 * worker thread clears the NO_EVICTION flag.
-	 */
-	file_cfg[1] = lsmconf;
-	WT_ERR(__wt_scr_alloc(session, 0, &buf));
-	WT_ERR(__wt_buf_fmt(session, buf,
-	    "key_format=u,value_format=u,memory_page_max=%" PRIu64,
-	    2 * lsm_tree->chunk_max));
-	file_cfg[2] = buf->data;
-	WT_ERR(__wt_config_collapse(session, file_cfg, &fileconf));
-	lsm_tree->file_config = fileconf;
-
 	WT_ERR(__wt_config_getones(session, lsmconf, "key_format", &cv));
 	WT_ERR(__wt_strndup(session, cv.str, cv.len, &lsm_tree->key_format));
 	WT_ERR(__wt_config_getones(session, lsmconf, "value_format", &cv));
@@ -344,6 +328,22 @@ __lsm_meta_read_v1(
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 	lsm_tree->nold_chunks = nchunks;
+
+	/*
+	 * Set up the config for each chunk.
+	 *
+	 * Make the memory_page_max double the chunk size, so application
+	 * threads don't immediately try to force evict the chunk when the
+	 * worker thread clears the NO_EVICTION flag.
+	 */
+	file_cfg[1] = lsmconf;
+	WT_ERR(__wt_scr_alloc(session, 0, &buf));
+	WT_ERR(__wt_buf_fmt(session, buf,
+	    "key_format=u,value_format=u,memory_page_max=%" PRIu64,
+	    2 * lsm_tree->chunk_max));
+	file_cfg[2] = buf->data;
+	WT_ERR(__wt_config_collapse(session, file_cfg, &fileconf));
+	lsm_tree->file_config = fileconf;
 
 	/*
 	 * Ignore any other values: the metadata entry might have been
