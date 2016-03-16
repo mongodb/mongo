@@ -11,9 +11,45 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
 (function() {
     "use strict";
 
-    function log(arg) {
-        jsTest.log(tojson(arg));
-    }
+    const majorityWriteConcern = {
+        writeConcern: {w: "majority", wtimeout: 60 * 1000}
+    };
+
+    // Each test case includes a 'prepareCollection' method that sets up the initial state starting
+    // with an empty collection, a 'write' method that does some write, and two arrays,
+    // 'expectedBefore' and 'expectedAfter' that describe the expected contents of the collection
+    // before and after the write. The 'prepareCollection' and 'write' methods should leave the
+    // collection either empty or with a single document with _id: 1.
+    const testCases = {
+        insert: {
+            prepareCollection: function(coll) {},  // No-op
+            write: function(coll, writeConcern) {
+                assert.writeOK(coll.insert({_id: 1}, writeConcern));
+            },
+            expectedBefore: [],
+            expectedAfter: [{_id: 1}],
+        },
+        update: {
+            prepareCollection: function(coll) {
+                assert.writeOK(coll.insert({_id: 1, state: 'before'}, majorityWriteConcern));
+            },
+            write: function(coll, writeConcern) {
+                assert.writeOK(coll.update({_id: 1}, {$set: {state: 'after'}}, writeConcern));
+            },
+            expectedBefore: [{_id: 1, state: 'before'}],
+            expectedAfter: [{_id: 1, state: 'after'}],
+        },
+        remove: {
+            prepareCollection: function(coll) {
+                assert.writeOK(coll.insert({_id: 1}, majorityWriteConcern));
+            },
+            write: function(coll, writeConcern) {
+                assert.writeOK(coll.remove({_id: 1}, writeConcern));
+            },
+            expectedBefore: [{_id: 1}],
+            expectedAfter: [],
+        },
+    };
 
     // Set up a set and grab things for later.
     var name = "read_committed";
@@ -40,54 +76,103 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
     // Get connections and collection.
     var primary = replTest.getPrimary();
     var secondary = replTest.liveNodes.slaves[0];
-    var secondaryId = replTest.getNodeId(secondary);
-    var db = primary.getDB(name);
-    var t = db[name];
+    var coll = primary.getDB(name)[name];
+    var secondaryColl = secondary.getDB(name)[name];
 
-    function doRead(readConcern) {
-        readConcern.maxTimeMS = 3000;
-        var res = assert.commandWorked(t.runCommand('find', readConcern));
-        var docs = (new DBCommandCursor(db.getMongo(), res)).toArray();
-        assert.gt(docs.length, 0, "no docs returned!");
-        return docs[0].state;
+    function log(arg) {
+        jsTest.log(tojson(arg));
     }
 
-    function doDirtyRead() {
+    function doRead(coll, readConcern) {
+        readConcern.maxTimeMS = 3000;
+        var res = assert.commandWorked(coll.runCommand('find', readConcern));
+        return new DBCommandCursor(coll.getMongo(), res).toArray();
+    }
+
+    function doDirtyRead(coll) {
         log("doing dirty read");
-        var ret = doRead({"readConcern": {"level": "local"}});
+        var ret = doRead(coll, {"readConcern": {"level": "local"}});
         log("done doing dirty read.");
         return ret;
     }
 
-    function doCommittedRead() {
+    function doCommittedRead(coll) {
         log("doing committed read");
-        var ret = doRead({"readConcern": {"level": "majority"}});
+        var ret = doRead(coll, {"readConcern": {"level": "majority"}});
         log("done doing committed read.");
         return ret;
     }
 
-    // Do a write, wait for it to replicate, and ensure it is visible.
-    assert.writeOK(
-        t.save({_id: 1, state: 0}, {writeConcern: {w: "majority", wtimeout: 60 * 1000}}));
-    assert.eq(doDirtyRead(), 0);
-    assert.eq(doCommittedRead(), 0);
+    function readLatestOplogEntry(readConcernLevel) {
+        var oplog = primary.getDB('local').oplog.rs;
+        var res = oplog.runCommand('find',
+                                   {
+                                     "readConcern": {"level": readConcernLevel},
+                                     "maxTimeMS": 3000,
+                                     sort: {$natural: -1},
+                                     limit: 1,
+                                   });
+        assert.commandWorked(res);
+        return new DBCommandCursor(coll.getMongo(), res).toArray()[0];
+    }
 
-    replTest.stop(secondaryId);
+    for (var testName in testCases) {
+        jsTestLog('Running test ' + testName);
+        var test = testCases[testName];
 
-    // Do a write and ensure it is only visible to dirty reads
-    assert.writeOK(t.save({_id: 1, state: 1}));
-    assert.eq(doDirtyRead(), 1);
-    assert.eq(doCommittedRead(), 0);
+        const setUpInitialState = function setUpInitialState() {
+            assert.writeOK(coll.remove({}, majorityWriteConcern));
+            test.prepareCollection(coll);
+            // Do some sanity checks.
+            assert.eq(doDirtyRead(coll), test.expectedBefore);
+            assert.eq(doCommittedRead(coll), test.expectedBefore);
+        };
 
-    // Try the committed read again after sleeping to ensure it doesn't only work for queries
-    // immediately after the write.
-    sleep(1000);
-    assert.eq(doCommittedRead(), 0);
+        // Writes done with majority write concern must be immediately visible to both dirty and
+        // committed reads.
+        setUpInitialState();
+        test.write(coll, majorityWriteConcern);
+        assert.eq(doDirtyRead(coll), test.expectedAfter);
+        assert.eq(doCommittedRead(coll), test.expectedAfter);
 
-    // Restart the node and ensure the committed view is updated.
-    replTest.restart(secondaryId);
-    db.getLastError("majority", 60 * 1000);
-    assert.eq(doDirtyRead(), 1);
-    assert.eq(doCommittedRead(), 1);
+        // Return to the initial state, then stop the secondary from applying new writes to prevent
+        // them from becoming committed.
+        setUpInitialState();
+        assert.commandWorked(
+            secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"}));
+        const initialOplogTs = readLatestOplogEntry('local').ts;
 
+        // Writes done without majority write concern must be immediately visible to dirty read
+        // and hidden from committed reads until they have been replicated. The rules for seeing
+        // an oplog entry for a write are the same as for the write itself.
+        test.write(coll, {});
+        assert.eq(doDirtyRead(coll), test.expectedAfter);
+        assert.neq(readLatestOplogEntry('local').ts, initialOplogTs);
+        assert.eq(doCommittedRead(coll), test.expectedBefore);
+        assert.eq(readLatestOplogEntry('majority').ts, initialOplogTs);
+
+        // Try the committed read again after sleeping to ensure it doesn't only work for
+        // queries immediately after the write.
+        sleep(1000);
+        assert.eq(doCommittedRead(coll), test.expectedBefore);
+        assert.eq(readLatestOplogEntry('majority').ts, initialOplogTs);
+
+        // Restart oplog application on the secondary and ensure the committed view is updated.
+        assert.commandWorked(
+            secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"}));
+        coll.getDB().getLastError("majority", 60 * 1000);
+        assert.eq(doCommittedRead(coll), test.expectedAfter);
+        assert.neq(readLatestOplogEntry('majority').ts, initialOplogTs);
+
+        // The secondary will be able to make the write committed soon after the primary, but there
+        // is no way to block until it does.
+        try {
+            assert.soon(function() {
+                return friendlyEqual(doCommittedRead(secondaryColl), test.expectedAfter);
+            });
+        } catch (e) {
+            // generate useful error messages on failures.
+            assert.eq(doCommittedRead(secondaryColl), test.expectedAfter);
+        }
+    }
 }());
