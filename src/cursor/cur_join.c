@@ -113,7 +113,6 @@ __curjoin_split_key(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 
 	if (isindex) {
 		cindex = ((WT_CURSOR_INDEX *)fromcur);
-		firstcg_cur = cindex->cg_cursors[0];
 		/*
 		 * Repack tells us where the index key ends; advance past
 		 * that to get where the raw primary key starts.
