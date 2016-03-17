@@ -1,4 +1,4 @@
-// Aggregation $substr tests.
+// Aggregation $substrBytes tests.
 
 t = db.jstests_aggregation_substr;
 t.drop();
@@ -6,11 +6,12 @@ t.drop();
 t.save({});
 
 function assertSubstring(expected, str, offset, len) {
-    assert.eq(expected, t.aggregate({$project: {a: {$substr: [str, offset, len]}}}).toArray()[0].a);
+    assert.eq(expected,
+              t.aggregate({$project: {a: {$substrBytes: [str, offset, len]}}}).toArray()[0].a);
 }
 
 function assertArgsException(args) {
-    assert.commandFailed(t.runCommand('aggregate', {pipeline: [{$substr: args}]}));
+    assert.commandFailed(t.runCommand('aggregate', {pipeline: [{$substrBytes: args}]}));
 }
 
 function assertException(str, offset, len) {
@@ -104,17 +105,21 @@ assertSubstring('cde', '$z', {$add: ['$b', '$b']}, {$add: ['$c', '$d']});
 assertSubstring('cde', '$z', {$add: ['$b', 1]}, {$add: [2, '$d']});
 
 // Nested.
-assert.eq('e',
-          t.aggregate({
-              $project: {
-                  a: {
-                      $substr: [
-                          {$substr: [{$substr: [{$substr: ['abcdefghij', 1, 6]}, 2, 5]}, 0, 3]},
-                          1,
-                          1
-                      ]
-                  }
-              }
-          })
-              .toArray()[0]
-              .a);
+assert.eq(
+    'e',
+    t.aggregate({
+        $project: {
+            a: {
+                $substrBytes: [
+                    {
+                      $substrBytes:
+                          [{$substrBytes: [{$substrBytes: ['abcdefghij', 1, 6]}, 2, 5]}, 0, 3]
+                    },
+                    1,
+                    1
+                ]
+            }
+        }
+    })
+        .toArray()[0]
+        .a);

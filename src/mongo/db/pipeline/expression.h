@@ -1245,7 +1245,14 @@ public:
 };
 
 
-class ExpressionSubstr final : public ExpressionFixedArity<ExpressionSubstr, 3> {
+class ExpressionSubstrBytes : public ExpressionFixedArity<ExpressionSubstrBytes, 3> {
+public:
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const;
+};
+
+
+class ExpressionSubstrCP final : public ExpressionFixedArity<ExpressionSubstrCP, 3> {
 public:
     Value evaluateInternal(Variables* vars) const final;
     const char* getOpName() const final;

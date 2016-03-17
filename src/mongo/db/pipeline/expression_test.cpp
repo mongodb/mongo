@@ -4294,7 +4294,7 @@ class NullMiddleGt : public ExpectedResultBase {
 
 }  // namespace Strcasecmp
 
-namespace Substr {
+namespace SubstrBytes {
 
 class ExpectedResultBase {
 public:
@@ -4317,7 +4317,7 @@ protected:
 
 private:
     BSONObj spec() {
-        return BSON("$substr" << BSON_ARRAY(str() << offset() << length()));
+        return BSON("$substrBytes" << BSON_ARRAY(str() << offset() << length()));
     }
 };
 
@@ -4402,6 +4402,60 @@ class DropEndingNull : public ExpectedResultBase {
 };
 
 }  // namespace Substr
+
+namespace SubstrCP {
+
+TEST(ExpressionSubstrCPTest, DoesThrowWithBadContinuationByte) {
+    VariablesIdGenerator idGenerator;
+    VariablesParseState vps(&idGenerator);
+
+    char continuationByte = 0x80;
+    const auto expr = Expression::parseExpression(
+        BSON("$substrCP" << BSON_ARRAY(&continuationByte << 0 << 1)).firstElement(), vps);
+    ASSERT_THROWS({ expr->evaluate(Document()); }, UserException);
+}
+
+TEST(ExpressionSubstrCPTest, DoesThrowWithInvalidLeadingByte) {
+    VariablesIdGenerator idGenerator;
+    VariablesParseState vps(&idGenerator);
+
+    char leadingByte = 0xFF;
+    const auto expr = Expression::parseExpression(
+        BSON("$substrCP" << BSON_ARRAY(&leadingByte << 0 << 1)).firstElement(), vps);
+    ASSERT_THROWS({ expr->evaluate(Document()); }, UserException);
+}
+
+TEST(ExpressionSubstrCPTest, WithStandardValue) {
+    assertExpectedResults("$substrCP", {{{Value("abc"), Value(0), Value(2)}, Value("ab")}});
+}
+
+TEST(ExpressionSubstrCPTest, WithNullCharacter) {
+    assertExpectedResults("$substrCP", {{{Value("abc\0d"), Value(2), Value(3)}, Value("c\0d")}});
+}
+
+TEST(ExpressionSubstrCPTest, WithNullCharacterAtEnd) {
+    assertExpectedResults("$substrCP", {{{Value("abc\0"), Value(2), Value(2)}, Value("c\0")}});
+}
+
+TEST(ExpressionSubstrCPTest, WithOutOfRangeString) {
+    assertExpectedResults("$substrCP", {{{Value("abc"), Value(3), Value(2)}, Value("")}});
+}
+
+TEST(ExpressionSubstrCPTest, WithPartiallyOutOfRangeString) {
+    assertExpectedResults("$substrCP", {{{Value("abc"), Value(1), Value(4)}, Value("bc")}});
+}
+
+TEST(ExpressionSubstrCPTest, WithUnicodeValue) {
+    assertExpectedResults("$substrCP", {{{Value("øø∫å"), Value(0), Value(4)}, Value("øø∫å")}});
+    assertExpectedResults("$substrBytes", {{{Value("øø∫å"), Value(0), Value(4)}, Value("øø")}});
+}
+
+TEST(ExpressionSubstrCPTest, WithMixedUnicodeAndASCIIValue) {
+    assertExpectedResults("$substrCP", {{{Value("a∫bøßabc"), Value(1), Value(4)}, Value("∫bøß")}});
+    assertExpectedResults("$substrBytes", {{{Value("a∫bøßabc"), Value(1), Value(4)}, Value("∫b")}});
+}
+
+}  // namespace SubstrCP
 
 namespace Type {
 
@@ -4963,11 +5017,11 @@ public:
         add<Strcasecmp::NullMiddleEq>();
         add<Strcasecmp::NullMiddleGt>();
 
-        add<Substr::FullNull>();
-        add<Substr::BeginAtNull>();
-        add<Substr::EndAtNull>();
-        add<Substr::DropBeginningNull>();
-        add<Substr::DropEndingNull>();
+        add<SubstrBytes::FullNull>();
+        add<SubstrBytes::BeginAtNull>();
+        add<SubstrBytes::EndAtNull>();
+        add<SubstrBytes::DropBeginningNull>();
+        add<SubstrBytes::DropEndingNull>();
 
         add<ToLower::NullBegin>();
         add<ToLower::NullMiddle>();

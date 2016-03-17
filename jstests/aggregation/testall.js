@@ -474,7 +474,7 @@ var p17 = db.runCommand({
     aggregate: "article",
     pipeline: [{
         $project: {
-            author: {$substr: ["$author", 1, 2]},
+            author: {$substrBytes: ["$author", 1, 2]},
         }
     }]
 });

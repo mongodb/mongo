@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/value.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/platform/bits.h"
 
 namespace mongo {
 using Parser = Expression::Parser;
@@ -2989,9 +2990,48 @@ const char* ExpressionStrcasecmp::getOpName() const {
     return "$strcasecmp";
 }
 
-/* ----------------------- ExpressionSubstr ---------------------------- */
+namespace {
+/**
+ * UTF-8 multi-byte code points consist of one leading byte of the form 11xxxxxx, and potentially
+ * many continuation bytes of the form 10xxxxxx. This method checks whether 'charByte' is a
+ * continuation byte.
+ */
+bool isContinuationByte(char charByte) {
+    return (charByte & 0xc0) == 0x80;
+}
 
-Value ExpressionSubstr::evaluateInternal(Variables* vars) const {
+/**
+ * UTF-8 multi-byte code points consist of one leading byte of the form 11xxxxxx, and potentially
+ * many continuation bytes of the form 10xxxxxx. This method checks whether 'charByte' is a leading
+ * byte.
+ */
+bool isLeadingByte(char charByte) {
+    return (charByte & 0xc0) == 0xc0;
+}
+
+/**
+ * UTF-8 single-byte code points are of the form 0xxxxxxx. This method checks whether 'charByte' is
+ * a single-byte code point.
+ */
+bool isSingleByte(char charByte) {
+    return (charByte & 0x80) == 0x0;
+}
+
+size_t getCodePointLength(char charByte) {
+    if (isSingleByte(charByte)) {
+        return 1;
+    }
+
+    invariant(isLeadingByte(charByte));
+
+    // In UTF-8, the number of leading ones is the number of bytes the code point takes up.
+    return countLeadingZeros64(~(uint64_t(charByte) << (64 - 8)));
+}
+}  // namespace
+
+/* ----------------------- ExpressionSubstrBytes ---------------------------- */
+
+Value ExpressionSubstrBytes::evaluateInternal(Variables* vars) const {
     Value pString(vpOperand[0]->evaluateInternal(vars));
     Value pLower(vpOperand[1]->evaluateInternal(vars));
     Value pLength(vpOperand[2]->evaluateInternal(vars));
@@ -3011,8 +3051,6 @@ Value ExpressionSubstr::evaluateInternal(Variables* vars) const {
 
     string::size_type lower = static_cast<string::size_type>(pLower.coerceToLong());
     string::size_type length = static_cast<string::size_type>(pLength.coerceToLong());
-
-    auto isContinuationByte = [](char c) { return ((c & 0xc0) == 0x80); };
 
     uassert(28656,
             str::stream() << getOpName()
@@ -3035,9 +3073,86 @@ Value ExpressionSubstr::evaluateInternal(Variables* vars) const {
     return Value(str.substr(lower, length));
 }
 
-REGISTER_EXPRESSION(substr, ExpressionSubstr::parse);
-const char* ExpressionSubstr::getOpName() const {
-    return "$substr";
+// $substr is deprecated in favor of $substrBytes, but for now will just parse into a $substrBytes.
+REGISTER_EXPRESSION(substrBytes, ExpressionSubstrBytes::parse);
+REGISTER_EXPRESSION(substr, ExpressionSubstrBytes::parse);
+const char* ExpressionSubstrBytes::getOpName() const {
+    return "$substrBytes";
+}
+
+/* ----------------------- ExpressionSubstrCP ---------------------------- */
+
+Value ExpressionSubstrCP::evaluateInternal(Variables* vars) const {
+    Value inputVal(vpOperand[0]->evaluateInternal(vars));
+    Value lowerVal(vpOperand[1]->evaluateInternal(vars));
+    Value lengthVal(vpOperand[2]->evaluateInternal(vars));
+
+    std::string str = inputVal.coerceToString();
+    uassert(34450,
+            str::stream() << getOpName() << ": starting index must be a numeric type (is BSON type "
+                          << typeName(lowerVal.getType()) << ")",
+            lowerVal.numeric());
+    uassert(34451,
+            str::stream() << getOpName()
+                          << ": starting index cannot be represented as a 32-bit integral value: "
+                          << lowerVal.toString(),
+            lowerVal.integral());
+    uassert(34452,
+            str::stream() << getOpName() << ": length must be a numeric type (is BSON type "
+                          << typeName(lengthVal.getType()) << ")",
+            lengthVal.numeric());
+    uassert(34453,
+            str::stream() << getOpName()
+                          << ": length cannot be represented as a 32-bit integral value: "
+                          << lengthVal.toString(),
+            lengthVal.integral());
+
+    int startIndexCodePoints = lowerVal.coerceToInt();
+    int length = lengthVal.coerceToInt();
+
+    uassert(34454,
+            str::stream() << getOpName() << ": length must be a nonnegative integer.",
+            length >= 0);
+
+    uassert(34455,
+            str::stream() << getOpName() << ": the starting index must be nonnegative integer.",
+            startIndexCodePoints >= 0);
+
+    size_t startIndexBytes = 0;
+
+    for (int i = 0; i < startIndexCodePoints; i++) {
+        if (startIndexBytes >= str.size()) {
+            return Value("");
+        }
+        uassert(34456,
+                str::stream() << getOpName() << ": invalid UTF-8 string: " << str,
+                !isContinuationByte(str[startIndexBytes]));
+        size_t codePointLength = getCodePointLength(str[startIndexBytes]);
+        uassert(34457,
+                str::stream() << getOpName() << ": invalid UTF-8 string: " << str,
+                codePointLength <= 4);
+        startIndexBytes += codePointLength;
+    }
+
+    size_t endIndexBytes = startIndexBytes;
+
+    for (int i = 0; i < length && endIndexBytes < str.size(); i++) {
+        uassert(34458,
+                str::stream() << getOpName() << ": invalid UTF-8 string: " << str,
+                !isContinuationByte(str[endIndexBytes]));
+        size_t codePointLength = getCodePointLength(str[endIndexBytes]);
+        uassert(34459,
+                str::stream() << getOpName() << ": invalid UTF-8 string: " << str,
+                codePointLength <= 4);
+        endIndexBytes += codePointLength;
+    }
+
+    return Value(std::string(str, startIndexBytes, endIndexBytes - startIndexBytes));
+}
+
+REGISTER_EXPRESSION(substrCP, ExpressionSubstrCP::parse);
+const char* ExpressionSubstrCP::getOpName() const {
+    return "$substrCP";
 }
 
 /* ----------------------- ExpressionSubtract ---------------------------- */
