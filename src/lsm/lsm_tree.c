@@ -369,7 +369,7 @@ __lsm_tree_find(WT_SESSION_IMPL *session,
 				 * exclusive flag.
 				 */
 				if (!__wt_atomic_cas_ptr(
-				    &lsm_tree->exclusive, NULL, session))
+				    &lsm_tree->excl_session, NULL, session))
 					return (EBUSY);
 
 				/*
@@ -381,7 +381,7 @@ __lsm_tree_find(WT_SESSION_IMPL *session,
 				    !__wt_atomic_cas32(
 				    &lsm_tree->refcnt, 0, 1)) {
 					F_SET(lsm_tree, WT_LSM_TREE_ACTIVE);
-					lsm_tree->exclusive = NULL;
+					lsm_tree->excl_session = NULL;
 					return (EBUSY);
 				}
 			} else {
@@ -391,7 +391,7 @@ __lsm_tree_find(WT_SESSION_IMPL *session,
 				 * We got a reference, check if an exclusive
 				 * lock beat us to it.
 				 */
-				if (lsm_tree->exclusive != NULL) {
+				if (lsm_tree->excl_session != NULL) {
 					WT_ASSERT(session,
 					    lsm_tree->refcnt > 0);
 					(void)__wt_atomic_sub32(
@@ -487,7 +487,7 @@ __lsm_tree_open(WT_SESSION_IMPL *session,
 	 * with getting handles exclusive.
 	 */
 	lsm_tree->refcnt = 1;
-	lsm_tree->exclusive = exclusive ? session : NULL;
+	lsm_tree->excl_session = exclusive ? session : NULL;
 	lsm_tree->queue_ref = 0;
 
 	/* Set a flush timestamp as a baseline. */
@@ -522,7 +522,7 @@ __wt_lsm_tree_get(WT_SESSION_IMPL *session,
 		ret = __lsm_tree_open(session, uri, exclusive, treep);
 
 	WT_ASSERT(session, ret != 0 ||
-	    (exclusive ? session : NULL)  == (*treep)->exclusive);
+	     (*treep)->excl_session == (exclusive ? session : NULL));
 	return (ret);
 }
 
@@ -534,10 +534,10 @@ void
 __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_ASSERT(session, lsm_tree->refcnt > 0);
-	if (lsm_tree->exclusive == session) {
+	if (lsm_tree->excl_session == session) {
 		/* We cleared the active flag when getting exclusive access. */
 		F_SET(lsm_tree, WT_LSM_TREE_ACTIVE);
-		lsm_tree->exclusive = NULL;
+		lsm_tree->excl_session = NULL;
 	}
 	(void)__wt_atomic_sub32(&lsm_tree->refcnt, 1);
 }

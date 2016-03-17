@@ -1556,7 +1556,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	WT_ERR(ret);
 
 	/* Make sure we have exclusive access if and only if we want it */
-	WT_ASSERT(session, !bulk || lsm_tree->exclusive);
+	WT_ASSERT(session, !bulk || lsm_tree->excl_session != NULL);
 
 	WT_ERR(__wt_calloc_one(session, &clsm));
 
