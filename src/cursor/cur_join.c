@@ -95,18 +95,20 @@ __curjoin_pack_recno(WT_SESSION_IMPL *session, uint64_t r, uint8_t *buf,
 }
 
 /*
- * __curjoin_copy_primary_key --
+ * __curjoin_split_key --
  *	Copy the primary key from a cursor (either main table or index)
- *	to another cursory.
+ *	to another cursor.  When copying from an index file, the index
+ *	key is also returned.
  *
  */
 static int
-__curjoin_copy_primary_key(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
-    WT_CURSOR *tocur, WT_CURSOR *fromcur, const char *repack_fmt, bool isindex)
+__curjoin_split_key(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
+    WT_ITEM *idxkey, WT_CURSOR *tocur, WT_CURSOR *fromcur,
+    const char *repack_fmt, bool isindex)
 {
 	WT_CURSOR *firstcg_cur;
 	WT_CURSOR_INDEX *cindex;
-	WT_ITEM key, *keyp;
+	WT_ITEM *keyp;
 	const uint8_t *p;
 
 	if (isindex) {
@@ -118,14 +120,14 @@ __curjoin_copy_primary_key(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		 */
 		WT_RET(__wt_struct_repack(session, cindex->child->key_format,
 		    repack_fmt != NULL ? repack_fmt : cindex->iface.key_format,
-		    &cindex->child->key, &key));
-		WT_ASSERT(session, cindex->child->key.size > key.size);
-		key.data = (uint8_t *)key.data + key.size;
-		key.size = cindex->child->key.size - key.size;
-		WT_ITEM_SET(tocur->key, key);
+		    &cindex->child->key, idxkey));
+		WT_ASSERT(session, cindex->child->key.size > idxkey->size);
+		tocur->key.data = (uint8_t *)idxkey->data + idxkey->size;
+		tocur->key.size = cindex->child->key.size - idxkey->size;
 		if (WT_CURSOR_RECNO(tocur)) {
-			p = (const uint8_t *)key.data;
-			WT_RET(__wt_vunpack_uint(&p, key.size, &tocur->recno));
+			p = (const uint8_t *)tocur->key.data;
+			WT_RET(__wt_vunpack_uint(&p, tocur->key.size,
+			    &tocur->recno));
 		} else
 			tocur->recno = 0;
 	} else {
@@ -141,6 +143,8 @@ __curjoin_copy_primary_key(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 			WT_ITEM_SET(tocur->key, *keyp);
 			tocur->recno = 0;
 		}
+		idxkey->data = NULL;
+		idxkey->size = 0;
 	}
 	return (0);
 }
@@ -162,8 +166,8 @@ __curjoin_entry_iter_next(WT_CURSOR_JOIN_ITER *iter, WT_CURSOR *cursor)
 	 * Set our key to the primary key, we'll also need this
 	 * to check membership.
 	 */
-	WT_RET(__curjoin_copy_primary_key(iter->session, iter->cjoin, cursor,
-	    iter->cursor, iter->entry->repack_format,
+	WT_RET(__curjoin_split_key(iter->session, iter->cjoin, &iter->idxkey,
+	    cursor, iter->cursor, iter->entry->repack_format,
 	    iter->entry->index != NULL));
 	iter->curkey = &cursor->key;
 	iter->entry->stats.actual_count++;
@@ -691,20 +695,30 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		bloom_found = true;
 	}
 	if (entry->index != NULL) {
-		memset(&v, 0, sizeof(v));  /* Keep lint quiet. */
-		c = entry->main;
-		c->set_key(c, key);
-		if ((ret = c->search(c)) == 0)
-			ret = c->get_value(c, &v);
-		else if (ret == WT_NOTFOUND)
-			WT_ERR_MSG(session, WT_ERROR,
-			    "main table for join is missing entry");
-		WT_TRET(c->reset(c));
-		WT_ERR(ret);
+		/*
+		 * If this entry is used by the iterator, then we already
+		 * have the index key, and we won't have to do any extraction
+		 * either.
+		 */
+		if (entry == cjoin->iter->entry)
+			WT_ITEM_SET(v, cjoin->iter->idxkey);
+		else {
+			memset(&v, 0, sizeof(v));  /* Keep lint quiet. */
+			c = entry->main;
+			c->set_key(c, key);
+			if ((ret = c->search(c)) == 0)
+				ret = c->get_value(c, &v);
+			else if (ret == WT_NOTFOUND)
+				WT_ERR_MSG(session, WT_ERROR,
+				    "main table for join is missing entry");
+			WT_TRET(c->reset(c));
+			WT_ERR(ret);
+		}
 	} else
-		v = *key;
+		WT_ITEM_SET(v, *key);
 
-	if ((idx = entry->index) != NULL && idx->extractor != NULL) {
+	if ((idx = entry->index) != NULL && idx->extractor != NULL &&
+	    entry != cjoin->iter->entry) {
 		WT_CLEAR(extract_cursor);
 		extract_cursor.iface = iface;
 		extract_cursor.iface.session = &session->iface;
