@@ -62,7 +62,11 @@ BtreeAccessMethod::BtreeAccessMethod(IndexCatalogEntry* btreeState, SortedDataIn
 }
 
 void BtreeAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) const {
-    _keyGenerator->getKeys(obj, keys);
+    // SERVER-22726 represents the work to gather and persist the path-level multikey information.
+    // Until that's done, we may as well avoid computing the prefixes of the indexed fields that
+    // cause the index to be multikey.
+    MultikeyPaths* multikeyPaths = nullptr;
+    _keyGenerator->getKeys(obj, keys, multikeyPaths);
 }
 
 }  // namespace mongo

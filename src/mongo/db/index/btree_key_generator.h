@@ -28,8 +28,10 @@
 
 #pragma once
 
-#include <vector>
 #include <set>
+#include <vector>
+
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
@@ -46,7 +48,7 @@ public:
 
     virtual ~BtreeKeyGenerator() {}
 
-    void getKeys(const BSONObj& obj, BSONObjSet* keys) const;
+    void getKeys(const BSONObj& obj, BSONObjSet* keys, MultikeyPaths* multikeyPaths) const;
 
     static const int ParallelArraysCode;
 
@@ -63,7 +65,8 @@ private:
     virtual void getKeysImpl(std::vector<const char*> fieldNames,
                              std::vector<BSONElement> fixed,
                              const BSONObj& obj,
-                             BSONObjSet* keys) const = 0;
+                             BSONObjSet* keys,
+                             MultikeyPaths* multikeyPaths) const = 0;
 
     std::vector<BSONElement> _fixed;
 };
@@ -77,10 +80,18 @@ public:
     virtual ~BtreeKeyGeneratorV0() {}
 
 private:
-    virtual void getKeysImpl(std::vector<const char*> fieldNames,
-                             std::vector<BSONElement> fixed,
-                             const BSONObj& obj,
-                             BSONObjSet* keys) const;
+    /**
+     * Generates the index keys for the document 'obj' and stores them in the set 'keys'.
+     *
+     * It isn't possible to create a v0 index, so it's unnecessary to track the prefixes of the
+     * indexed fields that cause the index to be mulitkey. This function therefore ignores its
+     * 'multikeyPaths' parameter.
+     */
+    void getKeysImpl(std::vector<const char*> fieldNames,
+                     std::vector<BSONElement> fixed,
+                     const BSONObj& obj,
+                     BSONObjSet* keys,
+                     MultikeyPaths* multikeyPaths) const final;
 };
 
 class BtreeKeyGeneratorV1 : public BtreeKeyGenerator {
@@ -147,18 +158,24 @@ private:
     };
 
     /**
+     * Generates the index keys for the document 'obj' and stores them in the set 'keys'.
+     *
      * @param fieldNames - fields to index, may be postfixes in recursive calls
      * @param fixed - values that have already been identified for their index fields
      * @param obj - object from which keys should be extracted, based on names in fieldNames
      * @param keys - set where index keys are written
-     * @param numNotFound - number of index fields that have already been identified as missing
-     * @param array - array from which keys should be extracted, based on names in fieldNames
-     *        If obj and array are both nonempty, obj will be one of the elements of array.
+     *
+     * If the 'multikeyPaths' pointer is non-null, then it must point to an empty vector. If this
+     * index type supports tracking path-level multikey information, then this function resizes
+     * 'multikeyPaths' to have the same number of elements as the index key pattern and fills each
+     * element with the prefixes of the indexed field that would cause this index to be multikey as
+     * a result of inserting 'keys'.
      */
-    virtual void getKeysImpl(std::vector<const char*> fieldNames,
-                             std::vector<BSONElement> fixed,
-                             const BSONObj& obj,
-                             BSONObjSet* keys) const;
+    void getKeysImpl(std::vector<const char*> fieldNames,
+                     std::vector<BSONElement> fixed,
+                     const BSONObj& obj,
+                     BSONObjSet* keys,
+                     MultikeyPaths* multikeyPaths) const final;
 
     /**
      * This recursive method does the heavy-lifting for getKeysImpl().
@@ -168,7 +185,8 @@ private:
                               const BSONObj& obj,
                               BSONObjSet* keys,
                               unsigned numNotFound,
-                              const std::vector<PositionalPathInfo>& positionalInfo) const;
+                              const std::vector<PositionalPathInfo>& positionalInfo,
+                              MultikeyPaths* multikeyPaths) const;
     /**
      * A call to getKeysImplWithArray() begins by calling this for each field in the key
      * pattern. It uses getFieldDottedOrArray() to traverse the path '*field' in 'obj'.
@@ -217,11 +235,16 @@ private:
                              BSONObjSet* keys,
                              unsigned numNotFound,
                              const BSONElement& arrObjElt,
-                             const std::set<unsigned>& arrIdxs,
+                             const std::set<size_t>& arrIdxs,
                              bool mayExpandArrayUnembedded,
-                             const std::vector<PositionalPathInfo>& positionalInfo) const;
+                             const std::vector<PositionalPathInfo>& positionalInfo,
+                             MultikeyPaths* multikeyPaths) const;
 
     const std::vector<PositionalPathInfo> _emptyPositionalInfo;
+
+    // A vector with size equal to the number of elements in the index key pattern. Each element in
+    // the vector is the number of path components in the indexed field.
+    std::vector<size_t> _pathLengths;
 };
 
 }  // namespace mongo

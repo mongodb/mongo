@@ -26,12 +26,17 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndex
+
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/index/btree_key_generator.h"
 
 #include <iostream>
 
 #include "mongo/db/json.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/log.h"
 
 using namespace mongo;
 using std::unique_ptr;
@@ -56,24 +61,29 @@ std::string dumpKeyset(const BSONObjSet& objs) {
     return ss.str();
 }
 
-bool keysetsMatch(const BSONObjSet& expected, const BSONObjSet& actual) {
-    if (expected.size() != actual.size()) {
-        return false;
-    }
+std::string dumpMultikeyPaths(const MultikeyPaths& multikeyPaths) {
+    std::stringstream ss;
 
-    for (BSONObjSet::iterator i = expected.begin(); i != expected.end(); ++i) {
-        if (actual.end() == actual.find(*i)) {
-            return false;
+    ss << "[ ";
+    for (const auto multikeyComponents : multikeyPaths) {
+        ss << "[ ";
+        for (const auto multikeyComponent : multikeyComponents) {
+            ss << multikeyComponent << " ";
         }
+        ss << "] ";
     }
+    ss << "]";
 
-    return true;
+    return ss.str();
 }
 
 bool testKeygen(const BSONObj& kp,
                 const BSONObj& obj,
                 const BSONObjSet& expectedKeys,
+                const MultikeyPaths& expectedMultikeyPaths,
                 bool sparse = false) {
+    invariant(expectedMultikeyPaths.size() == static_cast<size_t>(kp.nFields()));
+
     //
     // Step 1: construct the btree key generator object, using the
     // index key pattern.
@@ -91,18 +101,28 @@ bool testKeygen(const BSONObj& kp,
     unique_ptr<BtreeKeyGenerator> keyGen(new BtreeKeyGeneratorV1(fieldNames, fixed, sparse));
 
     //
-    // Step 2: ask 'keyGen' to generate index keys for the object 'obj'.
+    // Step 2: ask 'keyGen' to generate index keys for the object 'obj' and report any prefixes of
+    // the indexed fields that would cause the index to be multikey as a result of inserting
+    // 'actualKeys'.
     //
     BSONObjSet actualKeys;
-    keyGen->getKeys(obj, &actualKeys);
+    MultikeyPaths actualMultikeyPaths;
+    keyGen->getKeys(obj, &actualKeys, &actualMultikeyPaths);
 
     //
     // Step 3: check that the results match the expected result.
     //
-    bool match = keysetsMatch(expectedKeys, actualKeys);
+    bool match = (expectedKeys == actualKeys);
     if (!match) {
-        cout << "Expected: " << dumpKeyset(expectedKeys) << ", "
-             << "Actual: " << dumpKeyset(actualKeys) << endl;
+        log() << "Expected: " << dumpKeyset(expectedKeys) << ", "
+              << "Actual: " << dumpKeyset(actualKeys);
+        return false;
+    }
+
+    match = (expectedMultikeyPaths == actualMultikeyPaths);
+    if (!match) {
+        log() << "Expected: " << dumpMultikeyPaths(expectedMultikeyPaths) << ", "
+              << "Actual: " << dumpMultikeyPaths(actualMultikeyPaths);
     }
 
     return match;
@@ -117,7 +137,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromObjectSimple) {
     BSONObj genKeysFrom = fromjson("{b: 4, a: 5}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': 5}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromObjectDotted) {
@@ -125,7 +146,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromObjectDotted) {
     BSONObj genKeysFrom = fromjson("{a: {b: 4}, c: 'foo'}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': 4}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromArraySimple) {
@@ -135,7 +157,26 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromArraySimple) {
     expectedKeys.insert(fromjson("{'': 1}"));
     expectedKeys.insert(fromjson("{'': 2}"));
     expectedKeys.insert(fromjson("{'': 3}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{{0U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
+}
+
+TEST(BtreeKeyGeneratorTest, GetKeysFromArrayWithIdenticalValues) {
+    BSONObj keyPattern = fromjson("{a: 1}");
+    BSONObj genKeysFrom = fromjson("{a: [0, 0, 0]}");
+    BSONObjSet expectedKeys;
+    expectedKeys.insert(fromjson("{'': 0}"));
+    MultikeyPaths expectedMultikeyPaths{{0U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
+}
+
+TEST(BtreeKeyGeneratorTest, GetKeysFromArrayWithEquivalentValues) {
+    BSONObj keyPattern = fromjson("{a: 1}");
+    BSONObj genKeysFrom = fromjson("{a: [0, NumberInt(0), NumberLong(0)]}");
+    BSONObjSet expectedKeys;
+    expectedKeys.insert(fromjson("{'': 0}"));
+    MultikeyPaths expectedMultikeyPaths{{0U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromArrayFirstElement) {
@@ -145,7 +186,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromArrayFirstElement) {
     expectedKeys.insert(fromjson("{'': 1, '': 2}"));
     expectedKeys.insert(fromjson("{'': 2, '': 2}"));
     expectedKeys.insert(fromjson("{'': 3, '': 2}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{{0U}, std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromArraySecondElement) {
@@ -155,7 +197,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromArraySecondElement) {
     expectedKeys.insert(fromjson("{'': 5, '': 1}"));
     expectedKeys.insert(fromjson("{'': 5, '': 2}"));
     expectedKeys.insert(fromjson("{'': 5, '': 3}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}, {0U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromSecondLevelArray) {
@@ -165,14 +208,17 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromSecondLevelArray) {
     expectedKeys.insert(fromjson("{'': 1}"));
     expectedKeys.insert(fromjson("{'': 2}"));
     expectedKeys.insert(fromjson("{'': 3}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{{1U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromParallelArraysBasic) {
     BSONObj keyPattern = fromjson("{'a': 1, 'b': 1}");
     BSONObj genKeysFrom = fromjson("{a: [1, 2, 3], b: [1, 2, 3]}}");
     BSONObjSet expectedKeys;
-    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys), UserException);
+    MultikeyPaths expectedMultikeyPaths(keyPattern.nFields());
+    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
+                  UserException);
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromArraySubobjectBasic) {
@@ -182,7 +228,18 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromArraySubobjectBasic) {
     expectedKeys.insert(fromjson("{'': 1}"));
     expectedKeys.insert(fromjson("{'': 2}"));
     expectedKeys.insert(fromjson("{'': 3}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{{0U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
+}
+
+TEST(BtreeKeyGeneratorTest, GetKeysFromSubobjectWithArrayOfSubobjects) {
+    BSONObj keyPattern = fromjson("{'a.b.c': 1}");
+    BSONObj genKeysFrom = fromjson("{a: {b: [{c: 1}, {c: 2}]}}");
+    BSONObjSet expectedKeys;
+    expectedKeys.insert(fromjson("{'': 1}"));
+    expectedKeys.insert(fromjson("{'': 2}"));
+    MultikeyPaths expectedMultikeyPaths{{1U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysArraySubobjectCompoundIndex) {
@@ -192,7 +249,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysArraySubobjectCompoundIndex) {
     expectedKeys.insert(fromjson("{'': 1, '': 99}"));
     expectedKeys.insert(fromjson("{'': 2, '': 99}"));
     expectedKeys.insert(fromjson("{'': 3, '': 99}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{{0U}, std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysArraySubobjectSingleMissing) {
@@ -203,7 +261,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysArraySubobjectSingleMissing) {
     expectedKeys.insert(fromjson("{'': 1}"));
     expectedKeys.insert(fromjson("{'': 2}"));
     expectedKeys.insert(fromjson("{'': 3}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{{0U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromArraySubobjectMissing) {
@@ -211,7 +270,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromArraySubobjectMissing) {
     BSONObj genKeysFrom = fromjson("{a: [{foo: 41}, {foo: 41}, {foo: 41}]}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': null}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{{0U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysMissingField) {
@@ -219,7 +279,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysMissingField) {
     BSONObj genKeysFrom = fromjson("{b: 1}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': null}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysSubobjectMissing) {
@@ -227,7 +288,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysSubobjectMissing) {
     BSONObj genKeysFrom = fromjson("{a: [1, 2]}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': null}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{{0U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromCompound) {
@@ -235,7 +297,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromCompound) {
     BSONObj genKeysFrom = fromjson("{x: 'a', y: 'b'}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': 'a', '': 'b'}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}, std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromCompoundMissing) {
@@ -243,7 +306,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromCompoundMissing) {
     BSONObj genKeysFrom = fromjson("{x: 'a'}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': 'a', '': null}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}, std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromArraySubelementComplex) {
@@ -251,14 +315,18 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromArraySubelementComplex) {
     BSONObj genKeysFrom = fromjson("{a:[{b:[2]}]}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': 2}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    // Both the 'a' and 'a.b' arrays contain a single element.
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromParallelArraysComplex) {
     BSONObj keyPattern = fromjson("{'a.b': 1, 'a.c': 1}");
     BSONObj genKeysFrom = fromjson("{a:[{b:[1],c:[2]}]}");
     BSONObjSet expectedKeys;
-    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys), UserException);
+    MultikeyPaths expectedMultikeyPaths(keyPattern.nFields());
+    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
+                  UserException);
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysAlternateMissing) {
@@ -267,7 +335,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysAlternateMissing) {
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': null, '': 2}"));
     expectedKeys.insert(fromjson("{'': 1, '': null}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{{0U}, {0U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromMultiComplex) {
@@ -277,7 +346,30 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromMultiComplex) {
     expectedKeys.insert(fromjson("{'': 1}"));
     expectedKeys.insert(fromjson("{'': 2}"));
     expectedKeys.insert(fromjson("{'': 3}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{{0U, 1U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
+}
+
+TEST(BtreeKeyGeneratorTest, GetKeysFromArrayOfSubobjectsWithArrayValues) {
+    BSONObj keyPattern = fromjson("{'a.b': 1}");
+    BSONObj genKeysFrom = fromjson("{a: [{b: [1, 2]}, {b: [2, 3]}]}");
+    BSONObjSet expectedKeys;
+    expectedKeys.insert(fromjson("{'': 1}"));
+    expectedKeys.insert(fromjson("{'': 2}"));
+    expectedKeys.insert(fromjson("{'': 3}"));
+    MultikeyPaths expectedMultikeyPaths{{0U, 1U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
+}
+
+TEST(BtreeKeyGeneratorTest, GetKeysFromArrayOfSubobjectsWithNonDistinctArrayValues) {
+    BSONObj keyPattern = fromjson("{'a.b': 1}");
+    BSONObj genKeysFrom = fromjson("{a: [{b: [1, 2, 3]}, {b: [2]}, {b: [3, 1]}]}");
+    BSONObjSet expectedKeys;
+    expectedKeys.insert(fromjson("{'': 1}"));
+    expectedKeys.insert(fromjson("{'': 2}"));
+    expectedKeys.insert(fromjson("{'': 3}"));
+    MultikeyPaths expectedMultikeyPaths{{0U, 1U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysArrayEmpty) {
@@ -286,22 +378,24 @@ TEST(BtreeKeyGeneratorTest, GetKeysArrayEmpty) {
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': 1}"));
     expectedKeys.insert(fromjson("{'': 2}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{{0U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 
     genKeysFrom = fromjson("{a: [1]}");
     expectedKeys.clear();
     expectedKeys.insert(fromjson("{'': 1}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    expectedMultikeyPaths[0].clear();
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 
     genKeysFrom = fromjson("{a: null}");
     expectedKeys.clear();
     expectedKeys.insert(fromjson("{'': null}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 
     genKeysFrom = fromjson("{a: []}");
     expectedKeys.clear();
     expectedKeys.insert(fromjson("{'': undefined}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromDoubleArray) {
@@ -310,7 +404,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromDoubleArray) {
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': 1, '': 1}"));
     expectedKeys.insert(fromjson("{'': 2, '': 2}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{{0U}, {0U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromDoubleEmptyArray) {
@@ -318,7 +413,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromDoubleEmptyArray) {
     BSONObj genKeysFrom = fromjson("{a:[]}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': undefined, '': undefined}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}, std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromMultiEmptyArray) {
@@ -327,17 +423,19 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromMultiEmptyArray) {
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': 1, '': 1}"));
     expectedKeys.insert(fromjson("{'': 1, '': 2}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}, {0U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 
     genKeysFrom = fromjson("{a: 1, b: [1]}");
     expectedKeys.clear();
     expectedKeys.insert(fromjson("{'': 1, '': 1}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    expectedMultikeyPaths[1].clear();
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 
     genKeysFrom = fromjson("{a: 1, b: []}");
     expectedKeys.clear();
     expectedKeys.insert(fromjson("{'': 1, '': undefined}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromNestedEmptyArray) {
@@ -345,7 +443,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromNestedEmptyArray) {
     BSONObj genKeysFrom = fromjson("{a:[]}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': null}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromMultiNestedEmptyArray) {
@@ -353,7 +452,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromMultiNestedEmptyArray) {
     BSONObj genKeysFrom = fromjson("{a:[]}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': null, '': null}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}, std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromUnevenNestedEmptyArray) {
@@ -361,17 +461,18 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromUnevenNestedEmptyArray) {
     BSONObj genKeysFrom = fromjson("{a:[]}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': undefined, '': null}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}, std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 
     genKeysFrom = fromjson("{a:[{b: 1}]}");
     expectedKeys.clear();
     expectedKeys.insert(fromjson("{'': {b:1}, '': 1}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 
     genKeysFrom = fromjson("{a:[{b: []}]}");
     expectedKeys.clear();
     expectedKeys.insert(fromjson("{'': {b:[]}, '': undefined}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromReverseUnevenNestedEmptyArray) {
@@ -379,66 +480,66 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromReverseUnevenNestedEmptyArray) {
     BSONObj genKeysFrom = fromjson("{a:[]}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': null, '': undefined}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}, std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, SparseReverseUnevenNestedEmptyArray) {
+    const bool sparse = true;
     BSONObj keyPattern = fromjson("{'a.b': 1, 'a': 1}");
     BSONObj genKeysFrom = fromjson("{a:[]}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': null, '': undefined}"));
-    // true means sparse
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, true));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}, std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths, sparse));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromSparseEmptyArray) {
+    const bool sparse = true;
     BSONObj keyPattern = fromjson("{'a.b': 1}");
     BSONObj genKeysFrom = fromjson("{a:1}");
     BSONObjSet expectedKeys;
-    // true means sparse
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, true));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths, sparse));
 
     genKeysFrom = fromjson("{a:[]}");
-    // true means sparse
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, true));
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths, sparse));
 
     genKeysFrom = fromjson("{a:[{c:1}]}");
-    // true means sparse
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, true));
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths, sparse));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromSparseEmptyArraySecond) {
+    const bool sparse = true;
     BSONObj keyPattern = fromjson("{z: 1, 'a.b': 1}");
     BSONObj genKeysFrom = fromjson("{a:1}");
     BSONObjSet expectedKeys;
-    // true means sparse
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, true));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}, std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths, sparse));
 
     genKeysFrom = fromjson("{a:[]}");
-    // true means sparse
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, true));
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths, sparse));
 
     genKeysFrom = fromjson("{a:[{c:1}]}");
-    // true means sparse
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, true));
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths, sparse));
 }
 
 TEST(BtreeKeyGeneratorTest, SparseNonObjectMissingNestedField) {
+    const bool sparse = true;
     BSONObj keyPattern = fromjson("{'a.b': 1}");
     BSONObj genKeysFrom = fromjson("{a:[]}");
     BSONObjSet expectedKeys;
-    // true means sparse
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, true));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths, sparse));
 
     genKeysFrom = fromjson("{a:[1]}");
-    // true means sparse
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, true));
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths, sparse));
 
     genKeysFrom = fromjson("{a:[1,{b:1}]}");
     expectedKeys.clear();
     expectedKeys.insert(fromjson("{'': 1}"));
-    // true means sparse
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, true));
+    expectedMultikeyPaths = {{0U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths, sparse));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromIndexedArrayIndex) {
@@ -446,34 +547,37 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromIndexedArrayIndex) {
     BSONObj genKeysFrom = fromjson("{a:[1]}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': 1}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 
     genKeysFrom = fromjson("{a:[[1]]}");
     expectedKeys.clear();
     expectedKeys.insert(fromjson("{'': [1]}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 
     genKeysFrom = fromjson("{a:[[]]}");
     expectedKeys.clear();
     expectedKeys.insert(fromjson("{'': undefined}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 
     genKeysFrom = fromjson("{a:[[]]}");
     expectedKeys.clear();
     expectedKeys.insert(fromjson("{'': undefined}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 
     genKeysFrom = fromjson("{a:{'0':1}}");
     expectedKeys.clear();
     expectedKeys.insert(fromjson("{'': 1}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 
     genKeysFrom = fromjson("{a:[{'0':1}]}");
     expectedKeys.clear();
-    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys), UserException);
+    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
+                  UserException);
 
     genKeysFrom = fromjson("{a:[1,{'0':2}]}");
-    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys), UserException);
+    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
+                  UserException);
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromDoubleIndexedArrayIndex) {
@@ -481,22 +585,23 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromDoubleIndexedArrayIndex) {
     BSONObj genKeysFrom = fromjson("{a:[[1]]}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': 1}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 
     genKeysFrom = fromjson("{a:[[]]}");
     expectedKeys.clear();
     expectedKeys.insert(fromjson("{'': null}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 
     genKeysFrom = fromjson("{a:[]}");
     expectedKeys.clear();
     expectedKeys.insert(fromjson("{'': null}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 
     genKeysFrom = fromjson("{a:[[[]]]}");
     expectedKeys.clear();
     expectedKeys.insert(fromjson("{'': undefined}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromObjectWithinArray) {
@@ -504,37 +609,38 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromObjectWithinArray) {
     BSONObj genKeysFrom = fromjson("{a:[{b:1}]}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': 1}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 
     genKeysFrom = fromjson("{a:[{b:[1]}]}");
     expectedKeys.clear();
     expectedKeys.insert(fromjson("{'': 1}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 
     genKeysFrom = fromjson("{a:[{b:[[1]]}]}");
     expectedKeys.clear();
     expectedKeys.insert(fromjson("{'': [1]}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 
     genKeysFrom = fromjson("{a:[[{b:1}]]}");
     expectedKeys.clear();
     expectedKeys.insert(fromjson("{'': 1}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 
     genKeysFrom = fromjson("{a:[[{b:[1]}]]}");
     expectedKeys.clear();
     expectedKeys.insert(fromjson("{'': 1}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 
     genKeysFrom = fromjson("{a:[[{b:[[1]]}]]}");
     expectedKeys.clear();
     expectedKeys.insert(fromjson("{'': [1]}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 
     genKeysFrom = fromjson("{a:[[{b:[]}]]}");
     expectedKeys.clear();
     expectedKeys.insert(fromjson("{'': undefined}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromArrayWithinObjectWithinArray) {
@@ -542,21 +648,26 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromArrayWithinObjectWithinArray) {
     BSONObj genKeysFrom = fromjson("{a:[{b:[1]}]}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': 1}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, ParallelArraysInNestedObjects) {
     BSONObj keyPattern = fromjson("{'a.a': 1, 'b.a': 1}");
     BSONObj genKeysFrom = fromjson("{a:{a:[1]}, b:{a:[1]}}");
     BSONObjSet expectedKeys;
-    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys), UserException);
+    MultikeyPaths expectedMultikeyPaths(keyPattern.nFields());
+    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
+                  UserException);
 }
 
 TEST(BtreeKeyGeneratorTest, ParallelArraysUneven) {
     BSONObj keyPattern = fromjson("{'b.a': 1, 'a': 1}");
     BSONObj genKeysFrom = fromjson("{b:{a:[1]}, a:[1,2]}");
     BSONObjSet expectedKeys;
-    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys), UserException);
+    MultikeyPaths expectedMultikeyPaths(keyPattern.nFields());
+    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
+                  UserException);
 }
 
 TEST(BtreeKeyGeneratorTest, MultipleArraysNotParallel) {
@@ -566,7 +677,8 @@ TEST(BtreeKeyGeneratorTest, MultipleArraysNotParallel) {
     expectedKeys.insert(fromjson("{'': null}"));
     expectedKeys.insert(fromjson("{'': 3}"));
     expectedKeys.insert(fromjson("{'': 4}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{{0U, 2U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, MultipleArraysNotParallelCompound) {
@@ -576,7 +688,8 @@ TEST(BtreeKeyGeneratorTest, MultipleArraysNotParallelCompound) {
     expectedKeys.insert(fromjson("{'': null, '': null}"));
     expectedKeys.insert(fromjson("{'': 3, '': 5}"));
     expectedKeys.insert(fromjson("{'': 4, '': 5}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{{0U, 2U}, {0U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysComplexNestedArrays) {
@@ -588,7 +701,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysComplexNestedArrays) {
     expectedKeys.insert(fromjson("{'':null, '':7, '':null, '':3, '':4}"));
     expectedKeys.insert(fromjson("{'':null, '':7, '':6, '':null, '':null}"));
     expectedKeys.insert(fromjson("{'':1, '':7, '':null, '':{d: 1}, '':4}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{{0U, 1U, 2U}, {0U}, {0U, 1U}, {0U, 1U, 2U}, {0U, 1U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 // Descriptive test. Should future index versions recursively index nested arrays?
@@ -597,7 +711,8 @@ TEST(BtreeKeyGeneratorTest, GetKeys2DArray) {
     BSONObj genKeysFrom = fromjson("{a: [[2]]}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': [2]}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 // Descriptive test. Should parallel indexed arrays be allowed? If not, should empty
@@ -606,21 +721,27 @@ TEST(BtreeKeyGeneratorTest, GetKeysParallelEmptyArrays) {
     BSONObj keyPattern = fromjson("{a: 1, b: 1}");
     BSONObj genKeysFrom = fromjson("{a: [], b: []}");
     BSONObjSet expectedKeys;
-    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys), UserException);
+    MultikeyPaths expectedMultikeyPaths(keyPattern.nFields());
+    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
+                  UserException);
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysParallelArraysOneArrayEmpty) {
     BSONObj keyPattern = fromjson("{a: 1, b: 1}");
     BSONObj genKeysFrom = fromjson("{a: [], b: [1, 2, 3]}");
     BSONObjSet expectedKeys;
-    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys), UserException);
+    MultikeyPaths expectedMultikeyPaths(keyPattern.nFields());
+    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
+                  UserException);
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysParallelArraysOneArrayEmptyNested) {
     BSONObj keyPattern = fromjson("{'a.b.c': 1, 'a.b.d': 1}");
     BSONObj genKeysFrom = fromjson("{a: [{b: [{c: [1, 2, 3], d: []}]}]}");
     BSONObjSet expectedKeys;
-    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys), UserException);
+    MultikeyPaths expectedMultikeyPaths(keyPattern.nFields());
+    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
+                  UserException);
 }
 
 // Descriptive test. The semantics for key generation are odd for positional key patterns.
@@ -629,7 +750,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysPositionalKeyPatternMissingElement) {
     BSONObj genKeysFrom = fromjson("{a: [{'2': 5}]}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': 5}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 // Descriptive test. The semantics for key generation are odd for positional key patterns.
@@ -638,7 +760,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysPositionalKeyPatternNestedArray) {
     BSONObj genKeysFrom = fromjson("{a: [[1, 2, 5]]}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': null}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 // Descriptive test. The semantics for key generation are odd for positional key patterns.
@@ -647,7 +770,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysPositionalKeyPatternNestedArray2) {
     BSONObj genKeysFrom = fromjson("{a: [[1, 2, 5], [3, 4, 6], [0, 1, 2]]}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': [0, 1, 2]}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 // Descriptive test. The semantics for key generation are odd for positional key patterns.
@@ -656,7 +780,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysPositionalKeyPatternNestedArray3) {
     BSONObj genKeysFrom = fromjson("{a: [{'0': 1, '1': 2, '2': 5}]}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': 5}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 // Descriptive test. The semantics for key generation are odd for positional key patterns.
@@ -665,7 +790,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysPositionalKeyPatternNestedArray4) {
     BSONObj genKeysFrom = fromjson("{a: [{b: [[1, 2, 5]]}]}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': null}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 // Descriptive test. The semantics for key generation are odd for positional key patterns.
@@ -675,7 +801,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysPositionalKeyPatternNestedArray5) {
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': null}"));
     expectedKeys.insert(fromjson("{'': 6}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{0U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetNullKeyNestedArray) {
@@ -683,7 +810,8 @@ TEST(BtreeKeyGeneratorTest, GetNullKeyNestedArray) {
     BSONObj genKeysFrom = fromjson("{a: [[1, 2, 5]]}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': null}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysUnevenNestedArrays) {
@@ -694,7 +822,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysUnevenNestedArrays) {
     expectedKeys.insert(fromjson("{'': {b:[2,3,4]}, '': 2}"));
     expectedKeys.insert(fromjson("{'': {b:[2,3,4]}, '': 3}"));
     expectedKeys.insert(fromjson("{'': {b:[2,3,4]}, '': 4}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{{0U}, {0U, 1U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 // Descriptive test. Should we define better semantics for future index versions in the case of
@@ -704,7 +833,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysRepeatedFieldName) {
     BSONObj genKeysFrom = fromjson("{a: 2, a: 3}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': 2}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 // Descriptive test. Future index versions may want different or at least more consistent
@@ -715,7 +845,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysEmptyPathPiece) {
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': 1}"));
     expectedKeys.insert(fromjson("{'': 2}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{{1U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 // Descriptive test. Future index versions may want different or at least more consistent
@@ -726,12 +857,13 @@ TEST(BtreeKeyGeneratorTest, GetKeysLastPathPieceEmpty) {
     BSONObj genKeysFrom = fromjson("{a: 2}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': 2}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 
     genKeysFrom = fromjson("{a: {'': 2}}");
     expectedKeys.clear();
     expectedKeys.insert(fromjson("{'': {'': 2}}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFirstPathPieceEmpty) {
@@ -739,7 +871,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysFirstPathPieceEmpty) {
     BSONObj genKeysFrom = fromjson("{a: 2}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': null}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, GetKeysFirstPathPieceEmpty2) {
@@ -749,50 +882,76 @@ TEST(BtreeKeyGeneratorTest, GetKeysFirstPathPieceEmpty2) {
     expectedKeys.insert(fromjson("{'': 1}"));
     expectedKeys.insert(fromjson("{'': 2}"));
     expectedKeys.insert(fromjson("{'': 3}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{{1U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, PositionalKeyPatternParallelArrays) {
     BSONObj keyPattern = fromjson("{a: 1, 'b.0': 1}");
     BSONObj genKeysFrom = fromjson("{a: [1], b: [2]}");
     BSONObjSet expectedKeys;
-    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys), UserException);
+    MultikeyPaths expectedMultikeyPaths(keyPattern.nFields());
+    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
+                  UserException);
 }
 
-// Descriptive test.
-TEST(BtreeKeyGeneratorTest, PositionalKeyPatternNestedArrays) {
+TEST(BtreeKeyGeneratorTest, KeyPattern_a_0_b_Extracts_b_ElementInsideSingleton2DArray) {
     BSONObj keyPattern = fromjson("{'a.0.b': 1}");
     BSONObj genKeysFrom = fromjson("{a: [[{b: 1}]]}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': 1}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
-// Descriptive test.
-TEST(BtreeKeyGeneratorTest, PositionalKeyPatternNestedArrays2) {
+TEST(BtreeKeyGeneratorTest, KeyPattern_a_0_0_b_Extracts_b_ElementInsideSingleton2DArray) {
     BSONObj keyPattern = fromjson("{'a.0.0.b': 1}");
     BSONObj genKeysFrom = fromjson("{a: [[{b: 1}]]}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': 1}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
-// Descriptive test.
-TEST(BtreeKeyGeneratorTest, PositionalKeyPatternNestedArrays3) {
+TEST(BtreeKeyGeneratorTest,
+     KeyPattern_a_0_0_b_ExtractsEachValueFrom_b_ArrayInsideSingleton2DArray) {
+    BSONObj keyPattern = fromjson("{'a.0.0.b': 1}");
+    BSONObj genKeysFrom = fromjson("{a: [[{b: [1, 2, 3]}]]}");
+    BSONObjSet expectedKeys;
+    expectedKeys.insert(fromjson("{'': 1}"));
+    expectedKeys.insert(fromjson("{'': 2}"));
+    expectedKeys.insert(fromjson("{'': 3}"));
+    MultikeyPaths expectedMultikeyPaths{{3U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
+}
+
+TEST(BtreeKeyGeneratorTest, KeyPattern_a_0_0_b_Extracts_b_ElementInsideSingleton3DArray) {
     BSONObj keyPattern = fromjson("{'a.0.0.b': 1}");
     BSONObj genKeysFrom = fromjson("{a: [[[ {b: 1} ]]]}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': 1}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
-// Descriptive test.
-TEST(BtreeKeyGeneratorTest, PositionalKeyPatternNestedArrays4) {
+TEST(BtreeKeyGeneratorTest, KeyPattern_a_0_0_b_ExtractsEach_b_ElementInside3DArray) {
+    BSONObj keyPattern = fromjson("{'a.0.0.b': 1}");
+    BSONObj genKeysFrom = fromjson("{a: [[[{b: 1}, {b: 2}, {b: 3}]]]}");
+    BSONObjSet expectedKeys;
+    expectedKeys.insert(fromjson("{'': 1}"));
+    expectedKeys.insert(fromjson("{'': 2}"));
+    expectedKeys.insert(fromjson("{'': 3}"));
+    MultikeyPaths expectedMultikeyPaths{{2U}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
+}
+
+TEST(BtreeKeyGeneratorTest, KeyPattern_a_0_0_b_ExtractsNullFrom4DArray) {
     BSONObj keyPattern = fromjson("{'a.0.0.b': 1}");
     BSONObj genKeysFrom = fromjson("{a: [[[[ {b: 1} ]]]]}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': null}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 TEST(BtreeKeyGeneratorTest, PositionalKeyPatternNestedArrays5) {
@@ -800,7 +959,8 @@ TEST(BtreeKeyGeneratorTest, PositionalKeyPatternNestedArrays5) {
     BSONObj genKeysFrom = fromjson("{a: [{b: [1, 2]}]}");
     BSONObjSet expectedKeys;
     expectedKeys.insert(fromjson("{'': 2}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 // Descriptive test.
@@ -812,7 +972,8 @@ TEST(BtreeKeyGeneratorTest, PositionalKeyPatternNestedArrays6) {
     expectedKeys.insert(fromjson("{'': {b:3}, '': 3, '': 2, '': null, '': 1}"));
     expectedKeys.insert(fromjson("{'': {b:[1,2]}, '': 1, '': 1, '': 1, '': 1}"));
     expectedKeys.insert(fromjson("{'': {b:[1,2]}, '': 2, '': 2, '': 1, '': 1}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{{0U}, {0U, 1U}, {2U}, {0U}, std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 // Descriptive test.
@@ -824,7 +985,8 @@ TEST(BtreeKeyGeneratorTest, PositionalKeyPatternNestedArrays7) {
     expectedKeys.insert(fromjson("{'': {b:{'0':3}}, '': {'0':3}, '': 2, '': 3, '': 1}"));
     expectedKeys.insert(fromjson("{'': {b:[1,2]}, '': 1, '': 1, '': 1, '': 1}"));
     expectedKeys.insert(fromjson("{'': {b:[1,2]}, '': 2, '': 2, '': 1, '': 1}"));
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    MultikeyPaths expectedMultikeyPaths{{0U}, {0U, 1U}, {2U}, {0U}, std::set<size_t>{}};
+    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
 }
 
 }  // namespace

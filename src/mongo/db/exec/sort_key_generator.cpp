@@ -177,7 +177,10 @@ StatusWith<BSONObj> SortKeyGenerator::getSortKeyFromObject(const WorkingSetMembe
     BSONObjSet keys(patternCmp);
 
     try {
-        _keyGen->getKeys(member.obj.value(), &keys);
+        // There's no need to compute the prefixes of the indexed fields that cause the index to be
+        // multikey when getting the index keys for sorting.
+        MultikeyPaths* multikeyPaths = nullptr;
+        _keyGen->getKeys(member.obj.value(), &keys, multikeyPaths);
     } catch (const UserException& e) {
         // Probably a parallel array.
         if (BtreeKeyGenerator::ParallelArraysCode == e.getCode()) {

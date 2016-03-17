@@ -26,8 +26,12 @@
 *    it in the license file.
 */
 
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/index/btree_key_generator.h"
+
+#include <boost/optional.hpp>
+
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -58,7 +62,9 @@ BtreeKeyGenerator::BtreeKeyGenerator(std::vector<const char*> fieldNames,
     _isIdIndex = fieldNames.size() == 1 && std::string("_id") == fieldNames[0];
 }
 
-void BtreeKeyGenerator::getKeys(const BSONObj& obj, BSONObjSet* keys) const {
+void BtreeKeyGenerator::getKeys(const BSONObj& obj,
+                                BSONObjSet* keys,
+                                MultikeyPaths* multikeyPaths) const {
     if (_isIdIndex) {
         // we special case for speed
         BSONElement e = obj["_id"];
@@ -76,7 +82,7 @@ void BtreeKeyGenerator::getKeys(const BSONObj& obj, BSONObjSet* keys) const {
 
     // '_fieldNames' and '_fixed' are passed by value so that they can be mutated as part of the
     // getKeys call.  :|
-    getKeysImpl(_fieldNames, _fixed, obj, keys);
+    getKeysImpl(_fieldNames, _fixed, obj, keys, multikeyPaths);
     if (keys->empty() && !_isSparse) {
         keys->insert(_nullKey);
     }
@@ -96,7 +102,8 @@ BtreeKeyGeneratorV0::BtreeKeyGeneratorV0(std::vector<const char*> fieldNames,
 void BtreeKeyGeneratorV0::getKeysImpl(std::vector<const char*> fieldNames,
                                       std::vector<BSONElement> fixed,
                                       const BSONObj& obj,
-                                      BSONObjSet* keys) const {
+                                      BSONObjSet* keys,
+                                      MultikeyPaths* multikeyPaths) const {
     BSONElement arrElt;
     unsigned arrIdx = ~0;
     unsigned numNotFound = 0;
@@ -181,7 +188,7 @@ void BtreeKeyGeneratorV0::getKeysImpl(std::vector<const char*> fieldNames,
             while (i.more()) {
                 BSONElement e = i.next();
                 if (e.type() == Object) {
-                    getKeysImpl(fieldNames, fixed, e.embeddedObject(), keys);
+                    getKeysImpl(fieldNames, fixed, e.embeddedObject(), keys, multikeyPaths);
                 }
             }
         } else {
@@ -210,7 +217,13 @@ void BtreeKeyGeneratorV0::getKeysImpl(std::vector<const char*> fieldNames,
 BtreeKeyGeneratorV1::BtreeKeyGeneratorV1(std::vector<const char*> fieldNames,
                                          std::vector<BSONElement> fixed,
                                          bool isSparse)
-    : BtreeKeyGenerator(fieldNames, fixed, isSparse), _emptyPositionalInfo(fieldNames.size()) {}
+    : BtreeKeyGenerator(fieldNames, fixed, isSparse), _emptyPositionalInfo(fieldNames.size()) {
+    for (const char* fieldName : fieldNames) {
+        size_t pathLength = FieldRef{fieldName}.numParts();
+        invariant(pathLength > 0);
+        _pathLengths.push_back(pathLength);
+    }
+}
 
 BSONElement BtreeKeyGeneratorV1::extractNextElement(const BSONObj& obj,
                                                     const PositionalPathInfo& positionalInfo,
@@ -242,19 +255,18 @@ BSONElement BtreeKeyGeneratorV1::extractNextElement(const BSONObj& obj,
     return BSONElement();
 }
 
-void BtreeKeyGeneratorV1::_getKeysArrEltFixed(
-    std::vector<const char*>* fieldNames,
-    std::vector<BSONElement>* fixed,
-    const BSONElement& arrEntry,
-    BSONObjSet* keys,
-    unsigned numNotFound,
-    const BSONElement& arrObjElt,
-    const std::set<unsigned>& arrIdxs,
-    bool mayExpandArrayUnembedded,
-    const std::vector<PositionalPathInfo>& positionalInfo) const {
+void BtreeKeyGeneratorV1::_getKeysArrEltFixed(std::vector<const char*>* fieldNames,
+                                              std::vector<BSONElement>* fixed,
+                                              const BSONElement& arrEntry,
+                                              BSONObjSet* keys,
+                                              unsigned numNotFound,
+                                              const BSONElement& arrObjElt,
+                                              const std::set<size_t>& arrIdxs,
+                                              bool mayExpandArrayUnembedded,
+                                              const std::vector<PositionalPathInfo>& positionalInfo,
+                                              MultikeyPaths* multikeyPaths) const {
     // Set up any terminal array values.
-    for (std::set<unsigned>::const_iterator j = arrIdxs.begin(); j != arrIdxs.end(); ++j) {
-        unsigned idx = *j;
+    for (const auto idx : arrIdxs) {
         if (*(*fieldNames)[idx] == '\0') {
             (*fixed)[idx] = mayExpandArrayUnembedded ? arrEntry : arrObjElt;
         }
@@ -266,14 +278,19 @@ void BtreeKeyGeneratorV1::_getKeysArrEltFixed(
                          arrEntry.type() == Object ? arrEntry.embeddedObject() : BSONObj(),
                          keys,
                          numNotFound,
-                         positionalInfo);
+                         positionalInfo,
+                         multikeyPaths);
 }
 
 void BtreeKeyGeneratorV1::getKeysImpl(std::vector<const char*> fieldNames,
                                       std::vector<BSONElement> fixed,
                                       const BSONObj& obj,
-                                      BSONObjSet* keys) const {
-    getKeysImplWithArray(fieldNames, fixed, obj, keys, 0, _emptyPositionalInfo);
+                                      BSONObjSet* keys,
+                                      MultikeyPaths* multikeyPaths) const {
+    if (multikeyPaths) {
+        multikeyPaths->resize(fieldNames.size());
+    }
+    getKeysImplWithArray(fieldNames, fixed, obj, keys, 0, _emptyPositionalInfo, multikeyPaths);
 }
 
 void BtreeKeyGeneratorV1::getKeysImplWithArray(
@@ -282,11 +299,38 @@ void BtreeKeyGeneratorV1::getKeysImplWithArray(
     const BSONObj& obj,
     BSONObjSet* keys,
     unsigned numNotFound,
-    const std::vector<PositionalPathInfo>& positionalInfo) const {
+    const std::vector<PositionalPathInfo>& positionalInfo,
+    MultikeyPaths* multikeyPaths) const {
     BSONElement arrElt;
-    std::set<unsigned> arrIdxs;
+
+    // A set containing the position of any indexed fields in the key pattern that traverse through
+    // the 'arrElt' array value.
+    std::set<size_t> arrIdxs;
+
+    // A vector with size equal to the number of elements in the index key pattern. Each element in
+    // the vector, if initialized, refers to the component within the indexed field that traverses
+    // through the 'arrElt' array value. We say that this component within the indexed field
+    // corresponds to a path that causes the index to be multikey if the 'arrElt' array value
+    // contains multiple elements.
+    //
+    // For example, consider the index {'a.b': 1, 'a.c'} and the document
+    // {a: [{b: 1, c: 'x'}, {b: 2, c: 'y'}]}. The path "a" causes the index to be multikey, so we'd
+    // have a std::vector<boost::optional<size_t>>{{0U}, {0U}}.
+    //
+    // Furthermore, due to how positional key patterns are specified, it's possible for an indexed
+    // field to cause the index to be multikey at a different component than another indexed field
+    // that also traverses through the 'arrElt' array value. It's then also possible for an indexed
+    // field not to cause the index to be multikey, even if it traverses through the 'arrElt' array
+    // value, because only a particular element would be indexed.
+    //
+    // For example, consider the index {'a.b': 1, 'a.b.0'} and the document {a: {b: [1, 2]}}. The
+    // path "a.b" causes the index to be multikey, but the key pattern "a.b.0" only indexes the
+    // first element of the array, so we'd have a
+    // std::vector<boost::optional<size_t>>{{1U}, boost::none}.
+    std::vector<boost::optional<size_t>> arrComponents(fieldNames.size());
+
     bool mayExpandArrayUnembedded = true;
-    for (unsigned i = 0; i < fieldNames.size(); ++i) {
+    for (size_t i = 0; i < fieldNames.size(); ++i) {
         if (*fieldNames[i] == '\0') {
             continue;
         }
@@ -340,7 +384,8 @@ void BtreeKeyGeneratorV1::getKeysImplWithArray(
                             arrElt,
                             arrIdxs,
                             true,
-                            _emptyPositionalInfo);
+                            _emptyPositionalInfo,
+                            multikeyPaths);
     } else {
         BSONObj arrObj = arrElt.embeddedObject();
 
@@ -350,21 +395,61 @@ void BtreeKeyGeneratorV1::getKeysImplWithArray(
         // array element).
         std::vector<PositionalPathInfo> subPositionalInfo(fixed.size());
         for (size_t i = 0; i < fieldNames.size(); ++i) {
+            const bool fieldIsArray = arrIdxs.find(i) != arrIdxs.end();
+
             if (*fieldNames[i] == '\0') {
                 // We've reached the end of the path.
+                if (multikeyPaths && fieldIsArray && mayExpandArrayUnembedded) {
+                    // The 'arrElt' array value isn't expanded into multiple elements when the last
+                    // component of the indexed field is positional and 'arrElt' contains nested
+                    // array values. In all other cases, the 'arrElt' array value may be expanded
+                    // into multiple element and can therefore cause the index to be multikey.
+                    arrComponents[i] = _pathLengths[i] - 1;
+                }
                 continue;
             }
+
+            // The earlier call to BSONObj::getFieldDottedOrArray(fieldNames[i]) modified
+            // fieldNames[i] to refer to the suffix of the path immediately following the 'arrElt'
+            // array value. If we haven't reached the end of this indexed field yet, then we must
+            // have traversed through 'arrElt'.
+            invariant(fieldIsArray);
 
             StringData part = fieldNames[i];
             part = part.substr(0, part.find('.'));
             subPositionalInfo[i].positionallyIndexedElt = arrObj[part];
             if (subPositionalInfo[i].positionallyIndexedElt.eoo()) {
-                // Not indexing an array by position.
+                // We aren't indexing a particular element of the 'arrElt' array value, so it may be
+                // expanded into multiple elements. It can therefore cause the index to be multikey.
+                if (multikeyPaths) {
+                    // We need to determine which component of the indexed field causes the index to
+                    // be multikey as a result of the 'arrElt' array value. Since
+                    //
+                    //   NumComponents("<pathPrefix>") + NumComponents("<pathSuffix>")
+                    //       = NumComponents("<pathPrefix>.<pathSuffix>"),
+                    //
+                    // we can compute the number of components in a prefix of the indexed field by
+                    // subtracting the number of components in the suffix 'fieldNames[i]' from the
+                    // number of components in the indexed field '_fieldNames[i]'.
+                    //
+                    // For example, consider the indexed field "a.b.c" and the suffix "c". The path
+                    // "a.b.c" has 3 components and the suffix "c" has 1 component. Subtracting the
+                    // latter from the former yields the number of components in the prefix "a.b",
+                    // i.e. 2.
+                    size_t fullPathLength = _pathLengths[i];
+                    size_t suffixPathLength = FieldRef{fieldNames[i]}.numParts();
+                    invariant(suffixPathLength < fullPathLength);
+                    arrComponents[i] = fullPathLength - suffixPathLength - 1;
+                }
                 continue;
             }
 
             // We're indexing an array element by its position. Traverse the remainder of the
             // field path now.
+            //
+            // Indexing an array element by its position selects a particular element of the
+            // 'arrElt' array value when generating keys. It therefore cannot cause the index to be
+            // multikey.
             subPositionalInfo[i].arrayObj = arrObj;
             subPositionalInfo[i].remainingPath = fieldNames[i];
             subPositionalInfo[i].dottedElt =
@@ -372,18 +457,31 @@ void BtreeKeyGeneratorV1::getKeysImplWithArray(
         }
 
         // Generate a key for each element of the indexed array.
-        BSONObjIterator i(arrObj);
-        while (i.more()) {
+        size_t nArrObjFields = 0;
+        for (const auto arrObjElem : arrObj) {
             _getKeysArrEltFixed(&fieldNames,
                                 &fixed,
-                                i.next(),
+                                arrObjElem,
                                 keys,
                                 numNotFound,
                                 arrElt,
                                 arrIdxs,
                                 mayExpandArrayUnembedded,
-                                subPositionalInfo);
+                                subPositionalInfo,
+                                multikeyPaths);
+            ++nArrObjFields;
+        }
+
+        if (multikeyPaths && nArrObjFields > 1) {
+            // The 'arrElt' array value contains multiple elements, so we say that it causes the
+            // index to be multikey.
+            for (size_t i = 0; i < arrComponents.size(); ++i) {
+                if (auto arrComponent = arrComponents[i]) {
+                    (*multikeyPaths)[i].insert(*arrComponent);
+                }
+            }
         }
     }
 }
+
 }  // namespace mongo
