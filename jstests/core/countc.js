@@ -28,7 +28,7 @@ assert.eq(2, t.count({a: {$in: vals}}));
 t.drop();
 t.ensureIndex({a: 1});
 t.save({a: [1, 2]});  // Will match because 'a' is in range.
-t.save({a: 9});  // Will not match because 'a' is not in range.
+t.save({a: 9});       // Will not match because 'a' is not in range.
 // Only one document matches.
 assert.eq(1, t.count({a: {$gt: 0, $lt: 5}}));
 
@@ -43,7 +43,7 @@ assert.eq(0, t.count({'a.b': 2, 'a.c': 2}));
 t.drop();
 t.ensureIndex({a: 1});
 t.save({a: 'a'});  // Will match.
-t.save({a: {}});  // Will not match because {} is not a string.
+t.save({a: {}});   // Will not match because {} is not a string.
 // Only one document matches.
 assert.eq(1, t.count({a: {$gte: ''}}));
 
@@ -51,7 +51,7 @@ assert.eq(1, t.count({a: {$gte: ''}}));
 t.drop();
 t.ensureIndex({a: 1});
 t.save({a: new Date(1)});  // Will match.
-t.save({a: true});  // Will not match because 'true' is not a date.
+t.save({a: true});         // Will not match because 'true' is not a date.
 // Only one document matches.
 assert.eq(1, t.count({a: {$lte: new Date(1)}}));
 

@@ -1,7 +1,7 @@
 'use strict';
 
 load('jstests/concurrency/fsm_libs/assert.js');
-load('jstests/concurrency/fsm_libs/cluster.js');  // for Cluster.isStandalone
+load('jstests/concurrency/fsm_libs/cluster.js');       // for Cluster.isStandalone
 load('jstests/concurrency/fsm_libs/parse_config.js');  // for parseConfig
 
 var workerThread = (function() {
@@ -40,7 +40,7 @@ var workerThread = (function() {
             }
 
             workloads.forEach(function(workload) {
-                load(workload);  // for $config
+                load(workload);                     // for $config
                 var config = parseConfig($config);  // to normalize
 
                 // Copy any modifications that were made to $config.data

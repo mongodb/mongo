@@ -111,7 +111,7 @@ function runMRTests(loop, childLoop) {
     test(loop,  // map
          function(k, v) {
              return v[0];
-         },  // reduce
+         },     // reduce
          null,  // finalize
          null,  // scope
          childLoop);
@@ -120,7 +120,7 @@ function runMRTests(loop, childLoop) {
     test(
         function() {
             emit(this.a, 1);
-        },  // map
+        },     // map
         loop,  // reduce
         null,  // finalize
         null,  // scope
@@ -133,8 +133,8 @@ function runMRTests(loop, childLoop) {
         },  // map
         function(k, v) {
             return v[0];
-        },  // reduce
-        null,  // finalize
+        },             // reduce
+        null,          // finalize
         {loop: loop},  // scope
         childLoop);
 }
@@ -148,7 +148,7 @@ function runFinalizeTests(loop, childLoop) {
         },  // map
         function(k, v) {
             return v[0];
-        },  // reduce
+        },     // reduce
         loop,  // finalize
         null,  // scope
         childLoop);
@@ -163,7 +163,7 @@ function runFinalizeTests(loop, childLoop) {
         },  // reduce
         function(a, b) {
             loop();
-        },  // finalize
+        },             // finalize
         {loop: loop},  // scope
         childLoop);
 }

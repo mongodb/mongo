@@ -1,6 +1,6 @@
 'use strict';
 
-load('jstests/libs/parallelTester.js');  // for ScopedThread and CountDownLatch
+load('jstests/libs/parallelTester.js');                 // for ScopedThread and CountDownLatch
 load('jstests/concurrency/fsm_libs/worker_thread.js');  // for workerThread
 
 /**
@@ -209,7 +209,7 @@ var ThreadManager = function(clusterOptions, executionMode = {composed: false}) 
 
 workerThread.fsm = function(workloads, args, options) {
     load('jstests/concurrency/fsm_libs/worker_thread.js');  // for workerThread.main
-    load('jstests/concurrency/fsm_libs/fsm.js');  // for fsm.run
+    load('jstests/concurrency/fsm_libs/fsm.js');            // for fsm.run
 
     return workerThread.main(workloads,
                              args,
@@ -222,7 +222,7 @@ workerThread.fsm = function(workloads, args, options) {
 
 workerThread.composed = function(workloads, args, options) {
     load('jstests/concurrency/fsm_libs/worker_thread.js');  // for workerThread.main
-    load('jstests/concurrency/fsm_libs/composer.js');  // for composer.run
+    load('jstests/concurrency/fsm_libs/composer.js');       // for composer.run
 
     return workerThread.main(workloads,
                              args,

@@ -77,9 +77,9 @@ var $config = (function() {
         startState: 'init',  // optional, default 'init'
         states: states,
         transitions: transitions,
-        setup: setup,  // optional, default empty function
+        setup: setup,        // optional, default empty function
         teardown: teardown,  // optional, default empty function
-        data: data  // optional, default empty object
+        data: data           // optional, default empty object
     };
 
 })();

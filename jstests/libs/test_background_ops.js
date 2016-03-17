@@ -276,7 +276,7 @@ var RandomFunctionContext = function(context) {
     Random.randCluster = function() {
 
         var numShards = 2;  // Random.randInt( 1, 10 )
-        var rs = false;  // Random.randBool()
+        var rs = false;     // Random.randBool()
         var st = new ShardingTest({shards: numShards, mongos: 4, other: {rs: rs}});
 
         return st;

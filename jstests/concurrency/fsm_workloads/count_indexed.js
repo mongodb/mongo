@@ -10,8 +10,8 @@
  * and then inserts 'modulus * countPerNum' documents. [250, 1000]
  * Each thread inserts docs into a unique collection.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/count.js');  // for $config
+load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload
+load('jstests/concurrency/fsm_workloads/count.js');              // for $config
 load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
 
 var $config = extendWorkload(

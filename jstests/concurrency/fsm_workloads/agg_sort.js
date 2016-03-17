@@ -6,8 +6,8 @@
  * Runs an aggregation with a $match that returns half the documents followed
  * by a $sort on a field containing a random float.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/agg_base.js');  // for $config
+load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload
+load('jstests/concurrency/fsm_workloads/agg_base.js');           // for $config
 load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
 
 var $config = extendWorkload(

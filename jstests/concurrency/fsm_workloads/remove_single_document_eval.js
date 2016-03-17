@@ -5,7 +5,7 @@
  *
  * Runs remove_single_document using the eval command.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
+load('jstests/concurrency/fsm_libs/extend_workload.js');              // for extendWorkload
 load('jstests/concurrency/fsm_workloads/remove_single_document.js');  // for $config
 
 var $config =

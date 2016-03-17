@@ -8,13 +8,13 @@
  * for each thread.
  */
 
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
+load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');    // for dropCollections
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isEphemeral
 
 var $config = (function() {
     var data = {
         nDocumentsToInsert: 1000,
-        nIndexes: 3 + 1,  // The number of indexes created in createIndexes + 1 for { _id: 1 }
+        nIndexes: 3 + 1,   // The number of indexes created in createIndexes + 1 for { _id: 1 }
         prefix: 'compact'  // Use filename for prefix because filename is assumed unique
     };
 

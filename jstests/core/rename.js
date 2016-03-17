@@ -53,7 +53,7 @@ printjson(b.stats());
 // while (res.hasNext()) printjson(res.next());
 
 assert.eq(1, b.count({i: i - 1}));  // make sure last is there
-assert.eq(0, b.count({i: 9.1}));  // make sure early one is gone
+assert.eq(0, b.count({i: 9.1}));    // make sure early one is gone
 
 assert(db.getCollectionNames().indexOf("jstests_rename_b") >= 0);
 assert(db.getCollectionNames().indexOf("jstests_rename_a") < 0);

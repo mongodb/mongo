@@ -8,7 +8,7 @@
  * Each thread operates on a separate collection.
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/distinct.js');  // for $config
+load('jstests/concurrency/fsm_workloads/distinct.js');    // for $config
 
 var $config = extendWorkload($config,
                              function($config, $super) {

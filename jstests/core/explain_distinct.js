@@ -35,10 +35,10 @@
         assert.writeOK(coll.insert({a: 2, c: 1}));
     }
 
-    assert.commandFailed(runDistinctExplain(coll, {}, {}));  // Bad keyString.
-    assert.commandFailed(runDistinctExplain(coll, 'a', 'a'));  // Bad query.
-    assert.commandFailed(runDistinctExplain(coll, 'b', {$not: 1}));  // Bad query.
-    assert.commandFailed(runDistinctExplain(coll, 'a', {$not: 1}));  // Bad query.
+    assert.commandFailed(runDistinctExplain(coll, {}, {}));            // Bad keyString.
+    assert.commandFailed(runDistinctExplain(coll, 'a', 'a'));          // Bad query.
+    assert.commandFailed(runDistinctExplain(coll, 'b', {$not: 1}));    // Bad query.
+    assert.commandFailed(runDistinctExplain(coll, 'a', {$not: 1}));    // Bad query.
     assert.commandFailed(runDistinctExplain(coll, '_id', {$not: 1}));  // Bad query.
 
     // Ensure that server accepts a distinct command with no 'query' field.

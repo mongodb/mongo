@@ -9,8 +9,8 @@
  *
  * Each thread updates a TTL index on a separate collection.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/collmod.js');  // for $config
+load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload
+load('jstests/concurrency/fsm_workloads/collmod.js');            // for $config
 load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
 
 var $config = extendWorkload($config,

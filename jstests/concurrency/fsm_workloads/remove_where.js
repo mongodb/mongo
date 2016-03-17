@@ -8,7 +8,7 @@
  * counts.
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
+load('jstests/concurrency/fsm_libs/extend_workload.js');            // for extendWorkload
 load('jstests/concurrency/fsm_workloads/indexed_insert_where.js');  // for $config
 
 var $config = extendWorkload(

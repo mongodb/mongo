@@ -1,6 +1,6 @@
 // SERVER-15319 Make sure pdfile version bumping for the new freelist works as intended
 
-var tooOld = "2.4";  // anything <= 2.6.4
+var tooOld = "2.4";     // anything <= 2.6.4
 var newEnough = "2.6";  // latest in 2.6 is >= 2.6.5
 var latest = "latest";
 

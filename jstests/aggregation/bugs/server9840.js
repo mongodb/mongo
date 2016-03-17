@@ -78,7 +78,7 @@ test(
               }
           }
       }
-    },  // not commutative!
+    },   // not commutative!
     4);  // 10-6 not 6-10 or 6-6
 
 // unicode is allowed

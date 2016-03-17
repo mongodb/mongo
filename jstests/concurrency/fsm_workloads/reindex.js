@@ -13,7 +13,7 @@ var $config = (function() {
     var data = {
         nIndexes: 3 + 1,  // 3 created and 1 for _id
         nDocumentsToInsert: 1000,
-        maxInteger: 100,  // Used for document values. Must be a factor of nDocumentsToInsert
+        maxInteger: 100,   // Used for document values. Must be a factor of nDocumentsToInsert
         prefix: 'reindex'  // Use filename for prefix because filename is assumed unique
     };
 

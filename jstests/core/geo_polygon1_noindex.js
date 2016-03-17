@@ -53,8 +53,8 @@ assert.writeOK(t.save({loc: [1, 3]}));  // Add a point that's in
 
 assert.eq(1, t.find({loc: {$within: {$polygon: pacman}}}).count(), "Pacman single point");
 
-t.save({loc: [5, 3]});  // Add a point that's out right in the mouth opening
-t.save({loc: [3, 7]});  // Add a point above the center of the head
+t.save({loc: [5, 3]});   // Add a point that's out right in the mouth opening
+t.save({loc: [3, 7]});   // Add a point above the center of the head
 t.save({loc: [3, -1]});  // Add a point below the center of the bottom
 
 assert.eq(1, t.find({loc: {$within: {$polygon: pacman}}}).count(), "Pacman double point");

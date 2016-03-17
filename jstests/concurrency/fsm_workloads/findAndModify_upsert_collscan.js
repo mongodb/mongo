@@ -10,7 +10,7 @@
  *
  * Forces 'sort' to perform a collection scan by using $natural.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
+load('jstests/concurrency/fsm_libs/extend_workload.js');            // for extendWorkload
 load('jstests/concurrency/fsm_workloads/findAndModify_upsert.js');  // for $config
 
 var $config = extendWorkload($config,

@@ -96,7 +96,7 @@ if (_isWindows() && getBuildInfo().bits == 32) {
 } else {
     for (var variant = 0; variant < 4; variant++) {
         for (var quickCommits = 0; quickCommits <= 1; quickCommits++) {  // false then true
-            for (var paranoid = 0; paranoid <= 1; paranoid++) {  // false then true
+            for (var paranoid = 0; paranoid <= 1; paranoid++) {          // false then true
                 f(variant, quickCommits, paranoid);
                 sleep(500);
             }

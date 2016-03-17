@@ -91,9 +91,9 @@ test(ISODate('1960-01-02 03:04:05.006Z'), true);
 
 // Testing special rounding rules for seconds
 test(ISODate('1960-01-02 03:04:04.999Z'), false);  // second = 4
-test(ISODate('1960-01-02 03:04:05.000Z'), true);  // second = 5
-test(ISODate('1960-01-02 03:04:05.001Z'), true);  // second = 5
-test(ISODate('1960-01-02 03:04:05.999Z'), true);  // second = 5
+test(ISODate('1960-01-02 03:04:05.000Z'), true);   // second = 5
+test(ISODate('1960-01-02 03:04:05.001Z'), true);   // second = 5
+test(ISODate('1960-01-02 03:04:05.999Z'), true);   // second = 5
 
 // Test date before 1900 (negative tm_year values from gmtime)
 test(ISODate('1860-01-02 03:04:05.006Z'), false);

@@ -5,7 +5,7 @@
  *
  * Intersperse geo $near queries with updates of non-geo fields to test deduplication.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
+load('jstests/concurrency/fsm_libs/extend_workload.js');      // for extendWorkload
 load('jstests/concurrency/fsm_workloads/yield_geo_near.js');  // for $config
 
 var $config = extendWorkload(

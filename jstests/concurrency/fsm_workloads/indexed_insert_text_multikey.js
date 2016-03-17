@@ -5,7 +5,7 @@
  *
  * like indexed_insert_text.js but the indexed value is an array of strings
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
+load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload
 load('jstests/concurrency/fsm_workloads/indexed_insert_text.js');  // for $config
 
 var $config =

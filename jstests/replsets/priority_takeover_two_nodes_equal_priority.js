@@ -30,7 +30,7 @@ load('jstests/replsets/rslib.js');
         },
         'neither of the priority 3 nodes was elected primary',
         60000,  // timeout
-        1000  // interval
+        1000    // interval
         );
 
     try {

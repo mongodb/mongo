@@ -29,11 +29,11 @@ for (i = 0; i < 24; i++) {
     var past = new Date(now - (3600 * 1000 * i));
     t.insert({x: past, y: past, z: past});
 }
-t.insert({a: 1});  // no x value
-t.insert({x: null});  // non-date value
-t.insert({x: true});  // non-date value
-t.insert({x: "yo"});  // non-date value
-t.insert({x: 3});  // non-date value
+t.insert({a: 1});      // no x value
+t.insert({x: null});   // non-date value
+t.insert({x: true});   // non-date value
+t.insert({x: "yo"});   // non-date value
+t.insert({x: 3});      // non-date value
 t.insert({x: /foo/});  // non-date value
 
 assert.eq(30, t.count());

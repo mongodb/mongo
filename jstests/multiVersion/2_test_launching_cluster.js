@@ -8,7 +8,6 @@ load('./jstests/multiVersion/libs/verify_versions.js');
     "use strict";
     // Check our latest versions
     var versionsToCheck = ["last-stable", "latest"];
-
     var versionsToCheckMongos = ["last-stable"];
 
     jsTest.log("Testing legacy versions...");

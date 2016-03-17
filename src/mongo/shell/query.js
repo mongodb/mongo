@@ -3,15 +3,15 @@
 if (typeof DBQuery == "undefined") {
     DBQuery = function(mongo, db, collection, ns, query, fields, limit, skip, batchSize, options) {
 
-        this._mongo = mongo;  // 0
-        this._db = db;  // 1
+        this._mongo = mongo;            // 0
+        this._db = db;                  // 1
         this._collection = collection;  // 2
-        this._ns = ns;  // 3
+        this._ns = ns;                  // 3
 
         this._query = query || {};  // 4
-        this._fields = fields;  // 5
-        this._limit = limit || 0;  // 6
-        this._skip = skip || 0;  // 7
+        this._fields = fields;      // 5
+        this._limit = limit || 0;   // 6
+        this._skip = skip || 0;     // 7
         this._batchSize = batchSize || 0;
         this._options = options || 0;
 

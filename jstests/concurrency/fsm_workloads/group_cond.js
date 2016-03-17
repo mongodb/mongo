@@ -14,7 +14,7 @@
  */
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/group.js');  // for $config
+load('jstests/concurrency/fsm_workloads/group.js');       // for $config
 
 var $config =
     extendWorkload($config,

@@ -59,9 +59,9 @@ if (0) {
      */
     var doTest = function(conn1, conn2) {
         var connInfo1 = {
-            id: null,  // thread id of this connection
+            id: null,      // thread id of this connection
             mongo: conn1,  // connection object
-            users: {}  // contains authenticated users represented as a map of db to user names.
+            users: {}      // contains authenticated users represented as a map of db to user names.
         };
 
         var connInfo2 = {
