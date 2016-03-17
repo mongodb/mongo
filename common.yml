@@ -239,6 +239,15 @@ functions:
         if [ '${library_path}' != '' ]; then
             export ${library_path}
         fi
+
+        # In RHEL 5.5, /usr/bin/ld can't handle --build-id parameters, so
+        # use a wrapper if it's present on the system
+        #
+        if [ -d /opt/ldwrapper/bin ]
+        then
+          export PATH=/opt/ldwrapper/bin:$PATH
+        fi
+
         . ./set_gopath.sh
         ${gorootvars} go build -ldflags "-X github.com/mongodb/mongo-tools/common/options.Gitspec `git rev-parse HEAD` -X github.com/mongodb/mongo-tools/common/options.VersionStr $(git describe)" ${args} ${build_tags} -o bin/${tool} ${tool}/main/${tool}.go
 
