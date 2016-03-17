@@ -244,6 +244,43 @@ func LoadPrivateKeyFromPEM(pem_block []byte) (PrivateKey, error) {
 	return p, nil
 }
 
+// LoadPrivateKeyFromPEM loads a private key from a PEM-encoded block.
+func LoadPrivateKeyFromPEMWidthPassword(pem_block []byte, password string) (
+	PrivateKey, error) {
+	if len(pem_block) == 0 {
+		return nil, errors.New("empty pem block")
+	}
+	bio := C.BIO_new_mem_buf(unsafe.Pointer(&pem_block[0]),
+		C.int(len(pem_block)))
+	if bio == nil {
+		return nil, errors.New("failed creating bio")
+	}
+	defer C.BIO_free(bio)
+	cs := C.CString(password)
+	defer C.free(unsafe.Pointer(cs))
+	rsakey := C.PEM_read_bio_RSAPrivateKey(bio, nil, nil, unsafe.Pointer(cs))
+	if rsakey == nil {
+		return nil, errors.New("failed reading rsa key")
+	}
+	defer C.RSA_free(rsakey)
+
+	// convert to PKEY
+	key := C.EVP_PKEY_new()
+	if key == nil {
+		return nil, errors.New("failed converting to evp_pkey")
+	}
+	if C.EVP_PKEY_set1_RSA(key, (*C.struct_rsa_st)(rsakey)) != 1 {
+		C.EVP_PKEY_free(key)
+		return nil, errors.New("failed converting to evp_pkey")
+	}
+
+	p := &pKey{key: key}
+	runtime.SetFinalizer(p, func(p *pKey) {
+		C.EVP_PKEY_free(p.key)
+	})
+	return p, nil
+}
+
 // LoadPublicKeyFromPEM loads a public key from a PEM-encoded block.
 func LoadPublicKeyFromPEM(pem_block []byte) (PublicKey, error) {
 	if len(pem_block) == 0 {
