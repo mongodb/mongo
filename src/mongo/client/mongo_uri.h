@@ -110,10 +110,12 @@ public:
         return _connectString.type();
     }
 
-private:
     explicit MongoURI(const ConnectionString connectString)
         : _connectString(std::move(connectString)){};
 
+    MongoURI() = default;
+
+private:
     MongoURI(ConnectionString connectString,
              const std::string& user,
              const std::string& password,
