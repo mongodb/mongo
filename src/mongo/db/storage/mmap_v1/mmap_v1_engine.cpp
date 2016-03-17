@@ -220,7 +220,12 @@ void clearTmpFiles() {
 }
 }  // namespace
 
-MMAPV1Engine::MMAPV1Engine(const StorageEngineLockFile* lockFile) {
+MMAPV1Engine::MMAPV1Engine(const StorageEngineLockFile* lockFile)
+    : MMAPV1Engine(lockFile, stdx::make_unique<MmapV1ExtentManager::Factory>()) {}
+
+MMAPV1Engine::MMAPV1Engine(const StorageEngineLockFile* lockFile,
+                           std::unique_ptr<ExtentManager::Factory> extentManagerFactory)
+    : _extentManagerFactory(std::move(extentManagerFactory)) {
     // TODO check non-journal subdirs if using directory-per-db
     checkReadAhead(storageGlobalParams.dbpath);
 
@@ -272,7 +277,13 @@ DatabaseCatalogEntry* MMAPV1Engine::getDatabaseCatalogEntry(OperationContext* op
     // can be creating the same database concurrenty. We need to create the database outside of
     // the _entryMapMutex so we do not deadlock (see SERVER-15880).
     MMAPV1DatabaseCatalogEntry* entry = new MMAPV1DatabaseCatalogEntry(
-        opCtx, db, storageGlobalParams.dbpath, storageGlobalParams.directoryperdb, false);
+        opCtx,
+        db,
+        storageGlobalParams.dbpath,
+        storageGlobalParams.directoryperdb,
+        false,
+        _extentManagerFactory->create(
+            db, storageGlobalParams.dbpath, storageGlobalParams.directoryperdb));
 
     stdx::lock_guard<stdx::mutex> lk(_entryMapMutex);
 

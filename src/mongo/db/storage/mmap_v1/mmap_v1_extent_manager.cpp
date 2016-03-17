@@ -119,6 +119,13 @@ MmapV1ExtentManager::MmapV1ExtentManager(StringData dbname, StringData path, boo
     _recordAccessTracker = &mmapEngine->getRecordAccessTracker();
 }
 
+std::unique_ptr<ExtentManager> MmapV1ExtentManager::Factory::create(StringData dbname,
+                                                                    StringData path,
+                                                                    bool directoryPerDB) {
+    return stdx::make_unique<MmapV1ExtentManager>(
+        std::move(dbname), std::move(path), directoryPerDB);
+}
+
 boost::filesystem::path MmapV1ExtentManager::_fileName(int n) const {
     stringstream ss;
     ss << _dbname << '.' << n;

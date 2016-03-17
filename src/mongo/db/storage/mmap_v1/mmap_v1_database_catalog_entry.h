@@ -57,7 +57,8 @@ public:
                                StringData name,
                                StringData path,
                                bool directoryperdb,
-                               bool transient);
+                               bool transient,
+                               std::unique_ptr<ExtentManager> extentManager);
 
     virtual ~MMAPV1DatabaseCatalogEntry();
 
@@ -110,11 +111,11 @@ public:
                                 const CollectionCatalogEntry* collection,
                                 IndexCatalogEntry* index);
 
-    const MmapV1ExtentManager* getExtentManager() const {
-        return &_extentManager;
+    const ExtentManager* getExtentManager() const {
+        return _extentManager.get();
     }
-    MmapV1ExtentManager* getExtentManager() {
-        return &_extentManager;
+    ExtentManager* getExtentManager() {
+        return _extentManager.get();
     }
 
     CollectionOptions getCollectionOptions(OperationContext* txn, StringData ns) const;
@@ -186,7 +187,7 @@ private:
     const std::string _path;
 
     NamespaceIndex _namespaceIndex;
-    MmapV1ExtentManager _extentManager;
+    std::unique_ptr<ExtentManager> _extentManager;
     CollectionMap _collections;
 };
 }

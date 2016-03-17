@@ -322,7 +322,13 @@ Status MMAPV1Engine::repairDatabase(OperationContext* txn,
 
         {
             dbEntry.reset(new MMAPV1DatabaseCatalogEntry(
-                txn, dbName, reservedPathString, storageGlobalParams.directoryperdb, true));
+                txn,
+                dbName,
+                reservedPathString,
+                storageGlobalParams.directoryperdb,
+                true,
+                _extentManagerFactory->create(
+                    dbName, reservedPathString, storageGlobalParams.directoryperdb)));
             tempDatabase.reset(new Database(txn, dbName, dbEntry.get()));
         }
 

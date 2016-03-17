@@ -41,6 +41,7 @@
 namespace mongo {
 
 class DataFile;
+class DataFileVersion;
 class MmapV1RecordHeader;
 class RecordFetcher;
 class OperationContext;
@@ -65,6 +66,14 @@ class ExtentManager {
 
 public:
     ExtentManager() {}
+
+    class Factory {
+    public:
+        virtual ~Factory() = default;
+        virtual std::unique_ptr<ExtentManager> create(StringData dbname,
+                                                      StringData path,
+                                                      bool directoryPerDB) = 0;
+    };
 
     virtual ~ExtentManager() {}
 
@@ -176,5 +185,11 @@ public:
      * Caller takes owernship of CacheHint
      */
     virtual CacheHint* cacheHint(const DiskLoc& extentLoc, const HintType& hint) = 0;
+
+    virtual DataFileVersion getFileFormat(OperationContext* txn) const = 0;
+    virtual void setFileFormat(OperationContext* txn, DataFileVersion newVersion) = 0;
+
+    virtual const DataFile* getOpenFile(int n) const = 0;
 };
-}
+
+}  // namespace mongo

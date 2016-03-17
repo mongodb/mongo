@@ -32,6 +32,7 @@
 
 #include <vector>
 
+#include "mongo/db/storage/mmap_v1/data_file.h"
 #include "mongo/db/storage/mmap_v1/extent_manager.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_base.h"
 
@@ -140,6 +141,13 @@ public:
     virtual int maxSize() const;
 
     virtual CacheHint* cacheHint(const DiskLoc& extentLoc, const HintType& hint);
+
+    DataFileVersion getFileFormat(OperationContext* txn) const final;
+
+    virtual void setFileFormat(OperationContext* txn, DataFileVersion newVersion) final;
+
+    const DataFile* getOpenFile(int n) const final;
+
 
 protected:
     struct ExtentInfo {

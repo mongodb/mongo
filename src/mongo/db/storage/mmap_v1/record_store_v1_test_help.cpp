@@ -295,6 +295,16 @@ DummyExtentManager::CacheHint* DummyExtentManager::cacheHint(const DiskLoc& exte
     return new CacheHint();
 }
 
+DataFileVersion DummyExtentManager::getFileFormat(OperationContext* txn) const {
+    return DataFileVersion::defaultForNewFiles();
+}
+
+void DummyExtentManager::setFileFormat(OperationContext* txn, DataFileVersion newVersion) {}
+
+const DataFile* DummyExtentManager::getOpenFile(int n) const {
+    return nullptr;
+}
+
 namespace {
 void accumulateExtentSizeRequirements(const LocAndSize* las, std::map<int, size_t>* sizes) {
     if (!las)
