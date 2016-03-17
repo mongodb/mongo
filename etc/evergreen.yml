@@ -4441,10 +4441,10 @@ buildvariants:
   stepback: false
   expansions:
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
-    tooltags: -gccgoflags '-static-libgo'
+    tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2)" -tags 'sasl ssl'
     compile_flags: --ssl MONGO_DISTMOD=rhel71 --release -j$(grep -c processor /proc/cpuinfo) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" CXX=/opt/mongodbtoolchain/v1/bin/g++ CC=/opt/mongodbtoolchain/v1/bin/gcc
     num_jobs_available: 20
-    test_flags: --continueOnFailure --excludeWithAnyTags=requires_ssl_mongo_tools
+    test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager-enterprise.py
     packager_arch: ppc64le
