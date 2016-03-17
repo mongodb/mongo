@@ -55,6 +55,11 @@ public:
     ~MigrationSourceManager();
 
     /**
+     * Returns the namespace for which this source manager is active.
+     */
+    NamespaceString getNss() const;
+
+    /**
      * Returns false if cannot start. One of the reason for not being able to start is there is
      * already an existing migration in progress.
      */

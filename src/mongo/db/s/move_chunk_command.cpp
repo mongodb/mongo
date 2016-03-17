@@ -41,13 +41,17 @@
 #include "mongo/db/s/chunk_move_write_concern_options.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/migration_impl.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logger/ramlog.h"
+#include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard_connection.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
+#include "mongo/s/move_chunk_request.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
@@ -57,6 +61,66 @@ using std::string;
 using str::stream;
 
 namespace {
+
+/**
+ * RAII object, which will register an active migration with the global sharding state so that no
+ * subsequent migrations may start until the previous one has completed.
+ */
+class ScopedSetInMigration {
+    MONGO_DISALLOW_COPYING(ScopedSetInMigration);
+
+public:
+    /**
+     * Registers a new migration with the global sharding state and acquires distributed lock on the
+     * collection so other shards cannot do migrations. If a migration is already active it will
+     * throw a user assertion with a ConflictingOperationInProgress code. Otherwise it may throw any
+     * other error due to distributed lock acquisition failure.
+     */
+    ScopedSetInMigration(OperationContext* txn, MoveChunkRequest args)
+        : _scopedRegisterMigration(txn, args.getNss()),
+          _collectionDistLock(_acquireDistLock(txn, args)) {}
+
+    ~ScopedSetInMigration() = default;
+
+    /**
+     * Blocking call, which polls the state of the distributed lock and ensures that it is still
+     * held.
+     */
+    Status checkDistLock() {
+        return _collectionDistLock.checkStatus();
+    }
+
+private:
+    /**
+     * Acquires a distributed lock for the specified colleciton or throws if lock cannot be
+     * acquired.
+     */
+    DistLockManager::ScopedDistLock _acquireDistLock(OperationContext* txn,
+                                                     const MoveChunkRequest& args) {
+        const std::string whyMessage(str::stream() << "migrating chunk [" << args.getMinKey()
+                                                   << ", " << args.getMaxKey() << ") in "
+                                                   << args.getNss().ns());
+        auto distLockStatus =
+            grid.catalogManager(txn)->distLock(txn, args.getNss().ns(), whyMessage);
+        if (!distLockStatus.isOK()) {
+            const std::string msg = str::stream()
+                << "Could not acquire collection lock for " << args.getNss().ns()
+                << " to migrate chunk [" << args.getMinKey() << "," << args.getMaxKey()
+                << ") due to " << distLockStatus.getStatus().toString();
+            warning() << msg;
+            uasserted(distLockStatus.getStatus().code(), msg);
+        }
+
+        return std::move(distLockStatus.getValue());
+    }
+
+    // The scoped migration registration
+    ShardingState::ScopedRegisterMigration _scopedRegisterMigration;
+
+    // Handle for the the distributed lock, which protects other migrations from happening on the
+    // same collection
+    DistLockManager::ScopedDistLock _collectionDistLock;
+};
 
 // Tests can pause and resume moveChunk's progress at each step by enabling/disabling each failpoint
 MONGO_FP_DECLARE(moveChunkHangAtStep1);
@@ -68,28 +132,6 @@ MONGO_FP_DECLARE(moveChunkHangAtStep6);
 
 Tee* const migrateLog = RamLog::get("migrate");
 
-/**
- * This is the main entry for moveChunk, which is called to initiate a move by a donor side. It can
- * be called by either mongos as a result of a user request or an automatic balancing action.
- *
- * Format:
- * {
- *   moveChunk: "namespace",
- *   from: "hostAndPort",
- *   fromShard: "shardName",
- *   to: "hostAndPort",
- *   toShard: "shardName",
- *   min: {},
- *   max: {},
- *   maxChunkBytes: numeric,
- *   configdb: "hostAndPort",
- *
- *   // optional
- *   secondaryThrottle: bool, //defaults to true.
- *   writeConcern: {} // applies to individual writes.
- * }
- *
- */
 class MoveChunkCommand : public Command {
 public:
     MoveChunkCommand() : Command("moveChunk") {}
@@ -105,7 +147,6 @@ public:
     bool adminOnly() const override {
         return true;
     }
-
 
     Status checkAuthForCommand(ClientBasic* client,
                                const std::string& dbname,
@@ -127,77 +168,47 @@ public:
              int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
-        // 1. Parse options
-        // 2. Make sure my view is complete and lock the distributed lock to ensure shard
-        //    metadata stability.
-        // 3. Migration
-        //    Retrieve all RecordIds, which need to be migrated in order to do as little seeking
-        //    as possible during transfer. Retrieval of the RecordIds happens under a collection
-        //    lock, but then the collection lock is dropped. This opens up an opportunity for
-        //    repair or compact to invalidate these RecordIds, because these commands do not
-        //    synchronized with migration. Note that data modifications are not a problem,
-        //    because we are registered for change notifications.
-        // 4. Pause till migrate is caught up
-        // 5. LOCK (critical section)
-        //    a) update my config, essentially locking
-        //    b) finish migrate
-        //    c) update config server
-        //    d) logChange to config server
-        // 6. Wait for all current cursors to expire
-        // 7. Remove data locally
-
-        // -------------------------------
-
-        // 1.
-        const string ns = parseNs(dbname, cmdObj);
-        if (ns.empty()) {
+        const NamespaceString nss = NamespaceString(parseNs(dbname, cmdObj));
+        if (!nss.isValid()) {
             return appendCommandStatus(
                 result, Status(ErrorCodes::InvalidOptions, "need to specify namespace in command"));
         }
 
+        MoveChunkRequest moveChunkRequest =
+            uassertStatusOK(MoveChunkRequest::createFromCommand(nss, cmdObj));
+
         ShardingState* const shardingState = ShardingState::get(txn);
 
-        // This could be the first call that enables sharding - make sure we initialize the
-        // sharding state for this shard.
         if (!shardingState->enabled()) {
-            if (cmdObj["configdb"].type() != String) {
-                const string msg = "sharding not enabled";
-                warning() << msg;
-                return appendCommandStatus(result, Status(ErrorCodes::IllegalOperation, msg));
-            }
-
-            const string configdb = cmdObj["configdb"].String();
-            shardingState->initialize(txn, configdb);
+            shardingState->initialize(txn, moveChunkRequest.getConfigServerCS().toString());
         }
 
-        ChunkMoveOperationState chunkMoveState{txn, NamespaceString(ns)};
+        shardingState->setShardName(moveChunkRequest.getFromShardId());
+
+        const auto& oss = OperationShardingState::get(txn);
+        if (!oss.hasShardVersion()) {
+            uassertStatusOK(
+                Status(ErrorCodes::InvalidOptions, "moveChunk command is missing shard version"));
+        }
+
+        const auto writeConcernForRangeDeleter =
+            uassertStatusOK(ChunkMoveWriteConcernOptions::getEffectiveWriteConcern(
+                moveChunkRequest.getSecondaryThrottle()));
+
+        // Make sure we're as up-to-date as possible with shard information. This catches the case
+        // where we might have changed a shard's host by removing/adding a shard with the same name.
+        grid.shardRegistry()->reload(txn);
+
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep1);
+
+        ScopedSetInMigration scopedInMigration(txn, moveChunkRequest);
+
+        ChunkMoveOperationState chunkMoveState{txn, nss};
         uassertStatusOK(chunkMoveState.initialize(cmdObj));
-
-        // Initialize our current shard name in the shard state if needed
-        shardingState->setShardName(chunkMoveState.getFromShard());
-
-        const auto secondaryThrottle =
-            uassertStatusOK(MigrationSecondaryThrottleOptions::createFromCommand(cmdObj));
-        const auto writeConcernForRangeDeleter = uassertStatusOK(
-            ChunkMoveWriteConcernOptions::getEffectiveWriteConcern(secondaryThrottle));
-
-        // Do inline deletion
-        bool waitForDelete = cmdObj["waitForDelete"].trueValue();
-        if (waitForDelete) {
-            log() << "moveChunk waiting for full cleanup after move";
-        }
-
-        BSONElement maxSizeElem = cmdObj["maxChunkSizeBytes"];
-        if (maxSizeElem.eoo() || !maxSizeElem.isNumber()) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::InvalidOptions, "need to specify maxChunkSizeBytes"));
-        }
-
-        const long long maxChunkSizeBytes = maxSizeElem.numberLong();
 
         MoveTimingHelper timing(txn,
                                 "from",
-                                ns,
+                                nss.ns(),
                                 chunkMoveState.getMinKey(),
                                 chunkMoveState.getMaxKey(),
                                 6,  // Total number of steps
@@ -209,8 +220,6 @@ public:
 
         timing.done(1);
 
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep1);
-
         // 2.
 
         if (shardingState->migrationSourceManager()->isActive()) {
@@ -221,13 +230,15 @@ public:
                                        Status(ErrorCodes::ConflictingOperationInProgress, msg));
         }
 
-        auto distLock = uassertStatusOK(chunkMoveState.acquireMoveMetadata());
+        uassertStatusOK(chunkMoveState.acquireMoveMetadata());
 
-        BSONObj chunkInfo = BSON(
-            "min" << chunkMoveState.getMinKey() << "max" << chunkMoveState.getMaxKey() << "from"
-                  << chunkMoveState.getFromShard() << "to" << chunkMoveState.getToShard());
-
-        grid.catalogManager(txn)->logChange(txn, "moveChunk.start", ns, chunkInfo);
+        grid.catalogManager(txn)->logChange(txn,
+                                            "moveChunk.start",
+                                            nss.ns(),
+                                            BSON("min" << chunkMoveState.getMinKey() << "max"
+                                                       << chunkMoveState.getMaxKey() << "from"
+                                                       << chunkMoveState.getFromShard() << "to"
+                                                       << chunkMoveState.getToShard()));
 
         const auto origCollMetadata = chunkMoveState.getCollMetadata();
         BSONObj shardKeyPattern = origCollMetadata->getKeyPattern();
@@ -253,13 +264,13 @@ public:
             // See comment at the top of the function for more information on what kind of
             // synchronization is used here.
             if (!shardingState->migrationSourceManager()->storeCurrentLocs(
-                    txn, maxChunkSizeBytes, errmsg, result)) {
+                    txn, moveChunkRequest.getMaxChunkSizeBytes(), errmsg, result)) {
                 warning() << errmsg;
                 return false;
             }
 
             BSONObjBuilder recvChunkStartBuilder;
-            recvChunkStartBuilder.append("_recvChunkStart", ns);
+            recvChunkStartBuilder.append("_recvChunkStart", nss.ns());
             migrationSessionId.append(&recvChunkStartBuilder);
             recvChunkStartBuilder.append("from", chunkMoveState.getFromShardCS().toString());
             recvChunkStartBuilder.append("fromShardName", chunkMoveState.getFromShard());
@@ -269,7 +280,7 @@ public:
             recvChunkStartBuilder.append("shardKeyPattern", shardKeyPattern);
             recvChunkStartBuilder.append("configServer",
                                          shardingState->getConfigServer(txn).toString());
-            secondaryThrottle.append(&recvChunkStartBuilder);
+            moveChunkRequest.getSecondaryThrottle().append(&recvChunkStartBuilder);
 
             BSONObj res;
 
@@ -350,7 +361,7 @@ public:
                 return false;
             }
 
-            if (res["ns"].str() != ns ||
+            if (res["ns"].str() != nss.ns() ||
                 res["from"].str() != chunkMoveState.getFromShardCS().toString() ||
                 !res["min"].isABSONObj() ||
                 res["min"].Obj().woCompare(chunkMoveState.getMinKey()) != 0 ||
@@ -425,7 +436,7 @@ public:
         }
 
         // Ensure distributed lock still held
-        Status lockStatus = distLock->checkStatus();
+        Status lockStatus = scopedInMigration.checkDistLock();
         if (!lockStatus.isOK()) {
             const string msg = stream() << "not entering migrate critical section because "
                                         << lockStatus.toString();
@@ -440,7 +451,7 @@ public:
 
         // 6.
 
-        RangeDeleterOptions deleterOptions(KeyRange(ns,
+        RangeDeleterOptions deleterOptions(KeyRange(nss.ns(),
                                                     chunkMoveState.getMinKey().getOwned(),
                                                     chunkMoveState.getMaxKey().getOwned(),
                                                     shardKeyPattern));
@@ -450,7 +461,7 @@ public:
         deleterOptions.onlyRemoveOrphanedDocs = true;
         deleterOptions.removeSaverReason = "post-cleanup";
 
-        if (waitForDelete) {
+        if (moveChunkRequest.getWaitForDelete()) {
             log() << "doing delete inline for cleanup of chunk data" << migrateLog;
 
             string errMsg;

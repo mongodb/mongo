@@ -88,10 +88,6 @@ ChunkMoveOperationState::~ChunkMoveOperationState() {
 }
 
 Status ChunkMoveOperationState::initialize(const BSONObj& cmdObj) {
-    // Make sure we're as up-to-date as possible with shard information. This catches the case where
-    // we might have changed a shard's host by removing/adding a shard with the same name.
-    grid.shardRegistry()->reload(_txn);
-
     _fromShard = cmdObj["fromShard"].str();
     if (_fromShard.empty()) {
         return {ErrorCodes::InvalidOptions, "need to specify shard to move chunk from"};
@@ -144,20 +140,7 @@ Status ChunkMoveOperationState::initialize(const BSONObj& cmdObj) {
     return Status::OK();
 }
 
-StatusWith<DistLockManager::ScopedDistLock*> ChunkMoveOperationState::acquireMoveMetadata() {
-    // Get the distributed lock
-    const string whyMessage(stream() << "migrating chunk [" << _minKey << ", " << _maxKey << ") in "
-                                     << _nss.ns());
-    _distLockStatus = grid.catalogManager(_txn)->distLock(_txn, _nss.ns(), whyMessage);
-
-    if (!_distLockStatus->isOK()) {
-        const string msg = stream() << "could not acquire collection lock for " << _nss.ns()
-                                    << " to migrate chunk [" << _minKey << "," << _maxKey << ")"
-                                    << causedBy(_distLockStatus->getStatus());
-        warning() << msg;
-        return Status(_distLockStatus->getStatus().code(), msg);
-    }
-
+Status ChunkMoveOperationState::acquireMoveMetadata() {
     ShardingState* const shardingState = ShardingState::get(_txn);
 
     // Snapshot the metadata
@@ -208,13 +191,10 @@ StatusWith<DistLockManager::ScopedDistLock*> ChunkMoveOperationState::acquireMov
         throw SendStaleConfigException(_nss.toString(), msg, _collectionVersion, _shardVersion);
     }
 
-    return &_distLockStatus->getValue();
+    return Status::OK();
 }
 
 Status ChunkMoveOperationState::commitMigration(const MigrationSessionId& sessionId) {
-    invariant(_distLockStatus.is_initialized());
-    invariant(_distLockStatus->isOK());
-
     log() << "About to enter migrate critical section";
 
     // We're under the collection distributed lock here, so no other migrate can change maxVersion
@@ -416,14 +396,10 @@ Status ChunkMoveOperationState::commitMigration(const MigrationSessionId& sessio
 }
 
 ChunkVersion ChunkMoveOperationState::getShardVersion() const {
-    invariant(_distLockStatus.is_initialized());
-    invariant(_distLockStatus->isOK());
     return _shardVersion;
 }
 
 std::shared_ptr<CollectionMetadata> ChunkMoveOperationState::getCollMetadata() const {
-    invariant(_distLockStatus.is_initialized());
-    invariant(_distLockStatus->isOK());
     return _collMetadata;
 }
 

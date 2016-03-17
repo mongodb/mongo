@@ -34,6 +34,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/stdx/memory.h"
@@ -58,12 +59,33 @@ class OpTime;
 }  // namespace repl
 
 /**
- * Represents the sharding state for the running instance. One per instance.
+ * Contains the global sharding state for a running mongod. There is one instance of this object per
+ * service context and it is never destroyed for the lifetime of the context.
  */
 class ShardingState {
     MONGO_DISALLOW_COPYING(ShardingState);
 
 public:
+    /**
+     * RAII object, which will register an active migration with the global sharding state so that
+     * no subsequent migrations may start until the previous one has completed.
+     */
+    class ScopedRegisterMigration {
+        MONGO_DISALLOW_COPYING(ScopedRegisterMigration);
+
+    public:
+        /**
+         * Registers a new migration with the global sharding state. If a migration is already
+         * active it will throw a user assertion with a ConflictingOperationInProgress code.
+         */
+        ScopedRegisterMigration(OperationContext* txn, NamespaceString nss);
+        ~ScopedRegisterMigration();
+
+    private:
+        // The operation context under which we are running. Must remain the same.
+        OperationContext* const _txn;
+    };
+
     ShardingState();
     ~ShardingState();
 
@@ -297,7 +319,18 @@ public:
      */
     void resetMetadata(const std::string& ns);
 
+    /**
+     * If a migration has been previously registered through a call to registerMigration returns
+     * that namespace. Otherwise returns boost::none.
+     *
+     * This method can be called without any locks, but once the namespace is fetched it needs to be
+     * re-checked after acquiring some intent lock on that namespace.
+     */
+    boost::optional<NamespaceString> getActiveMigrationNss();
+
 private:
+    friend class ScopedRegisterMigration;
+
     // Map from a namespace into the sharding state for each collection we have
     typedef std::map<std::string, std::unique_ptr<CollectionShardingState>>
         CollectionShardingStateMap;
@@ -370,6 +403,20 @@ private:
                             bool useRequestedVersion,
                             ChunkVersion* latestShardVersion);
 
+    /**
+     * Registers a namespace with ongoing migration. This is what ensures that there is a single
+     * migration active per shard.
+     *
+     * Returns OK if there is no active migration and ConflictingOperationInProgress otherwise.
+     */
+    Status _registerMigration(NamespaceString nss);
+
+    /**
+     * Unregisters a previously registered namespace with ongoing migration. Must only be called if
+     * a previous call to registerMigration has succeeded.
+     */
+    void _clearMigration();
+
     // Manages the state of the migration donor shard
     MigrationSourceManager _migrationSourceManager;
 
@@ -393,6 +440,12 @@ private:
 
     // Protects from hitting the config server from too many threads at once
     TicketHolder _configServerTickets;
+
+    // If there is an active migration going on, this field contains the namespace which is being
+    // migrated. The need for this is due to the fact that _initialClone/_transferMods do not carry
+    // any namespace with them. This value can be read using only the global sharding state mutex
+    // (_mutex), but to be set requires both collection lock and the mutex.
+    boost::optional<NamespaceString> _activeMigrationNss;
 
     // Cache of collection metadata on this shard. It is not safe to look-up values from this map
     // without holding some form of collection lock. It is only safe to add/remove values when

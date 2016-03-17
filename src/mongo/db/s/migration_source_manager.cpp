@@ -45,6 +45,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/logger/ramlog.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -162,6 +163,11 @@ MigrationSourceManager::MigrationSourceManager() = default;
 
 MigrationSourceManager::~MigrationSourceManager() = default;
 
+NamespaceString MigrationSourceManager::getNss() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _nss;
+}
+
 bool MigrationSourceManager::start(OperationContext* txn,
                                    const MigrationSessionId& sessionId,
                                    const std::string& ns,
@@ -172,9 +178,11 @@ bool MigrationSourceManager::start(OperationContext* txn,
     invariant(!max.isEmpty());
     invariant(!ns.empty());
 
-    // Get global shared to synchronize with logOp. Also see comments in the class
-    // members declaration for more details.
-    Lock::GlobalRead globalShared(txn->lockState());
+    // Get collection X lock in order to synchronize with logOp
+    ScopedTransaction scopedXact(txn, MODE_IX);
+    AutoGetCollection autoColl(txn, NamespaceString(ns), MODE_IX, MODE_X);
+
+    CollectionShardingState::get(txn, ns)->setMigrationSourceManager(txn, this);
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
@@ -202,9 +210,11 @@ bool MigrationSourceManager::start(OperationContext* txn,
 void MigrationSourceManager::done(OperationContext* txn) {
     log() << "MigrateFromStatus::done About to acquire global lock to exit critical section";
 
-    // Get global shared to synchronize with logOp. Also see comments in the class
-    // members declaration for more details.
-    Lock::GlobalRead globalShared(txn->lockState());
+    // Get collection X lock in order to synchronize with logOp
+    ScopedTransaction scopedXact(txn, MODE_IX);
+    AutoGetCollection autoColl(txn, _getNS(), MODE_IX, MODE_X);
+
+    CollectionShardingState::get(txn, getNss())->clearMigrationSourceManager(txn);
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 

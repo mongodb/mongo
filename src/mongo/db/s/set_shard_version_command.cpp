@@ -43,6 +43,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/wire_version.h"
@@ -240,12 +241,14 @@ public:
                 // TODO: Refactor all of this
                 if (requestedVersion < collectionShardVersion &&
                     requestedVersion.epoch() == collectionShardVersion.epoch()) {
-                    auto critSec =
-                        shardingState->migrationSourceManager()->getMigrationCriticalSection();
-                    if (critSec) {
-                        autoColl.reset();
-                        log() << "waiting till out of critical section";
-                        critSec->waitUntilOutOfCriticalSection(Seconds(10));
+                    if (css->getMigrationSourceManager()) {
+                        auto critSec =
+                            css->getMigrationSourceManager()->getMigrationCriticalSection();
+                        if (critSec) {
+                            autoColl.reset();
+                            log() << "waiting till out of critical section";
+                            critSec->waitUntilOutOfCriticalSection(Seconds(10));
+                        }
                     }
 
                     errmsg = str::stream() << "shard global version for collection is higher "
@@ -260,12 +263,14 @@ public:
                 if (!collectionShardVersion.isSet() && !authoritative) {
                     // Needed b/c when the last chunk is moved off a shard, the version gets reset
                     // to zero, which should require a reload.
-                    auto critSec =
-                        shardingState->migrationSourceManager()->getMigrationCriticalSection();
-                    if (critSec) {
-                        autoColl.reset();
-                        log() << "waiting till out of critical section";
-                        critSec->waitUntilOutOfCriticalSection(Seconds(10));
+                    if (css->getMigrationSourceManager()) {
+                        auto critSec =
+                            css->getMigrationSourceManager()->getMigrationCriticalSection();
+                        if (critSec) {
+                            autoColl.reset();
+                            log() << "waiting till out of critical section";
+                            critSec->waitUntilOutOfCriticalSection(Seconds(10));
+                        }
                     }
 
                     // need authoritative for first look

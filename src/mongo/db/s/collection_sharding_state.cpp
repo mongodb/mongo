@@ -37,6 +37,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
@@ -51,7 +52,9 @@ CollectionShardingState::CollectionShardingState(
     NamespaceString nss, std::unique_ptr<CollectionMetadata> initialMetadata)
     : _nss(std::move(nss)), _metadata(std::move(initialMetadata)) {}
 
-CollectionShardingState::~CollectionShardingState() = default;
+CollectionShardingState::~CollectionShardingState() {
+    invariant(!_sourceMgr);
+}
 
 CollectionShardingState* CollectionShardingState::get(OperationContext* txn,
                                                       const NamespaceString& nss) {
@@ -76,16 +79,35 @@ void CollectionShardingState::setMetadata(std::shared_ptr<CollectionMetadata> ne
     _metadata = std::move(newMetadata);
 }
 
+MigrationSourceManager* CollectionShardingState::getMigrationSourceManager() {
+    return _sourceMgr;
+}
+
+void CollectionShardingState::setMigrationSourceManager(OperationContext* txn,
+                                                        MigrationSourceManager* sourceMgr) {
+    invariant(txn->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
+    invariant(sourceMgr);
+    invariant(!_sourceMgr);
+
+    _sourceMgr = sourceMgr;
+}
+
+void CollectionShardingState::clearMigrationSourceManager(OperationContext* txn) {
+    invariant(txn->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
+    invariant(_sourceMgr);
+
+    _sourceMgr = nullptr;
+}
+
 void CollectionShardingState::checkShardVersionOrThrow(OperationContext* txn) const {
     string errmsg;
     ChunkVersion received;
     ChunkVersion wanted;
     if (!_checkShardVersionOk(txn, &errmsg, &received, &wanted)) {
         // Set migration critical section in case we failed because of migration
-        auto migrationCritSec =
-            ShardingState::get(txn)->migrationSourceManager()->getMigrationCriticalSection();
-        if (migrationCritSec) {
-            OperationShardingState::get(txn).setMigrationCriticalSection(migrationCritSec);
+        if (_sourceMgr && _sourceMgr->getMigrationCriticalSection()) {
+            OperationShardingState::get(txn)
+                .setMigrationCriticalSection(_sourceMgr->getMigrationCriticalSection());
         }
 
         throw SendStaleConfigException(_nss.ns(),
@@ -100,7 +122,11 @@ bool CollectionShardingState::isDocumentInMigratingChunk(OperationContext* txn,
                                                          const BSONObj& doc) {
     dassert(txn->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
 
-    return ShardingState::get(txn)->migrationSourceManager()->isInMigratingChunk(_nss, doc);
+    if (_sourceMgr) {
+        return _sourceMgr->isInMigratingChunk(_nss, doc);
+    }
+
+    return false;
 }
 
 void CollectionShardingState::onInsertOp(OperationContext* txn, const BSONObj& insertedDoc) {
@@ -108,8 +134,9 @@ void CollectionShardingState::onInsertOp(OperationContext* txn, const BSONObj& i
 
     checkShardVersionOrThrow(txn);
 
-    ShardingState::get(txn)->migrationSourceManager()->logInsertOp(
-        txn, _nss.ns().c_str(), insertedDoc);
+    if (_sourceMgr) {
+        _sourceMgr->logInsertOp(txn, _nss.ns().c_str(), insertedDoc);
+    }
 }
 
 void CollectionShardingState::onUpdateOp(OperationContext* txn, const BSONObj& updatedDoc) {
@@ -117,8 +144,9 @@ void CollectionShardingState::onUpdateOp(OperationContext* txn, const BSONObj& u
 
     checkShardVersionOrThrow(txn);
 
-    ShardingState::get(txn)->migrationSourceManager()->logUpdateOp(
-        txn, _nss.ns().c_str(), updatedDoc);
+    if (_sourceMgr) {
+        _sourceMgr->logUpdateOp(txn, _nss.ns().c_str(), updatedDoc);
+    }
 }
 
 void CollectionShardingState::onDeleteOp(OperationContext* txn, const BSONObj& deletedDocId) {
@@ -126,8 +154,9 @@ void CollectionShardingState::onDeleteOp(OperationContext* txn, const BSONObj& d
 
     checkShardVersionOrThrow(txn);
 
-    ShardingState::get(txn)->migrationSourceManager()->logDeleteOp(
-        txn, _nss.ns().c_str(), deletedDocId);
+    if (_sourceMgr) {
+        _sourceMgr->logDeleteOp(txn, _nss.ns().c_str(), deletedDocId);
+    }
 }
 
 bool CollectionShardingState::_checkShardVersionOk(OperationContext* txn,

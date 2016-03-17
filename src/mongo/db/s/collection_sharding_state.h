@@ -39,6 +39,7 @@ namespace mongo {
 class BSONObj;
 struct ChunkVersion;
 class CollectionMetadata;
+class MigrationSourceManager;
 class OperationContext;
 
 /**
@@ -81,6 +82,25 @@ public:
      * Set a new metadata to be used for this collection.
      */
     void setMetadata(std::shared_ptr<CollectionMetadata> newMetadata);
+
+    /**
+     * Returns the active migration source manager, if one is available.
+     */
+    MigrationSourceManager* getMigrationSourceManager();
+
+    /**
+     * Attaches a migration source manager to this collection's sharding state. Must be called with
+     * collection X lock. May not be called if there is a migration source manager already
+     * installed. Must be followed by a call to clearMigrationSourceManager.
+     */
+    void setMigrationSourceManager(OperationContext* txn, MigrationSourceManager* sourceMgr);
+
+    /**
+     * Removes a migration source manager from this collection's sharding state. Must be called with
+     * collection X lock. May not be called if there isn't a migration source manager installed
+     * already through a previous call to setMigrationSourceManager.
+     */
+    void clearMigrationSourceManager(OperationContext* txn);
 
     /**
      * Checks whether the shard version in the context is compatible with the shard version of the
@@ -129,6 +149,13 @@ private:
     // Contains all the chunks associated with this collection. This value will be null if the
     // collection is not sharded.
     std::shared_ptr<CollectionMetadata> _metadata;
+
+    // If this collection is serving as a source shard for chunk migration, this value will be
+    // non-null. To write this value there needs to be X-lock on the collection in order to
+    // synchronize with other callers, which read it.
+    //
+    // NOTE: The value is not owned by this class.
+    MigrationSourceManager* _sourceMgr{nullptr};
 };
 
 }  // namespace mongo
