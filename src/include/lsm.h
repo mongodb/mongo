@@ -179,7 +179,7 @@ struct __wt_lsm_tree {
 	int collator_owned;
 
 	uint32_t refcnt;		/* Number of users of the tree */
-	uint8_t exclusive;		/* Tree is locked exclusively */
+	WT_SESSION_IMPL *excl_session;	/* Session has exclusive lock */
 
 #define	LSM_TREE_MAX_QUEUE	100
 	uint32_t queue_ref;

@@ -114,11 +114,14 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		if (i % WT_THOUSAND == 0) {
 			WT_WITHOUT_LOCKS(session, ret =
 			    __wt_lsm_manager_clear_tree(session, lsm_tree));
-			WT_RET(ret);
+			WT_ERR(ret);
 		}
 		__wt_yield();
 	}
 	return (0);
+
+err:	F_SET(lsm_tree, WT_LSM_TREE_ACTIVE);
+	return (ret);
 }
 
 /*
@@ -363,27 +366,25 @@ __lsm_tree_find(WT_SESSION_IMPL *session,
 	/* See if the tree is already open. */
 	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q)
 		if (strcmp(uri, lsm_tree->name) == 0) {
-			/*
-			 * Short circuit if the handle is already held
-			 * exclusively or exclusive access is requested and
-			 * there are references held.
-			 */
-			if ((exclusive && lsm_tree->refcnt > 0) ||
-			    lsm_tree->exclusive)
-				return (EBUSY);
-
 			if (exclusive) {
 				/*
 				 * Make sure we win the race to switch on the
 				 * exclusive flag.
 				 */
-				if (!__wt_atomic_cas8(
-				    &lsm_tree->exclusive, 0, 1))
+				if (!__wt_atomic_cas_ptr(
+				    &lsm_tree->excl_session, NULL, session))
 					return (EBUSY);
-				/* Make sure there are no readers */
-				if (!__wt_atomic_cas32(
+
+				/*
+				 * Drain the work queue before checking for
+				 * open cursors - otherwise we can generate
+				 * spurious busy returns.
+				 */
+				if (__lsm_tree_close(session, lsm_tree) != 0 ||
+				    !__wt_atomic_cas32(
 				    &lsm_tree->refcnt, 0, 1)) {
-					lsm_tree->exclusive = 0;
+					F_SET(lsm_tree, WT_LSM_TREE_ACTIVE);
+					lsm_tree->excl_session = NULL;
 					return (EBUSY);
 				}
 			} else {
@@ -393,7 +394,7 @@ __lsm_tree_find(WT_SESSION_IMPL *session,
 				 * We got a reference, check if an exclusive
 				 * lock beat us to it.
 				 */
-				if (lsm_tree->exclusive) {
+				if (lsm_tree->excl_session != NULL) {
 					WT_ASSERT(session,
 					    lsm_tree->refcnt > 0);
 					(void)__wt_atomic_sub32(
@@ -489,7 +490,7 @@ __lsm_tree_open(WT_SESSION_IMPL *session,
 	 * with getting handles exclusive.
 	 */
 	lsm_tree->refcnt = 1;
-	lsm_tree->exclusive = exclusive ? 1 : 0;
+	lsm_tree->excl_session = exclusive ? session : NULL;
 	lsm_tree->queue_ref = 0;
 
 	/* Set a flush timestamp as a baseline. */
@@ -524,7 +525,7 @@ __wt_lsm_tree_get(WT_SESSION_IMPL *session,
 		ret = __lsm_tree_open(session, uri, exclusive, treep);
 
 	WT_ASSERT(session, ret != 0 ||
-	    (exclusive ? 1 : 0)  == (*treep)->exclusive);
+	     (*treep)->excl_session == (exclusive ? session : NULL));
 	return (ret);
 }
 
@@ -536,8 +537,11 @@ void
 __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_ASSERT(session, lsm_tree->refcnt > 0);
-	if (lsm_tree->exclusive)
-		lsm_tree->exclusive = 0;
+	if (lsm_tree->excl_session == session) {
+		/* We cleared the active flag when getting exclusive access. */
+		F_SET(lsm_tree, WT_LSM_TREE_ACTIVE);
+		lsm_tree->excl_session = NULL;
+	}
 	(void)__wt_atomic_sub32(&lsm_tree->refcnt, 1);
 }
 
@@ -851,9 +855,6 @@ __wt_lsm_tree_drop(
 	    ret = __wt_lsm_tree_get(session, name, true, &lsm_tree));
 	WT_RET(ret);
 
-	/* Shut down the LSM worker. */
-	WT_ERR(__lsm_tree_close(session, lsm_tree));
-
 	/* Prevent any new opens. */
 	WT_ERR(__wt_lsm_tree_writelock(session, lsm_tree));
 	locked = true;
@@ -912,9 +913,6 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 	WT_WITH_HANDLE_LIST_LOCK(session,
 	    ret = __wt_lsm_tree_get(session, olduri, true, &lsm_tree));
 	WT_RET(ret);
-
-	/* Shut down the LSM worker. */
-	WT_ERR(__lsm_tree_close(session, lsm_tree));
 
 	/* Prevent any new opens. */
 	WT_ERR(__wt_lsm_tree_writelock(session, lsm_tree));
@@ -987,9 +985,6 @@ __wt_lsm_tree_truncate(
 	WT_WITH_HANDLE_LIST_LOCK(session,
 	    ret = __wt_lsm_tree_get(session, name, true, &lsm_tree));
 	WT_RET(ret);
-
-	/* Shut down the LSM worker. */
-	WT_ERR(__lsm_tree_close(session, lsm_tree));
 
 	/* Prevent any new opens. */
 	WT_ERR(__wt_lsm_tree_writelock(session, lsm_tree));
