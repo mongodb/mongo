@@ -11,7 +11,7 @@
  * This workload was designed to reproduce an issue similar to SERVER-18304 for update operations
  * using the findAndModify command where the old version of the document is returned.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
+load('jstests/concurrency/fsm_libs/extend_workload.js');                  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/findAndModify_remove_queue.js');  // for $config
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod and isMMAPv1
 

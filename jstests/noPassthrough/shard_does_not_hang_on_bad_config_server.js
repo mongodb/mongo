@@ -11,8 +11,8 @@
         configdb: 'localhost:1',
         fromShard: 'DummyFromShard',
         toShard: 'DummyToShard',
-        min: { Key: -1 },
-        max: { Key: 1 },
+        min: {Key: -1},
+        max: {Key: 1},
         maxChunkSizeBytes: 1024,
         maxTimeMS: 10000
     }));
@@ -24,8 +24,8 @@
         configdb: 'localhost:1',
         fromShard: 'DummyFromShard',
         toShard: 'DummyToShard',
-        min: { Key: -1 },
-        max: { Key: 1 },
+        min: {Key: -1},
+        max: {Key: 1},
         maxChunkSizeBytes: 1024,
         maxTimeMS: 10000
     }));

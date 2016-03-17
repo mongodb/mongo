@@ -27,7 +27,7 @@ function testWithCollectionIndexIds(capped, sparse, useIds) {
     }
     assert.eq(mc.count(), 1);
 
-    s = rt.start(false);  // slave
+    s = rt.start(false);     // slave
     sc = s.getDB('d')['c'];  // slave collection
 
     // Wait for the document to be cloned.

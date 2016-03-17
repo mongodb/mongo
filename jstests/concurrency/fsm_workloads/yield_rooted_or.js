@@ -8,7 +8,7 @@
  * Other workloads that need an index on c and d can inherit from this.
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/yield.js');  // for $config
+load('jstests/concurrency/fsm_workloads/yield.js');       // for $config
 
 var $config =
     extendWorkload($config,

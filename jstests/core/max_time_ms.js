@@ -48,7 +48,7 @@ assert.doesNotThrow(function() {
 //
 
 t.drop();
-t.insert([{}, {}, {}]);  // fast batch
+t.insert([{}, {}, {}]);                                // fast batch
 t.insert([{slow: true}, {slow: true}, {slow: true}]);  // slow batch
 cursor = t.find({
     $where: function() {
@@ -79,7 +79,7 @@ assert.throws(function() {
 //
 
 t.drop();
-t.insert([{}, {}, {}]);  // fast batch
+t.insert([{}, {}, {}]);            // fast batch
 t.insert([{}, {}, {slow: true}]);  // slow batch
 cursor = t.find({
     $where: function() {
@@ -348,7 +348,7 @@ assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut",
 
 // maxTimeNeverTimeOut positive test for getmore.
 t.drop();
-t.insert([{}, {}, {}]);  // fast batch
+t.insert([{}, {}, {}]);                                // fast batch
 t.insert([{slow: true}, {slow: true}, {slow: true}]);  // slow batch
 cursor = t.find({
     $where: function() {

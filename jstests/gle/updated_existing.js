@@ -19,7 +19,7 @@ while (bigString.length < 1024 * 50)
 for (var i = 0; i < 10000; ++i) {
     testDB[coll].update({"shardkey1": "test" + i, "shardkey2": "test" + i},
                         {$set: {"test_upsert": bigString}},
-                        true,  // upsert
+                        true,    // upsert
                         false);  // multi
     assert.eq(testDB.getLastErrorObj().updatedExisting, false);
 }

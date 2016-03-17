@@ -7,7 +7,7 @@
  * documents appear in both a collection scan and an index scan. The indexed
  * value is a different BSON type, depending on the thread's id.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
+load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload
 load('jstests/concurrency/fsm_workloads/indexed_insert_base.js');  // for $config
 
 var $config = extendWorkload($config,
@@ -41,12 +41,12 @@ var $config = extendWorkload($config,
                                      }
 
                                      var choices = [
-                                         this.tid,  // int
+                                         this.tid,             // int
                                          this.tid.toString(),  // string
-                                         this.tid * 0.0001,  // float
-                                         {tid: this.tid},  // subdocument
-                                         makeOID(this.tid),  // objectid
-                                         makeDate(this.tid),  // date
+                                         this.tid * 0.0001,    // float
+                                         {tid: this.tid},      // subdocument
+                                         makeOID(this.tid),    // objectid
+                                         makeDate(this.tid),   // date
                                          new Function('', 'return ' + this.tid + ';')  // function
                                      ];
 

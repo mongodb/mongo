@@ -19,7 +19,7 @@ dbname2 = "NOT_" + dbname;
 
 db2 = db.getSisterDB(dbname2);
 
-db.dropDatabase();  // make sure it's empty
+db.dropDatabase();   // make sure it's empty
 db2.dropDatabase();  // make sure everybody's empty
 
 assert.eq(0, c.getIndexes().length, "setup1");

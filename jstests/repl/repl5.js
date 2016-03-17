@@ -3,7 +3,7 @@
 soonCountAtLeast = function(db, coll, count) {
     assert.soon(function() {
         try {
-        //                print( "count: " + s.getDB( db )[ coll ].find().count() );
+            //                print( "count: " + s.getDB( db )[ coll ].find().count() );
             return s.getDB(db)[coll].find().itcount() >= count;
         } catch (e) {
             return false;
@@ -33,5 +33,5 @@ doTest = function(signal, extraOpts) {
     rt.stop();
 };
 
-doTest(15);  // SIGTERM
+doTest(15);                  // SIGTERM
 doTest(9, {journal: null});  // SIGKILL

@@ -20,7 +20,7 @@
     s.shardColl("foo", {count: 1}, {count: ""});
 
     for (var i = 0; i < 50; i++) {
-        db.foo.insert({count: i});  // chunk [MinKey, ""), including numbers
+        db.foo.insert({count: i});       // chunk [MinKey, ""), including numbers
         db.foo.insert({count: "" + i});  // chunk ["", MaxKey]
     }
 
@@ -43,7 +43,7 @@
     s.shardColl("foo", {mapReduce: 1}, {mapReduce: ""});
 
     for (var i = 0; i < 50; i++) {
-        db.foo.insert({mapReduce: i});  // to the chunk including number
+        db.foo.insert({mapReduce: i});       // to the chunk including number
         db.foo.insert({mapReduce: "" + i});  // to the chunk including string
     }
 

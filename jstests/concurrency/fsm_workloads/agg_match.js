@@ -6,7 +6,7 @@
  * Runs an aggregation with a $match that returns half the documents.
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/agg_base.js');  // for $config
+load('jstests/concurrency/fsm_workloads/agg_base.js');    // for $config
 
 var $config = extendWorkload(
     $config,

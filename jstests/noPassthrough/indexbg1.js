@@ -70,7 +70,7 @@ while (1) {  // if indexing finishes before we can run checks, try indexing w/ m
         assert(ex.executionStats.totalKeysExamined < 1000,
                "took too long to find 100: " + tojson(ex));
 
-        assert.writeOK(t.remove({i: 40}, true));  // table scan
+        assert.writeOK(t.remove({i: 40}, true));      // table scan
         assert.writeOK(t.update({i: 10}, {i: -10}));  // should scan 10
 
         var id = t.find().hint({$natural: -1}).next()._id;

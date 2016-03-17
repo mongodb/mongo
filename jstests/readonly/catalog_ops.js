@@ -12,7 +12,8 @@ runReadOnlyTest(function() {
 
             // Catalog guarantees are neccessarily weaker in sharded systems since mongos is not
             // read-only aware.
-            if (TestData.fixture === "sharded") return;
+            if (TestData.fixture === "sharded")
+                return;
 
             var db = writableCollection.getDB();
 
@@ -31,16 +32,18 @@ runReadOnlyTest(function() {
 
             // Catalog guarantees are neccessarily weaker in sharded systems since mongos is not
             // read-only aware.
-            if (TestData.fixture === "sharded") return;
+            if (TestData.fixture === "sharded")
+                return;
 
             // Check that we can read our collections out.
             var db = readableCollection.getDB();
-            var collections = db.getCollectionNames(); // runs listCollections internally.
+            var collections = db.getCollectionNames();  // runs listCollections internally.
             for (var collectionName of this.collectionNames) {
-                assert.contains(collectionName, collections,
+                assert.contains(collectionName,
+                                collections,
                                 "expected to have a collection '" + collectionName +
-                                "' in the output of listCollections, which was " +
-                                tojson(collections));
+                                    "' in the output of listCollections, which was " +
+                                    tojson(collections));
             }
             assert.gte(collections.length, this.collectionNames.length);
 
@@ -55,17 +58,16 @@ runReadOnlyTest(function() {
 
             // Check that we can read our indexes out.
             var indexes = readableCollection.getIndexes();
-            var actualIndexes = indexes.map((fullSpec) => { return fullSpec.key; });
+            var actualIndexes = indexes.map((fullSpec) => {
+                return fullSpec.key;
+            });
             var expectedIndexes = Array.concat([{_id: 1}], this.indexSpecs);
 
             assert.docEq(actualIndexes, expectedIndexes);
 
             // Check that createIndexes fails.
-            assert.commandFailed(db.runCommand({createIndexes: this.name,
-                                                        indexes: [
-                                                            {key: {d : 1},
-                                                             name: "foo"}
-                                                        ]}));
+            assert.commandFailed(
+                db.runCommand({createIndexes: this.name, indexes: [{key: {d: 1}, name: "foo"}]}));
         }
     };
 }());

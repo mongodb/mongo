@@ -56,7 +56,8 @@
         st.restartConfigServer(i);
     }
 
-    // TODO: SERVER-23192 - restart mongos because it has deemend the CSRS config server set as unusable
+    // TODO: SERVER-23192 - restart mongos because it has deemend the CSRS config server set as
+    // unusable
     st.restartMongos(0);
 
     jsTestLog("Queries against the original mongos should work again");

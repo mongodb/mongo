@@ -7,7 +7,7 @@
  * and queries to verify the number of documents inserted by the thread.
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
+load('jstests/concurrency/fsm_libs/extend_workload.js');            // for extendWorkload
 load('jstests/concurrency/fsm_workloads/indexed_insert_where.js');  // for $config
 // For isMongod, isMMAPv1, and isEphemeral.
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');

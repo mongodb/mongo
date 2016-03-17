@@ -29,7 +29,7 @@ admin.runCommand({enableSharding: coll.getDB() + ""});
 // TODO(PM-85): Make sure we *always* move the primary after collection lifecyle project is complete
 st.ensurePrimaryShard(coll.getDB().getName(), 'shard0001');
 admin.runCommand({shardCollection: coll + "", key: {_id: 1}});
-st.configRS.awaitLastOpCommitted(); // TODO: Remove after collection lifecyle project (PM-85)
+st.configRS.awaitLastOpCommitted();  // TODO: Remove after collection lifecyle project (PM-85)
 
 var bulk = insertMongos.getCollection(coll + "").initializeUnorderedBulkOp();
 for (var i = 0; i < 100; i++) {
@@ -78,7 +78,7 @@ var getOtherShard = function(shard) {
 
 var otherShard = getOtherShard(config.databases.findOne({_id: coll.getDB() + ""}).primary);
 assert.commandWorked(admin.runCommand({movePrimary: coll.getDB() + "", to: otherShard}));
-st.configRS.awaitLastOpCommitted(); // TODO: Remove after collection lifecyle project (PM-85)
+st.configRS.awaitLastOpCommitted();  // TODO: Remove after collection lifecyle project (PM-85)
 
 jsTest.log("moved primary...");
 

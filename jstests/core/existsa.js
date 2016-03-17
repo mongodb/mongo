@@ -85,7 +85,7 @@ assertExistsUnindexed({a: {$not: {$exists: false}}});
 // Nested $exists queries disallow the sparse index in some cases where it is not strictly
 // necessary to do so.  (Descriptive tests.)
 assertExistsUnindexed({$nor: [{b: {$exists: false}}]}, 1);  // Unindexed field.
-assertExists({$or: [{a: {$exists: true}}]});  // $exists:true not $exists:false.
+assertExists({$or: [{a: {$exists: true}}]});                // $exists:true not $exists:false.
 
 // Behavior is similar with $elemMatch.
 t.drop();

@@ -6,7 +6,7 @@
  * Repeatedly creates a capped collection. Also verifies that truncation
  * occurs once the collection reaches a certain size.
  */
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
+load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');    // for dropCollections
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod and isMMAPv1
 
 var $config = (function() {

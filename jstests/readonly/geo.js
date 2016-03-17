@@ -35,10 +35,7 @@ runReadOnlyTest(function() {
         exec: function(readableCollection) {
             var res = readableCollection.runCommand({
                 geoNear: readableCollection.getName(),
-                near: {
-                    type: "Point",
-                    coordinates: [40.7211404, -73.9591494]
-                },
+                near: {type: "Point", coordinates: [40.7211404, -73.9591494]},
                 spherical: true,
                 limit: 1
             });

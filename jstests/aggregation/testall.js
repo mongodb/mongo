@@ -802,7 +802,7 @@ var g6 = db.runCommand({
         {$sort: {author: -1}},
         {
           $group: {
-              _id: "authors", /* constant string, *not* a field reference */
+              _id: "authors",                  /* constant string, *not* a field reference */
               firstAuthor: {$last: "$author"}, /* note reverse sort above */
               lastAuthor: {$first: "$author"}, /* note reverse sort above */
               count: {$sum: 1}

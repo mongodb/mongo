@@ -10,7 +10,7 @@
  *
  * Attempts to force a collection scan by not creating an index.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
+load('jstests/concurrency/fsm_libs/extend_workload.js');            // for extendWorkload
 load('jstests/concurrency/fsm_workloads/findAndModify_update.js');  // for $config
 
 var $config = extendWorkload($config,

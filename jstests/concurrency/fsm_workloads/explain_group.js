@@ -7,8 +7,8 @@
  *
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/explain.js');  // for $config
-load('jstests/libs/analyze_plan.js');  // for planHasStage
+load('jstests/concurrency/fsm_workloads/explain.js');     // for $config
+load('jstests/libs/analyze_plan.js');                     // for planHasStage
 
 var $config =
     extendWorkload($config,

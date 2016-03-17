@@ -8,8 +8,8 @@
  * for all threads. Uses paddingBytes as a parameter for compact.
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/compact.js');  // for $config
+load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload
+load('jstests/concurrency/fsm_workloads/compact.js');              // for $config
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isEphemeral
 
 var $config = extendWorkload(

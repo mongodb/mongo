@@ -63,15 +63,13 @@ UseTab:          Never
 ---
 
 Language:        JavaScript
-# Disable JS formatting until the JS linter is in place (SERVER-22338)
-DisableFormat:   true
 # BasedOnStyle:  Google
 # ---
 AccessModifierOffset: -1
 AlignAfterOpenBracket: true
 AlignEscapedNewlinesLeft: true
 AlignOperands:   false
-AlignTrailingComments: false
+AlignTrailingComments: true
 AllowAllParametersOfDeclarationOnNextLine: true
 AllowShortBlocksOnASingleLine: false
 AllowShortCaseLabelsOnASingleLine: false
@@ -94,7 +92,7 @@ ConstructorInitializerIndentWidth: 4
 ContinuationIndentWidth: 4
 Cpp11BracedListStyle: true
 DerivePointerAlignment: true
-#DisableFormat:   false
+DisableFormat:   false
 ExperimentalAutoDetectBinPacking: false
 ForEachMacros:   [ ]
 IndentCaseLabels: true

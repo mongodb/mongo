@@ -98,8 +98,8 @@ ISODate = function(isoDateStr) {
     if (res[11] && res[11] != 'Z') {
         var ofs = 0;
         ofs += (parseInt(res[13], 10) || 0) * 60 * 60 * 1000;  // hours
-        ofs += (parseInt(res[14], 10) || 0) * 60 * 1000;  // mins
-        if (res[12] == '+')  // if ahead subtract
+        ofs += (parseInt(res[14], 10) || 0) * 60 * 1000;       // mins
+        if (res[12] == '+')                                    // if ahead subtract
             ofs *= -1;
 
         time += ofs;

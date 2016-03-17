@@ -201,7 +201,7 @@ allocatePorts = function(numPorts) {
     return ports;
 };
 
-function startParallelShell( jsCode, port, noConnect ) {
+function startParallelShell(jsCode, port, noConnect) {
     var args = ["mongo"];
 
     if (typeof db == "object") {

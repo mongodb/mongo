@@ -5,10 +5,10 @@
  *
  * Runs explain() and count() on a collection.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/explain.js');  // for $config
+load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload
+load('jstests/concurrency/fsm_workloads/explain.js');              // for $config
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
-load('jstests/libs/analyze_plan.js');  // for planHasStage
+load('jstests/libs/analyze_plan.js');                              // for planHasStage
 
 var $config = extendWorkload(
     $config,

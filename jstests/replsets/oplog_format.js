@@ -99,8 +99,8 @@ var lastTS = assertLastOplog({$set: {"a.0": 3}}, {_id: 1}, msg);
 var msg = "bad $setOnInsert";
 res = assert.writeOK(coll.update({}, {$setOnInsert: {a: -1}}));
 assert.eq(res.nMatched, 1, "update failed for '" + msg + "': " + res.toString());
-assert.docEq({_id: 1, a: [3]}, coll.findOne({}), msg);  // No-op
-var otherTS = assertLastOplog({$set: {"a.0": 3}}, {_id: 1}, msg);  // Nothing new
+assert.docEq({_id: 1, a: [3]}, coll.findOne({}), msg);               // No-op
+var otherTS = assertLastOplog({$set: {"a.0": 3}}, {_id: 1}, msg);    // Nothing new
 assert.eq(lastTS, otherTS, "new oplog was not expected -- " + msg);  // No new oplog entry
 
 coll.remove({});
@@ -111,7 +111,7 @@ res = assert.writeOK(coll.update({}, {$setOnInsert: {a: 200}}, {upsert: true}));
 assert.eq(res.nUpserted, 1, "update failed for '" + msg + "': " + res.toString());
 var id = res.getUpsertedId()._id;
 assert.docEq({_id: id, a: 200}, coll.findOne({}), msg);  // No-op
-assertLastOplog({_id: id, a: 200}, null, msg);  // No new oplog entry
+assertLastOplog({_id: id, a: 200}, null, msg);           // No new oplog entry
 
 coll.remove({});
 assert.eq(coll.count(), 0, "collection not empty-2");

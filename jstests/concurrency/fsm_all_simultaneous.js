@@ -13,7 +13,7 @@ var blacklist = [
     'update_inc_capped.js',
 
     'agg_group_external.js',  // uses >100MB of data, which can overwhelm test hosts
-    'agg_sort_external.js',  // uses >100MB of data, which can overwhelm test hosts
+    'agg_sort_external.js',   // uses >100MB of data, which can overwhelm test hosts
 ].map(function(file) {
     return dir + '/' + file;
 });

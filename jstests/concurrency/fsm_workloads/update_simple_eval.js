@@ -9,7 +9,7 @@
  *  - what value to $set the field to
  *  and then applies the update using db.runCommand({ eval: ... })
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
+load('jstests/concurrency/fsm_libs/extend_workload.js');     // for extendWorkload
 load('jstests/concurrency/fsm_workloads/update_simple.js');  // for $config
 
 var $config =

@@ -6,7 +6,7 @@
  * Bulk inserts documents in batches of 100, randomly selects a document that doesn't exist and
  * updates it, and queries by the thread that created the documents to verify counts. */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
+load('jstests/concurrency/fsm_libs/extend_workload.js');            // for extendWorkload
 load('jstests/concurrency/fsm_workloads/indexed_insert_where.js');  // for $config
 
 var $config = extendWorkload(

@@ -14,7 +14,7 @@
  * Specifies nonAtomic=true and writes the results of each thread to
  * the same collection.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
+load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload
 load('jstests/concurrency/fsm_workloads/map_reduce_inline.js');  // for $config
 
 var $config =

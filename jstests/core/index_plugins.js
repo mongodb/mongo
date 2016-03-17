@@ -46,7 +46,7 @@ coll.dropIndexes();
 assert.commandWorked(coll.ensureIndex({a: "text", b: "text"}));
 coll.dropIndexes();
 
-assert.commandFailed(coll.ensureIndex({a: "2d", b: "2d"}));  // unsupported
+assert.commandFailed(coll.ensureIndex({a: "2d", b: "2d"}));                  // unsupported
 assert.commandFailed(coll.ensureIndex({a: "geoHaystack", b: "geoHaystack"},  // unsupported
                                       {bucketSize: 1}));
 
@@ -54,9 +54,9 @@ assert.commandFailed(coll.ensureIndex({a: "hashed", b: "hashed"}));  // unsuppor
 
 // Test compounding different special index types with each other.
 
-assert.commandFailed(coll.ensureIndex({a: "2d", b: "hashed"}));  // unsupported
-assert.commandFailed(coll.ensureIndex({a: "hashed", b: "2dsphere"}));  // unsupported
-assert.commandFailed(coll.ensureIndex({a: "2dsphere", b: "text"}));  // unsupported
+assert.commandFailed(coll.ensureIndex({a: "2d", b: "hashed"}));         // unsupported
+assert.commandFailed(coll.ensureIndex({a: "hashed", b: "2dsphere"}));   // unsupported
+assert.commandFailed(coll.ensureIndex({a: "2dsphere", b: "text"}));     // unsupported
 assert.commandFailed(coll.ensureIndex({a: "text", b: "geoHaystack"}));  // unsupported
-assert.commandFailed(coll.ensureIndex({a: "geoHaystack", b: "2d"},  // unsupported
+assert.commandFailed(coll.ensureIndex({a: "geoHaystack", b: "2d"},      // unsupported
                                       {bucketSize: 1}));

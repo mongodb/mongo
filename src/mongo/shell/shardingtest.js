@@ -31,7 +31,7 @@
  *
  *     config {number|Object|Array.<Object>}: number of config server or
  *       config server configuration object(s)(*). @see MongoRunner.runMongod
- * 
+ *
  *     (*) There are two ways For multiple configuration objects.
  *       (1) Using the object format. Example:
  *
@@ -57,7 +57,7 @@
  *
  *       shardOptions {Object}: same as the shards property above.
  *          Can be used to specify options that are common all shards.
- * 
+ *
  *       configOptions {Object}: same as the config property above.
  *          Can be used to specify options that are common all config servers.
  *       mongosOptions {Object}: same as the mongos property above.
@@ -845,16 +845,18 @@ var ShardingTest = function(params) {
         this.stopMongod(n);
 
         if (otherParams.useBridge) {
-            var bridgeOptions = (opts !== mongod) ? opts.bridgeOptions
-                    : mongod.fullOptions.bridgeOptions;
+            var bridgeOptions =
+                (opts !== mongod) ? opts.bridgeOptions : mongod.fullOptions.bridgeOptions;
             bridgeOptions = Object.merge(otherParams.bridgeOptions, bridgeOptions || {});
-            bridgeOptions = Object.merge(bridgeOptions, {
-                hostName: otherParams.useHostname ? hostName : "localhost",
-                port: this._connections[n].port,
-                // The mongod processes identify themselves to mongobridge as host:port, where the
-                // host is the actual hostname of the machine and not localhost.
-                dest: hostName + ":" + opts.port,
-            });
+            bridgeOptions = Object.merge(
+                bridgeOptions,
+                {
+                  hostName: otherParams.useHostname ? hostName : "localhost",
+                  port: this._connections[n].port,
+                  // The mongod processes identify themselves to mongobridge as host:port, where the
+                  // host is the actual hostname of the machine and not localhost.
+                  dest: hostName + ":" + opts.port,
+                });
 
             this._connections[n] = new MongoBridge(bridgeOptions);
         }
@@ -1182,21 +1184,23 @@ var ShardingTest = function(params) {
     this._configServers = [];
 
     // Using replica set for config servers
-    var rstOptions = { useHostName : otherParams.useHostname,
-                       useBridge : otherParams.useBridge,
-                       bridgeOptions : otherParams.bridgeOptions,
-                       keyFile : keyFile,
-                       name: testName + "-configRS",
-                     };
+    var rstOptions = {
+        useHostName: otherParams.useHostname,
+        useBridge: otherParams.useBridge,
+        bridgeOptions: otherParams.bridgeOptions,
+        keyFile: keyFile,
+        name: testName + "-configRS",
+    };
 
     // when using CSRS, always use wiredTiger as the storage engine
-    var startOptions = { pathOpts: pathOpts,
-                         // Ensure that journaling is always enabled for config servers.
-                         journal : "",
-                         configsvr : "",
-                         noJournalPrealloc : otherParams.nopreallocj,
-                         storageEngine : "wiredTiger",
-                       };
+    var startOptions = {
+        pathOpts: pathOpts,
+        // Ensure that journaling is always enabled for config servers.
+        journal: "",
+        configsvr: "",
+        noJournalPrealloc: otherParams.nopreallocj,
+        storageEngine: "wiredTiger",
+    };
 
     if (otherParams.configOptions && otherParams.configOptions.binVersion) {
         otherParams.configOptions.binVersion =
@@ -1222,7 +1226,7 @@ var ShardingTest = function(params) {
     var initiateTimeout = otherParams.rsOptions && otherParams.rsOptions.initiateTimeout;
     this.configRS.initiate(config, null, initiateTimeout);
 
-    this.configRS.getPrimary(); // Wait for master to be elected before starting mongos
+    this.configRS.getPrimary();  // Wait for master to be elected before starting mongos
 
     this._configDB = this.configRS.getURL();
     this._configServers = this.configRS.nodes;

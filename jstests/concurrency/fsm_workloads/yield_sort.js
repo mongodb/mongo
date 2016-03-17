@@ -6,7 +6,7 @@
  * Intersperse queries which use the SORT stage with updates and deletes of documents they may
  * match.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
+load('jstests/concurrency/fsm_libs/extend_workload.js');        // for extendWorkload
 load('jstests/concurrency/fsm_workloads/yield_sort_merge.js');  // for $config
 
 var $config = extendWorkload(
