@@ -3166,6 +3166,58 @@ const char* ExpressionSubstrCP::getOpName() const {
     return "$substrCP";
 }
 
+/* ----------------------- ExpressionStrLenBytes ------------------------- */
+
+Value ExpressionStrLenBytes::evaluateInternal(Variables* vars) const {
+    Value str(vpOperand[0]->evaluateInternal(vars));
+
+    uassert(34473,
+            str::stream() << "$strLenBytes requires a string argument, found: "
+                          << typeName(str.getType()),
+            str.getType() == String);
+
+    size_t strLen = str.getString().size();
+
+    uassert(34470,
+            "string length could not be represented as an int.",
+            strLen <= std::numeric_limits<int>::max());
+    return Value(static_cast<int>(strLen));
+}
+
+REGISTER_EXPRESSION(strLenBytes, ExpressionStrLenBytes::parse);
+const char* ExpressionStrLenBytes::getOpName() const {
+    return "$strLenBytes";
+}
+
+/* ----------------------- ExpressionStrLenCP ------------------------- */
+
+Value ExpressionStrLenCP::evaluateInternal(Variables* vars) const {
+    Value val(vpOperand[0]->evaluateInternal(vars));
+
+    uassert(
+        34471,
+        str::stream() << "$strLenCP requires a string argument, found: " << typeName(val.getType()),
+        val.getType() == String);
+
+    std::string stringVal = val.getString();
+
+    size_t strLen = 0;
+    for (char byte : stringVal) {
+        strLen += !isContinuationByte(byte);
+    }
+
+    uassert(34472,
+            "string length could not be represented as an int.",
+            strLen <= std::numeric_limits<int>::max());
+
+    return Value(static_cast<int>(strLen));
+}
+
+REGISTER_EXPRESSION(strLenCP, ExpressionStrLenCP::parse);
+const char* ExpressionStrLenCP::getOpName() const {
+    return "$strLenCP";
+}
+
 /* ----------------------- ExpressionSubtract ---------------------------- */
 
 Value ExpressionSubtract::evaluateInternal(Variables* vars) const {

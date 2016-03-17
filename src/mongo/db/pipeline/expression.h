@@ -1259,6 +1259,18 @@ public:
 };
 
 
+class ExpressionStrLenBytes final : public ExpressionFixedArity<ExpressionStrLenBytes, 1> {
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
+};
+
+
+class ExpressionStrLenCP final : public ExpressionFixedArity<ExpressionStrLenCP, 1> {
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
+};
+
+
 class ExpressionSubtract final : public ExpressionFixedArity<ExpressionSubtract, 2> {
 public:
     Value evaluateInternal(Variables* vars) const final;

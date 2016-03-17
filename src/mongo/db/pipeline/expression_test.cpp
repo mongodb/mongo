@@ -4294,6 +4294,59 @@ class NullMiddleGt : public ExpectedResultBase {
 
 }  // namespace Strcasecmp
 
+namespace StrLenBytes {
+
+TEST(ExpressionStrLenBytes, ComputesLengthOfString) {
+    assertExpectedResults("$strLenBytes", {{{Value("abc")}, Value(3)}});
+}
+
+TEST(ExpressionStrLenBytes, ComputesLengthOfEmptyString) {
+    assertExpectedResults("$strLenBytes", {{{Value("")}, Value(0)}});
+}
+
+TEST(ExpressionStrLenBytes, ComputesLengthOfStringWithNull) {
+    assertExpectedResults("$strLenBytes",
+                          {{{Value(StringData("ab\0c", StringData::LiteralTag()))}, Value(4)}});
+}
+
+TEST(ExpressionStrLenCP, ComputesLengthOfStringWithNullAtEnd) {
+    assertExpectedResults("$strLenBytes",
+                          {{{Value(StringData("abc\0", StringData::LiteralTag()))}, Value(4)}});
+}
+
+}  // namespace StrLenBytes
+
+namespace StrLenCP {
+
+TEST(ExpressionStrLenCP, ComputesLengthOfASCIIString) {
+    assertExpectedResults("$strLenCP", {{{Value("abc")}, Value(3)}});
+}
+
+TEST(ExpressionStrLenCP, ComputesLengthOfEmptyString) {
+    assertExpectedResults("$strLenCP", {{{Value("")}, Value(0)}});
+}
+
+TEST(ExpressionStrLenCP, ComputesLengthOfStringWithNull) {
+    assertExpectedResults("$strLenCP",
+                          {{{Value(StringData("ab\0c", StringData::LiteralTag()))}, Value(4)}});
+}
+
+TEST(ExpressionStrLenCP, ComputesLengthOfStringWithNullAtEnd) {
+    assertExpectedResults("$strLenCP",
+                          {{{Value(StringData("abc\0", StringData::LiteralTag()))}, Value(4)}});
+}
+
+TEST(ExpressionStrLenCP, ComputesLengthOfStringWithAccent) {
+    assertExpectedResults("$strLenCP",
+                          {{{Value(StringData("a\0bâ", StringData::LiteralTag()))}, Value(4)}});
+}
+
+TEST(ExpressionStrLenCP, ComputesLengthOfStringWithSpecialCharacters) {
+    assertExpectedResults("$strLenCP", {{{Value("ºabøåß")}, Value(6)}});
+}
+
+}  // namespace StrLenCP
+
 namespace SubstrBytes {
 
 class ExpectedResultBase {
