@@ -3847,8 +3847,6 @@ buildvariants:
   - name: mmap
   - name: replicasets_auth
   - name: sasl
-  - name: sharding_auth
-  - name: sharding_auth_audit_WT
   - name: snmp
   - name: snmp_WT
   - name: ssl
