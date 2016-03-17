@@ -1617,3 +1617,14 @@ buildvariants:
     arch: "linux/x86_64"
   tasks:
   - name: dist
+
+- name: osx1010
+  display_name: OSX 10.10 64-bit
+  run_on:
+      - osx-1010
+  expansions:
+    <<: *mongo_url_ubuntu1204
+    build_tags: -tags "sasl ssl"
+    arch: "osx/x86_64"
+  tasks:
+  - name: dist
