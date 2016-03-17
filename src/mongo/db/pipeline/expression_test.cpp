@@ -757,6 +757,41 @@ TEST_F(ExpressionFloorTest, NullArg) {
     assertEvaluates(Value(BSONNULL), Value(BSONNULL));
 }
 
+/* ------------------------ ExpressionRange --------------------------- */
+
+TEST(ExpressionRangeTest, ComputesStandardRange) {
+    assertExpectedResults("$range", {{{Value(0), Value(3)}, Value(BSON_ARRAY(0 << 1 << 2))}});
+}
+
+TEST(ExpressionRangeTest, ComputesRangeWithStep) {
+    assertExpectedResults("$range",
+                          {{{Value(0), Value(6), Value(2)}, Value(BSON_ARRAY(0 << 2 << 4))}});
+}
+
+TEST(ExpressionRangeTest, ComputesReverseRange) {
+    assertExpectedResults("$range",
+                          {{{Value(0), Value(-3), Value(-1)}, Value(BSON_ARRAY(0 << -1 << -2))}});
+}
+
+TEST(ExpressionRangeTest, ComputesRangeWithPositiveAndNegative) {
+    assertExpectedResults("$range",
+                          {{{Value(-2), Value(3)}, Value(BSON_ARRAY(-2 << -1 << 0 << 1 << 2))}});
+}
+
+TEST(ExpressionRangeTest, ComputesEmptyRange) {
+    assertExpectedResults("$range",
+                          {{{Value(-2), Value(3), Value(-1)}, Value(std::vector<Value>())}});
+}
+
+TEST(ExpressionRangeTest, ComputesRangeWithSameStartAndEnd) {
+    assertExpectedResults("$range", {{{Value(20), Value(20)}, Value(std::vector<Value>())}});
+}
+
+TEST(ExpressionRangeTest, ComputesRangeWithLargeNegativeStep) {
+    assertExpectedResults("$range",
+                          {{{Value(3), Value(-5), Value(-3)}, Value(BSON_ARRAY(3 << 0 << -3))}});
+}
+
 /* ------------------------ ExpressionReverseArray -------------------- */
 
 TEST(ExpressionReverseArrayTest, ReversesNormalArray) {
