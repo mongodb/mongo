@@ -139,7 +139,7 @@ __lsm_worker(void *arg)
 			if (ret == WT_NOTFOUND) {
 				F_CLR(entry->lsm_tree, WT_LSM_TREE_COMPACTING);
 				ret = 0;
-			} else if (ret == EBUSY)
+			} else if (ret == EBUSY || ret == EINTR)
 				ret = 0;
 
 			/* Paranoia: clear session state. */
