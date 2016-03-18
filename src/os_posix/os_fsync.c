@@ -21,7 +21,7 @@ __wt_directory_sync_fh(WT_SESSION_IMPL *session, WT_FH *fh)
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 
 #ifdef __linux__
-	return (WT_JUMP(j_handle_sync, session, fh, true)));
+	return (WT_JUMP(j_handle_sync, session, fh, true));
 #else
 	WT_UNUSED(fh);
 	return (0);
@@ -35,14 +35,15 @@ __wt_directory_sync_fh(WT_SESSION_IMPL *session, WT_FH *fh)
 int
 __wt_directory_sync(WT_SESSION_IMPL *session, const char *path)
 {
+#ifdef __linux__
+	WT_DECL_RET;
+	const char *dir;
+	char *copy;
+#endif
+
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 
 #ifdef __linux__
-	WT_DECL_RET;
-	int fd, tret;
-	const char *dir;
-	char *copy;
-
 	/*
 	 * POSIX 1003.1 does not require that fsync of a file handle ensures the
 	 * entry in the directory containing the file has also reached disk (and
