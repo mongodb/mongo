@@ -3146,17 +3146,13 @@ Value ExpressionIsoWeek::evaluateInternal(Variables* vars) const {
 
 int ExpressionIsoWeek::lastWeek(int year) {
     // Create YYYY-12-31T23:59:59 so only 1 second left to new year.
-    struct tm tm;
+    struct tm tm = {};
     tm.tm_year = year - 1900;
     tm.tm_mon = 11;
     tm.tm_mday = 31;
     tm.tm_hour = 23;
     tm.tm_min = 59;
     tm.tm_sec = 59;
-    tm.tm_wday = -1; // this was enough to solve the bug for 1900
-    tm.tm_yday = -1;
-    tm.tm_gmtoff = 0;
-    tm.tm_isdst = 0;
     mktime(&tm);
 
     // From: https://en.wikipedia.org/wiki/ISO_week_date#Last_week :
