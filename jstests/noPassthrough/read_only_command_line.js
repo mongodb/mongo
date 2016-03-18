@@ -15,7 +15,7 @@
     MongoRunner.stopMongod(mongod);
 
     mongod = MongoRunner.runMongod(
-        {storageEngine: "mmapv1", readOnly: "", dbpath: dbpath, noCleanData: true});
+        {storageEngine: "mmapv1", queryableBackupMode: "", dbpath: dbpath, noCleanData: true});
     assert(mongod.getDB("admin").isMaster().readOnly);
     assert(mongod.getDB("admin").serverStatus().storageEngine.readOnly);
     MongoRunner.stopMongod(mongod);

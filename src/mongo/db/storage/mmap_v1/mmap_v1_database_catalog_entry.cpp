@@ -476,7 +476,7 @@ void MMAPV1DatabaseCatalogEntry::_init(OperationContext* txn) {
     if (freeListDetails) {
         if (storageGlobalParams.readOnly) {
             severe() << "Legacy storage format detected, but server was started with the "
-                        "--readOnly command line parameter.";
+                        "--queryableBackupMode command line parameter.";
             fassertFailedNoTrace(34373);
         }
 
@@ -492,7 +492,7 @@ void MMAPV1DatabaseCatalogEntry::_init(OperationContext* txn) {
     if (version.isCompatibleWithCurrentCode() && !version.mayHave28Freelist()) {
         if (storageGlobalParams.readOnly) {
             severe() << "Legacy storage format detected, but server was started with the "
-                        "--readOnly command line parameter.";
+                        "--queryableBackupMode command line parameter.";
             fassertFailedNoTrace(34374);
         }
 

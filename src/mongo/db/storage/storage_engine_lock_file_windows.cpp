@@ -126,7 +126,7 @@ Status StorageEngineLockFile::open() {
             return Status(ErrorCodes::IllegalOperation,
                           str::stream()
                               << "Attempted to create a lock file on a read-only directory: "
-                              << _dbpath << " - did you mean to start with --readOnly?");
+                              << _dbpath);
         }
         return Status(ErrorCodes::DBPathInUse,
                       str::stream() << "Unable to create/open lock file: " << _filespec << ' '

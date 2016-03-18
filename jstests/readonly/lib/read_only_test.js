@@ -32,7 +32,7 @@ StandaloneFixture.prototype.runExecPhase = function runExecPhase(test) {
         makeDirectoryReadOnly(this.dbpath);
 
         var options = {
-            readOnly: "",
+            queryableBackupMode: "",
             noCleanData: true,
             dbpath: this.dbpath
         };
@@ -73,7 +73,7 @@ ShardedFixture.prototype.runExecPhase = function runExecPhase(test) {
     try {
         for (var i = 0; i < this.nShards; ++i) {
             var opts = {
-                readOnly: "",
+                queryableBackupMode: "",
                 dbpath: this.paths[i]
             };
 

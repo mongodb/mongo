@@ -205,11 +205,12 @@ Status addMongodOptions(moe::OptionSection* options) {
                                       "each database will be stored in a separate directory");
 
     storage_options.addOptionChaining(
-                        "storage.readOnly",
-                        "readOnly",
+                        "storage.queryableBackupMode",
+                        "queryableBackupMode",
                         moe::Switch,
                         "enable read-only mode - if true the server will not accept writes.")
-        .setSources(moe::SourceAll);
+        .setSources(moe::SourceAll)
+        .hidden();
 
 
     general_options.addOptionChaining(
@@ -657,8 +658,8 @@ Status validateMongodOptions(const moe::Environment& params) {
     }
 #endif
 
-    if (params.count("storage.readOnly")) {
-        // Command line options that are disallowed when --readOnly is specified.
+    if (params.count("storage.queryableBackupMode")) {
+        // Command line options that are disallowed when --queryableBackupMode is specified.
         for (const auto& disallowedOption : {"replSet",
                                              "configSvr",
                                              "upgrade",
@@ -676,7 +677,7 @@ Status validateMongodOptions(const moe::Environment& params) {
                                              "fastsync"}) {
             if (params.count(disallowedOption)) {
                 return Status(ErrorCodes::BadValue,
-                              str::stream() << "Cannot specify both --readOnly and --"
+                              str::stream() << "Cannot specify both --queryableBackupMode and --"
                                             << disallowedOption);
             }
         }
@@ -1049,7 +1050,8 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
         storageGlobalParams.directoryperdb = params["storage.directoryPerDB"].as<bool>();
     }
 
-    if (params.count("storage.readOnly") && params["storage.readOnly"].as<bool>()) {
+    if (params.count("storage.queryableBackupMode") &&
+        params["storage.queryableBackupMode"].as<bool>()) {
         storageGlobalParams.readOnly = true;
         storageGlobalParams.dur = false;
     }
