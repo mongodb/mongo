@@ -327,7 +327,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	    (block->os_cache_dirty += align_size) > block->os_cache_dirty_max &&
 	    __wt_session_can_wait(session)) {
 		block->os_cache_dirty = 0;
-		WT_RET(__wt_fsync_async(session, fh));
+		WT_RET(__wt_fsync(session, fh, false));
 	}
 #endif
 #ifdef HAVE_POSIX_FADVISE
