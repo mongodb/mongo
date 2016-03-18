@@ -86,8 +86,8 @@ Status CatalogManagerMock::updateDatabase(OperationContext* txn,
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-StatusWith<OpTimePair<DatabaseType>> CatalogManagerMock::getDatabase(OperationContext* txn,
-                                                                     const string& dbName) {
+StatusWith<repl::OpTimeWith<DatabaseType>> CatalogManagerMock::getDatabase(OperationContext* txn,
+                                                                           const string& dbName) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
@@ -97,8 +97,8 @@ Status CatalogManagerMock::updateCollection(OperationContext* txn,
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-StatusWith<OpTimePair<CollectionType>> CatalogManagerMock::getCollection(OperationContext* txn,
-                                                                         const string& collNs) {
+StatusWith<repl::OpTimeWith<CollectionType>> CatalogManagerMock::getCollection(
+    OperationContext* txn, const string& collNs) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
@@ -140,7 +140,7 @@ StatusWith<string> CatalogManagerMock::getTagForChunk(OperationContext* txn,
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-StatusWith<OpTimePair<std::vector<ShardType>>> CatalogManagerMock::getAllShards(
+StatusWith<repl::OpTimeWith<std::vector<ShardType>>> CatalogManagerMock::getAllShards(
     OperationContext* txn) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }

@@ -28,22 +28,44 @@
 
 #pragma once
 
+#include <iosfwd>
+#include <string>
+
 #include "mongo/db/repl/optime.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+namespace repl {
 
 /**
  * Basic structure that contains a value and an opTime.
  */
 template <typename T>
-struct OpTimePair {
+struct OpTimeWith {
 public:
-    OpTimePair() = default;
-    explicit OpTimePair(T val) : value(std::move(val)) {}
-    OpTimePair(T val, repl::OpTime ts) : value(std::move(val)), opTime(std::move(ts)) {}
+    OpTimeWith() = default;
+    explicit OpTimeWith(T val) : value(std::move(val)) {}
+    OpTimeWith(T val, repl::OpTime ts) : value(std::move(val)), opTime(std::move(ts)) {}
+
+    std::string toString() const;
+
+    bool operator==(const OpTimeWith<T>& rhs) const {
+        return opTime == rhs.opTime && value == rhs.value;
+    }
 
     T value;
     repl::OpTime opTime;
 };
 
+template <typename T>
+std::ostream& operator<<(std::ostream& out, const OpTimeWith<T>& opTimeWith) {
+    return out << opTimeWith.toString();
+}
+
+template <typename T>
+std::string OpTimeWith<T>::toString() const {
+    return str::stream() << opTime.toString() << "[" << value << "]";
+}
+
+}  // namespace repl
 }  // namespace mongo

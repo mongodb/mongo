@@ -34,9 +34,9 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/repl/optime_with.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/client/shard.h"
-#include "mongo/s/optime_pair.h"
 
 namespace mongo {
 
@@ -184,8 +184,8 @@ public:
      * the failure. These are some of the known failures:
      *  - NamespaceNotFound - database does not exist
      */
-    virtual StatusWith<OpTimePair<DatabaseType>> getDatabase(OperationContext* txn,
-                                                             const std::string& dbName) = 0;
+    virtual StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(OperationContext* txn,
+                                                                   const std::string& dbName) = 0;
 
     /**
      * Updates or creates the metadata for a given collection.
@@ -204,8 +204,8 @@ public:
      * the failure. These are some of the known failures:
      *  - NamespaceNotFound - collection does not exist
      */
-    virtual StatusWith<OpTimePair<CollectionType>> getCollection(OperationContext* txn,
-                                                                 const std::string& collNs) = 0;
+    virtual StatusWith<repl::OpTimeWith<CollectionType>> getCollection(
+        OperationContext* txn, const std::string& collNs) = 0;
 
     /**
      * Retrieves all collections undera specified database (or in the system).
@@ -281,7 +281,8 @@ public:
      * Retrieves all shards in this sharded cluster.
      * Returns a !OK status if an error occurs.
      */
-    virtual StatusWith<OpTimePair<std::vector<ShardType>>> getAllShards(OperationContext* txn) = 0;
+    virtual StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
+        OperationContext* txn) = 0;
 
     /**
      * Runs a user management command on the config servers, potentially synchronizing through

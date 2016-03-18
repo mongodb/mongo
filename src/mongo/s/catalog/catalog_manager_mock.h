@@ -66,15 +66,15 @@ public:
                           const std::string& dbName,
                           const DatabaseType& db) override;
 
-    StatusWith<OpTimePair<DatabaseType>> getDatabase(OperationContext* txn,
-                                                     const std::string& dbName) override;
+    StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(OperationContext* txn,
+                                                           const std::string& dbName) override;
 
     Status updateCollection(OperationContext* txn,
                             const std::string& collNs,
                             const CollectionType& coll) override;
 
-    StatusWith<OpTimePair<CollectionType>> getCollection(OperationContext* txn,
-                                                         const std::string& collNs) override;
+    StatusWith<repl::OpTimeWith<CollectionType>> getCollection(OperationContext* txn,
+                                                               const std::string& collNs) override;
 
     Status getCollections(OperationContext* txn,
                           const std::string* dbName,
@@ -102,7 +102,8 @@ public:
                                            const std::string& collectionNs,
                                            const ChunkType& chunk) override;
 
-    StatusWith<OpTimePair<std::vector<ShardType>>> getAllShards(OperationContext* txn) override;
+    StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
+        OperationContext* txn) override;
 
     bool runUserManagementWriteCommand(OperationContext* txn,
                                        const std::string& commandName,

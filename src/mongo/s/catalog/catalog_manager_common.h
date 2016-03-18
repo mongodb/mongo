@@ -34,10 +34,10 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/repl/optime_with.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/client/shard.h"
-#include "mongo/s/optime_pair.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
 

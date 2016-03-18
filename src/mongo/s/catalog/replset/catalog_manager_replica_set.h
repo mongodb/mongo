@@ -66,11 +66,11 @@ public:
     StatusWith<ShardDrainingStatus> removeShard(OperationContext* txn,
                                                 const std::string& name) override;
 
-    StatusWith<OpTimePair<DatabaseType>> getDatabase(OperationContext* txn,
-                                                     const std::string& dbName) override;
+    StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(OperationContext* txn,
+                                                           const std::string& dbName) override;
 
-    StatusWith<OpTimePair<CollectionType>> getCollection(OperationContext* txn,
-                                                         const std::string& collNs) override;
+    StatusWith<repl::OpTimeWith<CollectionType>> getCollection(OperationContext* txn,
+                                                               const std::string& collNs) override;
 
     Status getCollections(OperationContext* txn,
                           const std::string* dbName,
@@ -98,7 +98,8 @@ public:
                                            const std::string& collectionNs,
                                            const ChunkType& chunk) override;
 
-    StatusWith<OpTimePair<std::vector<ShardType>>> getAllShards(OperationContext* txn) override;
+    StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
+        OperationContext* txn) override;
 
     bool runUserManagementWriteCommand(OperationContext* txn,
                                        const std::string& commandName,
@@ -181,7 +182,7 @@ private:
                                                    const NamespaceString& ns,
                                                    BSONObj query);
 
-    StatusWith<OpTimePair<std::vector<BSONObj>>> _exhaustiveFindOnConfig(
+    StatusWith<repl::OpTimeWith<std::vector<BSONObj>>> _exhaustiveFindOnConfig(
         OperationContext* txn,
         const ReadPreferenceSetting& readPref,
         const NamespaceString& nss,
@@ -203,7 +204,7 @@ private:
      * Queries the config servers for the database metadata for the given database, using the
      * given read preference.  Returns NamespaceNotFound if no database metadata is found.
      */
-    StatusWith<OpTimePair<DatabaseType>> _fetchDatabaseMetadata(
+    StatusWith<repl::OpTimeWith<DatabaseType>> _fetchDatabaseMetadata(
         OperationContext* txn, const std::string& dbName, const ReadPreferenceSetting& readPref);
 
     //

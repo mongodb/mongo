@@ -330,7 +330,7 @@ StatusWith<ShardDrainingStatus> CatalogManagerReplicaSet::removeShard(OperationC
     return ShardDrainingStatus::COMPLETED;
 }
 
-StatusWith<OpTimePair<DatabaseType>> CatalogManagerReplicaSet::getDatabase(
+StatusWith<repl::OpTimeWith<DatabaseType>> CatalogManagerReplicaSet::getDatabase(
     OperationContext* txn, const std::string& dbName) {
     if (!NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow)) {
         return {ErrorCodes::InvalidNamespace, stream() << dbName << " is not a valid db name"};
@@ -343,7 +343,7 @@ StatusWith<OpTimePair<DatabaseType>> CatalogManagerReplicaSet::getDatabase(
         dbt.setSharded(false);
         dbt.setPrimary("config");
 
-        return OpTimePair<DatabaseType>(dbt);
+        return repl::OpTimeWith<DatabaseType>(dbt);
     }
 
     auto result = _fetchDatabaseMetadata(txn, dbName, kConfigReadSelector);
@@ -364,7 +364,7 @@ StatusWith<OpTimePair<DatabaseType>> CatalogManagerReplicaSet::getDatabase(
     return result;
 }
 
-StatusWith<OpTimePair<DatabaseType>> CatalogManagerReplicaSet::_fetchDatabaseMetadata(
+StatusWith<repl::OpTimeWith<DatabaseType>> CatalogManagerReplicaSet::_fetchDatabaseMetadata(
     OperationContext* txn, const std::string& dbName, const ReadPreferenceSetting& readPref) {
     dassert(dbName != "admin" && dbName != "config");
 
@@ -390,10 +390,10 @@ StatusWith<OpTimePair<DatabaseType>> CatalogManagerReplicaSet::_fetchDatabaseMet
         return parseStatus.getStatus();
     }
 
-    return OpTimePair<DatabaseType>(parseStatus.getValue(), docsWithOpTime.opTime);
+    return repl::OpTimeWith<DatabaseType>(parseStatus.getValue(), docsWithOpTime.opTime);
 }
 
-StatusWith<OpTimePair<CollectionType>> CatalogManagerReplicaSet::getCollection(
+StatusWith<repl::OpTimeWith<CollectionType>> CatalogManagerReplicaSet::getCollection(
     OperationContext* txn, const std::string& collNs) {
     auto statusFind = _exhaustiveFindOnConfig(txn,
                                               kConfigReadSelector,
@@ -419,7 +419,7 @@ StatusWith<OpTimePair<CollectionType>> CatalogManagerReplicaSet::getCollection(
         return parseStatus.getStatus();
     }
 
-    return OpTimePair<CollectionType>(parseStatus.getValue(), retOpTimePair.opTime);
+    return repl::OpTimeWith<CollectionType>(parseStatus.getValue(), retOpTimePair.opTime);
 }
 
 Status CatalogManagerReplicaSet::getCollections(OperationContext* txn,
@@ -761,7 +761,7 @@ StatusWith<string> CatalogManagerReplicaSet::getTagForChunk(OperationContext* tx
     return tagsResult.getValue().getTag();
 }
 
-StatusWith<OpTimePair<std::vector<ShardType>>> CatalogManagerReplicaSet::getAllShards(
+StatusWith<repl::OpTimeWith<std::vector<ShardType>>> CatalogManagerReplicaSet::getAllShards(
     OperationContext* txn) {
     std::vector<ShardType> shards;
     auto findStatus = _exhaustiveFindOnConfig(txn,
@@ -795,7 +795,8 @@ StatusWith<OpTimePair<std::vector<ShardType>>> CatalogManagerReplicaSet::getAllS
         shards.push_back(shardRes.getValue());
     }
 
-    return OpTimePair<std::vector<ShardType>>{std::move(shards), findStatus.getValue().opTime};
+    return repl::OpTimeWith<std::vector<ShardType>>{std::move(shards),
+                                                    findStatus.getValue().opTime};
 }
 
 bool CatalogManagerReplicaSet::runUserManagementWriteCommand(OperationContext* txn,
@@ -1364,7 +1365,7 @@ StatusWith<VersionType> CatalogManagerReplicaSet::_getConfigVersion(OperationCon
     return versionTypeResult.getValue();
 }
 
-StatusWith<OpTimePair<vector<BSONObj>>> CatalogManagerReplicaSet::_exhaustiveFindOnConfig(
+StatusWith<repl::OpTimeWith<vector<BSONObj>>> CatalogManagerReplicaSet::_exhaustiveFindOnConfig(
     OperationContext* txn,
     const ReadPreferenceSetting& readPref,
     const NamespaceString& nss,
@@ -1377,8 +1378,8 @@ StatusWith<OpTimePair<vector<BSONObj>>> CatalogManagerReplicaSet::_exhaustiveFin
         return response.getStatus();
     }
 
-    return OpTimePair<vector<BSONObj>>(std::move(response.getValue().docs),
-                                       response.getValue().opTime);
+    return repl::OpTimeWith<vector<BSONObj>>(std::move(response.getValue().docs),
+                                             response.getValue().opTime);
 }
 
 void CatalogManagerReplicaSet::_appendReadConcern(BSONObjBuilder* builder) {
