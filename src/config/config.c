@@ -16,9 +16,9 @@ static int
 __config_err(WT_CONFIG *conf, const char *msg, int err)
 {
 	WT_RET_MSG(conf->session, err,
-	    "Error parsing '%.*s' at byte %u: %s",
+	    "Error parsing '%.*s' at offset %" WT_PTRDIFFT_FMT ": %s",
 	    (int)(conf->end - conf->orig), conf->orig,
-	    (u_int)(conf->cur - conf->orig), msg);
+	    conf->cur - conf->orig, msg);
 }
 
 /*

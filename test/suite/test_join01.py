@@ -148,7 +148,8 @@ class test_join01(wttest.WiredTigerTestCase):
         # and examine primary keys 2,5,8,...,95,98,1,4,7,...,94,97.
         jc = self.session.open_cursor('join:table:join01' + proj_suffix,
                                       None, None)
-        c2 = self.session.open_cursor('index:join01:index2', None, None)
+        # Adding a projection to a reference cursor should be allowed.
+        c2 = self.session.open_cursor('index:join01:index2(v1)', None, None)
         c2.set_key(99)   # skips all entries w/ primary key divisible by three
         self.assertEquals(0, c2.search())
         self.session.join(jc, c2, 'compare=gt')
@@ -166,12 +167,12 @@ class test_join01(wttest.WiredTigerTestCase):
 
         # Then select all numbers whose reverse string representation
         # is in '20' < x < '40'.
-        c1a = self.session.open_cursor('index:join01:index1', None, None)
+        c1a = self.session.open_cursor('index:join01:index1(v1)', None, None)
         c1a.set_key('21')
         self.assertEquals(0, c1a.search())
         self.session.join(jc, c1a, 'compare=gt' + joincfg1)
 
-        c1b = self.session.open_cursor('index:join01:index1', None, None)
+        c1b = self.session.open_cursor('index:join01:index1(v1)', None, None)
         c1b.set_key('41')
         self.assertEquals(0, c1b.search())
         self.session.join(jc, c1b, 'compare=lt' + joincfg1)

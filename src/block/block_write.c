@@ -206,8 +206,14 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	uint32_t cksum;
 	bool local_locked;
 
-	blk = WT_BLOCK_HEADER_REF(buf->mem);
 	fh = block->fh;
+
+	/*
+	 * Clear the block header to ensure all of it is initialized, even the
+	 * unused fields.
+	 */
+	blk = WT_BLOCK_HEADER_REF(buf->mem);
+	memset(blk, 0, sizeof(*blk));
 
 	/*
 	 * Swap the page-header as needed; this doesn't belong here, but it's

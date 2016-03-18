@@ -369,7 +369,7 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		WT_ERR_MSG(session, WT_ERROR,
 		    "unsupported WiredTiger file version: this build only "
 		    "supports major/minor versions up to %d/%d, and the file "
-		    "is version %d/%d",
+		    "is version %" PRIu16 "/%" PRIu16,
 		    WT_BLOCK_MAJOR_VERSION, WT_BLOCK_MINOR_VERSION,
 		    desc->majorv, desc->minorv);
 

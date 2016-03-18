@@ -179,7 +179,7 @@ struct __wt_lsm_tree {
 	int collator_owned;
 
 	uint32_t refcnt;		/* Number of users of the tree */
-	uint8_t exclusive;		/* Tree is locked exclusively */
+	WT_SESSION_IMPL *excl_session;	/* Session has exclusive lock */
 
 #define	LSM_TREE_MAX_QUEUE	100
 	uint32_t queue_ref;
@@ -215,7 +215,7 @@ struct __wt_lsm_tree {
 	size_t chunk_alloc;		/* Space allocated for chunks */
 	uint32_t nchunks;		/* Number of active chunks */
 	uint32_t last;			/* Last allocated ID */
-	int modified;			/* Have there been updates? */
+	bool modified;			/* Have there been updates? */
 
 	WT_LSM_CHUNK **old_chunks;	/* Array of old LSM chunks */
 	size_t old_alloc;		/* Space allocated for old chunks */

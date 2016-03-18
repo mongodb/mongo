@@ -408,8 +408,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * completion. Do it after flushing the pages to give the
 	 * asynchronous flush as much time as possible before we wait.
 	 */
-	if (F_ISSET(conn, WT_CONN_CKPT_SYNC))
-		WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
+	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
 
 	/* Start the checkpoint for real. */
 	WT_ERR(__wt_meta_track_on(session));
@@ -509,8 +508,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Checkpoints have to hit disk (it would be reasonable to configure for
 	 * lazy checkpoints, but we don't support them yet).
 	 */
-	if (F_ISSET(conn, WT_CONN_CKPT_SYNC))
-		WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
+	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
 
 	WT_ERR(__checkpoint_verbose_track(session,
 	    "sync completed", &verb_timer));
@@ -1120,9 +1118,8 @@ fake:	/*
 	 * sync the file here or we could roll forward the metadata in
 	 * recovery and open a checkpoint that isn't yet durable.
 	 */
-	if (F_ISSET(conn, WT_CONN_CKPT_SYNC) &&
-	    (WT_IS_METADATA(session, dhandle) ||
-	    !F_ISSET(&session->txn, WT_TXN_RUNNING)))
+	if (WT_IS_METADATA(session, dhandle) ||
+	    !F_ISSET(&session->txn, WT_TXN_RUNNING))
 		WT_ERR(__wt_checkpoint_sync(session, NULL));
 
 	WT_ERR(__wt_meta_ckptlist_set(
@@ -1197,8 +1194,9 @@ __wt_checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Should not be called with a checkpoint handle. */
 	WT_ASSERT(session, session->dhandle->checkpoint == NULL);
 
-	/* Should have an underlying block manager reference. */
-	WT_ASSERT(session, bm != NULL);
+	/* Unnecessary if checkpoint_sync has been configured "off". */
+	if (!F_ISSET(S2C(session), WT_CONN_CKPT_SYNC))
+		return (0);
 
 	return (bm->sync(bm, session, true));
 }

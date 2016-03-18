@@ -211,7 +211,6 @@ descend:	/*
 leaf_only:
 	page = current->page;
 	cbt->ref = current;
-	cbt->recno = recno;
 
 	/* 
 	 * Don't bother searching if the caller is appending a new record where
@@ -223,13 +222,6 @@ leaf_only:
 		cbt->compare = -1;
 		return (0);
 	}
-
-	/*
-	 * Set the on-page slot to an impossible value larger than any possible
-	 * slot (it's used to interpret the search function's return after the
-	 * search returns an insert list for a page that has no entries).
-	 */
-	cbt->slot = UINT32_MAX;
 
 	/*
 	 * Search the leaf page.
@@ -244,28 +236,38 @@ leaf_only:
 	 * that's impossibly large for the page. We do have additional setup to
 	 * do in that case, the record may be appended to the page.
 	 */
-	cbt->compare = 0;
 	if (page->type == WT_PAGE_COL_FIX) {
 		if (recno < page->pg_fix_recno) {
+			cbt->recno = page->pg_fix_recno;
 			cbt->compare = 1;
 			return (0);
 		}
 		if (recno >= page->pg_fix_recno + page->pg_fix_entries) {
 			cbt->recno = page->pg_fix_recno + page->pg_fix_entries;
 			goto past_end;
-		} else
+		} else {
+			cbt->recno = recno;
+			cbt->compare = 0;
 			ins_head = WT_COL_UPDATE_SINGLE(page);
+		}
 	} else {
 		if (recno < page->pg_var_recno) {
+			cbt->recno = page->pg_var_recno;
+			cbt->slot = 0;
 			cbt->compare = 1;
 			return (0);
 		}
 		if ((cip = __col_var_search(page, recno, NULL)) == NULL) {
 			cbt->recno = __col_var_last_recno(page);
+			cbt->slot = page->pg_var_entries == 0 ?
+			    0 : page->pg_var_entries - 1;
 			goto past_end;
 		} else {
+			cbt->recno = recno;
 			cbt->slot = WT_COL_SLOT(page, cip);
+			cbt->compare = 0;
 			ins_head = WT_COL_UPDATE_SLOT(page, cbt->slot);
+			F_SET(cbt, WT_CBT_VAR_ONPAGE_MATCH);
 		}
 	}
 

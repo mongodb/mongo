@@ -281,10 +281,8 @@ err:	WT_TRET(__wt_las_cursor_close(session, &cursor, session_flags));
 	 * On error, upd points to a single unlinked WT_UPDATE structure,
 	 * first_upd points to a list.
 	 */
-	if (upd != NULL)
-		__wt_free(session, upd);
-	if (first_upd != NULL)
-		__wt_free_update_list(session, first_upd);
+	__wt_free(session, upd);
+	__wt_free_update_list(session, first_upd);
 
 	__wt_scr_free(session, &current_key);
 	__wt_scr_free(session, &las_addr);

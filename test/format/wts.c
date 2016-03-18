@@ -53,7 +53,8 @@ compressor(uint32_t compress_flag)
 	default:
 		break;
 	}
-	testutil_die(EINVAL, "illegal compression flag: 0x%x", compress_flag);
+	testutil_die(EINVAL,
+	    "illegal compression flag: %#" PRIx32, compress_flag);
 }
 
 /*
@@ -71,7 +72,8 @@ encryptor(uint32_t encrypt_flag)
 	default:
 		break;
 	}
-	testutil_die(EINVAL, "illegal encryption flag: 0x%x", encrypt_flag);
+	testutil_die(EINVAL,
+	    "illegal encryption flag: %#" PRIx32, encrypt_flag);
 }
 
 static int
@@ -313,7 +315,7 @@ wts_create(void)
 	p += snprintf(p, REMAIN(p, end),
 	    "key_format=%s,"
 	    "allocation_size=512,%s"
-	    "internal_page_max=%d,leaf_page_max=%d",
+	    "internal_page_max=%" PRIu32 ",leaf_page_max=%" PRIu32,
 	    (g.type == ROW) ? "u" : "r",
 	    g.c_firstfit ? "block_allocation=first," : "",
 	    maxintlpage, maxleafpage);
@@ -325,15 +327,15 @@ wts_create(void)
 	maxintlkey = mmrand(NULL, maxintlpage / 50, maxintlpage / 40);
 	if (maxintlkey > 20)
 		p += snprintf(p, REMAIN(p, end),
-		    ",internal_key_max=%d", maxintlkey);
+		    ",internal_key_max=%" PRIu32, maxintlkey);
 	maxleafkey = mmrand(NULL, maxleafpage / 50, maxleafpage / 40);
 	if (maxleafkey > 20)
 		p += snprintf(p, REMAIN(p, end),
-		    ",leaf_key_max=%d", maxleafkey);
+		    ",leaf_key_max=%" PRIu32, maxleafkey);
 	maxleafvalue = mmrand(NULL, maxleafpage * 10, maxleafpage / 40);
 	if (maxleafvalue > 40 && maxleafvalue < 100 * 1024)
 		p += snprintf(p, REMAIN(p, end),
-		    ",leaf_value_max=%d", maxleafvalue);
+		    ",leaf_value_max=%" PRIu32, maxleafvalue);
 
 	switch (g.type) {
 	case FIX:
@@ -361,7 +363,7 @@ wts_create(void)
 			    ",huffman_value=english");
 		if (g.c_dictionary)
 			p += snprintf(p, REMAIN(p, end),
-			    ",dictionary=%d", mmrand(NULL, 123, 517));
+			    ",dictionary=%" PRIu32, mmrand(NULL, 123, 517));
 		break;
 	}
 
