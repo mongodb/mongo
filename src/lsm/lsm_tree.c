@@ -85,7 +85,7 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool final)
  *	Close an LSM tree structure.
  */
 static int
-__lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+__lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool wait)
 {
 	WT_DECL_RET;
 	int i;
@@ -94,10 +94,13 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	F_CLR(lsm_tree, WT_LSM_TREE_ACTIVE);
 
 	/*
-	 * Wait for all LSM operations and work units that were in flight to
-	 * finish.
+	 * Wait for all LSM operations to drain. If WiredTiger is shutting
+	 * down also wait for the tree reference count to go to zero, otherwise
+	 * we know a user is holding a reference to the tree, so exclusive
+	 * access is not available.
 	 */
-	for (i = 0; lsm_tree->refcnt > 1 || lsm_tree->queue_ref > 0; ++i) {
+	for (i = 0;
+	    lsm_tree->refcnt > 1 && (wait || lsm_tree->queue_ref > 0); ++i) {
 		/*
 		 * Remove any work units from the manager queues. Do this step
 		 * repeatedly in case a work unit was in the process of being
@@ -145,7 +148,7 @@ __wt_lsm_tree_close_all(WT_SESSION_IMPL *session)
 		 * is unconditional.
 		 */
 		(void)__wt_atomic_add32(&lsm_tree->refcnt, 1);
-		WT_TRET(__lsm_tree_close(session, lsm_tree));
+		WT_TRET(__lsm_tree_close(session, lsm_tree, true));
 		WT_TRET(__lsm_tree_discard(session, lsm_tree, true));
 	}
 
@@ -380,9 +383,12 @@ __lsm_tree_find(WT_SESSION_IMPL *session,
 				 * open cursors - otherwise we can generate
 				 * spurious busy returns.
 				 */
-				if (__lsm_tree_close(session, lsm_tree) != 0 ||
-				    !__wt_atomic_cas32(
-				    &lsm_tree->refcnt, 0, 1)) {
+				(void)__wt_atomic_add32(&lsm_tree->refcnt, 1);
+				if (__lsm_tree_close(
+				    session, lsm_tree, false) != 0 ||
+				    lsm_tree->refcnt != 1) {
+					(void)__wt_atomic_sub32(
+					    &lsm_tree->refcnt, 1);
 					F_SET(lsm_tree, WT_LSM_TREE_ACTIVE);
 					lsm_tree->excl_session = NULL;
 					return (EBUSY);
