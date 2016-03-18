@@ -60,10 +60,10 @@ functions:
           # to create a mongod EC2 cluster
           set -e
           set -v
-          cd ./clusters/${cluster}
           # create all resources and instances
-          ./setup-cluster.sh
+          bin/setup-cluster.sh ${cluster}
           echo "EC2 Cluster CREATED."
+          cd ./clusters/${cluster}
           touch terraform.tfstate.backup
           tar -czvf cluster_config.tgz ips.sh terraform.tfstate.backup terraform.tfstate
     - command: s3.put
@@ -122,7 +122,7 @@ functions:
           rm -f ../../reports.tgz
           echo "Run test for ${test} with setup ${setup}"
           # run test
-          ./run-${test}.sh ${storageEngine} ${setup}
+          ../../bin/run-${test}.sh ${storageEngine} ${setup} ${cluster}
           rm -f ../perf.json
           chmod 766 perf.json
           cp ./perf.json ..

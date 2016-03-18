@@ -62,8 +62,7 @@ functions:
           # to create a mongod EC2 cluster
           set -e
           set -o verbose
-          cd ./clusters/${cluster}
-          ./setup-cluster.sh
+          bin/setup-cluster.sh ${cluster}
           echo "EC2 Cluster CREATED."
 
   "configure mongodb cluster":
@@ -97,7 +96,7 @@ functions:
           rm -f ../../reports.tgz
           echo "Run test for ${test} with setup ${setup}"
           # run test
-          ./run-${test}.sh
+          ../../bin/run-${test}.sh ${storageEngine} ${setup} ${cluster}
           mv perf.json ..
           cd ..
           cat perf.json >> perf_all.json
@@ -253,7 +252,7 @@ tasks:
         use_csrs: "true"
     - func: "run test"
       vars:
-        test: "ycsb-CSRS-wiredTiger"
+        test: "ycsb-csrs"
     - func: "make test log artifact"
     - func: "upload log file"
       vars:
