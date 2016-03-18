@@ -7,29 +7,6 @@
  */
 
 /*
- * FILE handle close/open configuration.
- */
-typedef enum {
-	WT_FHANDLE_APPEND, WT_FHANDLE_READ, WT_FHANDLE_WRITE
-} WT_FHANDLE_MODE;
-
-#ifdef	_WIN32
-/*
- * Open in binary (untranslated) mode; translations involving carriage-return
- * and linefeed characters are suppressed.
- */
-#define	WT_FOPEN_APPEND		"ab"
-#define	WT_FOPEN_READ		"rb"
-#define	WT_FOPEN_WRITE		"wb"
-#else
-#define	WT_FOPEN_APPEND		"a"
-#define	WT_FOPEN_READ		"r"
-#define	WT_FOPEN_WRITE		"w"
-#endif
-
-#define	WT_FOPEN_FIXED		0x1	/* Path isn't relative to home */
-
-/*
  * Number of directory entries can grow dynamically.
  */
 #define	WT_DIR_ENTRY	32
@@ -81,6 +58,17 @@ typedef enum {
 	     (t1).tv_nsec < (t2).tv_nsec ? -1 :				\
 	     (t1).tv_nsec == (t2).tv_nsec ? 0 : 1 : 1)
 
+#define	WT_OPEN_CREATE		0x001	/* Create is OK */
+#define	WT_OPEN_EXCLUSIVE	0x002	/* Exclusive open */
+#define	WT_OPEN_FIXED		0x004	/* Path isn't relative to home */
+#define	WT_OPEN_READONLY	0x008	/* Readonly open */
+#define	WT_STREAM_APPEND	0x010	/* Open a stream: append */
+#define	WT_STREAM_READ		0x020	/* Open a stream: read */
+#define	WT_STREAM_WRITE		0x040	/* Open a stream: write */
+
+#define	WT_STDERR	((void *)0x1)	/* WT_FH to stderr */
+#define	WT_STDOUT	((void *)0x2)	/* WT_FH to stdout */
+
 struct __wt_fh {
 	char	*name;				/* File name */
 	uint64_t name_hash;			/* Hash of name */
@@ -89,6 +77,10 @@ struct __wt_fh {
 
 	u_int	ref;				/* Reference count */
 
+	/*
+	 * Underlying file system handle support.
+	 */
+	FILE	*fp;				/* ANSI C file handle */
 #ifndef _WIN32
 	int	 fd;				/* POSIX file handle */
 #else
@@ -100,6 +92,12 @@ struct __wt_fh {
 	wt_off_t extend_size;			/* File extended size */
 	wt_off_t extend_len;			/* File extend chunk size */
 
+	/*
+	 * Underlying in-memory handle support.
+	 */
+	wt_off_t off;				/* Read/write offset */
+	WT_ITEM  buf;				/* Data */
+
 	bool	 direct_io;			/* O_DIRECT configured */
 
 	enum {					/* file extend configuration */
@@ -109,4 +107,173 @@ struct __wt_fh {
 	    WT_FALLOCATE_STD,
 	    WT_FALLOCATE_SYS } fallocate_available;
 	bool fallocate_requires_locking;
+
+#define	WT_FH_IN_MEMORY		0x01		/* In-memory, don't remove */
+#define	WT_FH_FLUSH_ON_CLOSE	0x02		/* Flush when closing */
+	uint32_t flags;
 };
+
+/*
+ * OS calls that are currently just stubs.
+ */
+/*
+ * __wt_exist --
+ *	Return if the file exists.
+ */
+static inline int
+__wt_exist(WT_SESSION_IMPL *session, const char *name, bool *existp)
+{
+	return (WT_JUMP(j_file_exist, session, name, existp));
+}
+
+/*
+ * __wt_posix_fadvise --
+ *	POSIX fadvise.
+ */
+static inline int
+__wt_posix_fadvise(WT_SESSION_IMPL *session,
+    WT_FH *fh, wt_off_t offset, wt_off_t len, int advice)
+{
+#if defined(HAVE_POSIX_FADVISE)
+	return (WT_JUMP(j_handle_advise, session, fh, offset, len, advice));
+#else
+	return (0);
+#endif
+}
+
+/*
+ * __wt_file_lock --
+ *	Lock/unlock a file.
+ */
+static inline int
+__wt_file_lock(WT_SESSION_IMPL * session, WT_FH *fh, bool lock)
+{
+	return (WT_JUMP(j_handle_lock, session, fh, lock));
+}
+
+/*
+ * __wt_filesize --
+ *	Get the size of a file in bytes, by file handle.
+ */
+static inline int
+__wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
+{
+	return (WT_JUMP(j_handle_size, session, fh, sizep));
+}
+
+/*
+ * __wt_filesize_name --
+ *	Get the size of a file in bytes, by file name.
+ */
+static inline int
+__wt_filesize_name(
+    WT_SESSION_IMPL *session, const char *name, bool silent, wt_off_t *sizep)
+{
+	return (WT_JUMP(j_file_size, session, name, silent, sizep));
+}
+
+/*
+ * __wt_fsync --
+ *	POSIX fflush/fsync.
+ */
+static inline int
+__wt_fsync(WT_SESSION_IMPL *session, void *fh, bool wait)
+{
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
+
+	return (WT_JUMP(j_handle_sync, session, fh, wait));
+}
+
+/*
+ * __wt_ftruncate --
+ *	POSIX ftruncate.
+ */
+static inline int
+__wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
+{
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
+
+	return (WT_JUMP(j_handle_truncate, session, fh, len));
+}
+
+/*
+ * __wt_read --
+ *	POSIX pread.
+ */
+static inline int
+__wt_read(
+    WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, void *buf)
+{
+	WT_STAT_FAST_CONN_INCR(session, read_io);
+
+	return (WT_JUMP(j_handle_read, session, fh, offset, len, buf));
+}
+
+/*
+ * __wt_remove --
+ *	POSIX remove.
+ */
+static inline int
+__wt_remove(WT_SESSION_IMPL *session, const char *name)
+{
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
+
+	return (WT_JUMP(j_file_remove, session, name));
+}
+
+/*
+ * __wt_rename --
+ *	POSIX rename.
+ */
+static inline int
+__wt_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
+{
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
+
+	return (WT_JUMP(j_file_rename, session, from, to));
+}
+
+/*
+ * __wt_write --
+ *	POSIX pwrite.
+ */
+static inline int
+__wt_write(WT_SESSION_IMPL *session,
+    WT_FH *fh, wt_off_t offset, size_t len, const void *buf)
+{
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY) ||
+	    WT_STRING_MATCH(fh->name,
+	    WT_SINGLETHREAD, strlen(WT_SINGLETHREAD)));
+
+	WT_STAT_FAST_CONN_INCR(session, write_io);
+
+	return (WT_JUMP(j_handle_write, session, fh, offset, len, buf));
+}
+
+/*
+ * __wt_vfprintf --
+ *	ANSI C vfprintf.
+ */
+static inline int
+__wt_vfprintf(WT_SESSION_IMPL *session, WT_FH *fh, const char *fmt, va_list ap)
+{
+	return (WT_JUMP(j_handle_printf, session, fh, fmt, ap));
+}
+
+/*
+ * __wt_fprintf --
+ *	ANSI C fprintf.
+ */
+static inline int
+__wt_fprintf(WT_SESSION_IMPL *session, WT_FH *fh, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
+{
+	WT_DECL_RET;
+	va_list ap;
+
+	va_start(ap, fmt);
+	ret = __wt_vfprintf(session, fh, fmt, ap);
+	va_end(ap);
+
+	return (ret);
+}

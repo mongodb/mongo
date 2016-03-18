@@ -595,9 +595,11 @@ fallocate
 fblocks
 fclose
 fcntl
+fdatasync
 ffc
 fflush
 ffs
+fgetc
 fgetln
 fh
 filefrag
@@ -631,6 +633,7 @@ func
 gcc
 gdb
 ge
+getc
 getenv
 getline
 getone
@@ -663,6 +666,7 @@ icount
 idx
 ifdef's
 ikey
+im
 impl
 incase
 incr
@@ -679,6 +683,7 @@ initsize
 initval
 inline
 inmem
+inmemory
 insertK
 insertV
 inserters
@@ -856,6 +861,7 @@ postsize
 powerpc
 pragmas
 pre
+pread
 prealloc
 preload
 prepend
@@ -875,6 +881,7 @@ pushms
 putK
 putV
 pv
+pwrite
 py
 qdown
 qrrSS

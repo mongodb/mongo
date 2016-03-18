@@ -27,6 +27,8 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 	bool match;
 	char **entries, *path;
 
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
+
 	*dirlist = NULL;
 	*countp = 0;
 

@@ -411,11 +411,9 @@ __bm_stat(WT_BM *bm, WT_SESSION_IMPL *session, WT_DSRC_STATS *stats)
  *	Flush a file to disk.
  */
 static int
-__bm_sync(WT_BM *bm, WT_SESSION_IMPL *session, bool async)
+__bm_sync(WT_BM *bm, WT_SESSION_IMPL *session, bool wait)
 {
-	return (async ?
-	    __wt_fsync_async(session, bm->block->fh) :
-	    __wt_fsync(session, bm->block->fh));
+	return (__wt_fsync(session, bm->block->fh, wait));
 }
 
 /*

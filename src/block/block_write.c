@@ -329,7 +329,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	if (block->os_cache_max != 0 &&
 	    (block->os_cache += align_size) > block->os_cache_max) {
 		block->os_cache = 0;
-		if ((ret = posix_fadvise(fh->fd,
+		if ((ret = __wt_posix_fadvise(session, fh,
 		    (wt_off_t)0, (wt_off_t)0, POSIX_FADV_DONTNEED)) != 0)
 			WT_RET_MSG(
 			    session, ret, "%s: posix_fadvise", block->name);

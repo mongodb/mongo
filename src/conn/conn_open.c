@@ -76,7 +76,6 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	WT_CONNECTION *wt_conn;
 	WT_DECL_RET;
 	WT_DLH *dlh;
-	WT_FH *fh;
 	WT_SESSION_IMPL *s, *session;
 	WT_TXN_GLOBAL *txn_global;
 	u_int i;
@@ -150,20 +149,6 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	WT_TRET(__wt_conn_remove_encryptor(session));
 	WT_TRET(__wt_conn_remove_extractor(session));
 
-	/*
-	 * Complain if files weren't closed, ignoring the lock file, we'll
-	 * close it in a minute.
-	 */
-	TAILQ_FOREACH(fh, &conn->fhqh, q) {
-		if (fh == conn->lock_fh)
-			continue;
-
-		__wt_errx(session,
-		    "Connection has open file handles: %s", fh->name);
-		WT_TRET(__wt_close(session, &fh));
-		fh = TAILQ_FIRST(&conn->fhqh);
-	}
-
 	/* Disconnect from shared cache - must be before cache destroy. */
 	WT_TRET(__wt_conn_cache_pool_destroy(session));
 
@@ -181,6 +166,13 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 			WT_TRET(dlh->terminate(wt_conn));
 		WT_TRET(__wt_dlclose(session, dlh));
 	}
+
+	/* Close the lock file, opening up the database to other connections. */
+	if (conn->lock_fh != NULL)
+		WT_TRET(__wt_close(session, &conn->lock_fh));
+
+	/* Close any file handles left open. */
+	WT_TRET(__wt_close_connection_close(session));
 
 	/*
 	 * Close the internal (default) session, and switch back to the dummy

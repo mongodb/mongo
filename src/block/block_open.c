@@ -44,8 +44,8 @@ __wt_block_manager_create(
 	 * in our space. Move any existing files out of the way and complain.
 	 */
 	for (;;) {
-		if ((ret = __wt_open(session,
-		    filename, true, true, WT_FILE_TYPE_DATA, &fh)) == 0)
+		if ((ret = __wt_open(session, filename, WT_FILE_TYPE_DATA,
+		    WT_OPEN_CREATE | WT_OPEN_EXCLUSIVE, &fh)) == 0)
 			break;
 		WT_ERR_TEST(ret != EEXIST, ret);
 
@@ -73,7 +73,7 @@ __wt_block_manager_create(
 	 * Ensure the truncated file has made it to disk, then the upper-level
 	 * is never surprised.
 	 */
-	WT_TRET(__wt_fsync(session, fh));
+	WT_TRET(__wt_fsync(session, fh, true));
 
 	/* Close the file handle. */
 	WT_TRET(__wt_close(session, &fh));
@@ -226,9 +226,9 @@ __wt_block_open(WT_SESSION_IMPL *session,
 #endif
 
 	/* Open the underlying file handle. */
-	WT_ERR(__wt_open(session, filename, false, false,
+	WT_ERR(__wt_open(session, filename,
 	    readonly ? WT_FILE_TYPE_CHECKPOINT : WT_FILE_TYPE_DATA,
-	    &block->fh));
+	    0, &block->fh));
 
 	/* Initialize the live checkpoint's lock. */
 	WT_ERR(__wt_spin_init(session, &block->live_lock, "block manager"));

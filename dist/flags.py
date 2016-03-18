@@ -13,7 +13,7 @@ flags = {
         'FILE_TYPE_DATA',
         'FILE_TYPE_DIRECTORY',
         'FILE_TYPE_LOG',
-        'FILE_TYPE_TURTLE',
+        'FILE_TYPE_REGULAR',
     ],
     'log_scan' : [
         'LOGSCAN_FIRST',

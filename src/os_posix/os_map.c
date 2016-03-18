@@ -21,6 +21,8 @@ __wt_mmap(WT_SESSION_IMPL *session,
 
 	WT_UNUSED(mappingcookie);
 
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
+
 	/*
 	 * Record the current size and only map and set that as the length, it
 	 * could change between the map call and when we set the return length.
@@ -57,10 +59,16 @@ __wt_mmap_preload(WT_SESSION_IMPL *session, const void *p, size_t size)
 {
 #ifdef HAVE_POSIX_MADVISE
 	/* Linux requires the address be aligned to a 4KB boundary. */
-	WT_CONNECTION_IMPL *conn = S2C(session);
-	WT_BM *bm = S2BT(session)->bm;
+	WT_CONNECTION_IMPL *conn;
+	WT_BM *bm;
 	WT_DECL_RET;
-	void *blk = (void *)((uintptr_t)p & ~(uintptr_t)(conn->page_size - 1));
+	void *blk;
+
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
+
+	conn = S2C(session);
+	bm = S2BT(session)->bm;
+	blk = (void *)((uintptr_t)p & ~(uintptr_t)(conn->page_size - 1));
 	size += WT_PTRDIFF(p, blk);
 
 	/* XXX proxy for "am I doing a scan?" -- manual read-ahead */
@@ -100,9 +108,14 @@ __wt_mmap_discard(WT_SESSION_IMPL *session, void *p, size_t size)
 {
 #ifdef HAVE_POSIX_MADVISE
 	/* Linux requires the address be aligned to a 4KB boundary. */
-	WT_CONNECTION_IMPL *conn = S2C(session);
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	void *blk = (void *)((uintptr_t)p & ~(uintptr_t)(conn->page_size - 1));
+	void *blk;
+
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
+
+	conn = S2C(session);
+	blk = (void *)((uintptr_t)p & ~(uintptr_t)(conn->page_size - 1));
 	size += WT_PTRDIFF(p, blk);
 
 	if ((ret = posix_madvise(blk, size, POSIX_MADV_DONTNEED)) != 0)
@@ -124,6 +137,8 @@ __wt_munmap(WT_SESSION_IMPL *session,
     WT_FH *fh, void *map, size_t len, void **mappingcookie)
 {
 	WT_UNUSED(mappingcookie);
+
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
 
 	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS,
 	    "%s: unmap %p: %" WT_SIZET_FMT " bytes", fh->name, map, len));

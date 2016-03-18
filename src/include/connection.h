@@ -25,6 +25,36 @@ struct __wt_process {
 					/* Locked: connection queue */
 	TAILQ_HEAD(__wt_connection_impl_qh, __wt_connection_impl) connqh;
 	WT_CACHE_POOL *cache_pool;
+
+	void *inmemory;			/* In-memory configuration cookie */
+
+	/*
+	 * OS library/system call jump table, to support in-memory and readonly
+	 * configurations as well as special devices with other non-POSIX APIs.
+	 */
+#define	WT_JUMP(func, ...)	__wt_process.func(__VA_ARGS__)
+	int	(*j_directory_sync)(WT_SESSION_IMPL *, const char *path);
+	int	(*j_file_exist)(WT_SESSION_IMPL *, const char *, bool *);
+	int	(*j_file_remove)(WT_SESSION_IMPL *, const char *);
+	int	(*j_file_rename)(WT_SESSION_IMPL *, const char *, const char *);
+	int	(*j_file_size)(
+		    WT_SESSION_IMPL *, const char *, bool, wt_off_t *);
+	int	(*j_handle_advise)(
+		    WT_SESSION_IMPL *, WT_FH *, wt_off_t, wt_off_t, int);
+	int	(*j_handle_close)(WT_SESSION_IMPL *, WT_FH *);
+	int	(*j_handle_getc)(WT_SESSION_IMPL *, WT_FH *, int *);
+	int	(*j_handle_lock)(WT_SESSION_IMPL *, WT_FH *, bool);
+	int	(*j_handle_open)(
+		    WT_SESSION_IMPL *, WT_FH *, const char *, int, u_int);
+	int	(*j_handle_printf)(
+		    WT_SESSION_IMPL *, WT_FH *, const char *, va_list);
+	int	(*j_handle_read)(
+		    WT_SESSION_IMPL *, WT_FH *, wt_off_t, size_t, void *);
+	int	(*j_handle_size)(WT_SESSION_IMPL *, WT_FH *, wt_off_t *);
+	int	(*j_handle_sync)(WT_SESSION_IMPL *, WT_FH *, bool);
+	int	(*j_handle_truncate)(WT_SESSION_IMPL *, WT_FH *, wt_off_t);
+	int	(*j_handle_write)(
+		    WT_SESSION_IMPL *, WT_FH *, wt_off_t, size_t, const void *);
 };
 extern WT_PROCESS __wt_process;
 
@@ -333,7 +363,7 @@ struct __wt_connection_impl {
 	bool		 stat_tid_set;	/* Statistics log thread set */
 	WT_CONDVAR	*stat_cond;	/* Statistics log wait mutex */
 	const char	*stat_format;	/* Statistics log timestamp format */
-	FILE		*stat_fp;	/* Statistics log file handle */
+	WT_FH		*stat_fh;	/* Statistics log file handle */
 	char		*stat_path;	/* Statistics log path format */
 	char	       **stat_sources;	/* Statistics log list of objects */
 	const char	*stat_stamp;	/* Statistics log entry timestamp */

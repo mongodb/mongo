@@ -45,7 +45,7 @@ __wt_bm_preload(
 		    session, (uint8_t *)bm->map + offset, size));
 
 #ifdef HAVE_POSIX_FADVISE
-	if (posix_fadvise(block->fh->fd,
+	if (__wt_posix_fadvise(session, block->fh,
 	    (wt_off_t)offset, (wt_off_t)size, POSIX_FADV_WILLNEED) == 0)
 		return (0);
 #endif
@@ -108,7 +108,7 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 
 		block->os_cache = 0;
 		/* Ignore EINVAL - some file systems don't support the flag. */
-		if ((ret = posix_fadvise(block->fh->fd,
+		if ((ret = __wt_posix_fadvise(session, block->fh,
 		    (wt_off_t)0, (wt_off_t)0, POSIX_FADV_DONTNEED)) != 0 &&
 		    ret != EINVAL)
 			WT_RET_MSG(
