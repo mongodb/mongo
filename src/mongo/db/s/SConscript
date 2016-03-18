@@ -64,6 +64,7 @@ env.Library(
         'metadata',
         'migration_chunk_cloner_legacy',
         'migration_types',
+        'type_shard_identity',
     ],
     LIBDEPS_TAGS=[
         # Depends on symbols defined in files in serverOnlyFiles, and has

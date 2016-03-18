@@ -146,7 +146,7 @@ public:
         if (!shardingState->enabled()) {
             if (!cmdObj["configServer"].eoo()) {
                 dassert(cmdObj["configServer"].type() == String);
-                shardingState->initialize(txn, cmdObj["configServer"].String());
+                shardingState->initializeFromConfigConnString(txn, cmdObj["configServer"].String());
             } else {
                 errmsg = str::stream()
                     << "cannot start recv'ing chunk, "

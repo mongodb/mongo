@@ -5,6 +5,9 @@ selector:
     exclude_files:
     # Error format changes. See SERVER-22184.
     - jstests/sharding/error_propagation.js
+    # New features for v3.4
+    - jstests/sharding/shard_aware_init.js
+    - jstests/sharding/shard_aware_primary_failover.js
 
 executor:
   js_test:

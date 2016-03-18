@@ -179,7 +179,8 @@ public:
         ShardingState* const shardingState = ShardingState::get(txn);
 
         if (!shardingState->enabled()) {
-            shardingState->initialize(txn, moveChunkRequest.getConfigServerCS().toString());
+            shardingState->initializeFromConfigConnString(
+                txn, moveChunkRequest.getConfigServerCS().toString());
         }
 
         shardingState->setShardName(moveChunkRequest.getFromShardId());

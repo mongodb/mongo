@@ -271,8 +271,12 @@ Status ShardingStateRecovery::recover(OperationContext* txn) {
     // Make sure the sharding state is initialized
     ShardingState* const shardingState = ShardingState::get(txn);
 
-    shardingState->initialize(txn, recoveryDoc.getConfigsvr().toString());
-    shardingState->setShardName(recoveryDoc.getShardName());
+    // For backwards compatibility. Shards added by v3.4 cluster should have been initialized by
+    // the shard identity document.
+    if (!shardingState->enabled()) {
+        shardingState->initializeFromConfigConnString(txn, recoveryDoc.getConfigsvr().toString());
+        shardingState->setShardName(recoveryDoc.getShardName());
+    }
 
     if (!recoveryDoc.getMinOpTimeUpdaters()) {
         // Treat the minOpTime as up-to-date

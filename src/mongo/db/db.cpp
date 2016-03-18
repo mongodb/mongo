@@ -656,6 +656,8 @@ static void _initAndListen(int listenPort) {
         startFTDC();
 
         if (!repl::getGlobalReplicationCoordinator()->isReplEnabled()) {
+            uassertStatusOK(ShardingState::get(startupOpCtx.get())
+                                ->initializeFromShardIdentity(startupOpCtx.get()));
             uassertStatusOK(ShardingStateRecovery::recover(startupOpCtx.get()));
         }
 

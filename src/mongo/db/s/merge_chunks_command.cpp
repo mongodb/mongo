@@ -148,7 +148,7 @@ public:
                 return false;
             }
 
-            shardingState->initialize(txn, config);
+            shardingState->initializeFromConfigConnString(txn, config);
         }
 
         // ShardName is optional, but might not be set yet

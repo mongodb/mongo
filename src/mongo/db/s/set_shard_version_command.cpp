@@ -76,7 +76,6 @@ public:
         return true;
     }
 
-
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,
                                std::vector<Privilege>* out) override {
@@ -424,7 +423,7 @@ private:
             return false;
         }
 
-        ShardingState::get(txn)->initialize(txn, configdb);
+        ShardingState::get(txn)->initializeFromConfigConnString(txn, configdb);
         return true;
     }
 

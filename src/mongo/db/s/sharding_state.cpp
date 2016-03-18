@@ -45,6 +45,7 @@
 #include "mongo/db/s/metadata_loader.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
+#include "mongo/db/s/type_shard_identity.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -373,7 +374,7 @@ Status ShardingState::refreshMetadataNow(OperationContext* txn,
     return _refreshMetadata(txn, ns, ChunkVersion(0, 0, OID()), false, latestShardVersion);
 }
 
-void ShardingState::initialize(OperationContext* txn, const string& configSvr) {
+void ShardingState::initializeFromConfigConnString(OperationContext* txn, const string& configSvr) {
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
 
@@ -394,6 +395,139 @@ void ShardingState::initialize(OperationContext* txn, const string& configSvr) {
     uassertStatusOK(_waitForInitialization(txn));
 
     updateConfigServerOpTimeFromMetadata(txn);
+}
+
+Status ShardingState::initializeFromShardIdentity(OperationContext* txn) {
+    invariant(!txn->lockState()->isLocked());
+
+    // TODO: SERVER-22663 if --shardsvr
+
+    BSONObj shardIdentityBSON;
+    try {
+        AutoGetCollection autoColl(txn, NamespaceString::kConfigCollectionNamespace, MODE_IS);
+        if (!Helpers::findOne(txn,
+                              autoColl.getCollection(),
+                              BSON("_id"
+                                   << "shardIdentity"),
+                              shardIdentityBSON)) {
+            return Status::OK();
+        }
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+
+    auto parseStatus = ShardIdentityType::fromBSON(shardIdentityBSON);
+    if (!parseStatus.isOK()) {
+        return parseStatus.getStatus();
+    }
+
+    return initializeFromShardIdentity(txn, parseStatus.getValue());
+}
+Status ShardingState::initializeFromShardIdentity(OperationContext* txn,
+                                                  const ShardIdentityType& shardIdentity) {
+    invariant(!txn->lockState()->isLocked());
+
+    // TODO: SERVER-22663 if --shardsvr
+
+    log() << "initializing sharding state with: " << shardIdentity;
+
+    auto parsedConfigConnStrStatus =
+        ConnectionString::parse(shardIdentity.getConfigsvrConnString());
+    if (!parsedConfigConnStrStatus.isOK()) {
+        return parsedConfigConnStrStatus.getStatus();
+    }
+
+    auto configSvrConnStr = parsedConfigConnStrStatus.getValue();
+    if (configSvrConnStr.type() != ConnectionString::SET) {
+        return {ErrorCodes::UnsupportedFormat,
+                str::stream() << "config server connection string can only be replica sets: "
+                              << configSvrConnStr.toString()};
+    }
+
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+
+    // TODO: remove after v3.4.
+    // This is for backwards compatibility with old style initialization through metadata
+    // commands/setShardVersion. As well as all assignments to _initializationStatus and
+    // _setInitializationState_inlock in this method.
+    if (_getInitializationState() == InitializationState::kInitializing) {
+        auto waitStatus = _waitForInitialization_inlock(txn, lk);
+        if (!waitStatus.isOK()) {
+            return waitStatus;
+        }
+    }
+
+    if (_getInitializationState() == InitializationState::kError) {
+        return {ErrorCodes::ManualInterventionRequired,
+                str::stream() << "Server's sharding metadata manager failed to initialize and will "
+                                 "remain in this state until the instance is manually reset"
+                              << causedBy(_initializationStatus)};
+    }
+
+    if (_getInitializationState() == InitializationState::kInitialized) {
+        if (_shardName != shardIdentity.getShardName()) {
+            return {ErrorCodes::InconsistentShardIdentity,
+                    str::stream() << "shard name previously set as " << _shardName
+                                  << " is different from stored: " << shardIdentity.getShardName()};
+        }
+
+        auto prevConfigsvrConnStr = grid.shardRegistry()->getConfigServerConnectionString();
+        if (prevConfigsvrConnStr.type() != ConnectionString::SET) {
+            return {ErrorCodes::UnsupportedFormat,
+                    str::stream() << "config server connection string was previosly initialized as "
+                                     "something that is not a replica sets: "
+                                  << prevConfigsvrConnStr.toString()};
+        }
+
+        if (prevConfigsvrConnStr.getSetName() != configSvrConnStr.getSetName()) {
+            return {ErrorCodes::InconsistentShardIdentity,
+                    str::stream() << "config server connection string previously set as "
+                                  << prevConfigsvrConnStr.toString()
+                                  << " is different from stored: " << configSvrConnStr.toString()};
+        }
+
+        // clusterId will only be unset if sharding state was initialized via the sharding
+        // metadata commands.
+        if (!_clusterId.isSet()) {
+            _clusterId = shardIdentity.getClusterId();
+        } else if (_clusterId != shardIdentity.getClusterId()) {
+            return {ErrorCodes::InconsistentShardIdentity,
+                    str::stream() << "cluster id previously set as " << _clusterId
+                                  << " is different from stored: " << shardIdentity.getClusterId()};
+        }
+
+        return Status::OK();
+    }
+
+    if (_getInitializationState() == InitializationState::kNew) {
+        ShardedConnectionInfo::addHook();
+        ReplicaSetMonitor::setSynchronousConfigChangeHook(
+            &ConfigServer::replicaSetChangeShardRegistryUpdateHook);
+
+        try {
+            Status status = initializeGlobalShardingState(txn, configSvrConnStr);
+
+            // For backwards compatibility with old style inits from metadata commands.
+            if (status.isOK()) {
+                _setInitializationState_inlock(InitializationState::kInitialized);
+            } else {
+                _initializationStatus = status;
+                _setInitializationState_inlock(InitializationState::kError);
+            }
+
+            _shardName = shardIdentity.getShardName();
+            _clusterId = shardIdentity.getClusterId();
+
+            return status;
+        } catch (const DBException& ex) {
+            auto errorStatus = ex.toStatus();
+            _setInitializationState_inlock(InitializationState::kError);
+            _initializationStatus = errorStatus;
+            return errorStatus;
+        }
+    }
+
+    MONGO_UNREACHABLE;
 }
 
 void ShardingState::_initializeImpl(ConnectionString configSvr) {
@@ -419,7 +553,11 @@ Status ShardingState::_waitForInitialization(OperationContext* txn) {
         return Status::OK();
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
+    return _waitForInitialization_inlock(txn, lk);
+}
 
+Status ShardingState::_waitForInitialization_inlock(OperationContext* txn,
+                                                    stdx::unique_lock<stdx::mutex>& lk) {
     {
         const Microseconds timeRemaining(txn->getRemainingMaxTimeMicros());
         while (_getInitializationState() == InitializationState::kInitializing ||
@@ -743,6 +881,7 @@ void ShardingState::appendInfo(OperationContext* txn, BSONObjBuilder& builder) {
     builder.append("configServer",
                    grid.shardRegistry()->getConfigServerConnectionString().toString());
     builder.append("shardName", _shardName);
+    builder.append("clusterId", _clusterId);
 
     BSONObjBuilder versionB(builder.subobjStart("versions"));
     for (CollectionShardingStateMap::const_iterator it = _collections.begin();

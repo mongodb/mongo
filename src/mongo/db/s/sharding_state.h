@@ -51,6 +51,7 @@ class CollectionShardingState;
 class ConnectionString;
 class OperationContext;
 class ServiceContext;
+class ShardIdentityType;
 class Status;
 
 namespace repl {
@@ -112,12 +113,28 @@ public:
     /**
      * Initializes sharding state and begins authenticating outgoing connections and handling shard
      * versions. If this is not run before sharded operations occur auth will not work and versions
-     * will not be tracked.
+     * will not be tracked. This method is deprecated and is mainly used for initialization from
+     * mongos metadata commands like moveChunk, splitChunk, mergeChunk and setShardVersion.
      *
      * Throws if initialization fails for any reason and the sharding state object becomes unusable
      * afterwards. Any sharding state operations afterwards will fail.
      */
-    void initialize(OperationContext* txn, const std::string& configSvr);
+    void initializeFromConfigConnString(OperationContext* txn, const std::string& configSvr);
+
+    /**
+     * Initializes the sharding state of this server from the shard identity document from local
+     * storage.
+     */
+    Status initializeFromShardIdentity(OperationContext* txn);
+
+    /**
+     * Initializes the sharding state of this server from the shard identity document argument.
+     * This is the more genaralized form of the initializeFromShardIdentity(OperationContext*)
+     * method that can accept the shard identity from any source.
+     * This method currently blocks for network and should not be called with database locks held.
+     */
+    Status initializeFromShardIdentity(OperationContext* txn,
+                                       const ShardIdentityType& shardIdentity);
 
     /**
      * Shuts down sharding machinery on the shard.
@@ -298,6 +315,7 @@ private:
      * and returns the initialization status.
      */
     Status _waitForInitialization(OperationContext* txn);
+    Status _waitForInitialization_inlock(OperationContext* txn, stdx::unique_lock<stdx::mutex>& lk);
 
     /**
      * Simple wrapper to cast the initialization state atomic uint64 to InitializationState value
@@ -365,6 +383,9 @@ private:
     // without holding some form of collection lock. It is only safe to add/remove values when
     // holding X lock on the respective namespace.
     CollectionShardingStateMap _collections;
+
+    // The id for the cluster this shard belongs to.
+    OID _clusterId;
 };
 
 }  // namespace mongo
