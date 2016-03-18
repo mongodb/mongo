@@ -212,6 +212,7 @@ static int
 __im_handle_open(WT_SESSION_IMPL *session,
     WT_FH *fh, const char *path, int dio_type, u_int flags)
 {
+	WT_UNUSED(session);
 	WT_UNUSED(path);
 	WT_UNUSED(dio_type);
 	WT_UNUSED(flags);
