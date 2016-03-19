@@ -1384,6 +1384,7 @@ elif env.TargetOSIs('windows'):
             'Psapi.lib',
             'advapi32.lib',
             'bcrypt.lib',
+            'crypt32.lib',
             'kernel32.lib',
             'shell32.lib',
             'version.lib',
