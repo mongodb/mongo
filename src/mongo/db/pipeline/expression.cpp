@@ -3139,6 +3139,20 @@ const char* ExpressionIsoWeekYear::getOpName() const {
 
 /* ------------------------- ExpressionIsoWeek -------------------------- */
 
+namespace {
+bool isLeapYear(int year) {
+    if (year % 4 != 0) { // non leap year
+        return false;
+    } else if (year % 100 != 0) { // leap year
+        return true;
+    } else if (year % 400 != 0) { // non leap year
+        return false;
+    } else { // leap year
+        return true;
+    }
+}
+}
+
 Value ExpressionIsoWeek::evaluateInternal(Variables* vars) const {
     Value date(vpOperand[0]->evaluateInternal(vars));
     return Value(extract(date.coerceToTm()));
@@ -3167,14 +3181,10 @@ int ExpressionIsoWeek::lastWeek(int year) {
     } else if (tm.tm_wday == 5) { // Fri (5)
         // On Fri it's week 52 for non leap years and 53 for leap years.
         // https://en.wikipedia.org/wiki/Leap_year#Algorithm
-        if (year % 4 != 0) { // non leap year
-            return 52;
-        } else if (year % 100 != 0) { // leap year
+        if (isLeapYear(year)) {
             return 53;
-        } else if (year % 400 != 0) { // non leap year
+        } else {
             return 52;
-        } else { // leap year
-            return 53;
         }
     } else { // Sat (6) or Sun (0)
         return 52;
