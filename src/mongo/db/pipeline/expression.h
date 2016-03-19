@@ -1296,7 +1296,6 @@ public:
     const char* getOpName() const final;
 
     static int extract(const tm& tm);
-    static int lastWeek(int year);
 };
 
 

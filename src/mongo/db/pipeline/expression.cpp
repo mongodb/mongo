@@ -3151,14 +3151,8 @@ bool isLeapYear(int year) {
         return true;
     }
 }
-}
 
-Value ExpressionIsoWeek::evaluateInternal(Variables* vars) const {
-    Value date(vpOperand[0]->evaluateInternal(vars));
-    return Value(extract(date.coerceToTm()));
-}
-
-int ExpressionIsoWeek::lastWeek(int year) {
+int lastWeek(int year) {
     // Create YYYY-12-31T23:59:59 so only 1 second left to new year.
     struct tm tm = {};
     tm.tm_year = year - 1900;
@@ -3189,6 +3183,12 @@ int ExpressionIsoWeek::lastWeek(int year) {
     } else { // Sat (6) or Sun (0)
         return 52;
     }
+}
+}
+
+Value ExpressionIsoWeek::evaluateInternal(Variables* vars) const {
+    Value date(vpOperand[0]->evaluateInternal(vars));
+    return Value(extract(date.coerceToTm()));
 }
 
 // Quote https://en.wikipedia.org/wiki/ISO_week_date :
