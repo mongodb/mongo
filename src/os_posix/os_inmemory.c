@@ -133,7 +133,7 @@ __im_file_size(
 	__wt_spin_lock(session, &im->lock);
 
 	if (__wt_handle_search(session, name, false, false, NULL, &fh)) {
-		*sizep = fh->buf.size;
+		*sizep = (wt_off_t)fh->buf.size;
 		__wt_handle_search_unlock(session);
 	} else
 		ret = ENOENT;
@@ -262,7 +262,7 @@ __im_handle_printf(
 	__wt_spin_lock(session, &im->lock);
 
 	/* Grow the handle's buffer as necessary. */
-	WT_ERR(__wt_buf_grow(session, &fh->buf, (size_t)(fh->off + len)));
+	WT_ERR(__wt_buf_grow(session, &fh->buf, fh->off + len));
 
 	/* Copy the data into place and update the offset. */
 	memcpy((uint8_t *)fh->buf.mem + fh->off, tmp->data, len);
@@ -284,14 +284,16 @@ __im_handle_read(
 {
 	WT_DECL_RET;
 	WT_IM *im;
+	size_t off;
 
 	im = __wt_process.inmemory;
 	__wt_spin_lock(session, &im->lock);
 
-	if (offset < fh->buf.size) {
-		len = WT_MIN(len, (size_t)(fh->buf.size - offset));
-		memcpy(buf, (uint8_t *)fh->buf.mem + offset, len);
-		fh->off = offset + len;
+	off = (size_t)offset;
+	if (off < fh->buf.size) {
+		len = WT_MIN(len, fh->buf.size - off);
+		memcpy(buf, (uint8_t *)fh->buf.mem + off, len);
+		fh->off = off + len;
 	} else
 		ret = WT_ERROR;
 
@@ -299,9 +301,9 @@ __im_handle_read(
 	if (ret == 0)
 		return (0);
 	WT_RET_MSG(session, WT_ERROR,
-	    "%s read error: failed to read %" WT_SIZET_FMT
-	    " bytes at offset %" PRIuMAX,
-	    fh->name, len, (uintmax_t)offset);
+	    "%s read error: failed to read %" WT_SIZET_FMT " bytes at "
+	    "offset %" WT_SIZET_FMT,
+	    fh->name, len, off);
 }
 
 /*
@@ -313,7 +315,7 @@ __im_handle_size(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
 {
 	WT_UNUSED(session);
 
-	*sizep = fh->buf.size;
+	*sizep = (wt_off_t)fh->buf.size;
 	return (0);
 }
 
@@ -322,9 +324,9 @@ __im_handle_size(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
  *	POSIX fflush/fsync.
  */
 static int
-__im_handle_sync(WT_SESSION_IMPL *session, WT_FH *fh, bool wait)
+__im_handle_sync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
 {
-	WT_UNUSED(wait);
+	WT_UNUSED(block);
 
 	/* Flush any stream's stdio buffers. */
 	if (fh == WT_STDERR || fh == WT_STDOUT) {
@@ -367,24 +369,26 @@ __im_handle_write(WT_SESSION_IMPL *session,
 {
 	WT_DECL_RET;
 	WT_IM *im;
+	size_t off;
 
 	im = __wt_process.inmemory;
 	__wt_spin_lock(session, &im->lock);
 
-	WT_ERR(__wt_buf_grow(session, &fh->buf, (size_t)(offset + len + 1024)));
+	off = (size_t)offset;
+	WT_ERR(__wt_buf_grow(session, &fh->buf, off + len + 1024));
 
-	memcpy((uint8_t *)fh->buf.data + offset, buf, len);
-	if (offset + len > fh->buf.size)
-		fh->buf.size = (size_t)(offset + len);
-	fh->off = offset + len;
+	memcpy((uint8_t *)fh->buf.data + off, buf, len);
+	if (off + len > fh->buf.size)
+		fh->buf.size = off + len;
+	fh->off = off + len;
 
 err:	__wt_spin_unlock(session, &im->lock);
 	if (ret == 0)
 		return (0);
 	WT_RET_MSG(session, ret,
-	    "%s write error: failed to write %" WT_SIZET_FMT
-	    " bytes at offset %" PRIuMAX,
-	    fh->name, len, (uintmax_t)offset);
+	    "%s write error: failed to write %" WT_SIZET_FMT " bytes at "
+	    "offset %" WT_SIZET_FMT,
+	    fh->name, len, off);
 }
 
 /*

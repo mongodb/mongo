@@ -13,12 +13,12 @@
  *	Underlying support function to flush a file handle.
  */
 static int
-__posix_sync(WT_SESSION_IMPL *session, int fd, const char *name, bool wait)
+__posix_sync(WT_SESSION_IMPL *session, int fd, const char *name, bool block)
 {
 	WT_DECL_RET;
 
 #ifdef	HAVE_SYNC_FILE_RANGE
-	if (!wait) {
+	if (!block) {
 		WT_SYSCALL_RETRY(sync_file_range(fd,
 		    (off64_t)0, (off64_t)0, SYNC_FILE_RANGE_WRITE), ret);
 		if (ret == 0)
@@ -26,7 +26,7 @@ __posix_sync(WT_SESSION_IMPL *session, int fd, const char *name, bool wait)
 		WT_RET_MSG(session, ret, "%s: sync_file_range", name);
 	}
 #else
-	if (!wait)
+	if (!block)
 		return (0);
 #endif
 
@@ -86,7 +86,7 @@ __posix_directory_sync(WT_SESSION_IMPL *session, const char *path)
 
 	WT_SYSCALL_RETRY(close(fd), tret);
 	if (tret != 0)
-		__wt_err(session, tret, "%s: fsync", name);
+		__wt_err(session, tret, "%s: fsync", path);
 	return (ret == 0 ? tret : ret);
 #else
 	WT_UNUSED(session);
@@ -328,7 +328,8 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 	mode_t mode;
 	int f, fd, tret;
 	bool direct_io;
-	char *path, *stream_mode;
+	char *path;
+	const char *stream_mode;
 
 	conn = S2C(session);
 	direct_io = false;
@@ -550,7 +551,7 @@ __posix_handle_size(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
  *	POSIX fflush/fsync.
  */
 static int
-__posix_handle_sync(WT_SESSION_IMPL *session, WT_FH *fh, bool wait)
+__posix_handle_sync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
 {
 	/* Flush any stream's stdio buffers. */
 	if (fh == WT_STDERR || fh == WT_STDOUT) {
@@ -561,7 +562,7 @@ __posix_handle_sync(WT_SESSION_IMPL *session, WT_FH *fh, bool wait)
 	}
 
 	if (fh->fp == NULL)
-		return (__posix_sync(session, fh->fd, fh->name, wait));
+		return (__posix_sync(session, fh->fd, fh->name, block));
 
 	if (fflush(fh->fp) == 0)
 		return (0);

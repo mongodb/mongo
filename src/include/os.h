@@ -95,7 +95,7 @@ struct __wt_fh {
 	/*
 	 * Underlying in-memory handle support.
 	 */
-	wt_off_t off;				/* Read/write offset */
+	size_t	 off;				/* Read/write offset */
 	WT_ITEM  buf;				/* Data */
 
 	bool	 direct_io;			/* O_DIRECT configured */
@@ -177,11 +177,11 @@ __wt_filesize_name(
  *	POSIX fflush/fsync.
  */
 static inline int
-__wt_fsync(WT_SESSION_IMPL *session, void *fh, bool wait)
+__wt_fsync(WT_SESSION_IMPL *session, void *fh, bool block)
 {
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 
-	return (WT_JUMP(j_handle_sync, session, fh, wait));
+	return (WT_JUMP(j_handle_sync, session, fh, block));
 }
 
 /*
