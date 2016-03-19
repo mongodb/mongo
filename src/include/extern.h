@@ -501,8 +501,6 @@ extern int __wt_map_error_rdonly(int error);
 extern const char *__wt_strerror(WT_SESSION_IMPL *session, int error, char *errbuf, size_t errlen);
 extern void __wt_fallocate_config(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_fallocate( WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, wt_off_t len);
-extern int __wt_directory_sync_fh(WT_SESSION_IMPL *session, WT_FH *fh);
-extern int __wt_directory_sync(WT_SESSION_IMPL *session, const char *path);
 extern int __wt_getenv(WT_SESSION_IMPL *session, const char *variable, const char **envp);
 extern int __wt_getline(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_FH *fh);
 extern int __wt_getopt( const char *progname, int nargc, char *const *nargv, const char *ostr);

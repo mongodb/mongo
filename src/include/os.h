@@ -117,6 +117,38 @@ struct __wt_fh {
  * OS calls that are currently just stubs.
  */
 /*
+ * __wt_directory_sync --
+ *	Flush a directory to ensure file creation is durable.
+ */
+static inline int
+__wt_directory_sync(WT_SESSION_IMPL *session, const char *path)
+{
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
+
+	return (WT_JUMP(j_directory_sync, session, path));
+}
+
+/*
+ * __wt_directory_sync_fh --
+ *	Flush a directory file handle to ensure file creation is durable.
+ *
+ * We don't use the normal sync path because many file systems don't require
+ * this step and we don't want to penalize them.
+ */
+static inline int
+__wt_directory_sync_fh(WT_SESSION_IMPL *session, WT_FH *fh)
+{
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
+
+#ifdef __linux__
+	return (WT_JUMP(j_handle_sync, session, fh, true));
+#else
+	WT_UNUSED(fh);
+	return (0);
+#endif
+}
+
+/*
  * __wt_exist --
  *	Return if the file exists.
  */

@@ -76,6 +76,27 @@ __posix_directory_sync(WT_SESSION_IMPL *session, const char *path)
 #ifdef __linux__
 	WT_DECL_RET;
 	int fd, tret;
+	const char *dir;
+	char *copy;
+
+	/*
+	 * POSIX 1003.1 does not require that fsync of a file handle ensures the
+	 * entry in the directory containing the file has also reached disk (and
+	 * there are historic Linux filesystems requiring this), do an explicit
+	 * fsync on a file descriptor for the directory to be sure.
+	 */
+	copy = NULL;
+	if (path == NULL || (dir = strrchr(path, '/')) == NULL)
+		path = S2C(session)->home;
+	else {
+		/*
+		 * Copy the directory name, leaving the trailing slash in place,
+		 * so a path of "/foo" doesn't result in an empty string.
+		 */
+		WT_RET(__wt_strndup(
+		    session, path, (size_t)(dir - path) + 1, &copy));
+		path = copy;
+	}
 
 	WT_SYSCALL_RETRY((
 	    (fd = open(path, O_RDONLY, 0444)) == -1 ? 1 : 0), ret);

@@ -107,7 +107,6 @@ src/os_posix/os_dir.c
 src/os_posix/os_dlopen.c
 src/os_posix/os_errno.c
 src/os_posix/os_fallocate.c
-src/os_posix/os_fsync.c
 src/os_posix/os_getenv.c
 src/os_posix/os_getline.c
 src/os_posix/os_getopt.c

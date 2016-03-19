@@ -114,7 +114,6 @@ src/os_win/os_dir.c
 src/os_win/os_dlopen.c
 src/os_win/os_errno.c
 src/os_win/os_fallocate.c
-src/os_win/os_fsync.c
 src/os_win/os_getenv.c
 src/os_win/os_map.c
 src/os_win/os_mtx_cond.c
