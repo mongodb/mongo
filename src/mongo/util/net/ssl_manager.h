@@ -70,22 +70,20 @@ public:
 };
 
 struct SSLConfiguration {
-    SSLConfiguration() : serverSubjectName(""), clientSubjectName(""), hasCA(false) {}
+    SSLConfiguration() : serverSubjectName(""), clientSubjectName("") {}
     SSLConfiguration(const std::string& serverSubjectName,
                      const std::string& clientSubjectName,
-                     const Date_t& serverCertificateExpirationDate,
-                     bool hasCA)
+                     const Date_t& serverCertificateExpirationDate)
         : serverSubjectName(serverSubjectName),
           clientSubjectName(clientSubjectName),
-          serverCertificateExpirationDate(serverCertificateExpirationDate),
-          hasCA(hasCA) {}
+          serverCertificateExpirationDate(serverCertificateExpirationDate) {}
 
     bool isClusterMember(StringData subjectName) const;
     BSONObj getServerStatusBSON() const;
     std::string serverSubjectName;
     std::string clientSubjectName;
     Date_t serverCertificateExpirationDate;
-    bool hasCA;
+    bool hasCA = false;
 };
 
 class SSLManagerInterface {

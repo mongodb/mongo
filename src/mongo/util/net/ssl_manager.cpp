@@ -59,6 +59,12 @@
 #ifdef MONGO_CONFIG_SSL
 #include <openssl/evp.h>
 #include <openssl/x509v3.h>
+
+#ifdef _WIN32
+#include <openssl/x509_vfy.h>
+#include <openssl/pkcs7.h>
+#include <wincrypt.h>
+#endif
 #endif
 
 using std::endl;
@@ -269,7 +275,12 @@ private:
     /*
      * Set up an SSL context for certificate validation by loading a CA
      */
-    bool _setupCA(SSL_CTX* context, const std::string& caFile);
+    Status _setupCA(SSL_CTX* context, const std::string& caFile);
+
+    /*
+     * Set up an SSL context for certificate validation by loading the system's CA store
+     */
+    Status _setupSystemCA(SSL_CTX* context);
 
     /*
      * Import a certificate revocation list into an SSL context
@@ -631,12 +642,10 @@ Status SSLManager::initSSLContext(SSL_CTX* context,
         }
     }
 
-    if (!params.sslCAFile.empty()) {
-        // Set up certificate validation with a certificate authority
-        if (!_setupCA(context, params.sslCAFile)) {
-            return Status(ErrorCodes::InvalidSSLConfiguration, "Can not set up CA file.");
-        }
-    }
+    const auto status =
+        params.sslCAFile.empty() ? _setupSystemCA(context) : _setupCA(context, params.sslCAFile);
+    if (!status.isOK())
+        return status;
 
     if (!params.sslCRLFile.empty()) {
         if (!_setupCRL(context, params.sslCRLFile)) {
@@ -779,27 +788,148 @@ bool SSLManager::_setupPEM(SSL_CTX* context,
     return true;
 }
 
-bool SSLManager::_setupCA(SSL_CTX* context, const std::string& caFile) {
+Status SSLManager::_setupCA(SSL_CTX* context, const std::string& caFile) {
     // Set the list of CAs sent to clients
     STACK_OF(X509_NAME)* certNames = SSL_load_client_CA_file(caFile.c_str());
     if (certNames == NULL) {
-        error() << "cannot read certificate authority file: " << caFile << " "
-                << getSSLErrorMessage(ERR_get_error()) << endl;
-        return false;
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      str::stream() << "cannot read certificate authority file: " << caFile << " "
+                                    << getSSLErrorMessage(ERR_get_error()));
     }
     SSL_CTX_set_client_CA_list(context, certNames);
 
     // Load trusted CA
     if (SSL_CTX_load_verify_locations(context, caFile.c_str(), NULL) != 1) {
-        error() << "cannot read certificate authority file: " << caFile << " "
-                << getSSLErrorMessage(ERR_get_error()) << endl;
-        return false;
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      str::stream() << "cannot read certificate authority file: " << caFile << " "
+                                    << getSSLErrorMessage(ERR_get_error()));
     }
+
     // Set SSL to require peer (client) certificate verification
     // if a certificate is presented
     SSL_CTX_set_verify(context, SSL_VERIFY_PEER, &SSLManager::verify_cb);
     _sslConfiguration.hasCA = true;
-    return true;
+    return Status::OK();
+}
+
+#ifdef _WIN32
+// This imports the certificates in a given Windows certificate store into an X509_STORE for
+// openssl to use during certificate validation.
+Status importCertStoreToX509_STORE(LPWSTR storeName, DWORD storeLocation, X509_STORE* verifyStore) {
+    HCERTSTORE systemStore =
+        CertOpenStore(CERT_STORE_PROV_SYSTEM_W, 0, NULL, storeLocation, storeName);
+    if (systemStore == NULL) {
+        return {ErrorCodes::InvalidSSLConfiguration,
+                str::stream() << "error opening system CA store: " << errnoWithDescription()};
+    }
+    auto systemStoreGuard = MakeGuard([systemStore]() { CertCloseStore(systemStore, 0); });
+
+    CERT_BLOB p7Data = {0, NULL};
+    // We call this the first time to get the size of the PKCS7 object that will be generated
+    if (CertSaveStore(systemStore,
+                      (PKCS_7_ASN_ENCODING | X509_ASN_ENCODING),  // Save it as X509 certs/CRLs
+                                                                  // encoded as PKCS7 objects
+                      CERT_STORE_SAVE_AS_PKCS7,                   // Save as a PKCS7 encoded object
+                      CERT_STORE_SAVE_TO_MEMORY,                  // Save cert store to memory
+                      &p7Data,
+                      0) == 0) {
+        return {ErrorCodes::InvalidSSLConfiguration,
+                str::stream() << "error getting size of PKCS7 object from system CA store"
+                              << errnoWithDescription()};
+    }
+
+    std::unique_ptr<BYTE[]> pbDataPtr(new BYTE[p7Data.cbData]);
+    p7Data.pbData = pbDataPtr.get();
+
+    // Then we call it again to actually create the PKCS7 object.
+    if (CertSaveStore(systemStore,
+                      (PKCS_7_ASN_ENCODING | X509_ASN_ENCODING),  // Save it as X509 certs/CRLs
+                                                                  // encoded as PKCS7 objects
+                      CERT_STORE_SAVE_AS_PKCS7,                   // Save as a PKCS7 encoded object
+                      CERT_STORE_SAVE_TO_MEMORY,                  // Save cert store to memory
+                      &p7Data,
+                      0) == 0) {
+        return {ErrorCodes::InvalidSSLConfiguration,
+                str::stream() << "error getting system CA store: " << errnoWithDescription()};
+    }
+
+    auto bioDeleter = [](BIO* b) { BIO_free_all(b); };
+    std::unique_ptr<BIO, decltype(bioDeleter)> p7Bio(BIO_new_mem_buf(p7Data.pbData, p7Data.cbData),
+                                                     bioDeleter);
+    if (!p7Bio) {
+        return {ErrorCodes::InvalidSSLConfiguration,
+                "error creating BIO for loading system CA cert store"};
+    }
+    BIO_set_close(p7Bio.get(), BIO_NOCLOSE);
+
+    auto pkcs7Deleter = [](PKCS7* p) { PKCS7_free(p); };
+    std::unique_ptr<PKCS7, decltype(pkcs7Deleter)> p7(d2i_PKCS7_bio(p7Bio.get(), NULL),
+                                                      pkcs7Deleter);
+    if (!p7) {
+        return {ErrorCodes::InvalidSSLConfiguration,
+                "error parsing PKCS7 object from system CA cert store"};
+    }
+
+    if ((OBJ_obj2nid(p7->type) != NID_pkcs7_signed) || (p7->d.sign->cert == NULL)) {
+        return {ErrorCodes::InvalidSSLConfiguration,
+                "invalid pkcs7 object while loading system certificates"};
+    }
+
+    STACK_OF(X509)* systemCACerts = p7->d.sign->cert;
+    for (auto i = 0; i < sk_X509_num(systemCACerts); i++) {
+        if (X509_STORE_add_cert(verifyStore, sk_X509_value(systemCACerts, i)) != 1) {
+            const auto errCode = ERR_peek_last_error();
+            if (ERR_GET_LIB(errCode) != ERR_LIB_X509 ||
+                ERR_GET_REASON(errCode) != X509_R_CERT_ALREADY_IN_HASH_TABLE) {
+                return {ErrorCodes::InvalidSSLConfiguration,
+                        str::stream() << "Error adding certificate to X509 store: "
+                                      << ERR_reason_error_string(errCode)};
+            }
+        }
+    }
+
+    STACK_OF(X509_CRL)* systemCRLs = p7->d.sign->crl;
+    for (auto i = 0; i < sk_X509_CRL_num(systemCRLs); i++) {
+        if (X509_STORE_add_crl(verifyStore, sk_X509_CRL_value(systemCRLs, i)) != 1) {
+            const auto errCode = ERR_peek_last_error();
+            if (ERR_GET_LIB(errCode) != ERR_LIB_X509 ||
+                ERR_GET_REASON(errCode) != X509_R_CERT_ALREADY_IN_HASH_TABLE) {
+                return {ErrorCodes::InvalidSSLConfiguration,
+                        str::stream() << "Error adding CRL to X509 store: "
+                                      << ERR_reason_error_string(errCode)};
+            }
+        }
+    }
+
+    return Status::OK();
+}
+#endif
+
+Status SSLManager::_setupSystemCA(SSL_CTX* context) {
+#ifndef _WIN32
+    // On non-Windows platforms, the OpenSSL libraries should have been configured with default
+    // locations for CA certificates.
+    if (SSL_CTX_set_default_verify_paths(context) != 1) {
+        return {
+            ErrorCodes::InvalidSSLConfiguration,
+            str::stream() << "error loading system CA certificates "
+                          << "(default certificate file: " << X509_get_default_cert_file() << ", "
+                          << "default certificate path: " << X509_get_default_cert_dir() << ")"};
+    }
+    return Status::OK();
+#else
+
+    X509_STORE* verifyStore = SSL_CTX_get_cert_store(context);
+    if (!verifyStore) {
+        return {ErrorCodes::InvalidSSLConfiguration,
+                "no X509 store found for SSL context while loading system certificates"};
+    }
+
+    auto status = importCertStoreToX509_STORE(L"root", CERT_SYSTEM_STORE_CURRENT_USER, verifyStore);
+    if (!status.isOK())
+        return status;
+    return importCertStoreToX509_STORE(L"CA", CERT_SYSTEM_STORE_CURRENT_USER, verifyStore);
+#endif
 }
 
 bool SSLManager::_setupCRL(SSL_CTX* context, const std::string& crlFile) {
@@ -933,8 +1063,7 @@ bool SSLManager::_hostNameMatch(const char* nameToMatch, const char* certHostNam
 
 StatusWith<boost::optional<std::string>> SSLManager::parseAndValidatePeerCertificate(
     SSL* conn, const std::string& remoteHost) {
-    // only set if a CA cert has been provided
-    if (!_sslConfiguration.hasCA)
+    if (!_sslConfiguration.hasCA && isSSLServer)
         return {boost::none};
 
     X509* peerCert = SSL_get_peer_certificate(conn);
