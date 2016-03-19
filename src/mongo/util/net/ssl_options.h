@@ -103,10 +103,4 @@ Status canonicalizeSSLServerOptions(moe::Environment* params);
 Status validateSSLServerOptions(const moe::Environment& params);
 
 Status storeSSLClientOptions(const moe::Environment& params);
-
-/**
- * Used by the Mongo shell to validate that the SSL options passed are acceptable and
- * do not conflict with one another.
- */
-Status validateSSLMongoShellOptions(const moe::Environment& params);
 }
