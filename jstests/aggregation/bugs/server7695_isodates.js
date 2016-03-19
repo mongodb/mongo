@@ -16,7 +16,21 @@
         var pipeline = [{$project: {_id: 0, result: {}}}];
         pipeline[0].$project.result[op] = value;
         var msg = "Exptected {"+op+": "+value+"} to equal: "+expResult;
-        assert.eq(coll.aggregate(pipeline).toArray()[0].result, expResult, msg);
+        var res = coll.runCommand('aggregate', {pipeline: pipeline});
+
+        if (value.valueOf() < 0 && _isWindows() && res.code === 16422) {
+            // some versions of windows (but not all) fail with dates before 1970
+            print("skipping test of " + date.tojson() + " because system doesn't support old dates");
+            return;
+        }
+
+        if (value.valueOf()/1000 < -2*1024*1024*1024 && res.code == 16421) {
+            // we correctly detected that we are outside of the range of a 32-bit time_t
+            print("skipping test of " + date.tojson() + " because it is outside of time_t range");
+            return;
+        }
+
+        assert.eq(res.result[0].result, expResult, pipeline);
     }
 
     // While development, there was a bug which caused an error with $dateToString if the order of
