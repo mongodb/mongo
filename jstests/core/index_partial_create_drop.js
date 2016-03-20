@@ -2,13 +2,14 @@
 
 (function() {
     "use strict";
-    var isMongos = (db.runCommand("isMaster").msg === "isdbgrid");
     var coll = db.index_partial_create_drop;
 
     var getNumKeys = function(idxName) {
         var res = assert.commandWorked(coll.validate(true));
         var kpi;
-        if (isMongos) {
+
+        var isShardedNS = res.hasOwnProperty('raw');
+        if (isShardedNS) {
             kpi = res.raw[Object.getOwnPropertyNames(res.raw)[0]].keysPerIndex;
         } else {
             kpi = res.keysPerIndex;
