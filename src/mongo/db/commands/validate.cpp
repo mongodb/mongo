@@ -37,6 +37,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -44,6 +45,8 @@ namespace mongo {
 using std::endl;
 using std::string;
 using std::stringstream;
+
+MONGO_FP_DECLARE(validateCmdCollectionNotValid);
 
 class ValidateCmd : public Command {
 public:
@@ -74,6 +77,12 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
+        if (MONGO_FAIL_POINT(validateCmdCollectionNotValid)) {
+            errmsg = "validateCmdCollectionNotValid fail point was triggered";
+            result.appendBool("valid", false);
+            return true;
+        }
+
         string ns = dbname + "." + cmdObj.firstElement().valuestrsafe();
 
         NamespaceString ns_string(ns);
