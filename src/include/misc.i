@@ -96,7 +96,7 @@ __wt_directory_sync_fh(WT_SESSION_IMPL *session, WT_FH *fh)
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 
 #ifdef __linux__
-	return (fh->handle_sync(session, fh, true));
+	return (fh->fh_sync(session, fh, true));
 #else
 	WT_UNUSED(fh);
 	return (0);
