@@ -129,7 +129,7 @@ __im_file_size(
 
 	WT_UNUSED(silent);
 
-	im = __wt_process.inmemory;
+	im = S2C(session)->inmemory;
 	__wt_spin_lock(session, &im->lock);
 
 	if (__wt_handle_search(session, name, false, false, NULL, &fh)) {
@@ -179,7 +179,7 @@ __im_handle_getc(WT_SESSION_IMPL *session, WT_FH *fh, int *chp)
 {
 	WT_IM *im;
 
-	im = __wt_process.inmemory;
+	im = S2C(session)->inmemory;
 	__wt_spin_lock(session, &im->lock);
 
 	if (fh->off >= fh->buf.size)
@@ -205,25 +205,6 @@ __im_handle_lock(WT_SESSION_IMPL *session, WT_FH *fh, bool lock)
 }
 
 /*
- * __im_handle_open --
- *	POSIX fopen/open.
- */
-static int
-__im_handle_open(WT_SESSION_IMPL *session,
-    WT_FH *fh, const char *path, int dio_type, u_int flags)
-{
-	WT_UNUSED(session);
-	WT_UNUSED(path);
-	WT_UNUSED(dio_type);
-	WT_UNUSED(flags);
-
-	fh->off = 0;
-	F_SET(fh, WT_FH_IN_MEMORY);
-
-	return (0);
-}
-
-/*
  * __im_handle_printf --
  *	ANSI C vfprintf.
  */
@@ -237,14 +218,7 @@ __im_handle_printf(
 	WT_IM *im;
 	size_t len;
 
-	im = __wt_process.inmemory;
-
-	if (fh == WT_STDERR || fh == WT_STDOUT) {
-		if (vfprintf(fh == WT_STDERR ? stderr : stdout, fmt, ap) >= 0)
-			return (0);
-		WT_RET_MSG(session, EIO,
-		    "%s: vfprintf", fh == WT_STDERR ? "stderr" : "stdout");
-	}
+	im = S2C(session)->inmemory;
 
 	/* Build the string we're writing. */
 	WT_RET(__wt_scr_alloc(session, strlen(fmt) * 2 + 128, &tmp));
@@ -286,7 +260,7 @@ __im_handle_read(
 	WT_IM *im;
 	size_t off;
 
-	im = __wt_process.inmemory;
+	im = S2C(session)->inmemory;
 	__wt_spin_lock(session, &im->lock);
 
 	off = (size_t)offset;
@@ -326,15 +300,10 @@ __im_handle_size(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
 static int
 __im_handle_sync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
 {
+	WT_UNUSED(session);
+	WT_UNUSED(fh);
 	WT_UNUSED(block);
 
-	/* Flush any stream's stdio buffers. */
-	if (fh == WT_STDERR || fh == WT_STDOUT) {
-		if (fflush(fh == WT_STDERR ? stderr : stdout) == 0)
-			return (0);
-		WT_RET_MSG(session, __wt_errno(),
-		    "%s: fflush", fh == WT_STDERR ? "stderr" : "stdout");
-	}
 	return (0);
 }
 
@@ -348,7 +317,7 @@ __im_handle_truncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
 	WT_DECL_RET;
 	WT_IM *im;
 
-	im = __wt_process.inmemory;
+	im = S2C(session)->inmemory;
 	__wt_spin_lock(session, &im->lock);
 
 	WT_ERR(__wt_buf_grow(session, &fh->buf, (size_t)len));
@@ -371,7 +340,7 @@ __im_handle_write(WT_SESSION_IMPL *session,
 	WT_IM *im;
 	size_t off;
 
-	im = __wt_process.inmemory;
+	im = S2C(session)->inmemory;
 	__wt_spin_lock(session, &im->lock);
 
 	off = (size_t)offset;
@@ -392,40 +361,62 @@ err:	__wt_spin_unlock(session, &im->lock);
 }
 
 /*
+ * __im_handle_open --
+ *	POSIX fopen/open.
+ */
+static int
+__im_handle_open(WT_SESSION_IMPL *session,
+    WT_FH *fh, const char *path, int dio_type, u_int flags)
+{
+	WT_UNUSED(session);
+	WT_UNUSED(path);
+	WT_UNUSED(dio_type);
+	WT_UNUSED(flags);
+
+	fh->off = 0;
+	F_SET(fh, WT_FH_IN_MEMORY);
+
+	fh->fh_advise = __im_handle_advise;
+	fh->fh_close = __im_handle_close;
+	fh->fh_getc = __im_handle_getc;
+	fh->fh_lock = __im_handle_lock;
+	fh->fh_printf = __im_handle_printf;
+	fh->fh_read = __im_handle_read;
+	fh->fh_size = __im_handle_size;
+	fh->fh_sync = __im_handle_sync;
+	fh->fh_truncate = __im_handle_truncate;
+	fh->fh_write = __im_handle_write;
+
+	return (0);
+}
+
+/*
  * __wt_os_inmemory --
  *	Initialize an in-memory configuration.
  */
 int
 __wt_os_inmemory(WT_SESSION_IMPL *session)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_IM *im;
 
+	conn = S2C(session);
 	im = NULL;
+
+	/* Initialize the in-memory jump table. */
+	conn->file_directory_sync = __im_directory_sync;
+	conn->file_exist = __im_file_exist;
+	conn->file_remove = __im_file_remove;
+	conn->file_rename = __im_file_rename;
+	conn->file_size = __im_file_size;
+	conn->handle_open = __im_handle_open;
 
 	/* Allocate an in-memory structure. */
 	WT_RET(__wt_calloc_one(session, &im));
 	WT_ERR(__wt_spin_init(session, &im->lock, "in-memory I/O"));
+	conn->inmemory = im;
 
-	/* Initialize the in-memory jump table. */
-	__wt_process.j_directory_sync = __im_directory_sync;
-	__wt_process.j_file_exist = __im_file_exist;
-	__wt_process.j_file_remove = __im_file_remove;
-	__wt_process.j_file_rename = __im_file_rename;
-	__wt_process.j_file_size = __im_file_size;
-	__wt_process.j_handle_advise = __im_handle_advise;
-	__wt_process.j_handle_close = __im_handle_close;
-	__wt_process.j_handle_getc = __im_handle_getc;
-	__wt_process.j_handle_lock = __im_handle_lock;
-	__wt_process.j_handle_open = __im_handle_open;
-	__wt_process.j_handle_printf = __im_handle_printf;
-	__wt_process.j_handle_read = __im_handle_read;
-	__wt_process.j_handle_size = __im_handle_size;
-	__wt_process.j_handle_sync = __im_handle_sync;
-	__wt_process.j_handle_truncate = __im_handle_truncate;
-	__wt_process.j_handle_write = __im_handle_write;
-
-	__wt_process.inmemory = im;
 	return (0);
 
 err:	__wt_free(session, im);
@@ -442,12 +433,11 @@ __wt_os_inmemory_cleanup(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 	WT_IM *im;
 
-	if ((im = __wt_process.inmemory) == NULL)
+	if ((im = S2C(session)->inmemory) == NULL)
 		return (0);
-	__wt_process.inmemory = NULL;
+	S2C(session)->inmemory = NULL;
 
 	__wt_spin_destroy(session, &im->lock);
-
 	__wt_free(session, im);
 
 	return (ret);

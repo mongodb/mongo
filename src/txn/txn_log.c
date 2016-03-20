@@ -74,21 +74,22 @@ __txn_commit_printlog(WT_SESSION_IMPL *session,
 	bool firstrecord;
 
 	firstrecord = true;
-	WT_RET(__wt_fprintf(session, WT_STDOUT, "    \"ops\": [\n"));
+	WT_RET(__wt_fprintf(session, WT_STDOUT(session), "    \"ops\": [\n"));
 
 	/* The logging subsystem zero-pads records. */
 	while (*pp < end && **pp) {
 		if (!firstrecord)
-			WT_RET(__wt_fprintf(session, WT_STDOUT, ",\n"));
-		WT_RET(__wt_fprintf(session, WT_STDOUT, "      {"));
+			WT_RET(__wt_fprintf(
+			    session, WT_STDOUT(session), ",\n"));
+		WT_RET(__wt_fprintf(session, WT_STDOUT(session), "      {"));
 
 		firstrecord = false;
 
 		WT_RET(__wt_txn_op_printlog(session, pp, end, flags));
-		WT_RET(__wt_fprintf(session, WT_STDOUT, "\n      }"));
+		WT_RET(__wt_fprintf(session, WT_STDOUT(session), "\n      }"));
 	}
 
-	WT_RET(__wt_fprintf(session, WT_STDOUT, "\n    ]\n"));
+	WT_RET(__wt_fprintf(session, WT_STDOUT(session), "\n    ]\n"));
 
 	return (0);
 }
@@ -484,16 +485,16 @@ __txn_printlog(WT_SESSION_IMPL *session,
 	WT_RET(__wt_logrec_read(session, &p, end, &rectype));
 
 	if (!firstrecord)
-		WT_RET(__wt_fprintf(session, WT_STDOUT, ",\n"));
+		WT_RET(__wt_fprintf(session, WT_STDOUT(session), ",\n"));
 
-	WT_RET(__wt_fprintf(session, WT_STDOUT,
+	WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 	    "  { \"lsn\" : [%" PRIu32 ",%" PRIu32 "],\n",
 	    lsnp->l.file, lsnp->l.offset));
-	WT_RET(__wt_fprintf(session, WT_STDOUT,
+	WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 	    "    \"hdr_flags\" : \"%s\",\n", compressed ? "compressed" : ""));
-	WT_RET(__wt_fprintf(session, WT_STDOUT,
+	WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 	    "    \"rec_len\" : %" PRIu32 ",\n", logrec->len));
-	WT_RET(__wt_fprintf(session, WT_STDOUT,
+	WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 	    "    \"mem_len\" : %" PRIu32 ",\n",
 	    compressed ? logrec->mem_len : logrec->len));
 
@@ -501,18 +502,18 @@ __txn_printlog(WT_SESSION_IMPL *session,
 	case WT_LOGREC_CHECKPOINT:
 		WT_RET(__wt_struct_unpack(session, p, WT_PTRDIFF(end, p),
 		    WT_UNCHECKED_STRING(II), &lsnfile, &lsnoffset));
-		WT_RET(__wt_fprintf(session, WT_STDOUT,
+		WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 		    "    \"type\" : \"checkpoint\",\n"));
-		WT_RET(__wt_fprintf(session, WT_STDOUT,
+		WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 		    "    \"ckpt_lsn\" : [%" PRIu32 ",%" PRIu32 "]\n",
 		    lsnfile, lsnoffset));
 		break;
 
 	case WT_LOGREC_COMMIT:
 		WT_RET(__wt_vunpack_uint(&p, WT_PTRDIFF(end, p), &txnid));
-		WT_RET(__wt_fprintf(session, WT_STDOUT,
+		WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 		    "    \"type\" : \"commit\",\n"));
-		WT_RET(__wt_fprintf(session, WT_STDOUT,
+		WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 		    "    \"txnid\" : %" PRIu64 ",\n", txnid));
 		WT_RET(__txn_commit_printlog(session, &p, end, args->flags));
 		break;
@@ -520,25 +521,25 @@ __txn_printlog(WT_SESSION_IMPL *session,
 	case WT_LOGREC_FILE_SYNC:
 		WT_RET(__wt_struct_unpack(session, p, WT_PTRDIFF(end, p),
 		    WT_UNCHECKED_STRING(Ii), &fileid, &start));
-		WT_RET(__wt_fprintf(session, WT_STDOUT,
+		WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 		    "    \"type\" : \"file_sync\",\n"));
-		WT_RET(__wt_fprintf(session, WT_STDOUT,
+		WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 		    "    \"fileid\" : %" PRIu32 ",\n", fileid));
-		WT_RET(__wt_fprintf(session, WT_STDOUT,
+		WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 		    "    \"start\" : %" PRId32 "\n", start));
 		break;
 
 	case WT_LOGREC_MESSAGE:
 		WT_RET(__wt_struct_unpack(session, p, WT_PTRDIFF(end, p),
 		    WT_UNCHECKED_STRING(S), &msg));
-		WT_RET(__wt_fprintf(session, WT_STDOUT,
+		WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 		    "    \"type\" : \"message\",\n"));
-		WT_RET(__wt_fprintf(session, WT_STDOUT,
+		WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 		    "    \"message\" : \"%s\"\n", msg));
 		break;
 	}
 
-	WT_RET(__wt_fprintf(session, WT_STDOUT, "  }"));
+	WT_RET(__wt_fprintf(session, WT_STDOUT(session), "  }"));
 
 	return (0);
 }
@@ -556,10 +557,10 @@ __wt_txn_printlog(WT_SESSION *wt_session, uint32_t flags)
 	session = (WT_SESSION_IMPL *)wt_session;
 	args.flags = flags;
 
-	WT_RET(__wt_fprintf(session, WT_STDOUT, "[\n"));
+	WT_RET(__wt_fprintf(session, WT_STDOUT(session), "[\n"));
 	WT_RET(__wt_log_scan(
 	    session, NULL, WT_LOGSCAN_FIRST, __txn_printlog, &args));
-	WT_RET(__wt_fprintf(session, WT_STDOUT, "\n]\n"));
+	WT_RET(__wt_fprintf(session, WT_STDOUT(session), "\n]\n"));
 
 	return (0);
 }

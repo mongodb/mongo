@@ -137,11 +137,11 @@ __wt_open(WT_SESSION_IMPL *session,
 	    WT_STRING_MATCH(name, WT_SINGLETHREAD, strlen(WT_SINGLETHREAD)));
 
 	/* Call the underlying open function. */
-	WT_ERR(WT_JUMP(j_handle_open, session, fh, name, dio_type, flags));
+	WT_ERR(conn->handle_open(session, fh, name, dio_type, flags));
 	open_called = true;
 
 	/* Set the file's size. */
-	WT_ERR(WT_JUMP(j_handle_size, session, fh, &fh->size));
+	WT_ERR(fh->fh_size(session, fh, &fh->size));
 
 	/*
 	 * Repeat the check for a match: if there's no match, link our newly
@@ -149,7 +149,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	 */
 	if (__wt_handle_search(session, name, true, true, fh, fhp)) {
 err:		if (open_called)
-			WT_TRET(WT_JUMP(j_handle_close, session, fh));
+			WT_TRET(fh->fh_close(session, fh));
 		if (fh != NULL) {
 			__wt_free(session, fh->name);
 			__wt_free(session, fh);
@@ -177,10 +177,6 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH **fhp)
 	fh = *fhp;
 	*fhp = NULL;
 
-	/* Catch attempts to close the standard streams. */
-	if (fh == WT_STDERR || fh == WT_STDOUT)
-		return (EINVAL);
-
 	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS, "%s: close", fh->name));
 
 	/*
@@ -204,7 +200,7 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH **fhp)
 	__wt_spin_unlock(session, &conn->fh_lock);
 
 	/* Discard underlying resources. */
-	ret = WT_JUMP(j_handle_close, session, fh);
+	ret = fh->fh_close(session, fh);
 
 	__wt_free(session, fh->name);
 	__wt_free(session, fh);

@@ -144,18 +144,18 @@ __wt_logop_col_put_print(WT_SESSION_IMPL *session,
 	WT_RET(__wt_logop_col_put_unpack(
 	    session, pp, end, &fileid, &recno, &value));
 
-	WT_RET(__wt_fprintf(session, WT_STDOUT,
+	WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 	    " \"optype\": \"col_put\",\n"));
-	WT_ERR(__wt_fprintf(session, WT_STDOUT,
+	WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
 	    "        \"fileid\": \"%" PRIu32 "\",\n", fileid));
-	WT_ERR(__wt_fprintf(session, WT_STDOUT,
+	WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
 	    "        \"recno\": \"%" PRIu64 "\",\n", recno));
 	WT_ERR(__logrec_make_json_str(session, &escaped, &value));
-	WT_ERR(__wt_fprintf(session, WT_STDOUT,
+	WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
 	    "        \"value\": \"%s\"", escaped));
 	if (LF_ISSET(WT_TXN_PRINTLOG_HEX)) {
 		WT_ERR(__logrec_make_hex_str(session, &escaped, &value));
-		WT_ERR(__wt_fprintf(session, WT_STDOUT,
+		WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
 		    ",\n        \"value-hex\": \"%s\"", escaped));
 	}
 
@@ -214,11 +214,11 @@ __wt_logop_col_remove_print(WT_SESSION_IMPL *session,
 	WT_RET(__wt_logop_col_remove_unpack(
 	    session, pp, end, &fileid, &recno));
 
-	WT_RET(__wt_fprintf(session, WT_STDOUT,
+	WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 	    " \"optype\": \"col_remove\",\n"));
-	WT_RET(__wt_fprintf(session, WT_STDOUT,
+	WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 	    "        \"fileid\": \"%" PRIu32 "\",\n", fileid));
-	WT_RET(__wt_fprintf(session, WT_STDOUT,
+	WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 	    "        \"recno\": \"%" PRIu64 "\"", recno));
 	return (0);
 }
@@ -275,13 +275,13 @@ __wt_logop_col_truncate_print(WT_SESSION_IMPL *session,
 	WT_RET(__wt_logop_col_truncate_unpack(
 	    session, pp, end, &fileid, &start, &stop));
 
-	WT_RET(__wt_fprintf(session, WT_STDOUT,
+	WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 	    " \"optype\": \"col_truncate\",\n"));
-	WT_RET(__wt_fprintf(session, WT_STDOUT,
+	WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 	    "        \"fileid\": \"%" PRIu32 "\",\n", fileid));
-	WT_RET(__wt_fprintf(session, WT_STDOUT,
+	WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 	    "        \"start\": \"%" PRIu64 "\",\n", start));
-	WT_RET(__wt_fprintf(session, WT_STDOUT,
+	WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 	    "        \"stop\": \"%" PRIu64 "\"", stop));
 	return (0);
 }
@@ -340,24 +340,24 @@ __wt_logop_row_put_print(WT_SESSION_IMPL *session,
 	WT_RET(__wt_logop_row_put_unpack(
 	    session, pp, end, &fileid, &key, &value));
 
-	WT_RET(__wt_fprintf(session, WT_STDOUT,
+	WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 	    " \"optype\": \"row_put\",\n"));
-	WT_ERR(__wt_fprintf(session, WT_STDOUT,
+	WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
 	    "        \"fileid\": \"%" PRIu32 "\",\n", fileid));
 	WT_ERR(__logrec_make_json_str(session, &escaped, &key));
-	WT_ERR(__wt_fprintf(session, WT_STDOUT,
+	WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
 	    "        \"key\": \"%s\",\n", escaped));
 	if (LF_ISSET(WT_TXN_PRINTLOG_HEX)) {
 		WT_ERR(__logrec_make_hex_str(session, &escaped, &key));
-		WT_ERR(__wt_fprintf(session, WT_STDOUT,
+		WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
 		    "        \"key-hex\": \"%s\",\n", escaped));
 	}
 	WT_ERR(__logrec_make_json_str(session, &escaped, &value));
-	WT_ERR(__wt_fprintf(session, WT_STDOUT,
+	WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
 	    "        \"value\": \"%s\"", escaped));
 	if (LF_ISSET(WT_TXN_PRINTLOG_HEX)) {
 		WT_ERR(__logrec_make_hex_str(session, &escaped, &value));
-		WT_ERR(__wt_fprintf(session, WT_STDOUT,
+		WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
 		    ",\n        \"value-hex\": \"%s\"", escaped));
 	}
 
@@ -418,16 +418,16 @@ __wt_logop_row_remove_print(WT_SESSION_IMPL *session,
 	WT_RET(__wt_logop_row_remove_unpack(
 	    session, pp, end, &fileid, &key));
 
-	WT_RET(__wt_fprintf(session, WT_STDOUT,
+	WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 	    " \"optype\": \"row_remove\",\n"));
-	WT_ERR(__wt_fprintf(session, WT_STDOUT,
+	WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
 	    "        \"fileid\": \"%" PRIu32 "\",\n", fileid));
 	WT_ERR(__logrec_make_json_str(session, &escaped, &key));
-	WT_ERR(__wt_fprintf(session, WT_STDOUT,
+	WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
 	    "        \"key\": \"%s\"", escaped));
 	if (LF_ISSET(WT_TXN_PRINTLOG_HEX)) {
 		WT_ERR(__logrec_make_hex_str(session, &escaped, &key));
-		WT_ERR(__wt_fprintf(session, WT_STDOUT,
+		WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
 		    ",\n        \"key-hex\": \"%s\"", escaped));
 	}
 
@@ -490,27 +490,27 @@ __wt_logop_row_truncate_print(WT_SESSION_IMPL *session,
 	WT_RET(__wt_logop_row_truncate_unpack(
 	    session, pp, end, &fileid, &start, &stop, &mode));
 
-	WT_RET(__wt_fprintf(session, WT_STDOUT,
+	WT_RET(__wt_fprintf(session, WT_STDOUT(session),
 	    " \"optype\": \"row_truncate\",\n"));
-	WT_ERR(__wt_fprintf(session, WT_STDOUT,
+	WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
 	    "        \"fileid\": \"%" PRIu32 "\",\n", fileid));
 	WT_ERR(__logrec_make_json_str(session, &escaped, &start));
-	WT_ERR(__wt_fprintf(session, WT_STDOUT,
+	WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
 	    "        \"start\": \"%s\",\n", escaped));
 	if (LF_ISSET(WT_TXN_PRINTLOG_HEX)) {
 		WT_ERR(__logrec_make_hex_str(session, &escaped, &start));
-		WT_ERR(__wt_fprintf(session, WT_STDOUT,
+		WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
 		    "        \"start-hex\": \"%s\",\n", escaped));
 	}
 	WT_ERR(__logrec_make_json_str(session, &escaped, &stop));
-	WT_ERR(__wt_fprintf(session, WT_STDOUT,
+	WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
 	    "        \"stop\": \"%s\",\n", escaped));
 	if (LF_ISSET(WT_TXN_PRINTLOG_HEX)) {
 		WT_ERR(__logrec_make_hex_str(session, &escaped, &stop));
-		WT_ERR(__wt_fprintf(session, WT_STDOUT,
+		WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
 		    "        \"stop-hex\": \"%s\",\n", escaped));
 	}
-	WT_ERR(__wt_fprintf(session, WT_STDOUT,
+	WT_ERR(__wt_fprintf(session, WT_STDOUT(session),
 	    "        \"mode\": \"%" PRIu32 "\"", mode));
 
 err:	__wt_free(session, escaped);

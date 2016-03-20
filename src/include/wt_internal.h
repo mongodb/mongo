@@ -339,6 +339,7 @@ union __wt_rand_state;
 #include "log.h"
 #include "lsm.h"
 #include "meta.h"
+#include "os.h"
 #include "schema.h"
 #include "txn.h"
 
@@ -356,7 +357,6 @@ union __wt_rand_state;
 #include "log.i"
 #include "misc.i"
 #include "mutex.i"			/* required by btree.i */
-#include "os.h"				/* requires connection.h */
 #include "packing.i"
 #include "txn.i"			/* required by btree.i */
 

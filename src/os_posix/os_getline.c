@@ -31,7 +31,7 @@ __wt_getline(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_FH *fh)
 	WT_RET(__wt_buf_init(session, buf, 100));
 
 	for (;;) {
-		WT_RET(WT_JUMP(j_handle_getc, session, fh, &c));
+		WT_RET(fh->fh_getc(session, fh, &c));
 		if (c == EOF)
 			break;
 
