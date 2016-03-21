@@ -144,10 +144,11 @@ Status ReplicaSetConfig::_initialize(const BSONObj& cfg,
     //
     // Parse configServer
     //
-    status = bsonExtractBooleanFieldWithDefault(cfg,
-                                                kConfigServerFieldName,
-                                                forInitiate ? serverGlobalParams.configsvr : false,
-                                                &_configServer);
+    status = bsonExtractBooleanFieldWithDefault(
+        cfg,
+        kConfigServerFieldName,
+        forInitiate ? serverGlobalParams.clusterRole == ClusterRole::ConfigServer : false,
+        &_configServer);
     if (!status.isOK()) {
         return status;
     }
@@ -498,7 +499,7 @@ Status ReplicaSetConfig::validate() const {
                               "servers cannot have a non-zero slaveDelay");
             }
         }
-        if (!serverGlobalParams.configsvr) {
+        if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
             return Status(ErrorCodes::BadValue,
                           "Nodes being used for config servers must be started with the "
                           "--configsvr flag");
@@ -509,7 +510,7 @@ Status ReplicaSetConfig::validate() const {
                                         << " must be true in replica set configurations being "
                                            "used for config servers");
         }
-    } else if (serverGlobalParams.configsvr) {
+    } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         return Status(ErrorCodes::BadValue,
                       "Nodes started with the --configsvr flag must have configsvr:true in "
                       "their config");

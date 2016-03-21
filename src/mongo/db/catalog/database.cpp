@@ -486,7 +486,7 @@ Collection* Database::createCollection(OperationContext* txn,
     massertNamespaceNotIndex(ns, "createCollection");
     invariant(txn->lockState()->isDbLockedForMode(name(), MODE_X));
 
-    if (serverGlobalParams.configsvr &&
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
         !(ns.startsWith("config.") || ns.startsWith("local.") || ns.startsWith("admin."))) {
         uasserted(14037, "can't create user databases on a --configsvr instance");
     }

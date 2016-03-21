@@ -1248,33 +1248,37 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
             return Status(ErrorCodes::BadValue, "bad --port number");
         }
     }
-    if (params.count("sharding.clusterRole") &&
-        params["sharding.clusterRole"].as<std::string>() == "configsvr") {
-        serverGlobalParams.configsvr = true;
-        serverGlobalParams.configsvrMode = replSettings.getReplSetString().empty()
-            ? CatalogManager::ConfigServerMode::SCCC
-            : CatalogManager::ConfigServerMode::CSRS;
-        mmapv1GlobalOptions.smallfiles = true;  // config server implies small files
+    if (params.count("sharding.clusterRole")) {
+        auto clusterRoleParam = params["sharding.clusterRole"].as<std::string>();
+        if (clusterRoleParam == "configsvr") {
+            serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
+            serverGlobalParams.configsvrMode = replSettings.getReplSetString().empty()
+                ? CatalogManager::ConfigServerMode::SCCC
+                : CatalogManager::ConfigServerMode::CSRS;
+            mmapv1GlobalOptions.smallfiles = true;  // config server implies small files
 
-        // If we haven't explicitly specified a journal option, default journaling to true for
-        // the config server role
-        if (!params.count("storage.journal.enabled")) {
-            storageGlobalParams.dur = true;
-        }
+            // If we haven't explicitly specified a journal option, default journaling to true for
+            // the config server role
+            if (!params.count("storage.journal.enabled")) {
+                storageGlobalParams.dur = true;
+            }
 
-        if (!params.count("storage.dbPath")) {
-            storageGlobalParams.dbpath = storageGlobalParams.kDefaultConfigDbPath;
-        }
-        if (serverGlobalParams.configsvrMode == CatalogManager::ConfigServerMode::SCCC) {
-            // Set to true to force SCCC config servers to have an oplog for backup.
-            replSettings.setMaster(true);
-            if (!params.count("replication.oplogSizeMB"))
-                replSettings.setOplogSizeBytes(5 * 1024 * 1024);
+            if (!params.count("storage.dbPath")) {
+                storageGlobalParams.dbpath = storageGlobalParams.kDefaultConfigDbPath;
+            }
+            if (serverGlobalParams.configsvrMode == CatalogManager::ConfigServerMode::SCCC) {
+                // Set to true to force SCCC config servers to have an oplog for backup.
+                replSettings.setMaster(true);
+                if (!params.count("replication.oplogSizeMB"))
+                    replSettings.setOplogSizeBytes(5 * 1024 * 1024);
+            }
+        } else if (clusterRoleParam == "shardsvr") {
+            serverGlobalParams.clusterRole = ClusterRole::ShardServer;
         }
     }
 
     if (params.count("sharding.configsvrMode")) {
-        if (!serverGlobalParams.configsvr) {
+        if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
             return Status(ErrorCodes::BadValue,
                           "Cannot set \"sharding.configsvrMode\" without "
                           "setting \"sharding.clusterRole\" to \"configsvr\"");

@@ -731,19 +731,19 @@ TEST(ReplicaSetConfig, ConfigServerField) {
     ASSERT_FALSE(config2.isConfigServer());
 
     // Configs in which configsvr is not the same as the --configsvr flag are invalid.
-    serverGlobalParams.configsvr = true;
-    ON_BLOCK_EXIT([&] { serverGlobalParams.configsvr = false; });
+    serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
+    ON_BLOCK_EXIT([&] { serverGlobalParams.clusterRole = ClusterRole::None; });
 
     ASSERT_OK(config.validate());
     ASSERT_EQUALS(ErrorCodes::BadValue, config2.validate());
 
-    serverGlobalParams.configsvr = false;
+    serverGlobalParams.clusterRole = ClusterRole::None;
     ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
     ASSERT_OK(config2.validate());
 }
 
 TEST(ReplicaSetConfig, ConfigServerFieldDefaults) {
-    serverGlobalParams.configsvr = false;
+    serverGlobalParams.clusterRole = ClusterRole::None;
 
     ReplicaSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
@@ -762,8 +762,8 @@ TEST(ReplicaSetConfig, ConfigServerFieldDefaults) {
                                                                     << "localhost:12345")))));
     ASSERT_FALSE(config2.isConfigServer());
 
-    serverGlobalParams.configsvr = true;
-    ON_BLOCK_EXIT([&] { serverGlobalParams.configsvr = false; });
+    serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
+    ON_BLOCK_EXIT([&] { serverGlobalParams.clusterRole = ClusterRole::None; });
 
     ReplicaSetConfig config3;
     ASSERT_OK(config3.initialize(BSON("_id"
@@ -1202,8 +1202,8 @@ TEST(ReplicaSetConfig, CheckConfigServerCantHaveSlaveDelay) {
 }
 
 TEST(ReplicaSetConfig, CheckConfigServerMustHaveTrueForWriteConcernMajorityJournalDefault) {
-    serverGlobalParams.configsvr = true;
-    ON_BLOCK_EXIT([&] { serverGlobalParams.configsvr = false; });
+    serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
+    ON_BLOCK_EXIT([&] { serverGlobalParams.clusterRole = ClusterRole::None; });
     ReplicaSetConfig configA;
     ASSERT_OK(
         configA.initialize(BSON("_id"

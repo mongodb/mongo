@@ -2919,7 +2919,7 @@ WriteConcernOptions ReplicationCoordinatorImpl::getGetLastErrorDefault() {
 
 Status ReplicationCoordinatorImpl::checkReplEnabledForCommand(BSONObjBuilder* result) {
     if (!_settings.usingReplSets()) {
-        if (serverGlobalParams.configsvr) {
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             result->append("info", "configsvr");  // for shell prompt
         }
         return Status(ErrorCodes::NoReplicationEnabled, "not running with --replSet");

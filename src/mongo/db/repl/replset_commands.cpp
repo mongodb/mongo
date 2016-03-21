@@ -355,7 +355,7 @@ public:
         std::string replSetString =
             ReplicationCoordinator::get(txn)->getSettings().getReplSetString();
         if (replSetString.empty()) {
-            if (serverGlobalParams.configsvr) {
+            if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
                 return appendCommandStatus(result,
                                            ReplicationCoordinator::get(txn)
                                                ->processReplSetInitiate(txn, configObj, &result));

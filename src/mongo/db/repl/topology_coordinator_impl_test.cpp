@@ -5917,8 +5917,8 @@ TEST_F(TopoCoordTest, ProcessDeclareElectionWinner) {
 }
 
 TEST_F(TopoCoordTest, CSRSConfigServerRejectsPV0Config) {
-    ON_BLOCK_EXIT([]() { serverGlobalParams.configsvr = false; });
-    serverGlobalParams.configsvr = true;
+    ON_BLOCK_EXIT([]() { serverGlobalParams.clusterRole = ClusterRole::None; });
+    serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
     TopologyCoordinatorImpl::Options options;
     options.configServerMode = CatalogManager::ConfigServerMode::CSRS;
     setOptions(options);
@@ -5938,8 +5938,8 @@ TEST_F(TopoCoordTest, CSRSConfigServerRejectsPV0Config) {
 }
 
 TEST_F(TopoCoordTest, SCCCConfigServerRejectsPV0Config) {
-    ON_BLOCK_EXIT([]() { serverGlobalParams.configsvr = false; });
-    serverGlobalParams.configsvr = true;
+    ON_BLOCK_EXIT([]() { serverGlobalParams.clusterRole = ClusterRole::None; });
+    serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
     TopologyCoordinatorImpl::Options options;
     options.configServerMode = CatalogManager::ConfigServerMode::SCCC;
     setOptions(options);

@@ -189,7 +189,7 @@ public:
              string& errmsg,
              BSONObjBuilder& result) {
         // disallow dropping the config database
-        if (serverGlobalParams.configsvr && (dbname == "config")) {
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer && (dbname == "config")) {
             return appendCommandStatus(result,
                                        Status(ErrorCodes::IllegalOperation,
                                               "Cannot drop 'config' database if mongod started "
@@ -1395,7 +1395,8 @@ bool Command::run(OperationContext* txn,
                 readConcernResult.appendInfo(&inPlaceReplyBob);
                 if (!readConcernResult.getStatus().isOK()) {
                     if (ErrorCodes::ExceededTimeLimit == readConcernResult.getStatus()) {
-                        const int debugLevel = serverGlobalParams.configsvr ? 0 : 2;
+                        const int debugLevel =
+                            serverGlobalParams.clusterRole == ClusterRole::ConfigServer ? 0 : 2;
                         LOG(debugLevel)
                             << "Command on database " << request.getDatabase()
                             << " timed out waiting for read concern to be satisfied. Command: "
@@ -1468,7 +1469,7 @@ bool Command::run(OperationContext* txn,
 
         // For commands from mongos, append some info to help getLastError(w) work.
         // TODO: refactor out of here as part of SERVER-18326
-        if (isShardingAware || serverGlobalParams.configsvr) {
+        if (isShardingAware || serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             rpc::ShardingMetadata(lastOpTimeFromClient, replCoord->getElectionId())
                 .writeToMetadata(&metadataBob, request.getProtocol());
         }

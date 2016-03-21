@@ -122,7 +122,7 @@ Status validateWriteConcern(OperationContext* txn,
                       "cannot use 'j' option when a host does not have journaling enabled");
     }
 
-    const bool isConfigServer = serverGlobalParams.configsvr;
+    const bool isConfigServer = serverGlobalParams.clusterRole == ClusterRole::ConfigServer;
     const bool isLocalDb(dbName == kLocalDB);
     const repl::ReplicationCoordinator::Mode replMode =
         repl::getGlobalReplicationCoordinator()->getReplicationMode();

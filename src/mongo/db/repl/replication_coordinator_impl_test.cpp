@@ -615,7 +615,7 @@ TEST_F(
     ReplCoordTest,
     NodeReturnsNoReplicationEnabledAndInfoConfigsvrWhenCheckReplEnabledForCommandWhileConfigsvr) {
     ReplSettings settings;
-    serverGlobalParams.configsvr = true;
+    serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
     init(settings);
     start();
 
@@ -624,7 +624,7 @@ TEST_F(
     Status status = getReplCoord()->checkReplEnabledForCommand(&result);
     ASSERT_EQUALS(status, ErrorCodes::NoReplicationEnabled);
     ASSERT_EQUALS(result.obj()["info"].String(), "configsvr");
-    serverGlobalParams.configsvr = false;
+    serverGlobalParams.clusterRole = ClusterRole::None;
 }
 
 TEST_F(
