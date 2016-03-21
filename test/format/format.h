@@ -109,6 +109,7 @@ typedef struct {
 
 	char *home;				/* Home directory */
 	char *home_backup;			/* Hot-backup directory */
+	char *home_backup2;			/* Saved Hot-backup directory */
 	char *home_backup_init;			/* Initialize backup command */
 	char *home_bdb;				/* BDB directory */
 	char *home_config;			/* Run CONFIG file path */
