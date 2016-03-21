@@ -434,20 +434,17 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         }
     }
 
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
     invariant(_rsConfigState == kConfigStartingUp);
     const PostMemberStateUpdateAction action =
         _setCurrentRSConfig_inlock(cbData, localConfig, myIndex.getValue());
     _setMyLastAppliedOpTime_inlock(lastOpTime, false);
     _setMyLastDurableOpTime_inlock(lastOpTime, false);
-    _reportUpstream_inlock(&lk);
+    _reportUpstream_inlock(std::move(lock));
     _externalState->setGlobalTimestamp(lastOpTime.getTimestamp());
     // Step down is impossible, so we don't need to wait for the returned event.
     _updateTerm_incallback(term);
     LOG(1) << "Current term is now " << term;
-    if (lk.owns_lock()) {
-        lk.unlock();
-    }
     _performPostMemberStateUpdateAction(action);
     if (!isArbiter) {
         _externalState->startThreads(_settings);
@@ -906,7 +903,7 @@ void ReplicationCoordinatorImpl::setMyLastAppliedOpTimeForward(const OpTime& opT
             _setMyLastDurableOpTime_inlock(opTime, allowRollback);
         }
 
-        _reportUpstream_inlock(&lock);
+        _reportUpstream_inlock(std::move(lock));
     }
 }
 
@@ -914,20 +911,20 @@ void ReplicationCoordinatorImpl::setMyLastDurableOpTimeForward(const OpTime& opT
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     if (opTime > _getMyLastDurableOpTime_inlock()) {
         _setMyLastDurableOpTime_inlock(opTime, false);
-        _reportUpstream_inlock(&lock);
+        _reportUpstream_inlock(std::move(lock));
     }
 }
 
 void ReplicationCoordinatorImpl::setMyLastAppliedOpTime(const OpTime& opTime) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     _setMyLastAppliedOpTime_inlock(opTime, false);
-    _reportUpstream_inlock(&lock);
+    _reportUpstream_inlock(std::move(lock));
 }
 
 void ReplicationCoordinatorImpl::setMyLastDurableOpTime(const OpTime& opTime) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     _setMyLastDurableOpTime_inlock(opTime, false);
-    _reportUpstream_inlock(&lock);
+    _reportUpstream_inlock(std::move(lock));
 }
 
 void ReplicationCoordinatorImpl::resetMyLastOpTimes() {
@@ -935,11 +932,11 @@ void ReplicationCoordinatorImpl::resetMyLastOpTimes() {
     // Reset to uninitialized OpTime
     _setMyLastAppliedOpTime_inlock(OpTime(), true);
     _setMyLastDurableOpTime_inlock(OpTime(), true);
-    _reportUpstream_inlock(&lock);
+    _reportUpstream_inlock(std::move(lock));
 }
 
-void ReplicationCoordinatorImpl::_reportUpstream_inlock(stdx::unique_lock<stdx::mutex>* lock) {
-    invariant(lock->owns_lock());
+void ReplicationCoordinatorImpl::_reportUpstream_inlock(stdx::unique_lock<stdx::mutex> lock) {
+    invariant(lock.owns_lock());
 
     if (getReplicationMode() != modeReplSet) {
         return;
@@ -949,7 +946,7 @@ void ReplicationCoordinatorImpl::_reportUpstream_inlock(stdx::unique_lock<stdx::
         return;
     }
 
-    lock->unlock();
+    lock.unlock();
 
     _externalState->forwardSlaveProgress();  // Must do this outside _mutex
 }
@@ -3027,10 +3024,10 @@ void ReplicationCoordinatorImpl::resetLastOpTimesFromOplog(OperationContext* txn
         lastOpTime = lastOpTimeStatus.getValue();
     }
 
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
     _setMyLastAppliedOpTime_inlock(lastOpTime, true);
     _setMyLastDurableOpTime_inlock(lastOpTime, true);
-    _reportUpstream_inlock(&lk);
+    _reportUpstream_inlock(std::move(lock));
     _externalState->setGlobalTimestamp(lastOpTime.getTimestamp());
 }
 

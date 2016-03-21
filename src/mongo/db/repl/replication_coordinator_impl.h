@@ -778,9 +778,9 @@ private:
      *
      * Takes in a unique lock, that must already be locked, on _mutex.
      *
-     * NOTE: It is unspecified what state the lock will be in after this method finishes.
+     * Lock will be released after this method finishes.
      */
-    void _reportUpstream_inlock(stdx::unique_lock<stdx::mutex>* lock);
+    void _reportUpstream_inlock(stdx::unique_lock<stdx::mutex> lock);
 
     /**
      * Helpers to set the last applied and durable OpTime.
