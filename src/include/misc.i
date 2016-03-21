@@ -150,6 +150,11 @@ __wt_posix_fadvise(WT_SESSION_IMPL *session,
 #if defined(HAVE_POSIX_FADVISE)
 	return (fh->fh_advise(session, fh, offset, len, advice));
 #else
+	WT_UNUSED(session);
+	WT_UNUSED(fh);
+	WT_UNUSED(offset);
+	WT_UNUSED(len);
+	WT_UNUSED(advice);
 	return (0);
 #endif
 }
