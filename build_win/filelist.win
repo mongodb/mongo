@@ -107,7 +107,6 @@ src/os_posix/os_getline.c
 src/os_posix/os_getopt.c
 src/os_posix/os_init.c
 src/os_posix/os_inmemory.c
-src/os_posix/os_mtx_rw.c
 src/os_posix/os_posix.c
 src/os_posix/os_stdio.c
 src/os_posix/os_strtouq.c
@@ -160,6 +159,7 @@ src/support/hash_fnv.c
 src/support/hazard.c
 src/support/hex.c
 src/support/huffman.c
+src/support/mtx_rw.c
 src/support/pow.c
 src/support/rand.c
 src/support/scratch.c

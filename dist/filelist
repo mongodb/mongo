@@ -114,7 +114,6 @@ src/os_posix/os_init.c
 src/os_posix/os_inmemory.c
 src/os_posix/os_map.c
 src/os_posix/os_mtx_cond.c
-src/os_posix/os_mtx_rw.c
 src/os_posix/os_once.c
 src/os_posix/os_open.c
 src/os_posix/os_pagesize.c
@@ -158,6 +157,7 @@ src/support/hash_fnv.c
 src/support/hazard.c
 src/support/hex.c
 src/support/huffman.c
+src/support/mtx_rw.c
 src/support/pow.c
 src/support/power8/crc32.S
 src/support/power8/crc32_wrapper.c
