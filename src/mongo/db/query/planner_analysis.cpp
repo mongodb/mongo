@@ -99,6 +99,12 @@ bool structureOKForExplode(QuerySolutionNode* solnRoot, QuerySolutionNode** toRe
     //
     // TODO: Can also try exploding if root is AND_HASH (last child dictates order.),
     // or other less obvious cases...
+
+    // Skip over a sharding filter stage.
+    if (STAGE_SHARDING_FILTER == solnRoot->getType()) {
+        solnRoot = solnRoot->children[0];
+    }
+
     if (STAGE_IXSCAN == solnRoot->getType()) {
         *toReplace = solnRoot;
         return true;
