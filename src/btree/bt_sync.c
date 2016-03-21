@@ -269,24 +269,18 @@ err:	/* On error, clear any left-over tree walk. */
  *	Cache operations.
  */
 int
-__wt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, WT_CACHE_OP op)
+__wt_cache_op(WT_SESSION_IMPL *session, WT_CACHE_OP op)
 {
-	WT_DECL_RET;
-	WT_BTREE *btree;
-
-	btree = S2BT(session);
-
 	switch (op) {
 	case WT_SYNC_CHECKPOINT:
 	case WT_SYNC_CLOSE:
 		/*
-		 * Set the checkpoint reference for reconciliation; it's ugly,
-		 * but drilling a function parameter path from our callers to
-		 * the reconciliation of the tree's root page is going to be
-		 * worse.
+		 * Make sure the checkpoint reference is set for
+		 * reconciliation; it's ugly, but drilling a function parameter
+		 * path from our callers to the reconciliation of the tree's
+		 * root page is going to be worse.
 		 */
-		WT_ASSERT(session, btree->ckpt == NULL);
-		btree->ckpt = ckptbase;
+		WT_ASSERT(session, S2BT(session)->ckpt != NULL);
 		break;
 	case WT_SYNC_DISCARD:
 	case WT_SYNC_WRITE_LEAVES:
@@ -296,23 +290,10 @@ __wt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, WT_CACHE_OP op)
 	switch (op) {
 	case WT_SYNC_CHECKPOINT:
 	case WT_SYNC_WRITE_LEAVES:
-		WT_ERR(__sync_file(session, op));
-		break;
+		return (__sync_file(session, op));
 	case WT_SYNC_CLOSE:
 	case WT_SYNC_DISCARD:
-		WT_ERR(__wt_evict_file(session, op));
-		break;
+		return (__wt_evict_file(session, op));
+	WT_ILLEGAL_VALUE(session);
 	}
-
-err:	switch (op) {
-	case WT_SYNC_CHECKPOINT:
-	case WT_SYNC_CLOSE:
-		btree->ckpt = NULL;
-		break;
-	case WT_SYNC_DISCARD:
-	case WT_SYNC_WRITE_LEAVES:
-		break;
-	}
-
-	return (ret);
 }
