@@ -66,11 +66,8 @@
 #define	WT_STREAM_READ		0x020	/* Open a stream: read */
 #define	WT_STREAM_WRITE		0x040	/* Open a stream: write */
 
-#define	WT_STDERR	((void *)0x1)	/* WT_FH to stderr */
-#define	WT_STDOUT	((void *)0x2)	/* WT_FH to stdout */
-
 struct __wt_fh {
-	char	*name;				/* File name */
+	const char *name;			/* File name */
 	uint64_t name_hash;			/* Hash of name */
 	TAILQ_ENTRY(__wt_fh) q;			/* List of open handles */
 	TAILQ_ENTRY(__wt_fh) hashq;		/* Hashed list of handles */
@@ -108,204 +105,19 @@ struct __wt_fh {
 	    WT_FALLOCATE_SYS } fallocate_available;
 	bool fallocate_requires_locking;
 
-#define	WT_FH_IN_MEMORY		0x01		/* In-memory, don't remove */
-#define	WT_FH_FLUSH_ON_CLOSE	0x02		/* Flush when closing */
+#define	WT_FH_FLUSH_ON_CLOSE	0x01		/* Flush when closing */
+#define	WT_FH_IN_MEMORY		0x02		/* In-memory, don't remove */
 	uint32_t flags;
+
+	int (*fh_advise)(WT_SESSION_IMPL *, WT_FH *, wt_off_t, wt_off_t, int);
+	int (*fh_close)(WT_SESSION_IMPL *, WT_FH *);
+	int (*fh_getc)(WT_SESSION_IMPL *, WT_FH *, int *);
+	int (*fh_lock)(WT_SESSION_IMPL *, WT_FH *, bool);
+	int (*fh_printf)(WT_SESSION_IMPL *, WT_FH *, const char *, va_list);
+	int (*fh_read)(WT_SESSION_IMPL *, WT_FH *, wt_off_t, size_t, void *);
+	int (*fh_size)(WT_SESSION_IMPL *, WT_FH *, wt_off_t *);
+	int (*fh_sync)(WT_SESSION_IMPL *, WT_FH *, bool);
+	int (*fh_truncate)(WT_SESSION_IMPL *, WT_FH *, wt_off_t);
+	int (*fh_write)(
+	    WT_SESSION_IMPL *, WT_FH *, wt_off_t, size_t, const void *);
 };
-
-/*
- * OS calls that are currently just stubs.
- */
-/*
- * __wt_directory_sync --
- *	Flush a directory to ensure file creation is durable.
- */
-static inline int
-__wt_directory_sync(WT_SESSION_IMPL *session, const char *path)
-{
-	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
-
-	return (WT_JUMP(j_directory_sync, session, path));
-}
-
-/*
- * __wt_directory_sync_fh --
- *	Flush a directory file handle to ensure file creation is durable.
- *
- * We don't use the normal sync path because many file systems don't require
- * this step and we don't want to penalize them.
- */
-static inline int
-__wt_directory_sync_fh(WT_SESSION_IMPL *session, WT_FH *fh)
-{
-	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
-
-#ifdef __linux__
-	return (WT_JUMP(j_handle_sync, session, fh, true));
-#else
-	WT_UNUSED(fh);
-	return (0);
-#endif
-}
-
-/*
- * __wt_exist --
- *	Return if the file exists.
- */
-static inline int
-__wt_exist(WT_SESSION_IMPL *session, const char *name, bool *existp)
-{
-	return (WT_JUMP(j_file_exist, session, name, existp));
-}
-
-/*
- * __wt_posix_fadvise --
- *	POSIX fadvise.
- */
-static inline int
-__wt_posix_fadvise(WT_SESSION_IMPL *session,
-    WT_FH *fh, wt_off_t offset, wt_off_t len, int advice)
-{
-#if defined(HAVE_POSIX_FADVISE)
-	return (WT_JUMP(j_handle_advise, session, fh, offset, len, advice));
-#else
-	return (0);
-#endif
-}
-
-/*
- * __wt_file_lock --
- *	Lock/unlock a file.
- */
-static inline int
-__wt_file_lock(WT_SESSION_IMPL * session, WT_FH *fh, bool lock)
-{
-	return (WT_JUMP(j_handle_lock, session, fh, lock));
-}
-
-/*
- * __wt_filesize --
- *	Get the size of a file in bytes, by file handle.
- */
-static inline int
-__wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
-{
-	return (WT_JUMP(j_handle_size, session, fh, sizep));
-}
-
-/*
- * __wt_filesize_name --
- *	Get the size of a file in bytes, by file name.
- */
-static inline int
-__wt_filesize_name(
-    WT_SESSION_IMPL *session, const char *name, bool silent, wt_off_t *sizep)
-{
-	return (WT_JUMP(j_file_size, session, name, silent, sizep));
-}
-
-/*
- * __wt_fsync --
- *	POSIX fflush/fsync.
- */
-static inline int
-__wt_fsync(WT_SESSION_IMPL *session, void *fh, bool block)
-{
-	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
-
-	return (WT_JUMP(j_handle_sync, session, fh, block));
-}
-
-/*
- * __wt_ftruncate --
- *	POSIX ftruncate.
- */
-static inline int
-__wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
-{
-	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
-
-	return (WT_JUMP(j_handle_truncate, session, fh, len));
-}
-
-/*
- * __wt_read --
- *	POSIX pread.
- */
-static inline int
-__wt_read(
-    WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, void *buf)
-{
-	WT_STAT_FAST_CONN_INCR(session, read_io);
-
-	return (WT_JUMP(j_handle_read, session, fh, offset, len, buf));
-}
-
-/*
- * __wt_remove --
- *	POSIX remove.
- */
-static inline int
-__wt_remove(WT_SESSION_IMPL *session, const char *name)
-{
-	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
-
-	return (WT_JUMP(j_file_remove, session, name));
-}
-
-/*
- * __wt_rename --
- *	POSIX rename.
- */
-static inline int
-__wt_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
-{
-	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
-
-	return (WT_JUMP(j_file_rename, session, from, to));
-}
-
-/*
- * __wt_write --
- *	POSIX pwrite.
- */
-static inline int
-__wt_write(WT_SESSION_IMPL *session,
-    WT_FH *fh, wt_off_t offset, size_t len, const void *buf)
-{
-	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY) ||
-	    WT_STRING_MATCH(fh->name,
-	    WT_SINGLETHREAD, strlen(WT_SINGLETHREAD)));
-
-	WT_STAT_FAST_CONN_INCR(session, write_io);
-
-	return (WT_JUMP(j_handle_write, session, fh, offset, len, buf));
-}
-
-/*
- * __wt_vfprintf --
- *	ANSI C vfprintf.
- */
-static inline int
-__wt_vfprintf(WT_SESSION_IMPL *session, WT_FH *fh, const char *fmt, va_list ap)
-{
-	return (WT_JUMP(j_handle_printf, session, fh, fmt, ap));
-}
-
-/*
- * __wt_fprintf --
- *	ANSI C fprintf.
- */
-static inline int
-__wt_fprintf(WT_SESSION_IMPL *session, WT_FH *fh, const char *fmt, ...)
-    WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
-{
-	WT_DECL_RET;
-	va_list ap;
-
-	va_start(ap, fmt);
-	ret = __wt_vfprintf(session, fh, fmt, ap);
-	va_end(ap);
-
-	return (ret);
-}

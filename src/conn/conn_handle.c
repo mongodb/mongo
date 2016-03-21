@@ -41,6 +41,9 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	TAILQ_INIT(&conn->lsm_manager.appqh);
 	TAILQ_INIT(&conn->lsm_manager.managerqh);
 
+	/* Random numbers. */
+	__wt_random_init(&session->rnd);
+
 	/* Configuration. */
 	WT_RET(__wt_conn_config_init(session));
 

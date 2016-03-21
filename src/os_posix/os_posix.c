@@ -337,6 +337,137 @@ __posix_handle_lock(WT_SESSION_IMPL *session, WT_FH *fh, bool lock)
 }
 
 /*
+ * __posix_handle_printf --
+ *	ANSI C vfprintf.
+ */
+static int
+__posix_handle_printf(
+    WT_SESSION_IMPL *session, WT_FH *fh, const char *fmt, va_list ap)
+{
+	if (fh->fp == NULL)
+		WT_RET_MSG(session, ENOTSUP,
+		    "%s: vfprintf: no stream configured", fh->name);
+
+	if (vfprintf(fh->fp, fmt, ap) >= 0)
+		return (0);
+	WT_RET_MSG(session, EIO, "%s: vfprintf", fh->name);
+}
+
+/*
+ * __posix_handle_read --
+ *	POSIX pread.
+ */
+static int
+__posix_handle_read(
+    WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, void *buf)
+{
+	size_t chunk;
+	ssize_t nr;
+	uint8_t *addr;
+
+	/* Assert direct I/O is aligned and a multiple of the alignment. */
+	WT_ASSERT(session,
+	    !fh->direct_io ||
+	    S2C(session)->buffer_alignment == 0 ||
+	    (!((uintptr_t)buf &
+	    (uintptr_t)(S2C(session)->buffer_alignment - 1)) &&
+	    len >= S2C(session)->buffer_alignment &&
+	    len % S2C(session)->buffer_alignment == 0));
+
+	/* Break reads larger than 1GB into 1GB chunks. */
+	for (addr = buf; len > 0; addr += nr, len -= (size_t)nr, offset += nr) {
+		chunk = WT_MIN(len, WT_GIGABYTE);
+		if ((nr = pread(fh->fd, addr, chunk, offset)) <= 0)
+			WT_RET_MSG(session, nr == 0 ? WT_ERROR : __wt_errno(),
+			    "%s read error: failed to read %" WT_SIZET_FMT
+			    " bytes at offset %" PRIuMAX,
+			    fh->name, chunk, (uintmax_t)offset);
+	}
+	return (0);
+}
+
+/*
+ * __posix_handle_size --
+ *	Get the size of a file in bytes, by file handle.
+ */
+static int
+__posix_handle_size(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
+{
+	struct stat sb;
+	WT_DECL_RET;
+
+	WT_SYSCALL_RETRY(fstat(fh->fd, &sb), ret);
+	if (ret == 0) {
+		*sizep = sb.st_size;
+		return (0);
+	}
+	WT_RET_MSG(session, ret, "%s: fstat", fh->name);
+}
+
+/*
+ * __posix_handle_sync --
+ *	POSIX fflush/fsync.
+ */
+static int
+__posix_handle_sync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
+{
+	if (fh->fp == NULL)
+		return (__posix_sync(session, fh->fd, fh->name, block));
+
+	if (fflush(fh->fp) == 0)
+		return (0);
+	WT_RET_MSG(session, __wt_errno(), "%s: fflush", fh->name);
+}
+
+/*
+ * __posix_handle_truncate --
+ *	POSIX ftruncate.
+ */
+static int
+__posix_handle_truncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
+{
+	WT_DECL_RET;
+
+	WT_SYSCALL_RETRY(ftruncate(fh->fd, len), ret);
+	if (ret == 0)
+		return (0);
+	WT_RET_MSG(session, ret, "%s: ftruncate", fh->name);
+}
+
+/*
+ * __posix_handle_write --
+ *	POSIX pwrite.
+ */
+static int
+__posix_handle_write(WT_SESSION_IMPL *session,
+    WT_FH *fh, wt_off_t offset, size_t len, const void *buf)
+{
+	size_t chunk;
+	ssize_t nw;
+	const uint8_t *addr;
+
+	/* Assert direct I/O is aligned and a multiple of the alignment. */
+	WT_ASSERT(session,
+	    !fh->direct_io ||
+	    S2C(session)->buffer_alignment == 0 ||
+	    (!((uintptr_t)buf &
+	    (uintptr_t)(S2C(session)->buffer_alignment - 1)) &&
+	    len >= S2C(session)->buffer_alignment &&
+	    len % S2C(session)->buffer_alignment == 0));
+
+	/* Break writes larger than 1GB into 1GB chunks. */
+	for (addr = buf; len > 0; addr += nw, len -= (size_t)nw, offset += nw) {
+		chunk = WT_MIN(len, WT_GIGABYTE);
+		if ((nw = pwrite(fh->fd, addr, chunk, offset)) < 0)
+			WT_RET_MSG(session, __wt_errno(),
+			    "%s write error: failed to write %" WT_SIZET_FMT
+			    " bytes at offset %" PRIuMAX,
+			    fh->name, chunk, (uintmax_t)offset);
+	}
+	return (0);
+}
+
+/*
  * __posix_handle_open --
  *	POSIX fopen/open.
  */
@@ -479,6 +610,18 @@ setupfh:
 
 	__wt_free(session, path);
 	fh->fd = fd;
+
+	fh->fh_advise = __posix_handle_advise;
+	fh->fh_close = __posix_handle_close;
+	fh->fh_getc = __posix_handle_getc;
+	fh->fh_lock = __posix_handle_lock;
+	fh->fh_printf = __posix_handle_printf;
+	fh->fh_read = __posix_handle_read;
+	fh->fh_size = __posix_handle_size;
+	fh->fh_sync = __posix_handle_sync;
+	fh->fh_truncate = __posix_handle_truncate;
+	fh->fh_write = __posix_handle_write;
+
 	return (0);
 
 err:	if (fd != -1) {
@@ -493,177 +636,23 @@ err:	if (fd != -1) {
 }
 
 /*
- * __posix_handle_printf --
- *	ANSI C vfprintf.
- */
-static int
-__posix_handle_printf(
-    WT_SESSION_IMPL *session, WT_FH *fh, const char *fmt, va_list ap)
-{
-	if (fh == WT_STDERR || fh == WT_STDOUT) {
-		if (vfprintf(fh == WT_STDERR ? stderr : stdout, fmt, ap) >= 0)
-			return (0);
-		WT_RET_MSG(session, EIO,
-		    "%s: vfprintf", fh == WT_STDERR ? "stderr" : "stdout");
-	}
-
-	if (fh->fp == NULL)
-		WT_RET_MSG(session, ENOTSUP,
-		    "%s: vfprintf: no stream configured", fh->name);
-
-	if (vfprintf(fh->fp, fmt, ap) >= 0)
-		return (0);
-	WT_RET_MSG(session, EIO, "%s: vfprintf", fh->name);
-}
-
-/*
- * __posix_handle_read --
- *	POSIX pread.
- */
-static int
-__posix_handle_read(
-    WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, void *buf)
-{
-	size_t chunk;
-	ssize_t nr;
-	uint8_t *addr;
-
-	/* Assert direct I/O is aligned and a multiple of the alignment. */
-	WT_ASSERT(session,
-	    !fh->direct_io ||
-	    S2C(session)->buffer_alignment == 0 ||
-	    (!((uintptr_t)buf &
-	    (uintptr_t)(S2C(session)->buffer_alignment - 1)) &&
-	    len >= S2C(session)->buffer_alignment &&
-	    len % S2C(session)->buffer_alignment == 0));
-
-	/* Break reads larger than 1GB into 1GB chunks. */
-	for (addr = buf; len > 0; addr += nr, len -= (size_t)nr, offset += nr) {
-		chunk = WT_MIN(len, WT_GIGABYTE);
-		if ((nr = pread(fh->fd, addr, chunk, offset)) <= 0)
-			WT_RET_MSG(session, nr == 0 ? WT_ERROR : __wt_errno(),
-			    "%s read error: failed to read %" WT_SIZET_FMT
-			    " bytes at offset %" PRIuMAX,
-			    fh->name, chunk, (uintmax_t)offset);
-	}
-	return (0);
-}
-
-/*
- * __posix_handle_size --
- *	Get the size of a file in bytes, by file handle.
- */
-static int
-__posix_handle_size(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
-{
-	struct stat sb;
-	WT_DECL_RET;
-
-	WT_SYSCALL_RETRY(fstat(fh->fd, &sb), ret);
-	if (ret == 0) {
-		*sizep = sb.st_size;
-		return (0);
-	}
-	WT_RET_MSG(session, ret, "%s: fstat", fh->name);
-}
-
-/*
- * __posix_handle_sync --
- *	POSIX fflush/fsync.
- */
-static int
-__posix_handle_sync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
-{
-	/* Flush any stream's stdio buffers. */
-	if (fh == WT_STDERR || fh == WT_STDOUT) {
-		if (fflush(fh == WT_STDERR ? stderr : stdout) == 0)
-			return (0);
-		WT_RET_MSG(session, __wt_errno(),
-		    "%s: fflush", fh == WT_STDERR ? "stderr" : "stdout");
-	}
-
-	if (fh->fp == NULL)
-		return (__posix_sync(session, fh->fd, fh->name, block));
-
-	if (fflush(fh->fp) == 0)
-		return (0);
-	WT_RET_MSG(session, __wt_errno(), "%s: fflush", fh->name);
-}
-
-/*
- * __posix_handle_truncate --
- *	POSIX ftruncate.
- */
-static int
-__posix_handle_truncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
-{
-	WT_DECL_RET;
-
-	WT_SYSCALL_RETRY(ftruncate(fh->fd, len), ret);
-	if (ret == 0)
-		return (0);
-	WT_RET_MSG(session, ret, "%s: ftruncate", fh->name);
-}
-
-/*
- * __posix_handle_write --
- *	POSIX pwrite.
- */
-static int
-__posix_handle_write(WT_SESSION_IMPL *session,
-    WT_FH *fh, wt_off_t offset, size_t len, const void *buf)
-{
-	size_t chunk;
-	ssize_t nw;
-	const uint8_t *addr;
-
-	/* Assert direct I/O is aligned and a multiple of the alignment. */
-	WT_ASSERT(session,
-	    !fh->direct_io ||
-	    S2C(session)->buffer_alignment == 0 ||
-	    (!((uintptr_t)buf &
-	    (uintptr_t)(S2C(session)->buffer_alignment - 1)) &&
-	    len >= S2C(session)->buffer_alignment &&
-	    len % S2C(session)->buffer_alignment == 0));
-
-	/* Break writes larger than 1GB into 1GB chunks. */
-	for (addr = buf; len > 0; addr += nw, len -= (size_t)nw, offset += nw) {
-		chunk = WT_MIN(len, WT_GIGABYTE);
-		if ((nw = pwrite(fh->fd, addr, chunk, offset)) < 0)
-			WT_RET_MSG(session, __wt_errno(),
-			    "%s write error: failed to write %" WT_SIZET_FMT
-			    " bytes at offset %" PRIuMAX,
-			    fh->name, chunk, (uintmax_t)offset);
-	}
-	return (0);
-}
-
-/*
  * __wt_os_posix --
  *	Initialize a POSIX configuration.
  */
 int
 __wt_os_posix(WT_SESSION_IMPL *session)
 {
-	WT_UNUSED(session);
+	WT_CONNECTION_IMPL *conn;
+
+	conn = S2C(session);
 
 	/* Initialize the POSIX jump table. */
-	__wt_process.j_directory_sync = __posix_directory_sync;
-	__wt_process.j_file_exist = __posix_file_exist;
-	__wt_process.j_file_remove = __posix_file_remove;
-	__wt_process.j_file_rename = __posix_file_rename;
-	__wt_process.j_file_size = __posix_file_size;
-	__wt_process.j_handle_advise = __posix_handle_advise;
-	__wt_process.j_handle_close = __posix_handle_close;
-	__wt_process.j_handle_getc = __posix_handle_getc;
-	__wt_process.j_handle_lock = __posix_handle_lock;
-	__wt_process.j_handle_open = __posix_handle_open;
-	__wt_process.j_handle_printf = __posix_handle_printf;
-	__wt_process.j_handle_read = __posix_handle_read;
-	__wt_process.j_handle_size = __posix_handle_size;
-	__wt_process.j_handle_sync = __posix_handle_sync;
-	__wt_process.j_handle_truncate = __posix_handle_truncate;
-	__wt_process.j_handle_write = __posix_handle_write;
+	conn->file_directory_sync = __posix_directory_sync;
+	conn->file_exist = __posix_file_exist;
+	conn->file_remove = __posix_file_remove;
+	conn->file_rename = __posix_file_rename;
+	conn->file_size = __posix_file_size;
+	conn->handle_open = __posix_handle_open;
 
 	return (0);
 }

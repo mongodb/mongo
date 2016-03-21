@@ -23,8 +23,8 @@ __handle_error_default(WT_EVENT_HANDLER *handler,
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
-	WT_RET(__wt_fprintf(session, WT_STDERR, "%s\n", errmsg));
-	WT_RET(__wt_fsync(session, WT_STDERR, true));
+	WT_RET(__wt_fprintf(session, WT_STDERR(session), "%s\n", errmsg));
+	WT_RET(__wt_fsync(session, WT_STDERR(session), true));
 	return (0);
 }
 
@@ -41,8 +41,8 @@ __handle_message_default(WT_EVENT_HANDLER *handler,
 	WT_UNUSED(handler);
 
 	session = (WT_SESSION_IMPL *)wt_session;
-	WT_RET(__wt_fprintf(session, WT_STDOUT, "%s\n", message));
-	WT_RET(__wt_fsync(session, WT_STDOUT, true));
+	WT_RET(__wt_fprintf(session, WT_STDOUT(session), "%s\n", message));
+	WT_RET(__wt_fsync(session, WT_STDOUT(session), true));
 	return (0);
 }
 
@@ -180,13 +180,13 @@ __wt_eventv(WT_SESSION_IMPL *session, bool msg_event, int error,
 	 * example, we can end up here without a session.)
 	 */
 	if (session == NULL) {
-		WT_RET(__wt_fprintf(session, WT_STDERR,
+		WT_RET(__wt_fprintf(session, WT_STDERR(session),
 		    "WiredTiger Error%s%s: ",
 		    error == 0 ? "" : ": ",
 		    error == 0 ? "" : __wt_strerror(session, error, NULL, 0)));
-		WT_RET(__wt_vfprintf(session, WT_STDERR, fmt, ap));
-		WT_RET(__wt_fprintf(session, WT_STDERR, "\n"));
-		return (__wt_fsync(session, WT_STDERR, true));
+		WT_RET(__wt_vfprintf(session, WT_STDERR(session), fmt, ap));
+		WT_RET(__wt_fprintf(session, WT_STDERR(session), "\n"));
+		return (__wt_fsync(session, WT_STDERR(session), true));
 	}
 
 	p = s;

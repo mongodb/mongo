@@ -537,6 +537,7 @@ extern int __wt_os_posix(WT_SESSION_IMPL *session);
 extern int __wt_os_posix_cleanup(WT_SESSION_IMPL *session);
 extern bool __wt_has_priv(void);
 extern void __wt_sleep(uint64_t seconds, uint64_t micro_seconds);
+extern int __wt_os_stdio(WT_SESSION_IMPL *session);
 extern uint64_t __wt_strtouq(const char *nptr, char **endptr, int base);
 extern int __wt_thread_create(WT_SESSION_IMPL *session, wt_thread_t *tidret, WT_THREAD_CALLBACK(*func)(void *), void *arg);
 extern int __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid);

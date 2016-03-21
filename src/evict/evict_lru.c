@@ -1702,7 +1702,7 @@ __wt_cache_dump(WT_SESSION_IMPL *session, const char *ofile)
 	total_bytes = 0;
 
 	if (ofile == NULL)
-		fh = WT_STDERR;
+		fh = WT_STDERR(session);
 	else
 		WT_RET(__wt_open(session, ofile, WT_FILE_TYPE_REGULAR,
 		    WT_OPEN_CREATE | WT_STREAM_WRITE, &fh));
@@ -1785,7 +1785,7 @@ __wt_cache_dump(WT_SESSION_IMPL *session, const char *ofile)
 	    "MB vs tracked inuse %" PRIu64 "MB\n",
 	    total_bytes >> 20, __wt_cache_bytes_inuse(conn->cache) >> 20);
 	(void)__wt_fprintf(session, fh, "==========\n");
-	if (fh != WT_STDERR)
+	if (ofile != NULL)
 		WT_RET(__wt_close(session, &fh));
 	return (0);
 }

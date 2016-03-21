@@ -122,6 +122,7 @@ src/os_posix/os_path.c
 src/os_posix/os_posix.c
 src/os_posix/os_priv.c
 src/os_posix/os_sleep.c
+src/os_posix/os_stdio.c
 src/os_posix/os_strtouq.c
 src/os_posix/os_thread.c
 src/os_posix/os_time.c

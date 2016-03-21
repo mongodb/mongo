@@ -89,7 +89,7 @@ def printf_line(f, optype, i, ishex):
         ifbegin = 'if (LF_ISSET(WT_TXN_PRINTLOG_HEX)) {' + nl_indent
         if postcomma == '':
             precomma = ',\\n'
-    body = '%s%s(__wt_fprintf(session, WT_STDOUT,' % (
+    body = '%s%s(__wt_fprintf(session, WT_STDOUT(session),' % (
         printf_setup(f, ishex, nl_indent),
         'WT_ERR' if has_escape(optype.fields) else 'WT_RET') + \
         '%s    "%s        \\"%s\\": \\"%s\\"%s",%s));' % (
@@ -300,7 +300,7 @@ __wt_logop_%(name)s_print(WT_SESSION_IMPL *session,
 \t%(arg_unused)s%(arg_init)sWT_RET(__wt_logop_%(name)s_unpack(
 \t    session, pp, end%(arg_addrs)s));
 
-\tWT_RET(__wt_fprintf(session, WT_STDOUT,
+\tWT_RET(__wt_fprintf(session, WT_STDOUT(session),
 \t    " \\"optype\\": \\"%(name)s\\",\\n"));
 \t%(print_args)s
 %(arg_fini)s

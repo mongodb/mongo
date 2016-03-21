@@ -1118,7 +1118,8 @@ __conn_config_append(const char *cfg[], const char *config)
 {
 	while (*cfg != NULL)
 		++cfg;
-	*cfg = config;
+	cfg[0] = config;
+	cfg[1] = NULL;
 }
 
 /*
@@ -1934,19 +1935,63 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	session = conn->default_session = &conn->dummy_session;
 	session->iface.connection = &conn->iface;
 	session->name = "wiredtiger_open";
-	__wt_random_init(&session->rnd);
+
+	/* Do standard I/O and error handling first. */
+	WT_ERR(__wt_os_stdio(session));
 	__wt_event_handler_set(session, event_handler);
 
-	/* Remaining basic initialization of the connection structure. */
+	/* Basic initialization of the connection structure. */
 	WT_ERR(__wt_connection_init(conn));
 
-	/* Check/set the application-specified configuration string. */
+	/* Check the application-specified configuration string. */
 	WT_ERR(__wt_config_check(session,
 	    WT_CONFIG_REF(session, wiredtiger_open), config, 0));
+
+	/*
+	 * Build the temporary, initial configuration stack, in the following
+	 * order (where later entries override earlier entries):
+	 *
+	 * 1. the base configuration for the wiredtiger_open call
+	 * 2. the config passed in by the application
+	 * 3. environment variable settings (optional)
+	 *
+	 * In other words, a configuration stack based on the application's
+	 * passed-in information and nothing else.
+	 */
 	cfg[0] = WT_CONFIG_BASE(session, wiredtiger_open);
 	cfg[1] = config;
+	WT_ERR(__wt_scr_alloc(session, 0, &i1));
+	WT_ERR(__conn_config_env(session, cfg, i1));
 
-	/* Capture the config_base setting file for later use. */
+	/*
+	 * We need to know if configured for read-only or in-memory behavior
+	 * before reading/writing the filesystem. The only way the application
+	 * can configure that before we touch the filesystem is the wiredtiger
+	 * config string or the WIREDTIGER_CONFIG environment variable.
+	 *
+	 * The environment isn't trusted by default, for security reasons; if
+	 * the application wants us to trust the environment before reading
+	 * the filesystem, the wiredtiger_open config string is the only way.
+	 */
+	WT_ERR(__wt_config_gets(session, cfg, "in_memory", &cval));
+	if (cval.val != 0)
+		F_SET(conn, WT_CONN_IN_MEMORY);
+	WT_ERR(__wt_config_gets(session, cfg, "readonly", &cval));
+	if (cval.val)
+		F_SET(conn, WT_CONN_READONLY);
+
+	/*
+	 * After checking readonly and in-memory, but before we do anything that
+	 * touches the filesystem, configure the OS layer.
+	 */
+	WT_ERR(__wt_os_init(session));
+
+	/*
+	 * Capture the config_base setting file for later use. Again, if the
+	 * application doesn't want us to read the base configuration file,
+	 * the WIREDTIGER_CONFIG environment variable or the wiredtiger_open
+	 * config string are the only ways.
+	 */
 	WT_ERR(__wt_config_gets(session, cfg, "config_base", &cval));
 	config_base_set = cval.val != 0;
 
@@ -1956,36 +2001,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		WT_ERR(__wt_strndup(
 		    session, cval.str, cval.len, &conn->error_prefix));
 
-	/*
-	 * Look for read-only early (for example, it configures use of the base
-	 * config file).
-	 *
-	 * XXX
-	 * We haven't read the WIREDTIGER_CONFIG environment variable, we need
-	 * to fix that.
-	 */
-	WT_ERR(__wt_config_gets(session, cfg, "readonly", &cval));
-	if (cval.val)
-		F_SET(conn, WT_CONN_READONLY);
-
-	/*
-	 * Look for in-memory early (for example, it configures writing the base
-	 * config file).
-	 *
-	 * XXX
-	 * We haven't read the WIREDTIGER_CONFIG environment variable, we need
-	 * to fix that.
-	 */
-	WT_ERR(__wt_config_gets(session, cfg, "in_memory", &cval));
-	if (cval.val != 0)
-		F_SET(conn, WT_CONN_IN_MEMORY);
-
-	/*
-	 * After checking readonly and in-memory, but before we do anything
-	 * that touches an underlying filesystem, configure the OS layer.
-	 */
-	WT_ERR(__wt_os_init(session));
-
 	/* Get the database home. */
 	WT_ERR(__conn_home(session, home, cfg));
 
@@ -1993,8 +2008,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__conn_single(session, cfg));
 
 	/*
-	 * Build the configuration stack, in the following order (where later
-	 * entries override earlier entries):
+	 * Build the real configuration stack, in the following order (where
+	 * later entries override earlier entries):
 	 *
 	 * 1. all possible wiredtiger_open configurations
 	 * 2. the WiredTiger compilation version (expected to be overridden by
@@ -2008,7 +2023,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * Clear the entries we added to the stack, we're going to build it in
 	 * order.
 	 */
-	WT_ERR(__wt_scr_alloc(session, 0, &i1));
 	WT_ERR(__wt_scr_alloc(session, 0, &i2));
 	WT_ERR(__wt_scr_alloc(session, 0, &i3));
 	cfg[0] = WT_CONFIG_BASE(session, wiredtiger_open_all);
@@ -2031,11 +2045,15 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * Merge the full configuration stack and save it for reconfiguration.
 	 */
 	WT_ERR(__wt_config_merge(session, cfg, NULL, &merge_cfg));
+
 	/*
-	 * The read-only setting may have been set in a configuration file.
-	 * Get it again so that we can override other configuration settings
-	 * before they are processed by the subsystems.
+	 * Read-only and in-memory settings may have been set in a configuration
+	 * file (not optimal, but we can handle it). Get those settings again so
+	 * we can override other configuration settings as they are processed.
 	 */
+	WT_ERR(__wt_config_gets(session, cfg, "in_memory", &cval));
+	if (cval.val != 0)
+		F_SET(conn, WT_CONN_IN_MEMORY);
 	WT_ERR(__wt_config_gets(session, cfg, "readonly", &cval));
 	if (cval.val)
 		F_SET(conn, WT_CONN_READONLY);
