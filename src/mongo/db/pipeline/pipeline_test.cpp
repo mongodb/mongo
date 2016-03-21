@@ -626,6 +626,57 @@ class UnwindBeforeDoubleMatchShouldRepeatedlyOptimize : public Base {
     }
 };
 
+class GraphLookupShouldCoalesceWithUnwindOnAs : public Base {
+    string inputPipeJson() {
+        return "[{$graphLookup: {from: 'a', as: 'out', connectToField: 'b', connectFromField: 'c', "
+               "                 startWith: '$d'}}, "
+               " {$unwind: '$out'}]";
+    }
+    string outputPipeJson() {
+        return "[{$graphLookup: {from: 'a', as: 'out', connectToField: 'b', connectFromField: 'c', "
+               "                 startWith: '$d', unwinding: {preserveNullAndEmptyArrays: "
+               "false}}}]";
+    }
+};
+
+class GraphLookupShouldCoalesceWithUnwindOnAsWithPreserveEmpty : public Base {
+    string inputPipeJson() {
+        return "[{$graphLookup: {from: 'a', as: 'out', connectToField: 'b', connectFromField: 'c', "
+               "                 startWith: '$d'}}, "
+               " {$unwind: {path: '$out', preserveNullAndEmptyArrays: true}}]";
+    }
+    string outputPipeJson() {
+        return "[{$graphLookup: {from: 'a', as: 'out', connectToField: 'b', connectFromField: 'c', "
+               "                 startWith: '$d', unwinding: {preserveNullAndEmptyArrays: true}}}]";
+    }
+};
+
+class GraphLookupShouldCoalesceWithUnwindOnAsWithIncludeArrayIndex : public Base {
+    string inputPipeJson() {
+        return "[{$graphLookup: {from: 'a', as: 'out', connectToField: 'b', connectFromField: 'c', "
+               "                 startWith: '$d'}}, "
+               " {$unwind: {path: '$out', includeArrayIndex: 'index'}}]";
+    }
+    string outputPipeJson() {
+        return "[{$graphLookup: {from: 'a', as: 'out', connectToField: 'b', connectFromField: 'c', "
+               "                 startWith: '$d', unwinding: {preserveNullAndEmptyArrays: false, "
+               "                                             includeArrayIndex: 'index'}}}]";
+    }
+};
+
+class GraphLookupShouldNotCoalesceWithUnwindNotOnAs : public Base {
+    string inputPipeJson() {
+        return "[{$graphLookup: {from: 'a', as: 'out', connectToField: 'b', connectFromField: 'c', "
+               "                 startWith: '$d'}}, "
+               " {$unwind: '$nottherightthing'}]";
+    }
+    string outputPipeJson() {
+        return "[{$graphLookup: {from: 'a', as: 'out', connectToField: 'b', connectFromField: 'c', "
+               "                 startWith: '$d'}}, "
+               " {$unwind: {path: '$nottherightthing'}}]";
+    }
+};
+
 }  // namespace Local
 
 namespace Sharded {
@@ -1043,6 +1094,10 @@ public:
         add<Optimizations::Local::LookupDoesSwapWithMatchOnLocalField>();
         add<Optimizations::Local::LookupDoesNotAbsorbUnwindOnSubfieldOfAsButStillMovesMatch>();
         add<Optimizations::Local::LookupDoesSwapWithMatchOnFieldWithSameNameAsForeignField>();
+        add<Optimizations::Local::GraphLookupShouldCoalesceWithUnwindOnAs>();
+        add<Optimizations::Local::GraphLookupShouldCoalesceWithUnwindOnAsWithPreserveEmpty>();
+        add<Optimizations::Local::GraphLookupShouldCoalesceWithUnwindOnAsWithIncludeArrayIndex>();
+        add<Optimizations::Local::GraphLookupShouldNotCoalesceWithUnwindNotOnAs>();
         add<Optimizations::Local::MatchShouldDuplicateItselfBeforeRedact>();
         add<Optimizations::Local::MatchShouldSwapWithUnwind>();
         add<Optimizations::Local::MatchShouldNotOptimizeWhenMatchingOnIndexField>();

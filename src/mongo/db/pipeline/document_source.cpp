@@ -114,4 +114,38 @@ BSONObjSet DocumentSource::allPrefixes(BSONObj obj) {
 
     return out;
 }
+
+BSONObjSet DocumentSource::truncateSortSet(const BSONObjSet& sorts,
+                                           const std::set<std::string>& fields) {
+    BSONObjSet out;
+
+    for (auto&& sort : sorts) {
+        BSONObjBuilder outputSort;
+
+        for (auto&& key : sort) {
+            auto keyName = key.fieldNameStringData();
+
+            bool shouldAppend = true;
+            for (auto&& field : fields) {
+                if (keyName == field || keyName.startsWith(field + '.')) {
+                    shouldAppend = false;
+                    break;
+                }
+            }
+
+            if (!shouldAppend) {
+                break;
+            }
+
+            outputSort.append(key);
+        }
+
+        BSONObj outSortObj = outputSort.obj();
+        if (!outSortObj.isEmpty()) {
+            out.insert(outSortObj);
+        }
+    }
+
+    return out;
+}
 }
