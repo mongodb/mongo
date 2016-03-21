@@ -1118,7 +1118,8 @@ __conn_config_append(const char *cfg[], const char *config)
 {
 	while (*cfg != NULL)
 		++cfg;
-	*cfg = config;
+	cfg[0] = config;
+	cfg[1] = NULL;
 }
 
 /*
