@@ -519,34 +519,21 @@ TEST_F(SingleChunkFixture, GetLastChunkIsFalse) {
     ASSERT(!getCollMetadata().getNextChunk(getCollMetadata().getMaxKey(), &nextChunk));
 }
 
-TEST_F(SingleChunkFixture, LastChunkCloneMinus) {
+TEST_F(SingleChunkFixture, DonateLastChunk) {
     ChunkType chunk;
     chunk.setMin(BSON("a" << 10));
     chunk.setMax(BSON("a" << 20));
 
-    string errMsg;
-    const ChunkVersion zeroVersion(0, 0, getCollMetadata().getShardVersion().epoch());
+    ChunkVersion newCollectionVersion(getCollMetadata().getCollVersion());
+    newCollectionVersion.incMajor();
+
     unique_ptr<CollectionMetadata> cloned(
-        getCollMetadata().cloneMigrate(chunk, zeroVersion, &errMsg));
+        getCollMetadata().cloneMigrate(chunk, newCollectionVersion));
 
-    ASSERT(errMsg.empty());
     ASSERT_EQUALS(0u, cloned->getNumChunks());
-    ASSERT_EQUALS(cloned->getShardVersion().toLong(), zeroVersion.toLong());
-    ASSERT_EQUALS(cloned->getCollVersion().toLong(), getCollMetadata().getCollVersion().toLong());
-    ASSERT_FALSE(cloned->keyBelongsToMe(BSON("a" << 15)));
-}
-
-TEST_F(SingleChunkFixture, LastChunkMinusCantHaveNonZeroVersion) {
-    ChunkType chunk;
-    chunk.setMin(BSON("a" << 10));
-    chunk.setMax(BSON("a" << 20));
-
-    string errMsg;
-    ChunkVersion version(99, 0, OID());
-    unique_ptr<CollectionMetadata> cloned(getCollMetadata().cloneMigrate(chunk, version, &errMsg));
-
-    ASSERT(cloned == NULL);
-    ASSERT_FALSE(errMsg.empty());
+    ASSERT_EQUALS(cloned->getShardVersion(), ChunkVersion(0, 0, newCollectionVersion.epoch()));
+    ASSERT_EQUALS(cloned->getCollVersion(), newCollectionVersion);
+    ASSERT(!cloned->keyBelongsToMe(BSON("a" << 15)));
 }
 
 TEST_F(SingleChunkFixture, PlusPendingChunk) {
@@ -583,30 +570,23 @@ TEST_F(SingleChunkFixture, PlusOverlapPendingChunk) {
 }
 
 TEST_F(SingleChunkFixture, MinusChunkWithPending) {
-    string errMsg;
     ChunkType chunk;
-    unique_ptr<CollectionMetadata> cloned;
-
     chunk.setMin(BSON("a" << 20));
     chunk.setMax(BSON("a" << 30));
 
-    cloned.reset(getCollMetadata().clonePlusPending(chunk, &errMsg));
-
-    ASSERT_EQUALS(errMsg, "");
-    ASSERT(cloned != NULL);
-
+    string errMsg;
+    unique_ptr<CollectionMetadata> cloned(getCollMetadata().clonePlusPending(chunk, &errMsg));
     ASSERT(cloned->keyIsPending(BSON("a" << 25)));
     ASSERT(!cloned->keyIsPending(BSON("a" << 35)));
 
     chunk.setMin(BSON("a" << 10));
     chunk.setMax(BSON("a" << 20));
 
-    cloned.reset(
-        cloned->cloneMigrate(chunk, ChunkVersion(0, 0, cloned->getCollVersion().epoch()), &errMsg));
+    ChunkVersion newCollectionVersion(getCollMetadata().getCollVersion());
+    newCollectionVersion.incMajor();
 
-    ASSERT_EQUALS(errMsg, "");
-    ASSERT(cloned != NULL);
-
+    cloned = cloned->cloneMigrate(chunk, newCollectionVersion);
+    ASSERT(cloned);
     ASSERT(cloned->keyIsPending(BSON("a" << 25)));
     ASSERT(!cloned->keyIsPending(BSON("a" << 35)));
 }
@@ -918,34 +898,18 @@ TEST_F(TwoChunksWithGapCompoundKeyFixture, CloneMinusBasic) {
     chunk.setMin(BSON("a" << 10 << "b" << 0));
     chunk.setMax(BSON("a" << 20 << "b" << 0));
 
-    string errMsg;
-    ChunkVersion version(2, 0, OID());
-    unique_ptr<CollectionMetadata> cloned(getCollMetadata().cloneMigrate(chunk, version, &errMsg));
+    ChunkVersion newCollectionVersion(getCollMetadata().getCollVersion());
+    newCollectionVersion.incMajor();
 
-    ASSERT(errMsg.empty());
+    unique_ptr<CollectionMetadata> cloned(
+        getCollMetadata().cloneMigrate(chunk, newCollectionVersion));
     ASSERT_EQUALS(2u, getCollMetadata().getNumChunks());
     ASSERT_EQUALS(1u, cloned->getNumChunks());
-
-    // TODO: test maxShardVersion, maxCollVersion
-
     ASSERT_FALSE(cloned->keyBelongsToMe(BSON("a" << 5 << "b" << 0)));
     ASSERT_FALSE(cloned->keyBelongsToMe(BSON("a" << 15 << "b" << 0)));
     ASSERT(cloned->keyBelongsToMe(BSON("a" << 30 << "b" << 0)));
     ASSERT(cloned->keyBelongsToMe(BSON("a" << 35 << "b" << 0)));
     ASSERT_FALSE(cloned->keyBelongsToMe(BSON("a" << 40 << "b" << 0)));
-}
-
-TEST_F(TwoChunksWithGapCompoundKeyFixture, CloneMinusNonExisting) {
-    ChunkType chunk;
-    chunk.setMin(BSON("a" << 25 << "b" << 0));
-    chunk.setMax(BSON("a" << 28 << "b" << 0));
-
-    string errMsg;
-    unique_ptr<CollectionMetadata> cloned(
-        getCollMetadata().cloneMigrate(chunk, ChunkVersion(1, 0, OID()), &errMsg));
-    ASSERT(cloned == NULL);
-    ASSERT_FALSE(errMsg.empty());
-    ASSERT_EQUALS(2u, getCollMetadata().getNumChunks());
 }
 
 TEST_F(TwoChunksWithGapCompoundKeyFixture, CloneSplitBasic) {

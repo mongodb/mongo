@@ -89,16 +89,13 @@ public:
     CollectionMetadata* clonePlusPending(const ChunkType& pending, std::string* errMsg) const;
 
     /**
-     * Returns a new metadata's instance based on 'this's state by removing 'chunk'.
-     * When cloning away the last chunk, 'newShardVersion' must be zero. In any case,
-     * the caller owns the new metadata when the cloning is successful.
+     * Returns a new metadata's instance based on 'this's state by removing 'chunk'. When cloning
+     * away the last chunk, the resulting metadata's shard version will be zero.
      *
-     * If a new metadata can't be created, returns NULL and fills in 'errMsg', if it was
-     * provided.
+     * The chunk to be migrated must exist, otherwise the call will fassert.
      */
-    CollectionMetadata* cloneMigrate(const ChunkType& chunk,
-                                     const ChunkVersion& newShardVersion,
-                                     std::string* errMsg) const;
+    std::unique_ptr<CollectionMetadata> cloneMigrate(
+        const ChunkType& chunk, const ChunkVersion& newCollectionVersion) const;
 
     /**
      * Returns a new metadata's instance by splitting an existing 'chunk' at the points

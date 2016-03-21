@@ -254,7 +254,7 @@ void ShardingState::donateChunk(OperationContext* txn,
                                 const string& ns,
                                 const BSONObj& min,
                                 const BSONObj& max,
-                                ChunkVersion version) {
+                                ChunkVersion newCollectionVersion) {
     invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
@@ -262,21 +262,13 @@ void ShardingState::donateChunk(OperationContext* txn,
     invariant(it != _collections.end());
     shared_ptr<CollectionMetadata> p = it->second->getMetadata();
 
-    // empty shards should have version 0
-    version = (p->getNumChunks() > 1) ? version : ChunkVersion(0, 0, p->getCollVersion().epoch());
-
     ChunkType chunk;
     chunk.setMin(min);
     chunk.setMax(max);
-    string errMsg;
-
-    std::unique_ptr<CollectionMetadata> cloned(p->cloneMigrate(chunk, version, &errMsg));
-    // uassert to match old behavior, TODO: report errors w/o throwing
-    uassert(16855, errMsg, NULL != cloned.get());
 
     // TODO: a bit dangerous to have two different zero-version states - no-metadata and
     // no-version
-    it->second->setMetadata(std::move(cloned));
+    it->second->setMetadata(p->cloneMigrate(chunk, newCollectionVersion));
 }
 
 void ShardingState::undoDonateChunk(OperationContext* txn,

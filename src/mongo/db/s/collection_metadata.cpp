@@ -34,6 +34,7 @@
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -49,69 +50,28 @@ CollectionMetadata::CollectionMetadata() = default;
 
 CollectionMetadata::~CollectionMetadata() = default;
 
-CollectionMetadata* CollectionMetadata::cloneMigrate(const ChunkType& chunk,
-                                                     const ChunkVersion& newShardVersion,
-                                                     string* errMsg) const {
-    // The error message string is optional.
-    string dummy;
-    if (errMsg == NULL) {
-        errMsg = &dummy;
-    }
+std::unique_ptr<CollectionMetadata> CollectionMetadata::cloneMigrate(
+    const ChunkType& chunk, const ChunkVersion& newCollectionVersion) const {
+    invariant(newCollectionVersion.epoch() == _collVersion.epoch());
+    invariant(newCollectionVersion > _collVersion);
+    invariant(rangeMapContains(_chunksMap, chunk.getMin(), chunk.getMax()));
 
-    // Check that we have the exact chunk that will be subtracted.
-    if (!rangeMapContains(_chunksMap, chunk.getMin(), chunk.getMax())) {
-        *errMsg = stream() << "cannot remove chunk "
-                           << rangeToString(chunk.getMin(), chunk.getMax())
-                           << ", this shard does not contain the chunk";
-
-        if (rangeMapOverlaps(_chunksMap, chunk.getMin(), chunk.getMax())) {
-            RangeVector overlap;
-            getRangeMapOverlap(_chunksMap, chunk.getMin(), chunk.getMax(), &overlap);
-
-            *errMsg += stream() << " and it overlaps " << overlapToString(overlap);
-        }
-
-        warning() << *errMsg;
-        return NULL;
-    }
-
-    // If left with no chunks, check that the version is zero.
-    if (_chunksMap.size() == 1) {
-        if (newShardVersion.isSet()) {
-            *errMsg = stream() << "cannot set shard version to non-zero value "
-                               << newShardVersion.toString() << " when removing last chunk "
-                               << rangeToString(chunk.getMin(), chunk.getMax());
-
-            warning() << *errMsg;
-            return NULL;
-        }
-    }
-    // Can't move version backwards when subtracting chunks.  This is what guarantees that
-    // no read or write would be taken once we subtract data from the current shard.
-    else if (newShardVersion <= _shardVersion) {
-        *errMsg = stream() << "cannot remove chunk "
-                           << rangeToString(chunk.getMin(), chunk.getMax())
-                           << " because the new shard version " << newShardVersion.toString()
-                           << " is not greater than the current shard version "
-                           << _shardVersion.toString();
-
-        warning() << *errMsg;
-        return NULL;
-    }
-
-    unique_ptr<CollectionMetadata> metadata(new CollectionMetadata);
-    metadata->_keyPattern = this->_keyPattern;
+    unique_ptr<CollectionMetadata> metadata(stdx::make_unique<CollectionMetadata>());
+    metadata->_keyPattern = _keyPattern;
     metadata->_keyPattern.getOwned();
     metadata->fillKeyPatternFields();
-    metadata->_pendingMap = this->_pendingMap;
-    metadata->_chunksMap = this->_chunksMap;
+    metadata->_pendingMap = _pendingMap;
+    metadata->_chunksMap = _chunksMap;
     metadata->_chunksMap.erase(chunk.getMin());
-    metadata->_shardVersion = newShardVersion;
-    metadata->_collVersion = newShardVersion > _collVersion ? newShardVersion : this->_collVersion;
+
+    metadata->_shardVersion =
+        (metadata->_chunksMap.empty() ? ChunkVersion(0, 0, newCollectionVersion.epoch())
+                                      : newCollectionVersion);
+    metadata->_collVersion = newCollectionVersion;
     metadata->fillRanges();
 
     invariant(metadata->isValid());
-    return metadata.release();
+    return metadata;
 }
 
 CollectionMetadata* CollectionMetadata::clonePlusChunk(const ChunkType& chunk,
@@ -736,6 +696,5 @@ void CollectionMetadata::fillKeyPatternFields() {
         newFieldRef->parse(current.fieldNameStringData());
     }
 }
-
 
 }  // namespace mongo

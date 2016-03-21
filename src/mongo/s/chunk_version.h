@@ -144,6 +144,10 @@ public:
     // more complex cases.
     //
 
+    bool operator==(const ChunkVersion& otherVersion) const {
+        return equals(otherVersion);
+    }
+
     bool operator>(const ChunkVersion& otherVersion) const {
         return this->_combined > otherVersion._combined;
     }
