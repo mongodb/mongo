@@ -466,6 +466,8 @@ def _lint_files(eslint, files):
               "files that were skipped")
         sys.exit(1)
 
+    return True
+
 def lint_patch(eslint, infile):
     """Lint patch command entry point
     """
@@ -517,7 +519,8 @@ def main():
     usage = "%prog [-e <eslint>] [-d] lint|lint-patch|fix [glob patterns] "
     description = "lint runs ESLint on provided patterns or all .js files under jstests/ "\
                   "and src/mongo. lint-patch runs ESLint against .js files modified in the "\
-                  "patch file (for upload.py). fix runs ESLint with --fix on provided patterns "\
+                  "provided patch file (for upload.py). "\
+                  "fix runs ESLint with --fix on provided patterns "\
                   "or files under jstests/ and src/mongo."
     epilog ="*Unless you specify -d a separate ESLint process will be launched for every file"
     parser = OptionParser()
@@ -532,7 +535,6 @@ def main():
 
     if len(args) > 1:
         command = args[1]
-        
         searchlist = args[2:]
         if not searchlist:
             searchlist = ["jstests/", "src/mongo/"]
@@ -540,7 +542,11 @@ def main():
         if command == "lint":
             success = lint(options.eslint, options.dirmode, searchlist)
         elif command == "lint-patch":
-            success = lint_patch(options.eslint, searchlist)
+            if not args[2:]:
+                success = False
+                print("You must provide the patch's fully qualified file name with lint-patch")
+            else:
+                success = lint_patch(options.eslint, searchlist)
         elif command == "fix":
             success = autofix_func(options.eslint, options.dirmode, searchlist)
         else:
