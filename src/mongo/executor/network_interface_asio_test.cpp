@@ -133,6 +133,13 @@ public:
         return *_timerFactory;
     }
 
+    void assertNumOps(uint64_t canceled, uint64_t timedOut, uint64_t failed, uint64_t succeeded) {
+        ASSERT(net().getNumCanceledOps() == canceled);
+        ASSERT(net().getNumTimedOutOps() == timedOut);
+        ASSERT(net().getNumFailedOps() == failed);
+        ASSERT(net().getNumSucceededOps() == succeeded);
+    }
+
 protected:
     AsyncTimerFactoryMock* _timerFactory;
     AsyncMockStreamFactory* _streamFactory;
@@ -142,6 +149,7 @@ protected:
 TEST_F(NetworkInterfaceASIOTest, CancelMissingOperation) {
     // This is just a sanity check, this action should have no effect.
     net().cancelCommand(makeCallbackHandle());
+    assertNumOps(0u, 0u, 0u, 0u);
 }
 
 TEST_F(NetworkInterfaceASIOTest, CancelOperation) {
@@ -171,6 +179,7 @@ TEST_F(NetworkInterfaceASIOTest, CancelOperation) {
     // Wait for op to complete, assert that it was canceled.
     auto& result = deferred.get();
     ASSERT(result == ErrorCodes::CallbackCanceled);
+    assertNumOps(1u, 0u, 0u, 0u);
 }
 
 TEST_F(NetworkInterfaceASIOTest, ImmediateCancel) {
@@ -191,6 +200,8 @@ TEST_F(NetworkInterfaceASIOTest, ImmediateCancel) {
 
     auto& result = deferred.get();
     ASSERT(result == ErrorCodes::CallbackCanceled);
+    // expect 0 completed ops because the op was canceled before getting a connection
+    assertNumOps(1u, 0u, 0u, 0u);
 }
 
 TEST_F(NetworkInterfaceASIOTest, LateCancel) {
@@ -217,6 +228,8 @@ TEST_F(NetworkInterfaceASIOTest, LateCancel) {
     // Allow to complete, then cancel, nothing should happen.
     deferred.get();
     net().cancelCommand(cbh);
+
+    assertNumOps(0u, 0u, 0u, 1u);
 }
 
 TEST_F(NetworkInterfaceASIOTest, CancelWithNetworkError) {
@@ -245,6 +258,7 @@ TEST_F(NetworkInterfaceASIOTest, CancelWithNetworkError) {
     // Wait for op to complete, assert that cancellation error had precedence.
     auto& result = deferred.get();
     ASSERT(result == ErrorCodes::CallbackCanceled);
+    assertNumOps(1u, 0u, 0u, 0u);
 }
 
 TEST_F(NetworkInterfaceASIOTest, CancelWithTimeout) {
@@ -271,6 +285,7 @@ TEST_F(NetworkInterfaceASIOTest, CancelWithTimeout) {
     // Wait for op to complete, assert that cancellation error had precedence.
     auto& result = deferred.get();
     ASSERT(result == ErrorCodes::CallbackCanceled);
+    assertNumOps(1u, 0u, 0u, 0u);
 }
 
 TEST_F(NetworkInterfaceASIOTest, TimeoutWithNetworkError) {
@@ -298,6 +313,7 @@ TEST_F(NetworkInterfaceASIOTest, TimeoutWithNetworkError) {
     // Wait for op to complete, assert that timeout had precedence.
     auto& result = deferred.get();
     ASSERT(result == ErrorCodes::ExceededTimeLimit);
+    assertNumOps(0u, 1u, 1u, 0u);
 }
 
 TEST_F(NetworkInterfaceASIOTest, CancelWithTimeoutAndNetworkError) {
@@ -326,6 +342,7 @@ TEST_F(NetworkInterfaceASIOTest, CancelWithTimeoutAndNetworkError) {
     // Wait for op to complete, assert that the cancellation had precedence.
     auto& result = deferred.get();
     ASSERT(result == ErrorCodes::CallbackCanceled);
+    assertNumOps(1u, 0u, 0u, 0u);
 }
 
 TEST_F(NetworkInterfaceASIOTest, AsyncOpTimeout) {
@@ -360,6 +377,7 @@ TEST_F(NetworkInterfaceASIOTest, AsyncOpTimeout) {
 
     auto& result = deferred.get();
     ASSERT(result == ErrorCodes::ExceededTimeLimit);
+    assertNumOps(0u, 1u, 1u, 0u);
 }
 
 TEST_F(NetworkInterfaceASIOTest, StartCommand) {
@@ -401,6 +419,7 @@ TEST_F(NetworkInterfaceASIOTest, StartCommand) {
     auto response = uassertStatusOK(res);
     ASSERT_EQ(response.data, expectedCommandReply);
     ASSERT_EQ(response.metadata, expectedMetadata);
+    assertNumOps(0u, 0u, 0u, 1u);
 }
 
 class MalformedMessageTest : public NetworkInterfaceASIOTest {
@@ -461,6 +480,7 @@ public:
 
         auto& response = deferred.get();
         ASSERT(response == code);
+        assertNumOps(0u, 0u, 1u, 0u);
     }
 };
 
@@ -593,6 +613,7 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, ValidateHostInvalid) {
 
     ASSERT(!makeRequestCalled);
     ASSERT(!handleReplyCalled);
+    assertNumOps(0u, 0u, 1u, 0u);
 }
 
 TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsError) {
@@ -633,6 +654,7 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsError) {
     ASSERT(res == makeRequestError);
     ASSERT(makeRequestCalled);
     ASSERT(!handleReplyCalled);
+    assertNumOps(0u, 0u, 1u, 0u);
 }
 
 TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
@@ -688,6 +710,7 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
     ASSERT(result.isOK());
     ASSERT(result.getValue().data == commandReply);
     ASSERT(result.getValue().metadata == metadata);
+    assertNumOps(0u, 0u, 0u, 1u);
 }
 
 TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
@@ -753,6 +776,7 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
     ASSERT(makeRequestCalled);
     ASSERT(handleReplyCalled);
     ASSERT(handleReplyArgumentCorrect);
+    assertNumOps(0u, 0u, 1u, 0u);
 }
 
 TEST_F(NetworkInterfaceASIOTest, setAlarm) {
@@ -847,6 +871,7 @@ TEST_F(NetworkInterfaceASIOMetadataTest, Metadata) {
     deferred.get();
     ASSERT(wroteRequestMetadata);
     ASSERT(gotReplyMetadata);
+    assertNumOps(0u, 0u, 0u, 1u);
 }
 
 }  // namespace

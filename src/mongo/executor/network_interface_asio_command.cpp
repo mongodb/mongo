@@ -276,12 +276,17 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
         op->_timeoutAlarm->cancel();
     }
 
+    if (resp.getStatus().code() == ErrorCodes::ExceededTimeLimit) {
+        _numTimedOutOps.fetchAndAdd(1);
+    }
+
     if (op->_inSetup) {
         // If we are in setup we should only be here if we failed to connect.
         MONGO_ASIO_INVARIANT(!resp.isOK(), "Failed to connect in setup", op);
         // If we fail during connection, we won't be able to access any of op's members after
         // calling finish(), so we return here.
         LOG(1) << "Failed to connect to " << op->request().target << " - " << resp.getStatus();
+        _numFailedOps.fetchAndAdd(1);
         op->finish(resp);
         return;
     }
@@ -292,6 +297,12 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
         // we got from the pool to execute a command, but it failed for some reason.
         LOG(2) << "Failed to execute command: " << op->request().toString()
                << " reason: " << resp.getStatus();
+
+        if (resp.getStatus().code() != ErrorCodes::CallbackCanceled) {
+            _numFailedOps.fetchAndAdd(1);
+        }
+    } else {
+        _numSucceededOps.fetchAndAdd(1);
     }
 
     op->finish(resp);
@@ -327,7 +338,7 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
     // We need to bump the generation BEFORE we call reset() or we could flip the timeout in the
     // timeout callback before returning the AsyncOp to the pool.
     ownedOp->reset();
-
+    
     asioConn->bindAsyncOp(std::move(ownedOp));
     if (!resp.isOK()) {
         asioConn->indicateFailure(resp.getStatus());

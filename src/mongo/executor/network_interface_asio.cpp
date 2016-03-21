@@ -98,13 +98,20 @@ std::string NetworkInterfaceASIO::getDiagnosticString() {
 
 std::string NetworkInterfaceASIO::_getDiagnosticString_inlock(AsyncOp* currentOp) {
     str::stream output;
+    std::vector<TableRow> rows;
 
-    output << "\n      NetworkInterfaceASIO:\n";
-    output << "\t Operations _inGetConnection: " << _inGetConnection.size() << "\n";
-    output << "\t Operations _inProgress: " << _inProgress.size() << "\n";
+    output << "\nNetworkInterfaceASIO Operations' Diagnostic:\n";
+    rows.push_back({"Operation:", "Count:"});
+    rows.push_back({"Connecting", std::to_string(_inGetConnection.size())});
+    rows.push_back({"In Progress", std::to_string(_inProgress.size())});
+    rows.push_back({"Succeeded", std::to_string(getNumSucceededOps())});
+    rows.push_back({"Canceled", std::to_string(getNumCanceledOps())});
+    rows.push_back({"Failed", std::to_string(getNumFailedOps())});
+    rows.push_back({"Timed Out", std::to_string(getNumTimedOutOps())});
+    output << toTable(rows);
 
     if (_inProgress.size() > 0) {
-        std::vector<TableRow> rows;
+        rows.clear();
         rows.push_back(AsyncOp::kFieldLabels);
 
         // Push AsyncOps
@@ -127,6 +134,22 @@ std::string NetworkInterfaceASIO::_getDiagnosticString_inlock(AsyncOp* currentOp
     output << "\n";
 
     return output;
+}
+
+uint64_t NetworkInterfaceASIO::getNumCanceledOps() {
+    return _numCanceledOps.load();
+}
+
+uint64_t NetworkInterfaceASIO::getNumFailedOps() {
+    return _numFailedOps.load();
+}
+
+uint64_t NetworkInterfaceASIO::getNumSucceededOps() {
+    return _numSucceededOps.load();
+}
+
+uint64_t NetworkInterfaceASIO::getNumTimedOutOps() {
+    return _numTimedOutOps.load();
 }
 
 void NetworkInterfaceASIO::appendConnectionStats(ConnectionPoolStats* stats) const {
@@ -352,8 +375,10 @@ void NetworkInterfaceASIO::cancelCommand(const TaskExecutor::CallbackHandle& cbH
     // If we found a matching cbHandle in _inGetConnection, then
     // simply removing it has the same effect as cancelling it, so we
     // can just return.
-    if (_inGetConnection.erase(cbHandle) != 0)
+    if (_inGetConnection.erase(cbHandle) != 0) {
+        _numCanceledOps.fetchAndAdd(1);
         return;
+    }
 
     // TODO: This linear scan is unfortunate. It is here because our
     // primary data structure is to keep the AsyncOps in an
@@ -363,6 +388,7 @@ void NetworkInterfaceASIO::cancelCommand(const TaskExecutor::CallbackHandle& cbH
     for (auto&& kv : _inProgress) {
         if (kv.first->cbHandle() == cbHandle) {
             kv.first->cancel();
+            _numCanceledOps.fetchAndAdd(1);
             break;
         }
     }
@@ -373,8 +399,10 @@ void NetworkInterfaceASIO::cancelAllCommands() {
     {
         stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
         _inGetConnection.swap(newInGetConnection);
-        for (auto&& kv : _inProgress)
+        for (auto&& kv : _inProgress) {
             kv.first->cancel();
+        }
+        _numCanceledOps.fetchAndAdd(_inProgress.size());
     }
 }
 
