@@ -27,6 +27,7 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool final)
 
 	WT_UNUSED(final);	/* Only used in diagnostic builds */
 
+	WT_ASSERT(session, !F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE));
 	/*
 	 * The work unit queue should be empty, but it's worth checking
 	 * since work units use a different locking scheme to regular tree
@@ -860,6 +861,7 @@ __wt_lsm_tree_drop(
 	WT_WITH_HANDLE_LIST_LOCK(session,
 	    ret = __wt_lsm_tree_get(session, name, true, &lsm_tree));
 	WT_RET(ret);
+	WT_ASSERT(session, !F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE));
 
 	/* Prevent any new opens. */
 	WT_ERR(__wt_lsm_tree_writelock(session, lsm_tree));
@@ -888,6 +890,7 @@ __wt_lsm_tree_drop(
 	WT_ERR(__wt_lsm_tree_writeunlock(session, lsm_tree));
 	ret = __wt_metadata_remove(session, name);
 
+	WT_ASSERT(session, !F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE));
 err:	if (locked)
 		WT_TRET(__wt_lsm_tree_writeunlock(session, lsm_tree));
 	WT_WITH_HANDLE_LIST_LOCK(session,
