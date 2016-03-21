@@ -861,6 +861,12 @@ __checkpoint_lock_tree(WT_SESSION_IMPL *session,
 	WT_CKPT_FOREACH(ckptbase, ckpt)
 		;
 	WT_ERR(__wt_strdup(session, name, &ckpt->name));
+	/*
+	 * We are now done with the local use of the name.  Free the local
+	 * allocation, if needed.
+	 */
+	__wt_free(session, name_alloc);
+	name_alloc = NULL;
 	F_SET(ckpt, WT_CKPT_ADD);
 
 	/*
