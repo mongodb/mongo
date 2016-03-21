@@ -1,4 +1,5 @@
 Import("env")
+Import("mmapv1")
 
 env.Library(
     target = 'storage_mmapv1',
@@ -25,7 +26,7 @@ env.Library(
                "mmap_v1_database_catalog_entry.cpp",
                "mmap_v1_engine.cpp",
                "mmap_v1_extent_manager.cpp",
-               "mmap_v1_init.cpp",
+               "mmap_v1_init.cpp" if mmapv1 else "mmap_v1_noinit.cpp",
                "repair_database.cpp",
              ],
     LIBDEPS = [
@@ -155,59 +156,6 @@ env.Library(
         ]
     )
 
-env.CppUnitTest(
-    target='storage_engine_mmap_v1_init_test',
-    source=['mmap_v1_init_test.cpp',
-            ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/serveronly',
-        '$BUILD_DIR/mongo/util/ntservice_mock',
-        ],
-    NO_CRUTCH=True,
-    )
-
-env.CppUnitTest(target = 'record_access_tracker_test',
-                source = ['record_access_tracker_test.cpp'],
-                LIBDEPS = ['record_access_tracker',
-                           '$BUILD_DIR/mongo/util/processinfo',
-                           '$BUILD_DIR/mongo/util/net/network'])
-
-env.CppUnitTest(target = 'namespace_test',
-                source = ['catalog/namespace_test.cpp'],
-                LIBDEPS = ['$BUILD_DIR/mongo/util/foundation'])
-
-env.CppUnitTest(
-    target='record_store_v1_simple_test',
-    source=['record_store_v1_simple_test.cpp',
-            ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/util/decorable',
-        'record_store_v1_test_help'
-        ]
-    )
-
-env.CppUnitTest(
-    target='record_store_v1_capped_test',
-    source=['record_store_v1_capped_test.cpp',
-            ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/util/decorable',
-        'record_store_v1_test_help'
-        ]
-    )
-
-
-env.CppUnitTest(
-    target='record_store_v1_test',
-    source=['mmap_v1_record_store_test.cpp',
-            ],
-    LIBDEPS=[
-        'record_store_v1_test_help',
-        '$BUILD_DIR/mongo/db/storage/record_store_test_harness'
-        ]
-    )
-
-
 env.Library(
     target= 'btree',
     source= [
@@ -223,35 +171,88 @@ env.Library(
         ]
     )
 
-env.Library(
-    target= 'btree_test_help',
-    source= [
-        'btree/btree_test_help.cpp',
-        'heap_record_store_btree.cpp'
-        ],
-    LIBDEPS= [
-        'btree',
-        'record_store_v1_test_help',
-        ]
-    )
-
-env.CppUnitTest(
-    target='btree_logic_test',
-    source=['btree/btree_logic_test.cpp'
+if mmapv1:
+    env.CppUnitTest(
+        target='storage_engine_mmap_v1_init_test',
+        source=['mmap_v1_init_test.cpp',
+                ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/db/serveronly',
+            '$BUILD_DIR/mongo/util/ntservice_mock',
             ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/util/decorable',
-        'btree_test_help'
-        ]
-    )
+        NO_CRUTCH=True,
+        )
 
-env.CppUnitTest(
-    target='btree_interface_test',
-    source=['btree/btree_interface_test.cpp'
+    env.CppUnitTest(target = 'record_access_tracker_test',
+                    source = ['record_access_tracker_test.cpp'],
+                    LIBDEPS = ['record_access_tracker',
+                               '$BUILD_DIR/mongo/util/processinfo',
+                               '$BUILD_DIR/mongo/util/net/network'])
+
+    env.CppUnitTest(target = 'namespace_test',
+                    source = ['catalog/namespace_test.cpp'],
+                    LIBDEPS = ['$BUILD_DIR/mongo/util/foundation'])
+
+    env.CppUnitTest(
+        target='record_store_v1_simple_test',
+        source=['record_store_v1_simple_test.cpp',
+                ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/util/decorable',
+            'record_store_v1_test_help'
+            ]
+        )
+
+    env.CppUnitTest(
+        target='record_store_v1_capped_test',
+        source=['record_store_v1_capped_test.cpp',
+                ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/util/decorable',
+            'record_store_v1_test_help'
+            ]
+        )
+
+
+    env.CppUnitTest(
+        target='record_store_v1_test',
+        source=['mmap_v1_record_store_test.cpp',
+                ],
+        LIBDEPS=[
+            'record_store_v1_test_help',
+            '$BUILD_DIR/mongo/db/storage/record_store_test_harness'
+            ]
+        )
+
+    env.Library(
+        target= 'btree_test_help',
+        source= [
+            'btree/btree_test_help.cpp',
+            'heap_record_store_btree.cpp'
             ],
-    LIBDEPS=[
-        'btree_test_help',
-        '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness'
-        ]
-    )
+        LIBDEPS= [
+            'btree',
+            'record_store_v1_test_help',
+            ]
+        )
+
+    env.CppUnitTest(
+        target='btree_logic_test',
+        source=['btree/btree_logic_test.cpp'
+                ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/util/decorable',
+            'btree_test_help'
+            ]
+        )
+
+    env.CppUnitTest(
+        target='btree_interface_test',
+        source=['btree/btree_interface_test.cpp'
+                ],
+        LIBDEPS=[
+            'btree_test_help',
+            '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness'
+            ]
+        )
 

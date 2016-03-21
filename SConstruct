@@ -182,6 +182,14 @@ add_option('ssl',
     nargs=0
 )
 
+add_option('mmapv1',
+    choices=['auto', 'on', 'off'],
+    default='auto',
+    help='Enable MMapV1',
+    nargs='?',
+    type='choice',
+)
+
 add_option('wiredtiger',
     choices=['on', 'off'],
     const='on',
@@ -1454,6 +1462,17 @@ if env.TargetOSIs('posix'):
             env.Append( LINKFLAGS=["-fstack-protector"] )
             env.Append( SHLINKFLAGS=["-fstack-protector"] )
 
+mmapv1 = False
+if get_option('mmapv1') == 'auto':
+    # MMapV1 only supports little-endian architectures, and will fail to run on big-endian
+    # so disable MMapV1 on big-endian architectures
+    if endian == 'big':
+        mmapv1 = False
+    else:
+        mmapv1 = True
+elif get_option('mmapv1') == 'on':
+    mmapv1 = True
+
 wiredtiger = False
 if get_option('wiredtiger') == 'on':
     # Wiredtiger only supports 64-bit architecture, and will fail to compile on 32-bit
@@ -2599,6 +2618,7 @@ Export("boostSuffix")
 Export('module_sconscripts')
 Export("debugBuild optBuild")
 Export("wiredtiger")
+Export("mmapv1")
 Export("endian")
 Export("icuEnabled")
 
