@@ -18,13 +18,15 @@
         var msg = "Exptected {"+op+": "+value+"} to equal: "+expResult;
         var res = coll.runCommand('aggregate', {pipeline: pipeline});
 
-        if (value.valueOf() < 0 && _isWindows() && res.code === 16422) {
+        // in the case of $dateToString the date is on property date
+        var date = value.date || value;
+        if (date.valueOf() < 0 && _isWindows() && res.code === 16422) {
             // some versions of windows (but not all) fail with dates before 1970
             print("skipping test of " + date.tojson() + " because system doesn't support old dates");
             return;
         }
 
-        if (value.valueOf()/1000 < -2*1024*1024*1024 && res.code == 16421) {
+        if (date.valueOf()/1000 < -2*1024*1024*1024 && res.code == 16421) {
             // we correctly detected that we are outside of the range of a 32-bit time_t
             print("skipping test of " + date.tojson() + " because it is outside of time_t range");
             return;
