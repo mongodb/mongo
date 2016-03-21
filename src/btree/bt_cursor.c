@@ -173,13 +173,18 @@ __cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 		 */
 		break;
 	case BTREE_COL_VAR:
+		/* The search function doesn't check for empty pages. */
+		if (page->pg_var_entries == 0)
+			return (false);
+		WT_ASSERT(session, cbt->slot < page->pg_var_entries);
+
 		/*
-		 * If search returned an insert object, there may or may not be
-		 * a matching on-page object, we have to check.  Variable-length
-		 * column-store pages don't map one-to-one to keys, but have
-		 * "slots", check if search returned a valid slot.
+		 * Column-store updates aren't stored on the page, instead they
+		 * are stored as "insert" objects. If search returned an insert
+		 * object we can't return, the returned on-page object must be
+		 * checked for a match.
 		 */
-		if (cbt->slot >= page->pg_var_entries)
+		if (cbt->ins != NULL && !F_ISSET(cbt, WT_CBT_VAR_ONPAGE_MATCH))
 			return (false);
 
 		/*
@@ -194,20 +199,16 @@ __cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 			return (false);
 		break;
 	case BTREE_ROW:
+		/* The search function doesn't check for empty pages. */
+		if (page->pg_row_entries == 0)
+			return (false);
+		WT_ASSERT(session, cbt->slot < page->pg_row_entries);
+
 		/*
 		 * See above: for row-store, no insert object can have the same
 		 * key as an on-page object, we're done.
 		 */
 		if (cbt->ins != NULL)
-			return (false);
-
-		/*
-		 * Check if searched returned a valid slot (the failure mode is
-		 * an empty page, the search function doesn't check, and so the
-		 * more exact test is "page->pg_row_entries == 0", but this test
-		 * mirrors the column-store test).
-		 */
-		if (cbt->slot >= page->pg_row_entries)
 			return (false);
 
 		/* Updates are stored on the page, check for a delete. */

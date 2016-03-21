@@ -310,6 +310,10 @@ path_setup(const char *home)
 	g.home_backup = dmalloc(len);
 	snprintf(g.home_backup, len, "%s/%s", g.home, "BACKUP");
 
+	len = strlen(g.home) + strlen("BACKUP2") + 2;
+	g.home_backup2 = dmalloc(len);
+	snprintf(g.home_backup2, len, "%s/%s", g.home, "BACKUP2");
+
 	/* BDB directory. */
 	len = strlen(g.home) + strlen("bdb") + 2;
 	g.home_bdb = dmalloc(len);
@@ -340,13 +344,15 @@ path_setup(const char *home)
 	/* Backup directory initialize command, remove and re-create it. */
 #undef	CMD
 #ifdef _WIN32
-#define	CMD	"del /s /q >:nul && mkdir %s"
+#define	CMD	"del /s /q >:nul && mkdir %s %s"
 #else
-#define	CMD	"rm -rf %s && mkdir %s"
+#define	CMD	"rm -rf %s %s && mkdir %s %s"
 #endif
-	len = strlen(g.home_backup) * 2 + strlen(CMD) + 1;
+	len = strlen(g.home_backup) * 2 +
+	    strlen(g.home_backup2) * 2 + strlen(CMD) + 1;
 	g.home_backup_init = dmalloc(len);
-	snprintf(g.home_backup_init, len, CMD, g.home_backup, g.home_backup);
+	snprintf(g.home_backup_init, len, CMD, g.home_backup, g.home_backup2,
+	    g.home_backup, g.home_backup2);
 
 	/*
 	 * Salvage command, save the interesting files so we can replay the

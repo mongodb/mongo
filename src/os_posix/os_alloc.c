@@ -18,6 +18,7 @@
 #include <gperftools/tcmalloc.h>
 
 #define	calloc			tc_calloc
+#define	malloc			tc_malloc
 #define	realloc 		tc_realloc
 #define	posix_memalign 		tc_posix_memalign
 #define	free 			tc_free

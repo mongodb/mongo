@@ -213,10 +213,11 @@ struct __wt_cursor_btree {
 #define	WT_CBT_NO_TXN   	0x10	/* Non-transactional cursor
 					   (e.g. on a checkpoint) */
 #define	WT_CBT_SEARCH_SMALLEST	0x20	/* Row-store: small-key insert list */
+#define	WT_CBT_VAR_ONPAGE_MATCH	0x40	/* Var-store: on-page recno match */
 
 #define	WT_CBT_POSITION_MASK		/* Flags associated with position */ \
 	(WT_CBT_ITERATE_APPEND | WT_CBT_ITERATE_NEXT | WT_CBT_ITERATE_PREV | \
-	WT_CBT_SEARCH_SMALLEST)
+	WT_CBT_SEARCH_SMALLEST | WT_CBT_VAR_ONPAGE_MATCH)
 
 	uint8_t flags;
 };
@@ -289,7 +290,8 @@ struct __wt_cursor_join_iter {
 	WT_CURSOR_JOIN_ENTRY	*entry;
 	WT_CURSOR		*cursor;	/* has null projection */
 	WT_CURSOR		*main;		/* main table with projection */
-	WT_ITEM			*curkey;
+	WT_ITEM			*curkey;	/* primary key */
+	WT_ITEM			 idxkey;
 	bool			 positioned;
 	bool			 isequal;	/* advancing means we're done */
 };
