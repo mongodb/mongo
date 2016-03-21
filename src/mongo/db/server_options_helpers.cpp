@@ -272,6 +272,12 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
                                moe::String,
                                "private key for cluster authentication").incompatibleWith("noauth");
 
+    options->addOptionChaining("noauth", "noauth", moe::Switch, "run without security")
+        .setSources(moe::SourceAllLegacy)
+        .incompatibleWith("auth")
+        .incompatibleWith("keyFile")
+        .incompatibleWith("clusterAuthMode");
+
     options->addOptionChaining(
                  "setParameter", "setParameter", moe::StringMap, "Set a configurable parameter")
         .composing();
@@ -689,6 +695,19 @@ Status canonicalizeServerOptions(moe::Environment* params) {
         }
     }
 
+    if (params->count("noauth")) {
+        Status ret =
+            params->set("security.authorization",
+                        (*params)["noauth"].as<bool>() ? moe::Value(std::string("disabled"))
+                                                       : moe::Value(std::string("enabled")));
+        if (!ret.isOK()) {
+            return ret;
+        }
+        ret = params->remove("noauth");
+        if (!ret.isOK()) {
+            return ret;
+        }
+    }
     return Status::OK();
 }
 
@@ -784,6 +803,7 @@ Status storeServerOptions(const moe::Environment& params, const std::vector<std:
             return Status(ErrorCodes::BadValue,
                           "unsupported value for clusterAuthMode " + clusterAuthMode);
         }
+        serverGlobalParams.authState = ServerGlobalParams::AuthState::kEnabled;
     } else {
         serverGlobalParams.clusterAuthMode.store(ServerGlobalParams::ClusterAuthMode_undefined);
     }
@@ -806,15 +826,6 @@ Status storeServerOptions(const moe::Environment& params, const std::vector<std:
 
     if (params.count("net.wireObjectCheck")) {
         serverGlobalParams.objcheck = params["net.wireObjectCheck"].as<bool>();
-    }
-
-    if (params.count("net.bindIp")) {
-        // passing in wildcard is the same as default behavior; remove and warn
-        if (serverGlobalParams.bind_ip == "0.0.0.0") {
-            std::cout << "warning: bind_ip of 0.0.0.0 is unnecessary; "
-                      << "listens on all ips by default" << endl;
-            serverGlobalParams.bind_ip = "";
-        }
     }
 
 #ifndef _WIN32
@@ -940,6 +951,14 @@ Status storeServerOptions(const moe::Environment& params, const std::vector<std:
         serverGlobalParams.keyFile =
             boost::filesystem::absolute(params["security.keyFile"].as<string>()).generic_string();
     }
+
+    if (params.count("security.authorization") &&
+        params["security.authorization"].as<std::string>() == "disabled") {
+        serverGlobalParams.authState = ServerGlobalParams::AuthState::kDisabled;
+    } else if (params.count("security.authorization") &&
+               params["security.authorization"].as<std::string>() == "enabled") {
+        serverGlobalParams.authState = ServerGlobalParams::AuthState::kEnabled;
+    } 
 
     if (params.count("processManagement.pidFilePath")) {
         serverGlobalParams.pidFile = params["processManagement.pidFilePath"].as<string>();

@@ -105,7 +105,11 @@ struct ServerGlobalParams {
 
     BSONArray argvArray;
     BSONObj parsedOpts;
-    bool isAuthEnabled = false;
+
+    enum AuthState { kEnabled, kDisabled, kUndefined };
+
+    AuthState authState = AuthState::kUndefined;
+
     AtomicInt32 clusterAuthMode;  // --clusterAuthMode, the internal cluster auth mode
 
     enum ClusterAuthModes {

@@ -54,7 +54,8 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateAuthorizationManager,
 (InitializerContext* context) {
     auto authzManager =
         stdx::make_unique<AuthorizationManager>(AuthzManagerExternalState::create());
-    authzManager->setAuthEnabled(serverGlobalParams.isAuthEnabled);
+    authzManager->setAuthEnabled(serverGlobalParams.authState ==
+                                 ServerGlobalParams::AuthState::kEnabled);
     AuthorizationManager::set(getGlobalServiceContext(), std::move(authzManager));
     return Status::OK();
 }

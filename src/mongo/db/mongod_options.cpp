@@ -102,10 +102,6 @@ Status addMongodOptions(moe::OptionSection* options) {
         .setSources(moe::SourceAllLegacy)
         .incompatibleWith("noauth");
 
-    general_options.addOptionChaining("noauth", "noauth", moe::Switch, "run without security")
-        .setSources(moe::SourceAllLegacy)
-        .incompatibleWith("auth");
-
     // Way to enable or disable auth in JSON Config
     general_options
         .addOptionChaining(
@@ -806,21 +802,8 @@ Status canonicalizeMongodOptions(moe::Environment* params) {
         }
     }
 
-    // "security.authorization" comes from the config file, so override it if "noauth" or
-    // "auth" are set since those come from the command line.
-    if (params->count("noauth")) {
-        Status ret =
-            params->set("security.authorization",
-                        (*params)["noauth"].as<bool>() ? moe::Value(std::string("disabled"))
-                                                       : moe::Value(std::string("enabled")));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = params->remove("noauth");
-        if (!ret.isOK()) {
-            return ret;
-        }
-    }
+    // "security.authorization" comes from the config file, so override it if "auth" is
+    // set since those come from the command line.
     if (params->count("auth")) {
         Status ret =
             params->set("security.authorization",
@@ -1058,14 +1041,6 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
 
     if (params.count("cpu")) {
         serverGlobalParams.cpu = params["cpu"].as<bool>();
-    }
-    if (params.count("security.authorization") &&
-        params["security.authorization"].as<std::string>() == "disabled") {
-        serverGlobalParams.isAuthEnabled = false;
-    }
-    if (params.count("security.authorization") &&
-        params["security.authorization"].as<std::string>() == "enabled") {
-        serverGlobalParams.isAuthEnabled = true;
     }
     if (params.count("storage.mmapv1.quota.enforced")) {
         mmapv1GlobalOptions.quota = params["storage.mmapv1.quota.enforced"].as<bool>();

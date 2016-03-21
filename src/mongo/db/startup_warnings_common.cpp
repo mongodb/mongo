@@ -61,8 +61,7 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
         }
     }
 
-    if ((serverParams.isAuthEnabled ||
-         serverParams.clusterAuthMode.load() != ServerGlobalParams::ClusterAuthMode_undefined) &&
+    if (serverParams.authState == ServerGlobalParams::AuthState::kEnabled &&
         (serverParams.rest || serverParams.isHttpInterfaceEnabled || serverParams.jsonp)) {
         log() << startupWarningsLog;
         log()
@@ -72,6 +71,31 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
               << startupWarningsLog;
         log() << "**          and should be disabled unless required for backward compatibility."
               << startupWarningsLog;
+        warned = true;
+    }
+
+    if (serverParams.authState == ServerGlobalParams::AuthState::kUndefined) {
+        log() << startupWarningsLog;
+        if (serverParams.bind_ip.empty()) {
+            log() << "** WARNING: Insecure configuration, access control is not "
+                     "enabled and no --bind_ip has been specified." << startupWarningsLog;
+            log() << "**          Read and write access to data and configuration is "
+                     "unrestricted, " << startupWarningsLog;
+            log() << "**          and the server listens on all available network interfaces."
+                  << startupWarningsLog;
+        } else {
+            log() << "** WARNING: Access control is not enabled for the database."
+                  << startupWarningsLog;
+            log() << "**          Read and write access to data and configuration is "
+                     "unrestricted." << startupWarningsLog;
+        }
+        warned = true;
+    } else if (serverParams.bind_ip.empty()) {
+        log() << startupWarningsLog;
+        log() << "** WARNING: The server was started without specifying a "
+                 "--bind_ip " << startupWarningsLog;
+        log() << "**          and listens for connections on all available "
+                 "network interfaces." << startupWarningsLog;
         warned = true;
     }
 
