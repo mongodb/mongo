@@ -1029,7 +1029,7 @@ DBCollection.prototype._getIndexesCommand = function(filter) {
             return null;
         }
 
-        throw _getErrorWithCode(ret, "listIndexes failed: " + tojson(res));
+        throw _getErrorWithCode(res, "listIndexes failed: " + tojson(res));
     }
 
     return new DBCommandCursor(this._mongo, res).toArray();
