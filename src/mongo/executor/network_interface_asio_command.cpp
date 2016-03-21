@@ -338,7 +338,7 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
     // We need to bump the generation BEFORE we call reset() or we could flip the timeout in the
     // timeout callback before returning the AsyncOp to the pool.
     ownedOp->reset();
-    
+
     asioConn->bindAsyncOp(std::move(ownedOp));
     if (!resp.isOK()) {
         asioConn->indicateFailure(resp.getStatus());
