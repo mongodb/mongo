@@ -11,13 +11,12 @@
 #include <dirent.h>
 
 /*
- * __wt_dirlist --
- *	Get a list of files from a directory, optionally filtered by
- *	a given prefix.
+ * __wt_posix_directory_list --
+ *	Get a list of files from a directory, POSIX version.
  */
 int
-__wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
-    uint32_t flags, char ***dirlist, u_int *countp)
+__wt_posix_directory_list(WT_SESSION_IMPL *session, const char *dir,
+    const char *prefix, uint32_t flags, char ***dirlist, u_int *countp)
 {
 	struct dirent *dp;
 	DIR *dirp;
@@ -57,6 +56,8 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 		    strcmp(dp->d_name, "..") == 0)
 			continue;
 		match = false;
+
+		/* The list of files is optionally filtered by a prefix. */
 		if (prefix != NULL &&
 		    ((LF_ISSET(WT_DIRLIST_INCLUDE) &&
 		    WT_PREFIX_MATCH(dp->d_name, prefix)) ||

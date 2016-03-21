@@ -110,6 +110,7 @@ struct __wt_fh {
 	uint32_t flags;
 
 	int (*fh_advise)(WT_SESSION_IMPL *, WT_FH *, wt_off_t, wt_off_t, int);
+	int (*fh_allocate)(WT_SESSION_IMPL *, WT_FH *, wt_off_t, wt_off_t);
 	int (*fh_close)(WT_SESSION_IMPL *, WT_FH *);
 	int (*fh_getc)(WT_SESSION_IMPL *, WT_FH *, int *);
 	int (*fh_lock)(WT_SESSION_IMPL *, WT_FH *, bool);

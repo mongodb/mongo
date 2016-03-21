@@ -492,15 +492,15 @@ extern int __wt_realloc_noclear(WT_SESSION_IMPL *session, size_t *bytes_allocate
 extern int __wt_realloc_aligned(WT_SESSION_IMPL *session, size_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp);
 extern int __wt_strndup(WT_SESSION_IMPL *session, const void *str, size_t len, void *retp);
 extern void __wt_free_int(WT_SESSION_IMPL *session, const void *p_arg);
-extern int __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix, uint32_t flags, char ***dirlist, u_int *countp);
+extern int __wt_posix_directory_list(WT_SESSION_IMPL *session, const char *dir, const char *prefix, uint32_t flags, char ***dirlist, u_int *countp);
 extern int __wt_dlopen(WT_SESSION_IMPL *session, const char *path, WT_DLH **dlhp);
 extern int __wt_dlsym(WT_SESSION_IMPL *session, WT_DLH *dlh, const char *name, bool fail, void *sym_ret);
 extern int __wt_dlclose(WT_SESSION_IMPL *session, WT_DLH *dlh);
 extern int __wt_errno(void);
 extern int __wt_map_error_rdonly(int error);
 extern const char *__wt_strerror(WT_SESSION_IMPL *session, int error, char *errbuf, size_t errlen);
-extern void __wt_fallocate_config(WT_SESSION_IMPL *session, WT_FH *fh);
-extern int __wt_fallocate( WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, wt_off_t len);
+extern void __wt_posix_handle_allocate_configure(WT_SESSION_IMPL *session, WT_FH *fh);
+extern int __wt_posix_handle_allocate( WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, wt_off_t len);
 extern int __wt_getenv(WT_SESSION_IMPL *session, const char *variable, const char **envp);
 extern int __wt_getline(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_FH *fh);
 extern int __wt_getopt( const char *progname, int nargc, char *const *nargv, const char *ostr);

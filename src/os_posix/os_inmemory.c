@@ -16,6 +16,24 @@ typedef struct {
 } WT_IM;
 
 /*
+ * __im_directory_list --
+ *	Get a list of files from a directory, in-memory version.
+ */
+static int
+__im_directory_list(WT_SESSION_IMPL *session, const char *dir,
+    const char *prefix, uint32_t flags, char ***dirlist, u_int *countp)
+{
+	WT_UNUSED(session);
+	WT_UNUSED(dir);
+	WT_UNUSED(prefix);
+	WT_UNUSED(flags);
+	WT_UNUSED(dirlist);
+	WT_UNUSED(countp);
+
+	WT_RET_MSG(session, ENOTSUP, "directory-list");
+}
+
+/*
  * __im_directory_sync --
  *	Flush a directory to ensure file creation is durable.
  */
@@ -405,6 +423,7 @@ __wt_os_inmemory(WT_SESSION_IMPL *session)
 	im = NULL;
 
 	/* Initialize the in-memory jump table. */
+	conn->file_directory_list = __im_directory_list;
 	conn->file_directory_sync = __im_directory_sync;
 	conn->file_exist = __im_file_exist;
 	conn->file_remove = __im_file_remove;

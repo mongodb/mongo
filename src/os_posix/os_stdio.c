@@ -23,6 +23,19 @@ __stdio_handle_advise(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __stdio_handle_allocate --
+ *	POSIX fallocate.
+ */
+static int
+__stdio_handle_allocate(
+    WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, wt_off_t len)
+{
+	WT_UNUSED(offset);
+	WT_UNUSED(len);
+	WT_RET_MSG(session, ENOTSUP, "%s: allocate", fh->name);
+}
+
+/*
  * __stdio_handle_close --
  *	ANSI C close/fclose.
  */
@@ -142,6 +155,7 @@ __stdio_func_init(WT_FH *fh, const char *name, FILE *fp)
 	fh->fp = fp;
 
 	fh->fh_advise = __stdio_handle_advise;
+	fh->fh_allocate = __stdio_handle_allocate;
 	fh->fh_close = __stdio_handle_close;
 	fh->fh_getc = __stdio_handle_getc;
 	fh->fh_lock = __stdio_handle_lock;

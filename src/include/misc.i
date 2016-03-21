@@ -72,6 +72,18 @@ __wt_verbose(WT_SESSION_IMPL *session, int flag, const char *fmt, ...)
 }
 
 /*
+ * __wt_dirlist --
+ *	Get a list of files from a directory.
+ */
+static inline int
+__wt_dirlist(WT_SESSION_IMPL *session, const char *dir,
+    const char *prefix, uint32_t flags, char ***dirlist, u_int *countp)
+{
+	return (S2C(session)->file_directory_list(
+	    session, dir, prefix, flags, dirlist, countp));
+}
+
+/*
  * __wt_directory_sync --
  *	Flush a directory to ensure file creation is durable.
  */
@@ -111,6 +123,20 @@ static inline int
 __wt_exist(WT_SESSION_IMPL *session, const char *name, bool *existp)
 {
 	return (S2C(session)->file_exist(session, name, existp));
+}
+
+/*
+ * __wt_fallocate --
+ *	Extend a file.
+ */
+static inline int
+__wt_fallocate(
+    WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, wt_off_t len)
+{
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
+
+	return (fh->fh_allocate(session, fh, offset, len));
 }
 
 /*

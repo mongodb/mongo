@@ -117,9 +117,6 @@ __wt_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_calloc_one(session, &fh));
 	WT_ERR(__wt_strdup(session, name, &fh->name));
 
-	/* Configure fallocate/posix_fallocate calls. */
-	__wt_fallocate_config(session, fh);
-
 	/*
 	 * If this is a read-only connection, open all files read-only except
 	 * the lock file.

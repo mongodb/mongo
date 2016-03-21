@@ -611,7 +611,11 @@ setupfh:
 	__wt_free(session, path);
 	fh->fd = fd;
 
+	/* Configure fallocate/posix_fallocate calls. */
+	__wt_posix_handle_allocate_configure(session, fh);
+
 	fh->fh_advise = __posix_handle_advise;
+	fh->fh_allocate = __wt_posix_handle_allocate;
 	fh->fh_close = __posix_handle_close;
 	fh->fh_getc = __posix_handle_getc;
 	fh->fh_lock = __posix_handle_lock;
@@ -647,6 +651,7 @@ __wt_os_posix(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 
 	/* Initialize the POSIX jump table. */
+	conn->file_directory_list = __wt_posix_directory_list;
 	conn->file_directory_sync = __posix_directory_sync;
 	conn->file_exist = __posix_file_exist;
 	conn->file_remove = __posix_file_remove;
