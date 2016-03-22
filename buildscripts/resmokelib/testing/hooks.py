@@ -34,16 +34,16 @@ class CustomBehavior(object):
     """
 
     @staticmethod
-    def start_dynamic_test(test_case, test_report):
+    def start_dynamic_test(hook_test_case, test_report):
         """
         If a CustomBehavior wants to add a test case that will show up
         in the test report, it should use this method to add it to the
         report, since we will need to count it as a dynamic test to get
         the stats in the summary information right.
         """
-        test_report.startTest(test_case, dynamic=True)
+        test_report.startTest(hook_test_case, dynamic=True)
 
-    def __init__(self, logger, fixture):
+    def __init__(self, logger, fixture, description):
         """
         Initializes the CustomBehavior with the specified fixture.
         """
@@ -53,6 +53,10 @@ class CustomBehavior(object):
 
         self.logger = logger
         self.fixture = fixture
+        self.hook_test_case = None
+        self.logger_name = self.__class__.__name__
+        self.description = description
+
 
     def before_suite(self, test_report):
         """
@@ -69,7 +73,7 @@ class CustomBehavior(object):
         """
         pass
 
-    def before_test(self, test_report):
+    def before_test(self, test, test_report):
         """
         Each test will call this before it executes.
 
@@ -79,7 +83,7 @@ class CustomBehavior(object):
         """
         pass
 
-    def after_test(self, test_report):
+    def after_test(self, test, test_report):
         """
         Each test will call this after it executes.
 
@@ -99,7 +103,8 @@ class CleanEveryN(CustomBehavior):
     DEFAULT_N = 20
 
     def __init__(self, logger, fixture, n=DEFAULT_N):
-        CustomBehavior.__init__(self, logger, fixture)
+        description = "CleanEveryN (restarts the fixture after running `n` tests)"
+        CustomBehavior.__init__(self, logger, fixture, description)
 
         # Try to isolate what test triggers the leak by restarting the fixture each time.
         if "detect_leaks=1" in os.getenv("ASAN_OPTIONS", ""):
@@ -110,7 +115,7 @@ class CleanEveryN(CustomBehavior):
         self.n = n
         self.tests_run = 0
 
-    def after_test(self, test_report):
+    def after_test(self, test, test_report):
         self.tests_run += 1
         if self.tests_run >= self.n:
             self.logger.info("%d tests have been run against the fixture, stopping it...",
@@ -125,6 +130,46 @@ class CleanEveryN(CustomBehavior):
             # Raise this after calling setup in case --continueOnFailure was specified.
             if not teardown_success:
                 raise errors.TestFailure("%s did not exit cleanly" % (self.fixture))
+
+
+class JsCustomBehavior(CustomBehavior):
+    def __init__(self, logger, fixture, js_filename, description, shell_options=None):
+        CustomBehavior.__init__(self, logger, fixture, description)
+        self.hook_test_case = testcases.JSTestCase(logger,
+                                              js_filename,
+                                              shell_options=shell_options,
+                                              test_kind="Hook")
+
+    def before_suite(self, test_report):
+        # Configure the test case after the fixture has been set up.
+        self.hook_test_case.configure(self.fixture)
+
+    def after_test(self, test, test_report):
+        try:
+            # Change test_name and description to be more descriptive.
+            self.hook_test_case.test_name =  test.short_name() + ":" + self.logger_name
+            self.description = "Collection validation after running {0}".format(test.short_name())
+            CustomBehavior.start_dynamic_test(self.hook_test_case, test_report)
+            self.hook_test_case.run_test()
+            self.hook_test_case.return_code = 0
+            test_report.addSuccess(self.hook_test_case)
+        except self.hook_test_case.failureException as err:
+            self.hook_test_case.logger.exception("{0} failed".format(self.description))
+            test_report.addFailure(self.hook_test_case, sys.exc_info())
+            raise errors.TestFailure(err.args[0])
+        finally:
+            test_report.stopTest(self.hook_test_case)
+
+
+class ValidateCollections(JsCustomBehavior):
+    """
+    Runs full validation on all collections in all databases on every stand-alone
+    node, primary replica-set node, or primary shard node.
+    """
+    def __init__(self, logger, fixture):
+        description = "Full collection validation"
+        js_filename = os.path.join("jstests", "hooks", "run_validate_collections.js")
+        JsCustomBehavior.__init__(self, logger, fixture, js_filename, description)
 
 
 class CheckReplDBHash(CustomBehavior):
@@ -142,13 +187,13 @@ class CheckReplDBHash(CustomBehavior):
         if not isinstance(fixture, fixtures.ReplFixture):
             raise TypeError("%s does not support replication" % (fixture.__class__.__name__))
 
-        CustomBehavior.__init__(self, logger, fixture)
-
-        self.test_case = testcases.TestCase(self.logger, "Hook", "#dbhash#")
+        description = "Check that replica-set nodes are consistent by using the dbHash command"
+        CustomBehavior.__init__(self, logger, fixture, description)
 
         self.started = False
+        self.hook_test_case = testcases.TestCase(self.logger, "Hook", self.logger_name)
 
-    def after_test(self, test_report):
+    def after_test(self, test, test_report):
         """
         After each test, check that the dbhash of the test database is
         the same on all nodes in the replica set or master/slave
@@ -157,7 +202,7 @@ class CheckReplDBHash(CustomBehavior):
 
         try:
             if not self.started:
-                CustomBehavior.start_dynamic_test(self.test_case, test_report)
+                CustomBehavior.start_dynamic_test(self.hook_test_case, test_report)
                 self.started = True
 
             # Wait until all operations have replicated.
@@ -192,20 +237,20 @@ class CheckReplDBHash(CustomBehavior):
                 CheckReplDBHash._dump_oplog(primary_conn, secondary_conn, sb)
 
                 # Adding failures to a TestReport requires traceback information, so we raise
-                # a 'self.test_case.failureException' that we will catch ourselves.
-                self.test_case.logger.info("\n    ".join(sb))
-                raise self.test_case.failureException("The dbhashes did not match")
-        except self.test_case.failureException as err:
-            self.test_case.logger.exception("The dbhashes did not match.")
-            self.test_case.return_code = 1
-            test_report.addFailure(self.test_case, sys.exc_info())
-            test_report.stopTest(self.test_case)
+                # a 'self.hook_test_case.failureException' that we will catch ourselves.
+                self.hook_test_case.logger.info("\n    ".join(sb))
+                raise self.hook_test_case.failureException("The dbhashes did not match")
+        except self.hook_test_case.failureException as err:
+            self.hook_test_case.logger.exception("The dbhashes did not match.")
+            self.hook_test_case.return_code = 1
+            test_report.addFailure(self.hook_test_case, sys.exc_info())
+            test_report.stopTest(self.hook_test_case)
             raise errors.ServerFailure(err.args[0])
         except pymongo.errors.WTimeoutError:
-            self.test_case.logger.exception("Awaiting replication timed out.")
-            self.test_case.return_code = 2
-            test_report.addError(self.test_case, sys.exc_info())
-            test_report.stopTest(self.test_case)
+            self.hook_test_case.logger.exception("Awaiting replication timed out.")
+            self.hook_test_case.return_code = 2
+            test_report.addError(self.hook_test_case, sys.exc_info())
+            test_report.stopTest(self.hook_test_case)
             raise errors.StopExecution("Awaiting replication timed out")
 
     def after_suite(self, test_report):
@@ -215,11 +260,11 @@ class CheckReplDBHash(CustomBehavior):
         """
 
         if self.started:
-            self.test_case.logger.info("The dbhashes matched for all tests.")
-            self.test_case.return_code = 0
-            test_report.addSuccess(self.test_case)
+            self.hook_test_case.logger.info("The dbhashes matched for all tests.")
+            self.hook_test_case.return_code = 0
+            test_report.addSuccess(self.hook_test_case)
             # TestReport.stopTest() has already been called if there was a failure.
-            test_report.stopTest(self.test_case)
+            test_report.stopTest(self.hook_test_case)
 
         self.started = False
 
@@ -617,100 +662,6 @@ class TypeSensitiveSON(bson.SON):
                     self.items_with_types() == other.items_with_types())
 
         raise TypeError("TypeSensitiveSON objects cannot be compared to other types")
-
-class ValidateCollections(CustomBehavior):
-    """
-    Runs full validation (db.collection.validate(true)) on all collections
-    in all databases on every standalone, or primary mongod. If validation
-    fails (validate.valid), then the validate return object is logged.
-
-    Compatible with all subclasses.
-    """
-    DEFAULT_FULL = True
-    DEFAULT_SCANDATA = True
-
-    def __init__(self, logger, fixture, full=DEFAULT_FULL, scandata=DEFAULT_SCANDATA):
-        CustomBehavior.__init__(self, logger, fixture)
-
-        if not isinstance(full, bool):
-            raise TypeError("Fixture option full is not specified as type bool")
-
-        if not isinstance(scandata, bool):
-            raise TypeError("Fixture option scandata is not specified as type bool")
-
-        self.test_case = testcases.TestCase(self.logger, "Hook", "#validate#")
-        self.started = False
-        self.full = full
-        self.scandata = scandata
-
-    def after_test(self, test_report):
-        """
-        After each test, run a full validation on all collections.
-        """
-
-        try:
-            if not self.started:
-                CustomBehavior.start_dynamic_test(self.test_case, test_report)
-                self.started = True
-
-            sb = []  # String builder.
-
-            # The self.fixture.port can be used for client connection to a
-            # standalone mongod, a replica-set primary, or mongos.
-            # TODO: Run collection validation on all nodes in a replica-set.
-            port = self.fixture.port
-            conn = utils.new_mongo_client(port=port)
-
-            success = ValidateCollections._check_all_collections(
-                conn, sb, self.full, self.scandata)
-
-            if not success:
-                # Adding failures to a TestReport requires traceback information, so we raise
-                # a 'self.test_case.failureException' that we will catch ourselves.
-                self.test_case.logger.info("\n    ".join(sb))
-                raise self.test_case.failureException("Collection validation failed")
-        except self.test_case.failureException as err:
-            self.test_case.logger.exception("Collection validation failed")
-            self.test_case.return_code = 1
-            test_report.addFailure(self.test_case, sys.exc_info())
-            test_report.stopTest(self.test_case)
-            raise errors.ServerFailure(err.args[0])
-
-    def after_suite(self, test_report):
-        """
-        If we get to this point, the #validate# test must have been
-        successful, so add it to the test report.
-        """
-
-        if self.started:
-            self.test_case.logger.info("Collection validation passed for all tests.")
-            self.test_case.return_code = 0
-            test_report.addSuccess(self.test_case)
-            # TestReport.stopTest() has already been called if there was a failure.
-            test_report.stopTest(self.test_case)
-
-        self.started = False
-
-    @staticmethod
-    def _check_all_collections(conn, sb, full, scandata):
-        """
-        Returns true if for all databases and collections validate_collection
-        succeeds. Returns false otherwise.
-
-        Logs a message if any database's collection fails validate_collection.
-        """
-
-        success = True
-
-        for db_name in conn.database_names():
-            for coll_name in conn[db_name].collection_names():
-                try:
-                    conn[db_name].validate_collection(coll_name, full=full, scandata=scandata)
-                except pymongo.errors.CollectionInvalid as err:
-                    sb.append("Database %s, collection %s failed to validate:\n%s"
-                              % (db_name, coll_name, err.args[0]))
-                    success = False
-        return success
 
 
 _CUSTOM_BEHAVIORS = {
