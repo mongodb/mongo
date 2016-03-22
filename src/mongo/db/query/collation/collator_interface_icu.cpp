@@ -41,13 +41,15 @@ CollatorInterfaceICU::CollatorInterfaceICU(CollationSpec spec,
     : CollatorInterface(std::move(spec)), _collator(std::move(collator)) {}
 
 int CollatorInterfaceICU::compare(StringData left, StringData right) {
-    // TODO SERVER-23028: What happens if 'status' is a failure code? In what circumstances could
-    // this happen?
     UErrorCode status = U_ZERO_ERROR;
     auto compareResult = _collator->compareUTF8(icu::StringPiece(left.rawData(), left.size()),
                                                 icu::StringPiece(right.rawData(), right.size()),
                                                 status);
-    invariant(U_SUCCESS(status));
+
+    // Any sequence of bytes, even invalid UTF-8, has defined comparison behavior in ICU (invalid
+    // subsequences are weighted as the replacement character, U+FFFD). A non-ok error code is only
+    // expected when a memory allocation fails inside ICU, which we consider fatal to the process.
+    fassert(34438, U_SUCCESS(status));
 
     switch (compareResult) {
         case UCOL_EQUAL:
@@ -65,12 +67,14 @@ CollatorInterface::ComparisonKey CollatorInterfaceICU::getComparisonKey(StringDa
     // A StringPiece is ICU's StringData. They are logically the same abstraction.
     const icu::StringPiece stringPiece(stringData.rawData(), stringData.size());
 
-    // TODO SERVER-23028: What happens if 'status' is a failure code? In what circumstances could
-    // this happen?
     UErrorCode status = U_ZERO_ERROR;
     icu::CollationKey icuKey;
     _collator->getCollationKey(icu::UnicodeString::fromUTF8(stringPiece), icuKey, status);
-    invariant(U_SUCCESS(status));
+
+    // Any sequence of bytes, even invalid UTF-8, has defined comparison behavior in ICU (invalid
+    // subsequences are weighted as the replacement character, U+FFFD). A non-ok error code is only
+    // expected when a memory allocation fails inside ICU, which we consider fatal to the process.
+    fassert(34439, U_SUCCESS(status));
 
     int32_t keyLength;
     const uint8_t* keyBuffer = icuKey.getByteArray(keyLength);

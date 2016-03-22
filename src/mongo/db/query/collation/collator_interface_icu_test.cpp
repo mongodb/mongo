@@ -30,11 +30,73 @@
 
 #include "mongo/db/query/collation/collator_interface_icu.h"
 
+#include <iomanip>
+#include <iostream>
+
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
 using namespace mongo;
+
+enum class ExpectedComparison {
+    EQUAL,
+    NOT_EQUAL,
+    LESS_THAN,
+    GREATER_THAN,
+};
+
+bool isExpectedComparison(int cmp, ExpectedComparison expectedCmp) {
+    switch (expectedCmp) {
+        case ExpectedComparison::EQUAL:
+            return cmp == 0;
+        case ExpectedComparison::NOT_EQUAL:
+            return cmp != 0;
+        case ExpectedComparison::LESS_THAN:
+            return cmp < 0;
+        case ExpectedComparison::GREATER_THAN:
+            return cmp > 0;
+    }
+
+    MONGO_UNREACHABLE;
+}
+
+void assertEnUSComparison(StringData left, StringData right, ExpectedComparison expectedCmp) {
+    CollationSpec collationSpec;
+    collationSpec.localeID = "en_US";
+    UErrorCode status = U_ZERO_ERROR;
+    std::unique_ptr<icu::Collator> coll(
+        icu::Collator::createInstance(icu::Locale("en", "US"), status));
+    ASSERT(U_SUCCESS(status));
+    CollatorInterfaceICU icuCollator(collationSpec, std::move(coll));
+
+    ASSERT(isExpectedComparison(icuCollator.compare(left, right), expectedCmp));
+
+    const auto leftKey = icuCollator.getComparisonKey(left);
+    const auto rightKey = icuCollator.getComparisonKey(right);
+    ASSERT(isExpectedComparison(leftKey.getKeyData().compare(rightKey.getKeyData()), expectedCmp));
+}
+
+// Returns true if an ICU collator compares 'lessThan' as smaller than 'greaterThan'. Verifies that
+// the comparison is correct using the compare() function directly and using comparison keys.
+void assertLessThanEnUS(StringData lessThan, StringData greaterThan) {
+    assertEnUSComparison(lessThan, greaterThan, ExpectedComparison::LESS_THAN);
+    assertEnUSComparison(greaterThan, lessThan, ExpectedComparison::GREATER_THAN);
+}
+
+// Returns true if an ICU collator compares 'left' and 'right' as equal. Verifies that
+// the comparison is correct using the compare() function directly and using comparison keys.
+void assertEqualEnUS(StringData left, StringData right) {
+    assertEnUSComparison(left, right, ExpectedComparison::EQUAL);
+    assertEnUSComparison(right, left, ExpectedComparison::EQUAL);
+}
+
+// Returns true if an ICU collator compares 'left' and 'right' as non-equal. Verifies that
+// the comparison is correct using the compare() function directly and using comparison keys.
+void assertNotEqualEnUS(StringData left, StringData right) {
+    assertEnUSComparison(left, right, ExpectedComparison::NOT_EQUAL);
+    assertEnUSComparison(right, left, ExpectedComparison::NOT_EQUAL);
+}
 
 TEST(CollatorInterfaceICUTest, ASCIIComparisonWorksForUSEnglishCollation) {
     CollationSpec collationSpec;
@@ -337,6 +399,155 @@ TEST(CollatorInterfaceICUTest, FrenchCanadianCollatorComparesCorrectlyUsingCompa
     ASSERT_GT(circumflexAndAcute.getKeyData().compare(graveAndAcute.getKeyData()), 0);
     ASSERT_GT(graveAndAcute.getKeyData().compare(circumflex.getKeyData()), 0);
     ASSERT_GT(circumflexAndAcute.getKeyData().compare(circumflex.getKeyData()), 0);
+}
+
+TEST(CollatorInterfaceICUTest, InvalidOneByteSequencesCompareEqual) {
+    // Both one-byte sequences are invalid.
+    assertEqualEnUS("\xEF", "\xF2");
+}
+
+TEST(CollatorInterfaceICUTest, LonelyStartCharacterComparesEqualToReplacementCharacter) {
+    assertEqualEnUS("\xEF", u8"\uFFFD");
+}
+
+TEST(CollatorInterfaceICUTest, ThreeByteSeqWithLastByteMissingComparesEqualToReplacement) {
+    // U+0823 ("samaritan vowel sign a") with last byte missing.
+    assertEqualEnUS("\xE0\xA0", u8"\uFFFD");
+}
+
+TEST(CollatorInterfaceICUTest, InvalidOneByteSeqAndTwoByteSeqCompareEqual) {
+    // Impossible byte compared against U+0823 ("samaritan vowel sign a") with last byte missing.
+    assertEqualEnUS("\xEF", "\xE0\xA0");
+}
+
+TEST(CollatorInterfaceICUTest, OverlongASCIICharacterComparesEqualToReplacementCharacter) {
+    // U+002F is the ASCII character "/", which should usually be represented as \x2F. The
+    // representation \xC0\xAF is an unnecessary two-byte encoding of this codepoint.
+    assertEqualEnUS("\xC0\xAF", u8"\uFFFD");
+}
+
+TEST(CollatorInterfaceICUTest, OverlongNullComparesEqualToReplacementCharacter) {
+    // The two-byte sequence \xC0\x80 decodes to U+0000, which should instead be encoded using a
+    // single null byte.
+    assertEqualEnUS("\xC0\x80", u8"\uFFFD");
+}
+
+TEST(CollatorInterfaceICUTest, IllegalCodePositionsCompareEqualToReplacementCharacter) {
+    // U+D800
+    assertEqualEnUS("\xED\xA0\x80", u8"\uFFFD");
+    // U+DBFF
+    assertEqualEnUS("\xED\xAF\xBF", u8"\uFFFD");
+    // U+DFFF
+    assertEqualEnUS("\xED\xBF\xBF", u8"\uFFFD");
+    // U+D800, U+DC00
+    assertEqualEnUS("\xED\xA0\x80\xED\xB0\x80", u8"\uFFFD\uFFFD");
+    // U+DB80, U+DFFF
+    assertEqualEnUS("\xED\xAE\x80\xED\xBF\xBF", u8"\uFFFD\uFFFD");
+}
+
+TEST(CollatorInterfaceICUTest, UnexpectedTrailingContinuationByteComparesAsReplacementCharacter) {
+    // U+0123 ("latin small letter g with cedilla").
+    StringData gWithCedilla("\xC4\xA3");
+    // U+0123 ("latin small letter g with cedilla") with an unexpected continuation byte.
+    StringData unexpectedContinuation("\xC4\xA3\x80");
+    // U+0123 ("latin small letter g with cedilla") followed by the replacement character, U+FFFD.
+    StringData gWithCedillaPlusReplacement("\xC4\xA3\xEF\xBF\xBD");
+
+    assertLessThanEnUS(gWithCedilla, unexpectedContinuation);
+    assertLessThanEnUS(gWithCedilla, gWithCedillaPlusReplacement);
+    assertEqualEnUS(unexpectedContinuation, gWithCedillaPlusReplacement);
+}
+
+TEST(CollatorInterfaceICUTest, ImpossibleBytesCompareEqualToReplacementCharacter) {
+    assertEqualEnUS("\xFE", u8"\uFFFD");
+    assertEqualEnUS("\xFF", u8"\uFFFD");
+}
+
+TEST(CollatorInterfaceICUTest, FourImpossibleBytesCompareEqualToFourReplacementCharacters) {
+    assertEqualEnUS("\xFE\xFE\xFF\xFF", u8"\uFFFD\uFFFD\uFFFD\uFFFD");
+}
+
+TEST(CollatorInterfaceICUTest, TwoUnexpectedContinuationsCompareAsTwoReplacementCharacters) {
+    // U+0123 ("latin small letter g with cedilla").
+    StringData gWithCedilla("\xC4\xA3");
+    // U+0123 ("latin small letter g with cedilla") with two unexpected continuation bytes.
+    StringData unexpectedContinuations("\xC4\xA3\x80\x80");
+    // U+0123 ("latin small letter g with cedilla") followed by two replacement characters.
+    StringData gWithCedillaPlusReplacements(u8"\u0123\uFFFD\uFFFD");
+
+    assertLessThanEnUS(gWithCedilla, unexpectedContinuations);
+    assertLessThanEnUS(gWithCedilla, gWithCedillaPlusReplacements);
+    assertEqualEnUS(unexpectedContinuations, gWithCedillaPlusReplacements);
+}
+
+TEST(CollatorInterfaceICUTest, FirstPossibleSequenceOfLengthNotEqualToReplacementCharacter) {
+    // First possible valid one-byte code point, U+0000.
+    assertNotEqualEnUS("\x00", u8"\uFFFD");
+    // First possible valid two-byte code point, U+0080.
+    assertNotEqualEnUS("\xC2\x80", u8"\uFFFD");
+    // First possible valid three-byte code point, U+0800.
+    assertNotEqualEnUS("\xE0\xA0\x80", u8"\uFFFD");
+    // First possible valid four-byte code point, U+00010000.
+    assertNotEqualEnUS("\xF0\x90\x80\x80", u8"\uFFFD");
+}
+
+TEST(CollatorInterfaceICUTest, LastPossibleSequenceOfLengthNotEqualToReplacementCharacter) {
+    // Last possible valid one-byte code point, U+007F.
+    assertNotEqualEnUS("\x7F", u8"\uFFFD");
+    // Last possible valid two-byte code point, U+07FF.
+    assertNotEqualEnUS("\xDF\xBF", u8"\uFFFD");
+    // Last possible valid three-byte code point, U+FFFF.
+    assertNotEqualEnUS("\xEF\xBF\xBF", u8"\uFFFD");
+    // Largest valid code point, U+0010FFFF.
+    assertNotEqualEnUS("\xF4\x8F\xBF\xBF", u8"\uFFFD");
+}
+
+TEST(CollatorInterfaceICUTest, CodePointBeyondLargestValidComparesEqualToReplacementCharacter) {
+    // Largest valid code point is U+0010FFFF; U+001FFFFF is higher, and is the last possible valid
+    // four byte sequence.
+    assertEqualEnUS("\xF7\xBF\xBF\xBF", u8"\uFFFD");
+}
+
+TEST(CollatorInterfaceICUTest, StringsWithDifferentEmbeddedInvalidSequencesCompareEqual) {
+    // U+0123 ("latin small letter g with cedilla"), follwed by invalid byte \xEF, followed by
+    // U+0145 ("latin capital letter n with cedilla").
+    StringData invalid1("\xC4\xA3\xEF\xC5\x85");
+    // U+0123 ("latin small letter g with cedilla"), follwed by unexpected continuation byte \x80,
+    // followed by U+0145 ("latin capital letter n with cedilla").
+    StringData invalid2("\xC4\xA3\x80\xC5\x85");
+    // U+0123 ("latin small letter g with cedilla"), followed by the replacement character, followed
+    // by U+0145 ("latin capital letter n with cedilla").
+    StringData withReplacementChar(u8"\u0123\uFFFD\u0145");
+
+    assertEqualEnUS(invalid1, invalid2);
+    assertEqualEnUS(invalid1, withReplacementChar);
+    assertEqualEnUS(invalid2, withReplacementChar);
+}
+
+TEST(CollatorInterfaceICUTest, DifferentEmbeddedInvalidSequencesAndDifferentFinalCodePoints) {
+    // U+0123 ("latin small letter g with cedilla"), followed by U+0146 ("latin small letter n
+    // with cedilla").
+    StringData valid1("\xC4\xA3\xC5\x86");
+    // U+0123 ("latin small letter g with cedilla"), followed by U+0145 ("latin capital letter n
+    // with cedilla").
+    StringData valid2("\xC4\xA3\xC5\x85");
+
+    // U+0123 ("latin small letter g with cedilla"), follwed by unexpected continuation byte \x80,
+    // followed by U+0146 ("latin small letter n with cedilla").
+    StringData invalid1("\xC4\xA3\x80\xC5\x86");
+    // U+0123 ("latin small letter g with cedilla"), follwed by invalid byte \xEF, followed by
+    // U+0145 ("latin capital letter n with cedilla").
+    StringData invalid2("\xC4\xA3\xEF\xC5\x85");
+
+    assertLessThanEnUS(valid1, valid2);
+    assertLessThanEnUS(invalid1, invalid2);
+
+    // Invalid strings are always greater than valid strings, since the replacement character (which
+    // replaces the invalid byte) compares greater than U+0145 and U+0146.
+    assertLessThanEnUS(valid1, invalid1);
+    assertLessThanEnUS(valid1, invalid2);
+    assertLessThanEnUS(valid2, invalid1);
+    assertLessThanEnUS(valid2, invalid2);
 }
 
 }  // namespace
