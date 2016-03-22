@@ -71,22 +71,16 @@ public:
      *
      * The shard and collection version of the new metadata are unaffected.  The caller owns the
      * new metadata.
-     *
-     * If a new metadata can't be created, returns NULL and fills in 'errMsg', if it was
-     * provided.
      */
-    CollectionMetadata* cloneMinusPending(const ChunkType& pending, std::string* errMsg) const;
+    std::unique_ptr<CollectionMetadata> cloneMinusPending(const ChunkType& chunk) const;
 
     /**
      * Returns a new metadata's instance based on 'this's state by adding a 'pending' chunk.
      *
      * The shard and collection version of the new metadata are unaffected.  The caller owns the
      * new metadata.
-     *
-     * If a new metadata can't be created, returns NULL and fills in 'errMsg', if it was
-     * provided.
      */
-    CollectionMetadata* clonePlusPending(const ChunkType& pending, std::string* errMsg) const;
+    std::unique_ptr<CollectionMetadata> clonePlusPending(const ChunkType& chunk) const;
 
     /**
      * Returns a new metadata's instance based on 'this's state by removing 'chunk'. When cloning

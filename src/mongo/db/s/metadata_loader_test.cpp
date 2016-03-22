@@ -26,114 +26,124 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/base/status.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/s/collection_metadata.h"
-#include "mongo/db/s/metadata_loader_fixture.h"
-#include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/db/s/metadata_loader.h"
+#include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
+#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_collection.h"
 
 namespace mongo {
+namespace {
 
 using std::string;
 using std::unique_ptr;
 using std::vector;
 
-using executor::RemoteCommandRequest;
+class MetadataLoaderFixture : public CatalogManagerReplSetTestFixture {
+public:
+    MetadataLoaderFixture() = default;
+    ~MetadataLoaderFixture() = default;
 
-MetadataLoaderFixture::MetadataLoaderFixture() = default;
-MetadataLoaderFixture::~MetadataLoaderFixture() = default;
-
-void MetadataLoaderFixture::setUp() {
-    CatalogManagerReplSetTestFixture::setUp();
-    getMessagingPort()->setRemote(HostAndPort("FakeRemoteClient:34567"));
-    configTargeter()->setFindHostReturnValue(configHost);
-    _epoch = OID::gen();
-    _maxCollVersion = ChunkVersion(1, 0, _epoch);
-    _loader.reset(new MetadataLoader);
-}
-
-void MetadataLoaderFixture::expectFindOnConfigSendCollectionDefault() {
-    CollectionType collType;
-    collType.setNs(NamespaceString{"test.foo"});
-    collType.setKeyPattern(BSON("a" << 1));
-    collType.setUnique(false);
-    collType.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
-    collType.setEpoch(_epoch);
-    ASSERT_OK(collType.validate());
-    expectFindOnConfigSendBSONObjVector(std::vector<BSONObj>{collType.toBSON()});
-}
-
-void MetadataLoaderFixture::expectFindOnConfigSendChunksDefault() {
-    ChunkVersion _maxCollVersion = ChunkVersion(1, 0, _epoch);
-    BSONObj chunk = BSON(
-        ChunkType::name("test.foo-a_MinKey")
-        << ChunkType::ns("test.foo") << ChunkType::min(BSON("a" << MINKEY))
-        << ChunkType::max(BSON("a" << MAXKEY))
-        << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(_maxCollVersion.toLong()))
-        << ChunkType::DEPRECATED_epoch(_epoch) << ChunkType::shard("shard0000"));
-    expectFindOnConfigSendBSONObjVector(std::vector<BSONObj>{chunk});
-}
-
-MetadataLoader& MetadataLoaderFixture::loader() const {
-    return *_loader;
-}
-
-void MetadataLoaderFixture::getMetadataFor(const OwnedPointerVector<ChunkType>& chunks,
-                                           CollectionMetadata* metadata) {
-    // Infer namespace, shard, epoch, keypattern from first chunk
-    const ChunkType* firstChunk = *(chunks.vector().begin());
-    const string ns = firstChunk->getNS();
-    const string shardName = firstChunk->getShard();
-    const OID epoch = firstChunk->getVersion().epoch();
-
-    CollectionType coll;
-    coll.setNs(NamespaceString{ns});
-    coll.setKeyPattern(BSON("a" << 1));
-    coll.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
-    coll.setEpoch(epoch);
-    ASSERT_OK(coll.validate());
-    std::vector<BSONObj> collToSend{coll.toBSON()};
-
-    ChunkVersion version(1, 0, epoch);
-    std::vector<BSONObj> chunksToSend;
-    for (const auto chunkVal : chunks.vector()) {
-        ChunkType chunk(*chunkVal);
-
-        chunk.setName(OID::gen().toString());
-        if (!chunk.isVersionSet()) {
-            chunk.setVersion(version);
-            version.incMajor();
-        }
-
-        ASSERT(chunk.validate().isOK());
-        chunksToSend.push_back(chunk.toBSON());
+protected:
+    void setUp() override {
+        CatalogManagerReplSetTestFixture::setUp();
+        getMessagingPort()->setRemote(HostAndPort("FakeRemoteClient:34567"));
+        configTargeter()->setFindHostReturnValue(configHost);
+        _maxCollVersion = ChunkVersion(1, 0, OID::gen());
+        _loader.reset(new MetadataLoader);
     }
 
-    auto future = launchAsync([this, ns, shardName, metadata] {
-        auto status = this->loader().makeCollectionMetadata(operationContext(),
-                                                            catalogManager(),
-                                                            ns,
-                                                            shardName,
-                                                            NULL, /* no old metadata */
-                                                            metadata);
-        ASSERT(status.isOK());
-    });
+    void expectFindOnConfigSendCollectionDefault() {
+        CollectionType collType;
+        collType.setNs(NamespaceString{"test.foo"});
+        collType.setKeyPattern(BSON("a" << 1));
+        collType.setUnique(false);
+        collType.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
+        collType.setEpoch(_maxCollVersion.epoch());
+        ASSERT_OK(collType.validate());
+        expectFindOnConfigSendBSONObjVector(std::vector<BSONObj>{collType.toBSON()});
+    }
 
-    expectFindOnConfigSendBSONObjVector(collToSend);
-    expectFindOnConfigSendBSONObjVector(chunksToSend);
+    void expectFindOnConfigSendChunksDefault() {
+        BSONObj chunk = BSON(
+            ChunkType::name("test.foo-a_MinKey")
+            << ChunkType::ns("test.foo") << ChunkType::min(BSON("a" << MINKEY))
+            << ChunkType::max(BSON("a" << MAXKEY))
+            << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(_maxCollVersion.toLong()))
+            << ChunkType::DEPRECATED_epoch(_maxCollVersion.epoch())
+            << ChunkType::shard("shard0000"));
+        expectFindOnConfigSendBSONObjVector(std::vector<BSONObj>{chunk});
+    }
 
-    future.timed_get(kFutureTimeout);
-}
+    MetadataLoader& loader() const {
+        return *_loader;
+    }
 
-ChunkVersion MetadataLoaderFixture::getMaxCollVersion() const {
-    return _maxCollVersion;
-}
+    void getMetadataFor(const OwnedPointerVector<ChunkType>& chunks, CollectionMetadata* metadata) {
+        // Infer namespace, shard, epoch, keypattern from first chunk
+        const ChunkType* firstChunk = *(chunks.vector().begin());
+        const string ns = firstChunk->getNS();
+        const string shardName = firstChunk->getShard();
+        const OID epoch = firstChunk->getVersion().epoch();
 
-ChunkVersion MetadataLoaderFixture::getMaxShardVersion() const {
-    return _maxCollVersion;
-}
+        CollectionType coll;
+        coll.setNs(NamespaceString{ns});
+        coll.setKeyPattern(BSON("a" << 1));
+        coll.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
+        coll.setEpoch(epoch);
+        ASSERT_OK(coll.validate());
+        std::vector<BSONObj> collToSend{coll.toBSON()};
+
+        ChunkVersion version(1, 0, epoch);
+        std::vector<BSONObj> chunksToSend;
+        for (const auto chunkVal : chunks.vector()) {
+            ChunkType chunk(*chunkVal);
+
+            chunk.setName(OID::gen().toString());
+            if (!chunk.isVersionSet()) {
+                chunk.setVersion(version);
+                version.incMajor();
+            }
+
+            ASSERT(chunk.validate().isOK());
+            chunksToSend.push_back(chunk.toBSON());
+        }
+
+        auto future = launchAsync([this, ns, shardName, metadata] {
+            auto status = loader().makeCollectionMetadata(operationContext(),
+                                                          catalogManager(),
+                                                          ns,
+                                                          shardName,
+                                                          NULL, /* no old metadata */
+                                                          metadata);
+            ASSERT_OK(status);
+        });
+
+        expectFindOnConfigSendBSONObjVector(collToSend);
+        expectFindOnConfigSendBSONObjVector(chunksToSend);
+
+        future.timed_get(kFutureTimeout);
+    }
+
+    ChunkVersion getMaxCollVersion() const {
+        return _maxCollVersion;
+    }
+
+    ChunkVersion getMaxShardVersion() const {
+        return _maxCollVersion;
+    }
+
+private:
+    const HostAndPort configHost{HostAndPort(CONFIG_HOST_PORT)};
+
+    unique_ptr<MetadataLoader> _loader;
+    ChunkVersion _maxCollVersion;
+};
 
 // TODO: Test config server down
 // TODO: Test read of chunks with new epoch
@@ -284,7 +294,7 @@ TEST_F(MetadataLoaderFixture, CheckNumChunk) {
                                                     NULL, /* no old metadata */
                                                     &metadata);
         std::cout << "status: " << status << std::endl;
-        ASSERT(status.isOK());
+        ASSERT_OK(status);
         ASSERT_EQUALS(0U, metadata.getNumChunks());
         ASSERT_EQUALS(1, metadata.getCollVersion().majorVersion());
         ASSERT_EQUALS(0, metadata.getShardVersion().majorVersion());
@@ -308,7 +318,7 @@ TEST_F(MetadataLoaderFixture, SingleChunkCheckNumChunk) {
                                                     "shard0000",
                                                     NULL, /* no old metadata */
                                                     &metadata);
-        ASSERT(status.isOK());
+        ASSERT_OK(status);
         ASSERT_EQUALS(1U, metadata.getNumChunks());
     });
 
@@ -434,18 +444,15 @@ TEST_F(MetadataLoaderFixture, PromotePendingNA) {
     getMetadataFor(chunks, &remoteMetadata);
 
     Status status = loader().promotePendingChunks(&afterMetadata, &remoteMetadata);
-    ASSERT(status.isOK());
+    ASSERT_OK(status);
 
-    string errMsg;
     ChunkType pending;
     pending.setMin(BSON("x" << 0));
     pending.setMax(BSON("x" << 10));
 
-    unique_ptr<CollectionMetadata> cloned(afterMetadata.clonePlusPending(pending, &errMsg));
-    ASSERT(cloned != NULL);
-
+    unique_ptr<CollectionMetadata> cloned(afterMetadata.clonePlusPending(pending));
     status = loader().promotePendingChunks(cloned.get(), &remoteMetadata);
-    ASSERT(status.isOK());
+    ASSERT_OK(status);
     ASSERT_EQUALS(remoteMetadata.getNumPending(), 0u);
 }
 
@@ -472,18 +479,15 @@ TEST_F(MetadataLoaderFixture, PromotePendingNAVersion) {
     getMetadataFor(chunks, &remoteMetadata);
 
     Status status = loader().promotePendingChunks(&afterMetadata, &remoteMetadata);
-    ASSERT(status.isOK());
+    ASSERT_OK(status);
 
-    string errMsg;
     ChunkType pending;
     pending.setMin(BSON("x" << 0));
     pending.setMax(BSON("x" << 10));
 
-    unique_ptr<CollectionMetadata> cloned(afterMetadata.clonePlusPending(pending, &errMsg));
-    ASSERT(cloned != NULL);
-
+    unique_ptr<CollectionMetadata> cloned(afterMetadata.clonePlusPending(pending));
     status = loader().promotePendingChunks(cloned.get(), &remoteMetadata);
-    ASSERT(status.isOK());
+    ASSERT_OK(status);
     ASSERT_EQUALS(remoteMetadata.getNumPending(), 0u);
 }
 
@@ -539,34 +543,29 @@ TEST_F(MetadataLoaderFixture, PromotePendingGoodOverlap) {
     CollectionMetadata afterMetadata;
     getMetadataFor(chunks, &afterMetadata);
 
-    string errMsg;
     ChunkType pending;
     pending.setMin(BSON("x" << MINKEY));
     pending.setMax(BSON("x" << 0));
 
-    unique_ptr<CollectionMetadata> cloned(afterMetadata.clonePlusPending(pending, &errMsg));
-    ASSERT(cloned != NULL);
+    unique_ptr<CollectionMetadata> cloned(afterMetadata.clonePlusPending(pending));
 
     pending.setMin(BSON("x" << 10));
     pending.setMax(BSON("x" << 20));
 
-    cloned.reset(cloned->clonePlusPending(pending, &errMsg));
-    ASSERT(cloned != NULL);
+    cloned = cloned->clonePlusPending(pending);
 
     pending.setMin(BSON("x" << 20));
     pending.setMax(BSON("x" << 30));
 
-    cloned.reset(cloned->clonePlusPending(pending, &errMsg));
-    ASSERT(cloned != NULL);
+    cloned = cloned->clonePlusPending(pending);
 
     pending.setMin(BSON("x" << 30));
     pending.setMax(BSON("x" << MAXKEY));
 
-    cloned.reset(cloned->clonePlusPending(pending, &errMsg));
-    ASSERT(cloned != NULL);
+    cloned = cloned->clonePlusPending(pending);
 
     Status status = loader().promotePendingChunks(cloned.get(), &remoteMetadata);
-    ASSERT(status.isOK());
+    ASSERT_OK(status);
 
     ASSERT_EQUALS(remoteMetadata.getNumPending(), 1u);
     ASSERT(remoteMetadata.keyIsPending(BSON("x" << 25)));
@@ -611,19 +610,16 @@ TEST_F(MetadataLoaderFixture, PromotePendingBadOverlap) {
     CollectionMetadata afterMetadata;
     getMetadataFor(chunks, &afterMetadata);
 
-    string errMsg;
     ChunkType pending;
     pending.setMin(BSON("x" << MINKEY));
     pending.setMax(BSON("x" << 1));
 
-    unique_ptr<CollectionMetadata> cloned(afterMetadata.clonePlusPending(pending, &errMsg));
-    ASSERT(cloned != NULL);
-
-    cloned.reset(cloned->clonePlusPending(pending, &errMsg));
-    ASSERT(cloned != NULL);
+    unique_ptr<CollectionMetadata> cloned(afterMetadata.clonePlusPending(pending));
+    cloned = cloned->clonePlusPending(pending);
 
     Status status = loader().promotePendingChunks(cloned.get(), &remoteMetadata);
     ASSERT_EQUALS(status.code(), ErrorCodes::RemoteChangeDetected);
 }
 
+}  // namespace
 }  // namespace mongo

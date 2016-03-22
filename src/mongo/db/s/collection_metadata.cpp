@@ -122,73 +122,37 @@ CollectionMetadata* CollectionMetadata::clonePlusChunk(const ChunkType& chunk,
     return metadata.release();
 }
 
-CollectionMetadata* CollectionMetadata::cloneMinusPending(const ChunkType& pending,
-                                                          string* errMsg) const {
-    // The error message string is optional.
-    string dummy;
-    if (errMsg == NULL) {
-        errMsg = &dummy;
-    }
+std::unique_ptr<CollectionMetadata> CollectionMetadata::cloneMinusPending(
+    const ChunkType& chunk) const {
+    invariant(rangeMapContains(_pendingMap, chunk.getMin(), chunk.getMax()));
 
-    // Check that we have the exact chunk that will be subtracted.
-    if (!rangeMapContains(_pendingMap, pending.getMin(), pending.getMax())) {
-        *errMsg = stream() << "cannot remove pending chunk "
-                           << rangeToString(pending.getMin(), pending.getMax())
-                           << ", this shard does not contain the chunk";
-
-        if (rangeMapOverlaps(_pendingMap, pending.getMin(), pending.getMax())) {
-            RangeVector overlap;
-            getRangeMapOverlap(_pendingMap, pending.getMin(), pending.getMax(), &overlap);
-
-            *errMsg += stream() << " and it overlaps " << overlapToString(overlap);
-        }
-
-        warning() << *errMsg;
-        return NULL;
-    }
-
-    unique_ptr<CollectionMetadata> metadata(new CollectionMetadata);
-    metadata->_keyPattern = this->_keyPattern;
+    unique_ptr<CollectionMetadata> metadata(stdx::make_unique<CollectionMetadata>());
+    metadata->_keyPattern = _keyPattern;
     metadata->_keyPattern.getOwned();
     metadata->fillKeyPatternFields();
-    metadata->_pendingMap = this->_pendingMap;
-    metadata->_pendingMap.erase(pending.getMin());
-    metadata->_chunksMap = this->_chunksMap;
-    metadata->_rangesMap = this->_rangesMap;
+    metadata->_pendingMap = _pendingMap;
+    metadata->_pendingMap.erase(chunk.getMin());
+
+    metadata->_chunksMap = _chunksMap;
+    metadata->_rangesMap = _rangesMap;
     metadata->_shardVersion = _shardVersion;
     metadata->_collVersion = _collVersion;
 
     invariant(metadata->isValid());
-    return metadata.release();
+    return metadata;
 }
 
-CollectionMetadata* CollectionMetadata::clonePlusPending(const ChunkType& pending,
-                                                         string* errMsg) const {
-    // The error message string is optional.
-    string dummy;
-    if (errMsg == NULL) {
-        errMsg = &dummy;
-    }
+std::unique_ptr<CollectionMetadata> CollectionMetadata::clonePlusPending(
+    const ChunkType& chunk) const {
+    invariant(!rangeMapOverlaps(_chunksMap, chunk.getMin(), chunk.getMax()));
 
-    if (rangeMapOverlaps(_chunksMap, pending.getMin(), pending.getMax())) {
-        RangeVector overlap;
-        getRangeMapOverlap(_chunksMap, pending.getMin(), pending.getMax(), &overlap);
-
-        *errMsg = stream() << "cannot add pending chunk "
-                           << rangeToString(pending.getMin(), pending.getMax())
-                           << " because the chunk overlaps " << overlapToString(overlap);
-
-        warning() << *errMsg;
-        return NULL;
-    }
-
-    unique_ptr<CollectionMetadata> metadata(new CollectionMetadata);
-    metadata->_keyPattern = this->_keyPattern;
+    unique_ptr<CollectionMetadata> metadata(stdx::make_unique<CollectionMetadata>());
+    metadata->_keyPattern = _keyPattern;
     metadata->_keyPattern.getOwned();
     metadata->fillKeyPatternFields();
-    metadata->_pendingMap = this->_pendingMap;
-    metadata->_chunksMap = this->_chunksMap;
-    metadata->_rangesMap = this->_rangesMap;
+    metadata->_pendingMap = _pendingMap;
+    metadata->_chunksMap = _chunksMap;
+    metadata->_rangesMap = _rangesMap;
     metadata->_shardVersion = _shardVersion;
     metadata->_collVersion = _collVersion;
 
@@ -198,11 +162,11 @@ CollectionMetadata* CollectionMetadata::clonePlusPending(const ChunkType& pendin
     // We remove any chunks we overlap, the remote request starting a chunk migration must have
     // been authoritative.
 
-    if (rangeMapOverlaps(_pendingMap, pending.getMin(), pending.getMax())) {
+    if (rangeMapOverlaps(_pendingMap, chunk.getMin(), chunk.getMax())) {
         RangeVector pendingOverlap;
-        getRangeMapOverlap(_pendingMap, pending.getMin(), pending.getMax(), &pendingOverlap);
+        getRangeMapOverlap(_pendingMap, chunk.getMin(), chunk.getMax(), &pendingOverlap);
 
-        warning() << "new pending chunk " << rangeToString(pending.getMin(), pending.getMax())
+        warning() << "new pending chunk " << rangeToString(chunk.getMin(), chunk.getMax())
                   << " overlaps existing pending chunks " << overlapToString(pendingOverlap)
                   << ", a migration may not have completed";
 
@@ -211,10 +175,10 @@ CollectionMetadata* CollectionMetadata::clonePlusPending(const ChunkType& pendin
         }
     }
 
-    metadata->_pendingMap.insert(make_pair(pending.getMin(), pending.getMax()));
+    metadata->_pendingMap.insert(make_pair(chunk.getMin(), chunk.getMax()));
 
     invariant(metadata->isValid());
-    return metadata.release();
+    return metadata;
 }
 
 CollectionMetadata* CollectionMetadata::cloneSplit(const ChunkType& chunk,

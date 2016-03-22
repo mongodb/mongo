@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/base/status.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
@@ -36,7 +38,6 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/write_ops/batched_command_response.h"
 
 namespace mongo {
 namespace {
@@ -44,8 +45,6 @@ namespace {
 using std::string;
 using std::unique_ptr;
 using std::vector;
-
-using executor::RemoteCommandResponse;
 
 class NoChunkFixture : public CatalogManagerReplSetTestFixture {
 protected:
@@ -165,18 +164,11 @@ TEST_F(NoChunkFixture, NoPendingChunks) {
 }
 
 TEST_F(NoChunkFixture, FirstPendingChunk) {
-    string errMsg;
     ChunkType chunk;
-    unique_ptr<CollectionMetadata> cloned;
-
     chunk.setMin(BSON("a" << 10));
     chunk.setMax(BSON("a" << 20));
 
-    cloned.reset(getCollMetadata().clonePlusPending(chunk, &errMsg));
-
-    ASSERT_EQUALS(errMsg, "");
-    ASSERT(cloned != NULL);
-
+    unique_ptr<CollectionMetadata> cloned(getCollMetadata().clonePlusPending(chunk));
     ASSERT(cloned->keyIsPending(BSON("a" << 15)));
     ASSERT(!cloned->keyIsPending(BSON("a" << 25)));
     ASSERT(cloned->keyIsPending(BSON("a" << 10)));
@@ -184,26 +176,16 @@ TEST_F(NoChunkFixture, FirstPendingChunk) {
 }
 
 TEST_F(NoChunkFixture, EmptyMultiPendingChunk) {
-    string errMsg;
     ChunkType chunk;
-    unique_ptr<CollectionMetadata> cloned;
-
     chunk.setMin(BSON("a" << 10));
     chunk.setMax(BSON("a" << 20));
 
-    cloned.reset(getCollMetadata().clonePlusPending(chunk, &errMsg));
-
-    ASSERT_EQUALS(errMsg, "");
-    ASSERT(cloned != NULL);
+    unique_ptr<CollectionMetadata> cloned(getCollMetadata().clonePlusPending(chunk));
 
     chunk.setMin(BSON("a" << 40));
     chunk.setMax(BSON("a" << 50));
 
-    cloned.reset(cloned->clonePlusPending(chunk, &errMsg));
-
-    ASSERT_EQUALS(errMsg, "");
-    ASSERT(cloned != NULL);
-
+    cloned = cloned->clonePlusPending(chunk);
     ASSERT(cloned->keyIsPending(BSON("a" << 15)));
     ASSERT(!cloned->keyIsPending(BSON("a" << 25)));
     ASSERT(cloned->keyIsPending(BSON("a" << 45)));
@@ -211,48 +193,28 @@ TEST_F(NoChunkFixture, EmptyMultiPendingChunk) {
 }
 
 TEST_F(NoChunkFixture, MinusPendingChunk) {
-    string errMsg;
     ChunkType chunk;
-    unique_ptr<CollectionMetadata> cloned;
-
     chunk.setMin(BSON("a" << 10));
     chunk.setMax(BSON("a" << 20));
 
-    cloned.reset(getCollMetadata().clonePlusPending(chunk, &errMsg));
+    unique_ptr<CollectionMetadata> cloned(getCollMetadata().clonePlusPending(chunk));
 
-    ASSERT_EQUALS(errMsg, "");
-    ASSERT(cloned != NULL);
-
-    cloned.reset(cloned->cloneMinusPending(chunk, &errMsg));
-
-    ASSERT_EQUALS(errMsg, "");
-    ASSERT(cloned != NULL);
-
+    cloned = cloned->cloneMinusPending(chunk);
     ASSERT(!cloned->keyIsPending(BSON("a" << 15)));
     ASSERT(!cloned->keyIsPending(BSON("a" << 25)));
 }
 
 TEST_F(NoChunkFixture, OverlappingPendingChunk) {
-    string errMsg;
     ChunkType chunk;
-    unique_ptr<CollectionMetadata> cloned;
-
     chunk.setMin(BSON("a" << 10));
     chunk.setMax(BSON("a" << 30));
 
-    cloned.reset(getCollMetadata().clonePlusPending(chunk, &errMsg));
-
-    ASSERT_EQUALS(errMsg, "");
-    ASSERT(cloned != NULL);
+    unique_ptr<CollectionMetadata> cloned(getCollMetadata().clonePlusPending(chunk));
 
     chunk.setMin(BSON("a" << 20));
     chunk.setMax(BSON("a" << 40));
 
-    cloned.reset(cloned->clonePlusPending(chunk, &errMsg));
-
-    ASSERT_EQUALS(errMsg, "");
-    ASSERT(cloned != NULL);
-
+    cloned = cloned->clonePlusPending(chunk);
     ASSERT(!cloned->keyIsPending(BSON("a" << 15)));
     ASSERT(cloned->keyIsPending(BSON("a" << 25)));
     ASSERT(cloned->keyIsPending(BSON("a" << 35)));
@@ -260,33 +222,21 @@ TEST_F(NoChunkFixture, OverlappingPendingChunk) {
 }
 
 TEST_F(NoChunkFixture, OverlappingPendingChunks) {
-    string errMsg;
     ChunkType chunk;
-    unique_ptr<CollectionMetadata> cloned;
-
     chunk.setMin(BSON("a" << 10));
     chunk.setMax(BSON("a" << 30));
 
-    cloned.reset(getCollMetadata().clonePlusPending(chunk, &errMsg));
-
-    ASSERT_EQUALS(errMsg, "");
-    ASSERT(cloned != NULL);
+    unique_ptr<CollectionMetadata> cloned(getCollMetadata().clonePlusPending(chunk));
 
     chunk.setMin(BSON("a" << 30));
     chunk.setMax(BSON("a" << 50));
 
-    cloned.reset(cloned->clonePlusPending(chunk, &errMsg));
-
-    ASSERT_EQUALS(errMsg, "");
-    ASSERT(cloned != NULL);
+    cloned = cloned->clonePlusPending(chunk);
 
     chunk.setMin(BSON("a" << 20));
     chunk.setMax(BSON("a" << 40));
 
-    cloned.reset(cloned->clonePlusPending(chunk, &errMsg));
-
-    ASSERT_EQUALS(errMsg, "");
-    ASSERT(cloned != NULL);
+    cloned = cloned->clonePlusPending(chunk);
 
     ASSERT(!cloned->keyIsPending(BSON("a" << 15)));
     ASSERT(cloned->keyIsPending(BSON("a" << 25)));
@@ -294,61 +244,19 @@ TEST_F(NoChunkFixture, OverlappingPendingChunks) {
     ASSERT(!cloned->keyIsPending(BSON("a" << 45)));
 }
 
-TEST_F(NoChunkFixture, MinusInvalidPendingChunk) {
-    string errMsg;
-    ChunkType chunk;
-    unique_ptr<CollectionMetadata> cloned;
-
-    chunk.setMin(BSON("a" << 10));
-    chunk.setMax(BSON("a" << 30));
-
-    cloned.reset(getCollMetadata().cloneMinusPending(chunk, &errMsg));
-
-    ASSERT_NOT_EQUALS(errMsg, "");
-    ASSERT(cloned == NULL);
-}
-
-TEST_F(NoChunkFixture, MinusOverlappingPendingChunk) {
-    string errMsg;
-    ChunkType chunk;
-    unique_ptr<CollectionMetadata> cloned;
-
-    chunk.setMin(BSON("a" << 10));
-    chunk.setMax(BSON("a" << 30));
-
-    cloned.reset(getCollMetadata().clonePlusPending(chunk, &errMsg));
-
-    ASSERT_EQUALS(errMsg, "");
-    ASSERT(cloned != NULL);
-
-    chunk.setMin(BSON("a" << 15));
-    chunk.setMax(BSON("a" << 35));
-
-    cloned.reset(cloned->cloneMinusPending(chunk, &errMsg));
-
-    ASSERT_NOT_EQUALS(errMsg, "");
-    ASSERT(cloned == NULL);
-}
-
 TEST_F(NoChunkFixture, PlusChunkWithPending) {
-    string errMsg;
     ChunkType chunk;
-    unique_ptr<CollectionMetadata> cloned;
-
     chunk.setMin(BSON("a" << 10));
     chunk.setMax(BSON("a" << 20));
 
-    cloned.reset(getCollMetadata().clonePlusPending(chunk, &errMsg));
-
-    ASSERT_EQUALS(errMsg, "");
-    ASSERT(cloned != NULL);
-
+    unique_ptr<CollectionMetadata> cloned(getCollMetadata().clonePlusPending(chunk));
     ASSERT(cloned->keyIsPending(BSON("a" << 15)));
     ASSERT(!cloned->keyIsPending(BSON("a" << 25)));
 
     chunk.setMin(BSON("a" << 20));
     chunk.setMax(BSON("a" << 30));
 
+    std::string errMsg;
     cloned.reset(cloned->clonePlusChunk(
         chunk, ChunkVersion(1, 0, cloned->getCollVersion().epoch()), &errMsg));
 
@@ -407,16 +315,11 @@ TEST_F(NoChunkFixture, OrphanedDataRangeEnd) {
 }
 
 TEST_F(NoChunkFixture, PendingOrphanedDataRanges) {
-    string errMsg;
     ChunkType chunk;
-    unique_ptr<CollectionMetadata> cloned;
-
     chunk.setMin(BSON("a" << 10));
     chunk.setMax(BSON("a" << 20));
 
-    cloned.reset(getCollMetadata().clonePlusPending(chunk, &errMsg));
-    ASSERT_EQUALS(errMsg, string(""));
-    ASSERT(cloned != NULL);
+    unique_ptr<CollectionMetadata> cloned(getCollMetadata().clonePlusPending(chunk));
 
     KeyRange keyRange;
     ASSERT(cloned->getNextOrphanRange(cloned->getMinKey(), &keyRange));
@@ -537,17 +440,11 @@ TEST_F(SingleChunkFixture, DonateLastChunk) {
 }
 
 TEST_F(SingleChunkFixture, PlusPendingChunk) {
-    string errMsg;
     ChunkType chunk;
-    unique_ptr<CollectionMetadata> cloned;
-
     chunk.setMin(BSON("a" << 20));
     chunk.setMax(BSON("a" << 30));
 
-    cloned.reset(getCollMetadata().clonePlusPending(chunk, &errMsg));
-
-    ASSERT_EQUALS(errMsg, "");
-    ASSERT(cloned != NULL);
+    unique_ptr<CollectionMetadata> cloned(getCollMetadata().clonePlusPending(chunk));
 
     ASSERT(cloned->keyBelongsToMe(BSON("a" << 15)));
     ASSERT(!cloned->keyBelongsToMe(BSON("a" << 25)));
@@ -555,27 +452,12 @@ TEST_F(SingleChunkFixture, PlusPendingChunk) {
     ASSERT(cloned->keyIsPending(BSON("a" << 25)));
 }
 
-TEST_F(SingleChunkFixture, PlusOverlapPendingChunk) {
-    string errMsg;
-    ChunkType chunk;
-    unique_ptr<CollectionMetadata> cloned;
-
-    chunk.setMin(BSON("a" << 10));
-    chunk.setMax(BSON("a" << 20));
-
-    cloned.reset(getCollMetadata().clonePlusPending(chunk, &errMsg));
-
-    ASSERT_NOT_EQUALS(errMsg, "");
-    ASSERT(cloned == NULL);
-}
-
 TEST_F(SingleChunkFixture, MinusChunkWithPending) {
     ChunkType chunk;
     chunk.setMin(BSON("a" << 20));
     chunk.setMax(BSON("a" << 30));
 
-    string errMsg;
-    unique_ptr<CollectionMetadata> cloned(getCollMetadata().clonePlusPending(chunk, &errMsg));
+    unique_ptr<CollectionMetadata> cloned(getCollMetadata().clonePlusPending(chunk));
     ASSERT(cloned->keyIsPending(BSON("a" << 25)));
     ASSERT(!cloned->keyIsPending(BSON("a" << 35)));
 
@@ -665,18 +547,11 @@ TEST_F(SingleChunkFixture, MultiSplit) {
 }
 
 TEST_F(SingleChunkFixture, SplitChunkWithPending) {
-    string errMsg;
     ChunkType chunk;
-    unique_ptr<CollectionMetadata> cloned;
-
     chunk.setMin(BSON("a" << 20));
     chunk.setMax(BSON("a" << 30));
 
-    cloned.reset(getCollMetadata().clonePlusPending(chunk, &errMsg));
-
-    ASSERT_EQUALS(errMsg, "");
-    ASSERT(cloned != NULL);
-
+    unique_ptr<CollectionMetadata> cloned(getCollMetadata().clonePlusPending(chunk));
     ASSERT(cloned->keyIsPending(BSON("a" << 25)));
     ASSERT(!cloned->keyIsPending(BSON("a" << 35)));
 
@@ -687,6 +562,7 @@ TEST_F(SingleChunkFixture, SplitChunkWithPending) {
     splitPoints.push_back(BSON("a" << 14));
     splitPoints.push_back(BSON("a" << 16));
 
+    std::string errMsg;
     cloned.reset(cloned->cloneSplit(chunk,
                                     splitPoints,
                                     ChunkVersion(cloned->getCollVersion().majorVersion() + 1,
@@ -1001,16 +877,11 @@ TEST_F(TwoChunksWithGapCompoundKeyFixture, ChunkGapOrphanedDataRanges) {
 }
 
 TEST_F(TwoChunksWithGapCompoundKeyFixture, ChunkGapAndPendingOrphanedDataRanges) {
-    string errMsg;
     ChunkType chunk;
-    unique_ptr<CollectionMetadata> cloned;
-
     chunk.setMin(BSON("a" << 20 << "b" << 0));
     chunk.setMax(BSON("a" << 30 << "b" << 0));
 
-    cloned.reset(getCollMetadata().clonePlusPending(chunk, &errMsg));
-    ASSERT_EQUALS(errMsg, string(""));
-    ASSERT(cloned != NULL);
+    unique_ptr<CollectionMetadata> cloned(getCollMetadata().clonePlusPending(chunk));
 
     KeyRange keyRange;
     ASSERT(cloned->getNextOrphanRange(cloned->getMinKey(), &keyRange));

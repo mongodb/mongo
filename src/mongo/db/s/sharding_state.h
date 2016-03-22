@@ -196,8 +196,6 @@ public:
 
     std::shared_ptr<CollectionMetadata> getCollectionMetadata(const std::string& ns);
 
-    // chunk migrate and split support
-
     /**
      * Creates and installs a new chunk metadata for a given collection by "forgetting" about
      * one of its chunks.  The new metadata uses the provided version, which has to be higher
@@ -238,41 +236,6 @@ public:
     void undoDonateChunk(OperationContext* txn,
                          const std::string& ns,
                          std::shared_ptr<CollectionMetadata> prevMetadata);
-
-    /**
-     * Remembers a chunk range between 'min' and 'max' as a range which will have data migrated
-     * into it.  This data can then be protected against cleanup of orphaned data.
-     *
-     * Overlapping pending ranges will be removed, so it is only safe to use this when you know
-     * your metadata view is definitive, such as at the start of a migration.
-     *
-     * @return false with errMsg if the range is owned by this shard
-     */
-    bool notePending(OperationContext* txn,
-                     const std::string& ns,
-                     const BSONObj& min,
-                     const BSONObj& max,
-                     const OID& epoch,
-                     std::string* errMsg);
-
-    /**
-     * Stops tracking a chunk range between 'min' and 'max' that previously was having data
-     * migrated into it.  This data is no longer protected against cleanup of orphaned data.
-     *
-     * To avoid removing pending ranges of other operations, ensure that this is only used when
-     * a migration is still active.
-     * TODO: Because migrations may currently be active when a collection drops, an epoch is
-     * necessary to ensure the pending metadata change is still applicable.
-     *
-     * @return false with errMsg if the range is owned by the shard or the epoch of the metadata
-     * has changed
-     */
-    bool forgetPending(OperationContext* txn,
-                       const std::string& ns,
-                       const BSONObj& min,
-                       const BSONObj& max,
-                       const OID& epoch,
-                       std::string* errMsg);
 
     /**
      * Creates and installs a new chunk metadata for a given collection by splitting one of its

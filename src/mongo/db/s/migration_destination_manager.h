@@ -42,6 +42,7 @@
 
 namespace mongo {
 
+class NamespaceString;
 class OperationContext;
 class Status;
 struct WriteConcernOptions;
@@ -126,6 +127,38 @@ private:
                              const repl::OpTime& lastOpApplied,
                              const WriteConcernOptions& writeConcern);
 
+    /**
+     * Remembers a chunk range between 'min' and 'max' as a range which will have data migrated
+     * into it.  This data can then be protected against cleanup of orphaned data.
+     *
+     * Overlapping pending ranges will be removed, so it is only safe to use this when you know
+     * your metadata view is definitive, such as at the start of a migration.
+     *
+     * TODO: Because migrations may currently be active when a collection drops, an epoch is
+     * necessary to ensure the pending metadata change is still applicable.
+     */
+    Status _notePending(OperationContext* txn,
+                        const NamespaceString& nss,
+                        const BSONObj& min,
+                        const BSONObj& max,
+                        const OID& epoch);
+
+    /**
+     * Stops tracking a chunk range between 'min' and 'max' that previously was having data
+     * migrated into it.  This data is no longer protected against cleanup of orphaned data.
+     *
+     * To avoid removing pending ranges of other operations, ensure that this is only used when
+     * a migration is still active.
+     *
+     * TODO: Because migrations may currently be active when a collection drops, an epoch is
+     * necessary to ensure the pending metadata change is still applicable.
+     */
+    Status _forgetPending(OperationContext* txn,
+                          const NamespaceString& nss,
+                          const BSONObj& min,
+                          const BSONObj& max,
+                          const OID& epoch);
+
     // Mutex to guard all fields
     mutable stdx::mutex _mutex;
 
@@ -143,6 +176,10 @@ private:
     BSONObj _min;
     BSONObj _max;
     BSONObj _shardKeyPattern;
+
+    // Set to true once we have accepted the chunk as pending into our metadata. Used so that on
+    // failure we can perform the appropriate cleanup.
+    bool _chunkMarkedPending{false};
 
     long long _numCloned{0};
     long long _clonedBytes{0};
