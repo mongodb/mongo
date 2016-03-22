@@ -248,6 +248,7 @@ public:
         Date_t now;
         unsigned selfUptime;
         const OpTime& lastOpApplied;
+        const OpTime& lastOpDurable;
         const OpTime& lastCommittedOpTime;
         const OpTime& readConcernMajorityOpTime;
     };

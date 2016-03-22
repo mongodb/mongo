@@ -311,7 +311,7 @@ var ReplSetTest = function(opts) {
     function _getLastCommittedOpTime(conn) {
         var replSetStatus =
             assert.commandWorked(conn.getDB("admin").runCommand({replSetGetStatus: 1}));
-        return replSetStatus.OpTimes.lastCommittedOpTime || {
+        return (replSetStatus.OpTimes || replSetStatus.optimes).lastCommittedOpTime || {
             ts: Timestamp(0, 0),
             t: NumberLong(0)
         };
@@ -326,7 +326,7 @@ var ReplSetTest = function(opts) {
     function _getReadConcernMajorityOpTime(conn) {
         var replSetStatus =
             assert.commandWorked(conn.getDB("admin").runCommand({replSetGetStatus: 1}));
-        return replSetStatus.OpTimes.readConcernMajorityOpTime || {
+        return (replSetStatus.OpTimes || replSetStatus.optimes).readConcernMajorityOpTime || {
             ts: Timestamp(0, 0),
             t: NumberLong(0)
         };

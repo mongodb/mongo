@@ -71,6 +71,9 @@ public:
     OpTime getAppliedOpTime() const {
         return _lastResponse.getAppliedOpTime();
     }
+    OpTime getDurableOpTime() const {
+        return _lastResponse.hasDurableOpTime() ? _lastResponse.getDurableOpTime() : OpTime();
+    }
     int getConfigVersion() const {
         return _lastResponse.getConfigVersion();
     }

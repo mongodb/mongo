@@ -1933,6 +1933,7 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(BSONObjBuilder* respo
                        _replExecutor.now(),
                        static_cast<unsigned>(time(0) - serverGlobalParams.started),
                        getMyLastAppliedOpTime(),
+                       getMyLastDurableOpTime(),
                        getLastCommittedOpTime(),
                        getCurrentCommittedSnapshotOpTime()},
                    response,

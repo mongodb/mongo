@@ -1314,6 +1314,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     Date_t curTime = heartbeatTime + uptimeSecs;
     Timestamp electionTime(1, 2);
     OpTime oplogProgress(Timestamp(3, 4), 2);
+    OpTime oplogDurable(Timestamp(3, 4), 1);
     OpTime lastCommittedOpTime(Timestamp(2, 3), 6);
     OpTime readConcernMajorityOpTime(Timestamp(4, 5), 7);
     std::string setName = "mySet";
@@ -1323,7 +1324,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     hb.setState(MemberState::RS_SECONDARY);
     hb.setElectionTime(electionTime);
     hb.setHbMsg("READY");
-    hb.setDurableOpTime(oplogProgress);
+    hb.setDurableOpTime(oplogDurable);
     hb.setAppliedOpTime(oplogProgress);
     StatusWith<ReplSetHeartbeatResponse> hbResponseGood = StatusWith<ReplSetHeartbeatResponse>(hb);
 
@@ -1369,6 +1370,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
             curTime,
             static_cast<unsigned>(durationCount<Seconds>(uptimeSecs)),
             oplogProgress,
+            oplogDurable,
             lastCommittedOpTime,
             readConcernMajorityOpTime},
         &statusBuilder,
@@ -1379,9 +1381,14 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     // Test results for all non-self members
     ASSERT_EQUALS(setName, rsStatus["set"].String());
     ASSERT_EQUALS(curTime.asInt64(), rsStatus["date"].Date().asInt64());
-    ASSERT_EQUALS(lastCommittedOpTime.toBSON(), rsStatus["OpTimes"]["lastCommittedOpTime"].Obj());
-    ASSERT_EQUALS(readConcernMajorityOpTime.toBSON(),
-                  rsStatus["OpTimes"]["readConcernMajorityOpTime"].Obj());
+    ASSERT_EQUALS(lastCommittedOpTime.toBSON(), rsStatus["optimes"]["lastCommittedOpTime"].Obj());
+    {
+        const auto optimes = rsStatus["optimes"].Obj();
+        ASSERT_EQUALS(readConcernMajorityOpTime.toBSON(),
+                      optimes["readConcernMajorityOpTime"].Obj());
+        ASSERT_EQUALS(oplogProgress.toBSON(), optimes["appliedOpTime"].Obj());
+        ASSERT_EQUALS((oplogDurable).toBSON(), optimes["durableOpTime"].Obj());
+    }
     std::vector<BSONElement> memberArray = rsStatus["members"].Array();
     ASSERT_EQUALS(4U, memberArray.size());
     BSONObj member0Status = memberArray[0].Obj();
@@ -1479,6 +1486,7 @@ TEST_F(TopoCoordTest, NodeReturnsInvalidReplicaSetConfigInResponseToGetStatusWhe
             curTime,
             static_cast<unsigned>(durationCount<Seconds>(uptimeSecs)),
             oplogProgress,
+            oplogProgress,
             OpTime(),
             OpTime()},
         &statusBuilder,
@@ -1539,7 +1547,7 @@ TEST_F(ShutdownInProgressTest, NodeReturnsShutDownInProgressWhenGetReplSetStatus
     BSONObjBuilder response;
     getTopoCoord().prepareStatusResponse(
         cbData(),
-        TopologyCoordinator::ReplSetStatusArgs{Date_t(), 0, OpTime(), OpTime(), OpTime()},
+        TopologyCoordinator::ReplSetStatusArgs{Date_t(), 0, OpTime(), OpTime(), OpTime(), OpTime()},
         &response,
         &result);
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
@@ -4047,6 +4055,7 @@ public:
             TopologyCoordinator::ReplSetStatusArgs{_firstRequestDate + Milliseconds(4000),
                                                    10,
                                                    OpTime(Timestamp(100, 0), 0),
+                                                   OpTime(Timestamp(100, 0), 0),
                                                    OpTime(),
                                                    OpTime()},
             &statusBuilder,
@@ -4060,9 +4069,9 @@ public:
         ASSERT_EQUALS(1, member1Status["health"].Double());
 
         ASSERT_EQUALS(Timestamp(0, 0),
-                      Timestamp(rsStatus["OpTimes"]["lastCommittedOpTime"]["ts"].timestampValue()));
-        ASSERT_EQUALS(-1LL, rsStatus["OpTimes"]["lastCommittedOpTime"]["t"].numberLong());
-        ASSERT_FALSE(rsStatus["OpTimes"].Obj().hasField("readConcernMajorityOpTime"));
+                      Timestamp(rsStatus["optimes"]["lastCommittedOpTime"]["ts"].timestampValue()));
+        ASSERT_EQUALS(-1LL, rsStatus["optimes"]["lastCommittedOpTime"]["t"].numberLong());
+        ASSERT_FALSE(rsStatus["optimes"].Obj().hasField("readConcernMajorityOpTime"));
     }
 
     Date_t firstRequestDate() {
@@ -4130,6 +4139,7 @@ public:
             TopologyCoordinator::ReplSetStatusArgs{firstRequestDate() + Seconds(4),
                                                    10,
                                                    OpTime(Timestamp(100, 0), 0),
+                                                   OpTime(Timestamp(100, 0), 0),
                                                    OpTime(),
                                                    OpTime()},
             &statusBuilder,
@@ -4177,6 +4187,7 @@ TEST_F(HeartbeatResponseTestTwoRetriesV1, NodeDoesNotRetryHeartbeatsAfterFailing
         cbData(),
         TopologyCoordinator::ReplSetStatusArgs{firstRequestDate() + Milliseconds(4900),
                                                10,
+                                               OpTime(Timestamp(100, 0), 0),
                                                OpTime(Timestamp(100, 0), 0),
                                                OpTime(),
                                                OpTime()},
@@ -4237,6 +4248,7 @@ TEST_F(HeartbeatResponseTestTwoRetriesV1, HeartbeatThreeNonconsecutiveFailures) 
         cbData(),
         TopologyCoordinator::ReplSetStatusArgs{firstRequestDate() + Milliseconds(7000),
                                                600,
+                                               OpTime(Timestamp(100, 0), 0),
                                                OpTime(Timestamp(100, 0), 0),
                                                OpTime(),
                                                OpTime()},

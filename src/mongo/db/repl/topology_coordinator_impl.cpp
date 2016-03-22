@@ -96,6 +96,16 @@ bool _hasOnlyAuthErrorUpHeartbeats(const std::vector<MemberHeartbeatData>& hbdat
     return foundAuthError;
 }
 
+void appendOpTime(BSONObjBuilder* bob,
+                  const char* elemName,
+                  const OpTime& opTime,
+                  const long long pv) {
+    if (pv == 1) {
+        opTime.append(bob, elemName);
+    } else {
+        bob->append(elemName, opTime.getTimestamp());
+    }
+}
 }  // namespace
 
 void PingStats::start(Date_t now) {
@@ -1511,6 +1521,7 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplicationExecutor::C
     const MemberState myState = getMemberState();
     const Date_t now = rsStatusArgs.now;
     const OpTime& lastOpApplied = rsStatusArgs.lastOpApplied;
+    const OpTime& lastOpDurable = rsStatusArgs.lastOpDurable;
 
     if (_selfIndex == -1) {
         // We're REMOVED or have an invalid config
@@ -1518,14 +1529,7 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplicationExecutor::C
         response->append("stateStr", myState.toString());
         response->append("uptime", rsStatusArgs.selfUptime);
 
-        if (_rsConfig.getProtocolVersion() == 1) {
-            BSONObjBuilder opTime(response->subobjStart("optime"));
-            opTime.append("ts", lastOpApplied.getTimestamp());
-            opTime.append("t", lastOpApplied.getTerm());
-            opTime.done();
-        } else {
-            response->append("optime", lastOpApplied.getTimestamp());
-        }
+        appendOpTime(response, "optime", lastOpApplied, _rsConfig.getProtocolVersion());
 
         response->appendDate("optimeDate",
                              Date_t::fromDurationSinceEpoch(Seconds(lastOpApplied.getSecs())));
@@ -1553,15 +1557,7 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplicationExecutor::C
             bb.append("stateStr", myState.toString());
             bb.append("uptime", rsStatusArgs.selfUptime);
             if (!_selfConfig().isArbiter()) {
-                if (_rsConfig.getProtocolVersion() == 1) {
-                    BSONObjBuilder opTime(bb.subobjStart("optime"));
-                    opTime.append("ts", lastOpApplied.getTimestamp());
-                    opTime.append("t", lastOpApplied.getTerm());
-                    opTime.done();
-                } else {
-                    bb.append("optime", lastOpApplied.getTimestamp());
-                }
-
+                appendOpTime(&bb, "optime", lastOpApplied, _rsConfig.getProtocolVersion());
                 bb.appendDate("optimeDate",
                               Date_t::fromDurationSinceEpoch(Seconds(lastOpApplied.getSecs())));
             }
@@ -1608,18 +1604,16 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplicationExecutor::C
                 it->getUpSince() != Date_t() ? durationCount<Seconds>(now - it->getUpSince()) : 0));
             bb.append("uptime", uptime);
             if (!itConfig.isArbiter()) {
-                if (_rsConfig.getProtocolVersion() == 1) {
-                    BSONObjBuilder opTime(bb.subobjStart("optime"));
-                    opTime.append("ts", it->getAppliedOpTime().getTimestamp());
-                    opTime.append("t", it->getAppliedOpTime().getTerm());
-                    opTime.done();
-                } else {
-                    bb.append("optime", it->getAppliedOpTime().getTimestamp());
-                }
+                appendOpTime(&bb, "optime", it->getAppliedOpTime(), _rsConfig.getProtocolVersion());
+                appendOpTime(
+                    &bb, "optimeDurable", it->getDurableOpTime(), _rsConfig.getProtocolVersion());
 
                 bb.appendDate(
                     "optimeDate",
                     Date_t::fromDurationSinceEpoch(Seconds(it->getAppliedOpTime().getSecs())));
+                bb.appendDate(
+                    "optimeDurableDate",
+                    Date_t::fromDurationSinceEpoch(Seconds(it->getDurableOpTime().getSecs())));
             }
             bb.appendDate("lastHeartbeat", it->getLastHeartbeat());
             bb.appendDate("lastHeartbeatRecv", it->getLastHeartbeatRecv());
@@ -1669,12 +1663,17 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplicationExecutor::C
     response->append("heartbeatIntervalMillis",
                      durationCount<Milliseconds>(_rsConfig.getHeartbeatInterval()));
 
+    // New optimes, to hold them all.
     BSONObjBuilder optimes;
     rsStatusArgs.lastCommittedOpTime.append(&optimes, "lastCommittedOpTime");
     if (!rsStatusArgs.readConcernMajorityOpTime.isNull()) {
         rsStatusArgs.readConcernMajorityOpTime.append(&optimes, "readConcernMajorityOpTime");
     }
-    response->append("OpTimes", optimes.obj());
+
+    appendOpTime(&optimes, "appliedOpTime", lastOpApplied, _rsConfig.getProtocolVersion());
+    appendOpTime(&optimes, "durableOpTime", lastOpDurable, _rsConfig.getProtocolVersion());
+    response->append("optimes", optimes.obj());
+
 
     response->append("members", membersOut);
     *result = Status::OK();
