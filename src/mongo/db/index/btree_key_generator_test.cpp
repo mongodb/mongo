@@ -35,7 +35,6 @@
 #include <iostream>
 
 #include "mongo/db/json.h"
-#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
@@ -82,8 +81,7 @@ bool testKeygen(const BSONObj& kp,
                 const BSONObj& obj,
                 const BSONObjSet& expectedKeys,
                 const MultikeyPaths& expectedMultikeyPaths,
-                bool sparse = false,
-                CollatorInterface* collator = nullptr) {
+                bool sparse = false) {
     invariant(expectedMultikeyPaths.size() == static_cast<size_t>(kp.nFields()));
 
     //
@@ -100,8 +98,7 @@ bool testKeygen(const BSONObj& kp,
         fixed.push_back(BSONElement());
     }
 
-    unique_ptr<BtreeKeyGenerator> keyGen(
-        new BtreeKeyGeneratorV1(fieldNames, fixed, sparse, collator));
+    unique_ptr<BtreeKeyGenerator> keyGen(new BtreeKeyGeneratorV1(fieldNames, fixed, sparse));
 
     //
     // Step 2: ask 'keyGen' to generate index keys for the object 'obj' and report any prefixes of
@@ -134,16 +131,6 @@ bool testKeygen(const BSONObj& kp,
 //
 // Unit tests
 //
-
-
-TEST(BtreeKeyGeneratorTest, GetIdKeyFromObject) {
-    BSONObj keyPattern = fromjson("{_id: 1}");
-    BSONObj genKeysFrom = fromjson("{_id: 'foo', b: 4}");
-    BSONObjSet expectedKeys;
-    expectedKeys.insert(fromjson("{'': 'foo'}"));
-    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
-    ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
-}
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromObjectSimple) {
     BSONObj keyPattern = fromjson("{a: 1}");
@@ -1000,96 +987,6 @@ TEST(BtreeKeyGeneratorTest, PositionalKeyPatternNestedArrays7) {
     expectedKeys.insert(fromjson("{'': {b:[1,2]}, '': 2, '': 2, '': 1, '': 1}"));
     MultikeyPaths expectedMultikeyPaths{{0U}, {0U, 1U}, {2U}, {0U}, std::set<size_t>{}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
-}
-
-TEST(BtreeKeyGeneratorTest, GetCollationAwareIdKeyFromObject) {
-    BSONObj keyPattern = fromjson("{_id: 1}");
-    BSONObj genKeysFrom = fromjson("{_id: 'foo', b: 4}");
-    BSONObjSet expectedKeys;
-    expectedKeys.insert(fromjson("{'': 'oof'}"));
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
-    ASSERT(
-        testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths, false, &collator));
-}
-
-TEST(BtreeKeyGeneratorTest, GetCollationAwareKeysFromObjectSimple) {
-    BSONObj keyPattern = fromjson("{a: 1}");
-    BSONObj genKeysFrom = fromjson("{b: 4, a: 'foo'}");
-    BSONObjSet expectedKeys;
-    expectedKeys.insert(fromjson("{'': 'oof'}"));
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
-    ASSERT(
-        testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths, false, &collator));
-}
-
-TEST(BtreeKeyGeneratorTest, GetCollationAwareKeysFromObjectDotted) {
-    BSONObj keyPattern = fromjson("{'a.b': 1}");
-    BSONObj genKeysFrom = fromjson("{a: {b: 'foo'}, c: 4}");
-    BSONObjSet expectedKeys;
-    expectedKeys.insert(fromjson("{'': 'oof'}"));
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
-    ASSERT(
-        testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths, false, &collator));
-}
-
-TEST(BtreeKeyGeneratorTest, GetCollationAwareKeysFromArraySimple) {
-    BSONObj keyPattern = fromjson("{a: 1}");
-    BSONObj genKeysFrom = fromjson("{a: ['foo', 'bar', 'baz']}");
-    BSONObjSet expectedKeys;
-    expectedKeys.insert(fromjson("{'': 'oof'}"));
-    expectedKeys.insert(fromjson("{'': 'rab'}"));
-    expectedKeys.insert(fromjson("{'': 'zab'}"));
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    MultikeyPaths expectedMultikeyPaths{{0U}};
-    ASSERT(
-        testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths, false, &collator));
-}
-
-TEST(BtreeKeyGeneratorTest, CollatorDoesNotAffectNonStringIdKey) {
-    BSONObj keyPattern = fromjson("{_id: 1}");
-    BSONObj genKeysFrom = fromjson("{_id: 5, b: 4}");
-    BSONObjSet expectedKeys;
-    expectedKeys.insert(fromjson("{'': 5}"));
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
-    ASSERT(
-        testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths, false, &collator));
-}
-
-TEST(BtreeKeyGeneratorTest, CollatorDoesNotAffectNonStringKeys) {
-    BSONObj keyPattern = fromjson("{a: 1}");
-    BSONObj genKeysFrom = fromjson("{b: 4, a: 5}");
-    BSONObjSet expectedKeys;
-    expectedKeys.insert(fromjson("{'': 5}"));
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
-    ASSERT(
-        testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths, false, &collator));
-}
-
-TEST(BtreeKeyGeneratorTest, CollatorDoesNotAffectNestedObjectKeys) {
-    BSONObj keyPattern = fromjson("{a: 1}");
-    BSONObj genKeysFrom = fromjson("{b: 4, a: {c: 'foo'}}");
-    BSONObjSet expectedKeys;
-    expectedKeys.insert(fromjson("{'': {c: 'foo'}}"));
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
-    ASSERT(
-        testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths, false, &collator));
-}
-
-TEST(BtreeKeyGeneratorTest, CollatorDoesNotAffectNestedArrayKeys) {
-    BSONObj keyPattern = fromjson("{a: 1}");
-    BSONObj genKeysFrom = fromjson("{b: 4, a: {c: ['foo', 'bar', 'baz']}}");
-    BSONObjSet expectedKeys;
-    expectedKeys.insert(fromjson("{'': {c: ['foo', 'bar', 'baz']}}"));
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
-    ASSERT(
-        testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths, false, &collator));
 }
 
 }  // namespace

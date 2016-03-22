@@ -36,8 +36,6 @@
 
 namespace mongo {
 
-class CollatorInterface;
-
 /**
  * Internal class used by BtreeAccessMethod to generate keys for indexed documents.
  * This class is meant to be kept under the index access layer.
@@ -63,6 +61,7 @@ protected:
     BSONSizeTracker _sizeTracker;
 
 private:
+    // We have V0 and V1.  Sigh.
     virtual void getKeysImpl(std::vector<const char*> fieldNames,
                              std::vector<BSONElement> fixed,
                              const BSONObj& obj,
@@ -99,8 +98,7 @@ class BtreeKeyGeneratorV1 : public BtreeKeyGenerator {
 public:
     BtreeKeyGeneratorV1(std::vector<const char*> fieldNames,
                         std::vector<BSONElement> fixed,
-                        bool isSparse,
-                        CollatorInterface* collator);
+                        bool isSparse);
 
     virtual ~BtreeKeyGeneratorV1() {}
 
@@ -247,10 +245,6 @@ private:
     // A vector with size equal to the number of elements in the index key pattern. Each element in
     // the vector is the number of path components in the indexed field.
     std::vector<size_t> _pathLengths;
-
-    // Null if this key generator orders strings according to the simple binary compare. If
-    // non-null, represents the collator used to generate index keys for indexed strings.
-    CollatorInterface* _collator;
 };
 
 }  // namespace mongo

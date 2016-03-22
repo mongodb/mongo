@@ -25,7 +25,6 @@ env.Library(
             '$BUILD_DIR/mongo/db/geo/geoparser',
             '$BUILD_DIR/mongo/db/index_names',
             '$BUILD_DIR/mongo/db/mongohasher',
-            '$BUILD_DIR/mongo/db/query/collation/collation_index_key',
             '$BUILD_DIR/third_party/s2/s2',
         ],
 )
@@ -66,6 +65,5 @@ env.CppUnitTest(
         LIBDEPS=[
             'key_generator',
             '$BUILD_DIR/mongo/db/mongohasher',
-            '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         ],
 )
