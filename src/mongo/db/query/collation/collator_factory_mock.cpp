@@ -26,51 +26,34 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include <memory>
+#include "mongo/db/query/collation/collator_factory_mock.h"
 
-#include "mongo/base/disallow_copying.h"
-#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/base/init.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/service_context.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
-class BSONObj;
-class ServiceContext;
-template <typename T>
-class StatusWith;
+namespace {
 
-/**
- * An interface which can be used to retrieve a collator.
- */
-class CollatorFactoryInterface {
-    MONGO_DISALLOW_COPYING(CollatorFactoryInterface);
+// TODO SERVER-22371: We should decorate with a CollatorFactoryICU instead.
+MONGO_INITIALIZER_WITH_PREREQUISITES(CreateCollatorFactory,
+                                     ("SetGlobalEnvironment"))(InitializerContext* context) {
+    CollatorFactoryInterface::set(getGlobalServiceContext(),
+                                  stdx::make_unique<CollatorFactoryMock>());
+    return Status::OK();
+}
 
-public:
-    CollatorFactoryInterface() = default;
+}  // namespace
 
-    virtual ~CollatorFactoryInterface() {}
-
-    /**
-     * Returns the CollatorFactoryInterface object associated with the specified service context.
-     * This method must only be called if a CollatorFactoryInterface has been set on the service
-     * context.
-     */
-    static CollatorFactoryInterface* get(ServiceContext* serviceContext);
-
-    /**
-     * Sets the CollatorFactoryInterface object associated with the specified service context.
-     */
-    static void set(ServiceContext* serviceContext,
-                    std::unique_ptr<CollatorFactoryInterface> collatorFactory);
-
-    /**
-     * Parses 'spec' and, on success, returns the corresponding CollatorInterface.
-     *
-     * Returns a non-OK status if 'spec' is invalid or otherwise cannot be converted into a
-     * collator.
-     */
-    virtual StatusWith<std::unique_ptr<CollatorInterface>> makeFromBSON(const BSONObj& spec) = 0;
-};
+StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryMock::makeFromBSON(
+    const BSONObj& spec) {
+    auto collator =
+        stdx::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
+    return {std::move(collator)};
+}
 
 }  // namespace mongo

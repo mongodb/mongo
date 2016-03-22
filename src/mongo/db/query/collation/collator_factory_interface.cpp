@@ -26,51 +26,29 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include <memory>
+#include "mongo/db/query/collation/collator_factory_interface.h"
 
-#include "mongo/base/disallow_copying.h"
-#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/service_context.h"
 
 namespace mongo {
 
-class BSONObj;
-class ServiceContext;
-template <typename T>
-class StatusWith;
+namespace {
 
-/**
- * An interface which can be used to retrieve a collator.
- */
-class CollatorFactoryInterface {
-    MONGO_DISALLOW_COPYING(CollatorFactoryInterface);
+const auto getCollatorFactory =
+    ServiceContext::declareDecoration<std::unique_ptr<CollatorFactoryInterface>>();
 
-public:
-    CollatorFactoryInterface() = default;
+}  // namespace
 
-    virtual ~CollatorFactoryInterface() {}
+CollatorFactoryInterface* CollatorFactoryInterface::get(ServiceContext* serviceContext) {
+    invariant(getCollatorFactory(serviceContext));
+    return getCollatorFactory(serviceContext).get();
+}
 
-    /**
-     * Returns the CollatorFactoryInterface object associated with the specified service context.
-     * This method must only be called if a CollatorFactoryInterface has been set on the service
-     * context.
-     */
-    static CollatorFactoryInterface* get(ServiceContext* serviceContext);
-
-    /**
-     * Sets the CollatorFactoryInterface object associated with the specified service context.
-     */
-    static void set(ServiceContext* serviceContext,
-                    std::unique_ptr<CollatorFactoryInterface> collatorFactory);
-
-    /**
-     * Parses 'spec' and, on success, returns the corresponding CollatorInterface.
-     *
-     * Returns a non-OK status if 'spec' is invalid or otherwise cannot be converted into a
-     * collator.
-     */
-    virtual StatusWith<std::unique_ptr<CollatorInterface>> makeFromBSON(const BSONObj& spec) = 0;
-};
+void CollatorFactoryInterface::set(ServiceContext* serviceContext,
+                                   std::unique_ptr<CollatorFactoryInterface> collatorFactory) {
+    getCollatorFactory(serviceContext) = std::move(collatorFactory);
+}
 
 }  // namespace mongo

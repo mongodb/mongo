@@ -97,6 +97,39 @@ env.CppUnitTest(
     ],
 )
 
+env.Library(
+    target="collator_factory_interface",
+    source=[
+        "collator_factory_interface.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/service_context",
+        "collator_interface",
+    ],
+)
+
+env.Library(
+    target="collator_factory_mock",
+    source=[
+        "collator_factory_mock.cpp",
+    ],
+    LIBDEPS=[
+        "collator_factory_interface",
+        "collator_interface_mock",
+    ],
+)
+
+env.CppUnitTest(
+    target="collator_factory_mock_test",
+    source=[
+        "collator_factory_mock_test.cpp",
+    ],
+    LIBDEPS=[
+        "collator_factory_mock",
+    ],
+)
+
 if icuEnabled:
     env.Library(
         target="collator_icu",

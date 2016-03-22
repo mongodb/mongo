@@ -28,49 +28,17 @@
 
 #pragma once
 
-#include <memory>
-
-#include "mongo/base/disallow_copying.h"
-#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 
 namespace mongo {
 
-class BSONObj;
-class ServiceContext;
-template <typename T>
-class StatusWith;
-
-/**
- * An interface which can be used to retrieve a collator.
- */
-class CollatorFactoryInterface {
-    MONGO_DISALLOW_COPYING(CollatorFactoryInterface);
-
+class CollatorFactoryMock : public CollatorFactoryInterface {
 public:
-    CollatorFactoryInterface() = default;
-
-    virtual ~CollatorFactoryInterface() {}
-
     /**
-     * Returns the CollatorFactoryInterface object associated with the specified service context.
-     * This method must only be called if a CollatorFactoryInterface has been set on the service
-     * context.
+     * Returns a collator that compares strings by reversing them and performing a binary
+     * comparison.
      */
-    static CollatorFactoryInterface* get(ServiceContext* serviceContext);
-
-    /**
-     * Sets the CollatorFactoryInterface object associated with the specified service context.
-     */
-    static void set(ServiceContext* serviceContext,
-                    std::unique_ptr<CollatorFactoryInterface> collatorFactory);
-
-    /**
-     * Parses 'spec' and, on success, returns the corresponding CollatorInterface.
-     *
-     * Returns a non-OK status if 'spec' is invalid or otherwise cannot be converted into a
-     * collator.
-     */
-    virtual StatusWith<std::unique_ptr<CollatorInterface>> makeFromBSON(const BSONObj& spec) = 0;
+    StatusWith<std::unique_ptr<CollatorInterface>> makeFromBSON(const BSONObj& spec) final;
 };
 
 }  // namespace mongo
