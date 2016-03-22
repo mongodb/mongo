@@ -884,6 +884,166 @@ Status OptionsParser::readConfigFile(const std::string& filename, std::string* c
     return Status::OK();
 }
 
+namespace {
+/**
+ * Find implicit options and merge them with "=".
+ * Implicit options in boost 1.59 no longer support
+ * --option value
+ * instead they only support "--option=value", this function
+ * attempts to workound this by translating the former into the later.
+ */
+StatusWith<std::vector<std::string>> transformImplictOptions(
+    const OptionSection& options, const std::vector<std::string>& argvOriginal) {
+    if (argvOriginal.empty()) {
+        return {std::vector<std::string>()};
+    }
+
+    std::vector<OptionDescription> optionDescs;
+    Status ret = options.getAllOptions(&optionDescs);
+    if (!ret.isOK()) {
+        return ret;
+    }
+
+    std::map<string, const OptionDescription*> implicitOptions;
+    for (const auto& opt : optionDescs) {
+        if (opt._implicit.isEmpty()) {
+            continue;
+        }
+
+        // Some options have a short name (a single letter) in addition to a long name.
+        // In this case, the format for the name of the option is "long_name,S" where S is a
+        // single character.
+        // This is validated as such by the boost option parser later in the code.
+        size_t pos = opt._singleName.find(',');
+        if (pos != string::npos) {
+            implicitOptions[opt._singleName.substr(0, pos)] = &opt;
+            implicitOptions[opt._singleName.substr(pos + 1)] = &opt;
+        } else {
+            implicitOptions[opt._singleName] = &opt;
+        }
+    }
+
+    std::vector<std::string> args;
+    args.reserve(argvOriginal.size());
+
+    // If there are no implicit options for this option parser instance, no filtering is needed.
+    if (implicitOptions.empty()) {
+        std::copy(argvOriginal.begin(), argvOriginal.end(), std::back_inserter(args));
+
+        return {args};
+    }
+
+    // Now try to merge the implicit arguments
+    // Candidates to merge:
+    //   -arg value
+    //   --arg value
+    //   -arg ""
+    //   --arg ""
+    // Candidates not to merge:
+    //   -arg=value
+    //   --arg=value
+    for (size_t i = 0; i < argvOriginal.size(); i++) {
+        std::string arg = argvOriginal[i];
+
+        // Enable us to fall through to the default code path of pushing another arg into the vector
+        do {
+            // Skip processing of the last argument in the array since there would be nothing to
+            // merge it with
+            if (i == argvOriginal.size() - 1) {
+                break;
+            }
+
+            // Skip empty strings
+            if (arg.empty()) {
+                break;
+            }
+
+            // All options start with at least one "-"
+            if (arg[0] == '-') {
+                int argPrefix = 1;
+
+                // Is the argument just a single "-", i.e. short form or a disguised long form?
+                if (arg.size() == 1) {
+                    break;
+                }
+
+                if (arg[argPrefix] == '-') {
+                    // Is the argument just a double "--", i.e. long form?
+                    if (arg.size() == 2) {
+                        break;
+                    }
+
+                    ++argPrefix;
+                }
+
+                // Now we strip the prefix, and do a match on the parameter name.
+                // At this point we may have "option=value" which is not in our option list so
+                // we move onto the next option.
+                std::string parameter = arg.substr(argPrefix);
+
+                const auto iterator = implicitOptions.find(parameter);
+                if (iterator == implicitOptions.end()) {
+                    break;
+                }
+
+                // If the next argument is the empty string, just eat the empty string
+                if (argvOriginal[i + 1].empty()) {
+                    const auto& value = iterator->second->_implicit;
+                    std::string defaultStr;
+
+                    Status stringStatus = value.get(&defaultStr);
+
+                    // If the type of the option was a string type with a implicit value other than
+                    // "", then we cannot handle merging these two strings because simply leaving
+                    // just the option name around has a different behavior.
+                    // i.e., it is impossible to have "--option=''" on the command line as some
+                    // non-empty string must follow the equal sign.
+                    // This specific case is only known to affect "verbose" in the long form in
+                    // mongod and mongos which makes it a breaking change for this one specific
+                    // change. Users can get similar behavior by removing both the option and the
+                    // original string in this case.
+                    if (stringStatus.isOK() && !defaultStr.empty()) {
+                        return Status(ErrorCodes::BadValue,
+                                      "The empty string is not supported with the option " +
+                                          parameter);
+                    };
+
+                    // For strings that have an implicit value of "", we just
+                    // disregard the empty string argument since it has the same meaning.
+                    // For other types like integers this is not a problem in non-test code as the
+                    // only options with implicit options are string types.
+                } else {
+                    // Before we decide to merge the arguments, we must see if the next argument
+                    // is actually an option. Boost checks its list of options, but we will just
+                    // guess based on a leading '-' rather then try to match Boost's logic.
+                    if (argvOriginal[i + 1][0] == '-') {
+                        break;
+                    }
+
+                    if (parameter.size() == 1) {
+                        // Merge this short form argument and the next into one.
+                        // Note: we do not support allow_sticky so a simple append works
+                        arg = str::stream() << argvOriginal[i] << argvOriginal[i + 1];
+                    } else {
+                        // Merge this long form argument and the next into one.
+                        arg = str::stream() << argvOriginal[i] << "=" << argvOriginal[i + 1];
+                    }
+                }
+
+                // Advance to the next argument
+                i++;
+            }
+        } while (false);
+
+        // Add the option to the final list, this may be an option that we simply ignore.
+        args.push_back(arg);
+    }
+
+    return {args};
+}
+
+}  // namespace
+
 /**
  * Run the OptionsParser
  *
@@ -897,14 +1057,21 @@ Status OptionsParser::readConfigFile(const std::string& filename, std::string* c
  * 6. Add the results to the output Environment in the proper order to ensure correct precedence
  */
 Status OptionsParser::run(const OptionSection& options,
-                          const std::vector<std::string>& argv,
+                          const std::vector<std::string>& argvOriginal,
                           const std::map<std::string, std::string>& env,  // XXX: Currently unused
                           Environment* environment) {
     Environment commandLineEnvironment;
     Environment configEnvironment;
     Environment composedEnvironment;
 
-    Status ret = parseCommandLine(options, argv, &commandLineEnvironment);
+    auto swTransform = transformImplictOptions(options, argvOriginal);
+    if (!swTransform.isOK()) {
+        return swTransform.getStatus();
+    }
+
+    std::vector<std::string> argvTransformed = std::move(swTransform.getValue());
+
+    Status ret = parseCommandLine(options, argvTransformed, &commandLineEnvironment);
     if (!ret.isOK()) {
         return ret;
     }

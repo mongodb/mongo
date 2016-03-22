@@ -144,6 +144,34 @@ TEST(Verbosity, CommandLineString) {
                   ::mongo::logger::LogSeverity::Debug(verbosity));
 }
 
+TEST(Verbosity, CommandLineStringDisguisedLongForm) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection options;
+
+    // Reset the log level before we test
+    ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+        ::mongo::logger::LogSeverity::Info());
+
+    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("-verbose");
+    argv.push_back("vvvv");
+    std::map<std::string, std::string> env_map;
+
+    ASSERT_OK(parser.run(options, argv, env_map, &environment));
+
+    ASSERT_OK(::mongo::validateServerOptions(environment));
+    ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
+    ASSERT_OK(::mongo::storeServerOptions(environment, argv));
+
+    int verbosity = 4;
+    ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(),
+                  ::mongo::logger::LogSeverity::Debug(verbosity));
+}
+
 TEST(Verbosity, CommandLineEmptyString) {
     OptionsParserTester parser;
     moe::Environment environment;
@@ -161,15 +189,7 @@ TEST(Verbosity, CommandLineEmptyString) {
     argv.push_back("");
     std::map<std::string, std::string> env_map;
 
-    ASSERT_OK(parser.run(options, argv, env_map, &environment));
-
-    ASSERT_OK(::mongo::validateServerOptions(environment));
-    ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
-    ASSERT_OK(::mongo::storeServerOptions(environment, argv));
-
-    int verbosity = 0;
-    ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(),
-                  ::mongo::logger::LogSeverity::Debug(verbosity));
+    ASSERT_NOT_OK(parser.run(options, argv, env_map, &environment));
 }
 
 TEST(Verbosity, CommandLineBadString) {
@@ -192,6 +212,44 @@ TEST(Verbosity, CommandLineBadString) {
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
     ASSERT_NOT_OK(::mongo::validateServerOptions(environment));
+}
+
+TEST(Verbosity, CommandLineBadStringOnlyDash) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection options;
+
+    // Reset the log level before we test
+    ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+        ::mongo::logger::LogSeverity::Info());
+
+    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("-");
+    std::map<std::string, std::string> env_map;
+
+    ASSERT_NOT_OK(parser.run(options, argv, env_map, &environment));
+}
+
+TEST(Verbosity, CommandLineBadStringOnlyTwoDashes) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection options;
+
+    // Reset the log level before we test
+    ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+        ::mongo::logger::LogSeverity::Info());
+
+    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--");
+    std::map<std::string, std::string> env_map;
+
+    ASSERT_OK(parser.run(options, argv, env_map, &environment));
 }
 
 TEST(Verbosity, INIConfigString) {
