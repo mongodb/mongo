@@ -124,9 +124,11 @@ void ReplicationCoordinatorImpl::_startElectSelfV1() {
 
 
     invariant(_rsConfig.getMemberAt(_selfIndex).isElectable());
-    OpTime lastOpTimeDurable(_getMyLastDurableOpTime_inlock());
+    // Note: If we aren't durable, send last applied.
+    const auto lastOpTime = _isDurableStorageEngine() ? _getMyLastDurableOpTime_inlock()
+                                                      : _getMyLastAppliedOpTime_inlock();
 
-    if (lastOpTimeDurable == OpTime()) {
+    if (lastOpTime == OpTime()) {
         log() << "not trying to elect self, "
                  "do not yet have a complete set of data from any point in time";
         return;
@@ -147,7 +149,7 @@ void ReplicationCoordinatorImpl::_startElectSelfV1() {
         _selfIndex,
         _topCoord->getTerm(),
         true,  // dry run
-        getMyLastDurableOpTime(),
+        lastOpTime,
         stdx::bind(&ReplicationCoordinatorImpl::_onDryRunComplete, this, term));
     if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
         return;
@@ -238,6 +240,9 @@ void ReplicationCoordinatorImpl::_startVoteRequester(long long newTerm) {
     invariant(!_electionWinnerDeclarer);
     LoseElectionGuardV1 lossGuard(this);
 
+    const auto lastOpTime =
+        _isDurableStorageEngine() ? getMyLastDurableOpTime() : getMyLastAppliedOpTime();
+
     _voteRequester.reset(new VoteRequester);
     StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh = _voteRequester->start(
         &_replExecutor,
@@ -245,7 +250,7 @@ void ReplicationCoordinatorImpl::_startVoteRequester(long long newTerm) {
         _selfIndex,
         _topCoord->getTerm(),
         false,
-        getMyLastDurableOpTime(),
+        lastOpTime,
         stdx::bind(&ReplicationCoordinatorImpl::_onVoteRequestComplete, this, newTerm));
     if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
         return;

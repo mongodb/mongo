@@ -807,6 +807,7 @@ void ReplicationCoordinatorImpl::_updateSlaveInfoAppliedOpTime_inlock(SlaveInfo*
     slaveInfo->lastUpdate = _replExecutor.now();
     slaveInfo->down = false;
 
+    _updateLastCommittedOpTime_inlock();
     // Wake up any threads waiting for replication that now have their replication
     // check satisfied
     _wakeReadyWaiters_inlock();
@@ -924,12 +925,6 @@ void ReplicationCoordinatorImpl::setMyLastAppliedOpTimeForward(const OpTime& opT
     if (opTime > _getMyLastAppliedOpTime_inlock()) {
         const bool allowRollback = false;
         _setMyLastAppliedOpTime_inlock(opTime, allowRollback);
-
-        // If the storage engine isn't durable then we need to update the durableOpTime.
-        if (!_isDurableStorageEngine()) {
-            _setMyLastDurableOpTime_inlock(opTime, allowRollback);
-        }
-
         _reportUpstream_inlock(std::move(lock));
     }
 }
@@ -1072,19 +1067,34 @@ ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext
                                        Milliseconds(timer.millis()));
         }
 
+        // Now we have to wait to be notified when
+        // either the optime or committed snapshot change.
+
+        // If we are doing a majority read concern we only need to wait
+        // for a new snapshot.
+        if (isMajorityReadConcern) {
+            // Wait for a snapshot that meets our needs (< targetOpTime).
+            const auto waitTime = CurOp::get(txn)->isMaxTimeSet()
+                ? Microseconds(txn->getRemainingMaxTimeMicros())
+                : Microseconds{0};
+            const auto waitForever = waitTime == Microseconds{0};
+            LOG(2) << "waitUntilOpTime: waiting for a new snapshot to occur for micros: "
+                   << waitTime;
+            if (!waitForever) {
+                _currentCommittedSnapshotCond.wait_for(lock, waitTime);
+            } else {
+                _currentCommittedSnapshotCond.wait(lock);
+            }
+
+            LOG(3) << "Got notified of new snapshot: " << _currentCommittedSnapshot->toString();
+            continue;
+        }
+
+        // We just need to wait for the opTime to catch up to what we need (not majority RC).
         stdx::condition_variable condVar;
-        WriteConcernOptions writeConcern;
-        writeConcern.wMode = WriteConcernOptions::kMajority;
-        writeConcern.syncMode = getWriteConcernMajorityShouldJournal_inlock()
-            ? WriteConcernOptions::SyncMode::JOURNAL
-            : WriteConcernOptions::SyncMode::NONE;
+        WaiterInfo waitInfo(&_opTimeWaiterList, txn->getOpID(), &targetOpTime, nullptr, &condVar);
 
-        WaiterInfo waitInfo(isMajorityReadConcern ? &_replicationWaiterList : &_opTimeWaiterList,
-                            txn->getOpID(),
-                            &targetOpTime,
-                            isMajorityReadConcern ? &writeConcern : nullptr,
-                            &condVar);
-
+        LOG(3) << "Waiting for OpTime: " << waitInfo;
         if (CurOp::get(txn)->isMaxTimeSet()) {
             condVar.wait_for(lock, Microseconds(txn->getRemainingMaxTimeMicros()));
         } else {
@@ -3241,20 +3251,26 @@ void ReplicationCoordinatorImpl::_setLastCommittedOpTime(const OpTime& committed
 }
 
 void ReplicationCoordinatorImpl::_setLastCommittedOpTime_inlock(const OpTime& committedOpTime) {
-    if (committedOpTime <= _lastCommittedOpTime) {
+    if (committedOpTime == _lastCommittedOpTime) {
+        return;  // Hasn't changed, so ignore it.
+    } else if (committedOpTime < _lastCommittedOpTime) {
+        LOG(1) << "Ignoring older committed snapshot optime: " << committedOpTime
+               << ", currentCommittedOpTime: " << _lastCommittedOpTime;
         return;  // This may have come from an out-of-order heartbeat. Ignore it.
     }
 
     // This check is performed to ensure primaries do not commit an OpTime from a previous term.
     if (_getMemberState_inlock().primary() && committedOpTime < _firstOpTimeOfMyTerm) {
+        LOG(1) << "Ignoring older committed snapshot from before I became primary, optime: "
+               << committedOpTime << ", firstOpTimeOfMyTerm: " << _firstOpTimeOfMyTerm;
         return;
     }
 
     if (_getMemberState_inlock().arbiter()) {
         _setMyLastAppliedOpTime_inlock(committedOpTime, false);
-        _setMyLastDurableOpTime_inlock(committedOpTime, false);
     }
 
+    LOG(2) << "Updating _lastCommittedOpTime to " << committedOpTime;
     _lastCommittedOpTime = committedOpTime;
 
     _externalState->notifyOplogMetadataWaiters();

@@ -64,9 +64,11 @@ void clearInitialSyncFlag(OperationContext* txn) {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "clearInitialSyncFlags", minvalidNS);
 
     auto replCoord = repl::ReplicationCoordinator::get(txn);
-    OpTime time = replCoord->getMyLastAppliedOpTime();
-    txn->recoveryUnit()->waitUntilDurable();
-    replCoord->setMyLastDurableOpTime(time);
+    if (getGlobalServiceContext()->getGlobalStorageEngine()->isDurable()) {
+        OpTime time = replCoord->getMyLastAppliedOpTime();
+        txn->recoveryUnit()->waitUntilDurable();
+        replCoord->setMyLastDurableOpTime(time);
+    }
     LOG(3) << "clearing initial sync flag";
 }
 
