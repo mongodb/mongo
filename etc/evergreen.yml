@@ -1874,17 +1874,17 @@ buildvariants:
 #             OSX buildvariants           #
 ###########################################
 
-- name: osx-108
-  display_name: OS X 10.8
+- name: osx-106
+  display_name: OS X 10.6
   modules: ~
   run_on:
-  - osx-108
+  - osx-1010
   expansions:
     push_path: osx
     push_bucket: downloads.mongodb.org
     push_name: osx
     push_arch: x86_64
-    compile_flags: --allocator=system -j$(sysctl -n hw.logicalcpu) --release --osx-version-min=10.6
+    compile_flags: --allocator=system -j$(sysctl -n hw.logicalcpu) --release --osx-version-min=10.6 --disable-warnings-as-errors
     test_flags: --continue-on-failure
   tasks:
   - name: compile
@@ -1914,18 +1914,18 @@ buildvariants:
     distros:
     - rhel55-test
 
-- name: osx-108-debug
-  display_name: OS X 10.8 DEBUG
+- name: osx-1010-debug
+  display_name: OS X 10.10 DEBUG
   modules: ~
   run_on:
-  - osx-108
+  - osx-1010
   expansions:
     push_path: osx
     push_bucket: downloads.mongodb.org
     push_name: osx-debug
     push_arch: x86_64
     test_flags: --continue-on-failure
-    compile_flags: --dbg=on --opt=on --allocator=system -j$(sysctl -n hw.logicalcpu)
+    compile_flags: --dbg=on --opt=on --allocator=system -j$(sysctl -n hw.logicalcpu) --disable-warnings-as-errors
   tasks:
   - name: compile
   - name: aggregation
@@ -1942,17 +1942,17 @@ buildvariants:
   - name: sharding
   - name: tool
 
-- name: osx-108-dur-off
-  display_name: OS X 10.8 DUR OFF
+- name: osx-1010-dur-off
+  display_name: OS X 10.10 DUR OFF
   modules: ~
   run_on:
-  - osx-108
+  - osx-1010
   expansions:
     push_path: osx
     push_bucket: downloads.mongodb.org
     push_name: osx-duroff
     push_arch: x86_64
-    compile_flags: --durableDefaultOff --allocator=system -j$(sysctl -n hw.logicalcpu)
+    compile_flags: --durableDefaultOff --allocator=system -j$(sysctl -n hw.logicalcpu) --disable-warnings-as-errors
     test_flags: --continue-on-failure
   tasks:
   - name: compile
@@ -1982,17 +1982,17 @@ buildvariants:
   - name: slow2
   - name: tool
 
-- name: osx-108-cxx11-debug
-  display_name: OS X 10.8 C++11 DEBUG
+- name: osx-107-cxx11-debug
+  display_name: OS X 10.7 C++11 DEBUG
   run_on:
-  - osx-108
+  - osx-1010
   expansions:
     push_path: osx
     push_bucket: downloads.mongodb.org
     push_name: osx-cxx11-debug
     push_arch: x86_64
     test_flags: --continue-on-failure
-    compile_flags: --dbg=on --opt=on --osx-version-min=10.7 --cc=/usr/bin/clang --cxx=/usr/bin/clang++ --c++11 --allocator=system --libc++ --ssl -j$(sysctl -n hw.logicalcpu)
+    compile_flags: --dbg=on --opt=on --osx-version-min=10.7 --c++11 --allocator=system --libc++ --ssl -j$(sysctl -n hw.logicalcpu) --disable-warnings-as-errors
   tasks:
   - name: compile
   - name: aggregation
