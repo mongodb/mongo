@@ -78,9 +78,10 @@ CommandRequest::CommandRequest(const Message* message) : _message(message) {
                           << " bytes. Got: " << _database,
             (_database.size() >= kMinDatabaseLength) && (_database.size() <= kMaxDatabaseLength));
 
-    uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "Invalid database name: '" << _database << "'",
-            NamespaceString::validDBName(_database));
+    uassert(
+        ErrorCodes::InvalidNamespace,
+        str::stream() << "Invalid database name: '" << _database << "'",
+        NamespaceString::validDBName(_database, NamespaceString::DollarInDbNameBehavior::Allow));
 
     uassertStatusOK(cur.readAndAdvance<>(&str));
     _commandName = std::move(str.value);

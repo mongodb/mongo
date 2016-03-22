@@ -291,7 +291,7 @@ rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData databas
                                                               const BSONObj& commandArgs) {
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Database name '" << database << "' is not valid.",
-            NamespaceString::validDBName(database));
+            NamespaceString::validDBName(database, NamespaceString::DollarInDbNameBehavior::Allow));
 
     // call() oddly takes this by pointer, so we need to put it on the stack.
     auto host = getServerAddress();

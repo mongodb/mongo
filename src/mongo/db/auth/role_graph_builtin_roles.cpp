@@ -622,7 +622,9 @@ void RoleGraph::generateUniversalPrivileges(PrivilegeVector* privileges) {
 }
 
 bool RoleGraph::isBuiltinRole(const RoleName& role) {
-    if (!NamespaceString::validDBName(role.getDB()) || role.getDB() == "$external") {
+    if (!NamespaceString::validDBName(role.getDB(),
+                                      NamespaceString::DollarInDbNameBehavior::Allow) ||
+        role.getDB() == "$external") {
         return false;
     }
 

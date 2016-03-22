@@ -151,7 +151,7 @@ Status userAllowedCreateNS(StringData db, StringData coll) {
     if (db.size() == 0)
         return Status(ErrorCodes::BadValue, "db cannot be blank");
 
-    if (!NamespaceString::validDBName(db))
+    if (!NamespaceString::validDBName(db, NamespaceString::DollarInDbNameBehavior::Allow))
         return Status(ErrorCodes::BadValue, "invalid db name");
 
     if (coll.size() == 0)

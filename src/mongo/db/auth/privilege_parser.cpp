@@ -87,7 +87,9 @@ bool ParsedResource::isValid(std::string* errMsg) const {
         *errMsg = stream() << cluster.name() << " must be true when specified";
         return false;
     }
-    if (isDbSet() && (!NamespaceString::validDBName(getDb()) && !getDb().empty())) {
+    if (isDbSet() &&
+        (!NamespaceString::validDBName(getDb(), NamespaceString::DollarInDbNameBehavior::Allow) &&
+         !getDb().empty())) {
         *errMsg = stream() << getDb() << " is not a valid database name";
         return false;
     }

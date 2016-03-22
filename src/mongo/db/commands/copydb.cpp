@@ -144,7 +144,7 @@ public:
             return false;
         }
 
-        if (!NamespaceString::validDBName(todb)) {
+        if (!NamespaceString::validDBName(todb, NamespaceString::DollarInDbNameBehavior::Allow)) {
             errmsg = "invalid todb name: " + todb;
             return false;
         }

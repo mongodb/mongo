@@ -563,7 +563,7 @@ public:
         uassert(ErrorCodes::EmptyFieldName, "missing todb argument", !todb.empty());
         uassert(ErrorCodes::InvalidNamespace,
                 "invalid todb argument",
-                NamespaceString::validDBName(todb));
+                NamespaceString::validDBName(todb, NamespaceString::DollarInDbNameBehavior::Allow));
 
         auto confTo = uassertStatusOK(grid.implicitCreateDb(txn, todb));
         uassert(ErrorCodes::IllegalOperation,

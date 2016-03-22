@@ -162,6 +162,9 @@ MMAPV1DatabaseCatalogEntry::MMAPV1DatabaseCatalogEntry(OperationContext* txn,
       _path(path.toString()),
       _namespaceIndex(_path, name.toString()),
       _extentManager(std::move(extentManager)) {
+    massert(34469,
+            str::stream() << name << " is not a valid database name",
+            NamespaceString::validDBName(name));
     invariant(txn->lockState()->isDbLockedForMode(name, MODE_X));
 
     try {

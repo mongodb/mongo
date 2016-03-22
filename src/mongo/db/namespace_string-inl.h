@@ -54,7 +54,7 @@ inline bool NamespaceString::special(StringData ns) {
     return !normal(ns) || ns.substr(ns.find('.')).startsWith(".system.");
 }
 
-inline bool NamespaceString::validDBName(StringData db) {
+inline bool NamespaceString::validDBName(StringData db, DollarInDbNameBehavior behavior) {
     if (db.size() == 0 || db.size() > 64)
         return false;
 
@@ -67,6 +67,10 @@ inline bool NamespaceString::validDBName(StringData db) {
             case ' ':
             case '"':
                 return false;
+            case '$':
+                if (behavior == DollarInDbNameBehavior::Disallow)
+                    return false;
+                continue;
 #ifdef _WIN32
             // We prohibit all FAT32-disallowed characters on Windows
             case '*':

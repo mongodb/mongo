@@ -66,10 +66,39 @@ TEST(NamespaceStringTest, Special) {
 }
 
 TEST(NamespaceStringTest, DatabaseValidNames) {
+    ASSERT(NamespaceString::validDBName("foo", NamespaceString::DollarInDbNameBehavior::Allow));
+    ASSERT(NamespaceString::validDBName("foo$bar", NamespaceString::DollarInDbNameBehavior::Allow));
+    ASSERT(
+        !NamespaceString::validDBName("foo/bar", NamespaceString::DollarInDbNameBehavior::Allow));
+    ASSERT(
+        !NamespaceString::validDBName("foo bar", NamespaceString::DollarInDbNameBehavior::Allow));
+    ASSERT(
+        !NamespaceString::validDBName("foo.bar", NamespaceString::DollarInDbNameBehavior::Allow));
+    ASSERT(
+        !NamespaceString::validDBName("foo\\bar", NamespaceString::DollarInDbNameBehavior::Allow));
+    ASSERT(
+        !NamespaceString::validDBName("foo\"bar", NamespaceString::DollarInDbNameBehavior::Allow));
+    ASSERT(!NamespaceString::validDBName(StringData("a\0b", StringData::LiteralTag()),
+                                         NamespaceString::DollarInDbNameBehavior::Allow));
+#ifdef _WIN32
+    ASSERT(
+        !NamespaceString::validDBName("foo*bar", NamespaceString::DollarInDbNameBehavior::Allow));
+    ASSERT(
+        !NamespaceString::validDBName("foo<bar", NamespaceString::DollarInDbNameBehavior::Allow));
+    ASSERT(
+        !NamespaceString::validDBName("foo>bar", NamespaceString::DollarInDbNameBehavior::Allow));
+    ASSERT(
+        !NamespaceString::validDBName("foo:bar", NamespaceString::DollarInDbNameBehavior::Allow));
+    ASSERT(
+        !NamespaceString::validDBName("foo|bar", NamespaceString::DollarInDbNameBehavior::Allow));
+    ASSERT(
+        !NamespaceString::validDBName("foo?bar", NamespaceString::DollarInDbNameBehavior::Allow));
+#endif
+
     ASSERT(NamespaceString::validDBName("foo"));
+    ASSERT(!NamespaceString::validDBName("foo$bar"));
     ASSERT(!NamespaceString::validDBName("foo/bar"));
     ASSERT(!NamespaceString::validDBName("foo bar"));
-    ASSERT(!NamespaceString::validDBName("foo.bar"));
     ASSERT(!NamespaceString::validDBName("foo.bar"));
     ASSERT(!NamespaceString::validDBName("foo\\bar"));
     ASSERT(!NamespaceString::validDBName("foo\"bar"));

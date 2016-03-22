@@ -332,7 +332,7 @@ StatusWith<ShardDrainingStatus> CatalogManagerReplicaSet::removeShard(OperationC
 
 StatusWith<OpTimePair<DatabaseType>> CatalogManagerReplicaSet::getDatabase(
     OperationContext* txn, const std::string& dbName) {
-    if (!NamespaceString::validDBName(dbName)) {
+    if (!NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow)) {
         return {ErrorCodes::InvalidNamespace, stream() << dbName << " is not a valid db name"};
     }
 

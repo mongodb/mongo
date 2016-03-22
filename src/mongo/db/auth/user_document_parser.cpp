@@ -238,7 +238,8 @@ Status V2UserDocumentParser::checkValidUserDocument(const BSONObj& doc) const {
         return _badValue("User document needs 'db' field to be a non-empty string", 0);
     }
     StringData userDBStr = userDBElement.valueStringData();
-    if (!NamespaceString::validDBName(userDBStr) && userDBStr != "$external") {
+    if (!NamespaceString::validDBName(userDBStr, NamespaceString::DollarInDbNameBehavior::Allow) &&
+        userDBStr != "$external") {
         return _badValue(mongoutils::str::stream() << "'" << userDBStr
                                                    << "' is not a valid value for the db field.",
                          0);

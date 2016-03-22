@@ -62,7 +62,9 @@ StringData _todb(StringData ns) {
     uassert(13075, "db name can't be empty", i > 0);
 
     const StringData d = ns.substr(0, i);
-    uassert(13280, "invalid db name: " + ns.toString(), NamespaceString::validDBName(d));
+    uassert(13280,
+            "invalid db name: " + ns.toString(),
+            NamespaceString::validDBName(d, NamespaceString::DollarInDbNameBehavior::Allow));
 
     return d;
 }
