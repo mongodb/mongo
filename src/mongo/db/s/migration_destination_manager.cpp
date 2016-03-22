@@ -974,13 +974,14 @@ Status MigrationDestinationManager::_notePending(OperationContext* txn,
 
     // This can currently happen because drops aren't synchronized with in-migrations.  The idea for
     // checking this here is that in the future we shouldn't have this problem.
-    if (metadata->getCollVersion().epoch() != epoch) {
+    if (!metadata || metadata->getCollVersion().epoch() != epoch) {
         return {ErrorCodes::StaleShardVersion,
                 str::stream() << "could not note chunk "
                               << "[" << min << "," << max << ")"
                               << " as pending because the epoch for " << nss.ns()
                               << " has changed from " << epoch << " to "
-                              << metadata->getCollVersion().epoch()};
+                              << (metadata ? metadata->getCollVersion().epoch()
+                                           : ChunkVersion::UNSHARDED().epoch())};
     }
 
     ChunkType chunk;
@@ -1018,12 +1019,13 @@ Status MigrationDestinationManager::_forgetPending(OperationContext* txn,
 
     // This can currently happen because drops aren't synchronized with in-migrations. The idea for
     // checking this here is that in the future we shouldn't have this problem.
-    if (metadata->getCollVersion().epoch() != epoch) {
+    if (!metadata || metadata->getCollVersion().epoch() != epoch) {
         return {ErrorCodes::StaleShardVersion,
                 str::stream() << "no need to forget pending chunk "
                               << "[" << min << "," << max << ")"
                               << " because the epoch for " << nss.ns() << " has changed from "
-                              << epoch << " to " << metadata->getCollVersion().epoch()};
+                              << epoch << " to " << (metadata ? metadata->getCollVersion().epoch()
+                                                              : ChunkVersion::UNSHARDED().epoch())};
     }
 
     ChunkType chunk;
