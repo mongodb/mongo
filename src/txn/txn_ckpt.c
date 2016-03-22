@@ -996,6 +996,15 @@ __checkpoint_tree(
 	was_modified = btree->modified;
 
 	/*
+	 * Set the checkpoint LSN to the maximum LSN so that if logging is
+	 * disabled, recovery will never roll old changes forward over the
+	 * non-logged changes in this checkpoint.  If logging is enabled, a
+	 * real checkpoint LSN will be assigned for this checkpoint and
+	 * overwrite this.
+	 */
+	WT_MAX_LSN(&ckptlsn);
+
+	/*
 	 * Check for clean objects not requiring a checkpoint.
 	 *
 	 * If we're closing a handle, and the object is clean, we can skip the
@@ -1104,15 +1113,6 @@ nockpt:			F_SET(btree, WT_BTREE_SKIP_CKPT);
 	 */
 	btree->modified = 0;
 	WT_FULL_BARRIER();
-
-	/*
-	 * Set the checkpoint LSN to the maximum LSN so that if logging is
-	 * disabled, recovery will never roll old changes forward over the
-	 * non-logged changes in this checkpoint.  If logging is enabled, a
-	 * real checkpoint LSN will be assigned for this checkpoint and
-	 * overwrite this.
-	 */
-	WT_MAX_LSN(&ckptlsn);
 
 	/* Tell logging that a file checkpoint is starting. */
 	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
