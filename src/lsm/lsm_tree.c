@@ -90,8 +90,13 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool wait)
 	WT_DECL_RET;
 	int i;
 
-	/* Stop any active merges. */
-	F_CLR(lsm_tree, WT_LSM_TREE_ACTIVE);
+	/*
+	 * Stop any new work units being added. The barrier is necessary
+	 * because we rely on the state change being visible before checking
+	 * the tree queue state.
+	 */
+	lsm_tree->active = false;
+	WT_READ_BARRIER();
 
 	/*
 	 * Wait for all LSM operations to drain. If WiredTiger is shutting
@@ -123,7 +128,7 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool wait)
 	}
 	return (0);
 
-err:	F_SET(lsm_tree, WT_LSM_TREE_ACTIVE);
+err:	lsm_tree->active = true;
 	return (ret);
 }
 
@@ -387,10 +392,8 @@ __lsm_tree_find(WT_SESSION_IMPL *session,
 				if (__lsm_tree_close(
 				    session, lsm_tree, false) != 0 ||
 				    lsm_tree->refcnt != 1) {
-					(void)__wt_atomic_sub32(
-					    &lsm_tree->refcnt, 1);
-					F_SET(lsm_tree, WT_LSM_TREE_ACTIVE);
-					lsm_tree->excl_session = NULL;
+					__wt_lsm_tree_release(
+					    session, lsm_tree);
 					return (EBUSY);
 				}
 			} else {
@@ -403,8 +406,8 @@ __lsm_tree_find(WT_SESSION_IMPL *session,
 				if (lsm_tree->excl_session != NULL) {
 					WT_ASSERT(session,
 					    lsm_tree->refcnt > 0);
-					(void)__wt_atomic_sub32(
-					    &lsm_tree->refcnt, 1);
+					__wt_lsm_tree_release(
+					    session, lsm_tree);
 					return (EBUSY);
 				}
 			}
@@ -504,7 +507,9 @@ __lsm_tree_open(WT_SESSION_IMPL *session,
 
 	/* Now the tree is setup, make it visible to others. */
 	TAILQ_INSERT_HEAD(&S2C(session)->lsmqh, lsm_tree, q);
-	F_SET(lsm_tree, WT_LSM_TREE_ACTIVE | WT_LSM_TREE_OPEN);
+	if (!exclusive)
+		lsm_tree->active = true;
+	F_SET(lsm_tree, WT_LSM_TREE_OPEN);
 
 	*treep = lsm_tree;
 
@@ -545,7 +550,7 @@ __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_ASSERT(session, lsm_tree->refcnt > 0);
 	if (lsm_tree->excl_session == session) {
 		/* We cleared the active flag when getting exclusive access. */
-		F_SET(lsm_tree, WT_LSM_TREE_ACTIVE);
+		lsm_tree->active = true;
 		lsm_tree->excl_session = NULL;
 	}
 	(void)__wt_atomic_sub32(&lsm_tree->refcnt, 1);
@@ -1218,7 +1223,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, bool *skipp)
 	}
 
 	/* Wait for the work unit queues to drain. */
-	while (F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE)) {
+	while (lsm_tree->active) {
 		/*
 		 * The flush flag is cleared when the chunk has been flushed.
 		 * Continue to push forced flushes until the chunk is on disk.
@@ -1300,7 +1305,6 @@ err:
 
 	__wt_lsm_tree_release(session, lsm_tree);
 	return (ret);
-
 }
 
 /*

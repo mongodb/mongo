@@ -463,7 +463,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 #define	LSM_MERGE_CHECK_INTERVAL	WT_THOUSAND
 	for (insert_count = 0; (ret = src->next(src)) == 0; insert_count++) {
 		if (insert_count % LSM_MERGE_CHECK_INTERVAL == 0) {
-			if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE))
+			if (!lsm_tree->active)
 				WT_ERR(EINTR);
 
 			WT_STAT_FAST_CONN_INCRV(session,
