@@ -10,4 +10,4 @@ t_LDFLAGS = -static
 TESTS = smoke.sh
 
 clean-local:
-	rm -rf WiredTiger* *.core __*
+	rm -rf WT_TEST *.core
