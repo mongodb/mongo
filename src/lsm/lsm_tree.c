@@ -27,6 +27,7 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool final)
 
 	WT_UNUSED(final);	/* Only used in diagnostic builds */
 
+	WT_ASSERT(session, !lsm_tree->active);
 	/*
 	 * The work unit queue should be empty, but it's worth checking
 	 * since work units use a different locking scheme to regular tree
@@ -85,13 +86,18 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool final)
  *	Close an LSM tree structure.
  */
 static int
-__lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool block)
+__lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool final)
 {
 	WT_DECL_RET;
 	int i;
 
-	/* Stop any active merges. */
-	F_CLR(lsm_tree, WT_LSM_TREE_ACTIVE);
+	/*
+	 * Stop any new work units being added. The barrier is necessary
+	 * because we rely on the state change being visible before checking
+	 * the tree queue state.
+	 */
+	lsm_tree->active = false;
+	WT_READ_BARRIER();
 
 	/*
 	 * Wait for all LSM operations to drain. If WiredTiger is shutting
@@ -100,7 +106,7 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool block)
 	 * access is not available.
 	 */
 	for (i = 0;
-	    lsm_tree->queue_ref > 0 || (block && lsm_tree->refcnt > 1); ++i) {
+	    lsm_tree->queue_ref > 0 || (final && lsm_tree->refcnt > 1); ++i) {
 		/*
 		 * Remove any work units from the manager queues. Do this step
 		 * repeatedly in case a work unit was in the process of being
@@ -123,7 +129,7 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool block)
 	}
 	return (0);
 
-err:	F_SET(lsm_tree, WT_LSM_TREE_ACTIVE);
+err:	lsm_tree->active = true;
 	return (ret);
 }
 
@@ -387,10 +393,8 @@ __lsm_tree_find(WT_SESSION_IMPL *session,
 				if (__lsm_tree_close(
 				    session, lsm_tree, false) != 0 ||
 				    lsm_tree->refcnt != 1) {
-					(void)__wt_atomic_sub32(
-					    &lsm_tree->refcnt, 1);
-					F_SET(lsm_tree, WT_LSM_TREE_ACTIVE);
-					lsm_tree->excl_session = NULL;
+					__wt_lsm_tree_release(
+					    session, lsm_tree);
 					return (EBUSY);
 				}
 			} else {
@@ -403,8 +407,8 @@ __lsm_tree_find(WT_SESSION_IMPL *session,
 				if (lsm_tree->excl_session != NULL) {
 					WT_ASSERT(session,
 					    lsm_tree->refcnt > 0);
-					(void)__wt_atomic_sub32(
-					    &lsm_tree->refcnt, 1);
+					__wt_lsm_tree_release(
+					    session, lsm_tree);
 					return (EBUSY);
 				}
 			}
@@ -504,7 +508,9 @@ __lsm_tree_open(WT_SESSION_IMPL *session,
 
 	/* Now the tree is setup, make it visible to others. */
 	TAILQ_INSERT_HEAD(&S2C(session)->lsmqh, lsm_tree, q);
-	F_SET(lsm_tree, WT_LSM_TREE_ACTIVE | WT_LSM_TREE_OPEN);
+	if (!exclusive)
+		lsm_tree->active = true;
+	F_SET(lsm_tree, WT_LSM_TREE_OPEN);
 
 	*treep = lsm_tree;
 
@@ -545,7 +551,7 @@ __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_ASSERT(session, lsm_tree->refcnt > 0);
 	if (lsm_tree->excl_session == session) {
 		/* We cleared the active flag when getting exclusive access. */
-		F_SET(lsm_tree, WT_LSM_TREE_ACTIVE);
+		lsm_tree->active = true;
 		lsm_tree->excl_session = NULL;
 	}
 	(void)__wt_atomic_sub32(&lsm_tree->refcnt, 1);
@@ -860,6 +866,7 @@ __wt_lsm_tree_drop(
 	WT_WITH_HANDLE_LIST_LOCK(session,
 	    ret = __wt_lsm_tree_get(session, name, true, &lsm_tree));
 	WT_RET(ret);
+	WT_ASSERT(session, !lsm_tree->active);
 
 	/* Prevent any new opens. */
 	WT_ERR(__wt_lsm_tree_writelock(session, lsm_tree));
@@ -888,6 +895,7 @@ __wt_lsm_tree_drop(
 	WT_ERR(__wt_lsm_tree_writeunlock(session, lsm_tree));
 	ret = __wt_metadata_remove(session, name);
 
+	WT_ASSERT(session, !lsm_tree->active);
 err:	if (locked)
 		WT_TRET(__wt_lsm_tree_writeunlock(session, lsm_tree));
 	WT_WITH_HANDLE_LIST_LOCK(session,
@@ -1218,7 +1226,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, bool *skipp)
 	}
 
 	/* Wait for the work unit queues to drain. */
-	while (F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE)) {
+	while (lsm_tree->active) {
 		/*
 		 * The flush flag is cleared when the chunk has been flushed.
 		 * Continue to push forced flushes until the chunk is on disk.
@@ -1300,7 +1308,6 @@ err:
 
 	__wt_lsm_tree_release(session, lsm_tree);
 	return (ret);
-
 }
 
 /*

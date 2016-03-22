@@ -59,8 +59,8 @@ __wt_mmap_preload(WT_SESSION_IMPL *session, const void *p, size_t size)
 {
 #ifdef HAVE_POSIX_MADVISE
 	/* Linux requires the address be aligned to a 4KB boundary. */
-	WT_CONNECTION_IMPL *conn;
 	WT_BM *bm;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	void *blk;
 
