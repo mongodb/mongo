@@ -82,6 +82,8 @@ public:
 
     ReadConcernLevel getLevel() const;
     OpTime getOpTime() const;
+    BSONObj toBSON() const;
+    std::string toString() const;
 
 private:
     boost::optional<OpTime> _opTime;

@@ -72,9 +72,7 @@ BSONObj OpTime::toBSON() const {
 }
 
 std::string OpTime::toString() const {
-    std::stringstream ss;
-    ss << "(term: " << _term << ", timestamp: " << _timestamp.toStringPretty() << ")";
-    return ss.str();
+    return toBSON().toString();
 }
 
 std::ostream& operator<<(std::ostream& out, const OpTime& opTime) {

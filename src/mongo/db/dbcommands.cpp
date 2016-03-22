@@ -1426,13 +1426,21 @@ bool Command::run(OperationContext* txn,
                     return result;
                 }
 
+                const int debugLevel =
+                    serverGlobalParams.clusterRole == ClusterRole::ConfigServer ? 1 : 2;
+                LOG(debugLevel) << "Waiting for 'committed' snapshot to be available for reading: "
+                                << readConcernArgs;
                 Status status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
 
                 // Wait until a snapshot is available.
                 while (status == ErrorCodes::ReadConcernMajorityNotAvailableYet) {
+                    LOG(debugLevel)
+                        << "Snapshot not available for readConcern: " << readConcernArgs;
                     replCoord->waitUntilSnapshotCommitted(txn, SnapshotName::min());
                     status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
                 }
+
+                LOG(debugLevel) << "Using 'committed' snapshot. " << CurOp::get(txn)->query();
 
                 if (!status.isOK()) {
                     auto result = appendCommandStatus(inPlaceReplyBob, status);

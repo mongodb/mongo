@@ -60,6 +60,16 @@ ReadConcernArgs::ReadConcernArgs(boost::optional<OpTime> opTime,
                                  boost::optional<ReadConcernLevel> level)
     : _opTime(std::move(opTime)), _level(std::move(level)) {}
 
+std::string ReadConcernArgs::toString() const {
+    return toBSON().toString();
+}
+
+BSONObj ReadConcernArgs::toBSON() const {
+    BSONObjBuilder bob;
+    appendInfo(&bob);
+    return bob.obj();
+}
+
 ReadConcernLevel ReadConcernArgs::getLevel() const {
     return _level.value_or(ReadConcernLevel::kLocalReadConcern);
 }

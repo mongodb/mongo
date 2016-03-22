@@ -164,9 +164,13 @@ struct ReplicationCoordinatorImpl::WaiterInfo {
     BSONObj toBSON() const {
         BSONObjBuilder bob;
         bob.append("opId", opID);
-        bob.append("opTime", opTime->toBSON());
+        if (opTime) {
+            bob.append("opTime", opTime->toBSON());
+        }
         bob.append("master", master);
-        bob.append("writeConcern", writeConcern);
+        if (writeConcern) {
+            bob.append("writeConcern", writeConcern->toBSON());
+        }
         return bob.obj();
     };
 
@@ -1053,6 +1057,10 @@ ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext
             : targetOpTime > _getMyLastAppliedOpTime_inlock();
     };
 
+    if (isMajorityReadConcern && loopCondition()) {
+        LOG(1) << "waitUntilOpTime: waiting for optime:" << targetOpTime
+               << " to be in a snapshot -- current snapshot: " << _currentCommittedSnapshot->opTime;
+    }
     while (loopCondition()) {
         Status interruptedStatus = txn->checkForInterruptNoAssert();
         if (!interruptedStatus.isOK()) {
@@ -1334,10 +1342,15 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
             if (getWriteConcernMajorityShouldJournal_inlock()) {
                 // Wait for the "current" snapshot to advance to/past the opTime.
 
+                const auto haveSnapshot = (_currentCommittedSnapshot->opTime >= opTime &&
+                                           _currentCommittedSnapshot->name >= minSnapshot);
+                if (!haveSnapshot) {
+                    log() << "Required snapshot optime: " << opTime << " is not yet part of the "
+                          << "current snapshot: " << *_currentCommittedSnapshot;
+                }
                 // We cannot have this committed snapshot until we have replicated to a majority,
                 // so we can return true here once that requirement is met for durable writes.
-                return (_currentCommittedSnapshot->opTime >= opTime &&
-                        _currentCommittedSnapshot->name >= minSnapshot);
+                return haveSnapshot;
             }
         }
         // Continue and wait for replication to the majority (of voters).
