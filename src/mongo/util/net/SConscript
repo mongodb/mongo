@@ -31,6 +31,7 @@ env.Library(
         "message.cpp",
         "message_port.cpp",
         "sock.cpp",
+        "sockaddr.cpp",
         "socket_poll.cpp",
         "ssl_expiration.cpp",
         "ssl_manager.cpp",

@@ -36,7 +36,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/util/net/miniwebserver.h"
-#include "mongo/util/net/sock.h"
+#include "mongo/util/net/sockaddr.h"
 
 namespace mongo {
 

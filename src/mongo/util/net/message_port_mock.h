@@ -33,7 +33,7 @@
 #include "mongo/config.h"
 #include "mongo/util/net/abstract_message_port.h"
 #include "mongo/util/net/message.h"
-#include "mongo/util/net/sock.h"
+#include "mongo/util/net/sockaddr.h"
 
 namespace mongo {
 

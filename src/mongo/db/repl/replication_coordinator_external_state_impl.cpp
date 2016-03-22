@@ -69,7 +69,6 @@
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/message_port.h"
-#include "mongo/util/net/sock.h"
 
 namespace mongo {
 namespace repl {

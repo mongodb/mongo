@@ -32,7 +32,7 @@
 
 #include "mongo/config.h"
 #include "mongo/util/net/message.h"
-#include "mongo/util/net/sock.h"
+#include "mongo/util/net/sockaddr.h"
 
 namespace mongo {
 

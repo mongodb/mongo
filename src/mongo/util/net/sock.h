@@ -54,6 +54,7 @@
 #include "mongo/logger/log_severity.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/net/sockaddr.h"
 
 namespace mongo {
 
@@ -72,18 +73,7 @@ void disableNagle(int sock);
 // Generate a string representation for getaddrinfo return codes
 std::string getAddrInfoStrError(int code);
 
-#if defined(_WIN32)
-
-typedef short sa_family_t;
-typedef int socklen_t;
-
-// This won't actually be used on windows
-struct sockaddr_un {
-    short sun_family;
-    char sun_path[108];  // length from unix header
-};
-
-#else  // _WIN32
+#if !defined(_WIN32)
 
 inline void closesocket(int s) {
     close(s);
@@ -103,62 +93,6 @@ void enableIPv6(bool state = true);
 bool IPv6Enabled();
 void setSockTimeouts(int sock, double secs);
 
-/**
- * wrapped around os representation of network address
- */
-struct SockAddr {
-    SockAddr();
-    explicit SockAddr(int sourcePort); /* listener side */
-    SockAddr(
-        const char* ip,
-        int port); /* EndPoint (remote) side, or if you want to specify which interface locally */
-
-    template <typename T>
-    T& as() {
-        return *(T*)(&sa);
-    }
-    template <typename T>
-    const T& as() const {
-        return *(const T*)(&sa);
-    }
-
-    std::string toString(bool includePort = true) const;
-
-    bool isValid() const {
-        return _isValid;
-    }
-
-    /**
-     * @return one of AF_INET, AF_INET6, or AF_UNIX
-     */
-    sa_family_t getType() const;
-
-    unsigned getPort() const;
-
-    std::string getAddr() const;
-
-    bool isLocalHost() const;
-
-    bool operator==(const SockAddr& r) const;
-
-    bool operator!=(const SockAddr& r) const;
-
-    bool operator<(const SockAddr& r) const;
-
-    const sockaddr* raw() const {
-        return (sockaddr*)&sa;
-    }
-    sockaddr* raw() {
-        return (sockaddr*)&sa;
-    }
-
-    socklen_t addressSize;
-
-private:
-    struct sockaddr_storage sa;
-    bool _isValid;
-};
-
 /** this is not cache and does a syscall */
 std::string getHostName();
 
@@ -169,7 +103,7 @@ std::string getHostNameCached();
 std::string prettyHostName();
 
 /**
- * thrown by Socket and SockAddr
+ * thrown by Socket
  */
 class SocketException : public DBException {
 public:

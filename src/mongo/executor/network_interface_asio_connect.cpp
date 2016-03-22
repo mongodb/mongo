@@ -42,7 +42,6 @@
 #include "mongo/executor/async_stream_interface.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/sock.h"
 
 namespace mongo {
 namespace executor {

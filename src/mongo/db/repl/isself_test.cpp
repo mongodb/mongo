@@ -32,7 +32,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
-#include "mongo/util/net/sock.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

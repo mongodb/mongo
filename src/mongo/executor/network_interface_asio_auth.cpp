@@ -44,7 +44,6 @@
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/sock.h"
 #include "mongo/util/net/ssl_manager.h"
 
 namespace mongo {

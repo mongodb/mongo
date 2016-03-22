@@ -40,7 +40,7 @@
 #include "mongo/util/allocator.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
-#include "mongo/util/net/sock.h"
+#include "mongo/util/net/sockaddr.h"
 #include "mongo/util/print.h"
 
 namespace mongo {

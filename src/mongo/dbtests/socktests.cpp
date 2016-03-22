@@ -33,7 +33,6 @@
 
 #include "mongo/db/repl/isself.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/util/net/sock.h"
 
 namespace SockTests {
 

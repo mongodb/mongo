@@ -37,7 +37,6 @@
 #include "mongo/platform/process_id.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/sock.h"
 #include "mongo/util/version.h"
 
 namespace mongo {
