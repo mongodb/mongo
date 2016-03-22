@@ -3093,14 +3093,17 @@ SyncSourceResolverResponse ReplicationCoordinatorImpl::selectSyncSource(
         }
 
         // Candidate found.
+        Status queryStatus(ErrorCodes::NotYetInitialized, "not mutated");
         BSONObj firstObjFound;
-        auto work = [&firstObjFound](const StatusWith<Fetcher::QueryResponse>& queryResult,
-                                     NextAction* nextActiion,
-                                     BSONObjBuilder* bob) {
-            if (queryResult.isOK() && !queryResult.getValue().documents.empty()) {
-                firstObjFound = queryResult.getValue().documents.front();
-            }
-        };
+        auto work =
+            [&firstObjFound, &queryStatus](const StatusWith<Fetcher::QueryResponse>& queryResult,
+                                           NextAction* nextActiion,
+                                           BSONObjBuilder* bob) {
+                queryStatus = queryResult.getStatus();
+                if (queryResult.isOK() && !queryResult.getValue().documents.empty()) {
+                    firstObjFound = queryResult.getValue().documents.front();
+                }
+            };
         Fetcher candidateProber(&_replExecutor,
                                 candidate,
                                 "local",
@@ -3113,9 +3116,18 @@ SyncSourceResolverResponse ReplicationCoordinatorImpl::selectSyncSource(
         candidateProber.schedule();
         candidateProber.wait();
 
+        if (!queryStatus.isOK()) {
+            // We got an error.
+            LOG(2) << "Unable to connect to " << candidate
+                   << " to read operations: " << queryStatus;
+            blacklistSyncSource(candidate, Date_t::now() + Seconds(10));
+            continue;
+        }
+
         if (firstObjFound.isEmpty()) {
-            // Remote oplog is emtpy, or we got an error.
-            blacklistSyncSource(candidate, Date_t::now() + Minutes(1));
+            // Remote oplog is empty.
+            LOG(2) << "Remote oplog on " << candidate << " is empty";
+            blacklistSyncSource(candidate, Date_t::now() + Seconds(10));
             continue;
         }
 
