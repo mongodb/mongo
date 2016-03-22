@@ -392,10 +392,8 @@ __lsm_tree_find(WT_SESSION_IMPL *session,
 				if (__lsm_tree_close(
 				    session, lsm_tree, false) != 0 ||
 				    lsm_tree->refcnt != 1) {
-					(void)__wt_atomic_sub32(
-					    &lsm_tree->refcnt, 1);
-					lsm_tree->active = true;
-					lsm_tree->excl_session = NULL;
+					__wt_lsm_tree_release(
+					    session, lsm_tree);
 					return (EBUSY);
 				}
 			} else {
@@ -408,8 +406,8 @@ __lsm_tree_find(WT_SESSION_IMPL *session,
 				if (lsm_tree->excl_session != NULL) {
 					WT_ASSERT(session,
 					    lsm_tree->refcnt > 0);
-					(void)__wt_atomic_sub32(
-					    &lsm_tree->refcnt, 1);
+					__wt_lsm_tree_release(
+					    session, lsm_tree);
 					return (EBUSY);
 				}
 			}
@@ -1307,7 +1305,6 @@ err:
 
 	__wt_lsm_tree_release(session, lsm_tree);
 	return (ret);
-
 }
 
 /*
