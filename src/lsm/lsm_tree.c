@@ -86,7 +86,7 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool final)
  *	Close an LSM tree structure.
  */
 static int
-__lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool wait)
+__lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool final)
 {
 	WT_DECL_RET;
 	int i;
@@ -106,7 +106,7 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool wait)
 	 * access is not available.
 	 */
 	for (i = 0;
-	    lsm_tree->queue_ref > 0 || (wait && lsm_tree->refcnt > 1); ++i) {
+	    lsm_tree->queue_ref > 0 || (final && lsm_tree->refcnt > 1); ++i) {
 		/*
 		 * Remove any work units from the manager queues. Do this step
 		 * repeatedly in case a work unit was in the process of being
