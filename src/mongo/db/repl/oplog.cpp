@@ -664,8 +664,8 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          return renameCollection(txn,
                                  NamespaceString(cmd.firstElement().valuestrsafe()),
                                  NamespaceString(cmd["to"].valuestrsafe()),
-                                 cmd["stayTemp"].trueValue(),
-                                 cmd["dropTarget"].trueValue());
+                                 cmd["dropTarget"].trueValue(),
+                                 cmd["stayTemp"].trueValue());
      },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::NamespaceExists}}},
     {"applyOps",
