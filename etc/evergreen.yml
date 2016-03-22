@@ -3528,11 +3528,11 @@ buildvariants:
 #             OSX buildvariants           #
 ###########################################
 
-- name: osx-108
-  display_name: OS X 10.8
+- name: osx-107
+  display_name: OS X 10.7
   modules: ~
   run_on:
-  - osx-108
+  - osx-1010
   batchtime: 1440 # 1 day
   expansions:
     push_path: osx
@@ -3619,11 +3619,11 @@ buildvariants:
     distros:
     - rhel55-test
 
-- name: osx-108-ssl
-  display_name: SSL OS X 10.8
+- name: osx-107-ssl
+  display_name: SSL OS X 10.7
   modules: ~
   run_on:
-  - osx-108
+  - osx-1010
   batchtime: 1440 # 1 day
   expansions:
     push_path: osx
@@ -3711,11 +3711,11 @@ buildvariants:
     distros:
     - rhel55-test
 
-- name: osx-108-debug
-  display_name: OS X 10.8 DEBUG
+- name: osx-107-debug
+  display_name: OS X 10.7 DEBUG
   modules: ~
   run_on:
-  - osx-108
+  - osx-1010
   expansions:
     push_path: osx
     push_bucket: downloads.mongodb.org
@@ -3748,12 +3748,12 @@ buildvariants:
   - name: tool_WT
   - name: unittests
 
-- name: enterprise-osx-108
-  display_name: Enterprise OS X 10.8
+- name: enterprise-osx-107
+  display_name: Enterprise OS X 10.7
   modules:
   - enterprise
   run_on:
-  - osx-108
+  - osx-1010
   batchtime: 1440 # 1 day
   expansions:
     push_path: osx
