@@ -278,10 +278,11 @@ class JSTestCase(TestCase):
                  logger,
                  js_filename,
                  shell_executable=None,
-                 shell_options=None):
+                 shell_options=None,
+                 test_kind="JSTest"):
         "Initializes the JSTestCase with the JS file to run."
 
-        TestCase.__init__(self, logger, "JSTest", js_filename)
+        TestCase.__init__(self, logger, test_kind, js_filename)
 
         # Command line options override the YAML configuration.
         self.shell_executable = utils.default_if_none(config.MONGO_EXECUTABLE, shell_executable)
