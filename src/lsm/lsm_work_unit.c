@@ -29,7 +29,7 @@ __lsm_copy_chunks(WT_SESSION_IMPL *session,
 	cookie->nchunks = 0;
 
 	WT_RET(__wt_lsm_tree_readlock(session, lsm_tree));
-	if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE))
+	if (!lsm_tree->active)
 		return (__wt_lsm_tree_readunlock(session, lsm_tree));
 
 	/* Take a copy of the current state of the LSM tree. */
@@ -79,7 +79,7 @@ __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
 
 	WT_ASSERT(session, lsm_tree->queue_ref > 0);
 	WT_RET(__wt_lsm_tree_readlock(session, lsm_tree));
-	if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE) || lsm_tree->nchunks == 0)
+	if (!lsm_tree->active || lsm_tree->nchunks == 0)
 		return (__wt_lsm_tree_readunlock(session, lsm_tree));
 
 	/* Search for a chunk to evict and/or a chunk to flush. */
@@ -322,7 +322,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 		 */
 		saved_isolation = session->txn.isolation;
 		session->txn.isolation = WT_ISO_READ_UNCOMMITTED;
-		ret = __wt_cache_op(session, NULL, WT_SYNC_WRITE_LEAVES);
+		ret = __wt_cache_op(session, WT_SYNC_WRITE_LEAVES);
 		session->txn.isolation = saved_isolation;
 		WT_TRET(__wt_session_release_btree(session));
 	}
