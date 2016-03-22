@@ -313,6 +313,55 @@ load("jstests/aggregation/extras/utils.js");
         testPipeline(pipeline, expectedResults, coll);
 
         //
+        // A local value of an array.
+        //
+
+        // Basic array corresponding to multiple documents.
+        coll.drop();
+        assert.writeOK(coll.insert({_id: 0, a: [0, 1, 2]}));
+
+        from.drop();
+        assert.writeOK(from.insert({_id: 0}));
+        assert.writeOK(from.insert({_id: 1}));
+
+        pipeline = [
+            {
+              $lookup: {
+                  localField: "a",
+                  foreignField: "_id",
+                  from: "from",
+                  as: "b",
+              }
+            },
+        ];
+        expectedResults = [{_id: 0, a: [0, 1, 2], b: [{_id: 0}, {_id: 1}]}];
+        testPipeline(pipeline, expectedResults, coll);
+
+        // Array containing regular expressions.
+        coll.drop();
+        assert.writeOK(coll.insert({_id: 0, a: [/a regex/, /^x/]}));
+
+        from.drop();
+        assert.writeOK(from.insert({_id: 0, b: "should not match a regex"}));
+        assert.writeOK(from.insert({_id: 1, b: "xxxx"}));
+        assert.writeOK(from.insert({_id: 2, b: /a regex/}));
+        assert.writeOK(from.insert({_id: 3, b: /^x/}));
+
+        pipeline = [
+            {
+              $lookup: {
+                  localField: "a",
+                  foreignField: "b",
+                  from: "from",
+                  as: "b",
+              }
+            },
+        ];
+        expectedResults =
+            [{_id: 0, a: [/a regex/, /^x/], b: [{_id: 2, b: /a regex/}, {_id: 3, b: /^x/}]}];
+        testPipeline(pipeline, expectedResults, coll);
+
+        //
         // Error cases.
         //
 

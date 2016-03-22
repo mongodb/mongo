@@ -349,6 +349,42 @@ public:
 
 }  // namespace DocumentSourceLimit
 
+namespace DocumentSourceLookup {
+
+TEST(QueryForInput, NonArrayValueUsesEqQuery) {
+    Document input = DOC("local" << 1);
+    BSONObj query = DocumentSourceLookUp::queryForInput(input, FieldPath("local"), "foreign");
+    ASSERT_EQ(query, BSON("foreign" << BSON("$eq" << 1)));
+}
+
+TEST(QueryForInput, RegexValueUsesEqQuery) {
+    BSONRegEx regex("^a");
+    Document input = DOC("local" << Value(regex));
+    BSONObj query = DocumentSourceLookUp::queryForInput(input, FieldPath("local"), "foreign");
+    ASSERT_EQ(query, BSON("foreign" << BSON("$eq" << regex)));
+}
+
+TEST(QueryForInput, ArrayValueUsesInQuery) {
+    vector<Value> inputArray = {Value(1), Value(2)};
+    Document input = DOC("local" << Value(inputArray));
+    BSONObj query = DocumentSourceLookUp::queryForInput(input, FieldPath("local"), "foreign");
+    ASSERT_EQ(query, BSON("foreign" << BSON("$in" << BSON_ARRAY(1 << 2))));
+}
+
+TEST(QueryForInput, ArrayValueWithRegexUsesOrQuery) {
+    BSONRegEx regex("^a");
+    vector<Value> inputArray = {Value(1), Value(regex), Value(2)};
+    Document input = DOC("local" << Value(inputArray));
+    BSONObj query = DocumentSourceLookUp::queryForInput(input, FieldPath("local"), "foreign");
+    ASSERT_EQ(query,
+              BSON("$or" << BSON_ARRAY(BSON("foreign" << BSON("$eq" << Value(1)))
+                                       << BSON("foreign" << BSON("$eq" << regex))
+                                       << BSON("foreign" << BSON("$eq" << Value(2))))));
+}
+
+
+}  // namespace DocumentSourceLookUp
+
 namespace DocumentSourceGroup {
 
 using mongo::DocumentSourceGroup;

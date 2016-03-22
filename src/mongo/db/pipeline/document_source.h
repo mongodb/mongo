@@ -1427,6 +1427,13 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
+    /**
+     * Build the BSONObj used to query the foreign collection.
+     */
+    static BSONObj queryForInput(const Document& input,
+                                 const FieldPath& localFieldName,
+                                 const std::string& foreignFieldName);
+
 private:
     DocumentSourceLookUp(NamespaceString fromNs,
                          std::string as,
@@ -1439,7 +1446,6 @@ private:
     }
 
     boost::optional<Document> unwindResult();
-    BSONObj queryForInput(const Document& input) const;
 
     NamespaceString _fromNs;
     FieldPath _as;

@@ -41,6 +41,7 @@
 namespace mongo {
 
 using boost::intrusive_ptr;
+using std::vector;
 
 DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
                                            std::string as,
@@ -60,6 +61,29 @@ const char* DocumentSourceLookUp::getSourceName() const {
     return "$lookup";
 }
 
+namespace {
+
+/**
+ * Constructs a query of the following shape:
+ *  {$or: [
+ *    {'fieldName': {$eq: 'values[0]'}},
+ *    {'fieldName': {$eq: 'values[1]'}},
+ *    ...
+ *  ]}
+ */
+BSONObj buildEqualityOrQuery(const std::string& fieldName, const vector<Value>& values) {
+    BSONObjBuilder orBuilder;
+    {
+        BSONArrayBuilder orPredicatesBuilder(orBuilder.subarrayStart("$or"));
+        for (auto&& value : values) {
+            orPredicatesBuilder.append(BSON(fieldName << BSON("$eq" << value)));
+        }
+    }
+    return orBuilder.obj();
+}
+
+}  // namespace
+
 boost::optional<Document> DocumentSourceLookUp::getNext() {
     pExpCtx->checkForInterrupt();
 
@@ -72,7 +96,7 @@ boost::optional<Document> DocumentSourceLookUp::getNext() {
     boost::optional<Document> input = pSource->getNext();
     if (!input)
         return {};
-    BSONObj query = queryForInput(*input);
+    BSONObj query = queryForInput(*input, _localField, _foreignFieldFieldName);
     std::unique_ptr<DBClientCursor> cursor = _mongod->directClient()->query(_fromNs.ns(), query);
 
     std::vector<Value> results;
@@ -114,16 +138,39 @@ void DocumentSourceLookUp::dispose() {
     pSource->dispose();
 }
 
-BSONObj DocumentSourceLookUp::queryForInput(const Document& input) const {
-    Value localFieldVal = input.getNestedField(_localField);
+BSONObj DocumentSourceLookUp::queryForInput(const Document& input,
+                                            const FieldPath& localFieldPath,
+                                            const std::string& foreignFieldName) {
+    Value localFieldVal = input.getNestedField(localFieldPath);
+
+    // Missing values are treated as null.
     if (localFieldVal.missing()) {
         localFieldVal = Value(BSONNULL);
     }
 
-    // { _foreignFieldFiedlName : { "$eq" : localFieldValue } }
     BSONObjBuilder query;
-    BSONObjBuilder subObj(query.subobjStart(_foreignFieldFieldName));
-    subObj << "$eq" << localFieldVal;
+    BSONObjBuilder subObj(query.subobjStart(foreignFieldName));
+
+    if (localFieldVal.isArray()) {
+        // Assume an array value logically corresponds to many documents, rather than logically
+        // corresponding to one document with an array value.
+        const vector<Value>& localArray = localFieldVal.getArray();
+        const bool containsRegex = std::any_of(
+            localArray.begin(), localArray.end(), [](Value val) { return val.getType() == RegEx; });
+
+        if (containsRegex) {
+            // A regex inside of an $in will not be treated as an equality comparison, so use an
+            // $or.
+            return buildEqualityOrQuery(foreignFieldName, localFieldVal.getArray());
+        }
+
+        // { _foreignFieldFieldName : { "$in" : localFieldValue } }
+        subObj << "$in" << localFieldVal;
+    } else {
+        // { _foreignFieldFieldName : { "$eq" : localFieldValue } }
+        subObj << "$eq" << localFieldVal;
+    }
+
     subObj.doneFast();
     return query.obj();
 }
@@ -165,7 +212,9 @@ boost::optional<Document> DocumentSourceLookUp::unwindResult() {
         if (!_input)
             return {};
 
-        _cursor = _mongod->directClient()->query(_fromNs.ns(), queryForInput(*_input));
+        _cursor = _mongod->directClient()->query(
+            _fromNs.ns(),
+            DocumentSourceLookUp::queryForInput(*_input, _localField, _foreignFieldFieldName));
         _cursorIndex = 0;
 
         if (_unwindSrc->preserveNullAndEmptyArrays() && !_cursor->more()) {
@@ -219,7 +268,7 @@ DocumentSource::GetDepsReturn DocumentSourceLookUp::getDependencies(DepsTracker*
     return SEE_NEXT;
 }
 
-boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
+intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(4569, "the $lookup specification must be an Object", elem.type() == Object);
 
