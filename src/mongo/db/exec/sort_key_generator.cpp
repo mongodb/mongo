@@ -96,7 +96,8 @@ SortKeyGenerator::SortKeyGenerator(const BSONObj& sortSpec, const BSONObj& query
         fixed.push_back(BSONElement());
     }
 
-    _keyGen.reset(new BtreeKeyGeneratorV1(fieldNames, fixed, false /* not sparse */));
+    // TODO SERVER-23095: change nullptr to the appropriate CollationInterface*.
+    _keyGen.reset(new BtreeKeyGeneratorV1(fieldNames, fixed, false /* not sparse */, nullptr));
 
     // The bounds checker only works on the Btree part of the sort key.
     getBoundsForSort(queryObj, _btreeObj);
