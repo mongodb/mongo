@@ -49,6 +49,13 @@ bulk-loaded, so they do not get named checkpoints that complete during the
 bulk load.
 </dd>
 
+<dt>Remove WT_LSN structure from public API</dt>
+<dd>
+The WiredTiger public API used to define a structure that could encapsulate
+log sequence numbers. That structure is no longer exposed publicly.
+</dd>
+
+<dt>
 </dl><hr>
 @section version_270 Upgrading to Version 2.7.0
 
