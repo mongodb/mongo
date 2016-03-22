@@ -59,7 +59,7 @@
                             function(conn) {
                                 conn.getDB('admin').shutdownServer();
                             },
-                            makeRegExMatchFn(/shutdown command received[\s\S]*dbexit:/),
+                            makeRegExMatchFn(/shutdown command received/),
                             MongoRunner.EXIT_CLEAN);
 
         testShutdownLogging(launcher,
