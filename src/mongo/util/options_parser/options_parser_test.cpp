@@ -744,7 +744,8 @@ TEST(Parsing, ImplicitValueOverride) {
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
-    argv.push_back("--port=5");
+    argv.push_back("--port");
+    argv.push_back("5");
     std::map<std::string, std::string> env_map;
 
     ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));

@@ -140,9 +140,10 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
     // Command Line Option | Resulting Verbosity
     // _________________________________________
     // (none)              | 0
+    // --verbose ""        | 0
     // --verbose           | 1
-    // --verbose=v         | 1
-    // --verbose=vv        | 2 (etc.)
+    // --verbose v         | 1
+    // --verbose vv        | 2 (etc.)
     // -v                  | 1
     // -vv                 | 2 (etc.)
     //

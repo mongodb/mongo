@@ -129,7 +129,8 @@ TEST(Verbosity, CommandLineString) {
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
-    argv.push_back("--verbose=vvvv");
+    argv.push_back("--verbose");
+    argv.push_back("vvvv");
     std::map<std::string, std::string> env_map;
 
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
@@ -139,6 +140,34 @@ TEST(Verbosity, CommandLineString) {
     ASSERT_OK(::mongo::storeServerOptions(environment, argv));
 
     int verbosity = 4;
+    ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(),
+                  ::mongo::logger::LogSeverity::Debug(verbosity));
+}
+
+TEST(Verbosity, CommandLineEmptyString) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection options;
+
+    // Reset the log level before we test
+    ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+        ::mongo::logger::LogSeverity::Info());
+
+    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--verbose");
+    argv.push_back("");
+    std::map<std::string, std::string> env_map;
+
+    ASSERT_OK(parser.run(options, argv, env_map, &environment));
+
+    ASSERT_OK(::mongo::validateServerOptions(environment));
+    ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
+    ASSERT_OK(::mongo::storeServerOptions(environment, argv));
+
+    int verbosity = 0;
     ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(),
                   ::mongo::logger::LogSeverity::Debug(verbosity));
 }
@@ -156,7 +185,8 @@ TEST(Verbosity, CommandLineBadString) {
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
-    argv.push_back("--verbose=beloud");
+    argv.push_back("--verbose");
+    argv.push_back("beloud");
     std::map<std::string, std::string> env_map;
 
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
@@ -293,7 +323,8 @@ TEST(Verbosity, MultipleSourcesMultipleOptions) {
     argv.push_back("binaryname");
     argv.push_back("--config");
     argv.push_back("config.json");
-    argv.push_back("--verbose=vvv");
+    argv.push_back("--verbose");
+    argv.push_back("vvv");
     std::map<std::string, std::string> env_map;
 
     parser.setConfig("config.json", "{ \"systemLog.verbosity\" : 4 }");
