@@ -18,13 +18,12 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_REF *next_ref, *ref;
-	bool evict_reset;
 
 	/*
 	 * We need exclusive access to the file -- disable ordinary eviction
 	 * and drain any blocks already queued.
 	 */
-	WT_RET(__wt_evict_file_exclusive_on(session, &evict_reset));
+	WT_RET(__wt_evict_file_exclusive_on(session));
 
 	/* Make sure the oldest transaction ID is up-to-date. */
 	__wt_txn_update_oldest(session, true);
@@ -98,8 +97,7 @@ err:		/* On error, clear any left-over tree walk. */
 			    session, next_ref, WT_READ_NO_EVICT));
 	}
 
-	if (evict_reset)
-		__wt_evict_file_exclusive_off(session);
+	__wt_evict_file_exclusive_off(session);
 
 	return (ret);
 }

@@ -129,15 +129,18 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	bool evict_reset, marked_dead, no_schema_lock;
+	bool marked_dead, no_schema_lock;
 
 	btree = S2BT(session);
 	bm = btree->bm;
 	dhandle = session->dhandle;
-	evict_reset = marked_dead = false;
+	marked_dead = false;
 
 	if (!F_ISSET(dhandle, WT_DHANDLE_OPEN))
 		return (0);
+
+	/* Turn off eviction. */
+	WT_RET(__wt_evict_file_exclusive_on(session));
 
 	/*
 	 * If we don't already have the schema lock, make it an error to try
@@ -158,13 +161,6 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	 * handle's close lock.
 	 */
 	__wt_spin_lock(session, &dhandle->close_lock);
-
-	/*
-	 * Ensure we aren't racing with the eviction server; inside the close
-	 * lock so threads won't race setting/clearing the tree's "no eviction"
-	 * flag.
-	 */
-	WT_ERR(__wt_evict_file_exclusive_on(session, &evict_reset));
 
 	/*
 	 * The close can fail if an update cannot be written, return the EBUSY
@@ -204,12 +200,12 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	    F_ISSET(dhandle, WT_DHANDLE_DEAD) ||
 	    !F_ISSET(dhandle, WT_DHANDLE_OPEN));
 
-err:	if (evict_reset)
-		__wt_evict_file_exclusive_off(session);
-	__wt_spin_unlock(session, &dhandle->close_lock);
+err:	__wt_spin_unlock(session, &dhandle->close_lock);
 
 	if (no_schema_lock)
 		F_CLR(session, WT_SESSION_NO_SCHEMA_LOCK);
+
+	__wt_evict_file_exclusive_off(session);
 
 	return (ret);
 }

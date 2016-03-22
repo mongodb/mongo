@@ -31,6 +31,58 @@
 } while (0)
 
 /*
+ * __wt_schema_create_final --
+ *	Create a single configuration line from a set of configuration strings,
+ * including all of the defaults declared for a session.create, and stripping
+ * any configuration strings that don't belong in a session.create. Here for
+ * the wt dump command utility, which reads a set of configuration strings and
+ * needs to add in the defaults and then collapse them into single string for
+ * a subsequent load.
+ */
+int
+__wt_schema_create_final(
+    WT_SESSION_IMPL *session, char *cfg_arg[], char **value_ret)
+{
+	WT_DECL_RET;
+	u_int i;
+	const char **cfg;
+
+	/*
+	 * Count the entries in the original,
+	 * Allocate a copy with the defaults as the first entry,
+	 * Collapse the whole thing into a single configuration string (which
+	 * also strips any entries that don't appear in the first entry).
+	 */
+	for (i = 0; cfg_arg[i] != NULL; ++i)
+		;
+	WT_RET(__wt_calloc_def(session, i + 2, &cfg));
+	cfg[0] = WT_CONFIG_BASE(session, WT_SESSION_create);
+	for (i = 0; cfg_arg[i] != NULL; ++i)
+		cfg[i + 1] = cfg_arg[i];
+	cfg[i + 1] = NULL;
+
+	ret = __wt_config_collapse(session, cfg, value_ret);
+
+	__wt_free(session, cfg);
+	return (ret);
+}
+
+/*
+ * __schema_create_strip --
+ *	Discard any configuration information from a schema entry that is not
+ * applicable to an session.create call. Here for the metadata:create URI.
+ */
+static int
+__schema_create_strip(
+    WT_SESSION_IMPL *session, const char *value, char **value_ret)
+{
+	const char *cfg[] =
+	    { WT_CONFIG_BASE(session, WT_SESSION_create), value, NULL };
+
+	return (__wt_config_collapse(session, cfg, value_ret));
+}
+
+/*
  * __curmetadata_setkv --
  *	Copy key/value into the public cursor, stripping internal metadata for
  *	"create-only" cursors.
@@ -49,8 +101,7 @@ __curmetadata_setkv(WT_CURSOR_METADATA *mdc, WT_CURSOR *fc)
 	c->key.data = fc->key.data;
 	c->key.size = fc->key.size;
 	if (F_ISSET(mdc, WT_MDC_CREATEONLY)) {
-		WT_RET(__wt_schema_create_strip(
-		    session, fc->value.data, NULL, &value));
+		WT_RET(__schema_create_strip(session, fc->value.data, &value));
 		ret = __wt_buf_set(
 		    session, &c->value, value, strlen(value) + 1);
 		__wt_free(session, value);
@@ -92,8 +143,7 @@ __curmetadata_metadata_search(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 	WT_RET(__wt_metadata_search(session, WT_METAFILE_URI, &value));
 
 	if (F_ISSET(mdc, WT_MDC_CREATEONLY)) {
-		ret = __wt_schema_create_strip(
-		    session, value, NULL, &stripped);
+		ret = __schema_create_strip(session, value, &stripped);
 		__wt_free(session, value);
 		WT_RET(ret);
 		value = stripped;

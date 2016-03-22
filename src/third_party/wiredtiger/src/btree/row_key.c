@@ -52,6 +52,7 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_RET(__wt_scr_alloc(session, 0, &key));
 	WT_RET(__wt_scr_alloc(session,
 	    (uint32_t)__bitstr_size(page->pg_row_entries), &tmp));
+	memset(tmp->mem, 0, tmp->memsize);
 
 	if ((gap = btree->key_gap) == 0)
 		gap = 1;

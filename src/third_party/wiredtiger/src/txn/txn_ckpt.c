@@ -8,6 +8,10 @@
 
 #include "wt_internal.h"
 
+static int __checkpoint_lock_tree(
+    WT_SESSION_IMPL *, bool, bool, const char *[]);
+static int __checkpoint_tree_helper(WT_SESSION_IMPL *, const char *[]);
+
 /*
  * __wt_checkpoint_name_ok --
  *	Complain if the checkpoint name isn't acceptable.
@@ -224,11 +228,11 @@ __checkpoint_data_source(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
- * __wt_checkpoint_list --
+ * __wt_checkpoint_get_handles --
  *	Get a list of handles to flush.
  */
 int
-__wt_checkpoint_list(WT_SESSION_IMPL *session, const char *cfg[])
+__wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_DECL_RET;
 	const char *name;
@@ -254,6 +258,13 @@ __wt_checkpoint_list(WT_SESSION_IMPL *session, const char *cfg[])
 	if ((ret = __wt_session_get_btree(session, name, NULL, NULL, 0)) != 0)
 		return (ret == EBUSY ? 0 : ret);
 
+	WT_SAVE_DHANDLE(session,
+	    ret = __checkpoint_lock_tree(session, true, true, cfg));
+	if (ret != 0) {
+		WT_TRET(__wt_session_release_btree(session));
+		return (ret);
+	}
+
 	session->ckpt_handle[session->ckpt_handle_next++] = session->dhandle;
 	return (0);
 }
@@ -267,7 +278,7 @@ __checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_UNUSED(cfg);
 
-	return (__wt_cache_op(session, NULL, WT_SYNC_WRITE_LEAVES));
+	return (__wt_cache_op(session, WT_SYNC_WRITE_LEAVES));
 }
 
 /*
@@ -371,15 +382,20 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Configure logging only if doing a full checkpoint. */
 	logging = FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED);
 
+	/* Keep track of handles acquired for locking. */
+	WT_ERR(__wt_meta_track_on(session));
+	tracking = true;
+
 	/*
 	 * Get a list of handles we want to flush; this may pull closed objects
 	 * into the session cache, but we're going to do that eventually anyway.
 	 */
+	WT_ASSERT(session, session->ckpt_handle_next == 0);
 	WT_WITH_SCHEMA_LOCK(session, ret,
 	    WT_WITH_TABLE_LOCK(session, ret,
 		WT_WITH_HANDLE_LIST_LOCK(session,
 		    ret = __checkpoint_apply_all(
-		    session, cfg, __wt_checkpoint_list, NULL))));
+		    session, cfg, __wt_checkpoint_get_handles, NULL))));
 	WT_ERR(ret);
 
 	/*
@@ -408,12 +424,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * completion. Do it after flushing the pages to give the
 	 * asynchronous flush as much time as possible before we wait.
 	 */
-	if (F_ISSET(conn, WT_CONN_CKPT_SYNC))
-		WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
-
-	/* Start the checkpoint for real. */
-	WT_ERR(__wt_meta_track_on(session));
-	tracking = true;
+	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
 
 	/* Tell logging that we are about to start a database checkpoint. */
 	if (full && logging)
@@ -427,6 +438,8 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__wt_epoch(session, &start));
 
 	/*
+	 * Start the checkpoint for real.
+	 *
 	 * Bump the global checkpoint generation, used to figure out whether
 	 * checkpoint has visited a tree.  There is no need for this to be
 	 * atomic: it is only written while holding the checkpoint lock.
@@ -490,7 +503,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__wt_txn_checkpoint_log(
 		    session, full, WT_TXN_LOG_CKPT_START, NULL));
 
-	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint));
+	WT_ERR(__checkpoint_apply(session, cfg, __checkpoint_tree_helper));
 
 	/*
 	 * Clear the dhandle so the visibility check doesn't get confused about
@@ -509,8 +522,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Checkpoints have to hit disk (it would be reasonable to configure for
 	 * lazy checkpoints, but we don't support them yet).
 	 */
-	if (F_ISSET(conn, WT_CONN_CKPT_SYNC))
-		WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
+	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
 
 	WT_ERR(__checkpoint_verbose_track(session,
 	    "sync completed", &verb_timer));
@@ -754,14 +766,13 @@ __drop_to(WT_CKPT *ckptbase, const char *name, size_t len)
 }
 
 /*
- * __checkpoint_worker --
- *	Checkpoint a tree.
+ * __checkpoint_lock_tree --
+ *	Acquire the locks required to checkpoint a tree.
  */
 static int
-__checkpoint_worker(WT_SESSION_IMPL *session,
-    const char *cfg[], bool is_checkpoint, bool need_tracking)
+__checkpoint_lock_tree(WT_SESSION_IMPL *session,
+    bool is_checkpoint, bool need_tracking, const char *cfg[])
 {
-	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_CKPT *ckpt, *ckptbase;
 	WT_CONFIG dropconf;
@@ -769,19 +780,15 @@ __checkpoint_worker(WT_SESSION_IMPL *session,
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	WT_LSN ckptlsn;
-	int deleted, was_modified;
-	bool fake_ckpt, force, hot_backup_locked;
-	const char *name;
 	char *name_alloc;
+	const char *name;
+	bool hot_backup_locked;
 
 	btree = S2BT(session);
-	bm = btree->bm;
 	conn = S2C(session);
 	ckpt = ckptbase = NULL;
 	dhandle = session->dhandle;
-	was_modified = btree->modified;
-	fake_ckpt = hot_backup_locked = false;
+	hot_backup_locked = false;
 	name_alloc = NULL;
 
 	/*
@@ -799,15 +806,6 @@ __checkpoint_worker(WT_SESSION_IMPL *session,
 	 */
 	WT_ASSERT(session, !need_tracking ||
 	    WT_IS_METADATA(session, dhandle) || WT_META_TRACKING(session));
-
-	/*
-	 * Set the checkpoint LSN to the maximum LSN so that if logging is
-	 * disabled, recovery will never roll old changes forward over the
-	 * non-logged changes in this checkpoint.  If logging is enabled, a
-	 * real checkpoint LSN will be assigned later for this checkpoint and
-	 * overwrite this.
-	 */
-	WT_MAX_LSN(&ckptlsn);
 
 	/* Get the list of checkpoints for this file. */
 	WT_RET(__wt_meta_ckptlist_get(session, dhandle->name, &ckptbase));
@@ -859,74 +857,15 @@ __checkpoint_worker(WT_SESSION_IMPL *session,
 	/* Drop checkpoints with the same name as the one we're taking. */
 	__drop(ckptbase, name, strlen(name));
 
-	/*
-	 * Check for clean objects not requiring a checkpoint.
-	 *
-	 * If we're closing a handle, and the object is clean, we can skip the
-	 * checkpoint, whatever checkpoints we have are sufficient.  (We might
-	 * not have any checkpoints if the object was never modified, and that's
-	 * OK: the object creation code doesn't mark the tree modified so we can
-	 * skip newly created trees here.)
-	 *
-	 * If the application repeatedly checkpoints an object (imagine hourly
-	 * checkpoints using the same explicit or internal name), there's no
-	 * reason to repeat the checkpoint for clean objects.  The test is if
-	 * the only checkpoint we're deleting is the last one in the list and
-	 * it has the same name as the checkpoint we're about to take, skip the
-	 * work.  (We can't skip checkpoints that delete more than the last
-	 * checkpoint because deleting those checkpoints might free up space in
-	 * the file.)  This means an application toggling between two (or more)
-	 * checkpoint names will repeatedly take empty checkpoints, but that's
-	 * not likely enough to make detection worthwhile.
-	 *
-	 * Checkpoint read-only objects otherwise: the application must be able
-	 * to open the checkpoint in a cursor after taking any checkpoint, which
-	 * means it must exist.
-	 */
-	force = false;
-	F_CLR(btree, WT_BTREE_SKIP_CKPT);
-	if (!btree->modified && cfg != NULL) {
-		ret = __wt_config_gets(session, cfg, "force", &cval);
-		if (ret != 0 && ret != WT_NOTFOUND)
-			WT_ERR(ret);
-		if (ret == 0 && cval.val != 0)
-			force = true;
-	}
-	if (!btree->modified && !force) {
-		if (!is_checkpoint)
-			goto nockpt;
-
-		deleted = 0;
-		WT_CKPT_FOREACH(ckptbase, ckpt)
-			if (F_ISSET(ckpt, WT_CKPT_DELETE))
-				++deleted;
-		/*
-		 * Complicated test: if the last checkpoint in the object has
-		 * the same name as the checkpoint we're taking (correcting for
-		 * internal checkpoint names with their generational suffix
-		 * numbers), we can skip the checkpoint, there's nothing to do.
-		 * The exception is if we're deleting two or more checkpoints:
-		 * then we may save space.
-		 */
-		if (ckpt > ckptbase &&
-		    (strcmp(name, (ckpt - 1)->name) == 0 ||
-		    (WT_PREFIX_MATCH(name, WT_CHECKPOINT) &&
-		    WT_PREFIX_MATCH((ckpt - 1)->name, WT_CHECKPOINT))) &&
-		    deleted < 2) {
-nockpt:			F_SET(btree, WT_BTREE_SKIP_CKPT);
-			WT_PUBLISH(btree->checkpoint_gen,
-			    S2C(session)->txn_global.checkpoint_gen);
-			WT_STAT_FAST_DATA_SET(session,
-			    btree_checkpoint_generation,
-			    btree->checkpoint_gen);
-			goto done;
-		}
-	}
-
 	/* Add a new checkpoint entry at the end of the list. */
 	WT_CKPT_FOREACH(ckptbase, ckpt)
 		;
 	WT_ERR(__wt_strdup(session, name, &ckpt->name));
+	/*
+	 * We are now done with the local use of the name.  Free the local
+	 * allocation, if needed.
+	 */
+	__wt_free(session, name_alloc);
 	F_SET(ckpt, WT_CKPT_ADD);
 
 	/*
@@ -1007,32 +946,128 @@ nockpt:			F_SET(btree, WT_BTREE_SKIP_CKPT);
 	 * copy instead of forcing checkpoints on clean objects to associate
 	 * names with checkpoints.
 	 */
-	if (is_checkpoint)
-		switch (F_MASK(btree, WT_BTREE_SPECIAL_FLAGS)) {
-		case 0:
-			break;
-		case WT_BTREE_BULK:
-			/*
-			 * The only checkpoints a bulk-loaded file should have
-			 * are fake ones we created without the underlying block
-			 * manager.  I'm leaving this code here because it's a
-			 * cheap test and a nasty race.
-			 */
-			WT_CKPT_FOREACH(ckptbase, ckpt)
-				if (!F_ISSET(ckpt, WT_CKPT_ADD | WT_CKPT_FAKE))
-					WT_ERR_MSG(session, ret,
-					    "block-manager checkpoint found "
-					    "for a bulk-loaded file");
-			fake_ckpt = true;
-			goto fake;
-		case WT_BTREE_REBALANCE:
-		case WT_BTREE_SALVAGE:
-		case WT_BTREE_UPGRADE:
-		case WT_BTREE_VERIFY:
-			WT_ERR_MSG(session, EINVAL,
-			    "checkpoints are blocked during rebalance, "
-			    "salvage, upgrade or verify operations");
+	WT_ASSERT(session,
+	    !is_checkpoint || !F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS));
+
+	hot_backup_locked = false;
+	WT_ERR(__wt_readunlock(session, conn->hot_backup_lock));
+
+	WT_ASSERT(session, btree->ckpt == NULL);
+	btree->ckpt = ckptbase;
+
+	return (0);
+
+err:	if (hot_backup_locked)
+		WT_TRET(__wt_readunlock(session, conn->hot_backup_lock));
+
+	__wt_meta_ckptlist_free(session, ckptbase);
+	__wt_free(session, name_alloc);
+
+	return (ret);
+}
+
+/*
+ * __checkpoint_tree --
+ *	Checkpoint a single tree.
+ *	Assumes all necessary locks have been acquired by the caller.
+ */
+static int
+__checkpoint_tree(
+    WT_SESSION_IMPL *session, bool is_checkpoint, const char *cfg[])
+{
+	WT_BM *bm;
+	WT_BTREE *btree;
+	WT_CKPT *ckpt, *ckptbase;
+	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
+	WT_DATA_HANDLE *dhandle;
+	WT_DECL_RET;
+	WT_LSN ckptlsn;
+	const char *name;
+	int deleted, was_modified;
+	bool fake_ckpt, force;
+
+	btree = S2BT(session);
+	bm = btree->bm;
+	ckptbase = btree->ckpt;
+	conn = S2C(session);
+	dhandle = session->dhandle;
+	fake_ckpt = false;
+	was_modified = btree->modified;
+
+	/*
+	 * Set the checkpoint LSN to the maximum LSN so that if logging is
+	 * disabled, recovery will never roll old changes forward over the
+	 * non-logged changes in this checkpoint.  If logging is enabled, a
+	 * real checkpoint LSN will be assigned for this checkpoint and
+	 * overwrite this.
+	 */
+	WT_MAX_LSN(&ckptlsn);
+
+	/*
+	 * Check for clean objects not requiring a checkpoint.
+	 *
+	 * If we're closing a handle, and the object is clean, we can skip the
+	 * checkpoint, whatever checkpoints we have are sufficient.  (We might
+	 * not have any checkpoints if the object was never modified, and that's
+	 * OK: the object creation code doesn't mark the tree modified so we can
+	 * skip newly created trees here.)
+	 *
+	 * If the application repeatedly checkpoints an object (imagine hourly
+	 * checkpoints using the same explicit or internal name), there's no
+	 * reason to repeat the checkpoint for clean objects.  The test is if
+	 * the only checkpoint we're deleting is the last one in the list and
+	 * it has the same name as the checkpoint we're about to take, skip the
+	 * work.  (We can't skip checkpoints that delete more than the last
+	 * checkpoint because deleting those checkpoints might free up space in
+	 * the file.)  This means an application toggling between two (or more)
+	 * checkpoint names will repeatedly take empty checkpoints, but that's
+	 * not likely enough to make detection worthwhile.
+	 *
+	 * Checkpoint read-only objects otherwise: the application must be able
+	 * to open the checkpoint in a cursor after taking any checkpoint, which
+	 * means it must exist.
+	 */
+	force = false;
+	F_CLR(btree, WT_BTREE_SKIP_CKPT);
+	if (!btree->modified && cfg != NULL) {
+		ret = __wt_config_gets(session, cfg, "force", &cval);
+		if (ret != 0 && ret != WT_NOTFOUND)
+			WT_ERR(ret);
+		if (ret == 0 && cval.val != 0)
+			force = true;
+	}
+	if (!btree->modified && !force) {
+		if (!is_checkpoint)
+			goto nockpt;
+
+		deleted = 0;
+		WT_CKPT_FOREACH(ckptbase, ckpt)
+			if (F_ISSET(ckpt, WT_CKPT_DELETE))
+				++deleted;
+		/*
+		 * Complicated test: if the tree is clean and last two
+		 * checkpoints have the same name (correcting for internal
+		 * checkpoint names with their generational suffix numbers), we
+		 * can skip the checkpoint, there's nothing to do.  The
+		 * exception is if we're deleting two or more checkpoints: then
+		 * we may save space.
+		 */
+		name = (ckpt - 1)->name;
+		if (ckpt > ckptbase + 1 && deleted < 2 &&
+		    (strcmp(name, (ckpt - 2)->name) == 0 ||
+		    (WT_PREFIX_MATCH(name, WT_CHECKPOINT) &&
+		    WT_PREFIX_MATCH((ckpt - 2)->name, WT_CHECKPOINT)))) {
+nockpt:			F_SET(btree, WT_BTREE_SKIP_CKPT);
+			WT_PUBLISH(btree->checkpoint_gen,
+			    S2C(session)->txn_global.checkpoint_gen);
+			WT_STAT_FAST_DATA_SET(session,
+			    btree_checkpoint_generation,
+			    btree->checkpoint_gen);
+			ret = 0;
+			goto err;
 		}
+	}
 
 	/*
 	 * If an object has never been used (in other words, if it could become
@@ -1086,9 +1121,9 @@ nockpt:			F_SET(btree, WT_BTREE_SKIP_CKPT);
 
 	/* Flush the file from the cache, creating the checkpoint. */
 	if (is_checkpoint)
-		WT_ERR(__wt_cache_op(session, ckptbase, WT_SYNC_CHECKPOINT));
+		WT_ERR(__wt_cache_op(session, WT_SYNC_CHECKPOINT));
 	else
-		WT_ERR(__wt_cache_op(session, ckptbase, WT_SYNC_CLOSE));
+		WT_ERR(__wt_cache_op(session, WT_SYNC_CLOSE));
 
 	/*
 	 * All blocks being written have been written; set the object's write
@@ -1120,9 +1155,8 @@ fake:	/*
 	 * sync the file here or we could roll forward the metadata in
 	 * recovery and open a checkpoint that isn't yet durable.
 	 */
-	if (F_ISSET(conn, WT_CONN_CKPT_SYNC) &&
-	    (WT_IS_METADATA(session, dhandle) ||
-	    !F_ISSET(&session->txn, WT_TXN_RUNNING)))
+	if (WT_IS_METADATA(session, dhandle) ||
+	    !F_ISSET(&session->txn, WT_TXN_RUNNING))
 		WT_ERR(__wt_checkpoint_sync(session, NULL));
 
 	WT_ERR(__wt_meta_ckptlist_set(
@@ -1147,7 +1181,6 @@ fake:	/*
 		WT_ERR(__wt_txn_checkpoint_log(
 		    session, false, WT_TXN_LOG_CKPT_STOP, NULL));
 
-done:
 err:	/*
 	 * If the checkpoint didn't complete successfully, make sure the
 	 * tree is marked dirty.
@@ -1155,13 +1188,20 @@ err:	/*
 	if (ret != 0 && !btree->modified && was_modified)
 		btree->modified = 1;
 
-	if (hot_backup_locked)
-		WT_TRET(__wt_readunlock(session, conn->hot_backup_lock));
-
 	__wt_meta_ckptlist_free(session, ckptbase);
-	__wt_free(session, name_alloc);
+	btree->ckpt = NULL;
 
 	return (ret);
+}
+
+/*
+ * __checkpoint_tree_helper --
+ *	Checkpoint a tree (suitable for use in *_apply functions).
+ */
+static int
+__checkpoint_tree_helper(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	return (__checkpoint_tree(session, true, cfg));
 }
 
 /*
@@ -1171,14 +1211,19 @@ err:	/*
 int
 __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_DECL_RET;
+
 	/* Should not be called with a checkpoint handle. */
 	WT_ASSERT(session, session->dhandle->checkpoint == NULL);
 
-	/* Should be holding the schema lock. */
+	/* We must hold the metadata lock if checkpointing the metadata. */
 	WT_ASSERT(session, !WT_IS_METADATA(session, session->dhandle) ||
 	    F_ISSET(session, WT_SESSION_LOCKED_METADATA));
 
-	return (__checkpoint_worker(session, cfg, true, true));
+	WT_SAVE_DHANDLE(session,
+	    ret = __checkpoint_lock_tree(session, true, true, cfg));
+	WT_RET(ret);
+	return (__checkpoint_tree(session, true, cfg));
 }
 
 /*
@@ -1197,8 +1242,9 @@ __wt_checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Should not be called with a checkpoint handle. */
 	WT_ASSERT(session, session->dhandle->checkpoint == NULL);
 
-	/* Should have an underlying block manager reference. */
-	WT_ASSERT(session, bm != NULL);
+	/* Unnecessary if checkpoint_sync has been configured "off". */
+	if (!F_ISSET(S2C(session), WT_CONN_CKPT_SYNC))
+		return (0);
 
 	return (bm->sync(bm, session, false));
 }
@@ -1227,7 +1273,7 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
 	if (F_ISSET(btree, WT_BTREE_NO_CHECKPOINT))
 		F_SET(session->dhandle, WT_DHANDLE_DEAD);
 	if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
-		return (__wt_cache_op(session, NULL, WT_SYNC_DISCARD));
+		return (__wt_cache_op(session, WT_SYNC_DISCARD));
 
 	/*
 	 * If closing an unmodified file, check that no update is required
@@ -1236,7 +1282,7 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
 	if (!btree->modified && !bulk) {
 		__wt_txn_update_oldest(session, true);
 		return (__wt_txn_visible_all(session, btree->rec_max_txn) ?
-		    __wt_cache_op(session, NULL, WT_SYNC_DISCARD) : EBUSY);
+		    __wt_cache_op(session, WT_SYNC_DISCARD) : EBUSY);
 	}
 
 	/*
@@ -1250,10 +1296,14 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
 	if (need_tracking)
 		WT_RET(__wt_meta_track_on(session));
 
-	WT_TRET(__checkpoint_worker(session, NULL, false, need_tracking));
+	WT_SAVE_DHANDLE(session,
+	    ret = __checkpoint_lock_tree(session, false, need_tracking, NULL));
+	WT_ASSERT(session, ret == 0);
+	if (ret == 0)
+		ret = __checkpoint_tree(session, false, NULL);
 
 	if (need_tracking)
-		WT_RET(__wt_meta_track_off(session, true, ret != 0));
+		WT_TRET(__wt_meta_track_off(session, true, ret != 0));
 
 	return (ret);
 }

@@ -20,6 +20,13 @@ struct __wt_condvar {
 
 	int waiters;			/* Numbers of waiters, or
 					   -1 if signalled with no waiters. */
+	/*
+	 * The following fields are only used for automatically adjusting
+	 * condition variables. They could be in a separate structure.
+	 */
+	uint64_t	min_wait;	/* Minimum wait duration */
+	uint64_t	max_wait;	/* Maximum wait duration */
+	uint64_t	prev_wait;	/* Wait duration used last time */
 };
 
 /*

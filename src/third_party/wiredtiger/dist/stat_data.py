@@ -109,6 +109,8 @@ connection_stats = [
     ##########################################
     # System statistics
     ##########################################
+    ConnStat('cond_auto_wait', 'auto adjusting condition wait calls'),
+    ConnStat('cond_auto_wait_reset', 'auto adjusting condition resets'),
     ConnStat('cond_wait', 'pthread mutex condition wait calls'),
     ConnStat('file_open', 'files currently open', 'no_clear,no_scale'),
     ConnStat('memory_allocation', 'memory allocations'),
@@ -124,7 +126,7 @@ connection_stats = [
     ##########################################
     AsyncStat('async_alloc_race', 'number of allocation state races'),
     AsyncStat('async_alloc_view', 'number of operation slots viewed for allocation'),
-    AsyncStat('async_cur_queue', 'current work queue length'),
+    AsyncStat('async_cur_queue', 'current work queue length', 'no_scale'),
     AsyncStat('async_flush', 'number of flush calls'),
     AsyncStat('async_full', 'number of times operation allocation failed'),
     AsyncStat('async_max_queue', 'maximum work queue length', 'no_clear,no_scale'),
@@ -218,6 +220,8 @@ connection_stats = [
     LogStat('log_compress_write_fails', 'log records not compressed'),
     LogStat('log_compress_writes', 'log records compressed'),
     LogStat('log_flush', 'log flush operations'),
+    LogStat('log_force_write', 'log force write operations'),
+    LogStat('log_force_write_skip', 'log force write operations skipped'),
     LogStat('log_max_filesize', 'maximum log file size', 'no_clear,no_scale,size'),
     LogStat('log_prealloc_files', 'pre-allocated log files prepared'),
     LogStat('log_prealloc_max', 'number of pre-allocated log files to create', 'no_clear,no_scale'),
@@ -238,6 +242,7 @@ connection_stats = [
     LogStat('log_sync', 'log sync operations'),
     LogStat('log_sync_dir', 'log sync_dir operations'),
     LogStat('log_write_lsn', 'log server thread advances write LSN'),
+    LogStat('log_write_lsn_skip', 'log server thread write LSN walk skipped'),
     LogStat('log_writes', 'log write operations'),
     LogStat('log_zero_fills', 'log files manually zero-filled'),
 
@@ -397,7 +402,7 @@ dsrc_stats = [
     BlockStat('block_magic', 'file magic number', 'max_aggregate,no_scale'),
     BlockStat('block_major', 'file major version number', 'max_aggregate,no_scale'),
     BlockStat('block_minor', 'minor version number', 'max_aggregate,no_scale'),
-    BlockStat('block_reuse_bytes', 'file bytes available for reuse', 'size'),
+    BlockStat('block_reuse_bytes', 'file bytes available for reuse', 'no_scale,size'),
     BlockStat('block_size', 'file size in bytes', 'no_scale,size'),
 
     ##########################################

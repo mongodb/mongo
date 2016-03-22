@@ -758,6 +758,8 @@ majorp
 malloc
 marshall
 marshalled
+maxcpu
+maxdbs
 mbll
 mbss
 mem
@@ -770,6 +772,7 @@ memset
 memsize
 metaconf
 metadata
+metadata's
 metafile
 mfence
 minorp
@@ -806,6 +809,7 @@ nfilename
 nhex
 nlpo
 nocase
+noclear
 nocrypto
 nolock
 nonliteral
@@ -844,8 +848,11 @@ parserp
 patchp
 pathname
 pathnames
+pclose
+pcpu
 perf
 pfx
+popen
 poptable
 popthreads
 portably
@@ -871,6 +878,7 @@ ps
 psp
 pthread
 ptr
+ptrdiff
 pushms
 putK
 putV
@@ -908,6 +916,7 @@ resize
 resizing
 ret
 retp
+revint
 rf
 rle
 rmw
@@ -988,6 +997,7 @@ t's
 tV
 tablename
 tcbench
+td
 testutil
 th
 tid

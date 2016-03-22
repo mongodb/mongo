@@ -337,7 +337,7 @@ generate_key(CONFIG *cfg, char *key_buf, uint64_t keyno)
 static inline void
 extract_key(char *key_buf, uint64_t *keynop)
 {
-	sscanf(key_buf, "%" SCNu64, keynop);
+	(void)sscanf(key_buf, "%" SCNu64, keynop);
 }
 
 /*
@@ -370,11 +370,11 @@ dmalloc(size_t len)
  *      Call calloc, dying on failure.
  */
 static inline void *
-dcalloc(size_t num, size_t len)
+dcalloc(size_t num, size_t size)
 {
 	void *p;
 
-	if ((p = calloc(len, num)) == NULL)
+	if ((p = calloc(num, size)) == NULL)
 		die(errno, "calloc");
 	return (p);
 }
@@ -416,11 +416,9 @@ static inline char *
 dstrndup(const char *str, const size_t len)
 {
 	char *p;
-	p = dcalloc(len + 1, 1);
 
-	strncpy(p, str, len);
-	if (p == NULL)
-		die(errno, "dstrndup");
+	p = dcalloc(len + 1, sizeof(char));
+	memcpy(p, str, len);
 	return (p);
 }
 #endif

@@ -1,6 +1,7 @@
 # DO NOT EDIT: automatically built by dist/stat.py. */
 
 no_scale_per_second_list = [
+    'async: current work queue length',
     'async: maximum work queue length',
     'cache: bytes currently in the cache',
     'cache: eviction currently operating in aggressive mode',
@@ -36,6 +37,7 @@ no_scale_per_second_list = [
     'transaction: transaction range of IDs currently pinned by named snapshots',
     'block-manager: checkpoint size',
     'block-manager: file allocation unit size',
+    'block-manager: file bytes available for reuse',
     'block-manager: file magic number',
     'block-manager: file major version number',
     'block-manager: file size in bytes',

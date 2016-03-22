@@ -350,7 +350,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	/* Initialize locks. */
 	WT_RET(__wt_rwlock_alloc(
 	    session, &btree->ovfl_lock, "btree overflow lock"));
-	WT_RET(__wt_spin_init(session, &btree->flush_lock, "btree flush lock"));
+	WT_RET(__wt_spin_init(session, &btree->flush_lock, "btree flush"));
 
 	btree->checkpointing = WT_CKPT_OFF;		/* Not checkpointing */
 	btree->modified = 0;				/* Clean */

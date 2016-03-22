@@ -126,7 +126,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 			   dsrc, wt_session, uri, (WT_CONFIG_ARG *)cfg));
 		else if (file_func == __wt_checkpoint)
 			;
-		else if (file_func == __wt_checkpoint_list)
+		else if (file_func == __wt_checkpoint_get_handles)
 			;
 		else if (file_func == __wt_checkpoint_sync)
 			;

@@ -210,10 +210,8 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 			/*
 			 * If hash arrays were allocated, free them now.
 			 */
-			if (s->dhhash != NULL)
-				__wt_free(session, s->dhhash);
-			if (s->tablehash != NULL)
-				__wt_free(session, s->tablehash);
+			__wt_free(session, s->dhhash);
+			__wt_free(session, s->tablehash);
 			__wt_free(session, s->hazard);
 		}
 

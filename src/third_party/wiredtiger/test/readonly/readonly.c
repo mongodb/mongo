@@ -42,9 +42,13 @@
 
 #define	HOME_SIZE	512
 static char home[HOME_SIZE];		/* Program working dir lock file */
-static char home_wr[HOME_SIZE];		/* Writable dir copy no lock file */
-static char home_rd[HOME_SIZE];		/* Read-only dir */
-static char home_rd2[HOME_SIZE];	/* Read-only dir no lock file */
+#define	HOME_WR_SUFFIX	".WRNOLOCK"	/* Writable dir copy no lock file */
+static char home_wr[HOME_SIZE + sizeof(HOME_WR_SUFFIX)];
+#define	HOME_RD_SUFFIX	".RD"		/* Read-only dir */
+static char home_rd[HOME_SIZE + sizeof(HOME_RD_SUFFIX)];
+#define	HOME_RD2_SUFFIX	".RDNOLOCK"	/* Read-only dir no lock file */
+static char home_rd2[HOME_SIZE + sizeof(HOME_RD2_SUFFIX)];
+
 static const char *progname;		/* Program name */
 static const char *saved_argv0;		/* Program command */
 static const char * const uri = "table:main";
@@ -87,13 +91,14 @@ run_child(const char *homedir, int op, int expect)
 		cfg = ENV_CONFIG_RD;
 	else
 		cfg = ENV_CONFIG_WR;
-	ret = wiredtiger_open(homedir, NULL, cfg, &conn);
-	if (expect == EXPECT_SUCCESS && ret != 0)
-		testutil_die(ret, "wiredtiger_open success err");
-	if (expect == EXPECT_ERR) {
-		if (ret == 0)
+	if ((ret = wiredtiger_open(homedir, NULL, cfg, &conn)) == 0) {
+		if (expect == EXPECT_ERR)
 			testutil_die(
-			    ret, "wiredtiger_open expected err succeeded");
+			    ret, "wiredtiger_open expected error, succeeded");
+	} else {
+		if (expect == EXPECT_SUCCESS)
+			testutil_die(
+			    ret, "wiredtiger_open expected success, error");
 		/*
 		 * If we expect an error and got one, we're done.
 		 */
@@ -207,17 +212,14 @@ main(int argc, char *argv[])
 	if (argc != 0)
 		usage();
 
-	memset(buf, 0, sizeof(buf));
 	/*
 	 * Set up all the directory names.
 	 */
-	testutil_work_dir_from_path(home, 512, working_dir);
-	strncpy(home_wr, home, HOME_SIZE);
-	strcat(home_wr, ".WRNOLOCK");
-	strncpy(home_rd, home, HOME_SIZE);
-	strcat(home_rd, ".RD");
-	strncpy(home_rd2, home, HOME_SIZE);
-	strcat(home_rd2, ".RDNOLOCK");
+	testutil_work_dir_from_path(home, sizeof(home), working_dir);
+	(void)snprintf(home_wr, sizeof(home_wr), "%s%s", home, HOME_WR_SUFFIX);
+	(void)snprintf(home_rd, sizeof(home_rd), "%s%s", home, HOME_RD_SUFFIX);
+	(void)snprintf(
+	    home_rd2, sizeof(home_rd2), "%s%s", home, HOME_RD2_SUFFIX);
 	if (!child) {
 		testutil_make_work_dir(home);
 		testutil_make_work_dir(home_wr);
@@ -260,6 +262,7 @@ main(int argc, char *argv[])
 	/*
 	 * Write data into the table and then cleanly shut down connection.
 	 */
+	memset(buf, 0, sizeof(buf));
 	data.data = buf;
 	data.size = MAX_VAL;
 	for (i = 0; i < MAX_KV; ++i) {
@@ -329,7 +332,8 @@ main(int argc, char *argv[])
 	 * the child even though it should not be.  So use 'system' to spawn
 	 * an entirely new process.
 	 */
-	(void)snprintf(cmd, sizeof(cmd), "%s -R", saved_argv0);
+	(void)snprintf(
+	    cmd, sizeof(cmd), "%s -h %s -R", saved_argv0, working_dir);
 	if ((status = system(cmd)) < 0)
 		testutil_die(status, "system");
 	/*
@@ -341,7 +345,8 @@ main(int argc, char *argv[])
 	/*
 	 * Scenario 2.  Run child with writable config.
 	 */
-	(void)snprintf(cmd, sizeof(cmd), "%s -W", saved_argv0);
+	(void)snprintf(
+	    cmd, sizeof(cmd), "%s -h %s -W", saved_argv0, working_dir);
 	if ((status = system(cmd)) < 0)
 		testutil_die(status, "system");
 
@@ -362,7 +367,8 @@ main(int argc, char *argv[])
 	/*
 	 * Scenario 3.  Child read-only.
 	 */
-	(void)snprintf(cmd, sizeof(cmd), "%s -R", saved_argv0);
+	(void)snprintf(
+	    cmd, sizeof(cmd), "%s -h %s -R", saved_argv0, working_dir);
 	if ((status = system(cmd)) < 0)
 		testutil_die(status, "system");
 	if (WEXITSTATUS(status) != 0)
@@ -371,7 +377,8 @@ main(int argc, char *argv[])
 	/*
 	 * Scenario 4.  Run child with writable config.
 	 */
-	(void)snprintf(cmd, sizeof(cmd), "%s -W", saved_argv0);
+	(void)snprintf(
+	    cmd, sizeof(cmd), "%s -h %s -W", saved_argv0, working_dir);
 	if ((status = system(cmd)) < 0)
 		testutil_die(status, "system");
 	if (WEXITSTATUS(status) != 0)

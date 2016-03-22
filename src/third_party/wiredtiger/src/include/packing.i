@@ -677,8 +677,8 @@ __wt_struct_unpackv(WT_SESSION_IMPL *session,
 
 	if (fmt[0] != '\0' && fmt[1] == '\0') {
 		pv.type = fmt[0];
-		if ((ret = __unpack_read(session, &pv, &p, size)) == 0)
-			WT_UNPACK_PUT(session, pv, ap);
+		WT_RET(__unpack_read(session, &pv, &p, size));
+		WT_UNPACK_PUT(session, pv, ap);
 		return (0);
 	}
 

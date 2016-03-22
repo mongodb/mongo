@@ -581,6 +581,8 @@ static const char * const __stats_connection_desc[] = {
 	"cache: tracked dirty bytes in the cache",
 	"cache: tracked dirty pages in the cache",
 	"cache: unmodified pages evicted",
+	"connection: auto adjusting condition resets",
+	"connection: auto adjusting condition wait calls",
 	"connection: files currently open",
 	"connection: memory allocations",
 	"connection: memory frees",
@@ -619,6 +621,8 @@ static const char * const __stats_connection_desc[] = {
 	"log: log bytes written",
 	"log: log files manually zero-filled",
 	"log: log flush operations",
+	"log: log force write operations",
+	"log: log force write operations skipped",
 	"log: log records compressed",
 	"log: log records not compressed",
 	"log: log records too small to compress",
@@ -626,6 +630,7 @@ static const char * const __stats_connection_desc[] = {
 	"log: log scan operations",
 	"log: log scan records requiring two reads",
 	"log: log server thread advances write LSN",
+	"log: log server thread write LSN walk skipped",
 	"log: log sync operations",
 	"log: log sync_dir operations",
 	"log: log write operations",
@@ -773,6 +778,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 		/* not clearing cache_bytes_dirty */
 		/* not clearing cache_pages_dirty */
 	stats->cache_eviction_clean = 0;
+	stats->cond_auto_wait_reset = 0;
+	stats->cond_auto_wait = 0;
 		/* not clearing file_open */
 	stats->memory_allocation = 0;
 	stats->memory_free = 0;
@@ -811,6 +818,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->log_bytes_written = 0;
 	stats->log_zero_fills = 0;
 	stats->log_flush = 0;
+	stats->log_force_write = 0;
+	stats->log_force_write_skip = 0;
 	stats->log_compress_writes = 0;
 	stats->log_compress_write_fails = 0;
 	stats->log_compress_small = 0;
@@ -818,6 +827,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->log_scans = 0;
 	stats->log_scan_rereads = 0;
 	stats->log_write_lsn = 0;
+	stats->log_write_lsn_skip = 0;
 	stats->log_sync = 0;
 	stats->log_sync_dir = 0;
 	stats->log_writes = 0;
@@ -974,6 +984,8 @@ __wt_stat_connection_aggregate(
 	to->cache_bytes_dirty += WT_STAT_READ(from, cache_bytes_dirty);
 	to->cache_pages_dirty += WT_STAT_READ(from, cache_pages_dirty);
 	to->cache_eviction_clean += WT_STAT_READ(from, cache_eviction_clean);
+	to->cond_auto_wait_reset += WT_STAT_READ(from, cond_auto_wait_reset);
+	to->cond_auto_wait += WT_STAT_READ(from, cond_auto_wait);
 	to->file_open += WT_STAT_READ(from, file_open);
 	to->memory_allocation += WT_STAT_READ(from, memory_allocation);
 	to->memory_free += WT_STAT_READ(from, memory_free);
@@ -1012,6 +1024,8 @@ __wt_stat_connection_aggregate(
 	to->log_bytes_written += WT_STAT_READ(from, log_bytes_written);
 	to->log_zero_fills += WT_STAT_READ(from, log_zero_fills);
 	to->log_flush += WT_STAT_READ(from, log_flush);
+	to->log_force_write += WT_STAT_READ(from, log_force_write);
+	to->log_force_write_skip += WT_STAT_READ(from, log_force_write_skip);
 	to->log_compress_writes += WT_STAT_READ(from, log_compress_writes);
 	to->log_compress_write_fails +=
 	    WT_STAT_READ(from, log_compress_write_fails);
@@ -1021,6 +1035,7 @@ __wt_stat_connection_aggregate(
 	to->log_scans += WT_STAT_READ(from, log_scans);
 	to->log_scan_rereads += WT_STAT_READ(from, log_scan_rereads);
 	to->log_write_lsn += WT_STAT_READ(from, log_write_lsn);
+	to->log_write_lsn_skip += WT_STAT_READ(from, log_write_lsn_skip);
 	to->log_sync += WT_STAT_READ(from, log_sync);
 	to->log_sync_dir += WT_STAT_READ(from, log_sync_dir);
 	to->log_writes += WT_STAT_READ(from, log_writes);

@@ -1668,7 +1668,7 @@ execute_workload(CONFIG *cfg)
 	for (threads = cfg->workers, i = 0,
 	    workp = cfg->workload; i < cfg->workload_cnt; ++i, ++workp) {
 		lprintf(cfg, 0, 1,
-		    "Starting workload #%d: %" PRId64 " threads, inserts=%"
+		    "Starting workload #%u: %" PRId64 " threads, inserts=%"
 		    PRId64 ", reads=%" PRId64 ", updates=%" PRId64
 		    ", truncate=%" PRId64 ", throttle=%" PRId64,
 		    i + 1, workp->threads, workp->insert,
@@ -2267,7 +2267,7 @@ main(int argc, char *argv[])
 	 * the compact operation, but not for the workloads.
 	 */
 	if (cfg->async_threads > 0) {
-		if (F_ISSET(cfg, CFG_TRUNCATE) > 0) {
+		if (F_ISSET(cfg, CFG_TRUNCATE)) {
 			lprintf(cfg, 1, 0, "Cannot run truncate and async\n");
 			goto err;
 		}
@@ -2285,7 +2285,7 @@ main(int argc, char *argv[])
 		req_len = strlen(",async=(enabled=true,threads=)") + 4;
 		cfg->async_config = dcalloc(req_len, 1);
 		snprintf(cfg->async_config, req_len,
-		    ",async=(enabled=true,threads=%d)",
+		    ",async=(enabled=true,threads=%" PRIu32 ")",
 		    cfg->async_threads);
 	}
 	if ((ret = config_compress(cfg)) != 0)

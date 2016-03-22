@@ -67,6 +67,13 @@ copy_file(const char *name)
 	    "cp %s/%s %s/%s", g.home, name, g.home_backup, name);
 	testutil_checkfmt(system(cmd), "backup copy: %s", cmd);
 	free(cmd);
+
+	len = strlen(g.home) + strlen(g.home_backup2) + strlen(name) * 2 + 20;
+	cmd = dmalloc(len);
+	(void)snprintf(cmd, len,
+	    "cp %s/%s %s/%s", g.home, name, g.home_backup2, name);
+	testutil_checkfmt(system(cmd), "backup copy: %s", cmd);
+	free(cmd);
 }
 
 /*

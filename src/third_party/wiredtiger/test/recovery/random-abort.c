@@ -249,9 +249,10 @@ main(int argc, char *argv[])
 	if ((ret = conn->close(conn, NULL)) != 0)
 		testutil_die(ret, "WT_CONNECTION:close");
 	if (absent) {
-		printf("%u record(s) absent from %u\n", absent, count);
+		printf("%" PRIu32 " record(s) absent from %" PRIu32 "\n",
+		    absent, count);
 		return (EXIT_FAILURE);
 	}
-	printf("%u records verified\n", count);
+	printf("%" PRIu32 " records verified\n", count);
 	return (EXIT_SUCCESS);
 }

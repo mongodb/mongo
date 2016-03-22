@@ -17,6 +17,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 {
 	struct timespec end, start;
 	WT_BTREE *btree;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
@@ -25,8 +26,8 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	uint64_t internal_bytes, internal_pages, leaf_bytes, leaf_pages;
 	uint64_t oldest_id, saved_snap_min;
 	uint32_t flags;
-	bool evict_reset;
 
+	conn = S2C(session);
 	btree = S2BT(session);
 	walk = NULL;
 	txn = &session->txn;
@@ -123,9 +124,8 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		 */
 		WT_PUBLISH(btree->checkpointing, WT_CKPT_PREPARE);
 
-		WT_ERR(__wt_evict_file_exclusive_on(session, &evict_reset));
-		if (evict_reset)
-			__wt_evict_file_exclusive_off(session);
+		WT_ERR(__wt_evict_file_exclusive_on(session));
+		__wt_evict_file_exclusive_off(session);
 
 		WT_PUBLISH(btree->checkpointing, WT_CKPT_RUNNING);
 
@@ -223,7 +223,7 @@ err:	/* On error, clear any left-over tree walk. */
 		 * so that eviction knows that the checkpoint has completed.
 		 */
 		WT_PUBLISH(btree->checkpoint_gen,
-		    S2C(session)->txn_global.checkpoint_gen);
+		    conn->txn_global.checkpoint_gen);
 		WT_STAT_FAST_DATA_SET(session,
 		    btree_checkpoint_generation, btree->checkpoint_gen);
 
@@ -257,7 +257,8 @@ err:	/* On error, clear any left-over tree walk. */
 	 * before checkpointing the file).  Start a flush to stable storage,
 	 * but don't wait for it.
 	 */
-	if (ret == 0 && syncop == WT_SYNC_WRITE_LEAVES)
+	if (ret == 0 &&
+	    syncop == WT_SYNC_WRITE_LEAVES && F_ISSET(conn, WT_CONN_CKPT_SYNC))
 		WT_RET(btree->bm->sync(btree->bm, session, true));
 
 	return (ret);
@@ -268,24 +269,18 @@ err:	/* On error, clear any left-over tree walk. */
  *	Cache operations.
  */
 int
-__wt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, WT_CACHE_OP op)
+__wt_cache_op(WT_SESSION_IMPL *session, WT_CACHE_OP op)
 {
-	WT_DECL_RET;
-	WT_BTREE *btree;
-
-	btree = S2BT(session);
-
 	switch (op) {
 	case WT_SYNC_CHECKPOINT:
 	case WT_SYNC_CLOSE:
 		/*
-		 * Set the checkpoint reference for reconciliation; it's ugly,
-		 * but drilling a function parameter path from our callers to
-		 * the reconciliation of the tree's root page is going to be
-		 * worse.
+		 * Make sure the checkpoint reference is set for
+		 * reconciliation; it's ugly, but drilling a function parameter
+		 * path from our callers to the reconciliation of the tree's
+		 * root page is going to be worse.
 		 */
-		WT_ASSERT(session, btree->ckpt == NULL);
-		btree->ckpt = ckptbase;
+		WT_ASSERT(session, S2BT(session)->ckpt != NULL);
 		break;
 	case WT_SYNC_DISCARD:
 	case WT_SYNC_WRITE_LEAVES:
@@ -295,23 +290,10 @@ __wt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, WT_CACHE_OP op)
 	switch (op) {
 	case WT_SYNC_CHECKPOINT:
 	case WT_SYNC_WRITE_LEAVES:
-		WT_ERR(__sync_file(session, op));
-		break;
+		return (__sync_file(session, op));
 	case WT_SYNC_CLOSE:
 	case WT_SYNC_DISCARD:
-		WT_ERR(__wt_evict_file(session, op));
-		break;
+		return (__wt_evict_file(session, op));
+	WT_ILLEGAL_VALUE(session);
 	}
-
-err:	switch (op) {
-	case WT_SYNC_CHECKPOINT:
-	case WT_SYNC_CLOSE:
-		btree->ckpt = NULL;
-		break;
-	case WT_SYNC_DISCARD:
-	case WT_SYNC_WRITE_LEAVES:
-		break;
-	}
-
-	return (ret);
 }

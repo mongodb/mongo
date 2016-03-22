@@ -40,7 +40,8 @@ __wt_session_reset_cursors(WT_SESSION_IMPL *session, bool free_buffers)
 		/* Stop when there are no positioned cursors. */
 		if (session->ncursors == 0)
 			break;
-		WT_TRET(cursor->reset(cursor));
+		if (!F_ISSET(cursor, WT_CURSTD_JOINED))
+			WT_TRET(cursor->reset(cursor));
 		/* Optionally, free the cursor buffers */
 		if (free_buffers) {
 			__wt_buf_free(session, &cursor->key);
@@ -492,10 +493,13 @@ __session_create(WT_SESSION *wt_session, const char *uri, const char *config)
 		/*
 		 * We can't disallow type entirely, a configuration string might
 		 * innocently include it, for example, a dump/load pair.  If the
-		 * URI type prefix and the type are the same, let it go.
+		 * underlying type is "file", it's OK ("file" is the underlying
+		 * type for every type); if the URI type prefix and the type are
+		 * the same, let it go.
 		 */
 		if ((ret =
 		    __wt_config_getones(session, config, "type", &cval)) == 0 &&
+		    !WT_STRING_MATCH("file", cval.str, cval.len) &&
 		    (strncmp(uri, cval.str, cval.len) != 0 ||
 		    uri[cval.len] != ':'))
 			WT_ERR_MSG(session, EINVAL,
@@ -1597,7 +1601,7 @@ __open_session(WT_CONNECTION_IMPL *conn,
 	if (i == conn->session_size)
 		WT_ERR_MSG(session, ENOMEM,
 		    "only configured to support %" PRIu32 " sessions"
-		    " (including %d additional internal sessions)",
+		    " (including %" PRIu32 " additional internal sessions)",
 		    conn->session_size, WT_EXTRA_INTERNAL_SESSIONS);
 
 	/*

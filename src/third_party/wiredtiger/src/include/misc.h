@@ -198,7 +198,7 @@
 
 /* Check if a string matches a prefix. */
 #define	WT_PREFIX_MATCH(str, pfx)					\
-	(((const char *)str)[0] == ((const char *)pfx)[0] &&		\
+	(((const char *)(str))[0] == ((const char *)pfx)[0] &&		\
 	    strncmp((str), (pfx), strlen(pfx)) == 0)
 
 /* Check if a string matches a prefix, and move past it. */
