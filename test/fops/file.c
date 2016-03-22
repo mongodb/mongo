@@ -147,7 +147,7 @@ obj_create_unique(int force)
 	/* Generate a unique object name. */
 	if ((ret = pthread_rwlock_wrlock(&single)) != 0)
 		testutil_die(ret, "pthread_rwlock_wrlock single");
-	(void)snprintf(new_uri, sizeof(new_uri), "%s.%d", uri, ++uid);
+	(void)snprintf(new_uri, sizeof(new_uri), "%s.%u", uri, ++uid);
 	if ((ret = pthread_rwlock_unlock(&single)) != 0)
 		testutil_die(ret, "pthread_rwlock_unlock single");
 

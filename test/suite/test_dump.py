@@ -29,8 +29,8 @@
 import os
 import wiredtiger, wttest
 from helper import \
-    complex_populate, complex_populate_check_cursor,\
-    simple_populate, simple_populate_check_cursor
+    complex_populate, complex_populate_check, \
+    simple_populate, simple_populate_check
 from suite_subprocess import suite_subprocess
 from wtscenario import multiply_scenarios, number_scenarios
 
@@ -54,15 +54,24 @@ class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
         ('string', dict(keyfmt='S'))
     ]
     types = [
-        ('file', dict(type='file:',
+        ('file', dict(uri='file:', config='', lsm=False,
           populate=simple_populate,
-          populate_check=simple_populate_check_cursor)),
-        ('table-simple', dict(type='table:',
+          populate_check=simple_populate_check)),
+        ('lsm', dict(uri='lsm:', config='', lsm=True,
           populate=simple_populate,
-          populate_check=simple_populate_check_cursor)),
-        ('table-complex', dict(type='table:',
+          populate_check=simple_populate_check)),
+        ('table-simple', dict(uri='table:', config='', lsm=False,
+          populate=simple_populate,
+          populate_check=simple_populate_check)),
+        ('table-simple-lsm', dict(uri='table:', config='type=lsm', lsm=True,
+          populate=simple_populate,
+          populate_check=simple_populate_check)),
+        ('table-complex', dict(uri='table:', config='', lsm=False,
           populate=complex_populate,
-          populate_check=complex_populate_check_cursor))
+          populate_check=complex_populate_check)),
+        ('table-complex-lsm', dict(uri='table:', config='type=lsm', lsm=True,
+          populate=complex_populate,
+          populate_check=complex_populate_check))
     ]
     scenarios = number_scenarios(
         multiply_scenarios('.', types, keyfmt, dumpfmt))
@@ -94,9 +103,14 @@ class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
 
     # Dump, re-load and do a content comparison.
     def test_dump(self):
+        # LSM and column-store isn't a valid combination.
+        if self.lsm and self.keyfmt == 'r':
+                return
+
         # Create the object.
-        uri = self.type + self.name
-        self.populate(self, uri, 'key_format=' + self.keyfmt, self.nentries)
+        uri = self.uri + self.name
+        self.populate(self, uri,
+            self.config + ',key_format=' + self.keyfmt, self.nentries)
 
         # Dump the object.
         os.mkdir(self.dir)
@@ -108,11 +122,17 @@ class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
         # Re-load the object.
         self.runWt(['-h', self.dir, 'load', '-f', 'dump.out'])
 
-        # Check the contents
+        # Check the database contents
+        self.runWt(['list'], outfilename='list.out')
+        self.runWt(['-h', self.dir, 'list'], outfilename='list.out.new')
+        s1 = set(open('list.out').read().split())
+        s2 = set(open('list.out.new').read().split())
+        self.assertEqual(not s1.symmetric_difference(s2), True)
+
+        # Check the object's contents
         conn = self.wiredtiger_open(self.dir)
         session = conn.open_session()
-        cursor = session.open_cursor(uri, None, None)
-        self.populate_check(self, cursor, self.nentries)
+        self.populate_check(self, uri, self.nentries)
         conn.close()
 
         # Re-load the object again.
@@ -121,8 +141,7 @@ class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
         # Check the contents, they shouldn't have changed.
         conn = self.wiredtiger_open(self.dir)
         session = conn.open_session()
-        cursor = session.open_cursor(uri, None, None)
-        self.populate_check(self, cursor, self.nentries)
+        self.populate_check(self, uri, self.nentries)
         conn.close()
 
         # Re-load the object again, but confirm -n (no overwrite) fails.
@@ -130,7 +149,7 @@ class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
             'load', '-n', '-f', 'dump.out'], errfilename='errfile.out')
         self.check_non_empty_file('errfile.out')
 
-        # If there is are indices, dump one of them and check the output.
+        # If there are indices, dump one of them and check the output.
         if self.populate == complex_populate:
             indexuri = 'index:' + self.name + ':indx1'
             hexopt = ['-x'] if self.hex == 1 else []

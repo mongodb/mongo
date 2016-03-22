@@ -205,7 +205,7 @@ __wt_las_cursor(
 	 * useful more than once.
 	 */
 	*session_flags =
-	    F_ISSET(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_EVICTION);
+	    F_MASK(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_EVICTION);
 
 	conn = S2C(session);
 

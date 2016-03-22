@@ -160,7 +160,7 @@ run(void)
 	for (i = 0; i < g.c_ops; i++) {
 		item.data = g.entries[i];
 		if ((ret = __wt_bloom_insert(bloomp, &item)) != 0)
-			testutil_die(ret, "__wt_bloom_insert: %d", i);
+			testutil_die(ret, "__wt_bloom_insert: %" PRIu32, i);
 	}
 
 	testutil_check(__wt_bloom_finalize(bloomp));
@@ -168,7 +168,8 @@ run(void)
 	for (i = 0; i < g.c_ops; i++) {
 		item.data = g.entries[i];
 		if ((ret = __wt_bloom_get(bloomp, &item)) != 0) {
-			fprintf(stderr, "get failed at record: %d\n", i);
+			fprintf(stderr,
+			    "get failed at record: %" PRIu32 "\n", i);
 			testutil_die(ret, "__wt_bloom_get");
 		}
 	}
@@ -201,7 +202,8 @@ run(void)
 			testutil_die(ret, "__wt_bloom_get");
 	}
 	free((void *)item.data);
-	printf("Out of %d ops, got %d false positives, %.4f%%\n",
+	printf(
+	    "Out of %" PRIu32 " ops, got %" PRIu32 " false positives, %.4f%%\n",
 	    g.c_ops, fp, 100.0 * fp/g.c_ops);
 	testutil_check(__wt_bloom_drop(bloomp, NULL));
 }

@@ -461,6 +461,12 @@ leaf_only:
 	cbt->ref = current;
 
 	/*
+	 * Clear current now that we have moved the reference into the btree
+	 * cursor, so that cleanup never releases twice.
+	 */
+	current = NULL;
+
+	/*
 	 * In the case of a right-side tree descent during an insert, do a fast
 	 * check for an append to the page, try to catch cursors appending data
 	 * into the tree.
@@ -614,14 +620,7 @@ leaf_match:	cbt->compare = 0;
 
 	return (0);
 
-err:	/*
-	 * Release the current page if the search started at the root. If the
-	 * search didn't start at the root we should never have gone looking
-	 * beyond the start page.
-	 */
-	WT_ASSERT(session, leaf == NULL || leaf == current);
-	if (leaf == NULL)
-		WT_TRET(__wt_page_release(session, current, 0));
+err:	WT_TRET(__wt_page_release(session, current, 0));
 	return (ret);
 }
 

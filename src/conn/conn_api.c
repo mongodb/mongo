@@ -772,6 +772,19 @@ __conn_get_extension_api(WT_CONNECTION *wt_conn)
 	conn->extension_api.transaction_visible = __wt_ext_transaction_visible;
 	conn->extension_api.version = wiredtiger_version;
 
+	/* Streaming pack/unpack API */
+	conn->extension_api.pack_start = __wt_ext_pack_start;
+	conn->extension_api.unpack_start = __wt_ext_unpack_start;
+	conn->extension_api.pack_close = __wt_ext_pack_close;
+	conn->extension_api.pack_item = __wt_ext_pack_item;
+	conn->extension_api.pack_int = __wt_ext_pack_int;
+	conn->extension_api.pack_str = __wt_ext_pack_str;
+	conn->extension_api.pack_uint = __wt_ext_pack_uint;
+	conn->extension_api.unpack_item = __wt_ext_unpack_item;
+	conn->extension_api.unpack_int = __wt_ext_unpack_int;
+	conn->extension_api.unpack_str = __wt_ext_unpack_str;
+	conn->extension_api.unpack_uint = __wt_ext_unpack_uint;
+
 	return (&conn->extension_api);
 }
 
@@ -1681,6 +1694,7 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "fileops",		WT_VERB_FILEOPS },
 		{ "log",		WT_VERB_LOG },
 		{ "lsm",		WT_VERB_LSM },
+		{ "lsm_manager",	WT_VERB_LSM_MANAGER },
 		{ "metadata",		WT_VERB_METADATA },
 		{ "mutex",		WT_VERB_MUTEX },
 		{ "overflow",		WT_VERB_OVERFLOW },

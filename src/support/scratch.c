@@ -45,7 +45,7 @@ __wt_buf_grow_worker(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 			WT_RET(__wt_realloc_aligned(
 			    session, &buf->memsize, size, &buf->mem));
 		else
-			WT_RET(__wt_realloc(
+			WT_RET(__wt_realloc_noclear(
 			    session, &buf->memsize, size, &buf->mem));
 	}
 

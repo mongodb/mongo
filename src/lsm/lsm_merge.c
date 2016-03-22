@@ -60,10 +60,11 @@ __lsm_merge_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	struct timespec now;
 	uint64_t msec_since_last_merge, msec_to_create_merge;
-	u_int new_aggressive;
+	uint32_t new_aggressive;
 
 	new_aggressive = 0;
 
+	WT_ASSERT(session, lsm_tree->merge_min != 0);
 	/*
 	 * If the tree is open read-only or we are compacting, be very
 	 * aggressive. Otherwise, we can spend a long time waiting for merges
@@ -124,8 +125,9 @@ __lsm_merge_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	if (new_aggressive > lsm_tree->merge_aggressiveness) {
 		WT_RET(__wt_verbose(session, WT_VERB_LSM,
-		    "LSM merge %s got aggressive (old %u new %u), "
-		    "merge_min %d, %u / %" PRIu64,
+		    "LSM merge %s got aggressive "
+		    "(old %" PRIu32 " new %" PRIu32 "), "
+		    "merge_min %u, %" PRIu64 " / %" PRIu64,
 		    lsm_tree->name, lsm_tree->merge_aggressiveness,
 		    new_aggressive, lsm_tree->merge_min,
 		    msec_since_last_merge, lsm_tree->chunk_fill_ms));
@@ -410,7 +412,8 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 		    start_chunk, end_chunk, dest_id, record_count, generation));
 		for (verb = start_chunk; verb <= end_chunk; verb++)
 			WT_ERR(__wt_verbose(session, WT_VERB_LSM,
-			    "Merging %s: Chunk[%u] id %u, gen: %" PRIu32
+			    "Merging %s: Chunk[%u] id %" PRIu32
+			    ", gen: %" PRIu32
 			    ", size: %" PRIu64 ", records: %" PRIu64,
 			    lsm_tree->name, verb, lsm_tree->chunk[verb]->id,
 			    lsm_tree->chunk[verb]->generation,
@@ -460,7 +463,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 #define	LSM_MERGE_CHECK_INTERVAL	WT_THOUSAND
 	for (insert_count = 0; (ret = src->next(src)) == 0; insert_count++) {
 		if (insert_count % LSM_MERGE_CHECK_INTERVAL == 0) {
-			if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE))
+			if (!lsm_tree->active)
 				WT_ERR(EINTR);
 
 			WT_STAT_FAST_CONN_INCRV(session,

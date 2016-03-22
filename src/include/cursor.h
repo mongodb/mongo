@@ -213,10 +213,11 @@ struct __wt_cursor_btree {
 #define	WT_CBT_NO_TXN   	0x10	/* Non-transactional cursor
 					   (e.g. on a checkpoint) */
 #define	WT_CBT_SEARCH_SMALLEST	0x20	/* Row-store: small-key insert list */
+#define	WT_CBT_VAR_ONPAGE_MATCH	0x40	/* Var-store: on-page recno match */
 
 #define	WT_CBT_POSITION_MASK		/* Flags associated with position */ \
 	(WT_CBT_ITERATE_APPEND | WT_CBT_ITERATE_NEXT | WT_CBT_ITERATE_PREV | \
-	WT_CBT_SEARCH_SMALLEST)
+	WT_CBT_SEARCH_SMALLEST | WT_CBT_VAR_ONPAGE_MATCH)
 
 	uint8_t flags;
 };
@@ -287,8 +288,10 @@ struct __wt_cursor_join_iter {
 	WT_SESSION_IMPL		*session;
 	WT_CURSOR_JOIN		*cjoin;
 	WT_CURSOR_JOIN_ENTRY	*entry;
-	WT_CURSOR		*cursor;
-	WT_ITEM			*curkey;
+	WT_CURSOR		*cursor;	/* has null projection */
+	WT_CURSOR		*main;		/* main table with projection */
+	WT_ITEM			*curkey;	/* primary key */
+	WT_ITEM			 idxkey;
 	bool			 positioned;
 	bool			 isequal;	/* advancing means we're done */
 };
@@ -303,6 +306,7 @@ struct __wt_cursor_join_endpoint {
 #define	WT_CURJOIN_END_GT	0x04		/* include values >  cursor */
 #define	WT_CURJOIN_END_GE	(WT_CURJOIN_END_GT | WT_CURJOIN_END_EQ)
 #define	WT_CURJOIN_END_LE	(WT_CURJOIN_END_LT | WT_CURJOIN_END_EQ)
+#define	WT_CURJOIN_END_OWN_CURSOR 0x08		/* must close cursor */
 	uint8_t			 flags;		/* range for this endpoint */
 };
 #define	WT_CURJOIN_END_RANGE(endp)					\

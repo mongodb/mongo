@@ -337,8 +337,7 @@ __free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 		copy = WT_ROW_KEY_COPY(rip);
 		(void)__wt_row_leaf_key_info(
 		    page, copy, &ikey, NULL, NULL, NULL);
-		if (ikey != NULL)
-			__wt_free(session, ikey);
+		__wt_free(session, ikey);
 	}
 
 	/*

@@ -13,6 +13,7 @@
 
 #define	inline __inline
 
+#define	WT_PTRDIFFT_FMT	"Id"			/* ptrdiff_t format string */
 #define	WT_SIZET_FMT	"Iu"			/* size_t format string */
 
 /*

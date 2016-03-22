@@ -6,6 +6,7 @@
 # If the directory exists, it is added to AUTO_SUBDIRS.
 # If a condition is included, the subdir is made conditional via AM_CONDITIONAL
 ext/collators/reverse
+ext/collators/revint
 ext/compressors/lz4 LZ4
 ext/compressors/nop
 ext/compressors/snappy SNAPPY
@@ -30,6 +31,7 @@ test/cursor_order
 test/fops
 test/format
 test/huge
+test/manydbs
 test/packing
 test/readonly
 test/recovery

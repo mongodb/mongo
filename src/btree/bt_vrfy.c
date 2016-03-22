@@ -226,7 +226,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 			WT_WITH_PAGE_INDEX(session,
 			    ret = __verify_tree(session, &btree->root, vs));
 
-			WT_TRET(__wt_cache_op(session, NULL, WT_SYNC_DISCARD));
+			WT_TRET(__wt_cache_op(session, WT_SYNC_DISCARD));
 		}
 
 		/* Unload the checkpoint. */

@@ -299,6 +299,8 @@ struct __wt_connection_stats {
 	int64_t cache_bytes_dirty;
 	int64_t cache_pages_dirty;
 	int64_t cache_eviction_clean;
+	int64_t cond_auto_wait_reset;
+	int64_t cond_auto_wait;
 	int64_t file_open;
 	int64_t memory_allocation;
 	int64_t memory_free;
@@ -337,6 +339,8 @@ struct __wt_connection_stats {
 	int64_t log_bytes_written;
 	int64_t log_zero_fills;
 	int64_t log_flush;
+	int64_t log_force_write;
+	int64_t log_force_write_skip;
 	int64_t log_compress_writes;
 	int64_t log_compress_write_fails;
 	int64_t log_compress_small;
@@ -344,6 +348,7 @@ struct __wt_connection_stats {
 	int64_t log_scans;
 	int64_t log_scan_rereads;
 	int64_t log_write_lsn;
+	int64_t log_write_lsn_skip;
 	int64_t log_sync;
 	int64_t log_sync_dir;
 	int64_t log_writes;

@@ -391,6 +391,61 @@ static const WT_CONFIG_CHECK confchk_colgroup_meta[] = {
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 
+static const WT_CONFIG_CHECK confchk_file_config[] = {
+	{ "allocation_size", "int",
+	    NULL, "min=512B,max=128MB",
+	    NULL, 0 },
+	{ "app_metadata", "string", NULL, NULL, NULL, 0 },
+	{ "block_allocation", "string",
+	    NULL, "choices=[\"first\",\"best\"]",
+	    NULL, 0 },
+	{ "block_compressor", "string", NULL, NULL, NULL, 0 },
+	{ "cache_resident", "boolean", NULL, NULL, NULL, 0 },
+	{ "checksum", "string",
+	    NULL, "choices=[\"on\",\"off\",\"uncompressed\"]",
+	    NULL, 0 },
+	{ "collator", "string", NULL, NULL, NULL, 0 },
+	{ "columns", "list", NULL, NULL, NULL, 0 },
+	{ "dictionary", "int", NULL, "min=0", NULL, 0 },
+	{ "encryption", "category",
+	    NULL, NULL,
+	    confchk_WT_SESSION_create_encryption_subconfigs, 2 },
+	{ "format", "string", NULL, "choices=[\"btree\"]", NULL, 0 },
+	{ "huffman_key", "string", NULL, NULL, NULL, 0 },
+	{ "huffman_value", "string", NULL, NULL, NULL, 0 },
+	{ "internal_item_max", "int", NULL, "min=0", NULL, 0 },
+	{ "internal_key_max", "int", NULL, "min=0", NULL, 0 },
+	{ "internal_key_truncate", "boolean", NULL, NULL, NULL, 0 },
+	{ "internal_page_max", "int",
+	    NULL, "min=512B,max=512MB",
+	    NULL, 0 },
+	{ "key_format", "format", __wt_struct_confchk, NULL, NULL, 0 },
+	{ "key_gap", "int", NULL, "min=0", NULL, 0 },
+	{ "leaf_item_max", "int", NULL, "min=0", NULL, 0 },
+	{ "leaf_key_max", "int", NULL, "min=0", NULL, 0 },
+	{ "leaf_page_max", "int",
+	    NULL, "min=512B,max=512MB",
+	    NULL, 0 },
+	{ "leaf_value_max", "int", NULL, "min=0", NULL, 0 },
+	{ "log", "category",
+	    NULL, NULL,
+	    confchk_WT_SESSION_create_log_subconfigs, 1 },
+	{ "memory_page_max", "int",
+	    NULL, "min=512B,max=10TB",
+	    NULL, 0 },
+	{ "os_cache_dirty_max", "int", NULL, "min=0", NULL, 0 },
+	{ "os_cache_max", "int", NULL, "min=0", NULL, 0 },
+	{ "prefix_compression", "boolean", NULL, NULL, NULL, 0 },
+	{ "prefix_compression_min", "int", NULL, "min=0", NULL, 0 },
+	{ "split_deepen_min_child", "int", NULL, NULL, NULL, 0 },
+	{ "split_deepen_per_child", "int", NULL, NULL, NULL, 0 },
+	{ "split_pct", "int", NULL, "min=25,max=100", NULL, 0 },
+	{ "value_format", "format",
+	    __wt_struct_confchk, NULL,
+	    NULL, 0 },
+	{ NULL, NULL, NULL, NULL, NULL, 0 }
+};
+
 static const WT_CONFIG_CHECK confchk_file_meta[] = {
 	{ "allocation_size", "int",
 	    NULL, "min=512B,max=128MB",
@@ -460,6 +515,67 @@ static const WT_CONFIG_CHECK confchk_index_meta[] = {
 	{ "key_format", "format", __wt_struct_confchk, NULL, NULL, 0 },
 	{ "source", "string", NULL, NULL, NULL, 0 },
 	{ "type", "string", NULL, NULL, NULL, 0 },
+	{ "value_format", "format",
+	    __wt_struct_confchk, NULL,
+	    NULL, 0 },
+	{ NULL, NULL, NULL, NULL, NULL, 0 }
+};
+
+static const WT_CONFIG_CHECK confchk_lsm_meta[] = {
+	{ "allocation_size", "int",
+	    NULL, "min=512B,max=128MB",
+	    NULL, 0 },
+	{ "app_metadata", "string", NULL, NULL, NULL, 0 },
+	{ "block_allocation", "string",
+	    NULL, "choices=[\"first\",\"best\"]",
+	    NULL, 0 },
+	{ "block_compressor", "string", NULL, NULL, NULL, 0 },
+	{ "cache_resident", "boolean", NULL, NULL, NULL, 0 },
+	{ "checksum", "string",
+	    NULL, "choices=[\"on\",\"off\",\"uncompressed\"]",
+	    NULL, 0 },
+	{ "chunks", "string", NULL, NULL, NULL, 0 },
+	{ "collator", "string", NULL, NULL, NULL, 0 },
+	{ "columns", "list", NULL, NULL, NULL, 0 },
+	{ "dictionary", "int", NULL, "min=0", NULL, 0 },
+	{ "encryption", "category",
+	    NULL, NULL,
+	    confchk_WT_SESSION_create_encryption_subconfigs, 2 },
+	{ "format", "string", NULL, "choices=[\"btree\"]", NULL, 0 },
+	{ "huffman_key", "string", NULL, NULL, NULL, 0 },
+	{ "huffman_value", "string", NULL, NULL, NULL, 0 },
+	{ "internal_item_max", "int", NULL, "min=0", NULL, 0 },
+	{ "internal_key_max", "int", NULL, "min=0", NULL, 0 },
+	{ "internal_key_truncate", "boolean", NULL, NULL, NULL, 0 },
+	{ "internal_page_max", "int",
+	    NULL, "min=512B,max=512MB",
+	    NULL, 0 },
+	{ "key_format", "format", __wt_struct_confchk, NULL, NULL, 0 },
+	{ "key_gap", "int", NULL, "min=0", NULL, 0 },
+	{ "last", "string", NULL, NULL, NULL, 0 },
+	{ "leaf_item_max", "int", NULL, "min=0", NULL, 0 },
+	{ "leaf_key_max", "int", NULL, "min=0", NULL, 0 },
+	{ "leaf_page_max", "int",
+	    NULL, "min=512B,max=512MB",
+	    NULL, 0 },
+	{ "leaf_value_max", "int", NULL, "min=0", NULL, 0 },
+	{ "log", "category",
+	    NULL, NULL,
+	    confchk_WT_SESSION_create_log_subconfigs, 1 },
+	{ "lsm", "category",
+	    NULL, NULL,
+	    confchk_WT_SESSION_create_lsm_subconfigs, 11 },
+	{ "memory_page_max", "int",
+	    NULL, "min=512B,max=10TB",
+	    NULL, 0 },
+	{ "old_chunks", "string", NULL, NULL, NULL, 0 },
+	{ "os_cache_dirty_max", "int", NULL, "min=0", NULL, 0 },
+	{ "os_cache_max", "int", NULL, "min=0", NULL, 0 },
+	{ "prefix_compression", "boolean", NULL, NULL, NULL, 0 },
+	{ "prefix_compression_min", "int", NULL, "min=0", NULL, 0 },
+	{ "split_deepen_min_child", "int", NULL, NULL, NULL, 0 },
+	{ "split_deepen_per_child", "int", NULL, NULL, NULL, 0 },
+	{ "split_pct", "int", NULL, "min=25,max=100", NULL, 0 },
 	{ "value_format", "format",
 	    __wt_struct_confchk, NULL,
 	    NULL, 0 },
@@ -985,6 +1101,20 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "app_metadata=,collator=,columns=,source=,type=file",
 	  confchk_colgroup_meta, 5
 	},
+	{ "file.config",
+	  "allocation_size=4KB,app_metadata=,block_allocation=best,"
+	  "block_compressor=,cache_resident=0,checksum=uncompressed,"
+	  "collator=,columns=,dictionary=0,encryption=(keyid=,name=),"
+	  "format=btree,huffman_key=,huffman_value=,internal_item_max=0,"
+	  "internal_key_max=0,internal_key_truncate=,internal_page_max=4KB,"
+	  "key_format=u,key_gap=10,leaf_item_max=0,leaf_key_max=0,"
+	  "leaf_page_max=32KB,leaf_value_max=0,log=(enabled=),"
+	  "memory_page_max=5MB,os_cache_dirty_max=0,os_cache_max=0,"
+	  "prefix_compression=0,prefix_compression_min=4,"
+	  "split_deepen_min_child=0,split_deepen_per_child=0,split_pct=75,"
+	  "value_format=u",
+	  confchk_file_config, 33
+	},
 	{ "file.meta",
 	  "allocation_size=4KB,app_metadata=,block_allocation=best,"
 	  "block_compressor=,cache_resident=0,checkpoint=,checkpoint_lsn=,"
@@ -1004,6 +1134,23 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "app_metadata=,collator=,columns=,extractor=,immutable=0,"
 	  "index_key_columns=,key_format=u,source=,type=file,value_format=u",
 	  confchk_index_meta, 10
+	},
+	{ "lsm.meta",
+	  "allocation_size=4KB,app_metadata=,block_allocation=best,"
+	  "block_compressor=,cache_resident=0,checksum=uncompressed,chunks="
+	  ",collator=,columns=,dictionary=0,encryption=(keyid=,name=),"
+	  "format=btree,huffman_key=,huffman_value=,internal_item_max=0,"
+	  "internal_key_max=0,internal_key_truncate=,internal_page_max=4KB,"
+	  "key_format=u,key_gap=10,last=,leaf_item_max=0,leaf_key_max=0,"
+	  "leaf_page_max=32KB,leaf_value_max=0,log=(enabled=),"
+	  "lsm=(auto_throttle=,bloom=,bloom_bit_count=16,bloom_config=,"
+	  "bloom_hash_count=8,bloom_oldest=0,chunk_count_limit=0,"
+	  "chunk_max=5GB,chunk_size=10MB,merge_max=15,merge_min=0),"
+	  "memory_page_max=5MB,old_chunks=,os_cache_dirty_max=0,"
+	  "os_cache_max=0,prefix_compression=0,prefix_compression_min=4,"
+	  "split_deepen_min_child=0,split_deepen_per_child=0,split_pct=75,"
+	  "value_format=u",
+	  confchk_lsm_meta, 37
 	},
 	{ "table.meta",
 	  "app_metadata=,colgroups=,collator=,columns=,key_format=u,"

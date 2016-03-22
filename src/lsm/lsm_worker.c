@@ -20,7 +20,7 @@ int
 __wt_lsm_worker_start(WT_SESSION_IMPL *session, WT_LSM_WORKER_ARGS *args)
 {
 	WT_RET(__wt_verbose(session, WT_VERB_LSM_MANAGER,
-	    "Start LSM worker %d type 0x%x", args->id, args->type));
+	    "Start LSM worker %u type %#" PRIx32, args->id, args->type));
 	return (__wt_thread_create(session, &args->tid, __lsm_worker, args));
 }
 
@@ -59,9 +59,8 @@ __lsm_worker_general_op(
 		 */
 		if (chunk != NULL) {
 			WT_ERR(__wt_verbose(session, WT_VERB_LSM,
-			    "Flush%s chunk %d %s",
-			    force ? " w/ force" : "",
-			    chunk->id, chunk->uri));
+			    "Flush%s chunk %" PRIu32 " %s",
+			    force ? " w/ force" : "", chunk->id, chunk->uri));
 			ret = __wt_lsm_checkpoint_chunk(
 			    session, entry->lsm_tree, chunk);
 			WT_ASSERT(session, chunk->refcnt > 0);
@@ -140,7 +139,7 @@ __lsm_worker(void *arg)
 			if (ret == WT_NOTFOUND) {
 				F_CLR(entry->lsm_tree, WT_LSM_TREE_COMPACTING);
 				ret = 0;
-			} else if (ret == EBUSY)
+			} else if (ret == EBUSY || ret == EINTR)
 				ret = 0;
 
 			/* Paranoia: clear session state. */
@@ -164,7 +163,7 @@ __lsm_worker(void *arg)
 	if (ret != 0) {
 err:		__wt_lsm_manager_free_work_unit(session, entry);
 		WT_PANIC_MSG(session, ret,
-		    "Error in LSM worker thread %d", cookie->id);
+		    "Error in LSM worker thread %u", cookie->id);
 	}
 	return (WT_THREAD_RET_VALUE);
 }

@@ -136,7 +136,7 @@ main(int argc, char *argv[])
 
 	printf("%s: process %" PRIu64 "\n", g.progname, (uint64_t)getpid());
 	for (cnt = 1; (runs == 0 || cnt <= runs) && g.status == 0; ++cnt) {
-		printf("    %d: %u workers, %u tables\n",
+		printf("    %d: %d workers, %d tables\n",
 		    cnt, g.nworkers, g.ntables);
 
 		(void)cleanup();		/* Clean up previous runs */
