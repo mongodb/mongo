@@ -166,6 +166,23 @@ public:
             return false;
         }
 
+        vector<ShardId> shardIds;
+        grid.shardRegistry()->getAllShardIds(&shardIds);
+        int numShards = shardIds.size();
+
+        // Cannot have more than 8192 initial chunks per shard. Setting a maximum of 1,000,000
+        // chunks in total to limit the amount of memory this command consumes so there is less
+        // danger of an OOM error.
+        const int maxNumInitialChunksForShards = numShards * 8192;
+        const int maxNumInitialChunksTotal = 1000 * 1000;  // Arbitrary limit to memory consumption
+        int numChunks = cmdObj["numInitialChunks"].numberInt();
+        if (numChunks > maxNumInitialChunksForShards || numChunks > maxNumInitialChunksTotal) {
+            errmsg = str::stream()
+                << "numInitialChunks cannot be more than either: " << maxNumInitialChunksForShards
+                << ", 8192 * number of shards; or " << maxNumInitialChunksTotal;
+            return false;
+        }
+
         // The rest of the checks require a connection to the primary db
         ConnectionString shardConnString;
         {
@@ -344,16 +361,11 @@ public:
         // 2. move them one at a time
         // 3. split the big chunks to achieve the desired total number of initial chunks
 
-        vector<ShardId> shardIds;
-        grid.shardRegistry()->getAllShardIds(&shardIds);
-        int numShards = shardIds.size();
-
         vector<BSONObj> initSplits;  // there will be at most numShards-1 of these
         vector<BSONObj> allSplits;   // all of the initial desired split points
 
         // only pre-split when using a hashed shard key and collection is still empty
         if (isHashedShardKey && isEmpty) {
-            int numChunks = cmdObj["numInitialChunks"].numberInt();
             if (numChunks <= 0) {
                 // default number of initial chunks
                 numChunks = 2 * numShards;
