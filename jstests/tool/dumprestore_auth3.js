@@ -114,9 +114,7 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
     // SERVER-23290: removed writeConcern: "0" from the mongorestore command line options because,
     // with it, sometimes the following assert.soon would succeed and then then userCount assert
     // would fail because it was not yet available
-    runTool("mongorestore",
-            mongod,
-            {dir: dumpDir + "foo/", db: 'foo', restoreDbUsersAndRoles: ""});
+    runTool("mongorestore", mongod, {dir: dumpDir + "foo/", db: 'foo', restoreDbUsersAndRoles: ""});
     db = mongod.getDB('foo');
     admindb = mongod.getDB('admin');
 
