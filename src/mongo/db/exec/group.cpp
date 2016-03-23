@@ -148,7 +148,8 @@ Status GroupStage::processObject(const BSONObj& obj) {
         }
     }
 
-    _scope->setObject("obj", obj, true);
+    BSONObj objCopy = obj.getOwned();
+    _scope->setObject("obj", objCopy, true);
     _scope->setNumber("n", n - 1);
 
     try {
