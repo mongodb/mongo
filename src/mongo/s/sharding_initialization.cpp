@@ -46,11 +46,12 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
-#include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/sharding_network_connection_hook.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_egress_metadata_hook_for_mongos.h"
+#include "mongo/db/s/sharding_egress_metadata_hook_for_mongod.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/dist_lock_catalog_impl.h"
 #include "mongo/s/catalog/replset/replset_dist_lock_manager.h"
@@ -67,7 +68,6 @@ using executor::NetworkInterface;
 using executor::NetworkInterfaceThreadPool;
 using executor::TaskExecutorPool;
 using executor::ThreadPoolTaskExecutor;
-
 
 std::unique_ptr<CatalogManager> makeCatalogManager(ServiceContext* service,
                                                    ShardRegistry* shardRegistry,
@@ -89,70 +89,26 @@ std::unique_ptr<CatalogManager> makeCatalogManager(ServiceContext* service,
     return stdx::make_unique<CatalogManagerReplicaSet>(std::move(distLockManager));
 }
 
-
-// Same logic as sharding_connection_hook.cpp.
-class ShardingEgressMetadataHook final : public rpc::EgressMetadataHook {
-public:
-    Status writeRequestMetadata(const HostAndPort& target, BSONObjBuilder* metadataBob) override {
-        try {
-            audit::writeImpersonatedUsersToMetadata(metadataBob);
-
-            // Add config server optime to metadata sent to shards.
-            auto shard = grid.shardRegistry()->getShardForHostNoReload(target);
-            if (!shard) {
-                return Status(ErrorCodes::ShardNotFound,
-                              str::stream() << "Shard not found for server: " << target.toString());
-            }
-            if (shard->isConfig()) {
-                return Status::OK();
-            }
-            rpc::ConfigServerMetadata(grid.shardRegistry()->getConfigOpTime())
-                .writeToMetadata(metadataBob);
-
-            return Status::OK();
-        } catch (...) {
-            return exceptionToStatus();
-        }
-    }
-
-    Status readReplyMetadata(const HostAndPort& replySource, const BSONObj& metadataObj) override {
-        try {
-            saveGLEStats(metadataObj, replySource.toString());
-
-            auto shard = grid.shardRegistry()->getShardForHostNoReload(replySource);
-            if (!shard) {
-                return Status::OK();
-            }
-            // If this host is a known shard of ours, look for a config server optime in the
-            // response metadata to use to update our notion of the current config server optime.
-            auto responseStatus = rpc::ConfigServerMetadata::readFromMetadata(metadataObj);
-            if (!responseStatus.isOK()) {
-                return responseStatus.getStatus();
-            }
-            auto opTime = responseStatus.getValue().getOpTime();
-            if (opTime.is_initialized()) {
-                grid.shardRegistry()->advanceConfigOpTime(opTime.get());
-            }
-            return Status::OK();
-        } catch (...) {
-            return exceptionToStatus();
-        }
-    }
-};
-
 std::unique_ptr<ThreadPoolTaskExecutor> makeTaskExecutor(std::unique_ptr<NetworkInterface> net) {
     auto netPtr = net.get();
     return stdx::make_unique<ThreadPoolTaskExecutor>(
         stdx::make_unique<NetworkInterfaceThreadPool>(netPtr), std::move(net));
 }
 
-std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(std::unique_ptr<NetworkInterface> fixedNet) {
+std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(std::unique_ptr<NetworkInterface> fixedNet,
+                                                       bool isMongos) {
     std::vector<std::unique_ptr<executor::TaskExecutor>> executors;
     for (size_t i = 0; i < TaskExecutorPool::getSuggestedPoolSize(); ++i) {
+        std::unique_ptr<rpc::EgressMetadataHook> metadataHook;
+        if (isMongos) {
+            metadataHook = stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>();
+        } else {
+            metadataHook = stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>();
+        };
         auto net = executor::makeNetworkInterface(
             "NetworkInterfaceASIO-TaskExecutorPool-" + std::to_string(i),
             stdx::make_unique<ShardingNetworkConnectionHook>(),
-            stdx::make_unique<ShardingEgressMetadataHook>());
+            std::move(metadataHook));
         auto netPtr = net.get();
         auto exec = stdx::make_unique<ThreadPoolTaskExecutor>(
             stdx::make_unique<NetworkInterfaceThreadPool>(netPtr), std::move(net));
@@ -170,21 +126,28 @@ std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(std::unique_ptr<NetworkIn
     return executorPool;
 }
 
-}  // namespace
-
-Status initializeGlobalShardingState(OperationContext* txn, const ConnectionString& configCS) {
+Status initializeGlobalShardingState(OperationContext* txn,
+                                     const ConnectionString& configCS,
+                                     bool isMongos) {
     if (configCS.type() == ConnectionString::INVALID) {
         return {ErrorCodes::BadValue, "Unrecognized connection string."};
+    }
+
+    std::unique_ptr<rpc::EgressMetadataHook> metadataHook;
+    if (isMongos) {
+        metadataHook = stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>();
+    } else {
+        metadataHook = stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>();
     }
 
     auto network =
         executor::makeNetworkInterface("NetworkInterfaceASIO-ShardRegistry",
                                        stdx::make_unique<ShardingNetworkConnectionHook>(),
-                                       stdx::make_unique<ShardingEgressMetadataHook>());
+                                       std::move(metadataHook));
     auto networkPtr = network.get();
     auto shardRegistry(
         stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryImpl>(),
-                                         makeTaskExecutorPool(std::move(network)),
+                                         makeTaskExecutorPool(std::move(network), isMongos),
                                          networkPtr,
                                          makeTaskExecutor(executor::makeNetworkInterface(
                                              "NetworkInterfaceASIO-ShardRegistry-TaskExecutor")),
@@ -226,6 +189,18 @@ Status initializeGlobalShardingState(OperationContext* txn, const ConnectionStri
     }
 
     return Status::OK();
+}
+
+}  // namespace
+
+Status initializeGlobalShardingStateForMongos(OperationContext* txn,
+                                              const ConnectionString& configCS) {
+    return initializeGlobalShardingState(txn, configCS, true);
+}
+
+Status initializeGlobalShardingStateForMongod(OperationContext* txn,
+                                              const ConnectionString& configCS) {
+    return initializeGlobalShardingState(txn, configCS, false);
 }
 
 }  // namespace mongo

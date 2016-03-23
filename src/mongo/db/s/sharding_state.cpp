@@ -505,7 +505,7 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* txn,
             &ConfigServer::replicaSetChangeShardRegistryUpdateHook);
 
         try {
-            Status status = initializeGlobalShardingState(txn, configSvrConnStr);
+            Status status = initializeGlobalShardingStateForMongod(txn, configSvrConnStr);
 
             // For backwards compatibility with old style inits from metadata commands.
             if (status.isOK()) {
@@ -541,7 +541,7 @@ void ShardingState::_initializeImpl(ConnectionString configSvr) {
         &ConfigServer::replicaSetChangeShardRegistryUpdateHook);
 
     try {
-        Status status = initializeGlobalShardingState(txn.get(), configSvr);
+        Status status = initializeGlobalShardingStateForMongod(txn.get(), configSvr);
         _signalInitializationComplete(status);
     } catch (const DBException& ex) {
         _signalInitializationComplete(ex.toStatus());

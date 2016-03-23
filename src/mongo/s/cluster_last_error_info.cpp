@@ -71,9 +71,6 @@ void ClusterLastErrorInfo::disableForCommand() {
     _prev = temp;
 }
 
-static TimerStats gleWtimeStats;
-static ServerStatusMetricField<TimerStats> displayGleLatency("getLastError.wtime", &gleWtimeStats);
-
 void saveGLEStats(const BSONObj& metadata, StringData hostString) {
     if (!haveClient()) {
         // TODO: how can this happen?

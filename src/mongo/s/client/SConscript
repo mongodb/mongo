@@ -37,10 +37,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/s/coreshard',
-    ],
-    LIBDEPS_TAGS=[
-        # Depends on saveGLEStats, which is not uniquely defined
-        'incomplete',
+        '$BUILD_DIR/mongo/s/sharding_egress_metadata_hook',
     ],
 )
 

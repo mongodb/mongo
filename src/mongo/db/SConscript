@@ -643,6 +643,7 @@ serverOnlyFiles = [
     "repl/rs_initialsync.cpp",
     "repl/rs_sync.cpp",
     "repl/sync_source_feedback.cpp",
+    "s/sharding_connection_hook_for_mongod.cpp",
     "service_context_d.cpp",
     "stats/fill_locker_info.cpp",
     "stats/lock_server_status_section.cpp",

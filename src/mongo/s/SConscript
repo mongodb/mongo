@@ -12,6 +12,19 @@ env.SConscript(
     ],
 )
 
+env.Library(
+    target='sharding_egress_metadata_hook',
+    source=[
+        '$BUILD_DIR/mongo/db/s/sharding_egress_metadata_hook_for_mongod.cpp',
+        'sharding_egress_metadata_hook.cpp',
+        'sharding_egress_metadata_hook_for_mongos.cpp',
+    ],
+    LIBDEPS=[
+        'cluster_last_error_info',
+        'coreshard',
+    ],
+)
+
 # Functionality for initializing global sharding state
 env.Library(
     target='sharding_initialization',
@@ -25,10 +38,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/catalog/catalog_manager_impl',
         'client/sharding_connection_hook',
         'coreshard',
-    ],
-    LIBDEPS_TAGS=[
-        # Depends on saveGLEStats, which lacks a unique definition
-        'incomplete',
+        'sharding_egress_metadata_hook',
     ],
 )
 
@@ -188,6 +198,21 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='cluster_last_error_info',
+    source=[
+        'cluster_last_error_info.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/client/connection_string',
+        '$BUILD_DIR/mongo/rpc/metadata',
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
+        '$BUILD_DIR/mongo/db/service_context', 
+        '$BUILD_DIR/mongo/db/stats/timer_stats',
+    ]
+)
+
 # This library is only used by the mongos execuable and any tests which require mongos runtime
 # objects, such as the request processing pipeline or the balancer.
 env.Library(
@@ -195,7 +220,6 @@ env.Library(
     source=[
         'balance.cpp',
         'cluster_cursor_stats.cpp',
-        'cluster_last_error_info.cpp',
         'request.cpp',
         's_only.cpp',
         's_sharding_server_status.cpp',
@@ -209,6 +233,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/s/query/cluster_query',
         '$BUILD_DIR/mongo/util/concurrency/task',
+        'cluster_last_error_info',
         'write_ops/cluster_write_op',
         'write_ops/cluster_write_op_conversion',
     ],

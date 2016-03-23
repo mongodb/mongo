@@ -233,6 +233,4 @@ bool haveLocalShardingInfo(OperationContext* txn, const string& ns) {
 
 void usingAShardConnection(const string& addr) {}
 
-void saveGLEStats(const BSONObj& result, StringData hostString) {}
-
 }  // namespace mongo

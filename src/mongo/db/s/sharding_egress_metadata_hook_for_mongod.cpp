@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,22 +26,15 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/s/sharding_egress_metadata_hook_for_mongod.h"
 
 namespace mongo {
+namespace rpc {
 
-class ConnectionString;
-class OperationContext;
-class Status;
+void ShardingEgressMetadataHookForMongod::saveGLEStats(const BSONObj& metadata,
+                                                       StringData hostString) {}
 
-/**
- * Takes in the connection string for reaching the config servers and initializes the global
- * CatalogManager, ShardingRegistry, and grid objects.
- */
-Status initializeGlobalShardingStateForMongos(OperationContext* txn,
-                                              const ConnectionString& configCS);
-
-Status initializeGlobalShardingStateForMongod(OperationContext* txn,
-                                              const ConnectionString& configCS);
-
+}  // namespace rpc
 }  // namespace mongo

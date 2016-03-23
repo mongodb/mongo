@@ -62,7 +62,7 @@
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/client/sharding_connection_hook.h"
+#include "mongo/s/client/sharding_connection_hook_for_mongos.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/mongos_options.h"
@@ -202,7 +202,7 @@ DBClientBase* createDirectClient(OperationContext* txn) {
 using namespace mongo;
 
 static Status initializeSharding(OperationContext* txn) {
-    Status status = initializeGlobalShardingState(txn, mongosGlobalParams.configdbs);
+    Status status = initializeGlobalShardingStateForMongos(txn, mongosGlobalParams.configdbs);
     if (!status.isOK()) {
         return status;
     }
@@ -233,8 +233,8 @@ static ExitCode runMongosServer() {
     _initWireSpec();
 
     // Add sharding hooks to both connection pools - ShardingConnectionHook includes auth hooks
-    globalConnPool.addHook(new ShardingConnectionHook(false));
-    shardConnectionPool.addHook(new ShardingConnectionHook(true));
+    globalConnPool.addHook(new ShardingConnectionHookForMongos(false));
+    shardConnectionPool.addHook(new ShardingConnectionHookForMongos(true));
 
     ReplicaSetMonitor::setAsynchronousConfigChangeHook(
         &ConfigServer::replicaSetChangeConfigServerUpdateHook);

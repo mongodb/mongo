@@ -28,20 +28,38 @@
 
 #pragma once
 
+#include <memory>
+
+#include "mongo/base/string_data.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
+
 namespace mongo {
 
-class ConnectionString;
-class OperationContext;
-class Status;
+class Shard;
 
-/**
- * Takes in the connection string for reaching the config servers and initializes the global
- * CatalogManager, ShardingRegistry, and grid objects.
- */
-Status initializeGlobalShardingStateForMongos(OperationContext* txn,
-                                              const ConnectionString& configCS);
+namespace rpc {
 
-Status initializeGlobalShardingStateForMongod(OperationContext* txn,
-                                              const ConnectionString& configCS);
+class ShardingEgressMetadataHook : public rpc::EgressMetadataHook {
+public:
+    Status readReplyMetadata(const HostAndPort& replySource, const BSONObj& metadataObj) override;
+    Status writeRequestMetadata(const HostAndPort& target, BSONObjBuilder* metadataBob) override;
 
+    // These overloaded methods exist to allow ShardingConnectionHook, which is soon to be
+    // deprecated, to use the logic in ShardingEgressMetadataHook instead of duplicating the
+    // logic. ShardingConnectionHook must provide the replySource and target as strings rather than
+    // HostAndPorts, since DBClientReplicaSet uses the hook before it decides on the actual host to
+    // contact.
+    Status readReplyMetadata(const StringData replySource, const BSONObj& metadataObj);
+    Status writeRequestMetadata(bool shardedConnection,
+                                const StringData target,
+                                BSONObjBuilder* metadataBob);
+
+private:
+    virtual void saveGLEStats(const BSONObj& metadata, StringData hostString) = 0;
+
+    Status _readReplyMetadataForShard(std::shared_ptr<Shard> shard, const BSONObj& metadataObj);
+    Status _writeRequestMetadataForShard(std::shared_ptr<Shard> shard, BSONObjBuilder* metadataBob);
+};
+
+}  // namespace rpc
 }  // namespace mongo

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,20 +28,17 @@
 
 #pragma once
 
+#include "mongo/s/client/sharding_connection_hook.h"
+
 namespace mongo {
 
-class ConnectionString;
-class OperationContext;
-class Status;
-
 /**
- * Takes in the connection string for reaching the config servers and initializes the global
- * CatalogManager, ShardingRegistry, and grid objects.
+ * Intercepts creation of sharded connections and transparently performs the internal
+ * authentication on them.
  */
-Status initializeGlobalShardingStateForMongos(OperationContext* txn,
-                                              const ConnectionString& configCS);
-
-Status initializeGlobalShardingStateForMongod(OperationContext* txn,
-                                              const ConnectionString& configCS);
+class ShardingConnectionHookForMongod final : public ShardingConnectionHook {
+public:
+    explicit ShardingConnectionHookForMongod(bool shardedConnections);
+};
 
 }  // namespace mongo

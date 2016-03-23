@@ -38,10 +38,10 @@
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/sharding_connection_hook_for_mongod.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_connection.h"
-#include "mongo/s/client/sharding_connection_hook.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -102,8 +102,8 @@ void ShardedConnectionInfo::addHook() {
     log() << "first cluster operation detected, adding sharding hook to enable versioning "
              "and authentication to remote servers";
 
-    globalConnPool.addHook(new ShardingConnectionHook(false));
-    shardConnectionPool.addHook(new ShardingConnectionHook(true));
+    globalConnPool.addHook(new ShardingConnectionHookForMongod(false));
+    shardConnectionPool.addHook(new ShardingConnectionHookForMongod(true));
 
     alreadyAddedHook.store(1);
 }
