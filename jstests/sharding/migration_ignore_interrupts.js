@@ -24,17 +24,15 @@ load('./jstests/libs/chunk_manipulation_util.js');
 
     var st = new ShardingTest({shards: 4, mongos: 1});
 
-    var mongos = st.s0, admin = mongos.getDB('admin'),
-        shards = mongos.getCollection('config.shards').find().toArray(), dbName = "testDB",
-        ns1 = dbName + ".foo", coll1 = mongos.getCollection(ns1), ns2 = dbName + ".baz",
-        coll2 = mongos.getCollection(ns2), shard0 = st.shard0, shard1 = st.shard1,
-        shard2 = st.shard2, shard0Coll1 = shard0.getCollection(ns1),
-        shard0Coll2 = shard0.getCollection(ns2), shard1Coll1 = shard1.getCollection(ns1),
-        shard1Coll2 = shard1.getCollection(ns2), shard2Coll1 = shard2.getCollection(ns1),
-        shard2Coll2 = shard2.getCollection(ns2);
+    var mongos = st.s0, admin = mongos.getDB('admin'), dbName = "testDB", ns1 = dbName + ".foo",
+        coll1 = mongos.getCollection(ns1), ns2 = dbName + ".baz", coll2 = mongos.getCollection(ns2),
+        shard0 = st.shard0, shard1 = st.shard1, shard2 = st.shard2,
+        shard0Coll1 = shard0.getCollection(ns1), shard0Coll2 = shard0.getCollection(ns2),
+        shard1Coll1 = shard1.getCollection(ns1), shard1Coll2 = shard1.getCollection(ns2),
+        shard2Coll1 = shard2.getCollection(ns1), shard2Coll2 = shard2.getCollection(ns2);
 
     assert.commandWorked(admin.runCommand({enableSharding: dbName}));
-    st.ensurePrimaryShard(dbName, shards[0]._id);
+    st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
     assert.commandWorked(admin.runCommand({shardCollection: ns1, key: {a: 1}}));
     assert.commandWorked(admin.runCommand({split: ns1, middle: {a: 10}}));
@@ -71,9 +69,12 @@ load('./jstests/libs/chunk_manipulation_util.js');
     //      coll1:     [10, 20)
     //      coll2:     [10, 20)
 
-    assert.commandWorked(admin.runCommand({moveChunk: ns1, find: {a: 10}, to: shards[2]._id}));
-    assert.commandWorked(admin.runCommand({moveChunk: ns2, find: {a: 10}, to: shards[2]._id}));
-    assert.commandWorked(admin.runCommand({moveChunk: ns1, find: {a: 20}, to: shards[1]._id}));
+    assert.commandWorked(
+        admin.runCommand({moveChunk: ns1, find: {a: 10}, to: st.shard2.shardName}));
+    assert.commandWorked(
+        admin.runCommand({moveChunk: ns2, find: {a: 10}, to: st.shard2.shardName}));
+    assert.commandWorked(
+        admin.runCommand({moveChunk: ns1, find: {a: 20}, to: st.shard1.shardName}));
     assert.eq(1, shard0Coll1.count());
     assert.eq(1, shard0Coll2.count());
     assert.eq(1, shard1Coll1.count());
@@ -84,29 +85,29 @@ load('./jstests/libs/chunk_manipulation_util.js');
     // Start a migration between shard0 and shard1 on coll1 and then pause it
     pauseMigrateAtStep(shard1, migrateStepNames.deletedPriorDataInRange);
     var joinMoveChunk1 = moveChunkParallel(
-        staticMongod1, st.s0.host, {a: 0}, null, coll1.getFullName(), shards[1]._id);
+        staticMongod1, st.s0.host, {a: 0}, null, coll1.getFullName(), st.shard1.shardName);
     waitForMigrateStep(shard1, migrateStepNames.deletedPriorDataInRange);
 
     jsTest.log('Attempting to interrupt migration....');
     // Test 1.1
     assert.commandFailed(
-        admin.runCommand({moveChunk: ns1, find: {a: 10}, to: shards[0]._id}),
+        admin.runCommand({moveChunk: ns1, find: {a: 10}, to: st.shard0.shardName}),
         "(1.1) coll1 lock should have prevented simultaneous migrations in the collection.");
     // Test 1.2
     assert.commandFailed(
-        admin.runCommand({moveChunk: ns1, find: {a: 10}, to: shards[1]._id}),
+        admin.runCommand({moveChunk: ns1, find: {a: 10}, to: st.shard1.shardName}),
         "(1.2) coll1 lock should have prevented simultaneous migrations in the collection.");
     // Test 1.3
     assert.commandFailed(
-        admin.runCommand({moveChunk: ns1, find: {a: 20}, to: shards[2]._id}),
+        admin.runCommand({moveChunk: ns1, find: {a: 20}, to: st.shard2.shardName}),
         "(1.3) coll1 lock should have prevented simultaneous migrations in the collection.");
     // Test 1.4
     assert.commandFailed(
-        admin.runCommand({moveChunk: ns2, find: {a: 10}, to: shards[1]._id}),
+        admin.runCommand({moveChunk: ns2, find: {a: 10}, to: st.shard1.shardName}),
         "(1.4) A shard should not be able to be the recipient of two ongoing migrations");
     // Test 1.5
     assert.commandFailed(
-        admin.runCommand({moveChunk: ns2, find: {a: 0}, to: shards[2]._id}),
+        admin.runCommand({moveChunk: ns2, find: {a: 0}, to: st.shard2.shardName}),
         "(1.5) A shard should not be able to be the donor for two ongoing migrations.");
 
     // Finish migration
@@ -118,10 +119,13 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert.eq(2, shard1Coll1.count());
 
     // Reset setup
-    assert.commandWorked(admin.runCommand({moveChunk: ns1, find: {a: 0}, to: shards[0]._id}));
-    assert.commandWorked(admin.runCommand({moveChunk: ns1, find: {a: 20}, to: shards[0]._id}));
-    assert.commandWorked(admin.runCommand({moveChunk: ns1, find: {a: 10}, to: shards[0]._id}));
-    assert.commandWorked(admin.runCommand({moveChunk: ns2, find: {a: 10}, to: shards[0]._id}));
+    assert.commandWorked(admin.runCommand({moveChunk: ns1, find: {a: 0}, to: st.shard0.shardName}));
+    assert.commandWorked(
+        admin.runCommand({moveChunk: ns1, find: {a: 20}, to: st.shard0.shardName}));
+    assert.commandWorked(
+        admin.runCommand({moveChunk: ns1, find: {a: 10}, to: st.shard0.shardName}));
+    assert.commandWorked(
+        admin.runCommand({moveChunk: ns2, find: {a: 10}, to: st.shard0.shardName}));
     assert.eq(3, shard0Coll1.count());
     assert.eq(2, shard0Coll2.count());
     assert.eq(0, shard1Coll1.count());
@@ -143,7 +147,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     // Start a migration between shard0 and shard1 on coll1, pause in steady state before commit
     pauseMoveChunkAtStep(shard0, moveChunkStepNames.reachedSteadyState);
     joinMoveChunk1 = moveChunkParallel(
-        staticMongod1, st.s0.host, {a: 0}, null, coll1.getFullName(), shards[1]._id);
+        staticMongod1, st.s0.host, {a: 0}, null, coll1.getFullName(), st.shard1.shardName);
     waitForMoveChunkStep(shard0, moveChunkStepNames.reachedSteadyState);
 
     jsTest.log('Sending false commit command....');
@@ -164,7 +168,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert.eq(1, shard1Coll1.count());
 
     // Reset setup
-    assert.commandWorked(admin.runCommand({moveChunk: ns1, find: {a: 0}, to: shards[0]._id}));
+    assert.commandWorked(admin.runCommand({moveChunk: ns1, find: {a: 0}, to: st.shard0.shardName}));
     assert.eq(3, shard0Coll1.count());
     assert.eq(2, shard0Coll2.count());
     assert.eq(0, shard1Coll1.count());
@@ -189,7 +193,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     pauseMigrateAtStep(shard1, migrateStepNames.deletedPriorDataInRange);
     pauseMoveChunkAtStep(shard0, moveChunkStepNames.startedMoveChunk);
     joinMoveChunk1 = moveChunkParallel(
-        staticMongod1, st.s0.host, {a: 0}, null, coll1.getFullName(), shards[1]._id);
+        staticMongod1, st.s0.host, {a: 0}, null, coll1.getFullName(), st.shard1.shardName);
     waitForMigrateStep(shard1, migrateStepNames.deletedPriorDataInRange);
 
     // Abort migration on donor side, recipient is unaware
@@ -212,7 +216,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     // Start coll2 migration to shard2, pause recipient after delete step
     pauseMigrateAtStep(shard2, migrateStepNames.deletedPriorDataInRange);
     var joinMoveChunk2 = moveChunkParallel(
-        staticMongod2, st.s0.host, {a: 0}, null, coll2.getFullName(), shards[2]._id);
+        staticMongod2, st.s0.host, {a: 0}, null, coll2.getFullName(), st.shard2.shardName);
     waitForMigrateStep(shard2, migrateStepNames.deletedPriorDataInRange);
 
     jsTest.log('Releasing coll1 migration recipient, whose clone command should fail....');
@@ -231,7 +235,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert.eq(1, shard2Coll2.count(), "shard2 failed to complete migration");
 
     // Reset setup
-    assert.commandWorked(admin.runCommand({moveChunk: ns2, find: {a: 0}, to: shards[0]._id}));
+    assert.commandWorked(admin.runCommand({moveChunk: ns2, find: {a: 0}, to: st.shard0.shardName}));
     assert.eq(3, shard0Coll1.count());
     assert.eq(2, shard0Coll2.count());
     assert.eq(0, shard1Coll1.count());
@@ -255,7 +259,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     pauseMigrateAtStep(shard1, migrateStepNames.cloned);
     pauseMoveChunkAtStep(shard0, moveChunkStepNames.startedMoveChunk);
     joinMoveChunk1 = moveChunkParallel(
-        staticMongod1, st.s0.host, {a: 0}, null, coll1.getFullName(), shards[1]._id);
+        staticMongod1, st.s0.host, {a: 0}, null, coll1.getFullName(), st.shard1.shardName);
     waitForMigrateStep(shard1, migrateStepNames.cloned);
 
     // Abort migration on donor side, recipient is unaware
@@ -278,7 +282,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     // Start coll2 migration to shard2, pause recipient after cloning step
     pauseMigrateAtStep(shard2, migrateStepNames.cloned);
     var joinMoveChunk2 = moveChunkParallel(
-        staticMongod2, st.s0.host, {a: 0}, null, coll2.getFullName(), shards[2]._id);
+        staticMongod2, st.s0.host, {a: 0}, null, coll2.getFullName(), st.shard2.shardName);
     waitForMigrateStep(shard2, migrateStepNames.cloned);
 
     // Populate donor (shard0) xfermods log.

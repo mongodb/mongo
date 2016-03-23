@@ -5,15 +5,14 @@
 (function() {
     "use strict";
 
-    var st = new ShardingTest({shards: 2, mongos: 1, other: {shardOptions: {verbose: 2}}});
+    var st = new ShardingTest({shards: 2, mongos: 1});
 
     var mongos = st.s0;
     var admin = mongos.getDB("admin");
-    var shards = mongos.getCollection("config.shards").find().toArray();
     var coll = mongos.getCollection("foo.bar");
 
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
-    printjson(admin.runCommand({movePrimary: coll.getDB() + "", to: shards[0]._id}));
+    printjson(admin.runCommand({movePrimary: coll.getDB() + "", to: st.shard0.shardName}));
     assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: "hashed"}}));
 
     // Create two orphaned data holes, one bounded by min or max on each shard
@@ -25,13 +24,13 @@
     assert.commandWorked(admin.runCommand({
         moveChunk: coll + "",
         bounds: [{_id: NumberLong(-100)}, {_id: NumberLong(-50)}],
-        to: shards[1]._id,
+        to: st.shard1.shardName,
         _waitForDelete: true
     }));
     assert.commandWorked(admin.runCommand({
         moveChunk: coll + "",
         bounds: [{_id: NumberLong(50)}, {_id: NumberLong(100)}],
-        to: shards[0]._id,
+        to: st.shard0.shardName,
         _waitForDelete: true
     }));
     st.printShardingStatus();

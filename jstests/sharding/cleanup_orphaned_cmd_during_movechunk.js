@@ -13,22 +13,20 @@ load('./jstests/libs/cleanup_orphaned_util.js');
     var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
     var st = new ShardingTest({shards: 2, other: {separateConfig: true}});
 
-    var mongos = st.s0, admin = mongos.getDB('admin'),
-        shards = mongos.getCollection('config.shards').find().toArray(), dbName = 'foo',
-        ns = dbName + '.bar', coll = mongos.getCollection(ns), donor = st.shard0,
-        recipient = st.shard1, donorColl = donor.getCollection(ns),
-        recipientColl = st.shard1.getCollection(ns);
+    var mongos = st.s0, admin = mongos.getDB('admin'), dbName = 'foo', ns = dbName + '.bar',
+        coll = mongos.getCollection(ns), donor = st.shard0, recipient = st.shard1,
+        donorColl = donor.getCollection(ns), recipientColl = st.shard1.getCollection(ns);
 
     // Three chunks of 10 documents each, with ids -20, -18, -16, ..., 38.
     // Donor:     [minKey, 0) [0, 20)
     // Recipient:                [20, maxKey)
     assert.commandWorked(admin.runCommand({enableSharding: dbName}));
-    printjson(admin.runCommand({movePrimary: dbName, to: shards[0]._id}));
+    printjson(admin.runCommand({movePrimary: dbName, to: st.shard0.shardName}));
     assert.commandWorked(admin.runCommand({shardCollection: ns, key: {_id: 1}}));
     assert.commandWorked(admin.runCommand({split: ns, middle: {_id: 0}}));
     assert.commandWorked(admin.runCommand({split: ns, middle: {_id: 20}}));
     assert.commandWorked(admin.runCommand(
-        {moveChunk: ns, find: {_id: 20}, to: shards[1]._id, _waitForDelete: true}));
+        {moveChunk: ns, find: {_id: 20}, to: st.shard1.shardName, _waitForDelete: true}));
 
     jsTest.log('Inserting 40 docs into shard 0....');
     for (var i = -20; i < 20; i += 2)
@@ -52,7 +50,7 @@ load('./jstests/libs/cleanup_orphaned_util.js');
     pauseMoveChunkAtStep(donor, moveChunkStepNames.startedMoveChunk);
     pauseMigrateAtStep(recipient, migrateStepNames.cloned);
     var joinMoveChunk = moveChunkParallel(
-        staticMongod, st.s0.host, {_id: 0}, null, coll.getFullName(), shards[1]._id);
+        staticMongod, st.s0.host, {_id: 0}, null, coll.getFullName(), st.shard1.shardName);
 
     waitForMoveChunkStep(donor, moveChunkStepNames.startedMoveChunk);
     waitForMigrateStep(recipient, migrateStepNames.cloned);
