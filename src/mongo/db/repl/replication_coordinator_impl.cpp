@@ -182,7 +182,7 @@ ReplicationCoordinator::Mode getReplicationModeFromSettings(const ReplSettings& 
 
 DataReplicatorOptions createDataReplicatorOptions(ReplicationCoordinator* replCoord) {
     DataReplicatorOptions options;
-    options.applierFn = [](const MultiApplier::Operations&) {};
+    options.applierFn = [](const MultiApplier::Operations&) -> Status { return Status::OK(); };
     options.multiApplyFn =
         [](OperationContext*, const MultiApplier::Operations&, MultiApplier::ApplyOperationFn)
             -> OpTime { return OpTime(); };
