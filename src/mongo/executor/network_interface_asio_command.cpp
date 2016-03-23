@@ -305,8 +305,6 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
         _numSucceededOps.fetchAndAdd(1);
     }
 
-    op->finish(resp);
-
     std::unique_ptr<AsyncOp> ownedOp;
 
     {
@@ -320,6 +318,8 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
         ownedOp = std::move(iter->second);
         _inProgress.erase(iter);
     }
+
+    op->finish(resp);
 
     MONGO_ASIO_INVARIANT(static_cast<bool>(ownedOp), "Invalid AsyncOp", op);
 
