@@ -728,17 +728,6 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target='multiapplier',
-    source=[
-        'multiapplier.cpp',
-    ],
-    LIBDEPS=[
-        'oplog_entry',
-        'replication_executor',
-    ],
-)
-
-env.Library(
     target='applier',
     source=[
         'applier.cpp',
@@ -769,7 +758,6 @@ env.Library(
         'applier',
         'collection_cloner',
         'database_cloner',
-        'multiapplier',
         'optime',
         'reporter',
         '$BUILD_DIR/mongo/client/fetcher',

@@ -30,8 +30,6 @@
 
 #include "mongo/bson/bsonobj.h"
 
-#include "mongo/db/repl/optime.h"
-
 namespace mongo {
 namespace repl {
 
@@ -54,11 +52,8 @@ struct OplogEntry {
     bool isForCappedCollection = false;
 
     bool isCommand() const;
-    bool isCrudOpType() const;
     bool hasNamespace() const;
     int getVersion() const;
-    BSONElement getIdElement() const;
-    OpTime getOpTime() const;
     Seconds getTimestampSecs() const;
     StringData getCollectionName() const;
     std::string toString() const;

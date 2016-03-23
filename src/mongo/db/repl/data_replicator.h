@@ -37,7 +37,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/multiapplier.h"
+#include "mongo/db/repl/applier.h"
 #include "mongo/db/repl/collection_cloner.h"
 #include "mongo/db/repl/database_cloner.h"
 #include "mongo/db/repl/optime.h"
@@ -56,7 +56,7 @@ class QueryFetcher;
 
 namespace repl {
 
-using Operations = MultiApplier::Operations;
+using Operations = Applier::Operations;
 using QueryResponseStatus = StatusWith<Fetcher::QueryResponse>;
 using CallbackArgs = ReplicationExecutor::CallbackArgs;
 using CBHStatus = StatusWith<ReplicationExecutor::CallbackHandle>;
@@ -132,8 +132,7 @@ struct DataReplicatorOptions {
     std::string scopeNS;
     BSONObj filterCriteria;
 
-    MultiApplier::ApplyOperationFn applierFn;
-    MultiApplier::MultiApplyFn multiApplyFn;
+    Applier::ApplyOperationFn applierFn;
     RollbackFn rollbackFn;
     Reporter::PrepareReplSetUpdatePositionCommandFn prepareReplSetUpdatePositionCommandFn;
     GetMyLastOptimeFn getMyLastOptime;
@@ -308,9 +307,9 @@ private:
     Handle _reporterHandle;               // (M)
     std::unique_ptr<Reporter> _reporter;  // (M)
 
-    bool _applierActive;                     // (M)
-    bool _applierPaused;                     // (X)
-    std::unique_ptr<MultiApplier> _applier;  // (M)
+    bool _applierActive;                // (M)
+    bool _applierPaused;                // (X)
+    std::unique_ptr<Applier> _applier;  // (M)
 
     HostAndPort _syncSource;              // (M)
     Timestamp _lastTimestampFetched;      // (MX)
