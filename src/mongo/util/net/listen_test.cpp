@@ -34,31 +34,52 @@
 #include "mongo/util/log.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/net/listen.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 
 namespace {
 
-const long long kSleepMillis = 5000;
-const long long kEpsilon = 3000;
-
 TEST(Listener, ElapsedTimeCheck) {
+    const long long kSleepMillis = 5000;
+    const long long kEpsilon = 4000;
+
     Listener listener("test_listener", "", 0);  // port 0 => any available high port
     listener.setupSockets();
+
+    // Start the thread, and add a guard to ensure that we join it on
+    // all paths. We call shutdownNoTerminate to set the inShutdown
+    // flag so that thread can escape from the listener.
     stdx::thread t([&listener]() { listener.initAndListen(); });
+    const auto joint = MakeGuard([&] {
+        shutdownNoTerminate();
+        t.join();
+    });
+
+    // Wait in this thread until the listener is active, and then let
+    // a little more time elapse to give the timer subsystem a chance
+    // to stabilize.
     listener.waitUntilListening();
-    sleepmillis(kSleepMillis);  // wait for setup.
+    sleepmillis(1000);
+
+    // Get our start times
     long long listenStart = listener.getMyElapsedTimeMillis();
     long long clockStart = curTimeMillis64();
+
+    // Let some time elapse.
     sleepmillis(kSleepMillis);
+
+    // Get our current times.
     long long listenDelta = listener.getMyElapsedTimeMillis() - listenStart;
     long long clockDelta = curTimeMillis64() - clockStart;
+
+    // Log the times to make it clear in the event of a failure what went wrong.
     log() << "Listener elapsed time: " << listenDelta << std::endl;
     log() << "Clock elapsed time:    " << clockDelta << std::endl;
+
+    // Fail if we weren't within epsilon.
     ASSERT_APPROX_EQUAL(listenDelta, clockDelta, kEpsilon);
-    shutdownNoTerminate();
-    t.join();
 }
 
 }  // namespace
