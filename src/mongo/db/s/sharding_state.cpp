@@ -121,7 +121,8 @@ VersionChoice chooseNewestVersion(ChunkVersion prevLocalVersion,
 ShardingState::ShardingState()
     : _initializationState(static_cast<uint32_t>(InitializationState::kNew)),
       _initializationStatus(Status(ErrorCodes::InternalError, "Uninitialized value")),
-      _configServerTickets(kMaxConfigServerRefreshThreads) {}
+      _configServerTickets(kMaxConfigServerRefreshThreads),
+      _globalInit(initializeGlobalShardingStateForMongod) {}
 
 ShardingState::~ShardingState() = default;
 
@@ -258,6 +259,10 @@ void ShardingState::resetMetadata(const string& ns) {
     _collections.erase(ns);
 }
 
+void ShardingState::setGlobalInitMethodForTest(GlobalInitFunc func) {
+    _globalInit = func;
+}
+
 Status ShardingState::onStaleShardVersion(OperationContext* txn,
                                           const NamespaceString& nss,
                                           const ChunkVersion& expectedVersion) {
@@ -354,7 +359,9 @@ void ShardingState::initializeFromConfigConnString(OperationContext* txn, const 
 Status ShardingState::initializeFromShardIdentity(OperationContext* txn) {
     invariant(!txn->lockState()->isLocked());
 
-    // TODO: SERVER-22663 if --shardsvr
+    if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
+        return Status::OK();
+    }
 
     BSONObj shardIdentityBSON;
     try {
@@ -381,7 +388,9 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* txn,
                                                   const ShardIdentityType& shardIdentity) {
     invariant(!txn->lockState()->isLocked());
 
-    // TODO: SERVER-22663 if --shardsvr
+    if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
+        return Status::OK();
+    }
 
     log() << "initializing sharding state with: " << shardIdentity;
 
@@ -459,7 +468,7 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* txn,
             &ConfigServer::replicaSetChangeShardRegistryUpdateHook);
 
         try {
-            Status status = initializeGlobalShardingStateForMongod(txn, configSvrConnStr);
+            Status status = _globalInit(txn, configSvrConnStr);
 
             // For backwards compatibility with old style inits from metadata commands.
             if (status.isOK()) {
@@ -495,7 +504,7 @@ void ShardingState::_initializeImpl(ConnectionString configSvr) {
         &ConfigServer::replicaSetChangeShardRegistryUpdateHook);
 
     try {
-        Status status = initializeGlobalShardingStateForMongod(txn.get(), configSvr);
+        Status status = _globalInit(txn.get(), configSvr);
         _signalInitializationComplete(status);
     } catch (const DBException& ex) {
         _signalInitializationComplete(ex.toStatus());

@@ -36,6 +36,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/migration_destination_manager.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/ticketholder.h"
@@ -84,6 +85,8 @@ public:
         // The operation context under which we are running. Must remain the same.
         OperationContext* const _txn;
     };
+
+    using GlobalInitFunc = stdx::function<Status(OperationContext*, const ConnectionString&)>;
 
     ShardingState();
     ~ShardingState();
@@ -222,6 +225,12 @@ public:
      */
     boost::optional<NamespaceString> getActiveMigrationNss();
 
+    /**
+     * For testing only. Mock the initialization method used by initializeFromConfigConnString and
+     * initializeFromShardIdentity after all checks are performed.
+     */
+    void setGlobalInitMethodForTest(GlobalInitFunc func);
+
 private:
     friend class ScopedRegisterMigration;
 
@@ -346,6 +355,9 @@ private:
 
     // The id for the cluster this shard belongs to.
     OID _clusterId;
+
+    // Function for initializing the external sharding state components not owned here.
+    GlobalInitFunc _globalInit;
 };
 
 }  // namespace mongo

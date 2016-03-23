@@ -1053,6 +1053,7 @@ var ShardingTest = function(params) {
                 useHostname: otherParams.useHostname,
                 noJournalPrealloc: otherParams.nopreallocj,
                 oplogSize: 16,
+                shardsvr: '',
                 pathOpts: Object.merge(pathOpts, {shard: i})
             };
 
@@ -1076,8 +1077,7 @@ var ShardingTest = function(params) {
                 useBridge: otherParams.useBridge,
                 bridgeOptions: otherParams.bridgeOptions,
                 keyFile: keyFile,
-                protocolVersion: protocolVersion,
-                shardSvr: true
+                protocolVersion: protocolVersion
             });
 
             this._rs[i] = {
@@ -1104,6 +1104,7 @@ var ShardingTest = function(params) {
                 noJournalPrealloc: otherParams.nopreallocj,
                 pathOpts: Object.merge(pathOpts, {shard: i}),
                 dbpath: "$testName$shard",
+                shardsvr: '',
                 keyFile: keyFile
             };
 

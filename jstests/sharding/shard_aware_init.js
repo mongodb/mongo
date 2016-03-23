@@ -27,6 +27,37 @@
             clusterId: ObjectId()
         };
 
+        /**
+         * Restarts the server without --shardsvr and replace the shardIdentity doc with a valid
+         * document. Then, restarts the server again with --shardsvr. This also returns a
+         * connection to the server after the last restart.
+         */
+        var restartAndFixShardIdentityDoc = function(startOptions) {
+            var options = Object.extend({}, startOptions);
+            delete options.shardsvr;
+            mongodConn = MongoRunner.runMongod(options);
+            waitForMaster(mongodConn);
+
+            var res = mongodConn.getDB('admin')
+                          .system.version.update({_id: 'shardIdentity'}, shardIdentityDoc);
+            assert.eq(1, res.nModified);
+
+            MongoRunner.stopMongod(mongodConn.port);
+
+            newMongodOptions.shardsvr = '';
+            mongodConn = MongoRunner.runMongod(newMongodOptions);
+            waitForMaster(mongodConn);
+
+            res = mongodConn.getDB('admin').runCommand({shardingState: 1});
+
+            assert(res.enabled);
+            assert.eq(shardIdentityDoc.configsvrConnectionString, res.configServer);
+            assert.eq(shardIdentityDoc.shardName, res.shardName);
+            assert.eq(shardIdentityDoc.clusterId, res.clusterId);
+
+            return mongodConn;
+        };
+
         assert.writeOK(mongodConn.getDB('admin').system.version.insert(shardIdentityDoc));
 
         //
@@ -51,7 +82,7 @@
         assert.eq(shardIdentityDoc.clusterId, res.clusterId);
 
         //
-        // Test badly formatted shardIdentity doc
+        // Test shardIdentity doc without configsvrConnectionString, resulting into parse error
         //
 
         assert.writeOK(mongodConn.getDB('admin').system.version.update(
@@ -65,25 +96,40 @@
             waitForMaster(mongodConn);
         });
 
-        // TODO: add more bad format tests.
+        //
+        // Test that it is possible to fix the invalid shardIdentity doc by not passing --shardsvr
+        //
+
+        try {
+            // The server was terminated not by calling stopMongod earlier, this will cleanup
+            // the process from registry in shell_utils_launcher.
+            MongoRunner.stopMongod(newMongodOptions.port);
+        } catch (ex) {
+            if (!(ex instanceof (MongoRunner.StopError))) {
+                throw ex;
+            }
+        }
+
+        mongodConn = restartAndFixShardIdentityDoc(newMongodOptions);
+        res = mongodConn.getDB('admin').runCommand({shardingState: 1});
+        assert(res.enabled);
     };
 
     var st = new ShardingTest({shards: 1});
 
-    var mongod = MongoRunner.runMongod();
+    var mongod = MongoRunner.runMongod({shardsvr: ''});
 
     runTest(mongod, st.configRS.getURL());
 
     MongoRunner.stopMongod(mongod.port);
 
     var replTest = new ReplSetTest({nodes: 1});
-    replTest.startSet();
+    replTest.startSet({shardsvr: ''});
     replTest.initiate();
 
     runTest(replTest.getPrimary(), st.configRS.getURL());
 
-    // TODO: cleanup properly once --shardsvr checks are added
-    // replTest.stopSet();
+    replTest.stopSet();
 
     st.stop();
 

@@ -457,6 +457,8 @@ void ReplicaSetMonitor::cleanup() {
     replicaSetMonitorWatcher.stop();
     replicaSetMonitorWatcher.wait();
     globalRSMonitorManager.removeAllMonitors();
+    asyncConfigChangeHook = ReplicaSetMonitor::ConfigChangeHook();
+    syncConfigChangeHook = ReplicaSetMonitor::ConfigChangeHook();
 }
 
 bool ReplicaSetMonitor::isKnownToHaveGoodPrimary() const {

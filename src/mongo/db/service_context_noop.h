@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/db/service_context.h"
 
 #include "mongo/platform/atomic_word.h"

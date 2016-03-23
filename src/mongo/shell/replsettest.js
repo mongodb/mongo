@@ -47,7 +47,6 @@
  *     useSeedList {boolean}: Use the connection string format of this set
  *        as the replica set name (overrides the name property). Default: false
  *     keyFile {string}
- *     shardSvr {boolean}: Whether this replica set serves as a shard in a cluster. Default: false.
  *     protocolVersion {number}: protocol version of replset used by the replset initiation.
  *
  *     useBridge {boolean}: If true, then a mongobridge process is started for each node in the
@@ -1173,7 +1172,6 @@ var ReplSetTest = function(opts) {
         self.oplogSize = opts.oplogSize || 40;
         self.useSeedList = opts.useSeedList || false;
         self.keyFile = opts.keyFile;
-        self.shardSvr = opts.shardSvr || false;
         self.protocolVersion = opts.protocolVersion;
 
         _useBridge = opts.useBridge || false;

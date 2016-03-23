@@ -45,8 +45,8 @@
                                                false
                                        });
 
-        st.rs0.start(rs0Primary, {restart: true});
-        st.rs1.start(rs1Primary, {restart: true});
+        st.rs0.start(rs0Primary, Object.extend(rs0Primary.savedOptions, {restart: true}));
+        st.rs1.start(rs1Primary, Object.extend(rs1Primary.savedOptions, {restart: true}));
 
         ReplSetTest.awaitRSClientHosts(mongos,
                                        [rs0Primary, rs1Primary],

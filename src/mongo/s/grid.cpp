@@ -76,7 +76,6 @@ void Grid::advanceConfigOpTime(repl::OpTime opTime) {
     }
 }
 
-// Note: shardRegistry->shutdown() must be called before this method is called.
 void Grid::clearForUnitTests() {
     _catalogManager.reset();
     _catalogCache.reset();

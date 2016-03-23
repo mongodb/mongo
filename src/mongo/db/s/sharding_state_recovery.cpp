@@ -241,6 +241,10 @@ void ShardingStateRecovery::endMetadataOp(OperationContext* txn) {
 }
 
 Status ShardingStateRecovery::recover(OperationContext* txn) {
+    if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
+        return Status::OK();
+    }
+
     if (!recoverShardingState) {
         warning()
             << "Not checking for ShardingState recovery document because the recoverShardingState "

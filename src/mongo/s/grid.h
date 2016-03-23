@@ -102,6 +102,8 @@ public:
      * be necessary if grid is hanging off the global ServiceContext and each test gets its
      * own service context.
      *
+     * Note: shardRegistry()->shutdown() must be called before this method is called.
+     *
      * NOTE: Do not use this outside of unit-tests.
      */
     void clearForUnitTests();

@@ -8,7 +8,7 @@
     var st = new ShardingTest({shards: 1});
 
     var replTest = new ReplSetTest({nodes: 3});
-    replTest.startSet();
+    replTest.startSet({shardsvr: ''});
     var nodes = replTest.nodeList();
     replTest.initiate({
         _id: replTest.name,
