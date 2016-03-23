@@ -112,6 +112,11 @@ env.Library(
     LIBDEPS=[
         'migration_chunk_cloner',
     ],
+    LIBDEPS_TAGS=[
+        # Depends on symbols defined in files in serverOnlyFiles, and has many other missing
+        # dependencies.
+        'incomplete',
+    ],
 )
 
 env.CppUnitTest(
