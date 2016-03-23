@@ -1472,8 +1472,7 @@ public:
                             return appendCommandStatus(
                                 result,
                                 Status(ErrorCodes::OperationFailed,
-                                       str::stream() << "Executor killed during mapReduce command: "
-                                                     << WorkingSetCommon::toStatusString(o)));
+                                       str::stream() << "Executor killed during mapReduce command"));
                         }
 
                         reduceTime += t.micros();
