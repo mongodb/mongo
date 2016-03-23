@@ -39,8 +39,8 @@ namespace {
 
 const char kRecvChunkStart[] = "_recvChunkStart";
 const char kConfigServerConnectionString[] = "configdb";
-const char kFromShardId[] = "fromShard";
-const char kToShardId[] = "toShard";
+const char kFromShardConnectionString[] = "from";
+const char kToShardId[] = "toShardName";
 const char kChunkMinKey[] = "min";
 const char kChunkMaxKey[] = "max";
 const char kShardKeyPattern[] = "shardKeyPattern";
@@ -87,10 +87,19 @@ StatusWith<StartChunkCloneRequest> StartChunkCloneRequest::createFromCommand(Nam
     }
 
     {
-        Status status = bsonExtractStringField(obj, kFromShardId, &request._fromShardId);
+        std::string fromShardConnectionString;
+        Status status =
+            bsonExtractStringField(obj, kFromShardConnectionString, &fromShardConnectionString);
         if (!status.isOK()) {
             return status;
         }
+
+        auto fromShardConnectionStringStatus = ConnectionString::parse(fromShardConnectionString);
+        if (!fromShardConnectionStringStatus.isOK()) {
+            return fromShardConnectionStringStatus.getStatus();
+        }
+
+        request._fromShardCS = std::move(fromShardConnectionStringStatus.getValue());
     }
 
     {
@@ -148,9 +157,9 @@ StatusWith<StartChunkCloneRequest> StartChunkCloneRequest::createFromCommand(Nam
 void StartChunkCloneRequest::appendAsCommand(
     BSONObjBuilder* builder,
     const NamespaceString& nss,
-    const MigrationSessionId& shardVersion,
+    const MigrationSessionId& sessionId,
     const ConnectionString& configServerConnectionString,
-    const std::string& fromShardId,
+    const ConnectionString& fromShardConnectionString,
     const std::string& toShardId,
     const BSONObj& chunkMinKey,
     const BSONObj& chunkMaxKey,
@@ -158,10 +167,12 @@ void StartChunkCloneRequest::appendAsCommand(
     const MigrationSecondaryThrottleOptions& secondaryThrottle) {
     invariant(builder->asTempObj().isEmpty());
     invariant(nss.isValid());
+    invariant(fromShardConnectionString.isValid());
 
     builder->append(kRecvChunkStart, nss.ns());
+    sessionId.append(builder);
     builder->append(kConfigServerConnectionString, configServerConnectionString.toString());
-    builder->append(kFromShardId, fromShardId);
+    builder->append(kFromShardConnectionString, fromShardConnectionString.toString());
     builder->append(kToShardId, toShardId);
     builder->append(kChunkMinKey, chunkMinKey);
     builder->append(kChunkMaxKey, chunkMaxKey);

@@ -250,40 +250,6 @@ ChunkVersion ShardingState::getVersion(const string& ns) {
     return ChunkVersion::UNSHARDED();
 }
 
-void ShardingState::donateChunk(OperationContext* txn,
-                                const string& ns,
-                                const BSONObj& min,
-                                const BSONObj& max,
-                                ChunkVersion newCollectionVersion) {
-    invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    CollectionShardingStateMap::const_iterator it = _collections.find(ns);
-    invariant(it != _collections.end());
-    shared_ptr<CollectionMetadata> p = it->second->getMetadata();
-
-    ChunkType chunk;
-    chunk.setMin(min);
-    chunk.setMax(max);
-
-    // TODO: a bit dangerous to have two different zero-version states - no-metadata and
-    // no-version
-    it->second->setMetadata(p->cloneMigrate(chunk, newCollectionVersion));
-}
-
-void ShardingState::undoDonateChunk(OperationContext* txn,
-                                    const string& ns,
-                                    shared_ptr<CollectionMetadata> prevMetadata) {
-    invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    log() << "ShardingState::undoDonateChunk acquired _mutex";
-
-    CollectionShardingStateMap::const_iterator it = _collections.find(ns);
-    invariant(it != _collections.end());
-    it->second->setMetadata(std::move(prevMetadata));
-}
-
 void ShardingState::splitChunk(OperationContext* txn,
                                const string& ns,
                                const BSONObj& min,

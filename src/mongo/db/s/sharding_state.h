@@ -36,7 +36,6 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/migration_destination_manager.h"
-#include "mongo/db/s/migration_source_manager.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/ticketholder.h"
@@ -105,10 +104,6 @@ public:
     ConnectionString getConfigServer(OperationContext* txn);
 
     std::string getShardName();
-
-    MigrationSourceManager* migrationSourceManager() {
-        return &_migrationSourceManager;
-    }
 
     MigrationDestinationManager* migrationDestinationManager() {
         return &_migrationDestManager;
@@ -195,47 +190,6 @@ public:
     bool needCollectionMetadata(OperationContext* txn, const std::string& ns);
 
     std::shared_ptr<CollectionMetadata> getCollectionMetadata(const std::string& ns);
-
-    /**
-     * Creates and installs a new chunk metadata for a given collection by "forgetting" about
-     * one of its chunks.  The new metadata uses the provided version, which has to be higher
-     * than the current metadata's shard version.
-     *
-     * One exception: if the forgotten chunk is the last one in this shard for the collection,
-     * version has to be 0.
-     *
-     * If it runs successfully, clients need to grab the new version to access the collection.
-     *
-     * LOCKING NOTE:
-     * Only safe to do inside the
-     *
-     * @param ns the collection
-     * @param min max the chunk to eliminate from the current metadata
-     * @param version at which the new metadata should be at
-     */
-    void donateChunk(OperationContext* txn,
-                     const std::string& ns,
-                     const BSONObj& min,
-                     const BSONObj& max,
-                     ChunkVersion version);
-
-    /**
-     * Creates and installs new chunk metadata for a given collection by reclaiming a previously
-     * donated chunk.  The previous metadata's shard version has to be provided.
-     *
-     * If it runs successfully, clients that became stale by the previous donateChunk will be
-     * able to access the collection again.
-     *
-     * Note: If a migration has aborted but not yet unregistered a pending chunk, replacing the
-     * metadata may leave the chunk as pending - this is not dangerous and should be rare, but
-     * will require a stepdown to fully recover.
-     *
-     * @param ns the collection
-     * @param prevMetadata the previous metadata before we donated a chunk
-     */
-    void undoDonateChunk(OperationContext* txn,
-                         const std::string& ns,
-                         std::shared_ptr<CollectionMetadata> prevMetadata);
 
     /**
      * Creates and installs a new chunk metadata for a given collection by splitting one of its
@@ -379,9 +333,6 @@ private:
      * a previous call to registerMigration has succeeded.
      */
     void _clearMigration();
-
-    // Manages the state of the migration donor shard
-    MigrationSourceManager _migrationSourceManager;
 
     // Manages the state of the migration recipient shard
     MigrationDestinationManager _migrationDestManager;

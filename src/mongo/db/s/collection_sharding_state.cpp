@@ -37,6 +37,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/s/migration_chunk_cloner_source.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
@@ -123,7 +124,7 @@ bool CollectionShardingState::isDocumentInMigratingChunk(OperationContext* txn,
     dassert(txn->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
 
     if (_sourceMgr) {
-        return _sourceMgr->isInMigratingChunk(_nss, doc);
+        return _sourceMgr->getCloner()->isDocumentInMigratingChunk(txn, doc);
     }
 
     return false;
@@ -135,7 +136,7 @@ void CollectionShardingState::onInsertOp(OperationContext* txn, const BSONObj& i
     checkShardVersionOrThrow(txn);
 
     if (_sourceMgr) {
-        _sourceMgr->logInsertOp(txn, _nss.ns().c_str(), insertedDoc);
+        _sourceMgr->getCloner()->onInsertOp(txn, insertedDoc);
     }
 }
 
@@ -145,7 +146,7 @@ void CollectionShardingState::onUpdateOp(OperationContext* txn, const BSONObj& u
     checkShardVersionOrThrow(txn);
 
     if (_sourceMgr) {
-        _sourceMgr->logUpdateOp(txn, _nss.ns().c_str(), updatedDoc);
+        _sourceMgr->getCloner()->onUpdateOp(txn, updatedDoc);
     }
 }
 
@@ -155,7 +156,7 @@ void CollectionShardingState::onDeleteOp(OperationContext* txn, const BSONObj& d
     checkShardVersionOrThrow(txn);
 
     if (_sourceMgr) {
-        _sourceMgr->logDeleteOp(txn, _nss.ns().c_str(), deletedDocId);
+        _sourceMgr->getCloner()->onDeleteOp(txn, deletedDocId);
     }
 }
 

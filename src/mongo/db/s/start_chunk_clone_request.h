@@ -61,7 +61,7 @@ public:
                                 const NamespaceString& nss,
                                 const MigrationSessionId& sessionId,
                                 const ConnectionString& configServerConnectionString,
-                                const std::string& fromShardId,
+                                const ConnectionString& fromShardConnectionString,
                                 const std::string& toShardId,
                                 const BSONObj& chunkMinKey,
                                 const BSONObj& chunkMaxKey,
@@ -72,12 +72,16 @@ public:
         return _nss;
     }
 
+    const MigrationSessionId& getSessionId() const {
+        return _sessionId;
+    }
+
     const ConnectionString& getConfigServerCS() const {
         return _configServerCS;
     }
 
-    const std::string& getFromShardId() const {
-        return _fromShardId;
+    const ConnectionString& getFromShardConnectionString() const {
+        return _fromShardCS;
     }
 
     const std::string& getToShardId() const {
@@ -116,8 +120,8 @@ private:
     // of a sharded system.
     ConnectionString _configServerCS;
 
-    // The source shard id
-    std::string _fromShardId;
+    // The source host and port
+    ConnectionString _fromShardCS;
 
     // The recipient shard id
     std::string _toShardId;

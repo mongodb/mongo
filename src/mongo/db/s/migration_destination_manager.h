@@ -190,35 +190,4 @@ private:
     std::string _errmsg;
 };
 
-class MoveTimingHelper {
-public:
-    MoveTimingHelper(OperationContext* txn,
-                     const std::string& where,
-                     const std::string& ns,
-                     const BSONObj& min,
-                     const BSONObj& max,
-                     int totalNumSteps,
-                     std::string* cmdErrmsg,
-                     const std::string& toShard,
-                     const std::string& fromShard);
-    ~MoveTimingHelper();
-
-    void done(int step);
-
-private:
-    // Measures how long the receiving of a chunk takes
-    Timer _t;
-
-    OperationContext* const _txn;
-    const std::string _where;
-    const std::string _ns;
-    const std::string _to;
-    const std::string _from;
-    const int _totalNumSteps;
-    const std::string* _cmdErrmsg;
-
-    int _nextStep;
-    BSONObjBuilder _b;
-};
-
 }  // namespace mongo

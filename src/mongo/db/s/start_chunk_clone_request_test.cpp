@@ -42,13 +42,15 @@ using unittest::assertGet;
 namespace {
 
 TEST(StartChunkCloneRequest, CreateAsCommandComplete) {
+    MigrationSessionId sessionId = MigrationSessionId::generate("shard0001", "shard0002");
+
     BSONObjBuilder builder;
     StartChunkCloneRequest::appendAsCommand(
         &builder,
         NamespaceString("TestDB.TestColl"),
-        MigrationSessionId::generate("shard0001", "shard0002"),
+        sessionId,
         assertGet(ConnectionString::parse("TestConfigRS/CS1:12345,CS2:12345,CS3:12345")),
-        "shard0001",
+        assertGet(ConnectionString::parse("TestDonorRS/Donor1:12345,Donor2:12345,Donor3:12345")),
         "shard0002",
         BSON("Key" << -100),
         BSON("Key" << 100),
@@ -60,8 +62,12 @@ TEST(StartChunkCloneRequest, CreateAsCommandComplete) {
     auto request = assertGet(StartChunkCloneRequest::createFromCommand(
         NamespaceString(cmdObj["_recvChunkStart"].String()), cmdObj));
     ASSERT_EQ("TestDB.TestColl", request.getNss().ns());
+    ASSERT_EQ(sessionId.toString(), request.getSessionId().toString());
+    ASSERT(sessionId.matches(request.getSessionId()));
     ASSERT_EQ("TestConfigRS/CS1:12345,CS2:12345,CS3:12345", request.getConfigServerCS().toString());
-    ASSERT_EQ("shard0001", request.getFromShardId());
+    ASSERT_EQ(assertGet(ConnectionString::parse(
+                            "TestDonorRS/Donor1:12345,Donor2:12345,Donor3:12345")).toString(),
+              request.getFromShardConnectionString().toString());
     ASSERT_EQ("shard0002", request.getToShardId());
     ASSERT_EQ(BSON("Key" << -100), request.getMinKey());
     ASSERT_EQ(BSON("Key" << 100), request.getMaxKey());

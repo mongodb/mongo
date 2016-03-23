@@ -33,25 +33,61 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/s/migration_session_id.h"
+#include "mongo/s/move_chunk_request.h"
+#include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
-class Database;
+class CollectionMetadata;
+class MigrationChunkClonerSource;
 class OperationContext;
-class PlanExecutor;
-class RecordId;
 
+/**
+ * The donor-side migration state machine. This object must be created and owned by a single thread,
+ * which controls its lifetime and should not be passed across threads. Unless explicitly indicated
+ * its methods must not be called from more than one thread and must not be called while any locks
+ * are held.
+ *
+ * The intended workflow is as follows:
+ *  - Acquire a distributed lock on the collection whose chunk is about to be moved.
+ *  - Instantiate a MigrationSourceManager on the stack. This will snapshot the latest collection
+ *      metadata, which should stay stable because of the distributed collection lock.
+ *  - Call startClone to initiate background cloning of the chunk contents. This will perform the
+ *      necessary registration of the cloner with the replication subsystem and will start listening
+ *      for document changes, while at the same time responding to data fetch requests from the
+ *      recipient.
+ *  - Call awaitUntilCriticalSectionIsAppropriate to wait for the cloning process to catch up
+ *      sufficiently so we don't keep the server in read-only state for too long.
+ *  - Call enterCriticalSection to cause the shard to enter in 'read only' mode while the latest
+ *      changes are drained by the recipient shard.
+ *  - Call commitDonateChunk to commit the chunk move in the config server's metadata and leave the
+ *      read only (critical section) mode.
+ *
+ * At any point in time it is safe to let the MigrationSourceManager object go out of scope in which
+ * case the desctructor will take care of clean up based on how far we have advanced. One exception
+ * is the commitDonateChunk and its comments explain the reasoning.
+ */
 class MigrationSourceManager {
     MONGO_DISALLOW_COPYING(MigrationSourceManager);
 
 public:
     class CriticalSectionState;
 
-    MigrationSourceManager();
+    /**
+     * Instantiates a new migration source manager with the specified migration parameters. Must be
+     * called with the distributed lock acquired in advance (not asserted).
+     *
+     * Loads the most up-to-date collection metadata and uses it as a starting point. It is assumed
+     * that because of the distributed lock, the collection's metadata will not change further.
+     *
+     * May throw any exception. Known exceptions are:
+     *  - InvalidOptions if the operation context is missing shard version
+     *  - SendStaleConfigException if the expected collection version does not match what we find it
+     *      to be after acquiring the distributed lock.
+     */
+    MigrationSourceManager(OperationContext* txn, MoveChunkRequest request);
     ~MigrationSourceManager();
 
     /**
@@ -60,148 +96,126 @@ public:
     NamespaceString getNss() const;
 
     /**
-     * Returns false if cannot start. One of the reason for not being able to start is there is
-     * already an existing migration in progress.
-     */
-    bool start(OperationContext* txn,
-               const MigrationSessionId& sessionId,
-               const std::string& ns,
-               const BSONObj& min,
-               const BSONObj& max,
-               const BSONObj& shardKeyPattern);
-
-    void done(OperationContext* txn);
-
-    /**
-     * If a migration for the chunk in 'ns' containing 'obj' is in progress, saves this insert
-     * to the transfer mods log. The entries saved here are later transferred to the receiving
-     * side of the migration.
-     */
-    void logInsertOp(OperationContext* txn, const char* ns, const BSONObj& obj);
-
-    /**
-     * If a migration for the chunk in 'ns' containing 'updatedDoc' is in progress, saves this
-     * update to the transfer mods log. The entries saved here are later transferred to the
-     * receiving side of the migration.
-     */
-    void logUpdateOp(OperationContext* txn, const char* ns, const BSONObj& updatedDoc);
-
-    /**
-     * If a migration for the chunk in 'ns' containing 'obj' is in progress, saves this delete
-     * to the transfer mods log. The entries saved here are later transferred to the receiving
-     * side of the migration.
-     */
-    void logDeleteOp(OperationContext* txn, const char* ns, const BSONObj& obj);
-
-    /**
-     * Determines whether the given document 'doc' in namespace 'ns' is within the range
-     * of a currently migrating chunk.
-     */
-    bool isInMigratingChunk(const NamespaceString& ns, const BSONObj& doc);
-
-    /**
-     * Called from the source of a migration process, this method transfers the accummulated local
-     * mods from source to destination.
-     */
-    bool transferMods(OperationContext* txn,
-                      const MigrationSessionId& sessionId,
-                      std::string& errmsg,
-                      BSONObjBuilder& b);
-
-    /**
-     * Get the disklocs that belong to the chunk migrated and sort them in _cloneLocs (to avoid
-     * seeking disk later).
+     * Contacts the donor shard and tells it to start cloning the specified chunk. This method will
+     * fail if for any reason the donor shard fails to initiate the cloning sequence.
      *
-     * @param maxChunkSize number of bytes beyond which a chunk's base data (no indices) is
-     *      considered too large to move
-     * @param errmsg filled with textual description of error if this call return false
-     *
-     * Returns false if approximate chunk size is too big to move or true otherwise.
+     * Expected state: kCreated
+     * Resulting state: kCloning on success, kDone on failure
      */
-    bool storeCurrentLocs(OperationContext* txn,
-                          long long maxChunkSize,
-                          std::string& errmsg,
-                          BSONObjBuilder& result);
+    Status startClone(OperationContext* txn);
 
-    bool clone(OperationContext* txn,
-               const MigrationSessionId& sessionId,
-               std::string& errmsg,
-               BSONObjBuilder& result);
+    /**
+     * Waits for the cloning to catch up sufficiently so we won't have to stay in the critical
+     * section for a long period of time. This method will fail if any error occurs while the
+     * recipient is catching up.
+     *
+     * Expected state: kCloning
+     * Resulting state: kCloneCaughtUp on success, kDone on failure
+     */
+    Status awaitToCatchUp(OperationContext* txn);
 
-    void aboutToDelete(const RecordId& dl);
+    /**
+     * Waits for the active clone operation to catch up and enters critical section. Once this call
+     * returns successfully, no writes will be happening on this shard until the chunk donation is
+     * committed. Therefore, commitDonateChunk must be called as soon as possible after it.
+     *
+     * Expected state: kCloneCaughtUp
+     * Resulting state: kCriticalSection on success, kDone on failure
+     */
+    Status enterCriticalSection(OperationContext* txn);
 
-    std::size_t cloneLocsRemaining() const;
+    /**
+     * Tells the recipient shard to fetch the latest portion of data from the donor and to commit it
+     * locally. After that it persists the changed metadata to the config servers and leaves the
+     * critical section.
+     *
+     * NOTE: Since we cannot recover from failures to write chunk metadata to the config servers, if
+     *       applying the committed chunk information fails and we cannot definitely verify that the
+     *       write was definitely applied or not, this call may crash the server.
+     *
+     * Expected state: kCriticalSection
+     * Resulting state: kDone
+     */
+    Status commitDonateChunk(OperationContext* txn);
 
-    long long mbUsed() const;
+    /**
+     * May be called at any time. Unregisters the migration source manager from the collection,
+     * restores the committed metadata (if in critical section) and logs error in the change log to
+     * indicate that the migration has failed.
+     *
+     * Expected state: Any
+     * Resulting state: kDone
+     */
+    void cleanupOnError(OperationContext* txn);
 
-    void setInCriticalSection(bool inCritSec);
+    /**
+     * Retrieves the last known committed collection metadata. What gets returned by this call may
+     * change before and after the critical section has started. It should only be used for
+     * diagnostics purposes and not relied on for any routing/consistency checking decisions.
+     */
+    std::shared_ptr<CollectionMetadata> getCommittedMetadata() const {
+        return _committedMetadata;
+    }
 
-    bool isActive() const;
+    /**
+     * Returns the cloner which is being used for this migration. This value is available only if
+     * the migration source manager is currently in the clone phase (i.e. the previous call to
+     * startClone has succeeded).
+     *
+     * Must be called with some form of lock on the collection namespace.
+     */
+    MigrationChunkClonerSource* getCloner() const {
+        return _cloneDriver.get();
+    }
 
-    std::shared_ptr<CriticalSectionState> getMigrationCriticalSection();
+    /**
+     * Retrieves a critical section object to wait on. Will return nullptr if the migration is not
+     * yet in critical section.
+     *
+     * Must be called with some form of lock on the collection namespace.
+     */
+    std::shared_ptr<CriticalSectionState> getMigrationCriticalSection() const {
+        return _critSec;
+    }
 
 private:
-    friend class LogOpForShardingHandler;
+    // Used to track the current state of the source manager. See the methods above, which have
+    // comments explaining the various state transitions.
+    enum State { kCreated, kCloning, kCloneCaughtUp, kCriticalSection, kDone };
 
     /**
-     * Insert items from docIdList to a new array with the given fieldName in the given builder. If
-     * explode is true, the inserted object will be the full version of the document. Note that
-     * whenever an item from the docList is inserted to the array, it will also be removed from
-     * docList.
-     *
-     * Should be holding the collection lock for ns if explode is true.
+     * Called when any of the states fails. May only be called once and will put the migration
+     * manager into the kDone state.
      */
-    void _xfer(OperationContext* txn,
-               const std::string& ns,
-               Database* db,
-               std::list<BSONObj>* docIdList,
-               BSONObjBuilder& builder,
-               const char* fieldName,
-               long long& size,
-               bool explode);
+    void _cleanup(OperationContext* txn);
 
-    NamespaceString _getNS() const;
+    // The parameters to the moveChunk command
+    const MoveChunkRequest _args;
 
-    // All member variables are labeled with one of the following codes indicating the
-    // synchronization rules for accessing them.
-    //
-    // (M)  Must hold _mutex for access.
-    // (MG) For reads, _mutex *OR* Global IX Lock must be held.
-    //      For writes, the _mutex *AND* (Global Shared or Exclusive Lock) must be held.
-    // (C)  Must hold _cloneLocsMutex for access.
-    //
-    // Locking order:
-    //
-    // Global Lock -> _mutex -> _cloneLocsMutex
+    // Gets initialized at creation time and will time the entire move chunk operation
+    const Timer _startTime;
 
-    mutable stdx::mutex _mutex;
+    // The current state. Used only for diagnostics and validation.
+    State _state{kCreated};
 
-    std::unique_ptr<PlanExecutor> _deleteNotifyExec;  // (M)
+    // The cached collection metadata from just after the collection distributed lock was acquired.
+    // This metadata is guaranteed to not change until either failure or successful completion,
+    // because the distributed lock is being held. Available after stabilize stage has completed.
+    std::shared_ptr<CollectionMetadata> _committedMetadata;
 
-    // List of _id of documents that were modified that must be re-cloned.
-    std::list<BSONObj> _reload;  // (M)
+    // The chunk cloner source. Only available if there is an active migration going on. To set and
+    // remove it, global S lock needs to be acquired first in order to block all logOp calls and
+    // then the mutex. To access it, only the mutex is necessary. Available after cloning stage has
+    // completed.
+    std::unique_ptr<MigrationChunkClonerSource> _cloneDriver;
 
-    // List of _id of documents that were deleted during clone that should be deleted later.
-    std::list<BSONObj> _deleted;  // (M)
+    // After the critical section has been entered, contains the uncommitted metadata with a single
+    // chunk bumped by one version. Available after the critical section stage has completed.
+    std::shared_ptr<CollectionMetadata> _uncommittedMetadata;
 
-    // Bytes in _reload + _deleted
-    long long _memoryUsed{0};  // (M)
-
-    // Uniquely identifies a migration and indicates a migration is active when set.
-    boost::optional<MigrationSessionId> _sessionId{boost::none};  // (MG)
-
-    NamespaceString _nss;      // (MG)
-    BSONObj _min;              // (MG)
-    BSONObj _max;              // (MG)
-    BSONObj _shardKeyPattern;  // (MG)
-
-    mutable stdx::mutex _cloneLocsMutex;
-
-    // List of record id that needs to be transferred from here to the other side.
-    std::set<RecordId> _cloneLocs;  // (C)
-
-    // This value is set when setInCriticalSection is called with true argument and is signalled and
-    // cleared when it is called with false argument.
+    // Whether the source manager is in a critical section. Tracked as a shared pointer so that
+    // callers don't have to hold collection lock in order to wait on it. Available after the
+    // critical section stage has completed.
     std::shared_ptr<CriticalSectionState> _critSec;
 };
 

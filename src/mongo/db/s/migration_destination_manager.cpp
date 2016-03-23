@@ -42,8 +42,6 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_create.h"
-#include "mongo/db/client.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
@@ -56,12 +54,11 @@
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/move_timing_helper.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logger/ramlog.h"
-#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/util/fail_point_service.h"
@@ -1035,73 +1032,6 @@ Status MigrationDestinationManager::_forgetPending(OperationContext* txn,
 
     css->setMetadata(metadata->cloneMinusPending(chunk));
     return Status::OK();
-}
-
-MoveTimingHelper::MoveTimingHelper(OperationContext* txn,
-                                   const string& where,
-                                   const string& ns,
-                                   const BSONObj& min,
-                                   const BSONObj& max,
-                                   int totalNumSteps,
-                                   string* cmdErrmsg,
-                                   const string& toShard,
-                                   const string& fromShard)
-    : _txn(txn),
-      _where(where),
-      _ns(ns),
-      _to(toShard),
-      _from(fromShard),
-      _totalNumSteps(totalNumSteps),
-      _cmdErrmsg(cmdErrmsg),
-      _nextStep(0) {
-    _b.append("min", min);
-    _b.append("max", max);
-}
-
-MoveTimingHelper::~MoveTimingHelper() {
-    // even if logChange doesn't throw, bson does
-    // sigh
-    try {
-        if (!_to.empty()) {
-            _b.append("to", _to);
-        }
-
-        if (!_from.empty()) {
-            _b.append("from", _from);
-        }
-
-        if (_nextStep != _totalNumSteps) {
-            _b.append("note", "aborted");
-        } else {
-            _b.append("note", "success");
-        }
-
-        if (!_cmdErrmsg->empty()) {
-            _b.append("errmsg", *_cmdErrmsg);
-        }
-
-        grid.catalogManager(_txn)->logChange(_txn, (string) "moveChunk." + _where, _ns, _b.obj());
-    } catch (const std::exception& e) {
-        warning() << "couldn't record timing for moveChunk '" << _where << "': " << e.what()
-                  << migrateLog;
-    }
-}
-
-void MoveTimingHelper::done(int step) {
-    invariant(step == ++_nextStep);
-    invariant(step <= _totalNumSteps);
-
-    const string s = str::stream() << "step " << step << " of " << _totalNumSteps;
-
-    CurOp* op = CurOp::get(_txn);
-
-    {
-        stdx::lock_guard<Client> lk(*_txn->getClient());
-        op->setMessage_inlock(s.c_str());
-    }
-
-    _b.appendNumber(s, _t.millis());
-    _t.reset();
 }
 
 }  // namespace mongo

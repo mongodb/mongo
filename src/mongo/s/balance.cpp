@@ -42,6 +42,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/balancer_policy.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
@@ -221,7 +222,9 @@ int Balancer::_moveChunks(OperationContext* txn,
             log() << "balancer move failed: " << res << " from: " << migrateInfo->from
                   << " to: " << migrateInfo->to << " chunk: " << migrateInfo->chunk;
 
-            if (res["chunkTooBig"].trueValue()) {
+            Status moveStatus = getStatusFromCommandResult(res);
+
+            if (moveStatus == ErrorCodes::ChunkTooBig || res["chunkTooBig"].trueValue()) {
                 // Reload just to be safe
                 cm = cfg->getChunkManager(txn, migrateInfo->ns);
                 invariant(cm);
