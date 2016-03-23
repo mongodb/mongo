@@ -533,6 +533,25 @@ void ConnectionPool::SpecificPool::spawnConnections(stdx::unique_lock<stdx::mute
 void ConnectionPool::SpecificPool::shutdown() {
     stdx::unique_lock<stdx::mutex> lk(_parent->_mutex);
 
+    // We're racing:
+    //
+    // Thread A (this thread)
+    //   * Fired the shutdown timer
+    //   * Came into shutdown() and blocked
+    //
+    // Thread B (some new consumer)
+    //   * Requested a new connection
+    //   * Beat thread A to the mutex
+    //   * Cancelled timer (but thread A already made it in)
+    //   * Set state to running
+    //   * released the mutex
+    //
+    // So we end up in shutdown, but with kRunning.  If we're here we raced and
+    // we should just bail.
+    if (_state == State::kRunning) {
+        return;
+    }
+
     _state = State::kInShutdown;
 
     // If we have processing connections, wait for them to finish or timeout
