@@ -74,7 +74,6 @@ variables:
   - enterprise-ubuntu1404-64
   - enterprise-debian71-64
   - enterprise-debian81-64
-  - linux-32
   - linux-64
   - amazon
   - rhel55
@@ -1934,7 +1933,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         permissions: public-read
-        build_variants: ["enterprise-windows-64", "windows-64", "windows-64-2k8", "windows-64-2k8-ssl", "windows-32"]
+        build_variants: ["enterprise-windows-64", "windows-64", "windows-64-2k8", "windows-64-2k8-ssl"]
         local_file: src/mongodb-win32-${push_arch}-${suffix}-signed.msi
         bucket: build-push-testing
         content_type: application/x-msi
@@ -1981,7 +1980,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         permissions: public-read
-        build_variants: ["enterprise-windows-64", "windows-64", "windows-64-2k8", "windows-64-2k8-ssl", "windows-32"]
+        build_variants: ["enterprise-windows-64", "windows-64", "windows-64-2k8", "windows-64-2k8-ssl"]
         local_file: src/mongodb-win32-${push_arch}-${suffix}-signed.msi.sha1
         bucket: build-push-testing
         content_type: text/plain
@@ -2027,7 +2026,7 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        build_variants: ["enterprise-windows-64", "windows-64", "windows-64-2k8", "windows-64-2k8-ssl", "windows-32"]
+        build_variants: ["enterprise-windows-64", "windows-64", "windows-64-2k8", "windows-64-2k8-ssl"]
         local_file: src/mongodb-win32-${push_arch}-${suffix}-signed.msi.sha256
         bucket: build-push-testing
         permissions: public-read
@@ -2074,7 +2073,7 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        build_variants: ["enterprise-windows-64", "windows-64", "windows-64-2k8", "windows-64-2k8-ssl", "windows-32"]
+        build_variants: ["enterprise-windows-64", "windows-64", "windows-64-2k8", "windows-64-2k8-ssl"]
         local_file: src/mongodb-win32-${push_arch}-${suffix}-signed.msi.md5
         bucket: build-push-testing
         permissions: public-read
@@ -2123,7 +2122,7 @@ tasks:
             #MSI (Windows only)
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-win32-${push_arch}-${suffix}-signed.msi', 'bucket': '${push_bucket}'},
-               'build_variants': [ 'enterprise-windows-64', 'windows-64', 'windows-64-2k8', 'windows-64-2k8-ssl', 'windows-32' ] }
+               'build_variants': [ 'enterprise-windows-64', 'windows-64', 'windows-64-2k8', 'windows-64-2k8-ssl' ] }
 
             #Binaries Signature
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig', 'bucket': 'build-push-testing'},
@@ -2160,7 +2159,7 @@ tasks:
             #SHA1 for MSI
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.sha1', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-win32-${push_arch}-${suffix}-signed.msi.sha1', 'bucket': '${push_bucket}'},
-               'build_variants': ['enterprise-windows-64', 'windows-64', 'windows-64-2k8', 'windows-64-2k8-ssl', 'windows-32'] }
+               'build_variants': ['enterprise-windows-64', 'windows-64', 'windows-64-2k8', 'windows-64-2k8-ssl'] }
 
             #SHA256 for binaries
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256', 'bucket': 'build-push-testing'},
@@ -2180,7 +2179,7 @@ tasks:
             #SHA256 for MSI files
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.sha256', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-win32-${push_arch}-${suffix}-signed.msi.sha256', 'bucket': '${push_bucket}'},
-               'build_variants': ['enterprise-windows-64', 'windows-64', 'windows-64-2k8', 'windows-64-2k8-ssl', 'windows-32'], }
+               'build_variants': ['enterprise-windows-64', 'windows-64', 'windows-64-2k8', 'windows-64-2k8-ssl'], }
 
 
             #MD5 for binaries
@@ -2202,7 +2201,7 @@ tasks:
             #MD5 for MSIs
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.md5', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-win32-${push_arch}-${suffix}-signed.msi.md5', 'bucket': '${push_bucket}'},
-               'build_variants': ['enterprise-windows-64', 'windows-64', 'windows-64-2k8', 'windows-64-2k8-ssl', 'windows-32'], }
+               'build_variants': ['enterprise-windows-64', 'windows-64', 'windows-64-2k8', 'windows-64-2k8-ssl'], }
 
 
 #######################################
@@ -3004,36 +3003,6 @@ buildvariants:
     distros:
     - rhel55-test
 
-- name: linux-32
-  display_name: Linux 32-bit
-  modules: ~
-  run_on:
-  - rhel55-32
-  batchtime: 1440 # 1 day
-  expansions:
-    gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
-    gorootvars: GOROOT=/opt/go32 PATH=/opt/go32/bin:$PATH
-    push_path: linux
-    push_bucket: downloads.mongodb.org
-    push_name: linux
-    push_arch: i686
-    compile_flags: --release MONGO_DISTARCH=i686 -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --wiredtiger=off CCFLAGS="-m32" LINKFLAGS="-m32"
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --storageEngine=mmapv1 -j1  # Avoid starting too many mongod's on 32-bit systems.
-  tasks:
-  - name: compile
-    distros:
-    - rhel55
-  - name: dbtest
-  - name: disk
-  - name: jsCore
-  - name: jsCore_compatibility
-  - name: mmap
-  - name: unittests
-  - name: push
-    distros:
-    - rhel55-test
-
 - name: linux-64-decimal
   display_name: Linux (Decimal Enabled)
   modules: ~
@@ -3551,39 +3520,6 @@ buildvariants:
   - name: unittests
   - name: ssl
   - name: sslSpecial
-  - name: push
-    distros:
-    - rhel55-test
-
-- name: windows-32
-  display_name: Windows 32-bit
-  modules: ~
-  run_on:
-  - windows-32
-  batchtime: 1440 # 1 day
-  expansions:
-    exe: ".exe"
-    gorootvars: GOARCH=386
-    push_path: win32
-    push_bucket: downloads.mongodb.org
-    push_name: win32
-    push_arch: i386
-    msi_target: msi
-    content_type: application/zip
-    compile_flags: --release -j$(grep -c ^processor /proc/cpuinfo) --wiredtiger=off TARGET_ARCH=i386 VARIANT_DIR=win32
-    num_jobs_available: 1
-    test_flags: --storageEngine=mmapv1 -j1  # Avoid starting too many mongod's on 32-bit systems.
-    ext: zip
-  tasks:
-  - name: compile
-    distros:
-    - windows-64-vs2013-compile
-  - name: dbtest
-  - name: disk
-  - name: jsCore
-  - name: jsCore_compatibility
-  - name: mmap
-  - name: unittests
   - name: push
     distros:
     - rhel55-test
