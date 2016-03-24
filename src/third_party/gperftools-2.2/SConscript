@@ -74,7 +74,7 @@ conf.CheckMallocHookVolatile()
 if has_option('use-cpu-profiler'):
     if not conf.CheckLib('unwind', autoadd=False):
         env.ConfError("Compiling with --use-cpu-profiler requires having libunwind installed")
-    conf.env.AppendUnique(
+    conf.env.Append(
         CPPDEFINES=["NO_FRAME_POINTER", ("HAVE_LIBUNWIND_H", "1")],
         SYSLIBDEPS=['unwind']
     )

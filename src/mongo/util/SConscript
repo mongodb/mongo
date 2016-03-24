@@ -333,13 +333,27 @@ if has_option('gcov'):
         ],
     )
 
+if has_option('use-cpu-profiler'):
+    quick_exit_env.Append(
+        CPPDEFINES=[
+            'MONGO_CPU_PROFILER',
+        ],
+    )
+
+    if not use_system_version_of_library('tcmalloc'):
+        quick_exit_env.InjectThirdPartyIncludePaths(
+            'tcmalloc'
+        )
+
 quick_exit_env.Library(
     target='quick_exit',
     source=[
         'quick_exit.cpp',
     ],
     LIBDEPS=[
-        # NOTE: You *must not* add any library dependencies to the quick_exit library
+        # NOTE: You *must not* add any other library dependencies to
+        # the quick_exit library
+        "$BUILD_DIR/third_party/shim_allocator",
     ]
 )
 
