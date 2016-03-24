@@ -16,19 +16,28 @@
 
 package openssl
 
-// #include <stdlib.h>
-// #include <openssl/ssl.h>
-// #include <openssl/conf.h>
-// #include <openssl/err.h>
-//
-// int sk_X509_num_not_a_macro(STACK_OF(X509) *sk) { return sk_X509_num(sk); }
-// X509 *sk_X509_value_not_a_macro(STACK_OF(X509)* sk, int i) {
-//    return sk_X509_value(sk, i);
-// }
+/*
+#include <stdlib.h>
+#include <openssl/ssl.h>
+#include <openssl/conf.h>
+#include <openssl/err.h>
+
+int sk_X509_num_not_a_macro(STACK_OF(X509) *sk) { return sk_X509_num(sk); }
+X509 *sk_X509_value_not_a_macro(STACK_OF(X509)* sk, int i) {
+   return sk_X509_value(sk, i);
+}
+const char * SSL_get_cipher_name_not_a_macro(const SSL *ssl) {
+   return SSL_get_cipher_name(ssl);
+}
+static int SSL_session_reused_not_a_macro(SSL *ssl) {
+    return SSL_session_reused(ssl);
+}
+*/
 import "C"
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"runtime"
@@ -56,6 +65,56 @@ type Conn struct {
 	mtx              sync.Mutex
 	want_read_future *utils.Future
 }
+
+type VerifyResult int
+
+const (
+	Ok                            VerifyResult = C.X509_V_OK
+	UnableToGetIssuerCert         VerifyResult = C.X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT
+	UnableToGetCrl                VerifyResult = C.X509_V_ERR_UNABLE_TO_GET_CRL
+	UnableToDecryptCertSignature  VerifyResult = C.X509_V_ERR_UNABLE_TO_DECRYPT_CERT_SIGNATURE
+	UnableToDecryptCrlSignature   VerifyResult = C.X509_V_ERR_UNABLE_TO_DECRYPT_CRL_SIGNATURE
+	UnableToDecodeIssuerPublicKey VerifyResult = C.X509_V_ERR_UNABLE_TO_DECODE_ISSUER_PUBLIC_KEY
+	CertSignatureFailure          VerifyResult = C.X509_V_ERR_CERT_SIGNATURE_FAILURE
+	CrlSignatureFailure           VerifyResult = C.X509_V_ERR_CRL_SIGNATURE_FAILURE
+	CertNotYetValid               VerifyResult = C.X509_V_ERR_CERT_NOT_YET_VALID
+	CertHasExpired                VerifyResult = C.X509_V_ERR_CERT_HAS_EXPIRED
+	CrlNotYetValid                VerifyResult = C.X509_V_ERR_CRL_NOT_YET_VALID
+	CrlHasExpired                 VerifyResult = C.X509_V_ERR_CRL_HAS_EXPIRED
+	ErrorInCertNotBeforeField     VerifyResult = C.X509_V_ERR_ERROR_IN_CERT_NOT_BEFORE_FIELD
+	ErrorInCertNotAfterField      VerifyResult = C.X509_V_ERR_ERROR_IN_CERT_NOT_AFTER_FIELD
+	ErrorInCrlLastUpdateField     VerifyResult = C.X509_V_ERR_ERROR_IN_CRL_LAST_UPDATE_FIELD
+	ErrorInCrlNextUpdateField     VerifyResult = C.X509_V_ERR_ERROR_IN_CRL_NEXT_UPDATE_FIELD
+	OutOfMem                      VerifyResult = C.X509_V_ERR_OUT_OF_MEM
+	DepthZeroSelfSignedCert       VerifyResult = C.X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT
+	SelfSignedCertInChain         VerifyResult = C.X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN
+	UnableToGetIssuerCertLocally  VerifyResult = C.X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY
+	UnableToVerifyLeafSignature   VerifyResult = C.X509_V_ERR_UNABLE_TO_VERIFY_LEAF_SIGNATURE
+	CertChainTooLong              VerifyResult = C.X509_V_ERR_CERT_CHAIN_TOO_LONG
+	CertRevoked                   VerifyResult = C.X509_V_ERR_CERT_REVOKED
+	InvalidCa                     VerifyResult = C.X509_V_ERR_INVALID_CA
+	PathLengthExceeded            VerifyResult = C.X509_V_ERR_PATH_LENGTH_EXCEEDED
+	InvalidPurpose                VerifyResult = C.X509_V_ERR_INVALID_PURPOSE
+	CertUntrusted                 VerifyResult = C.X509_V_ERR_CERT_UNTRUSTED
+	CertRejected                  VerifyResult = C.X509_V_ERR_CERT_REJECTED
+	SubjectIssuerMismatch         VerifyResult = C.X509_V_ERR_SUBJECT_ISSUER_MISMATCH
+	AkidSkidMismatch              VerifyResult = C.X509_V_ERR_AKID_SKID_MISMATCH
+	AkidIssuerSerialMismatch      VerifyResult = C.X509_V_ERR_AKID_ISSUER_SERIAL_MISMATCH
+	KeyusageNoCertsign            VerifyResult = C.X509_V_ERR_KEYUSAGE_NO_CERTSIGN
+	UnableToGetCrlIssuer          VerifyResult = C.X509_V_ERR_UNABLE_TO_GET_CRL_ISSUER
+	UnhandledCriticalExtension    VerifyResult = C.X509_V_ERR_UNHANDLED_CRITICAL_EXTENSION
+	KeyusageNoCrlSign             VerifyResult = C.X509_V_ERR_KEYUSAGE_NO_CRL_SIGN
+	UnhandledCriticalCrlExtension VerifyResult = C.X509_V_ERR_UNHANDLED_CRITICAL_CRL_EXTENSION
+	InvalidNonCa                  VerifyResult = C.X509_V_ERR_INVALID_NON_CA
+	ProxyPathLengthExceeded       VerifyResult = C.X509_V_ERR_PROXY_PATH_LENGTH_EXCEEDED
+	KeyusageNoDigitalSignature    VerifyResult = C.X509_V_ERR_KEYUSAGE_NO_DIGITAL_SIGNATURE
+	ProxyCertificatesNotAllowed   VerifyResult = C.X509_V_ERR_PROXY_CERTIFICATES_NOT_ALLOWED
+	InvalidExtension              VerifyResult = C.X509_V_ERR_INVALID_EXTENSION
+	InvalidPolicyExtension        VerifyResult = C.X509_V_ERR_INVALID_POLICY_EXTENSION
+	NoExplicitPolicy              VerifyResult = C.X509_V_ERR_NO_EXPLICIT_POLICY
+	UnnestedResource              VerifyResult = C.X509_V_ERR_UNNESTED_RESOURCE
+	ApplicationVerification       VerifyResult = C.X509_V_ERR_APPLICATION_VERIFICATION
+)
 
 func newSSL(ctx *C.SSL_CTX) (*C.SSL, error) {
 	runtime.LockOSThread()
@@ -139,6 +198,15 @@ func Server(conn net.Conn, ctx *Ctx) (*Conn, error) {
 	}
 	C.SSL_set_accept_state(c.ssl)
 	return c, nil
+}
+
+func (c *Conn) CurrentCipher() (string, error) {
+	p := C.SSL_get_cipher_name_not_a_macro(c.ssl)
+	if p == nil {
+		return "", errors.New("Session not established")
+	}
+
+	return C.GoString(p), nil
 }
 
 func (c *Conn) fillInputBuffer() error {
@@ -316,11 +384,13 @@ type ConnectionState struct {
 	CertificateError      error
 	CertificateChain      []*Certificate
 	CertificateChainError error
+	SessionReused         bool
 }
 
 func (c *Conn) ConnectionState() (rv ConnectionState) {
 	rv.Certificate, rv.CertificateError = c.PeerCertificate()
 	rv.CertificateChain, rv.CertificateChainError = c.PeerCertificateChain()
+	rv.SessionReused = c.SessionReused()
 	return
 }
 
@@ -500,3 +570,56 @@ func (c *Conn) UnderlyingConn() net.Conn {
 	return c.conn
 }
 
+func (c *Conn) VerifyResult() VerifyResult {
+	return VerifyResult(C.SSL_get_verify_result(c.ssl))
+}
+
+func (c *Conn) SessionReused() bool {
+	return C.SSL_session_reused_not_a_macro(c.ssl) == 1
+}
+
+func (c *Conn) GetSession() ([]byte, error) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	// get1 increases the refcount of the session, so we have to free it.
+	session := (*C.SSL_SESSION)(C.SSL_get1_session(c.ssl))
+	if session == nil {
+		return nil, errors.New("failed to get session")
+	}
+	defer C.SSL_SESSION_free(session)
+
+	// get the size of the encoding
+	slen := C.i2d_SSL_SESSION(session, nil)
+
+	buf := (*C.uchar)(C.malloc(C.size_t(slen)))
+	defer C.free(unsafe.Pointer(buf))
+
+	// this modifies the value of buf (seriously), so we have to pass in a temp
+	// var so that we can actually read the bytes from buf.
+	tmp := buf
+	slen2 := C.i2d_SSL_SESSION(session, &tmp)
+	if slen != slen2 {
+		return nil, errors.New("session had different lengths")
+	}
+
+	return C.GoBytes(unsafe.Pointer(buf), slen), nil
+}
+
+func (c *Conn) setSession(session []byte) error {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	ptr := (*C.uchar)(&session[0])
+	s := C.d2i_SSL_SESSION(nil, &ptr, C.long(len(session)))
+	if s == nil {
+		return fmt.Errorf("unable to load session: %s", errorFromErrorQueue())
+	}
+	defer C.SSL_SESSION_free(s)
+
+	ret := C.SSL_set_session(c.ssl, s)
+	if ret != 1 {
+		return fmt.Errorf("unable to set session: %s", errorFromErrorQueue())
+	}
+	return nil
+}

@@ -1,4 +1,4 @@
-// Copyright (C) 2014 Ryan Hileman
+// Copyright (C) 2014 Space Monkey, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,21 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package openssl
+#include <openssl/ssl.h>
+#include "_cgo_export.h"
+#include <stdio.h>
 
-import (
-	"regexp"
-)
-
-var pemSplit *regexp.Regexp = regexp.MustCompile(`(?sm)` +
-	`(^-----[\s-]*?BEGIN.*?-----$` +
-	`.*?` +
-	`^-----[\s-]*?END.*?-----$)`)
-
-func SplitPEM(data []byte) [][]byte {
-	var results [][]byte
-	for _, block := range pemSplit.FindAll(data, -1) {
-		results = append(results, block)
-	}
-	return results
+int sni_cb(SSL *con, int *ad, void *arg) {
+	SSL_CTX* ssl_ctx = ssl_ctx = SSL_get_SSL_CTX(con);
+	void* p = SSL_CTX_get_ex_data(ssl_ctx, get_ssl_ctx_idx());
+	return sni_cb_thunk(p, con, ad, arg);
 }

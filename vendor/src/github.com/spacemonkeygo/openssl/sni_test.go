@@ -1,4 +1,4 @@
-// Copyright (C) 2014 Ryan Hileman
+// Copyright (C) 2014 Space Monkey, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,19 +14,10 @@
 
 package openssl
 
-import (
-	"regexp"
-)
+import "fmt"
 
-var pemSplit *regexp.Regexp = regexp.MustCompile(`(?sm)` +
-	`(^-----[\s-]*?BEGIN.*?-----$` +
-	`.*?` +
-	`^-----[\s-]*?END.*?-----$)`)
-
-func SplitPEM(data []byte) [][]byte {
-	var results [][]byte
-	for _, block := range pemSplit.FindAll(data, -1) {
-		results = append(results, block)
-	}
-	return results
+// We can implemant SNI rfc6066 (http://tools.ietf.org/html/rfc6066) on the server side using foolowing callback.
+// You should implement context storage (tlsCtxStorage) by your self.
+func ExampleSetTLSExtServernameCallback() {
+	fmt.Println("Hello")
 }
