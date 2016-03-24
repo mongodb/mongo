@@ -32,6 +32,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/geo/geometry_container.h"
+#include "mongo/db/query/collation/collation_serializer.h"
 #include "third_party/s2/s2cellid.h"
 #include "third_party/s2/s2regioncoverer.h"
 
@@ -47,6 +48,10 @@ std::string S2IndexingParams::toString() const {
     ss << "finestIndexedLevel: " << finestIndexedLevel << std::endl;
     ss << "coarsestIndexedLevel: " << coarsestIndexedLevel << std::endl;
     ss << "indexVersion: " << indexVersion << std::endl;
+    if (collator) {
+        ss << "collation: " << CollationSerializer::specToBSON(collator->getSpec()).toString()
+           << std::endl;
+    }
     return ss.str();
 }
 

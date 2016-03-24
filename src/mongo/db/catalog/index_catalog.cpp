@@ -562,8 +562,8 @@ Status IndexCatalog::_isSpecOk(OperationContext* txn, const BSONObj& spec) const
     BSONElement collationElement = spec.getField("collation");
     if (collationElement) {
         string pluginName = IndexNames::findPluginName(key);
-        if ((pluginName != IndexNames::BTREE) && (pluginName != IndexNames::GEO_2D) &&
-            (pluginName != IndexNames::GEO_2DSPHERE) && (pluginName != IndexNames::HASHED)) {
+        if ((pluginName != IndexNames::BTREE) && (pluginName != IndexNames::GEO_2DSPHERE) &&
+            (pluginName != IndexNames::HASHED)) {
             return Status(ErrorCodes::CannotCreateIndex,
                           str::stream() << "\"collation\" not supported for index type "
                                         << pluginName);

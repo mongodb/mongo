@@ -300,7 +300,8 @@ void QueryPlannerAnalysis::analyzeGeo(const QueryPlannerParams& params,
         }
 
         S2IndexingParams params;
-        ExpressionParams::parse2dsphereParams(indexEntry.infoObj, &params);
+        ExpressionParams::initialize2dsphereParams(
+            indexEntry.infoObj, indexEntry.collator, &params);
 
         if (params.indexVersion < S2_INDEX_VERSION_3) {
             continue;

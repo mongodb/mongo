@@ -123,8 +123,11 @@ void ExpressionParams::parseHaystackParams(const BSONObj& infoObj,
     }
 }
 
-void ExpressionParams::parse2dsphereParams(const BSONObj& infoObj, S2IndexingParams* out) {
+void ExpressionParams::initialize2dsphereParams(const BSONObj& infoObj,
+                                                CollatorInterface* collator,
+                                                S2IndexingParams* out) {
     // Set up basic params.
+    out->collator = collator;
     out->maxKeysPerInsert = 200;
 
     // Near distances are specified in meters...sometimes.

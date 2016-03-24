@@ -87,6 +87,10 @@ public:
         return _filterExpression.get();
     }
 
+    CollatorInterface* getCollator() {
+        return _collator.get();
+    }
+
     /// ---------------------
 
     const RecordId& head(OperationContext* txn) const;

@@ -40,6 +40,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/2d_common.h"
 #include "mongo/db/index/s2_common.h"
+#include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -148,7 +149,7 @@ void getS2GeoKeys(const BSONObj& document,
  * Expands array and appends items to 'out'.
  * Used by getOneLiteralKey.
  */
-void getS2LiteralKeysArray(const BSONObj& obj, BSONObjSet* out) {
+void getS2LiteralKeysArray(const BSONObj& obj, CollatorInterface* collator, BSONObjSet* out) {
     BSONObjIterator objIt(obj);
     if (!objIt.more()) {
         // Empty arrays are indexed as undefined.
@@ -159,7 +160,7 @@ void getS2LiteralKeysArray(const BSONObj& obj, BSONObjSet* out) {
         // Non-empty arrays are exploded.
         while (objIt.more()) {
             BSONObjBuilder b;
-            b.appendAs(objIt.next(), "");
+            CollationIndexKey::collationAwareIndexKeyAppend(objIt.next(), collator, &b);
             out->insert(b.obj());
         }
     }
@@ -170,13 +171,13 @@ void getS2LiteralKeysArray(const BSONObj& obj, BSONObjSet* out) {
  * Otherwise, adds 'elt' as a single element.
  * Used by getLiteralKeys.
  */
-void getS2OneLiteralKey(const BSONElement& elt, BSONObjSet* out) {
+void getS2OneLiteralKey(const BSONElement& elt, CollatorInterface* collator, BSONObjSet* out) {
     if (Array == elt.type()) {
-        getS2LiteralKeysArray(elt.Obj(), out);
+        getS2LiteralKeysArray(elt.Obj(), collator, out);
     } else {
         // One thing, not an array, index as-is.
         BSONObjBuilder b;
-        b.appendAs(elt, "");
+        CollationIndexKey::collationAwareIndexKeyAppend(elt, collator, &b);
         out->insert(b.obj());
     }
 }
@@ -185,7 +186,9 @@ void getS2OneLiteralKey(const BSONElement& elt, BSONObjSet* out) {
  * elements is a non-geo field.  Add the values literally, expanding arrays.
  * Used by getS2Keys.
  */
-void getS2LiteralKeys(const BSONElementSet& elements, BSONObjSet* out) {
+void getS2LiteralKeys(const BSONElementSet& elements,
+                      CollatorInterface* collator,
+                      BSONObjSet* out) {
     if (0 == elements.size()) {
         // Missing fields are indexed as null.
         BSONObjBuilder b;
@@ -193,7 +196,7 @@ void getS2LiteralKeys(const BSONElementSet& elements, BSONObjSet* out) {
         out->insert(b.obj());
     } else {
         for (BSONElementSet::iterator i = elements.begin(); i != elements.end(); ++i) {
-            getS2OneLiteralKey(*i, out);
+            getS2OneLiteralKey(*i, collator, out);
         }
     }
 }
@@ -321,9 +324,20 @@ void ExpressionKeysPrivate::getHashKeys(const BSONObj& obj,
                                         HashSeed seed,
                                         int hashVersion,
                                         bool isSparse,
+                                        CollatorInterface* collator,
                                         BSONObjSet* keys) {
     const char* cstr = hashedField.c_str();
     BSONElement fieldVal = obj.getFieldDottedOrArray(cstr);
+
+    // Convert strings to comparison keys.
+    BSONObj fieldValObj;
+    if (!fieldVal.eoo()) {
+        BSONObjBuilder bob;
+        CollationIndexKey::collationAwareIndexKeyAppend(fieldVal, collator, &bob);
+        fieldValObj = bob.obj();
+        fieldVal = fieldValObj.firstElement();
+    }
+
     uassert(16766,
             "Error: hashed indexes do not currently support array values",
             fieldVal.type() != Array);
@@ -462,7 +476,7 @@ void ExpressionKeysPrivate::getS2Keys(const BSONObj& obj,
 
             getS2GeoKeys(obj, fieldElements, params, &keysForThisField);
         } else {
-            getS2LiteralKeys(fieldElements, &keysForThisField);
+            getS2LiteralKeys(fieldElements, params.collator, &keysForThisField);
         }
 
         // We expect there to be the missing field element present in the keys if data is

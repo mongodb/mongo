@@ -52,6 +52,10 @@ private:
     virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const;
 
     S2IndexingParams _params;
+
+    // Null if this index orders strings according to the simple binary compare. If non-null,
+    // represents the collator used to generate index keys for indexed strings.
+    CollatorInterface* _collator;
 };
 
 }  // namespace mongo

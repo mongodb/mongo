@@ -31,6 +31,7 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/query/collation/collator_interface.h"
 
 class S2CellId;
 class S2RegionCoverer;
@@ -71,6 +72,9 @@ struct S2IndexingParams {
     S2IndexVersion indexVersion;
     // Radius of the earth in meters
     double radius;
+    // Null if this index orders strings according to the simple binary compare. If non-null,
+    // represents the collator used to generate index keys for indexed strings.
+    CollatorInterface* collator = nullptr;
 
     std::string toString() const;
 

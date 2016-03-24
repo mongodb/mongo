@@ -58,6 +58,10 @@ private:
     int _hashVersion;
 
     BSONObj _missingKey;
+
+    // Null if this index orders strings according to the simple binary compare. If non-null,
+    // represents the collator used to generate index keys for indexed strings.
+    CollatorInterface* _collator;
 };
 
 }  // namespace mongo

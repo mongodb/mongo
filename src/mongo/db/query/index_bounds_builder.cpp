@@ -596,7 +596,7 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
             verify(gme->getGeoExpression().getGeometry().hasS2Region());
             const S2Region& region = gme->getGeoExpression().getGeometry().getS2Region();
             S2IndexingParams indexParams;
-            ExpressionParams::parse2dsphereParams(index.infoObj, &indexParams);
+            ExpressionParams::initialize2dsphereParams(index.infoObj, index.collator, &indexParams);
             ExpressionMapping::cover2dsphere(region, indexParams, oilOut);
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         } else if (mongoutils::str::equals("2d", elt.valuestrsafe())) {

@@ -47,11 +47,13 @@ HashAccessMethod::HashAccessMethod(IndexCatalogEntry* btreeState, SortedDataInte
             !descriptor->unique());
 
     ExpressionParams::parseHashParams(descriptor->infoObj(), &_seed, &_hashVersion, &_hashedField);
+
+    _collator = btreeState->getCollator();
 }
 
 void HashAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) const {
     ExpressionKeysPrivate::getHashKeys(
-        obj, _hashedField, _seed, _hashVersion, _descriptor->isSparse(), keys);
+        obj, _hashedField, _seed, _hashVersion, _descriptor->isSparse(), _collator, keys);
 }
 
 }  // namespace mongo

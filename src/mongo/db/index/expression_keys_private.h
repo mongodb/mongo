@@ -36,6 +36,7 @@
 
 namespace mongo {
 
+class CollatorInterface;
 struct TwoDIndexingParams;
 struct S2IndexingParams;
 
@@ -79,6 +80,7 @@ public:
                             HashSeed seed,
                             int hashVersion,
                             bool isSparse,
+                            CollatorInterface* collator,
                             BSONObjSet* keys);
 
     /**

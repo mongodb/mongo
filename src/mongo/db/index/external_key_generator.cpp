@@ -60,7 +60,10 @@ void getKeysForUpgradeChecking(const BSONObj& infoObj, const BSONObj& doc, BSONO
         ExpressionKeysPrivate::getHaystackKeys(doc, geoField, otherFields, bucketSize, keys);
     } else if (IndexNames::GEO_2DSPHERE == type) {
         S2IndexingParams params;
-        ExpressionParams::parse2dsphereParams(infoObj, &params);
+        // TODO SERVER-22251: If the index has a collator, it should be passed here, or the keys
+        // generated will be wrong.
+        CollatorInterface* collator = nullptr;
+        ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
         ExpressionKeysPrivate::getS2Keys(doc, keyPattern, params, keys);
     } else if (IndexNames::TEXT == type) {
         fts::FTSSpec spec(infoObj);
@@ -70,8 +73,11 @@ void getKeysForUpgradeChecking(const BSONObj& infoObj, const BSONObj& doc, BSONO
         int version;
         std::string field;
         ExpressionParams::parseHashParams(infoObj, &seed, &version, &field);
+        // TODO SERVER-22251: If the index has a collator, it should be passed here, or the keys
+        // generated will be wrong.
+        CollatorInterface* collator = nullptr;
         ExpressionKeysPrivate::getHashKeys(
-            doc, field, seed, version, infoObj["sparse"].trueValue(), keys);
+            doc, field, seed, version, infoObj["sparse"].trueValue(), collator, keys);
     } else {
         invariant(IndexNames::BTREE == type);
 
