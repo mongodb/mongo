@@ -58,12 +58,12 @@ Other noteworthy changes since the previous release:
 * WT-2258       Stop WiredTiger pre-loading pages when direct-IO is configured
 * WT-2259       Fix error handling when getting exclusive access to a btree
 * WT-2262       Fix random cursor next so it is not skewed by tree shape
-* WT-2265       WiredTiger related change in PPC specific code block in gcc.h
+* WT-2265       WiredTiger related change in PowerPC specific code block in gcc.h
 * WT-2272       Fix a bug in the sweep server that triggered an assertion
 * WT-2276       Add a tool to decode checkpoint addr
 * WT-2277       Remove WT check against big-endian systems
 * WT-2279       Define WT_PAUSE(), WT_FULL_BARRIER(), etc when s390x is defined
-* WT-2280       Add CRC32 Optimized code for PPC
+* WT-2280       Add CRC32 Optimized code for PowerPC
 * WT-2282       Error in wt_txn_update_oldest verbose message test
 * WT-2283       Retry in txn_update_oldest results in a hang
 * WT-2285       Enhance configure to set BUFFER_ALIGNMENT_DEFAULT to 4kb on Linux
@@ -130,15 +130,15 @@ Other noteworthy changes since the previous release:
 * WT-2434       Fix a race between force-drop and sweep
 * WT-2436       Fix a bug in join cursors with lt, le conditions and "strategy=bloom"
 * WT-2438       Extend WiredTiger stat declarations to help external tools
-* WT-2440       Fix a bug in the PPC checksum implementation
+* WT-2440       Fix a bug in the PowerPC checksum implementation
 * WT-2443       Add statistics for all indexes used in join cursor
 * WT-2447       Enhance join cursor implementation to avoid reading main table where possible
 * WT-2448       Add no_scale flag to relevant statistics
 * WT-2449       Enhance configure to check for a 64-bit build
 * WT-2454       Fix checkpoint_sync=false behavior to prevent flushes/sync to disk
-* WT-2456       Fix PPC CRC32 Code
-* WT-2457       Fix a bug where dropping an LSM table can fail with EBUSY when no user ops are active
-* WT-2459       Allow configure scripts to provide the --tag option for libtool when compiling on PPC
+* WT-2456       Fix PowerPC CRC32 Code
+* WT-2457       Fix a bug where dropping an LSM table can return EBUSY when no user ops are active
+* WT-2459       Allow configure to use the --tag option for libtool when compiling on PowerPC
 * WT-2460       Fix a bug where checkpoint could fail with WT_ROLLBACK
 * WT-2471       Update WiredTiger printf formats to be platform aware
 * WT-2476       Fix a race where btree->evict_lock is being accessed after being destroyed
@@ -242,7 +242,7 @@ Other note worthy changes since the previous release:
 * WT-1744 Throttle worker threads based on eviction targets.
 * WT-1845 Allow read only transactions to commit after failure.
 * WT-1869 Avoid doing in memory splits while checkpointing a tree.
-* WT-1942 Add atomic implementations for PPC64 architecture.
+* WT-1942 Add atomic implementations for PowerPC architecture.
 * WT-1962 Make the hot_backup_lock a read/write lock.
 * WT-1963 Fix backup cursor Java API.
 * WT-1964 Fix a bug in the Java API when closing handles from a different thread.
