@@ -306,30 +306,30 @@ bool RangeDeleter::deleteNow(OperationContext* txn,
         _deletesInProgress++;
     }
 
-    set<CursorId> cursorsToWait;
+    RangeDeleteEntry taskDetails(options);
     if (options.waitForOpenCursors) {
-        _env->getCursorIds(txn, ns, &cursorsToWait);
+        _env->getCursorIds(txn, ns, &taskDetails.cursorsToWait);
     }
 
     long long checkIntervalMillis = 5;
 
-    RangeDeleteEntry taskDetails(options);
+
     taskDetails.stats.queueStartTS = jsTime();
 
-    for (; !cursorsToWait.empty(); sleepmillis(checkIntervalMillis)) {
+    for (; !taskDetails.cursorsToWait.empty(); sleepmillis(checkIntervalMillis)) {
         logCursorsWaiting(&taskDetails);
 
         set<CursorId> cursorsNow;
         _env->getCursorIds(txn, ns, &cursorsNow);
 
         set<CursorId> cursorsLeft;
-        std::set_intersection(cursorsToWait.begin(),
-                              cursorsToWait.end(),
+        std::set_intersection(taskDetails.cursorsToWait.begin(),
+                              taskDetails.cursorsToWait.end(),
                               cursorsNow.begin(),
                               cursorsNow.end(),
                               std::inserter(cursorsLeft, cursorsLeft.end()));
 
-        cursorsToWait.swap(cursorsLeft);
+        taskDetails.cursorsToWait.swap(cursorsLeft);
 
         if (stopRequested()) {
             *errMsg = "deleter was stopped.";
