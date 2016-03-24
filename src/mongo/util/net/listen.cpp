@@ -452,15 +452,15 @@ void Listener::initAndListen() {
             if (status == SOCKET_ERROR) {
                 const int mongo_errno = WSAGetLastError();
 
-                // During shutdown, we may fail to listen on the socket if it has already
-                // been closed
-                if (inShutdown()) {
-                    return;
+                // We may fail to listen on the socket if it has
+                // already been closed. If we are not in shutdown,
+                // that is possibly interesting, so log an error.
+                if (!inShutdown()) {
+                    error() << "Windows WSAEventSelect returned "
+                            << errnoWithDescription(mongo_errno) << endl;
                 }
 
-                error() << "Windows WSAEventSelect returned " << errnoWithDescription(mongo_errno)
-                        << endl;
-                fassertFailed(16727);
+                return;
             }
         }
 
