@@ -1,14 +1,14 @@
 WiredTiger release 2.8.0, 2015-22-03
 ------------------------------------
 
-The WiredTiger 2.8.0 release contains new features, minor API changes and bug
-fixes.
+The WiredTiger 2.8.0 release contains new features, new supported platforms,
+minor API changes and bug fixes.
 
 New features and API changes; refer to the API documentation for full details:
 
 * WT-60         Port WiredTiger to run on big endian platforms
 * WT-2287       Add a new WT_SESSION.rebalance API
-* WT-2333       Add a no_wait configuration setting to WT_SESSION.drop so it doesn't block
+* WT-2333       Add a lock_wait configuration setting to WT_SESSION.drop to avoid blocking
 * WT-2349       Add a readonly configuration setting to wiredtiger_open
 * WT-2363       Remove built in support for bzip2 compression
 * WT-2404       Add streaming pack/unpack methods to the extension API
@@ -17,12 +17,13 @@ Significant changes and bug fixes:
 
 * WT-1801       Add a directory sync after rollback of a WT_SESSION::rename operation
 * WT-2130       Improve on-disk page utilization with random workloads
-* WT-2275       Fix a database corruption after application crash
+* WT-2275       Fix a database corruption after truncate and crash
 * WT-2264       High update workloads can cause checkpoints to never complete
-* WT-2290       Improve how effective WT_SESSION.compact is
+* WT-2290       Improve effectiveness of WT_SESSION.compact
 * WT-2361       Fix a bug in column-store where verify identifies out of order data
 * WT-2367       Fix a bug in WT_CURSOR.next that could cause out-of-order key returns
-* WT-2374       Fix a bug where a database was corrupted after a hard crash
+* WT-2374       Fix a bug where a database was corrupted when restoring a backup
+* WT-2381       Fix the dump utility to include the table configuration
 * WT-2451       Allow the WiredTiger metadata to be evicted
 * WT-2490       Fix a bug in column-store where search_near() returns the wrong key
 
@@ -31,11 +32,11 @@ Issues fixed in MongoDB:
 * SERVER-21619  sys-perf: WT crash during core_workloads_WT execution
 * SERVER-21833  Enhance WT_SESSION::compact to more reliably release space
 * SERVER-21887  Enhance $sample to be faster on newly created collection
-* SERVER-22676  Fix a bug in WiredTiger fails to open databases created by 3.0.0 or 3.0.1
-* SERVER-22773  CRC32 implementation on PPC was broken
+* SERVER-22676  Allow WiredTiger to open databases created by 3.0.0 or 3.0.1
+* SERVER-22773  New CRC32 implementation on PowerPC
 * SERVER-22831  Low query rate with heavy cache pressure and an idle collection
 
-Other note worthy changes since the previous release:
+Other noteworthy changes since the previous release:
 
 * WT-1517       Fix error handling around schema format edge cases
 * WT-2060       Simplify aggregation of statistics
@@ -101,7 +102,6 @@ Other note worthy changes since the previous release:
 * WT-2372       WiredTiger windows builder fails with C4005 against the "inline" macro
 * WT-2375       Add tests for custom collators
 * WT-2378       Fix a hang in LSM when doing forced drop with the no wait option
-* WT-2381       Fix the dump utility so it does not discard the table configuration
 * WT-2382       Fix a bug in join cursors with custom collator for 'u' format
 * WT-2384       Fix a bug in join cursors where lt, le conditions for ordering could be wrong
 * WT-2387       Fix cursor random unit test on Windows
@@ -138,7 +138,7 @@ Other note worthy changes since the previous release:
 * WT-2454       Fix checkpoint_sync=false behavior to prevent flushes/sync to disk
 * WT-2456       Fix PPC CRC32 Code
 * WT-2457       Fix a bug where dropping an LSM table can fail with EBUSY when no user ops are active
-* WT-2459       Allow Configure scripts to provide the --tag option for libtool when compiling on PPC
+* WT-2459       Allow configure scripts to provide the --tag option for libtool when compiling on PPC
 * WT-2460       Fix a bug where checkpoint could fail with WT_ROLLBACK
 * WT-2471       Update WiredTiger printf formats to be platform aware
 * WT-2476       Fix a race where btree->evict_lock is being accessed after being destroyed
