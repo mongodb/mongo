@@ -54,7 +54,7 @@ done
 l=`sed -e '/^[a-z]/!d' -e '/os/!d' filelist`
 for i in $l; do
 	proto ../$i
-done | sort -u
+done | env LC_ALL=C sort -u
 ) > $t
 
 f=../src/include/extern.h
