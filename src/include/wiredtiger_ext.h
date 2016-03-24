@@ -268,8 +268,9 @@ struct __wt_extension_api {
 	    WT_SESSION *session, const char *key, const char *value);
 
 	/*!
-	 * Pack a structure into a buffer.
-	 * See ::wiredtiger_struct_pack for details.
+	 * Pack a structure into a buffer. Deprecated in favor of stream
+	 * based pack and unpack API. See WT_EXTENSION_API::pack_start for
+	 * details.
 	 *
 	 * @param wt_api the extension handle
 	 * @param session the session handle
@@ -282,8 +283,8 @@ struct __wt_extension_api {
 	    void *buffer, size_t size, const char *format, ...);
 
 	/*!
-	 * Calculate the size required to pack a structure.
-	 * See ::wiredtiger_struct_size for details.
+	 * Calculate the size required to pack a structure. Deprecated in
+	 * favor of stream based pack and unpack API.
 	 *
 	 * @param wt_api the extension handle
 	 * @param session the session handle
@@ -296,8 +297,9 @@ struct __wt_extension_api {
 	    size_t *sizep, const char *format, ...);
 
 	/*!
-	 * Unpack a structure from a buffer.
-	 * See ::wiredtiger_struct_unpack for details.
+	 * Unpack a structure from a buffer. Deprecated in favor of stream
+	 * based pack and unpack API. See WT_EXTENSION_API::unpack_start for
+	 * details.
 	 *
 	 * @param wt_api the extension handle
 	 * @param session the session handle
@@ -308,6 +310,130 @@ struct __wt_extension_api {
 	 */
 	int (*struct_unpack)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
 	    const void *buffer, size_t size, const char *format, ...);
+
+	/*
+	 * Streaming pack/unpack API.
+	 */
+	/*!
+	 * Start a packing operation into a buffer.
+	 * See ::wiredtiger_pack_start for details.
+	 *
+	 * @param session the session handle
+	 * @param format the data format, see @ref packing
+	 * @param buffer a pointer to memory to hold the packed data
+	 * @param size the size of the buffer
+	 * @param[out] psp the new packing stream handle
+	 * @errors
+	 */
+	int (*pack_start)(WT_EXTENSION_API *wt_api,
+	    WT_SESSION *session, const char *format,
+	    void *buffer, size_t size, WT_PACK_STREAM **psp);
+
+	/*!
+	 * Start an unpacking operation from a buffer.
+	 * See ::wiredtiger_unpack_start for details.
+	 *
+	 * @param session the session handle
+	 * @param format the data format, see @ref packing
+	 * @param buffer a pointer to memory holding the packed data
+	 * @param size the size of the buffer
+	 * @param[out] psp the new packing stream handle
+	 * @errors
+	 */
+	int (*unpack_start)(WT_EXTENSION_API *wt_api,
+	    WT_SESSION *session, const char *format,
+	    const void *buffer, size_t size, WT_PACK_STREAM **psp);
+
+	/*!
+	 * Close a packing stream.
+	 *
+	 * @param ps the packing stream handle
+	 * @param[out] usedp the number of bytes in the buffer used by the
+	 * stream
+	 * @errors
+	 */
+	int (*pack_close)(WT_EXTENSION_API *wt_api,
+	    WT_PACK_STREAM *ps, size_t *usedp);
+
+	/*!
+	 * Pack an item into a packing stream.
+	 *
+	 * @param ps the packing stream handle
+	 * @param item an item to pack
+	 * @errors
+	 */
+	int (*pack_item)(WT_EXTENSION_API *wt_api,
+	    WT_PACK_STREAM *ps, WT_ITEM *item);
+
+	/*!
+	 * Pack a signed integer into a packing stream.
+	 *
+	 * @param ps the packing stream handle
+	 * @param i a signed integer to pack
+	 * @errors
+	 */
+	int (*pack_int)(WT_EXTENSION_API *wt_api,
+	    WT_PACK_STREAM *ps, int64_t i);
+
+	/*!
+	 * Pack a string into a packing stream.
+	 *
+	 * @param ps the packing stream handle
+	 * @param s a string to pack
+	 * @errors
+	 */
+	int (*pack_str)(WT_EXTENSION_API *wt_api,
+	    WT_PACK_STREAM *ps, const char *s);
+
+	/*!
+	 * Pack an unsigned integer into a packing stream.
+	 *
+	 * @param ps the packing stream handle
+	 * @param u an unsigned integer to pack
+	 * @errors
+	 */
+	int (*pack_uint)(WT_EXTENSION_API *wt_api,
+	    WT_PACK_STREAM *ps, uint64_t u);
+
+	/*!
+	 * Unpack an item from a packing stream.
+	 *
+	 * @param ps the packing stream handle
+	 * @param item an item to unpack
+	 * @errors
+	 */
+	int (*unpack_item)(WT_EXTENSION_API *wt_api,
+	    WT_PACK_STREAM *ps, WT_ITEM *item);
+
+	/*!
+	 * Unpack a signed integer from a packing stream.
+	 *
+	 * @param ps the packing stream handle
+	 * @param[out] ip the unpacked signed integer
+	 * @errors
+	 */
+	int (*unpack_int)(WT_EXTENSION_API *wt_api,
+	    WT_PACK_STREAM *ps, int64_t *ip);
+
+	/*!
+	 * Unpack a string from a packing stream.
+	 *
+	 * @param ps the packing stream handle
+	 * @param[out] sp the unpacked string
+	 * @errors
+	 */
+	int (*unpack_str)(WT_EXTENSION_API *wt_api,
+	    WT_PACK_STREAM *ps, const char **sp);
+
+	/*!
+	 * Unpack an unsigned integer from a packing stream.
+	 *
+	 * @param ps the packing stream handle
+	 * @param[out] up the unpacked unsigned integer
+	 * @errors
+	 */
+	int (*unpack_uint)(WT_EXTENSION_API *wt_api,
+	     WT_PACK_STREAM *ps, uint64_t *up);
 
 	/*!
 	 * Return the current transaction ID.

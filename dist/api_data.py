@@ -76,12 +76,12 @@ lsm_config = [
         Config('bloom', 'true', r'''
             create bloom filters on LSM tree chunks as they are merged''',
             type='boolean'),
-        Config('bloom_config', '', r'''
-            config string used when creating Bloom filter files, passed
-            to WT_SESSION::create'''),
         Config('bloom_bit_count', '16', r'''
             the number of bits used per item for LSM bloom filters''',
             min='2', max='1000'),
+        Config('bloom_config', '', r'''
+            config string used when creating Bloom filter files, passed
+            to WT_SESSION::create'''),
         Config('bloom_hash_count', '8', r'''
             the number of hash values per item used for LSM bloom
             filters''',
@@ -297,6 +297,15 @@ file_meta = file_config + [
         the file's ID number'''),
     Config('version', '(major=0,minor=0)', r'''
         the file version'''),
+]
+
+lsm_meta = file_config + lsm_config + [
+    Config('last', '', r'''
+        the last allocated chunk ID'''),
+    Config('chunks', '', r'''
+        active chunks in the LSM tree'''),
+    Config('old_chunks', '', r'''
+        obsolete chunks in the LSM tree'''),
 ]
 
 table_only_config = [
@@ -522,6 +531,9 @@ connection_runtime_config = [
         the statistics log server uses a session from the configured
         session_max''',
         type='category', subconfig=[
+        Config('json', 'false', r'''
+            encode statistics in JSON format''',
+            type='boolean'),
         Config('on_close', 'false', r'''log statistics on database close''',
             type='boolean'),
         Config('path', '"WiredTigerStat.%d.%H"', r'''
@@ -538,7 +550,8 @@ connection_runtime_config = [
             type='list'),
         Config('timestamp', '"%b %d %H:%M:%S"', r'''
             a timestamp prepended to each log record, may contain strftime
-            conversion specifications'''),
+            conversion specifications, when \c json is configured, defaults
+            to \c "%FT%Y.000Z"'''),
         Config('wait', '0', r'''
             seconds to wait between each write of the log records; setting
             this value above 0 configures statistics logging''',
@@ -655,6 +668,11 @@ wiredtiger_open_common = connection_runtime_config + [
         RPC server for primary processes and use RPC for secondary
         processes). <b>Not yet supported in WiredTiger</b>''',
         type='boolean'),
+    Config('readonly', 'false', r'''
+        open connection in read-only mode.  The database must exist.  All
+        methods that may modify a database are disabled.  See @ref readonly
+        for more information''',
+        type='boolean'),
     Config('session_max', '100', r'''
         maximum expected number of sessions (including server
         threads)''',
@@ -732,11 +750,15 @@ cursor_runtime_config = [
 ]
 
 methods = {
-'file.meta' : Method(file_meta),
-
 'colgroup.meta' : Method(colgroup_meta),
 
+'file.config' : Method(file_config),
+
+'file.meta' : Method(file_meta),
+
 'index.meta' : Method(index_meta),
+
+'lsm.meta' : Method(lsm_meta),
 
 'table.meta' : Method(table_meta),
 

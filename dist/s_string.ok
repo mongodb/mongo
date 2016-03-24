@@ -107,11 +107,13 @@ FALLTHROUGH
 FH
 FLD
 FLSv
+FLv
 FNV
 FORALL
 FOREACH
 FULLFSYNC
 FindFirstFile
+Fixup
 Fk
 FlushFileBuffers
 Fprintf
@@ -189,6 +191,7 @@ MALLOC
 MEM
 MEMALIGN
 MERCHANTABILITY
+METADATA
 MONGODB
 MSVC
 MULTIBLOCK
@@ -210,6 +213,7 @@ MySecret
 NEEDKEY
 NEEDVALUE
 NOLL
+NOLOCK
 NONINFRINGEMENT
 NOTFOUND
 NOTREACHED
@@ -243,6 +247,7 @@ Preload
 Prepend
 Qsort
 RCS
+RDNOLOCK
 RECNO
 REF's
 REFs
@@ -255,6 +260,7 @@ RNG
 RPC
 RUNDIR
 Radu
+Readonly
 Rebalance
 RedHat
 Redistributions
@@ -328,6 +334,7 @@ VxWorks
 WAL
 WIREDTIGER
 WRLSN
+WRNOLOCK
 WakeAllConditionVariable
 Wconditional
 WeakHashLen
@@ -430,6 +437,8 @@ cfg
 cfkos
 change's
 changelog
+chdir
+checkfmt
 checkpointed
 checkpointer
 checkpointing
@@ -437,6 +446,7 @@ checksum
 checksums
 children's
 chk
+chmod
 chongo
 cip
 cjoin
@@ -501,6 +511,7 @@ datasets
 datasource
 datastore
 dbc
+dbs
 dcalloc
 decile
 deciles
@@ -670,6 +681,7 @@ inline
 inmem
 insertK
 insertV
+inserters
 instantiation
 intl
 intnum
@@ -686,6 +698,7 @@ jnr
 jrx
 json
 kb
+kbits
 keycmp
 keyid
 keyv
@@ -715,6 +728,7 @@ libwiredtiger
 llll
 llu
 loadtext
+localTime
 localtime
 logf
 logmgr
@@ -744,6 +758,8 @@ majorp
 malloc
 marshall
 marshalled
+maxcpu
+maxdbs
 mbll
 mbss
 mem
@@ -756,6 +772,7 @@ memset
 memsize
 metaconf
 metadata
+metadata's
 metafile
 mfence
 minorp
@@ -792,7 +809,9 @@ nfilename
 nhex
 nlpo
 nocase
+noclear
 nocrypto
+nolock
 nonliteral
 noop
 nop
@@ -829,8 +848,11 @@ parserp
 patchp
 pathname
 pathnames
+pclose
+pcpu
 perf
 pfx
+popen
 poptable
 popthreads
 portably
@@ -838,6 +860,7 @@ pos
 posint
 posix
 postsize
+powerpc
 pragmas
 pre
 prealloc
@@ -855,6 +878,7 @@ ps
 psp
 pthread
 ptr
+ptrdiff
 pushms
 putK
 putV
@@ -869,6 +893,7 @@ rS
 rb
 rbrace
 rbracket
+rdonly
 rduppo
 readlock
 readonly
@@ -891,6 +916,7 @@ resize
 resizing
 ret
 retp
+revint
 rf
 rle
 rmw
@@ -898,6 +924,7 @@ rng
 rocksdb
 rotN
 rotn
+rp
 rpc
 run's
 runtime
@@ -965,10 +992,12 @@ superset
 sw
 sy
 sys
+sz
 t's
 tV
 tablename
 tcbench
+td
 testutil
 th
 tid
@@ -1054,9 +1083,12 @@ vsize
 vsnprintf
 vtype
 vunpack
+vw
+waitpid
 walk's
 warmup
 wb
+wiredTiger
 wiredtiger
 workFactor
 wrapup

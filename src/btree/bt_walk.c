@@ -583,14 +583,14 @@ restart:	/*
 					break;
 			}
 			WT_ERR(ret);
+			couple = ref;
 
 			/*
 			 * A new page: configure for traversal of any internal
 			 * page's children, else return the leaf page.
 			 */
 			if (WT_PAGE_IS_INTERNAL(ref->page)) {
-descend:			couple = ref;
-				empty_internal = true;
+descend:			empty_internal = true;
 
 				/*
 				 * There's a split race when a cursor is setting
@@ -649,7 +649,6 @@ descend:			couple = ref;
 				 */
 				if (skipleafcntp != NULL ||
 				    LF_ISSET(WT_READ_SKIP_LEAF)) {
-					couple = ref;
 					if (LF_ISSET(WT_READ_SKIP_LEAF))
 						break;
 					if (*skipleafcntp > 0) {

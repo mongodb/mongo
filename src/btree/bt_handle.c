@@ -36,7 +36,8 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 	btree = S2BT(session);
 
 	/* Checkpoint files are readonly. */
-	readonly = dhandle->checkpoint != NULL;
+	readonly = (dhandle->checkpoint != NULL ||
+	    F_ISSET(S2C(session), WT_CONN_READONLY));
 
 	/* Get the checkpoint information for this name/checkpoint pair. */
 	WT_CLEAR(ckpt);
@@ -349,7 +350,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	/* Initialize locks. */
 	WT_RET(__wt_rwlock_alloc(
 	    session, &btree->ovfl_lock, "btree overflow lock"));
-	WT_RET(__wt_spin_init(session, &btree->flush_lock, "btree flush lock"));
+	WT_RET(__wt_spin_init(session, &btree->flush_lock, "btree flush"));
 
 	btree->checkpointing = WT_CKPT_OFF;		/* Not checkpointing */
 	btree->modified = 0;				/* Clean */

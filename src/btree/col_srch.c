@@ -77,6 +77,7 @@ __wt_col_search(WT_SESSION_IMPL *session,
 	int depth;
 
 	btree = S2BT(session);
+	current = NULL;
 
 	__cursor_pos_clear(cbt);
 
@@ -116,12 +117,19 @@ __wt_col_search(WT_SESSION_IMPL *session,
 		goto leaf_only;
 	}
 
-restart_root:
+	if (0) {
+restart:	/*
+		 * Discard the currently held page and restart the search from
+		 * the root.
+		 */
+		WT_RET(__wt_page_release(session, current, 0));
+	}
+
 	/* Search the internal pages of the tree. */
 	current = &btree->root;
 	for (depth = 2, pindex = NULL;; ++depth) {
 		parent_pindex = pindex;
-restart_page:	page = current->page;
+		page = current->page;
 		if (page->type != WT_PAGE_COL_INT)
 			break;
 
@@ -138,10 +146,8 @@ restart_page:	page = current->page;
 			 * on the page), check for an internal page split race.
 			 */
 			if (__wt_split_descent_race(
-			    session, current, parent_pindex)) {
-				WT_RET(__wt_page_release(session, current, 0));
-				goto restart_root;
-			}
+			    session, current, parent_pindex))
+				goto restart;
 
 			goto descend;
 		}
@@ -178,8 +184,14 @@ descend:	/*
 
 		/*
 		 * Swap the current page for the child page. If the page splits
-		 * while we're retrieving it, restart the search in the current
-		 * page; otherwise return on error, the swap call ensures we're
+		 * while we're retrieving it, restart the search at the root.
+		 * We cannot restart in the "current" page; for example, if a
+		 * thread is appending to the tree, the page it's waiting for
+		 * did an insert-split into the parent, then the parent split
+		 * into its parent, the name space we are searching for may have
+		 * moved above the current page in the tree.
+		 *
+		 * On other error, simply return, the swap call ensures we're
 		 * holding nothing on failure.
 		 */
 		if ((ret = __wt_page_swap(
@@ -188,7 +200,7 @@ descend:	/*
 			continue;
 		}
 		if (ret == WT_RESTART)
-			goto restart_page;
+			goto restart;
 		return (ret);
 	}
 
@@ -199,7 +211,6 @@ descend:	/*
 leaf_only:
 	page = current->page;
 	cbt->ref = current;
-	cbt->recno = recno;
 
 	/* 
 	 * Don't bother searching if the caller is appending a new record where
@@ -211,13 +222,6 @@ leaf_only:
 		cbt->compare = -1;
 		return (0);
 	}
-
-	/*
-	 * Set the on-page slot to an impossible value larger than any possible
-	 * slot (it's used to interpret the search function's return after the
-	 * search returns an insert list for a page that has no entries).
-	 */
-	cbt->slot = UINT32_MAX;
 
 	/*
 	 * Search the leaf page.
@@ -232,28 +236,38 @@ leaf_only:
 	 * that's impossibly large for the page. We do have additional setup to
 	 * do in that case, the record may be appended to the page.
 	 */
-	cbt->compare = 0;
 	if (page->type == WT_PAGE_COL_FIX) {
 		if (recno < page->pg_fix_recno) {
+			cbt->recno = page->pg_fix_recno;
 			cbt->compare = 1;
 			return (0);
 		}
 		if (recno >= page->pg_fix_recno + page->pg_fix_entries) {
 			cbt->recno = page->pg_fix_recno + page->pg_fix_entries;
 			goto past_end;
-		} else
+		} else {
+			cbt->recno = recno;
+			cbt->compare = 0;
 			ins_head = WT_COL_UPDATE_SINGLE(page);
+		}
 	} else {
 		if (recno < page->pg_var_recno) {
+			cbt->recno = page->pg_var_recno;
+			cbt->slot = 0;
 			cbt->compare = 1;
 			return (0);
 		}
 		if ((cip = __col_var_search(page, recno, NULL)) == NULL) {
 			cbt->recno = __col_var_last_recno(page);
+			cbt->slot = page->pg_var_entries == 0 ?
+			    0 : page->pg_var_entries - 1;
 			goto past_end;
 		} else {
+			cbt->recno = recno;
 			cbt->slot = WT_COL_SLOT(page, cip);
+			cbt->compare = 0;
 			ins_head = WT_COL_UPDATE_SLOT(page, cbt->slot);
+			F_SET(cbt, WT_CBT_VAR_ONPAGE_MATCH);
 		}
 	}
 

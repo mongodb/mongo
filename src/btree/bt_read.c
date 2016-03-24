@@ -281,10 +281,8 @@ err:	WT_TRET(__wt_las_cursor_close(session, &cursor, session_flags));
 	 * On error, upd points to a single unlinked WT_UPDATE structure,
 	 * first_upd points to a list.
 	 */
-	if (upd != NULL)
-		__wt_free(session, upd);
-	if (first_upd != NULL)
-		__wt_free_update_list(session, first_upd);
+	__wt_free(session, upd);
+	__wt_free_update_list(session, first_upd);
 
 	__wt_scr_free(session, &current_key);
 	__wt_scr_free(session, &las_addr);
@@ -460,12 +458,12 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 	WT_DECL_RET;
 	WT_PAGE *page;
 	u_int sleep_cnt, wait_cnt;
-	bool busy, cache_work, oldgen, stalled;
+	bool busy, cache_work, evict_soon, stalled;
 	int force_attempts;
 
 	btree = S2BT(session);
 
-	for (oldgen = stalled = false,
+	for (evict_soon = stalled = false,
 	    force_attempts = 0, sleep_cnt = wait_cnt = 0;;) {
 		switch (ref->state) {
 		case WT_REF_DELETED:
@@ -486,7 +484,16 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 				WT_RET(__wt_cache_eviction_check(
 				    session, 1, NULL));
 			WT_RET(__page_read(session, ref));
-			oldgen = LF_ISSET(WT_READ_WONT_NEED) ||
+
+			/*
+			 * If configured to not trash the cache, leave the page
+			 * generation unset, we'll set it before returning to
+			 * the oldest read generation, so the page is forcibly
+			 * evicted as soon as possible. We don't do that set
+			 * here because we don't want to evict the page before
+			 * we "acquire" it.
+			 */
+			evict_soon = LF_ISSET(WT_READ_WONT_NEED) ||
 			    F_ISSET(session, WT_SESSION_NO_CACHE);
 			continue;
 		case WT_REF_READING:
@@ -575,20 +582,24 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			}
 
 			/*
-			 * If we read the page and we are configured to not
-			 * trash the cache, set the oldest read generation so
-			 * the page is forcibly evicted as soon as possible.
+			 * If we read the page and are configured to not trash
+			 * the cache, and no other thread has already used the
+			 * page, set the oldest read generation so the page is
+			 * forcibly evicted as soon as possible.
 			 *
-			 * Otherwise, update the page's read generation.
+			 * Otherwise, if we read the page, or, if configured to
+			 * update the page's read generation and the page isn't
+			 * already flagged for forced eviction, update the page
+			 * read generation.
 			 */
 			page = ref->page;
-			if (oldgen && page->read_gen == WT_READGEN_NOTSET)
-				__wt_page_evict_soon(page);
-			else if (!LF_ISSET(WT_READ_NO_GEN) &&
-			    page->read_gen != WT_READGEN_OLDEST &&
-			    page->read_gen < __wt_cache_read_gen(session))
-				page->read_gen =
-				    __wt_cache_read_gen_bump(session);
+			if (page->read_gen == WT_READGEN_NOTSET) {
+				if (evict_soon)
+					__wt_page_evict_soon(page);
+				else
+					__wt_cache_read_gen_new(session, page);
+			} else if (!LF_ISSET(WT_READ_NO_GEN))
+				__wt_cache_read_gen_bump(session, page);
 skip_evict:
 			/*
 			 * Check if we need an autocommit transaction.

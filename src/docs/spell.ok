@@ -7,6 +7,7 @@ Atomicity
 BLOBs
 CFLAGS
 CPPFLAGS
+CRC
 Cheng
 Christoph
 Collet's
@@ -64,6 +65,7 @@ NOTFOUND
 NUMA
 NoSQL
 OPTYPE
+PPC
 PRELOAD
 README
 Rebalance
@@ -151,6 +153,7 @@ control's
 copydoc
 cpp
 crashless
+crc
 cursortype
 customerABC
 cv
@@ -377,6 +380,7 @@ rVv
 rdbms
 rdlock
 readlock
+readonly
 realclean
 realloc
 realloc'd
@@ -419,6 +423,7 @@ src
 ssd
 startsync
 statlog
+stderr
 str
 strerror
 strftime
@@ -475,6 +480,7 @@ valuefmt
 vec
 versa
 vm
+vpmsum
 warmup
 whitespace
 wiredtiger

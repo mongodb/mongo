@@ -58,6 +58,8 @@ __wt_las_create(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 
+	if (F_ISSET(conn, WT_CONN_READONLY))
+		return (0);
 	/*
 	 * Done at startup: we cannot do it on demand because we require the
 	 * schema lock to create and drop the table, and it may not always be
@@ -203,7 +205,7 @@ __wt_las_cursor(
 	 * useful more than once.
 	 */
 	*session_flags =
-	    F_ISSET(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_EVICTION);
+	    F_MASK(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_EVICTION);
 
 	conn = S2C(session);
 

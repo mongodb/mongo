@@ -33,7 +33,6 @@ from wtscenario import check_scenarios, multiply_scenarios, number_scenarios
 #    Join operations
 # Basic tests for join
 class test_join01(wttest.WiredTigerTestCase):
-    table_name1 = 'test_join01'
     nentries = 100
 
     scenarios = [
@@ -75,8 +74,18 @@ class test_join01(wttest.WiredTigerTestCase):
     # the join cursor and iterating again.
     def stats(self, jc, which):
         statcur = self.session.open_cursor('statistics:join', jc, None)
-        self.check_stats(statcur, 0, 'join: index:join01:index1: ' +
-                         'bloom filter false positives')
+        # pick a stat we always expect to see
+        statdesc = 'bloom filter false positives'
+        expectstats = [
+            'join: index:join01:index1: ' + statdesc,
+            'join: index:join01:index2: ' + statdesc ]
+        if self.ref == 'index':
+            expectstats.append('join: index:join01:index0: ' + statdesc)
+        else:
+            expectstats.append('join: table:join01: ' + statdesc)
+        self.check_stats(statcur, expectstats)
+        statcur.reset()
+        self.check_stats(statcur, expectstats)
         statcur.close()
 
     def statstr_to_int(self, str):
@@ -87,16 +96,14 @@ class test_join01(wttest.WiredTigerTestCase):
         parts = str.rpartition('(')
         return int(parts[2].rstrip(')'))
 
-    # string should appear with a minimum value of least "min".
-    def check_stats(self, statcursor, min, lookfor):
+    # All of the expect strings should appear
+    def check_stats(self, statcursor, expectstats):
         stringclass = ''.__class__
         intclass = (0).__class__
 
         # Reset the cursor, we're called multiple times.
         statcursor.reset()
 
-        found = False
-        foundval = 0
         self.printVerbose(3, 'statistics:')
         for id, desc, valstr, val in statcursor:
             self.assertEqual(type(desc), stringclass)
@@ -105,12 +112,11 @@ class test_join01(wttest.WiredTigerTestCase):
             self.assertEqual(val, self.statstr_to_int(valstr))
             self.printVerbose(3, '  stat: \'' + desc + '\', \'' +
                               valstr + '\', ' + str(val))
-            if desc == lookfor:
-                found = True
-                foundval = val
+            if desc in expectstats:
+                expectstats.remove(desc)
 
-        self.assertTrue(found, 'in stats, did not see: ' + lookfor)
-        self.assertTrue(foundval >= min)
+        self.assertTrue(len(expectstats) == 0,
+                        'missing expected values in stats: ' + str(expectstats))
 
     # Common function for testing the most basic functionality
     # of joins
@@ -142,7 +148,8 @@ class test_join01(wttest.WiredTigerTestCase):
         # and examine primary keys 2,5,8,...,95,98,1,4,7,...,94,97.
         jc = self.session.open_cursor('join:table:join01' + proj_suffix,
                                       None, None)
-        c2 = self.session.open_cursor('index:join01:index2', None, None)
+        # Adding a projection to a reference cursor should be allowed.
+        c2 = self.session.open_cursor('index:join01:index2(v1)', None, None)
         c2.set_key(99)   # skips all entries w/ primary key divisible by three
         self.assertEquals(0, c2.search())
         self.session.join(jc, c2, 'compare=gt')
@@ -160,12 +167,12 @@ class test_join01(wttest.WiredTigerTestCase):
 
         # Then select all numbers whose reverse string representation
         # is in '20' < x < '40'.
-        c1a = self.session.open_cursor('index:join01:index1', None, None)
+        c1a = self.session.open_cursor('index:join01:index1(v1)', None, None)
         c1a.set_key('21')
         self.assertEquals(0, c1a.search())
         self.session.join(jc, c1a, 'compare=gt' + joincfg1)
 
-        c1b = self.session.open_cursor('index:join01:index1', None, None)
+        c1b = self.session.open_cursor('index:join01:index1(v1)', None, None)
         c1b.set_key('41')
         self.assertEquals(0, c1b.search())
         self.session.join(jc, c1b, 'compare=lt' + joincfg1)
@@ -342,11 +349,12 @@ class test_join01(wttest.WiredTigerTestCase):
             '/index cursor is being used in a join/')
 
         # Only a small number of operations allowed on a join cursor
-        self.assertRaises(wiredtiger.WiredTigerError,
-            lambda: jc.search())
+        msg = "/Unsupported cursor/"
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: jc.search(), msg)
 
-        self.assertRaises(wiredtiger.WiredTigerError,
-            lambda: jc.prev())
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: jc.prev(), msg)
 
         self.assertEquals(jc.next(), 0)
         self.assertEquals(jc.next(), wiredtiger.WT_NOTFOUND)
@@ -390,6 +398,7 @@ class test_join01(wttest.WiredTigerTestCase):
     def test_cursor_close2(self):
         self.cursor_close_common(False)
 
+    # test statistics using the framework set up for this test
     def test_stats(self):
         bloomcfg1000 = ',strategy=bloom,count=1000'
         bloomcfg10 = ',strategy=bloom,count=10'
@@ -398,6 +407,40 @@ class test_join01(wttest.WiredTigerTestCase):
         # Intentially run with an underconfigured Bloom filter,
         # statistics should pick up some false positives.
         self.join_common(bloomcfg10, bloomcfg10, False, True)
+
+    # test statistics with a simple one index join cursor
+    def test_simple_stats(self):
+        self.session.create("table:join01b",
+                       "key_format=i,value_format=i,columns=(k,v)")
+        self.session.create("index:join01b:index", "columns=(v)")
+
+        cursor = self.session.open_cursor("table:join01b", None, None)
+        cursor[1] = 11
+        cursor[2] = 12
+        cursor[3] = 13
+        cursor.close()
+
+        cursor = self.session.open_cursor("index:join01b:index", None, None)
+        cursor.set_key(11)
+        cursor.search()
+
+        jcursor = self.session.open_cursor("join:table:join01b", None, None)
+        self.session.join(jcursor, cursor, "compare=gt")
+
+        while jcursor.next() == 0:
+            [k] = jcursor.get_keys()
+            [v] = jcursor.get_values()
+
+        statcur = self.session.open_cursor("statistics:join", jcursor, None)
+        found = False
+        while statcur.next() == 0:
+            [desc, pvalue, value] = statcur.get_values()
+            #self.tty(str(desc) + "=" + str(pvalue))
+            found = True
+        self.assertEquals(found, True)
+
+        jcursor.close()
+        cursor.close()
 
 
 if __name__ == '__main__':

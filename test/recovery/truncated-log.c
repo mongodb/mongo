@@ -45,7 +45,7 @@
 
 static char home[512];			/* Program working dir */
 static const char *progname;		/* Program name */
-static const char *uri = "table:main";
+static const char * const uri = "table:main";
 
 #define	RECORDS_FILE "records"
 
@@ -54,7 +54,6 @@ static const char *uri = "table:main";
     "transaction_sync=(enabled,method=none)"
 #define	ENV_CONFIG_REC "log=(recover=on)"
 #define	LOG_FILE_1 "WiredTigerLog.0000000001"
-#define	MAX_VAL	4096
 
 #define	K_SIZE	16
 #define	V_SIZE	256
@@ -86,7 +85,8 @@ fill_db(void)
 	/*
 	 * Run in the home directory so that the records file is in there too.
 	 */
-	chdir(home);
+	if (chdir(home) != 0)
+		testutil_die(errno, "chdir: %s", home);
 	if ((ret = wiredtiger_open(NULL, NULL, ENV_CONFIG, &conn)) != 0)
 		testutil_die(ret, "wiredtiger_open");
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
@@ -107,7 +107,7 @@ fill_db(void)
 	/*
 	 * Set to no buffering.
 	 */
-	setvbuf(fp, NULL, _IONBF, 0);
+	(void)setvbuf(fp, NULL, _IONBF, 0);
 	save_lsn.l.file = 0;
 
 	/*
@@ -156,17 +156,22 @@ fill_db(void)
 					    "%" PRIu32 " %" PRIu32 "\n",
 					    save_lsn.l.offset, i - 1) == -1)
 						testutil_die(errno, "fprintf");
-					fclose(fp);
-					abort();
+					break;
 				}
 			}
 			first = false;
 		}
 	}
+	if (fclose(fp) != 0)
+		testutil_die(errno, "fclose");
+	abort();
+	/* NOTREACHED */
 }
 
 extern int __wt_optind;
 extern char *__wt_optarg;
+
+void (*custom_die)(void) = NULL;
 
 int
 main(int argc, char *argv[])
@@ -218,26 +223,32 @@ main(int argc, char *argv[])
 
 	/* parent */
 	/* Wait for child to kill itself. */
-	waitpid(pid, &status, 0);
+	if (waitpid(pid, &status, 0) == -1)
+		testutil_die(errno, "waitpid");
 
 	/*
 	 * !!! If we wanted to take a copy of the directory before recovery,
 	 * this is the place to do it.
 	 */
-	chdir(home);
+	if (chdir(home) != 0)
+		testutil_die(errno, "chdir: %s", home);
+
 	printf("Open database, run recovery and verify content\n");
 	if ((fp = fopen(RECORDS_FILE, "r")) == NULL)
 		testutil_die(errno, "fopen");
 	ret = fscanf(fp, "%" SCNu64 " %" SCNu32 "\n", &offset, &max_key);
-	fclose(fp);
 	if (ret != 2)
 		testutil_die(errno, "fscanf");
+	if (fclose(fp) != 0)
+		testutil_die(errno, "fclose");
 	/*
 	 * The offset is the beginning of the last record.  Truncate to
 	 * the middle of that last record (i.e. ahead of that offset).
 	 */
+	if (offset > UINT64_MAX - V_SIZE)
+		testutil_die(ERANGE, "offset");
 	new_offset = offset + V_SIZE;
-	printf("Parent: Truncate to %u\n", (uint32_t)new_offset);
+	printf("Parent: Truncate to %" PRIu64 "\n", new_offset);
 	if ((ret = truncate(LOG_FILE_1, (wt_off_t)new_offset)) != 0)
 		testutil_die(errno, "truncate");
 
@@ -260,9 +271,10 @@ main(int argc, char *argv[])
 	if ((ret = conn->close(conn, NULL)) != 0)
 		testutil_die(ret, "WT_CONNECTION:close");
 	if (count > max_key) {
-		printf("expected %u records found %u\n", max_key, count);
+		printf("expected %" PRIu32 " records found %" PRIu32 "\n",
+		    max_key, count);
 		return (EXIT_FAILURE);
 	}
-	printf("%u records verified\n", count);
+	printf("%" PRIu32 " records verified\n", count);
 	return (EXIT_SUCCESS);
 }

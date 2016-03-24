@@ -11,13 +11,13 @@
  *	Search a column-store insert list for the next larger record.
  */
 static inline WT_INSERT *
-__col_insert_search_gt(WT_INSERT_HEAD *inshead, uint64_t recno)
+__col_insert_search_gt(WT_INSERT_HEAD *ins_head, uint64_t recno)
 {
 	WT_INSERT *ins, **insp;
 	int i;
 
 	/* If there's no insert chain to search, we're done. */
-	if ((ins = WT_SKIP_LAST(inshead)) == NULL)
+	if ((ins = WT_SKIP_LAST(ins_head)) == NULL)
 		return (NULL);
 
 	/* Fast path check for targets past the end of the skiplist. */
@@ -29,7 +29,7 @@ __col_insert_search_gt(WT_INSERT_HEAD *inshead, uint64_t recno)
 	 * go as far as possible at each level before stepping down to the next.
 	 */
 	ins = NULL;
-	for (i = WT_SKIP_MAXDEPTH - 1, insp = &inshead->head[i]; i >= 0;)
+	for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i]; i >= 0;)
 		if (*insp != NULL && recno >= WT_INSERT_RECNO(*insp)) {
 			ins = *insp;	/* GTE: keep going at this level */
 			insp = &(*insp)->next[i];
@@ -50,7 +50,7 @@ __col_insert_search_gt(WT_INSERT_HEAD *inshead, uint64_t recno)
 	 * such a record exists before searching.
 	 */
 	if (ins == NULL)
-		ins = WT_SKIP_FIRST(inshead);
+		ins = WT_SKIP_FIRST(ins_head);
 	while (recno >= WT_INSERT_RECNO(ins))
 		ins = WT_SKIP_NEXT(ins);
 	return (ins);
@@ -61,13 +61,13 @@ __col_insert_search_gt(WT_INSERT_HEAD *inshead, uint64_t recno)
  *	Search a column-store insert list for the next smaller record.
  */
 static inline WT_INSERT *
-__col_insert_search_lt(WT_INSERT_HEAD *inshead, uint64_t recno)
+__col_insert_search_lt(WT_INSERT_HEAD *ins_head, uint64_t recno)
 {
 	WT_INSERT *ins, **insp;
 	int i;
 
 	/* If there's no insert chain to search, we're done. */
-	if ((ins = WT_SKIP_FIRST(inshead)) == NULL)
+	if ((ins = WT_SKIP_FIRST(ins_head)) == NULL)
 		return (NULL);
 
 	/* Fast path check for targets before the skiplist. */
@@ -78,7 +78,7 @@ __col_insert_search_lt(WT_INSERT_HEAD *inshead, uint64_t recno)
 	 * The insert list is a skip list: start at the highest skip level, then
 	 * go as far as possible at each level before stepping down to the next.
 	 */
-	for (i = WT_SKIP_MAXDEPTH - 1, insp = &inshead->head[i]; i >= 0;)
+	for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i]; i >= 0;)
 		if (*insp != NULL && recno > WT_INSERT_RECNO(*insp)) {
 			ins = *insp;	/* GT: keep going at this level */
 			insp = &(*insp)->next[i];
@@ -95,14 +95,14 @@ __col_insert_search_lt(WT_INSERT_HEAD *inshead, uint64_t recno)
  *	Search a column-store insert list for an exact match.
  */
 static inline WT_INSERT *
-__col_insert_search_match(WT_INSERT_HEAD *inshead, uint64_t recno)
+__col_insert_search_match(WT_INSERT_HEAD *ins_head, uint64_t recno)
 {
 	WT_INSERT **insp, *ret_ins;
 	uint64_t ins_recno;
 	int cmp, i;
 
 	/* If there's no insert chain to search, we're done. */
-	if ((ret_ins = WT_SKIP_LAST(inshead)) == NULL)
+	if ((ret_ins = WT_SKIP_LAST(ins_head)) == NULL)
 		return (NULL);
 
 	/* Fast path the check for values at the end of the skiplist. */
@@ -115,7 +115,7 @@ __col_insert_search_match(WT_INSERT_HEAD *inshead, uint64_t recno)
 	 * The insert list is a skip list: start at the highest skip level, then
 	 * go as far as possible at each level before stepping down to the next.
 	 */
-	for (i = WT_SKIP_MAXDEPTH - 1, insp = &inshead->head[i]; i >= 0; ) {
+	for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i]; i >= 0; ) {
 		if (*insp == NULL) {
 			--i;
 			--insp;
@@ -143,7 +143,7 @@ __col_insert_search_match(WT_INSERT_HEAD *inshead, uint64_t recno)
  *	Search a column-store insert list, creating a skiplist stack as we go.
  */
 static inline WT_INSERT *
-__col_insert_search(WT_INSERT_HEAD *inshead,
+__col_insert_search(WT_INSERT_HEAD *ins_head,
     WT_INSERT ***ins_stack, WT_INSERT **next_stack, uint64_t recno)
 {
 	WT_INSERT **insp, *ret_ins;
@@ -151,15 +151,15 @@ __col_insert_search(WT_INSERT_HEAD *inshead,
 	int cmp, i;
 
 	/* If there's no insert chain to search, we're done. */
-	if ((ret_ins = WT_SKIP_LAST(inshead)) == NULL)
+	if ((ret_ins = WT_SKIP_LAST(ins_head)) == NULL)
 		return (NULL);
 
 	/* Fast path appends. */
 	if (recno >= WT_INSERT_RECNO(ret_ins)) {
 		for (i = 0; i < WT_SKIP_MAXDEPTH; i++) {
 			ins_stack[i] = (i == 0) ? &ret_ins->next[0] :
-			    (inshead->tail[i] != NULL) ?
-			    &inshead->tail[i]->next[i] : &inshead->head[i];
+			    (ins_head->tail[i] != NULL) ?
+			    &ins_head->tail[i]->next[i] : &ins_head->head[i];
 			next_stack[i] = NULL;
 		}
 		return (ret_ins);
@@ -169,7 +169,7 @@ __col_insert_search(WT_INSERT_HEAD *inshead,
 	 * The insert list is a skip list: start at the highest skip level, then
 	 * go as far as possible at each level before stepping down to the next.
 	 */
-	for (i = WT_SKIP_MAXDEPTH - 1, insp = &inshead->head[i]; i >= 0; ) {
+	for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i]; i >= 0; ) {
 		if ((ret_ins = *insp) == NULL) {
 			next_stack[i] = NULL;
 			ins_stack[i--] = insp--;

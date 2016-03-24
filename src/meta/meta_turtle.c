@@ -113,8 +113,9 @@ __metadata_load_bulk(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 	uint32_t allocsize;
 	bool exist;
-	const char *filecfg[] = { WT_CONFIG_BASE(session, file_meta), NULL };
-	const char *key;
+	const char *filecfg[] = {
+	    WT_CONFIG_BASE(session, file_meta), NULL, NULL };
+	const char *key, *value;
 
 	/*
 	 * If a file was being bulk-loaded during the hot backup, it will appear
@@ -135,6 +136,8 @@ __metadata_load_bulk(WT_SESSION_IMPL *session)
 		 * If the file doesn't exist, assume it's a bulk-loaded file;
 		 * retrieve the allocation size and re-create the file.
 		 */
+		WT_ERR(cursor->get_value(cursor, &value));
+		filecfg[1] = value;
 		WT_ERR(__wt_direct_io_size_check(
 		    session, filecfg, "allocation_size", &allocsize));
 		WT_ERR(__wt_block_manager_create(session, key, allocsize));
@@ -153,10 +156,11 @@ int
 __wt_turtle_init(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
-	bool exist, exist_incr;
+	bool exist_backup, exist_incr, exist_turtle, load;
 	char *metaconf;
 
 	metaconf = NULL;
+	load = false;
 
 	/*
 	 * Discard any turtle setup file left-over from previous runs.  This
@@ -179,13 +183,29 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 	 * done.
 	 */
 	WT_RET(__wt_exist(session, WT_INCREMENTAL_BACKUP, &exist_incr));
-	WT_RET(__wt_exist(session, WT_METADATA_TURTLE, &exist));
-	if (exist) {
+	WT_RET(__wt_exist(session, WT_METADATA_BACKUP, &exist_backup));
+	WT_RET(__wt_exist(session, WT_METADATA_TURTLE, &exist_turtle));
+	if (exist_turtle) {
 		if (exist_incr)
 			WT_RET_MSG(session, EINVAL,
 			    "Incremental backup after running recovery "
 			    "is not allowed.");
-	} else {
+		/*
+		 * If we have a backup file and metadata and turtle files,
+		 * we want to recreate the metadata from the backup.
+		 */
+		if (exist_backup) {
+			WT_RET(__wt_msg(session, "Both %s and %s exist. "
+			    "Recreating metadata from backup.",
+			    WT_METADATA_TURTLE, WT_METADATA_BACKUP));
+			WT_RET(__wt_remove_if_exists(session, WT_METAFILE));
+			WT_RET(__wt_remove_if_exists(
+			    session, WT_METADATA_TURTLE));
+			load = true;
+		}
+	} else
+		load = true;
+	if (load) {
 		if (exist_incr)
 			F_SET(S2C(session), WT_CONN_WAS_BACKUP);
 

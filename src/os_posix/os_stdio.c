@@ -46,8 +46,7 @@ __wt_fopen(WT_SESSION_IMPL *session,
 	if (*fpp == NULL)
 		ret = __wt_errno();
 
-	if (pathbuf != NULL)
-		__wt_free(session, pathbuf);
+	__wt_free(session, pathbuf);
 
 	if (ret == 0)
 		return (0);

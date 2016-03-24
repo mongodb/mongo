@@ -115,6 +115,7 @@ __wt_fallocate(
 {
 	WT_DECL_RET;
 
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 	switch (fh->fallocate_available) {
 	/*
 	 * Check for already configured handles and make the configured call.

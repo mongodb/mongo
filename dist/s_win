@@ -44,7 +44,7 @@ win_filelist()
 	f='../build_win/filelist.win'
 
 	# Process the files for which there's a Windows-specific version, then
-	# append Windows-only files. (There aren't yet any POSIX-only files.)
+	# append Windows-only files and discard POSIX-only files.
 	(sed \
 	    -e 's;os_posix/os_dir.c;os_win/os_dir.c;' \
 	    -e 's;os_posix/os_dlopen.c;os_win/os_dlopen.c;' \
@@ -71,7 +71,9 @@ win_filelist()
 	    -e 's;os_posix/os_sleep.c;os_win/os_sleep.c;' \
 	    -e 's;os_posix/os_thread.c;os_win/os_thread.c;' \
 	    -e 's;os_posix/os_time.c;os_win/os_time.c;' \
-	    -e 's;os_posix/os_yield.c;os_win/os_yield.c;'
+	    -e 's;os_posix/os_yield.c;os_win/os_yield.c;' \
+	    -e '/src\/support\/power8\/crc32.S/d' \
+	    -e '/src\/support\/power8\/crc32_wrapper.c/d'
 	 echo 'src/os_win/os_snprintf.c'
 	 echo 'src/os_win/os_vsnprintf.c') < filelist | sort > $t
 	 cmp $t $f > /dev/null 2>&1 ||
