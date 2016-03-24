@@ -16,7 +16,12 @@ int
 __wt_os_init(WT_SESSION_IMPL *session)
 {
 	return (F_ISSET(S2C(session), WT_CONN_IN_MEMORY) ?
-	    __wt_os_inmemory(session) : __wt_os_posix(session));
+	    __wt_os_inmemory(session) :
+#if defined(_MSC_VER)
+	    __wt_os_win(session));
+#else
+	    __wt_os_posix(session));
+#endif
 }
 
 /*
@@ -27,5 +32,10 @@ int
 __wt_os_cleanup(WT_SESSION_IMPL *session)
 {
 	return (F_ISSET(S2C(session), WT_CONN_IN_MEMORY) ?
-	    __wt_os_inmemory_cleanup(session) : __wt_os_posix_cleanup(session));
+	    __wt_os_inmemory_cleanup(session) :
+#if defined(_MSC_VER)
+	    __wt_os_win_cleanup(session));
+#else
+	    __wt_os_posix_cleanup(session));
+#endif
 }

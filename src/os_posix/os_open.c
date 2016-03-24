@@ -137,8 +137,9 @@ __wt_open(WT_SESSION_IMPL *session,
 	WT_ERR(conn->handle_open(session, fh, name, dio_type, flags));
 	open_called = true;
 
-	/* Set the file's size. */
-	WT_ERR(fh->fh_size(session, fh, &fh->size));
+	/* Set file sizes. */
+	if (dio_type != WT_FILE_TYPE_DIRECTORY)
+		WT_ERR(fh->fh_size(session, fh, &fh->size));
 
 	/*
 	 * Repeat the check for a match: if there's no match, link our newly

@@ -63,14 +63,33 @@ int
 __wt_errno(void)
 {
 	/*
+	 * Check for 0:
+	 * It's easy to introduce a problem by calling the wrong error function,
+	 * for example, this function when the MSVC function set the C runtime
+	 * error value. Handle gracefully and always return an error.
+	 */
+	return (errno == 0 ? WT_ERROR : errno);
+}
+
+/*
+ * __wt_win32_errno --
+ *	Return GetLastError, or WT_ERROR if error not set.
+ */
+int
+__wt_win32_errno(void)
+{
+	/*
 	 * Called when we know an error occurred, and we want the system
-	 * error code, but there's some chance it's not set.
+	 * error code.
 	 */
 	DWORD err = GetLastError();
 
-	/* GetLastError should only be called if we hit an actual error */
-	WT_ASSERT(NULL, err != ERROR_SUCCESS);
-
+	/*
+	 * Check for ERROR_SUCCESS:
+	 * It's easy to introduce a problem by calling the wrong error function,
+	 * for example, this function when the MSVC function set the C runtime
+	 * error value. Handle gracefully and always return an error.
+	 */
 	return (err == ERROR_SUCCESS ?
 	    WT_ERROR : __wt_map_windows_error_to_error(err));
 }

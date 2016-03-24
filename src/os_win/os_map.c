@@ -30,7 +30,7 @@ __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp,
 	*mappingcookie =
 	    CreateFileMappingA(fh->filehandle, NULL, PAGE_READONLY, 0, 0, NULL);
 	if (*mappingcookie == NULL)
-		WT_RET_MSG(session, __wt_errno(),
+		WT_RET_MSG(session, __wt_win32_errno(),
 			"%s CreateFileMapping error: failed to map %"
 			WT_SIZET_FMT " bytes",
 			fh->name, orig_size);
@@ -40,7 +40,7 @@ __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp,
 		CloseHandle(*mappingcookie);
 		*mappingcookie = NULL;
 
-		WT_RET_MSG(session, __wt_errno(),
+		WT_RET_MSG(session, __wt_win32_errno(),
 		    "%s map error: failed to map %" WT_SIZET_FMT " bytes",
 		    fh->name, orig_size);
 	}
@@ -93,14 +93,14 @@ __wt_munmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, size_t len,
 	    fh->name, map, len));
 
 	if (UnmapViewOfFile(map) == 0) {
-		WT_RET_MSG(session, __wt_errno(),
+		WT_RET_MSG(session, __wt_win32_errno(),
 		    "%s UnmapViewOfFile error: failed to unmap %" WT_SIZET_FMT
 		    " bytes",
 		    fh->name, len);
 	}
 
 	if (CloseHandle(*mappingcookie) == 0) {
-		WT_RET_MSG(session, __wt_errno(),
+		WT_RET_MSG(session, __wt_win32_errno(),
 		    "CloseHandle: MapViewOfFile: %s", fh->name);
 	}
 

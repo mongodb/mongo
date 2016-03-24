@@ -145,7 +145,7 @@ __posix_file_exist(WT_SESSION_IMPL *session, const char *name, bool *existp)
 
 /*
  * __posix_file_remove --
- *	POSIX remove.
+ *	Remove a file.
  */
 static int
 __posix_file_remove(WT_SESSION_IMPL *session, const char *name)
@@ -172,7 +172,7 @@ __posix_file_remove(WT_SESSION_IMPL *session, const char *name)
 
 /*
  * __posix_file_rename --
- *	POSIX rename.
+ *	Rename a file.
  */
 static int
 __posix_file_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
@@ -469,7 +469,7 @@ __posix_handle_write(WT_SESSION_IMPL *session,
 
 /*
  * __posix_handle_open --
- *	POSIX fopen/open.
+ *	Open a file handle.
  */
 static int
 __posix_handle_open(WT_SESSION_IMPL *session,
@@ -485,12 +485,12 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 
 	conn = S2C(session);
 	direct_io = false;
+	path = NULL;
 
 	/* 0 is a legal file descriptor, set up error handling. */
 	fh->fd = fd = -1;
 
 	/* Create the path to the file. */
-	path = NULL;
 	if (!LF_ISSET(WT_OPEN_FIXED)) {
 		WT_ERR(__wt_filename(session, name, &path));
 		name = path;
@@ -606,12 +606,12 @@ setupfh:
 		break;
 	}
 	if (stream_mode != NULL && (fh->fp = fdopen(fd, stream_mode)) == NULL)
-		WT_ERR_MSG(session, __wt_errno(), "%s: fopen", name);
+		WT_ERR_MSG(session, __wt_errno(), "%s: fdopen", name);
 
 	__wt_free(session, path);
 	fh->fd = fd;
 
-	/* Configure fallocate/posix_fallocate calls. */
+	/* Configure fallocate calls. */
 	__wt_posix_handle_allocate_configure(session, fh);
 
 	fh->fh_advise = __posix_handle_advise;

@@ -132,7 +132,7 @@ testutil_clean_work_dir(char *dir)
 
 	snprintf(buf, len, "%s%s", RM_COMMAND, dir);
 
-	if ((ret = system(buf)) != 0)
+	if ((ret = system(buf)) != 0 && ret != ENOENT)
 		testutil_die(ret, "%s", buf);
 	free(buf);
 }

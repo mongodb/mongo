@@ -25,8 +25,8 @@ __wt_dlopen(WT_SESSION_IMPL *session, const char *path, WT_DLH **dlhp)
 	if (path == NULL) {
 		ret = GetModuleHandleExA(0, NULL, (HMODULE *)&dlh->handle);
 		if (ret == FALSE)
-			WT_ERR_MSG(session,
-			    __wt_errno(), "GetModuleHandleEx(%s): %s", path, 0);
+			WT_ERR_MSG(session, __wt_win32_errno(),
+			    "GetModuleHandleEx(%s): %s", path, 0);
 	} else {
 		// TODO: load dll here
 		DebugBreak();
@@ -57,7 +57,7 @@ __wt_dlsym(WT_SESSION_IMPL *session,
 
 	sym = GetProcAddress(dlh->handle, name);
 	if (sym == NULL && fail) {
-		WT_RET_MSG(session, __wt_errno(),
+		WT_RET_MSG(session, __wt_win32_errno(),
 		    "GetProcAddress(%s in %s)", name, dlh->name);
 	}
 
@@ -75,7 +75,7 @@ __wt_dlclose(WT_SESSION_IMPL *session, WT_DLH *dlh)
 	WT_DECL_RET;
 
 	if ((ret = FreeLibrary(dlh->handle)) == FALSE) {
-		__wt_err(session, __wt_errno(), "FreeLibrary");
+		__wt_err(session, __wt_win32_errno(), "FreeLibrary");
 	}
 
 	/* Windows returns 0 on failure, WT expects 0 on success */

@@ -94,5 +94,7 @@ err:
 			__wt_free(session, entries[count]);
 		__wt_free(session, entries);
 	}
-	WT_RET_MSG(session, ret, "dirlist %s prefix %s", dir, prefix);
+	WT_RET_MSG(session, ret,
+	    "directory-list %s, prefix \"%s\"",
+	    dir, prefix == NULL ? "" : prefix);
 }

@@ -335,6 +335,7 @@ WAL
 WIREDTIGER
 WRLSN
 WRNOLOCK
+WaitForSingleObject
 WakeAllConditionVariable
 Wconditional
 WeakHashLen
@@ -596,6 +597,7 @@ fblocks
 fclose
 fcntl
 fdatasync
+fdopen
 ffc
 fflush
 ffs
@@ -843,6 +845,7 @@ optimizations
 optype
 ori
 os
+osfhandle
 ovfl
 ownp
 packv

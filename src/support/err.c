@@ -180,13 +180,19 @@ __wt_eventv(WT_SESSION_IMPL *session, bool msg_event, int error,
 	 * example, we can end up here without a session.)
 	 */
 	if (session == NULL) {
-		WT_RET(__wt_fprintf(session, WT_STDERR(session),
+		if (fprintf(stderr,
 		    "WiredTiger Error%s%s: ",
 		    error == 0 ? "" : ": ",
-		    error == 0 ? "" : __wt_strerror(session, error, NULL, 0)));
-		WT_RET(__wt_vfprintf(session, WT_STDERR(session), fmt, ap));
-		WT_RET(__wt_fprintf(session, WT_STDERR(session), "\n"));
-		return (__wt_fsync(session, WT_STDERR(session), true));
+		    error == 0 ? "" :
+		    __wt_strerror(session, error, NULL, 0)) < 0)
+			ret = EIO;
+		if (vfprintf(stderr, fmt, ap) < 0)
+			ret = EIO;
+		if (fprintf(stderr, "\n") < 0)
+			ret = EIO;
+		if (fflush(stderr) != 0)
+			ret = EIO;
+		return (ret);
 	}
 
 	p = s;

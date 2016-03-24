@@ -9,13 +9,12 @@
 #include "wt_internal.h"
 
 /*
- * __wt_dirlist --
- *	Get a list of files from a directory, optionally filtered by
- *	a given prefix.
+ * __wt_win_directory_list --
+ *	Get a list of files from a directory, MSVC version.
  */
 int
-__wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
-    uint32_t flags, char ***dirlist, u_int *countp)
+__wt_win_directory_list(WT_SESSION_IMPL *session, const char *dir,
+    const char *prefix, uint32_t flags, char ***dirlist, u_int *countp)
 {
 	HANDLE findhandle;
 	WIN32_FIND_DATA finddata;
@@ -56,7 +55,7 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 	findhandle = FindFirstFileA(pathbuf->data, &finddata);
 
 	if (INVALID_HANDLE_VALUE == findhandle)
-		WT_ERR_MSG(session, __wt_errno(), "%s: FindFirstFile",
+		WT_ERR_MSG(session, __wt_win32_errno(), "%s: FindFirstFile",
 		    pathbuf->data);
 	else {
 		do {
@@ -67,6 +66,10 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 			    strcmp(finddata.cFileName, "..") == 0)
 				continue;
 			match = false;
+
+			/*
+			 * The list of files is optionally filtered by a prefix.
+			 */
 			if (prefix != NULL &&
 			    ((LF_ISSET(WT_DIRLIST_INCLUDE) &&
 			    WT_PREFIX_MATCH(finddata.cFileName, prefix)) ||
@@ -108,5 +111,7 @@ err:
 		__wt_free(session, entries);
 	}
 
-	WT_RET_MSG(session, ret, "dirlist %s prefix %s", dir, prefix);
+	WT_RET_MSG(session, ret,
+	    "directory-list %s, prefix \"%s\"",
+	    dir, prefix == NULL ? "" : prefix);
 }

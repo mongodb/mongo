@@ -21,7 +21,7 @@ __wt_thread_create(WT_SESSION_IMPL *session,
 	if (*tidret != 0)
 		return (0);
 
-	WT_RET_MSG(session, errno, "_beginthreadex");
+	WT_RET_MSG(session, __wt_errno, "thread create: _beginthreadex");
 }
 
 /*
@@ -37,12 +37,13 @@ __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid)
 		/*
 		 * If we fail to wait, we will leak handles so do not continue
 		 */
-		WT_PANIC_RET(session, ret == WAIT_FAILED ? __wt_errno() : ret,
-		    "Wait for thread join failed");
+		WT_PANIC_RET(session,
+		    ret == WAIT_FAILED ? __wt_win32_errno() : ret,
+		    "thread join: WaitForSingleObject");
 
 	if (CloseHandle(tid) == 0) {
-		WT_RET_MSG(session, __wt_errno(),
-		    "CloseHandle: thread join");
+		WT_RET_MSG(session,
+		    __wt_win32_errno(), "thread join: CloseHandle");
 	}
 
 	return (0);
