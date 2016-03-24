@@ -164,7 +164,7 @@ __posix_file_remove(WT_SESSION_IMPL *session, const char *name)
 
 	WT_SYSCALL_RETRY(remove(name), ret);
 	if (ret != 0)
-		__wt_err(session, ret, "%s: remove", path);
+		__wt_err(session, ret, "%s: remove", name);
 
 	__wt_free(session, path);
 	return (ret);

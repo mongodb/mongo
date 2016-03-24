@@ -53,7 +53,6 @@ __win_file_remove(WT_SESSION_IMPL *session, const char *name)
 {
 	WT_DECL_RET;
 	char *path;
-	uint32_t lasterror;
 
 #ifdef HAVE_DIAGNOSTIC
 	if (__wt_handle_search(session, name, false, true, NULL, NULL))
@@ -62,16 +61,15 @@ __win_file_remove(WT_SESSION_IMPL *session, const char *name)
 #endif
 
 	WT_RET(__wt_filename(session, name, &path));
+	name = path;
 
-	if ((ret = DeleteFileA(path)) == FALSE)
-		lasterror = __wt_win32_errno();
+	if (DeleteFileA(path) == FALSE) {
+		ret = __wt_win32_errno();
+		__wt_err(session, ret, "%s: remove", name);
+	}
 
 	__wt_free(session, path);
-
-	if (ret != FALSE)
-		return (0);
-
-	WT_RET_MSG(session, lasterror, "%s: remove", name);
+	return (ret);
 }
 
 /*
@@ -82,7 +80,6 @@ static int
 __win_file_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
 {
 	WT_DECL_RET;
-	uint32_t lasterror;
 	char *from_path, *to_path;
 
 #ifdef HAVE_DIAGNOSTIC
@@ -104,23 +101,21 @@ __win_file_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
 	 * Check if file exists since Windows does not override the file if
 	 * it exists.
 	 */
-	if ((ret = GetFileAttributesA(to)) != INVALID_FILE_ATTRIBUTES) {
-		if ((ret = DeleteFileA(to)) == FALSE) {
-			lasterror = __wt_win32_errno();
+	if (GetFileAttributesA(to) != INVALID_FILE_ATTRIBUTES)
+		if (DeleteFileA(to) == FALSE) {
+			ret = __wt_win32_errno();
 			goto err;
 		}
-	}
 
-	if ((MoveFileA(from, to)) == FALSE)
-		lasterror = __wt_win32_errno();
+	if (MoveFileA(from, to) == FALSE)
+		ret = __wt_win32_errno();
 
-err:	__wt_free(session, from_path);
+err:	if (ret != 0)
+		__wt_err(session, ret, "%s to %s: rename", from, to);
+
+	__wt_free(session, from_path);
 	__wt_free(session, to_path);
-
-	if (ret != FALSE)
-		return (0);
-
-	WT_RET_MSG(session, lasterror, "MoveFile %s to %s", from, to);
+	return (ret);
 }
 
 /*
