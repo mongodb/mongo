@@ -623,6 +623,31 @@ class TCMallocImplementation : public MallocExtension {
     IterateOverRanges(arg, func);
   }
 
+  virtual void SizeClasses(void* arg, SizeClassFunction func) {
+    TCMallocStats global_stats;
+    base::MallocSizeClass stats;
+    uint64_t class_count[kNumClasses];
+    ExtractStats(&global_stats, class_count, NULL, NULL);
+
+    for (int cl = 0; cl < kNumClasses; cl++) {
+      uint64_t central_objs = Static::central_cache()[cl].length();
+      uint64_t transfer_objs = Static::central_cache()[cl].tc_length();
+      uint64_t num_spans = Static::central_cache()[cl].spans();
+      uint64_t pages_per_span = Static::sizemap()->class_to_pages(cl);
+
+      stats.bytes_per_obj = Static::sizemap()->ByteSizeForClass(cl);
+      stats.pages_per_span = pages_per_span;
+      stats.num_spans = num_spans;
+      stats.num_central_objs = central_objs;
+      stats.num_transfer_objs = transfer_objs;
+      stats.num_thread_objs = class_count[cl] - central_objs - transfer_objs;
+      stats.free_bytes = class_count[cl] * Static::sizemap()->ByteSizeForClass(cl);
+      stats.alloc_bytes = (num_spans * pages_per_span) << kPageShift;
+
+      func(arg, &stats);
+    }
+  }
+
   virtual bool GetNumericProperty(const char* name, size_t* value) {
     ASSERT(name != NULL);
 

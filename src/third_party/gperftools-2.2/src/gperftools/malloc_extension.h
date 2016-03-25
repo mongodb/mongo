@@ -69,6 +69,7 @@ typedef std::string MallocExtensionWriter;
 
 namespace base {
 struct MallocRange;
+struct MallocSizeClass;
 }
 
 // Interface to a pluggable system allocator.
@@ -395,6 +396,11 @@ class PERFTOOLS_DLL_DECL MallocExtension {
   // Like ReadStackTraces(), but returns stack traces that caused growth
   // in the address space size.
   virtual void** ReadHeapGrowthStackTraces();
+
+  // Invokes func(arg, classinfo) for every size class.
+  // *classinfo is filled in with information about the size class.
+  typedef void (SizeClassFunction)(void*, const base::MallocSizeClass*);
+  virtual void SizeClasses(void* arg, SizeClassFunction func);
 };
 
 namespace base {
@@ -418,6 +424,17 @@ struct MallocRange {
   // - stack trace if this range was sampled
   // - heap growth stack trace if applicable to this range
   // - age when allocated (for inuse) or freed (if not in use)
+};
+
+struct MallocSizeClass {
+    size_t bytes_per_obj;
+    size_t pages_per_span;
+    size_t num_spans;
+    size_t num_thread_objs;
+    size_t num_central_objs;
+    size_t num_transfer_objs;
+    size_t free_bytes;
+    size_t alloc_bytes;
 };
 
 } // namespace base

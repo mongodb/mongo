@@ -118,6 +118,7 @@ bool MallocExtension::GetNumericProperty(const char* property, size_t* value) {
   return false;
 }
 
+
 bool MallocExtension::SetNumericProperty(const char* property, size_t value) {
   return false;
 }
@@ -345,6 +346,10 @@ void MallocExtension::Ranges(void* arg, RangeFunction func) {
   // No callbacks by default
 }
 
+void MallocExtension::SizeClasses(void* arg, SizeClassFunction func) {
+  // Do nothing by default
+}
+
 // These are C shims that work on the current instance.
 
 #define C_SHIM(fn, retval, paramlist, arglist)          \
@@ -366,6 +371,9 @@ C_SHIM(GetNumericProperty, int,
        (const char* property, size_t* value), (property, value));
 C_SHIM(SetNumericProperty, int,
        (const char* property, size_t value), (property, value));
+C_SHIM(SizeClasses, void,
+       (void* arg, void (func)(void*, const base::MallocSizeClass*)),
+       (arg, func));
 
 C_SHIM(MarkThreadIdle, void, (void), ());
 C_SHIM(MarkThreadBusy, void, (void), ());

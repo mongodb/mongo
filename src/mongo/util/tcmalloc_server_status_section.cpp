@@ -111,6 +111,7 @@ public:
         }
         {
             BSONObjBuilder sub(builder.subobjStart("tcmalloc"));
+
             appendNumericPropertyIfAvailable(
                 sub, "pageheap_free_bytes", "tcmalloc.pageheap_free_bytes");
             appendNumericPropertyIfAvailable(
@@ -122,6 +123,16 @@ public:
                                              "tcmalloc.current_total_thread_cache_bytes");
             // Not including tcmalloc.slack_bytes since it is deprecated.
 
+            // Calculate total free bytes, *excluding the page heap*
+            size_t central, transfer, thread;
+            if (MallocExtension::instance()->GetNumericProperty("tcmalloc.central_cache_free_bytes",
+                                                                &central) &&
+                MallocExtension::instance()->GetNumericProperty(
+                    "tcmalloc.transfer_cache_free_bytes", &transfer) &&
+                MallocExtension::instance()->GetNumericProperty("tcmalloc.thread_cache_free_bytes",
+                                                                &thread)) {
+                sub.appendNumber("total_free_bytes", central + transfer + thread);
+            }
             appendNumericPropertyIfAvailable(
                 sub, "central_cache_free_bytes", "tcmalloc.central_cache_free_bytes");
             appendNumericPropertyIfAvailable(
@@ -130,11 +141,14 @@ public:
                 sub, "thread_cache_free_bytes", "tcmalloc.thread_cache_free_bytes");
             appendNumericPropertyIfAvailable(
                 sub, "aggressive_memory_decommit", "tcmalloc.aggressive_memory_decommit");
-        }
 
-        char buffer[4096];
-        MallocExtension::instance()->GetStats(buffer, sizeof(buffer));
-        builder.append("formattedString", buffer);
+#if MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS
+            // Size class information
+            BSONArrayBuilder arr;
+            MallocExtension::instance()->SizeClasses(&arr, appendSizeClassInfo);
+            sub.append("size_classes", arr.arr());
+#endif
+        }
 
         return builder.obj();
     }
@@ -147,6 +161,24 @@ private:
         if (MallocExtension::instance()->GetNumericProperty(property, &value))
             builder.appendNumber(bsonName, value);
     }
+
+#if MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS
+    static void appendSizeClassInfo(void* bsonarr_builder, const base::MallocSizeClass* stats) {
+        BSONArrayBuilder* builder = reinterpret_cast<BSONArrayBuilder*>(bsonarr_builder);
+        BSONObjBuilder doc;
+
+        doc.appendNumber("bytes_per_object", stats->bytes_per_obj);
+        doc.appendNumber("pages_per_span", stats->pages_per_span);
+        doc.appendNumber("num_spans", stats->num_spans);
+        doc.appendNumber("num_thread_objs", stats->num_thread_objs);
+        doc.appendNumber("num_central_objs", stats->num_central_objs);
+        doc.appendNumber("num_transfer_objs", stats->num_transfer_objs);
+        doc.appendNumber("free_bytes", stats->free_bytes);
+        doc.appendNumber("allocated_bytes", stats->alloc_bytes);
+
+        builder->append(doc.obj());
+    }
+#endif
 } tcmallocServerStatusSection;
 }
 }
