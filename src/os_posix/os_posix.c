@@ -471,6 +471,35 @@ __posix_handle_write(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __posix_handle_open_cloexec --
+ *	Prevent child access to file handles.
+ */
+static inline int
+__posix_handle_open_cloexec(WT_SESSION_IMPL *session, int fd, const char *name)
+{
+#if defined(HAVE_FCNTL) && defined(FD_CLOEXEC) && !defined(O_CLOEXEC)
+	int f;
+
+	/*
+	 * Security:
+	 * The application may spawn a new process, and we don't want another
+	 * process to have access to our file handles. There's an obvious race
+	 * between the open and this call, prefer the flag to open if available.
+	 */
+	if ((f = fcntl(fd, F_GETFD)) == -1 ||
+	    fcntl(fd, F_SETFD, f | FD_CLOEXEC) == -1)
+		WT_RET_MSG(session, __wt_errno(),
+		    "%s: handle-open: fcntl", name);
+	return (0);
+#else
+	WT_UNUSED(session);
+	WT_UNUSED(fd);
+	WT_UNUSED(name);
+	return (0);
+#endif
+}
+
+/*
  * __posix_handle_open --
  *	Open a file handle.
  */
@@ -490,8 +519,9 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 	direct_io = false;
 	path = NULL;
 
-	/* 0 is a legal file descriptor, set up error handling. */
+	/* Set up error handling. */
 	fh->fd = fd = -1;
+	fh->fp = NULL;
 
 	/* Create the path to the file. */
 	if (!LF_ISSET(WT_OPEN_FIXED)) {
@@ -500,11 +530,21 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 	}
 
 	if (dio_type == WT_FILE_TYPE_DIRECTORY) {
+		f = O_RDONLY;
+#ifdef O_CLOEXEC
+		/*
+		 * Security:
+		 * The application may spawn a new process, and we don't want
+		 * another process to have access to our file handles.
+		 */
+		f |= O_CLOEXEC;
+#endif
 		WT_SYSCALL_RETRY((
-		    (fd = open(name, O_RDONLY, 0444)) == -1 ? 1 : 0), ret);
-		if (ret == 0)
-			goto setupfh;
-		WT_ERR_MSG(session, ret, "%s: handle-open: open", name);
+		    (fd = open(name, f, 0444)) == -1 ? 1 : 0), ret);
+		if (ret != 0)
+			WT_ERR_MSG(session, ret, "%s: handle-open: open", name);
+		WT_ERR(__posix_handle_open_cloexec(session, fd, name));
+		goto directory_open;
 	}
 
 	f = LF_ISSET(WT_OPEN_READONLY) ? O_RDONLY : O_RDWR;
@@ -550,7 +590,7 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 		f |= O_SYNC;
 #else
 		WT_ERR_MSG(session, ENOTSUP,
-		    "Unsupported log sync mode requested");
+		    "unsupported log sync mode configured");
 #endif
 	}
 
@@ -561,20 +601,7 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 		    "%s: handle-open: open: failed with direct I/O configured, "
 		    "some filesystem types do not support direct I/O" :
 		    "%s: handle-open: open", name);
-
-setupfh:
-#if defined(HAVE_FCNTL) && defined(FD_CLOEXEC) && !defined(O_CLOEXEC)
-	/*
-	 * Security:
-	 * The application may spawn a new process, and we don't want another
-	 * process to have access to our file handles.  There's an obvious
-	 * race here, so we prefer the flag to open if available.
-	 */
-	if ((f = fcntl(fd, F_GETFD)) == -1 ||
-	    fcntl(fd, F_SETFD, f | FD_CLOEXEC) == -1)
-		WT_ERR_MSG(session, __wt_errno(),
-		    "%s: handle-open: fcntl", name);
-#endif
+	WT_ERR(__posix_handle_open_cloexec(session, fd, name));
 
 	/* Disable read-ahead on trees: it slows down random read workloads. */
 #if defined(HAVE_POSIX_FADVISE)
@@ -593,7 +620,7 @@ setupfh:
 	    dio_type == WT_FILE_TYPE_CHECKPOINT)
 		fh->extend_len = conn->data_extend_len;
 
-	/* Optionally configure the stream API. */
+	/* Optionally configure a stdio stream API. */
 	switch (LF_MASK(WT_STREAM_APPEND | WT_STREAM_READ | WT_STREAM_WRITE)) {
 	case WT_STREAM_APPEND:
 		stream_mode = "a";
@@ -615,6 +642,7 @@ setupfh:
 		WT_ERR_MSG(session, __wt_errno(),
 		    "%s: handle-open: fdopen", name);
 
+directory_open:
 	__wt_free(session, path);
 	fh->fd = fd;
 
@@ -640,9 +668,8 @@ err:	if (fd != -1) {
 		if (tret != 0)
 			__wt_err(session, tret, "%s: handle-open: close", name);
 	}
+
 	__wt_free(session, path);
-	fh->fd = -1;
-	fh->fp = NULL;
 	return (ret);
 }
 

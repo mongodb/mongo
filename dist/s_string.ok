@@ -462,6 +462,7 @@ ckpt
 ckptfrag
 ckptlist
 cksum
+cloexec
 clsm
 cmd
 cmp
