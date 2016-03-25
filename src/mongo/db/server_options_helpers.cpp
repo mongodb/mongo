@@ -958,7 +958,7 @@ Status storeServerOptions(const moe::Environment& params, const std::vector<std:
     } else if (params.count("security.authorization") &&
                params["security.authorization"].as<std::string>() == "enabled") {
         serverGlobalParams.authState = ServerGlobalParams::AuthState::kEnabled;
-    } 
+    }
 
     if (params.count("processManagement.pidFilePath")) {
         serverGlobalParams.pidFile = params["processManagement.pidFilePath"].as<string>();
