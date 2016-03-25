@@ -3125,12 +3125,11 @@ Value ExpressionSubstrCP::evaluateInternal(Variables* vars) const {
             return Value("");
         }
         uassert(34456,
-                str::stream() << getOpName() << ": invalid UTF-8 string: " << str,
+                str::stream() << getOpName() << ": invalid UTF-8 string",
                 !isContinuationByte(str[startIndexBytes]));
         size_t codePointLength = getCodePointLength(str[startIndexBytes]);
-        uassert(34457,
-                str::stream() << getOpName() << ": invalid UTF-8 string: " << str,
-                codePointLength <= 4);
+        uassert(
+            34457, str::stream() << getOpName() << ": invalid UTF-8 string", codePointLength <= 4);
         startIndexBytes += codePointLength;
     }
 
@@ -3138,12 +3137,11 @@ Value ExpressionSubstrCP::evaluateInternal(Variables* vars) const {
 
     for (int i = 0; i < length && endIndexBytes < str.size(); i++) {
         uassert(34458,
-                str::stream() << getOpName() << ": invalid UTF-8 string: " << str,
+                str::stream() << getOpName() << ": invalid UTF-8 string",
                 !isContinuationByte(str[endIndexBytes]));
         size_t codePointLength = getCodePointLength(str[endIndexBytes]);
-        uassert(34459,
-                str::stream() << getOpName() << ": invalid UTF-8 string: " << str,
-                codePointLength <= 4);
+        uassert(
+            34459, str::stream() << getOpName() << ": invalid UTF-8 string", codePointLength <= 4);
         endIndexBytes += codePointLength;
     }
 
