@@ -292,7 +292,7 @@ TEST_F(NetworkInterfaceASIOTest, TimeoutWithNetworkError) {
     auto cbh = makeCallbackHandle();
     auto deferred = startCommand(
         cbh,
-        RemoteCommandRequest(testHost, "testDB", BSON("a" << 1), BSONObj(), Milliseconds(100)));
+        RemoteCommandRequest(testHost, "testDB", BSON("a" << 1), BSONObj(), Milliseconds(1000)));
 
     // Create and initialize a stream so operation can begin
     auto stream = streamFactory().blockUntilStreamExists(testHost);
@@ -307,7 +307,7 @@ TEST_F(NetworkInterfaceASIOTest, TimeoutWithNetworkError) {
 
         // Trigger both a timeout and a network error
         stream->setError(make_error_code(ErrorCodes::HostUnreachable));
-        timerFactory().fastForward(Milliseconds(500));
+        timerFactory().fastForward(Milliseconds(2000));
     }
 
     // Wait for op to complete, assert that timeout had precedence.
