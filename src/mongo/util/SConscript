@@ -255,7 +255,8 @@ if env['MONGO_ALLOCATOR'] == 'tcmalloc':
         # level configure check, though its effects should still be scoped just to these files.
         tcmspEnv.Append(
             CPPDEFINES=[
-                'MONGO_HAVE_GPERFTOOLS_GET_THREAD_CACHE_SIZE'
+                'MONGO_HAVE_GPERFTOOLS_GET_THREAD_CACHE_SIZE',
+                'MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS'
             ]
         )
 
