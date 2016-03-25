@@ -82,6 +82,7 @@
     var SATURDAY = 6;
     var SUNDAY = 7;
 
+    // Make numbers at least with two digits with 0 in front if shorter than two digits
     function padded(val) {
         return ("00" + val).slice(-2);
     }
