@@ -44,7 +44,7 @@ struct DeleteStageParams {
           fromMigrate(false),
           isExplain(false),
           returnDeleted(false),
-          canonicalQuery(NULL) {}
+          canonicalQuery(nullptr) {}
 
     // Should we delete all documents returned from the child (a "multi delete"), or at most one
     // (a "single delete")?
@@ -62,6 +62,9 @@ struct DeleteStageParams {
 
     // The parsed query predicate for this delete. Not owned here.
     CanonicalQuery* canonicalQuery;
+
+    // The user-requested sort specification. Currently used just for findAndModify.
+    BSONObj sort;
 };
 
 /**
@@ -105,6 +108,12 @@ public:
     static long long getNumDeleted(const PlanExecutor& exec);
 
 private:
+    /**
+     * Stores 'idToRetry' in '_idRetrying' so the delete can be retried during the next call to
+     * work(). Always returns NEED_YIELD and sets 'out' to WorkingSet::INVALID_ID.
+     */
+    StageState prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out);
+
     DeleteStageParams _params;
 
     // Not owned by us.

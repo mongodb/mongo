@@ -671,6 +671,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* txn,
     deleteStageParams.fromMigrate = request->isFromMigrate();
     deleteStageParams.isExplain = request->isExplain();
     deleteStageParams.returnDeleted = request->shouldReturnDeleted();
+    deleteStageParams.sort = request->getSort();
 
     unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
     PlanExecutor::YieldPolicy policy =

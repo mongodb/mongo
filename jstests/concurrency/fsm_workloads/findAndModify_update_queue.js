@@ -31,11 +31,8 @@ var $config = extendWorkload(
             };
         };
 
-        $config.data.getIndexSpec = function getIndexSpec() {
-            return {
-                counter: 1,
-                rand: -1
-            };
+        $config.data.getIndexSpecs = function getIndexSpecs() {
+            return [{counter: 1, rand: -1}];
         };
 
         $config.data.opName = 'updated';

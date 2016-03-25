@@ -36,6 +36,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/query/canonical_query.h"
@@ -49,6 +50,22 @@ namespace mongo {
 using std::unique_ptr;
 using std::vector;
 using stdx::make_unique;
+
+namespace {
+
+/**
+ * Returns true if we should throw a WriteConflictException in order to retry the operation in
+ * the case of a conflict. Returns false if we should skip the document and keep going.
+ */
+bool shouldRestartDeleteIfNoLongerMatches(const DeleteStageParams& params) {
+    // When we're doing a findAndModify with a sort, the sort will have a limit of 1, so it will not
+    // produce any more results even if there is another matching document. Throw a WCE here so that
+    // these operations get another chance to find a matching document. The findAndModify command
+    // should automatically retry if it gets a WCE.
+    return params.returnDeleted && !params.sort.isEmpty();
+};
+
+}  // namespace
 
 // static
 const char* DeleteStage::kStageType = "DELETE";
@@ -141,7 +158,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     // We advanced, or are retrying, and id is set to the WSM to work on.
     WorkingSetMember* member = _ws->get(id);
 
-    // We want to free this member when we return, unless we need to retry it.
+    // We want to free this member when we return, unless we need to retry deleting or returning it.
     ScopeGuard memberFreer = MakeGuard(&WorkingSet::free, _ws, id);
 
     if (!member->hasRecordId()) {
@@ -154,66 +171,57 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     // a fetch. We should always get fetched data, and never just key data.
     invariant(member->hasObj());
 
+    // Ensure the document still exists and matches the predicate.
+    bool docStillMatches;
     try {
-        // If the snapshot changed, then we have to make sure we have the latest copy of the
-        // doc and that it still matches.
-        std::unique_ptr<SeekableRecordCursor> cursor;
-        if (getOpCtx()->recoveryUnit()->getSnapshotId() != member->obj.snapshotId()) {
-            cursor = _collection->getCursor(getOpCtx());
-            if (!WorkingSetCommon::fetch(getOpCtx(), _ws, id, cursor)) {
-                // Doc is already deleted. Nothing more to do.
-                return PlanStage::NEED_TIME;
-            }
+        docStillMatches = write_stage_common::ensureStillMatches(
+            _collection, getOpCtx(), _ws, id, _params.canonicalQuery);
+    } catch (const WriteConflictException& wce) {
+        // There was a problem trying to detect if the document still exists, so retry.
+        memberFreer.Dismiss();
+        return prepareToRetryWSM(id, out);
+    }
 
-            // Make sure the re-fetched doc still matches the predicate.
-            if (_params.canonicalQuery &&
-                !_params.canonicalQuery->root()->matchesBSON(member->obj.value(), NULL)) {
-                // Doesn't match.
-                return PlanStage::NEED_TIME;
-            }
+    if (!docStillMatches) {
+        // Either the document has already been deleted, or it has been updated such that it no
+        // longer matches the predicate.
+        if (shouldRestartDeleteIfNoLongerMatches(_params)) {
+            throw WriteConflictException();
         }
+        return PlanStage::NEED_TIME;
+    }
 
-        // Ensure that the BSONObj underlying the WorkingSetMember is owned because saveState()
-        // is allowed to free the memory.
-        if (_params.returnDeleted) {
-            // Save a copy of the document that is about to get deleted, but keep it in the
-            // RID_AND_OBJ state in case we need to retry deleting it.
-            BSONObj deletedDoc = member->obj.value();
-            member->obj.setValue(deletedDoc.getOwned());
-        }
+    // Ensure that the BSONObj underlying the WorkingSetMember is owned because saveState() is
+    // allowed to free the memory.
+    if (_params.returnDeleted) {
+        // Save a copy of the document that is about to get deleted, but keep it in the RID_AND_OBJ
+        // state in case we need to retry deleting it.
+        BSONObj deletedDoc = member->obj.value();
+        member->obj.setValue(deletedDoc.getOwned());
+    }
 
-        // TODO: Do we want to buffer docs and delete them in a group rather than
-        // saving/restoring state repeatedly?
+    // TODO: Do we want to buffer docs and delete them in a group rather than saving/restoring state
+    // repeatedly?
 
+    try {
+        WorkingSetCommon::prepareForSnapshotChange(_ws);
+        child()->saveState();
+    } catch (const WriteConflictException& wce) {
+        std::terminate();
+    }
+
+    // Do the write, unless this is an explain.
+    if (!_params.isExplain) {
         try {
-            WorkingSetCommon::prepareForSnapshotChange(_ws);
-            child()->saveState();
-        } catch (const WriteConflictException& wce) {
-            std::terminate();
-        }
-
-        // Do the write, unless this is an explain.
-        if (!_params.isExplain) {
             WriteUnitOfWork wunit(getOpCtx());
             _collection->deleteDocument(getOpCtx(), recordId, _params.fromMigrate);
             wunit.commit();
+        } catch (const WriteConflictException& wce) {
+            memberFreer.Dismiss();  // Keep this member around so we can retry deleting it.
+            return prepareToRetryWSM(id, out);
         }
-
-        ++_specificStats.docsDeleted;
-    } catch (const WriteConflictException& wce) {
-        // When we're doing a findAndModify with a sort, the sort will have a limit of 1, so will
-        // not produce any more results even if there is another matching document. Re-throw the WCE
-        // here so that these operations get another chance to find a matching document. The
-        // findAndModify command should automatically retry if it gets a WCE.
-        // TODO: this is not necessary if there was no sort specified.
-        if (_params.returnDeleted) {
-            throw;
-        }
-        _idRetrying = id;
-        memberFreer.Dismiss();  // Keep this member around so we can retry deleting it.
-        *out = WorkingSet::INVALID_ID;
-        return NEED_YIELD;
     }
+    ++_specificStats.docsDeleted;
 
     if (_params.returnDeleted) {
         // After deleting the document, the RecordId associated with this member is invalid.
@@ -222,15 +230,14 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
         member->transitionToOwnedObj();
     }
 
-    //  As restoreState may restore (recreate) cursors, cursors are tied to the
-    //  transaction in which they are created, and a WriteUnitOfWork is a
-    //  transaction, make sure to restore the state outside of the WritUnitOfWork.
+    // As restoreState may restore (recreate) cursors, cursors are tied to the transaction in which
+    // they are created, and a WriteUnitOfWork is a transaction, make sure to restore the state
+    // outside of the WriteUnitOfWork.
     try {
         child()->restoreState();
     } catch (const WriteConflictException& wce) {
-        // Note we don't need to retry anything in this case since the delete already
-        // was committed. However, we still need to return the deleted document
-        // (if it was requested).
+        // Note we don't need to retry anything in this case since the delete already was committed.
+        // However, we still need to return the deleted document (if it was requested).
         if (_params.returnDeleted) {
             // member->obj should refer to the deleted document.
             invariant(member->getState() == WorkingSetMember::OWNED_OBJ);
@@ -284,6 +291,12 @@ long long DeleteStage::getNumDeleted(const PlanExecutor& exec) {
     const DeleteStats* deleteStats =
         static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
     return deleteStats->docsDeleted;
+}
+
+PlanStage::StageState DeleteStage::prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out) {
+    _idRetrying = idToRetry;
+    *out = WorkingSet::INVALID_ID;
+    return NEED_YIELD;
 }
 
 }  // namespace mongo

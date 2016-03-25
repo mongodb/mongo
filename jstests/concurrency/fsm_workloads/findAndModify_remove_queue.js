@@ -26,10 +26,8 @@ var $config = (function() {
             };
         },
 
-        getIndexSpec: function getIndexSpec() {
-            return {
-                rand: 1
-            };
+        getIndexSpecs: function getIndexSpecs() {
+            return [{rand: 1}];
         },
 
         opName: 'removed',
@@ -114,7 +112,9 @@ var $config = (function() {
         assertAlways.writeOK(res);
         assertAlways.eq(this.numDocs, res.nInserted);
 
-        assertAlways.commandWorked(db[collName].ensureIndex(this.getIndexSpec()));
+        this.getIndexSpecs().forEach(function ensureIndex(indexSpec) {
+            assertAlways.commandWorked(db[collName].ensureIndex(indexSpec));
+        });
     }
 
     function teardown(db, collName, cluster) {
@@ -133,7 +133,7 @@ var $config = (function() {
             }
         }
 
-        assertWhenOwnColl(function() {
+        assertWhenOwnColl(() => {
             var docs = ownedDB[collName].find().toArray();
             var ids = [];
 
@@ -142,7 +142,7 @@ var $config = (function() {
             }
 
             checkForDuplicateIds(ids, this.opName);
-        }.bind(this));
+        });
 
         var res = ownedDB.dropDatabase();
         assertAlways.commandWorked(res);

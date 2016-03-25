@@ -36,6 +36,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/update_lifecycle.h"
@@ -409,6 +410,18 @@ Status addObjectIDIdField(mb::Document* doc) {
 
     return Status::OK();
 }
+
+/**
+ * Returns true if we should throw a WriteConflictException in order to retry the operation in the
+ * case of a conflict. Returns false if we should skip the document and keep going.
+ */
+bool shouldRestartUpdateIfNoLongerMatches(const UpdateStageParams& params) {
+    // When we're doing a findAndModify with a sort, the sort will have a limit of 1, so it will not
+    // produce any more results even if there is another matching document. Throw a WCE here so that
+    // these operations get another chance to find a matching document. The findAndModify command
+    // should automatically retry if it gets a WCE.
+    return params.request->shouldReturnAnyDocs() && !params.request->getSort().isEmpty();
+};
 
 }  // namespace
 
@@ -826,7 +839,8 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
 
         WorkingSetMember* member = _ws->get(id);
 
-        // We want to free this member when we return, unless we need to retry it.
+        // We want to free this member when we return, unless we need to retry updating or returning
+        // it.
         ScopeGuard memberFreer = MakeGuard(&WorkingSet::free, _ws, id);
 
         if (!member->hasRecordId()) {
@@ -848,70 +862,63 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
             return PlanStage::NEED_TIME;
         }
 
+        bool docStillMatches;
         try {
-            std::unique_ptr<SeekableRecordCursor> cursor;
-            if (getOpCtx()->recoveryUnit()->getSnapshotId() != member->obj.snapshotId()) {
-                cursor = _collection->getCursor(getOpCtx());
-                // our snapshot has changed, refetch
-                if (!WorkingSetCommon::fetch(getOpCtx(), _ws, id, cursor)) {
-                    // document was deleted, we're done here
-                    return PlanStage::NEED_TIME;
-                }
-
-                // we have to re-match the doc as it might not match anymore
-                CanonicalQuery* cq = _params.canonicalQuery;
-                if (cq && !cq->root()->matchesBSON(member->obj.value(), NULL)) {
-                    // doesn't match predicates anymore!
-                    return PlanStage::NEED_TIME;
-                }
-            }
-
-            // Ensure that the BSONObj underlying the WorkingSetMember is owned because saveState()
-            // is allowed to free the memory.
-            member->makeObjOwnedIfNeeded();
-
-            // Save state before making changes
-            try {
-                WorkingSetCommon::prepareForSnapshotChange(_ws);
-                child()->saveState();
-            } catch (const WriteConflictException& wce) {
-                std::terminate();
-            }
-
-            // If we care about the pre-updated version of the doc, save it out here.
-            BSONObj oldObj;
-            if (_params.request->shouldReturnOldDocs()) {
-                oldObj = member->obj.value().getOwned();
-            }
-
-            // Do the update, get us the new version of the doc.
-            BSONObj newObj = transformAndUpdate(member->obj, recordId);
-
-            // Set member's obj to be the doc we want to return.
-            if (_params.request->shouldReturnAnyDocs()) {
-                if (_params.request->shouldReturnNewDocs()) {
-                    member->obj = Snapshotted<BSONObj>(getOpCtx()->recoveryUnit()->getSnapshotId(),
-                                                       newObj.getOwned());
-                } else {
-                    invariant(_params.request->shouldReturnOldDocs());
-                    member->obj.setValue(oldObj);
-                }
-                member->recordId = RecordId();
-                member->transitionToOwnedObj();
-            }
+            docStillMatches = write_stage_common::ensureStillMatches(
+                _collection, getOpCtx(), _ws, id, _params.canonicalQuery);
         } catch (const WriteConflictException& wce) {
-            // When we're doing a findAndModify with a sort, the sort will have a limit of 1, so
-            // will not produce any more results even if there is another matching document.
-            // Re-throw the WCE here so that these operations get another chance to find a matching
-            // document. The findAndModify command should automatically retry if it gets a WCE.
-            // TODO: this is not necessary if there was no sort specified.
-            if (_params.request->shouldReturnAnyDocs()) {
-                throw;
+            // There was a problem trying to detect if the document still exists, so retry.
+            memberFreer.Dismiss();
+            return prepareToRetryWSM(id, out);
+        }
+
+        if (!docStillMatches) {
+            // Either the document has been deleted, or it has been updated such that it no longer
+            // matches the predicate.
+            if (shouldRestartUpdateIfNoLongerMatches(_params)) {
+                throw WriteConflictException();
             }
-            _idRetrying = id;
+            return PlanStage::NEED_TIME;
+        }
+
+        // Ensure that the BSONObj underlying the WorkingSetMember is owned because saveState()
+        // is allowed to free the memory.
+        member->makeObjOwnedIfNeeded();
+
+        // Save state before making changes
+        try {
+            WorkingSetCommon::prepareForSnapshotChange(_ws);
+            child()->saveState();
+        } catch (const WriteConflictException& wce) {
+            std::terminate();
+        }
+
+        // If we care about the pre-updated version of the doc, save it out here.
+        BSONObj oldObj;
+        if (_params.request->shouldReturnOldDocs()) {
+            oldObj = member->obj.value().getOwned();
+        }
+
+        BSONObj newObj;
+        try {
+            // Do the update, get us the new version of the doc.
+            newObj = transformAndUpdate(member->obj, recordId);
+        } catch (const WriteConflictException& wce) {
             memberFreer.Dismiss();  // Keep this member around so we can retry updating it.
-            *out = WorkingSet::INVALID_ID;
-            return NEED_YIELD;
+            return prepareToRetryWSM(id, out);
+        }
+
+        // Set member's obj to be the doc we want to return.
+        if (_params.request->shouldReturnAnyDocs()) {
+            if (_params.request->shouldReturnNewDocs()) {
+                member->obj = Snapshotted<BSONObj>(getOpCtx()->recoveryUnit()->getSnapshotId(),
+                                                   newObj.getOwned());
+            } else {
+                invariant(_params.request->shouldReturnOldDocs());
+                member->obj.setValue(oldObj);
+            }
+            member->recordId = RecordId();
+            member->transitionToOwnedObj();
         }
 
         // This should be after transformAndUpdate to make sure we actually updated this doc.
@@ -1047,5 +1054,11 @@ UpdateResult UpdateStage::makeUpdateResult(const UpdateStats* updateStats) {
                         updateStats->nMatched /* # of docs matched/updated, even no-ops */,
                         updateStats->objInserted);
 };
+
+PlanStage::StageState UpdateStage::prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out) {
+    _idRetrying = idToRetry;
+    *out = WorkingSet::INVALID_ID;
+    return NEED_YIELD;
+}
 
 }  // namespace mongo

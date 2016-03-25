@@ -176,6 +176,12 @@ private:
      */
     Status restoreUpdateState();
 
+    /**
+     * Stores 'idToRetry' in '_idRetrying' so the update can be retried during the next call to
+     * work(). Always returns NEED_YIELD and sets 'out' to WorkingSet::INVALID_ID.
+     */
+    StageState prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out);
+
     UpdateStageParams _params;
 
     // Not owned by us.

@@ -50,9 +50,13 @@ var blacklist = [
     'compact_simultaneous_padding_bytes.js',  // compact can only be run against a mongod
     'convert_to_capped_collection.js',        // convertToCapped can't be run on mongos processes
     'convert_to_capped_collection_index.js',  // convertToCapped can't be run on mongos processes
-    'findAndModify_remove_queue.js',          // remove cannot be {} for findAndModify
-    'findAndModify_update_collscan.js',       // findAndModify requires a shard key
-    'findAndModify_update_queue.js',          // findAndModify requires a shard key
+    'findAndModify_mixed_queue.js',           // findAndModify requires a shard key
+    'findAndModify_mixed_queue_unindexed.js',   // findAndModify requires a shard key
+    'findAndModify_remove_queue.js',            // remove cannot be {} for findAndModify
+    'findAndModify_remove_queue_unindexed.js',  // findAndModify requires a shard key
+    'findAndModify_update_collscan.js',         // findAndModify requires a shard key
+    'findAndModify_update_queue.js',            // findAndModify requires a shard key
+    'findAndModify_update_queue_unindexed.js',  // findAndModify requires a shard key
     'group.js',                // the group command cannot be issued against a sharded cluster
     'group_cond.js',           // the group command cannot be issued against a sharded cluster
     'indexed_insert_eval.js',  // eval doesn't work with sharded collections
