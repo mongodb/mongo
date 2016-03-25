@@ -41,7 +41,7 @@ by default and commands that only read data will not run recovery.
 Perform a backup of a database or set of data sources.
 
 The \c backup command performs a backup of the database, copying the
-database files to a \c specified directory, which can be subsequently
+underlying files to a \c specified directory, which can be subsequently
 opened as a WiredTiger database.  See @ref backup for more information,
 and @ref file_permissions for specifics on the copied file permissions.
 
@@ -58,10 +58,10 @@ the named data sources.
 
 <hr>
 @section util_compact wt compact
-Compact a table or file.
+Compact a table.
 
-The \c compact command attempts to rewrite the specified table or file
-to consume less disk space.
+The \c compact command attempts to rewrite the specified table to
+consume less disk space.
 
 @subsection util_compact_synopsis Synopsis
 <code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] compact uri</code>
@@ -71,7 +71,7 @@ The \c compact command has no command-specific options.
 
 <hr>
 @section util_create wt create
-Create a table or file.
+Create a table.
 
 The \c create command creates the specified \c uri with the specified
 configuration.  It is equivalent to a call to WT_SESSION::create with
@@ -88,7 +88,7 @@ Include a configuration string to be passed to WT_SESSION::create.
 
 <hr>
 @section util_drop wt drop
-Drop a table or file.
+Drop a table.
 
 The \c drop command drops the specified \c uri.  It is equivalent to a
 call to WT_SESSION::drop with the "force" configuration argument.
@@ -136,10 +136,10 @@ printable characters unencoded).
 
 <hr>
 @section util_list wt list
-List the tables and files in the database.
+List the tables in the database.
 
-By default, the \c list command prints out the tables and files stored in
-the database.  If a URI is specified as an argument, only information about
+By default, the \c list command prints out the tables stored in the
+database.  If a URI is specified as an argument, only information about
 that data source is printed.
 
 @subsection util_list_synopsis Synopsis
@@ -158,16 +158,16 @@ value is printed.
 
 <hr>
 @section util_load wt load
-Load a table or file from dump output.
+Load a table from dump output.
 
 The \c load command reads the standard input for data and loads it into
-a table or file, creating the table or file if it does not yet exist.
-The data should be the format produced by the \c dump command; see
-@ref dump_formats for details.
+a table, creating the table if it does not yet exist.  The data should
+be the format produced by the \c dump command; see @ref dump_formats for
+details.
 
-By default, if the table or file already exists, data in the file or
-table will be overwritten by the new data (use the \c -n option to
-make an attempt to overwrite existing data return an error).
+By default, if the table already exists, data in the table will be
+overwritten by the new data (use the \c -n option to make an attempt to
+overwrite existing data return an error).
 
 @subsection util_load_synopsis Synopsis
 <code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] load [-ajn] [-f input] [-r name] [uri configuration ...]</code>
@@ -182,8 +182,8 @@ number keys.  The \c -a option is only applicable when loading into a
 column store.
 
 @par <code>-f</code>
-By default, the \c load command reads from the standard input; the \c
--f option reads the input from the specified file.
+By default, the \c load command reads from the standard input; the \c -f
+option reads the input from the specified file.
 
 @par <code>-j</code>
 Load input in the JSON (<a href="http://www.json.org">JavaScript Object
@@ -196,7 +196,7 @@ load command to fail if there's an attempt to overwrite already existing
 data.
 
 @par <code>-r</code>
-By default, the \c load command uses the table or file name taken from the
+By default, the \c load command uses the table name taken from the
 input; the \c -r option renames the data source.
 
 Additionally, \c uri and \c configuration pairs may be specified to the
@@ -227,24 +227,23 @@ table:xxx block_allocation=first table:xxx prefix_compress=false
 
 <hr>
 @section util_loadtext wt loadtext
-Load text into a table or file.
+Load text into a table.
 
 The \c loadtext command reads the standard input for text and loads it
-into a table or file.  The input data should be printable characters,
-with newline delimiters for each key or value.
+into a table.  The input data should be printable characters, with
+newline delimiters for each key or value.
 
-The \c loadtext command does not create the file if it does not yet
+The \c loadtext command does not create the object if it does not yet
 exist.
 
-In the case of inserting values into a column-store table or file, each
-value is appended to the table or file; in the case of inserting values
-into a row-store table or file, lines are handled in pairs, where the
-first line is the key and the second line is the value.  If the
-row-store table or file already exists, data in the table or file will
-be overwritten by the new data.
+In the case of inserting values into a column-store table, each value
+is appended to the table; in the case of inserting values into a
+row-store table, lines are handled in pairs, where the first line is the
+key and the second line is the value.  If the row-store table already
+exists, data in the table will be overwritten by the new data.
 
 @subsection util_loadtext_synopsis Synopsis
-<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] loadtext [-f input]</code>
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] loadtext [-f input] uri</code>
 
 @subsection util_loadtext_options Options
 The following are command-specific options for the \c loadtext command:
@@ -275,7 +274,7 @@ to the default string format.
 
 <hr>
 @section util_read wt read
-Read records from a table or file.
+Read records from a table.
 
 The \c read command prints out the records associated with the specified
 keys from the specified data source.  The data source must be configured
@@ -291,9 +290,9 @@ The \c read command has no command-specific options.
 
 <hr>
 @section util_rename wt rename
-Rename a table or file.
+Rename a table.
 
-The \c rename command renames the specified table or file.
+The \c rename command renames the specified table.
 
 @subsection util_rename_synopsis Synopsis
 <code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] rename uri name</code>
@@ -303,11 +302,11 @@ The \c rename command has no command-specific options.
 
 <hr>
 @section util_salvage wt salvage
-Recover data from a corrupted file.
+Recover data from a corrupted table.
 
 The \c salvage command salvages the specified data source, discarding any
-data that cannot be recovered.  Underlying files are re-written in
-place, overwriting the original file contents.
+data that cannot be recovered.  Underlying files are re-written in place,
+overwriting the original file contents.
 
 @subsection util_salvage_synopsis Synopsis
 <code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] salvage [-F force] uri</code>
@@ -316,9 +315,9 @@ place, overwriting the original file contents.
 The following are command-specific options for the \c salvage command:
 
 @par <code>-F</code>
-By default, salvage will refuse to salvage files that fail basic tests
-(for example, files that don't appear to be in a WiredTiger format).
-The \c -F option forces the salvage of the file, regardless.
+By default, salvage will refuse to salvage tables that fail basic tests
+(for example, tables that don't appear to be in a WiredTiger format).
+The \c -F option forces the salvage of the table, regardless.
 
 <hr>
 @section util_stat wt stat
@@ -339,11 +338,11 @@ Include only "fast" statistics in the output (equivalent to passing
 
 <hr>
 @section util_upgrade wt upgrade
-Upgrade a table or file.
+Upgrade a table.
 
-The \c upgrade command upgrades the specified table or file, exiting
-success if the data source is up-to-date, and failure if the data source
-cannot be upgraded.
+The \c upgrade command upgrades the specified table, exiting success if
+the data source is up-to-date, and failure if the data source cannot be
+upgraded.
 
 @subsection util_upgrade_synopsis Synopsis
 <code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] upgrade uri</code>
@@ -353,11 +352,10 @@ The \c upgrade command has no command-specific options.
 
 <hr>
 @section util_verify wt verify
-Check the structural integrity of a table or file.
+Check the structural integrity of a table.
 
-The \c verify command verifies the specified table or file, exiting
-success if the data source is correct, and failure if the data source is
-corrupted.
+The \c verify command verifies the specified table, exiting success if
+the data source is correct, and failure if the data source is corrupted.
 
 @subsection util_verify_synopsis Synopsis
 <code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] verify uri</code>
@@ -367,7 +365,7 @@ The \c verify command has no command-specific options.
 
 <hr>
 @section util_write wt write
-Write records to a table or file.
+Write records to a table.
 
 The \c write command stores records into the specified data source.
 The data source must be configured with string or record number keys and

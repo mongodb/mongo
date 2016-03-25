@@ -246,6 +246,10 @@ static CONFIG c[] = {
 	  "minimum gain before prefix compression is used",
 	  0x0, 0, 8, 256, &g.c_prefix_compression_min, NULL },
 
+	{ "quiet",
+	  "quiet run (same as -q)",
+	  C_IGNORE|C_BOOL, 0, 0, 0, &g.c_quiet, NULL },
+
 	{ "repeat_data_pct",
 	  "percent duplicate values in row- or var-length column-stores",
 	  0x0, 0, 90, 90, &g.c_repeat_data_pct, NULL },

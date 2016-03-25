@@ -42,7 +42,7 @@ dmalloc(size_t len)
 	void *p;
 
 	if ((p = malloc(len)) == NULL)
-		die(errno, "malloc");
+		testutil_die(errno, "malloc");
 	return (p);
 }
 
@@ -56,7 +56,7 @@ dstrdup(const char *str)
 	char *p;
 
 	if ((p = strdup(str)) == NULL)
-		die(errno, "strdup");
+		testutil_die(errno, "strdup");
 	return (p);
 }
 
@@ -236,7 +236,7 @@ track(const char *tag, uint64_t cnt, TINFO *tinfo)
 	int len;
 	char msg[128];
 
-	if (!g.track || tag == NULL)
+	if (g.c_quiet || tag == NULL)
 		return;
 
 	if (tinfo == NULL && cnt == 0)
@@ -268,9 +268,9 @@ track(const char *tag, uint64_t cnt, TINFO *tinfo)
 	lastlen = len;
 
 	if (printf("%s\r", msg) < 0)
-		die(EIO, "printf");
+		testutil_die(EIO, "printf");
 	if (fflush(stdout) == EOF)
-		die(errno, "fflush");
+		testutil_die(errno, "fflush");
 }
 
 /*
@@ -310,6 +310,10 @@ path_setup(const char *home)
 	g.home_backup = dmalloc(len);
 	snprintf(g.home_backup, len, "%s/%s", g.home, "BACKUP");
 
+	len = strlen(g.home) + strlen("BACKUP2") + 2;
+	g.home_backup2 = dmalloc(len);
+	snprintf(g.home_backup2, len, "%s/%s", g.home, "BACKUP2");
+
 	/* BDB directory. */
 	len = strlen(g.home) + strlen("bdb") + 2;
 	g.home_bdb = dmalloc(len);
@@ -340,13 +344,15 @@ path_setup(const char *home)
 	/* Backup directory initialize command, remove and re-create it. */
 #undef	CMD
 #ifdef _WIN32
-#define	CMD	"del /s /q >:nul && mkdir %s"
+#define	CMD	"del /s /q >:nul && mkdir %s %s"
 #else
-#define	CMD	"rm -rf %s && mkdir %s"
+#define	CMD	"rm -rf %s %s && mkdir %s %s"
 #endif
-	len = strlen(g.home_backup) * 2 + strlen(CMD) + 1;
+	len = strlen(g.home_backup) * 2 +
+	    strlen(g.home_backup2) * 2 + strlen(CMD) + 1;
 	g.home_backup_init = dmalloc(len);
-	snprintf(g.home_backup_init, len, CMD, g.home_backup, g.home_backup);
+	snprintf(g.home_backup_init, len, CMD, g.home_backup, g.home_backup2,
+	    g.home_backup, g.home_backup2);
 
 	/*
 	 * Salvage command, save the interesting files so we can replay the
@@ -407,7 +413,7 @@ rng(WT_RAND_STATE *rnd)
 				    "\n" "end of random number log reached\n");
 				exit(EXIT_SUCCESS);
 			}
-			die(errno, "random number log");
+			testutil_die(errno, "random number log");
 		}
 
 		return ((uint32_t)strtoul(buf, NULL, 10));
@@ -435,6 +441,6 @@ fclose_and_clear(FILE **fpp)
 		return;
 	*fpp = NULL;
 	if (fclose(fp) != 0)
-		die(errno, "fclose");
+		testutil_die(errno, "fclose");
 	return;
 }

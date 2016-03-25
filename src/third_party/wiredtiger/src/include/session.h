@@ -126,13 +126,23 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_session_impl {
 	void	*block_manager;		/* Block-manager support */
 	int	(*block_manager_cleanup)(WT_SESSION_IMPL *);
 
-					/* Checkpoint support */
-	struct {
-		WT_DATA_HANDLE *dhandle;
-		const char *name;
-	} *ckpt_handle;			/* Handle list */
+					/* Checkpoint handles */
+	WT_DATA_HANDLE **ckpt_handle;	/* Handle list */
 	u_int   ckpt_handle_next;	/* Next empty slot */
 	size_t  ckpt_handle_allocated;	/* Bytes allocated */
+
+	/*
+	 * Operations acting on handles.
+	 *
+	 * The preferred pattern is to gather all of the required handles at
+	 * the beginning of an operation, then drop any other locks, perform
+	 * the operation, then release the handles.  This cannot be easily
+	 * merged with the list of checkpoint handles because some operations
+	 * (such as compact) do checkpoints internally.
+	 */
+	WT_DATA_HANDLE **op_handle;	/* Handle list */
+	u_int   op_handle_next;		/* Next empty slot */
+	size_t  op_handle_allocated;	/* Bytes allocated */
 
 	void	*reconcile;		/* Reconciliation support */
 	int	(*reconcile_cleanup)(WT_SESSION_IMPL *);

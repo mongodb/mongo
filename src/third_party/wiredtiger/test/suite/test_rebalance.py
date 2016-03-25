@@ -59,7 +59,7 @@ class test_rebalance(wttest.WiredTigerTestCase):
         if with_cursor:
             cursor = self.session.open_cursor(uri, None, None)
             self.assertRaises(wiredtiger.WiredTigerError,
-                lambda: self.session.drop(uri, None))
+                lambda: self.session.rebalance(uri, None))
             cursor.close()
 
         self.session.rebalance(uri, None)

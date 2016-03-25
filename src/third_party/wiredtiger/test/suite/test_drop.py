@@ -41,12 +41,11 @@ class test_drop(wttest.WiredTigerTestCase):
     scenarios = check_scenarios([
         ('file', dict(uri='file:')),
         ('table', dict(uri='table:')),
-        #Not yet: drop failing with an open cursor needs handle locking
-        #('table-lsm', dict(uri='table:', extra_config=',type=lsm')),
+        ('table-lsm', dict(uri='table:', extra_config=',type=lsm')),
     ])
 
     # Populate an object, remove it and confirm it no longer exists.
-    def drop(self, populate, with_cursor, close_session, drop_index):
+    def drop(self, populate, with_cursor, reopen, drop_index):
         uri = self.uri + self.name
         populate(self, uri, 'key_format=S' + self.extra_config, 10)
 
@@ -57,7 +56,7 @@ class test_drop(wttest.WiredTigerTestCase):
                 lambda: self.session.drop(uri, None))
             cursor.close()
 
-        if close_session:
+        if reopen:
             self.reopen_conn()
 
         if drop_index:
@@ -73,17 +72,17 @@ class test_drop(wttest.WiredTigerTestCase):
         # Try all combinations except dropping the index, the simple
         # case has no indices.
         for with_cursor in [False, True]:
-            for close_session in [False, True]:
-                self.drop(simple_populate, with_cursor, close_session, False)
+            for reopen in [False, True]:
+                self.drop(simple_populate, with_cursor, reopen, False)
 
         # A complex, multi-file table object.
         # Try all test combinations.
         if self.uri == "table:":
             for with_cursor in [False, True]:
-                for close_session in [False, True]:
+                for reopen in [False, True]:
                     for drop_index in [False, True]:
                         self.drop(complex_populate, with_cursor,
-                                  close_session, drop_index)
+                                  reopen, drop_index)
 
     # Test drop of a non-existent object: force succeeds, without force fails.
     def test_drop_dne(self):

@@ -218,7 +218,7 @@ main(void)
 	 */
 	ret = conn->close(conn, NULL);
 
-	printf("Searched for %d keys\n", ex_asynckeys.num_keys);
+	printf("Searched for %" PRIu32 " keys\n", ex_asynckeys.num_keys);
 
 	return (ret);
 }

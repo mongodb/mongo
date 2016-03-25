@@ -212,6 +212,10 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	manager = &conn->lsm_manager;
 
+	if (F_ISSET(conn, WT_CONN_READONLY)) {
+		manager->lsm_workers = 0;
+		return (0);
+	}
 	/*
 	 * We need at least a manager, a switch thread and a generic
 	 * worker.
@@ -284,6 +288,8 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
 	manager = &conn->lsm_manager;
 	removed = 0;
 
+	WT_ASSERT(session, !F_ISSET(conn, WT_CONN_READONLY) ||
+	    manager->lsm_workers == 0);
 	if (manager->lsm_workers > 0) {
 		/*
 		 * Stop the main LSM manager thread first.
@@ -384,7 +390,7 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 		F_SET(session, WT_SESSION_LOCKED_HANDLE_LIST);
 		dhandle_locked = true;
 		TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q) {
-			if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE))
+			if (!lsm_tree->active)
 				continue;
 			WT_ERR(__wt_epoch(session, &now));
 			pushms = lsm_tree->work_push_ts.tv_sec == 0 ? 0 :
@@ -427,8 +433,10 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 				    session, WT_LSM_WORK_BLOOM, 0, lsm_tree));
 				WT_ERR(__wt_verbose(session,
 				    WT_VERB_LSM_MANAGER,
-				    "MGR %s: queue %d mod %d nchunks %d"
-				    " flags 0x%x aggressive %d pushms %" PRIu64
+				    "MGR %s: queue %" PRIu32 " mod %d "
+				    "nchunks %" PRIu32
+				    " flags %#" PRIx32 " aggressive %" PRIu32
+				    " pushms %" PRIu64
 				    " fillms %" PRIu64,
 				    lsm_tree->name, lsm_tree->queue_ref,
 				    lsm_tree->modified, lsm_tree->nchunks,
@@ -616,6 +624,7 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 
 	manager = &S2C(session)->lsm_manager;
 
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 	/*
 	 * Don't add merges or bloom filter creates if merges
 	 * or bloom filters are disabled in the tree.
@@ -641,7 +650,7 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 	 * is checked.
 	 */
 	(void)__wt_atomic_add32(&lsm_tree->queue_ref, 1);
-	if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE)) {
+	if (!lsm_tree->active) {
 		(void)__wt_atomic_sub32(&lsm_tree->queue_ref, 1);
 		return (0);
 	}

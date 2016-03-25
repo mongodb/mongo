@@ -1149,7 +1149,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
 	 * parent frees the backing blocks for any no-longer-used overflow keys,
 	 * which will corrupt the checkpoint's block management.
 	 */
-	if (btree->checkpointing &&
+	if (btree->checkpointing != WT_CKPT_OFF &&
 	    F_ISSET_ATOMIC(ref->home, WT_PAGE_OVERFLOW_KEYS))
 		return (false);
 

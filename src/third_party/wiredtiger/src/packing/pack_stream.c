@@ -65,8 +65,7 @@ wiredtiger_pack_close(WT_PACK_STREAM *ps, size_t *usedp)
 	if (usedp != NULL)
 		*usedp = WT_PTRDIFF(ps->p, ps->start);
 
-	if (ps != NULL)
-		__wt_free(ps->pack.session, ps);
+	__wt_free(ps->pack.session, ps);
 
 	return (0);
 }
@@ -326,4 +325,140 @@ wiredtiger_unpack_uint(WT_PACK_STREAM *ps, uint64_t *up)
 	WT_ILLEGAL_VALUE(session);
 	}
 	return (0);
+}
+
+/*
+ * __wt_ext_pack_start --
+ *	WT_EXTENSION.pack_start method.
+ */
+int
+__wt_ext_pack_start(WT_EXTENSION_API *wt_api,
+    WT_SESSION *wt_session, const char *format,
+    void *buffer, size_t size, WT_PACK_STREAM **psp)
+{
+	WT_CONNECTION_IMPL *conn;
+
+	conn = (WT_CONNECTION_IMPL *)wt_api->conn;
+	if (wt_session == NULL)
+		wt_session = (WT_SESSION *)conn->default_session;
+	return (wiredtiger_pack_start(wt_session, format, buffer, size, psp));
+}
+
+/*
+ * __wt_ext_unpack_start --
+ *	WT_EXTENSION.unpack_start
+ */
+int
+__wt_ext_unpack_start(WT_EXTENSION_API *wt_api,
+    WT_SESSION *wt_session, const char *format,
+    const void *buffer, size_t size, WT_PACK_STREAM **psp)
+{
+	WT_CONNECTION_IMPL *conn;
+
+	conn = (WT_CONNECTION_IMPL *)wt_api->conn;
+	if (wt_session == NULL)
+		wt_session = (WT_SESSION *)conn->default_session;
+	return (wiredtiger_unpack_start(wt_session, format, buffer, size, psp));
+}
+
+/*
+ * __wt_ext_pack_close --
+ *	WT_EXTENSION.pack_close
+ */
+int
+__wt_ext_pack_close(WT_EXTENSION_API *wt_api, WT_PACK_STREAM *ps, size_t *usedp)
+{
+	WT_UNUSED(wt_api);
+	return (wiredtiger_pack_close(ps, usedp));
+}
+
+/*
+ * __wt_ext_pack_item --
+ *	WT_EXTENSION.pack_item
+ */
+int
+__wt_ext_pack_item(WT_EXTENSION_API *wt_api, WT_PACK_STREAM *ps, WT_ITEM *item)
+{
+	WT_UNUSED(wt_api);
+	return (wiredtiger_pack_item(ps, item));
+}
+
+/*
+ * __wt_ext_pack_int --
+ *	WT_EXTENSION.pack_int
+ */
+int
+__wt_ext_pack_int(WT_EXTENSION_API *wt_api, WT_PACK_STREAM *ps, int64_t i)
+{
+	WT_UNUSED(wt_api);
+	return (wiredtiger_pack_int(ps, i));
+}
+
+/*
+ * __wt_ext_pack_str --
+ *	WT_EXTENSION.pack_str
+ */
+int
+__wt_ext_pack_str(WT_EXTENSION_API *wt_api, WT_PACK_STREAM *ps, const char *s)
+{
+	WT_UNUSED(wt_api);
+	return (wiredtiger_pack_str(ps, s));
+}
+
+/*
+ * __wt_ext_pack_uint --
+ *	WT_EXTENSION.pack_uint
+ */
+int
+__wt_ext_pack_uint(WT_EXTENSION_API *wt_api, WT_PACK_STREAM *ps, uint64_t u)
+{
+	WT_UNUSED(wt_api);
+	return (wiredtiger_pack_uint(ps, u));
+}
+
+/*
+ * __wt_ext_unpack_item --
+ *	WT_EXTENSION.unpack_item
+ */
+int
+__wt_ext_unpack_item(WT_EXTENSION_API *wt_api,
+    WT_PACK_STREAM *ps, WT_ITEM *item)
+{
+	WT_UNUSED(wt_api);
+	return (wiredtiger_unpack_item(ps, item));
+}
+
+/*
+ * __wt_ext_unpack_int --
+ *	WT_EXTENSION.unpack_int
+ */
+int
+__wt_ext_unpack_int(WT_EXTENSION_API *wt_api,
+    WT_PACK_STREAM *ps, int64_t *ip)
+{
+	WT_UNUSED(wt_api);
+	return (wiredtiger_unpack_int(ps, ip));
+}
+
+/*
+ * __wt_ext_unpack_str --
+ *	WT_EXTENSION.unpack_str
+ */
+int
+__wt_ext_unpack_str(WT_EXTENSION_API *wt_api,
+    WT_PACK_STREAM *ps, const char **sp)
+{
+	WT_UNUSED(wt_api);
+	return (wiredtiger_unpack_str(ps, sp));
+}
+
+/*
+ * __wt_ext_unpack_uint --
+ *	WT_EXTENSION.unpack_uint
+ */
+int
+__wt_ext_unpack_uint(WT_EXTENSION_API *wt_api, WT_PACK_STREAM *ps, uint64_t *up)
+{
+	WT_UNUSED(wt_api);
+	return (wiredtiger_unpack_uint(ps, up));
 }

@@ -107,7 +107,10 @@ def copy_wiredtiger_home(olddir, newdir, aligned=True):
     for fname in os.listdir(olddir):
         fullname = os.path.join(olddir, fname)
         # Skip lock file, on Windows it is locked.
-        if os.path.isfile(fullname) and "WiredTiger.lock" not in fullname:
+        # Skip temporary log files.
+        if os.path.isfile(fullname) and "WiredTiger.lock" not in fullname and \
+            "WiredTigerTmplog" not in fullname and \
+            "WiredTigerPreplog" not in fullname:
             # Use a dd command that does not align on a block boundary.
             if aligned:
                 shutil.copy(fullname, newdir)
@@ -196,31 +199,36 @@ def complex_populate_index_count():
 #    config:    prefix of the session.create configuration string
 #    rows:      entries to insert
 def complex_populate(self, uri, config, rows):
-        complex_populate_type(self, uri, config, rows, '')
+        complex_populate_type(self, uri, config, '', rows, '')
+def complex_populate_cgconfig(self, uri, config, rows):
+        complex_populate_type(self, uri, config, config, rows, '')
 def complex_populate_lsm(self, uri, config, rows):
-        complex_populate_type(self, uri, config, rows, 'type=lsm')
-def complex_populate_type(self, uri, config, rows, type):
+        complex_populate_type(self, uri, config, '', rows, 'type=lsm')
+def complex_populate_cgconfig_lsm(self, uri, config, rows):
+        complex_populate_type(self, uri, config, config, rows, 'type=lsm')
+def complex_populate_type(self, uri, config, cgconfig, rows, type):
     self.session.create(uri,
         config + ',value_format=SiSS,' +
         'columns=(record,column2,column3,column4,column5),' +
         'colgroups=(cgroup1,cgroup2,cgroup3,cgroup4,cgroup5,cgroup6)')
 
     cgname = 'colgroup:' + uri.split(":")[1]
-    self.session.create(cgname + ':cgroup1', 'columns=(column2)' + ',' + type)
-    self.session.create(cgname + ':cgroup2', 'columns=(column3)' + ',' + type)
-    self.session.create(cgname + ':cgroup3', 'columns=(column4)' + ',' + type)
+    cgcfg = ',' + cgconfig + ',' + type
+    self.session.create(cgname + ':cgroup1', 'columns=(column2)' + ',' + cgcfg)
+    self.session.create(cgname + ':cgroup2', 'columns=(column3)' + ',' + cgcfg)
+    self.session.create(cgname + ':cgroup3', 'columns=(column4)' + ',' + cgcfg)
     self.session.create(
-        cgname + ':cgroup4', 'columns=(column2,column3)' + ',' + type)
+        cgname + ':cgroup4', 'columns=(column2,column3)' + ',' + cgcfg)
     self.session.create(
-        cgname + ':cgroup5', 'columns=(column3,column4)' + ',' + type)
+        cgname + ':cgroup5', 'columns=(column3,column4)' + ',' + cgcfg)
     self.session.create(
-        cgname + ':cgroup6', 'columns=(column2,column4,column5)' + ',' + type)
+        cgname + ':cgroup6', 'columns=(column2,column4,column5)' + ',' + cgcfg)
     indxname = 'index:' + uri.split(":")[1]
-    self.session.create(indxname + ':indx1', 'columns=(column2)' + ',' + type)
-    self.session.create(indxname + ':indx2', 'columns=(column3)' + ',' + type)
-    self.session.create(indxname + ':indx3', 'columns=(column4)' + ',' + type)
+    self.session.create(indxname + ':indx1', 'columns=(column2)' + ',' + cgcfg)
+    self.session.create(indxname + ':indx2', 'columns=(column3)' + ',' + cgcfg)
+    self.session.create(indxname + ':indx3', 'columns=(column4)' + ',' + cgcfg)
     self.session.create(
-        indxname + ':indx4', 'columns=(column2,column4)' + ',' + type)
+        indxname + ':indx4', 'columns=(column2,column4)' + ',' + cgcfg)
     cursor = self.session.open_cursor(uri, None)
     for i in range(1, rows + 1):
         cursor[key_populate(cursor, i)] = \
@@ -228,9 +236,9 @@ def complex_populate_type(self, uri, config, rows, type):
     cursor.close()
     # add some indices after populating
     self.session.create(
-        indxname + ':indx5', 'columns=(column3,column5)' + ',' + type)
+        indxname + ':indx5', 'columns=(column3,column5)' + ',' + cgcfg)
     self.session.create(
-        indxname + ':indx6', 'columns=(column3,column5,column4)' + ',' + type)
+        indxname + ':indx6', 'columns=(column3,column5,column4)' + ',' + cgcfg)
 
 def complex_populate_colgroup_name(self, uri, i):
     return 'colgroup:' + uri.split(":")[1] + ':cgroup' + str(i + 1)

@@ -6,6 +6,7 @@
  * See the file LICENSE for redistribution information.
  */
 
+#define	WT_PTRDIFFT_FMT	"td"			/* ptrdiff_t format string */
 #define	WT_SIZET_FMT	"zu"			/* size_t format string */
 
 /* Add GCC-specific attributes to types and function declarations. */

@@ -67,18 +67,16 @@ __wt_metadata_cursor_open(
 	btree = ((WT_CURSOR_BTREE *)(*cursorp))->btree;
 
 	/* 
-	 * Set special flags for the metadata file: eviction (the metadata file
-	 * is in-memory and never evicted), logging (the metadata file is always
-	 * logged if possible).
+	 * Special settings for metadata: skew eviction so metadata almost
+	 * always stays in cache and make sure metadata is logged if possible.
 	 *
-	 * Test flags before setting them so updates can't race in subsequent
-	 * opens (the first update is safe because it's single-threaded from
+	 * Test before setting so updates can't race in subsequent opens (the
+	 * first update is safe because it's single-threaded from
 	 * wiredtiger_open).
 	 */
-	if (!F_ISSET(btree, WT_BTREE_IN_MEMORY))
-		F_SET(btree, WT_BTREE_IN_MEMORY);
-	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION))
-		F_SET(btree, WT_BTREE_NO_EVICTION);
+	if (btree->evict_priority == 0)
+		WT_WITH_BTREE(session, btree,
+		    __wt_evict_priority_set(session, WT_EVICT_INT_SKEW));
 	if (F_ISSET(btree, WT_BTREE_NO_LOGGING))
 		F_CLR(btree, WT_BTREE_NO_LOGGING);
 

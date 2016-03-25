@@ -812,8 +812,7 @@ __ckpt_string(WT_SESSION_IMPL *session,
 	WT_RET(__wt_block_buffer_to_ckpt(session, block, addr, ci));
 
 	WT_RET(__wt_buf_fmt(session, buf,
-	    "version=%d",
-	    ci->version));
+	    "version=%" PRIu8, ci->version));
 	if (ci->root_offset == WT_BLOCK_INVALID_OFFSET)
 		WT_RET(__wt_buf_catfmt(session, buf, ", root=[Empty]"));
 	else
