@@ -47,7 +47,7 @@ __wt_posix_directory_list(WT_SESSION_IMPL *session, const char *dir,
 
 	WT_SYSCALL_RETRY(((dirp = opendir(path)) == NULL ? 1 : 0), ret);
 	if (ret != 0)
-		WT_ERR_MSG(session, ret, "%s: opendir", path);
+		WT_ERR_MSG(session, ret, "%s: directory-list: opendir", path);
 	for (dirsz = 0, count = 0; (dp = readdir(dirp)) != NULL;) {
 		/*
 		 * Skip . and ..
@@ -95,6 +95,6 @@ err:
 		__wt_free(session, entries);
 	}
 	WT_RET_MSG(session, ret,
-	    "directory-list %s, prefix \"%s\"",
+	    "%s: directory-list, prefix \"%s\"",
 	    dir, prefix == NULL ? "" : prefix);
 }

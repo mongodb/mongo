@@ -53,10 +53,9 @@ __wt_win_directory_list(WT_SESSION_IMPL *session, const char *dir,
 	    prefix == NULL ? "all" : prefix));
 
 	findhandle = FindFirstFileA(pathbuf->data, &finddata);
-
-	if (INVALID_HANDLE_VALUE == findhandle)
-		WT_ERR_MSG(session, __wt_win32_errno(), "%s: FindFirstFile",
-		    pathbuf->data);
+	if (findhandle == INVALID_HANDLE_VALUE)
+		WT_ERR_MSG(session, __wt_win32_errno(),
+		    "%s: directory-list: FindFirstFile", pathbuf->data);
 	else {
 		do {
 			/*
@@ -112,6 +111,6 @@ err:
 	}
 
 	WT_RET_MSG(session, ret,
-	    "directory-list %s, prefix \"%s\"",
+	    "%s: directory-list, prefix \"%s\"",
 	    dir, prefix == NULL ? "" : prefix);
 }

@@ -293,7 +293,7 @@ __im_handle_read(
 	if (ret == 0)
 		return (0);
 	WT_RET_MSG(session, WT_ERROR,
-	    "%s read error: failed to read %" WT_SIZET_FMT " bytes at "
+	    "%s: handle-read: failed to read %" WT_SIZET_FMT " bytes at "
 	    "offset %" WT_SIZET_FMT,
 	    fh->name, len, off);
 }
@@ -321,7 +321,6 @@ __im_handle_sync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
 	WT_UNUSED(session);
 	WT_UNUSED(fh);
 	WT_UNUSED(block);
-
 	return (0);
 }
 
@@ -373,7 +372,7 @@ err:	__wt_spin_unlock(session, &im->lock);
 	if (ret == 0)
 		return (0);
 	WT_RET_MSG(session, ret,
-	    "%s write error: failed to write %" WT_SIZET_FMT " bytes at "
+	    "%s: handle-write: failed to write %" WT_SIZET_FMT " bytes at "
 	    "offset %" WT_SIZET_FMT,
 	    fh->name, len, off);
 }

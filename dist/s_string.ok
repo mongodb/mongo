@@ -67,6 +67,7 @@ CloseHandle
 Comparator
 Config
 Coverity
+CreateFileA
 CreateFileMapping
 Crummey
 CustomersPhone
@@ -81,6 +82,7 @@ DbCursor
 DbEnv
 Decrement
 Decrypt
+DeleteFileA
 EAGAIN
 EBUSY
 EEXIST
@@ -248,6 +250,7 @@ Prepend
 Qsort
 RCS
 RDNOLOCK
+RDONLY
 RECNO
 REF's
 REFs
@@ -260,6 +263,7 @@ RNG
 RPC
 RUNDIR
 Radu
+ReadFile
 Readonly
 Rebalance
 RedHat
@@ -317,6 +321,7 @@ UTF
 UltraSparc
 Unbuffered
 UnixLib
+UnlockFile
 Unmap
 UnmapViewOfFile
 Unmarshall
@@ -353,6 +358,7 @@ WiredTigerPreplog
 WiredTigerTmplog
 WiredTigerTxn
 WithSeeds
+WriteFile
 Wuninitialized
 Wunused
 XP
@@ -596,6 +602,7 @@ fallocate
 fblocks
 fclose
 fcntl
+fd
 fdatasync
 fdopen
 ffc
@@ -605,6 +612,7 @@ fgetc
 fgetln
 fh
 filefrag
+filehandle
 fileid
 filename
 filenames
@@ -693,6 +701,7 @@ instantiation
 intl
 intnum
 intpack
+intptr
 intrin
 inuse
 io

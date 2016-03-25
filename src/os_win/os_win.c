@@ -56,16 +56,16 @@ __win_file_remove(WT_SESSION_IMPL *session, const char *name)
 
 #ifdef HAVE_DIAGNOSTIC
 	if (__wt_handle_search(session, name, false, true, NULL, NULL))
-		WT_RET_MSG(
-		    session, EINVAL, "%s: remove: file has open handles", name);
+		WT_RET_MSG(session, EINVAL,
+		    "%s: file-remove: file has open handles", name);
 #endif
 
 	WT_RET(__wt_filename(session, name, &path));
 	name = path;
 
-	if (DeleteFileA(path) == FALSE) {
+	if (DeleteFileA(name) == FALSE) {
 		ret = __wt_win32_errno();
-		__wt_err(session, ret, "%s: remove", name);
+		__wt_err(session, ret, "%s: file-remove: DeleteFileA", name);
 	}
 
 	__wt_free(session, path);
@@ -84,11 +84,11 @@ __win_file_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
 
 #ifdef HAVE_DIAGNOSTIC
 	if (__wt_handle_search(session, from, false, true, NULL, NULL))
-		WT_RET_MSG(
-		    session, EINVAL, "%s: rename: file has open handles", from);
+		WT_RET_MSG(session, EINVAL,
+		    "%s: file-rename: file has open handles", from);
 	if (__wt_handle_search(session, to, false, true, NULL, NULL))
-		WT_RET_MSG(
-		    session, EINVAL, "%s: rename: file has open handles", to);
+		WT_RET_MSG(session, EINVAL,
+		    "%s: file-rename: file has open handles", to);
 #endif
 
 	from_path = to_path = NULL;
@@ -104,16 +104,17 @@ __win_file_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
 	if (GetFileAttributesA(to) != INVALID_FILE_ATTRIBUTES)
 		if (DeleteFileA(to) == FALSE) {
 			ret = __wt_win32_errno();
-			goto err;
+			__wt_err(session, ret,
+			    "%s to %s: file-rename: rename", from, to);
 		}
 
-	if (MoveFileA(from, to) == FALSE)
+	if (ret == 0 && MoveFileA(from, to) == FALSE) {
 		ret = __wt_win32_errno();
+		__wt_err(session, ret,
+		    "%s to %s: file-rename: rename", from, to);
+	}
 
-err:	if (ret != 0)
-		__wt_err(session, ret, "%s to %s: rename", from, to);
-
-	__wt_free(session, from_path);
+err:	__wt_free(session, from_path);
 	__wt_free(session, to_path);
 	return (ret);
 }
@@ -148,7 +149,8 @@ __win_file_size(
 	 */
 	ret = __wt_win32_errno();
 	if (!silent)
-		WT_RET_MSG(session, ret, "%s: GetFileAttributesEx", name);
+		WT_RET_MSG(session, ret,
+		    "%s: file-size: GetFileAttributesEx", name);
 	return (ret);
 }
 
@@ -163,7 +165,7 @@ __win_handle_advise(WT_SESSION_IMPL *session,
 	WT_UNUSED(offset);
 	WT_UNUSED(len);
 	WT_UNUSED(advice);
-	WT_RET_MSG(session, ENOTSUP, "%s: advise", fh->name);
+	WT_RET_MSG(session, ENOTSUP, "%s: handle-advise", fh->name);
 }
 
 /*
@@ -198,6 +200,7 @@ __win_handle_allocate(
 	WT_UNUSED(offset);
 	WT_UNUSED(len);
 
+	WT_RET_MSG(session, ENOTSUP, "%s: handle-allocate", fh->name);
 	return (ENOTSUP);
 }
 
@@ -217,13 +220,15 @@ __win_handle_close(WT_SESSION_IMPL *session, WT_FH *fh)
 	if (fh->filehandle != INVALID_HANDLE_VALUE &&
 	    CloseHandle(fh->filehandle) == 0) {
 		ret = __wt_win32_errno();
-		__wt_err(session, ret, "%s: CloseHandle", fh->name);
+		__wt_err(session, ret,
+		    "%s: handle-close: CloseHandle", fh->name);
 	}
 
 	if (fh->filehandle_secondary != INVALID_HANDLE_VALUE &&
 	    CloseHandle(fh->filehandle_secondary) == 0) {
 		ret = __wt_win32_errno();
-		__wt_err(session, ret, "%s: CloseHandle: secondary", fh->name);
+		__wt_err(session, ret,
+		    "%s: handle-close: secondary: CloseHandle", fh->name);
 	}
 	return (ret);
 }
@@ -237,12 +242,12 @@ __win_handle_getc(WT_SESSION_IMPL *session, WT_FH *fh, int *chp)
 {
 	if (fh->fp == NULL)
 		WT_RET_MSG(session,
-		    ENOTSUP, "%s: getc: no stream configured", fh->name);
+		    ENOTSUP, "%s: handle-getc: no stream configured", fh->name);
 
 	*chp = fgetc(fh->fp);
 	if (*chp != EOF || !ferror(fh->fp))
 		return (0);
-	WT_RET_MSG(session, __wt_errno(), "%s: getc", fh->name);
+	WT_RET_MSG(session, __wt_errno(), "%s: handle-getc: fgetc", fh->name);
 }
 
 /*
@@ -269,14 +274,19 @@ __win_handle_lock(WT_SESSION_IMPL *session, WT_FH *fh, bool lock)
 	 * You can lock bytes that are beyond the end of the current file.
 	 * This is useful to coordinate adding records to the end of a file.
 	 */
-	ret = lock ?
-	    LockFile(fh->filehandle, 0, 0, 1, 0) :
-	    UnlockFile(fh->filehandle, 0, 0, 1, 0);
-
-	if (ret == FALSE)
-		WT_RET_MSG(NULL, __wt_win32_errno(), "%s: LockFile", fh->name);
-
-	return (0);
+	if (lock) {
+		if (LockFile(fh->filehandle, 0, 0, 1, 0) == FALSE) {
+			ret = __wt_win32_errno();
+			__wt_err(session, ret,
+			    "%s: handle-lock: LockFile", fh->name);
+		}
+	} else
+		if (UnlockFile(fh->filehandle, 0, 0, 1, 0) == FALSE) {
+			ret = __wt_win32_errno();
+			__wt_err(session, ret,
+			    "%s: handle-lock: UnlockFile", fh->name);
+		}
+	return (ret);
 }
 
 /*
@@ -293,7 +303,7 @@ __win_handle_printf(
 
 	if (vfprintf(fh->fp, fmt, ap) >= 0)
 		return (0);
-	WT_RET_MSG(session, EIO, "%s: vfprintf", fh->name);
+	WT_RET_MSG(session, EIO, "%s: handle-printf: vfprintf", fh->name);
 }
 
 /*
@@ -328,8 +338,8 @@ __win_handle_read(
 		if (!ReadFile(fh->filehandle, addr, chunk, &nr, &overlapped))
 			WT_RET_MSG(session,
 			    nr == 0 ? WT_ERROR : __wt_win32_errno(),
-			    "%s read error: failed to read %" WT_SIZET_FMT
-			    " bytes at offset %" PRIuMAX,
+			    "%s: handle-read: ReadFile: failed to read %"
+			    WT_SIZET_FMT " bytes at offset %" PRIuMAX,
 			    fh->name, chunk, (uintmax_t)offset);
 	}
 	return (0);
@@ -343,14 +353,14 @@ static int
 __win_handle_size(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
 {
 	LARGE_INTEGER size;
-	WT_DECL_RET;
 
-	if ((ret = GetFileSizeEx(fh->filehandle, &size)) != 0) {
+	if (GetFileSizeEx(fh->filehandle, &size) != 0) {
 		*sizep = size.QuadPart;
 		return (0);
 	}
 
-	WT_RET_MSG(session, __wt_win32_errno(), "%s: GetFileSizeEx", fh->name);
+	WT_RET_MSG(session,
+	    __wt_win32_errno(), "%s: handle-size: GetFileSizeEx", fh->name);
 }
 
 /*
@@ -367,13 +377,13 @@ __win_handle_sync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
 	if (fh->fp == NULL) {
 		if ((ret = FlushFileBuffers(fh->filehandle)) == FALSE)
 			WT_RET_MSG(session, __wt_win32_errno(),
-			    "%s FlushFileBuffers error", fh->name);
+			    "%s handle-sync: FlushFileBuffers error", fh->name);
 		return (0);
 	}
 
 	if (fflush(fh->fp) == 0)
 		return (0);
-	WT_RET_MSG(session, __wt_errno(), "%s: fflush", fh->name);
+	WT_RET_MSG(session, __wt_errno(), "%s: handle-sync: fflush", fh->name);
 }
 
 /*
@@ -388,21 +398,18 @@ __win_handle_truncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
 
 	largeint.QuadPart = len;
 
-	if ((ret = SetFilePointerEx(
-	    fh->filehandle_secondary, largeint, NULL, FILE_BEGIN)) == FALSE)
-		WT_RET_MSG(session,
-		    __wt_win32_errno(), "%s SetFilePointerEx error",
-		    fh->name);
+	if (SetFilePointerEx(
+	    fh->filehandle_secondary, largeint, NULL, FILE_BEGIN) == FALSE)
+		WT_RET_MSG(session, __wt_win32_errno(),
+		    "%s: handle-truncate: SetFilePointerEx", fh->name);
 
-	ret = SetEndOfFile(fh->filehandle_secondary);
-	if (ret != FALSE)
-		return (0);
-
-	if (GetLastError() == ERROR_USER_MAPPED_FILE)
-		return (EBUSY);
-
-	WT_RET_MSG(session,
-	    __wt_win32_errno(), "%s SetEndOfFile error", fh->name);
+	if (SetEndOfFile(fh->filehandle_secondary) == FALSE) {
+		if (GetLastError() == ERROR_USER_MAPPED_FILE)
+			return (EBUSY);
+		WT_RET_MSG(session, __wt_win32_errno(),
+		    "%s: handle-truncate: SetEndOfFile error", fh->name);
+	}
+	return (0);
 }
 
 /*
@@ -437,8 +444,8 @@ __win_handle_write(WT_SESSION_IMPL *session,
 
 		if (!WriteFile(fh->filehandle, addr, chunk, &nw, &overlapped))
 			WT_RET_MSG(session, __wt_win32_errno(),
-			    "%s write error: failed to write %" WT_SIZET_FMT
-			    " bytes at offset %" PRIuMAX,
+			    "%s: handle-write: WriteFile: failed to write %"
+			    WT_SIZET_FMT " bytes at offset %" PRIuMAX,
 			    fh->name, chunk, (uintmax_t)offset);
 	}
 	return (0);
@@ -555,9 +562,10 @@ __win_handle_open(WT_SESSION_IMPL *session,
 		if (filehandle == INVALID_HANDLE_VALUE)
 			WT_ERR_MSG(session, __wt_win32_errno(),
 			    direct_io ?
-			    "%s: open failed with direct I/O configured, some "
-			    "filesystem types do not support direct I/O" :
-			    "%s", name);
+			    "%s: handle-open: CreateFileA: failed with direct "
+			    "I/O configured, some filesystem types do not "
+			    "support direct I/O" :
+			    "%s: handle-open: CreateFileA", name);
 	}
 
 	/*
@@ -574,7 +582,7 @@ __win_handle_open(WT_SESSION_IMPL *session,
 	    NULL);
 	if (filehandle_secondary == INVALID_HANDLE_VALUE)
 		WT_ERR_MSG(session, __wt_win32_errno(),
-		    "open failed for secondary handle: %s", name);
+		    "%s: handle-open: CreateFileA: secondary", name);
 
 	/* Optionally configure the stream API. */
 	switch (LF_MASK(WT_STREAM_APPEND | WT_STREAM_READ | WT_STREAM_WRITE)) {
@@ -599,10 +607,11 @@ __win_handle_open(WT_SESSION_IMPL *session,
 	}
 	if (stream_mode != NULL) {
 		if ((fd = _open_osfhandle((intptr_t)filehandle, f)) == -1)
-			WT_ERR_MSG(
-			    session, __wt_errno(), "%s: _open_osfhandle", name);
+			WT_ERR_MSG(session, __wt_errno(),
+			    "%s: handle-open: _open_osfhandle", name);
 		if ((fh->fp = fdopen(fd, stream_mode)) == NULL)
-			WT_ERR_MSG(session, __wt_errno(), "%s: fdopen", name);
+			WT_ERR_MSG(session, __wt_errno(),
+			    "%s: handle-open: fdopen", name);
 	}
 
 	/* Configure fallocate/posix_fallocate calls. */
