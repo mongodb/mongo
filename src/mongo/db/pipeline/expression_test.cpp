@@ -4409,9 +4409,9 @@ TEST(ExpressionSubstrCPTest, DoesThrowWithBadContinuationByte) {
     VariablesIdGenerator idGenerator;
     VariablesParseState vps(&idGenerator);
 
-    char continuationByte = 0x80;
+    StringData continuationByte("\x80\x00", StringData::LiteralTag());
     const auto expr = Expression::parseExpression(
-        BSON("$substrCP" << BSON_ARRAY(&continuationByte << 0 << 1)).firstElement(), vps);
+        BSON("$substrCP" << BSON_ARRAY(continuationByte << 0 << 1)).firstElement(), vps);
     ASSERT_THROWS({ expr->evaluate(Document()); }, UserException);
 }
 
@@ -4419,9 +4419,9 @@ TEST(ExpressionSubstrCPTest, DoesThrowWithInvalidLeadingByte) {
     VariablesIdGenerator idGenerator;
     VariablesParseState vps(&idGenerator);
 
-    char leadingByte = 0xFF;
+    StringData leadingByte("\xFF\x00", StringData::LiteralTag());
     const auto expr = Expression::parseExpression(
-        BSON("$substrCP" << BSON_ARRAY(&leadingByte << 0 << 1)).firstElement(), vps);
+        BSON("$substrCP" << BSON_ARRAY(leadingByte << 0 << 1)).firstElement(), vps);
     ASSERT_THROWS({ expr->evaluate(Document()); }, UserException);
 }
 
