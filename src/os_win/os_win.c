@@ -472,13 +472,16 @@ __win_handle_open(WT_SESSION_IMPL *session,
 	direct_io = false;
 	path = NULL;
 
-	filehandle = filehandle_secondary = INVALID_HANDLE_VALUE;
+	/* Set up error handling. */
+	fh->filehandle = fh->filehandle_secondary =
+	    filehandle = filehandle_secondary = INVALID_HANDLE_VALUE;
+	fh->fp = NULL;
 
 	/*
 	 * Opening a file handle on a directory is only to support filesystems
 	 * that require a directory sync for durability, and Windows doesn't
-	 * require that, functionality: create empty file handles with invalid
-	 * handles.
+	 * require that functionality: create an empty WT_FH structure with
+	 * invalid handles.
 	 */
 	if (dio_type == WT_FILE_TYPE_DIRECTORY)
 		goto directory_open;
@@ -541,24 +544,14 @@ __win_handle_open(WT_SESSION_IMPL *session,
 	    dio_type == WT_FILE_TYPE_CHECKPOINT)
 		fh->extend_len = conn->data_extend_len;
 
-	filehandle = CreateFileA(name,
-				(GENERIC_READ | GENERIC_WRITE),
-				share_mode,
-				NULL,
-				dwCreationDisposition,
-				f,
-				NULL);
+	filehandle = CreateFileA(name, GENERIC_READ | GENERIC_WRITE,
+	    share_mode, NULL, dwCreationDisposition, f, NULL);
 	if (filehandle == INVALID_HANDLE_VALUE) {
 		if (LF_ISSET(WT_OPEN_CREATE) &&
 		    GetLastError() == ERROR_FILE_EXISTS)
-			filehandle = CreateFileA(name,
-						(GENERIC_READ | GENERIC_WRITE),
-						share_mode,
-						NULL,
-						OPEN_EXISTING,
-						f,
-						NULL);
-
+			filehandle = CreateFileA(
+			    name, GENERIC_READ | GENERIC_WRITE, share_mode,
+			    NULL, OPEN_EXISTING, f, NULL);
 		if (filehandle == INVALID_HANDLE_VALUE)
 			WT_ERR_MSG(session, __wt_win32_errno(),
 			    direct_io ?
@@ -573,18 +566,13 @@ __win_handle_open(WT_SESSION_IMPL *session,
 	 * concurrently with reads on the file. Writes would also move the file
 	 * pointer.
 	 */
-	filehandle_secondary = CreateFileA(name,
-	    (GENERIC_READ | GENERIC_WRITE),
-	    share_mode,
-	    NULL,
-	    OPEN_EXISTING,
-	    f,
-	    NULL);
+	filehandle_secondary = CreateFileA(name, GENERIC_READ | GENERIC_WRITE,
+	    share_mode, NULL, OPEN_EXISTING, f, NULL);
 	if (filehandle_secondary == INVALID_HANDLE_VALUE)
 		WT_ERR_MSG(session, __wt_win32_errno(),
 		    "%s: handle-open: CreateFileA: secondary", name);
 
-	/* Optionally configure the stream API. */
+	/* Optionally configure a stdio stream API. */
 	switch (LF_MASK(WT_STREAM_APPEND | WT_STREAM_READ | WT_STREAM_WRITE)) {
 	case WT_STREAM_APPEND:
 		f = _O_APPEND | _O_TEXT;
