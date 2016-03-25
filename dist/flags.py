@@ -65,6 +65,7 @@ flags = {
         'VERB_EVICT',
         'VERB_EVICTSERVER',
         'VERB_FILEOPS',
+        'VERB_HANDLEOPS',
         'VERB_LOG',
         'VERB_LSM',
         'VERB_LSM_MANAGER',

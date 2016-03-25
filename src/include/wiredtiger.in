@@ -1922,8 +1922,8 @@ struct __wt_connection {
 	 * as a list\, such as <code>"verbose=[evictserver\,read]"</code>., a
 	 * list\, with values chosen from the following options: \c "api"\, \c
 	 * "block"\, \c "checkpoint"\, \c "compact"\, \c "evict"\, \c
-	 * "evictserver"\, \c "fileops"\, \c "log"\, \c "lsm"\, \c
-	 * "lsm_manager"\, \c "metadata"\, \c "mutex"\, \c "overflow"\, \c
+	 * "evictserver"\, \c "fileops"\, \c "handleops"\, \c "log"\, \c "lsm"\,
+	 * \c "lsm_manager"\, \c "metadata"\, \c "mutex"\, \c "overflow"\, \c
 	 * "read"\, \c "rebalance"\, \c "reconcile"\, \c "recovery"\, \c
 	 * "salvage"\, \c "shared_cache"\, \c "split"\, \c "temporary"\, \c
 	 * "transaction"\, \c "verify"\, \c "version"\, \c "write"; default
@@ -2417,10 +2417,10 @@ struct __wt_connection {
  * list\, such as <code>"verbose=[evictserver\,read]"</code>., a list\, with
  * values chosen from the following options: \c "api"\, \c "block"\, \c
  * "checkpoint"\, \c "compact"\, \c "evict"\, \c "evictserver"\, \c "fileops"\,
- * \c "log"\, \c "lsm"\, \c "lsm_manager"\, \c "metadata"\, \c "mutex"\, \c
- * "overflow"\, \c "read"\, \c "rebalance"\, \c "reconcile"\, \c "recovery"\, \c
- * "salvage"\, \c "shared_cache"\, \c "split"\, \c "temporary"\, \c
- * "transaction"\, \c "verify"\, \c "version"\, \c "write"; default empty.}
+ * \c "handleops"\, \c "log"\, \c "lsm"\, \c "lsm_manager"\, \c "metadata"\, \c
+ * "mutex"\, \c "overflow"\, \c "read"\, \c "rebalance"\, \c "reconcile"\, \c
+ * "recovery"\, \c "salvage"\, \c "shared_cache"\, \c "split"\, \c "temporary"\,
+ * \c "transaction"\, \c "verify"\, \c "version"\, \c "write"; default empty.}
  * @config{write_through, Use \c FILE_FLAG_WRITE_THROUGH on Windows to write to
  * files.  Ignored on non-Windows systems.  Options are given as a list\, such
  * as <code>"write_through=[data]"</code>. Configuring \c write_through requires

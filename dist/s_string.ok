@@ -661,6 +661,7 @@ gostring
 gostruct
 goutf
 gt
+handleops
 hashval
 havesize
 hdr

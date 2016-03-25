@@ -44,13 +44,6 @@ __wt_win_directory_list(WT_SESSION_IMPL *session, const char *dir,
 	dirallocsz = 0;
 	dirsz = 0;
 	entries = NULL;
-	if (flags == 0)
-	    LF_SET(WT_DIRLIST_INCLUDE);
-
-	WT_ERR(__wt_verbose(session, WT_VERB_FILEOPS,
-	    "wt_dirlist of %s %s prefix %s",
-	    pathbuf->data, LF_ISSET(WT_DIRLIST_INCLUDE) ? "include" : "exclude",
-	    prefix == NULL ? "all" : prefix));
 
 	findhandle = FindFirstFileA(pathbuf->data, &finddata);
 	if (findhandle == INVALID_HANDLE_VALUE)

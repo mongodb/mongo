@@ -120,20 +120,14 @@ __wt_posix_handle_allocate(
 	 * Check for already configured handles and make the configured call.
 	 */
 	case WT_FALLOCATE_POSIX:
-		WT_RET(__wt_verbose(
-		    session, WT_VERB_FILEOPS, "%s: posix_fallocate", fh->name));
 		if ((ret = __posix_posix_fallocate(fh, offset, len)) == 0)
 			return (0);
 		WT_RET_MSG(session, ret, "%s: posix_fallocate", fh->name);
 	case WT_FALLOCATE_STD:
-		WT_RET(__wt_verbose(
-		    session, WT_VERB_FILEOPS, "%s: fallocate", fh->name));
 		if ((ret = __posix_std_fallocate(fh, offset, len)) == 0)
 			return (0);
 		WT_RET_MSG(session, ret, "%s: fallocate", fh->name);
 	case WT_FALLOCATE_SYS:
-		WT_RET(__wt_verbose(
-		    session, WT_VERB_FILEOPS, "%s: sys_fallocate", fh->name));
 		if ((ret = __posix_sys_fallocate(fh, offset, len)) == 0)
 			return (0);
 		WT_RET_MSG(session, ret, "%s: sys_fallocate", fh->name);

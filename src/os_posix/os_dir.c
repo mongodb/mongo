@@ -37,13 +37,6 @@ __wt_posix_directory_list(WT_SESSION_IMPL *session, const char *dir,
 	dirallocsz = 0;
 	dirsz = 0;
 	entries = NULL;
-	if (flags == 0)
-		LF_SET(WT_DIRLIST_INCLUDE);
-
-	WT_ERR(__wt_verbose(session, WT_VERB_FILEOPS,
-	    "wt_dirlist of %s %s prefix %s",
-	    path, LF_ISSET(WT_DIRLIST_INCLUDE) ? "include" : "exclude",
-	    prefix == NULL ? "all" : prefix));
 
 	WT_SYSCALL_RETRY(((dirp = opendir(path)) == NULL ? 1 : 0), ret);
 	if (ret != 0)
@@ -55,9 +48,9 @@ __wt_posix_directory_list(WT_SESSION_IMPL *session, const char *dir,
 		if (strcmp(dp->d_name, ".") == 0 ||
 		    strcmp(dp->d_name, "..") == 0)
 			continue;
-		match = false;
 
 		/* The list of files is optionally filtered by a prefix. */
+		match = false;
 		if (prefix != NULL &&
 		    ((LF_ISSET(WT_DIRLIST_INCLUDE) &&
 		    WT_PREFIX_MATCH(dp->d_name, prefix)) ||

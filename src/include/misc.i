@@ -79,6 +79,11 @@ static inline int
 __wt_dirlist(WT_SESSION_IMPL *session, const char *dir,
     const char *prefix, uint32_t flags, char ***dirlist, u_int *countp)
 {
+	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS,
+	    "%s: directory-list: %s prefix %s",
+	    dir, LF_ISSET(WT_DIRLIST_INCLUDE) ? "include" : "exclude",
+	    prefix == NULL ? "all" : prefix));
+
 	return (S2C(session)->file_directory_list(
 	    session, dir, prefix, flags, dirlist, countp));
 }
@@ -88,11 +93,68 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir,
  *	Flush a directory to ensure file creation is durable.
  */
 static inline int
-__wt_directory_sync(WT_SESSION_IMPL *session, const char *path)
+__wt_directory_sync(WT_SESSION_IMPL *session, const char *name)
 {
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 
-	return (S2C(session)->file_directory_sync(session, path));
+	WT_RET(__wt_verbose(
+	    session, WT_VERB_FILEOPS, "%s: directory-sync", name));
+
+	return (S2C(session)->file_directory_sync(session, name));
+}
+
+/*
+ * __wt_exist --
+ *	Return if the file exists.
+ */
+static inline int
+__wt_exist(WT_SESSION_IMPL *session, const char *name, bool *existp)
+{
+	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS, "%s: file-exist", name));
+
+	return (S2C(session)->file_exist(session, name, existp));
+}
+
+/*
+ * __wt_remove --
+ *	POSIX remove.
+ */
+static inline int
+__wt_remove(WT_SESSION_IMPL *session, const char *name)
+{
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
+
+	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS, "%s: file-remove", name));
+
+	return (S2C(session)->file_remove(session, name));
+}
+
+/*
+ * __wt_rename --
+ *	POSIX rename.
+ */
+static inline int
+__wt_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
+{
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
+
+	WT_RET(__wt_verbose(
+	    session, WT_VERB_FILEOPS, "%s to %s: file-rename", from, to));
+
+	return (S2C(session)->file_rename(session, from, to));
+}
+
+/*
+ * __wt_filesize_name --
+ *	Get the size of a file in bytes, by file name.
+ */
+static inline int
+__wt_filesize_name(
+    WT_SESSION_IMPL *session, const char *name, bool silent, wt_off_t *sizep)
+{
+	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS, "%s: file-size", name));
+
+	return (S2C(session)->file_size(session, name, silent, sizep));
 }
 
 /*
@@ -116,13 +178,26 @@ __wt_directory_sync_fh(WT_SESSION_IMPL *session, WT_FH *fh)
 }
 
 /*
- * __wt_exist --
- *	Return if the file exists.
+ * __wt_posix_fadvise --
+ *	POSIX fadvise.
  */
 static inline int
-__wt_exist(WT_SESSION_IMPL *session, const char *name, bool *existp)
+__wt_posix_fadvise(WT_SESSION_IMPL *session,
+    WT_FH *fh, wt_off_t offset, wt_off_t len, int advice)
 {
-	return (S2C(session)->file_exist(session, name, existp));
+#if defined(HAVE_POSIX_FADVISE)
+	WT_RET(__wt_verbose(
+	    session, WT_VERB_HANDLEOPS, "%s: handle-advise", fh->name));
+
+	return (fh->fh_advise(session, fh, offset, len, advice));
+#else
+	WT_UNUSED(session);
+	WT_UNUSED(fh);
+	WT_UNUSED(offset);
+	WT_UNUSED(len);
+	WT_UNUSED(advice);
+	return (0);
+#endif
 }
 
 /*
@@ -136,27 +211,11 @@ __wt_fallocate(
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
 
-	return (fh->fh_allocate(session, fh, offset, len));
-}
+	WT_RET(__wt_verbose(session, WT_VERB_HANDLEOPS,
+	    "%s: handle-allocate: %" PRIuMAX " at %" PRIuMAX,
+	    fh->name, (uintmax_t)len, (uintmax_t)offset));
 
-/*
- * __wt_posix_fadvise --
- *	POSIX fadvise.
- */
-static inline int
-__wt_posix_fadvise(WT_SESSION_IMPL *session,
-    WT_FH *fh, wt_off_t offset, wt_off_t len, int advice)
-{
-#if defined(HAVE_POSIX_FADVISE)
-	return (fh->fh_advise(session, fh, offset, len, advice));
-#else
-	WT_UNUSED(session);
-	WT_UNUSED(fh);
-	WT_UNUSED(offset);
-	WT_UNUSED(len);
-	WT_UNUSED(advice);
-	return (0);
-#endif
+	return (fh->fh_allocate(session, fh, offset, len));
 }
 
 /*
@@ -166,106 +225,10 @@ __wt_posix_fadvise(WT_SESSION_IMPL *session,
 static inline int
 __wt_file_lock(WT_SESSION_IMPL * session, WT_FH *fh, bool lock)
 {
+	WT_RET(__wt_verbose(session, WT_VERB_HANDLEOPS,
+	    "%s: handle-lock: %s", fh->name, lock ? "lock" : "unlock"));
+
 	return (fh->fh_lock(session, fh, lock));
-}
-
-/*
- * __wt_filesize --
- *	Get the size of a file in bytes, by file handle.
- */
-static inline int
-__wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
-{
-	return (fh->fh_size(session, fh, sizep));
-}
-
-/*
- * __wt_filesize_name --
- *	Get the size of a file in bytes, by file name.
- */
-static inline int
-__wt_filesize_name(
-    WT_SESSION_IMPL *session, const char *name, bool silent, wt_off_t *sizep)
-{
-	return (S2C(session)->file_size(session, name, silent, sizep));
-}
-
-/*
- * __wt_fsync --
- *	POSIX fflush/fsync.
- */
-static inline int
-__wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
-{
-	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
-
-	return (fh->fh_sync(session, fh, block));
-}
-
-/*
- * __wt_ftruncate --
- *	POSIX ftruncate.
- */
-static inline int
-__wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
-{
-	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
-
-	return (fh->fh_truncate(session, fh, len));
-}
-
-/*
- * __wt_read --
- *	POSIX pread.
- */
-static inline int
-__wt_read(
-    WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, void *buf)
-{
-	WT_STAT_FAST_CONN_INCR(session, read_io);
-
-	return (fh->fh_read(session, fh, offset, len, buf));
-}
-
-/*
- * __wt_remove --
- *	POSIX remove.
- */
-static inline int
-__wt_remove(WT_SESSION_IMPL *session, const char *name)
-{
-	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
-
-	return (S2C(session)->file_remove(session, name));
-}
-
-/*
- * __wt_rename --
- *	POSIX rename.
- */
-static inline int
-__wt_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
-{
-	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
-
-	return (S2C(session)->file_rename(session, from, to));
-}
-
-/*
- * __wt_write --
- *	POSIX pwrite.
- */
-static inline int
-__wt_write(WT_SESSION_IMPL *session,
-    WT_FH *fh, wt_off_t offset, size_t len, const void *buf)
-{
-	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY) ||
-	    WT_STRING_MATCH(fh->name,
-	    WT_SINGLETHREAD, strlen(WT_SINGLETHREAD)));
-
-	WT_STAT_FAST_CONN_INCR(session, write_io);
-
-	return (fh->fh_write(session, fh, offset, len, buf));
 }
 
 /*
@@ -275,6 +238,9 @@ __wt_write(WT_SESSION_IMPL *session,
 static inline int
 __wt_vfprintf(WT_SESSION_IMPL *session, WT_FH *fh, const char *fmt, va_list ap)
 {
+	WT_RET(__wt_verbose(
+	    session, WT_VERB_HANDLEOPS, "%s: handle-printf", fh->name));
+
 	return (fh->fh_printf(session, fh, fmt, ap));
 }
 
@@ -294,4 +260,86 @@ __wt_fprintf(WT_SESSION_IMPL *session, WT_FH *fh, const char *fmt, ...)
 	va_end(ap);
 
 	return (ret);
+}
+
+/*
+ * __wt_read --
+ *	POSIX pread.
+ */
+static inline int
+__wt_read(
+    WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, void *buf)
+{
+	WT_RET(__wt_verbose(session, WT_VERB_HANDLEOPS,
+	    "%s: handle-read: %" WT_SIZET_FMT " at %" PRIuMAX,
+	    fh->name, len, (uintmax_t)offset));
+
+	WT_STAT_FAST_CONN_INCR(session, read_io);
+
+	return (fh->fh_read(session, fh, offset, len, buf));
+}
+
+/*
+ * __wt_filesize --
+ *	Get the size of a file in bytes, by file handle.
+ */
+static inline int
+__wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
+{
+	WT_RET(__wt_verbose(
+	    session, WT_VERB_HANDLEOPS, "%s: handle-size", fh->name));
+
+	return (fh->fh_size(session, fh, sizep));
+}
+
+/*
+ * __wt_fsync --
+ *	POSIX fflush/fsync.
+ */
+static inline int
+__wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
+{
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
+
+	WT_RET(__wt_verbose(
+	    session, WT_VERB_HANDLEOPS, "%s: handle-sync", fh->name));
+
+	return (fh->fh_sync(session, fh, block));
+}
+
+/*
+ * __wt_ftruncate --
+ *	POSIX ftruncate.
+ */
+static inline int
+__wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
+{
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
+
+	WT_RET(__wt_verbose(session, WT_VERB_HANDLEOPS,
+	    "%s: handle-truncate: %" PRIuMAX,
+	    fh->name, (uintmax_t)len));
+
+	return (fh->fh_truncate(session, fh, len));
+}
+
+/*
+ * __wt_write --
+ *	POSIX pwrite.
+ */
+static inline int
+__wt_write(WT_SESSION_IMPL *session,
+    WT_FH *fh, wt_off_t offset, size_t len, const void *buf)
+{
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY) ||
+	    WT_STRING_MATCH(fh->name,
+	    WT_SINGLETHREAD, strlen(WT_SINGLETHREAD)));
+
+	WT_RET(__wt_verbose(session, WT_VERB_HANDLEOPS,
+	    "%s: handle-write: %" WT_SIZET_FMT " at %" PRIuMAX,
+	    fh->name, len, (uintmax_t)offset));
+
+	WT_STAT_FAST_CONN_INCR(session, write_io);
+
+	return (fh->fh_write(session, fh, offset, len, buf));
 }

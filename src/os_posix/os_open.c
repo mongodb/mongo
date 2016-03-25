@@ -79,12 +79,86 @@ __wt_handle_search_unlock(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __open_verbose --
+ *	Optionally output a verbose message on handle open.
+ */
+static inline int
+__open_verbose(
+    WT_SESSION_IMPL *session, const char *name, int dio_type, uint32_t flags)
+{
+#ifdef HAVE_VERBOSE
+	if (!WT_VERBOSE_ISSET(session, WT_VERB_FILEOPS))
+		return (0);
+
+	/*
+	 * It's useful to track file opens when debugging platforms, take some
+	 * effort to output good tracking information.
+	 */
+	WT_DECL_RET;
+	WT_DECL_ITEM(tmp);
+	const char *dio_type_tag, *sep;
+
+	switch (dio_type) {
+	case WT_FILE_TYPE_CHECKPOINT:
+		dio_type_tag = "checkpoint";
+		break;
+	case WT_FILE_TYPE_DATA:
+		dio_type_tag = "data";
+		break;
+	case WT_FILE_TYPE_DIRECTORY:
+		dio_type_tag = "directory";
+		break;
+	case WT_FILE_TYPE_LOG:
+		dio_type_tag = "log";
+		break;
+	case WT_FILE_TYPE_REGULAR:
+		dio_type_tag = "regular";
+		break;
+	default:
+		dio_type_tag = "unknown open type";
+		break;
+	}
+
+	sep = "";
+	WT_RET(__wt_scr_alloc(session, 0, &tmp));
+
+#define	WT_OPEN_VERBOSE_FLAG(f, name)					\
+	if (LF_ISSET(f)) {						\
+		WT_ERR(__wt_buf_catfmt(					\
+		    session, tmp, "%s%s", sep, name));			\
+		sep = ",";						\
+	}
+
+	WT_OPEN_VERBOSE_FLAG(WT_OPEN_CREATE, "create");
+	WT_OPEN_VERBOSE_FLAG(WT_OPEN_EXCLUSIVE, "exclusive");
+	WT_OPEN_VERBOSE_FLAG(WT_OPEN_FIXED, "fixed");
+	WT_OPEN_VERBOSE_FLAG(WT_OPEN_READONLY, "readonly");
+	WT_OPEN_VERBOSE_FLAG(WT_STREAM_APPEND, "stream-append");
+	WT_OPEN_VERBOSE_FLAG(WT_STREAM_READ, "stream-read");
+	WT_OPEN_VERBOSE_FLAG(WT_STREAM_WRITE, "stream-write");
+
+	ret = __wt_verbose(session, WT_VERB_FILEOPS,
+	    "%s: handle-open: type %s, flags %s",
+	    name, dio_type_tag, (char *)tmp->data);
+
+err:	__wt_scr_free(session, &tmp);
+	return (ret);
+#else
+	WT_UNUSED(session);
+	WT_UNUSED(name);
+	WT_UNUSED(dio_type);
+	WT_UNUSED(flags);
+	return (0);
+#endif
+}
+
+/*
  * __wt_open --
  *	Open a file handle.
  */
 int
 __wt_open(WT_SESSION_IMPL *session,
-    const char *name, int dio_type, u_int flags, WT_FH **fhp)
+    const char *name, int dio_type, uint32_t flags, WT_FH **fhp)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -96,7 +170,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	fh = NULL;
 	open_called = false;
 
-	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS, "%s: open", name));
+	WT_RET(__open_verbose(session, name, dio_type, flags));
 
 	/* Check if the handle is already open. */
 	if (__wt_handle_search(session, name, true, true, NULL, &fh)) {
@@ -175,7 +249,9 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH **fhp)
 	fh = *fhp;
 	*fhp = NULL;
 
-	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS, "%s: close", fh->name));
+	/* Track handle-close as a file operation, so open and close match. */
+	WT_RET(__wt_verbose(
+	    session, WT_VERB_FILEOPS, "%s: handle-close", fh->name));
 
 	/*
 	 * If the reference count hasn't gone to 0, or if it's an in-memory
