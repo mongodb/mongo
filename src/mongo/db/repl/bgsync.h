@@ -28,9 +28,12 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/base/status_with.h"
-#include "mongo/client/fetcher.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/data_replicator_external_state.h"
+#include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -104,7 +107,7 @@ public:
     // starts the sync target notifying thread
     void notifierThread();
 
-    HostAndPort getSyncTarget();
+    HostAndPort getSyncTarget() const;
 
     // Interface implementation
 
@@ -124,46 +127,25 @@ public:
      */
     void cancelFetcher();
 
-    bool getInitialSyncRequestedFlag();
+    bool getInitialSyncRequestedFlag() const;
     void setInitialSyncRequestedFlag(bool value);
 
-    void setIndexPrefetchConfig(const IndexPrefetchConfig cfg) {
-        _indexPrefetchConfig = cfg;
-    }
+    IndexPrefetchConfig getIndexPrefetchConfig() const;
+    void setIndexPrefetchConfig(const IndexPrefetchConfig cfg);
 
-    IndexPrefetchConfig getIndexPrefetchConfig() {
-        return _indexPrefetchConfig;
-    }
-
+    /**
+     * Returns true if any of the following is true:
+     * 1) We are shutting down;
+     * 2) We are primary;
+     * 3) We are in drain mode; or
+     * 4) We are stopped.
+     */
+    bool shouldStopFetching() const;
 
     // Testing related stuff
     void pushTestOpToBuffer(const BSONObj& op);
 
 private:
-    static BackgroundSync* s_instance;
-    // protects creation of s_instance
-    static stdx::mutex s_mutex;
-
-    // Production thread
-    BlockingQueue<BSONObj> _buffer;
-
-    // Task executor used to run find/getMore commands on sync source.
-    executor::ThreadPoolTaskExecutor _threadPoolTaskExecutor;
-
-    // _mutex protects all of the class variables except _buffer
-    mutable stdx::mutex _mutex;
-
-    OpTime _lastOpTimeFetched;
-
-    // lastFetchedHash is used to match ops to determine if we need to rollback, when
-    // a secondary.
-    long long _lastFetchedHash;
-
-    // if producer thread should not be running
-    bool _stopped;
-
-    HostAndPort _syncSourceHost;
-
     BackgroundSync();
     BackgroundSync(const BackgroundSync& s);
     BackgroundSync operator=(const BackgroundSync& s);
@@ -181,15 +163,18 @@ private:
     void _signalNoNewDataForApplier();
 
     /**
-     * Processes query responses from fetcher.
+     * Record metrics.
      */
-    void _fetcherCallback(const StatusWith<Fetcher::QueryResponse>& result,
-                          BSONObjBuilder* bob,
-                          const HostAndPort& source,
-                          OpTime lastOpTimeFetched,
-                          long long lastFetchedHash,
-                          Milliseconds fetcherMaxTimeMS,
-                          Status* returnStatus);
+    void _recordStats(const OplogFetcher::DocumentsInfo& info, Milliseconds getMoreElapsedTime);
+
+    /**
+     * Checks current background sync state before pushing operations into blocking queue and
+     * updating metrics. If the queue is full, might block.
+     */
+    void _enqueueDocuments(Fetcher::Documents::const_iterator begin,
+                           Fetcher::Documents::const_iterator end,
+                           const OplogFetcher::DocumentsInfo& info,
+                           Milliseconds elapsed);
 
     /**
      * Executes a rollback.
@@ -204,20 +189,53 @@ private:
 
     long long _readLastAppliedHash(OperationContext* txn);
 
+    static BackgroundSync* s_instance;
+    // protects creation of s_instance
+    static stdx::mutex s_mutex;
+
+    // Production thread
+    BlockingQueue<BSONObj> _buffer;
+
+    // Task executor used to run find/getMore commands on sync source.
+    executor::ThreadPoolTaskExecutor _threadPoolTaskExecutor;
+
+    // bool for indicating resync need on this node and the mutex that protects it
+    // The resync command sets this flag; the Applier thread observes and clears it.
+    mutable stdx::mutex _initialSyncMutex;
+    bool _initialSyncRequestedFlag = false;
+
+    // This setting affects the Applier prefetcher behavior.
+    mutable stdx::mutex _indexPrefetchMutex;
+    IndexPrefetchConfig _indexPrefetchConfig = PREFETCH_ALL;
+
     // A pointer to the replication coordinator running the show.
     ReplicationCoordinator* _replCoord;
+
+    // Data replicator external state required by the oplog fetcher.
+    // Owned by us.
+    std::unique_ptr<DataReplicatorExternalState> _dataReplicatorExternalState;
 
     // Used to determine sync source.
     // TODO(dannenberg) move into DataReplicator.
     SyncSourceResolver _syncSourceResolver;
 
-    // bool for indicating resync need on this node and the mutex that protects it
-    // The resync command sets this flag; the Applier thread observes and clears it.
-    bool _initialSyncRequestedFlag;
-    stdx::mutex _initialSyncMutex;
+    // _mutex protects all of the class variables declared below.
+    mutable stdx::mutex _mutex;
 
-    // This setting affects the Applier prefetcher behavior.
-    IndexPrefetchConfig _indexPrefetchConfig;
+    OpTime _lastOpTimeFetched;
+
+    // lastFetchedHash is used to match ops to determine if we need to rollback, when
+    // a secondary.
+    long long _lastFetchedHash = 0LL;
+
+    // if producer thread should not be running
+    bool _stopped = true;
+
+    HostAndPort _syncSourceHost;
+
+    // Current oplog fetcher tailing the oplog on the sync source.
+    // Owned by us.
+    std::unique_ptr<OplogFetcher> _oplogFetcher;
 };
 
 

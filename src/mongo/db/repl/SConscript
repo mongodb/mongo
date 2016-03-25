@@ -8,6 +8,7 @@ env.Library(
         'bgsync.cpp',
     ],
     LIBDEPS=[
+        'data_replicator_external_state_impl',
         'repl_coordinator_interface',
         'rollback_source_impl',
         'rs_rollback',
