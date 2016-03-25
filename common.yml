@@ -286,7 +286,6 @@ functions:
     params:
       working_dir: src
       script: |
-        set -e
         if [ "Windows_NT" = "$OS" ]; then
             set -o igncr
         fi;
