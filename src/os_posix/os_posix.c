@@ -505,7 +505,7 @@ __posix_handle_open_cloexec(WT_SESSION_IMPL *session, int fd, const char *name)
  */
 static int
 __posix_handle_open(WT_SESSION_IMPL *session,
-    WT_FH *fh, const char *name, int dio_type, uint32_t flags)
+    WT_FH *fh, const char *name, uint32_t file_type, uint32_t flags)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -529,7 +529,7 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 		name = path;
 	}
 
-	if (dio_type == WT_FILE_TYPE_DIRECTORY) {
+	if (file_type == WT_FILE_TYPE_DIRECTORY) {
 		f = O_RDONLY;
 #ifdef O_CLOEXEC
 		/*
@@ -569,7 +569,10 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 	f |= O_CLOEXEC;
 #endif
 #ifdef O_DIRECT
-	if (dio_type && FLD_ISSET(conn->direct_io, dio_type)) {
+	if (FLD_ISSET(conn->direct_io, file_type) ||
+	    (LF_ISSET(WT_OPEN_READONLY) &&
+	    file_type == WT_FILE_TYPE_DATA &&
+	    FLD_ISSET(conn->direct_io, WT_FILE_TYPE_CHECKPOINT))) {
 		f |= O_DIRECT;
 		direct_io = true;
 	}
@@ -577,12 +580,11 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 	fh->direct_io = direct_io;
 #ifdef O_NOATIME
 	/* Avoid updating metadata for read-only workloads. */
-	if (dio_type == WT_FILE_TYPE_DATA ||
-	    dio_type == WT_FILE_TYPE_CHECKPOINT)
+	if (file_type == WT_FILE_TYPE_DATA)
 		f |= O_NOATIME;
 #endif
 
-	if (dio_type == WT_FILE_TYPE_LOG &&
+	if (file_type == WT_FILE_TYPE_LOG &&
 	    FLD_ISSET(conn->txn_logsync, WT_LOG_DSYNC)) {
 #ifdef O_DSYNC
 		f |= O_DSYNC;
@@ -605,8 +607,7 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 
 	/* Disable read-ahead on trees: it slows down random read workloads. */
 #if defined(HAVE_POSIX_FADVISE)
-	if (dio_type == WT_FILE_TYPE_DATA ||
-	    dio_type == WT_FILE_TYPE_CHECKPOINT) {
+	if (file_type == WT_FILE_TYPE_DATA) {
 		WT_SYSCALL_RETRY(
 		    posix_fadvise(fd, 0, 0, POSIX_FADV_RANDOM), ret);
 		if (ret != 0)
@@ -616,8 +617,7 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 #endif
 
 	/* Configure file extension. */
-	if (dio_type == WT_FILE_TYPE_DATA ||
-	    dio_type == WT_FILE_TYPE_CHECKPOINT)
+	if (file_type == WT_FILE_TYPE_DATA)
 		fh->extend_len = conn->data_extend_len;
 
 	/* Optionally configure a stdio stream API. */

@@ -1197,7 +1197,8 @@ __conn_config_file(WT_SESSION_IMPL *session,
 		return (0);
 
 	/* Open the configuration file. */
-	WT_RET(__wt_open(session, filename, 0, 0, &fh));
+	WT_RET(__wt_open(
+	    session, filename, WT_FILE_TYPE_REGULAR, WT_OPEN_READONLY, &fh));
 	WT_ERR(__wt_filesize(session, fh, &size));
 	if (size == 0)
 		goto err;
@@ -1489,7 +1490,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	exist = false;
 	if (!is_create)
 		WT_ERR(__wt_exist(session, WT_WIREDTIGER, &exist));
-	ret = __wt_open(session, WT_SINGLETHREAD, 0,
+	ret = __wt_open(session, WT_SINGLETHREAD, WT_FILE_TYPE_REGULAR,
 	    is_create || exist ? WT_OPEN_CREATE : 0, &conn->lock_fh);
 
 	/*
@@ -1544,8 +1545,8 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	/* We own the lock file, optionally create the WiredTiger file. */
-	ret = __wt_open(
-	    session, WT_WIREDTIGER, 0, is_create ? WT_OPEN_CREATE : 0, &fh);
+	ret = __wt_open(session, WT_WIREDTIGER,
+	    WT_FILE_TYPE_REGULAR, is_create ? WT_OPEN_CREATE : 0, &fh);
 
 	/*
 	 * If we're read-only, check for success as well as handled errors.

@@ -457,7 +457,7 @@ __win_handle_write(WT_SESSION_IMPL *session,
  */
 static int
 __win_handle_open(WT_SESSION_IMPL *session,
-    WT_FH *fh, const char *name, int dio_type, uint32_t flags)
+    WT_FH *fh, const char *name, uint32_t file_type, uint32_t flags)
 {
 	DWORD dwCreationDisposition;
 	HANDLE filehandle, filehandle_secondary;
@@ -483,7 +483,7 @@ __win_handle_open(WT_SESSION_IMPL *session,
 	 * require that functionality: create an empty WT_FH structure with
 	 * invalid handles.
 	 */
-	if (dio_type == WT_FILE_TYPE_DIRECTORY)
+	if (file_type == WT_FILE_TYPE_DIRECTORY)
 		goto directory_open;
 
 	/* Create the path to the file. */
@@ -518,30 +518,29 @@ __win_handle_open(WT_SESSION_IMPL *session,
 	 * direct_io means no OS file caching. This requires aligned buffer
 	 * allocations like O_DIRECT.
 	 */
-	if (dio_type && FLD_ISSET(conn->direct_io, dio_type)) {
+	if (FLD_ISSET(conn->direct_io, file_type) ||
+	    (LF_ISSET(WT_OPEN_READONLY) &&
+	    file_type == WT_FILE_TYPE_DATA &&
+	    FLD_ISSET(conn->direct_io, WT_FILE_TYPE_CHECKPOINT))) {
 		f |= FILE_FLAG_NO_BUFFERING;
 		direct_io = true;
 	}
 	fh->direct_io = direct_io;
 
 	/* FILE_FLAG_WRITE_THROUGH does not require aligned buffers */
-	if (dio_type && FLD_ISSET(conn->write_through, dio_type)) {
+	if (FLD_ISSET(conn->write_through, file_type))
 		f |= FILE_FLAG_WRITE_THROUGH;
-	}
 
-	if (dio_type == WT_FILE_TYPE_LOG &&
-	    FLD_ISSET(conn->txn_logsync, WT_LOG_DSYNC)) {
+	if (file_type == WT_FILE_TYPE_LOG &&
+	    FLD_ISSET(conn->txn_logsync, WT_LOG_DSYNC))
 		f |= FILE_FLAG_WRITE_THROUGH;
-	}
 
 	/* Disable read-ahead on trees: it slows down random read workloads. */
-	if (dio_type == WT_FILE_TYPE_DATA ||
-	    dio_type == WT_FILE_TYPE_CHECKPOINT)
+	if (file_type == WT_FILE_TYPE_DATA)
 		f |= FILE_FLAG_RANDOM_ACCESS;
 
 	/* Configure file extension. */
-	if (dio_type == WT_FILE_TYPE_DATA ||
-	    dio_type == WT_FILE_TYPE_CHECKPOINT)
+	if (file_type == WT_FILE_TYPE_DATA)
 		fh->extend_len = conn->data_extend_len;
 
 	filehandle = CreateFileA(name, GENERIC_READ | GENERIC_WRITE,

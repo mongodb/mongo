@@ -78,8 +78,8 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session)
 	WT_RET(__wt_exist(session, WT_METADATA_BACKUP, &exist));
 	if (!exist)
 		return (0);
-	WT_RET(__wt_open(session,
-	    WT_METADATA_BACKUP, WT_FILE_TYPE_REGULAR, WT_STREAM_READ, &fh));
+	WT_RET(__wt_open(session, WT_METADATA_BACKUP,
+	    WT_FILE_TYPE_REGULAR, WT_OPEN_READONLY | WT_STREAM_READ, &fh));
 
 	/* Read line pairs and load them into the metadata file. */
 	WT_ERR(__wt_scr_alloc(session, 512, &key));
@@ -257,8 +257,8 @@ __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
 	if (!exist)
 		return (strcmp(key, WT_METAFILE_URI) == 0 ?
 		    __metadata_config(session, valuep) : WT_NOTFOUND);
-	WT_RET(__wt_open(session,
-	    WT_METADATA_TURTLE, WT_FILE_TYPE_REGULAR, WT_STREAM_READ, &fh));
+	WT_RET(__wt_open(session, WT_METADATA_TURTLE,
+	    WT_FILE_TYPE_REGULAR, WT_OPEN_READONLY | WT_STREAM_READ, &fh));
 
 	/* Search for the key. */
 	WT_ERR(__wt_scr_alloc(session, 512, &buf));

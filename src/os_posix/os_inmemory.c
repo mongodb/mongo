@@ -383,11 +383,11 @@ err:	__wt_spin_unlock(session, &im->lock);
  */
 static int
 __im_handle_open(WT_SESSION_IMPL *session,
-    WT_FH *fh, const char *path, int dio_type, u_int flags)
+    WT_FH *fh, const char *path, uint32_t file_type, uint32_t flags)
 {
 	WT_UNUSED(session);
 	WT_UNUSED(path);
-	WT_UNUSED(dio_type);
+	WT_UNUSED(file_type);
 	WT_UNUSED(flags);
 
 	fh->off = 0;

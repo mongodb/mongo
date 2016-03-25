@@ -157,6 +157,8 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	uint64_t bucket, hash;
 
+	WT_UNUSED(readonly);
+
 	WT_RET(__wt_verbose(session, WT_VERB_BLOCK, "open: %s", filename));
 
 	conn = S2C(session);
@@ -226,9 +228,7 @@ __wt_block_open(WT_SESSION_IMPL *session,
 #endif
 
 	/* Open the underlying file handle. */
-	WT_ERR(__wt_open(session, filename,
-	    readonly ? WT_FILE_TYPE_CHECKPOINT : WT_FILE_TYPE_DATA,
-	    0, &block->fh));
+	WT_ERR(__wt_open(session, filename, WT_FILE_TYPE_DATA, 0, &block->fh));
 
 	/* Initialize the live checkpoint's lock. */
 	WT_ERR(__wt_spin_init(session, &block->live_lock, "block manager"));

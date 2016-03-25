@@ -438,8 +438,8 @@ struct __wt_connection_impl {
 	int	(*file_remove)(WT_SESSION_IMPL *, const char *);
 	int	(*file_rename)(WT_SESSION_IMPL *, const char *, const char *);
 	int	(*file_size)(WT_SESSION_IMPL *, const char *, bool, wt_off_t *);
-	int	(*handle_open)(
-		    WT_SESSION_IMPL *, WT_FH *, const char *, int, u_int);
+	int	(*handle_open)(WT_SESSION_IMPL *,
+		    WT_FH *, const char *, uint32_t, uint32_t);
 
 	uint32_t flags;
 };
