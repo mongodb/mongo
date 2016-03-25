@@ -886,8 +886,8 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         member->makeObjOwnedIfNeeded();
 
         // Save state before making changes
+        WorkingSetCommon::prepareForSnapshotChange(_ws);
         try {
-            WorkingSetCommon::prepareForSnapshotChange(_ws);
             child()->saveState();
         } catch (const WriteConflictException& wce) {
             std::terminate();
