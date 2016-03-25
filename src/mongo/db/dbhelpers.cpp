@@ -107,9 +107,6 @@ void Helpers::ensureIndex(OperationContext* txn,
     wunit.commit();
 }
 
-/* fetch a single object from collection ns that matches query
-   set your db SavedContext first
-*/
 bool Helpers::findOne(OperationContext* txn,
                       Collection* collection,
                       const BSONObj& query,
@@ -122,9 +119,6 @@ bool Helpers::findOne(OperationContext* txn,
     return true;
 }
 
-/* fetch a single object from collection ns that matches query
-   set your db SavedContext first
-*/
 RecordId Helpers::findOne(OperationContext* txn,
                           Collection* collection,
                           const BSONObj& query,
