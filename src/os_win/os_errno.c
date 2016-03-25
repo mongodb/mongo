@@ -46,13 +46,13 @@ __wt_map_windows_error_to_error(DWORD winerr)
  *	of failures.
  */
 int
-__wt_map_error_rdonly(int winerr)
+__wt_map_error_rdonly(int error)
 {
-	if (winerr == ERROR_FILE_NOT_FOUND)
+	if (error == ERROR_FILE_NOT_FOUND)
 		return (WT_NOTFOUND);
-	else if (winerr == ERROR_ACCESS_DENIED)
+	else if (error == ERROR_ACCESS_DENIED)
 		return (WT_PERM_DENIED);
-	return (winerr);
+	return (error);
 }
 
 /*

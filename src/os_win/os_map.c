@@ -13,8 +13,8 @@
  *	Map a file into memory.
  */
 int
-__wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp,
-   void** mappingcookie)
+__wt_mmap(WT_SESSION_IMPL *session,
+    WT_FH *fh, void *mapp, size_t *lenp, void **mappingcookie)
 {
 	void *map;
 	size_t orig_size;
@@ -85,8 +85,8 @@ __wt_mmap_discard(WT_SESSION_IMPL *session, void *p, size_t size)
  *	Remove a memory mapping.
  */
 int
-__wt_munmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, size_t len,
-   void** mappingcookie)
+__wt_munmap(WT_SESSION_IMPL *session,
+    WT_FH *fh, void *map, size_t len, void **mappingcookie)
 {
 	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS,
 	    "%s: UnmapViewOfFile %p: %" WT_SIZET_FMT " bytes",
