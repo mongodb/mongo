@@ -244,6 +244,7 @@ Pandis
 Phong
 PlatformSDK
 Posix
+PowerPC
 Pre
 Preload
 Prepend
@@ -1054,6 +1055,7 @@ undef
 unencrypted
 unesc
 unescaped
+unicode
 uninstantiated
 unistd
 unlinked
