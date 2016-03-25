@@ -1357,30 +1357,31 @@ var ShardingTest = function(params) {
         }
     }
 
-    if (!otherParams.manualAddShard) {
-        this._shardNames = [];
+    try {
+        if (!otherParams.manualAddShard) {
+            this._shardNames = [];
 
-        var testName = this._testName;
-        var admin = this.admin;
-        var shardNames = this._shardNames;
+            var testName = this._testName;
+            var admin = this.admin;
+            var shardNames = this._shardNames;
 
-        this._connections.forEach(function(z) {
-            var n = z.name;
-            if (!n) {
-                n = z.host;
-                if (!n) {
-                    n = z;
-                }
-            }
+            this._connections.forEach(function(z) {
+                var n = z.name || z.host || z;
 
-            print("ShardingTest " + testName + " going to add shard : " + n);
+                print("ShardingTest " + testName + " going to add shard : " + n);
 
-            var result = admin.runCommand({addshard: n});
-            assert.commandWorked(result, "Failed to add shard " + n);
+                var result = admin.runCommand({addshard: n});
+                assert.commandWorked(result, "Failed to add shard " + n);
 
-            shardNames.push(result.shardAdded);
-            z.shardName = result.shardAdded;
-        });
+                shardNames.push(result.shardAdded);
+                z.shardName = result.shardAdded;
+            });
+        }
+    } catch (e) {
+        // Clean up the running procceses on failure
+        print("Failed to add shards, stopping cluster.");
+        this.stop();
+        throw e;
     }
 
     if (jsTestOptions().keyFile) {

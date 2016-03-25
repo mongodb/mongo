@@ -202,10 +202,8 @@ bool isSelf(const HostAndPort& hostAndPort) {
             return false;
         }
 
-        if (getGlobalAuthorizationManager()->isAuthEnabled() && isInternalAuthSet()) {
-            if (!conn.authenticateInternalUser()) {
-                return false;
-            }
+        if (isInternalAuthSet() && !conn.authenticateInternalUser()) {
+            return false;
         }
         BSONObj out;
         bool ok = conn.simpleCommand("admin", &out, "_isSelf");

@@ -32,7 +32,9 @@ namespace mongo {
 class BSONObj;
 
 /**
- * @return true if internal authentication parameters has been set up
+ * @return true if internal authentication parameters has been set up. Note this does not
+ * imply that auth is enabled. For instance, with the --tryClusterAuth flag this will
+ * be set and auth will be disabled.
  */
 bool isInternalAuthSet();
 

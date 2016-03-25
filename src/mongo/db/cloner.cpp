@@ -470,8 +470,7 @@ Status Cloner::copyDb(OperationContext* txn,
                 return Status(ErrorCodes::HostUnreachable, errmsg);
             }
 
-            if (getGlobalAuthorizationManager()->isAuthEnabled() &&
-                !con->authenticateInternalUser()) {
+            if (isInternalAuthSet() && !con->authenticateInternalUser()) {
                 return Status(ErrorCodes::AuthenticationFailed,
                               "Unable to authenticate as internal user");
             }

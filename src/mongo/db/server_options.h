@@ -110,6 +110,7 @@ struct ServerGlobalParams {
 
     AuthState authState = AuthState::kUndefined;
 
+    bool tryClusterAuth = false;  // --tryClusterAuth, mixed mode for rolling auth upgrade
     AtomicInt32 clusterAuthMode;  // --clusterAuthMode, the internal cluster auth mode
 
     enum ClusterAuthModes {

@@ -68,12 +68,11 @@ static ServerStatusMetricField<Counter64> displayReadersCreated("repl.network.re
 
 
 bool replAuthenticate(DBClientBase* conn) {
-    if (!getGlobalAuthorizationManager()->isAuthEnabled())
-        return true;
-
-    if (!isInternalAuthSet())
+    if (isInternalAuthSet())
+        return conn->authenticateInternalUser();
+    if (getGlobalAuthorizationManager()->isAuthEnabled())
         return false;
-    return conn->authenticateInternalUser();
+    return true;
 }
 
 const Seconds OplogReader::kSocketTimeout(30);
@@ -94,8 +93,7 @@ bool OplogReader::connect(const HostAndPort& host) {
         _conn = shared_ptr<DBClientConnection>(
             new DBClientConnection(false, durationCount<Seconds>(kSocketTimeout)));
         string errmsg;
-        if (!_conn->connect(host, errmsg) ||
-            (getGlobalAuthorizationManager()->isAuthEnabled() && !replAuthenticate(_conn.get()))) {
+        if (!_conn->connect(host, errmsg) || !replAuthenticate(_conn.get())) {
             resetConnection();
             error() << errmsg << endl;
             return false;

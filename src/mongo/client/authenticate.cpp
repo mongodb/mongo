@@ -37,7 +37,9 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/config.h"
+#include "mongo/db/server_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/password_digest.h"
@@ -239,12 +241,30 @@ void authX509(RunCommandHook runCommand,
 // General Auth
 //
 
+bool isFailedAuthOk(const AuthResponse& response) {
+    return (response == ErrorCodes::AuthenticationFailed && serverGlobalParams.tryClusterAuth);
+}
+
 void auth(RunCommandHook runCommand,
           const BSONObj& params,
           StringData hostname,
           StringData clientName,
           AuthCompletionHandler handler) {
     std::string mechanism;
+    auto authCompletionHandler = [handler](AuthResponse response) {
+        if (isFailedAuthOk(response)) {
+            // If auth failed in tryClusterAuth, just pretend it succeeded.
+            log() << "Failed to authenticate in tryClusterAuth, falling back to no "
+                     "authentication.";
+
+            // We need to mock a successful AuthResponse.
+            return handler(
+                AuthResponse(RemoteCommandResponse(BSON("ok" << 1), BSONObj(), Milliseconds(0))));
+        }
+
+        // otherwise, call handler
+        return handler(std::move(response));
+    };
     auto response = bsonExtractStringField(params, saslCommandMechanismFieldName, &mechanism);
     if (!response.isOK())
         return handler(std::move(response));
@@ -255,15 +275,15 @@ void auth(RunCommandHook runCommand,
     }
 
     if (mechanism == kMechanismMongoCR)
-        return authMongoCR(runCommand, params, handler);
+        return authMongoCR(runCommand, params, authCompletionHandler);
 
 #ifdef MONGO_CONFIG_SSL
     else if (mechanism == kMechanismMongoX509)
-        return authX509(runCommand, params, clientName, handler);
+        return authX509(runCommand, params, clientName, authCompletionHandler);
 #endif
 
     else if (saslClientAuthenticate != nullptr)
-        return saslClientAuthenticate(runCommand, hostname, params, handler);
+        return saslClientAuthenticate(runCommand, hostname, params, authCompletionHandler);
 
     return handler({ErrorCodes::AuthenticationFailed,
                     mechanism + " mechanism support not compiled into client library."});
@@ -286,12 +306,13 @@ void asyncAuth(RunCommandHook runCommand,
          clientName,
          [runCommand, params, hostname, clientName, handler](AuthResponse response) {
              // If auth failed, try again with fallback params when appropriate
-             if (needsFallback(response))
+             if (needsFallback(response)) {
                  return auth(runCommand,
                              std::move(getFallbackAuthParams(params)),
                              hostname,
                              clientName,
                              handler);
+             }
 
              // otherwise, call handler
              return handler(std::move(response));

@@ -350,9 +350,10 @@ bool initializeServerGlobalState() {
         }
     }
 
-    // Auto-enable auth except if clusterAuthMode is not set.
-    // clusterAuthMode is automatically set if a --keyFile parameter is provided.
-    if (clusterAuthMode != ServerGlobalParams::ClusterAuthMode_undefined) {
+    // Auto-enable auth unless we are in mixed auth/no-auth or clusterAuthMode was not provided.
+    // clusterAuthMode defaults to "keyFile" if a --keyFile parameter is provided.
+    if (clusterAuthMode != ServerGlobalParams::ClusterAuthMode_undefined &&
+        !serverGlobalParams.tryClusterAuth) {
         getGlobalAuthorizationManager()->setAuthEnabled(true);
     }
 

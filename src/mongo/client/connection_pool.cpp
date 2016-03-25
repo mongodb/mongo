@@ -187,11 +187,8 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
     uassertStatusOK(conn->connect(target));
     conn->port().tag |= _messagingPortTags;
 
-    if (getGlobalAuthorizationManager()->isAuthEnabled()) {
-        uassert(ErrorCodes::AuthenticationFailed,
-                "Missing credentials for authenticating as internal user",
-                isInternalAuthSet());
-        conn->auth(getInternalUserAuthParamsWithFallback());
+    if (isInternalAuthSet()) {
+        conn->authenticateInternalUser();
     }
 
     if (_hook) {
