@@ -114,13 +114,14 @@
     function getNewYearsEve(year) {
         return new Date("" + year + "-12-31T23:59:59Z");
     }
-    function shiftWeekday(day, days) {
-        return ((day - 1 + days) % 7) + 1;
+    function shiftWeekday(dayOfWeek, daysToAdd) {
+        return ((dayOfWeek - 1 + daysToAdd) % 7) + 1;
     }
 
     ['common', 'leap', 'commonAfterLeap'].forEach(function(type) {
         years[type].forEach(function(year, day) {
-            var day = day + 1; // Move zero based
+            // forEach starts indexing at zero but weekdays start with Monday on 1 so we add +1.
+            var day = day + 1;
             var newYear = getNewYear(year);
             var endOfFirstWeekInYear = getEndOfFirstWeekInYear(year, day);
             var startOfSecondWeekInYear = getStartOfSecondWeekInYear(year, day);

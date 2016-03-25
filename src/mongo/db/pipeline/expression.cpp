@@ -3141,13 +3141,17 @@ const char* ExpressionIsoWeekYear::getOpName() const {
 
 namespace {
 bool isLeapYear(int year) {
-    if (year % 4 != 0) { // non leap year
+    if (year % 4 != 0) {
+        // Not a leap year because a leap year must be divisable by 4.
         return false;
-    } else if (year % 100 != 0) { // leap year
+    } else if (year % 100 != 0) {
+        // Every year that is divisable by 100 is a leap year.
         return true;
-    } else if (year % 400 != 0) { // non leap year
+    } else if (year % 400 != 0) {
+        // Every 400th year is not a leap year, althoght it is divisable by 4.
         return false;
-    } else { // leap year
+    } else {
+        // Every year divisable by 4 but not 400 is a leap year.
         return true;
     }
 }
@@ -3198,10 +3202,7 @@ int ExpressionIsoWeek::extract(const tm& tm) {
     // Calculation taken from:
     // https://en.wikipedia.org/wiki/ISO_week_date#Calculating_the_week_number_of_a_given_date
     //
-    //              │ ordinal(date) - weekday(date) + 10 │
-    // week(date) = │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │
-    //              │                 7                  │
-    //              └                                    ┘
+    // week(date) = floor( (ordinal(data) - weekday(date) + 10) / 7 )
     //
     // The first week must contain the first Thursday, therefore the `+ 10` after subtracting the
     // weekday. Example: 2016-01-07 is the first Thursday
