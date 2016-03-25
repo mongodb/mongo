@@ -26,8 +26,6 @@ __wt_posix_directory_list(WT_SESSION_IMPL *session, const char *dir,
 	bool match;
 	char **entries, *path;
 
-	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
-
 	*dirlist = NULL;
 	*countp = 0;
 
@@ -41,7 +39,8 @@ __wt_posix_directory_list(WT_SESSION_IMPL *session, const char *dir,
 	WT_SYSCALL_RETRY(((dirp = opendir(path)) == NULL ? 1 : 0), ret);
 	if (ret != 0)
 		WT_ERR_MSG(session, ret, "%s: directory-list: opendir", path);
-	for (dirsz = 0, count = 0; (dp = readdir(dirp)) != NULL;) {
+
+	for (count = 0; (dp = readdir(dirp)) != NULL;) {
 		/*
 		 * Skip . and ..
 		 */
@@ -74,8 +73,8 @@ __wt_posix_directory_list(WT_SESSION_IMPL *session, const char *dir,
 	if (count > 0)
 		*dirlist = entries;
 	*countp = count;
-err:
-	if (dirp != NULL)
+
+err:	if (dirp != NULL)
 		(void)closedir(dirp);
 	__wt_free(session, path);
 

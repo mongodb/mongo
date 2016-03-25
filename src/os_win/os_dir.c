@@ -28,19 +28,15 @@ __wt_win_directory_list(WT_SESSION_IMPL *session, const char *dir,
 	*dirlist = NULL;
 	*countp = 0;
 
-	findhandle = INVALID_HANDLE_VALUE;
-	count = 0;
-
 	WT_RET(__wt_filename(session, dir, &path));
 
 	pathlen = strlen(path);
-	if (path[pathlen - 1] == '\\') {
+	if (path[pathlen - 1] == '\\')
 		path[pathlen - 1] = '\0';
-	}
-
 	WT_ERR(__wt_scr_alloc(session, pathlen + 3, &pathbuf));
 	WT_ERR(__wt_buf_fmt(session, pathbuf, "%s\\*", path));
 
+	findhandle = INVALID_HANDLE_VALUE;
 	dirallocsz = 0;
 	dirsz = 0;
 	entries = NULL;
@@ -49,47 +45,43 @@ __wt_win_directory_list(WT_SESSION_IMPL *session, const char *dir,
 	if (findhandle == INVALID_HANDLE_VALUE)
 		WT_ERR_MSG(session, __wt_win32_errno(),
 		    "%s: directory-list: FindFirstFile", pathbuf->data);
-	else {
-		do {
-			/*
-			 * Skip . and ..
-			 */
-			if (strcmp(finddata.cFileName, ".") == 0 ||
-			    strcmp(finddata.cFileName, "..") == 0)
-				continue;
-			match = false;
 
+	count = 0;
+	do {
+		/*
+		 * Skip . and ..
+		 */
+		if (strcmp(finddata.cFileName, ".") == 0 ||
+		    strcmp(finddata.cFileName, "..") == 0)
+			continue;
+
+		/* The list of files is optionally filtered by a prefix. */
+		match = false;
+		if (prefix != NULL &&
+		    ((LF_ISSET(WT_DIRLIST_INCLUDE) &&
+		    WT_PREFIX_MATCH(finddata.cFileName, prefix)) ||
+		    (LF_ISSET(WT_DIRLIST_EXCLUDE) &&
+		    !WT_PREFIX_MATCH(finddata.cFileName, prefix))))
+			match = true;
+		if (prefix == NULL || match) {
 			/*
-			 * The list of files is optionally filtered by a prefix.
+			 * We have a file name we want to return.
 			 */
-			if (prefix != NULL &&
-			    ((LF_ISSET(WT_DIRLIST_INCLUDE) &&
-			    WT_PREFIX_MATCH(finddata.cFileName, prefix)) ||
-			    (LF_ISSET(WT_DIRLIST_EXCLUDE) &&
-			    !WT_PREFIX_MATCH(finddata.cFileName, prefix))))
-				match = true;
-			if (prefix == NULL || match) {
-				/*
-				 * We have a file name we want to return.
-				 */
-				count++;
-				if (count > dirsz) {
-					dirsz += WT_DIR_ENTRY;
-					WT_ERR(__wt_realloc_def(session,
-					    &dirallocsz, dirsz, &entries));
-				}
-				WT_ERR(__wt_strdup(session,
-				    finddata.cFileName, &entries[count - 1]));
+			count++;
+			if (count > dirsz) {
+				dirsz += WT_DIR_ENTRY;
+				WT_ERR(__wt_realloc_def(session,
+				    &dirallocsz, dirsz, &entries));
 			}
-		} while (FindNextFileA(findhandle, &finddata) != 0);
-	}
-
+			WT_ERR(__wt_strdup(session,
+			    finddata.cFileName, &entries[count - 1]));
+		}
+	} while (FindNextFileA(findhandle, &finddata) != 0);
 	if (count > 0)
 		*dirlist = entries;
 	*countp = count;
 
-err:
-	if (findhandle != INVALID_HANDLE_VALUE)
+err:	if (findhandle != INVALID_HANDLE_VALUE)
 		(void)FindClose(findhandle);
 	__wt_free(session, path);
 	__wt_scr_free(session, &pathbuf);

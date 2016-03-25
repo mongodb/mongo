@@ -79,6 +79,8 @@ static inline int
 __wt_dirlist(WT_SESSION_IMPL *session, const char *dir,
     const char *prefix, uint32_t flags, char ***dirlist, u_int *countp)
 {
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
+
 	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS,
 	    "%s: directory-list: %s prefix %s",
 	    dir, LF_ISSET(WT_DIRLIST_INCLUDE) ? "include" : "exclude",
