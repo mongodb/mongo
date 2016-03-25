@@ -176,8 +176,6 @@ const (
 func NewCtxWithVersion(version SSLVersion) (*Ctx, error) {
 	var method *C.SSL_METHOD
 	switch version {
-	case SSLv3:
-		method = C.SSLv3_method()
 	case TLSv1:
 		method = C.TLSv1_method()
 	case TLSv1_1:
