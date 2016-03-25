@@ -724,8 +724,7 @@ __log_alloc_prealloc(WT_SESSION_IMPL *session, uint32_t to_num)
 	 * If there are no pre-allocated files, return WT_NOTFOUND.
 	 */
 	logfiles = NULL;
-	WT_ERR(__log_get_files(session,
-	    WT_LOG_PREPNAME, &logfiles, &logcount));
+	WT_ERR(__log_get_files(session, WT_LOG_PREPNAME, &logfiles, &logcount));
 	if (logcount == 0)
 		return (WT_NOTFOUND);
 
@@ -955,8 +954,7 @@ __log_truncate(WT_SESSION_IMPL *session,
 	 */
 	if (this_log)
 		goto err;
-	WT_ERR(__log_get_files(session,
-	    WT_LOG_FILENAME, &logfiles, &logcount));
+	WT_ERR(__log_get_files(session, WT_LOG_FILENAME, &logfiles, &logcount));
 	for (i = 0; i < logcount; i++) {
 		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
 		if (lognum > lsn->l.file &&

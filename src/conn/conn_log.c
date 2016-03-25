@@ -260,8 +260,7 @@ __log_prealloc_once(WT_SESSION_IMPL *session)
 	 * files that may not have been used yet.
 	 */
 	WT_ERR(__wt_dirlist(session, conn->log_path,
-	    WT_LOG_PREPNAME, WT_DIRLIST_INCLUDE,
-	    &recfiles, &reccount));
+	    WT_LOG_PREPNAME, WT_DIRLIST_INCLUDE, &recfiles, &reccount));
 	__wt_log_files_free(session, recfiles, reccount);
 	recfiles = NULL;
 	/*
