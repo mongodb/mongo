@@ -173,7 +173,7 @@ __im_handle_advise(WT_SESSION_IMPL *session,
 	WT_UNUSED(offset);
 	WT_UNUSED(len);
 	WT_UNUSED(advice);
-	return (0);
+	return (ENOTSUP);
 }
 
 /*

@@ -222,9 +222,9 @@ struct __wt_block {
 
 	WT_FH	*fh;			/* Backing file handle */
 	wt_off_t size;			/* File size */
-
 	wt_off_t extend_size;		/* File extended size */
 	wt_off_t extend_len;		/* File extend chunk size */
+	bool	 preload_available;	/* File pages can be preloaded. */
 
 	/* Configuration information, set when the file is opened. */
 	uint32_t allocfirst;		/* Allocation is first-fit */
@@ -404,3 +404,15 @@ __wt_block_header_byteswap(WT_BLOCK_HEADER *blk)
  */
 #define	WT_BLOCK_COMPRESS_SKIP	64
 #define	WT_BLOCK_ENCRYPT_SKIP	WT_BLOCK_HEADER_BYTE_SIZE
+
+/*
+ * __wt_block_header --
+ *	Return the size of the block-specific header.
+ */
+static inline u_int
+__wt_block_header(WT_BLOCK *block)
+{
+	WT_UNUSED(block);
+
+	return ((u_int)WT_BLOCK_HEADER_SIZE);
+}

@@ -42,14 +42,6 @@ __wt_block_map(
 		return (0);
 
 	/*
-	 * Turn off mapping when direct I/O is configured for the file, the
-	 * Linux open(2) documentation says applications should avoid mixing
-	 * mmap(2) of files with direct I/O to the same files.
-	 */
-	if (block->fh->direct_io)
-		return (0);
-
-	/*
 	 * Turn off mapping if the application configured a cache size maximum,
 	 * we can't control how much of the cache size we use in that case.
 	 */

@@ -9,18 +9,6 @@
 #include "wt_internal.h"
 
 /*
- * __wt_block_header --
- *	Return the size of the block-specific header.
- */
-u_int
-__wt_block_header(WT_BLOCK *block)
-{
-	WT_UNUSED(block);
-
-	return ((u_int)WT_BLOCK_HEADER_SIZE);
-}
-
-/*
  * __wt_block_truncate --
  *	Truncate the file.
  */
@@ -31,6 +19,37 @@ __wt_block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t len)
 
 	block->size = block->extend_size = len;
 
+	return (0);
+}
+
+/*
+ * __wt_block_discard --
+ *	Discard blocks from the system buffer cache.
+ */
+int
+__wt_block_discard(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t added_size)
+{
+	WT_DECL_RET;
+
+	if (block->os_cache_max == 0)
+		return (0);
+
+	/*
+	 * We're racing on the addition, but I'm not willing to serialize on it
+	 * in the standard read path with more evidence it's needed.
+	 */
+	if ((block->os_cache += added_size) <= block->os_cache_max)
+		return (0);
+
+	block->os_cache = 0;
+	WT_ERR(__wt_posix_fadvise(session, block->fh,
+	    (wt_off_t)0, (wt_off_t)0, POSIX_FADV_DONTNEED));
+	return (0);
+
+err:	/* Ignore ENOTSUP, but don't try again. */
+	if (ret != ENOTSUP)
+		return (ret);
+	block->os_cache_max = 0;
 	return (0);
 }
 
@@ -330,17 +349,10 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		WT_RET(__wt_fsync(session, fh, false));
 	}
 #endif
-#ifdef HAVE_POSIX_FADVISE
-	/* Optionally discard blocks from the system buffer cache. */
-	if (block->os_cache_max != 0 &&
-	    (block->os_cache += align_size) > block->os_cache_max) {
-		block->os_cache = 0;
-		if ((ret = __wt_posix_fadvise(session, fh,
-		    (wt_off_t)0, (wt_off_t)0, POSIX_FADV_DONTNEED)) != 0)
-			WT_RET_MSG(
-			    session, ret, "%s: posix_fadvise", block->name);
-	}
-#endif
+
+	/* Optionally discard blocks from the buffer cache. */
+	WT_RET(__wt_block_discard(session, block, align_size));
+
 	WT_STAT_FAST_CONN_INCR(session, block_write);
 	WT_STAT_FAST_CONN_INCRV(session, block_byte_write, align_size);
 

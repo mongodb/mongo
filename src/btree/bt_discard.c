@@ -134,7 +134,8 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 	if (F_ISSET_ATOMIC(page, WT_PAGE_DISK_ALLOC))
 		__wt_overwrite_and_free_len(session, dsk, dsk->mem_size);
 	if (F_ISSET_ATOMIC(page, WT_PAGE_DISK_MAPPED))
-		(void)__wt_mmap_discard(session, dsk, dsk->mem_size);
+		(void)__wt_mmap_discard(
+		    session, S2BT(session)->bm->block->fh, dsk, dsk->mem_size);
 
 	__wt_overwrite_and_free(session, page);
 }

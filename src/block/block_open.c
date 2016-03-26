@@ -196,36 +196,10 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	/* Configuration: optional OS buffer cache maximum size. */
 	WT_ERR(__wt_config_gets(session, cfg, "os_cache_max", &cval));
 	block->os_cache_max = (size_t)cval.val;
-#ifdef HAVE_POSIX_FADVISE
-	if (conn->direct_io && block->os_cache_max)
-		WT_ERR_MSG(session, EINVAL,
-		    "os_cache_max not supported in combination with direct_io");
-#else
-	if (block->os_cache_max)
-		WT_ERR_MSG(session, EINVAL,
-		    "os_cache_max not supported if posix_fadvise not "
-		    "available");
-#endif
 
 	/* Configuration: optional immediate write scheduling flag. */
 	WT_ERR(__wt_config_gets(session, cfg, "os_cache_dirty_max", &cval));
 	block->os_cache_dirty_max = (size_t)cval.val;
-#ifdef HAVE_SYNC_FILE_RANGE
-	if (conn->direct_io && block->os_cache_dirty_max)
-		WT_ERR_MSG(session, EINVAL,
-		    "os_cache_dirty_max not supported in combination with "
-		    "direct_io");
-#else
-	if (block->os_cache_dirty_max) {
-		/*
-		 * Ignore any setting if it is not supported.
-		 */
-		block->os_cache_dirty_max = 0;
-		WT_ERR(__wt_verbose(session, WT_VERB_BLOCK,
-		    "os_cache_dirty_max ignored when sync_file_range not "
-		    "available"));
-	}
-#endif
 
 	/* Open the underlying file handle. */
 	WT_ERR(__wt_open(session, filename, WT_FILE_TYPE_DATA, 0, &block->fh));
@@ -235,6 +209,9 @@ __wt_block_open(WT_SESSION_IMPL *session,
 
 	/* Set the file extension information. */
 	block->extend_len = conn->data_extend_len;
+
+	/* Set the preload availability. */
+	block->preload_available = true;
 
 	/* Initialize the live checkpoint's lock. */
 	WT_ERR(__wt_spin_init(session, &block->live_lock, "block manager"));

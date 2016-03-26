@@ -162,10 +162,14 @@ static int
 __win_handle_advise(WT_SESSION_IMPL *session,
     WT_FH *fh, wt_off_t offset, wt_off_t len, int advice)
 {
+	WT_UNUSED(session);
+	WT_UNUSED(fh);
 	WT_UNUSED(offset);
 	WT_UNUSED(len);
 	WT_UNUSED(advice);
-	WT_RET_MSG(session, ENOTSUP, "%s: handle-advise", fh->name);
+
+	/* Quietly fail, callers expect not-supported failures. */
+	return (ENOTSUP);
 }
 
 /*

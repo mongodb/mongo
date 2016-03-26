@@ -25,6 +25,14 @@ __wt_mmap(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
 
 	/*
+	 * Mapping isn't possible if direct I/O configured for the file, the
+	 * Linux open(2) documentation says applications should avoid mixing
+	 * mmap(2) of files with direct I/O to the same files.
+	 */
+	if (fh->direct_io)
+		return (ENOTSUP);
+
+	/*
 	 * There's no locking here to prevent the underlying file from changing
 	 * underneath us, our caller needs to ensure consistency of the mapped
 	 * region vs. any other file activity.
@@ -51,24 +59,24 @@ __wt_mmap(WT_SESSION_IMPL *session,
 	return (0);
 }
 
+#ifdef HAVE_POSIX_MADVISE
 /*
- * __wt_mmap_preload --
+ * __wt_mmap_preload_madvise --
  *	Cause a section of a memory map to be faulted in.
  */
 int
-__wt_mmap_preload(WT_SESSION_IMPL *session, const void *p, size_t size)
+__wt_mmap_preload_madvise(
+    WT_SESSION_IMPL *session, WT_FH *fh, const void *p, size_t size)
 {
-#ifdef HAVE_POSIX_MADVISE
-	/* Linux requires the address be aligned to a 4KB boundary. */
 	WT_BM *bm;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	void *blk;
 
-	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
-
 	conn = S2C(session);
 	bm = S2BT(session)->bm;
+
+	/* Linux requires the address be aligned to a 4KB boundary. */
 	blk = (void *)((uintptr_t)p & ~(uintptr_t)(conn->page_size - 1));
 	size += WT_PTRDIFF(p, blk);
 
@@ -90,14 +98,30 @@ __wt_mmap_preload(WT_SESSION_IMPL *session, const void *p, size_t size)
 
 	if (size > (size_t)conn->page_size &&
 	    (ret = posix_madvise(blk, size, POSIX_MADV_WILLNEED)) != 0)
-		WT_RET_MSG(session, ret, "posix_madvise will need");
-#else
-	WT_UNUSED(session);
-	WT_UNUSED(p);
-	WT_UNUSED(size);
+		WT_RET_MSG(session, ret,
+		    "%s: posix_madvise: POSIX_MADV_WILLNEED", fh->name);
+	return (0);
+}
 #endif
 
-	return (0);
+/*
+ * __wt_mmap_preload --
+ *	Cause a section of a memory map to be faulted in.
+ */
+int
+__wt_mmap_preload(
+    WT_SESSION_IMPL *session, WT_FH *fh, const void *p, size_t size)
+{
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
+
+#ifdef HAVE_POSIX_MADVISE
+	return (__wt_mmap_preload_madvise(session, fh, p, size));
+#else
+	WT_UNUSED(fh);
+	WT_UNUSED(p);
+	WT_UNUSED(size);
+	return (ENOTSUP);
+#endif
 }
 
 /*
@@ -105,28 +129,30 @@ __wt_mmap_preload(WT_SESSION_IMPL *session, const void *p, size_t size)
  *	Discard a chunk of the memory map.
  */
 int
-__wt_mmap_discard(WT_SESSION_IMPL *session, void *p, size_t size)
+__wt_mmap_discard(WT_SESSION_IMPL *session, WT_FH *fh, void *p, size_t size)
 {
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
+
 #ifdef HAVE_POSIX_MADVISE
-	/* Linux requires the address be aligned to a 4KB boundary. */
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	void *blk;
 
-	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
-
 	conn = S2C(session);
+
+	/* Linux requires the address be aligned to a 4KB boundary. */
 	blk = (void *)((uintptr_t)p & ~(uintptr_t)(conn->page_size - 1));
 	size += WT_PTRDIFF(p, blk);
 
 	if ((ret = posix_madvise(blk, size, POSIX_MADV_DONTNEED)) != 0)
-		WT_RET_MSG(session, ret, "posix_madvise don't need");
+		WT_RET_MSG(session, ret,
+		    "%s: posix_madvise: POSIX_MADV_DONTNEED", fh->name);
 #else
-	WT_UNUSED(session);
+	WT_UNUSED(fh);
 	WT_UNUSED(p);
 	WT_UNUSED(size);
 #endif
-	return (0);
+	return (ENOTSUP);
 }
 
 /*

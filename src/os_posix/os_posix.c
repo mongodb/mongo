@@ -247,9 +247,24 @@ __posix_handle_advise(WT_SESSION_IMPL *session,
 #if defined(HAVE_POSIX_FADVISE)
 	WT_DECL_RET;
 
+	/*
+	 * Refuse pre-load when direct I/O is configured for the file, the
+	 * kernel cache isn't interesting.
+	 */
+	if (advice == POSIX_MADV_WILLNEED && fh->direct_io)
+		return (ENOTSUP);
+
 	WT_SYSCALL_RETRY(posix_fadvise(fh->fd, offset, len, advice), ret);
 	if (ret == 0)
 		return (0);
+
+	/*
+	 * Treat EINVAL as not-supported, some systems don't support some flags.
+	 * Quietly fail, callers expect not-supported failures.
+	 */
+	if (ret == EINVAL)
+		return (ENOTSUP);
+
 	WT_RET_MSG(session, ret, "%s: handle-advise: posix_fadvise", fh->name);
 #else
 	WT_UNUSED(session);
@@ -257,7 +272,9 @@ __posix_handle_advise(WT_SESSION_IMPL *session,
 	WT_UNUSED(offset);
 	WT_UNUSED(len);
 	WT_UNUSED(advice);
-	return (0);
+
+	/* Quietly fail, callers expect not-supported failures. */
+	return (ENOTSUP);
 #endif
 }
 

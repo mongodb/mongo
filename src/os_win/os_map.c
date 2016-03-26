@@ -59,13 +59,15 @@ __wt_mmap(WT_SESSION_IMPL *session,
  *	Cause a section of a memory map to be faulted in.
  */
 int
-__wt_mmap_preload(WT_SESSION_IMPL *session, const void *p, size_t size)
+__wt_mmap_preload(
+    WT_SESSION_IMPL *session, WT_FH *fh, const void *p, size_t size)
 {
 	WT_UNUSED(session);
+	WT_UNUSED(fh);
 	WT_UNUSED(p);
 	WT_UNUSED(size);
 
-	return (0);
+	return (ENOTSUP);
 }
 
 /*
@@ -73,12 +75,14 @@ __wt_mmap_preload(WT_SESSION_IMPL *session, const void *p, size_t size)
  *	Discard a chunk of the memory map.
  */
 int
-__wt_mmap_discard(WT_SESSION_IMPL *session, void *p, size_t size)
+__wt_mmap_discard(WT_SESSION_IMPL *session, WT_FH *fh, void *p, size_t size)
 {
 	WT_UNUSED(session);
+	WT_UNUSED(fh);
 	WT_UNUSED(p);
 	WT_UNUSED(size);
-	return (0);
+
+	return (ENOTSUP);
 }
 
 /*
