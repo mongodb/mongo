@@ -217,9 +217,14 @@ struct __wt_block {
 
 	/* A list of block manager handles, sharing a file descriptor. */
 	uint32_t ref;			/* References */
-	WT_FH	*fh;			/* Backing file handle */
 	TAILQ_ENTRY(__wt_block) q;	/* Linked list of handles */
 	TAILQ_ENTRY(__wt_block) hashq;	/* Hashed list of handles */
+
+	WT_FH	*fh;			/* Backing file handle */
+	wt_off_t size;			/* File size */
+
+	wt_off_t extend_size;		/* File extended size */
+	wt_off_t extend_len;		/* File extend chunk size */
 
 	/* Configuration information, set when the file is opened. */
 	uint32_t allocfirst;		/* Allocation is first-fit */

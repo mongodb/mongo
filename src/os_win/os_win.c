@@ -539,10 +539,6 @@ __win_handle_open(WT_SESSION_IMPL *session,
 	if (file_type == WT_FILE_TYPE_DATA)
 		f |= FILE_FLAG_RANDOM_ACCESS;
 
-	/* Configure file extension. */
-	if (file_type == WT_FILE_TYPE_DATA)
-		fh->extend_len = conn->data_extend_len;
-
 	filehandle = CreateFileA(name, GENERIC_READ | GENERIC_WRITE,
 	    share_mode, NULL, dwCreationDisposition, f, NULL);
 	if (filehandle == INVALID_HANDLE_VALUE) {

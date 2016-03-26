@@ -1204,18 +1204,18 @@ __wt_log_close(WT_SESSION_IMPL *session)
  *	file is zeroes.
  */
 static int
-__log_has_hole(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, bool *hole)
+__log_has_hole(WT_SESSION_IMPL *session,
+    WT_FH *fh, wt_off_t log_size, wt_off_t offset, bool *hole)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
-	wt_off_t log_size, off, remainder;
+	wt_off_t off, remainder;
 	size_t bufsz, rdlen;
 	char *buf, *zerobuf;
 
 	conn = S2C(session);
 	log = conn->log;
-	log_size = fh->size;
 	remainder = log_size - offset;
 	*hole = false;
 
@@ -1559,7 +1559,8 @@ advance:
 				 * See if there is anything non-zero at the
 				 * end of this log file.
 				 */
-				WT_ERR(__log_has_hole(session, log_fh,
+				WT_ERR(__log_has_hole(
+				    session, log_fh, log_size,
 				    rd_lsn.l.offset, &partial_record));
 			/*
 			 * If we read the last record, go to the next file.
@@ -1623,7 +1624,7 @@ advance:
 		 */
 		if (reclen == 0) {
 			WT_ERR(__log_has_hole(
-			    session, log_fh, rd_lsn.l.offset, &eol));
+			    session, log_fh, log_size, rd_lsn.l.offset, &eol));
 			if (eol)
 				/* Found a hole. This LSN is the end. */
 				break;

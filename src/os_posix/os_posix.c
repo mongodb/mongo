@@ -616,10 +616,6 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 	}
 #endif
 
-	/* Configure file extension. */
-	if (file_type == WT_FILE_TYPE_DATA)
-		fh->extend_len = conn->data_extend_len;
-
 	/* Optionally configure a stdio stream API. */
 	switch (LF_MASK(WT_STREAM_APPEND | WT_STREAM_READ | WT_STREAM_WRITE)) {
 	case WT_STREAM_APPEND:

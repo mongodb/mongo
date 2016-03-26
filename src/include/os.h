@@ -85,10 +85,6 @@ struct __wt_fh {
 	HANDLE filehandle_secondary;		/* Windows file handle
 						   for file size changes */
 #endif
-	wt_off_t size;				/* File size */
-	wt_off_t extend_size;			/* File extended size */
-	wt_off_t extend_len;			/* File extend chunk size */
-
 	/*
 	 * Underlying in-memory handle support.
 	 */

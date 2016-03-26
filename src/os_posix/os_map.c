@@ -16,22 +16,23 @@ int
 __wt_mmap(WT_SESSION_IMPL *session,
     WT_FH *fh, void *mapp, size_t *lenp, void **mappingcookie)
 {
+	size_t len;
 	void *map;
-	size_t orig_size;
+	wt_off_t file_size;
 
 	WT_UNUSED(mappingcookie);
 
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
 
 	/*
-	 * Record the current size and only map and set that as the length, it
-	 * could change between the map call and when we set the return length.
-	 * For the same reason we could actually map past the end of the file;
-	 * we don't read bytes past the end of the file though, so as long as
-	 * the map call succeeds, it's all OK.
+	 * There's no locking here to prevent the underlying file from changing
+	 * underneath us, our caller needs to ensure consistency of the mapped
+	 * region vs. any other file activity.
 	 */
-	orig_size = (size_t)fh->size;
-	if ((map = mmap(NULL, orig_size,
+	WT_RET(__wt_filesize(session, fh, &file_size));
+	len = (size_t)file_size;
+
+	if ((map = mmap(NULL, len,
 	    PROT_READ,
 #ifdef MAP_NOCORE
 	    MAP_NOCORE |
@@ -40,13 +41,13 @@ __wt_mmap(WT_SESSION_IMPL *session,
 	    fh->fd, (wt_off_t)0)) == MAP_FAILED) {
 		WT_RET_MSG(session, __wt_errno(),
 		    "%s map error: failed to map %" WT_SIZET_FMT " bytes",
-		    fh->name, orig_size);
+		    fh->name, len);
 	}
 	(void)__wt_verbose(session, WT_VERB_FILEOPS,
-	    "%s: map %p: %" WT_SIZET_FMT " bytes", fh->name, map, orig_size);
+	    "%s: map %p: %" WT_SIZET_FMT " bytes", fh->name, map, len);
 
 	*(void **)mapp = map;
-	*lenp = orig_size;
+	*lenp = len;
 	return (0);
 }
 

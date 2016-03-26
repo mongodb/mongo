@@ -25,11 +25,11 @@ __wt_block_header(WT_BLOCK *block)
  *	Truncate the file.
  */
 int
-__wt_block_truncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
+__wt_block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t len)
 {
-	WT_RET(__wt_ftruncate(session, fh, len));
+	WT_RET(__wt_ftruncate(session, block->fh, len));
 
-	fh->size = fh->extend_size = len;
+	block->size = block->extend_size = len;
 
 	return (0);
 }
@@ -61,7 +61,7 @@ __wt_block_extend(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	locked = true;
 
 	/* If not configured to extend the file, we're done. */
-	if (fh->extend_len == 0)
+	if (block->extend_len == 0)
 		return (0);
 
 	/*
@@ -73,9 +73,9 @@ __wt_block_extend(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * why there's a check in case the extended file size becomes too small:
 	 * if the file size catches up, every thread tries to extend it.
 	 */
-	if (fh->extend_size > fh->size &&
-	    (offset > fh->extend_size ||
-	    offset + fh->extend_len + (wt_off_t)align_size < fh->extend_size))
+	if (block->extend_size > block->size &&
+	    (offset > block->extend_size || offset +
+	    block->extend_len + (wt_off_t)align_size < block->extend_size))
 		return (0);
 
 	/*
@@ -108,9 +108,9 @@ __wt_block_extend(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		 * and that's OK, we simply may do another extension sooner than
 		 * otherwise.
 		 */
-		fh->extend_size = fh->size + fh->extend_len * 2;
+		block->extend_size = block->size + block->extend_len * 2;
 		if ((ret = __wt_fallocate(
-		    session, fh, fh->size, fh->extend_len * 2)) == 0)
+		    session, fh, block->size, block->extend_len * 2)) == 0)
 			return (0);
 		if (ret != ENOTSUP)
 			return (ret);
@@ -130,13 +130,13 @@ __wt_block_extend(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * extend length after locking so we don't overwrite already-written
 	 * blocks.
 	 */
-	fh->extend_size = fh->size + fh->extend_len * 2;
+	block->extend_size = block->size + block->extend_len * 2;
 
 	/*
 	 * The truncate might fail if there's a mapped file (in other words, if
 	 * there's an open checkpoint on the file), that's OK.
 	 */
-	if ((ret = __wt_ftruncate(session, fh, fh->extend_size)) == EBUSY)
+	if ((ret = __wt_ftruncate(session, fh, block->extend_size)) == EBUSY)
 		ret = 0;
 	return (ret);
 }

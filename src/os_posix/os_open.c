@@ -213,10 +213,6 @@ __wt_open(WT_SESSION_IMPL *session,
 	WT_ERR(conn->handle_open(session, fh, name, file_type, flags));
 	open_called = true;
 
-	/* Set file sizes. */
-	if (file_type != WT_FILE_TYPE_DIRECTORY)
-		WT_ERR(fh->fh_size(session, fh, &fh->size));
-
 	/*
 	 * Repeat the check for a match: if there's no match, link our newly
 	 * created handle onto the database's list of files.

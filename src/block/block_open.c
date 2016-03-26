@@ -230,6 +230,12 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	/* Open the underlying file handle. */
 	WT_ERR(__wt_open(session, filename, WT_FILE_TYPE_DATA, 0, &block->fh));
 
+	/* Set the file's size. */
+	WT_ERR(__wt_filesize(session, block->fh, &block->size));
+
+	/* Set the file extension information. */
+	block->extend_len = conn->data_extend_len;
+
 	/* Initialize the live checkpoint's lock. */
 	WT_ERR(__wt_spin_init(session, &block->live_lock, "block manager"));
 
@@ -406,7 +412,7 @@ __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_DSRC_STATS *stats)
 	WT_STAT_WRITE(stats, block_minor, WT_BLOCK_MINOR_VERSION);
 	WT_STAT_WRITE(
 	    stats, block_reuse_bytes, (int64_t)block->live.avail.bytes);
-	WT_STAT_WRITE(stats, block_size, block->fh->size);
+	WT_STAT_WRITE(stats, block_size, block->size);
 }
 
 /*
@@ -418,7 +424,7 @@ __wt_block_manager_size(WT_BM *bm, WT_SESSION_IMPL *session, wt_off_t *sizep)
 {
 	WT_UNUSED(session);
 
-	*sizep = bm->block->fh == NULL ? 0 : bm->block->fh->size;
+	*sizep = bm->block->size;
 	return (0);
 }
 

@@ -74,7 +74,7 @@ extern int __wt_verify_ckpt_load( WT_SESSION_IMPL *session, WT_BLOCK *block, WT_
 extern int __wt_verify_ckpt_unload(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_block_verify_addr(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint8_t *addr, size_t addr_size);
 extern u_int __wt_block_header(WT_BLOCK *block);
-extern int __wt_block_truncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len);
+extern int __wt_block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t len);
 extern int __wt_block_write_size(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t *sizep);
 extern int __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint8_t *addr, size_t *addr_sizep, bool data_cksum);
 extern int __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, wt_off_t *offsetp, uint32_t *sizep, uint32_t *cksump, bool data_cksum, bool caller_locked);
