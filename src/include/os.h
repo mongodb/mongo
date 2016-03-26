@@ -77,14 +77,15 @@ struct __wt_fh {
 	/*
 	 * Underlying file system handle support.
 	 */
-	FILE	*fp;				/* ANSI C file handle */
-#ifndef _WIN32
-	int	 fd;				/* POSIX file handle */
-#else
+#ifdef _WIN32
 	HANDLE filehandle;			/* Windows file handle */
 	HANDLE filehandle_secondary;		/* Windows file handle
 						   for file size changes */
+#else
+	int	 fd;				/* POSIX file handle */
 #endif
+	FILE	*fp;				/* ANSI C stdio handle */
+
 	/*
 	 * Underlying in-memory handle support.
 	 */
