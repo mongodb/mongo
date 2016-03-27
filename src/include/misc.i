@@ -65,8 +65,8 @@ __wt_verbose(WT_SESSION_IMPL *session, int flag, const char *fmt, ...)
 	return (ret);
 #else
 	WT_UNUSED(session);
-	WT_UNUSED(fmt);
 	WT_UNUSED(flag);
+	WT_UNUSED(fmt);
 	return (0);
 #endif
 }
@@ -187,19 +187,10 @@ static inline int
 __wt_posix_fadvise(WT_SESSION_IMPL *session,
     WT_FH *fh, wt_off_t offset, wt_off_t len, int advice)
 {
-#if defined(HAVE_POSIX_FADVISE)
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_HANDLEOPS, "%s: handle-advise", fh->name));
 
 	return (fh->fh_advise(session, fh, offset, len, advice));
-#else
-	WT_UNUSED(session);
-	WT_UNUSED(fh);
-	WT_UNUSED(offset);
-	WT_UNUSED(len);
-	WT_UNUSED(advice);
-	return (0);
-#endif
 }
 
 /*
