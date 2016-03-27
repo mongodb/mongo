@@ -81,6 +81,7 @@ struct __wt_fh {
 	HANDLE filehandle;			/* Windows file handle */
 	HANDLE filehandle_secondary;		/* Windows file handle
 						   for file size changes */
+	HANDLE maphandle;			/* Windows map object */
 #else
 	int	 fd;				/* POSIX file handle */
 #endif

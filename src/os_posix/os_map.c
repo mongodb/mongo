@@ -13,14 +13,11 @@
  *	Map a file into memory.
  */
 int
-__wt_mmap(WT_SESSION_IMPL *session,
-    WT_FH *fh, void *mapp, size_t *lenp, void **mappingcookie)
+__wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp)
 {
 	size_t len;
 	void *map;
 	wt_off_t file_size;
-
-	WT_UNUSED(mappingcookie);
 
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
 
@@ -174,11 +171,8 @@ __wt_mmap_discard(WT_SESSION_IMPL *session, WT_FH *fh, void *p, size_t size)
  *	Remove a memory mapping.
  */
 int
-__wt_munmap(WT_SESSION_IMPL *session,
-    WT_FH *fh, void *map, size_t len, void **mappingcookie)
+__wt_munmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, size_t len)
 {
-	WT_UNUSED(mappingcookie);
-
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
 
 	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS,
