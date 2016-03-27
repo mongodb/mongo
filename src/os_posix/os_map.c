@@ -16,8 +16,8 @@ int
 __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp)
 {
 	size_t len;
-	void *map;
 	wt_off_t file_size;
+	void *map;
 
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
 
@@ -37,19 +37,18 @@ __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp)
 	WT_RET(__wt_filesize(session, fh, &file_size));
 	len = (size_t)file_size;
 
+	(void)__wt_verbose(session, WT_VERB_FILEOPS,
+	    "%s: memory-map: %" WT_SIZET_FMT " bytes", fh->name, len);
+
 	if ((map = mmap(NULL, len,
 	    PROT_READ,
 #ifdef MAP_NOCORE
 	    MAP_NOCORE |
 #endif
 	    MAP_PRIVATE,
-	    fh->fd, (wt_off_t)0)) == MAP_FAILED) {
-		WT_RET_MSG(session, __wt_errno(),
-		    "%s map error: failed to map %" WT_SIZET_FMT " bytes",
-		    fh->name, len);
-	}
-	(void)__wt_verbose(session, WT_VERB_FILEOPS,
-	    "%s: map %p: %" WT_SIZET_FMT " bytes", fh->name, map, len);
+	    fh->fd, (wt_off_t)0)) == MAP_FAILED)
+		WT_RET_MSG(session,
+		    __wt_errno(), "%s: memory-map: mmap", fh->name);
 
 	*(void **)mapp = map;
 	*lenp = len;
@@ -97,7 +96,8 @@ __mmap_preload_madvise(
 	    (ret = posix_madvise(blk, size, POSIX_MADV_WILLNEED)) == 0)
 		return (0);
 	WT_RET_MSG(session, ret,
-	    "%s: posix_madvise: POSIX_MADV_WILLNEED", fh->name);
+	    "%s: memory-map preload: posix_madvise: POSIX_MADV_WILLNEED",
+	    fh->name);
 }
 #endif
 
@@ -143,7 +143,8 @@ __mmap_discard_madvise(
 	if ((ret = posix_madvise(blk, size, POSIX_MADV_DONTNEED)) == 0)
 		return (0);
 	WT_RET_MSG(session, ret,
-	    "%s: posix_madvise: POSIX_MADV_DONTNEED", fh->name);
+	    "%s: memory-map discard: posix_madvise: POSIX_MADV_DONTNEED",
+	    fh->name);
 }
 #endif
 
@@ -175,13 +176,11 @@ __wt_munmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, size_t len)
 {
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
 
-	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS,
-	    "%s: unmap %p: %" WT_SIZET_FMT " bytes", fh->name, map, len));
+	(void)__wt_verbose(session, WT_VERB_FILEOPS,
+	    "%s: memory-unmap: %" WT_SIZET_FMT " bytes", fh->name, len);
 
 	if (munmap(map, len) == 0)
 		return (0);
 
-	WT_RET_MSG(session, __wt_errno(),
-	    "%s unmap error: failed to unmap %" WT_SIZET_FMT " bytes",
-	    fh->name, len);
+	WT_RET_MSG(session, __wt_errno(), "%s: memory-unmap: munmap", fh->name);
 }

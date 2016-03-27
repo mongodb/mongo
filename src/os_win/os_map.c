@@ -15,9 +15,10 @@
 int
 __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp)
 {
+	WT_DECL_RET;
 	size_t len;
-	void *map;
 	wt_off_t file_size;
+	void *map;
 
 	/*
 	 * There's no locking here to prevent the underlying file from changing
@@ -27,26 +28,25 @@ __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp)
 	WT_RET(__wt_filesize(session, fh, &file_size));
 	len = (size_t)file_size;
 
+	(void)__wt_verbose(session, WT_VERB_FILEOPS,
+	    "%s: memory-map: %" WT_SIZET_FMT " bytes", fh->name, len);
+
 	fh->maphandle =
 	    CreateFileMappingA(fh->filehandle, NULL, PAGE_READONLY, 0, 0, NULL);
-	if (fh->maphandle == NULL)
+	if (fh->maphandle == INVALID_HANDLE_VALUE)
 		WT_RET_MSG(session, __wt_win32_errno(),
-			"%s CreateFileMapping error: failed to map %"
-			WT_SIZET_FMT " bytes",
-			fh->name, len);
+		    "%s: memory-map: CreateFileMappingA", fh->name);
 
-	if ((map = MapViewOfFile(
-	    fh->maphandle, FILE_MAP_READ, 0, 0, len)) == NULL) {
+	if ((map =
+	    MapViewOfFile(fh->maphandle, FILE_MAP_READ, 0, 0, len)) == NULL) {
+		ret = __wt_win32_errno();
+
 		(void)CloseHandle(fh->maphandle);
 		fh->maphandle = INVALID_HANDLE_VALUE;
 
-		WT_RET_MSG(session, __wt_win32_errno(),
-		    "%s map error: failed to map %" WT_SIZET_FMT " bytes",
-		    fh->name, len);
+		WT_RET_MSG(session, ret,
+		    "%s: memory-map: MapViewOfFile",  fh->name);
 	}
-	(void)__wt_verbose(session, WT_VERB_FILEOPS,
-	    "%s: MapViewOfFile %p: %" WT_SIZET_FMT " bytes",
-	    fh->name, map, len);
 
 	*(void **)mapp = map;
 	*lenp = len;
@@ -91,21 +91,24 @@ __wt_mmap_discard(WT_SESSION_IMPL *session, WT_FH *fh, void *p, size_t size)
 int
 __wt_munmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, size_t len)
 {
-	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS,
-	    "%s: UnmapViewOfFile %p: %" WT_SIZET_FMT " bytes",
-	    fh->name, map, len));
+	WT_DECL_RET;
 
-	if (UnmapViewOfFile(map) == 0)
-		WT_RET_MSG(session, __wt_win32_errno(),
-		    "%s UnmapViewOfFile error: failed to unmap %" WT_SIZET_FMT
-		    " bytes",
-		    fh->name, len);
+	(void)__wt_verbose(session, WT_VERB_FILEOPS,
+	    "%s: memory-unmap: %" WT_SIZET_FMT " bytes", fh->name, len);
 
-	if (CloseHandle(fh->maphandle) == 0)
-		WT_RET_MSG(session, __wt_win32_errno(),
-		    "CloseHandle: MapViewOfFile: %s", fh->name);
+	if (UnmapViewOfFile(map) == 0) {
+		ret = __wt_win32_errno();
+		__wt_err(session, ret,
+		    "%s: memory-unmap: UnmapViewOfFile", fh->name);
+	}
+
+	if (CloseHandle(fh->maphandle) == 0) {
+		ret = __wt_win32_errno();
+		__wt_err(session, ret,
+		    "%s: memory-unmap: CloseHandle", fh->name);
+	}
 
 	fh->maphandle = INVALID_HANDLE_VALUE;
 
-	return (0);
+	return (ret);
 }

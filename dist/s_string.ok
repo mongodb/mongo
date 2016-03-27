@@ -69,6 +69,7 @@ Config
 Coverity
 CreateFileA
 CreateFileMapping
+CreateFileMappingA
 Crummey
 CustomersPhone
 DECL
