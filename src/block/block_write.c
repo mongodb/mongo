@@ -337,7 +337,6 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		WT_RET(ret);
 	}
 
-#ifdef HAVE_SYNC_FILE_RANGE
 	/*
 	 * Optionally schedule writes for dirty pages in the system buffer
 	 * cache, but only if the current session can wait.
@@ -346,9 +345,15 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	    (block->os_cache_dirty += align_size) > block->os_cache_dirty_max &&
 	    __wt_session_can_wait(session)) {
 		block->os_cache_dirty = 0;
-		WT_RET(__wt_fsync(session, fh, false));
+		if ((ret = __wt_fsync(session, fh, false)) != 0) {
+			 /*
+			  * Ignore ENOTSUP, but don't try again.
+			  */
+			if (ret != ENOTSUP)
+				return (ret);
+			block->os_cache_dirty_max = 0;
+		}
 	}
-#endif
 
 	/* Optionally discard blocks from the buffer cache. */
 	WT_RET(__wt_block_discard(session, block, align_size));

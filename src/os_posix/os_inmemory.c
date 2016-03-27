@@ -320,8 +320,12 @@ __im_handle_sync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
 {
 	WT_UNUSED(session);
 	WT_UNUSED(fh);
-	WT_UNUSED(block);
-	return (0);
+
+	/*
+	 * Callers attempting asynchronous flush handle ENOTSUP returns, and
+	 * won't make further attempts.
+	 */
+	return (block ? 0 : ENOTSUP);
 }
 
 /*

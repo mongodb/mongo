@@ -210,7 +210,8 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	/* Set the file extension information. */
 	block->extend_len = conn->data_extend_len;
 
-	/* Set the preload availability. */
+	/* Set the asynchronous flush, preload availability. */
+	block->nowait_sync_available = true;
 	block->preload_available = true;
 
 	/* Initialize the live checkpoint's lock. */

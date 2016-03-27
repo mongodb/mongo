@@ -27,8 +27,12 @@ __posix_sync(WT_SESSION_IMPL *session,
 		WT_RET_MSG(session, ret, "%s: %s: sync_file_range", name, func);
 	}
 #else
+	/*
+	 * Callers attempting asynchronous flush handle ENOTSUP returns, and
+	 * won't make further attempts.
+	 */
 	if (!block)
-		return (0);
+		return (ENOTSUP);
 #endif
 
 #if defined(F_FULLFSYNC)

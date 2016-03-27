@@ -413,7 +413,19 @@ __bm_stat(WT_BM *bm, WT_SESSION_IMPL *session, WT_DSRC_STATS *stats)
 static int
 __bm_sync(WT_BM *bm, WT_SESSION_IMPL *session, bool block)
 {
-	return (__wt_fsync(session, bm->block->fh, block));
+	WT_DECL_RET;
+
+	if (!block && !bm->block->nowait_sync_available)
+		return (0);
+
+	if ((ret = __wt_fsync(session, bm->block->fh, block)) == 0)
+		return (0);
+
+	/* Ignore ENOTSUP, but don't try again. */
+	if (ret != ENOTSUP)
+		return (ret);
+	bm->block->nowait_sync_available = false;
+	return (0);
 }
 
 /*

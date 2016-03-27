@@ -376,9 +376,14 @@ __win_handle_sync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
 {
 	WT_DECL_RET;
 
-	WT_UNUSED(block);
-
 	if (fh->fp == NULL) {
+		/*
+		 * Callers attempting asynchronous flush handle ENOTSUP returns,
+		 * and won't make further attempts.
+		 */
+		if (!block)
+			return (ENOTSUP);
+
 		if ((ret = FlushFileBuffers(fh->filehandle)) == FALSE)
 			WT_RET_MSG(session, __wt_win32_errno(),
 			    "%s handle-sync: FlushFileBuffers error", fh->name);
