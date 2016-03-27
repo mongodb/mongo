@@ -61,11 +61,11 @@ __wt_mmap(WT_SESSION_IMPL *session,
 
 #ifdef HAVE_POSIX_MADVISE
 /*
- * __wt_mmap_preload_madvise --
+ * __mmap_preload_madvise --
  *	Cause a section of a memory map to be faulted in.
  */
-int
-__wt_mmap_preload_madvise(
+static int
+__mmap_preload_madvise(
     WT_SESSION_IMPL *session, WT_FH *fh, const void *p, size_t size)
 {
 	WT_BM *bm;
@@ -97,10 +97,10 @@ __wt_mmap_preload_madvise(
 	size &= ~(size_t)(conn->page_size - 1);
 
 	if (size > (size_t)conn->page_size &&
-	    (ret = posix_madvise(blk, size, POSIX_MADV_WILLNEED)) != 0)
-		WT_RET_MSG(session, ret,
-		    "%s: posix_madvise: POSIX_MADV_WILLNEED", fh->name);
-	return (0);
+	    (ret = posix_madvise(blk, size, POSIX_MADV_WILLNEED)) == 0)
+		return (0);
+	WT_RET_MSG(session, ret,
+	    "%s: posix_madvise: POSIX_MADV_WILLNEED", fh->name);
 }
 #endif
 
@@ -115,7 +115,7 @@ __wt_mmap_preload(
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
 
 #ifdef HAVE_POSIX_MADVISE
-	return (__wt_mmap_preload_madvise(session, fh, p, size));
+	return (__mmap_preload_madvise(session, fh, p, size));
 #else
 	WT_UNUSED(fh);
 	WT_UNUSED(p);
@@ -123,6 +123,32 @@ __wt_mmap_preload(
 	return (ENOTSUP);
 #endif
 }
+
+#ifdef HAVE_POSIX_MADVISE
+/*
+ * __mmap_discard_madvise --
+ *	Discard a chunk of the memory map.
+ */
+static int
+__mmap_discard_madvise(
+    WT_SESSION_IMPL *session, WT_FH *fh, void *p, size_t size)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	void *blk;
+
+	conn = S2C(session);
+
+	/* Linux requires the address be aligned to a 4KB boundary. */
+	blk = (void *)((uintptr_t)p & ~(uintptr_t)(conn->page_size - 1));
+	size += WT_PTRDIFF(p, blk);
+
+	if ((ret = posix_madvise(blk, size, POSIX_MADV_DONTNEED)) == 0)
+		return (0);
+	WT_RET_MSG(session, ret,
+	    "%s: posix_madvise: POSIX_MADV_DONTNEED", fh->name);
+}
+#endif
 
 /*
  * __wt_mmap_discard --
@@ -134,25 +160,13 @@ __wt_mmap_discard(WT_SESSION_IMPL *session, WT_FH *fh, void *p, size_t size)
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
 
 #ifdef HAVE_POSIX_MADVISE
-	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
-	void *blk;
-
-	conn = S2C(session);
-
-	/* Linux requires the address be aligned to a 4KB boundary. */
-	blk = (void *)((uintptr_t)p & ~(uintptr_t)(conn->page_size - 1));
-	size += WT_PTRDIFF(p, blk);
-
-	if ((ret = posix_madvise(blk, size, POSIX_MADV_DONTNEED)) != 0)
-		WT_RET_MSG(session, ret,
-		    "%s: posix_madvise: POSIX_MADV_DONTNEED", fh->name);
+	return (__mmap_discard_madvise(session, fh, p, size));
 #else
 	WT_UNUSED(fh);
 	WT_UNUSED(p);
 	WT_UNUSED(size);
-#endif
 	return (ENOTSUP);
+#endif
 }
 
 /*

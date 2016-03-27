@@ -743,7 +743,6 @@ extern int __wt_map_error_rdonly(int error);
 extern int __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp, void **mappingcookie);
 extern int __wt_mmap_discard(WT_SESSION_IMPL *session, WT_FH *fh, void *p, size_t size);
 extern int __wt_mmap_preload( WT_SESSION_IMPL *session, WT_FH *fh, const void *p, size_t size);
-extern int __wt_mmap_preload_madvise( WT_SESSION_IMPL *session, WT_FH *fh, const void *p, size_t size);
 extern int __wt_munmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, size_t len, void **mappingcookie);
 extern int __wt_once(void (*init_routine)(void));
 extern int __wt_open(WT_SESSION_IMPL *session, const char *name, uint32_t file_type, uint32_t flags, WT_FH **fhp);
