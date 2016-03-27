@@ -1343,25 +1343,22 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
 
     StringData patternName;
     if (writeConcern.wMode == WriteConcernOptions::kMajority) {
-        if (useDurableOpTime && _externalState->snapshotsEnabled()) {
-            // Make sure we have a valid snapshot.
+        if (_externalState->snapshotsEnabled()) {
+            // Make sure we have a valid "committed" snapshot up to the needed optime.
             if (!_currentCommittedSnapshot) {
                 return false;
             }
 
-            if (getWriteConcernMajorityShouldJournal_inlock()) {
-                // Wait for the "current" snapshot to advance to/past the opTime.
-
-                const auto haveSnapshot = (_currentCommittedSnapshot->opTime >= opTime &&
-                                           _currentCommittedSnapshot->name >= minSnapshot);
-                if (!haveSnapshot) {
-                    log() << "Required snapshot optime: " << opTime << " is not yet part of the "
-                          << "current snapshot: " << *_currentCommittedSnapshot;
-                }
-                // We cannot have this committed snapshot until we have replicated to a majority,
-                // so we can return true here once that requirement is met for durable writes.
-                return haveSnapshot;
+            // Wait for the "current" snapshot to advance to/past the opTime.
+            const auto haveSnapshot = (_currentCommittedSnapshot->opTime >= opTime &&
+                                       _currentCommittedSnapshot->name >= minSnapshot);
+            if (!haveSnapshot) {
+                LOG(1) << "Required snapshot optime: " << opTime << " is not yet part of the "
+                       << "current 'committed' snapshot: " << *_currentCommittedSnapshot;
+                return false;
             }
+
+            // Fallthrough to wait for "majority" write concern.
         }
         // Continue and wait for replication to the majority (of voters).
         // *** Needed for J:True, writeConcernMajorityShouldJournal:False (appliedOpTime snapshot).
