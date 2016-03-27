@@ -96,7 +96,7 @@ __mmap_preload_madvise(
 	 */
 	size &= ~(size_t)(conn->page_size - 1);
 
-	if (size > (size_t)conn->page_size &&
+	if (size <= (size_t)conn->page_size ||
 	    (ret = posix_madvise(blk, size, POSIX_MADV_WILLNEED)) == 0)
 		return (0);
 	WT_RET_MSG(session, ret,
