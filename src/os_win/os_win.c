@@ -407,6 +407,10 @@ __win_handle_truncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
 
 	largeint.QuadPart = len;
 
+	if (fh->filehandle_secondary == INVALID_HANDLE_VALUE)
+		WT_RET_MSG(session, EINVAL,
+		    "%s: handle-truncate: read-only", fh->name);
+
 	if (SetFilePointerEx(
 	    fh->filehandle_secondary, largeint, NULL, FILE_BEGIN) == FALSE)
 		WT_RET_MSG(session, __wt_win32_errno(),
@@ -570,11 +574,14 @@ __win_handle_open(WT_SESSION_IMPL *session,
 	 * concurrently with reads on the file. Writes would also move the file
 	 * pointer.
 	 */
-	filehandle_secondary = CreateFileA(name, GENERIC_READ | GENERIC_WRITE,
-	    share_mode, NULL, OPEN_EXISTING, f, NULL);
-	if (filehandle_secondary == INVALID_HANDLE_VALUE)
-		WT_ERR_MSG(session, __wt_win32_errno(),
-		    "%s: handle-open: CreateFileA: secondary", name);
+	if (!LF_ISSET(WT_OPEN_READONLY)) {
+		filehandle_secondary = CreateFileA(name,
+		    GENERIC_READ | GENERIC_WRITE,
+		    share_mode, NULL, OPEN_EXISTING, f, NULL);
+		if (filehandle_secondary == INVALID_HANDLE_VALUE)
+			WT_ERR_MSG(session, __wt_win32_errno(),
+			    "%s: handle-open: CreateFileA: secondary", name);
+	}
 
 	/* Optionally configure a stdio stream API. */
 	switch (LF_MASK(WT_STREAM_APPEND | WT_STREAM_READ | WT_STREAM_WRITE)) {
