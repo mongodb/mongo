@@ -609,6 +609,7 @@ extern int __wt_nfilename( WT_SESSION_IMPL *session, const char *name, size_t na
 extern int __wt_remove_if_exists(WT_SESSION_IMPL *session, const char *name);
 extern int __wt_rename_and_sync_directory( WT_SESSION_IMPL *session, const char *from, const char *to);
 extern int __wt_sync_handle_and_rename( WT_SESSION_IMPL *session, WT_FH **fhp, const char *from, const char *to);
+extern int __wt_copy_and_sync(WT_SESSION *wt_session, const char *from, const char *to);
 extern int __wt_library_init(void);
 extern int __wt_breakpoint(void);
 extern void __wt_attach(WT_SESSION_IMPL *session);
