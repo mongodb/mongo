@@ -21,7 +21,7 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	allocsize = block->allocsize;
 
 	/* Reset the description information in the first block. */
-	WT_RET(__wt_desc_init(session, block->fh, allocsize));
+	WT_RET(__wt_desc_write(session, block->fh, allocsize));
 
 	/*
 	 * Salvage creates a new checkpoint when it's finished, set up for

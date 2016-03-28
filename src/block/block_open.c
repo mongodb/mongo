@@ -67,7 +67,7 @@ __wt_block_manager_create(
 	}
 
 	/* Write out the file's meta-data. */
-	ret = __wt_desc_init(session, fh, allocsize);
+	ret = __wt_desc_write(session, fh, allocsize);
 
 	/*
 	 * Ensure the truncated file has made it to disk, then the upper-level
@@ -266,15 +266,19 @@ __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
 }
 
 /*
- * __wt_desc_init --
+ * __wt_desc_write --
  *	Write a file's initial descriptor structure.
  */
 int
-__wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh, uint32_t allocsize)
+__wt_desc_write(WT_SESSION_IMPL *session, WT_FH *fh, uint32_t allocsize)
 {
 	WT_BLOCK_DESC *desc;
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
+
+	/* If in-memory, we don't read or write the descriptor structure. */
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+		return (0);
 
 	/* Use a scratch buffer to get correct alignment for direct I/O. */
 	WT_RET(__wt_scr_alloc(session, allocsize, &buf));
@@ -312,6 +316,10 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	uint32_t cksum_calculate, cksum_tmp;
+
+	/* If in-memory, we don't read or write the descriptor structure. */
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+		return (0);
 
 	/* Use a scratch buffer to get correct alignment for direct I/O. */
 	WT_RET(__wt_scr_alloc(session, block->allocsize, &buf));
