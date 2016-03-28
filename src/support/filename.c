@@ -152,10 +152,11 @@ __wt_copy_and_sync(WT_SESSION *wt_session, const char *from, const char *to)
 	 * that might not detect a corrupted backup file; it's cheap insurance
 	 * in a path where undetected failure is very bad.
 	 */
-	WT_RET(__wt_remove_if_exists(session, to));
-
 	WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 	WT_ERR(__wt_buf_fmt(session, tmp, "%s.copy", to));
+
+	WT_ERR(__wt_remove_if_exists(session, to));
+	WT_ERR(__wt_remove_if_exists(session, tmp->data));
 
 	/* Open the from and temporary file handles. */
 	WT_ERR(__wt_open(session, from,
