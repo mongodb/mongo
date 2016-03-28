@@ -582,6 +582,12 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 	f |= O_CLOEXEC;
 #endif
 #ifdef O_DIRECT
+	/*
+	 * Direct I/O: file-type is a flag from the set of possible flags stored
+	 * in the connection handle during configuration, check for a match.
+	 * Also, "direct_io=checkpoint" configures direct I/O for readonly data
+	 * files.
+	 */
 	if (FLD_ISSET(conn->direct_io, file_type) ||
 	    (LF_ISSET(WT_OPEN_READONLY) &&
 	    file_type == WT_FILE_TYPE_DATA &&
