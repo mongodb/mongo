@@ -216,6 +216,9 @@ bool getFileVersion(const char* filePath, DWORD& fileVersionMS, DWORD& fileVersi
 // If the version of the ntfs.sys driver shows that the KB2731284 hotfix or a later update
 // is installed, zeroing out data files is unnecessary. The file version numbers used below
 // are taken from the Hotfix File Information at http://support.microsoft.com/kb/2731284.
+// In https://support.microsoft.com/en-us/kb/3121255, the LDR branch prefix for SP1 is now
+// .23xxxx since patch numbers have rolled over to the next range.
+// Windows 7 RTM has not received patches for KB3121255.
 bool isKB2731284OrLaterUpdateInstalled() {
     UINT pathBufferSize = GetSystemDirectoryA(NULL, 0);
     if (pathBufferSize == 0) {
@@ -257,7 +260,7 @@ bool isKB2731284OrLaterUpdateInstalled() {
             return true;
         } else if (fileVersionFirstNumber == 6 && fileVersionSecondNumber == 1 &&
                    fileVersionThirdNumber == 7601 && fileVersionFourthNumber >= 22083 &&
-                   fileVersionFourthNumber <= 22999) {
+                   fileVersionFourthNumber <= 23999) {
             return true;
         }
     }
