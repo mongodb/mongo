@@ -96,7 +96,6 @@ public:
 
 
     // helpers for doing pointer arithmetic with this class
-    // Note: These don't dereference 'this' so they are safe to use with NULL
     char* ptr() {
         return reinterpret_cast<char*>(this);
     }
@@ -308,7 +307,7 @@ public:
 private:
     /// Same as lastElement->next() or firstElement() if empty.
     const ValueElement* end() const {
-        return _firstElement->plusBytes(_usedBytes);
+        return _firstElement ? _firstElement->plusBytes(_usedBytes) : nullptr;
     }
 
     /// Allocates space in _buffer. Copies existing data if there is any.
