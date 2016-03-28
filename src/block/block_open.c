@@ -201,18 +201,18 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_config_gets(session, cfg, "os_cache_dirty_max", &cval));
 	block->os_cache_dirty_max = (size_t)cval.val;
 
-	/* Open the underlying file handle. */
-	WT_ERR(__wt_open(session, filename, WT_FILE_TYPE_DATA, 0, &block->fh));
-
-	/* Set the file's size. */
-	WT_ERR(__wt_filesize(session, block->fh, &block->size));
-
 	/* Set the file extension information. */
 	block->extend_len = conn->data_extend_len;
 
 	/* Set the asynchronous flush, preload availability. */
 	block->nowait_sync_available = true;
 	block->preload_available = true;
+
+	/* Open the underlying file handle. */
+	WT_ERR(__wt_open(session, filename, WT_FILE_TYPE_DATA, 0, &block->fh));
+
+	/* Set the file's size. */
+	WT_ERR(__wt_filesize(session, block->fh, &block->size));
 
 	/* Initialize the live checkpoint's lock. */
 	WT_ERR(__wt_spin_init(session, &block->live_lock, "block manager"));
