@@ -668,6 +668,10 @@ directory_open:
 	fh->fh_close = __posix_handle_close;
 	fh->fh_getc = __posix_handle_getc;
 	fh->fh_lock = __posix_handle_lock;
+	fh->fh_map = __wt_posix_map;
+	fh->fh_map_discard = __wt_posix_map_discard;
+	fh->fh_map_preload = __wt_posix_map_preload;
+	fh->fh_map_unmap = __wt_posix_map_unmap;
 	fh->fh_printf = __posix_handle_printf;
 	fh->fh_read = __posix_handle_read;
 	fh->fh_size = __posix_handle_size;

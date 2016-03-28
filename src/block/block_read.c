@@ -37,10 +37,10 @@ __wt_bm_preload(
 		mapped = bm->map != NULL &&
 		    offset + size <= (wt_off_t)bm->maplen;
 		if (mapped)
-			ret = __wt_mmap_preload(session,
+			ret = block->fh->fh_map_preload(session,
 			    block->fh, (uint8_t *)bm->map + offset, size);
 		else
-			ret = __wt_posix_fadvise(session,
+			ret = block->fh->fh_advise(session,
 			    block->fh, (wt_off_t)offset,
 			    (wt_off_t)size, POSIX_FADV_WILLNEED);
 		if (ret == 0)
@@ -91,7 +91,7 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 		buf->data = (uint8_t *)bm->map + offset;
 		buf->size = size;
 		if (block->preload_available)
-			WT_RET(__wt_mmap_preload(
+			WT_RET(block->fh->fh_map_preload(
 			    session, block->fh, buf->data, buf->size));
 
 		WT_STAT_FAST_CONN_INCR(session, block_map_read);

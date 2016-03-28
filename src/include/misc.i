@@ -180,20 +180,6 @@ __wt_directory_sync_fh(WT_SESSION_IMPL *session, WT_FH *fh)
 }
 
 /*
- * __wt_posix_fadvise --
- *	POSIX fadvise.
- */
-static inline int
-__wt_posix_fadvise(WT_SESSION_IMPL *session,
-    WT_FH *fh, wt_off_t offset, wt_off_t len, int advice)
-{
-	WT_RET(__wt_verbose(
-	    session, WT_VERB_HANDLEOPS, "%s: handle-advise", fh->name));
-
-	return (fh->fh_advise(session, fh, offset, len, advice));
-}
-
-/*
  * __wt_fallocate --
  *	Extend a file.
  */

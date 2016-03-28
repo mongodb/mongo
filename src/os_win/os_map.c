@@ -9,11 +9,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_mmap --
+ * __wt_win_map --
  *	Map a file into memory.
  */
 int
-__wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp)
+__wt_win_map(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp)
 {
 	WT_DECL_RET;
 	size_t len;
@@ -54,11 +54,11 @@ __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp)
 }
 
 /*
- * __wt_mmap_preload --
+ * __wt_win_map_preload --
  *	Cause a section of a memory map to be faulted in.
  */
 int
-__wt_mmap_preload(
+__wt_win_map_preload(
     WT_SESSION_IMPL *session, WT_FH *fh, const void *p, size_t size)
 {
 	WT_UNUSED(session);
@@ -70,11 +70,11 @@ __wt_mmap_preload(
 }
 
 /*
- * __wt_mmap_discard --
+ * __wt_win_map_discard --
  *	Discard a chunk of the memory map.
  */
 int
-__wt_mmap_discard(WT_SESSION_IMPL *session, WT_FH *fh, void *p, size_t size)
+__wt_win_map_discard(WT_SESSION_IMPL *session, WT_FH *fh, void *p, size_t size)
 {
 	WT_UNUSED(session);
 	WT_UNUSED(fh);
@@ -85,11 +85,11 @@ __wt_mmap_discard(WT_SESSION_IMPL *session, WT_FH *fh, void *p, size_t size)
 }
 
 /*
- * __wt_munmap --
+ * __wt_win_map_unmap --
  *	Remove a memory mapping.
  */
 int
-__wt_munmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, size_t len)
+__wt_win_map_unmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, size_t len)
 {
 	WT_DECL_RET;
 

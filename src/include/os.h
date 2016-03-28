@@ -112,6 +112,10 @@ struct __wt_fh {
 	int (*fh_close)(WT_SESSION_IMPL *, WT_FH *);
 	int (*fh_getc)(WT_SESSION_IMPL *, WT_FH *, int *);
 	int (*fh_lock)(WT_SESSION_IMPL *, WT_FH *, bool);
+	int (*fh_map)(WT_SESSION_IMPL *, WT_FH *, void *, size_t *);
+	int (*fh_map_discard)(WT_SESSION_IMPL *, WT_FH *, void *, size_t);
+	int (*fh_map_preload)(WT_SESSION_IMPL *, WT_FH *, const void *, size_t);
+	int (*fh_map_unmap)(WT_SESSION_IMPL *, WT_FH *, void *, size_t);
 	int (*fh_printf)(WT_SESSION_IMPL *, WT_FH *, const char *, va_list);
 	int (*fh_read)(WT_SESSION_IMPL *, WT_FH *, wt_off_t, size_t, void *);
 	int (*fh_size)(WT_SESSION_IMPL *, WT_FH *, wt_off_t *);

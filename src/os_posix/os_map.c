@@ -9,11 +9,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_mmap --
+ * __wt_posix_map --
  *	Map a file into memory.
  */
 int
-__wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp)
+__wt_posix_map(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp)
 {
 	size_t len;
 	wt_off_t file_size;
@@ -57,11 +57,11 @@ __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp)
 
 #ifdef HAVE_POSIX_MADVISE
 /*
- * __mmap_preload_madvise --
+ * __posix_map_preload_madvise --
  *	Cause a section of a memory map to be faulted in.
  */
 static int
-__mmap_preload_madvise(
+__posix_map_preload_madvise(
     WT_SESSION_IMPL *session, WT_FH *fh, const void *p, size_t size)
 {
 	WT_BM *bm;
@@ -102,17 +102,17 @@ __mmap_preload_madvise(
 #endif
 
 /*
- * __wt_mmap_preload --
+ * __wt_posix_map_preload --
  *	Cause a section of a memory map to be faulted in.
  */
 int
-__wt_mmap_preload(
+__wt_posix_map_preload(
     WT_SESSION_IMPL *session, WT_FH *fh, const void *p, size_t size)
 {
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
 
 #ifdef HAVE_POSIX_MADVISE
-	return (__mmap_preload_madvise(session, fh, p, size));
+	return (__posix_map_preload_madvise(session, fh, p, size));
 #else
 	WT_UNUSED(fh);
 	WT_UNUSED(p);
@@ -123,11 +123,11 @@ __wt_mmap_preload(
 
 #ifdef HAVE_POSIX_MADVISE
 /*
- * __mmap_discard_madvise --
+ * __posix_map_discard_madvise --
  *	Discard a chunk of the memory map.
  */
 static int
-__mmap_discard_madvise(
+__posix_map_discard_madvise(
     WT_SESSION_IMPL *session, WT_FH *fh, void *p, size_t size)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -149,16 +149,17 @@ __mmap_discard_madvise(
 #endif
 
 /*
- * __wt_mmap_discard --
+ * __wt_posix_map_discard --
  *	Discard a chunk of the memory map.
  */
 int
-__wt_mmap_discard(WT_SESSION_IMPL *session, WT_FH *fh, void *p, size_t size)
+__wt_posix_map_discard(
+    WT_SESSION_IMPL *session, WT_FH *fh, void *p, size_t size)
 {
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
 
 #ifdef HAVE_POSIX_MADVISE
-	return (__mmap_discard_madvise(session, fh, p, size));
+	return (__posix_map_discard_madvise(session, fh, p, size));
 #else
 	WT_UNUSED(fh);
 	WT_UNUSED(p);
@@ -168,11 +169,11 @@ __wt_mmap_discard(WT_SESSION_IMPL *session, WT_FH *fh, void *p, size_t size)
 }
 
 /*
- * __wt_munmap --
+ * __wt_posix_map_unmap --
  *	Remove a memory mapping.
  */
 int
-__wt_munmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, size_t len)
+__wt_posix_map_unmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, size_t len)
 {
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
 

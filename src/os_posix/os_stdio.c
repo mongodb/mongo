@@ -68,6 +68,57 @@ __stdio_handle_lock(WT_SESSION_IMPL *session, WT_FH *fh, bool lock)
 }
 
 /*
+ * __stdio_handle_map --
+ *	Map a file.
+ */
+static int
+__stdio_handle_map(WT_SESSION_IMPL *session, WT_FH *fh, void *p, size_t *lenp)
+{
+	WT_UNUSED(p);
+	WT_UNUSED(lenp);
+	WT_RET_MSG(session, ENOTSUP, "%s: handle-map", fh->name);
+}
+
+/*
+ * __stdio_handle_map_discard --
+ *	Discard a section of a mapped region.
+ */
+static int
+__stdio_handle_map_discard(
+    WT_SESSION_IMPL *session, WT_FH *fh, void *p, size_t len)
+{
+	WT_UNUSED(p);
+	WT_UNUSED(len);
+	WT_RET_MSG(session, ENOTSUP, "%s: handle-map-discard", fh->name);
+}
+
+/*
+ * __stdio_handle_map_preload --
+ *	Preload a section of a mapped region.
+ */
+static int
+__stdio_handle_map_preload(
+    WT_SESSION_IMPL *session, WT_FH *fh, const void *p, size_t len)
+{
+	WT_UNUSED(p);
+	WT_UNUSED(len);
+	WT_RET_MSG(session, ENOTSUP, "%s: handle-map-preload", fh->name);
+}
+
+/*
+ * __stdio_handle_map_unmap --
+ *	Unmap a file.
+ */
+static int
+__stdio_handle_map_unmap(
+    WT_SESSION_IMPL *session, WT_FH *fh, void *p, size_t len)
+{
+	WT_UNUSED(p);
+	WT_UNUSED(len);
+	WT_RET_MSG(session, ENOTSUP, "%s: handle-map-unmap", fh->name);
+}
+
+/*
  * __stdio_handle_printf --
  *	ANSI C vfprintf.
  */
@@ -159,6 +210,10 @@ __stdio_func_init(WT_FH *fh, const char *name, FILE *fp)
 	fh->fh_close = __stdio_handle_close;
 	fh->fh_getc = __stdio_handle_getc;
 	fh->fh_lock = __stdio_handle_lock;
+	fh->fh_map = __stdio_handle_map;
+	fh->fh_map_discard = __stdio_handle_map_discard;
+	fh->fh_map_preload = __stdio_handle_map_preload;
+	fh->fh_map_unmap = __stdio_handle_map_unmap;
 	fh->fh_printf = __stdio_handle_printf;
 	fh->fh_read = __stdio_handle_read;
 	fh->fh_size = __stdio_handle_size;

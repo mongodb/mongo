@@ -16,6 +16,8 @@ int
 __wt_block_map(
     WT_SESSION_IMPL *session, WT_BLOCK *block, void *mapp, size_t *maplenp)
 {
+	WT_DECL_RET;
+
 	*(void **)mapp = NULL;
 	*maplenp = 0;
 
@@ -48,12 +50,15 @@ __wt_block_map(
 
 	/*
 	 * Map the file into memory.
-	 * Ignore errors, we'll read the file through the cache if map fails.
+	 * Ignore not-supported errors, we'll read the file through the cache
+	 * if map fails.
 	 */
-	(void)__wt_mmap(session, block->fh, mapp, maplenp);
+	ret = block->fh->fh_map(session, block->fh, mapp, maplenp);
+	if (ret == ENOTSUP)
+		ret = 0;
 #endif
 
-	return (0);
+	return (ret);
 }
 
 /*
@@ -65,5 +70,5 @@ __wt_block_unmap(
     WT_SESSION_IMPL *session, WT_BLOCK *block, void *map, size_t maplen)
 {
 	/* Unmap the file from memory. */
-	return (__wt_munmap(session, block->fh, map, maplen));
+	return (block->fh->fh_map_unmap(session, block->fh, map, maplen));
 }

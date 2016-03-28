@@ -617,6 +617,10 @@ directory_open:
 	fh->fh_close = __win_handle_close;
 	fh->fh_getc = __win_handle_getc;
 	fh->fh_lock = __win_handle_lock;
+	fh->fh_map = __wt_win_map;
+	fh->fh_map_discard = __wt_win_map_discard;
+	fh->fh_map_preload = __wt_win_map_preload;
+	fh->fh_map_unmap = __wt_win_map_unmap;
 	fh->fh_printf = __win_handle_printf;
 	fh->fh_read = __win_handle_read;
 	fh->fh_size = __win_handle_size;
