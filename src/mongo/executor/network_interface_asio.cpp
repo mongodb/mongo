@@ -32,6 +32,8 @@
 
 #include "mongo/executor/network_interface_asio.h"
 
+#include <asio/system_timer.hpp>
+
 #include <utility>
 
 #include "mongo/executor/async_stream_factory.h"
@@ -406,12 +408,9 @@ void NetworkInterfaceASIO::cancelAllCommands() {
     }
 }
 
-const auto kMaxTimerDuration = duration_cast<Milliseconds>(asio::steady_timer::duration::max());
-
 void NetworkInterfaceASIO::setAlarm(Date_t when, const stdx::function<void()>& action) {
     // "alarm" must stay alive until it expires, hence the shared_ptr.
-    auto alarm = std::make_shared<asio::steady_timer>(_io_service,
-                                                      std::min(when - now(), kMaxTimerDuration));
+    auto alarm = std::make_shared<asio::system_timer>(_io_service, when.toSystemTimePoint());
     alarm->async_wait([alarm, this, action](std::error_code ec) {
         if (!ec) {
             return action();
