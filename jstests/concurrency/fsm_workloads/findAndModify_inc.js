@@ -10,7 +10,9 @@
  *
  * This workload was designed to reproduce SERVER-15892.
  */
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod and isMMAPv1
+
+// For isMongod and supportsDocumentLevelConcurrency.
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = (function() {
 
@@ -34,11 +36,11 @@ var $config = (function() {
             // If the document was invalidated during a yield, then we wouldn't have modified it.
             // The "findAndModify" command returns a null value in this case. See SERVER-22002 for
             // more details.
-            if (isMongod(db) && !isMMAPv1(db)) {
-                // For storage engines other than MMAPv1, if the document is modified by another
-                // thread during a yield, then the operation is retried internally. We never expect
-                // to see a null value returned by the "findAndModify" command when it is known that
-                // a matching document exists in the collection.
+            if (isMongod(db) && supportsDocumentLevelConcurrency(db)) {
+                // For storage engines that support document-level concurrency, if the document is
+                // modified by another thread during a yield, then the operation is retried
+                // internally. We never expect to see a null value returned by the "findAndModify"
+                // command when it is known that a matching document exists in the collection.
                 assertWhenOwnColl(res.value !== null, 'query spec should have matched a document');
             }
 

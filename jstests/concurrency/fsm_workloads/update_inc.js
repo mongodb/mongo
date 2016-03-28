@@ -8,7 +8,9 @@
  * field. Asserts that the field has the correct value based on the number
  * of increments performed.
  */
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod and isMMAPv1
+
+// For isMongod and supportsDocumentLevelConcurrency.
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = (function() {
 
@@ -33,16 +35,18 @@ var $config = (function() {
             var res = db[collName].update({_id: this.id}, updateDoc);
             assertAlways.eq(0, res.nUpserted, tojson(res));
 
-            if (isMongod(db) && !isMMAPv1(db)) {
-                // For non-mmap storage engines we can have a strong assertion that exactly one doc
-                // will be modified.
+            if (isMongod(db) && supportsDocumentLevelConcurrency(db)) {
+                // Storage engines which support document-level concurrency will automatically retry
+                // any operations when there are conflicts, so we should always see a matching
+                // document.
                 assertWhenOwnColl.eq(res.nMatched, 1, tojson(res));
                 if (db.getMongo().writeMode() === 'commands') {
                     assertWhenOwnColl.eq(res.nModified, 1, tojson(res));
                 }
             } else {
-                // Zero matches are possible for MMAP v1 because the update will skip a document
-                // that was invalidated during a yield.
+                // On storage engines that do not support document-level concurrency, it is possible
+                // that the query will not find the document. This can happen if another thread
+                // updated the target document during a yield, triggering an invalidation.
                 assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));
                 if (db.getMongo().writeMode() === 'commands') {
                     assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));

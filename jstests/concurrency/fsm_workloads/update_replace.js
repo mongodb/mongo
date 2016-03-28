@@ -6,7 +6,9 @@
  * Does updates that replace an entire document.
  * The collection has indexes on some but not all fields.
  */
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod and isMMAPv1
+
+// For isMongod and supportsDocumentLevelConcurrency.
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = (function() {
 
@@ -14,13 +16,15 @@ var $config = (function() {
     function assertResult(db, res) {
         assertAlways.eq(0, res.nUpserted, tojson(res));
 
-        if (isMongod(db) && !isMMAPv1(db)) {
-            // For non-MMAPv1 storage engines we can make a stong assertion that exactly one
-            // document was matched.
+        if (isMongod(db) && supportsDocumentLevelConcurrency(db)) {
+            // Storage engines which support document-level concurrency will automatically retry
+            // any operations when there are conflicts, so we should always see a matching
+            // document.
             assertWhenOwnColl.eq(res.nMatched, 1, tojson(res));
         } else {
-            // It's possible to match zero documents with MMAPv1 because the update can skip a
-            // document that was invalidated during a yield.
+            // On storage engines that do not support document-level concurrency, it is possible
+            // that the query will not find the document. This can happen if another thread
+            // updated the target document during a yield, triggering an invalidation.
             assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));
         }
 

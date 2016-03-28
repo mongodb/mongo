@@ -6,9 +6,11 @@
  * Does updates that affect multiple fields on multiple documents.
  * The collection has an index for each field, and a multikey index for all fields.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload
-load('jstests/concurrency/fsm_workloads/update_multifield.js');    // for $config
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod and isMMAPv1
+load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload
+load('jstests/concurrency/fsm_workloads/update_multifield.js');  // for $config
+
+// For isMongod and recordIdCanChangeOnUpdate.
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config =
     extendWorkload($config,
@@ -20,21 +22,17 @@ var $config =
                            assertAlways.eq(0, res.nUpserted, tojson(res));
 
                            if (isMongod(db)) {
-                               if (isMMAPv1(db)) {
-                                   // If an update triggers a document to move forward, then
-                                   // that document can be matched multiple times. If an update
-                                   // triggers a document to move backwards, then that document
-                                   // can be missed by other threads.
-                                   assertAlways.gte(res.nMatched, 0, tojson(res));
-                               } else {  // non-mmapv1 storage engine
-                                   // TODO: Can we assert exact equality with WiredTiger?
-                                   //       What about for other storage engines?
+                               if (!recordIdCanChangeOnUpdate(db)) {
+                                   // If a document's RecordId cannot change, then we should not
+                                   // have updated any document more than once, since the update
+                                   // stage internally de-duplicates based on RecordId.
                                    assertWhenOwnColl.lte(this.numDocs, res.nMatched, tojson(res));
+                               } else {
+                                   // If RecordIds can change, then there are no guarantees on how
+                                   // many documents were updated.
+                                   assertAlways.gte(res.nMatched, 0, tojson(res));
                                }
                            } else {  // mongos
-                               // In a mixed cluster, it is unknown what underlying storage engine
-                               // the update operations will be executed against. Thus, we can only
-                               // make the weakest of all assertions above.
                                assertAlways.gte(res.nMatched, 0, tojson(res));
                            }
 
