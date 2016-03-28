@@ -164,14 +164,14 @@ __wt_open(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_FH *fh;
 	bool lock_file, open_called;
-	const char *path;
+	char *path;
 
 	WT_ASSERT(session, file_type != 0);	/* A file type is required. */
 
 	conn = S2C(session);
 	fh = NULL;
 	open_called = false;
-	path = name;
+	path = NULL;
 
 	WT_RET(__open_verbose(session, name, file_type, flags));
 
@@ -212,7 +212,8 @@ __wt_open(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_filename(session, name, &path));
 
 	/* Call the underlying open function. */
-	WT_ERR(conn->handle_open(session, fh, path, file_type, flags));
+	WT_ERR(conn->handle_open(
+	    session, fh, path == NULL ? name : path, file_type, flags));
 	open_called = true;
 
 	/*
@@ -228,8 +229,7 @@ err:		if (open_called)
 		}
 	}
 
-	if (path != name)
-		__wt_free(session, path);
+	__wt_free(session, path);
 	return (ret);
 }
 
