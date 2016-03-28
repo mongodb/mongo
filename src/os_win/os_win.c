@@ -478,12 +478,10 @@ __win_handle_open(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	int f, fd, share_mode;
 	bool direct_io;
-	char *path;
 	const char *stream_mode;
 
 	conn = S2C(session);
 	direct_io = false;
-	path = NULL;
 
 	/* Set up error handling. */
 	fh->filehandle = fh->filehandle_secondary =
@@ -498,12 +496,6 @@ __win_handle_open(WT_SESSION_IMPL *session,
 	 */
 	if (file_type == WT_FILE_TYPE_DIRECTORY)
 		goto directory_open;
-
-	/* Create the path to the file. */
-	if (!LF_ISSET(WT_OPEN_FIXED)) {
-		WT_ERR(__wt_filename(session, name, &path));
-		name = path;
-	}
 
 	share_mode = FILE_SHARE_READ;
 	if (!LF_ISSET(WT_OPEN_READONLY))
@@ -617,7 +609,6 @@ __win_handle_open(WT_SESSION_IMPL *session,
 	__win_handle_allocate_configure(session, fh);
 
 directory_open:
-	__wt_free(session, path);
 	fh->filehandle = filehandle;
 	fh->filehandle_secondary = filehandle_secondary;
 
@@ -640,7 +631,6 @@ err:	if (filehandle != INVALID_HANDLE_VALUE)
 	if (filehandle_secondary != INVALID_HANDLE_VALUE)
 		(void)CloseHandle(filehandle_secondary);
 
-	__wt_free(session, path);
 	return (ret);
 }
 

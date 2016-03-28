@@ -533,22 +533,14 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 	mode_t mode;
 	int f, fd, tret;
 	bool direct_io;
-	char *path;
 	const char *stream_mode;
 
 	conn = S2C(session);
 	direct_io = false;
-	path = NULL;
 
 	/* Set up error handling. */
 	fh->fd = fd = -1;
 	fh->fp = NULL;
-
-	/* Create the path to the file. */
-	if (!LF_ISSET(WT_OPEN_FIXED)) {
-		WT_ERR(__wt_filename(session, name, &path));
-		name = path;
-	}
 
 	if (file_type == WT_FILE_TYPE_DIRECTORY) {
 		f = O_RDONLY;
@@ -660,7 +652,6 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 		    "%s: handle-open: fdopen", name);
 
 directory_open:
-	__wt_free(session, path);
 	fh->fd = fd;
 
 	/* Configure fallocate calls. */
@@ -685,8 +676,6 @@ err:	if (fd != -1) {
 		if (tret != 0)
 			__wt_err(session, tret, "%s: handle-open: close", name);
 	}
-
-	__wt_free(session, path);
 	return (ret);
 }
 

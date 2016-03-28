@@ -163,14 +163,15 @@ __wt_open(WT_SESSION_IMPL *session,
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_FH *fh;
-	bool open_called;
+	bool lock_file, open_called;
+	const char *path;
 
 	WT_ASSERT(session, file_type != 0);	/* A file type is required. */
 
 	conn = S2C(session);
-
 	fh = NULL;
 	open_called = false;
+	path = name;
 
 	WT_RET(__open_verbose(session, name, file_type, flags));
 
@@ -196,21 +197,22 @@ __wt_open(WT_SESSION_IMPL *session,
 	/*
 	 * If this is a read-only connection, open all files read-only except
 	 * the lock file.
-	 */
-	if (F_ISSET(conn, WT_CONN_READONLY) &&
-	    !WT_STRING_MATCH(name, WT_SINGLETHREAD, strlen(WT_SINGLETHREAD)))
-		LF_SET(WT_OPEN_READONLY);
-
-	/*
+	 *
 	 * The only file created in read-only mode is the lock file.
 	 */
-	WT_ASSERT(session,
-	    !LF_ISSET(WT_OPEN_CREATE) ||
-	    !F_ISSET(conn, WT_CONN_READONLY) ||
-	    WT_STRING_MATCH(name, WT_SINGLETHREAD, strlen(WT_SINGLETHREAD)));
+	if (F_ISSET(conn, WT_CONN_READONLY)) {
+		lock_file = strcmp(name, WT_SINGLETHREAD) == 0;
+		if (!lock_file)
+			LF_SET(WT_OPEN_READONLY);
+		WT_ASSERT(session, lock_file || !LF_ISSET(WT_OPEN_CREATE));
+	}
+
+	/* Create the path to the file. */
+	if (!LF_ISSET(WT_OPEN_FIXED))
+		WT_ERR(__wt_filename(session, name, &path));
 
 	/* Call the underlying open function. */
-	WT_ERR(conn->handle_open(session, fh, name, file_type, flags));
+	WT_ERR(conn->handle_open(session, fh, path, file_type, flags));
 	open_called = true;
 
 	/*
@@ -225,6 +227,9 @@ err:		if (open_called)
 			__wt_free(session, fh);
 		}
 	}
+
+	if (path != name)
+		__wt_free(session, path);
 	return (ret);
 }
 
