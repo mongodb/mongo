@@ -305,6 +305,17 @@ typedef unordered_set<Value, Value::Hash> ValueSet;
 inline void swap(mongo::Value& lhs, mongo::Value& rhs) {
     lhs.swap(rhs);
 }
+
+/**
+ * This class is identical to Value, but supports implicit creation from any of the types explicitly
+ * supported by Value.
+ */
+class ImplicitValue : public Value {
+public:
+    template <typename T>
+    ImplicitValue(T arg)
+        : Value(std::move(arg)) {}
+};
 }
 
 /* ======================= INLINED IMPLEMENTATIONS ========================== */

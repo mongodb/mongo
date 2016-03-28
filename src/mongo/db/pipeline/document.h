@@ -72,6 +72,13 @@ public:
     /// Create a new Document deep-converted from the given BSONObj.
     explicit Document(const BSONObj& bson);
 
+    /**
+     * Create a new document from key, value pairs. Enables constructing a document using this
+     * syntax:
+     * auto document = Document{{"hello", "world"}, {"number": 1}};
+     */
+    Document(std::initializer_list<std::pair<StringData, ImplicitValue>> initializerList);
+
 #if defined(_MSC_VER) && _MSC_VER < 1900  // MVSC++ <= 2013 can't generate default move operations
     Document(const Document& other) = default;
     Document& operator=(const Document& other) = default;
