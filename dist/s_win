@@ -53,7 +53,7 @@ win_filelist()
 	echo 'src/os_win/os_dir.c'
 	echo 'src/os_win/os_dlopen.c'
 	echo 'src/os_win/os_errno.c'
-	echo 'src/os_win/os_fs_win.c'
+	echo 'src/os_win/os_fs.c'
 	echo 'src/os_win/os_getenv.c'
 	echo 'src/os_win/os_map.c'
 	echo 'src/os_win/os_mtx_cond.c'

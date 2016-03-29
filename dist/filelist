@@ -115,7 +115,7 @@ src/os_posix/os_dir.c
 src/os_posix/os_dlopen.c
 src/os_posix/os_errno.c
 src/os_posix/os_fallocate.c
-src/os_posix/os_fs_posix.c
+src/os_posix/os_fs.c
 src/os_posix/os_getenv.c
 src/os_posix/os_map.c
 src/os_posix/os_mtx_cond.c

@@ -220,7 +220,7 @@ __win_handle_close(WT_SESSION_IMPL *session, WT_FH *fh)
 	if (fh->fp == NULL) {
 		/*
 		 * We don't open Windows system handles when opening directories
-		 * for flushing, since it is not necessary (or possible) to flush
+		 * for flushing, as it is not necessary (or possible) to flush
 		 * a directory on Windows. Confirm the file handle is set before
 		 * attempting to close it.
 		 */
