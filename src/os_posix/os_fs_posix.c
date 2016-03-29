@@ -290,7 +290,6 @@ static int
 __posix_handle_close(WT_SESSION_IMPL *session, WT_FH *fh)
 {
 	WT_DECL_RET;
-	int tret;
 
 	if (fh->fp == NULL) {
 		WT_SYSCALL_RETRY(close(fh->fd), ret);
@@ -299,17 +298,18 @@ __posix_handle_close(WT_SESSION_IMPL *session, WT_FH *fh)
 		WT_RET_MSG(session, ret, "%s: handle-close: close", fh->name);
 	}
 
-	/* If the handle was opened for writing, flush the file. */
+	/* If the stream was opened for writing, flush the file. */
 	if (F_ISSET(fh, WT_FH_FLUSH_ON_CLOSE) && fflush(fh->fp) != 0) {
 		ret = __wt_errno();
 		__wt_err(session, ret, "%s: handle-close: fflush", fh->name);
 	}
 
-	if ((tret = fclose(fh->fp)) != 0) {
-		tret = __wt_errno();
-		__wt_err(session, tret, "%s: handle-close: fclose", fh->name);
+	/* Close the file. */
+	if (fclose(fh->fp) != 0) {
+		ret = __wt_errno();
+		__wt_err(session, ret, "%s: handle-close: fclose", fh->name);
 	}
-	return (ret == 0 ? tret : ret);
+	return (ret);
 }
 
 /*
