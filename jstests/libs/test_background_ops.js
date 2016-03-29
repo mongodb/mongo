@@ -138,6 +138,7 @@ startParallelOps = function(mongo, proc, args, context) {
     var bootstrapper = function(stored) {
 
         var procContext = stored.procContext;
+        eval("procContext = " + procContext);
         procContext.setup(procContext, stored);
 
         var contexts = stored.contexts;
@@ -177,7 +178,7 @@ startParallelOps = function(mongo, proc, args, context) {
         bootstrapper: tojson(bootstrapper),
         operation: tojson(proc),
         args: tojson(args),
-        procContext: procContext,
+        procContext: tojson(procContext),
         contexts: tojson(contexts)
     });
 

@@ -2,13 +2,46 @@
  * The ParallelTester class is used to test more than one test concurrently
  */
 if (typeof _threadInject != "undefined") {
+    // With --enableJavaScriptProtection functions are presented as Code objects.
+    // This function evals all the Code objects then calls the provided start function.
+    // arguments: [startFunction, startFunction args...]
+    function _threadStartWrapper() {
+        // Recursively evals all the Code objects present in arguments
+        // NOTE: This is a naive implementation that cannot handle cyclic objects.
+        function evalCodeArgs(arg) {
+            if (arg instanceof Code) {
+                return eval("(" + arg.code + ")");
+            } else if (arg !== null && isObject(arg)) {
+                var newArg = arg instanceof Array ? [] : {};
+                for (var prop in arg) {
+                    if (arg.hasOwnProperty(prop)) {
+                        newArg[prop] = evalCodeArgs(arg[prop]);
+                    }
+                }
+                return newArg;
+            }
+            return arg;
+        }
+        var realStartFn;
+        var newArgs = [];
+        for (var i = 0, l = arguments.length; i < l; i++) {
+            newArgs.push(evalCodeArgs(arguments[i]));
+        }
+        realStartFn = newArgs.shift();
+        return realStartFn.apply(this, newArgs);
+    }
+
     Thread = function() {
-        this.init.apply(this, arguments);
+        var args = Array.prototype.slice.call(arguments);
+        args.unshift(_threadStartWrapper);
+        this.init.apply(this, args);
     };
     _threadInject(Thread.prototype);
 
     ScopedThread = function() {
-        this.init.apply(this, arguments);
+        var args = Array.prototype.slice.call(arguments);
+        args.unshift(_threadStartWrapper);
+        this.init.apply(this, args);
     };
     ScopedThread.prototype = new Thread(function() {});
     _scopedThreadInject(ScopedThread.prototype);

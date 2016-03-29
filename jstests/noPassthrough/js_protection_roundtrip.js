@@ -10,48 +10,48 @@
 (function() {
     "use strict";
 
-    var testServer = MongoRunner.runMongod({setParameter: "javascriptProtection=true"});
-    assert.neq(
-        null, testServer, "failed to start mongod with --setParameter=javascriptProtection=true");
-
+    var testServer = MongoRunner.runMongod();
+    assert.neq(null, testServer, "failed to start mongod");
     var db = testServer.getDB("test");
     var t = db.js_protection_roundtrip;
 
-    function makeRoundTrip() {
-        var functionToEval = function() {
-            var doc = db.js_protection_roundtrip.findOne({_id: 0});
-            assert.neq(null, doc);
-            db.js_protection_roundtrip.insertOne({_id: 1, myFunc: doc.myFunc});
-        };
+    function withoutJavaScriptProtection() {
+        var doc = db.foo.findOne({_id: 0});
+        assert.neq(doc, null);
+        assert.eq(typeof doc.myFunc, "function", "myFunc should have been presented as a function");
+        assert.eq(doc.myFunc(), "yes");
+    }
 
-        var exitCode = runMongoProgram("mongo",
-                                       "--port",
-                                       testServer.port,
-                                       "--enableJavaScriptProtection",
-                                       "--eval",
-                                       "(" + functionToEval.toString() + ")();");
-        assert.eq(0, exitCode);
+    function withJavaScriptProtection() {
+        var doc = db.foo.findOne({_id: 0});
+        assert.neq(doc, null);
+        assert(doc.myFunc instanceof Code, "myFunc should have been a Code object");
+        doc.myFunc = eval("(" + doc.myFunc.code + ")");
+        assert.eq(doc.myFunc(), "yes");
+    }
+
+    function testFunctionUnmarshall(jsProtection, evalFunc) {
+        var evalString = "(" + tojson(evalFunc) + ")();";
+        var protectionFlag =
+            jsProtection ? "--enableJavaScriptProtection" : "--disableJavaScriptProtection";
+        var exitCode = runMongoProgram(
+            "mongo", "--port", testServer.port, protectionFlag, "--eval", evalString);
+        assert.eq(exitCode, 0);
     }
 
     /**
      *  ACTUAL TEST
      */
-
-    t.insertOne({
+    var result = t.insert({
         _id: 0,
         myFunc: function() {
             return "yes";
         }
     });
+    assert.writeOK(result);
 
-    makeRoundTrip();
-
-    var doc = t.findOne({_id: 1});
-    assert.neq(null, doc, "failed to find document inserted by other mongo shell");
-
-    assert(doc.hasOwnProperty("myFunc"), tojson(doc));
-    assert.eq("function", typeof doc.myFunc, tojson(doc));
-    assert.eq("yes", doc.myFunc(), tojson(doc));
+    testFunctionUnmarshall(true, withJavaScriptProtection);
+    testFunctionUnmarshall(false, withoutJavaScriptProtection);
 
     MongoRunner.stopMongod(testServer);
 })();

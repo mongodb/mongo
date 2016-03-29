@@ -477,7 +477,13 @@ BSONObj MozJSImplScope::callThreadArgs(const BSONObj& args) {
     MozJSEntry entry(this);
 
     JS::RootedValue function(_context);
-    ValueReader(_context, &function).fromBSONElement(args.firstElement(), args, true);
+    auto firstElem = args.firstElement();
+
+    // The first argument must be the thread start function
+    if (firstElem.type() != mongo::Code)
+        uasserted(ErrorCodes::BadValue, "first thread argument must be a function");
+
+    getScope(_context)->newFunction(firstElem.valueStringData(), &function);
 
     int argc = args.nFields() - 1;
 
