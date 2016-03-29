@@ -83,7 +83,7 @@ util_backup(WT_SESSION *session, int argc, char *argv[])
 	while (
 	    (ret = cursor->next(cursor)) == 0 &&
 	    (ret = cursor->get_key(cursor, &name)) == 0)
-		if ((ret = copy(session, name, directory)) != 0)
+		if ((ret = copy(session, directory, name)) != 0)
 			goto err;
 	if (ret == WT_NOTFOUND)
 		ret = 0;
@@ -99,25 +99,21 @@ err:	free(config);
 }
 
 static int
-copy(WT_SESSION *session, const char *name, const char *directory)
+copy(WT_SESSION *session, const char *directory, const char *name)
 {
 	WT_DECL_RET;
 	size_t len;
-	char *from, *to;
+	char *to;
 
-	from = to = NULL;
+	to = NULL;
 
-	/* Build the 2 pathnames we need. */
-	len = strlen(home) + strlen(name) + 2;
-	if ((from = malloc(len)) == NULL)
-		goto memerr;
-	(void)snprintf(from, len, "%s/%s", home, name);
+	/* Build the target pathname. */
 	len = strlen(directory) + strlen(name) + 2;
 	if ((to = malloc(len)) == NULL)
 		goto memerr;
 	(void)snprintf(to, len, "%s/%s", directory, name);
 
-	if (verbose && printf("Backing up %s to %s\n", from, to) < 0) {
+	if (verbose && printf("Backing up %s/%s to %s\n", home, name, to) < 0) {
 		fprintf(stderr, "%s: %s\n", progname, strerror(EIO));
 		goto err;
 	}
@@ -126,15 +122,14 @@ copy(WT_SESSION *session, const char *name, const char *directory)
 	 * Use WiredTiger to copy the file: ensuring stability of the copied
 	 * file on disk requires care, and WiredTiger knows how to do it.
 	 */
-	if ((ret = __wt_copy_and_sync(session, from, to)) != 0)
-		fprintf(stderr, "%s to %s: backup copy: %s\n",
-		    from, to, session->strerror(session, ret));
+	if ((ret = __wt_copy_and_sync(session, name, to)) != 0)
+		fprintf(stderr, "%s/%s to %s: backup copy: %s\n",
+		    home, name, to, session->strerror(session, ret));
 
 	if (0) {
 memerr:		fprintf(stderr, "%s: %s\n", progname, strerror(errno));
 	}
-err:	free(from);
-	free(to);
+err:	free(to);
 
 	return (ret);
 }
