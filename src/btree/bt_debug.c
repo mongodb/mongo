@@ -97,8 +97,8 @@ __debug_config(WT_SESSION_IMPL *session, WT_DBG *ds, const char *ofile)
 	if (ofile == NULL)
 		return (__wt_scr_alloc(session, 512, &ds->msg));
 
-	return (__wt_open(session, ofile,
-	    WT_FILE_TYPE_REGULAR, WT_OPEN_CREATE | WT_STREAM_WRITE, &ds->fh));
+	return (__wt_open(session, ofile, WT_FILE_TYPE_REGULAR,
+	    WT_OPEN_CREATE | WT_STREAM_LINE_BUFFER | WT_STREAM_WRITE, &ds->fh));
 }
 
 /*

@@ -776,5 +776,7 @@ extern void __wt_free_int(WT_SESSION_IMPL *session, const void *p_arg);
 extern void __wt_handle_search_unlock(WT_SESSION_IMPL *session);
 extern void __wt_posix_handle_allocate_configure(WT_SESSION_IMPL *session, WT_FH *fh);
 extern void __wt_sleep(uint64_t seconds, uint64_t micro_seconds);
+extern void __wt_stream_set_line_buffer(FILE *fp);
+extern void __wt_stream_set_no_buffer(FILE *fp);
 extern void __wt_thread_id(char *buf, size_t buflen);
 extern void __wt_yield(void);

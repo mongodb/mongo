@@ -967,6 +967,7 @@ sessionp
 setkv
 setstr
 setv
+setvbuf
 sfence
 sii
 sizeof

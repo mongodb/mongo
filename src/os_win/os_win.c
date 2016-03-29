@@ -603,6 +603,8 @@ __win_handle_open(WT_SESSION_IMPL *session,
 		if ((fh->fp = fdopen(fd, stream_mode)) == NULL)
 			WT_ERR_MSG(session, __wt_errno(),
 			    "%s: handle-open: fdopen", name);
+		if (LF_ISSET(WT_STREAM_LINE_BUFFER))
+			__wt_stream_set_line_buffer(fh->fp);
 	}
 
 	/* Configure fallocate/posix_fallocate calls. */

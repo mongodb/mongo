@@ -120,6 +120,7 @@ src/os_posix/os_pagesize.c
 src/os_posix/os_path.c
 src/os_posix/os_posix.c
 src/os_posix/os_priv.c
+src/os_posix/os_setvbuf.c
 src/os_posix/os_sleep.c
 src/os_posix/os_stdio.c
 src/os_posix/os_strtouq.c

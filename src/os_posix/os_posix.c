@@ -653,9 +653,13 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 		stream_mode = NULL;
 		break;
 	}
-	if (stream_mode != NULL && (fh->fp = fdopen(fd, stream_mode)) == NULL)
-		WT_ERR_MSG(session, __wt_errno(),
-		    "%s: handle-open: fdopen", name);
+	if (stream_mode != NULL) {
+		if ((fh->fp = fdopen(fd, stream_mode)) == NULL)
+			WT_ERR_MSG(session, __wt_errno(),
+			    "%s: handle-open: fdopen", name);
+		if (LF_ISSET(WT_STREAM_LINE_BUFFER))
+			__wt_stream_set_line_buffer(fh->fp);
+	}
 
 directory_open:
 	fh->fd = fd;
