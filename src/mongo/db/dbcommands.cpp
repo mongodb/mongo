@@ -853,7 +853,6 @@ public:
         if (!min.isEmpty()) {
             os << " between " << min << " and " << max;
         }
-        logIfSlow(timer, os.str());
 
         result.appendNumber("size", size);
         result.appendNumber("numObjects", numObjects);

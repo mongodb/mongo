@@ -320,13 +320,6 @@ BSONObj Command::getRedactedCopyForLogging(const BSONObj& cmdObj) {
     return bob.obj();
 }
 
-void Command::logIfSlow(const Timer& timer, const string& msg) {
-    int ms = timer.millis();
-    if (ms > serverGlobalParams.slowMS) {
-        log() << msg << " took " << ms << " ms.";
-    }
-}
-
 static Status _checkAuthorizationImpl(Command* c,
                                       ClientBasic* client,
                                       const std::string& dbname,

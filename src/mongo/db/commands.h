@@ -260,8 +260,6 @@ protected:
         fassertFailed(16940);
     }
 
-    static void logIfSlow(const Timer& cmdTimer, const std::string& msg);
-
     static CommandMap* _commands;
     static CommandMap* _commandsByBestName;
     static CommandMap* _webCommands;
