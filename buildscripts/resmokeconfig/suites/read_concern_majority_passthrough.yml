@@ -38,11 +38,21 @@ selector:
     - jstests/core/mr_outreduce2.js # mr temp tables aren't replicated
     - jstests/core/opcounters_active.js  # off by n problem with opcounters
     - jstests/core/opcounters_write_cmd.js # off by n problem with opcounters
+    - jstests/core/profile_agg.js # system.profile not replicated
+    - jstests/core/profile_count.js # system.profile not replicated
+    - jstests/core/profile_delete.js # system.profile not replicated
+    - jstests/core/profile_distinct.js # system.profile not replicated
+    - jstests/core/profile_find.js # system.profile not replicated
+    - jstests/core/profile_findandmodify.js # system.profile not replicated
+    - jstests/core/profile_geonear.js # system.profile not replicated
+    - jstests/core/profile_getmore.js # system.profile not replicated
+    - jstests/core/profile_group.js # system.profile not replicated
+    - jstests/core/profile_insert.js # system.profile not replicated
+    - jstests/core/profile_mapreduce.js # system.profile not replicated
+    - jstests/core/profile_update.js # system.profile not replicated
     - jstests/core/profile1.js # system.profile not replicated
     - jstests/core/profile2.js # system.profile not replicated
     - jstests/core/profile3.js # system.profile not replicated
-    - jstests/core/profile4.js # system.profile not replicated
-    - jstests/core/profile5.js # system.profile not replicated
     - jstests/core/read_after_optime.js # verifies read after optime fails on standalone
     - jstests/core/remove8.js # db.eval() used
     - jstests/core/rename4.js # db.eval() used

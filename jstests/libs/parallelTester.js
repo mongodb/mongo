@@ -126,8 +126,6 @@ if (typeof _threadInject != "undefined") {
             // tests turn on profiling
             "profile1.js",
             "profile3.js",
-            "profile4.js",
-            "profile5.js",
             "geo_s2cursorlimitskip.js",
 
             "mr_drop.js",

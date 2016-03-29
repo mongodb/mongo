@@ -8,7 +8,6 @@ selector:
     - jstests/core/finda.js # Reduction of objsLeftInBatch.
     - jstests/core/profile1.js # Extra operation for a getmore.
     - jstests/core/profile2.js # Extra operation for a getmore.
-    - jstests/core/profile4.js # Query now includes batchSize.
     - jstests/core/sortk.js # Negative limit value changes result to batchSize.
     - jstests/core/tailable_skip_limit.js # Negative limit value changes result to batchSize.
 
