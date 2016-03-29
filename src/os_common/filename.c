@@ -24,8 +24,6 @@ __wt_filename(WT_SESSION_IMPL *session, const char *name, char **path)
  *	Build a file name in a scratch buffer.  If the name is already an
  *	absolute path duplicate it, otherwise generate a path relative to the
  *	connection home directory.
-  *     Needs to work with a NULL session handle - since this is called via
-  *     the exists API which is used by the test utilities.
  */
 int
 __wt_nfilename(
@@ -36,6 +34,10 @@ __wt_nfilename(
 
 	*path = NULL;
 
+	/*
+	 * Needs to work with a NULL session handle - since this is called via
+	 * the exists API which is used by the test utilities.
+	 */
 	if (session == NULL || __wt_absolute_path(name))
 		WT_RET(__wt_strndup(session, name, namelen, path));
 	else {
