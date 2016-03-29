@@ -37,7 +37,10 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/client/remote_command_targeter.h"
 #include "mongo/s/client/multi_command_dispatch.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/util/log.h"
@@ -48,10 +51,8 @@ using std::make_pair;
 using std::stringstream;
 using std::vector;
 
-BatchWriteExec::BatchWriteExec(NSTargeter* targeter,
-                               ShardResolver* resolver,
-                               MultiCommandDispatch* dispatcher)
-    : _targeter(targeter), _resolver(resolver), _dispatcher(dispatcher) {}
+BatchWriteExec::BatchWriteExec(NSTargeter* targeter, MultiCommandDispatch* dispatcher)
+    : _targeter(targeter), _dispatcher(dispatcher) {}
 
 namespace {
 
@@ -169,22 +170,43 @@ void BatchWriteExec::executeBatch(OperationContext* txn,
                     continue;
 
                 // Figure out what host we need to dispatch our targeted batch
-                ConnectionString shardHost;
-                Status resolveStatus =
-                    _resolver->chooseWriteHost(txn, nextBatch->getEndpoint().shardName, &shardHost);
-                if (!resolveStatus.isOK()) {
-                    ++stats->numResolveErrors;
+                bool resolvedHost = true;
+                const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
+                auto shard =
+                    grid.shardRegistry()->getShard(txn, nextBatch->getEndpoint().shardName);
+
+                if (!shard) {
+                    Status status = Status(ErrorCodes::ShardNotFound,
+                                           str::stream() << "unknown shard name "
+                                                         << nextBatch->getEndpoint().shardName);
+                    resolvedHost = false;
 
                     // Record a resolve failure
                     // TODO: It may be necessary to refresh the cache if stale, or maybe just
                     // cancel and retarget the batch
                     WriteErrorDetail error;
-                    buildErrorFrom(resolveStatus, &error);
-
-                    LOG(4) << "unable to send write batch to " << shardHost.toString()
-                           << causedBy(resolveStatus.toString());
-
+                    buildErrorFrom(status, &error);
+                    LOG(4) << "unable to send write batch to " << nextBatch->getEndpoint().shardName
+                           << causedBy(status);
                     batchOp.noteBatchError(*nextBatch, error);
+                }
+
+                auto swHostAndPort = shard->getTargeter()->findHost(readPref);
+                if (!swHostAndPort.isOK()) {
+                    resolvedHost = false;
+
+                    // Record a resolve failure
+                    // TODO: It may be necessary to refresh the cache if stale, or maybe just
+                    // cancel and retarget the batch
+                    WriteErrorDetail error;
+                    buildErrorFrom(swHostAndPort.getStatus(), &error);
+                    LOG(4) << "unable to send write batch to " << nextBatch->getEndpoint().shardName
+                           << causedBy(swHostAndPort.getStatus());
+                    batchOp.noteBatchError(*nextBatch, error);
+                }
+
+                if (!resolvedHost) {
+                    ++stats->numResolveErrors;
 
                     // We're done with this batch
                     // Clean up when we can't resolve a host
@@ -193,6 +215,8 @@ void BatchWriteExec::executeBatch(OperationContext* txn,
                     --numToSend;
                     continue;
                 }
+
+                ConnectionString shardHost(swHostAndPort.getValue());
 
                 // If we already have a batch for this host, wait until the next time
                 OwnedHostBatchMap::MapType::iterator pendingIt = pendingBatches.find(shardHost);

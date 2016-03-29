@@ -44,7 +44,6 @@
 #include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/client/dbclient_multi_command.h"
 #include "mongo/s/config.h"
-#include "mongo/s/dbclient_shard_resolver.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/mongos_options.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
@@ -273,9 +272,8 @@ void ClusterWriter::write(OperationContext* txn,
                 return;
             }
 
-            DBClientShardResolver resolver;
             DBClientMultiCommand dispatcher;
-            BatchWriteExec exec(&targeter, &resolver, &dispatcher);
+            BatchWriteExec exec(&targeter, &dispatcher);
             exec.executeBatch(txn, *request, response, &_stats);
         }
 
