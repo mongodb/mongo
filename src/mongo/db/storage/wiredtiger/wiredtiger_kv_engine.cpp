@@ -171,7 +171,7 @@ TicketServerParameter openReadTransactionParam(&openReadTransaction,
 WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
                                        const std::string& path,
                                        const std::string& extraOpenOptions,
-                                       size_t cacheSizeGB,
+                                       size_t cacheSizeMB,
                                        bool durable,
                                        bool ephemeral,
                                        bool repair,
@@ -200,7 +200,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
 
     std::stringstream ss;
     ss << "create,";
-    ss << "cache_size=" << cacheSizeGB << "G,";
+    ss << "cache_size=" << cacheSizeMB << "M,";
     ss << "session_max=20000,";
     ss << "eviction=(threads_max=4),";
     ss << "config_base=false,";
