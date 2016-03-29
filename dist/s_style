@@ -84,7 +84,7 @@ else
 		cat $t
 	}
 
-	if ! expr "$f" : 'src/os_common/os_setvbuf.c' > /dev/null &&
+	if ! expr "$f" : 'src/.*/os_setvbuf.c' > /dev/null &&
 	    egrep -w 'setvbuf' $f > $t; then
 		echo "$f: setvbuf call, use WiredTiger library replacements"
 		cat $t

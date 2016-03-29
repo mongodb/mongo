@@ -110,7 +110,6 @@ src/os_common/os_fs_stdio.c
 src/os_common/os_getline.c
 src/os_common/os_getopt.c
 src/os_common/os_init.c
-src/os_common/os_setvbuf.c
 src/os_common/os_strtouq.c
 src/os_posix/os_dir.c
 src/os_posix/os_dlopen.c
@@ -124,6 +123,7 @@ src/os_posix/os_once.c
 src/os_posix/os_pagesize.c
 src/os_posix/os_path.c
 src/os_posix/os_priv.c
+src/os_posix/os_setvbuf.c
 src/os_posix/os_sleep.c
 src/os_posix/os_thread.c
 src/os_posix/os_time.c
