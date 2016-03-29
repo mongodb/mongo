@@ -678,7 +678,16 @@ private:
 
 class DocumentSourceMergeCursors : public DocumentSource {
 public:
-    typedef std::vector<std::pair<ConnectionString, CursorId>> CursorIds;
+    struct CursorDescriptor {
+        CursorDescriptor(ConnectionString connectionString, std::string ns, CursorId cursorId)
+            : connectionString(std::move(connectionString)),
+              ns(std::move(ns)),
+              cursorId(cursorId) {}
+
+        ConnectionString connectionString;
+        std::string ns;
+        CursorId cursorId;
+    };
 
     // virtuals from DocumentSource
     boost::optional<Document> getNext();
@@ -693,7 +702,8 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     static boost::intrusive_ptr<DocumentSource> create(
-        const CursorIds& cursorIds, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        std::vector<CursorDescriptor> cursorDescriptors,
+        const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     /** Returns non-owning pointers to cursors managed by this stage.
      *  Call this instead of getNext() if you want access to the raw streams.
@@ -709,7 +719,7 @@ public:
 
 private:
     struct CursorAndConnection {
-        CursorAndConnection(ConnectionString host, NamespaceString ns, CursorId id);
+        CursorAndConnection(const CursorDescriptor& cursorDescriptor);
         ScopedDbConnection connection;
         DBClientCursor cursor;
     };
@@ -717,14 +727,14 @@ private:
     // using list to enable removing arbitrary elements
     typedef std::list<std::shared_ptr<CursorAndConnection>> Cursors;
 
-    DocumentSourceMergeCursors(const CursorIds& cursorIds,
+    DocumentSourceMergeCursors(std::vector<CursorDescriptor> cursorDescriptors,
                                const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    // Converts _cursorIds into active _cursors.
+    // Converts _cursorDescriptors into active _cursors.
     void start();
 
     // This is the description of cursors to merge.
-    const CursorIds _cursorIds;
+    const std::vector<CursorDescriptor> _cursorDescriptors;
 
     // These are the actual cursors we are merging. Created lazily.
     Cursors _cursors;

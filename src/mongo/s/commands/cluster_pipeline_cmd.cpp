@@ -209,8 +209,8 @@ public:
             return reply["ok"].trueValue();
         }
 
-        DocumentSourceMergeCursors::CursorIds cursorIds = parseCursors(shardResults, fullns);
-        pipeline->addInitialSource(DocumentSourceMergeCursors::create(cursorIds, mergeCtx));
+        pipeline->addInitialSource(
+            DocumentSourceMergeCursors::create(parseCursors(shardResults), mergeCtx));
 
         MutableDocument mergeCmd(pipeline->serialize());
         mergeCmd["cursor"] = Value(cmdObj["cursor"]);
@@ -251,8 +251,8 @@ public:
     }
 
 private:
-    DocumentSourceMergeCursors::CursorIds parseCursors(
-        const vector<Strategy::CommandResult>& shardResults, const string& fullns);
+    std::vector<DocumentSourceMergeCursors::CursorDescriptor> parseCursors(
+        const vector<Strategy::CommandResult>& shardResults);
 
     void killAllCursors(const vector<Strategy::CommandResult>& shardResults);
     void uassertAllShardsSupportExplain(const vector<Strategy::CommandResult>& shardResults);
@@ -271,10 +271,10 @@ private:
                         int queryOptions);
 } clusterPipelineCmd;
 
-DocumentSourceMergeCursors::CursorIds PipelineCommand::parseCursors(
-    const vector<Strategy::CommandResult>& shardResults, const string& fullns) {
+std::vector<DocumentSourceMergeCursors::CursorDescriptor> PipelineCommand::parseCursors(
+    const vector<Strategy::CommandResult>& shardResults) {
     try {
-        DocumentSourceMergeCursors::CursorIds cursors;
+        std::vector<DocumentSourceMergeCursors::CursorDescriptor> cursors;
 
         for (size_t i = 0; i < shardResults.size(); i++) {
             BSONObj result = shardResults[i].result;
@@ -309,10 +309,11 @@ DocumentSourceMergeCursors::CursorIds PipelineCommand::parseCursors(
 
             massert(17025,
                     str::stream() << "shard " << shardResults[i].shardTargetId
-                                  << " returned different ns: " << cursor["ns"],
-                    cursor["ns"].String() == fullns);
+                                  << " returned invalid ns: " << cursor["ns"],
+                    NamespaceString(cursor["ns"].String()).isValid());
 
-            cursors.push_back(std::make_pair(shardResults[i].target, cursor["id"].Long()));
+            cursors.emplace_back(
+                shardResults[i].target, cursor["ns"].String(), cursor["id"].Long());
         }
 
         return cursors;

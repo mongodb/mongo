@@ -39,8 +39,9 @@ using std::string;
 using std::vector;
 
 DocumentSourceMergeCursors::DocumentSourceMergeCursors(
-    const CursorIds& cursorIds, const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx), _cursorIds(cursorIds), _unstarted(true) {}
+    std::vector<CursorDescriptor> cursorDescriptors,
+    const intrusive_ptr<ExpressionContext>& pExpCtx)
+    : DocumentSource(pExpCtx), _cursorDescriptors(std::move(cursorDescriptors)), _unstarted(true) {}
 
 REGISTER_DOCUMENT_SOURCE(mergeCursors, DocumentSourceMergeCursors::createFromBson);
 
@@ -49,8 +50,9 @@ const char* DocumentSourceMergeCursors::getSourceName() const {
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::create(
-    const CursorIds& cursorIds, const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    return new DocumentSourceMergeCursors(cursorIds, pExpCtx);
+    std::vector<CursorDescriptor> cursorDescriptors,
+    const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    return new DocumentSourceMergeCursors(std::move(cursorDescriptors), pExpCtx);
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(
@@ -59,33 +61,40 @@ intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(
             string("Expected an Array, but got a ") + typeName(elem.type()),
             elem.type() == Array);
 
-    CursorIds cursorIds;
+    std::vector<CursorDescriptor> cursorDescriptors;
     BSONObj array = elem.embeddedObject();
     BSONForEach(cursor, array) {
         massert(17027,
                 string("Expected an Object, but got a ") + typeName(cursor.type()),
                 cursor.type() == Object);
 
-        cursorIds.push_back(
-            make_pair(ConnectionString(HostAndPort(cursor["host"].String())), cursor["id"].Long()));
+        // The cursor descriptors for the merge cursors stage used to lack an "ns" field; "ns" was
+        // understood to be the expression context namespace in that case. For mixed-version
+        // compatibility, we accept both the old and new formats here.
+        std::string cursorNs = cursor["ns"] ? cursor["ns"].String() : pExpCtx->ns.ns();
+
+        cursorDescriptors.emplace_back(ConnectionString(HostAndPort(cursor["host"].String())),
+                                       std::move(cursorNs),
+                                       cursor["id"].Long());
     }
 
-    return new DocumentSourceMergeCursors(cursorIds, pExpCtx);
+    return new DocumentSourceMergeCursors(std::move(cursorDescriptors), pExpCtx);
 }
 
 Value DocumentSourceMergeCursors::serialize(bool explain) const {
     vector<Value> cursors;
-    for (size_t i = 0; i < _cursorIds.size(); i++) {
+    for (size_t i = 0; i < _cursorDescriptors.size(); i++) {
         cursors.push_back(Value(
-            DOC("host" << Value(_cursorIds[i].first.toString()) << "id" << _cursorIds[i].second)));
+            DOC("host" << Value(_cursorDescriptors[i].connectionString.toString()) << "ns"
+                       << _cursorDescriptors[i].ns << "id" << _cursorDescriptors[i].cursorId)));
     }
     return Value(DOC(getSourceName() << Value(cursors)));
 }
 
-DocumentSourceMergeCursors::CursorAndConnection::CursorAndConnection(ConnectionString host,
-                                                                     NamespaceString nss,
-                                                                     CursorId id)
-    : connection(host), cursor(connection.get(), nss.ns(), id, 0, 0) {}
+DocumentSourceMergeCursors::CursorAndConnection::CursorAndConnection(
+    const CursorDescriptor& cursorDescriptor)
+    : connection(cursorDescriptor.connectionString),
+      cursor(connection.get(), cursorDescriptor.ns, cursorDescriptor.cursorId, 0, 0) {}
 
 vector<DBClientCursor*> DocumentSourceMergeCursors::getCursors() {
     verify(_unstarted);
@@ -102,18 +111,17 @@ void DocumentSourceMergeCursors::start() {
     _unstarted = false;
 
     // open each cursor and send message asking for a batch
-    for (CursorIds::const_iterator it = _cursorIds.begin(); it != _cursorIds.end(); ++it) {
-        _cursors.push_back(
-            std::make_shared<CursorAndConnection>(it->first, pExpCtx->ns, it->second));
+    for (auto&& cursorDescriptor : _cursorDescriptors) {
+        _cursors.push_back(std::make_shared<CursorAndConnection>(cursorDescriptor));
         verify(_cursors.back()->connection->lazySupported());
         _cursors.back()->cursor.initLazy();  // shouldn't block
     }
 
     // wait for all cursors to return a batch
     // TODO need a way to keep cursors alive if some take longer than 10 minutes.
-    for (Cursors::const_iterator it = _cursors.begin(); it != _cursors.end(); ++it) {
+    for (auto&& cursor : _cursors) {
         bool retry = false;
-        bool ok = (*it)->cursor.initLazyFinish(retry);  // blocks here for first batch
+        bool ok = cursor->cursor.initLazyFinish(retry);  // blocks here for first batch
 
         uassert(
             17028, "error reading response from " + _cursors.back()->connection->toString(), ok);
