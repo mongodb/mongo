@@ -1233,7 +1233,7 @@ monitor(void *arg)
 		goto err;
 	}
 	/* Set line buffering for monitor file. */
-	(void)setvbuf(fp, NULL, _IOLBF, 0);
+	(void)setvbuf(fp, NULL, _IOLBF, 1024);
 	fprintf(fp,
 	    "#time,"
 	    "totalsec,"
@@ -2313,7 +2313,7 @@ main(int argc, char *argv[])
 	    cfg->table_name);
 
 	/* Make stdout line buffered, so verbose output appears quickly. */
-	(void)setvbuf(stdout, NULL, _IOLBF, 32);
+	(void)setvbuf(stdout, NULL, _IOLBF, 1024);
 
 	/* Concatenate non-default configuration strings. */
 	if (cfg->verbose > 1 || user_cconfig != NULL ||
