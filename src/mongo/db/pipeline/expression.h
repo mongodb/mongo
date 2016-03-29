@@ -1303,6 +1303,33 @@ public:
 };
 
 
+class ExpressionIsoWeekYear final : public ExpressionFixedArity<ExpressionIsoWeekYear, 1> {
+public:
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
+
+    static int extract(const tm& tm);
+};
+
+
+class ExpressionIsoDayOfWeek final : public ExpressionFixedArity<ExpressionIsoDayOfWeek, 1> {
+public:
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
+
+    static int extract(const tm& tm);
+};
+
+
+class ExpressionIsoWeek final : public ExpressionFixedArity<ExpressionIsoWeek, 1> {
+public:
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
+
+    static int extract(const tm& tm);
+};
+
+
 class ExpressionYear final : public ExpressionFixedArity<ExpressionYear, 1> {
 public:
     Value evaluateInternal(Variables* vars) const final;
