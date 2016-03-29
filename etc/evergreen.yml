@@ -4509,7 +4509,7 @@ buildvariants:
     tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2)" -tags 'sasl ssl'
     compile_flags: --ssl MONGO_DISTMOD=rhel72 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" CXX=/opt/mongodbtoolchain/v1/bin/g++ CC=/opt/mongodbtoolchain/v1/bin/gcc
     num_jobs_available: 2
-    test_flags: --continueOnFailure
+    test_flags: --continueOnFailure --excludeWithAnyTags=requires_mmapv1
     # has_packages: true
     packager_script: packager-enterprise.py
     packager_arch: s390x

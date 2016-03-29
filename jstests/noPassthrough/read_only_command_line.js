@@ -1,5 +1,8 @@
 // Test that setting readOnly mode on the command line causes readOnly to be properly set in both
 // isMaster and serverStatus output.
+//
+// This test requires mmapv1.
+// @tags: [requires_mmapv1]
 (function() {
     "use strict";
 

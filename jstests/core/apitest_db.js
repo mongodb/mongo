@@ -1,5 +1,8 @@
 /**
  *   Tests for the db object enhancement
+ *
+ *    This test requires mmapv1.
+ *    @tags: [requires_mmapv1]
  */
 
 assert("test" == db, "wrong database currently not test");
