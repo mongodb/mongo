@@ -93,7 +93,7 @@ void Command::execCommand(OperationContext* txn,
 
 void Command::execCommandClientBasic(OperationContext* txn,
                                      Command* c,
-                                     ClientBasic& client,
+                                     Client& client,
                                      int queryOptions,
                                      const char* ns,
                                      BSONObj& cmdObj,
@@ -102,7 +102,7 @@ void Command::execCommandClientBasic(OperationContext* txn,
 
     if (cmdObj.getBoolField("help")) {
         stringstream help;
-        help << "help for: " << c->name << " ";
+        help << "help for: " << c->getName() << " ";
         c->help(help);
         result.append("help", help.str());
         appendCommandStatus(result, true, "");

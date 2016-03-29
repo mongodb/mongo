@@ -236,7 +236,7 @@ public:
         return appendCommandStatus(
             result,
             Status(ErrorCodes::IllegalOperation,
-                   str::stream() << "can't do command: " << name << " on sharded collection"));
+                   str::stream() << "can't do command: " << getName() << " on sharded collection"));
     }
 };
 

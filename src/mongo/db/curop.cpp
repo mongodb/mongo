@@ -467,6 +467,7 @@ StringData getProtoString(int op) {
 #define OPDEBUG_TOSTRING_HELP_BOOL(x) \
     if (x)                            \
     s << " " #x ":" << (x)
+
 string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockStats) const {
     StringBuilder s;
     if (iscommand)
@@ -484,7 +485,7 @@ string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockSt
             if (curCommand) {
                 mutablebson::Document cmdToLog(query, mutablebson::Document::kInPlaceDisabled);
                 curCommand->redactForLogging(&cmdToLog);
-                s << curCommand->name << " ";
+                s << curCommand->getName() << " ";
                 s << cmdToLog.toString();
             } else {  // Should not happen but we need to handle curCommand == NULL gracefully
                 s << query.toString();

@@ -68,9 +68,11 @@ static ServerStatusMetricField<Counter64> displayUnknownCommands("commands.<UNKN
                                                                  &Command::unknownCommands);
 
 namespace {
+
 ExportedServerParameter<bool, ServerParameterType::kStartupOnly> testCommandsParameter(
     ServerParameterSet::getGlobal(), "enableTestCommands", &Command::testCommandsEnabled);
-}
+
+}  // namespace
 
 Command::~Command() = default;
 
@@ -130,10 +132,10 @@ void Command::htmlHelp(stringstream& ss) const {
         helpStr = h.str();
     }
     ss << "\n<tr><td>";
-    bool web = _webCommands->find(name) != _webCommands->end();
+    bool web = _webCommands->find(getName()) != _webCommands->end();
     if (web)
-        ss << "<a href=\"/" << name << "?text=1\">";
-    ss << name;
+        ss << "<a href=\"/" << getName() << "?text=1\">";
+    ss << getName();
     if (web)
         ss << "</a>";
     ss << "</td>\n";
@@ -190,10 +192,10 @@ void Command::htmlHelp(stringstream& ss) const {
     ss << "</tr>\n";
 }
 
-Command::Command(StringData _name, bool web, StringData oldName)
-    : name(_name.toString()),
-      _commandsExecutedMetric("commands." + _name.toString() + ".total", &_commandsExecuted),
-      _commandsFailedMetric("commands." + _name.toString() + ".failed", &_commandsFailed) {
+Command::Command(StringData name, bool web, StringData oldName)
+    : _name(name.toString()),
+      _commandsExecutedMetric("commands." + _name + ".total", &_commandsExecuted),
+      _commandsFailedMetric("commands." + _name + ".failed", &_commandsFailed) {
     // register ourself.
     if (_commands == 0)
         _commands = new CommandMap();
@@ -217,6 +219,15 @@ Command::Command(StringData _name, bool web, StringData oldName)
 
 void Command::help(stringstream& help) const {
     help << "no help defined";
+}
+
+Status Command::explain(OperationContext* txn,
+                        const string& dbname,
+                        const BSONObj& cmdObj,
+                        ExplainCommon::Verbosity verbosity,
+                        const rpc::ServerSelectionMetadata& serverSelectionMetadata,
+                        BSONObjBuilder* out) const {
+    return {ErrorCodes::IllegalOperation, str::stream() << "Cannot explain cmd: " << getName()};
 }
 
 Command* Command::findCommand(StringData name) {
@@ -327,7 +338,8 @@ static Status _checkAuthorizationImpl(Command* c,
     namespace mmb = mutablebson;
     if (c->adminOnly() && dbname != "admin") {
         return Status(ErrorCodes::Unauthorized,
-                      str::stream() << c->name << " may only be run against the admin database.");
+                      str::stream() << c->getName()
+                                    << " may only be run against the admin database.");
     }
     if (AuthorizationSession::get(client)->getAuthorizationManager().isAuthEnabled()) {
         Status status = c->checkAuthForCommand(client, dbname, cmdObj);
@@ -344,14 +356,14 @@ static Status _checkAuthorizationImpl(Command* c,
     } else if (c->adminOnly() && c->localHostOnlyIfNoAuth(cmdObj) &&
                !client->getIsLocalHostConnection()) {
         return Status(ErrorCodes::Unauthorized,
-                      str::stream() << c->name
+                      str::stream() << c->getName()
                                     << " must run from localhost when running db without auth");
     }
     return Status::OK();
 }
 
 Status Command::_checkAuthorization(Command* c,
-                                    ClientBasic* client,
+                                    Client* client,
                                     const std::string& dbname,
                                     const BSONObj& cmdObj) {
     namespace mmb = mutablebson;
@@ -375,7 +387,7 @@ void Command::generateHelpResponse(OperationContext* txn,
                                    const Command& command) {
     std::stringstream ss;
     BSONObjBuilder helpBuilder;
-    ss << "help for: " << command.name << " ";
+    ss << "help for: " << command.getName() << " ";
     command.help(ss);
     helpBuilder.append("help", ss.str());
 

@@ -1380,7 +1380,7 @@ bool Command::run(OperationContext* txn,
                 auto result = appendCommandStatus(
                     inPlaceReplyBob,
                     {ErrorCodes::InvalidOptions,
-                     str::stream() << "Command " << name << " does not support "
+                     str::stream() << "Command " << getName() << " does not support "
                                    << repl::ReadConcernArgs::kReadConcernFieldName});
                 inPlaceReplyBob.doneFast();
                 replyBuilder->setMetadata(rpc::makeEmptyMetadata());
@@ -1458,7 +1458,6 @@ bool Command::run(OperationContext* txn,
 
     // run expects const db std::string (can't bind to temporary)
     const std::string db = request.getDatabase().toString();
-
 
     // TODO: remove queryOptions parameter from command's run method.
     bool result = this->run(txn, db, cmd, 0, errmsg, inPlaceReplyBob);
