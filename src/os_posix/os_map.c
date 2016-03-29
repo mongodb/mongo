@@ -37,7 +37,7 @@ __wt_posix_map(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp)
 	WT_RET(__wt_filesize(session, fh, &file_size));
 	len = (size_t)file_size;
 
-	(void)__wt_verbose(session, WT_VERB_FILEOPS,
+	(void)__wt_verbose(session, WT_VERB_HANDLEOPS,
 	    "%s: memory-map: %" WT_SIZET_FMT " bytes", fh->name, len);
 
 	if ((map = mmap(NULL, len,
@@ -177,7 +177,7 @@ __wt_posix_map_unmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, size_t len)
 {
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
 
-	(void)__wt_verbose(session, WT_VERB_FILEOPS,
+	(void)__wt_verbose(session, WT_VERB_HANDLEOPS,
 	    "%s: memory-unmap: %" WT_SIZET_FMT " bytes", fh->name, len);
 
 	if (munmap(map, len) == 0)
