@@ -45,6 +45,7 @@
 #include "mongo/dbtests/framework_options.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/grid.h"
+#include "mongo/scripting/engine.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit.h"
@@ -59,6 +60,20 @@ int runDbTests(int argc, char** argv) {
     frameworkGlobalParams.perfHist = 1;
     frameworkGlobalParams.seed = time(0);
     frameworkGlobalParams.runsPerTest = 1;
+
+    registerShutdownTask([] {
+        // We drop the scope cache because leak sanitizer can't see across the
+        // thread we use for proxying MozJS requests. Dropping the cache cleans up
+        // the memory and makes leak sanitizer happy.
+        ScriptEngine::dropScopeCache();
+
+        // We may be shut down before we have a global storage
+        // engine.
+        if (!getGlobalServiceContext()->getGlobalStorageEngine())
+            return;
+
+        getGlobalServiceContext()->shutdownGlobalStorageEngineCleanly();
+    });
 
     Client::initThread("testsuite");
 
