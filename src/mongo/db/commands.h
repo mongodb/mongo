@@ -260,14 +260,6 @@ protected:
         fassertFailed(16940);
     }
 
-    BSONObj getQuery(const BSONObj& cmdObj) {
-        if (cmdObj["query"].type() == Object)
-            return cmdObj["query"].embeddedObject();
-        if (cmdObj["q"].type() == Object)
-            return cmdObj["q"].embeddedObject();
-        return BSONObj();
-    }
-
     static void logIfSlow(const Timer& cmdTimer, const std::string& msg);
 
     static CommandMap* _commands;
@@ -330,11 +322,6 @@ public:
 
     // @return s.isOK()
     static bool appendCommandStatus(BSONObjBuilder& result, const Status& status);
-
-    // Converts "result" into a Status object.  The input is expected to be the object returned
-    // by running a command.  Returns ErrorCodes::CommandResultSchemaViolation if "result" does
-    // not look like the result of a command.
-    static Status getStatusFromCommandResult(const BSONObj& result);
 
     /**
      * Parses cursor options from the command request object "cmdObj".  Used by commands that

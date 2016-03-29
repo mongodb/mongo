@@ -1,8 +1,5 @@
-/* commands.cpp
-   db "commands" (sent via db.$cmd.findOne(...))
- */
-
-/*    Copyright 2009 10gen Inc.
+/**
+ *    Copyright (C) 2009-2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -50,7 +47,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/write_ops/wc_error_detail.h"
@@ -60,7 +56,6 @@ namespace mongo {
 
 using std::string;
 using std::stringstream;
-using std::endl;
 
 using logger::LogComponent;
 
@@ -111,7 +106,7 @@ string Command::parseNsCollectionRequired(const string& dbname, const BSONObj& c
 #if defined(CLC)
     DEV if (mongoutils::str::startsWith(coll, dbname + '.')) {
         log() << "DEBUG parseNs Command's collection name looks like it includes the db name\n"
-              << dbname << '\n' << coll << '\n' << cmdObj.toString() << endl;
+              << dbname << '\n' << coll << '\n' << cmdObj.toString();
         dassert(false);
     }
 #endif
@@ -206,7 +201,7 @@ Command::Command(StringData _name, bool web, StringData oldName)
         _commandsByBestName = new CommandMap();
     Command*& c = (*_commands)[name];
     if (c)
-        log() << "warning: 2 commands with name: " << _name << endl;
+        log() << "warning: 2 commands with name: " << _name;
     c = this;
     (*_commandsByBestName)[name] = this;
 
@@ -260,10 +255,6 @@ void Command::appendCommandWCStatus(BSONObjBuilder& result, const Status& status
         wcError.setErrMessage(status.reason());
         result.append("writeConcernError", wcError.toBSON());
     }
-}
-
-Status Command::getStatusFromCommandResult(const BSONObj& result) {
-    return mongo::getStatusFromCommandResult(result);
 }
 
 Status Command::parseCommandCursorOptions(const BSONObj& cmdObj,
@@ -332,7 +323,7 @@ BSONObj Command::getRedactedCopyForLogging(const BSONObj& cmdObj) {
 void Command::logIfSlow(const Timer& timer, const string& msg) {
     int ms = timer.millis();
     if (ms > serverGlobalParams.slowMS) {
-        log() << msg << " took " << ms << " ms." << endl;
+        log() << msg << " took " << ms << " ms.";
     }
 }
 

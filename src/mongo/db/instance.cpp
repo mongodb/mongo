@@ -91,6 +91,7 @@
 #include "mongo/platform/process_id.h"
 #include "mongo/rpc/command_reply_builder.h"
 #include "mongo/rpc/command_request.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/legacy_reply.h"
 #include "mongo/rpc/legacy_reply_builder.h"
 #include "mongo/rpc/legacy_request.h"
@@ -1142,7 +1143,7 @@ static void insertSystemIndexes(OperationContext* txn, DbMessage& d, CurOp& curO
             Command::execCommand(txn, createIndexesCmd, cmdRequest, &cmdReplyBuilder);
             auto cmdReplyMsg = cmdReplyBuilder.done();
             rpc::LegacyReply cmdReply{&cmdReplyMsg};
-            uassertStatusOK(Command::getStatusFromCommandResult(cmdReply.getCommandReply()));
+            uassertStatusOK(getStatusFromCommandResult(cmdReply.getCommandReply()));
         } catch (const DBException& ex) {
             LastError::get(txn->getClient()).setLastError(ex.getCode(), ex.getInfo().msg);
             curOp.debug().exceptionInfo = ex.getInfo();

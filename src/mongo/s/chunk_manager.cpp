@@ -37,20 +37,20 @@
 #include <set>
 
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_diff.h"
-#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
@@ -367,7 +367,7 @@ void ChunkManager::calcInitSplitsAndShards(OperationContext* txn,
 
         long long numObjects = 0;
         uassertStatusOK(result.getStatus());
-        uassertStatusOK(Command::getStatusFromCommandResult(result.getValue()));
+        uassertStatusOK(getStatusFromCommandResult(result.getValue()));
         uassertStatusOK(bsonExtractIntegerField(result.getValue(), "n", &numObjects));
 
         if (numObjects > 0)

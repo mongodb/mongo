@@ -43,6 +43,7 @@
 #include "mongo/db/commands/rename_collection.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/chunk_manager.h"
@@ -99,7 +100,7 @@ bool cursorCommandPassthrough(OperationContext* txn,
     }
     BSONObj response = cursor->nextSafe().getOwned();
     conn.done();
-    Status status = Command::getStatusFromCommandResult(response);
+    Status status = getStatusFromCommandResult(response);
     if (ErrorCodes::SendStaleConfig == status || ErrorCodes::RecvStaleConfig == status) {
         throw RecvStaleConfigException("command failed because of stale config", response);
     }
@@ -118,6 +119,14 @@ bool cursorCommandPassthrough(OperationContext* txn,
     out->appendElements(transformedResponse.getValue());
 
     return true;
+}
+
+BSONObj getQuery(const BSONObj& cmdObj) {
+    if (cmdObj["query"].type() == Object)
+        return cmdObj["query"].embeddedObject();
+    if (cmdObj["q"].type() == Object)
+        return cmdObj["q"].embeddedObject();
+    return BSONObj();
 }
 
 class PublicGridCommand : public Command {

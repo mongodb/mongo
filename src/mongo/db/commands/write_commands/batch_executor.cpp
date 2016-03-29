@@ -72,6 +72,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/write_ops/batched_upsert_detail.h"
@@ -1020,7 +1021,7 @@ static void singleCreateIndex(OperationContext* txn,
         createIndexesCmd->run(txn, ns.db().toString(), cmd, 0, errmsg, resultBuilder);
     Command::appendCommandStatus(resultBuilder, success, errmsg);
     BSONObj cmdResult = resultBuilder.done();
-    uassertStatusOK(Command::getStatusFromCommandResult(cmdResult));
+    uassertStatusOK(getStatusFromCommandResult(cmdResult));
     result->getStats().n =
         cmdResult["numIndexesAfter"].numberInt() - cmdResult["numIndexesBefore"].numberInt();
 }

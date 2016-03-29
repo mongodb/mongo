@@ -321,7 +321,7 @@ void Chunk::pickSplitVector(OperationContext* txn,
         cmdObj);
 
     uassertStatusOK(result.getStatus());
-    uassertStatusOK(Command::getStatusFromCommandResult(result.getValue()));
+    uassertStatusOK(getStatusFromCommandResult(result.getValue()));
 
     BSONObjIterator it(result.getValue().getObjectField("splitKeys"));
     while (it.more()) {

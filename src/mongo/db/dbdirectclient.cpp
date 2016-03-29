@@ -28,6 +28,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/dbdirectclient.h"
 
 #include "mongo/db/client.h"
@@ -36,12 +38,12 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
 using std::unique_ptr;
-using std::endl;
 using std::string;
 
 // Called from scripting/engine.cpp and scripting/v8_db.cpp.
@@ -174,7 +176,7 @@ unsigned long long DBDirectClient::count(
     bool runRetval = countCmd->run(_txn, dbname, cmdObj, options, errmsg, result);
     if (!runRetval) {
         Command::appendCommandStatus(result, runRetval, errmsg);
-        Status commandStatus = Command::getStatusFromCommandResult(result.obj());
+        Status commandStatus = getStatusFromCommandResult(result.obj());
         invariant(!commandStatus.isOK());
         uassertStatusOK(commandStatus);
     }

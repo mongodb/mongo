@@ -38,6 +38,7 @@
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
@@ -636,7 +637,7 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementReadCommandUnsatisfiedReadPre
         operationContext(), "test", BSON("usersInfo" << 1), &responseBuilder);
     ASSERT_FALSE(ok);
 
-    Status commandStatus = Command::getStatusFromCommandResult(responseBuilder.obj());
+    Status commandStatus = getStatusFromCommandResult(responseBuilder.obj());
     ASSERT_EQUALS(ErrorCodes::FailedToSatisfyReadPreference, commandStatus);
 }
 
@@ -653,7 +654,7 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandSuccess) {
                                                                   &responseBuilder);
         ASSERT_FALSE(ok);
 
-        Status commandStatus = Command::getStatusFromCommandResult(responseBuilder.obj());
+        Status commandStatus = getStatusFromCommandResult(responseBuilder.obj());
         ASSERT_EQUALS(ErrorCodes::UserNotFound, commandStatus);
     });
 
@@ -693,7 +694,7 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandInvalidWriteConce
                                                         &responseBuilder);
     ASSERT_FALSE(ok);
 
-    Status commandStatus = Command::getStatusFromCommandResult(responseBuilder.obj());
+    Status commandStatus = getStatusFromCommandResult(responseBuilder.obj());
     ASSERT_EQUALS(ErrorCodes::InvalidOptions, commandStatus);
     ASSERT_STRING_CONTAINS(commandStatus.reason(), "Invalid replication write concern");
 }
@@ -726,7 +727,7 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandRewriteWriteConce
                     &responseBuilder);
             ASSERT_FALSE(ok);
 
-            Status commandStatus = Command::getStatusFromCommandResult(responseBuilder.obj());
+            Status commandStatus = getStatusFromCommandResult(responseBuilder.obj());
             ASSERT_EQUALS(ErrorCodes::UserNotFound, commandStatus);
         });
 
@@ -764,7 +765,7 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandNotMaster) {
                                                                   &responseBuilder);
         ASSERT_FALSE(ok);
 
-        Status commandStatus = Command::getStatusFromCommandResult(responseBuilder.obj());
+        Status commandStatus = getStatusFromCommandResult(responseBuilder.obj());
         ASSERT_EQUALS(ErrorCodes::NotMaster, commandStatus);
     });
 
@@ -797,7 +798,7 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandNotMasterRetrySuc
                                                                   &responseBuilder);
         ASSERT_TRUE(ok);
 
-        Status commandStatus = Command::getStatusFromCommandResult(responseBuilder.obj());
+        Status commandStatus = getStatusFromCommandResult(responseBuilder.obj());
         ASSERT_OK(commandStatus);
     });
 
@@ -2556,7 +2557,7 @@ TEST_F(CatalogManagerReplSetTest, RetryOnReadCommandNetworkErrorFailsAtMaxRetry)
         auto ok = getCatalogManagerReplicaSet()->runReadCommandForTest(
             operationContext(), "test", BSON("dummy" << 1), &responseBuilder);
         ASSERT_FALSE(ok);
-        auto status = Command::getStatusFromCommandResult(responseBuilder.obj());
+        auto status = getStatusFromCommandResult(responseBuilder.obj());
         ASSERT_EQ(ErrorCodes::HostUnreachable, status.code());
     });
 
