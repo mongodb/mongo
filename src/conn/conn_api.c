@@ -2089,6 +2089,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * The error message configuration might have changed (if set in a
 	 * configuration file, and not in the application's configuration
 	 * string), get it again. Do it first, make error messages correct.
+	 * Ditto verbose configuration so we dump everything the application
+	 * wants to see.
 	 */
 	WT_ERR(__wt_config_gets(session, cfg, "error_prefix", &cval));
 	if (cval.len != 0) {
@@ -2096,6 +2098,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		WT_ERR(__wt_strndup(
 		    session, cval.str, cval.len, &conn->error_prefix));
 	}
+	WT_ERR(__wt_verbose_config(session, cfg));
 
 	WT_ERR(__wt_config_gets(session, cfg, "hazard_max", &cval));
 	conn->hazard_max = (uint32_t)cval.val;
@@ -2168,7 +2171,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__conn_statistics_config(session, cfg));
 	WT_ERR(__wt_lsm_manager_config(session, cfg));
 	WT_ERR(__wt_sweep_config(session, cfg));
-	WT_ERR(__wt_verbose_config(session, cfg));
 
 	/* Initialize the OS page size for mmap */
 	conn->page_size = __wt_get_vm_pagesize();
