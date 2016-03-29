@@ -60,7 +60,6 @@ using std::stringstream;
 using logger::LogComponent;
 
 Command::CommandMap* Command::_commandsByBestName;
-Command::CommandMap* Command::_webCommands;
 Command::CommandMap* Command::_commands;
 
 Counter64 Command::unknownCommands;
@@ -124,76 +123,9 @@ ResourcePattern Command::parseResourcePattern(const std::string& dbname,
     return ResourcePattern::forExactNamespace(NamespaceString(ns));
 }
 
-void Command::htmlHelp(stringstream& ss) const {
-    string helpStr;
-    {
-        stringstream h;
-        help(h);
-        helpStr = h.str();
-    }
-    ss << "\n<tr><td>";
-    bool web = _webCommands->find(getName()) != _webCommands->end();
-    if (web)
-        ss << "<a href=\"/" << getName() << "?text=1\">";
-    ss << getName();
-    if (web)
-        ss << "</a>";
-    ss << "</td>\n";
-    ss << "<td>";
-    ss << "UNUSED ";
-    if (slaveOk())
-        ss << "S ";
-    if (adminOnly())
-        ss << "A";
-    ss << "</td>";
-    ss << "<td>";
-    if (helpStr != "no help defined") {
-        const char* p = helpStr.c_str();
-        while (*p) {
-            if (*p == '<') {
-                ss << "&lt;";
-                p++;
-                continue;
-            } else if (*p == '{')
-                ss << "<code>";
-            else if (*p == '}') {
-                ss << "}</code>";
-                p++;
-                continue;
-            }
-            if (strncmp(p, "http:", 5) == 0) {
-                ss << "<a href=\"";
-                const char* q = p;
-                while (*q && *q != ' ' && *q != '\n')
-                    ss << *q++;
-                ss << "\">";
-                q = p;
-                if (str::startsWith(q, "http://www.mongodb.org/display/"))
-                    q += 31;
-                while (*q && *q != ' ' && *q != '\n') {
-                    ss << (*q == '+' ? ' ' : *q);
-                    q++;
-                    if (*q == '#')
-                        while (*q && *q != ' ' && *q != '\n')
-                            q++;
-                }
-                ss << "</a>";
-                p = q;
-                continue;
-            }
-            if (*p == '\n')
-                ss << "<br>";
-            else
-                ss << *p;
-            p++;
-        }
-    }
-    ss << "</td>";
-    ss << "</tr>\n";
-}
-
-Command::Command(StringData name, bool web, StringData oldName)
+Command::Command(StringData name, bool webUI, StringData oldName)
     : _name(name.toString()),
+      _webUI(webUI),
       _commandsExecutedMetric("commands." + _name + ".total", &_commandsExecuted),
       _commandsFailedMetric("commands." + _name + ".failed", &_commandsFailed) {
     // register ourself.
@@ -206,12 +138,6 @@ Command::Command(StringData name, bool web, StringData oldName)
         log() << "warning: 2 commands with name: " << _name;
     c = this;
     (*_commandsByBestName)[name] = this;
-
-    if (web) {
-        if (_webCommands == 0)
-            _webCommands = new CommandMap();
-        (*_webCommands)[name] = this;
-    }
 
     if (!oldName.empty())
         (*_commands)[oldName.toString()] = this;

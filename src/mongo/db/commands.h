@@ -96,6 +96,13 @@ public:
         return _name;
     }
 
+    /**
+     * Returns whether this command is visible in the Web UI.
+     */
+    bool isWebUI() const {
+        return _webUI;
+    }
+
     // Return the namespace for the command. If the first field in 'cmdObj' is of type
     // mongo::String, then that field is interpreted as the collection name, and is
     // appended to 'dbname' after a '.' character. If the first field is not of type
@@ -138,8 +145,6 @@ public:
     virtual bool adminOnly() const {
         return false;
     }
-
-    void htmlHelp(std::stringstream&) const;
 
     /* Like adminOnly, but even stricter: we must either be authenticated for admin db,
        or, if running without auth, on the local interface.  Used for things which
@@ -266,7 +271,6 @@ protected:
 
     static CommandMap* _commands;
     static CommandMap* _commandsByBestName;
-    static CommandMap* _webCommands;
 
     // Counters for how many times this command has been executed and failed
     Counter64 _commandsExecuted;
@@ -275,10 +279,6 @@ protected:
 public:
     static const CommandMap* commandsByBestName() {
         return _commandsByBestName;
-    }
-
-    static const CommandMap* webCommands() {
-        return _webCommands;
     }
 
     // Counter for unknown commands
@@ -443,6 +443,9 @@ private:
 
     // The full name of the command
     const std::string _name;
+
+    // Whether the command is available in the web UI
+    const bool _webUI;
 
     // Pointers to hold the metrics tree references
     ServerStatusMetricField<Counter64> _commandsExecutedMetric;
