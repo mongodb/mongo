@@ -119,14 +119,13 @@ __open_verbose(WT_SESSION_IMPL *session,
 		break;
 	}
 
-	sep = "";
 	WT_RET(__wt_scr_alloc(session, 0, &tmp));
-
+	sep = " (";
 #define	WT_OPEN_VERBOSE_FLAG(f, name)					\
 	if (LF_ISSET(f)) {						\
 		WT_ERR(__wt_buf_catfmt(					\
 		    session, tmp, "%s%s", sep, name));			\
-		sep = ",";						\
+		sep = ", ";						\
 	}
 
 	WT_OPEN_VERBOSE_FLAG(WT_OPEN_CREATE, "create");
@@ -137,9 +136,12 @@ __open_verbose(WT_SESSION_IMPL *session,
 	WT_OPEN_VERBOSE_FLAG(WT_STREAM_READ, "stream-read");
 	WT_OPEN_VERBOSE_FLAG(WT_STREAM_WRITE, "stream-write");
 
+	if (tmp->size != 0)
+		WT_ERR(__wt_buf_catfmt(session, tmp, ")"));
+
 	ret = __wt_verbose(session, WT_VERB_FILEOPS,
-	    "%s: handle-open: type %s, flags %s",
-	    name, file_type_tag, (char *)tmp->data);
+	    "%s: handle-open: type %s%s",
+	    name, file_type_tag, tmp->size == 0 ? "" : (char *)tmp->data);
 
 err:	__wt_scr_free(session, &tmp);
 	return (ret);
