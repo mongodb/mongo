@@ -1233,7 +1233,7 @@ monitor(void *arg)
 		goto err;
 	}
 	/* Set line buffering for monitor file. */
-	(void)setvbuf(fp, NULL, _IOLBF, 0);
+	(void)setvbuf(fp, NULL, _IOLBF, 1024);
 	fprintf(fp,
 	    "#time,"
 	    "totalsec,"
