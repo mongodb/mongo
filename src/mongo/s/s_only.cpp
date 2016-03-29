@@ -145,31 +145,6 @@ void Command::execCommandClientBasic(OperationContext* txn,
     appendCommandStatus(result, ok, errmsg);
 }
 
-void Command::runAgainstRegistered(OperationContext* txn,
-                                   const char* ns,
-                                   BSONObj& jsobj,
-                                   BSONObjBuilder& anObjBuilder,
-                                   int queryOptions) {
-    // It should be impossible for this uassert to fail since there should be no way to get
-    // into this function with any other collection name.
-    uassert(16618,
-            "Illegal attempt to run a command against a namespace other than $cmd.",
-            nsToCollectionSubstring(ns) == "$cmd");
-
-    BSONElement e = jsobj.firstElement();
-    std::string commandName = e.fieldName();
-    Command* c = e.type() ? Command::findCommand(commandName) : NULL;
-    if (!c) {
-        Command::appendCommandStatus(
-            anObjBuilder, false, str::stream() << "no such cmd: " << commandName);
-        anObjBuilder.append("code", ErrorCodes::CommandNotFound);
-        Command::unknownCommands.increment();
-        return;
-    }
-
-    execCommandClientBasic(txn, c, cc(), queryOptions, ns, jsobj, anObjBuilder);
-}
-
 void Command::registerError(OperationContext* txn, const DBException& exception) {}
 
 }  // namespace mongo

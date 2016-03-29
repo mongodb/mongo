@@ -81,6 +81,35 @@ using std::string;
 using std::stringstream;
 using std::vector;
 
+namespace {
+
+void runAgainstRegistered(OperationContext* txn,
+                          const char* ns,
+                          BSONObj& jsobj,
+                          BSONObjBuilder& anObjBuilder,
+                          int queryOptions) {
+    // It should be impossible for this uassert to fail since there should be no way to get
+    // into this function with any other collection name.
+    uassert(16618,
+            "Illegal attempt to run a command against a namespace other than $cmd.",
+            nsToCollectionSubstring(ns) == "$cmd");
+
+    BSONElement e = jsobj.firstElement();
+    std::string commandName = e.fieldName();
+    Command* c = e.type() ? Command::findCommand(commandName) : NULL;
+    if (!c) {
+        Command::appendCommandStatus(
+            anObjBuilder, false, str::stream() << "no such cmd: " << commandName);
+        anObjBuilder.append("code", ErrorCodes::CommandNotFound);
+        Command::unknownCommands.increment();
+        return;
+    }
+
+    Command::execCommandClientBasic(txn, c, cc(), queryOptions, ns, jsobj, anObjBuilder);
+}
+
+}  // namespace
+
 void Strategy::queryOp(OperationContext* txn, Request& request) {
     verify(!NamespaceString(request.getns()).isCommand());
 
@@ -233,7 +262,7 @@ void Strategy::clientCommandOp(OperationContext* txn, Request& request) {
             OpQueryReplyBuilder reply;
             {
                 BSONObjBuilder builder(reply.bufBuilderForResults());
-                Command::runAgainstRegistered(txn, q.ns, cmdObj, builder, q.queryOptions);
+                runAgainstRegistered(txn, q.ns, cmdObj, builder, q.queryOptions);
             }
             reply.sendCommandReply(request.p(), request.m());
             return;
@@ -280,8 +309,7 @@ bool Strategy::handleSpecialNamespaces(OperationContext* txn, Request& request, 
         auto interposedCmd = cmdBob.done();
         // Rewrite upgraded pseudoCommands to run on the 'admin' database.
         NamespaceString interposedNss("admin", "$cmd");
-        Command::runAgainstRegistered(
-            txn, interposedNss.ns().c_str(), interposedCmd, reply, q.queryOptions);
+        runAgainstRegistered(txn, interposedNss.ns().c_str(), interposedCmd, reply, q.queryOptions);
     };
 
     if (strcmp(ns, "inprog") == 0) {
@@ -455,7 +483,7 @@ void Strategy::writeOp(OperationContext* txn, int op, Request& request) {
         {
             // Disable the last error object for the duration of the write cmd
             LastError::Disabled disableLastError(&LastError::get(cc()));
-            Command::runAgainstRegistered(txn, cmdNS.c_str(), requestBSON, builder, 0);
+            runAgainstRegistered(txn, cmdNS.c_str(), requestBSON, builder, 0);
         }
 
         BatchedCommandResponse commandResponse;

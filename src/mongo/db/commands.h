@@ -284,12 +284,6 @@ public:
     // Counter for unknown commands
     static Counter64 unknownCommands;
 
-    static void runAgainstRegistered(OperationContext* txn,
-                                     const char* ns,
-                                     BSONObj& jsobj,
-                                     BSONObjBuilder& anObjBuilder,
-                                     int queryOptions = 0);
-
     static Command* findCommand(StringData name);
 
     /**
