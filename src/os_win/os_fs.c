@@ -495,7 +495,7 @@ __win_handle_open(WT_SESSION_IMPL *session,
 	HANDLE filehandle, filehandle_secondary;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	int f, fd, share_mode;
+	int desired_access, f, fd;
 	bool direct_io;
 	const char *stream_mode;
 
@@ -516,9 +516,9 @@ __win_handle_open(WT_SESSION_IMPL *session,
 	if (file_type == WT_FILE_TYPE_DIRECTORY)
 		goto directory_open;
 
-	share_mode = FILE_SHARE_READ;
+	desired_access = GENERIC_READ;
 	if (!LF_ISSET(WT_OPEN_READONLY))
-		share_mode |= FILE_SHARE_WRITE;
+		desired_access |= GENERIC_WRITE;
 
 	/*
 	 * Security:
@@ -563,13 +563,14 @@ __win_handle_open(WT_SESSION_IMPL *session,
 	if (file_type == WT_FILE_TYPE_DATA)
 		f |= FILE_FLAG_RANDOM_ACCESS;
 
-	filehandle = CreateFileA(name, GENERIC_READ | GENERIC_WRITE,
-	    share_mode, NULL, dwCreationDisposition, f, NULL);
+	filehandle = CreateFileA(name, desired_access,
+	    FILE_SHARE_READ | FILE_SHARE_WRITE,
+	    NULL, dwCreationDisposition, f, NULL);
 	if (filehandle == INVALID_HANDLE_VALUE) {
 		if (LF_ISSET(WT_OPEN_CREATE) &&
 		    GetLastError() == ERROR_FILE_EXISTS)
-			filehandle = CreateFileA(
-			    name, GENERIC_READ | GENERIC_WRITE, share_mode,
+			filehandle = CreateFileA(name, desired_access,
+			    FILE_SHARE_READ | FILE_SHARE_WRITE,
 			    NULL, OPEN_EXISTING, f, NULL);
 		if (filehandle == INVALID_HANDLE_VALUE)
 			WT_ERR_MSG(session, __wt_win32_errno(),
@@ -586,9 +587,9 @@ __win_handle_open(WT_SESSION_IMPL *session,
 	 * pointer.
 	 */
 	if (!LF_ISSET(WT_OPEN_READONLY)) {
-		filehandle_secondary = CreateFileA(name,
-		    GENERIC_READ | GENERIC_WRITE,
-		    share_mode, NULL, OPEN_EXISTING, f, NULL);
+		filehandle_secondary = CreateFileA(name, desired_access,
+		    FILE_SHARE_READ | FILE_SHARE_WRITE,
+		    NULL, OPEN_EXISTING, f, NULL);
 		if (filehandle_secondary == INVALID_HANDLE_VALUE)
 			WT_ERR_MSG(session, __wt_win32_errno(),
 			    "%s: handle-open: CreateFileA: secondary", name);
