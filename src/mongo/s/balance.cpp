@@ -278,7 +278,7 @@ bool Balancer::_checkOIDs(OperationContext* txn) {
             continue;
         }
 
-        BSONObj f = uassertStatusOK(grid.shardRegistry()->runIdempotentCommandOnShard(
+        BSONObj f = uassertStatusOK(grid.shardRegistry()->runCommandOnShard(
             txn,
             s,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -292,7 +292,7 @@ bool Balancer::_checkOIDs(OperationContext* txn) {
                 log() << "error: 2 machines have " << x << " as oid machine piece: " << shardId
                       << " and " << oids[x];
 
-                uassertStatusOK(grid.shardRegistry()->runIdempotentCommandOnShard(
+                uassertStatusOK(grid.shardRegistry()->runCommandOnShard(
                     txn,
                     s,
                     ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -301,7 +301,7 @@ bool Balancer::_checkOIDs(OperationContext* txn) {
 
                 const auto otherShard = grid.shardRegistry()->getShard(txn, oids[x]);
                 if (otherShard) {
-                    uassertStatusOK(grid.shardRegistry()->runIdempotentCommandOnShard(
+                    uassertStatusOK(grid.shardRegistry()->runCommandOnShard(
                         txn,
                         otherShard,
                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},

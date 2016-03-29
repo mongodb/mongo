@@ -220,12 +220,8 @@ Status CatalogManagerReplicaSet::shardCollection(OperationContext* txn,
         manager->getVersion(),
         true);
 
-    auto ssvStatus = grid.shardRegistry()->runIdempotentCommandOnShard(
-        txn,
-        dbPrimaryShardId,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        "admin",
-        ssv.toBSON());
+    auto ssvStatus = grid.shardRegistry()->runCommandWithNotMasterRetries(
+        txn, dbPrimaryShardId, "admin", ssv.toBSON());
     if (!ssvStatus.isOK()) {
         warning() << "could not update initial version of " << ns << " on shard primary "
                   << dbPrimaryShardId << ssvStatus.getStatus();
@@ -495,12 +491,8 @@ Status CatalogManagerReplicaSet::dropCollection(OperationContext* txn, const Nam
     auto* shardRegistry = grid.shardRegistry();
 
     for (const auto& shardEntry : allShards) {
-        auto dropResult = shardRegistry->runIdempotentCommandOnShard(
-            txn,
-            shardEntry.getName(),
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            ns.db().toString(),
-            BSON("drop" << ns.coll()));
+        auto dropResult = shardRegistry->runCommandWithNotMasterRetries(
+            txn, shardEntry.getName(), ns.db().toString(), BSON("drop" << ns.coll()));
 
         if (!dropResult.isOK()) {
             return dropResult.getStatus();
@@ -564,12 +556,8 @@ Status CatalogManagerReplicaSet::dropCollection(OperationContext* txn, const Nam
             ChunkVersion::DROPPED(),
             true);
 
-        auto ssvResult = shardRegistry->runIdempotentCommandOnShard(
-            txn,
-            shardEntry.getName(),
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            "admin",
-            ssv.toBSON());
+        auto ssvResult = shardRegistry->runCommandWithNotMasterRetries(
+            txn, shardEntry.getName(), "admin", ssv.toBSON());
 
         if (!ssvResult.isOK()) {
             return ssvResult.getStatus();
@@ -580,12 +568,8 @@ Status CatalogManagerReplicaSet::dropCollection(OperationContext* txn, const Nam
             return ssvStatus;
         }
 
-        auto unsetShardingStatus = shardRegistry->runIdempotentCommandOnShard(
-            txn,
-            shardEntry.getName(),
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            "admin",
-            BSON("unsetSharding" << 1));
+        auto unsetShardingStatus = shardRegistry->runCommandWithNotMasterRetries(
+            txn, shardEntry.getName(), "admin", BSON("unsetSharding" << 1));
 
         if (!unsetShardingStatus.isOK()) {
             return unsetShardingStatus.getStatus();
@@ -867,8 +851,7 @@ bool CatalogManagerReplicaSet::runReadCommandForTest(OperationContext* txn,
     cmdBuilder.appendElements(cmdObj);
     _appendReadConcern(&cmdBuilder);
 
-    auto resultStatus = grid.shardRegistry()->runIdempotentCommandOnConfig(
-        txn, kConfigReadSelector, dbname, cmdBuilder.done());
+    auto resultStatus = _runReadCommand(txn, dbname, cmdBuilder.done(), kConfigReadSelector);
     if (resultStatus.isOK()) {
         result->appendElements(resultStatus.getValue());
         return Command::getStatusFromCommandResult(resultStatus.getValue()).isOK();
@@ -881,8 +864,7 @@ bool CatalogManagerReplicaSet::runUserManagementReadCommand(OperationContext* tx
                                                             const std::string& dbname,
                                                             const BSONObj& cmdObj,
                                                             BSONObjBuilder* result) {
-    auto resultStatus = grid.shardRegistry()->runIdempotentCommandOnConfig(
-        txn, kConfigPrimaryPreferredSelector, dbname, cmdObj);
+    auto resultStatus = _runReadCommand(txn, dbname, cmdObj, kConfigPrimaryPreferredSelector);
     if (resultStatus.isOK()) {
         result->appendElements(resultStatus.getValue());
         return Command::getStatusFromCommandResult(resultStatus.getValue()).isOK();
@@ -1253,8 +1235,8 @@ StatusWith<long long> CatalogManagerReplicaSet::_runCountCommandOnConfig(Operati
     countBuilder.append("query", query);
     _appendReadConcern(&countBuilder);
 
-    auto resultStatus = grid.shardRegistry()->runIdempotentCommandOnConfig(
-        txn, kConfigReadSelector, ns.db().toString(), countBuilder.done());
+    auto resultStatus =
+        _runReadCommand(txn, ns.db().toString(), countBuilder.done(), kConfigReadSelector);
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
     }
@@ -1405,10 +1387,32 @@ void CatalogManagerReplicaSet::_appendReadConcern(BSONObjBuilder* builder) {
     readConcern.appendInfo(builder);
 }
 
+StatusWith<BSONObj> CatalogManagerReplicaSet::_runReadCommand(
+    OperationContext* txn,
+    const std::string& dbname,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref) {
+    for (int retry = 1; retry <= kMaxReadRetry; ++retry) {
+        auto response = grid.shardRegistry()->runCommandOnConfig(txn, readPref, dbname, cmdObj);
+        if (response.isOK()) {
+            return response;
+        }
+
+        if (ShardRegistry::kAllRetriableErrors.count(response.getStatus().code()) &&
+            retry < kMaxReadRetry) {
+            continue;
+        }
+
+        return response.getStatus();
+    }
+
+    MONGO_UNREACHABLE;
+}
+
 Status CatalogManagerReplicaSet::appendInfoForConfigServerDatabases(OperationContext* txn,
                                                                     BSONArrayBuilder* builder) {
-    auto resultStatus = grid.shardRegistry()->runIdempotentCommandOnConfig(
-        txn, kConfigPrimaryPreferredSelector, "admin", BSON("listDatabases" << 1));
+    auto resultStatus =
+        _runReadCommand(txn, "admin", BSON("listDatabases" << 1), kConfigPrimaryPreferredSelector);
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();

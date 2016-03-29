@@ -310,7 +310,7 @@ void Chunk::pickSplitVector(OperationContext* txn,
 
     BSONObj cmdObj = cmd.obj();
 
-    auto result = grid.shardRegistry()->runIdempotentCommandOnShard(
+    auto result = grid.shardRegistry()->runCommandOnShard(
         txn,
         getShardId(),
         ReadPreferenceSetting{ReadPreference::PrimaryPreferred},

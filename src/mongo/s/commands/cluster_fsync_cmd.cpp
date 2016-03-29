@@ -91,7 +91,7 @@ public:
                 continue;
             }
 
-            BSONObj x = uassertStatusOK(grid.shardRegistry()->runIdempotentCommandOnShard(
+            BSONObj x = uassertStatusOK(grid.shardRegistry()->runCommandOnShard(
                 txn,
                 s,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},

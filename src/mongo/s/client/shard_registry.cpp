@@ -645,12 +645,11 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfig(
     MONGO_UNREACHABLE;
 }
 
-StatusWith<BSONObj> ShardRegistry::runIdempotentCommandOnShard(
-    OperationContext* txn,
-    const std::shared_ptr<Shard>& shard,
-    const ReadPreferenceSetting& readPref,
-    const std::string& dbName,
-    const BSONObj& cmdObj) {
+StatusWith<BSONObj> ShardRegistry::runCommandOnShard(OperationContext* txn,
+                                                     const std::shared_ptr<Shard>& shard,
+                                                     const ReadPreferenceSetting& readPref,
+                                                     const std::string& dbName,
+                                                     const BSONObj& cmdObj) {
     auto response = _runCommandWithRetries(txn,
                                            _executorPool->getFixedExecutor(),
                                            shard,
@@ -660,7 +659,7 @@ StatusWith<BSONObj> ShardRegistry::runIdempotentCommandOnShard(
                                            readPref.pref == ReadPreference::PrimaryOnly
                                                ? rpc::makeEmptyMetadata()
                                                : kSecondaryOkMetadata,
-                                           kAllRetriableErrors);
+                                           kNotMasterErrors);
     if (!response.isOK()) {
         return response.getStatus();
     }
@@ -668,26 +667,24 @@ StatusWith<BSONObj> ShardRegistry::runIdempotentCommandOnShard(
     return response.getValue().response;
 }
 
-StatusWith<BSONObj> ShardRegistry::runIdempotentCommandOnShard(
-    OperationContext* txn,
-    ShardId shardId,
-    const ReadPreferenceSetting& readPref,
-    const std::string& dbName,
-    const BSONObj& cmdObj) {
+StatusWith<BSONObj> ShardRegistry::runCommandOnShard(OperationContext* txn,
+                                                     ShardId shardId,
+                                                     const ReadPreferenceSetting& readPref,
+                                                     const std::string& dbName,
+                                                     const BSONObj& cmdObj) {
     auto shard = getShard(txn, shardId);
     if (!shard) {
         return {ErrorCodes::ShardNotFound, str::stream() << "shard " << shardId << " not found"};
     }
-    return runIdempotentCommandOnShard(txn, shard, readPref, dbName, cmdObj);
+    return runCommandOnShard(txn, shard, readPref, dbName, cmdObj);
 }
 
 
-StatusWith<BSONObj> ShardRegistry::runIdempotentCommandForAddShard(
-    OperationContext* txn,
-    const std::shared_ptr<Shard>& shard,
-    const ReadPreferenceSetting& readPref,
-    const std::string& dbName,
-    const BSONObj& cmdObj) {
+StatusWith<BSONObj> ShardRegistry::runCommandForAddShard(OperationContext* txn,
+                                                         const std::shared_ptr<Shard>& shard,
+                                                         const ReadPreferenceSetting& readPref,
+                                                         const std::string& dbName,
+                                                         const BSONObj& cmdObj) {
     auto status = _runCommandWithRetries(txn,
                                          _executorForAddShard.get(),
                                          shard,
@@ -697,7 +694,7 @@ StatusWith<BSONObj> ShardRegistry::runIdempotentCommandForAddShard(
                                          readPref.pref == ReadPreference::PrimaryOnly
                                              ? rpc::makeEmptyMetadata()
                                              : kSecondaryOkMetadata,
-                                         kAllRetriableErrors);
+                                         kNotMasterErrors);
     if (!status.isOK()) {
         return status.getStatus();
     }
@@ -705,11 +702,10 @@ StatusWith<BSONObj> ShardRegistry::runIdempotentCommandForAddShard(
     return status.getValue().response;
 }
 
-StatusWith<BSONObj> ShardRegistry::runIdempotentCommandOnConfig(
-    OperationContext* txn,
-    const ReadPreferenceSetting& readPref,
-    const std::string& dbName,
-    const BSONObj& cmdObj) {
+StatusWith<BSONObj> ShardRegistry::runCommandOnConfig(OperationContext* txn,
+                                                      const ReadPreferenceSetting& readPref,
+                                                      const std::string& dbName,
+                                                      const BSONObj& cmdObj) {
     auto response = _runCommandWithRetries(
         txn,
         _executorPool->getFixedExecutor(),
@@ -718,8 +714,30 @@ StatusWith<BSONObj> ShardRegistry::runIdempotentCommandOnConfig(
         dbName,
         cmdObj,
         readPref.pref == ReadPreference::PrimaryOnly ? kReplMetadata : kReplSecondaryOkMetadata,
-        kAllRetriableErrors);
+        kNotMasterErrors);
 
+    if (!response.isOK()) {
+        return response.getStatus();
+    }
+
+    return response.getValue().response;
+}
+
+StatusWith<BSONObj> ShardRegistry::runCommandWithNotMasterRetries(OperationContext* txn,
+                                                                  const ShardId& shardId,
+                                                                  const std::string& dbname,
+                                                                  const BSONObj& cmdObj) {
+    auto shard = getShard(txn, shardId);
+    invariant(!shard->isConfig());
+
+    auto response = _runCommandWithRetries(txn,
+                                           _executorPool->getFixedExecutor(),
+                                           shard,
+                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                           dbname,
+                                           cmdObj,
+                                           rpc::makeEmptyMetadata(),
+                                           kNotMasterErrors);
     if (!response.isOK()) {
         return response.getStatus();
     }
