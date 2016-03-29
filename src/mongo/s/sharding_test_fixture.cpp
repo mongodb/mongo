@@ -133,7 +133,7 @@ void ShardingTestFixture::setUp() {
     // from there until we get rid of it.
     grid.init(std::move(cm),
               std::move(shardRegistry),
-              stdx::make_unique<ClusterCursorManager>(_service->getClockSource()));
+              stdx::make_unique<ClusterCursorManager>(_service->getPreciseClockSource()));
 }
 
 void ShardingTestFixture::tearDown() {

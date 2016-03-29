@@ -147,7 +147,7 @@ TickSource* ServiceContext::getTickSource() const {
     return _tickSource.get();
 }
 
-ClockSource* ServiceContext::getClockSource() const {
+ClockSource* ServiceContext::getPreciseClockSource() const {
     return _clockSource.get();
 }
 

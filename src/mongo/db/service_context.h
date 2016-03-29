@@ -312,7 +312,7 @@ public:
      * Returns the tick/clock source set in this context.
      */
     TickSource* getTickSource() const;
-    ClockSource* getClockSource() const;
+    ClockSource* getPreciseClockSource() const;
 
     /**
      * Replaces the current tick/clock source with a new one. In other words, the old source will be

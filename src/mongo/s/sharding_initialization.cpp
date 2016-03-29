@@ -75,8 +75,8 @@ std::unique_ptr<CatalogManager> makeCatalogManager(ServiceContext* service,
     std::unique_ptr<SecureRandom> rng(SecureRandom::create());
     std::string distLockProcessId = str::stream()
         << thisHost.toString() << ':'
-        << durationCount<Seconds>(service->getClockSource()->now().toDurationSinceEpoch()) << ':'
-        << static_cast<int32_t>(rng->nextInt64());
+        << durationCount<Seconds>(service->getPreciseClockSource()->now().toDurationSinceEpoch())
+        << ':' << static_cast<int32_t>(rng->nextInt64());
 
     auto distLockCatalog = stdx::make_unique<DistLockCatalogImpl>(shardRegistry);
     auto distLockManager =
@@ -197,7 +197,8 @@ Status initializeGlobalShardingState(OperationContext* txn, const ConnectionStri
     shardRegistry->startup();
     grid.init(std::move(catalogManager),
               std::move(shardRegistry),
-              stdx::make_unique<ClusterCursorManager>(getGlobalServiceContext()->getClockSource()));
+              stdx::make_unique<ClusterCursorManager>(
+                  getGlobalServiceContext()->getPreciseClockSource()));
 
     while (!inShutdown()) {
         try {

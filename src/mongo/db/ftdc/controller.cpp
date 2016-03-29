@@ -162,7 +162,7 @@ void FTDCController::doLoop() {
         while (true) {
             // Compute the next interval to run regardless of how we were woken up
             // Skipping an interval due to a race condition with a config signal is harmless.
-            auto now = getGlobalServiceContext()->getClockSource()->now();
+            auto now = getGlobalServiceContext()->getPreciseClockSource()->now();
 
             // Get next time to run at
             auto next_time = FTDCUtil::roundTime(now, _config.period);

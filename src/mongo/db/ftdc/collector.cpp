@@ -55,7 +55,7 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
 
     BSONObjBuilder builder;
 
-    Date_t start = client->getServiceContext()->getClockSource()->now();
+    Date_t start = client->getServiceContext()->getPreciseClockSource()->now();
     Date_t end;
     bool firstLoop = true;
 
@@ -69,7 +69,7 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
         Date_t now = start;
 
         if (!firstLoop) {
-            now = client->getServiceContext()->getClockSource()->now();
+            now = client->getServiceContext()->getPreciseClockSource()->now();
         }
 
         firstLoop = false;
@@ -84,7 +84,7 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
             collector->collect(txn.get(), subObjBuilder);
         }
 
-        end = client->getServiceContext()->getClockSource()->now();
+        end = client->getServiceContext()->getPreciseClockSource()->now();
         subObjBuilder.appendDate(kFTDCCollectEndField, end);
     }
 

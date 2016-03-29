@@ -53,7 +53,7 @@ CollectionInfoCache::CollectionInfoCache(Collection* collection)
       _keysComputed(false),
       _planCache(new PlanCache(collection->ns().ns())),
       _querySettings(new QuerySettings()),
-      _indexUsageTracker(getGlobalServiceContext()->getClockSource()) {}
+      _indexUsageTracker(getGlobalServiceContext()->getPreciseClockSource()) {}
 
 
 const UpdateIndexData& CollectionInfoCache::getIndexKeys(OperationContext* txn) const {

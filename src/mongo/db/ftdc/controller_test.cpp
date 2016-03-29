@@ -68,21 +68,22 @@ public:
             BSONObjBuilder b2;
 
             b2.appendDate(kFTDCCollectStartField,
-                          getGlobalServiceContext()->getClockSource()->now());
+                          getGlobalServiceContext()->getPreciseClockSource()->now());
 
             {
                 BSONObjBuilder subObjBuilder(b2.subobjStart(name()));
 
                 subObjBuilder.appendDate(kFTDCCollectStartField,
-                                         getGlobalServiceContext()->getClockSource()->now());
+                                         getGlobalServiceContext()->getPreciseClockSource()->now());
 
                 generateDocument(subObjBuilder, _counter);
 
                 subObjBuilder.appendDate(kFTDCCollectEndField,
-                                         getGlobalServiceContext()->getClockSource()->now());
+                                         getGlobalServiceContext()->getPreciseClockSource()->now());
             }
 
-            b2.appendDate(kFTDCCollectEndField, getGlobalServiceContext()->getClockSource()->now());
+            b2.appendDate(kFTDCCollectEndField,
+                          getGlobalServiceContext()->getPreciseClockSource()->now());
 
             _docs.emplace_back(b2.obj());
         }
