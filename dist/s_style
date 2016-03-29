@@ -60,7 +60,8 @@ else
 		echo "$f: use TAILQ for all lists"
 	fi
 
-	if ! expr "$f" : 'src/os_posix/.*' > /dev/null &&
+	if ! expr "$f" : 'src/os_common/.*' > /dev/null &&
+	   ! expr "$f" : 'src/os_posix/.*' > /dev/null &&
 	   ! expr "$f" : 'src/os_win/.*' > /dev/null &&
 	   ! expr "$f" : 'src/include/extern.h' > /dev/null &&
 	   ! expr "$f" : 'src/include/os.h' > /dev/null &&
@@ -83,7 +84,7 @@ else
 		cat $t
 	}
 
-	if ! expr "$f" : 'src/os_posix/os_setvbuf.c' > /dev/null &&
+	if ! expr "$f" : 'src/os_common/os_setvbuf.c' > /dev/null &&
 	    egrep -w 'setvbuf' $f > $t; then
 		echo "$f: setvbuf call, use WiredTiger library replacements"
 		cat $t
