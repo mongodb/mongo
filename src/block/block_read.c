@@ -73,6 +73,7 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
     WT_ITEM *buf, const uint8_t *addr, size_t addr_size)
 {
 	WT_BLOCK *block;
+	WT_DECL_RET;
 	wt_off_t offset;
 	uint32_t cksum, size;
 	bool mapped;
@@ -90,9 +91,15 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 	if (mapped) {
 		buf->data = (uint8_t *)bm->map + offset;
 		buf->size = size;
-		if (block->preload_available)
-			WT_RET(block->fh->fh_map_preload(
-			    session, block->fh, buf->data, buf->size));
+		if (block->preload_available) {
+			ret = block->fh->fh_map_preload(
+			    session, block->fh, buf->data, buf->size);
+
+			/* Ignore ENOTSUP, but don't try again. */
+			if (ret != ENOTSUP)
+				return (ret);
+			block->preload_available = false;
+		}
 
 		WT_STAT_FAST_CONN_INCR(session, block_map_read);
 		WT_STAT_FAST_CONN_INCRV(session, block_byte_map_read, size);
