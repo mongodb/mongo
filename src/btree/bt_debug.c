@@ -100,7 +100,7 @@ __debug_config(WT_SESSION_IMPL *session, WT_DBG *ds, const char *ofile)
 	/* If we're using a file, flush on each line. */
 	WT_RET(__wt_fopen(session, ofile, WT_FHANDLE_WRITE, 0, &ds->fp));
 
-	(void)setvbuf(ds->fp, NULL, _IOLBF, 0);
+	(void)setvbuf(ds->fp, NULL, _IOLBF, 1024);
 	return (0);
 }
 

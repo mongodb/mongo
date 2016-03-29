@@ -54,7 +54,7 @@ setup_log_file(CONFIG *cfg)
 		return (ret);
 
 	/* Use line buffering for the log file. */
-	(void)setvbuf(cfg->logf, NULL, _IOLBF, 32);
+	(void)setvbuf(cfg->logf, NULL, _IOLBF, 1024);
 	return (0);
 }
 
