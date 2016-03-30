@@ -1,7 +1,6 @@
 // Validates that auto rebalancing works and reaches quiescent state when replica sets are used as
 // shards
 (function() {
-
     'use strict';
 
     var st = new ShardingTest(
@@ -40,8 +39,5 @@
     st.rs0.awaitReplication(120000);
     st.rs1.awaitReplication(120000);
 
-    // TODO: mongod only exits with MongoRunner.EXIT_ABRUPT in sharding_legacy_op_query_WT
-    // this should be fixed by SERVER-22176
-    st.stop({allowedExitCodes: [MongoRunner.EXIT_ABRUPT]});
-
+    st.stop();
 })();
