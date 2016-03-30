@@ -86,6 +86,11 @@ public:
     virtual void shutdown() = 0;
 
     /**
+     * Returns true if shutdown has been called, false otherwise.
+     */
+    virtual bool inShutdown() const = 0;
+
+    /**
      * Blocks the current thread (presumably the executor thread) until the network interface
      * knows of work for the executor to perform.
      */
@@ -114,10 +119,14 @@ public:
 
     /**
      * Starts asynchronous execution of the command described by "request".
+     *
+     * Returns ErrorCodes::ShutdownInProgress if NetworkInterface::shutdown has already started
+     * and Status::OK() otherwise. If it returns Status::OK(), then the onFinish argument will be
+     * executed by NetworkInterface eventually; otherwise, it will not.
      */
-    virtual void startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                              const RemoteCommandRequest& request,
-                              const RemoteCommandCompletionFn& onFinish) = 0;
+    virtual Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                                const RemoteCommandRequest& request,
+                                const RemoteCommandCompletionFn& onFinish) = 0;
 
     /**
      * Requests cancelation of the network activity associated with "cbHandle" if it has not yet
@@ -133,13 +142,17 @@ public:
     /**
      * Sets an alarm, which schedules "action" to run no sooner than "when".
      *
+     * Returns ErrorCodes::ShutdownInProgress if NetworkInterface::shutdown has already started
+     * and true otherwise. If it returns Status::OK(), then the action will be executed by
+     * NetworkInterface eventually; otherwise, it will not.
+     *
      * "action" should not do anything that requires a lot of computation, or that might block for a
      * long time, as it may execute in a network thread.
      *
      * Any callbacks invoked from setAlarm must observe onNetworkThread to
      * return true. See that method for why.
      */
-    virtual void setAlarm(Date_t when, const stdx::function<void()>& action) = 0;
+    virtual Status setAlarm(Date_t when, const stdx::function<void()>& action) = 0;
 
     /**
      * Returns true if called from a thread dedicated to networking. I.e. not a

@@ -69,6 +69,7 @@ NetworkInterfaceImpl::NetworkInterfaceImpl() : NetworkInterfaceImpl(nullptr){};
 NetworkInterfaceImpl::NetworkInterfaceImpl(std::unique_ptr<NetworkConnectionHook> hook)
     : NetworkInterface(),
       _pool(makeOptions()),
+      _inShutdown(false),
       _commandRunner(kMessagingPortKeepOpen, std::move(hook)) {}
 
 NetworkInterfaceImpl::~NetworkInterfaceImpl() {}
@@ -79,7 +80,7 @@ std::string NetworkInterfaceImpl::getDiagnosticString() {
     str::stream output;
     output << "NetworkImpl";
     output << " threads:" << poolStats.numThreads;
-    output << " inShutdown:" << _inShutdown;
+    output << " inShutdown:" << inShutdown();
     output << " active:" << _numActiveNetworkRequests;
     output << " pending:" << _pending.size();
     output << " execRunable:" << _isExecutorRunnable;
@@ -89,9 +90,7 @@ std::string NetworkInterfaceImpl::getDiagnosticString() {
 void NetworkInterfaceImpl::appendConnectionStats(ConnectionPoolStats* stats) const {}
 
 void NetworkInterfaceImpl::startup() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    invariant(!_inShutdown);
-    lk.unlock();
+    invariant(!inShutdown());
 
     _commandRunner.startup();
     _pool.startup();
@@ -100,7 +99,7 @@ void NetworkInterfaceImpl::startup() {
 
 void NetworkInterfaceImpl::shutdown() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _inShutdown = true;
+    _inShutdown.store(true);
     _hasPending.notify_all();
     _newAlarmReady.notify_all();
     lk.unlock();
@@ -108,6 +107,10 @@ void NetworkInterfaceImpl::shutdown() {
     _pool.shutdown();
     _pool.join();
     _commandRunner.shutdown();
+}
+
+bool NetworkInterfaceImpl::inShutdown() const {
+    return _inShutdown.load();
 }
 
 void NetworkInterfaceImpl::signalWorkAvailable() {
@@ -161,17 +164,25 @@ void NetworkInterfaceImpl::_runOneCommand() {
     _signalWorkAvailable_inlock();
 }
 
-void NetworkInterfaceImpl::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                        const RemoteCommandRequest& request,
-                                        const RemoteCommandCompletionFn& onFinish) {
+Status NetworkInterfaceImpl::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                                          const RemoteCommandRequest& request,
+                                          const RemoteCommandCompletionFn& onFinish) {
+    if (inShutdown()) {
+        return {ErrorCodes::ShutdownInProgress, "NetworkInterfaceImpl shutdown in progress"};
+    }
+
     LOG(2) << "Scheduling " << request.cmdObj.firstElementFieldName() << " to " << request.target;
+
     stdx::lock_guard<stdx::mutex> lk(_mutex);
+
     _pending.push_back(CommandData());
     CommandData& cd = _pending.back();
     cd.cbHandle = cbHandle;
     cd.request = request;
     cd.onFinish = onFinish;
     fassert(28730, _pool.schedule([this]() -> void { _runOneCommand(); }));
+
+    return Status::OK();
 }
 
 void NetworkInterfaceImpl::cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) {
@@ -203,13 +214,20 @@ std::string NetworkInterfaceImpl::getHostName() {
     return getHostNameCached();
 }
 
-void NetworkInterfaceImpl::setAlarm(Date_t when, const stdx::function<void()>& action) {
+Status NetworkInterfaceImpl::setAlarm(Date_t when, const stdx::function<void()>& action) {
+    if (inShutdown()) {
+        return {ErrorCodes::ShutdownInProgress, "NetworkInterfaceImpl shutdown in progress"};
+    }
+
     stdx::unique_lock<stdx::mutex> lk(_mutex);
+
     const bool notify = _alarms.empty() || _alarms.top().when > when;
     _alarms.emplace(when, action);
     if (notify) {
         _newAlarmReady.notify_all();
     }
+
+    return Status::OK();
 }
 
 bool NetworkInterfaceImpl::onNetworkThread() {
@@ -218,7 +236,7 @@ bool NetworkInterfaceImpl::onNetworkThread() {
 
 void NetworkInterfaceImpl::_processAlarms() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    while (!_inShutdown) {
+    while (!inShutdown()) {
         if (_alarms.empty()) {
             _newAlarmReady.wait(lk);
         } else if (now() < _alarms.top().when) {

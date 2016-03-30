@@ -86,21 +86,22 @@ public:
 
     virtual void startup();
     virtual void shutdown();
+    virtual bool inShutdown() const;
     virtual void waitForWork();
     virtual void waitForWorkUntil(Date_t when);
     virtual void setConnectionHook(std::unique_ptr<NetworkConnectionHook> hook);
     virtual void signalWorkAvailable();
     virtual Date_t now();
     virtual std::string getHostName();
-    virtual void startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                              const RemoteCommandRequest& request,
-                              const RemoteCommandCompletionFn& onFinish);
+    virtual Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                                const RemoteCommandRequest& request,
+                                const RemoteCommandCompletionFn& onFinish);
     virtual void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle);
     /**
      * Not implemented.
      */
     void cancelAllCommands() override {}
-    virtual void setAlarm(Date_t when, const stdx::function<void()>& action);
+    virtual Status setAlarm(Date_t when, const stdx::function<void()>& action);
 
     virtual bool onNetworkThread();
 
@@ -290,7 +291,7 @@ private:
     bool _hasStarted;  // (M)
 
     // Set to true by "shutDown()".
-    bool _inShutdown;  // (M)
+    std::atomic<bool> _inShutdown;  // (M)
 
     // Next date that the executor expects to wake up at (due to a scheduleWorkAt() call).
     Date_t _executorNextWakeupDate;  // (M)
