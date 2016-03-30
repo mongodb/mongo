@@ -34,6 +34,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/rpc/metadata.h"
 
 #include "mongo/unittest/unittest.h"
 
@@ -43,7 +44,7 @@ using namespace mongo;
 using executor::NetworkInterfaceMock;
 using executor::TaskExecutor;
 
-const HostAndPort target("localhost", -1);
+const HostAndPort source("localhost", -1);
 const BSONObj findCmdObj = BSON("find"
                                 << "coll");
 
@@ -92,15 +93,15 @@ FetcherTest::FetcherTest()
 void FetcherTest::setUp() {
     executor::ThreadPoolExecutorTest::setUp();
     clear();
-    fetcher.reset(new Fetcher(&getExecutor(),
-                              target,
-                              "db",
-                              findCmdObj,
-                              stdx::bind(&FetcherTest::_callback,
-                                         this,
-                                         stdx::placeholders::_1,
-                                         stdx::placeholders::_2,
-                                         stdx::placeholders::_3)));
+    fetcher = stdx::make_unique<Fetcher>(&getExecutor(),
+                                         source,
+                                         "db",
+                                         findCmdObj,
+                                         stdx::bind(&FetcherTest::_callback,
+                                                    this,
+                                                    stdx::placeholders::_1,
+                                                    stdx::placeholders::_2,
+                                                    stdx::placeholders::_3));
     launchExecutorThread();
 }
 
@@ -206,28 +207,42 @@ void FetcherTest::_callback(const StatusWith<Fetcher::QueryResponse>& result,
     }
 }
 
-void unusedFetcherCallback(const StatusWith<Fetcher::QueryResponse>& fetchResult,
-                           Fetcher::NextAction* nextAction,
-                           BSONObjBuilder* getMoreBob) {
+void unreachableCallback(const StatusWith<Fetcher::QueryResponse>& fetchResult,
+                         Fetcher::NextAction* nextAction,
+                         BSONObjBuilder* getMoreBob) {
     FAIL("should not reach here");
 }
+
+void doNothingCallback(const StatusWith<Fetcher::QueryResponse>& fetchResult,
+                       Fetcher::NextAction* nextAction,
+                       BSONObjBuilder* getMoreBob) {}
 
 TEST_F(FetcherTest, InvalidConstruction) {
     TaskExecutor& executor = getExecutor();
 
     // Null executor.
-    ASSERT_THROWS(Fetcher(nullptr, target, "db", findCmdObj, unusedFetcherCallback), UserException);
+    ASSERT_THROWS_CODE_AND_WHAT(Fetcher(nullptr, source, "db", findCmdObj, unreachableCallback),
+                                UserException,
+                                ErrorCodes::BadValue,
+                                "null task executor");
 
     // Empty database name.
-    ASSERT_THROWS(Fetcher(&executor, target, "", findCmdObj, unusedFetcherCallback), UserException);
+    ASSERT_THROWS_CODE_AND_WHAT(Fetcher(&executor, source, "", findCmdObj, unreachableCallback),
+                                UserException,
+                                ErrorCodes::BadValue,
+                                "database name cannot be empty");
 
     // Empty command object.
-    ASSERT_THROWS(Fetcher(&executor, target, "db", BSONObj(), unusedFetcherCallback),
-                  UserException);
+    ASSERT_THROWS_CODE_AND_WHAT(Fetcher(&executor, source, "db", BSONObj(), unreachableCallback),
+                                UserException,
+                                ErrorCodes::BadValue,
+                                "command object cannot be empty");
 
     // Callback function cannot be null.
-    ASSERT_THROWS(Fetcher(&executor, target, "db", findCmdObj, Fetcher::CallbackFn()),
-                  UserException);
+    ASSERT_THROWS_CODE_AND_WHAT(Fetcher(&executor, source, "db", findCmdObj, Fetcher::CallbackFn()),
+                                UserException,
+                                ErrorCodes::BadValue,
+                                "callback function cannot be null");
 }
 
 // Command object can refer to any command that returns a cursor. This
@@ -236,18 +251,44 @@ TEST_F(FetcherTest, NonFindCommand) {
     TaskExecutor& executor = getExecutor();
 
     Fetcher(&executor,
-            target,
+            source,
             "db",
             BSON("listIndexes"
                  << "coll"),
-            unusedFetcherCallback);
-    Fetcher(&executor, target, "db", BSON("listCollections" << 1), unusedFetcherCallback);
-    Fetcher(&executor, target, "db", BSON("a" << 1), unusedFetcherCallback);
+            unreachableCallback);
+    Fetcher(&executor, source, "db", BSON("listCollections" << 1), unreachableCallback);
+    Fetcher(&executor, source, "db", BSON("a" << 1), unreachableCallback);
+}
+
+TEST_F(FetcherTest, RemoteCommandRequestShouldContainCommandParametersPassedToConstructor) {
+    auto metadataObj = BSON("x" << 1);
+    Milliseconds timeout(8000);
+
+    fetcher = stdx::make_unique<Fetcher>(
+        &getExecutor(), source, "db", findCmdObj, doNothingCallback, metadataObj, timeout);
+
+    ASSERT_EQUALS(source, fetcher->getSource());
+    ASSERT_EQUALS(findCmdObj, fetcher->getCommandObject());
+    ASSERT_EQUALS(metadataObj, fetcher->getMetadataObject());
+    ASSERT_EQUALS(timeout, fetcher->getTimeout());
+
+    ASSERT_OK(fetcher->schedule());
+
+    auto net = getNet();
+    net->enterNetwork();
+    ASSERT_TRUE(net->hasReadyRequests());
+    auto noi = net->getNextReadyRequest();
+    auto request = noi->getRequest();
+    net->exitNetwork();
+
+    ASSERT_EQUALS(source, request.target);
+    ASSERT_EQUALS(findCmdObj, request.cmdObj);
+    ASSERT_EQUALS(metadataObj, request.metadata);
+    ASSERT_EQUALS(timeout, request.timeout);
 }
 
 TEST_F(FetcherTest, GetDiagnosticString) {
-    Fetcher fetcher(&getExecutor(), target, "db", findCmdObj, unusedFetcherCallback);
-    ASSERT_FALSE(fetcher.getDiagnosticString().empty());
+    ASSERT_FALSE(fetcher->getDiagnosticString().empty());
 }
 
 TEST_F(FetcherTest, IsActiveAfterSchedule) {

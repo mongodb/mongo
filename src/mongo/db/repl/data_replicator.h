@@ -40,6 +40,8 @@
 #include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/collection_cloner.h"
 #include "mongo/db/repl/database_cloner.h"
+#include "mongo/db/repl/data_replicator_external_state.h"
+#include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/reporter.h"
@@ -70,7 +72,6 @@ using Response = executor::RemoteCommandResponse;
 using TimestampStatus = StatusWith<Timestamp>;
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
-class OplogFetcher;
 struct InitialSyncState;
 struct MemberState;
 class ReplicationProgressManager;
@@ -113,6 +114,9 @@ struct DataReplicatorOptions {
     /** Function to get this node's slaveDelay. */
     using GetSlaveDelayFn = stdx::function<Seconds()>;
 
+    /** Function to get current replica set configuration */
+    using GetReplSetConfigFn = stdx::function<ReplicaSetConfig()>;
+
     // Error and retry values
     Milliseconds syncSourceRetryWait{1000};
     Milliseconds initialSyncRetryWait{1000};
@@ -140,6 +144,8 @@ struct DataReplicatorOptions {
     SetMyLastOptimeFn setMyLastOptime;
     SetFollowerModeFn setFollowerMode;
     GetSlaveDelayFn getSlaveDelay;
+    GetReplSetConfigFn getReplSetConfig;
+
     SyncSourceSelector* syncSourceSelector = nullptr;
 
     std::string toString() const {
@@ -158,7 +164,9 @@ struct DataReplicatorOptions {
  */
 class DataReplicator {
 public:
-    DataReplicator(DataReplicatorOptions opts, ReplicationExecutor* exec);
+    DataReplicator(DataReplicatorOptions opts,
+                   std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
+                   ReplicationExecutor* exec);
 
     virtual ~DataReplicator();
 
@@ -226,8 +234,16 @@ private:
 
     // Only executed via executor
     void _resumeFinish(CallbackArgs cbData);
-    void _onOplogFetchFinish(const QueryResponseStatus& fetchResult,
-                             Fetcher::NextAction* nextAction);
+
+    /**
+     * Pushes documents from oplog fetcher to blocking queue for
+     * applier to consume.
+     */
+    void _enqueueDocuments(Fetcher::Documents::const_iterator begin,
+                           Fetcher::Documents::const_iterator end,
+                           const OplogFetcher::DocumentsInfo& info,
+                           Milliseconds elapsed);
+    void _onOplogFetchFinish(const Status& status, const OpTimeWithHash& lastFetched);
     void _rollbackOperations(const CallbackArgs& cbData);
     void _doNextActions();
     void _doNextActions_InitialSync_inlock();
@@ -273,6 +289,7 @@ private:
 
     // Set during construction
     const DataReplicatorOptions _opts;
+    std::unique_ptr<DataReplicatorExternalState> _dataReplicatorExternalState;
     ReplicationExecutor* _exec;
 
     //

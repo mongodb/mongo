@@ -41,6 +41,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
+#include "mongo/db/repl/data_replicator_external_state_impl.h"
 #include "mongo/db/repl/elect_cmd_runner.h"
 #include "mongo/db/repl/election_winner_declarer.h"
 #include "mongo/db/repl/freshness_checker.h"
@@ -253,7 +254,9 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
       _sleptLastElection(false),
       _canAcceptNonLocalWrites(!(settings.usingReplSets() || settings.isSlave())),
       _canServeNonLocalReads(0U),
-      _dr(createDataReplicatorOptions(this), &_replExecutor),
+      _dr(createDataReplicatorOptions(this),
+          stdx::make_unique<DataReplicatorExternalStateImpl>(this),
+          &_replExecutor),
       _isDurableStorageEngine(isDurableStorageEngineFn ? *isDurableStorageEngineFn : []() -> bool {
           return getGlobalServiceContext()->getGlobalStorageEngine()->isDurable();
       }) {

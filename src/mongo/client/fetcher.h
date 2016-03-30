@@ -128,6 +128,26 @@ public:
     virtual ~Fetcher();
 
     /**
+     * Returns host where remote commands will be sent to.
+     */
+    HostAndPort getSource() const;
+
+    /**
+     * Returns command object sent in first remote command.
+     */
+    BSONObj getCommandObject() const;
+
+    /**
+     * Returns metadata object sent in remote commands.
+     */
+    BSONObj getMetadataObject() const;
+
+    /**
+     * Returns timeout for remote commands to complete.
+     */
+    Milliseconds getTimeout() const;
+
+    /**
      * Returns diagnostic information.
      */
     std::string getDiagnosticString() const;

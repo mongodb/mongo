@@ -165,6 +165,22 @@ Fetcher::~Fetcher() {
     DESTRUCTOR_GUARD(cancel(); wait(););
 }
 
+HostAndPort Fetcher::getSource() const {
+    return _source;
+}
+
+BSONObj Fetcher::getCommandObject() const {
+    return _cmdObj;
+}
+
+BSONObj Fetcher::getMetadataObject() const {
+    return _metadata;
+}
+
+Milliseconds Fetcher::getTimeout() const {
+    return _timeout;
+}
+
 std::string Fetcher::getDiagnosticString() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     str::stream output;

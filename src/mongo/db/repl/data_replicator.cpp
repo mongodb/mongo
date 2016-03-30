@@ -42,11 +42,13 @@
 #include "mongo/db/repl/collection_cloner.h"
 #include "mongo/db/repl/database_cloner.h"
 #include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point_service.h"
@@ -93,102 +95,6 @@ std::string toString(DataReplicatorState s) {
     }
     MONGO_UNREACHABLE;
 }
-
-/**
- * Follows the fetcher pattern for a find+getmore on an oplog
- * Returns additional errors if the start oplog entry cannot be found.
- */
-class OplogFetcher : public QueryFetcher {
-    MONGO_DISALLOW_COPYING(OplogFetcher);
-
-public:
-    OplogFetcher(ReplicationExecutor* exec,
-                 const Timestamp& startTS,
-                 const HostAndPort& src,
-                 const NamespaceString& nss,
-                 const QueryFetcher::CallbackFn& work);
-
-    virtual ~OplogFetcher() = default;
-    std::string toString() const;
-
-    const Timestamp getStartTimestamp() const {
-        return _startTS;
-    }
-
-protected:
-    void _delegateCallback(const Fetcher::QueryResponseStatus& fetchResult, NextAction* nextAction);
-
-    const Timestamp _startTS;
-};
-
-// OplogFetcher
-OplogFetcher::OplogFetcher(ReplicationExecutor* exec,
-                           const Timestamp& startTS,
-                           const HostAndPort& src,
-                           const NamespaceString& oplogNSS,
-                           const QueryFetcher::CallbackFn& work)
-    // TODO: add query options await_data, oplog_replay
-    : QueryFetcher(exec,
-                   src,
-                   oplogNSS,
-                   BSON("find" << oplogNSS.coll() << "filter"
-                               << BSON("ts" << BSON("$gte" << startTS))),
-                   work,
-                   BSON(rpc::kReplSetMetadataFieldName << 1)),
-      _startTS(startTS) {}
-
-std::string OplogFetcher::toString() const {
-    return str::stream() << "OplogReader -"
-                         << " startTS: " << _startTS.toString()
-                         << " fetcher: " << QueryFetcher::getDiagnosticString();
-}
-
-void OplogFetcher::_delegateCallback(const Fetcher::QueryResponseStatus& fetchResult,
-                                     Fetcher::NextAction* nextAction) {
-    if (fetchResult.isOK()) {
-        Fetcher::Documents::const_iterator firstDoc = fetchResult.getValue().documents.begin();
-        auto hasDoc = firstDoc != fetchResult.getValue().documents.end();
-
-        if (fetchResult.getValue().first) {
-            if (!hasDoc) {
-                // Set next action to none.
-                *nextAction = Fetcher::NextAction::kNoAction;
-                _onQueryResponse(
-                    Status(ErrorCodes::OplogStartMissing,
-                           str::stream()
-                               << "No operations on sync source with op time starting at: "
-                               << _startTS.toString()),
-                    nextAction);
-                return;
-            } else if ((*firstDoc)["ts"].eoo()) {
-                // Set next action to none.
-                *nextAction = Fetcher::NextAction::kNoAction;
-                _onQueryResponse(Status(ErrorCodes::OplogStartMissing,
-                                        str::stream() << "Missing 'ts' field in first returned "
-                                                      << (*firstDoc)["ts"] << " starting at "
-                                                      << _startTS.toString()),
-                                 nextAction);
-                return;
-            } else if ((*firstDoc)["ts"].timestamp() != _startTS) {
-                // Set next action to none.
-                *nextAction = Fetcher::NextAction::kNoAction;
-                _onQueryResponse(Status(ErrorCodes::OplogStartMissing,
-                                        str::stream() << "First returned " << (*firstDoc)["ts"]
-                                                      << " is not where we wanted to start: "
-                                                      << _startTS.toString()),
-                                 nextAction);
-                return;
-            }
-        }
-
-        if (hasDoc) {
-            _onQueryResponse(fetchResult, nextAction);
-        } else {
-        }
-    } else {
-        _onQueryResponse(fetchResult, nextAction);
-    }
-};
 
 class DatabasesCloner {
 public:
@@ -511,8 +417,12 @@ void DatabasesCloner::_failed() {
 }
 
 // Data Replicator
-DataReplicator::DataReplicator(DataReplicatorOptions opts, ReplicationExecutor* exec)
+DataReplicator::DataReplicator(
+    DataReplicatorOptions opts,
+    std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
+    ReplicationExecutor* exec)
     : _opts(opts),
+      _dataReplicatorExternalState(std::move(dataReplicatorExternalState)),
       _exec(exec),
       _state(DataReplicatorState::Uninitialized),
       _fetcherPaused(false),
@@ -533,7 +443,7 @@ DataReplicator::DataReplicator(DataReplicatorOptions opts, ReplicationExecutor* 
 }
 
 DataReplicator::~DataReplicator() {
-    DESTRUCTOR_GUARD(_cancelAllHandles_inlock(); _waitOnAll_inlock(););
+    DESTRUCTOR_GUARD(_cancelAllHandles_inlock(); _oplogBuffer.clear(); _waitOnAll_inlock(););
 }
 
 Status DataReplicator::start() {
@@ -767,14 +677,27 @@ TimestampStatus DataReplicator::initialSync() {
             attemptErrorStatus = tsStatus.getStatus();
             if (attemptErrorStatus.isOK()) {
                 _initialSyncState->beginTimestamp = tsStatus.getValue();
-                _fetcher.reset(new OplogFetcher(_exec,
-                                                _initialSyncState->beginTimestamp,
-                                                _syncSource,
-                                                _opts.remoteOplogNS,
-                                                stdx::bind(&DataReplicator::_onOplogFetchFinish,
-                                                           this,
-                                                           stdx::placeholders::_1,
-                                                           stdx::placeholders::_2)));
+                long long term = OpTime::kUninitializedTerm;
+                // TODO: Read last fetched hash from storage.
+                long long lastHashFetched = 1LL;
+                OpTime lastOpTimeFetched(_initialSyncState->beginTimestamp, term);
+                _fetcher = stdx::make_unique<OplogFetcher>(
+                    _exec,
+                    OpTimeWithHash(lastHashFetched, lastOpTimeFetched),
+                    _syncSource,
+                    _opts.remoteOplogNS,
+                    _opts.getReplSetConfig(),
+                    _dataReplicatorExternalState.get(),
+                    stdx::bind(&DataReplicator::_enqueueDocuments,
+                               this,
+                               stdx::placeholders::_1,
+                               stdx::placeholders::_2,
+                               stdx::placeholders::_3,
+                               stdx::placeholders::_4),
+                    stdx::bind(&DataReplicator::_onOplogFetchFinish,
+                               this,
+                               stdx::placeholders::_1,
+                               stdx::placeholders::_2));
                 _scheduleFetch_inlock();
                 lk.unlock();
                 _initialSyncState->dbsCloner.start();  // When the cloner is done applier starts.
@@ -888,7 +811,7 @@ bool DataReplicator::_anyActiveHandles_inlock() const {
 
 void DataReplicator::_cancelAllHandles_inlock() {
     if (_fetcher)
-        _fetcher->cancel();
+        _fetcher->shutdown();
     if (_applier)
         _applier->cancel();
     if (_reporter)
@@ -899,7 +822,7 @@ void DataReplicator::_cancelAllHandles_inlock() {
 
 void DataReplicator::_waitOnAll_inlock() {
     if (_fetcher)
-        _fetcher->wait();
+        _fetcher->join();
     if (_applier)
         _applier->wait();
     if (_reporter)
@@ -1102,6 +1025,10 @@ void DataReplicator::_onApplyBatchFinish(const CallbackArgs& cbData,
                                          const TimestampStatus& ts,
                                          const Operations& ops,
                                          const size_t numApplied) {
+    if (ErrorCodes::CallbackCanceled == cbData.status) {
+        return;
+    }
+
     invariant(cbData.status.isOK());
     UniqueLock lk(_mutex);
     if (_initialSyncState) {
@@ -1293,21 +1220,31 @@ Status DataReplicator::_scheduleFetch_inlock() {
             }
         }
 
-        const auto startOptime = _opts.getMyLastOptime().getTimestamp();
+        const auto startOptime = _opts.getMyLastOptime();
+        // TODO: Read last applied hash from storage. See
+        // BackgroundSync::_readLastAppliedHash(OperationContex*).
+        long long startHash = 0LL;
         const auto remoteOplogNS = _opts.remoteOplogNS;
 
-        // TODO: add query options await_data, oplog_replay
-        _fetcher.reset(new OplogFetcher(_exec,
-                                        startOptime,
-                                        _syncSource,
-                                        remoteOplogNS,
-                                        stdx::bind(&DataReplicator::_onOplogFetchFinish,
-                                                   this,
-                                                   stdx::placeholders::_1,
-                                                   stdx::placeholders::_2)));
+        _fetcher = stdx::make_unique<OplogFetcher>(_exec,
+                                                   OpTimeWithHash(startHash, startOptime),
+                                                   _syncSource,
+                                                   remoteOplogNS,
+                                                   _opts.getReplSetConfig(),
+                                                   _dataReplicatorExternalState.get(),
+                                                   stdx::bind(&DataReplicator::_enqueueDocuments,
+                                                              this,
+                                                              stdx::placeholders::_1,
+                                                              stdx::placeholders::_2,
+                                                              stdx::placeholders::_3,
+                                                              stdx::placeholders::_4),
+                                                   stdx::bind(&DataReplicator::_onOplogFetchFinish,
+                                                              this,
+                                                              stdx::placeholders::_1,
+                                                              stdx::placeholders::_2));
     }
     if (!_fetcher->isActive()) {
-        Status status = _fetcher->schedule();
+        Status status = _fetcher->startup();
         if (!status.isOK()) {
             return status;
         }
@@ -1335,6 +1272,7 @@ Status DataReplicator::scheduleShutdown() {
         invariant(!_onShutdown.isValid());
         _onShutdown = eventStatus.getValue();
         _cancelAllHandles_inlock();
+        _oplogBuffer.clear();
     }
 
     // Schedule _doNextActions in case nothing is active to trigger the _onShutdown event.
@@ -1369,38 +1307,45 @@ Status DataReplicator::_shutdown() {
     return status;
 }
 
-void DataReplicator::_onOplogFetchFinish(const StatusWith<Fetcher::QueryResponse>& fetchResult,
-                                         Fetcher::NextAction* nextAction) {
-    const Status status = fetchResult.getStatus();
-    if (status.code() == ErrorCodes::CallbackCanceled)
+void DataReplicator::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
+                                       Fetcher::Documents::const_iterator end,
+                                       const OplogFetcher::DocumentsInfo& info,
+                                       Milliseconds getMoreElapsed) {
+    if (info.toApplyDocumentCount == 0) {
         return;
-    if (status.isOK()) {
-        const auto& docs = fetchResult.getValue().documents;
-        if (docs.begin() != docs.end()) {
-            LockGuard lk(_mutex);
-            std::for_each(
-                docs.cbegin(), docs.cend(), [&](const BSONObj& doc) { _oplogBuffer.push(doc); });
-            auto doc = docs.rbegin();
-            BSONElement tsElem(doc->getField("ts"));
-            while (tsElem.eoo() && doc != docs.rend()) {
-                tsElem = (doc++)->getField("ts");
-            }
-
-            if (!tsElem.eoo()) {
-                _lastTimestampFetched = tsElem.timestamp();
-            } else {
-                warning() << "Did not find a 'ts' timestamp field in any of the fetched documents";
-            }
-        }
-        if (*nextAction == Fetcher::NextAction::kNoAction) {
-            // TODO: create new fetcher?, with new query from where we left off -- d'tor fetcher
-        }
     }
 
-    if (!status.isOK()) {
+    // Wait for enough space.
+    // Gets unblocked on shutdown.
+    _oplogBuffer.waitForSpace(info.toApplyDocumentBytes);
+
+    OCCASIONALLY {
+        LOG(2) << "bgsync buffer has " << _oplogBuffer.size() << " bytes";
+    }
+
+    // Buffer docs for later application.
+    _oplogBuffer.pushAllNonBlocking(begin, end);
+
+    _lastTimestampFetched = info.lastDocument.opTime.getTimestamp();
+
+    // TODO: updates metrics with "info" and "getMoreElapsed".
+
+    _doNextActions();
+}
+
+void DataReplicator::_onOplogFetchFinish(const Status& status, const OpTimeWithHash& lastFetched) {
+    if (status.code() == ErrorCodes::CallbackCanceled) {
+        return;
+    } else if (status.isOK()) {
+        _lastTimestampFetched = lastFetched.opTime.getTimestamp();
+
+        // TODO: create new fetcher?, with new query from where we left off -- d'tor fetcher
+    } else {
+        invariant(!status.isOK());
         // Got an error, now decide what to do...
         switch (status.code()) {
-            case ErrorCodes::OplogStartMissing: {
+            case ErrorCodes::OplogStartMissing:
+            case ErrorCodes::RemoteOplogStale: {
                 _setState(DataReplicatorState::Rollback);
                 // possible rollback
                 auto scheduleResult = _exec->scheduleDBWork(

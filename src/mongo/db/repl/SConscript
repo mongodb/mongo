@@ -324,6 +324,7 @@ env.Library('repl_coordinator_impl',
                      '$BUILD_DIR/mongo/rpc/metadata',
                      '$BUILD_DIR/mongo/util/fail_point',
                      'data_replicator',
+                     'data_replicator_external_state_impl',
                      'repl_coordinator_global',
                      'repl_coordinator_interface',
                      'repl_settings',
@@ -558,6 +559,31 @@ env.Library(
 )
 
 env.Library(
+    target='oplog_fetcher',
+    source=[
+        'oplog_fetcher.cpp',
+    ],
+    LIBDEPS=[
+        'repl_coordinator_interface',
+        'replica_set_messages',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/client/fetcher',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
+    ],
+)
+
+env.CppUnitTest(
+    target='oplog_fetcher_test',
+    source='oplog_fetcher_test.cpp',
+    LIBDEPS=[
+        'oplog_fetcher',
+        'data_replicator_external_state_mock',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
+    ],
+)
+
+env.Library(
     target='reporter',
     source=[
         'reporter.cpp',
@@ -763,6 +789,28 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target='data_replicator_external_state_impl',
+    source=[
+        'data_replicator_external_state_impl.cpp',
+    ],
+    LIBDEPS=[
+        'optime',
+        'repl_coordinator_interface',
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
+    target='data_replicator_external_state_mock',
+    source=[
+        'data_replicator_external_state_mock.cpp',
+    ],
+    LIBDEPS=[
+        'optime',
+    ],
+)
+
+env.Library(
     target='data_replicator',
     source=[
         'data_replicator.cpp',
@@ -772,6 +820,7 @@ env.Library(
         'collection_cloner',
         'database_cloner',
         'multiapplier',
+        'oplog_fetcher',
         'optime',
         'reporter',
         '$BUILD_DIR/mongo/client/fetcher',
@@ -786,6 +835,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'base_cloner_test_fixture',
         'data_replicator',
+        'data_replicator_external_state_mock',
         'replication_executor_test_fixture',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/unittest/concurrency',

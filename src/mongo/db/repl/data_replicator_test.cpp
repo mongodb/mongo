@@ -36,6 +36,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/repl/base_cloner_test_fixture.h"
 #include "mongo/db/repl/data_replicator.h"
+#include "mongo/db/repl/data_replicator_external_state_mock.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/update_position_args.h"
@@ -183,6 +184,9 @@ protected:
         reset();
 
         launchExecutorThread();
+
+        _myLastOpTime = OpTime({3, 0}, 1);
+
         DataReplicatorOptions options;
         options.initialSyncRetryWait = Milliseconds(0);
         options.applierFn = [this](const MultiApplier::Operations& ops) { return _applierFn(ops); };
@@ -207,8 +211,25 @@ protected:
         };
         options.getSlaveDelay = [this]() { return Seconds(0); };
         options.syncSourceSelector = this;
+        options.getReplSetConfig = []() {
+            ReplicaSetConfig config;
+            ASSERT_OK(
+                config.initialize(BSON("_id"
+                                       << "myset"
+                                       << "version" << 1 << "protocolVersion" << 1 << "members"
+                                       << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                << "localhost:12345")) << "settings"
+                                       << BSON("electionTimeoutMillis" << 10000))));
+            return config;
+        };
+
+        auto dataReplicatorExternalState = stdx::make_unique<DataReplicatorExternalStateMock>();
+        dataReplicatorExternalState->currentTerm = 1LL;
+        dataReplicatorExternalState->lastCommittedOpTime = _myLastOpTime;
+
         try {
-            _dr.reset(new DataReplicator(options, &(getReplExecutor())));
+            _dr.reset(new DataReplicator(
+                options, std::move(dataReplicatorExternalState), &(getReplExecutor())));
         } catch (...) {
             ASSERT_OK(exceptionToStatus());
         }
@@ -325,7 +346,7 @@ protected:
         const int expectedResponses(_responses.size());
 
         // counter for oplog entries
-        int c(0);
+        int c(1);
         while (true) {
             net->enterNetwork();
             if (!net->hasReadyRequests() && processedRequests < expectedResponses) {
@@ -871,10 +892,16 @@ TEST_F(SteadyStateTest, RollbackTwoSyncSourcesSecondRollbackSucceeds) {
 }
 
 TEST_F(SteadyStateTest, PauseDataReplicator) {
+    auto lastOperationApplied = BSON("op"
+                                     << "a"
+                                     << "v" << OplogEntry::kOplogVersion << "ts"
+                                     << Timestamp(Seconds(123), 0));
+
     auto operationToApply = BSON("op"
                                  << "a"
                                  << "v" << OplogEntry::kOplogVersion << "ts"
-                                 << Timestamp(Seconds(123), 0));
+                                 << Timestamp(Seconds(456), 0));
+
     stdx::mutex mutex;
     unittest::Barrier barrier(2U);
     Timestamp lastTimestampApplied;
@@ -896,7 +923,7 @@ TEST_F(SteadyStateTest, PauseDataReplicator) {
     };
 
     auto& dr = getDR();
-    _myLastOpTime = OpTime(operationToApply["ts"].timestamp(), OpTime::kInitialTerm);
+    _myLastOpTime = OpTime(lastOperationApplied["ts"].timestamp(), OpTime::kInitialTerm);
     _memberState = MemberState::RS_SECONDARY;
 
     auto net = getNet();
@@ -907,10 +934,12 @@ TEST_F(SteadyStateTest, PauseDataReplicator) {
     ASSERT_TRUE(net->hasReadyRequests());
     {
         auto networkRequest = net->getNextReadyRequest();
-        auto commandResponse = BSON(
-            "ok" << 1 << "cursor" << BSON("id" << 0LL << "ns"
-                                               << "local.oplog.rs"
-                                               << "firstBatch" << BSON_ARRAY(operationToApply)));
+        auto commandResponse =
+            BSON("ok" << 1 << "cursor"
+                      << BSON("id" << 1LL << "ns"
+                                   << "local.oplog.rs"
+                                   << "firstBatch"
+                                   << BSON_ARRAY(lastOperationApplied << operationToApply)));
         scheduleNetworkResponse(networkRequest, commandResponse);
     }
 
@@ -955,10 +984,16 @@ TEST_F(SteadyStateTest, PauseDataReplicator) {
 }
 
 TEST_F(SteadyStateTest, ApplyOneOperation) {
+    auto lastOperationApplied = BSON("op"
+                                     << "a"
+                                     << "v" << OplogEntry::kOplogVersion << "ts"
+                                     << Timestamp(Seconds(123), 0));
+
     auto operationToApply = BSON("op"
                                  << "a"
                                  << "v" << OplogEntry::kOplogVersion << "ts"
-                                 << Timestamp(Seconds(123), 0));
+                                 << Timestamp(Seconds(456), 0));
+
     stdx::mutex mutex;
     unittest::Barrier barrier(2U);
     Timestamp lastTimestampApplied;
@@ -979,7 +1014,7 @@ TEST_F(SteadyStateTest, ApplyOneOperation) {
         barrier.countDownAndWait();
     };
 
-    _myLastOpTime = OpTime(operationToApply["ts"].timestamp(), OpTime::kInitialTerm);
+    _myLastOpTime = OpTime(lastOperationApplied["ts"].timestamp(), OpTime::kInitialTerm);
     _memberState = MemberState::RS_SECONDARY;
 
     auto net = getNet();
@@ -991,10 +1026,12 @@ TEST_F(SteadyStateTest, ApplyOneOperation) {
     ASSERT_TRUE(net->hasReadyRequests());
     {
         auto networkRequest = net->getNextReadyRequest();
-        auto commandResponse = BSON(
-            "ok" << 1 << "cursor" << BSON("id" << 0LL << "ns"
-                                               << "local.oplog.rs"
-                                               << "firstBatch" << BSON_ARRAY(operationToApply)));
+        auto commandResponse =
+            BSON("ok" << 1 << "cursor"
+                      << BSON("id" << 1LL << "ns"
+                                   << "local.oplog.rs"
+                                   << "firstBatch"
+                                   << BSON_ARRAY(lastOperationApplied << operationToApply)));
         scheduleNetworkResponse(networkRequest, commandResponse);
     }
     ASSERT_EQUALS(0U, dr.getOplogBufferCount());
