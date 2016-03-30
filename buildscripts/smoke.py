@@ -469,14 +469,15 @@ def skipTest(path):
 
         authTestsToSkip = [("jstests", "drop2.js"), # SERVER-8589,
                            ("jstests", "killop.js"), # SERVER-10128
+                           ("sharding", "cleanup_orphaned_cmd_during_movechunk.js"), # SERVER-21713
+                           ("sharding", "cleanup_orphaned_cmd_during_movechunk_hashed.js"), # SERVER-21713
+                           ("sharding", "copydb_from_mongos.js"), # SERVER-13080
+                           ("sharding", "migration_ignore_interrupts.js"), # SERVER-21713
+                           ("sharding", "migration_sets_fromMigrate_flag.js"), # SERVER-21713
+                           ("sharding", "migration_with_source_ops.js"), # SERVER-21713
+                           ("sharding", "parallel.js"),
                            ("sharding", "sync3.js"), # SERVER-6388 for this and those below
                            ("sharding", "sync6.js"),
-                           ("sharding", "parallel.js"),
-                           ("sharding", "copydb_from_mongos.js"), # SERVER-13080
-                           ("jstests", "bench_test1.js"),
-                           ("jstests", "bench_test2.js"),
-                           ("jstests", "bench_test3.js"),
-                           ("jstests", "bench_test_insert.js"),
                            ("core", "bench_test1.js"),
                            ("core", "bench_test2.js"),
                            ("core", "bench_test3.js"),

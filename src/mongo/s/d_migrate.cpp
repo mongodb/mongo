@@ -1827,6 +1827,9 @@ MONGO_FP_DECLARE(migrateThreadHangAtStep2);
 MONGO_FP_DECLARE(migrateThreadHangAtStep3);
 MONGO_FP_DECLARE(migrateThreadHangAtStep4);
 MONGO_FP_DECLARE(migrateThreadHangAtStep5);
+MONGO_FP_DECLARE(migrateThreadHangAtStep6);
+
+MONGO_FP_DECLARE(failMigrationReceivedOutOfRangeOperation);
 
 class MigrateStatus {
 public:
@@ -1948,7 +1951,7 @@ public:
               << epoch.toString() << endl;
 
         string errmsg;
-        MoveTimingHelper timing(txn, "to", ns, min, max, 5 /* steps */, &errmsg, "", "");
+        MoveTimingHelper timing(txn, "to", ns, min, max, 6 /* steps */, &errmsg, "", "");
 
         ScopedDbConnection conn(fromShard);
         conn->getLastError();  // just test connection
@@ -2358,6 +2361,8 @@ public:
         }
 
         setState(DONE);
+        timing.done(6);
+        MONGO_FP_PAUSE_WHILE(migrateThreadHangAtStep6);
         conn.done();
     }
 
@@ -2415,8 +2420,11 @@ public:
                 BSONObj fullObj;
                 if (Helpers::findById(txn, ctx.db(), ns.c_str(), id, fullObj)) {
                     if (!isInRange(fullObj, min, max, shardKeyPattern)) {
-                        log() << "not applying out of range deletion: " << fullObj << migrateLog;
+                        if (MONGO_FAIL_POINT(failMigrationReceivedOutOfRangeOperation)) {
+                            invariant(false);
+                        }
 
+                        log() << "not applying out of range deletion: " << fullObj << migrateLog;
                         continue;
                     }
                 }
@@ -2446,6 +2454,11 @@ public:
                 Client::WriteContext cx(txn, ns);
 
                 BSONObj updatedDoc = i.next().Obj();
+
+                if (MONGO_FAIL_POINT(failMigrationReceivedOutOfRangeOperation) &&
+                    !isInRange(updatedDoc, min, max, shardKeyPattern)) {
+                    invariant(false);
+                }
 
                 BSONObj localDoc;
                 if (willOverrideLocalId(
