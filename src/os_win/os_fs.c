@@ -395,6 +395,15 @@ __win_handle_sync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
 {
 	WT_DECL_RET;
 
+	/*
+	 * We don't open Windows system handles when opening directories
+	 * for flushing, as it is not necessary (or possible) to flush
+	 * a directory on Windows. Confirm the file handle is set before
+	 * attempting to sync it.
+	 */
+	if (fhp->fp == NULL && fh->filehandle == INVALID_HANDLE_VALUE)
+		return (0);
+
 	if (fh->fp == NULL) {
 		/*
 		 * Callers attempting asynchronous flush handle ENOTSUP returns,

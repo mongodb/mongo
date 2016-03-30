@@ -24,7 +24,7 @@ __wt_stream_set_line_buffer(FILE *fp)
 	 * same as full-buffering. We assume our caller wants immediate output,
 	 * set no-buffering instead.
 	 */
-	return (__wt_stream_set_no_buffer(fp));
+	__wt_stream_set_no_buffer(fp);
 }
 
 /*
