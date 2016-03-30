@@ -87,6 +87,9 @@ __open_verbose(WT_SESSION_IMPL *session,
     const char *name, uint32_t file_type, uint32_t flags)
 {
 #ifdef HAVE_VERBOSE
+	WT_DECL_RET;
+	WT_DECL_ITEM(tmp);
+	const char *file_type_tag, *sep;
 	if (!WT_VERBOSE_ISSET(session, WT_VERB_FILEOPS))
 		return (0);
 
@@ -94,9 +97,6 @@ __open_verbose(WT_SESSION_IMPL *session,
 	 * It's useful to track file opens when debugging platforms, take some
 	 * effort to output good tracking information.
 	 */
-	WT_DECL_RET;
-	WT_DECL_ITEM(tmp);
-	const char *file_type_tag, *sep;
 
 	switch (file_type) {
 	case WT_FILE_TYPE_CHECKPOINT:
