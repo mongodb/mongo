@@ -16,25 +16,28 @@
 
 package openssl
 
-// #include <stdlib.h>
-// #include <openssl/ssl.h>
-// #include <openssl/conf.h>
-// #include <openssl/err.h>
-//
-// int sk_X509_num_not_a_macro(STACK_OF(X509) *sk) { return sk_X509_num(sk); }
-// X509 *sk_X509_value_not_a_macro(STACK_OF(X509)* sk, int i) {
-//    return sk_X509_value(sk, i);
-// }
-// long SSL_set_tlsext_host_name_not_a_macro(SSL *ssl, const char *name) {
-//    return SSL_set_tlsext_host_name(ssl, name);
-// }
-// const char * SSL_get_cipher_name_not_a_macro(const SSL *ssl) {
-//    return SSL_get_cipher_name(ssl);
-// }
+/*
+#include <stdlib.h>
+#include <openssl/ssl.h>
+#include <openssl/conf.h>
+#include <openssl/err.h>
+
+int sk_X509_num_not_a_macro(STACK_OF(X509) *sk) { return sk_X509_num(sk); }
+X509 *sk_X509_value_not_a_macro(STACK_OF(X509)* sk, int i) {
+   return sk_X509_value(sk, i);
+}
+const char * SSL_get_cipher_name_not_a_macro(const SSL *ssl) {
+   return SSL_get_cipher_name(ssl);
+}
+static int SSL_session_reused_not_a_macro(SSL *ssl) {
+    return SSL_session_reused(ssl);
+}
+*/
 import "C"
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"runtime"
@@ -381,11 +384,13 @@ type ConnectionState struct {
 	CertificateError      error
 	CertificateChain      []*Certificate
 	CertificateChainError error
+	SessionReused         bool
 }
 
 func (c *Conn) ConnectionState() (rv ConnectionState) {
 	rv.Certificate, rv.CertificateError = c.PeerCertificate()
 	rv.CertificateChain, rv.CertificateChainError = c.PeerCertificateChain()
+	rv.SessionReused = c.SessionReused()
 	return
 }
 
@@ -565,17 +570,56 @@ func (c *Conn) UnderlyingConn() net.Conn {
 	return c.conn
 }
 
-func (c *Conn) SetTlsExtHostName(name string) error {
-	cname := C.CString(name)
-	defer C.free(unsafe.Pointer(cname))
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
-	if C.SSL_set_tlsext_host_name_not_a_macro(c.ssl, cname) == 0 {
-		return errorFromErrorQueue()
-	}
-	return nil
-}
-
 func (c *Conn) VerifyResult() VerifyResult {
 	return VerifyResult(C.SSL_get_verify_result(c.ssl))
+}
+
+func (c *Conn) SessionReused() bool {
+	return C.SSL_session_reused_not_a_macro(c.ssl) == 1
+}
+
+func (c *Conn) GetSession() ([]byte, error) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	// get1 increases the refcount of the session, so we have to free it.
+	session := (*C.SSL_SESSION)(C.SSL_get1_session(c.ssl))
+	if session == nil {
+		return nil, errors.New("failed to get session")
+	}
+	defer C.SSL_SESSION_free(session)
+
+	// get the size of the encoding
+	slen := C.i2d_SSL_SESSION(session, nil)
+
+	buf := (*C.uchar)(C.malloc(C.size_t(slen)))
+	defer C.free(unsafe.Pointer(buf))
+
+	// this modifies the value of buf (seriously), so we have to pass in a temp
+	// var so that we can actually read the bytes from buf.
+	tmp := buf
+	slen2 := C.i2d_SSL_SESSION(session, &tmp)
+	if slen != slen2 {
+		return nil, errors.New("session had different lengths")
+	}
+
+	return C.GoBytes(unsafe.Pointer(buf), slen), nil
+}
+
+func (c *Conn) setSession(session []byte) error {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	ptr := (*C.uchar)(&session[0])
+	s := C.d2i_SSL_SESSION(nil, &ptr, C.long(len(session)))
+	if s == nil {
+		return fmt.Errorf("unable to load session: %s", errorFromErrorQueue())
+	}
+	defer C.SSL_SESSION_free(s)
+
+	ret := C.SSL_set_session(c.ssl, s)
+	if ret != 1 {
+		return fmt.Errorf("unable to set session: %s", errorFromErrorQueue())
+	}
+	return nil
 }

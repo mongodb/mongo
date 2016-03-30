@@ -31,6 +31,10 @@ static long SSL_CTX_clear_options_not_a_macro(SSL_CTX* ctx, long options) {
    return SSL_CTX_clear_options(ctx, options);
 }
 
+static long SSL_CTX_get_options_not_a_macro(SSL_CTX* ctx) {
+   return SSL_CTX_get_options(ctx);
+}
+
 static long SSL_CTX_set_mode_not_a_macro(SSL_CTX* ctx, long modes) {
    return SSL_CTX_set_mode(ctx, modes);
 }
@@ -41,6 +45,22 @@ static long SSL_CTX_get_mode_not_a_macro(SSL_CTX* ctx) {
 
 static long SSL_CTX_set_session_cache_mode_not_a_macro(SSL_CTX* ctx, long modes) {
    return SSL_CTX_set_session_cache_mode(ctx, modes);
+}
+
+static long SSL_CTX_sess_set_cache_size_not_a_macro(SSL_CTX* ctx, long t) {
+	return SSL_CTX_sess_set_cache_size(ctx, t);
+}
+
+static long SSL_CTX_sess_get_cache_size_not_a_macro(SSL_CTX* ctx) {
+	return SSL_CTX_sess_get_cache_size(ctx);
+}
+
+static long SSL_CTX_set_timeout_not_a_macro(SSL_CTX* ctx, long t) {
+   return SSL_CTX_set_timeout(ctx, t);
+}
+
+static long SSL_CTX_get_timeout_not_a_macro(SSL_CTX* ctx) {
+   return SSL_CTX_get_timeout(ctx);
 }
 
 static int CRYPTO_add_not_a_macro(int *pointer,int amount,int type) {
@@ -60,7 +80,7 @@ static long SSL_CTX_add_extra_chain_cert_not_a_macro(SSL_CTX* ctx, X509 *cert) {
 #endif
 
 static const SSL_METHOD *OUR_TLSv1_1_method() {
-#if defined(TLS1_1_VERSION) && !defined(OPENSSL_SYSNAME_MACOSX)
+#if OPENSSL_VERSION_NUMBER > 0x1000100fL && defined(TLS1_1_VERSION) && !defined(OPENSSL_SYSNAME_MACOSX)
     return TLSv1_1_method();
 #else
     return NULL;
@@ -68,12 +88,16 @@ static const SSL_METHOD *OUR_TLSv1_1_method() {
 }
 
 static const SSL_METHOD *OUR_TLSv1_2_method() {
-#if defined(TLS1_2_VERSION) && !defined(OPENSSL_SYSNAME_MACOSX)
+#if OPENSSL_VERSION_NUMBER > 0x1000100fL && defined(TLS1_2_VERSION) && !defined(OPENSSL_SYSNAME_MACOSX)
     return TLSv1_2_method();
 #else
     return NULL;
 #endif
 }
+
+#if defined SSL_CTRL_SET_TLSEXT_HOSTNAME
+	extern int sni_cb(SSL *ssl_conn, int *ad, void *arg);
+#endif
 
 extern int verify_cb(int ok, X509_STORE_CTX* store);
 
@@ -93,6 +117,7 @@ import (
 	"io/ioutil"
 	"os"
 	"runtime"
+	"time"
 	"unsafe"
 
 	"github.com/spacemonkeygo/spacelog"
@@ -110,6 +135,7 @@ type Ctx struct {
 	chain     []*Certificate
 	key       PrivateKey
 	verify_cb VerifyCallback
+	sni_cb    TLSExtServernameCallback
 }
 
 //export get_ssl_ctx_idx
@@ -376,6 +402,8 @@ func (c *Ctx) AddChainCertificate(cert *Certificate) error {
 	if int(C.SSL_CTX_add_extra_chain_cert_not_a_macro(c.ctx, cert.x)) != 1 {
 		return errorFromErrorQueue()
 	}
+	// OpenSSL takes ownership via SSL_CTX_add_extra_chain_cert
+	runtime.SetFinalizer(cert, nil)
 	return nil
 }
 
@@ -541,6 +569,10 @@ type CertificateStoreCtx struct {
 	ssl_ctx *Ctx
 }
 
+func (self *CertificateStoreCtx) VerifyResult() VerifyResult {
+	return VerifyResult(C.X509_STORE_CTX_get_error(self.ctx))
+}
+
 func (self *CertificateStoreCtx) Err() error {
 	code := C.X509_STORE_CTX_get_error(self.ctx)
 	if code == C.X509_V_OK {
@@ -617,6 +649,12 @@ func (c *Ctx) SetOptions(options Options) Options {
 func (c *Ctx) ClearOptions(options Options) Options {
 	return Options(C.SSL_CTX_clear_options_not_a_macro(
 		c.ctx, C.long(options)))
+}
+
+// GetOptions returns context options. See
+// https://www.openssl.org/docs/ssl/SSL_CTX_set_options.html
+func (c *Ctx) GetOptions() Options {
+	return Options(C.SSL_CTX_get_options_not_a_macro(c.ctx))
 }
 
 type Modes int
@@ -697,6 +735,10 @@ func (c *Ctx) SetVerifyCallback(verify_cb VerifyCallback) {
 	c.SetVerify(c.VerifyMode(), verify_cb)
 }
 
+func (c *Ctx) GetVerifyCallback() VerifyCallback {
+	return c.verify_cb
+}
+
 func (c *Ctx) VerifyMode() VerifyOptions {
 	return VerifyOptions(C.SSL_CTX_get_verify_mode(c.ctx))
 }
@@ -707,6 +749,15 @@ func (c *Ctx) VerifyMode() VerifyOptions {
 func (c *Ctx) SetVerifyDepth(depth int) {
 	C.SSL_CTX_set_verify_depth(c.ctx, C.int(depth))
 }
+
+// GetVerifyDepth controls how many certificates deep the certificate
+// verification logic is willing to follow a certificate chain. See
+// https://www.openssl.org/docs/ssl/SSL_CTX_set_verify.html
+func (c *Ctx) GetVerifyDepth() int {
+	return int(C.SSL_CTX_get_verify_depth(c.ctx))
+}
+
+type TLSExtServernameCallback func(ssl *SSL) SSLTLSExtErr
 
 func (c *Ctx) SetSessionId(session_id []byte) error {
 	runtime.LockOSThread()
@@ -754,4 +805,29 @@ const (
 func (c *Ctx) SetSessionCacheMode(modes SessionCacheModes) SessionCacheModes {
 	return SessionCacheModes(
 		C.SSL_CTX_set_session_cache_mode_not_a_macro(c.ctx, C.long(modes)))
+}
+
+// Set session cache timeout. Returns previously set value.
+// See https://www.openssl.org/docs/ssl/SSL_CTX_set_timeout.html
+func (c *Ctx) SetTimeout(t time.Duration) time.Duration {
+	prev := C.SSL_CTX_set_timeout_not_a_macro(c.ctx, C.long(t/time.Second))
+	return time.Duration(prev) * time.Second
+}
+
+// Get session cache timeout.
+// See https://www.openssl.org/docs/ssl/SSL_CTX_set_timeout.html
+func (c *Ctx) GetTimeout() time.Duration {
+	return time.Duration(C.SSL_CTX_get_timeout_not_a_macro(c.ctx)) * time.Second
+}
+
+// Set session cache size. Returns previously set value.
+// https://www.openssl.org/docs/ssl/SSL_CTX_sess_set_cache_size.html
+func (c *Ctx) SessSetCacheSize(t int) int {
+	return int(C.SSL_CTX_sess_set_cache_size_not_a_macro(c.ctx, C.long(t)))
+}
+
+// Get session cache size.
+// https://www.openssl.org/docs/ssl/SSL_CTX_sess_set_cache_size.html
+func (c *Ctx) SessGetCacheSize() int {
+	return int(C.SSL_CTX_sess_get_cache_size_not_a_macro(c.ctx))
 }

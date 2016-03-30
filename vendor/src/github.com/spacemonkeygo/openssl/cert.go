@@ -27,6 +27,7 @@ import "C"
 import (
 	"errors"
 	"io/ioutil"
+	"math/big"
 	"runtime"
 	"time"
 	"unsafe"
@@ -57,7 +58,7 @@ type Certificate struct {
 }
 
 type CertificateInfo struct {
-	Serial       int
+	Serial       *big.Int
 	Issued       time.Duration
 	Expires      time.Duration
 	Country      string
@@ -104,6 +105,19 @@ func (n *Name) AddTextEntries(entries map[string]string) error {
 		}
 	}
 	return nil
+}
+
+// GetEntry returns a name entry based on NID.  If no entry, then ("", false) is
+// returned.
+func (n *Name) GetEntry(nid NID) (entry string, ok bool) {
+	entrylen := C.X509_NAME_get_text_by_NID(n.name, C.int(nid), nil, 0)
+	if entrylen == -1 {
+		return "", false
+	}
+	buf := (*C.char)(C.malloc(C.size_t(entrylen + 1)))
+	defer C.free(unsafe.Pointer(buf))
+	C.X509_NAME_get_text_by_NID(n.name, C.int(nid), buf, entrylen+1)
+	return C.GoStringN(buf, entrylen), true
 }
 
 // NewCertificate generates a basic certificate based
@@ -193,8 +207,20 @@ func (c *Certificate) SetIssuerName(name *Name) error {
 }
 
 // SetSerial sets the serial of a certificate.
-func (c *Certificate) SetSerial(serial int) error {
-	if C.ASN1_INTEGER_set(C.X509_get_serialNumber(c.x), C.long(serial)) != 1 {
+func (c *Certificate) SetSerial(serial *big.Int) error {
+	sno := C.ASN1_INTEGER_new()
+	defer C.ASN1_INTEGER_free(sno)
+	bn := C.BN_new()
+	defer C.BN_free(bn)
+
+	serialBytes := serial.Bytes()
+	if bn = C.BN_bin2bn((*C.uchar)(unsafe.Pointer(&serialBytes[0])), C.int(len(serialBytes)), bn); bn == nil {
+		return errors.New("failed to set serial")
+	}
+	if sno = C.BN_to_ASN1_INTEGER(bn, sno); sno == nil {
+		return errors.New("failed to set serial")
+	}
+	if C.X509_set_serialNumber(c.x, sno) != 1 {
 		return errors.New("failed to set serial")
 	}
 	return nil
