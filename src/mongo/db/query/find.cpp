@@ -489,8 +489,10 @@ std::string runQuery(OperationContext* txn,
                      const NamespaceString& nss,
                      Message& result) {
     CurOp& curop = *CurOp::get(txn);
-    // Validate the namespace.
-    uassert(16256, str::stream() << "Invalid ns [" << nss.ns() << "]", nss.isValid());
+
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "Invalid ns [" << nss.ns() << "]",
+            nss.isValid());
     invariant(!nss.isCommand());
 
     // Set curop information.

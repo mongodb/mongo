@@ -915,7 +915,9 @@ bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, 
 
     try {
         const NamespaceString nsString(ns);
-        uassert(16258, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid());
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Invalid ns [" << ns << "]",
+                nsString.isValid());
 
         Status status = AuthorizationSession::get(txn->getClient())
                             ->checkAuthForGetMore(nsString, cursorid, false);

@@ -133,7 +133,7 @@ public:
         ASSERT(cursor->more());
         BSONObj result = cursor->next().getOwned();
         ASSERT(result.hasField("$err"));
-        ASSERT_EQUALS(result["code"].Int(), 16256);
+        ASSERT_EQUALS(result["code"].Int(), ErrorCodes::InvalidNamespace);
     }
 };
 
@@ -147,7 +147,7 @@ public:
         ASSERT(cursor->more());
         BSONObj result = cursor->next().getOwned();
         ASSERT(result.hasField("$err"));
-        ASSERT_EQUALS(result["code"].Int(), 16258);
+        ASSERT_EQUALS(result["code"].Int(), ErrorCodes::InvalidNamespace);
     }
 };
 
