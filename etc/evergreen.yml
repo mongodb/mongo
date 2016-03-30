@@ -4545,9 +4545,9 @@ buildvariants:
   - name: concurrency_simultaneous_WT
   # - name: dbtest
   - name: dbtest_WT
-  - name: disk
+  # - name: disk
   # - name: dur_jscore_passthrough
-  - name: durability
+  # - name: durability
   - name: ese_WT
   - name: failpoints
   - name: failpoints_auth
@@ -4577,7 +4577,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   # - name: mmap
   - name: mongosTest
-  - name: noPassthrough
+  # - name: noPassthrough
   # - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
   - name: noPassthrough_WT
