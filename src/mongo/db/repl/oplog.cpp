@@ -398,7 +398,7 @@ static void logOpInternal(OperationContext* txn,
                           BSONObj* patt,
                           bool* b,
                           bool fromMigrate,
-                          bool isDeleteInMigratingChunk) {
+                          bool isMaybeInActiveChunk) {
     if (getGlobalReplicationCoordinator()->isReplEnabled()) {
         _logOp(txn, opstr, ns, 0, obj, patt, b, fromMigrate);
     }
@@ -408,7 +408,7 @@ static void logOpInternal(OperationContext* txn,
     // rollback-safe logOp listeners
     //
     getGlobalAuthorizationManager()->logOp(txn, opstr, ns, obj, patt, b);
-    logOpForSharding(txn, opstr, ns, obj, patt, fromMigrate || !isDeleteInMigratingChunk);
+    logOpForSharding(txn, opstr, ns, obj, patt, fromMigrate || !isMaybeInActiveChunk);
     logOpForDbHash(txn, ns);
     if (strstr(ns, ".system.js")) {
         Scope::storedFuncMod(txn);
@@ -426,7 +426,7 @@ void logOp(OperationContext* txn,
         severe() << "logOp called with opstr == 'd'; use logDeleteOp instead";
         invariant(*opstr != 'd');
     }
-    logOpInternal(txn, opstr, ns, obj, patt, b, fromMigrate, false);
+    logOpInternal(txn, opstr, ns, obj, patt, b, fromMigrate, true);
 }
 
 void logDeleteOp(OperationContext* txn,
