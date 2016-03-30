@@ -94,6 +94,7 @@ variables:
   - enterprise-rhel-62-64-bit
   - enterprise-rhel-70-64-bit
   - enterprise-rhel-71-ppc64le
+  - enterprise-rhel-72-s390x
   - enterprise-suse11-64
   - enterprise-suse12-64
   - enterprise-ubuntu1204-64
@@ -4510,7 +4511,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=rhel72 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" CXX=/opt/mongodbtoolchain/v1/bin/g++ CC=/opt/mongodbtoolchain/v1/bin/gcc
     num_jobs_available: 2
     test_flags: --continueOnFailure --excludeWithAnyTags=requires_mmapv1
-    # has_packages: true
+    has_packages: true
     packager_script: packager-enterprise.py
     packager_arch: s390x
     packager_distro: rhel72
@@ -4622,9 +4623,9 @@ buildvariants:
   # - name: tool
   - name: tool_WT
   - name: unittests
-#  - name: push
-#    distros:
-#    - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 ###########################################
 #          Ubuntu buildvariants           #

@@ -132,14 +132,28 @@ class Distro(object):
         return "mongodb"
 
     def archname(self, arch):
+        """Return the packaging system's architecture name.
+        Power and x86 have different names for apt/yum (ppc64le/ppc64el
+        and x86_64/amd64)
+        """
         if re.search("^(debian|ubuntu)", self.n):
             if arch == "ppc64le":
                 return "ppc64el"
-            return "i386" if arch.endswith("86") else "amd64"
+            elif arch == "s390x":
+                return "s390x"
+            elif arch.endswith("86"):
+              return "i386"
+            else:
+              return "amd64"
         elif re.search("^(suse|centos|redhat|fedora|amazon)", self.n):
             if arch == "ppc64le":
                 return "ppc64le"
-            return "i686" if arch.endswith("86") else "x86_64"
+            elif arch == "s390x":
+                return "s390x"
+            elif arch.endswith("86"):
+              return "i686"
+            else:
+              return "x86_64"
         else:
             raise Exception("BUG: unsupported platform?")
 
@@ -232,17 +246,16 @@ class Distro(object):
             raise Exception("BUG: unsupported platform?")
 
     def build_os(self, arch):
-        """Return the build os label in the binary package to download ("rhel55", "rhel62" and "rhel70"
-        for redhat, "ubuntu1204" and "ubuntu1404" for Ubuntu, "debian71" for Debian), and "suse11"
-        for SUSE)"""
+        """Return the build os label in the binary package to download (e.g. "rhel55" for redhat,
+        "ubuntu1204" for ubuntu, "debian71" for debian, "suse11" for suse, etc.)"""
         # Community builds only support amd64
-        if arch not in ['x86_64', 'ppc64le']:
+        if arch not in ['x86_64', 'ppc64le', 's390x']:
             raise Exception("BUG: unsupported architecture (%s)" % arch)
 
         if re.search("(suse)", self.n):
             return [ "suse11", "suse12" ]
         elif re.search("(redhat|fedora|centos)", self.n):
-            return [ "rhel70", "rhel71", "rhel62", "rhel55" ]
+            return [ "rhel70", "rhel71", "rhel72", "rhel62", "rhel55" ]
         elif self.n == 'amazon':
             return [ "amazon" ]
         elif self.n == 'ubuntu':

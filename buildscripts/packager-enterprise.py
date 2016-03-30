@@ -42,7 +42,7 @@ import time
 import urlparse
 
 # The MongoDB names for the architectures we support.
-ARCH_CHOICES=["x86_64", "ppc64le"]
+ARCH_CHOICES=["x86_64", "ppc64le", "s390x"]
 
 # Made up names for the flavors of distribution we package for.
 DISTROS=["suse", "debian","redhat","ubuntu","amazon"]
@@ -114,6 +114,11 @@ class EnterpriseDistro(packager.Distro):
                 return [ "ubuntu1504" ]
             if self.n == 'redhat':
                 return [ "rhel71" ]
+            else:
+                return []
+        if arch == "s390x":
+            if self.n == 'redhat':
+                return [ "rhel72" ]
             else:
                 return []
 
@@ -263,7 +268,7 @@ def make_deb_repo(repo, distro, build_os, spec):
 Label: mongodb
 Suite: %s
 Codename: %s/mongodb-enterprise
-Architectures: amd64 ppc64el
+Architectures: amd64 ppc64el s390x
 Components: %s
 Description: MongoDB packages
 """ % (distro.repo_os_version(build_os), distro.repo_os_version(build_os), distro.repo_component())
