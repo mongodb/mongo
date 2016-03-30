@@ -401,7 +401,7 @@ __win_handle_sync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
 	 * a directory on Windows. Confirm the file handle is set before
 	 * attempting to sync it.
 	 */
-	if (fhp->fp == NULL && fh->filehandle == INVALID_HANDLE_VALUE)
+	if (fh->fp == NULL && fh->filehandle == INVALID_HANDLE_VALUE)
 		return (0);
 
 	if (fh->fp == NULL) {
