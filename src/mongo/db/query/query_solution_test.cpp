@@ -28,8 +28,10 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -245,6 +247,89 @@ TEST(QuerySolutionTest, IntervalListSomePoints) {
     ASSERT(node.getSort().count(BSON("c" << 1 << "d" << 1 << "e" << 1)));
     ASSERT(node.getSort().count(BSON("c" << 1 << "d" << 1)));
     ASSERT(node.getSort().count(BSON("c" << 1)));
+}
+
+std::unique_ptr<ParsedProjection> createParsedProjection(const BSONObj& query,
+                                                         const BSONObj& projObj) {
+    StatusWithMatchExpression queryMatchExpr =
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions());
+    ASSERT(queryMatchExpr.isOK());
+    ParsedProjection* out = nullptr;
+    Status status = ParsedProjection::make(
+        projObj, queryMatchExpr.getValue().get(), &out, ExtensionsCallbackDisallowExtensions());
+    if (!status.isOK()) {
+        FAIL(mongoutils::str::stream() << "failed to parse projection " << projObj
+                                       << " (query: " << query << "): " << status.toString());
+    }
+    ASSERT(out);
+    return std::unique_ptr<ParsedProjection>(out);
+}
+
+TEST(QuerySolutionTest, InclusionProjectionPreservesSort) {
+    auto node = stdx::make_unique<IndexScanNode>();
+    node->indexKeyPattern = BSON("a" << 1);
+
+    BSONObj projection = BSON("a" << 1);
+    BSONObj match;
+
+    auto parsedProjection = createParsedProjection(match, projection);
+
+    ProjectionNode proj{*parsedProjection};
+    proj.children.push_back(node.release());
+    proj.computeProperties();
+
+    ASSERT_EQ(proj.getSort().size(), 1U);
+    ASSERT(proj.getSort().count(BSON("a" << 1)));
+}
+
+TEST(QuerySolutionTest, ExclusionProjectionDoesNotPreserveSort) {
+    auto node = stdx::make_unique<IndexScanNode>();
+    node->indexKeyPattern = BSON("a" << 1);
+
+    BSONObj projection = BSON("a" << 0);
+    BSONObj match;
+
+    auto parsedProjection = createParsedProjection(match, projection);
+
+    ProjectionNode proj{*parsedProjection};
+    proj.children.push_back(node.release());
+    proj.computeProperties();
+
+    ASSERT_EQ(proj.getSort().size(), 0U);
+}
+
+TEST(QuerySolutionTest, InclusionProjectionTruncatesSort) {
+    auto node = stdx::make_unique<IndexScanNode>();
+    node->indexKeyPattern = BSON("a" << 1 << "b" << 1);
+
+    BSONObj projection = BSON("a" << 1);
+    BSONObj match;
+
+    auto parsedProjection = createParsedProjection(match, projection);
+
+    ProjectionNode proj{*parsedProjection};
+    proj.children.push_back(node.release());
+    proj.computeProperties();
+
+    ASSERT_EQ(proj.getSort().size(), 1U);
+    ASSERT(proj.getSort().count(BSON("a" << 1)));
+}
+
+TEST(QuerySolutionTest, ExclusionProjectionTruncatesSort) {
+    auto node = stdx::make_unique<IndexScanNode>();
+    node->indexKeyPattern = BSON("a" << 1 << "b" << 1);
+
+    BSONObj projection = BSON("b" << 0);
+    BSONObj match;
+
+    auto parsedProjection = createParsedProjection(match, projection);
+
+    ProjectionNode proj{*parsedProjection};
+    proj.children.push_back(node.release());
+    proj.computeProperties();
+
+    ASSERT_EQ(proj.getSort().size(), 1U);
+    ASSERT(proj.getSort().count(BSON("a" << 1)));
 }
 
 }  // namespace

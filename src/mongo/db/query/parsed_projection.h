@@ -68,8 +68,10 @@ public:
     /**
      * If requiresDocument() == false, what fields are required to compute
      * the projection?
+     *
+     * Returned StringDatas are owned by, and have the lifetime of, the ParsedProjection.
      */
-    const std::vector<std::string>& getRequiredFields() const {
+    const std::vector<StringData>& getRequiredFields() const {
         return _requiredFields;
     }
 
@@ -99,6 +101,13 @@ public:
         return _wantSortKey;
     }
 
+    /**
+     * Returns true if the element at 'path' is preserved entirely after this projection is applied,
+     * and false otherwise. For example, the projection {a: 1} will preserve the element located at
+     * 'a.b', and the projection {'a.b': 0} will not preserve the element located at 'a'.
+     */
+    bool isFieldRetainedExactly(StringData path) const;
+
 private:
     /**
      * Must go through ::make
@@ -122,8 +131,40 @@ private:
     static bool _hasPositionalOperatorMatch(const MatchExpression* const query,
                                             const std::string& matchfield);
 
-    // TODO: stringdata?
-    std::vector<std::string> _requiredFields;
+    // Track fields needed by the projection so that the query planner can perform projection
+    // analysis and possibly give us a covered projection.
+    //
+    // StringDatas are owned by the ParsedProjection.
+    //
+    // The order of the fields is the order they were in the projection object.
+    std::vector<StringData> _requiredFields;
+
+    // _hasId determines whether the _id field of the input is included in the output.
+    bool _hasId = false;
+
+    // Tracks the fields that have been explicitly included and excluded, respectively, in this
+    // projection.
+    //
+    // StringDatas are owned by the ParsedProjection.
+    //
+    // The ordering of the paths is the order that they appeared within the projection, and should
+    // be maintained.
+    std::vector<StringData> _includedFields;
+    std::vector<StringData> _excludedFields;
+
+    // Tracks fields referenced within the projection that are meta or array projections,
+    // respectively.
+    //
+    // StringDatas are owned by the ParsedProjection.
+    //
+    // The order of the fields is not significant.
+    std::vector<StringData> _metaFields;
+    std::vector<StringData> _arrayFields;
+
+    // Tracks whether this projection is an inclusion projection, i.e., {a: 1}, or an exclusion
+    // projection, i.e., {a: 0}. The projection {_id: 0} is ambiguous but will result in this field
+    // being set to false.
+    bool _isInclusionProjection = false;
 
     bool _requiresMatchDetails = false;
 

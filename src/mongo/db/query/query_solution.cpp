@@ -637,15 +637,40 @@ void ProjectionNode::appendToString(mongoutils::str::stream* ss, int indent) con
     children[0]->appendToString(ss, indent + 2);
 }
 
+void ProjectionNode::computeProperties() {
+    invariant(children.size() == 1U);
+    children[0]->computeProperties();
+
+    _sorts.clear();
+
+    const BSONObjSet& inputSorts = children[0]->getSort();
+
+    // Our input sort is not necessarily maintained if we project some fields that are part of the
+    // sort out.
+    for (auto&& sort : inputSorts) {
+        bool sortCompatible = true;
+        for (auto&& key : sort) {
+            if (!parsed.isFieldRetainedExactly(key.fieldNameStringData())) {
+                sortCompatible = false;
+                break;
+            }
+        }
+        if (sortCompatible) {
+            _sorts.insert(sort);
+        }
+    }
+}
+
 QuerySolutionNode* ProjectionNode::clone() const {
-    ProjectionNode* copy = new ProjectionNode();
+    ProjectionNode* copy = new ProjectionNode(parsed);
     cloneBaseData(copy);
 
     copy->_sorts = this->_sorts;
-    copy->fullExpression = this->fullExpression;
 
     // This MatchExpression* is owned by the canonical query, not by the
     // ProjectionNode. Just copying the pointer is fine.
+    copy->fullExpression = this->fullExpression;
+
     copy->projection = this->projection;
 
     return copy;

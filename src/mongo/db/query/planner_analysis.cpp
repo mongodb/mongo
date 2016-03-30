@@ -726,10 +726,10 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
             // the fields we want to include and they're not dotted.  So we want to execute the
             // projection in the fast-path simple fashion.  Just don't know which fast path yet.
             LOG(5) << "PROJECTION: requires fields\n";
-            const vector<string>& fields = query.getProj()->getRequiredFields();
+            const vector<StringData>& fields = query.getProj()->getRequiredFields();
             bool covered = true;
             for (size_t i = 0; i < fields.size(); ++i) {
-                if (!solnRoot->hasField(fields[i])) {
+                if (!solnRoot->hasField(fields[i].toString())) {
                     LOG(5) << "PROJECTION: not covered due to field " << fields[i] << endl;
                     covered = false;
                     break;
@@ -805,7 +805,7 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
         }
 
         // We now know we have whatever data is required for the projection.
-        ProjectionNode* projNode = new ProjectionNode();
+        ProjectionNode* projNode = new ProjectionNode(*query.getProj());
         projNode->children.push_back(solnRoot);
         projNode->fullExpression = query.root();
         projNode->projection = lpq.getProj();

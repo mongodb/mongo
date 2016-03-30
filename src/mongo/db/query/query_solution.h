@@ -496,13 +496,15 @@ struct ProjectionNode : public QuerySolutionNode {
         SIMPLE_DOC,
     };
 
-    ProjectionNode() : fullExpression(NULL), projType(DEFAULT) {}
+    ProjectionNode(ParsedProjection proj) : fullExpression(NULL), projType(DEFAULT), parsed(proj) {}
 
     virtual ~ProjectionNode() {}
 
     virtual StageType getType() const {
         return STAGE_PROJECTION;
     }
+
+    virtual void computeProperties();
 
     virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
@@ -532,8 +534,6 @@ struct ProjectionNode : public QuerySolutionNode {
     }
 
     const BSONObjSet& getSort() const {
-        // TODO: If we're applying a projection that maintains sort order, the prefix of the
-        // sort order we project is the sort order.
         return _sorts;
     }
 
@@ -551,6 +551,8 @@ struct ProjectionNode : public QuerySolutionNode {
 
     // What implementation of the projection algorithm should we use?
     ProjectionType projType;
+
+    ParsedProjection parsed;
 
     // Only meaningful if projType == COVERED_ONE_INDEX.  This is the key pattern of the index
     // supplying our covered data.  We can pre-compute which fields to include and cache that
