@@ -38,12 +38,12 @@ __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid)
 		 * If we fail to wait, we will leak handles so do not continue
 		 */
 		WT_PANIC_RET(session,
-		    ret == WAIT_FAILED ? __wt_win32_errno() : ret,
+		    ret == WAIT_FAILED ? __wt_getlasterror() : ret,
 		    "thread join: WaitForSingleObject");
 
 	if (CloseHandle(tid) == 0) {
 		WT_RET_MSG(session,
-		    __wt_win32_errno(), "thread join: CloseHandle");
+		    __wt_getlasterror(), "thread join: CloseHandle");
 	}
 
 	return (0);

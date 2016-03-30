@@ -34,12 +34,12 @@ __wt_win_map(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp)
 	fh->maphandle =
 	    CreateFileMappingA(fh->filehandle, NULL, PAGE_READONLY, 0, 0, NULL);
 	if (fh->maphandle == NULL)
-		WT_RET_MSG(session, __wt_win32_errno(),
+		WT_RET_MSG(session, __wt_getlasterror(),
 		    "%s: memory-map: CreateFileMappingA", fh->name);
 
 	if ((map =
 	    MapViewOfFile(fh->maphandle, FILE_MAP_READ, 0, 0, len)) == NULL) {
-		ret = __wt_win32_errno();
+		ret = __wt_getlasterror();
 
 		(void)CloseHandle(fh->maphandle);
 		fh->maphandle = NULL;
@@ -100,13 +100,13 @@ __wt_win_map_unmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, size_t len)
 		return (0);
 
 	if (UnmapViewOfFile(map) == 0) {
-		ret = __wt_win32_errno();
+		ret = __wt_getlasterror();
 		__wt_err(session, ret,
 		    "%s: memory-unmap: UnmapViewOfFile", fh->name);
 	}
 
 	if (CloseHandle(fh->maphandle) == 0) {
-		ret = __wt_win32_errno();
+		ret = __wt_getlasterror();
 		__wt_err(session, ret,
 		    "%s: memory-unmap: CloseHandle", fh->name);
 	}

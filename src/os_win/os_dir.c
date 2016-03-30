@@ -43,7 +43,7 @@ __wt_win_directory_list(WT_SESSION_IMPL *session, const char *dir,
 
 	findhandle = FindFirstFileA(pathbuf->data, &finddata);
 	if (findhandle == INVALID_HANDLE_VALUE)
-		WT_ERR_MSG(session, __wt_win32_errno(),
+		WT_ERR_MSG(session, __wt_getlasterror(),
 		    "%s: directory-list: FindFirstFile", pathbuf->data);
 
 	count = 0;

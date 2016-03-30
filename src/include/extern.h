@@ -733,6 +733,7 @@ extern int __wt_errno(void);
 extern int __wt_filename(WT_SESSION_IMPL *session, const char *name, char **path);
 extern int __wt_get_vm_pagesize(void);
 extern int __wt_getenv(WT_SESSION_IMPL *session, const char *variable, const char **envp);
+extern int __wt_getlasterror(void);
 extern int __wt_getline(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_FH *fh);
 extern int __wt_getopt( const char *progname, int nargc, char *const *nargv, const char *ostr);
 extern int __wt_malloc(WT_SESSION_IMPL *session, size_t bytes_to_allocate, void *retp);
@@ -764,7 +765,6 @@ extern int __wt_strndup(WT_SESSION_IMPL *session, const void *str, size_t len, v
 extern int __wt_sync_handle_and_rename( WT_SESSION_IMPL *session, WT_FH **fhp, const char *from, const char *to);
 extern int __wt_thread_create(WT_SESSION_IMPL *session, wt_thread_t *tidret, WT_THREAD_CALLBACK(*func)(void *), void *arg);
 extern int __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid);
-extern int __wt_win32_errno(void);
 extern int __wt_win_directory_list(WT_SESSION_IMPL *session, const char *dir, const char *prefix, uint32_t flags, char ***dirlist, u_int *countp);
 extern int __wt_win_map(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp);
 extern int __wt_win_map_discard(WT_SESSION_IMPL *session, WT_FH *fh, void *p, size_t size);

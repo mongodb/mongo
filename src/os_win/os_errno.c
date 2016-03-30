@@ -72,11 +72,11 @@ __wt_errno(void)
 }
 
 /*
- * __wt_win32_errno --
+ * __wt_getlasterror --
  *	Return GetLastError, or WT_ERROR if error not set.
  */
 int
-__wt_win32_errno(void)
+__wt_getlasterror(void)
 {
 	/*
 	 * Called when we know an error occurred, and we want the system
