@@ -350,7 +350,7 @@ public:
     boost::optional<Document> getNext() final;
     const char* getSourceName() const final;
     BSONObjSet getOutputSorts() final {
-        return _exec->getOutputSorts();
+        return _outputSorts;
     }
     /**
      * Attempts to combine with any subsequent $limit stages by setting the internal '_limit' field.
@@ -443,6 +443,7 @@ private:
 
     const std::string _ns;
     std::shared_ptr<PlanExecutor> _exec;  // PipelineProxyStage holds a weak_ptr to this.
+    BSONObjSet _outputSorts;
 };
 
 

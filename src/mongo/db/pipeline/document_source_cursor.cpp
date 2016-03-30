@@ -200,7 +200,11 @@ Value DocumentSourceCursor::serialize(bool explain) const {
 DocumentSourceCursor::DocumentSourceCursor(const string& ns,
                                            const std::shared_ptr<PlanExecutor>& exec,
                                            const intrusive_ptr<ExpressionContext>& pCtx)
-    : DocumentSource(pCtx), _docsAddedToBatches(0), _ns(ns), _exec(exec) {}
+    : DocumentSource(pCtx),
+      _docsAddedToBatches(0),
+      _ns(ns),
+      _exec(exec),
+      _outputSorts(exec->getOutputSorts()) {}
 
 intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
     const string& ns,

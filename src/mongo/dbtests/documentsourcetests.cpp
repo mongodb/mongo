@@ -30,15 +30,21 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/exec/multi_plan.h"
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/stage_builder.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace DocumentSourceCursorTests {
@@ -83,14 +89,23 @@ public:
     }
 
 protected:
-    void createSource() {
+    void createSource(boost::optional<BSONObj> hint = boost::none) {
         // clean up first if this was called before
         _source.reset();
         _exec.reset();
 
         OldClientWriteContext ctx(&_opCtx, nss.ns());
-        auto cq = uassertStatusOK(CanonicalQuery::canonicalize(
-            nss, /*query=*/BSONObj(), ExtensionsCallbackDisallowExtensions()));
+
+        auto cq =
+            uassertStatusOK(CanonicalQuery::canonicalize(nss,
+                                                         /*query=*/BSONObj(),
+                                                         /*sort=*/BSONObj(),
+                                                         /*proj=*/BSONObj(),
+                                                         /*skip=*/0,
+                                                         /*limit=*/0,
+                                                         hint.value_or(BSONObj()),
+                                                         ExtensionsCallbackDisallowExtensions()));
+
         _exec = uassertStatusOK(
             getExecutor(&_opCtx, ctx.getCollection(), std::move(cq), PlanExecutor::YIELD_MANUAL));
 
@@ -99,9 +114,11 @@ protected:
 
         _source = DocumentSourceCursor::create(nss.ns(), _exec, _ctx);
     }
+
     intrusive_ptr<ExpressionContext> ctx() {
         return _ctx;
     }
+
     DocumentSourceCursor* source() {
         return _source.get();
     }
@@ -250,6 +267,51 @@ public:
     }
 };
 
+//
+// Test cursor output sort.
+//
+class CollectionScanProvidesNoSort : public Base {
+public:
+    void run() {
+        createSource(BSON("$natural" << 1));
+        ASSERT_EQ(source()->getOutputSorts().size(), 0U);
+    }
+};
+
+class IndexScanProvidesSortOnKeys : public Base {
+public:
+    void run() {
+        client.ensureIndex(nss.ns(), BSON("a" << 1));
+        createSource(BSON("a" << 1));
+
+        ASSERT_EQ(source()->getOutputSorts().size(), 1U);
+        ASSERT_EQ(source()->getOutputSorts().count(BSON("a" << 1)), 1U);
+    }
+};
+
+class ReverseIndexScanProvidesSort : public Base {
+public:
+    void run() {
+        client.ensureIndex(nss.ns(), BSON("a" << -1));
+        createSource(BSON("a" << -1));
+
+        ASSERT_EQ(source()->getOutputSorts().size(), 1U);
+        ASSERT_EQ(source()->getOutputSorts().count(BSON("a" << -1)), 1U);
+    }
+};
+
+class CompoundIndexScanProvidesMultipleSorts : public Base {
+public:
+    void run() {
+        client.ensureIndex(nss.ns(), BSON("a" << 1 << "b" << -1));
+        createSource(BSON("a" << 1 << "b" << -1));
+
+        ASSERT_EQ(source()->getOutputSorts().size(), 2U);
+        ASSERT_EQ(source()->getOutputSorts().count(BSON("a" << 1)), 1U);
+        ASSERT_EQ(source()->getOutputSorts().count(BSON("a" << 1 << "b" << -1)), 1U);
+    }
+};
+
 }  // namespace DocumentSourceCursor
 
 class All : public Suite {
@@ -261,6 +323,10 @@ public:
         add<DocumentSourceCursor::Dispose>();
         add<DocumentSourceCursor::IterateDispose>();
         add<DocumentSourceCursor::LimitCoalesce>();
+        add<DocumentSourceCursor::CollectionScanProvidesNoSort>();
+        add<DocumentSourceCursor::IndexScanProvidesSortOnKeys>();
+        add<DocumentSourceCursor::ReverseIndexScanProvidesSort>();
+        add<DocumentSourceCursor::CompoundIndexScanProvidesMultipleSorts>();
     }
 };
 

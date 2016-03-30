@@ -125,6 +125,14 @@ public:
      */
     bool branchPlannedFromCache(size_t i) const;
 
+    /**
+     * Provide access to the query solution for our composite solution. Does not relinquish
+     * ownership.
+     */
+    QuerySolution* compositeSolution() const {
+        return _compositeSolution.get();
+    }
+
 private:
     /**
      * A class used internally in order to keep track of the results of planning

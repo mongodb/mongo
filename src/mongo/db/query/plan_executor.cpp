@@ -251,6 +251,31 @@ const Collection* PlanExecutor::collection() const {
     return _collection;
 }
 
+BSONObjSet PlanExecutor::getOutputSorts() const {
+    if (_qs && _qs->root) {
+        _qs->root->computeProperties();
+        return _qs->root->getSort();
+    }
+
+    if (_root->stageType() == STAGE_MULTI_PLAN) {
+        // If we needed a MultiPlanStage, the PlanExecutor does not own the QuerySolution. We
+        // must go through the MultiPlanStage to access the output sort.
+        auto multiPlanStage = static_cast<MultiPlanStage*>(_root.get());
+        if (multiPlanStage->bestSolution()) {
+            multiPlanStage->bestSolution()->root->computeProperties();
+            return multiPlanStage->bestSolution()->root->getSort();
+        }
+    } else if (_root->stageType() == STAGE_SUBPLAN) {
+        auto subplanStage = static_cast<SubplanStage*>(_root.get());
+        if (subplanStage->compositeSolution()) {
+            subplanStage->compositeSolution()->root->computeProperties();
+            return subplanStage->compositeSolution()->root->getSort();
+        }
+    }
+
+    return BSONObjSet();
+}
+
 OperationContext* PlanExecutor::getOpCtx() const {
     return _opCtx;
 }
