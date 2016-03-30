@@ -867,11 +867,6 @@ static void shutdownServer() {
     log(LogComponent::kNetwork) << "shutdown: going to flush diaglog..." << endl;
     _diaglog.flush();
 
-    /* must do this before unmapping mem or you may get a seg fault */
-    log(LogComponent::kNetwork) << "shutdown: going to close sockets..." << endl;
-    stdx::thread close_socket_thread(stdx::bind(MessagingPort::closeAllSockets, 0));
-    close_socket_thread.detach();
-
     // We drop the scope cache because leak sanitizer can't see across the
     // thread we use for proxying MozJS requests. Dropping the cache cleans up
     // the memory and makes leak sanitizer happy.
