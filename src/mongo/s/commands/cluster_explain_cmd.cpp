@@ -56,13 +56,13 @@ class ClusterExplainCmd : public Command {
 public:
     ClusterExplainCmd() : Command("explain") {}
 
-
     /**
      * Running an explain on a secondary requires explicitly setting slaveOk.
      */
     virtual bool slaveOk() const {
         return false;
     }
+
     virtual bool slaveOverrideOk() const {
         return true;
     }
@@ -120,11 +120,11 @@ public:
 
         const std::string cmdName = explainObj.firstElementFieldName();
         Command* commToExplain = Command::findCommand(cmdName);
-        if (NULL == commToExplain) {
-            mongoutils::str::stream ss;
-            ss << "Explain failed due to unknown command: " << cmdName;
-            Status explainStatus(ErrorCodes::CommandNotFound, ss);
-            return appendCommandStatus(result, explainStatus);
+        if (!commToExplain) {
+            return appendCommandStatus(
+                result,
+                Status{ErrorCodes::CommandNotFound,
+                       str::stream() << "Explain failed due to unknown command: " << cmdName});
         }
 
         auto readPref =

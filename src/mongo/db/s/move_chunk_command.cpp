@@ -171,7 +171,7 @@ public:
              std::string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss = NamespaceString(parseNs(dbname, cmdObj));
-        uassert(ErrorCodes::InvalidOptions, "need to specify a valid namespace", nss.isValid());
+        uassert(ErrorCodes::InvalidNamespace, "need to specify a valid namespace", nss.isValid());
 
         MoveChunkRequest moveChunkRequest =
             uassertStatusOK(MoveChunkRequest::createFromCommand(nss, cmdObj));

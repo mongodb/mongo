@@ -195,6 +195,10 @@ public:
                            const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                            BSONObjBuilder* out) const {
         const NamespaceString nss(parseNs(dbname, cmdObj));
+        if (!nss.isValid()) {
+            return Status{ErrorCodes::InvalidNamespace,
+                          str::stream() << "Invalid collection name: " << nss.ns()};
+        }
 
         // Extract the targeting query.
         BSONObj targetingQuery;
