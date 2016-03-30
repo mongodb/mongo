@@ -18,7 +18,6 @@ static int  __evict_pass(WT_SESSION_IMPL *);
 static int  __evict_walk(WT_SESSION_IMPL *, uint32_t);
 static int  __evict_walk_file(WT_SESSION_IMPL *, uint32_t, u_int *);
 static WT_THREAD_RET __evict_worker(void *);
-static int  __evict_server_work(WT_SESSION_IMPL *);
 
 /*
  * __evict_read_gen --
@@ -637,7 +636,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 		    conn->cache_size, cache->bytes_inmem, cache->bytes_dirty));
 
 		WT_RET(__evict_lru_walk(session));
-		WT_RET(__evict_server_work(session));
+		WT_RET(__evict_lru_pages(session, true));
 
 		/*
 		 * If we're making progress, keep going; if we're not making
@@ -1037,36 +1036,6 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 	 * are multiple eviction workers running.
 	 */
 	WT_RET(__wt_cond_signal(session, cache->evict_waiter_cond));
-
-	return (0);
-}
-
-/*
- * __evict_server_work --
- *	Evict pages from the cache based on their read generation.
- */
-static int
-__evict_server_work(WT_SESSION_IMPL *session)
-{
-	WT_CACHE *cache;
-	WT_EVICT_QUEUE *evict_queue;
-
-	cache = S2C(session)->cache;
-
-	if (S2C(session)->evict_workers > 1) {
-		WT_STAT_FAST_CONN_INCR(
-		    session, cache_eviction_server_not_evicting);
-
-		/*
-		 * If there are candidates queued, give other threads a chance
-		 * to access them before gathering more.
-		 */
-		evict_queue = cache->evict_current_queue;
-		if (evict_queue->evict_candidates > 10 &&
-		    cache->evict_current != NULL)
-			__wt_yield();
-	} else
-		WT_RET_NOTFOUND_OK(__evict_lru_pages(session, true));
 
 	return (0);
 }
