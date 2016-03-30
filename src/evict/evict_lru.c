@@ -1485,19 +1485,10 @@ __evict_get_ref(
 
 	/*
 	 * Avoid the LRU lock if no pages are available.  If there are pages
-	 * available, spin until we get the lock.  If this function returns
-	 * without getting a page to evict, application threads assume there
-	 * are no more pages available and will attempt to wake the eviction
-	 * server.
 	 */
-	for (;;) {
-		if (cache->evict_current == NULL)
-			return (WT_NOTFOUND);
-		if (__wt_spin_trylock(session, &cache->evict_queue_lock) == 0)
-			break;
-		__wt_yield();
-	}
-
+	if (cache->evict_current == NULL)
+		return (WT_NOTFOUND);
+	__wt_spin_lock(session, &cache->evict_queue_lock);
 	/*
 	 * We got the queue lock, which should be fast, and now we want to
 	 * get the lock on the individual queue.  We know that the shared
