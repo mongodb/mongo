@@ -104,8 +104,8 @@ worker_throttle(CONFIG_THREAD *thread)
 		 */
 		WT_RET(__wt_epoch(NULL, &throttle_cfg->last_increment));
 	} else {
-		throttle_cfg->ops_count = usecs_delta *
-		    throttle_cfg->ops_per_increment /
+		throttle_cfg->ops_count = (usecs_delta *
+		    throttle_cfg->ops_per_increment) /
 		    throttle_cfg->usecs_increment;
 		throttle_cfg->last_increment = now;
 	}
