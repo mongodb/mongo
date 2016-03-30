@@ -402,24 +402,22 @@ Status MigrationChunkClonerSourceLegacy::nextCloneBatch(OperationContext* txn,
     std::set<RecordId>::iterator it;
 
     for (it = _cloneLocs.begin(); it != _cloneLocs.end(); ++it) {
+        // We must always make progress in this method by at least one document because empty return
+        // indicates there is no more initial clone data.
+        if (arrBuilder->arrSize() && tracker.intervalHasElapsed()) {
+            break;
+        }
+
         Snapshotted<BSONObj> doc;
-        if (!collection->findDoc(txn, *it, &doc)) {
-            // Document must have been deleted
-            continue;
-        }
+        if (collection->findDoc(txn, *it, &doc)) {
+            // Use the builder size instead of accumulating the document sizes directly so that we
+            // take into consideration the overhead of BSONArray indices.
+            if (arrBuilder->arrSize() &&
+                (arrBuilder->len() + doc.value().objsize() + 1024) > BSONObjMaxUserSize) {
+                break;
+            }
 
-        // Use the builder size instead of accumulating the document sizes directly so that we take
-        // into consideration the overhead of BSONArray indices, and *always* append at least one
-        // document.
-        if (arrBuilder->arrSize() &&
-            (arrBuilder->len() + doc.value().objsize() + 1024) > BSONObjMaxUserSize) {
-            break;
-        }
-
-        arrBuilder->append(doc.value());
-
-        if (tracker.intervalHasElapsed()) {
-            break;
+            arrBuilder->append(doc.value());
         }
     }
 

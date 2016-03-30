@@ -82,6 +82,7 @@ env.Library(
         'set_shard_version_command.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
         '$BUILD_DIR/mongo/s/serveronly',
         'metadata',
@@ -99,7 +100,7 @@ env.Library(
         'migration_chunk_cloner_source.cpp',
     ],
     LIBDEPS=[
-
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
@@ -110,6 +111,7 @@ env.Library(
         'migration_chunk_cloner_source_legacy_commands.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/commands',
         'migration_chunk_cloner',
     ],
     LIBDEPS_TAGS=[
