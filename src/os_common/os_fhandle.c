@@ -90,6 +90,7 @@ __open_verbose(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_DECL_ITEM(tmp);
 	const char *file_type_tag, *sep;
+
 	if (!WT_VERBOSE_ISSET(session, WT_VERB_FILEOPS))
 		return (0);
 
