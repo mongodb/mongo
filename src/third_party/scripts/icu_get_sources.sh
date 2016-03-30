@@ -5,7 +5,7 @@ set -o errexit
 # This script fetches and creates a copy of sources for ICU.
 
 NAME=icu4c
-MAJOR_VERSION=56
+MAJOR_VERSION=57
 MINOR_VERSION=1
 VERSION=${MAJOR_VERSION}.${MINOR_VERSION}
 

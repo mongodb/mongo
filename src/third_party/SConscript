@@ -9,7 +9,7 @@ zlibSuffix = '-1.2.8'
 pcreSuffix = "-8.38"
 mozjsSuffix = '-38'
 yamlSuffix = '-0.5.3'
-icuSuffix = '-56.1'
+icuSuffix = '-57.1'
 
 thirdPartyIncludePathList = [
     ('s2', '#/src/third_party/s2'),
