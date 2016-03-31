@@ -17,8 +17,11 @@ post:
           set -e
           set -o verbose
           cd ./clusters/${cluster}
-          if [ ! -f "test.success" ]; then yes yes | ./terraform destroy; fi
-          if [ ! -f "test.success" ]; then echo "Cluster DESTROYED."; fi
+          if [ ! -f "test.success" ]; then 
+            yes yes | ./terraform destroy
+            if [ $? != 0 ]; then yes yes | ./terraform destroy; fi
+            echo "Cluster DESTROYED."
+          fi
 
 functions:
   "prepare environment":
@@ -105,7 +108,7 @@ functions:
           cd ./clusters/${cluster}
           # configure mongodb cluster with wiredTiger
           ../../bin/config-${setup}.sh mongodb ${storageEngine} ${numShard} ${test}
-          echo "${cluster} MongoDB Replica Cluster STARTED."
+          echo "${cluster} MongoDB Cluster STARTED."
   "run test":
     - command: shell.exec
       params:
@@ -153,12 +156,10 @@ functions:
           set -o verbose
           cd ./clusters/${cluster}
           # destroy the EC2 cluster
-          yes yes | ./terraform destroy
+          yes yes | ./terraform destroy; true
           # make sure we destroy the cluster in case of AWS API timing issue
-          yes yes | ./terraform destroy
+          yes yes | ./terraform destroy; true
           echo "Cluster DESTROYED."
-          echo "All perf results"
-          cd ..
 
   "make test log artifact":
     - command: shell.exec
