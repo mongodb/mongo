@@ -106,13 +106,14 @@ __posix_directory_sync(WT_SESSION_IMPL *session, const char *path)
 	WT_SYSCALL_RETRY((
 	    (fd = open(path, O_RDONLY, 0444)) == -1 ? 1 : 0), ret);
 	if (ret != 0)
-		WT_RET_MSG(session, ret, "%s: directory-sync: open", path);
+		WT_ERR_MSG(session, ret, "%s: directory-sync: open", path);
 
 	ret = __posix_sync(session, fd, path, "directory-sync", true);
 
 	WT_SYSCALL_RETRY(close(fd), tret);
 	if (tret != 0)
 		__wt_err(session, tret, "%s: directory-sync: close", path);
+err:	__wt_free(session, copy);
 	return (ret == 0 ? tret : ret);
 #else
 	WT_UNUSED(session);
