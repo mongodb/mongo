@@ -160,7 +160,7 @@ private:
     bool _isExecutorRunnable = false;
 
     // Flag indicating when this interface is being shut down (because shutdown() has executed).
-    std::atomic<bool> _inShutdown;
+    AtomicWord<bool> _inShutdown;
 
     // Interface for running remote commands
     RemoteCommandRunnerImpl _commandRunner;
