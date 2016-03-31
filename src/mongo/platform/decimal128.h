@@ -360,7 +360,10 @@ public:
      * decimals with the same representation (5000000000000000000000000000000000E-33).
      * Hashing equal decimals to equal hashes becomes possible with such normalization.
      */
-    Decimal128 normalize() const;
+    Decimal128 normalize() const {
+        // Normalize by adding 0E-6176 which forces a decimal to maximum precision (34 digits)
+        return add(kLargestNegativeExponentZero);
+    }
 
     /**
      * This set of comparison operations takes a single Decimal128 and returns a boolean

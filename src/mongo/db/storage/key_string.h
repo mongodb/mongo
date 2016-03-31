@@ -30,17 +30,28 @@
 
 #pragma once
 
+#include <limits>
+
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/timestamp.h"
 #include "mongo/bson/ordering.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/record_id.h"
+#include "mongo/platform/decimal128.h"
 
 namespace mongo {
 
 class KeyString {
 public:
+    /**
+     * Selects version of KeyString to use. V0 and V1 differ in their encoding of numeric values.
+     */
+    enum class Version : uint8_t { V0 = 0, V1 = 1 };
+    static StringData versionToString(Version version) {
+        return version == Version::V0 ? "V0" : "V1";
+    }
+
     /**
      * Encodes info needed to restore the original BSONTypes from a KeyString. They cannot be
      * stored in place since we don't want them to affect the ordering (1 and 1.0 compare as
@@ -51,8 +62,17 @@ public:
         // Sufficient bytes to encode extra type information for any BSON key that fits in 1KB.
         // The encoding format will need to change if we raise this limit.
         static const uint8_t kMaxBytesNeeded = 127;
+        static const uint32_t kMaxKeyBytes = 1024;
+        static const uint32_t kMaxTypeBitsPerDecimal = 17;
+        static const uint32_t kBytesForTypeAndEmptyKey = 2;
+        static const uint32_t kMaxDecimalsPerKey =
+            kMaxKeyBytes / (sizeof(Decimal128::Value) + kBytesForTypeAndEmptyKey);
+        static_assert(kMaxTypeBitsPerDecimal * kMaxDecimalsPerKey < kMaxBytesNeeded * 8UL,
+                      "encoding needs change to contain all type bits for worst case key");
+        static const uint8_t kStoredDecimalExponentBits = 6;
+        static const uint32_t kStoredDecimalExponentMask = (1U << kStoredDecimalExponentBits) - 1;
 
-        TypeBits() {
+        explicit TypeBits(Version version) : version(version) {
             reset();
         }
 
@@ -61,8 +81,8 @@ public:
          * BufReader in the format described on the getBuffer() method.
          */
         void resetFromBuffer(BufReader* reader);
-        static TypeBits fromBuffer(BufReader* reader) {
-            TypeBits out;
+        static TypeBits fromBuffer(Version version, BufReader* reader) {
+            TypeBits out(version);
             out.resetFromBuffer(reader);
             return out;
         }
@@ -124,9 +144,26 @@ public:
         static const uint8_t kSymbol = 0x1;
 
         static const uint8_t kInt = 0x0;
-        static const uint8_t kDouble = 0x1;
-        static const uint8_t kLong = 0x2;
-        static const uint8_t kNegativeZero = 0x3;  // decodes as a double
+        static const uint8_t kLong = 0x1;
+        static const uint8_t kDouble = 0x2;
+        static const uint8_t kDecimal = 0x3;            // indicates 6 more bits of typeinfo follow.
+        static const uint8_t kSpecialZeroPrefix = 0x3;  // kNumericZero case, 3 more bits follow.
+        static const uint8_t kNegativeDoubleZero = 0x3;  // normalized -0.0 double, either V0 or V1.
+        static const uint8_t kV0NegativeDoubleZero = 0x3;  // legacy encoding for V0
+
+        // The following describe the initial 5 type bits for kNegativeOrDecimalZero. These bits
+        // encode double -0 or a 3-bit prefix (range 0 to 5) of the 15-bit decimal zero type.
+        static const uint8_t kV1NegativeDoubleZero = 0x18;  // 0b11000
+
+        static const uint8_t kUnusedEncoding = 0x19;  // 0b11001
+
+        // There are 6 * (1<<12) == 2 * (kMaxBiasedExponent + 1) == 24576 decimal zeros.
+        static const uint8_t kDecimalZero0xxx = 0x1a;  // 0b11010 12 more exponent bits follow
+        static const uint8_t kDecimalZero1xxx = 0x1b;  // 0b11011
+        static const uint8_t kDecimalZero2xxx = 0x1c;  // 0b11100
+        static const uint8_t kDecimalZero3xxx = 0x1d;  // 0b11101
+        static const uint8_t kDecimalZero4xxx = 0x1e;  // 0b11110
+        static const uint8_t kDecimalZero5xxx = 0x1f;  // 0b11111
 
         void reset() {
             _curBit = 0;
@@ -143,21 +180,24 @@ public:
         }
 
         void appendNumberDouble() {
-            appendBit(kDouble & 1);
             appendBit(kDouble >> 1);
+            appendBit(kDouble & 1);
         }
         void appendNumberInt() {
-            appendBit(kInt & 1);
             appendBit(kInt >> 1);
+            appendBit(kInt & 1);
         }
         void appendNumberLong() {
-            appendBit(kLong & 1);
             appendBit(kLong >> 1);
+            appendBit(kLong & 1);
         }
-        void appendNegativeZero() {
-            appendBit(kNegativeZero & 1);
-            appendBit(kNegativeZero >> 1);
+        void appendNumberDecimal() {
+            appendBit(kDecimal >> 1);
+            appendBit(kDecimal & 1);
         }
+        void appendZero(uint8_t zeroType);
+        void appendDecimalZero(uint32_t whichZero);
+        void appendDecimalExponent(uint8_t storedExponentBits);
 
         class Reader {
         public:
@@ -170,9 +210,17 @@ public:
                 return readBit();
             }
             uint8_t readNumeric() {
-                uint8_t lowBit = readBit();
-                return lowBit | (readBit() << 1);
+                uint8_t highBit = readBit();
+                return (highBit << 1) | readBit();
             }
+            uint8_t readZero();
+
+            // Given a decimal zero type between kDecimalZero0xxx and kDecimal5xxx, read the
+            // remaining 12 bits and return which of the 24576 decimal zeros to produce.
+            uint32_t readDecimalZero(uint8_t zeroType);
+
+            // Reads the stored exponent bits of a non-zero decimal number.
+            uint8_t readDecimalExponent();
 
         private:
             uint8_t readBit();
@@ -180,6 +228,8 @@ public:
             size_t _curBit;
             const TypeBits& _typeBits;
         };
+
+        const Version version;
 
     private:
         /**
@@ -211,17 +261,32 @@ public:
         kExclusiveAfter,
     };
 
-    KeyString() {}
+    /**
+     * Encodes the kind of NumberDecimal that is stored.
+     */
+    enum DecimalContinuationMarker {
+        kDCMEqualToDouble = 0x0,
+        kDCMHasContinuationLessThanDoubleRoundedUpTo15Digits = 0x1,
+        kDCMEqualToDoubleRoundedUpTo15Digits = 0x2,
+        kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits = 0x3
+    };
 
-    KeyString(const BSONObj& obj, Ordering ord, RecordId recordId) {
+    explicit KeyString(Version version) : version(version), _typeBits(version) {}
+
+    KeyString(Version version, const BSONObj& obj, Ordering ord, RecordId recordId)
+        : KeyString(version) {
         resetToKey(obj, ord, recordId);
     }
 
-    KeyString(const BSONObj& obj, Ordering ord, Discriminator discriminator = kInclusive) {
+    KeyString(Version version,
+              const BSONObj& obj,
+              Ordering ord,
+              Discriminator discriminator = kInclusive)
+        : KeyString(version) {
         resetToKey(obj, ord, discriminator);
     }
 
-    explicit KeyString(RecordId rid) {
+    KeyString(Version version, RecordId rid) : version(version), _typeBits(version) {
         appendRecordId(rid);
     }
 
@@ -278,6 +343,12 @@ public:
      */
     std::string toString() const;
 
+    /**
+     * Version to use for conversion to/from KeyString. V1 has different encodings for numeric
+     * values.
+     */
+    const Version version;
+
 private:
     void _appendAllElementsForIndexing(const BSONObj& obj,
                                        Ordering ord,
@@ -299,6 +370,7 @@ private:
     void _appendNumberDouble(const double num, bool invert);
     void _appendNumberLong(const long long num, bool invert);
     void _appendNumberInt(const int num, bool invert);
+    void _appendNumberDecimal(const Decimal128 num, bool invert);
 
     /**
      * @param name - optional, can be NULL
@@ -309,10 +381,14 @@ private:
 
     void _appendStringLike(StringData str, bool invert);
     void _appendBson(const BSONObj& obj, bool invert);
-    void _appendSmallDouble(double value, bool invert);
-    void _appendLargeDouble(double value, bool invert);
+    void _appendSmallDouble(double value, DecimalContinuationMarker dcm, bool invert);
+    void _appendLargeDouble(double value, DecimalContinuationMarker dcm, bool invert);
     void _appendInteger(const long long num, bool invert);
     void _appendPreshiftedIntegerPortion(uint64_t value, bool isNegative, bool invert);
+
+    void _appendDoubleWithoutTypeBits(const double num, DecimalContinuationMarker dcm, bool invert);
+    void _appendHugeDecimalWithoutTypeBits(const Decimal128 dec, bool invert);
+    void _appendTinyDecimalWithoutTypeBits(const Decimal128 dec, const double bin, bool invert);
 
     template <typename T>
     void _append(const T& thing, bool invert);

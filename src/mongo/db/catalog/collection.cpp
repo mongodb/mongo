@@ -1176,7 +1176,8 @@ private:
 
     uint32_t hashIndexEntry(const BSONObj& key, RecordId& loc) {
         uint32_t hash;
-        KeyString ks(key, Ordering::make(BSONObj()), loc);
+        // We're only using KeyString to get something hashable here, so version doesn't matter.
+        KeyString ks(KeyString::Version::V1, key, Ordering::make(BSONObj()), loc);
         MurmurHash3_x86_32(ks.getTypeBits().getBuffer(), ks.getTypeBits().getSize(), 0, &hash);
         MurmurHash3_x86_32(ks.getBuffer(), ks.getSize(), hash, &hash);
         // Take the first 25 bits to conserve memory.

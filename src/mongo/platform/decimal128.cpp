@@ -223,7 +223,7 @@ Decimal128::Decimal128(double doubleValue,
     // Estimate doubleValue's base10 exponent from its base2 exponent by
     // multiplying by an approximation of log10(2).
     // Since 10^(x*log10(2)) == 2^x, this initial guess gets us very close.
-    int base10Exp = (base2Exp * 301) / 1000;
+    int base10Exp = (base2Exp * 30103) / (100 * 1000);
 
     // Although both 1000 and .001 have a base 10 exponent of magnitude 3, they have
     // a different number of leading/trailing zeros. Adjust base10Exp to compensate.
@@ -244,6 +244,7 @@ Decimal128::Decimal128(double doubleValue,
     }
 
     // The decimal must have exactly 15 digits of precision
+    invariant(getCoefficientHigh() == 0);
     invariant(_value.low64 >= 100000000000000ull && _value.low64 <= 999999999999999ull);
 }
 
@@ -564,11 +565,6 @@ Decimal128 Decimal128::quantize(const Decimal128& reference,
     Decimal128::Value value = libraryTypeToValue(quantizedResult);
     Decimal128 result(value);
     return result;
-}
-
-Decimal128 Decimal128::normalize() const {
-    // Normalize by adding 0E-6176 which forces a decimal to maximum precision (34 digits)
-    return add(kLargestNegativeExponentZero);
 }
 
 bool Decimal128::isEqual(const Decimal128& other) const {

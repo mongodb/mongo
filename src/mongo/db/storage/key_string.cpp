@@ -77,7 +77,7 @@ const uint8_t kMaxKey = 240;
 // Therefore each format can be considered independently without considering
 // cross-format comparisons.
 const uint8_t kNumericNaN = kNumeric + 0;
-const uint8_t kNumericNegativeLargeDouble = kNumeric + 1;  // <= -2**63 including -Inf
+const uint8_t kNumericNegativeLargeMagnitude = kNumeric + 1;  // <= -2**63 including -Inf
 const uint8_t kNumericNegative8ByteInt = kNumeric + 2;
 const uint8_t kNumericNegative7ByteInt = kNumeric + 3;
 const uint8_t kNumericNegative6ByteInt = kNumeric + 4;
@@ -86,9 +86,9 @@ const uint8_t kNumericNegative4ByteInt = kNumeric + 6;
 const uint8_t kNumericNegative3ByteInt = kNumeric + 7;
 const uint8_t kNumericNegative2ByteInt = kNumeric + 8;
 const uint8_t kNumericNegative1ByteInt = kNumeric + 9;
-const uint8_t kNumericNegativeSmallDouble = kNumeric + 10;  // between 0 and -1 exclusive
+const uint8_t kNumericNegativeSmallMagnitude = kNumeric + 10;  // between 0 and -1 exclusive
 const uint8_t kNumericZero = kNumeric + 11;
-const uint8_t kNumericPositiveSmallDouble = kNumeric + 12;  // between 0 and 1 exclusive
+const uint8_t kNumericPositiveSmallMagnitude = kNumeric + 12;  // between 0 and 1 exclusive
 const uint8_t kNumericPositive1ByteInt = kNumeric + 13;
 const uint8_t kNumericPositive2ByteInt = kNumeric + 14;
 const uint8_t kNumericPositive3ByteInt = kNumeric + 15;
@@ -97,9 +97,9 @@ const uint8_t kNumericPositive5ByteInt = kNumeric + 17;
 const uint8_t kNumericPositive6ByteInt = kNumeric + 18;
 const uint8_t kNumericPositive7ByteInt = kNumeric + 19;
 const uint8_t kNumericPositive8ByteInt = kNumeric + 20;
-const uint8_t kNumericPositiveLargeDouble = kNumeric + 21;  // >= 2**63 including +Inf
-static_assert(kNumericPositiveLargeDouble < kStringLike,
-              "kNumericPositiveLargeDouble < kStringLike");
+const uint8_t kNumericPositiveLargeMagnitude = kNumeric + 21;  // >= 2**63 including +Inf
+static_assert(kNumericPositiveLargeMagnitude < kStringLike,
+              "kNumericPositiveLargeMagnitude < kStringLike");
 
 const uint8_t kBoolFalse = kBool + 0;
 const uint8_t kBoolTrue = kBool + 1;
@@ -169,8 +169,54 @@ uint8_t bsonTypeToGenericKeyStringType(BSONType type) {
     }
 }
 
+// Doubles smaller than this store only a single bit indicating a decimal continuation follows.
+const double kTiniestDoubleWith2BitDCM = std::ldexp(1, -255);
+
+// Amount to add to exponent of doubles tinier than kTiniestDoubleWith2BitDCM to avoid subnormals.
+const int kTinyDoubleExponentShift = 256;
+
+// Amount to multiply tiny doubles to perform a shift of the exponent by
+// kSmallMagnitudeExponentShift.
+const double kTinyDoubleExponentUpshiftFactor = std::ldexp(1, kTinyDoubleExponentShift);
+
+// Amount to multiply scaled tiny doubles by to recover the unscaled value.
+const double kTinyDoubleExponentDownshiftFactor = std::ldexp(1, -kTinyDoubleExponentShift);
+
+// An underestimate of 2**256.
+const Decimal128 kTinyDoubleExponentUpshiftFactorAsDecimal(std::ldexp(1, kTinyDoubleExponentShift),
+                                                           Decimal128::kRoundTo34Digits,
+                                                           Decimal128::kRoundTowardZero);
+
+// An underestimate of 2**(-256).
+const Decimal128 kTinyDoubleExponentDownshiftFactorAsDecimal(std::ldexp(1,
+                                                                        -kTinyDoubleExponentShift),
+                                                             Decimal128::kRoundTo34Digits,
+                                                             Decimal128::kRoundTowardZero);
+
 // First double that isn't an int64.
-const double kMinLargeDouble = 9223372036854775808.0;  // 1ULL<<63
+const double kMinLargeDouble = 1ULL << 63;
+
+// Integers larger than this may not be representable as doubles.
+const double kMaxIntForDouble = 1ULL << 53;
+
+// Factors for scaling a double by powers of 256 to do a logical shift left of x bytes.
+const double kPow256[] = {1.0,                                             // 2**0
+                          1.0 * 256,                                       // 2**8
+                          1.0 * 256 * 256,                                 // 2**16
+                          1.0 * 256 * 256 * 256,                           // 2**24
+                          1.0 * 256 * 256 * 256 * 256,                     // 2**32
+                          1.0 * 256 * 256 * 256 * 256 * 256,               // 2**40
+                          1.0 * 256 * 256 * 256 * 256 * 256 * 256,         // 2**48
+                          1.0 * 256 * 256 * 256 * 256 * 256 * 256 * 256};  // 2**56
+// Factors for scaling a double by negative powers of 256 to do a logical shift right of x bytes.
+const double kInvPow256[] = {1.0,                                             // 2**0
+                             1.0 / 256,                                       // 2**(-8)
+                             1.0 / 256 / 256,                                 // 2**(-16)
+                             1.0 / 256 / 256 / 256,                           // 2**(-24)
+                             1.0 / 256 / 256 / 256 / 256,                     // 2**(-32)
+                             1.0 / 256 / 256 / 256 / 256 / 256,               // 2**(-40)
+                             1.0 / 256 / 256 / 256 / 256 / 256 / 256,         // 2**(-48)
+                             1.0 / 256 / 256 / 256 / 256 / 256 / 256 / 256};  // 2**(-56)
 
 const uint8_t kEnd = 0x4;
 
@@ -479,65 +525,85 @@ void KeyString::_appendObject(const BSONObj& val, bool invert) {
 }
 
 void KeyString::_appendNumberDouble(const double num, bool invert) {
-    if (num == 0.0 && std::signbit(num)) {
-        _typeBits.appendNegativeZero();
-    } else {
+    if (num == 0.0 && std::signbit(num))
+        _typeBits.appendZero(TypeBits::kNegativeDoubleZero);
+    else
         _typeBits.appendNumberDouble();
-    }
 
-    // no special cases needed for Inf,
-    // see http://en.wikipedia.org/wiki/IEEE_754-1985#Positive_and_negative_infinity
-    if (std::isnan(num)) {
-        _append(CType::kNumericNaN, invert);
-        return;
-    }
+    _appendDoubleWithoutTypeBits(num, kDCMEqualToDouble, invert);
+}
 
-    if (num == 0.0) {
-        // We are collapsing -0.0 and 0.0 to the same value here.
-        // This is correct as IEEE-754 specifies that they compare as equal,
-        // however this prevents roundtripping -0.0.
-        // So if you put a -0.0 in, you'll get 0.0 out.
-        // We believe this to be ok.
-        _append(CType::kNumericZero, invert);
-        return;
-    }
-
+void KeyString::_appendDoubleWithoutTypeBits(const double num,
+                                             DecimalContinuationMarker dcm,
+                                             bool invert) {
     const bool isNegative = num < 0.0;
     const double magnitude = isNegative ? -num : num;
 
-    if (magnitude < 1.0) {
-        // This includes subnormal numbers.
-        _appendSmallDouble(num, invert);
+    // Tests are structured such that NaNs and infinities fall through correctly.
+    if (!(magnitude >= 1.0)) {
+        if (magnitude > 0.0) {
+            // This includes subnormal numbers.
+            _appendSmallDouble(num, dcm, invert);
+        } else if (num == 0.0) {
+            // We are collapsing -0.0 and 0.0 to the same value here, the type bits disambiguate.
+            _append(CType::kNumericZero, invert);
+        } else {
+            invariant(std::isnan(num));
+            _append(CType::kNumericNaN, invert);
+        }
         return;
     }
 
     if (magnitude < kMinLargeDouble) {
-        uint64_t integerPart = uint64_t(magnitude);
-        if (double(integerPart) == magnitude) {
+        uint64_t integerPart = static_cast<uint64_t>(magnitude);
+        if (static_cast<double>(integerPart) == magnitude && dcm == kDCMEqualToDouble) {
             // No fractional part
             _appendPreshiftedIntegerPortion(integerPart << 1, isNegative, invert);
             return;
         }
 
-        // There is a fractional part.
-        _appendPreshiftedIntegerPortion((integerPart << 1) | 1, isNegative, invert);
+        if (version == Version::V0) {
+            invariant(dcm == kDCMEqualToDouble);
+            // There is a fractional part.
+            _appendPreshiftedIntegerPortion((integerPart << 1) | 1, isNegative, invert);
 
-        // Append the bytes of the mantissa that include fractional bits.
-        const size_t fractionalBits = (53 - (64 - countLeadingZeros64(integerPart)));
-        const size_t fractionalBytes = (fractionalBits + 7) / 8;
-        dassert(fractionalBytes > 0);
-        uint64_t mantissa;
-        memcpy(&mantissa, &num, sizeof(mantissa));
-        mantissa &= ~(uint64_t(-1) << fractionalBits);  // set non-fractional bits to 0;
-        mantissa = endian::nativeToBig(mantissa);
+            // Append the bytes of the mantissa that include fractional bits.
+            const size_t fractionalBits = 53 - (64 - countLeadingZeros64(integerPart));
+            const size_t fractionalBytes = (fractionalBits + 7) / 8;
+            dassert(fractionalBytes > 0);
+            uint64_t mantissa;
+            memcpy(&mantissa, &num, sizeof(mantissa));
+            mantissa &= ~(uint64_t(-1) << fractionalBits);  // set non-fractional bits to 0;
 
-        const void* firstUsedByte =
-            reinterpret_cast<const char*>((&mantissa) + 1) - fractionalBytes;
-        _appendBytes(firstUsedByte, fractionalBytes, isNegative ? !invert : invert);
-        return;
+            mantissa = endian::nativeToBig(mantissa);
+
+            const void* firstUsedByte =
+                reinterpret_cast<const char*>((&mantissa) + 1) - fractionalBytes;
+            _appendBytes(firstUsedByte, fractionalBytes, isNegative ? !invert : invert);
+        } else {
+            const size_t fractionalBytes = countLeadingZeros64(integerPart << 1) / 8;
+            const auto ctype = isNegative ? CType::kNumericNegative8ByteInt + fractionalBytes
+                                          : CType::kNumericPositive8ByteInt - fractionalBytes;
+            _append(static_cast<uint8_t>(ctype), invert);
+
+            // Multiplying the double by 256 to the power X is logically equivalent to shifting the
+            // fraction left by X bytes.
+            uint64_t encoding = static_cast<uint64_t>(magnitude * kPow256[fractionalBytes]);
+            dassert(encoding == magnitude * kPow256[fractionalBytes]);
+
+            // Merge in the bit indicating the value has a fractional part by doubling the integer
+            // part and adding 1. This leaves encoding with the high 8-fractionalBytes bytes in the
+            // same form they'd have with _appendPreshiftedIntegerPortion(). The remaining low bytes
+            // are the fractional bytes left-shifted by 2 bits to make room for the DCM.
+            encoding += (integerPart + 1) << (fractionalBytes * 8);
+            invariant((encoding & 0x3ULL) == 0);
+            encoding |= dcm;
+            encoding = endian::nativeToBig(encoding);
+            _append(encoding, isNegative ? !invert : invert);
+        }
+    } else {
+        _appendLargeDouble(num, dcm, invert);
     }
-
-    _appendLargeDouble(num, invert);
 }
 
 void KeyString::_appendNumberLong(const long long num, bool invert) {
@@ -548,6 +614,148 @@ void KeyString::_appendNumberLong(const long long num, bool invert) {
 void KeyString::_appendNumberInt(const int num, bool invert) {
     _typeBits.appendNumberInt();
     _appendInteger(num, invert);
+}
+
+void KeyString::_appendNumberDecimal(const Decimal128 dec, bool invert) {
+    bool isNegative = dec.isNegative();
+    if (dec.isZero()) {
+        uint32_t zeroExp = dec.getBiasedExponent();
+        if (isNegative)
+            zeroExp += Decimal128::kMaxBiasedExponent + 1;
+
+        _typeBits.appendDecimalZero(zeroExp);
+        _append(CType::kNumericZero, invert);
+        return;
+    }
+
+    if (dec.isNaN()) {
+        _append(CType::kNumericNaN, invert);
+        _typeBits.appendNumberDecimal();
+        return;
+    }
+
+    if (dec.isInfinite()) {
+        _append(isNegative ? CType::kNumericNegativeLargeMagnitude
+                           : CType::kNumericPositiveLargeMagnitude,
+                invert);
+        const uint64_t infinity = ~0ULL;
+        _append(infinity, isNegative ? !invert : invert);
+        _typeBits.appendNumberDecimal();
+        return;
+    }
+
+    const uint32_t biasedExponent = dec.getBiasedExponent();
+    dassert(biasedExponent <= Decimal128::kInfinityExponent);
+    _typeBits.appendNumberDecimal();
+    _typeBits.appendDecimalExponent(biasedExponent & TypeBits::kStoredDecimalExponentMask);
+
+    uint32_t signalingFlags = Decimal128::kNoFlag;
+    double bin = dec.toDouble(&signalingFlags, Decimal128::kRoundTowardZero);
+
+    // Easy case: the decimal actually is a double. True for many integers, fractions like 1.5, etc.
+    if (!Decimal128::hasFlag(signalingFlags, Decimal128::kInexact) &&
+        !Decimal128::hasFlag(signalingFlags, Decimal128::kOverflow)) {
+        _appendDoubleWithoutTypeBits(bin, kDCMEqualToDouble, invert);
+        return;
+    }
+
+    // Values smaller than the double normalized range need special handling: a regular double
+    // wouldn't give 15 digits, if any at all.
+    if (std::abs(bin) < std::numeric_limits<double>::min()) {
+        _appendTinyDecimalWithoutTypeBits(dec, bin, invert);
+        return;
+    }
+
+    // Huge finite values are encoded directly. Because the value is not exact, and truncates
+    // to the maximum double, the original decimal was outside of the range of finite doubles.
+    // Because all decimals larger than the max finite double round down to that value, strict
+    // less-than would be incorrect.
+    if (std::abs(bin) >= std::numeric_limits<double>::max()) {
+        _appendHugeDecimalWithoutTypeBits(dec, invert);
+        return;
+    }
+
+    const auto roundAwayFromZero =
+        isNegative ? Decimal128::kRoundTowardNegative : Decimal128::kRoundTowardPositive;
+    const uint64_t k1E15 = 1E15;  // Exact in both double and int64_t.
+
+    // If the conditions below fall through, a decimal continuation is needed to represent the
+    // difference between the stored value and the actual decimal. All paths that fall through
+    // must set 'storedValue', overwriting the NaN.
+    Decimal128 storedValue = Decimal128::kPositiveNaN;
+
+    // For doubles in this range, 'bin' may have lost precision in the integer part, which would
+    // lead to miscompares with integers. So, instead handle explicitly.
+    if ((bin <= -kMaxIntForDouble || bin >= kMaxIntForDouble) && bin > -kMinLargeDouble &&
+        bin < kMinLargeDouble) {
+        uint32_t signalingFlags = Decimal128::kNoFlag;
+        Decimal128 truncated = dec.quantize(
+            Decimal128::kNormalizedZero, &signalingFlags, Decimal128::kRoundTowardZero);
+        dassert(truncated.getBiasedExponent() == Decimal128::kExponentBias);
+        dassert(truncated.getCoefficientHigh() == 0 &&
+                truncated.getCoefficientLow() < (1ULL << 63));
+        int64_t integerPart = truncated.getCoefficientLow();
+        bool hasFraction = Decimal128::hasFlag(signalingFlags, Decimal128::kInexact);
+        bool isNegative = truncated.isNegative();
+        bool has8bytes = integerPart >= (1LL << 55);
+        uint64_t preshifted = integerPart << 1;
+        _appendPreshiftedIntegerPortion(preshifted | hasFraction, isNegative, invert);
+        if (!hasFraction)
+            return;
+        if (!has8bytes) {
+            // A Fraction byte follows, but the leading 7 bytes already encode 53 bits of the
+            // coefficient, so just store the DCM.
+            uint8_t dcm = hasFraction ? kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits
+                                      : kDCMEqualToDouble;
+            _append(dcm, isNegative ? !invert : invert);
+        }
+
+        storedValue = Decimal128(isNegative, Decimal128::kExponentBias, 0, integerPart);
+
+        // Common case: the coefficient less than 1E15, so at most 15 digits, and the number is
+        // in the normal range of double, so the decimal can be represented with at least 15 digits
+        // of precision by the double 'bin'
+    } else if (dec.getCoefficientHigh() == 0 && dec.getCoefficientLow() < k1E15) {
+        dassert(Decimal128(std::abs(bin),
+                           Decimal128::kRoundTo15Digits,
+                           Decimal128::kRoundTowardPositive).isEqual(dec.toAbs()));
+        _appendDoubleWithoutTypeBits(bin, kDCMEqualToDoubleRoundedUpTo15Digits, invert);
+        return;
+    } else {
+        // The coefficient has more digits, but may still be 15 digits after removing trailing
+        // zeros.
+        Decimal128 decFromBin = Decimal128(bin, Decimal128::kRoundTo15Digits, roundAwayFromZero);
+        if (decFromBin.isEqual(dec)) {
+            _appendDoubleWithoutTypeBits(bin, kDCMEqualToDoubleRoundedUpTo15Digits, invert);
+            return;
+        }
+        // Harder cases: decimal continuation is needed.
+        // First store the double and kind of continuation needed.
+        DecimalContinuationMarker dcm = dec.isLess(decFromBin) != isNegative
+            ? kDCMHasContinuationLessThanDoubleRoundedUpTo15Digits
+            : kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits;
+        _appendDoubleWithoutTypeBits(bin, dcm, invert);
+
+        // Note that 'dec' and 'bin' can be negative.
+        storedValue = Decimal128(bin, Decimal128::kRoundTo34Digits, roundAwayFromZero);
+    }
+    invariant(!storedValue.isNaN());        // Should have been set explicitly.
+    storedValue = storedValue.normalize();  // Normalize to 34 digits to fix decDiff exponent.
+
+    Decimal128 decDiff = dec.subtract(storedValue);
+    invariant(decDiff.isNegative() == dec.isNegative() || decDiff.isZero());
+    invariant(decDiff.getBiasedExponent() == storedValue.getBiasedExponent());
+    invariant(decDiff.getCoefficientHigh() == 0);
+
+    // Now we know that we can recover the original decimal value (but not its precision, which is
+    // given by the type bits) from the binary double plus the decimal continuation.
+    uint64_t decimalContinuation = decDiff.getCoefficientLow();
+    dassert(storedValue.add(Decimal128(isNegative,
+                                       storedValue.getBiasedExponent(),
+                                       0,
+                                       decimalContinuation)).isEqual(dec));
+    decimalContinuation = endian::nativeToBig(decimalContinuation);
+    _append(decimalContinuation, isNegative ? !invert : invert);
 }
 
 void KeyString::_appendBsonValue(const BSONElement& elem, bool invert, const StringData* name) {
@@ -621,6 +829,12 @@ void KeyString::_appendBsonValue(const BSONElement& elem, bool invert, const Str
         case NumberLong:
             _appendNumberLong(elem._numberLong(), invert);
             break;
+        case NumberDecimal:
+            uassert(ErrorCodes::UnsupportedFormat,
+                    "Index version does not support NumberDecimal",
+                    version >= Version::V1);
+            _appendNumberDecimal(elem._numberDecimal(), invert);
+            break;
 
         default:
             invariant(false);
@@ -656,36 +870,138 @@ void KeyString::_appendBson(const BSONObj& obj, bool invert) {
     _append(int8_t(0), invert);
 }
 
-void KeyString::_appendSmallDouble(double value, bool invert) {
-    dassert(!std::isnan(value));
-    dassert(value != 0.0);
+void KeyString::_appendSmallDouble(double value, DecimalContinuationMarker dcm, bool invert) {
+    bool isNegative = value < 0;
+    double magnitude = isNegative ? -value : value;
+    dassert(!std::isnan(value) && value != 0 && magnitude < 1);
 
-    uint64_t data;
-    memcpy(&data, &value, sizeof(data));
+    _append(isNegative ? CType::kNumericNegativeSmallMagnitude
+                       : CType::kNumericPositiveSmallMagnitude,
+            invert);
 
-    if (value > 0) {
-        _append(CType::kNumericPositiveSmallDouble, invert);
-        _append(endian::nativeToBig(data), invert);
+    uint64_t encoded;
+
+    if (version == KeyString::Version::V0) {
+        // Not using magnitude to preserve sign bit in V0
+        memcpy(&encoded, &value, sizeof(encoded));
+    } else if (magnitude >= kTiniestDoubleWith2BitDCM) {
+        // Values in the range [2**(-255), 1) get the prefix 0b11
+        memcpy(&encoded, &magnitude, sizeof(encoded));
+        dassert((encoded & (0x3ULL << 62)) == 0);
+        encoded <<= 2;
+        encoded |= dcm;
+        dassert(encoded >> 62 == 0x3);
     } else {
-        _append(CType::kNumericNegativeSmallDouble, invert);
-        _append(endian::nativeToBig(data), !invert);
+        // Values in the range [numeric_limits<double>::denorm_min(), 2**(-255)) get the prefixes
+        // 0b01 or 0b10. The 0b00 prefix is used by _appendHugeDecimalWithoutTypeBits for decimals
+        // smaller than that.
+        magnitude *= kTinyDoubleExponentUpshiftFactor;
+        memcpy(&encoded, &magnitude, sizeof(encoded));
+        encoded <<= 1;
+        encoded |= (dcm != kDCMEqualToDouble);
+        // Change the two most significant bits from 0b00 or 0b01 to 0b01 or 0b10.
+        encoded += (1ULL << 62);
+        dassert(encoded >> 62 == 0x1 || encoded >> 62 == 0x2);
     }
+
+    _append(endian::nativeToBig(encoded), isNegative ? !invert : invert);
 }
 
-void KeyString::_appendLargeDouble(double value, bool invert) {
+void KeyString::_appendLargeDouble(double value, DecimalContinuationMarker dcm, bool invert) {
     dassert(!std::isnan(value));
     dassert(value != 0.0);
 
-    uint64_t data;
-    memcpy(&data, &value, sizeof(data));
+    _append(value > 0 ? CType::kNumericPositiveLargeMagnitude
+                      : CType::kNumericNegativeLargeMagnitude,
+            invert);
 
-    if (value > 0) {
-        _append(CType::kNumericPositiveLargeDouble, invert);
-        _append(endian::nativeToBig(data), invert);
-    } else {
-        _append(CType::kNumericNegativeLargeDouble, invert);
-        _append(endian::nativeToBig(data), !invert);
+    uint64_t encoded;
+    memcpy(&encoded, &value, sizeof(encoded));
+
+    if (version != Version::V0) {
+        if (std::isfinite(value)) {
+            encoded <<= 1;
+            encoded &= ~(1ULL << 63);
+            encoded |= (dcm != kDCMEqualToDouble);
+        } else {
+            encoded = ~0ULL;  // infinity
+        }
     }
+    encoded = endian::nativeToBig(encoded);
+    _append(encoded, value > 0 ? invert : !invert);
+}
+
+void KeyString::_appendTinyDecimalWithoutTypeBits(const Decimal128 dec,
+                                                  const double bin,
+                                                  bool invert) {
+    // This function is only for 'dec' that doesn't exactly equal a double, but rounds to 'bin'
+    dassert(bin == dec.toDouble(Decimal128::kRoundTowardZero));
+    dassert(std::abs(bin) < DBL_MIN);
+    const bool isNegative = dec.isNegative();
+    Decimal128 magnitude = isNegative ? dec.negate() : dec;
+
+    _append(isNegative ? CType::kNumericNegativeSmallMagnitude
+                       : CType::kNumericPositiveSmallMagnitude,
+            invert);
+
+    // For decimals smaller than the smallest subnormal double, just store the decimal number
+    if (bin == 0.0) {
+        Decimal128 normalized = magnitude.normalize();
+        uint64_t hi = normalized.getValue().high64;
+        uint64_t lo = normalized.getValue().low64;
+        invariant((hi & (0x3ULL << 62)) == 0);
+        _append(endian::nativeToBig(hi), isNegative ? !invert : invert);
+        _append(endian::nativeToBig(lo), isNegative ? !invert : invert);
+        return;
+    }
+    // Encode decimal in subnormal double range by scaling in the decimal domain. Round down at
+    // each step, but ensure not to get below the subnormal double. This will ensure that
+    // 'scaledBin' is monotonically increasing and will only be off by at most a few units in the
+    // last place, so the decimal continuation will stay in range.
+    Decimal128 scaledDec =
+        magnitude.multiply(kTinyDoubleExponentUpshiftFactorAsDecimal, Decimal128::kRoundTowardZero);
+    double scaledBin = scaledDec.toDouble(Decimal128::kRoundTowardZero);
+
+    // Here we know that scaledBin contains the first 15 significant digits of scaled dec, and
+    // sorts correctly with scaled double.
+    scaledBin = std::max(scaledBin, std::abs(bin) * kTinyDoubleExponentUpshiftFactor);
+    uint64_t encoded;
+    memcpy(&encoded, &scaledBin, sizeof(encoded));
+    encoded <<= 1;
+    encoded |= 1;  // Even if decDiff.isZero() we aren't exactly equal
+    encoded += (1ULL << 62);
+    dassert(encoded >> 62 == 0x1);
+    _append(endian::nativeToBig(encoded), isNegative ? !invert : invert);
+
+    Decimal128 storedVal(scaledBin, Decimal128::kRoundTo34Digits, Decimal128::kRoundTowardPositive);
+    storedVal = storedVal.multiply(kTinyDoubleExponentDownshiftFactorAsDecimal,
+                                   Decimal128::kRoundTowardZero)
+                    .add(Decimal128::kLargestNegativeExponentZero);
+    dassert(storedVal.isLess(magnitude));
+    Decimal128 decDiff = magnitude.subtract(storedVal);
+    dassert(decDiff.getBiasedExponent() == storedVal.getBiasedExponent() || decDiff.isZero());
+    dassert(decDiff.getCoefficientHigh() == 0 && !decDiff.isNegative());
+    uint64_t continuation = decDiff.getCoefficientLow();
+    _append(endian::nativeToBig(continuation), isNegative ? !invert : invert);
+}
+
+
+void KeyString::_appendHugeDecimalWithoutTypeBits(const Decimal128 dec, bool invert) {
+    // To allow us to use CType::kNumericNegativeLargeMagnitude we need to fit between the highest
+    // finite double and the representation of +/-Inf. We do this by forcing the high bit to 1
+    // (large doubles always have 0) and never encoding ~0 here.
+
+    const bool isNegative = dec.isNegative();
+    Decimal128 normalizedMagnitude = (isNegative ? dec.negate() : dec).normalize();
+    uint64_t hi = normalizedMagnitude.getValue().high64;
+    uint64_t lo = normalizedMagnitude.getValue().low64;
+    dassert(hi < (1ULL << 63));
+    hi |= (1ULL << 63);
+    _append(isNegative ? CType::kNumericNegativeLargeMagnitude
+                       : CType::kNumericPositiveLargeMagnitude,
+            invert);
+    _append(endian::nativeToBig(hi), isNegative ? !invert : invert);
+    _append(endian::nativeToBig(lo), isNegative ? !invert : invert);
 }
 
 // Handles NumberLong and NumberInt which are encoded identically except for the TypeBits.
@@ -694,7 +1010,7 @@ void KeyString::_appendInteger(const long long num, bool invert) {
         // -2**63 is exactly representable as a double and not as a positive int64.
         // Therefore we encode it as a double.
         dassert(-double(num) == kMinLargeDouble);
-        _appendLargeDouble(double(num), invert);
+        _appendLargeDouble(static_cast<double>(num), kDCMEqualToDouble, invert);
         return;
     }
 
@@ -708,10 +1024,9 @@ void KeyString::_appendInteger(const long long num, bool invert) {
     _appendPreshiftedIntegerPortion(magnitude << 1, isNegative, invert);
 }
 
-
 void KeyString::_appendPreshiftedIntegerPortion(uint64_t value, bool isNegative, bool invert) {
-    dassert(value != 0ull);
-    dassert(value != 1ull);
+    dassert(value != 0ULL);
+    dassert(value != 1ULL);
 
     const size_t bytesNeeded = (64 - countLeadingZeros64(value) + 7) / 8;
 
@@ -753,26 +1068,53 @@ void toBsonValue(uint8_t ctype,
                  BufReader* reader,
                  TypeBits::Reader* typeBits,
                  bool inverted,
+                 KeyString::Version version,
                  BSONObjBuilderValueStream* stream);
 
-void toBson(BufReader* reader, TypeBits::Reader* typeBits, bool inverted, BSONObjBuilder* builder) {
+void toBson(BufReader* reader,
+            TypeBits::Reader* typeBits,
+            bool inverted,
+            KeyString::Version version,
+            BSONObjBuilder* builder) {
     while (readType<uint8_t>(reader, inverted) != 0) {
         if (inverted) {
             std::string name = readInvertedCString(reader);
             BSONObjBuilderValueStream& stream = *builder << name;
-            toBsonValue(readType<uint8_t>(reader, inverted), reader, typeBits, inverted, &stream);
+            toBsonValue(
+                readType<uint8_t>(reader, inverted), reader, typeBits, inverted, version, &stream);
         } else {
             StringData name = readCString(reader);
             BSONObjBuilderValueStream& stream = *builder << name;
-            toBsonValue(readType<uint8_t>(reader, inverted), reader, typeBits, inverted, &stream);
+            toBsonValue(
+                readType<uint8_t>(reader, inverted), reader, typeBits, inverted, version, &stream);
         }
     }
+}
+
+/**
+ * Helper function to read the least significant type bits for 'num' and return a value that
+ * is numerically equal to 'num', but has its exponent adjusted to match the stored exponent bits.
+ */
+Decimal128 adjustDecimalExponent(TypeBits::Reader* typeBits, Decimal128 num);
+
+/**
+ * Helper function that takes a 'num' with 15 decimal digits of precision, normalizes it to 34
+ * digits and reads a 64-bit (19-digit) continuation to obtain the full 34-bit value.
+ */
+Decimal128 readDecimalContinuation(BufReader* reader, bool inverted, Decimal128 num) {
+    uint32_t flags = Decimal128::kNoFlag;
+    uint64_t continuation = endian::bigToNative(readType<uint64_t>(reader, inverted));
+    num = num.normalize();
+    num = num.add(Decimal128(num.isNegative(), num.getBiasedExponent(), 0, continuation), &flags);
+    invariant(!(Decimal128::hasFlag(flags, Decimal128::kInexact)));
+    return num;
 }
 
 void toBsonValue(uint8_t ctype,
                  BufReader* reader,
                  TypeBits::Reader* typeBits,
                  bool inverted,
+                 KeyString::Version version,
                  BSONObjBuilderValueStream* stream) {
     // This is only used by the kNumeric.*ByteInt types, but needs to be declared up here
     // since it is used across a fallthrough.
@@ -861,7 +1203,7 @@ void toBsonValue(uint8_t ctype,
             }
             // Not going to optimize CodeWScope.
             BSONObjBuilder scope;
-            toBson(reader, typeBits, inverted, &scope);
+            toBson(reader, typeBits, inverted, version, &scope);
             *stream << BSONCodeWScope(code, scope.done());
             break;
         }
@@ -916,7 +1258,7 @@ void toBsonValue(uint8_t ctype,
 
         case CType::kObject: {
             BSONObjBuilder subObj(stream->subobjStart());
-            toBson(reader, typeBits, inverted, &subObj);
+            toBson(reader, typeBits, inverted, version, &subObj);
             break;
         }
 
@@ -929,6 +1271,7 @@ void toBsonValue(uint8_t ctype,
                             reader,
                             typeBits,
                             inverted,
+                            version,
                             &(subArr << BSONObjBuilder::numStr(index++)));
             }
             break;
@@ -938,13 +1281,20 @@ void toBsonValue(uint8_t ctype,
         // Numerics
         //
 
-        case CType::kNumericNaN:
-            invariant(typeBits->readNumeric() == TypeBits::kDouble);
-            *stream << std::numeric_limits<double>::quiet_NaN();
+        case CType::kNumericNaN: {
+            auto type = typeBits->readNumeric();
+            if (type == TypeBits::kDouble) {
+                *stream << std::numeric_limits<double>::quiet_NaN();
+            } else {
+                invariant(type == TypeBits::kDecimal && version == KeyString::Version::V1);
+                *stream << Decimal128::kPositiveNaN;
+            }
             break;
+        }
 
-        case CType::kNumericZero:
-            switch (typeBits->readNumeric()) {
+        case CType::kNumericZero: {
+            uint8_t zeroType = typeBits->readZero();
+            switch (zeroType) {
                 case TypeBits::kDouble:
                     *stream << 0.0;
                     break;
@@ -954,35 +1304,190 @@ void toBsonValue(uint8_t ctype,
                 case TypeBits::kLong:
                     *stream << 0ll;
                     break;
-                case TypeBits::kNegativeZero:
+                case TypeBits::kNegativeDoubleZero:
                     *stream << -0.0;
+                    break;
+                default:
+                    const uint32_t whichZero = typeBits->readDecimalZero(zeroType);
+                    const bool isNegative = whichZero > Decimal128::kMaxBiasedExponent;
+                    const uint32_t biasedExponent =
+                        isNegative ? whichZero - (Decimal128::kMaxBiasedExponent + 1) : whichZero;
+
+                    *stream << Decimal128(isNegative, biasedExponent, 0, 0);
                     break;
             }
             break;
+        }
 
-        case CType::kNumericNegativeLargeDouble:
-        case CType::kNumericNegativeSmallDouble:
+        case CType::kNumericNegativeLargeMagnitude:
             inverted = !inverted;
+            isNegative = true;
+        // fallthrough (format is the same as positive, but inverted)
+        case CType::kNumericPositiveLargeMagnitude: {
+            const uint8_t originalType = typeBits->readNumeric();
+            invariant(version > KeyString::Version::V0 || originalType != TypeBits::kDecimal);
+            uint64_t encoded = readType<uint64_t>(reader, inverted);
+            encoded = endian::bigToNative(encoded);
+            bool hasDecimalContinuation = false;
+            double bin;
+
+            // Backward compatibility
+            if (version == KeyString::Version::V0) {
+                memcpy(&bin, &encoded, sizeof(bin));
+            } else if (!(encoded & (1ULL << 63))) {  // In range of (finite) doubles
+                hasDecimalContinuation = encoded & 1;
+                encoded >>= 1;          // remove decimal continuation marker
+                encoded |= 1ULL << 62;  // implied leading exponent bit
+                memcpy(&bin, &encoded, sizeof(bin));
+                if (isNegative)
+                    bin = -bin;
+            } else if (encoded == ~0ULL) {  // infinity
+                bin = isNegative ? -std::numeric_limits<double>::infinity()
+                                 : std::numeric_limits<double>::infinity();
+            } else {  // Huge decimal number, directly output
+                invariant(originalType == TypeBits::kDecimal);
+                uint64_t highbits = encoded & ~(1ULL << 63);
+                uint64_t lowbits = endian::bigToNative(readType<uint64_t>(reader, inverted));
+                Decimal128 dec(Decimal128::Value{lowbits, highbits});
+                if (isNegative)
+                    dec = dec.negate();
+                dec = adjustDecimalExponent(typeBits, dec);
+                *stream << dec;
+                break;
+            }
+
+            // 'bin' contains the value of the input, rounded toward zero in case of decimal
+            if (originalType == TypeBits::kDouble) {
+                *stream << bin;
+            } else if (originalType == TypeBits::kLong) {
+                // This can only happen for a single number.
+                invariant(bin == static_cast<double>(std::numeric_limits<long long>::min()));
+                *stream << std::numeric_limits<long long>::min();
+            } else {
+                invariant(originalType == TypeBits::kDecimal && version != KeyString::Version::V0);
+                const auto roundAwayFromZero = isNegative ? Decimal128::kRoundTowardNegative
+                                                          : Decimal128::kRoundTowardPositive;
+                Decimal128 dec(bin, Decimal128::kRoundTo34Digits, roundAwayFromZero);
+                if (hasDecimalContinuation)
+                    dec = readDecimalContinuation(reader, inverted, dec);
+                dec = adjustDecimalExponent(typeBits, dec);
+                *stream << dec;
+            }
+            break;
+        }
+
+        case CType::kNumericNegativeSmallMagnitude:
+            inverted = !inverted;
+            isNegative = true;
         // fallthrough (format is the same as positive, but inverted)
 
-        case CType::kNumericPositiveLargeDouble:
-        case CType::kNumericPositiveSmallDouble: {
-            // for these, the raw double was stored intact, including sign bit.
+        case CType::kNumericPositiveSmallMagnitude: {
             const uint8_t originalType = typeBits->readNumeric();
             uint64_t encoded = readType<uint64_t>(reader, inverted);
             encoded = endian::bigToNative(encoded);
-            double d;
-            memcpy(&d, &encoded, sizeof(d));
 
-            if (originalType == TypeBits::kDouble) {
+            if (version == KeyString::Version::V0) {
+                // for these, the raw double was stored intact, including sign bit.
+                invariant(originalType == TypeBits::kDouble);
+                double d;
+                memcpy(&d, &encoded, sizeof(d));
                 *stream << d;
-            } else {
-                // This can only happen for a single number.
-                invariant(originalType == TypeBits::kLong);
-                invariant(d == double(std::numeric_limits<long long>::min()));
-                *stream << std::numeric_limits<long long>::min();
+                break;
             }
 
+            switch (encoded >> 62) {
+                case 0x0: {
+                    // Teeny tiny decimal, smaller magnitude than 2**(-1074)
+                    uint64_t lowbits = readType<uint64_t>(reader, inverted);
+                    lowbits = endian::bigToNative(lowbits);
+                    Decimal128 dec = Decimal128(Decimal128::Value{lowbits, encoded});
+                    dec = adjustDecimalExponent(typeBits, dec);
+                    if (ctype == CType::kNumericNegativeSmallMagnitude)
+                        dec = dec.negate();
+                    *stream << dec;
+                    break;
+                }
+                case 0x1:
+                case 0x2: {
+                    // Tiny double or decimal, magnitude from 2**(-1074) to 2**(-255), exclusive.
+                    // The exponent is shifted by 256 in order to avoid subnormals, which would
+                    // result in less than 15 significant digits. Because 2**(-255) has 179
+                    // decimal digits, no doubles exactly equal decimals, so all decimals have
+                    // a continuation. The bit is still needed for comparison purposes.
+                    bool hasDecimalContinuation = encoded & 1;
+                    encoded -= 1ULL << 62;
+                    encoded >>= 1;
+                    double scaledBin;
+                    memcpy(&scaledBin, &encoded, sizeof(scaledBin));
+                    if (originalType == TypeBits::kDouble) {
+                        invariant(!hasDecimalContinuation);
+                        double bin = scaledBin * kTinyDoubleExponentDownshiftFactor;
+                        *stream << (isNegative ? -bin : bin);
+                        break;
+                    }
+                    invariant(originalType == TypeBits::kDecimal && hasDecimalContinuation);
+
+                    // If the actual double would be subnormal, scale in decimal domain.
+                    Decimal128 dec;
+                    if (scaledBin < DBL_MIN * kTinyDoubleExponentUpshiftFactor) {
+                        // For conversion from binary->decimal scale away from zero,
+                        // otherwise round toward. Needs to be done consistently in read/write.
+
+                        Decimal128 scaledDec = Decimal128(scaledBin,
+                                                          Decimal128::kRoundTo34Digits,
+                                                          Decimal128::kRoundTowardPositive);
+                        dec = scaledDec.multiply(kTinyDoubleExponentDownshiftFactorAsDecimal,
+                                                 Decimal128::kRoundTowardZero);
+                    } else {
+                        double bin = scaledBin * kTinyDoubleExponentDownshiftFactor;
+                        dec = Decimal128(
+                            bin, Decimal128::kRoundTo34Digits, Decimal128::kRoundTowardPositive);
+                    }
+
+                    dec = readDecimalContinuation(reader, inverted, dec);
+                    *stream << adjustDecimalExponent(typeBits, isNegative ? dec.negate() : dec);
+                    break;
+                }
+                case 0x3: {
+                    // Small double, 2**(-255) or more in magnitude. Common case.
+                    auto dcm = static_cast<KeyString::DecimalContinuationMarker>(encoded & 3);
+                    encoded >>= 2;
+                    double bin;
+                    memcpy(&bin, &encoded, sizeof(bin));
+                    if (originalType == TypeBits::kDouble) {
+                        invariant(dcm == KeyString::kDCMEqualToDouble);
+                        *stream << (isNegative ? -bin : bin);
+                        break;
+                    }
+
+                    // Deal with decimal cases
+                    invariant(originalType == TypeBits::kDecimal);
+                    Decimal128 dec;
+                    switch (dcm) {
+                        case KeyString::kDCMEqualToDoubleRoundedUpTo15Digits:
+                            dec = Decimal128(bin,
+                                             Decimal128::kRoundTo15Digits,
+                                             Decimal128::kRoundTowardPositive);
+                            break;
+                        case KeyString::kDCMEqualToDouble:
+                            dec = Decimal128(bin,
+                                             Decimal128::kRoundTo34Digits,
+                                             Decimal128::kRoundTowardPositive);
+                            break;
+                        case KeyString::kDCMHasContinuationLessThanDoubleRoundedUpTo15Digits:
+                        case KeyString::kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits:
+                            // Deal with decimal continuation
+                            dec = Decimal128(bin,
+                                             Decimal128::kRoundTo34Digits,
+                                             Decimal128::kRoundTowardPositive);
+                            dec = readDecimalContinuation(reader, inverted, dec);
+                    }
+                    *stream << adjustDecimalExponent(typeBits, isNegative ? dec.negate() : dec);
+                    break;
+                }
+                default:
+                    MONGO_UNREACHABLE;
+            }
             break;
         }
 
@@ -1018,7 +1523,7 @@ void toBsonValue(uint8_t ctype,
             }
 
             const bool haveFractionalPart = (encodedIntegerPart & 1);
-            long long integerPart = encodedIntegerPart >> 1;
+            int64_t integerPart = encodedIntegerPart >> 1;
 
             if (!haveFractionalPart) {
                 if (isNegative)
@@ -1032,25 +1537,30 @@ void toBsonValue(uint8_t ctype,
                         *stream << int(integerPart);
                         break;
                     case TypeBits::kLong:
-                        *stream << integerPart;
+                        *stream << static_cast<long long>(integerPart);
                         break;
-                    case TypeBits::kNegativeZero:
-                        invariant(false);
+                    case TypeBits::kDecimal:
+                        *stream << adjustDecimalExponent(typeBits, Decimal128(integerPart));
+                        break;
+                    default:
+                        MONGO_UNREACHABLE;
                 }
-            } else {
-                // Nothing else can have a fractional part.
-                invariant(originalType == TypeBits::kDouble);
+                break;
+            }
 
+            // KeyString V0: anything fractional is a double
+            if (version == KeyString::Version::V0) {
+                invariant(originalType == TypeBits::kDouble);
                 const uint64_t exponent = (64 - countLeadingZeros64(integerPart)) - 1;
                 const size_t fractionalBits = (52 - exponent);
                 const size_t fractionalBytes = (fractionalBits + 7) / 8;
 
                 // build up the bits of a double here.
                 uint64_t doubleBits = integerPart << fractionalBits;
-                doubleBits &= ~(1ull << 52);  // clear implicit leading 1
+                doubleBits &= ~(1ULL << 52);  // clear implicit leading 1
                 doubleBits |= (exponent + 1023 /*bias*/) << 52;
                 if (isNegative) {
-                    doubleBits |= (1ull << 63);  // sign bit
+                    doubleBits |= (1ULL << 63);  // sign bit
                 }
                 for (size_t i = 0; i < fractionalBytes; i++) {
                     // fold in the fractional bytes
@@ -1061,14 +1571,104 @@ void toBsonValue(uint8_t ctype,
                 double number;
                 memcpy(&number, &doubleBits, sizeof(number));
                 *stream << number;
+                break;
             }
 
+            // KeyString V1: all numeric values with fractions have at least 8 bytes.
+            // Start with integer part, and read until we have a full 8 bytes worth of data.
+            const size_t fracBytes = 8 - CType::numBytesForInt(ctype);
+            uint64_t encodedFraction = integerPart;
+
+            for (int fracBytesRemaining = fracBytes; fracBytesRemaining; fracBytesRemaining--)
+                encodedFraction = (encodedFraction << 8) | readType<uint8_t>(reader, inverted);
+
+            // Zero out the DCM and convert the whole binary fraction
+            double bin = static_cast<double>(encodedFraction & ~3ULL) * kInvPow256[fracBytes];
+            if (originalType == TypeBits::kDouble) {
+                *stream << (isNegative ? -bin : bin);
+                break;
+            }
+
+            // The two lsb's are the DCM, except for the 8-byte case, where it's already known
+            KeyString::DecimalContinuationMarker dcm = fracBytes
+                ? static_cast<KeyString::DecimalContinuationMarker>(encodedFraction & 3)
+                : KeyString::kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits;
+
+            // Deal with decimal cases
+            invariant(originalType == TypeBits::kDecimal);
+            Decimal128 dec;
+            switch (dcm) {
+                case KeyString::kDCMEqualToDoubleRoundedUpTo15Digits:
+                    dec = Decimal128(
+                        bin, Decimal128::kRoundTo15Digits, Decimal128::kRoundTowardPositive);
+                    break;
+                case KeyString::kDCMEqualToDouble:
+                    dec = Decimal128(
+                        bin, Decimal128::kRoundTo34Digits, Decimal128::kRoundTowardPositive);
+                    break;
+                default:
+                    // Deal with decimal continuation
+                    dec = integerPart > kMaxIntForDouble
+                        ? Decimal128(integerPart)
+                        : Decimal128(
+                              bin, Decimal128::kRoundTo34Digits, Decimal128::kRoundTowardPositive);
+                    dec = readDecimalContinuation(reader, inverted, dec);
+            }
+            *stream << adjustDecimalExponent(typeBits, isNegative ? dec.negate() : dec);
             break;
         }
         default:
             invariant(false);
     }
 }
+
+
+Decimal128 adjustDecimalExponent(TypeBits::Reader* typeBits, Decimal128 num) {
+    // The last 6 bits of the exponent are stored in the type bits. First figure out if the exponent
+    // of 'num' is too high or too low. Even for a non-zero number with only a single significant
+    // digit, there are only 34 possiblities while exponents with the given low 6 bits are spaced
+    // (1 << 6) == 64 apart. This is not quite enough to figure out whether to shift the expnent up
+    // or down when the difference is for example 32 in either direction. However, if the high part
+    // of the coefficient is zero, the coefficient can only be scaled down by up to 1E19 (increasing
+    // the exponent by 19), as 2**64 < 1E20. If scaling down to match the higher exponent isn't
+    // possible, we must be able to scale up. Scaling always must be exact and not change the value.
+    const uint32_t kMaxExpAdjust = 33;
+    const uint32_t kMaxExpIncrementForZeroHighCoefficient = 19;
+    dassert(!num.isZero());
+    const uint32_t origExp = num.getBiasedExponent();
+    const uint8_t storedBits = typeBits->readDecimalExponent();
+
+    uint32_t highExp = (origExp & ~KeyString::TypeBits::kStoredDecimalExponentMask) | storedBits;
+
+    // Start by determining an exponent that's not less than num's and matches the stored bits.
+    if (highExp < origExp)
+        highExp += (1U << KeyString::TypeBits::kStoredDecimalExponentBits);
+
+    // This must be the right exponent, as no scaling is required.
+    if (highExp == origExp)
+        return num;
+
+    // For increasing the exponent, quantize the existing number. This must be
+    // exact, as the value stays in the same cohort.
+    if (highExp <= origExp + kMaxExpAdjust &&
+        (num.getCoefficientHigh() != 0 ||
+         highExp <= origExp + kMaxExpIncrementForZeroHighCoefficient)) {
+        // Increase exponent and decrease (right shift) coefficient.
+        uint32_t flags = Decimal128::SignalingFlag::kNoFlag;
+        auto quantized = num.quantize(Decimal128(0, highExp, 0, 1), &flags);
+        invariant(flags == Decimal128::SignalingFlag::kNoFlag);  // must be exact
+        num = quantized;
+    } else {
+        // Decrease exponent and increase (left shift) coefficient.
+        uint32_t lowExp = highExp - (1U << KeyString::TypeBits::kStoredDecimalExponentBits);
+        invariant(lowExp >= origExp - kMaxExpAdjust);
+        num = num.add(Decimal128(0, lowExp, 0, 0));
+    }
+    dassert((num.getBiasedExponent() & KeyString::TypeBits::kStoredDecimalExponentMask) ==
+            (highExp & KeyString::TypeBits::kStoredDecimalExponentMask));
+    return num;
+}
+
 }  // namespace
 
 BSONObj KeyString::toBson(const char* buffer, size_t len, Ordering ord, const TypeBits& typeBits) {
@@ -1088,7 +1688,7 @@ BSONObj KeyString::toBson(const char* buffer, size_t len, Ordering ord, const Ty
 
         if (ctype == kEnd)
             break;
-        toBsonValue(ctype, &reader, &typeBitsReader, invert, &(builder << ""));
+        toBsonValue(ctype, &reader, &typeBitsReader, invert, typeBits.version, &(builder << ""));
     }
     return builder.obj();
 }
@@ -1201,6 +1801,52 @@ void KeyString::TypeBits::appendBit(uint8_t oneOrZero) {
     _curBit++;
 }
 
+void KeyString::TypeBits::appendZero(uint8_t zeroType) {
+    switch (zeroType) {
+        // 2-bit encodings
+        case kInt:
+        case kDouble:
+        case kLong:
+            appendBit(zeroType >> 1);
+            appendBit(zeroType & 1);
+            break;
+        case kNegativeDoubleZero:
+            if (version == Version::V0) {
+                appendBit(kV0NegativeDoubleZero >> 1);
+                appendBit(kV0NegativeDoubleZero & 1);
+                break;
+            }
+            zeroType = kV1NegativeDoubleZero;
+        // fallthrough for 5-bit encodings
+        case kDecimalZero0xxx:
+        case kDecimalZero1xxx:
+        case kDecimalZero2xxx:
+        case kDecimalZero3xxx:
+        case kDecimalZero4xxx:
+        case kDecimalZero5xxx:
+            // first two bits output are ones
+            dassert((zeroType >> 3) == 3);
+            for (int bitPos = 4; bitPos >= 0; bitPos--)
+                appendBit((zeroType >> bitPos) & 1);
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+void KeyString::TypeBits::appendDecimalZero(uint32_t whichZero) {
+    invariant((whichZero >> 12) <= kDecimalZero5xxx - kDecimalZero0xxx);
+    appendZero((whichZero >> 12) + kDecimalZero0xxx);
+    for (int bitPos = 11; bitPos >= 0; bitPos--)
+        appendBit((whichZero >> bitPos) & 1);
+}
+
+void KeyString::TypeBits::appendDecimalExponent(uint8_t storedExponentBits) {
+    invariant(storedExponentBits < (1U << kStoredDecimalExponentBits));
+    for (int bitPos = kStoredDecimalExponentBits - 1; bitPos >= 0; bitPos--)
+        appendBit((storedExponentBits >> bitPos) & 1);
+}
+
 uint8_t KeyString::TypeBits::Reader::readBit() {
     if (_typeBits._isAllZeros)
         return 0;
@@ -1214,4 +1860,32 @@ uint8_t KeyString::TypeBits::Reader::readBit() {
     return (_typeBits._buf[byte] & (1 << offsetInByte)) ? 1 : 0;
 }
 
+uint8_t KeyString::TypeBits::Reader::readZero() {
+    uint8_t res = readNumeric();
+
+    // For keyString v1, negative and decimal zeros require at least 3 more bits.
+    if (_typeBits.version != Version::V0 && res == kSpecialZeroPrefix) {
+        res = (res << 1) | readBit();
+        res = (res << 1) | readBit();
+        res = (res << 1) | readBit();
+    }
+    if (res == kV1NegativeDoubleZero || res == kV0NegativeDoubleZero)
+        res = kNegativeDoubleZero;
+    return res;
+}
+
+uint32_t KeyString::TypeBits::Reader::readDecimalZero(uint8_t zeroType) {
+    uint32_t whichZero = zeroType - TypeBits::kDecimalZero0xxx;
+    for (int bitPos = 11; bitPos >= 0; bitPos--)
+        whichZero = (whichZero << 1) | readBit();
+
+    return whichZero;
+}
+
+uint8_t KeyString::TypeBits::Reader::readDecimalExponent() {
+    uint8_t exponentBits = 0;
+    for (int bitPos = kStoredDecimalExponentBits - 1; bitPos >= 0; bitPos--)
+        exponentBits = (exponentBits << 1) | readBit();
+    return exponentBits;
+}
 }  // namespace mongo
