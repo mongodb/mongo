@@ -47,7 +47,7 @@ FTDCCompressor::addSample(const BSONObj& sample, Date_t date) {
     if (_referenceDoc.isEmpty()) {
         FTDCBSONUtil::extractMetricsFromDocument(sample, sample, &_metrics);
         _reset(sample, date);
-        return {boost::none_t()};
+        return {boost::none};
     }
 
     _metrics.resize(0);
@@ -107,7 +107,7 @@ FTDCCompressor::addSample(const BSONObj& sample, Date_t date) {
     }
 
     // The buffer is not full, inform the caller
-    return {boost::none_t()};
+    return {boost::none};
 }
 
 StatusWith<std::tuple<ConstDataRange, Date_t>> FTDCCompressor::getCompressedSamples() {

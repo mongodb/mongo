@@ -122,7 +122,7 @@ public:
     TestTie() : _compressor(&_config) {}
 
     ~TestTie() {
-        validate(boost::none_t());
+        validate(boost::none);
     }
 
     StatusWith<boost::optional<std::tuple<ConstDataRange, FTDCCompressor::CompressorState, Date_t>>>

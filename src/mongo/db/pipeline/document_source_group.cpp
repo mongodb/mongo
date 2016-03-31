@@ -133,7 +133,7 @@ boost::optional<Document> DocumentSourceGroup::getNextStreaming() {
         // Release our references to the previous input document before asking for the next. This
         // makes operations like $unwind more efficient.
         _variables->clearRoot();
-        _firstDocOfNextGroup = {};
+        _firstDocOfNextGroup = boost::none;
 
         // Retrieve the next document.
         _firstDocOfNextGroup = pSource->getNext();

@@ -175,7 +175,7 @@ namespace boost
                     return true;
                 }
                     
-                unsigned long const res=detail::win32::WaitForSingleObject(unlock_sem,::boost::detail::get_milliseconds_until(wait_until));
+                unsigned long const res=WaitForSingleObject(unlock_sem,::boost::detail::get_milliseconds_until(wait_until));
                 if(res==detail::win32::timeout)
                 {
                     for(;;)
@@ -328,7 +328,7 @@ namespace boost
                 {
                     return true;
                 }
-                unsigned long const wait_res=detail::win32::WaitForMultipleObjects(2,semaphores,true,::boost::detail::get_milliseconds_until(wait_until));
+                unsigned long const wait_res=WaitForMultipleObjects(2,semaphores,true,::boost::detail::get_milliseconds_until(wait_until));
                 if(wait_res==detail::win32::timeout)
                 {
                     for(;;)
@@ -421,7 +421,7 @@ namespace boost
                     return;
                 }
                     
-                BOOST_VERIFY(!detail::win32::WaitForSingleObject(unlock_sem,detail::win32::infinite));
+                BOOST_VERIFY(!WaitForSingleObject(unlock_sem,detail::win32::infinite));
             }
         }
 
@@ -502,7 +502,7 @@ namespace boost
                 {
                     if(!last_reader)
                     {
-                        BOOST_VERIFY(!detail::win32::WaitForSingleObject(upgrade_sem,detail::win32::infinite));
+                        BOOST_VERIFY(!WaitForSingleObject(upgrade_sem,detail::win32::infinite));
                     }
                     break;
                 }

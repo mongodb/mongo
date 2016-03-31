@@ -205,7 +205,7 @@ Status FTDCFileWriter::flush(const boost::optional<ConstDataRange>& range, Date_
 
 Status FTDCFileWriter::close() {
     if (_archiveStream.is_open()) {
-        Status s = flush(boost::none_t(), Date_t());
+        Status s = flush(boost::none, Date_t());
 
         _archiveStream.close();
 
