@@ -1453,11 +1453,18 @@ __evict_get_ref(
 	*refp = NULL;
 
 	/*
-	 * Avoid the LRU lock if no pages are available.  If there are pages
+	 * Avoid the LRU lock if no pages are available.
 	 */
 	if (cache->evict_current == NULL)
 		return (WT_NOTFOUND);
 	__wt_spin_lock(session, &cache->evict_queue_lock);
+	/*
+	 * Verify there are still pages available.
+	 */
+	if (cache->evict_current == NULL) {
+		__wt_spin_unlock(session, &cache->evict_queue_lock);
+		return (WT_NOTFOUND);
+	}
 	/*
 	 * We got the queue lock, which should be fast, and now we want to
 	 * get the lock on the individual queue.  We know that the shared
