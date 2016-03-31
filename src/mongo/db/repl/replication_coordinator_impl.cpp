@@ -478,7 +478,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     }
 }
 
-void ReplicationCoordinatorImpl::startReplication(OperationContext* txn) {
+void ReplicationCoordinatorImpl::startup(OperationContext* txn) {
     if (!isReplEnabled()) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _setConfigState_inlock(kConfigReplicationDisabled);
@@ -534,7 +534,7 @@ void ReplicationCoordinatorImpl::shutdown() {
         _inShutdown = true;
         if (_rsConfigState == kConfigPreStart) {
             warning() << "ReplicationCoordinatorImpl::shutdown() called before "
-                         "startReplication() finished.  Shutting down without cleaning up the "
+                         "start() finished.  Shutting down without cleaning up the "
                          "replication system";
             return;
         }

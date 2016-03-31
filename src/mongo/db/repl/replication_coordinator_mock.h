@@ -52,7 +52,7 @@ public:
     ReplicationCoordinatorMock(const ReplSettings& settings);
     virtual ~ReplicationCoordinatorMock();
 
-    virtual void startReplication(OperationContext* txn);
+    virtual void startup(OperationContext* txn);
 
     virtual void shutdown();
 

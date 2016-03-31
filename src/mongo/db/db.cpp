@@ -705,7 +705,7 @@ static void _initAndListen(int listenPort) {
 
             restartInProgressIndexesFromLastShutdown(startupOpCtx.get());
 
-            repl::getGlobalReplicationCoordinator()->startReplication(startupOpCtx.get());
+            repl::getGlobalReplicationCoordinator()->startup(startupOpCtx.get());
 
             const unsigned long long missingRepl =
                 checkIfReplMissingFromCommandLine(startupOpCtx.get());

@@ -49,7 +49,7 @@ ReplicationCoordinatorMock::ReplicationCoordinatorMock(const ReplSettings& setti
     : _settings(settings) {}
 ReplicationCoordinatorMock::~ReplicationCoordinatorMock() {}
 
-void ReplicationCoordinatorMock::startReplication(OperationContext* txn) {
+void ReplicationCoordinatorMock::startup(OperationContext* txn) {
     // TODO
 }
 

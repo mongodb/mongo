@@ -140,7 +140,7 @@ void ReplCoordTest::start() {
     }
 
     OperationContextNoop txn;
-    _repl->startReplication(&txn);
+    _repl->startup(&txn);
     _repl->waitForStartUpComplete();
     _callShutdown = true;
 }

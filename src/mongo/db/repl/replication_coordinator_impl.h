@@ -112,7 +112,7 @@ public:
 
     // ================== Members of public ReplicationCoordinator API ===================
 
-    virtual void startReplication(OperationContext* txn) override;
+    virtual void startup(OperationContext* txn) override;
 
     virtual void shutdown() override;
 

@@ -127,7 +127,7 @@ public:
      * components of the replication system to start up whatever threads and do whatever
      * initialization they need.
      */
-    virtual void startReplication(OperationContext* txn) = 0;
+    virtual void startup(OperationContext* txn) = 0;
 
     /**
      * Does whatever cleanup is required to stop replication, including instructing the other
