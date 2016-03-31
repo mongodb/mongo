@@ -361,35 +361,41 @@ namespace DocumentSourceLookup {
 
 TEST(QueryForInput, NonArrayValueUsesEqQuery) {
     Document input = DOC("local" << 1);
-    BSONObj query = DocumentSourceLookUp::queryForInput(input, FieldPath("local"), "foreign");
-    ASSERT_EQ(query, BSON("foreign" << BSON("$eq" << 1)));
+    BSONObj query =
+        DocumentSourceLookUp::queryForInput(input, FieldPath("local"), "foreign", BSONObj());
+    ASSERT_EQ(query, fromjson("{$and: [{foreign: {$eq: 1}}, {}]}"));
 }
 
 TEST(QueryForInput, RegexValueUsesEqQuery) {
     BSONRegEx regex("^a");
     Document input = DOC("local" << Value(regex));
-    BSONObj query = DocumentSourceLookUp::queryForInput(input, FieldPath("local"), "foreign");
-    ASSERT_EQ(query, BSON("foreign" << BSON("$eq" << regex)));
+    BSONObj query =
+        DocumentSourceLookUp::queryForInput(input, FieldPath("local"), "foreign", BSONObj());
+    ASSERT_EQ(query,
+              BSON("$and" << BSON_ARRAY(BSON("foreign" << BSON("$eq" << regex)) << BSONObj())));
 }
 
 TEST(QueryForInput, ArrayValueUsesInQuery) {
     vector<Value> inputArray = {Value(1), Value(2)};
     Document input = DOC("local" << Value(inputArray));
-    BSONObj query = DocumentSourceLookUp::queryForInput(input, FieldPath("local"), "foreign");
-    ASSERT_EQ(query, BSON("foreign" << BSON("$in" << BSON_ARRAY(1 << 2))));
+    BSONObj query =
+        DocumentSourceLookUp::queryForInput(input, FieldPath("local"), "foreign", BSONObj());
+    ASSERT_EQ(query, fromjson("{$and: [{foreign: {$in: [1, 2]}}, {}]}"));
 }
 
 TEST(QueryForInput, ArrayValueWithRegexUsesOrQuery) {
     BSONRegEx regex("^a");
     vector<Value> inputArray = {Value(1), Value(regex), Value(2)};
     Document input = DOC("local" << Value(inputArray));
-    BSONObj query = DocumentSourceLookUp::queryForInput(input, FieldPath("local"), "foreign");
+    BSONObj query =
+        DocumentSourceLookUp::queryForInput(input, FieldPath("local"), "foreign", BSONObj());
     ASSERT_EQ(query,
-              BSON("$or" << BSON_ARRAY(BSON("foreign" << BSON("$eq" << Value(1)))
-                                       << BSON("foreign" << BSON("$eq" << regex))
-                                       << BSON("foreign" << BSON("$eq" << Value(2))))));
+              BSON("$and" << BSON_ARRAY(
+                       BSON("$or" << BSON_ARRAY(BSON("foreign" << BSON("$eq" << Value(1)))
+                                                << BSON("foreign" << BSON("$eq" << regex))
+                                                << BSON("foreign" << BSON("$eq" << Value(2)))))
+                       << BSONObj())));
 }
-
 
 }  // namespace DocumentSourceLookUp
 

@@ -40,7 +40,7 @@ Status TextNoOpMatchExpression::init(TextParams params) {
     _ftsQuery.setCaseSensitive(params.caseSensitive);
     _ftsQuery.setDiacriticSensitive(params.diacriticSensitive);
     invariantOK(_ftsQuery.parse(fts::TEXT_INDEX_VERSION_INVALID));
-    return initPath("_fts");
+    return setPath("_fts");
 }
 
 std::unique_ptr<MatchExpression> TextNoOpMatchExpression::shallowClone() const {

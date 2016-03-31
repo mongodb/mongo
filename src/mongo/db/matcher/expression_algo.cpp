@@ -33,8 +33,10 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/pipeline/dependencies.h"
 
 namespace mongo {
 
@@ -233,20 +235,6 @@ bool isElemMatch(const MatchExpression& expr) {
         expr.matchType() == MatchExpression::ELEM_MATCH_VALUE;
 }
 
-/**
- * Returns whether 'first' is a prefix of 'second'.
- */
-bool isPathPrefixOf(const StringData& first, const StringData& second) {
-    if (first == second) {
-        return true;
-    }
-
-    if (first.size() >= second.size()) {
-        return false;
-    }
-
-    return second.startsWith(first) && second[first.size()] == '.';
-}
 
 /**
  * Returns whether the leaf at 'path' is independent of 'fields'.
@@ -256,7 +244,8 @@ bool isLeafIndependentOf(const StringData& path, const std::set<std::string>& fi
     // is a prefix of that field. For example, the expression {a.b: {c: 1}} is not independent of
     // 'a.b.c', and and the expression {a.b.c.d: 1} is not independent of 'a.b.c'.
     for (StringData field : fields) {
-        if (isPathPrefixOf(path, field) || isPathPrefixOf(field, path)) {
+        if (path == field || expression::isPathPrefixOf(path, field) ||
+            expression::isPathPrefixOf(field, path)) {
             return false;
         }
     }
@@ -427,6 +416,30 @@ std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchEx
         }
         default: { MONGO_UNREACHABLE; }
     }
+}
+
+void mapOver(MatchExpression* expr, NodeTraversalFunc func, std::string path) {
+    if (!expr->path().empty()) {
+        if (!path.empty()) {
+            path += ".";
+        }
+
+        path += expr->path().toString();
+    }
+
+    for (size_t i = 0; i < expr->numChildren(); i++) {
+        mapOver(expr->getChild(i), func, path);
+    }
+
+    func(expr, path);
+}
+
+bool isPathPrefixOf(StringData first, StringData second) {
+    if (first.size() >= second.size()) {
+        return false;
+    }
+
+    return second.startsWith(first) && second[first.size()] == '.';
 }
 
 }  // namespace expression

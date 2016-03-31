@@ -45,7 +45,7 @@ public:
     ArrayMatchingMatchExpression(MatchType matchType) : MatchExpression(matchType) {}
     virtual ~ArrayMatchingMatchExpression() {}
 
-    Status initPath(StringData path);
+    Status setPath(StringData path);
 
     virtual bool matches(const MatchableDocument* doc, MatchDetails* details) const;
 

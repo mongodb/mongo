@@ -72,8 +72,7 @@ public:
         return _path;
     }
 
-protected:
-    Status initPath(StringData path);
+    Status setPath(StringData path);
 
 private:
     StringData _path;

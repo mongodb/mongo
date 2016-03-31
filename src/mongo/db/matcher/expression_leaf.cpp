@@ -46,7 +46,7 @@
 
 namespace mongo {
 
-Status LeafMatchExpression::initPath(StringData path) {
+Status LeafMatchExpression::setPath(StringData path) {
     _path = path;
     return _elementPath.init(_path);
 }
@@ -104,7 +104,7 @@ Status ComparisonMatchExpression::init(StringData path, const BSONElement& rhs) 
             return Status(ErrorCodes::BadValue, "bad match type for ComparisonMatchExpression");
     }
 
-    return initPath(path);
+    return setPath(path);
 }
 
 
@@ -288,7 +288,7 @@ Status RegexMatchExpression::init(StringData path, StringData regex, StringData 
     _flags = options.toString();
     _re.reset(new pcrecpp::RE(_regex.c_str(), flags2options(_flags.c_str())));
 
-    return initPath(path);
+    return setPath(path);
 }
 
 bool RegexMatchExpression::matchesSingleElement(const BSONElement& e) const {
@@ -335,7 +335,7 @@ Status ModMatchExpression::init(StringData path, int divisor, int remainder) {
         return Status(ErrorCodes::BadValue, "divisor cannot be 0");
     _divisor = divisor;
     _remainder = remainder;
-    return initPath(path);
+    return setPath(path);
 }
 
 bool ModMatchExpression::matchesSingleElement(const BSONElement& e) const {
@@ -372,7 +372,7 @@ bool ModMatchExpression::equivalent(const MatchExpression* other) const {
 // ------------------
 
 Status ExistsMatchExpression::init(StringData path) {
-    return initPath(path);
+    return setPath(path);
 }
 
 bool ExistsMatchExpression::matchesSingleElement(const BSONElement& e) const {
@@ -618,7 +618,7 @@ void ArrayFilterEntries::serialize(BSONArrayBuilder* out) const {
 // -----------
 
 Status InMatchExpression::init(StringData path) {
-    return initPath(path);
+    return setPath(path);
 }
 
 bool InMatchExpression::_matchesRealElement(const BSONElement& e) const {
@@ -712,7 +712,7 @@ Status BitTestMatchExpression::init(StringData path, std::vector<uint32_t> bitPo
         _bitMask |= 1ULL << bitPosition;
     }
 
-    return initPath(path);
+    return setPath(path);
 }
 
 Status BitTestMatchExpression::init(StringData path, uint64_t bitMask) {
@@ -725,7 +725,7 @@ Status BitTestMatchExpression::init(StringData path, uint64_t bitMask) {
         }
     }
 
-    return initPath(path);
+    return setPath(path);
 }
 
 Status BitTestMatchExpression::init(StringData path,
@@ -754,7 +754,7 @@ Status BitTestMatchExpression::init(StringData path,
         }
     }
 
-    return initPath(path);
+    return setPath(path);
 }
 
 bool BitTestMatchExpression::needFurtherBitTests(bool isBitSet) const {

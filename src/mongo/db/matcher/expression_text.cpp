@@ -93,7 +93,7 @@ Status TextMatchExpression::init(OperationContext* txn,
         return parseStatus;
     }
 
-    return initPath("_fts");
+    return setPath("_fts");
 }
 
 std::unique_ptr<MatchExpression> TextMatchExpression::shallowClone() const {
@@ -101,7 +101,7 @@ std::unique_ptr<MatchExpression> TextMatchExpression::shallowClone() const {
     // We initialize _ftsQuery here directly rather than calling init(), to avoid needing to examine
     // the index catalog.
     expr->_ftsQuery = _ftsQuery;
-    invariantOK(expr->initPath("_fts"));
+    invariantOK(expr->setPath("_fts"));
     if (getTag()) {
         expr->setTag(getTag()->clone());
     }

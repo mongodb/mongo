@@ -28,11 +28,16 @@
  *    it in the license file.
  */
 
+#include "mongo/stdx/functional.h"
+
 namespace mongo {
 
 class MatchExpression;
+struct DepsTracker;
 
 namespace expression {
+
+using NodeTraversalFunc = stdx::function<void(MatchExpression*, std::string)>;
 
 /**
  * Returns true if the documents matched by 'lhs' are a subset of the documents matched by
@@ -73,6 +78,24 @@ bool isSplittableBy(const MatchExpression& expr, const std::set<std::string>& pa
  * Determine if 'expr' is reliant upon any path from 'pathSet'.
  */
 bool isIndependentOf(const MatchExpression& expr, const std::set<std::string>& pathSet);
+
+/**
+ * Returns whether the path represented by 'first' is an prefix of the path represented by 'second'.
+ * Equality is not considered a prefix. For example:
+ *
+ * a.b is a prefix of a.b.c
+ * a.b is not a prefix of a.balloon
+ * a is a prefix of a.b
+ * a is not a prefix of a
+ * a.b is not a prefix of a
+ */
+bool isPathPrefixOf(StringData first, StringData second);
+
+/**
+ * Applies 'func' to each node of 'expr', where the first argument is a pointer to that actual node
+ * (not a copy), and the second argument is the path to that node.
+ */
+void mapOver(MatchExpression* expr, NodeTraversalFunc func, std::string path = "");
 
 /**
  * Attempt to split 'expr' into two MatchExpressions, where the first is not reliant upon any

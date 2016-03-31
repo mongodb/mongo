@@ -32,12 +32,14 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/matcher/expression_array.h"
+#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/util/stringutils.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
@@ -93,14 +95,13 @@ Pipeline::SourceContainer::iterator DocumentSourceMatch::optimizeAt(
     // combine a non-text stage with a text stage, as that may turn an invalid pipeline into a
     // valid one, unbeknownst to the user.
     if (nextMatch && !nextMatch->_isTextQuery) {
-        _predicate = BSON("$and" << BSON_ARRAY(getQuery() << nextMatch->getQuery()));
+        // Merge 'nextMatch' into this stage.
+        joinMatchWith(nextMatch);
 
-        StatusWithMatchExpression status =
-            uassertStatusOK(MatchExpressionParser::parse(_predicate, ExtensionsCallbackNoop()));
-        _expression = std::move(status.getValue());
-
+        // Erase 'nextMatch'.
         container->erase(std::next(itr));
-        return itr;
+
+        return itr == container->begin() ? itr : std::prev(itr);
     }
     return std::next(itr);
 }
@@ -353,6 +354,14 @@ bool DocumentSourceMatch::isTextQuery(const BSONObj& query) {
     return false;
 }
 
+void DocumentSourceMatch::joinMatchWith(intrusive_ptr<DocumentSourceMatch> other) {
+    _predicate = BSON("$and" << BSON_ARRAY(_predicate << other->getQuery()));
+
+    StatusWithMatchExpression status =
+        uassertStatusOK(MatchExpressionParser::parse(_predicate, ExtensionsCallbackNoop()));
+    _expression = std::move(status.getValue());
+}
+
 pair<intrusive_ptr<DocumentSource>, intrusive_ptr<DocumentSource>>
 DocumentSourceMatch::splitSourceBy(const std::set<std::string>& fields) {
     pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> newExpr(
@@ -388,6 +397,41 @@ DocumentSourceMatch::splitSourceBy(const std::set<std::string>& fields) {
     intrusive_ptr<DocumentSource> secondMatch(new DocumentSourceMatch(secondBob.obj(), pExpCtx));
 
     return {firstMatch, secondMatch};
+}
+
+boost::intrusive_ptr<DocumentSourceMatch> DocumentSourceMatch::descendMatchOnPath(
+    MatchExpression* matchExpr,
+    const std::string& descendOn,
+    intrusive_ptr<ExpressionContext> expCtx) {
+    expression::mapOver(matchExpr,
+                        [&descendOn](MatchExpression* node, std::string path) -> void {
+                            // Cannot call this method on a $match including a $elemMatch.
+                            invariant(node->matchType() != MatchExpression::ELEM_MATCH_OBJECT &&
+                                      node->matchType() != MatchExpression::ELEM_MATCH_VALUE);
+                            // Logical nodes do not have a path, but both 'leaf' and 'array' nodes
+                            // do.
+                            if (node->isLogical()) {
+                                return;
+                            }
+
+                            auto leafPath = node->path();
+                            invariant(expression::isPathPrefixOf(descendOn, leafPath));
+
+                            auto newPath = leafPath.substr(descendOn.size() + 1);
+                            if (node->isLeaf() &&
+                                node->matchType() != MatchExpression::TYPE_OPERATOR &&
+                                node->matchType() != MatchExpression::WHERE) {
+                                auto leafNode = static_cast<LeafMatchExpression*>(node);
+                                leafNode->setPath(newPath);
+                            } else if (node->isArray()) {
+                                auto arrayNode = static_cast<ArrayMatchingMatchExpression*>(node);
+                                arrayNode->setPath(newPath);
+                            }
+                        });
+
+    BSONObjBuilder query;
+    matchExpr->serialize(&query);
+    return new DocumentSourceMatch(query.obj(), expCtx);
 }
 
 static void uassertNoDisallowedClauses(BSONObj query) {
@@ -429,33 +473,20 @@ DocumentSource::GetDepsReturn DocumentSourceMatch::getDependencies(DepsTracker* 
         return EXHAUSTIVE_ALL;
     }
 
-    addDependencies(_expression.get(), deps, "");
+    addDependencies(deps);
     return SEE_NEXT;
 }
 
-void DocumentSourceMatch::addDependencies(MatchExpression* expression,
-                                          DepsTracker* deps,
-                                          std::string prefix) const {
-    if (!expression->path().empty()) {
-        if (!prefix.empty()) {
-            prefix += ".";
-        }
-
-        prefix += expression->path().toString();
-    }
-
-    if (expression->numChildren()) {
-        for (size_t i = 0; i < expression->numChildren(); i++) {
-            addDependencies(expression->getChild(i), deps, prefix);
-        }
-    }
-
-    if (!expression->path().empty() &&
-        (expression->numChildren() == 0 ||
-         expression->matchType() == MatchExpression::ELEM_MATCH_VALUE ||
-         expression->matchType() == MatchExpression::ELEM_MATCH_OBJECT)) {
-        deps->fields.insert(prefix);
-    }
+void DocumentSourceMatch::addDependencies(DepsTracker* deps) const {
+    expression::mapOver(_expression.get(),
+                        [deps](MatchExpression* node, std::string path) -> void {
+                            if (!path.empty() &&
+                                (node->numChildren() == 0 ||
+                                 node->matchType() == MatchExpression::ELEM_MATCH_VALUE ||
+                                 node->matchType() == MatchExpression::ELEM_MATCH_OBJECT)) {
+                                deps->fields.insert(path);
+                            }
+                        });
 }
 
 DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,
@@ -463,7 +494,6 @@ DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,
     : DocumentSource(pExpCtx), _predicate(query.getOwned()), _isTextQuery(isTextQuery(query)) {
     StatusWithMatchExpression status =
         uassertStatusOK(MatchExpressionParser::parse(_predicate, ExtensionsCallbackNoop()));
-
     _expression = std::move(status.getValue());
     getDependencies(&_dependencies);
 }

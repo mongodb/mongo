@@ -644,6 +644,19 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pCtx);
 
     /**
+     * Access the MatchExpression stored inside the DocumentSourceMatch. Does not release ownership.
+     */
+    MatchExpression* getMatchExpression() const {
+        return _expression.get();
+    }
+
+    /**
+     * Combines the filter in this $match with the filter of 'other' using a $and, updating this
+     * match in place.
+     */
+    void joinMatchWith(boost::intrusive_ptr<DocumentSourceMatch> other);
+
+    /**
      * Returns the query in MatchExpression syntax.
      */
     BSONObj getQuery() const;
@@ -684,11 +697,28 @@ public:
      */
     static BSONObj getObjectForMatch(const Document& input, const std::set<std::string>& fields);
 
+    /**
+     * Should be called _only_ on a MatchExpression  that is a predicate on 'path', or subfields  of
+     * 'path'. It is also invalid to call this method on a $match including a $elemMatch on 'path',
+     * for example: {$match: {'path': {$elemMatch: {'subfield': 3}}}}
+     *
+     * Returns a new DocumentSourceMatch that, if executed on the subdocument at 'path', is
+     * equivalent to 'expression'.
+     *
+     * For example, if the original expression is {$and: [{'a.b': {$gt: 0}}, {'a.d': {$eq: 3}}]},
+     * the new $match will have the expression {$and: [{b: {$gt: 0}}, {d: {$eq: 3}}]} after
+     * descending on the path 'a'.
+     */
+    static boost::intrusive_ptr<DocumentSourceMatch> descendMatchOnPath(
+        MatchExpression* matchExpr,
+        const std::string& path,
+        boost::intrusive_ptr<ExpressionContext> expCtx);
+
 private:
     DocumentSourceMatch(const BSONObj& query,
                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    void addDependencies(MatchExpression* expression, DepsTracker* deps, std::string prefix) const;
+    void addDependencies(DepsTracker* deps) const;
 
     std::unique_ptr<MatchExpression> _expression;
 
@@ -1472,7 +1502,8 @@ public:
      */
     static BSONObj queryForInput(const Document& input,
                                  const FieldPath& localFieldName,
-                                 const std::string& foreignFieldName);
+                                 const std::string& foreignFieldName,
+                                 const BSONObj& additionalFilter);
 
 private:
     DocumentSourceLookUp(NamespaceString fromNs,
@@ -1493,8 +1524,11 @@ private:
     FieldPath _foreignField;
     std::string _foreignFieldFieldName;
 
+    boost::intrusive_ptr<DocumentSourceMatch> _matchSrc;
     boost::intrusive_ptr<DocumentSourceUnwind> _unwindSrc;
+
     bool _handlingUnwind = false;
+    bool _handlingMatch = false;
     std::unique_ptr<DBClientCursor> _cursor;
     long long _cursorIndex = 0;
     boost::optional<Document> _input;

@@ -259,6 +259,193 @@ class LookupShouldNotCoalesceWithUnwindNotOnAs : public Base {
     }
 };
 
+class LookupShouldSwapWithMatch : public Base {
+    string inputPipeJson() {
+        return "[{$lookup: {from: 'foo', as: 'asField', localField: 'y', foreignField: 'z'}}, "
+               " {$match: {'independent': 0}}]";
+    }
+    string outputPipeJson() {
+        return "[{$match: {independent: 0}}, "
+               " {$lookup: {from: 'foo', as: 'asField', localField: 'y', foreignField: 'z'}}]";
+    }
+};
+
+class LookupShouldSplitMatch : public Base {
+    string inputPipeJson() {
+        return "[{$lookup: {from: 'foo', as: 'asField', localField: 'y', foreignField: 'z'}}, "
+               " {$match: {'independent': 0, asField: {$eq: 3}}}]";
+    }
+    string outputPipeJson() {
+        return "[{$match: {independent: {$eq: 0}}}, "
+               " {$lookup: {from: 'foo', as: 'asField', localField: 'y', foreignField: 'z'}}, "
+               " {$match: {asField: {$eq: 3}}}]";
+    }
+};
+class LookupShouldNotAbsorbMatchOnAs : public Base {
+    string inputPipeJson() {
+        return "[{$lookup: {from: 'foo', as: 'asField', localField: 'y', foreignField: 'z'}}, "
+               " {$match: {'asField.subfield': 0}}]";
+    }
+    string outputPipeJson() {
+        return "[{$lookup: {from: 'foo', as: 'asField', localField: 'y', foreignField: 'z'}}, "
+               " {$match: {'asField.subfield': 0}}]";
+    }
+};
+
+class LookupShouldAbsorbUnwindMatch : public Base {
+    string inputPipeJson() {
+        return "[{$lookup: {from: 'foo', as: 'asField', localField: 'y', foreignField: 'z'}}, "
+               "{$unwind: '$asField'}, "
+               "{$match: {'asField.subfield': {$eq: 1}}}]";
+    }
+    string outputPipeJson() {
+        return "[{$lookup: {from: 'foo', as: 'asField', localField: 'y', foreignField: 'z', "
+               "            unwinding: {preserveNullAndEmptyArrays: false}, "
+               "            matching: {subfield: {$eq: 1}}}}]";
+    }
+};
+
+class LookupShouldAbsorbUnwindAndSplitAndAbsorbMatch : public Base {
+    string inputPipeJson() {
+        return "[{$lookup: {from: 'foo', as: 'asField', localField: 'y', foreignField: 'z'}}, "
+               " {$unwind: '$asField'}, "
+               " {$match: {'asField.subfield': {$eq: 1}, independentField: {$gt: 2}}}]";
+    }
+    string outputPipeJson() {
+        return "[{$match: {independentField: {$gt: 2}}}, "
+               " {$lookup: { "
+               "      from: 'foo', "
+               "      as: 'asField', "
+               "      localField: 'y', "
+               "      foreignField: 'z', "
+               "      unwinding: { "
+               "          preserveNullAndEmptyArrays: false"
+               "      }, "
+               "      matching: { "
+               "          subfield: {$eq: 1} "
+               "      } "
+               " }}]";
+    }
+};
+
+class LookupShouldNotSplitIndependentAndDependentOrClauses : public Base {
+    // If any child of the $or is dependent on the 'asField', then the $match cannot be moved above
+    // the $lookup, and if any child of the $or is independent of the 'asField', then the $match
+    // cannot be absorbed by the $lookup.
+    string inputPipeJson() {
+        return "[{$lookup: {from: 'foo', as: 'asField', localField: 'y', foreignField: 'z'}}, "
+               " {$unwind: '$asField'}, "
+               " {$match: {$or: [{'independent': {$gt: 4}}, "
+               "                 {'asField.dependent': {$elemMatch: {a: {$eq: 1}}}}]}}]";
+    }
+    string outputPipeJson() {
+        return "[{$lookup: {from: 'foo', as: 'asField', localField: 'y', foreignField: 'z', "
+               "            unwinding: {preserveNullAndEmptyArrays: false}}}, "
+               " {$match: {$or: [{'independent': {$gt: 4}}, "
+               "                 {'asField.dependent': {$elemMatch: {a: {$eq: 1}}}}]}}]";
+    }
+};
+
+class LookupWithMatchOnArrayIndexFieldShouldNotCoalesce : public Base {
+    string inputPipeJson() {
+        return "[{$lookup: {from: 'foo', as: 'asField', localField: 'y', foreignField: 'z'}}, "
+               " {$unwind: {path: '$asField', includeArrayIndex: 'index'}}, "
+               " {$match: {index: 0, 'asField.value': {$gt: 0}, independent: 1}}]";
+    }
+    string outputPipeJson() {
+        return "[{$match: {independent: {$eq: 1}}}, "
+               " {$lookup: { "
+               "      from: 'foo', "
+               "      as: 'asField', "
+               "      localField: 'y', "
+               "      foreignField: 'z', "
+               "      unwinding: { "
+               "          preserveNullAndEmptyArrays: false, "
+               "          includeArrayIndex: 'index' "
+               "      } "
+               " }}, "
+               " {$match: {$and: [{index: {$eq: 0}}, {'asField.value': {$gt: 0}}]}}]";
+    }
+};
+
+class LookupWithUnwindPreservingNullAndEmptyArraysShouldNotCoalesce : public Base {
+    string inputPipeJson() {
+        return "[{$lookup: {from: 'foo', as: 'asField', localField: 'y', foreignField: 'z'}}, "
+               " {$unwind: {path: '$asField', preserveNullAndEmptyArrays: true}}, "
+               " {$match: {'asField.value': {$gt: 0}, independent: 1}}]";
+    }
+    string outputPipeJson() {
+        return "[{$match: {independent: {$eq: 1}}}, "
+               " {$lookup: { "
+               "      from: 'foo', "
+               "      as: 'asField', "
+               "      localField: 'y', "
+               "      foreignField: 'z', "
+               "      unwinding: { "
+               "          preserveNullAndEmptyArrays: true"
+               "      } "
+               " }}, "
+               " {$match: {'asField.value': {$gt: 0}}}]";
+    }
+};
+
+class LookupDoesNotAbsorbElemMatch : public Base {
+    string inputPipeJson() {
+        return "[{$lookup: {from: 'foo', as: 'x', localField: 'y', foreignField: 'z'}}, "
+               " {$unwind: '$x'}, "
+               " {$match: {x: {$elemMatch: {a: 1}}}}]";
+    }
+    string outputPipeJson() {
+        return "[{$lookup: { "
+               "             from: 'foo', "
+               "             as: 'x', "
+               "             localField: 'y', "
+               "             foreignField: 'z', "
+               "             unwinding: { "
+               "                          preserveNullAndEmptyArrays: false "
+               "             } "
+               "           } "
+               " }, "
+               " {$match: {x: {$elemMatch: {a: 1}}}}]";
+    }
+};
+
+class LookupDoesSwapWithMatchOnLocalField : public Base {
+    string inputPipeJson() {
+        return "[{$lookup: {from: 'foo', as: 'x', localField: 'y', foreignField: 'z'}}, "
+               " {$match: {y: {$eq: 3}}}]";
+    }
+    string outputPipeJson() {
+        return "[{$match: {y: {$eq: 3}}}, "
+               " {$lookup: {from: 'foo', as: 'x', localField: 'y', foreignField: 'z'}}]";
+    }
+};
+
+class LookupDoesSwapWithMatchOnFieldWithSameNameAsForeignField : public Base {
+    string inputPipeJson() {
+        return "[{$lookup: {from: 'foo', as: 'x', localField: 'y', foreignField: 'z'}}, "
+               " {$match: {z: {$eq: 3}}}]";
+    }
+    string outputPipeJson() {
+        return "[{$match: {z: {$eq: 3}}}, "
+               " {$lookup: {from: 'foo', as: 'x', localField: 'y', foreignField: 'z'}}]";
+    }
+};
+
+class LookupDoesNotAbsorbUnwindOnSubfieldOfAsButStillMovesMatch : public Base {
+    string inputPipeJson() {
+        return "[{$lookup: {from: 'foo', as: 'x', localField: 'y', foreignField: 'z'}}, "
+               " {$unwind: {path: '$x.subfield'}}, "
+               " {$match: {'independent': 2, 'x.dependent': 2}}]";
+    }
+    string outputPipeJson() {
+        return "[{$match: {'independent': {$eq: 2}}}, "
+               " {$lookup: {from: 'foo', as: 'x', localField: 'y', foreignField: 'z'}}, "
+               " {$match: {'x.dependent': {$eq: 2}}}, "
+               " {$unwind: {path: '$x.subfield'}}]";
+    }
+};
+
 class MatchShouldDuplicateItselfBeforeRedact : public Base {
     string inputPipeJson() {
         return "[{$redact: '$$PRUNE'}, {$match: {a: 1, b:12}}]";
@@ -768,6 +955,18 @@ public:
         add<Optimizations::Local::LookupShouldCoalesceWithUnwindOnAsWithPreserveEmpty>();
         add<Optimizations::Local::LookupShouldCoalesceWithUnwindOnAsWithIncludeArrayIndex>();
         add<Optimizations::Local::LookupShouldNotCoalesceWithUnwindNotOnAs>();
+        add<Optimizations::Local::LookupShouldSwapWithMatch>();
+        add<Optimizations::Local::LookupShouldSplitMatch>();
+        add<Optimizations::Local::LookupShouldNotAbsorbMatchOnAs>();
+        add<Optimizations::Local::LookupShouldAbsorbUnwindMatch>();
+        add<Optimizations::Local::LookupShouldAbsorbUnwindAndSplitAndAbsorbMatch>();
+        add<Optimizations::Local::LookupShouldNotSplitIndependentAndDependentOrClauses>();
+        add<Optimizations::Local::LookupWithMatchOnArrayIndexFieldShouldNotCoalesce>();
+        add<Optimizations::Local::LookupWithUnwindPreservingNullAndEmptyArraysShouldNotCoalesce>();
+        add<Optimizations::Local::LookupDoesNotAbsorbElemMatch>();
+        add<Optimizations::Local::LookupDoesSwapWithMatchOnLocalField>();
+        add<Optimizations::Local::LookupDoesNotAbsorbUnwindOnSubfieldOfAsButStillMovesMatch>();
+        add<Optimizations::Local::LookupDoesSwapWithMatchOnFieldWithSameNameAsForeignField>();
         add<Optimizations::Local::MatchShouldDuplicateItselfBeforeRedact>();
         add<Optimizations::Local::MatchShouldSwapWithUnwind>();
         add<Optimizations::Local::MatchShouldNotOptimizeWhenMatchingOnIndexField>();

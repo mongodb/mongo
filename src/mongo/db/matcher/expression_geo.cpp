@@ -328,7 +328,7 @@ Status GeoMatchExpression::init(StringData path,
                                 const BSONObj& rawObj) {
     _query.reset(query);
     _rawObj = rawObj;
-    return initPath(path);
+    return setPath(path);
 }
 
 bool GeoMatchExpression::matchesSingleElement(const BSONElement& e) const {
@@ -405,7 +405,7 @@ Status GeoNearMatchExpression::init(StringData path,
                                     const BSONObj& rawObj) {
     _query.reset(query);
     _rawObj = rawObj;
-    return initPath(path);
+    return setPath(path);
 }
 
 bool GeoNearMatchExpression::matchesSingleElement(const BSONElement& e) const {

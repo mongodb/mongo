@@ -35,7 +35,7 @@
 
 namespace mongo {
 
-Status ArrayMatchingMatchExpression::initPath(StringData path) {
+Status ArrayMatchingMatchExpression::setPath(StringData path) {
     _path = path;
     Status s = _elementPath.init(_path);
     _elementPath.setTraverseLeafArray(false);
@@ -95,7 +95,7 @@ bool ArrayMatchingMatchExpression::equivalent(const MatchExpression* other) cons
 
 Status ElemMatchObjectMatchExpression::init(StringData path, MatchExpression* sub) {
     _sub.reset(sub);
-    return initPath(path);
+    return setPath(path);
 }
 
 bool ElemMatchObjectMatchExpression::matchesArray(const BSONObj& anArray,
@@ -150,7 +150,7 @@ Status ElemMatchValueMatchExpression::init(StringData path, MatchExpression* sub
 }
 
 Status ElemMatchValueMatchExpression::init(StringData path) {
-    return initPath(path);
+    return setPath(path);
 }
 
 
@@ -215,7 +215,7 @@ void ElemMatchValueMatchExpression::serialize(BSONObjBuilder* out) const {
 
 Status SizeMatchExpression::init(StringData path, int size) {
     _size = size;
-    return initPath(path);
+    return setPath(path);
 }
 
 bool SizeMatchExpression::matchesArray(const BSONObj& anArray, MatchDetails* details) const {

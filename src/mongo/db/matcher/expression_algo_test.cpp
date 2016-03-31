@@ -834,4 +834,75 @@ TEST(SplitMatchExpression, ComplexMatchExpressionSplitsCorrectly) {
                       "{$eq: 1}}]}]}, {y: {$eq: 3}}]}]}]}"));
 }
 
+TEST(MapOverMatchExpression, DoesMapOverLogicalNodes) {
+    BSONObj matchPredicate = fromjson("{a: {$not: {$eq: 1}}}");
+    auto swMatchExpression = MatchExpressionParser::parse(matchPredicate, ExtensionsCallbackNoop());
+    ASSERT_OK(swMatchExpression.getStatus());
+
+    bool hasLogicalNode = false;
+    expression::mapOver(swMatchExpression.getValue().get(),
+                        [&hasLogicalNode](MatchExpression* expression, std::string path) -> void {
+                            if (expression->isLogical()) {
+                                hasLogicalNode = true;
+                            }
+                        });
+
+    ASSERT_TRUE(hasLogicalNode);
+}
+
+TEST(MapOverMatchExpression, DoesMapOverLeafNodes) {
+    BSONObj matchPredicate = fromjson("{a: {$not: {$eq: 1}}}");
+    auto swMatchExpression = MatchExpressionParser::parse(matchPredicate, ExtensionsCallbackNoop());
+    ASSERT_OK(swMatchExpression.getStatus());
+
+    bool hasLeafNode = false;
+    expression::mapOver(swMatchExpression.getValue().get(),
+                        [&hasLeafNode](MatchExpression* expression, std::string path) -> void {
+                            if (!expression->isLogical()) {
+                                hasLeafNode = true;
+                            }
+                        });
+
+    ASSERT_TRUE(hasLeafNode);
+}
+
+TEST(MapOverMatchExpression, DoesPassPath) {
+    BSONObj matchPredicate = fromjson("{a: {$elemMatch: {b: 1}}}");
+    auto swMatchExpression = MatchExpressionParser::parse(matchPredicate, ExtensionsCallbackNoop());
+    ASSERT_OK(swMatchExpression.getStatus());
+
+    std::vector<std::string> paths;
+    expression::mapOver(swMatchExpression.getValue().get(),
+                        [&paths](MatchExpression* expression, std::string path) -> void {
+                            if (!expression->numChildren()) {
+                                paths.push_back(path);
+                            }
+                        });
+
+    ASSERT_EQ(paths.size(), 1U);
+    ASSERT_EQ(paths[0], "a.b");
+}
+
+TEST(MapOverMatchExpression, DoesMapOverNodesWithMultipleChildren) {
+    BSONObj matchPredicate = fromjson("{$and: [{a: {$gt: 1}}, {b: {$lte: 2}}]}");
+    auto swMatchExpression = MatchExpressionParser::parse(matchPredicate, ExtensionsCallbackNoop());
+    ASSERT_OK(swMatchExpression.getStatus());
+
+    size_t nodeCount = 0;
+    expression::mapOver(swMatchExpression.getValue().get(),
+                        [&nodeCount](MatchExpression* expression, std::string path)
+                            -> void { ++nodeCount; });
+
+    ASSERT_EQ(nodeCount, 3U);
+}
+
+TEST(IsPathPrefixOf, ComputesPrefixesCorrectly) {
+    ASSERT_TRUE(expression::isPathPrefixOf("a.b", "a.b.c"));
+    ASSERT_TRUE(expression::isPathPrefixOf("a", "a.b"));
+    ASSERT_FALSE(expression::isPathPrefixOf("a.b", "a.balloon"));
+    ASSERT_FALSE(expression::isPathPrefixOf("a", "a"));
+    ASSERT_FALSE(expression::isPathPrefixOf("a.b", "a"));
+}
+
+
 }  // namespace mongo
