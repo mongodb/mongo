@@ -6,8 +6,13 @@
 // RECOVERING state. A restarted node with an ephemeral storage engine will not have an oplog upon
 // restart, so will immediately resync.
 // @tags: [requires_persistence]
-(function() {
+(function(doNotRun) {
     "use strict";
+
+    if (doNotRun) {
+        return;
+    }
+
     var replTest = new ReplSetTest({name: 'resync', nodes: 3, oplogSize: 1});
     var nodes = replTest.nodeList();
 
@@ -98,4 +103,4 @@
 
     replTest.stopSet(15);
     jsTest.log("success");
-})();
+})(true /* Disabled until SERVER-23476 re-enabled rsync command */);

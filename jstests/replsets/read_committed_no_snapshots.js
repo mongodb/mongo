@@ -7,8 +7,12 @@
 
 load("jstests/replsets/rslib.js");  // For reconfig and startSetIfSupportsReadMajority.
 
-(function() {
+(function(doNotRun) {
     "use strict";
+
+    if (doNotRun) {
+        return;
+    }
 
     // Set up a set and grab things for later.
     var name = "read_committed_no_snapshots";
@@ -80,4 +84,4 @@ load("jstests/replsets/rslib.js");  // For reconfig and startSetIfSupportsReadMa
     // Ensure maxTimeMS times out while waiting for this snapshot
     assert.commandFailed(primary.getSiblingDB(name).foo.runCommand(
         'find', {"readConcern": {"level": "majority"}, "maxTimeMS": 1000}));
-}());
+})(true /* Disabled until SERVER-23476 re-enabled rsync command */);

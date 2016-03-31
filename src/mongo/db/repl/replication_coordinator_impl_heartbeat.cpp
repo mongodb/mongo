@@ -441,13 +441,14 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
             }
             return;
         }
-
+        auto isFirstConfig = !_rsConfig.isInitialized();
         lk.unlock();
 
         bool isArbiter = myIndex.isOK() && myIndex.getValue() != -1 &&
             newConfig.getMemberAt(myIndex.getValue()).isArbiter();
-        if (!isArbiter) {
+        if (!isArbiter && isFirstConfig) {
             _externalState->startThreads(_settings);
+            _startDataReplication();
         }
     }
 

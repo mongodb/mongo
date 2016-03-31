@@ -86,6 +86,7 @@ public:
         PREFETCH_ALL = 3
     };
 
+    // TODO: remove, once initialSyncRequestedFlag and indexPrefetchConfig go somewhere else.
     static BackgroundSync* get();
 
     // stop syncing (when this node becomes a primary, e.g.)

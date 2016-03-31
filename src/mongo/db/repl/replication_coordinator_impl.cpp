@@ -468,6 +468,8 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     _setMyLastAppliedOpTime_inlock(lastOpTime, false);
     _setMyLastDurableOpTime_inlock(lastOpTime, false);
     _reportUpstream_inlock(std::move(lock));
+    // Unlocked below.
+
     _externalState->setGlobalTimestamp(lastOpTime.getTimestamp());
     // Step down is impossible, so we don't need to wait for the returned event.
     _updateTerm_incallback(term);
@@ -475,6 +477,30 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     _performPostMemberStateUpdateAction(action);
     if (!isArbiter) {
         _externalState->startThreads(_settings);
+        _startDataReplication();
+    }
+}
+
+void ReplicationCoordinatorImpl::_stopDataReplication() {}
+void ReplicationCoordinatorImpl::_startDataReplication() {
+    // When initial sync is done, callback.
+    OnInitialSyncFinishedFn callback{[this]() {
+        log() << "Initial sync done, starting steady state replication.";
+        _externalState->startSteadyStateReplication();
+    }};
+
+    const auto lastApplied = getMyLastAppliedOpTime();
+    if (!lastApplied.isNull()) {
+        callback();
+        return;
+    }
+
+    // Do initial sync.
+    if (false) {
+        // TODO: make this async with callback.
+        _dr.initialSync();
+    } else {
+        _externalState->startInitialSync(callback);
     }
 }
 
@@ -534,7 +560,7 @@ void ReplicationCoordinatorImpl::shutdown() {
         _inShutdown = true;
         if (_rsConfigState == kConfigPreStart) {
             warning() << "ReplicationCoordinatorImpl::shutdown() called before "
-                         "start() finished.  Shutting down without cleaning up the "
+                         "startup() finished.  Shutting down without cleaning up the "
                          "replication system";
             return;
         }
@@ -2485,6 +2511,7 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
         // will fail validation with a "replSet initiate got ... while validating" reason.
         invariant(!newConfig.getMemberAt(myIndex.getValue()).isArbiter());
         _externalState->startThreads(_settings);
+        _startDataReplication();
     }
 
     return Status::OK();
@@ -2637,11 +2664,11 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
             }
             _topCoord->processWinElection(_electionId, getNextGlobalTimestamp());
             _isWaitingForDrainToComplete = true;
-            _externalState->signalApplierToCancelFetcher();
             const PostMemberStateUpdateAction nextAction =
                 _updateMemberStateFromTopologyCoordinator_inlock();
             invariant(nextAction != kActionWinElection);
             lk.unlock();
+            _externalState->signalApplierToCancelFetcher();
             _performPostMemberStateUpdateAction(nextAction);
             // Notify all secondaries of the election win.
             _scheduleElectionWinNotification();
@@ -3089,6 +3116,8 @@ void ReplicationCoordinatorImpl::resetLastOpTimesFromOplog(OperationContext* txn
     _setMyLastAppliedOpTime_inlock(lastOpTime, true);
     _setMyLastDurableOpTime_inlock(lastOpTime, true);
     _reportUpstream_inlock(std::move(lock));
+    // Unlocked below.
+
     _externalState->setGlobalTimestamp(lastOpTime.getTimestamp());
 }
 

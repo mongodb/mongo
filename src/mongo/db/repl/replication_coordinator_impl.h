@@ -882,6 +882,16 @@ private:
                                 const StatusWith<LastVote>& lastVoteStatus);
 
     /**
+     * Start replicating data, and does an initial sync if needed first.
+     */
+    void _startDataReplication();
+
+    /**
+     * Stops replicating data by stopping the applier, fetcher and such.
+     */
+    void _stopDataReplication();
+
+    /**
      * Callback that finishes the work of processReplSetInitiate() inside the replication
      * executor context, in the event of a successful quorum check.
      */

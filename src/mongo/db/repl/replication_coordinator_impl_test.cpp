@@ -2442,8 +2442,7 @@ TEST_F(ReplCoordTest, LogAMessageWhenShutDownBeforeReplicationStartUpFinished) {
     startCapturingLogMessages();
     getReplCoord()->shutdown();
     stopCapturingLogMessages();
-    ASSERT_EQUALS(1,
-                  countLogLinesContaining("shutdown() called before startReplication() finished"));
+    ASSERT_EQUALS(1, countLogLinesContaining("shutdown() called before startup() finished"));
 }
 
 TEST_F(ReplCoordTest, DoNotProcessSelfWhenUpdatePositionContainsInfoAboutSelf) {

@@ -277,6 +277,10 @@ bool _initialSyncApplyOplog(OperationContext* ctx, repl::InitialSync* syncer, Op
     return true;
 }
 
+
+// Number of connection retries allowed during initial sync.
+const auto kConnectRetryLimit = 10;
+
 /**
  * Do the initial sync for this member.  There are several steps to this process:
  *
@@ -316,15 +320,20 @@ Status _initialSync() {
 
     OplogReader r;
 
+    auto currentRetry = 0;
     while (r.getHost().empty()) {
         // We must prime the sync source selector so that it considers all candidates regardless
         // of oplog position, by passing in null OpTime as the last op fetched time.
         r.connectToSyncSource(&txn, OpTime(), replCoord);
+
         if (r.getHost().empty()) {
             std::string msg =
-                "no valid sync sources found in current replset to do an initial sync";
-            log() << msg;
-            return Status(ErrorCodes::InitialSyncOplogSourceMissing, msg);
+                "No valid sync source found in current replica set to do an initial sync.";
+            if (++currentRetry >= kConnectRetryLimit) {
+                return Status(ErrorCodes::InitialSyncOplogSourceMissing, msg);
+            }
+            LOG(1) << msg << ", retry " << currentRetry << " of " << kConnectRetryLimit;
+            sleepsecs(1);
         }
 
         if (inShutdown()) {
@@ -338,7 +347,6 @@ Status _initialSync() {
     BSONObj lastOp = r.getLastOp(rsOplogName);
     if (lastOp.isEmpty()) {
         std::string msg = "initial sync couldn't read remote oplog";
-        log() << msg;
         sleepsecs(15);
         return Status(ErrorCodes::InitialSyncFailure, msg);
     }
@@ -445,10 +453,17 @@ Status _initialSync() {
     log() << "initial sync done";
     return Status::OK();
 }
+
+stdx::mutex _initialSyncMutex;
+const auto kMaxFailedAttempts = 10;
+const auto kInitialSyncRetrySleepDuration = Seconds{5};
 }  // namespace
 
 void syncDoInitialSync() {
-    static const int maxFailedAttempts = 10;
+    stdx::unique_lock<stdx::mutex> lk(_initialSyncMutex, stdx::defer_lock);
+    if (!lk.try_lock()) {
+        uasserted(34474, "Initial Sync Already Active.");
+    }
 
     {
         OperationContextImpl txn;
@@ -456,16 +471,14 @@ void syncDoInitialSync() {
     }
 
     int failedAttempts = 0;
-    while (failedAttempts < maxFailedAttempts) {
+    while (failedAttempts < kMaxFailedAttempts) {
         try {
             // leave loop when successful
             Status status = _initialSync();
             if (status.isOK()) {
                 break;
-            }
-            if (status == ErrorCodes::InitialSyncOplogSourceMissing) {
-                sleepsecs(1);
-                return;
+            } else {
+                error() << status;
             }
         } catch (const DBException& e) {
             error() << e;
@@ -479,13 +492,13 @@ void syncDoInitialSync() {
             return;
         }
 
-        error() << "initial sync attempt failed, " << (maxFailedAttempts - ++failedAttempts)
+        error() << "initial sync attempt failed, " << (kMaxFailedAttempts - ++failedAttempts)
                 << " attempts remaining";
-        sleepsecs(5);
+        sleepmillis(durationCount<Milliseconds>(kInitialSyncRetrySleepDuration));
     }
 
     // No need to print a stack
-    if (failedAttempts >= maxFailedAttempts) {
+    if (failedAttempts >= kMaxFailedAttempts) {
         severe() << "The maximum number of retries have been exhausted for initial sync.";
         fassertFailedNoTrace(16233);
     }

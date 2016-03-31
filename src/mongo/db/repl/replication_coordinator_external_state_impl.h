@@ -52,6 +52,9 @@ public:
     ReplicationCoordinatorExternalStateImpl();
     virtual ~ReplicationCoordinatorExternalStateImpl();
     virtual void startThreads(const ReplSettings& settings) override;
+    virtual void startInitialSync(OnInitialSyncFinishedFn finished) override;
+    virtual void startSteadyStateReplication() override;
+
     virtual void startMasterSlave(OperationContext* txn);
     virtual void shutdown();
     virtual Status initializeReplSetStorage(OperationContext* txn,
@@ -117,6 +120,11 @@ private:
     long long _nextThreadId;
 
     std::unique_ptr<SnapshotThread> _snapshotThread;
+
+    // Initial sync stuff
+    StartInitialSyncFn _startInitialSyncIfNeededFn;
+    StartSteadyReplicationFn _startSteadReplicationFn;
+    std::unique_ptr<stdx::thread> _initialSyncThread;
 };
 
 }  // namespace repl

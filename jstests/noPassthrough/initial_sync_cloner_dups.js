@@ -6,8 +6,13 @@
  * add new secondary to force initialSync
  * verify collection and both indexes on the secondary have the right number of docs
  */
-(function() {
-    'use strict';
+(function(doNotRun) {
+    "use strict";
+
+    if (doNotRun) {
+        return;
+    }
+
     load('jstests/libs/parallelTester.js');
 
     Random.setRandomSeed();
@@ -127,4 +132,4 @@
     }
     assert.eq(index, table);
     assert.eq(table, secondary_index);
-})();
+})(true /* Disabled until SERVER-23476 re-enabled rsync command */);

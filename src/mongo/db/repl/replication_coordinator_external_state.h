@@ -32,7 +32,9 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -51,6 +53,9 @@ namespace repl {
 class LastVote;
 class ReplSettings;
 
+using OnInitialSyncFinishedFn = stdx::function<void()>;
+using StartInitialSyncFn = stdx::function<void(OnInitialSyncFinishedFn callback)>;
+using StartSteadyReplicationFn = stdx::function<void()>;
 /**
  * This class represents the interface the ReplicationCoordinator uses to interact with the
  * rest of the system.  All functionality of the ReplicationCoordinatorImpl that would introduce
@@ -65,11 +70,26 @@ public:
     virtual ~ReplicationCoordinatorExternalState();
 
     /**
-     * Starts the background sync, producer, and sync source feedback threads
+     * Starts the journal listener, and snapshot threads
      *
      * NOTE: Only starts threads if they are not already started,
      */
     virtual void startThreads(const ReplSettings& settings) = 0;
+
+    /**
+     * Starts an initial sync, and calls "finished" when done,
+     * for replica set member -- legacy impl not in DataReplicator.
+     *
+     * NOTE: Use either this (and below function) or the Master/Slave version, but not both.
+     */
+    virtual void startInitialSync(OnInitialSyncFinishedFn finished) = 0;
+
+    /**
+     * Starts steady state sync for replica set member -- legacy impl not in DataReplicator.
+     *
+     * NOTE: Use either this or the Master/Slave version, but not both.
+     */
+    virtual void startSteadyStateReplication() = 0;
 
     /**
      * Starts the Master/Slave threads and sets up logOp
