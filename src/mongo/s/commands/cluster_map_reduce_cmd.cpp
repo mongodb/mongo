@@ -70,10 +70,9 @@ const stdx::chrono::milliseconds kNoDistLockTimeout(-1);
 /**
  * Generates a unique name for the temporary M/R output collection.
  */
-string getTmpName(const string& coll) {
-    StringBuilder sb;
-    sb << "tmp.mrs." << coll << "_" << time(0) << "_" << JOB_NUMBER.fetchAndAdd(1);
-    return sb.str();
+string getTmpName(StringData coll) {
+    return str::stream() << "tmp.mrs." << coll << "_" << time(0) << "_"
+                         << JOB_NUMBER.fetchAndAdd(1);
 }
 
 /**
@@ -183,12 +182,13 @@ public:
                      BSONObjBuilder& result) {
         Timer t;
 
-        const string collection = cmdObj.firstElement().valuestrsafe();
-        const string fullns = dbname + "." + collection;
-        const string shardResultCollection = getTmpName(collection);
+        const NamespaceString nss(parseNs(dbname, cmdObj));
+        uassert(ErrorCodes::InvalidNamespace, "Invalid namespace", nss.isValid());
+
+        const string shardResultCollection = getTmpName(nss.coll());
 
         bool shardedOutput = false;
-        string finalColLong;
+        NamespaceString outputCollNss;
         bool customOutDB = false;
 
         string outDB = dbname;
@@ -214,7 +214,10 @@ public:
                     outDB = customOut.getField("db").str();
                 }
 
-                finalColLong = outDB + "." + finalColShort;
+                outputCollNss = NamespaceString(outDB, finalColShort);
+                uassert(ErrorCodes::InvalidNamespace,
+                        "Invalid output namespace",
+                        outputCollNss.isValid());
             }
         }
 
@@ -235,13 +238,13 @@ public:
         }
 
         const bool shardedInput =
-            confIn && confIn->isShardingEnabled() && confIn->isSharded(fullns);
+            confIn && confIn->isShardingEnabled() && confIn->isSharded(nss.ns());
 
         if (!shardedOutput) {
             uassert(15920,
                     "Cannot output to a non-sharded collection because "
                     "sharded collection exists already",
-                    !confOut->isSharded(finalColLong));
+                    !confOut->isSharded(outputCollNss.ns()));
 
             // TODO: Should we also prevent going from non-sharded to sharded? During the
             //       transition client may see partial data.
@@ -302,10 +305,10 @@ public:
             // TODO: take distributed lock to prevent split / migration?
 
             try {
-                Strategy::commandOp(txn, dbname, shardedCommand, 0, fullns, q, &mrCommandResults);
+                Strategy::commandOp(txn, dbname, shardedCommand, 0, nss.ns(), q, &mrCommandResults);
             } catch (DBException& e) {
                 e.addContext(str::stream() << "could not run map command on all shards for ns "
-                                           << fullns << " and query " << q);
+                                           << nss.ns() << " and query " << q);
                 throw;
             }
 
@@ -405,10 +408,10 @@ public:
 
         if (!shardedOutput) {
             const auto shard = grid.shardRegistry()->getShard(txn, confOut->getPrimaryId());
-            LOG(1) << "MR with single shard output, NS=" << finalColLong
+            LOG(1) << "MR with single shard output, NS=" << outputCollNss.ns()
                    << " primary=" << shard->toString();
 
-            ShardConnection conn(shard->getConnString(), finalColLong);
+            ShardConnection conn(shard->getConnString(), outputCollNss.ns());
             ok = conn->runCommand(outDB, finalCmd.obj(), singleResult);
 
             BSONObj counts = singleResult.getObjectField("counts");
@@ -418,10 +421,10 @@ public:
 
             conn.done();
         } else {
-            LOG(1) << "MR with sharded output, NS=" << finalColLong;
+            LOG(1) << "MR with sharded output, NS=" << outputCollNss.ns();
 
             // Create the sharded collection if needed
-            if (!confOut->isSharded(finalColLong)) {
+            if (!confOut->isSharded(outputCollNss.ns())) {
                 // Enable sharding on db
                 confOut->enableSharding(txn);
 
@@ -446,23 +449,22 @@ public:
                 BSONObj sortKey = BSON("_id" << 1);
                 ShardKeyPattern sortKeyPattern(sortKey);
                 Status status = grid.catalogManager(txn)->shardCollection(
-                    txn, finalColLong, sortKeyPattern, true, sortedSplitPts, outShardIds);
+                    txn, outputCollNss.ns(), sortKeyPattern, true, sortedSplitPts, outShardIds);
                 if (!status.isOK()) {
                     return appendCommandStatus(result, status);
                 }
 
                 // Make sure the cached metadata for the collection knows that we are now sharded
-                const NamespaceString finalNss(finalColLong);
                 confOut = uassertStatusOK(
-                    grid.catalogCache()->getDatabase(txn, finalNss.db().toString()));
-                confOut->getChunkManager(txn, finalNss.ns(), true /* force */);
+                    grid.catalogCache()->getDatabase(txn, outputCollNss.db().toString()));
+                confOut->getChunkManager(txn, outputCollNss.ns(), true /* force */);
             }
 
             map<BSONObj, int> chunkSizes;
             {
                 // Take distributed lock to prevent split / migration.
                 auto scopedDistLock = grid.catalogManager(txn)->distLock(
-                    txn, finalColLong, "mr-post-process", kNoDistLockTimeout);
+                    txn, outputCollNss.ns(), "mr-post-process", kNoDistLockTimeout);
 
                 if (!scopedDistLock.isOK()) {
                     return appendCommandStatus(result, scopedDistLock.getStatus());
@@ -472,12 +474,17 @@ public:
                 mrCommandResults.clear();
 
                 try {
-                    Strategy::commandOp(
-                        txn, outDB, finalCmdObj, 0, finalColLong, BSONObj(), &mrCommandResults);
+                    Strategy::commandOp(txn,
+                                        outDB,
+                                        finalCmdObj,
+                                        0,
+                                        outputCollNss.ns(),
+                                        BSONObj(),
+                                        &mrCommandResults);
                     ok = true;
                 } catch (DBException& e) {
                     e.addContext(str::stream() << "could not run final reduce on all shards for "
-                                               << fullns << ", output " << finalColLong);
+                                               << nss.ns() << ", output " << outputCollNss.ns());
                     throw;
                 }
 
@@ -516,10 +523,10 @@ public:
             }
 
             // Do the splitting round
-            ChunkManagerPtr cm = confOut->getChunkManagerIfExists(txn, finalColLong);
+            ChunkManagerPtr cm = confOut->getChunkManagerIfExists(txn, outputCollNss.ns());
 
             uassert(34359,
-                    str::stream() << "Failed to write mapreduce output to " << finalColLong
+                    str::stream() << "Failed to write mapreduce output to " << outputCollNss.ns()
                                   << "; expected that collection to be sharded, but it was not",
                     cm);
 
