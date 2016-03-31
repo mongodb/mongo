@@ -31,8 +31,8 @@
 
 #include "mongo/bson/bsonelement.h"
 
-#include <cmath>
 #include <boost/functional/hash.hpp>
+#include <cmath>
 
 #include "mongo/base/compare_numbers.h"
 #include "mongo/base/data_cursor.h"
@@ -1051,7 +1051,9 @@ size_t BSONElement::Hasher::operator()(const BSONElement& elem) const {
 
         case mongo::NumberDecimal: {
             const Decimal128 dcml = elem.numberDecimal();
-            if (dcml.toAbs().isGreater(Decimal128(std::numeric_limits<double>::max())) &&
+            if (dcml.toAbs().isGreater(Decimal128(std::numeric_limits<double>::max(),
+                                                  Decimal128::kRoundTo34Digits,
+                                                  Decimal128::kRoundTowardZero)) &&
                 !dcml.isInfinite() && !dcml.isNaN()) {
                 // Normalize our decimal to force equivalent decimals
                 // in the same cohort to hash to the same value

@@ -1900,7 +1900,7 @@ Status Element::setValueSafeNum(const SafeNum value) {
         case mongo::NumberDouble:
             return setValueDouble(value._value.doubleVal);
         case mongo::NumberDecimal:
-            return setValueDecimal(value._value.decimalVal);
+            return setValueDecimal(Decimal128(value._value.decimalVal));
         default:
             return Status(ErrorCodes::UnsupportedFormat,
                           "Don't know how to handle unexpected SafeNum type");
@@ -2564,7 +2564,7 @@ Element Document::makeElementSafeNum(StringData fieldName, SafeNum value) {
         case mongo::NumberDouble:
             return makeElementDouble(fieldName, value._value.doubleVal);
         case mongo::NumberDecimal:
-            return makeElementDecimal(fieldName, value._value.decimalVal);
+            return makeElementDecimal(fieldName, Decimal128(value._value.decimalVal));
         default:
             // Return an invalid element to indicate that we failed.
             return end();

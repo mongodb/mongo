@@ -39,6 +39,11 @@
 namespace mongo {
 
 // Tests for Decimal128 constructors
+TEST(Decimal128Test, TestDefaultConstructor) {
+    Decimal128 d;
+    ASSERT_TRUE(d.isBinaryEqual(Decimal128(0)));
+}
+
 TEST(Decimal128Test, TestInt32ConstructorZero) {
     int32_t intZero = 0;
     Decimal128 d(intZero);
@@ -185,13 +190,15 @@ TEST(Decimal128Test, TestDoubleConstructorNeg) {
 
 TEST(Decimal128Test, TestDoubleConstructorMaxRoundDown) {
     double doubleMax = DBL_MAX;
-    Decimal128 d(doubleMax, Decimal128::RoundingMode::kRoundTowardNegative);
+    Decimal128 d(
+        doubleMax, Decimal128::kRoundTo15Digits, Decimal128::RoundingMode::kRoundTowardNegative);
     ASSERT_EQUALS(d.toString(), "1.79769313486231E+308");
 }
 
 TEST(Decimal128Test, TestDoubleConstructorMaxRoundUp) {
     double doubleMax = DBL_MAX;
-    Decimal128 d(doubleMax, Decimal128::RoundingMode::kRoundTowardPositive);
+    Decimal128 d(
+        doubleMax, Decimal128::kRoundTo15Digits, Decimal128::RoundingMode::kRoundTowardPositive);
     ASSERT_EQUALS(d.toString(), "1.79769313486232E+308");
 }
 
@@ -267,6 +274,39 @@ TEST(Decimal128Test, TestStringConstructorNaN) {
     uint64_t lowBytes = 0x0000000000000000;
     ASSERT_EQUALS(val.high64, highBytes);
     ASSERT_EQUALS(val.low64, lowBytes);
+}
+
+TEST(Decimal128Test, TestNonCanonicalDecimal) {
+    // It is possible to encode a significand with more than 34 decimal digits.
+    // Conforming implementations should not generate these, but they must be treated as zero
+    // when encountered. However, the exponent and sign still matter.
+
+    // 0x6c10000000000000 0000000000000000 = non-canonical 0, all ignored bits clear
+    Decimal128 nonCanonical0E0(Decimal128::Value{0, 0x6c10000000000000ull});
+    std::string zeroE0 = nonCanonical0E0.toString();
+    ASSERT_EQUALS(zeroE0, "0");
+
+    // 0xec100000deadbeef 0123456789abcdef = non-canonical -0, random stuff in ignored bits
+    Decimal128 nonCanonicalM0E0(Decimal128::Value{0x0123456789abcdefull, 0xec100000deadbeefull});
+    std::string minusZeroE0 = nonCanonicalM0E0.toString();
+    ASSERT_EQUALS(minusZeroE0, "-0");
+
+    // 0x6c11fffffffffffff ffffffffffffffff = non-canonical 0.000, all ignored bits set
+    Decimal128 nonCanonical0E3(Decimal128::Value{0xffffffffffffffffull, 0x6c11ffffffffffffull});
+    std::string zeroE3 = nonCanonical0E3.toString();
+    ASSERT_EQUALS(zeroE3, "0E+3");
+
+    // Check extraction functions, they should treat this as the corresponding zero as well.
+    ASSERT_EQUALS(nonCanonical0E3.getBiasedExponent(), Decimal128("0E+3").getBiasedExponent());
+    ASSERT_EQUALS(nonCanonical0E3.getCoefficientHigh(), 0u);
+    ASSERT_EQUALS(nonCanonical0E3.getCoefficientLow(), 0u);
+
+    // Check doing some arithmetic opations and number conversions
+    const double minusZeroDouble = nonCanonicalM0E0.toDouble();
+    ASSERT_EQUALS(minusZeroDouble, 0.0);
+    ASSERT_EQUALS(-1.0, std::copysign(1.0, minusZeroDouble));
+    ASSERT_TRUE(nonCanonical0E3.add(Decimal128(1)).isEqual(Decimal128(1)));
+    ASSERT_TRUE(Decimal128(1).divide(nonCanonicalM0E0).isEqual(Decimal128::kNegativeInfinity));
 }
 
 // Tests for absolute value function

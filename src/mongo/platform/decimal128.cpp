@@ -30,10 +30,10 @@
 
 #include <cmath>
 #include <cstdlib>
+#include <iostream>
 #include <memory>
 #include <string>
 #include <utility>
-#include <iostream>
 // The Intel C library typedefs wchar_t, but it is a distinct fundamental type
 // in C++, so we #define _WCHAR_T here to prevent the library from trying to typedef.
 #define _WCHAR_T
@@ -202,13 +202,16 @@ Decimal128::Decimal128(std::int64_t int64Value)
  * In the worst case, proven by the above error analysis, we only need to
  * requantize once to yield exactly 15 decimal digits of precision.
  */
-Decimal128::Decimal128(double doubleValue, RoundingMode roundMode) {
+Decimal128::Decimal128(double doubleValue,
+                       RoundingPrecision roundPrecision,
+                       RoundingMode roundMode) {
     BID_UINT128 convertedDoubleValue;
     std::uint32_t throwAwayFlag = 0;
     convertedDoubleValue = binary64_to_bid128(doubleValue, roundMode, &throwAwayFlag);
 
     // If the original number was zero, infinity, or NaN, there's no need to quantize
-    if (doubleValue == 0.0 || std::isinf(doubleValue) || std::isnan(doubleValue)) {
+    if (doubleValue == 0.0 || std::isinf(doubleValue) || std::isnan(doubleValue) ||
+        roundPrecision == kRoundTo34Digits) {
         _value = libraryTypeToValue(convertedDoubleValue);
         return;
     }
@@ -629,37 +632,33 @@ const std::uint64_t t17hi32 = t17 >> 32;
 // t17hi32*t17hi32 + 2*t17hi32*t17lo32 + t17lo32*t17lo32 where the 2nd term
 // is shifted right by 32 and the 3rd term by 64 (which effectively drops the 3rd term)
 const std::uint64_t t34hi64 = t17hi32 * t17hi32 + (((t17hi32 * t17lo32) >> 31));
-
-// Get the max exponent for a decimal128 (including the bias)
-const std::uint64_t maxBiasedExp = 6143 + 6144;
-// Get the binary representation of the negative sign bit
-const std::uint64_t negativeSignBit = 1ull << 63;
+static_assert(t34hi64 == 0x1ed09bead87c0, "");
+static_assert(t34lo64 == 0x378d8e63ffffffff, "");
 }  // namespace
 
-// The low bits of the largest positive number are all 9s (t34lo64) and
-// the highest are t32hi64 added to the max exponent shifted over 49.
-// The exponent is placed at 49 because 64 bits - 1 sign bit - 14 exponent bits = 49
-const Decimal128 Decimal128::kLargestPositive(Decimal128::Value({t34lo64,
-                                                                 (maxBiasedExp << 49) + t34hi64}));
-// The smallest positive decimal is 1 with the largest negative exponent of 0 (biased -6176)
-const Decimal128 Decimal128::kSmallestPositive(Decimal128::Value({1ull, 0ull}));
+// (t34hi64 << 64) + t34lo64 == 1e34 - 1
+const Decimal128 Decimal128::kLargestPositive(0, Decimal128::kMaxBiasedExponent, t34hi64, t34lo64);
+// The smallest positive decimal is 1 with the largest negative exponent of 0 (biased)
+const Decimal128 Decimal128::kSmallestPositive(0, 0, 0, 1);
 
 // Add a sign bit to the largest and smallest positive to get their corresponding negatives
-const Decimal128 Decimal128::kLargestNegative(
-    Decimal128::Value({t34lo64, (maxBiasedExp << 49) + t34hi64 + negativeSignBit}));
-const Decimal128 Decimal128::kSmallestNegative(Decimal128::Value({1ull, 0ull + negativeSignBit}));
-// Get the reprsentation of 0 with the largest negative exponent
+const Decimal128 Decimal128::kLargestNegative(1, Decimal128::kMaxBiasedExponent, t34hi64, t34lo64);
+const Decimal128 Decimal128::kSmallestNegative(1, 0, 0, 1);
+
+// Get the representation of 0 (0E0).
+const Decimal128 Decimal128::kNormalizedZero(Decimal128::Value(
+    {0, static_cast<uint64_t>(Decimal128::kExponentBias) << Decimal128::kExponentFieldPos}));
+
+// Get the representation of 0 with the most negative exponent
 const Decimal128 Decimal128::kLargestNegativeExponentZero(Decimal128::Value({0ull, 0ull}));
 
 // Shift the format of the combination bits to the right position to get Inf and NaN
-// +Inf = 0111 1000 ... ... = 0x78 ... ...
-// +NaN = 0111 1100 ... ... = 0x7c ... ...
+// +Inf = 0111 1000 ... ... = 0x78 ... ..., -Inf = 1111 1000 ... ... = 0xf8 ... ...
+// +NaN = 0111 1100 ... ... = 0x7c ... ..., -NaN = 1111 1100 ... ... = 0xfc ... ...
 const Decimal128 Decimal128::kPositiveInfinity(Decimal128::Value({0ull, 0x78ull << 56}));
-const Decimal128 Decimal128::kNegativeInfinity(
-    Decimal128::Value({0ull, (0x78ull << 56) + negativeSignBit}));
+const Decimal128 Decimal128::kNegativeInfinity(Decimal128::Value({0ull, 0xf8ull << 56}));
 const Decimal128 Decimal128::kPositiveNaN(Decimal128::Value({0ull, 0x7cull << 56}));
-const Decimal128 Decimal128::kNegativeNaN(Decimal128::Value({0ull,
-                                                             (0x7cull << 56) + negativeSignBit}));
+const Decimal128 Decimal128::kNegativeNaN(Decimal128::Value({0ull, 0xfcull << 56}));
 
 std::ostream& operator<<(std::ostream& stream, const Decimal128& value) {
     return stream << value.toString();

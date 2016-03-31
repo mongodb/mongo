@@ -711,7 +711,7 @@ inline Decimal128 BSONElement::numberDecimal() const {
         case NumberDecimal:
             return _numberDecimal();
         default:
-            return 0;
+            return Decimal128::kNormalizedZero;
     }
 }
 

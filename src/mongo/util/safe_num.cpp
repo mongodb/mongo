@@ -150,7 +150,7 @@ bool SafeNum::isIdentical(const SafeNum& rhs) const {
         case NumberDouble:
             return _value.doubleVal == rhs._value.doubleVal;
         case NumberDecimal:
-            return Decimal128(_value.decimalVal).isEqual(rhs._value.decimalVal);
+            return Decimal128(_value.decimalVal).isEqual(Decimal128(rhs._value.decimalVal));
         case EOO:
         // EOO doesn't match anything, including itself.
         default:
@@ -187,15 +187,15 @@ double SafeNum::getDouble(const SafeNum& snum) {
 Decimal128 SafeNum::getDecimal(const SafeNum& snum) {
     switch (snum._type) {
         case NumberInt:
-            return snum._value.int32Val;
+            return Decimal128(snum._value.int32Val);
         case NumberLong:
-            return snum._value.int64Val;
+            return Decimal128(snum._value.int64Val);
         case NumberDouble:
-            return snum._value.doubleVal;
+            return Decimal128(snum._value.doubleVal, Decimal128::kRoundTo15Digits);
         case NumberDecimal:
-            return snum._value.decimalVal;
+            return Decimal128(snum._value.decimalVal);
         default:
-            return 0.0;
+            return Decimal128::kNormalizedZero;
     }
 }
 

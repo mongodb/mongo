@@ -822,7 +822,9 @@ void Value::hash_combine(size_t& seed) const {
 
         case mongo::NumberDecimal: {
             const Decimal128 dcml = getDecimal();
-            if (dcml.toAbs().isGreater(Decimal128(std::numeric_limits<double>::max())) &&
+            if (dcml.toAbs().isGreater(Decimal128(std::numeric_limits<double>::max(),
+                                                  Decimal128::kRoundTo34Digits,
+                                                  Decimal128::kRoundTowardZero)) &&
                 !dcml.isInfinite() && !dcml.isNaN()) {
                 // Normalize our decimal to force equivalent decimals
                 // in the same cohort to hash to the same value

@@ -33,6 +33,7 @@
 #include <js/Conversions.h>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/scripting/mozjs/exception.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/jsstringwrapper.h"
@@ -164,7 +165,7 @@ int64_t ValueWriter::toInt64() {
 
 Decimal128 ValueWriter::toDecimal128() {
     if (_value.isNumber()) {
-        return Decimal128(toNumber());
+        return Decimal128(toNumber(), Decimal128::kRoundTo15Digits);
     }
 
     if (getScope(_context)->getProto<NumberIntInfo>().instanceOf(_value))

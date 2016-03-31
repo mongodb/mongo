@@ -41,7 +41,9 @@ Decimal128::Decimal128(int64_t int64Value) {
     invariant(false);
 }
 
-Decimal128::Decimal128(double doubleValue, RoundingMode roundMode) {
+Decimal128::Decimal128(double doubleValue,
+                       RoundingPrecision roundPrecision,
+                       RoundingMode roundMode) {
     invariant(false);
 }
 
@@ -206,5 +208,7 @@ const Decimal128 Decimal128::kPositiveInfinity = Decimal128();
 const Decimal128 Decimal128::kNegativeInfinity = Decimal128();
 const Decimal128 Decimal128::kPositiveNaN = Decimal128();
 const Decimal128 Decimal128::kNegativeNaN = Decimal128();
+
+const Decimal128 Decimal128::kNormalizedZero = {};
 
 }  // namespace mongo
