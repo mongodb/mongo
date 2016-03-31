@@ -313,14 +313,6 @@ add_option('use-system-wiredtiger',
     nargs=0,
 )
 
-boost_choices = ['1.56']
-add_option('internal-boost',
-    choices=boost_choices,
-    default=boost_choices[0],
-    help='Specify internal boost version to use',
-    type='choice',
-)
-
 add_option('system-boost-lib-search-suffixes',
     help='Comma delimited sequence of boost library suffixes to search',
 )
@@ -1526,14 +1518,6 @@ if get_option("system-boost-lib-search-suffixes") is not None:
     else:
         boostSuffixList = boostSuffixList.split(',')
 
-# boostSuffix is used when using internal boost to select which version
-# of boost is in play.
-boostSuffix = "";
-if not use_system_version_of_library("boost"):
-    # Boost release numbers are x.y.z, where z is usually 0 which we do not include in
-    # the internal-boost option
-    boostSuffix = "-%s.0" % get_option( "internal-boost")
-
 # discover modules, and load the (python) module for each module's build.py
 mongo_modules = moduleconfig.discover_modules('src/mongo/db/modules', get_option('modules'))
 env['MONGO_MODULES'] = [m.name for m in mongo_modules]
@@ -1777,6 +1761,12 @@ def doConfigure(myenv):
         # Warn about redundant moves, such as moving a local variable in a return that is different
         # than the return type.
         AddToCXXFLAGSIfSupported(myenv, "-Wredundant-move")
+
+        # Disable warning about variables that may not be initialized
+        # Failures are triggered in the case of boost::optional in GCC 4.8.x
+        # TODO: re-evaluate when we move to GCC 5.3
+        # see: http://stackoverflow.com/questions/21755206/how-to-get-around-gcc-void-b-4-may-be-used-uninitialized-in-this-funct
+        AddToCXXFLAGSIfSupported(myenv, "-Wno-maybe-uninitialized")
 
     # Check if we need to disable null-conversion warnings
     if myenv.ToolchainIs('clang'):
@@ -2614,7 +2604,6 @@ Export("get_option")
 Export("has_option use_system_version_of_library")
 Export("serverJs")
 Export("usemozjs")
-Export("boostSuffix")
 Export('module_sconscripts')
 Export("debugBuild optBuild")
 Export("wiredtiger")
