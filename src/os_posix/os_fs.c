@@ -84,6 +84,7 @@ __posix_directory_sync(WT_SESSION_IMPL *session, const char *path)
 	const char *dir;
 	char *copy;
 
+	tret = 0;
 	/*
 	 * POSIX 1003.1 does not require that fsync of a file handle ensures the
 	 * entry in the directory containing the file has also reached disk (and
@@ -111,10 +112,13 @@ __posix_directory_sync(WT_SESSION_IMPL *session, const char *path)
 	ret = __posix_sync(session, fd, path, "directory-sync", true);
 
 	WT_SYSCALL_RETRY(close(fd), tret);
-	if (tret != 0)
+	if (tret != 0) {
 		__wt_err(session, tret, "%s: directory-sync: close", path);
+		if (ret == 0)
+			ret = tret;
+	}
 err:	__wt_free(session, copy);
-	return (ret == 0 ? tret : ret);
+	return (ret);
 #else
 	WT_UNUSED(session);
 	WT_UNUSED(path);
