@@ -72,10 +72,12 @@ __stdio_handle_lock(WT_SESSION_IMPL *session, WT_FH *fh, bool lock)
  *	Map a file.
  */
 static int
-__stdio_handle_map(WT_SESSION_IMPL *session, WT_FH *fh, void *p, size_t *lenp)
+__stdio_handle_map(WT_SESSION_IMPL *session,
+    WT_FH *fh, void *p, size_t *lenp, void **mappingcookie)
 {
 	WT_UNUSED(p);
 	WT_UNUSED(lenp);
+	WT_UNUSED(mappingcookie);
 	WT_RET_MSG(session, ENOTSUP, "%s: handle-map", fh->name);
 }
 
@@ -110,11 +112,12 @@ __stdio_handle_map_preload(
  *	Unmap a file.
  */
 static int
-__stdio_handle_map_unmap(
-    WT_SESSION_IMPL *session, WT_FH *fh, void *p, size_t len)
+__stdio_handle_map_unmap(WT_SESSION_IMPL *session,
+    WT_FH *fh, void *p, size_t len, void **mappingcookie)
 {
 	WT_UNUSED(p);
 	WT_UNUSED(len);
+	WT_UNUSED(mappingcookie);
 	WT_RET_MSG(session, ENOTSUP, "%s: handle-map-unmap", fh->name);
 }
 

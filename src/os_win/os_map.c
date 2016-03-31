@@ -13,7 +13,8 @@
  *	Map a file into memory.
  */
 int
-__wt_win_map(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp)
+__wt_win_map(WT_SESSION_IMPL *session,
+    WT_FH *fh, void *mapp, size_t *lenp, void **mappingcookie)
 {
 	WT_DECL_RET;
 	size_t len;
@@ -31,18 +32,18 @@ __wt_win_map(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp)
 	(void)__wt_verbose(session, WT_VERB_HANDLEOPS,
 	    "%s: memory-map: %" WT_SIZET_FMT " bytes", fh->name, len);
 
-	fh->maphandle =
+	*mappingcookie =
 	    CreateFileMappingA(fh->filehandle, NULL, PAGE_READONLY, 0, 0, NULL);
-	if (fh->maphandle == NULL)
+	if (*mappingcookie == NULL)
 		WT_RET_MSG(session, __wt_getlasterror(),
 		    "%s: memory-map: CreateFileMappingA", fh->name);
 
 	if ((map =
-	    MapViewOfFile(fh->maphandle, FILE_MAP_READ, 0, 0, len)) == NULL) {
+	    MapViewOfFile(*mappingcookie, FILE_MAP_READ, 0, 0, len)) == NULL) {
+		/* Retrieve the error before cleaning up. */
 		ret = __wt_getlasterror();
-
-		(void)CloseHandle(fh->maphandle);
-		fh->maphandle = NULL;
+		CloseHandle(*mappingcookie);
+		*mappingcookie = NULL;
 
 		WT_RET_MSG(session, ret,
 		    "%s: memory-map: MapViewOfFile",  fh->name);
@@ -89,15 +90,15 @@ __wt_win_map_discard(WT_SESSION_IMPL *session, WT_FH *fh, void *p, size_t size)
  *	Remove a memory mapping.
  */
 int
-__wt_win_map_unmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, size_t len)
+__wt_win_map_unmap(WT_SESSION_IMPL *session,
+    WT_FH *fh, void *map, size_t len, void **mappingcookie)
 {
 	WT_DECL_RET;
 
 	(void)__wt_verbose(session, WT_VERB_HANDLEOPS,
 	    "%s: memory-unmap: %" WT_SIZET_FMT " bytes", fh->name, len);
 
-	if (fh->maphandle == NULL)
-		return (0);
+	WT_ASSERT(session, *mappingcookie != NULL);
 
 	if (UnmapViewOfFile(map) == 0) {
 		ret = __wt_getlasterror();
@@ -105,13 +106,13 @@ __wt_win_map_unmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, size_t len)
 		    "%s: memory-unmap: UnmapViewOfFile", fh->name);
 	}
 
-	if (CloseHandle(fh->maphandle) == 0) {
+	if (CloseHandle(*mappingcookie) == 0) {
 		ret = __wt_getlasterror();
 		__wt_err(session, ret,
 		    "%s: memory-unmap: CloseHandle", fh->name);
 	}
 
-	fh->maphandle = NULL;
+	*mappingcookie = NULL;
 
 	return (ret);
 }

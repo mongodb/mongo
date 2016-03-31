@@ -14,7 +14,8 @@
  */
 int
 __wt_block_map(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, void *mapp, size_t *maplenp)
+    WT_SESSION_IMPL *session, WT_BLOCK *block, void *mapp, size_t *maplenp,
+    void **mappingcookie)
 {
 	WT_DECL_RET;
 
@@ -28,6 +29,7 @@ __wt_block_map(
 	 */
 	WT_UNUSED(session);
 	WT_UNUSED(block);
+	WT_UNUSED(mappingcookie);
 #else
 	/* Map support is configurable. */
 	if (!S2C(session)->mmap)
@@ -53,7 +55,8 @@ __wt_block_map(
 	 * Ignore not-supported errors, we'll read the file through the cache
 	 * if map fails.
 	 */
-	ret = block->fh->fh_map(session, block->fh, mapp, maplenp);
+	ret = block->fh->fh_map(
+	    session, block->fh, mapp, maplenp, mappingcookie);
 	if (ret == ENOTSUP)
 		ret = 0;
 #endif
@@ -67,8 +70,10 @@ __wt_block_map(
  */
 int
 __wt_block_unmap(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, void *map, size_t maplen)
+    WT_SESSION_IMPL *session, WT_BLOCK *block, void *map, size_t maplen,
+    void **mappingcookie)
 {
 	/* Unmap the file from memory. */
-	return (block->fh->fh_map_unmap(session, block->fh, map, maplen));
+	return (block->fh->fh_map_unmap(
+	    session, block->fh, map, maplen, mappingcookie));
 }

@@ -13,11 +13,14 @@
  *	Map a file into memory.
  */
 int
-__wt_posix_map(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp)
+__wt_posix_map(WT_SESSION_IMPL *session,
+    WT_FH *fh, void *mapp, size_t *lenp, void **mappingcookie)
 {
 	size_t len;
 	wt_off_t file_size;
 	void *map;
+
+	WT_UNUSED(mappingcookie);
 
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
 
@@ -173,8 +176,11 @@ __wt_posix_map_discard(
  *	Remove a memory mapping.
  */
 int
-__wt_posix_map_unmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, size_t len)
+__wt_posix_map_unmap(WT_SESSION_IMPL *session,
+    WT_FH *fh, void *map, size_t len, void **mappingcookie)
 {
+	WT_UNUSED(mappingcookie);
+
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
 
 	(void)__wt_verbose(session, WT_VERB_HANDLEOPS,
