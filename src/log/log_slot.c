@@ -96,7 +96,7 @@ retry:
 	slot->slot_end_lsn = slot->slot_start_lsn;
 	end_offset =
 	    WT_LOG_SLOT_JOINED_BUFFERED(old_state) + slot->slot_unbuffered;
-	slot->slot_end_lsn.l.offset += end_offset;
+	slot->slot_end_lsn.l.offset += (uint32_t)end_offset;
 	WT_STAT_FAST_CONN_INCRV(session,
 	    log_slot_consolidated, end_offset);
 	/*
