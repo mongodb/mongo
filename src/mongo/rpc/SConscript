@@ -155,7 +155,7 @@ env.Library(
 
 env.CppUnitTest(
     target=[
-        'metadata_test',
+        'rpc_metadata_test',
     ],
     source=[
         'metadata/server_selection_metadata_test.cpp',
