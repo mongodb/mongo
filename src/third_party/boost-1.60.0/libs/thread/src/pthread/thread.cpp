@@ -115,6 +115,22 @@ namespace boost
                 }
             }
 
+#if defined BOOST_THREAD_PATCH
+// MONGODB Modification - revert to Boost 1.59 behavior, and do not delete TLS keys.
+// This prevents ASAN leaks in unit tests by giving us a chance to free the TLS slots on the main
+// thread.
+//
+// Here is how the leak works:
+// 1. create_current_thread_tls_key allocates a pthread key.
+// 2. during process shutdown, libc calls atexit handlers.
+//    a. delete_current_thread_tls_key_on_dlclose_t::~ delete_current_thread_tls_key_on_dlclose_t
+//       is called, and deletes the pthread key.
+//    b. thread_specific_ptr::~thread_specific_ptr is called which calls set_tss_data, and this
+//       uses the pthread key to get the actual data to destroy. Since the pthread key has been
+//       deallocated, pthread_getspecific returns null, and memory is leaked.
+//
+// See https://github.com/boostorg/thread/blob/boost-1.59.0/src/pthread/thread.cpp#L118-L134
+// and https://github.com/boostorg/thread/commit/242cf35c519fc886c13789f1f9a049571fde4cdc#diff-d70e9675395ed66968d044fcfaa862b7
             struct  delete_current_thread_tls_key_on_dlclose_t
             {
                 delete_current_thread_tls_key_on_dlclose_t()
@@ -130,6 +146,7 @@ namespace boost
                 }
             };
             delete_current_thread_tls_key_on_dlclose_t delete_current_thread_tls_key_on_dlclose;
+#endif
 
             void create_current_thread_tls_key()
             {

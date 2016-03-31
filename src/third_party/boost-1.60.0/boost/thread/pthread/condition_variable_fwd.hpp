@@ -81,7 +81,12 @@ namespace boost
             {
                 boost::throw_exception(thread_resource_error(res, "boost::condition_variable::condition_variable() constructor failed in pthread_mutex_init"));
             }
+#else
+            // MONGODB MODIFICATION
+            // See https://svn.boost.org/trac/boost/ticket/12102
+            int res;
 #endif
+
             res = detail::monotonic_pthread_cond_init(cond);
             if (res)
             {
