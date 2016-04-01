@@ -713,7 +713,7 @@ extern int __wt_txn_named_snapshot_config(WT_SESSION_IMPL *session, const char *
 extern int __wt_txn_named_snapshot_destroy(WT_SESSION_IMPL *session);
 extern int __wt_txn_recover(WT_SESSION_IMPL *session);
 extern bool __wt_absolute_path(const char *path);
-extern bool __wt_handle_search(WT_SESSION_IMPL *session, const char *name, bool increment_ref, bool unlock, WT_FH *newfh, WT_FH **fhp);
+extern bool __wt_handle_search(WT_SESSION_IMPL *session, const char *name, bool increment_ref, WT_FH *newfh, WT_FH **fhp);
 extern bool __wt_has_priv(void);
 extern const char *__wt_path_separator(void);
 extern const char *__wt_strerror(WT_SESSION_IMPL *session, int error, char *errbuf, size_t errlen);
@@ -773,7 +773,6 @@ extern int __wt_win_map_unmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, si
 extern uint64_t __wt_strtouq(const char *nptr, char **endptr, int base);
 extern void __wt_abort(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 extern void __wt_free_int(WT_SESSION_IMPL *session, const void *p_arg);
-extern void __wt_handle_search_unlock(WT_SESSION_IMPL *session);
 extern void __wt_posix_handle_allocate_configure(WT_SESSION_IMPL *session, WT_FH *fh);
 extern void __wt_sleep(uint64_t seconds, uint64_t micro_seconds);
 extern void __wt_stream_set_line_buffer(FILE *fp);

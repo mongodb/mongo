@@ -164,7 +164,7 @@ __posix_file_remove(WT_SESSION_IMPL *session, const char *name)
 	char *path;
 
 #ifdef HAVE_DIAGNOSTIC
-	if (__wt_handle_search(session, name, false, true, NULL, NULL))
+	if (__wt_handle_search(session, name, false, NULL, NULL))
 		WT_RET_MSG(session, EINVAL,
 		    "%s: file-remove: file has open handles", name);
 #endif
@@ -191,10 +191,10 @@ __posix_file_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
 	char *from_path, *to_path;
 
 #ifdef HAVE_DIAGNOSTIC
-	if (__wt_handle_search(session, from, false, true, NULL, NULL))
+	if (__wt_handle_search(session, from, false, NULL, NULL))
 		WT_RET_MSG(session, EINVAL,
 		    "%s: file-rename: file has open handles", from);
-	if (__wt_handle_search(session, to, false, true, NULL, NULL))
+	if (__wt_handle_search(session, to, false, NULL, NULL))
 		WT_RET_MSG(session, EINVAL,
 		    "%s: file-rename: file has open handles", to);
 #endif

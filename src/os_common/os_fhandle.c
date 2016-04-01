@@ -13,8 +13,8 @@
  *	Search for a matching handle.
  */
 bool
-__wt_handle_search(WT_SESSION_IMPL *session, const char *name,
-    bool increment_ref, bool unlock, WT_FH *newfh, WT_FH **fhp)
+__wt_handle_search(WT_SESSION_IMPL *session,
+    const char *name, bool increment_ref, WT_FH *newfh, WT_FH **fhp)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_FH *fh;
@@ -58,24 +58,9 @@ __wt_handle_search(WT_SESSION_IMPL *session, const char *name,
 			*fhp = newfh;
 	}
 
-	/*
-	 * Our caller may be operating on the handle itself, optionally leave
-	 * the list locked.
-	 */
-	if (unlock)
-		__wt_spin_unlock(session, &conn->fh_lock);
+	__wt_spin_unlock(session, &conn->fh_lock);
 
 	return (found);
-}
-
-/*
- * __wt_handle_search_unlock --
- *	Release handle lock.
- */
-void
-__wt_handle_search_unlock(WT_SESSION_IMPL *session)
-{
-	__wt_spin_unlock(session, &S2C(session)->fh_lock);
 }
 
 /*
@@ -179,7 +164,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	WT_RET(__open_verbose(session, name, file_type, flags));
 
 	/* Check if the handle is already open. */
-	if (__wt_handle_search(session, name, true, true, NULL, &fh)) {
+	if (__wt_handle_search(session, name, true, NULL, &fh)) {
 		/*
 		 * XXX
 		 * The in-memory implementation has to reset the file offset
@@ -223,7 +208,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	 * Repeat the check for a match: if there's no match, link our newly
 	 * created handle onto the database's list of files.
 	 */
-	if (__wt_handle_search(session, name, true, true, fh, fhp)) {
+	if (__wt_handle_search(session, name, true, fh, fhp)) {
 err:		if (open_called)
 			WT_TRET(fh->fh_close(session, fh));
 		if (fh != NULL) {
