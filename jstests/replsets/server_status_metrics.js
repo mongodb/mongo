@@ -5,7 +5,8 @@ function testSecondaryMetrics(secondary, opCount, offset) {
     var ss = secondary.getDB("test").serverStatus();
     printjson(ss.metrics);
 
-    assert(ss.metrics.repl.network.readersCreated > 0, "no (oplog) readers created");
+    // TODO: Re-enable once metric is updated in DataReplicator OplogFetcher (SERVER-23478).
+    // assert(ss.metrics.repl.network.readersCreated > 0, "no (oplog) readers created");
     assert(ss.metrics.repl.network.getmores.num > 0, "no getmores");
     assert(ss.metrics.repl.network.getmores.totalMillis > 0, "no getmores time");
     // The first oplog entry may or may not make it into network.ops now that we have two
