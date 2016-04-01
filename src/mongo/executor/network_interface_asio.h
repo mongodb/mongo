@@ -130,19 +130,20 @@ public:
     std::string getHostName() override;
     void startup() override;
     void shutdown() override;
-    bool inShutdown() const override;
     void waitForWork() override;
     void waitForWorkUntil(Date_t when) override;
     void signalWorkAvailable() override;
     Date_t now() override;
-    Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                        const RemoteCommandRequest& request,
-                        const RemoteCommandCompletionFn& onFinish) override;
+    void startCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                      const RemoteCommandRequest& request,
+                      const RemoteCommandCompletionFn& onFinish) override;
     void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) override;
     void cancelAllCommands() override;
-    Status setAlarm(Date_t when, const stdx::function<void()>& action) override;
+    void setAlarm(Date_t when, const stdx::function<void()>& action) override;
 
     bool onNetworkThread() override;
+
+    bool inShutdown() const;
 
 private:
     using ResponseStatus = TaskExecutor::ResponseStatus;

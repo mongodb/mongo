@@ -81,21 +81,20 @@ public:
     void appendConnectionStats(ConnectionPoolStats* stats) const override;
     void startup() override;
     void shutdown() override;
-    bool inShutdown() const override;
     void waitForWork() override;
     void waitForWorkUntil(Date_t when) override;
     void signalWorkAvailable() override;
     Date_t now() override;
     std::string getHostName() override;
-    Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                        const RemoteCommandRequest& request,
-                        const RemoteCommandCompletionFn& onFinish) override;
+    void startCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                      const RemoteCommandRequest& request,
+                      const RemoteCommandCompletionFn& onFinish) override;
     void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) override;
     /**
      * Not implemented.
      */
     void cancelAllCommands() override {}
-    Status setAlarm(Date_t when, const stdx::function<void()>& action) override;
+    void setAlarm(Date_t when, const stdx::function<void()>& action) override;
     bool onNetworkThread() override;
 
 private:
@@ -160,7 +159,7 @@ private:
     bool _isExecutorRunnable = false;
 
     // Flag indicating when this interface is being shut down (because shutdown() has executed).
-    std::atomic<bool> _inShutdown;
+    bool _inShutdown = false;
 
     // Interface for running remote commands
     RemoteCommandRunnerImpl _commandRunner;
