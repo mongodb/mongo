@@ -60,8 +60,8 @@
 
 /*
  * The underlying OS calls return ENOTSUP if posix_fadvise functionality isn't
- * available, but the WiredTiger code uses the the POSIX flag names in the API.
- * Use two values so the underlying code can distinguish.
+ * available, but WiredTiger uses the POSIX flag names in the API. Use distinct
+ * values so the underlying code can distinguish.
  */
 #ifndef	POSIX_FADV_DONTNEED
 #define	POSIX_FADV_DONTNEED	0x01
