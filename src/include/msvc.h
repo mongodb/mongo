@@ -17,17 +17,6 @@
 #define	WT_SIZET_FMT	"Iu"			/* size_t format string */
 
 /*
- * The Windows fadvise calls will return ENOTSUP, but the WiredTiger code
- * currently uses POSIX flags in the API.
- */
-#ifndef POSIX_FADV_DONTNEED
-#define	POSIX_FADV_DONTNEED	0
-#endif
-#ifndef POSIX_FADV_WILLNEED
-#define	POSIX_FADV_WILLNEED	0
-#endif
-
-/*
  * Add MSVC-specific attributes and pragmas to types and function declarations.
  */
 #define	WT_COMPILER_TYPE_ALIGN(x)	__declspec(align(x))
