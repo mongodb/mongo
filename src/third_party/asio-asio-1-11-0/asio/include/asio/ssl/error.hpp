@@ -30,7 +30,7 @@ enum ssl_errors
 extern ASIO_DECL
 const asio::error_category& get_ssl_category();
 
-static const asio::error_category& ssl_category
+ASIO_USED_VARIABLE static const asio::error_category& ssl_category
   = asio::error::get_ssl_category();
 
 } // namespace error

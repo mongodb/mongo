@@ -29,6 +29,13 @@
 
 #include "asio/detail/push_options.hpp"
 
+// Newer gcc needs some variables marked as used (used in error.hpp and ssl/error.hpp)
+#if defined(__GNUC__)
+#  define ASIO_USED_VARIABLE __attribute__((used))
+#else
+#  define ASIO_USED_VARIABLE
+#endif // defined(__GNUC__)
+
 namespace asio {
 
 #if defined(ASIO_HAS_STD_SYSTEM_ERROR)
