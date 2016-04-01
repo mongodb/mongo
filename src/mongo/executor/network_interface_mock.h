@@ -291,7 +291,7 @@ private:
     bool _hasStarted;  // (M)
 
     // Set to true by "shutDown()".
-    AtomicWord<bool> _inShutdown;  // (M)
+    std::atomic<bool> _inShutdown;  // (M)
 
     // Next date that the executor expects to wake up at (due to a scheduleWorkAt() call).
     Date_t _executorNextWakeupDate;  // (M)
