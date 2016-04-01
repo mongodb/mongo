@@ -1246,7 +1246,7 @@ __wt_checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[])
 	if (!F_ISSET(S2C(session), WT_CONN_CKPT_SYNC))
 		return (0);
 
-	return (bm->sync(bm, session, false));
+	return (bm->sync(bm, session, true));
 }
 
 /*

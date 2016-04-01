@@ -11,13 +11,12 @@
 #include <dirent.h>
 
 /*
- * __wt_dirlist --
- *	Get a list of files from a directory, optionally filtered by
- *	a given prefix.
+ * __wt_posix_directory_list --
+ *	Get a list of files from a directory, POSIX version.
  */
 int
-__wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
-    uint32_t flags, char ***dirlist, u_int *countp)
+__wt_posix_directory_list(WT_SESSION_IMPL *session, const char *dir,
+    const char *prefix, uint32_t flags, char ***dirlist, u_int *countp)
 {
 	struct dirent *dp;
 	DIR *dirp;
@@ -36,24 +35,20 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 	dirallocsz = 0;
 	dirsz = 0;
 	entries = NULL;
-	if (flags == 0)
-		LF_SET(WT_DIRLIST_INCLUDE);
-
-	WT_ERR(__wt_verbose(session, WT_VERB_FILEOPS,
-	    "wt_dirlist of %s %s prefix %s",
-	    path, LF_ISSET(WT_DIRLIST_INCLUDE) ? "include" : "exclude",
-	    prefix == NULL ? "all" : prefix));
 
 	WT_SYSCALL_RETRY(((dirp = opendir(path)) == NULL ? 1 : 0), ret);
 	if (ret != 0)
-		WT_ERR_MSG(session, ret, "%s: opendir", path);
-	for (dirsz = 0, count = 0; (dp = readdir(dirp)) != NULL;) {
+		WT_ERR_MSG(session, ret, "%s: directory-list: opendir", path);
+
+	for (count = 0; (dp = readdir(dirp)) != NULL;) {
 		/*
 		 * Skip . and ..
 		 */
 		if (strcmp(dp->d_name, ".") == 0 ||
 		    strcmp(dp->d_name, "..") == 0)
 			continue;
+
+		/* The list of files is optionally filtered by a prefix. */
 		match = false;
 		if (prefix != NULL &&
 		    ((LF_ISSET(WT_DIRLIST_INCLUDE) &&
@@ -78,8 +73,8 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 	if (count > 0)
 		*dirlist = entries;
 	*countp = count;
-err:
-	if (dirp != NULL)
+
+err:	if (dirp != NULL)
 		(void)closedir(dirp);
 	__wt_free(session, path);
 
@@ -91,5 +86,7 @@ err:
 			__wt_free(session, entries[count]);
 		__wt_free(session, entries);
 	}
-	WT_RET_MSG(session, ret, "dirlist %s prefix %s", dir, prefix);
+	WT_RET_MSG(session, ret,
+	    "%s: directory-list, prefix \"%s\"",
+	    dir, prefix == NULL ? "" : prefix);
 }

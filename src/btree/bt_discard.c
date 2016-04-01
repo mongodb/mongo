@@ -40,6 +40,7 @@ __wt_ref_out(WT_SESSION_IMPL *session, WT_REF *ref)
 void
 __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 {
+	WT_FH *fh;
 	WT_PAGE *page;
 	WT_PAGE_HEADER *dsk;
 	WT_PAGE_MODIFY *mod;
@@ -133,8 +134,10 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 	dsk = (WT_PAGE_HEADER *)page->dsk;
 	if (F_ISSET_ATOMIC(page, WT_PAGE_DISK_ALLOC))
 		__wt_overwrite_and_free_len(session, dsk, dsk->mem_size);
-	if (F_ISSET_ATOMIC(page, WT_PAGE_DISK_MAPPED))
-		(void)__wt_mmap_discard(session, dsk, dsk->mem_size);
+	if (F_ISSET_ATOMIC(page, WT_PAGE_DISK_MAPPED)) {
+		fh = S2BT(session)->bm->block->fh;
+		(void)fh->fh_map_discard(session, fh, dsk, dsk->mem_size);
+	}
 
 	__wt_overwrite_and_free(session, page);
 }

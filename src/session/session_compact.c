@@ -267,8 +267,9 @@ __wt_session_compact(
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, compact, config, cfg);
 
+	/* In-memory is already as compact as it's going to get. */
 	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
-		WT_ERR(ENOTSUP);
+		goto err;
 
 	/* Disallow objects in the WiredTiger name space. */
 	WT_ERR(__wt_str_name_check(session, uri));

@@ -110,7 +110,7 @@ fill_db(void)
 	/*
 	 * Set to no buffering.
 	 */
-	(void)setvbuf(fp, NULL, _IONBF, 0);
+	__wt_stream_set_no_buffer(fp);
 
 	/*
 	 * Write data into the table until we are killed by the parent.

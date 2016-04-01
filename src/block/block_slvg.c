@@ -21,7 +21,7 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	allocsize = block->allocsize;
 
 	/* Reset the description information in the first block. */
-	WT_RET(__wt_desc_init(session, block->fh, allocsize));
+	WT_RET(__wt_desc_write(session, block->fh, allocsize));
 
 	/*
 	 * Salvage creates a new checkpoint when it's finished, set up for
@@ -33,10 +33,10 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * Truncate the file to an allocation-size multiple of blocks (bytes
 	 * trailing the last block must be garbage, by definition).
 	 */
-	if (block->fh->size > allocsize) {
-		len = (block->fh->size / allocsize) * allocsize;
-		if (len != block->fh->size)
-			WT_RET(__wt_block_truncate(session, block->fh, len));
+	if (block->size > allocsize) {
+		len = (block->size / allocsize) * allocsize;
+		if (len != block->size)
+			WT_RET(__wt_block_truncate(session, block, len));
 	} else
 		len = allocsize;
 	block->live.file_size = len;
@@ -83,7 +83,7 @@ __wt_block_offset_invalid(WT_BLOCK *block, wt_off_t offset, uint32_t size)
 	if (size > WT_BTREE_PAGE_SIZE_MAX)	/* > maximum page size */
 		return (true);
 						/* past end-of-file */
-	if (offset + (wt_off_t)size > block->fh->size)
+	if (offset + (wt_off_t)size > block->size)
 		return (true);
 	return (false);
 }
@@ -111,7 +111,7 @@ __wt_block_salvage_next(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_scr_alloc(session, allocsize, &tmp));
 
 	/* Read through the file, looking for pages. */
-	for (max = fh->size;;) {
+	for (max = block->size;;) {
 		offset = block->slvg_off;
 		if (offset >= max) {			/* Check eof. */
 			*eofp = 1;

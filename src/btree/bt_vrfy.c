@@ -84,7 +84,7 @@ __verify_config_offsets(
 	WT_CONFIG list;
 	WT_CONFIG_ITEM cval, k, v;
 	WT_DECL_RET;
-	u_long offset;
+	uint64_t offset;
 
 	*quitp = false;
 
@@ -97,7 +97,7 @@ __verify_config_offsets(
 		 * verify because that's where we "dump blocks" for debugging.)
 		 */
 		*quitp = true;
-		if (v.len != 0 || sscanf(k.str, "%lu", &offset) != 1)
+		if (v.len != 0 || sscanf(k.str, "%" SCNu64, &offset) != 1)
 			WT_RET_MSG(session, EINVAL,
 			    "unexpected dump offset format");
 #if !defined(HAVE_DIAGNOSTIC)

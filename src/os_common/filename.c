@@ -24,8 +24,6 @@ __wt_filename(WT_SESSION_IMPL *session, const char *name, char **path)
  *	Build a file name in a scratch buffer.  If the name is already an
  *	absolute path duplicate it, otherwise generate a path relative to the
  *	connection home directory.
-  *     Needs to work with a NULL session handle - since this is called via
-  *     the exists API which is used by the test utilities.
  */
 int
 __wt_nfilename(
@@ -36,6 +34,10 @@ __wt_nfilename(
 
 	*path = NULL;
 
+	/*
+	 * Needs to work with a NULL session handle - since this is called via
+	 * the exists API which is used by the test utilities.
+	 */
 	if (session == NULL || __wt_absolute_path(name))
 		WT_RET(__wt_strndup(session, name, namelen, path));
 	else {
@@ -103,11 +105,11 @@ __wt_rename_and_sync_directory(
 }
 
 /*
- * __wt_fh_sync_and_rename --
- *	Sync and close a file, and swap it into place.
+ * __wt_sync_handle_and_rename --
+ *	Sync and close a handle, and swap it into place.
  */
 int
-__wt_fh_sync_and_rename(
+__wt_sync_handle_and_rename(
     WT_SESSION_IMPL *session, WT_FH **fhp, const char *from, const char *to)
 {
 	WT_DECL_RET;
@@ -117,7 +119,7 @@ __wt_fh_sync_and_rename(
 	*fhp = NULL;
 
 	/* Flush to disk and close the handle. */
-	ret = __wt_fsync(session, fh);
+	ret = __wt_fsync(session, fh, true);
 	WT_TRET(__wt_close(session, &fh));
 	WT_RET(ret);
 
@@ -125,20 +127,67 @@ __wt_fh_sync_and_rename(
 }
 
 /*
- * __wt_sync_fp_and_rename --
- *	Sync and close a file, and swap it into place.
+ * __wt_copy_and_sync --
+ *	Copy a file safely; here to support the wt utility.
  */
 int
-__wt_sync_fp_and_rename(
-    WT_SESSION_IMPL *session, FILE **fpp, const char *from, const char *to)
+__wt_copy_and_sync(WT_SESSION *wt_session, const char *from, const char *to)
 {
-	FILE *fp;
+	WT_DECL_ITEM(tmp);
+	WT_DECL_RET;
+	WT_FH *ffh, *tfh;
+	WT_SESSION_IMPL *session;
+	wt_off_t n, offset, size;
+	char *buf;
 
-	fp = *fpp;
-	*fpp = NULL;
+	session = (WT_SESSION_IMPL *)wt_session;
+	ffh = tfh = NULL;
+	buf = NULL;
 
-	/* Flush to disk and close the handle. */
-	WT_RET(__wt_fclose(&fp, WT_FHANDLE_WRITE));
+	/*
+	 * Remove the target file if it exists, then create a temporary file,
+	 * copy the original into it and rename it into place. I don't think
+	 * its necessary to remove the file, or create a copy and do a rename,
+	 * it's likely safe to overwrite the backup file directly. I'm doing
+	 * the remove and rename to insulate us from errors in other programs
+	 * that might not detect a corrupted backup file; it's cheap insurance
+	 * in a path where undetected failure is very bad.
+	 */
+	WT_ERR(__wt_scr_alloc(session, 0, &tmp));
+	WT_ERR(__wt_buf_fmt(session, tmp, "%s.copy", to));
 
-	return (__wt_rename_and_sync_directory(session, from, to));
+	WT_ERR(__wt_remove_if_exists(session, to));
+	WT_ERR(__wt_remove_if_exists(session, tmp->data));
+
+	/* Open the from and temporary file handles. */
+	WT_ERR(__wt_open(session, from,
+	    WT_FILE_TYPE_REGULAR, WT_OPEN_READONLY, &ffh));
+	WT_ERR(__wt_open(session, tmp->data,
+	    WT_FILE_TYPE_REGULAR, WT_OPEN_CREATE | WT_OPEN_EXCLUSIVE, &tfh));
+
+	/*
+	 * Allocate a copy buffer. Don't use a scratch buffer, this thing is
+	 * big, and we don't want it hanging around.
+	 */
+#define	WT_BACKUP_COPY_SIZE	(128 * 1024)
+	WT_ERR(__wt_malloc(session, WT_BACKUP_COPY_SIZE, &buf));
+
+	/* Get the file's size, then copy the bytes. */
+	WT_ERR(__wt_filesize(session, ffh, &size));
+	for (offset = 0; size > 0; size -= n, offset += n) {
+		n = WT_MIN(size, WT_BACKUP_COPY_SIZE);
+		WT_ERR(__wt_read(session, ffh, offset, (size_t)n, buf));
+		WT_ERR(__wt_write(session, tfh, offset, (size_t)n, buf));
+	}
+
+	/* Close the from handle, then swap the temporary file into place. */
+	WT_ERR(__wt_close(session, &ffh));
+	ret = __wt_sync_handle_and_rename(session, &tfh, tmp->data, to);
+
+err:	WT_TRET(__wt_close(session, &ffh));
+	WT_TRET(__wt_close(session, &tfh));
+
+	__wt_free(session, buf);
+	__wt_scr_free(session, &tmp);
+	return (ret);
 }

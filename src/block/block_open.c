@@ -44,8 +44,8 @@ __wt_block_manager_create(
 	 * in our space. Move any existing files out of the way and complain.
 	 */
 	for (;;) {
-		if ((ret = __wt_open(session,
-		    filename, true, true, WT_FILE_TYPE_DATA, &fh)) == 0)
+		if ((ret = __wt_open(session, filename, WT_FILE_TYPE_DATA,
+		    WT_OPEN_CREATE | WT_OPEN_EXCLUSIVE, &fh)) == 0)
 			break;
 		WT_ERR_TEST(ret != EEXIST, ret);
 
@@ -67,13 +67,13 @@ __wt_block_manager_create(
 	}
 
 	/* Write out the file's meta-data. */
-	ret = __wt_desc_init(session, fh, allocsize);
+	ret = __wt_desc_write(session, fh, allocsize);
 
 	/*
 	 * Ensure the truncated file has made it to disk, then the upper-level
 	 * is never surprised.
 	 */
-	WT_TRET(__wt_fsync(session, fh));
+	WT_TRET(__wt_fsync(session, fh, true));
 
 	/* Close the file handle. */
 	WT_TRET(__wt_close(session, &fh));
@@ -157,6 +157,8 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	uint64_t bucket, hash;
 
+	WT_UNUSED(readonly);
+
 	WT_RET(__wt_verbose(session, WT_VERB_BLOCK, "open: %s", filename));
 
 	conn = S2C(session);
@@ -194,41 +196,23 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	/* Configuration: optional OS buffer cache maximum size. */
 	WT_ERR(__wt_config_gets(session, cfg, "os_cache_max", &cval));
 	block->os_cache_max = (size_t)cval.val;
-#ifdef HAVE_POSIX_FADVISE
-	if (conn->direct_io && block->os_cache_max)
-		WT_ERR_MSG(session, EINVAL,
-		    "os_cache_max not supported in combination with direct_io");
-#else
-	if (block->os_cache_max)
-		WT_ERR_MSG(session, EINVAL,
-		    "os_cache_max not supported if posix_fadvise not "
-		    "available");
-#endif
 
 	/* Configuration: optional immediate write scheduling flag. */
 	WT_ERR(__wt_config_gets(session, cfg, "os_cache_dirty_max", &cval));
 	block->os_cache_dirty_max = (size_t)cval.val;
-#ifdef HAVE_SYNC_FILE_RANGE
-	if (conn->direct_io && block->os_cache_dirty_max)
-		WT_ERR_MSG(session, EINVAL,
-		    "os_cache_dirty_max not supported in combination with "
-		    "direct_io");
-#else
-	if (block->os_cache_dirty_max) {
-		/*
-		 * Ignore any setting if it is not supported.
-		 */
-		block->os_cache_dirty_max = 0;
-		WT_ERR(__wt_verbose(session, WT_VERB_BLOCK,
-		    "os_cache_dirty_max ignored when sync_file_range not "
-		    "available"));
-	}
-#endif
+
+	/* Set the file extension information. */
+	block->extend_len = conn->data_extend_len;
+
+	/* Set the asynchronous flush, preload availability. */
+	block->nowait_sync_available = true;
+	block->preload_available = true;
 
 	/* Open the underlying file handle. */
-	WT_ERR(__wt_open(session, filename, false, false,
-	    readonly ? WT_FILE_TYPE_CHECKPOINT : WT_FILE_TYPE_DATA,
-	    &block->fh));
+	WT_ERR(__wt_open(session, filename, WT_FILE_TYPE_DATA, 0, &block->fh));
+
+	/* Set the file's size. */
+	WT_ERR(__wt_filesize(session, block->fh, &block->size));
 
 	/* Initialize the live checkpoint's lock. */
 	WT_ERR(__wt_spin_init(session, &block->live_lock, "block manager"));
@@ -282,15 +266,19 @@ __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
 }
 
 /*
- * __wt_desc_init --
+ * __wt_desc_write --
  *	Write a file's initial descriptor structure.
  */
 int
-__wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh, uint32_t allocsize)
+__wt_desc_write(WT_SESSION_IMPL *session, WT_FH *fh, uint32_t allocsize)
 {
 	WT_BLOCK_DESC *desc;
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
+
+	/* If in-memory, we don't read or write the descriptor structure. */
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+		return (0);
 
 	/* Use a scratch buffer to get correct alignment for direct I/O. */
 	WT_RET(__wt_scr_alloc(session, allocsize, &buf));
@@ -328,6 +316,10 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	uint32_t cksum_calculate, cksum_tmp;
+
+	/* If in-memory, we don't read or write the descriptor structure. */
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+		return (0);
 
 	/* Use a scratch buffer to get correct alignment for direct I/O. */
 	WT_RET(__wt_scr_alloc(session, block->allocsize, &buf));
@@ -406,7 +398,7 @@ __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_DSRC_STATS *stats)
 	WT_STAT_WRITE(stats, block_minor, WT_BLOCK_MINOR_VERSION);
 	WT_STAT_WRITE(
 	    stats, block_reuse_bytes, (int64_t)block->live.avail.bytes);
-	WT_STAT_WRITE(stats, block_size, block->fh->size);
+	WT_STAT_WRITE(stats, block_size, block->size);
 }
 
 /*
@@ -418,7 +410,7 @@ __wt_block_manager_size(WT_BM *bm, WT_SESSION_IMPL *session, wt_off_t *sizep)
 {
 	WT_UNUSED(session);
 
-	*sizep = bm->block->fh == NULL ? 0 : bm->block->fh->size;
+	*sizep = bm->block->size;
 	return (0);
 }
 
