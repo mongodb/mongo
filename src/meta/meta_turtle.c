@@ -282,6 +282,9 @@ __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
 
 err:	WT_TRET(__wt_close(session, &fh));
 	__wt_scr_free(session, &buf);
+
+	if (ret != 0)
+		__wt_free(session, *valuep);
 	return (ret);
 }
 
