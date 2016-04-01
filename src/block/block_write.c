@@ -42,10 +42,8 @@ __wt_block_discard(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t added_size)
 		return (0);
 
 	block->os_cache = 0;
-#if defined(HAVE_POSIX_FADVISE)
 	WT_ERR(block->fh->fh_advise(session,
 	    block->fh, (wt_off_t)0, (wt_off_t)0, POSIX_FADV_DONTNEED));
-#endif
 	return (0);
 
 err:	/* Ignore ENOTSUP, but don't try again. */

@@ -40,13 +40,9 @@ __wt_bm_preload(
 			ret = block->fh->fh_map_preload(session,
 			    block->fh, (uint8_t *)bm->map + offset, size);
 		else
-#if defined(HAVE_POSIX_FADVISE)
 			ret = block->fh->fh_advise(session,
 			    block->fh, (wt_off_t)offset,
 			    (wt_off_t)size, POSIX_FADV_WILLNEED);
-#else
-		ret = 0;
-#endif
 		if (ret == 0)
 			return (0);
 
