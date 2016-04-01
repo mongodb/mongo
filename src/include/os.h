@@ -58,6 +58,18 @@
 	     (t1).tv_nsec < (t2).tv_nsec ? -1 :				\
 	     (t1).tv_nsec == (t2).tv_nsec ? 0 : 1 : 1)
 
+/*
+ * The underlying OS calls return ENOTSUP if posix_fadvise functionality isn't
+ * available, but the WiredTiger code uses the the POSIX flag names in the API.
+ * Use two values so the underlying code can distinguish.
+ */
+#ifndef	POSIX_FADV_DONTNEED
+#define	POSIX_FADV_DONTNEED	0x01
+#endif
+#ifndef	POSIX_FADV_WILLNEED
+#define	POSIX_FADV_WILLNEED	0x02
+#endif
+
 #define	WT_OPEN_CREATE		0x001	/* Create is OK */
 #define	WT_OPEN_EXCLUSIVE	0x002	/* Exclusive open */
 #define	WT_OPEN_FIXED		0x004	/* Path isn't relative to home */
