@@ -231,8 +231,13 @@ Pipeline::SourceContainer::iterator DocumentSourceUnwind::optimizeAt(
 
     if (auto nextMatch = dynamic_cast<DocumentSourceMatch*>((*std::next(itr)).get())) {
         const bool includeDollarPrefix = false;
-        std::set<std::string> field = {_unwindPath.getPath(includeDollarPrefix)};
-        auto splitMatch = nextMatch->splitSourceBy(field);
+        std::set<std::string> fields = {_unwindPath.getPath(includeDollarPrefix)};
+
+        if (_indexPath) {
+            fields.insert((*_indexPath).getPath(false));
+        }
+
+        auto splitMatch = nextMatch->splitSourceBy(fields);
 
         invariant(splitMatch.first || splitMatch.second);
 

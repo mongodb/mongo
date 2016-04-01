@@ -315,6 +315,18 @@ class MatchShouldNotOptimizeWithElemMatch : public Base {
     }
 };
 
+class MatchShouldNotOptimizeWhenMatchingOnIndexField : public Base {
+    string inputPipeJson() {
+        return "[{$unwind: {path: '$a', includeArrayIndex: 'foo'}}, "
+               " {$match: {foo: 0, b: 1}}]";
+    }
+    string outputPipeJson() {
+        return "[{$match: {b: {$eq: 1}}}, "
+               " {$unwind: {path: '$a', includeArrayIndex: 'foo'}}, "
+               " {$match: {foo: {$eq: 0}}}]";
+    }
+};
+
 class MatchWithNorOnlySplitsIndependentChildren : public Base {
     string inputPipeJson() {
         return "[{$unwind: {path: '$a'}}, "
@@ -758,6 +770,7 @@ public:
         add<Optimizations::Local::LookupShouldNotCoalesceWithUnwindNotOnAs>();
         add<Optimizations::Local::MatchShouldDuplicateItselfBeforeRedact>();
         add<Optimizations::Local::MatchShouldSwapWithUnwind>();
+        add<Optimizations::Local::MatchShouldNotOptimizeWhenMatchingOnIndexField>();
         add<Optimizations::Local::MatchOnPrefixShouldNotSwapOnUnwind>();
         add<Optimizations::Local::MatchShouldNotOptimizeWithElemMatch>();
         add<Optimizations::Local::MatchWithNorOnlySplitsIndependentChildren>();
