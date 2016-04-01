@@ -94,6 +94,7 @@ struct __wt_fh {
 	WT_ITEM  buf;				/* Data */
 
 	bool	 direct_io;			/* O_DIRECT configured */
+	bool	 readonly;			/* WT_OPEN_READONLY set */
 
 	enum {					/* file extend configuration */
 	    WT_FALLOCATE_AVAILABLE,

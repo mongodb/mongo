@@ -178,8 +178,24 @@ __wt_open(WT_SESSION_IMPL *session,
 
 	WT_RET(__open_verbose(session, name, file_type, flags));
 
+	/*
+	 * If this is a read-only connection, open all files read-only except
+	 * the lock file.
+	 *
+	 * The only file created in read-only mode is the lock file.
+	 */
+	if (F_ISSET(conn, WT_CONN_READONLY)) {
+		lock_file = strcmp(name, WT_SINGLETHREAD) == 0;
+		if (!lock_file)
+			LF_SET(WT_OPEN_READONLY);
+		WT_ASSERT(session, lock_file || !LF_ISSET(WT_OPEN_CREATE));
+	}
+
 	/* Check if the handle is already open. */
 	if (__wt_handle_search(session, name, true, true, NULL, &fh)) {
+		if (!LF_ISSET(WT_OPEN_READONLY) && fh->readonly)
+			WT_RET_MSG(session, EPERM,
+			    "%s: attempt to write a readonly handle", name);
 		/*
 		 * XXX
 		 * The in-memory implementation has to reset the file offset
@@ -193,22 +209,10 @@ __wt_open(WT_SESSION_IMPL *session,
 		return (0);
 	}
 
-	/* Allocate a structure and set the name. */
+	/* Allocate a structure and set the name and read/write type. */
 	WT_ERR(__wt_calloc_one(session, &fh));
 	WT_ERR(__wt_strdup(session, name, &fh->name));
-
-	/*
-	 * If this is a read-only connection, open all files read-only except
-	 * the lock file.
-	 *
-	 * The only file created in read-only mode is the lock file.
-	 */
-	if (F_ISSET(conn, WT_CONN_READONLY)) {
-		lock_file = strcmp(name, WT_SINGLETHREAD) == 0;
-		if (!lock_file)
-			LF_SET(WT_OPEN_READONLY);
-		WT_ASSERT(session, lock_file || !LF_ISSET(WT_OPEN_CREATE));
-	}
+	fh->readonly = LF_ISSET(WT_OPEN_READONLY);
 
 	/* Create the path to the file. */
 	if (!LF_ISSET(WT_OPEN_FIXED))
