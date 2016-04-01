@@ -1046,17 +1046,18 @@ ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext
                    "Current storage engine does not support majority readConcerns"));
     }
 
-    auto loopCondition = [this, isMajorityReadConcern, targetOpTime] {
-        return isMajorityReadConcern
-            ? !_currentCommittedSnapshot || targetOpTime > _currentCommittedSnapshot->opTime
-            : targetOpTime > _getMyLastAppliedOpTime_inlock();
+    auto getCurrentOpTime = [this, isMajorityReadConcern, targetOpTime] {
+        auto committedOptime =
+            _currentCommittedSnapshot ? _currentCommittedSnapshot->opTime : OpTime();
+        return isMajorityReadConcern ? committedOptime : _getMyLastAppliedOpTime_inlock();
     };
 
-    if (isMajorityReadConcern && loopCondition()) {
+    if (isMajorityReadConcern && targetOpTime > getCurrentOpTime()) {
         LOG(1) << "waitUntilOpTime: waiting for optime:" << targetOpTime
-               << " to be in a snapshot -- current snapshot: " << _currentCommittedSnapshot->opTime;
+               << " to be in a snapshot -- current snapshot: " << getCurrentOpTime();
     }
-    while (loopCondition()) {
+
+    while (targetOpTime > getCurrentOpTime()) {
         Status interruptedStatus = txn->checkForInterruptNoAssert();
         if (!interruptedStatus.isOK()) {
             return ReadConcernResponse(interruptedStatus, Milliseconds(timer.millis()));
