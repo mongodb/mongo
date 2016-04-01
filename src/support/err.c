@@ -16,12 +16,15 @@ static int
 __handle_error_default(WT_EVENT_HANDLER *handler,
     WT_SESSION *wt_session, int error, const char *errmsg)
 {
+	WT_SESSION_IMPL *session;
+
 	WT_UNUSED(handler);
-	WT_UNUSED(wt_session);
 	WT_UNUSED(error);
 
-	WT_RET(__wt_fprintf(stderr, "%s\n", errmsg));
-	WT_RET(__wt_fflush(stderr));
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	WT_RET(__wt_fprintf(session, WT_STDERR(session), "%s\n", errmsg));
+	WT_RET(__wt_fsync(session, WT_STDERR(session), true));
 	return (0);
 }
 
@@ -33,11 +36,13 @@ static int
 __handle_message_default(WT_EVENT_HANDLER *handler,
     WT_SESSION *wt_session, const char *message)
 {
-	WT_UNUSED(handler);
-	WT_UNUSED(wt_session);
+	WT_SESSION_IMPL *session;
 
-	WT_RET(__wt_fprintf(stdout, "%s\n", message));
-	WT_RET(__wt_fflush(stdout));
+	WT_UNUSED(handler);
+
+	session = (WT_SESSION_IMPL *)wt_session;
+	WT_RET(__wt_fprintf(session, WT_STDOUT(session), "%s\n", message));
+	WT_RET(__wt_fsync(session, WT_STDOUT(session), true));
 	return (0);
 }
 
@@ -175,13 +180,19 @@ __wt_eventv(WT_SESSION_IMPL *session, bool msg_event, int error,
 	 * example, we can end up here without a session.)
 	 */
 	if (session == NULL) {
-		WT_RET(__wt_fprintf(stderr,
+		if (fprintf(stderr,
 		    "WiredTiger Error%s%s: ",
 		    error == 0 ? "" : ": ",
-		    error == 0 ? "" : __wt_strerror(session, error, NULL, 0)));
-		WT_RET(__wt_vfprintf(stderr, fmt, ap));
-		WT_RET(__wt_fprintf(stderr, "\n"));
-		return (__wt_fflush(stderr));
+		    error == 0 ? "" :
+		    __wt_strerror(session, error, NULL, 0)) < 0)
+			ret = EIO;
+		if (vfprintf(stderr, fmt, ap) < 0)
+			ret = EIO;
+		if (fprintf(stderr, "\n") < 0)
+			ret = EIO;
+		if (fflush(stderr) != 0)
+			ret = EIO;
+		return (ret);
 	}
 
 	p = s;

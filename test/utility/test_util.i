@@ -101,13 +101,13 @@ testutil_die(int e, const char *fmt, ...)
  *	Creates the full intended work directory in buffer.
  */
 static inline void
-testutil_work_dir_from_path(char *buffer, size_t inputSize, const char *dir)
+testutil_work_dir_from_path(char *buffer, size_t len, const char *dir)
 {
 	/* If no directory is provided, use the default. */
 	if (dir == NULL)
 		dir = DEFAULT_DIR;
 
-	if (inputSize < strlen(dir) + 1)
+	if (len < strlen(dir) + 1)
 		testutil_die(ENOMEM,
 		    "Not enough memory in buffer for directory %s", dir);
 
@@ -116,55 +116,48 @@ testutil_work_dir_from_path(char *buffer, size_t inputSize, const char *dir)
 
 /*
  * testutil_clean_work_dir --
- *	Remove any existing work directories, can optionally fail on error
+ *	Remove the work directory.
  */
 static inline void
 testutil_clean_work_dir(char *dir)
 {
-	size_t inputSize;
+	size_t len;
 	int ret;
-	bool exist;
-	char *buffer;
+	char *buf;
 
 	/* Additional bytes for the Windows rd command. */
-	inputSize = strlen(dir) + sizeof(RM_COMMAND);
-	if ((buffer = malloc(inputSize)) == NULL)
+	len = strlen(dir) + strlen(RM_COMMAND) + 1;
+	if ((buf = malloc(len)) == NULL)
 		testutil_die(ENOMEM, "Failed to allocate memory");
 
-	snprintf(buffer, inputSize, "%s%s", RM_COMMAND, dir);
+	snprintf(buf, len, "%s%s", RM_COMMAND, dir);
 
-	exist = 0;
-	if ((ret = __wt_exist(NULL, dir, &exist)) != 0)
-		testutil_die(ret,
-		    "Unable to check if directory exists");
-	if (exist == 1 && (ret = system(buffer)) != 0)
-		testutil_die(ret,
-		    "System call to remove directory failed");
-	free(buffer);
+	if ((ret = system(buf)) != 0 && ret != ENOENT)
+		testutil_die(ret, "%s", buf);
+	free(buf);
 }
 
 /*
  * testutil_make_work_dir --
- *	Delete the existing work directory if it exists, then create a new one.
+ *	Delete the existing work directory, then create a new one.
  */
 static inline void
 testutil_make_work_dir(char *dir)
 {
-	size_t inputSize;
+	size_t len;
 	int ret;
-	char *buffer;
+	char *buf;
 
 	testutil_clean_work_dir(dir);
 
 	/* Additional bytes for the mkdir command */
-	inputSize = strlen(dir) + sizeof(MKDIR_COMMAND);
-	if ((buffer = malloc(inputSize)) == NULL)
+	len = strlen(dir) + strlen(MKDIR_COMMAND) + 1;
+	if ((buf = malloc(len)) == NULL)
 		testutil_die(ENOMEM, "Failed to allocate memory");
 
 	/* mkdir shares syntax between Windows and Linux */
-	snprintf(buffer, inputSize, "%s%s", MKDIR_COMMAND, dir);
-	if ((ret = system(buffer)) != 0)
-		testutil_die(ret, "directory create call of '%s%s' failed",
-		    MKDIR_COMMAND, dir);
-	free(buffer);
+	snprintf(buf, len, "%s%s", MKDIR_COMMAND, dir);
+	if ((ret = system(buf)) != 0)
+		testutil_die(ret, "%s", buf);
+	free(buf);
 }

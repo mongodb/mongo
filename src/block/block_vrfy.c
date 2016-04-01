@@ -57,7 +57,7 @@ __wt_block_verify_start(WT_SESSION_IMPL *session,
 	 * a file immediately after creation or the checkpoint doesn't reflect
 	 * any of the data pages).
 	 */
-	size = block->fh->size;
+	size = block->size;
 	if (size <= block->allocsize)
 		return (0);
 
@@ -156,7 +156,7 @@ __verify_last_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt)
 	ci = &_ci;
 	WT_RET(__wt_block_ckpt_init(session, ci, ckpt->name));
 	WT_ERR(__wt_block_buffer_to_ckpt(session, block, ckpt->raw.data, ci));
-	WT_ERR(__wt_block_truncate(session, block->fh, ci->file_size));
+	WT_ERR_BUSY_OK(__wt_block_truncate(session, block, ci->file_size));
 
 err:	__wt_block_ckpt_destroy(session, ci);
 	return (ret);
@@ -368,7 +368,7 @@ __verify_filefrag_add(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	    (uintmax_t)offset, (uintmax_t)(offset + size), (uintmax_t)size));
 
 	/* Check each chunk against the total file size. */
-	if (offset + size > block->fh->size)
+	if (offset + size > block->size)
 		WT_RET_MSG(session, WT_ERROR,
 		    "fragment %" PRIuMAX "-%" PRIuMAX " references "
 		    "non-existent file blocks",

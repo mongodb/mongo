@@ -90,7 +90,7 @@ handle_wiredtiger_message(
 /*! [Function event_handler] */
 
 static int
-config_event_handler()
+config_event_handler(void)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;

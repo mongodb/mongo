@@ -569,6 +569,7 @@ connection_runtime_config = [
             'evict',
             'evictserver',
             'fileops',
+            'handleops',
             'log',
             'lsm',
             'lsm_manager',

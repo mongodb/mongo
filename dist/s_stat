@@ -11,7 +11,7 @@ l=`sed \
     -e 's,#.*,,' \
     -e '/^$/d' \
     -e 's,^,../,' filelist`
-l="$l `echo ../src/include/*.i`"
+l="$l `echo ../src/include/*.i ../src/include/os.h`"
 
 (
 # Get the list of statistics fields.
