@@ -243,6 +243,7 @@ __im_handle_printf(
 	for (;;) {
 		va_copy(ap_copy, ap);
 		len = (size_t)vsnprintf(tmp->mem, tmp->memsize, fmt, ap_copy);
+		va_end(ap_copy);
 		if (len < tmp->memsize) {
 			tmp->data = tmp->mem;
 			tmp->size = len;
