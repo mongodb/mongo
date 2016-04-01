@@ -157,6 +157,8 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	uint64_t bucket, hash;
 
+	WT_UNUSED(readonly);
+
 	WT_RET(__wt_verbose(session, WT_VERB_BLOCK, "open: %s", filename));
 
 	conn = S2C(session);
@@ -164,17 +166,14 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	hash = __wt_hash_city64(filename, strlen(filename));
 	bucket = hash % WT_HASH_ARRAY_SIZE;
 	__wt_spin_lock(session, &conn->block_lock);
-	TAILQ_FOREACH(block, &conn->blockhash[bucket], hashq)
+	TAILQ_FOREACH(block, &conn->blockhash[bucket], hashq) {
 		if (strcmp(filename, block->name) == 0) {
-			if (!readonly && block->readonly)
-				WT_RET_MSG(session, EPERM,
-				    "%s: attempt to write a readonly handle",
-				    filename);
 			++block->ref;
 			*blockp = block;
 			__wt_spin_unlock(session, &conn->block_lock);
 			return (0);
 		}
+	}
 
 	/*
 	 * Basic structure allocation, initialization.
@@ -210,7 +209,6 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	block->preload_available = true;
 
 	/* Open the underlying file handle. */
-	block->readonly = readonly;
 	WT_ERR(__wt_open(session, filename, WT_FILE_TYPE_DATA, 0, &block->fh));
 
 	/* Set the file's size. */
