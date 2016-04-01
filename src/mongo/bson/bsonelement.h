@@ -802,7 +802,10 @@ inline long long BSONElement::safeNumberLong() const {
 }
 
 inline BSONElement::BSONElement() {
-    static const char kEooElement[] = "";
+    // This needs to be 2 elements because we check the strlen of data + 1 and GCC sees that as
+    // accessing beyond the end of a constant string, even though we always check whether the
+    // element is an eoo.
+    static const char kEooElement[2] = {'\0', '\0'};
     data = kEooElement;
     fieldNameSize_ = 0;
     totalSize = 1;
