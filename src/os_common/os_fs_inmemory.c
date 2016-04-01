@@ -52,7 +52,7 @@ __im_directory_sync(WT_SESSION_IMPL *session, const char *path)
 static int
 __im_file_exist(WT_SESSION_IMPL *session, const char *name, bool *existp)
 {
-	*existp = __wt_handle_search(session, name, false, true, NULL, NULL);
+	*existp = __wt_handle_search(session, name, false, NULL, NULL);
 	return (0);
 }
 
@@ -66,7 +66,7 @@ __im_file_remove(WT_SESSION_IMPL *session, const char *name)
 	WT_DECL_RET;
 	WT_FH *fh;
 
-	if (__wt_handle_search(session, name, true, true, NULL, &fh)) {
+	if (__wt_handle_search(session, name, true, NULL, &fh)) {
 		WT_ASSERT(session, fh->ref == 1);
 
 		/* Force a discard of the handle. */
@@ -150,9 +150,9 @@ __im_file_size(
 	im = S2C(session)->inmemory;
 	__wt_spin_lock(session, &im->lock);
 
-	if (__wt_handle_search(session, name, false, false, NULL, &fh)) {
+	if (__wt_handle_search(session, name, true, NULL, &fh)) {
 		*sizep = (wt_off_t)fh->buf.size;
-		__wt_handle_search_unlock(session);
+		ret = __wt_close(session, &fh);
 	} else
 		ret = ENOENT;
 
@@ -243,6 +243,7 @@ __im_handle_printf(
 	for (;;) {
 		va_copy(ap_copy, ap);
 		len = (size_t)vsnprintf(tmp->mem, tmp->memsize, fmt, ap_copy);
+		va_end(ap_copy);
 		if (len < tmp->memsize) {
 			tmp->data = tmp->mem;
 			tmp->size = len;
