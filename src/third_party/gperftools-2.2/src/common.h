@@ -88,14 +88,14 @@ static const size_t kNumClasses = 95;
 // waste due alignment of 25%. (eg malloc of 24 bytes will get 32 bytes)
 static const size_t kMinAlign   = 8;
 #else
-static const size_t kPageShift  = 13;
-static const size_t kNumClasses = 88;
+static const size_t kPageShift  = 12;
+static const size_t kNumClasses = 52;
 static const size_t kMinAlign   = 16;
 #endif
 static const size_t kMaxThreadCacheSize = 4 << 20;
 
 static const size_t kPageSize   = 1 << kPageShift;
-static const size_t kMaxSize    = 256 * 1024;
+static const size_t kMaxSize    = 16 * 1024;
 static const size_t kAlignment  = 8;
 static const size_t kLargeSizeClass = 0;
 // For all span-lengths < kMaxPages we keep an exact-size list.

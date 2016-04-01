@@ -1,11 +1,11 @@
 // -*- Mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*-
 // Copyright (c) 2008, Google Inc.
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
 // met:
-// 
+//
 //     * Redistributions of source code must retain the above copyright
 // notice, this list of conditions and the following disclaimer.
 //     * Redistributions in binary form must reproduce the above
@@ -15,7 +15,7 @@
 //     * Neither the name of Google Inc. nor the names of its
 // contributors may be used to endorse or promote products derived from
 // this software without specific prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 // "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 // LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -45,6 +45,7 @@ namespace tcmalloc {
 static int32 FLAGS_tcmalloc_transfer_num_objects;
 
 static const int32 kDefaultTransferNumObjecs = 32768;
+static const int32 kTargetTransferBytes = 8 * 1024;
 
 // The init function is provided to explicit initialize the variable value
 // from the env. var to avoid C++ global construction that might defer its
@@ -98,8 +99,8 @@ int AlignmentForSize(size_t size) {
 
 int SizeMap::NumMoveSize(size_t size) {
   if (size == 0) return 0;
-  // Use approx 64k transfers between thread and central caches.
-  int num = static_cast<int>(64.0 * 1024.0 / size);
+  // Use approx 32k transfers between thread and central caches.
+  int num = kTargetTransferBytes / size;
   if (num < 2) num = 2;
 
   // Avoid bringing too many objects into small object free lists.
@@ -140,7 +141,7 @@ void SizeMap::Init() {
     alignment = AlignmentForSize(size);
     CHECK_CONDITION((size % alignment) == 0);
 
-    int blocks_to_move = NumMoveSize(size) / 4;
+    int min_objects_per_span = kTargetTransferBytes / size;
     size_t psize = 0;
     do {
       psize += kPageSize;
@@ -152,7 +153,7 @@ void SizeMap::Init() {
       // Continue to add pages until there are at least as many objects in
       // the span as are needed when moving objects from the central
       // freelists and spans to the thread caches.
-    } while ((psize / size) < (blocks_to_move));
+    } while ((psize / size) < min_objects_per_span);
     const size_t my_pages = psize >> kPageShift;
 
     if (sc > 1 && my_pages == class_to_pages_[sc-1]) {
