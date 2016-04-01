@@ -131,7 +131,7 @@ private:
     bool _areWriteUnitOfWorksBanned = false;
     bool _inUnitOfWork;
     bool _active;
-    uint64_t _myTransactionCount;
+    uint64_t _mySnapshotId;
     bool _everStartedWrite;
     Timer _timer;
     RecordId _oplogReadTill;
