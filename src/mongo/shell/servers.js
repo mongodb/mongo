@@ -768,6 +768,15 @@
         // Normalize and get the binary version to use
         opts.binVersion = MongoRunner.getBinVersionFor(opts.binVersion);
 
+        // Recent versions of the mongo tools support a --dialTimeout flag to set for how
+        // long they retry connecting to a mongod or mongos process. We have them retry
+        // connecting for up to 30 seconds to handle when the tests are run on a
+        // resource-constrained host machine.
+        if (!opts.hasOwnProperty('dialTimeout') &&
+            MongoRunner.getBinVersionFor(opts.binVersion) === '') {
+            opts['dialTimeout'] = '30';
+        }
+
         var argsArray = MongoRunner.arrOptions(binaryName, opts);
 
         return runMongoProgram.apply(null, argsArray);
