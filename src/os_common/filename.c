@@ -137,8 +137,7 @@ __wt_copy_and_sync(WT_SESSION *wt_session, const char *from, const char *to)
 	WT_DECL_RET;
 	WT_FH *ffh, *tfh;
 	WT_SESSION_IMPL *session;
-	size_t n;
-	wt_off_t offset, size;
+	wt_off_t n, offset, size;
 	char *buf;
 
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -176,9 +175,11 @@ __wt_copy_and_sync(WT_SESSION *wt_session, const char *from, const char *to)
 	/* Get the file's size, then copy the bytes. */
 	WT_ERR(__wt_filesize(session, ffh, &size));
 	for (offset = 0; size > 0; size -= n, offset += n) {
-		n = (size_t)WT_MIN(size, WT_BACKUP_COPY_SIZE);
-		WT_ERR(__wt_read(session, ffh, offset, n, buf));
-		WT_ERR(__wt_write(session, tfh, offset, n, buf));
+		n = WT_MIN(size, WT_BACKUP_COPY_SIZE);
+		WT_ERR(__wt_read(
+		    session, ffh, offset, (size_t)n, buf));
+		WT_ERR(__wt_write(
+		    session, tfh, offset, (size_t)n, buf));
 	}
 
 	/* Close the from handle, then swap the temporary file into place. */
