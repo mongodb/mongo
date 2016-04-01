@@ -62,7 +62,8 @@ functions:
           # to create a mongod EC2 cluster
           set -e
           set -o verbose
-          bin/setup-cluster.sh ${cluster}
+          cd ./clusters/${cluster}
+          ../../bin/setup-cluster.sh ${cluster}
           echo "EC2 Cluster CREATED."
 
   "configure mongodb cluster":

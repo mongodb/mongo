@@ -63,10 +63,10 @@ functions:
           # to create a mongod EC2 cluster
           set -e
           set -o verbose
-          # create all resources and instances
-          bin/setup-cluster.sh ${cluster}
-          echo "EC2 Cluster CREATED."
           cd ./clusters/${cluster}
+          # create all resources and instances
+          ../../bin/setup-cluster.sh ${cluster}
+          echo "EC2 Cluster CREATED."
           tar -czvf cluster_config.tgz ips.sh terraform.tfstate.backup terraform.tfstate cluster.tf terraform.tfvars variables.tf
     - command: s3.put
       params:
