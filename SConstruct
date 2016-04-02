@@ -1410,7 +1410,7 @@ if env.TargetOSIs('posix'):
                          "-Wno-unknown-pragmas",
                          "-Winvalid-pch"] )
     # env.Append( " -Wconversion" ) TODO: this doesn't really work yet
-    if env.TargetOSIs('linux', 'osx'):
+    if env.TargetOSIs('linux', 'osx', 'solaris'):
         if not has_option("disable-warnings-as-errors"):
             env.Append( CCFLAGS=["-Werror"] )
 

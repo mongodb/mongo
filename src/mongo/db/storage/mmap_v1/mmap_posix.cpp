@@ -182,9 +182,7 @@ void* MemoryMappedFile::map(const char* filename, unsigned long long& length) {
     }
 
 
-#if defined(__sun)
-#warning madvise not supported on solaris yet
-#else
+#if !defined(__sun)
     if (isOptionSet(SEQUENTIAL)) {
         if (madvise(view, length, MADV_SEQUENTIAL)) {
             warning() << "map: madvise failed for " << filename << ' ' << errnoWithDescription()

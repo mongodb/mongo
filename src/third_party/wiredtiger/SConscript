@@ -52,6 +52,9 @@ elif env.TargetOSIs('osx'):
     env.Append(CPPPATH=["build_darwin"])
 elif env.TargetOSIs('solaris'):
     env.Append(CPPPATH=["build_solaris"])
+    # For an explanation of __EXTENSIONS__,
+    # see http://docs.oracle.com/cd/E19253-01/816-5175/standards-5/index.html
+    env.Append(CPPDEFINES=["__EXTENSIONS__"])
 elif env.TargetOSIs('freebsd'):
     env.Append(CPPPATH=["build_freebsd"])
 elif env.TargetOSIs('openbsd'):
