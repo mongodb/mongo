@@ -76,10 +76,16 @@ env.Library(
 env.Library(
     target='commands',
     source=[
+        'check_sharding_index_command.cpp',
         'cleanup_orphaned_cmd.cpp',
+        'get_shard_version_command.cpp',
         'merge_chunks_command.cpp',
         'move_chunk_command.cpp',
         'set_shard_version_command.cpp',
+        'sharding_state_command.cpp',
+        'split_chunk_command.cpp',
+        'split_vector_command.cpp',
+        'unset_sharding_command.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands',

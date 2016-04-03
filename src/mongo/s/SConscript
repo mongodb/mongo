@@ -255,10 +255,8 @@ env.CppUnitTest(
 env.Library(
     target='serveronly',
     source=[
-        "d_merge.cpp",
         "d_migrate.cpp",
         'd_sharding_server_status.cpp',
-        "d_split.cpp",
         "d_state.cpp",
     ],
     LIBDEPS=[

@@ -250,52 +250,6 @@ ChunkVersion ShardingState::getVersion(const string& ns) {
     return ChunkVersion::UNSHARDED();
 }
 
-void ShardingState::splitChunk(OperationContext* txn,
-                               const string& ns,
-                               const BSONObj& min,
-                               const BSONObj& max,
-                               const vector<BSONObj>& splitKeys,
-                               ChunkVersion version) {
-    invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    CollectionShardingStateMap::const_iterator it = _collections.find(ns);
-    verify(it != _collections.end());
-
-    ChunkType chunk;
-    chunk.setMin(min);
-    chunk.setMax(max);
-    string errMsg;
-
-    std::unique_ptr<CollectionMetadata> cloned(
-        it->second->getMetadata()->cloneSplit(chunk, splitKeys, version, &errMsg));
-    // uassert to match old behavior, TODO: report errors w/o throwing
-    uassert(16857, errMsg, NULL != cloned.get());
-
-    it->second->setMetadata(std::move(cloned));
-}
-
-void ShardingState::mergeChunks(OperationContext* txn,
-                                const string& ns,
-                                const BSONObj& minKey,
-                                const BSONObj& maxKey,
-                                ChunkVersion mergedVersion) {
-    invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    CollectionShardingStateMap::const_iterator it = _collections.find(ns);
-    verify(it != _collections.end());
-
-    string errMsg;
-
-    std::unique_ptr<CollectionMetadata> cloned(
-        it->second->getMetadata()->cloneMerge(minKey, maxKey, mergedVersion, &errMsg));
-    // uassert to match old behavior, TODO: report errors w/o throwing
-    uassert(17004, errMsg, NULL != cloned.get());
-
-    it->second->setMetadata(std::move(cloned));
-}
-
 void ShardingState::resetMetadata(const string& ns) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 

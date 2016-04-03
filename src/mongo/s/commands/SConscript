@@ -56,7 +56,7 @@ env.Library(
         'cluster_reset_error_cmd.cpp',
         'cluster_shard_collection_cmd.cpp',
         'cluster_shutdown_cmd.cpp',
-        'cluster_split_collection_cmd.cpp',
+        'cluster_split_cmd.cpp',
         'cluster_user_management_commands.cpp',
         'cluster_whats_my_uri_cmd.cpp',
         'cluster_write_cmd.cpp',

@@ -45,7 +45,6 @@ namespace mongo {
 class BSONObj;
 class BSONObjBuilder;
 struct ChunkVersion;
-class Client;
 class CollectionMetadata;
 class CollectionShardingState;
 class ConnectionString;
@@ -207,45 +206,6 @@ public:
     bool needCollectionMetadata(OperationContext* txn, const std::string& ns);
 
     std::shared_ptr<CollectionMetadata> getCollectionMetadata(const std::string& ns);
-
-    /**
-     * Creates and installs a new chunk metadata for a given collection by splitting one of its
-     * chunks in two or more. The version for the first split chunk should be provided. The
-     * subsequent chunks' version would be the latter with the minor portion incremented.
-     *
-     * The effect on clients will depend on the version used. If the major portion is the same
-     * as the current shards, clients shouldn't perceive the split.
-     *
-     * @param ns the collection
-     * @param min max the chunk that should be split
-     * @param splitKeys point in which to split
-     * @param version at which the new metadata should be at
-     */
-    void splitChunk(OperationContext* txn,
-                    const std::string& ns,
-                    const BSONObj& min,
-                    const BSONObj& max,
-                    const std::vector<BSONObj>& splitKeys,
-                    ChunkVersion version);
-
-    /**
-     * Creates and installs a new chunk metadata for a given collection by merging a range of
-     * chunks ['minKey', 'maxKey') into a single chunk with version 'mergedVersion'.
-     * The current metadata must overlap the range completely and minKey and maxKey must not
-     * divide an existing chunk.
-     *
-     * The merged chunk version must have a greater version than the current shard version,
-     * and if it has a greater major version clients will need to reload metadata.
-     *
-     * @param ns the collection
-     * @param minKey maxKey the range which should be merged
-     * @param newShardVersion the shard version the newly merged chunk should have
-     */
-    void mergeChunks(OperationContext* txn,
-                     const std::string& ns,
-                     const BSONObj& minKey,
-                     const BSONObj& maxKey,
-                     ChunkVersion mergedVersion);
 
     /**
      * TESTING ONLY

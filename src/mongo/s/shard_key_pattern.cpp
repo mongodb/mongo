@@ -209,8 +209,7 @@ static BSONElement extractKeyElementFromMatchable(const MatchableDocument& match
     return matchEl;
 }
 
-BSONObj  //
-    ShardKeyPattern::extractShardKeyFromMatchable(const MatchableDocument& matchable) const {
+BSONObj ShardKeyPattern::extractShardKeyFromMatchable(const MatchableDocument& matchable) const {
     if (!isValid())
         return BSONObj();
 
