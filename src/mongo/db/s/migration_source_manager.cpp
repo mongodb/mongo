@@ -42,7 +42,6 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/chunk.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/stale_exception.h"
@@ -307,7 +306,7 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
         op.append("ns", ChunkType::ConfigNS);
 
         BSONObjBuilder n(op.subobjStart("o"));
-        n.append(ChunkType::name(), Chunk::genID(_args.getNss().ns(), _args.getMinKey()));
+        n.append(ChunkType::name(), ChunkType::genID(_args.getNss().ns(), _args.getMinKey()));
         _uncommittedMetadata->getCollVersion().addToBSON(n, ChunkType::DEPRECATED_lastmod());
         n.append(ChunkType::ns(), _args.getNss().ns());
         n.append(ChunkType::min(), _args.getMinKey());
@@ -316,7 +315,7 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
         n.done();
 
         BSONObjBuilder q(op.subobjStart("o2"));
-        q.append(ChunkType::name(), Chunk::genID(_args.getNss().ns(), _args.getMinKey()));
+        q.append(ChunkType::name(), ChunkType::genID(_args.getNss().ns(), _args.getMinKey()));
         q.done();
 
         updates.append(op.obj());
@@ -348,7 +347,7 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
         op.append("ns", ChunkType::ConfigNS);
 
         BSONObjBuilder n(op.subobjStart("o"));
-        n.append(ChunkType::name(), Chunk::genID(_args.getNss().ns(), bumpMin));
+        n.append(ChunkType::name(), ChunkType::genID(_args.getNss().ns(), bumpMin));
         nextVersion.addToBSON(n, ChunkType::DEPRECATED_lastmod());
         n.append(ChunkType::ns(), _args.getNss().ns());
         n.append(ChunkType::min(), bumpMin);
@@ -357,7 +356,7 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
         n.done();
 
         BSONObjBuilder q(op.subobjStart("o2"));
-        q.append(ChunkType::name(), Chunk::genID(_args.getNss().ns(), bumpMin));
+        q.append(ChunkType::name(), ChunkType::genID(_args.getNss().ns(), bumpMin));
         q.done();
 
         updates.append(op.obj());

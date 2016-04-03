@@ -420,7 +420,7 @@ Status ChunkManager::createFirstChunks(OperationContext* txn,
             i < splitPoints.size() ? splitPoints[i] : _keyPattern.getKeyPattern().globalMax();
 
         ChunkType chunk;
-        chunk.setName(Chunk::genID(_ns, min));
+        chunk.setName(ChunkType::genID(_ns, min));
         chunk.setNS(_ns);
         chunk.setMin(min);
         chunk.setMax(max);
@@ -444,10 +444,11 @@ Status ChunkManager::createFirstChunks(OperationContext* txn,
     return Status::OK();
 }
 
-ChunkPtr ChunkManager::findIntersectingChunk(OperationContext* txn, const BSONObj& shardKey) const {
+shared_ptr<Chunk> ChunkManager::findIntersectingChunk(OperationContext* txn,
+                                                      const BSONObj& shardKey) const {
     {
         BSONObj chunkMin;
-        ChunkPtr chunk;
+        shared_ptr<Chunk> chunk;
         {
             ChunkMap::const_iterator it = _chunkMap.upper_bound(shardKey);
             if (it != _chunkMap.end()) {

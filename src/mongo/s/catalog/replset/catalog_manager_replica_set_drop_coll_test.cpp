@@ -41,7 +41,7 @@
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/chunk.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/write_ops/batched_update_request.h"
 #include "mongo/stdx/chrono.h"

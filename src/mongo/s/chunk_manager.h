@@ -194,7 +194,8 @@ public:
      * when the shard key is {a : "hashed"}, you can call
      *  findIntersectingChunk() on {a : hash("foo") }
      */
-    ChunkPtr findIntersectingChunk(OperationContext* txn, const BSONObj& shardKey) const;
+    std::shared_ptr<Chunk> findIntersectingChunk(OperationContext* txn,
+                                                 const BSONObj& shardKey) const;
 
     void getShardIdsForQuery(OperationContext* txn,
                              const BSONObj& query,

@@ -88,8 +88,6 @@ public:
     //  to a subset of fields).
     bool containsKey(const BSONObj& shardKey) const;
 
-    static std::string genID(const std::string& ns, const BSONObj& min);
-
     //
     // chunk version support
     //

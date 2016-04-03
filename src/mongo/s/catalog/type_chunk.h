@@ -68,6 +68,11 @@ public:
     static StatusWith<ChunkType> fromBSON(const BSONObj& source);
 
     /**
+     * Generates chunk id based on the namespace name and the lower bound of the chunk.
+     */
+    static std::string genID(StringData ns, const BSONObj& min);
+
+    /**
      * Returns OK if all fields have been set. Otherwise returns NoSuchKey
      * and information about the first field that is missing.
      */

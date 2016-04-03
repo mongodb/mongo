@@ -161,8 +161,8 @@ public:
         }
 
         // This refreshes the chunk metadata if stale.
-        ChunkManagerPtr info = config->getChunkManager(txn, nss.ns(), true);
-        ChunkPtr chunk;
+        shared_ptr<ChunkManager> info = config->getChunkManager(txn, nss.ns(), true);
+        shared_ptr<Chunk> chunk;
 
         if (!find.isEmpty()) {
             StatusWith<BSONObj> status = info->getShardKeyPattern().extractShardKeyFromQuery(find);

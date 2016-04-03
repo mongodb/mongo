@@ -774,7 +774,7 @@ public:
 
             // add the modified (new) chunk information as the update object
             BSONObjBuilder n(op.subobjStart("o"));
-            n.append(ChunkType::name(), Chunk::genID(nss.ns(), startKey));
+            n.append(ChunkType::name(), ChunkType::genID(nss.ns(), startKey));
             nextChunkVersion.addToBSON(n, ChunkType::DEPRECATED_lastmod());
             n.append(ChunkType::ns(), nss.ns());
             n.append(ChunkType::min(), startKey);
@@ -784,7 +784,7 @@ public:
 
             // add the chunk's _id as the query part of the update statement
             BSONObjBuilder q(op.subobjStart("o2"));
-            q.append(ChunkType::name(), Chunk::genID(nss.ns(), startKey));
+            q.append(ChunkType::name(), ChunkType::genID(nss.ns(), startKey));
             q.done();
 
             updates.append(op.obj());

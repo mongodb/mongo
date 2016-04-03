@@ -40,7 +40,6 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/chunk.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
@@ -341,7 +340,7 @@ Status runApplyOpsCmd(OperationContext* txn,
 
     // Fill in details not tracked by metadata
     ChunkType mergedChunk(firstChunk);
-    mergedChunk.setName(Chunk::genID(firstChunk.getNS(), firstChunk.getMin()));
+    mergedChunk.setName(ChunkType::genID(firstChunk.getNS(), firstChunk.getMin()));
     mergedChunk.setMax(chunksToMerge.back().getMax());
     mergedChunk.setVersion(newMergedVersion);
 
@@ -350,7 +349,7 @@ Status runApplyOpsCmd(OperationContext* txn,
     // Don't remove chunk we're expanding
     for (size_t i = 1; i < chunksToMerge.size(); ++i) {
         ChunkType chunkToMerge(chunksToMerge[i]);
-        chunkToMerge.setName(Chunk::genID(chunkToMerge.getNS(), chunkToMerge.getMin()));
+        chunkToMerge.setName(ChunkType::genID(chunkToMerge.getNS(), chunkToMerge.getMin()));
         updatesB.append(buildOpRemoveChunk(chunkToMerge));
     }
 

@@ -629,19 +629,6 @@ bool Chunk::operator==(const Chunk& s) const {
     return _min.woCompare(s._min) == 0 && _max.woCompare(s._max) == 0;
 }
 
-string Chunk::genID(const string& ns, const BSONObj& o) {
-    StringBuilder buf;
-    buf << ns << "-";
-
-    BSONObjIterator i(o);
-    while (i.more()) {
-        BSONElement e = i.next();
-        buf << e.fieldName() << "_" << e.toString(false, true);
-    }
-
-    return buf.str();
-}
-
 string Chunk::toString() const {
     stringstream ss;
     ss << ChunkType::ns() << ": " << _manager->getns() << ", " << ChunkType::shard() << ": "
@@ -656,7 +643,7 @@ void Chunk::markAsJumbo(OperationContext* txn) const {
     // at least this mongos won't try and keep moving
     _jumbo = true;
 
-    const string chunkName = genID(_manager->getns(), _min);
+    const string chunkName = ChunkType::genID(_manager->getns(), _min);
 
     auto status =
         grid.catalogManager(txn)->updateConfigDocument(txn,

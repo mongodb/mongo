@@ -50,8 +50,8 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/chunk.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/chunk.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -307,7 +307,7 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
     ShardKeyPattern keyPattern(BSON("_id" << 1));
 
     ChunkType expectedChunk;
-    expectedChunk.setName(Chunk::genID(ns, keyPattern.getKeyPattern().globalMin()));
+    expectedChunk.setName(ChunkType::genID(ns, keyPattern.getKeyPattern().globalMin()));
     expectedChunk.setNS(ns);
     expectedChunk.setMin(keyPattern.getKeyPattern().globalMin());
     expectedChunk.setMax(keyPattern.getKeyPattern().globalMax());
@@ -442,7 +442,7 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     expectedChunk0.setShard(shard0.getName());
     expectedChunk0.setMin(keyPattern.getKeyPattern().globalMin());
     expectedChunk0.setMax(splitPoint0);
-    expectedChunk0.setName(Chunk::genID(ns, expectedChunk0.getMin()));
+    expectedChunk0.setName(ChunkType::genID(ns, expectedChunk0.getMin()));
     expectedChunk0.setVersion(expectedVersion);
     expectedVersion.incMinor();
 
@@ -451,7 +451,7 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     expectedChunk1.setShard(shard1.getName());
     expectedChunk1.setMin(splitPoint0);
     expectedChunk1.setMax(splitPoint1);
-    expectedChunk1.setName(Chunk::genID(ns, expectedChunk1.getMin()));
+    expectedChunk1.setName(ChunkType::genID(ns, expectedChunk1.getMin()));
     expectedChunk1.setVersion(expectedVersion);
     expectedVersion.incMinor();
 
@@ -460,7 +460,7 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     expectedChunk2.setShard(shard2.getName());
     expectedChunk2.setMin(splitPoint1);
     expectedChunk2.setMax(splitPoint2);
-    expectedChunk2.setName(Chunk::genID(ns, expectedChunk2.getMin()));
+    expectedChunk2.setName(ChunkType::genID(ns, expectedChunk2.getMin()));
     expectedChunk2.setVersion(expectedVersion);
     expectedVersion.incMinor();
 
@@ -469,7 +469,7 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     expectedChunk3.setShard(shard0.getName());
     expectedChunk3.setMin(splitPoint2);
     expectedChunk3.setMax(splitPoint3);
-    expectedChunk3.setName(Chunk::genID(ns, expectedChunk3.getMin()));
+    expectedChunk3.setName(ChunkType::genID(ns, expectedChunk3.getMin()));
     expectedChunk3.setVersion(expectedVersion);
     expectedVersion.incMinor();
 
@@ -478,7 +478,7 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     expectedChunk4.setShard(shard1.getName());
     expectedChunk4.setMin(splitPoint3);
     expectedChunk4.setMax(keyPattern.getKeyPattern().globalMax());
-    expectedChunk4.setName(Chunk::genID(ns, expectedChunk4.getMin()));
+    expectedChunk4.setName(ChunkType::genID(ns, expectedChunk4.getMin()));
     expectedChunk4.setVersion(expectedVersion);
 
     vector<ChunkType> expectedChunks{
@@ -597,7 +597,7 @@ TEST_F(ShardCollectionTest, withInitialData) {
     expectedChunk0.setShard(shard.getName());
     expectedChunk0.setMin(keyPattern.getKeyPattern().globalMin());
     expectedChunk0.setMax(splitPoint0);
-    expectedChunk0.setName(Chunk::genID(ns, expectedChunk0.getMin()));
+    expectedChunk0.setName(ChunkType::genID(ns, expectedChunk0.getMin()));
     expectedChunk0.setVersion(expectedVersion);
     expectedVersion.incMinor();
 
@@ -606,7 +606,7 @@ TEST_F(ShardCollectionTest, withInitialData) {
     expectedChunk1.setShard(shard.getName());
     expectedChunk1.setMin(splitPoint0);
     expectedChunk1.setMax(splitPoint1);
-    expectedChunk1.setName(Chunk::genID(ns, expectedChunk1.getMin()));
+    expectedChunk1.setName(ChunkType::genID(ns, expectedChunk1.getMin()));
     expectedChunk1.setVersion(expectedVersion);
     expectedVersion.incMinor();
 
@@ -615,7 +615,7 @@ TEST_F(ShardCollectionTest, withInitialData) {
     expectedChunk2.setShard(shard.getName());
     expectedChunk2.setMin(splitPoint1);
     expectedChunk2.setMax(splitPoint2);
-    expectedChunk2.setName(Chunk::genID(ns, expectedChunk2.getMin()));
+    expectedChunk2.setName(ChunkType::genID(ns, expectedChunk2.getMin()));
     expectedChunk2.setVersion(expectedVersion);
     expectedVersion.incMinor();
 
@@ -624,7 +624,7 @@ TEST_F(ShardCollectionTest, withInitialData) {
     expectedChunk3.setShard(shard.getName());
     expectedChunk3.setMin(splitPoint2);
     expectedChunk3.setMax(splitPoint3);
-    expectedChunk3.setName(Chunk::genID(ns, expectedChunk3.getMin()));
+    expectedChunk3.setName(ChunkType::genID(ns, expectedChunk3.getMin()));
     expectedChunk3.setVersion(expectedVersion);
     expectedVersion.incMinor();
 
@@ -633,7 +633,7 @@ TEST_F(ShardCollectionTest, withInitialData) {
     expectedChunk4.setShard(shard.getName());
     expectedChunk4.setMin(splitPoint3);
     expectedChunk4.setMax(keyPattern.getKeyPattern().globalMax());
-    expectedChunk4.setName(Chunk::genID(ns, expectedChunk4.getMin()));
+    expectedChunk4.setName(ChunkType::genID(ns, expectedChunk4.getMin()));
     expectedChunk4.setVersion(expectedVersion);
 
     vector<ChunkType> expectedChunks{

@@ -117,6 +117,19 @@ StatusWith<ChunkType> ChunkType::fromBSON(const BSONObj& source) {
     return chunk;
 }
 
+std::string ChunkType::genID(StringData ns, const BSONObj& o) {
+    StringBuilder buf;
+    buf << ns << "-";
+
+    BSONObjIterator i(o);
+    while (i.more()) {
+        BSONElement e = i.next();
+        buf << e.fieldName() << "_" << e.toString(false, true);
+    }
+
+    return buf.str();
+}
+
 Status ChunkType::validate() const {
     if (!_name.is_initialized() || _name->empty()) {
         return Status(ErrorCodes::NoSuchKey,
