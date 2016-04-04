@@ -395,6 +395,8 @@ __win_handle_sync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
 {
 	WT_DECL_RET;
 
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
+
 	/*
 	 * We don't open Windows system handles when opening directories
 	 * for flushing, as it is not necessary (or possible) to flush
