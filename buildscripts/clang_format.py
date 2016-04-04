@@ -517,7 +517,7 @@ def get_files_to_check():
     """
     repos = get_repos()
 
-    valid_files = list(itertools.chain.from_iterable([r.get_candidates() for r in repos]))
+    valid_files = list(itertools.chain.from_iterable([r.get_candidates(None) for r in repos]))
 
     return valid_files
 
