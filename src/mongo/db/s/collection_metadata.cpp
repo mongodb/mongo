@@ -74,26 +74,52 @@ std::unique_ptr<CollectionMetadata> CollectionMetadata::cloneMigrate(
     return metadata;
 }
 
-unique_ptr<CollectionMetadata> CollectionMetadata::clonePlusChunk(
-    const BSONObj& minKey, const BSONObj& maxKey, const ChunkVersion& newShardVersion) const {
-    invariant(newShardVersion.epoch() == _shardVersion.epoch());
-    invariant(newShardVersion.isSet());
-    invariant(minKey.woCompare(maxKey) < 0);
-    invariant(!rangeMapOverlaps(_chunksMap, minKey, maxKey));
+CollectionMetadata* CollectionMetadata::clonePlusChunk(const ChunkType& chunk,
+                                                       const ChunkVersion& newShardVersion,
+                                                       string* errMsg) const {
+    // The error message string is optional.
+    string dummy;
+    if (errMsg == NULL) {
+        errMsg = &dummy;
+    }
 
-    unique_ptr<CollectionMetadata> metadata(stdx::make_unique<CollectionMetadata>());
-    metadata->_keyPattern = _keyPattern;
+    // It is acceptable to move version backwards (e.g., undoing a migration that went bad
+    // during commit) but only cloning away the last chunk may reset the version to 0.
+    if (!newShardVersion.isSet()) {
+        *errMsg = stream() << "cannot add chunk " << rangeToString(chunk.getMin(), chunk.getMax())
+                           << " with zero shard version";
+
+        warning() << *errMsg;
+        return NULL;
+    }
+
+    invariant(chunk.getMin().woCompare(chunk.getMax()) < 0);
+
+    // Check that there isn't any chunk on the interval to be added.
+    if (rangeMapOverlaps(_chunksMap, chunk.getMin(), chunk.getMax())) {
+        RangeVector overlap;
+        getRangeMapOverlap(_chunksMap, chunk.getMin(), chunk.getMax(), &overlap);
+
+        *errMsg = stream() << "cannot add chunk " << rangeToString(chunk.getMin(), chunk.getMax())
+                           << " because the chunk overlaps " << overlapToString(overlap);
+
+        warning() << *errMsg;
+        return NULL;
+    }
+
+    unique_ptr<CollectionMetadata> metadata(new CollectionMetadata);
+    metadata->_keyPattern = this->_keyPattern;
     metadata->_keyPattern.getOwned();
     metadata->fillKeyPatternFields();
-    metadata->_pendingMap = _pendingMap;
-    metadata->_chunksMap = _chunksMap;
-    metadata->_chunksMap.insert(make_pair(minKey.getOwned(), maxKey.getOwned()));
+    metadata->_pendingMap = this->_pendingMap;
+    metadata->_chunksMap = this->_chunksMap;
+    metadata->_chunksMap.insert(make_pair(chunk.getMin().getOwned(), chunk.getMax().getOwned()));
     metadata->_shardVersion = newShardVersion;
-    metadata->_collVersion = newShardVersion > _collVersion ? newShardVersion : _collVersion;
+    metadata->_collVersion = newShardVersion > _collVersion ? newShardVersion : this->_collVersion;
     metadata->fillRanges();
 
     invariant(metadata->isValid());
-    return metadata;
+    return metadata.release();
 }
 
 std::unique_ptr<CollectionMetadata> CollectionMetadata::cloneMinusPending(

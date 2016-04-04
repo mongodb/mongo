@@ -28,6 +28,7 @@
 
 #pragma once
 
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/field_ref_set.h"
@@ -39,6 +40,9 @@ namespace mongo {
 
 class ChunkType;
 class MetadataLoader;
+class CollectionMetadata;
+
+typedef std::shared_ptr<const CollectionMetadata> CollectionMetadataPtr;
 
 /**
  * The collection metadata has metadata information about a collection, in particular the
@@ -56,15 +60,11 @@ class CollectionMetadata {
     MONGO_DISALLOW_COPYING(CollectionMetadata);
 
 public:
-    /**
-     * Use the MetadataLoader to fill the empty metadata from the config server, or use
-     * clone*() methods to use existing metadatas to build new ones.
-     *
-     * Unless you are the MetadataLoader or a test you should probably not be using this
-     * directly.
-     */
-    CollectionMetadata();
     ~CollectionMetadata();
+
+    //
+    // cloning support
+    //
 
     /**
      * Returns a new metadata's instance based on 'this's state by removing a 'pending' chunk.
@@ -120,6 +120,10 @@ public:
                                    const ChunkVersion& newShardVersion,
                                    std::string* errMsg) const;
 
+    //
+    // verification logic
+    //
+
     /**
      * Returns true if the document key 'key' is a valid instance of a shard key for this
      * metadata.  The 'key' must contain exactly the same fields as the shard key pattern.
@@ -165,6 +169,10 @@ public:
      */
     bool getNextOrphanRange(const BSONObj& lookupKey, KeyRange* orphanRange) const;
 
+    //
+    // accessors
+    //
+
     ChunkVersion getCollVersion() const {
         return _collVersion;
     }
@@ -193,6 +201,10 @@ public:
         return _pendingMap.size();
     }
 
+    //
+    // reporting
+    //
+
     /**
      * BSON output of the metadata information.
      */
@@ -219,18 +231,30 @@ public:
     std::string toString() const;
 
     /**
-     * This method is used only for unit-tests and it returns a new metadata's instance based on
-     * 'this's state by adding 'chunk'. The new metadata can never be zero.
+     * Use the MetadataLoader to fill the empty metadata from the config server, or use
+     * clone*() methods to use existing metadatas to build new ones.
      *
-     * It will fassert if the chunk bounds are incorrect or overlap an existing chunk.
+     * Unless you are the MetadataLoader or a test you should probably not be using this
+     * directly.
      */
-    std::unique_ptr<CollectionMetadata> clonePlusChunk(const BSONObj& minKey,
-                                                       const BSONObj& maxKey,
-                                                       const ChunkVersion& newShardVersion) const;
+    CollectionMetadata();
+
+    /**
+     * TESTING ONLY
+     *
+     * Returns a new metadata's instance based on 'this's state by adding 'chunk'. The new
+     * metadata can never be zero, though (see cloneMinus). The caller owns the new metadata.
+     *
+     * If a new metadata can't be created, returns NULL and fills in 'errMsg', if it was
+     * provided.
+     */
+    CollectionMetadata* clonePlusChunk(const ChunkType& chunk,
+                                       const ChunkVersion& newShardVersion,
+                                       std::string* errMsg) const;
 
 private:
-    // Effectively, the MetadataLoader is this class's builder. So we open an exception and grant it
-    // friendship.
+    // Effectively, the MetadataLoader is this class's builder. So we open an exception
+    // and grant it friendship.
     friend class MetadataLoader;
 
     // a version for this collection that identifies the collection incarnation (ie, a
