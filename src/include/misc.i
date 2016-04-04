@@ -273,8 +273,6 @@ __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
 static inline int
 __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
 {
-	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
-
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_HANDLEOPS, "%s: handle-sync", fh->name));
 
