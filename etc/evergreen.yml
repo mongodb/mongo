@@ -671,9 +671,7 @@ tasks:
   - func: "run jstestfuzz"
   - <<: *run_jstestfuzz_tests
     vars:
-      # Run the mmapv1 tests without the dbHash hook, as a DB could be created with an
-      # invalid namespace (SERVER-10926).
-      resmoke_args: --suites=jstestfuzz_replication_nodbhash --storageEngine=mmapv1
+      resmoke_args: --suites=jstestfuzz_replication --storageEngine=mmapv1
       should_shuffle: false
       continue_on_failure: false
 
