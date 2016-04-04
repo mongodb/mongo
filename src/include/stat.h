@@ -265,6 +265,7 @@ struct __wt_connection_stats {
 	int64_t cache_eviction_queue_empty;
 	int64_t cache_eviction_queue_not_empty;
 	int64_t cache_eviction_server_evicting;
+	int64_t cache_eviction_server_toobig;
 	int64_t cache_eviction_slow;
 	int64_t cache_eviction_worker_evicting;
 	int64_t cache_eviction_force_fail;

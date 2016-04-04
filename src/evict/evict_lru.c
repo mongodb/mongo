@@ -1436,6 +1436,39 @@ fast:		/* If the page can't be evicted, give up. */
 }
 
 /*
+ * __evict_check_entry_size --
+ *	Check if the size of an entry is too large for this thread to evict.
+ *	We use this so that the server thread doesn't get stalled evicting
+ *	a very large page.
+ */
+static bool
+__evict_check_entry_size(WT_SESSION_IMPL *session, WT_EVICT_ENTRY *entry)
+{
+	WT_CACHE *cache;
+	WT_PAGE *page;
+	WT_REF *ref;
+	uint64_t max;
+
+	cache = S2C(session)->cache;
+	max = (cache->bytes_evict / cache->pages_evict) * 4;
+	if ((ref = entry->ref) != NULL) {
+		if ((page = ref->page) == NULL)
+			return (true);
+		/*
+		 * If this page is more than four times the average evicted page
+		 * size then return false.  Return true in all other cases.
+		 * XXX Should we care here if the page is dirty?  Probably...
+		 */
+		if (page->memory_footprint > max) {
+			WT_STAT_FAST_CONN_INCR(
+			    session, cache_eviction_server_toobig);
+			return (false);
+		}
+	}
+	return (true);
+}
+
+/*
  * __evict_get_ref --
  *	Get a page for eviction.
  */
@@ -1490,6 +1523,15 @@ __evict_get_ref(
 	    evict < evict_queue->evict_queue + candidates &&
 	    evict->ref != NULL) {
 		WT_ASSERT(session, evict->btree != NULL);
+		/*
+		 * If the server is helping out and encounters an entry that
+		 * is too large, it stops helping.  Evicting a very large
+		 * page in the server thread could stall eviction from finding
+		 * new work.
+		 */
+		if (is_server && S2C(session)->evict_workers > 1 &&
+		    !__evict_check_entry_size(session, evict))
+			break;
 
 		/* Move to the next item. */
 		++cache->evict_current;
