@@ -75,9 +75,9 @@
 #define	WT_OPEN_FIXED		0x004	/* Path isn't relative to home */
 #define	WT_OPEN_READONLY	0x008	/* Readonly open */
 #define	WT_STREAM_APPEND	0x010	/* Open a stream: append */
-#define	WT_STREAM_LINE_BUFFER	0x010	/* Line buffer the stream */
-#define	WT_STREAM_READ		0x020	/* Open a stream: read */
-#define	WT_STREAM_WRITE		0x040	/* Open a stream: write */
+#define	WT_STREAM_LINE_BUFFER	0x020	/* Line buffer the stream */
+#define	WT_STREAM_READ		0x040	/* Open a stream: read */
+#define	WT_STREAM_WRITE		0x080	/* Open a stream: write */
 
 struct __wt_fh {
 	const char *name;			/* File name */
