@@ -3161,12 +3161,25 @@ public:
         DepsTracker dependencies;
         ASSERT_EQUALS(DocumentSource::SEE_NEXT, match->getDependencies(&dependencies));
         ASSERT_EQUALS(1U, dependencies.fields.count("a.c"));
-        ASSERT_EQUALS(1U, dependencies.fields.size());
+        ASSERT_EQUALS(1U, dependencies.fields.count("a"));
+        ASSERT_EQUALS(2U, dependencies.fields.size());
         ASSERT_EQUALS(false, dependencies.needWholeDocument);
         ASSERT_EQUALS(false, dependencies.needTextScore);
     }
 };
 
+class DependenciesElemMatchWithNoSubfield {
+public:
+    void run() {
+        intrusive_ptr<DocumentSourceMatch> match = makeMatch("{a: {$elemMatch: {$gt: 1, $lt: 5}}}");
+        DepsTracker dependencies;
+        ASSERT_EQUALS(DocumentSource::SEE_NEXT, match->getDependencies(&dependencies));
+        ASSERT_EQUALS(1U, dependencies.fields.count("a"));
+        ASSERT_EQUALS(1U, dependencies.fields.size());
+        ASSERT_EQUALS(false, dependencies.needWholeDocument);
+        ASSERT_EQUALS(false, dependencies.needTextScore);
+    }
+};
 class DependenciesNotExpression {
 public:
     void run() {
@@ -3250,6 +3263,44 @@ public:
                           "{c:1}]}"));
     }
 };
+
+TEST(ObjectForMatch, ShouldExtractTopLevelFieldIfDottedFieldNeeded) {
+    Document input(fromjson("{a: 1, b: {c: 1, d: 1}}"));
+    BSONObj expected = fromjson("{b: {c: 1, d: 1}}");
+    ASSERT_EQUALS(expected, DocumentSourceMatch::getObjectForMatch(input, {"b.c"}));
+}
+
+TEST(ObjectForMatch, ShouldExtractEntireArray) {
+    Document input(fromjson("{a: [1, 2, 3], b: 1}"));
+    BSONObj expected = fromjson("{a: [1, 2, 3]}");
+    ASSERT_EQUALS(expected, DocumentSourceMatch::getObjectForMatch(input, {"a"}));
+}
+
+TEST(ObjectForMatch, ShouldOnlyAddPrefixedFieldOnceIfTwoDottedSubfields) {
+    Document input(fromjson("{a: 1, b: {c: 1, f: {d: {e: 1}}}}"));
+    BSONObj expected = fromjson("{b: {c: 1, f: {d: {e: 1}}}}");
+    ASSERT_EQUALS(expected, DocumentSourceMatch::getObjectForMatch(input, {"b.f", "b.f.d.e"}));
+}
+
+TEST(ObjectForMatch, MissingFieldShouldNotAppearInResult) {
+    Document input(fromjson("{a: 1}"));
+    BSONObj expected;
+    ASSERT_EQUALS(expected, DocumentSourceMatch::getObjectForMatch(input, {"b", "c"}));
+}
+
+TEST(ObjectForMatch, ShouldSerializeNothingIfNothingIsNeeded) {
+    Document input(fromjson("{a: 1, b: {c: 1}}"));
+    BSONObj expected;
+    ASSERT_EQUALS(expected, DocumentSourceMatch::getObjectForMatch(input, {}));
+}
+
+TEST(ObjectForMatch, ShouldExtractEntireArrayFromPrefixOfDottedField) {
+    Document input(fromjson("{a: [{b: 1}, {b: 2}], c: 1}"));
+    BSONObj expected = fromjson("{a: [{b: 1}, {b: 2}]}");
+    ASSERT_EQUALS(expected, DocumentSourceMatch::getObjectForMatch(input, {"a.b"}));
+}
+
+
 }  // namespace DocumentSourceMatch
 
 namespace DocumentSourceLookUp {
@@ -3406,6 +3457,7 @@ public:
         add<DocumentSourceMatch::DependenciesOrExpression>();
         add<DocumentSourceMatch::DependenciesGTEExpression>();
         add<DocumentSourceMatch::DependenciesElemMatchExpression>();
+        add<DocumentSourceMatch::DependenciesElemMatchWithNoSubfield>();
         add<DocumentSourceMatch::DependenciesNotExpression>();
         add<DocumentSourceMatch::DependenciesNorExpression>();
         add<DocumentSourceMatch::DependenciesCommentExpression>();

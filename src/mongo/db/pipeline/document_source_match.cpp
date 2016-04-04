@@ -68,12 +68,18 @@ boost::optional<Document> DocumentSourceMatch::getNext() {
     massert(17309, "Should never call getNext on a $match stage with $text clause", !_isTextQuery);
 
     while (boost::optional<Document> next = pSource->getNext()) {
-        // MatchExpression only takes BSON documents, so we have to make one.
-        if (_expression->matchesBSON(next->toBson()))
+        // MatchExpression only takes BSON documents, so we have to make one. As an optimization,
+        // only serialize the fields we need to do the match.
+        if (_dependencies.needWholeDocument) {
+            if (_expression->matchesBSON(next->toBson())) {
+                return next;
+            }
+        } else if (_expression->matchesBSON(getObjectForMatch(*next, _dependencies.fields))) {
             return next;
+        }
     }
 
-    // Nothing matched
+    // We have exhausted the previous source.
     return boost::none;
 }
 
@@ -97,6 +103,24 @@ Pipeline::SourceContainer::iterator DocumentSourceMatch::optimizeAt(
         return itr;
     }
     return std::next(itr);
+}
+
+BSONObj DocumentSourceMatch::getObjectForMatch(const Document& input,
+                                               const std::set<std::string>& fields) {
+    BSONObjBuilder matchObject;
+
+    for (auto&& field : fields) {
+        // getNestedField does not handle dotted paths correctly, so instead of retrieving the
+        // entire path, we just extract the first element of the path.
+        FieldPath path(field);
+        auto prefix = path.getFieldName(0);
+        if (!matchObject.hasField(prefix)) {
+            // Avoid adding the same prefix twice.
+            input.getField(prefix).addToBsonObj(&matchObject, prefix);
+        }
+    }
+
+    return matchObject.obj();
 }
 
 namespace {
@@ -424,7 +448,12 @@ void DocumentSourceMatch::addDependencies(MatchExpression* expression,
         for (size_t i = 0; i < expression->numChildren(); i++) {
             addDependencies(expression->getChild(i), deps, prefix);
         }
-    } else if (!expression->path().empty()) {
+    }
+
+    if (!expression->path().empty() &&
+        (expression->numChildren() == 0 ||
+         expression->matchType() == MatchExpression::ELEM_MATCH_VALUE ||
+         expression->matchType() == MatchExpression::ELEM_MATCH_OBJECT)) {
         deps->fields.insert(prefix);
     }
 }
@@ -436,5 +465,6 @@ DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,
         uassertStatusOK(MatchExpressionParser::parse(_predicate, ExtensionsCallbackNoop()));
 
     _expression = std::move(status.getValue());
+    getDependencies(&_dependencies);
 }
 }  // namespace mongo

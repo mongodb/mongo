@@ -679,6 +679,11 @@ public:
     std::pair<boost::intrusive_ptr<DocumentSource>, boost::intrusive_ptr<DocumentSource>>
     splitSourceBy(const std::set<std::string>& fields);
 
+    /**
+     * Given a document 'input', extract 'fields' and produce a BSONObj with those values.
+     */
+    static BSONObj getObjectForMatch(const Document& input, const std::set<std::string>& fields);
+
 private:
     DocumentSourceMatch(const BSONObj& query,
                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
@@ -686,6 +691,10 @@ private:
     void addDependencies(MatchExpression* expression, DepsTracker* deps, std::string prefix) const;
 
     std::unique_ptr<MatchExpression> _expression;
+
+    // Cache the dependencies so that we know what fields we need to serialize to BSON for matching.
+    DepsTracker _dependencies;
+
     BSONObj _predicate;
     bool _isTextQuery;
 };
