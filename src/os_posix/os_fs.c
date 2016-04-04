@@ -18,6 +18,8 @@ __posix_sync(WT_SESSION_IMPL *session,
 {
 	WT_DECL_RET;
 
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
+
 #ifdef	HAVE_SYNC_FILE_RANGE
 	if (!block) {
 		WT_SYSCALL_RETRY(sync_file_range(fd,
