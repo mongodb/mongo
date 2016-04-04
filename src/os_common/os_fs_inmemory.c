@@ -334,17 +334,25 @@ __im_handle_sync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
  *	POSIX ftruncate.
  */
 static int
-__im_handle_truncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
+__im_handle_truncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
 {
 	WT_DECL_RET;
 	WT_IM *im;
+	size_t off;
 
 	im = S2C(session)->inmemory;
 	__wt_spin_lock(session, &im->lock);
 
-	WT_ERR(__wt_buf_grow(session, &fh->buf, (size_t)len));
-	memset((uint8_t *)
-	    fh->buf.mem + fh->buf.size, 0, fh->buf.memsize - fh->buf.size);
+	/*
+	 * Grow the buffer as necessary, clear any new space in the file,
+	 * and reset the file's data length.
+	 */
+	off = (size_t)offset;
+	WT_ERR(__wt_buf_grow(session, &fh->buf, off));
+	if (fh->buf.size < off)
+		memset((uint8_t *)
+		    fh->buf.data + fh->buf.size, 0, off - fh->buf.size);
+	fh->buf.size = off;
 
 err:	__wt_spin_unlock(session, &im->lock);
 	return (ret);
