@@ -372,6 +372,10 @@ void NamespaceDetailsCollectionCatalogEntry::updateFlags(OperationContext* txn, 
     _updateSystemNamespaces(txn, BSON("$set" << BSON("options.flags" << newValue)));
 }
 
+void NamespaceDetailsCollectionCatalogEntry::clearTempFlag(OperationContext* txn) {
+    _updateSystemNamespaces(txn, BSON("$set" << BSON("options.temp" << false)));
+}
+
 void NamespaceDetailsCollectionCatalogEntry::updateValidator(OperationContext* txn,
                                                              const BSONObj& validator,
                                                              StringData validationLevel,

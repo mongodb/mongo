@@ -68,6 +68,8 @@ public:
 
     void updateFlags(OperationContext* txn, int newValue) final;
 
+    void clearTempFlag(OperationContext* txn) final;
+
     void updateValidator(OperationContext* txn,
                          const BSONObj& validator,
                          StringData validationLevel,

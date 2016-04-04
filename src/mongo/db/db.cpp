@@ -50,6 +50,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -59,8 +60,10 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/dbwebserver.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -151,6 +154,8 @@ void (*snmpInit)() = NULL;
 
 extern int diagLogging;
 
+static const NamespaceString startupLogCollectionName("local.startup_log");
+
 #ifdef _WIN32
 ntservice::NtServiceDefaultStrings defaultServiceStrings = {
     L"MongoDB", L"MongoDB", L"MongoDB Server"};
@@ -238,18 +243,17 @@ static void logStartup(OperationContext* txn) {
 
     ScopedTransaction transaction(txn, MODE_X);
     Lock::GlobalWrite lk(txn->lockState());
-    AutoGetOrCreateDb autoDb(txn, "local", mongo::MODE_X);
+    AutoGetOrCreateDb autoDb(txn, startupLogCollectionName.db(), mongo::MODE_X);
     Database* db = autoDb.getDb();
-    const std::string ns = "local.startup_log";
-    Collection* collection = db->getCollection(ns);
+    Collection* collection = db->getCollection(startupLogCollectionName);
     WriteUnitOfWork wunit(txn);
     if (!collection) {
         BSONObj options = BSON("capped" << true << "size" << 10 * 1024 * 1024);
         bool shouldReplicateWrites = txn->writesAreReplicated();
         txn->setReplicatedWrites(false);
         ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, txn, shouldReplicateWrites);
-        uassertStatusOK(userCreateNS(txn, db, ns, options));
-        collection = db->getCollection(ns);
+        uassertStatusOK(userCreateNS(txn, db, startupLogCollectionName.ns(), options));
+        collection = db->getCollection(startupLogCollectionName);
     }
     invariant(collection);
     uassertStatusOK(collection->insertDocument(txn, o, false));
@@ -305,6 +309,76 @@ static unsigned long long checkIfReplMissingFromCommandLine(OperationContext* tx
     return 0;
 }
 
+/**
+ * Due to SERVER-23274, versions 3.2.0 through 3.2.4 of MongoDB incorrectly mark the final output
+ * collections of aggregations with $out stages as temporary on most replica set secondaries. Rather
+ * than risk deleting collections that the user did not intend to be temporary when newer nodes
+ * start up or get promoted to be replica set primaries, newer nodes clear the temp flags left by
+ * these versions.
+ */
+static bool isSubjectToSERVER23299(OperationContext* txn) {
+    dbHolder().openDb(txn, startupLogCollectionName.db());
+    AutoGetCollectionForRead autoColl(txn, startupLogCollectionName);
+    // No startup log or an empty one means either that the user was not running an affected
+    // version, or that they manually deleted the startup collection since they last started an
+    // affected version.
+    LOG(1) << "Checking node for SERVER-23299 eligibility";
+    if (!autoColl.getCollection()) {
+        LOG(1) << "Didn't find " << startupLogCollectionName;
+        return false;
+    }
+    LOG(1) << "Checking node for SERVER-23299 applicability - reading startup log";
+    BSONObj lastStartupLogDoc;
+    if (!Helpers::getLast(txn, startupLogCollectionName.ns().c_str(), lastStartupLogDoc)) {
+        return false;
+    }
+    std::vector<int> versionComponents;
+    try {
+        for (auto elem : lastStartupLogDoc["buildinfo"]["versionArray"].Obj()) {
+            versionComponents.push_back(elem.Int());
+        }
+        uassert(40050,
+                str::stream() << "Expected three elements in buildinfo.versionArray; found "
+                              << versionComponents.size(),
+                versionComponents.size() >= 3);
+    } catch (const DBException& ex) {
+        log() << "Last entry of " << startupLogCollectionName
+              << " has no well-formed  buildinfo.versionArray field; ignoring " << causedBy(ex);
+        return false;
+    }
+    LOG(1)
+        << "Checking node for SERVER-23299 applicability - checking version 3.2.x for x in [0, 4]";
+    if (versionComponents[0] != 3)
+        return false;
+    if (versionComponents[1] != 2)
+        return false;
+    if (versionComponents[2] > 4)
+        return false;
+    LOG(1) << "Node eligible for SERVER-23299";
+    return true;
+}
+
+static void handleSERVER23299ForDb(OperationContext* txn, Database* db) {
+    log() << "Scanning " << db->name() << " db for SERVER-23299 eligibility";
+    const auto dbEntry = db->getDatabaseCatalogEntry();
+    list<string> collNames;
+    dbEntry->getCollectionNamespaces(&collNames);
+    for (const auto& collName : collNames) {
+        const auto collEntry = dbEntry->getCollectionCatalogEntry(collName);
+        const auto collOptions = collEntry->getCollectionOptions(txn);
+        if (!collOptions.temp)
+            continue;
+        log() << "Marking collection " << collName << " as permanent per SERVER-23299";
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            WriteUnitOfWork wuow(txn);
+            collEntry->clearTempFlag(txn);
+            wuow.commit();
+        }
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "repair SERVER-23299", collEntry->ns().ns());
+    }
+    log() << "Done scanning " << db->name() << " for SERVER-23299 eligibility";
+}
+
 static void repairDatabasesAndCheckVersion(OperationContext* txn) {
     LOG(1) << "enter repairDatabases (to check pdfile version #)" << endl;
 
@@ -313,7 +387,7 @@ static void repairDatabasesAndCheckVersion(OperationContext* txn) {
 
     vector<string> dbNames;
 
-    StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
+    StorageEngine* storageEngine = txn->getServiceContext()->getGlobalStorageEngine();
     storageEngine->listDatabases(&dbNames);
 
     // Repair all databases first, so that we do not try to open them if they are in bad shape
@@ -336,6 +410,8 @@ static void repairDatabasesAndCheckVersion(OperationContext* txn) {
     const bool shouldClearNonLocalTmpCollections =
         !(checkIfReplMissingFromCommandLine(txn) || replSettings.usingReplSets() ||
           replSettings.isSlave());
+
+    const bool shouldDoCleanupForSERVER23299 = isSubjectToSERVER23299(txn);
 
     for (vector<string>::const_iterator i = dbNames.begin(); i != dbNames.end(); ++i) {
         const string dbName = *i;
@@ -402,6 +478,10 @@ static void repairDatabasesAndCheckVersion(OperationContext* txn) {
         if (replSettings.usingReplSets()) {
             // We only care about the _id index if we are in a replset
             checkForIdIndexes(txn, db);
+        }
+
+        if (shouldDoCleanupForSERVER23299) {
+            handleSERVER23299ForDb(txn, db);
         }
 
         if (shouldClearNonLocalTmpCollections || dbName == "local") {
