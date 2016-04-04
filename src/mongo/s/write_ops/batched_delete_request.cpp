@@ -106,27 +106,39 @@ bool BatchedDeleteRequest::parseBSON(StringData dbName, const BSONObj& source, s
         errMsg = &dummy;
 
     FieldParser::FieldState fieldState;
-    std::string collNameTemp;
-    fieldState = FieldParser::extract(source, collName, &collNameTemp, errMsg);
-    if (fieldState == FieldParser::FIELD_INVALID)
-        return false;
-    _ns = NamespaceString(dbName, collNameTemp);
-    _isNSSet = fieldState == FieldParser::FIELD_SET;
-
-    fieldState = FieldParser::extract(source, deletes, &_deletes, errMsg);
-    if (fieldState == FieldParser::FIELD_INVALID)
-        return false;
-    _isDeletesSet = fieldState == FieldParser::FIELD_SET;
-
-    fieldState = FieldParser::extract(source, writeConcern, &_writeConcern, errMsg);
-    if (fieldState == FieldParser::FIELD_INVALID)
-        return false;
-    _isWriteConcernSet = fieldState == FieldParser::FIELD_SET;
-
-    fieldState = FieldParser::extract(source, ordered, &_ordered, errMsg);
-    if (fieldState == FieldParser::FIELD_INVALID)
-        return false;
-    _isOrderedSet = fieldState == FieldParser::FIELD_SET;
+    for (BSONElement field : source) {
+        const StringData fieldName = field.fieldNameStringData();
+        if (fieldName == collName.name()) {
+            std::string collNameTemp;
+            fieldState = FieldParser::extract(field, collName, &collNameTemp, errMsg);
+            if (fieldState == FieldParser::FIELD_INVALID)
+                return false;
+            _ns = NamespaceString(dbName, collNameTemp);
+            _isNSSet = fieldState == FieldParser::FIELD_SET;
+        } else if (fieldName == deletes.name()) {
+            fieldState = FieldParser::extract(field, deletes, &_deletes, errMsg);
+            if (fieldState == FieldParser::FIELD_INVALID)
+                return false;
+            _isDeletesSet = fieldState == FieldParser::FIELD_SET;
+        } else if (fieldName == writeConcern.name()) {
+            fieldState = FieldParser::extract(field, writeConcern, &_writeConcern, errMsg);
+            if (fieldState == FieldParser::FIELD_INVALID)
+                return false;
+            _isWriteConcernSet = fieldState == FieldParser::FIELD_SET;
+        } else if (fieldName == ordered.name()) {
+            fieldState = FieldParser::extract(field, ordered, &_ordered, errMsg);
+            if (fieldState == FieldParser::FIELD_INVALID)
+                return false;
+            _isOrderedSet = fieldState == FieldParser::FIELD_SET;
+        } else if (fieldName[0] != '$') {
+            std::initializer_list<StringData> ignoredFields = {"maxTimeMS", "shardVersion"};
+            if (std::find(ignoredFields.begin(), ignoredFields.end(), fieldName) ==
+                ignoredFields.end()) {
+                *errMsg = str::stream() << "Unknown option to delete command: " << fieldName;
+                return false;
+            }
+        }
+    }
 
     return true;
 }

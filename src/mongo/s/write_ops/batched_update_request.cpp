@@ -140,6 +140,13 @@ bool BatchedUpdateRequest::parseBSON(StringData dbName, const BSONObj& source, s
             _isOrderedSet = fieldState == FieldParser::FIELD_SET;
         } else if (fieldName == bypassDocumentValidationCommandOption()) {
             _shouldBypassValidation = elem.trueValue();
+        } else if (fieldName[0] != '$') {
+            std::initializer_list<StringData> ignoredFields = {"maxTimeMS", "shardVersion"};
+            if (std::find(ignoredFields.begin(), ignoredFields.end(), fieldName) ==
+                ignoredFields.end()) {
+                *errMsg = str::stream() << "Unknown option to update command: " << fieldName;
+                return false;
+            }
         }
     }
     return true;

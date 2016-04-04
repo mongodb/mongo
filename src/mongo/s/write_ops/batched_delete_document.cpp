@@ -91,16 +91,29 @@ bool BatchedDeleteDocument::parseBSON(const BSONObj& source, string* errMsg) {
         errMsg = &dummy;
 
     FieldParser::FieldState fieldState;
-    fieldState = FieldParser::extract(source, query, &_query, errMsg);
-    if (fieldState == FieldParser::FIELD_INVALID)
-        return false;
-    _isQuerySet = fieldState == FieldParser::FIELD_SET;
-
-    fieldState = FieldParser::extractNumber(source, limit, &_limit, errMsg);
-    if (fieldState == FieldParser::FIELD_INVALID)
-        return false;
-    _isLimitSet = fieldState == FieldParser::FIELD_SET;
-
+    for (BSONElement field : source) {
+        const StringData fieldName = field.fieldNameStringData();
+        if (fieldName == query.name()) {
+            fieldState = FieldParser::extract(field, query, &_query, errMsg);
+            if (fieldState == FieldParser::FIELD_INVALID)
+                return false;
+            _isQuerySet = fieldState == FieldParser::FIELD_SET;
+        } else if (fieldName == limit.name()) {
+            fieldState = FieldParser::extractNumber(field, limit, &_limit, errMsg);
+            if (fieldState == FieldParser::FIELD_INVALID)
+                return false;
+            // isValid() checks that it is 0 or 1, but by the time it gets there, it doesn't know if
+            // it was originally 0.5.
+            if (_limit != field.numberDouble()) {
+                *errMsg = "The limit field in delete documents must be representable as an int";
+                return false;
+            }
+            _isLimitSet = fieldState == FieldParser::FIELD_SET;
+        } else {
+            *errMsg = str::stream() << "Unknown option in delete document: " << fieldName;
+            return false;
+        }
+    }
     return true;
 }
 

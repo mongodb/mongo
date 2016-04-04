@@ -120,6 +120,9 @@ bool BatchedUpdateDocument::parseBSON(const BSONObj& source, string* errMsg) {
             if (fieldState == FieldParser::FIELD_INVALID)
                 return false;
             _isUpsertSet = fieldState == FieldParser::FIELD_SET;
+        } else {
+            *errMsg = str::stream() << "Unknown option in update document: " << fieldName;
+            return false;
         }
     }
 

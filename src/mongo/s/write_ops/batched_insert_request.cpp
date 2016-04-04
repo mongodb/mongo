@@ -143,6 +143,14 @@ bool BatchedInsertRequest::parseBSON(StringData dbName, const BSONObj& source, s
             _isOrderedSet = fieldState == FieldParser::FIELD_SET;
         } else if (bypassDocumentValidationCommandOption() == sourceEl.fieldNameStringData()) {
             _shouldBypassValidation = sourceEl.trueValue();
+        } else if (sourceEl.fieldName()[0] != '$') {
+            std::initializer_list<StringData> ignoredFields = {"maxTimeMS", "shardVersion"};
+            if (std::find(ignoredFields.begin(), ignoredFields.end(), sourceEl.fieldName()) ==
+                ignoredFields.end()) {
+                *errMsg = str::stream()
+                    << "Unknown option to insert command: " << sourceEl.fieldName();
+                return false;
+            }
         }
     }
 
