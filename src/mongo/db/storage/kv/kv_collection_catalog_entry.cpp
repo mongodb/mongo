@@ -163,6 +163,12 @@ void KVCollectionCatalogEntry::updateFlags(OperationContext* txn, int newValue) 
     _catalog->putMetaData(txn, ns().toString(), md);
 }
 
+void KVCollectionCatalogEntry::clearTempFlag(OperationContext* txn) {
+    MetaData md = _getMetaData(txn);
+    md.options.temp = false;
+    _catalog->putMetaData(txn, ns().ns(), md);
+}
+
 void KVCollectionCatalogEntry::updateValidator(OperationContext* txn,
                                                const BSONObj& validator,
                                                StringData validationLevel,

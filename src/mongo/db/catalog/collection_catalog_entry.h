@@ -98,6 +98,11 @@ public:
     virtual void updateFlags(OperationContext* txn, int newValue) = 0;
 
     /**
+     * Clears the "temp" flag from the CollectionOptions of this collection.
+     */
+    virtual void clearTempFlag(OperationContext* txn) = 0;
+
+    /**
      * Updates the validator for this collection.
      *
      * An empty validator removes all validation.
