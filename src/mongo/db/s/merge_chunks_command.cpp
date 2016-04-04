@@ -335,11 +335,8 @@ bool mergeChunks(OperationContext* txn,
 
         auto css = CollectionShardingState::get(txn, nss);
 
-        string cloneErrMsg;
         std::unique_ptr<CollectionMetadata> cloned(
-            css->getMetadata()->cloneMerge(minKey, maxKey, mergeVersion, &cloneErrMsg));
-        uassert(17004, cloneErrMsg, cloned);
-
+            uassertStatusOK(css->getMetadata()->cloneMerge(minKey, maxKey, mergeVersion)));
         css->setMetadata(std::move(cloned));
     }
 

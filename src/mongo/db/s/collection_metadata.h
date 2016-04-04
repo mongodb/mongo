@@ -97,28 +97,25 @@ public:
      * subsequent one would have that with the minor version incremented at each chunk. The
      * caller owns the metadata.
      *
-     * If a new metadata can't be created, returns NULL and fills in 'errMsg', if it was
-     * provided.
+     * If a new metadata can't be created returns a failed status.
      *
      * Note: 'splitKeys' must be sorted in ascending order.
      */
-    CollectionMetadata* cloneSplit(const ChunkType& chunk,
-                                   const std::vector<BSONObj>& splitKeys,
-                                   const ChunkVersion& newShardVersion,
-                                   std::string* errMsg) const;
+    StatusWith<std::unique_ptr<CollectionMetadata>> cloneSplit(
+        const BSONObj& minKey,
+        const BSONObj& maxKey,
+        const std::vector<BSONObj>& splitKeys,
+        const ChunkVersion& newShardVersion) const;
 
     /**
      * Returns a new metadata instance by merging a key range which starts and ends at existing
-     * chunks into a single chunk.  The range may not have holes.  The resulting metadata will
-     * have the 'newShardVersion'.  The caller owns the new metadata.
+     *chunks into a single chunk. The range may not have holes. The resulting metadata will have the
+     *'newShardVersion'.
      *
-     * If a new metadata can't be created, returns NULL and fills in 'errMsg', if it was
-     * provided.
+     * If a new metadata can't be created, returns a failed status.
      */
-    CollectionMetadata* cloneMerge(const BSONObj& minKey,
-                                   const BSONObj& maxKey,
-                                   const ChunkVersion& newShardVersion,
-                                   std::string* errMsg) const;
+    StatusWith<std::unique_ptr<CollectionMetadata>> cloneMerge(
+        const BSONObj& minKey, const BSONObj& maxKey, const ChunkVersion& newShardVersion) const;
 
     /**
      * Returns true if the document key 'key' is a valid instance of a shard key for this

@@ -422,15 +422,8 @@ public:
             // TODO: Revisit this interface, it's a bit clunky
             newShardVersion.incMinor();
 
-            ChunkType chunk;
-            chunk.setMin(min);
-            chunk.setMax(max);
-
-            string cloneErrMsg;
-            std::unique_ptr<CollectionMetadata> cloned(
-                css->getMetadata()->cloneSplit(chunk, splitKeys, newShardVersion, &cloneErrMsg));
-            uassert(16857, cloneErrMsg, cloned);
-
+            std::unique_ptr<CollectionMetadata> cloned(uassertStatusOK(
+                css->getMetadata()->cloneSplit(min, max, splitKeys, newShardVersion)));
             css->setMetadata(std::move(cloned));
         }
 
