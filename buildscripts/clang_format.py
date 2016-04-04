@@ -426,13 +426,23 @@ class Repo(object):
         return callo(['git', '--git-dir', os.path.join(self.path, ".git"),
                             '--work-tree', self.path] + args)
 
-    def get_candidates(self):
+    def _get_local_dir(self, path):
+        """Get a directory path relative to the git root directory
+        """
+        if os.path.isabs(path):
+            return os.path.relpath(path, self.root)
+        return path
+
+    def get_candidates(self, candidates):
         """Get the set of candidate files to check by querying the repository
 
         Returns the full path to the file for clang-format to consume.
         """
-        # NOTE: Files may have an absolute root (i.e. leading /)
-        valid_files = list(self.get_candidate_files())
+        if candidates is not None and len(candidates) > 0:
+            candidates = [self._get_local_dir(f) for f in candidates]
+            valid_files = list(set(candidates).intersection(self.get_candidate_files()))
+        else:
+            valid_files = list(self.get_candidate_files())
 
         # Get the full file name here
         valid_files = [os.path.normpath(os.path.join(self.root, f)) for f in valid_files]
