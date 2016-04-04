@@ -1197,8 +1197,7 @@ __conn_config_file(WT_SESSION_IMPL *session,
 		return (0);
 
 	/* Open the configuration file. */
-	WT_RET(__wt_open(
-	    session, filename, WT_FILE_TYPE_REGULAR, WT_OPEN_READONLY, &fh));
+	WT_RET(__wt_open(session, filename, WT_FILE_TYPE_REGULAR, 0, &fh));
 	WT_ERR(__wt_filesize(session, fh, &size));
 	if (size == 0)
 		goto err;

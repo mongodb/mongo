@@ -539,11 +539,9 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	mode_t mode;
 	int f, fd, tret;
-	bool direct_io;
 	const char *stream_mode;
 
 	conn = S2C(session);
-	direct_io = false;
 
 	/* Set up error handling. */
 	fh->fd = fd = -1;
@@ -589,21 +587,12 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 	f |= O_CLOEXEC;
 #endif
 #ifdef O_DIRECT
-	/*
-	 * Direct I/O: file-type is a flag from the set of possible flags stored
-	 * in the connection handle during configuration, check for a match.
-	 * Also, "direct_io=checkpoint" configures direct I/O for readonly data
-	 * files.
-	 */
-	if (FLD_ISSET(conn->direct_io, file_type) ||
-	    (LF_ISSET(WT_OPEN_READONLY) &&
-	    file_type == WT_FILE_TYPE_DATA &&
-	    FLD_ISSET(conn->direct_io, WT_FILE_TYPE_CHECKPOINT))) {
+	/* Direct I/O. */
+	if (LF_ISSET(WT_OPEN_DIRECTIO)) {
 		f |= O_DIRECT;
-		direct_io = true;
+		fh->direct_io = true;
 	}
 #endif
-	fh->direct_io = direct_io;
 #ifdef O_NOATIME
 	/* Avoid updating metadata for read-only workloads. */
 	if (file_type == WT_FILE_TYPE_DATA)
@@ -625,7 +614,7 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 	WT_SYSCALL_RETRY(((fd = open(name, f, mode)) == -1 ? 1 : 0), ret);
 	if (ret != 0)
 		WT_ERR_MSG(session, ret,
-		    direct_io ?
+		    fh->direct_io ?
 		    "%s: handle-open: open: failed with direct I/O configured, "
 		    "some filesystem types do not support direct I/O" :
 		    "%s: handle-open: open", name);

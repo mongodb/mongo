@@ -156,8 +156,7 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	uint64_t bucket, hash;
-
-	WT_UNUSED(readonly);
+	uint32_t flags;
 
 	WT_RET(__wt_verbose(session, WT_VERB_BLOCK, "open: %s", filename));
 
@@ -208,8 +207,16 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	block->nowait_sync_available = true;
 	block->preload_available = true;
 
-	/* Open the underlying file handle. */
-	WT_ERR(__wt_open(session, filename, WT_FILE_TYPE_DATA, 0, &block->fh));
+	/*
+	 * Open the underlying file handle.
+	 *
+	 * "direct_io=checkpoint" configures direct I/O for readonly data files.
+	 */
+	flags = 0;
+	if (readonly && FLD_ISSET(conn->direct_io, WT_FILE_TYPE_CHECKPOINT))
+		LF_SET(WT_OPEN_DIRECTIO);
+	WT_ERR(__wt_open(
+	    session, filename, WT_FILE_TYPE_DATA, flags, &block->fh));
 
 	/* Set the file's size. */
 	WT_ERR(__wt_filesize(session, block->fh, &block->size));
