@@ -470,8 +470,8 @@ public:
                      BSONObjBuilder& result) {
         const std::string nsToDrop = parseNsCollectionRequired(dbname, cmdObj);
 
-        if (nsToDrop.find('$') != string::npos) {
-            errmsg = "can't drop collection with reserved $ character in name";
+        if (NamespaceString::virtualized(nsToDrop)) {
+            errmsg = "can't drop a virtual collection";
             return false;
         }
 

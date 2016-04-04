@@ -42,6 +42,8 @@ TEST(NamespaceStringTest, Normal) {
 
     ASSERT(!NamespaceString::normal("a.b.$c"));
     ASSERT(!NamespaceString::normal("a.b.$.c"));
+    ASSERT(!NamespaceString::normal("a.b$.c"));
+    ASSERT(!NamespaceString::normal("a$.b.c"));
 
     ASSERT(NamespaceString::normal("local.oplog.$main"));
     ASSERT(NamespaceString::normal("local.oplog.rs"));
@@ -63,6 +65,20 @@ TEST(NamespaceStringTest, Special) {
     ASSERT(!NamespaceString::special("a.foo"));
     ASSERT(!NamespaceString::special("a.foo.system.bar"));
     ASSERT(!NamespaceString::special("a.systemfoo"));
+}
+
+TEST(NamespaceStringTest, Virtualized) {
+    ASSERT(!NamespaceString::virtualized("a"));
+    ASSERT(!NamespaceString::virtualized("a.b"));
+    ASSERT(!NamespaceString::virtualized("a.b.c"));
+
+    ASSERT(NamespaceString::virtualized("a.b.$c"));
+    ASSERT(NamespaceString::virtualized("a.b.$.c"));
+    ASSERT(NamespaceString::virtualized("a.b$.c"));
+    ASSERT(NamespaceString::virtualized("a$.b.c"));
+
+    ASSERT(!NamespaceString::virtualized("local.oplog.$main"));
+    ASSERT(!NamespaceString::virtualized("local.oplog.rs"));
 }
 
 TEST(NamespaceStringTest, DatabaseValidNames) {

@@ -760,7 +760,7 @@ list<BSONObj> DBClientWithCommands::getCollectionInfos(const string& db, const B
     while (c->more()) {
         BSONObj obj = c->nextSafe();
         string ns = obj["name"].valuestr();
-        if (ns.find("$") != string::npos)
+        if (NamespaceString::virtualized(ns))
             continue;
         BSONObjBuilder b;
         b.append("name", ns.substr(db.size() + 1));

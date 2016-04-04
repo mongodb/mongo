@@ -205,8 +205,8 @@ Collection::~Collection() {
 }
 
 bool Collection::requiresIdIndex() const {
-    if (_ns.ns().find('$') != string::npos) {
-        // no indexes on indexes
+    if (_ns.isVirtualized() || _ns.isOplog()) {
+        // No indexes on virtual collections or the oplog.
         return false;
     }
 
@@ -216,17 +216,6 @@ bool Collection::requiresIdIndex() const {
             return false;
         }
     }
-
-    if (_ns.db() == "local") {
-        if (_ns.coll().startsWith("oplog."))
-            return false;
-    }
-
-    if (!_ns.isSystem()) {
-        // non system collections definitely have an _id index
-        return true;
-    }
-
 
     return true;
 }

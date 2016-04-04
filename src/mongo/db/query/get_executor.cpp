@@ -647,9 +647,9 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* txn,
             uassert(
                 12050, "cannot delete from system namespace", legalClientSystemNS(nss.ns(), true));
         }
-        if (nss.ns().find('$') != string::npos) {
-            log() << "cannot delete from collection with reserved $ in name: " << nss;
-            uasserted(10100, "cannot delete from collection with reserved $ in name");
+        if (nss.isVirtualized()) {
+            log() << "cannot delete from a virtual collection: " << nss;
+            uasserted(10100, "cannot delete from a virtual collection");
         }
     }
 

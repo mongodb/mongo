@@ -161,6 +161,12 @@ public:
     bool isNormal() const {
         return normal(_ns);
     }
+
+    // Check if the NamespaceString references a special collection that cannot
+    // be used for generic data storage.
+    bool isVirtualized() const {
+        return virtualized(_ns);
+    }
     bool isListCollectionsCursorNS() const;
     bool isListIndexesCursorNS() const;
 
@@ -226,6 +232,10 @@ public:
     static bool oplog(StringData ns);
 
     static bool special(StringData ns);
+
+    // Check if `ns` references a special collection that cannot be used for
+    // generic data storage.
+    static bool virtualized(StringData ns);
 
     /**
      * Returns true for DBs with special meaning to mongodb.

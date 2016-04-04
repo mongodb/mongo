@@ -41,9 +41,7 @@ inline StringData NamespaceString::coll() const {
 }
 
 inline bool NamespaceString::normal(StringData ns) {
-    if (ns.find('$') == std::string::npos)
-        return true;
-    return oplog(ns);
+    return !virtualized(ns);
 }
 
 inline bool NamespaceString::oplog(StringData ns) {
@@ -52,6 +50,10 @@ inline bool NamespaceString::oplog(StringData ns) {
 
 inline bool NamespaceString::special(StringData ns) {
     return !normal(ns) || ns.substr(ns.find('.')).startsWith(".system.");
+}
+
+inline bool NamespaceString::virtualized(StringData ns) {
+    return ns.find('$') != std::string::npos && ns != "local.oplog.$main";
 }
 
 inline bool NamespaceString::validDBName(StringData db, DollarInDbNameBehavior behavior) {

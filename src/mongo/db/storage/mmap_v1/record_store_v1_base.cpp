@@ -256,7 +256,7 @@ DiskLoc RecordStoreV1Base::_findFirstSpot(OperationContext* txn,
     DiskLoc emptyLoc = extDiskLoc;
     emptyLoc.inc(Extent::HeaderSize());
     int delRecLength = e->length - Extent::HeaderSize();
-    if (delRecLength >= 32 * 1024 && _ns.find('$') != string::npos && !isCapped()) {
+    if (delRecLength >= 32 * 1024 && NamespaceString::virtualized(_ns) && !isCapped()) {
         // probably an index. so skip forward to keep its records page aligned
         int& ofs = emptyLoc.GETOFS();
         int newOfs = (ofs + 0xfff) & ~0xfff;
