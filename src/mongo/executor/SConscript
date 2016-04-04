@@ -68,6 +68,17 @@ env.Library(target='network_interface_impl', # TODO: rename to thread_pool_netwo
                 'task_executor_interface',
             ])
 
+env.CppUnitTest(
+    target='network_interface_impl_test',
+    source=[
+        'network_interface_impl_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        'network_interface_impl',
+    ],
+)
+
 env.Library('network_interface_mock',
             [
                 'network_interface_mock.cpp',

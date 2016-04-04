@@ -47,7 +47,7 @@ namespace {
 
 class NetworkInterfaceMockTest : public mongo::unittest::Test {
 public:
-    NetworkInterfaceMockTest() : _net{}, _executor(&_net, 1) {}
+    NetworkInterfaceMockTest() : _net{}, _executor(&_net, 1), _tearDownCalled(false) {}
 
     NetworkInterfaceMock& net() {
         return _net;
@@ -68,7 +68,18 @@ public:
         executor().startup();
     }
 
+    virtual void setUp() override {
+        _tearDownCalled = false;
+    }
+
     virtual void tearDown() override {
+        // We're calling tearDown() manually in some tests so
+        // we can check post-conditions.
+        if (_tearDownCalled) {
+            return;
+        }
+        _tearDownCalled = true;
+
         net().exitNetwork();
         executor().shutdown();
         // Wake up sleeping executor threads so they clean up.
@@ -80,6 +91,7 @@ public:
 private:
     NetworkInterfaceMock _net;
     ThreadPoolMock _executor;
+    bool _tearDownCalled;
 };
 
 TEST_F(NetworkInterfaceMockTest, ConnectionHook) {
@@ -152,15 +164,16 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHook) {
                                                  BSONObj(),
                                                  Milliseconds(0)};
 
-    net().startCommand(cb,
-                       actualCommandExpected,
-                       [&](StatusWith<RemoteCommandResponse> resp) {
-                           commandFinished = true;
-                           if (resp.isOK()) {
-                               gotCorrectCommandReply = (actualResponseExpected.toString() ==
-                                                         resp.getValue().toString());
-                           }
-                       });
+    ASSERT_OK(net().startCommand(cb,
+                                 actualCommandExpected,
+                                 [&](StatusWith<RemoteCommandResponse> resp) {
+                                     commandFinished = true;
+                                     if (resp.isOK()) {
+                                         gotCorrectCommandReply =
+                                             (actualResponseExpected.toString() ==
+                                              resp.getValue().toString());
+                                     }
+                                 }));
 
     // At this point validate and makeRequest should have been called.
     ASSERT(validateCalled);
@@ -223,14 +236,14 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookFailedValidation) {
     bool commandFinished = false;
     bool statusPropagated = false;
 
-    net().startCommand(cb,
-                       RemoteCommandRequest{},
-                       [&](StatusWith<RemoteCommandResponse> resp) {
-                           commandFinished = true;
+    ASSERT_OK(net().startCommand(cb,
+                                 RemoteCommandRequest{},
+                                 [&](StatusWith<RemoteCommandResponse> resp) {
+                                     commandFinished = true;
 
-                           statusPropagated = resp.getStatus().code() ==
-                               ErrorCodes::ConflictingOperationInProgress;
-                       });
+                                     statusPropagated = resp.getStatus().code() ==
+                                         ErrorCodes::ConflictingOperationInProgress;
+                                 }));
 
     {
         net().enterNetwork();
@@ -263,9 +276,10 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookNoRequest) {
 
     bool commandFinished = false;
 
-    net().startCommand(cb,
-                       RemoteCommandRequest{},
-                       [&](StatusWith<RemoteCommandResponse> resp) { commandFinished = true; });
+    ASSERT_OK(net().startCommand(
+        cb,
+        RemoteCommandRequest{},
+        [&](StatusWith<RemoteCommandResponse> resp) { commandFinished = true; }));
 
     {
         net().enterNetwork();
@@ -298,13 +312,13 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookMakeRequestFails) {
     bool commandFinished = false;
     bool errorPropagated = false;
 
-    net().startCommand(cb,
-                       RemoteCommandRequest{},
-                       [&](StatusWith<RemoteCommandResponse> resp) {
-                           commandFinished = true;
-                           errorPropagated =
-                               resp.getStatus().code() == ErrorCodes::InvalidSyncSource;
-                       });
+    ASSERT_OK(net().startCommand(cb,
+                                 RemoteCommandRequest{},
+                                 [&](StatusWith<RemoteCommandResponse> resp) {
+                                     commandFinished = true;
+                                     errorPropagated =
+                                         resp.getStatus().code() == ErrorCodes::InvalidSyncSource;
+                                 }));
 
     {
         net().enterNetwork();
@@ -336,13 +350,13 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookHandleReplyFails) {
     bool commandFinished = false;
     bool errorPropagated = false;
 
-    net().startCommand(cb,
-                       RemoteCommandRequest{},
-                       [&](StatusWith<RemoteCommandResponse> resp) {
-                           commandFinished = true;
-                           errorPropagated =
-                               resp.getStatus().code() == ErrorCodes::CappedPositionLost;
-                       });
+    ASSERT_OK(net().startCommand(cb,
+                                 RemoteCommandRequest{},
+                                 [&](StatusWith<RemoteCommandResponse> resp) {
+                                     commandFinished = true;
+                                     errorPropagated =
+                                         resp.getStatus().code() == ErrorCodes::CappedPositionLost;
+                                 }));
 
     ASSERT(!handleReplyCalled);
 
@@ -358,6 +372,28 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookHandleReplyFails) {
     ASSERT(handleReplyCalled);
     ASSERT(commandFinished);
     ASSERT(errorPropagated);
+}
+
+TEST_F(NetworkInterfaceMockTest, InShutdown) {
+    startNetwork();
+    ASSERT_FALSE(net().inShutdown());
+    tearDown();
+    ASSERT(net().inShutdown());
+}
+
+TEST_F(NetworkInterfaceMockTest, StartCommandReturnsNotOKIfShutdownHasStarted) {
+    startNetwork();
+    tearDown();
+
+    TaskExecutor::CallbackHandle cb{};
+    ASSERT_NOT_OK(net().startCommand(
+        cb, RemoteCommandRequest{}, [](StatusWith<RemoteCommandResponse> resp) {}));
+}
+
+TEST_F(NetworkInterfaceMockTest, SetAlarmReturnsNotOKIfShutdownHasStarted) {
+    startNetwork();
+    tearDown();
+    ASSERT_NOT_OK(net().setAlarm(net().now() + Milliseconds(100), [] {}));
 }
 
 }  // namespace

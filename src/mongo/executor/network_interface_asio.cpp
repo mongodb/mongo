@@ -228,15 +228,19 @@ Date_t NetworkInterfaceASIO::now() {
     return Date_t::now();
 }
 
-void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                        const RemoteCommandRequest& request,
-                                        const RemoteCommandCompletionFn& onFinish) {
+Status NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                                          const RemoteCommandRequest& request,
+                                          const RemoteCommandCompletionFn& onFinish) {
     MONGO_ASIO_INVARIANT(onFinish, "Invalid completion function");
     {
         stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
         const auto insertResult = _inGetConnection.emplace(cbHandle);
         // We should never see the same CallbackHandle added twice
         MONGO_ASIO_INVARIANT_INLOCK(insertResult.second, "Same CallbackHandle added twice");
+    }
+
+    if (inShutdown()) {
+        return {ErrorCodes::ShutdownInProgress, "NetworkInterfaceASIO shutdown in progress"};
     }
 
     LOG(2) << "startCommand: " << request.toString();
@@ -369,6 +373,7 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
     };
 
     _connectionPool.get(request.target, request.timeout, nextStep);
+    return Status::OK();
 }
 
 void NetworkInterfaceASIO::cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) {
@@ -408,7 +413,11 @@ void NetworkInterfaceASIO::cancelAllCommands() {
     }
 }
 
-void NetworkInterfaceASIO::setAlarm(Date_t when, const stdx::function<void()>& action) {
+Status NetworkInterfaceASIO::setAlarm(Date_t when, const stdx::function<void()>& action) {
+    if (inShutdown()) {
+        return {ErrorCodes::ShutdownInProgress, "NetworkInterfaceASIO shutdown in progress"};
+    }
+
     // "alarm" must stay alive until it expires, hence the shared_ptr.
     auto alarm = std::make_shared<asio::system_timer>(_io_service, when.toSystemTimePoint());
     alarm->async_wait([alarm, this, action](std::error_code ec) {
@@ -420,6 +429,8 @@ void NetworkInterfaceASIO::setAlarm(Date_t when, const stdx::function<void()>& a
             warning() << "setAlarm() received an error: " << ec.message();
         }
     });
+
+    return Status::OK();
 };
 
 bool NetworkInterfaceASIO::inShutdown() const {

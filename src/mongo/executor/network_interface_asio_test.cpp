@@ -104,11 +104,12 @@ public:
     Deferred<StatusWith<RemoteCommandResponse>> startCommand(
         const TaskExecutor::CallbackHandle& cbHandle, const RemoteCommandRequest& request) {
         Deferred<StatusWith<RemoteCommandResponse>> deferredResponse;
-        net().startCommand(cbHandle,
-                           request,
-                           [deferredResponse](StatusWith<RemoteCommandResponse> response) mutable {
-                               deferredResponse.emplace(std::move(response));
-                           });
+        ASSERT_OK(net().startCommand(
+            cbHandle,
+            request,
+            [deferredResponse](StatusWith<RemoteCommandResponse> response) mutable {
+                deferredResponse.emplace(std::move(response));
+            }));
         return deferredResponse;
     }
 
@@ -420,6 +421,19 @@ TEST_F(NetworkInterfaceASIOTest, StartCommand) {
     ASSERT_EQ(response.data, expectedCommandReply);
     ASSERT_EQ(response.metadata, expectedMetadata);
     assertNumOps(0u, 0u, 0u, 1u);
+}
+
+TEST_F(NetworkInterfaceASIOTest, InShutdown) {
+    ASSERT_FALSE(net().inShutdown());
+    net().shutdown();
+    ASSERT(net().inShutdown());
+}
+
+TEST_F(NetworkInterfaceASIOTest, StartCommandReturnsNotOKIfShutdownHasStarted) {
+    net().shutdown();
+    ASSERT_NOT_OK(net().startCommand(makeCallbackHandle(),
+                                     RemoteCommandRequest{},
+                                     [&](StatusWith<RemoteCommandResponse> resp) {}));
 }
 
 class MalformedMessageTest : public NetworkInterfaceASIOTest {
@@ -779,13 +793,13 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
     assertNumOps(0u, 0u, 1u, 0u);
 }
 
-TEST_F(NetworkInterfaceASIOTest, setAlarm) {
+TEST_F(NetworkInterfaceASIOTest, SetAlarm) {
     // set a first alarm, to execute after "expiration"
     Date_t expiration = net().now() + Milliseconds(100);
 
     Deferred<Date_t> deferred;
-    net().setAlarm(expiration,
-                   [this, expiration, deferred]() mutable { deferred.emplace(net().now()); });
+    ASSERT_OK(net().setAlarm(
+        expiration, [this, expiration, deferred]() mutable { deferred.emplace(net().now()); }));
 
     // Get our timer factory
     auto& factory = timerFactory();
@@ -799,10 +813,15 @@ TEST_F(NetworkInterfaceASIOTest, setAlarm) {
 
     expiration = net().now() + Milliseconds(99999999);
     Deferred<bool> deferred2;
-    net().setAlarm(expiration, [this, deferred2]() mutable { deferred2.emplace(true); });
+    ASSERT_OK(net().setAlarm(expiration, [this, deferred2]() mutable { deferred2.emplace(true); }));
 
     net().shutdown();
     ASSERT(!deferred2.hasCompleted());
+}
+
+TEST_F(NetworkInterfaceASIOTest, SetAlarmReturnsNotOKIfShutdownHasStarted) {
+    net().shutdown();
+    ASSERT_NOT_OK(net().setAlarm(net().now() + Milliseconds(100), [] {}));
 }
 
 class NetworkInterfaceASIOMetadataTest : public NetworkInterfaceASIOTest {

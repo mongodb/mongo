@@ -54,7 +54,7 @@ NetworkInterfaceMock::NetworkInterfaceMock()
 
 NetworkInterfaceMock::~NetworkInterfaceMock() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    invariant(!_hasStarted || _inShutdown);
+    invariant(!_hasStarted || inShutdown());
     invariant(_scheduled.empty());
     invariant(_blackHoled.empty());
 }
@@ -75,11 +75,15 @@ std::string NetworkInterfaceMock::getHostName() {
     return "thisisourhostname";
 }
 
-void NetworkInterfaceMock::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                        const RemoteCommandRequest& request,
-                                        const RemoteCommandCompletionFn& onFinish) {
+Status NetworkInterfaceMock::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                                          const RemoteCommandRequest& request,
+                                          const RemoteCommandCompletionFn& onFinish) {
+    if (inShutdown()) {
+        return {ErrorCodes::ShutdownInProgress, "NetworkInterfaceMock shutdown in progress"};
+    }
+
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    invariant(!_inShutdown);
+
     const Date_t now = _now_inlock();
     auto op = NetworkOperation(cbHandle, request, now, onFinish);
 
@@ -89,6 +93,8 @@ void NetworkInterfaceMock::startCommand(const TaskExecutor::CallbackHandle& cbHa
     } else {
         _connectThenEnqueueOperation_inlock(request.target, std::move(op));
     }
+
+    return Status::OK();
 }
 
 void NetworkInterfaceMock::setHandshakeReplyForHost(
@@ -121,8 +127,9 @@ static bool findAndCancelIf(
 }
 
 void NetworkInterfaceMock::cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) {
+    invariant(!inShutdown());
+
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    invariant(!_inShutdown);
     stdx::function<bool(const NetworkOperation&)> matchesHandle =
         stdx::bind(&NetworkOperation::isForCallback, stdx::placeholders::_1, cbHandle);
     const Date_t now = _now_inlock();
@@ -138,14 +145,21 @@ void NetworkInterfaceMock::cancelCommand(const TaskExecutor::CallbackHandle& cbH
     // No not-in-progress network command matched cbHandle.  Oh, well.
 }
 
-void NetworkInterfaceMock::setAlarm(const Date_t when, const stdx::function<void()>& action) {
+Status NetworkInterfaceMock::setAlarm(const Date_t when, const stdx::function<void()>& action) {
+    if (inShutdown()) {
+        return {ErrorCodes::ShutdownInProgress, "NetworkInterfaceMock shutdown in progress"};
+    }
+
     stdx::unique_lock<stdx::mutex> lk(_mutex);
+
     if (when <= _now_inlock()) {
         lk.unlock();
         action();
-        return;
+        return Status::OK();
     }
     _alarms.emplace(when, action);
+
+    return Status::OK();
 }
 
 bool NetworkInterfaceMock::onNetworkThread() {
@@ -156,16 +170,17 @@ void NetworkInterfaceMock::startup() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(!_hasStarted);
     _hasStarted = true;
-    _inShutdown = false;
+    _inShutdown.store(false);
     invariant(_currentlyRunning == kNoThread);
     _currentlyRunning = kExecutorThread;
 }
 
 void NetworkInterfaceMock::shutdown() {
+    invariant(!inShutdown());
+
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_hasStarted);
-    invariant(!_inShutdown);
-    _inShutdown = true;
+    _inShutdown.store(true);
     NetworkOperationList todo;
     todo.splice(todo.end(), _scheduled);
     todo.splice(todo.end(), _unscheduled);
@@ -186,6 +201,10 @@ void NetworkInterfaceMock::shutdown() {
     _currentlyRunning = kNoThread;
     _waitingToRunMask = kNetworkThread;
     _shouldWakeNetworkCondition.notify_one();
+}
+
+bool NetworkInterfaceMock::inShutdown() const {
+    return _inShutdown.load();
 }
 
 void NetworkInterfaceMock::enterNetwork() {
