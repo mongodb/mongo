@@ -135,8 +135,11 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * that was done when the checkpoint was first written (re-writing the
 	 * checkpoint might possibly make it relevant here, but it's unlikely
 	 * enough I don't bother).
+	 *
+	 * If in-memory, we don't read or write the object, and the truncate
+	 * will unnecessarily allocate buffer space.
 	 */
-	if (!checkpoint) {
+	if (!checkpoint && !F_ISSET(S2C(session), WT_CONN_IN_MEMORY)) {
 		/*
 		 * The truncate might fail if there's a file mapping (if there's
 		 * an open checkpoint on the file), that's OK.
