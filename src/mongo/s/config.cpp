@@ -51,6 +51,7 @@
 #include "mongo/s/type_lockpings.h"
 #include "mongo/s/type_settings.h"
 #include "mongo/s/type_shard.h"
+#include "mongo/s/type_tags.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/stringutils.h"
 
@@ -1163,6 +1164,16 @@ namespace mongo {
         if ( !result.isOK() ) {
             warning() << "couldn't create lockping ping time index on config db: "
                       << result.reason() << endl;
+        }
+
+        result = clusterCreateIndex(TagsType::ConfigNS,
+                                    BSON(TagsType::ns() << 1 << TagsType::min() << 1),
+                                    true, // unique
+                                    WriteConcernOptions::AllConfigs,
+                                    NULL);
+
+        if (!result.isOK()) {
+            warning() << "could not create index ns_1_min_1: " << causedBy(result);
         }
     }
 
