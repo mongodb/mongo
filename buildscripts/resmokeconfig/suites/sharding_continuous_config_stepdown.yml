@@ -18,6 +18,7 @@ selector:
     - jstests/sharding/balance_tags1.js
     - jstests/sharding/balance_tags2.js
     - jstests/sharding/basic_drop_coll.js
+    - jstests/sharding/basic_merge.js
     - jstests/sharding/bulk_shard_insert.js
     - jstests/sharding/count1.js
     - jstests/sharding/count2.js
@@ -38,7 +39,6 @@ selector:
     - jstests/sharding/key_string.js
     - jstests/sharding/large_chunk.js
     - jstests/sharding/limit_push.js
-    - jstests/sharding/merge_chunks_basic.js
     - jstests/sharding/migrateBig_balancer.js
     - jstests/sharding/move_chunk_basic.js
     - jstests/sharding/movePrimary1.js

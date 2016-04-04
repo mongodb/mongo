@@ -100,10 +100,9 @@ public:
         ShardConnection::sync();
 
         const NamespaceString nss(parseNs(dbname, cmdObj));
-        if (nss.size() == 0) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::InvalidNamespace, "no namespace specified"));
-        }
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << nss.ns() << " is not a valid namespace",
+                nss.isValid());
 
         auto status = grid.catalogCache()->getDatabase(txn, nss.db().toString());
         if (!status.isOK()) {
