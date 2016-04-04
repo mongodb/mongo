@@ -89,7 +89,7 @@ static const size_t kNumClasses = 95;
 static const size_t kMinAlign   = 8;
 #else
 static const size_t kPageShift  = 12;
-static const size_t kNumClasses = 52;
+static const size_t kNumClasses = 42;
 static const size_t kMinAlign   = 16;
 #endif
 static const size_t kMaxThreadCacheSize = 4 << 20;
