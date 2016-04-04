@@ -382,8 +382,7 @@ static bool checkIndexConstraints(OperationContext* txn,
 
     ShardingState* shardingState = ShardingState::get(txn);
     if (shardingState->enabled()) {
-        CollectionMetadataPtr metadata = shardingState->getCollectionMetadata(nss.ns());
-
+        auto metadata = shardingState->getCollectionMetadata(nss.ns());
         if (metadata) {
             ShardKeyPattern shardKeyPattern(metadata->getKeyPattern());
             if (!shardKeyPattern.isUniqueIndexCompatible(request.getIndexKeyPattern())) {

@@ -1321,7 +1321,7 @@ public:
 
         uassert(16149, "cannot run map reduce without the js engine", globalScriptEngine);
 
-        CollectionMetadataPtr collMetadata;
+        shared_ptr<CollectionMetadata> collMetadata;
 
         // Prevent sharding state from changing during the MR.
         unique_ptr<RangePreserver> rangePreserver;
