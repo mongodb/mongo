@@ -47,6 +47,10 @@ MONGO_STARTUP_OPTIONS_VALIDATE(MongoShellOptions)(InitializerContext* context) {
     if (!ret.isOK()) {
         return ret;
     }
+    ret = validateMongoShellOptions(moe::startupOptionsParsed);
+    if (!ret.isOK()) {
+        return ret;
+    }
 
     return Status::OK();
 }
