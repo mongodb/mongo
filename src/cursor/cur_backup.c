@@ -440,6 +440,7 @@ __backup_list_uri_append(
     WT_SESSION_IMPL *session, const char *name, bool *skip)
 {
 	WT_CURSOR_BACKUP *cb;
+	WT_DECL_RET;
 	char *value;
 
 	cb = session->bkp_cursor;
@@ -472,8 +473,9 @@ __backup_list_uri_append(
 
 	/* Add the metadata entry to the backup file. */
 	WT_RET(__wt_metadata_search(session, name, &value));
-	WT_RET(__wt_fprintf(session, cb->bfh, "%s\n%s\n", name, value));
+	ret = __wt_fprintf(session, cb->bfh, "%s\n%s\n", name, value);
 	__wt_free(session, value);
+	WT_RET(ret);
 
 	/* Add file type objects to the list of files to be copied. */
 	if (WT_PREFIX_MATCH(name, "file:"))
