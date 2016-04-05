@@ -64,6 +64,7 @@ variables:
 
 - &debug_symbol_variants
   - enterprise-linux-64-amazon-ami
+  - enterprise-osx-107
   - enterprise-rhel-57-64-bit
   - enterprise-rhel-62-64-bit
   - enterprise-rhel-70-64-bit
@@ -83,9 +84,13 @@ variables:
   - suse12
   - ubuntu1204
   - ubuntu1404
+  - ubuntu1404-rocksdb
+  - ubuntu1410-fast-clang
   - debian71
   - solaris-64-bit
-  - osx
+  - osx-107-ssl
+  - osx-107
+
 
 - &packaging_variants
   - enterprise-linux-64-amazon-ami
@@ -4028,7 +4033,7 @@ buildvariants:
   - name: sharding_legacy_op_query_WT
   - name: sharding_op_query_WT
   - name: sharding_legacy_multiversion
-  - name: sharding_csrs_continuous_config_stepdown_WT  
+  - name: sharding_csrs_continuous_config_stepdown_WT
   - name: slow1
   - name: slow1_WT
   - name: slow2
