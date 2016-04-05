@@ -53,9 +53,15 @@ public:
     /**
      * Implementation of validateHost can be called without a ShardingNetworkConnectionHook
      * instance.
+     *
+     * 'forSCC' bool will be true if this is being called on a connection created by
+     * SyncClusterConnection.  If forSCC is true we should fail to connect if the config server
+     * is detected to be in CSRS mode, regardless of whether we actually still need to swap our
+     * catalog manager or not.
      */
     static Status validateHostImpl(const HostAndPort& remoteHost,
-                                   const executor::RemoteCommandResponse& isMasterReply);
+                                   const executor::RemoteCommandResponse& isMasterReply,
+                                   bool forSCC);
 
     /**
      * Makes a SetShardVersion request for initializing sharding information on the new connection.

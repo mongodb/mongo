@@ -155,7 +155,7 @@ Status initializeGlobalShardingState(OperationContext* txn,
                                      bool allowNetworking) {
     SyncClusterConnection::setConnectionValidationHook(
         [](const HostAndPort& target, const executor::RemoteCommandResponse& isMasterReply) {
-            return ShardingNetworkConnectionHook::validateHostImpl(target, isMasterReply);
+            return ShardingNetworkConnectionHook::validateHostImpl(target, isMasterReply, true);
         });
     auto network =
         executor::makeNetworkInterface("NetworkInterfaceASIO-ShardRegistry",

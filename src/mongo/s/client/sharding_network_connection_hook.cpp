@@ -45,11 +45,13 @@ namespace mongo {
 
 Status ShardingNetworkConnectionHook::validateHost(
     const HostAndPort& remoteHost, const executor::RemoteCommandResponse& isMasterReply) {
-    return validateHostImpl(remoteHost, isMasterReply);
+    return validateHostImpl(remoteHost, isMasterReply, false);
 }
 
 Status ShardingNetworkConnectionHook::validateHostImpl(
-    const HostAndPort& remoteHost, const executor::RemoteCommandResponse& isMasterReply) {
+    const HostAndPort& remoteHost,
+    const executor::RemoteCommandResponse& isMasterReply,
+    bool forSCC) {
     auto shard = grid.shardRegistry()->getShardForHostNoReload(remoteHost);
     if (!shard) {
         return {ErrorCodes::ShardNotFound,
@@ -69,10 +71,23 @@ Status ShardingNetworkConnectionHook::validateHostImpl(
             }
             using ConfigServerMode = CatalogManager::ConfigServerMode;
             const BSONElement setName = isMasterReply.data["setName"];
-            return grid.forwardingCatalogManager()->scheduleReplaceCatalogManagerIfNeeded(
-                (configServerModeNumber == 0 ? ConfigServerMode::SCCC : ConfigServerMode::CSRS),
-                (setName.type() == String ? setName.valueStringData() : StringData()),
-                remoteHost);
+            auto configServerMode =
+                (configServerModeNumber == 0 ? ConfigServerMode::SCCC : ConfigServerMode::CSRS);
+            auto catalogSwapStatus =
+                grid.forwardingCatalogManager()->scheduleReplaceCatalogManagerIfNeeded(
+                    configServerMode,
+                    (setName.type() == String ? setName.valueStringData() : StringData()),
+                    remoteHost);
+            if (configServerMode == ConfigServerMode::CSRS && catalogSwapStatus.isOK() && forSCC) {
+                // Even though scheduleReplaceCatalogManagerIfNeeded didn't indicate that a catalog
+                // manager swap is needed, if this connection is part of a SyncClusterConnection,
+                // and it's talking to a CSRS config server we still need to fail.
+                return Status(ErrorCodes::IncompatibleCatalogManager,
+                              "Need to swap sharding catalog manager. Detected config server in "
+                              "CSRS mode while using a SyncClusterConnection, which only supports "
+                              "SCCC mode config servers");
+            }
+            return catalogSwapStatus;
         }
         case ErrorCodes::NoSuchKey: {
             // The ismaster response indicates that remoteHost is not a config server, or that
