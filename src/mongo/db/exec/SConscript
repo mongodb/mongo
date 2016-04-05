@@ -94,7 +94,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/repl/repl_coordinator_global",
         "$BUILD_DIR/mongo/scripting/scripting",
         "$BUILD_DIR/mongo/db/storage/storage_options",
-        "$BUILD_DIR/mongo/s/coreshard",
+        "$BUILD_DIR/mongo/s/common",
         '$BUILD_DIR/third_party/s2/s2',
     ],
     LIBDEPS_TAGS=[

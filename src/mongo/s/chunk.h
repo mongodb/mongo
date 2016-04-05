@@ -218,7 +218,7 @@ public:
     //
 
     static long long MaxChunkSize;
-    static int MaxObjectPerChunk;
+    static const int MaxObjectPerChunk{250000};
     static bool ShouldAutoSplit;
 
     //

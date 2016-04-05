@@ -51,14 +51,18 @@ env.Library(
         'migration_secondary_throttle_options.cpp',
         'move_chunk_request.cpp',
         'set_shard_version_request.cpp',
+        'shard_key_pattern.cpp',
     ],
     LIBDEPS=[
-        'catalog/catalog_types',
         '$BUILD_DIR/mongo/client/connection_string',
         '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/matcher/expressions',
+        '$BUILD_DIR/mongo/db/ops/update_common',
         '$BUILD_DIR/mongo/db/query/lite_parsed_query',
+        '$BUILD_DIR/mongo/db/query/query_planner',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/rpc/metadata',
+        'catalog/catalog_types',
     ]
 )
 
@@ -180,7 +184,6 @@ env.Library(
         'chunk_manager.cpp',
         'config.cpp',
         'grid.cpp',
-        'shard_key_pattern.cpp',
         'version_manager.cpp',
     ],
     LIBDEPS=[

@@ -158,7 +158,6 @@ bool tryMoveToOtherShard(OperationContext* txn,
 }  // namespace
 
 long long Chunk::MaxChunkSize = 1024 * 1024 * 64;
-int Chunk::MaxObjectPerChunk = 250000;
 
 // Can be overridden from command line
 bool Chunk::ShouldAutoSplit = true;

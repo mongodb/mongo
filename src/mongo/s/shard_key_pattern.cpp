@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/shard_key_pattern.h"
 
 #include <vector>
@@ -422,4 +424,5 @@ BoundList ShardKeyPattern::flattenBounds(const IndexBounds& indexBounds) const {
         ret.push_back(make_pair(i->first->obj(), i->second->obj()));
     return ret;
 }
-}
+
+}  // namespace mongo
