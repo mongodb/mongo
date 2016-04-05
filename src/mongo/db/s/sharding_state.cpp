@@ -187,7 +187,7 @@ void ShardingState::updateConfigServerOpTimeFromMetadata(OperationContext* txn) 
 
     boost::optional<repl::OpTime> opTime = rpc::ConfigServerMetadata::get(txn).getOpTime();
     if (opTime) {
-        grid.shardRegistry()->advanceConfigOpTime(*opTime);
+        grid.advanceConfigOpTime(*opTime);
     }
 }
 

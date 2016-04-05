@@ -214,17 +214,6 @@ public:
     void appendConnectionStats(executor::ConnectionPoolStats* stats) const;
 
     /**
-     * If the newly specified optime is newer than the one the ShardRegistry already knows, the
-     * one in the registry will be advanced. Otherwise, it remains the same.
-     */
-    void advanceConfigOpTime(repl::OpTime opTime);
-
-    /**
-     * Returns the last known OpTime of the config servers.
-     */
-    repl::OpTime getConfigOpTime();
-
-    /**
      * Executes 'find' command against a config server matching the given read preference, and
      * fetches *all* the results that the host will return until there are no more or until an error
      * is returned.
@@ -405,8 +394,7 @@ private:
     // added as shards.  Does not have any connection hook set on it.
     const std::unique_ptr<executor::TaskExecutor> _executorForAddShard;
 
-    // Protects the _reloadState, config server connections string, _configOpTime,
-    // and the lookup maps below.
+    // Protects the _reloadState, config server connections string, and the lookup maps below.
     mutable stdx::mutex _mutex;
 
     stdx::condition_variable _inReloadCV;
@@ -421,9 +409,6 @@ private:
 
     // Config server connection string
     ConnectionString _configServerCS;
-
-    // Last known highest opTime from the config server that should be used when doing reads.
-    repl::OpTime _configOpTime;
 
     // Map of both shardName -> Shard and hostName -> Shard
     ShardMap _lookup;

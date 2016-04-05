@@ -83,7 +83,7 @@ Status ShardingEgressMetadataHook::_writeRequestMetadataForShard(shared_ptr<Shar
     if (shard->isConfig()) {
         return Status::OK();
     }
-    rpc::ConfigServerMetadata(grid.shardRegistry()->getConfigOpTime()).writeToMetadata(metadataBob);
+    rpc::ConfigServerMetadata(grid.configOpTime()).writeToMetadata(metadataBob);
     return Status::OK();
 }
 
@@ -124,7 +124,7 @@ Status ShardingEgressMetadataHook::_readReplyMetadataForShard(shared_ptr<Shard> 
         }
         auto opTime = responseStatus.getValue().getOpTime();
         if (opTime.is_initialized()) {
-            grid.shardRegistry()->advanceConfigOpTime(opTime.get());
+            grid.advanceConfigOpTime(opTime.get());
         }
         return Status::OK();
     } catch (...) {

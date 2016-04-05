@@ -65,7 +65,7 @@ BSONObj ShardingServerStatus::generateSection(OperationContext* txn,
     result.append("configsvrConnectionString",
                   grid.shardRegistry()->getConfigServerConnectionString().toString());
 
-    grid.shardRegistry()->getConfigOpTime().append(&result, "lastSeenConfigServerOpTime");
+    grid.configOpTime().append(&result, "lastSeenConfigServerOpTime");
 
     return result.obj();
 }

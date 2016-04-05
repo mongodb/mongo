@@ -113,6 +113,13 @@ public:
         return _cursorManager.get();
     }
 
+    repl::OpTime configOpTime() const {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        return _configOpTime;
+    }
+
+    void advanceConfigOpTime(repl::OpTime opTime);
+
     /**
      * Clears the grid object so that it can be reused between test executions. This will not
      * be necessary if grid is hanging off the global ServiceContext and each test gets its
@@ -127,6 +134,12 @@ private:
     std::unique_ptr<CatalogCache> _catalogCache;
     std::unique_ptr<ShardRegistry> _shardRegistry;
     std::unique_ptr<ClusterCursorManager> _cursorManager;
+
+    // Protects _configOpTime.
+    mutable stdx::mutex _mutex;
+
+    // Last known highest opTime from the config server that should be used when doing reads.
+    repl::OpTime _configOpTime;
 
     // can 'localhost' be used in shard addresses?
     bool _allowLocalShard;

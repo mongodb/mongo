@@ -1330,7 +1330,7 @@ void Command::execCommand(OperationContext* txn,
 
         BSONObj metadata = rpc::makeEmptyMetadata();
         if (ShardingState::get(txn)->enabled()) {
-            auto opTime = grid.shardRegistry()->getConfigOpTime();
+            auto opTime = grid.configOpTime();
             BSONObjBuilder metadataBob;
             rpc::ConfigServerMetadata(opTime).writeToMetadata(&metadataBob);
             metadata = metadataBob.obj();
@@ -1482,7 +1482,7 @@ bool Command::run(OperationContext* txn,
     }
 
     if (isShardingAware) {
-        auto opTime = grid.shardRegistry()->getConfigOpTime();
+        auto opTime = grid.configOpTime();
         rpc::ConfigServerMetadata(opTime).writeToMetadata(&metadataBob);
     }
 

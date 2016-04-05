@@ -187,7 +187,7 @@ Status modifyRecoveryDocument(OperationContext* txn,
         BSONObj updateObj = RecoveryDocument::createChangeObj(
             grid.shardRegistry()->getConfigServerConnectionString(),
             ShardingState::get(txn)->getShardName(),
-            grid.shardRegistry()->getConfigOpTime(),
+            grid.configOpTime(),
             change);
 
         LOG(1) << "Changing sharding recovery document " << updateObj;
@@ -280,7 +280,7 @@ Status ShardingStateRecovery::recover(OperationContext* txn) {
 
     if (!recoveryDoc.getMinOpTimeUpdaters()) {
         // Treat the minOpTime as up-to-date
-        grid.shardRegistry()->advanceConfigOpTime(recoveryDoc.getMinOpTime());
+        grid.advanceConfigOpTime(recoveryDoc.getMinOpTime());
         return Status::OK();
     }
 
@@ -298,8 +298,7 @@ Status ShardingStateRecovery::recover(OperationContext* txn) {
     if (!status.isOK())
         return status;
 
-    log() << "Sharding state recovered. New config server opTime is "
-          << grid.shardRegistry()->getConfigOpTime();
+    log() << "Sharding state recovered. New config server opTime is " << grid.configOpTime();
 
     // Finally, clear the recovery document so next time we don't need to recover
     status = modifyRecoveryDocument(txn, RecoveryDocument::Clear, kMajorityWriteConcern);

@@ -126,6 +126,13 @@ bool Grid::getConfigShouldBalance(OperationContext* txn) const {
     return shouldBalance(balSettings);
 }
 
+void Grid::advanceConfigOpTime(repl::OpTime opTime) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (_configOpTime < opTime) {
+        _configOpTime = opTime;
+    }
+}
+
 void Grid::clearForUnitTests() {
     _catalogManager.reset();
     _catalogCache.reset();
@@ -134,6 +141,8 @@ void Grid::clearForUnitTests() {
     _shardRegistry.reset();
 
     _cursorManager.reset();
+
+    _configOpTime = repl::OpTime();
 }
 
 }  // namespace mongo

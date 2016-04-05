@@ -1399,7 +1399,7 @@ StatusWith<OpTimePair<vector<BSONObj>>> CatalogManagerReplicaSet::_exhaustiveFin
 }
 
 void CatalogManagerReplicaSet::_appendReadConcern(BSONObjBuilder* builder) {
-    repl::ReadConcernArgs readConcern(grid.shardRegistry()->getConfigOpTime(),
+    repl::ReadConcernArgs readConcern(grid.configOpTime(),
                                       repl::ReadConcernLevel::kMajorityReadConcern);
     readConcern.appendInfo(builder);
 }

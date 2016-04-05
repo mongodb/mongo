@@ -500,19 +500,6 @@ shared_ptr<Shard> ShardRegistry::_findUsingLookUp_inlock(const ShardId& shardId)
     return nullptr;
 }
 
-void ShardRegistry::advanceConfigOpTime(OpTime opTime) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    if (_configOpTime < opTime) {
-        _configOpTime = opTime;
-    }
-}
-
-OpTime ShardRegistry::getConfigOpTime() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _configOpTime;
-}
-
 StatusWith<ShardRegistry::QueryResponse> ShardRegistry::_exhaustiveFindOnConfig(
     OperationContext* txn,
     const ReadPreferenceSetting& readPref,
@@ -553,7 +540,7 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::_exhaustiveFindOnConfig(
             }
 
             response.opTime = replParseStatus.getValue().getLastOpVisible();
-            advanceConfigOpTime(response.opTime);
+            grid.advanceConfigOpTime(response.opTime);
         }
 
         for (const BSONObj& doc : data.documents) {
@@ -565,7 +552,7 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::_exhaustiveFindOnConfig(
 
     BSONObj readConcernObj;
     {
-        const repl::ReadConcernArgs readConcern{getConfigOpTime(),
+        const repl::ReadConcernArgs readConcern{grid.configOpTime(),
                                                 repl::ReadConcernLevel::kMajorityReadConcern};
         BSONObjBuilder bob;
         readConcern.appendInfo(&bob);
@@ -839,7 +826,7 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadat
         cmdResponse.visibleOpTime = replMetadata.getLastOpVisible();
 
         if (shard->isConfig()) {
-            advanceConfigOpTime(cmdResponse.visibleOpTime);
+            grid.advanceConfigOpTime(cmdResponse.visibleOpTime);
         }
     }
 
