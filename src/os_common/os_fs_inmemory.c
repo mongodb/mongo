@@ -8,6 +8,8 @@
 
 #include "wt_internal.h"
 
+static int __im_handle_size(WT_SESSION_IMPL *, WT_FH *, wt_off_t *);
+
 /*
  * In-memory information.
  */
@@ -151,12 +153,12 @@ __im_file_size(
 	__wt_spin_lock(session, &im->lock);
 
 	if (__wt_handle_search(session, name, true, NULL, &fh)) {
-		*sizep = (wt_off_t)fh->buf.size;
-		ret = __wt_close(session, &fh);
+		WT_ERR(__im_handle_size(session, fh, sizep));
+		WT_ERR(__wt_close(session, &fh));
 	} else
 		ret = ENOENT;
 
-	__wt_spin_unlock(session, &im->lock);
+err:	__wt_spin_unlock(session, &im->lock);
 	return (ret);
 }
 
@@ -308,7 +310,12 @@ __im_handle_size(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
 {
 	WT_UNUSED(session);
 
-	*sizep = (wt_off_t)fh->buf.size;
+	/*
+	 * XXX hack - MongoDB assumes that any file with content will have a
+	 * non-zero size. In memory tables generally are zero-sized, make
+	 * MongoDB happy.
+	 */
+	*sizep = fh->buf.size == 0 ? 1024 : (wt_off_t)fh->buf.size;
 	return (0);
 }
 
@@ -334,17 +341,25 @@ __im_handle_sync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
  *	POSIX ftruncate.
  */
 static int
-__im_handle_truncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
+__im_handle_truncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
 {
 	WT_DECL_RET;
 	WT_IM *im;
+	size_t off;
 
 	im = S2C(session)->inmemory;
 	__wt_spin_lock(session, &im->lock);
 
-	WT_ERR(__wt_buf_grow(session, &fh->buf, (size_t)len));
-	memset((uint8_t *)
-	    fh->buf.mem + fh->buf.size, 0, fh->buf.memsize - fh->buf.size);
+	/*
+	 * Grow the buffer as necessary, clear any new space in the file,
+	 * and reset the file's data length.
+	 */
+	off = (size_t)offset;
+	WT_ERR(__wt_buf_grow(session, &fh->buf, off));
+	if (fh->buf.size < off)
+		memset((uint8_t *)
+		    fh->buf.data + fh->buf.size, 0, off - fh->buf.size);
+	fh->buf.size = off;
 
 err:	__wt_spin_unlock(session, &im->lock);
 	return (ret);
