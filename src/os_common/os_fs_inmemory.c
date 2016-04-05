@@ -8,6 +8,8 @@
 
 #include "wt_internal.h"
 
+static int __im_handle_size(WT_SESSION_IMPL *, WT_FH *, wt_off_t *);
+
 /*
  * In-memory information.
  */
