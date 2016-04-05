@@ -271,13 +271,15 @@ void DistributionStatus::dump() const {
     }
 }
 
-Status DistributionStatus::populateShardInfoMap(OperationContext* txn, ShardInfoMap* shardInfo) {
+StatusWith<ShardInfoMap> DistributionStatus::populateShardInfoMap(OperationContext* txn) {
     try {
         auto shardsStatus = grid.catalogManager(txn)->getAllShards(txn);
         if (!shardsStatus.isOK()) {
             return shardsStatus.getStatus();
         }
-        vector<ShardType> shards = std::move(shardsStatus.getValue().value);
+        const vector<ShardType> shards(std::move(shardsStatus.getValue().value));
+
+        ShardInfoMap shardInfo;
 
         for (const ShardType& shardData : shards) {
             std::set<std::string> dummy;
@@ -298,13 +300,13 @@ Status DistributionStatus::populateShardInfoMap(OperationContext* txn, ShardInfo
                 newShardEntry.addTag(shardTag);
             }
 
-            shardInfo->insert(make_pair(shardData.getName(), newShardEntry));
+            shardInfo.insert(make_pair(shardData.getName(), newShardEntry));
         }
+
+        return std::move(shardInfo);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
-
-    return Status::OK();
 }
 
 void DistributionStatus::populateShardToChunksMap(const ShardInfoMap& allShards,

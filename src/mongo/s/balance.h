@@ -28,7 +28,9 @@
 
 #pragma once
 
-#include "mongo/s/catalog/dist_lock_manager.h"
+#include <string>
+#include <vector>
+
 #include "mongo/util/background.h"
 
 namespace mongo {
@@ -37,6 +39,8 @@ class BalancerPolicy;
 struct MigrateInfo;
 class MigrationSecondaryThrottleOptions;
 class OperationContext;
+template <typename T>
+class StatusWith;
 
 /**
  * The balancer is a background task that tries to keep the number of chunks across all
@@ -80,13 +84,9 @@ private:
      * Gathers all the necessary information about shards and chunks, and decides whether there are
      * candidate chunks to be moved.
      *
-     * @param conn is the connection with the config server(s)
-     * @param candidateChunks (IN/OUT) filled with candidate chunks, one per collection, that could
-     *                          possibly be moved
+     * Returns candidate chunks, one per collection, that could possibly be moved
      */
-    void _doBalanceRound(OperationContext* txn,
-                         DistLockManager::ScopedDistLock* distLock,
-                         std::vector<std::shared_ptr<MigrateInfo>>* candidateChunks);
+    StatusWith<std::vector<MigrateInfo>> _doBalanceRound(OperationContext* txn);
 
     /**
      * Issues chunk migration request, one at a time.
@@ -97,7 +97,7 @@ private:
      * @return number of chunks effectively moved
      */
     int _moveChunks(OperationContext* txn,
-                    const std::vector<std::shared_ptr<MigrateInfo>>& candidateChunks,
+                    const std::vector<MigrateInfo>& candidateChunks,
                     const MigrationSecondaryThrottleOptions& secondaryThrottle,
                     bool waitForDelete);
 

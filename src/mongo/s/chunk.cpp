@@ -81,14 +81,14 @@ bool tryMoveToOtherShard(OperationContext* txn,
     // reload sharding metadata before starting migration
     ChunkManagerPtr chunkMgr = manager.reload(txn, false /* just reloaded in mulitsplit */);
 
-    ShardInfoMap shardInfo;
-    Status loadStatus = DistributionStatus::populateShardInfoMap(txn, &shardInfo);
-
-    if (!loadStatus.isOK()) {
+    auto shardInfoMapStatus = DistributionStatus::populateShardInfoMap(txn);
+    if (!shardInfoMapStatus.isOK()) {
         warning() << "failed to load shard metadata while trying to moveChunk after "
-                  << "auto-splitting" << causedBy(loadStatus);
+                  << "auto-splitting" << causedBy(shardInfoMapStatus.getStatus());
         return false;
     }
+
+    const ShardInfoMap shardInfo(std::move(shardInfoMapStatus.getValue()));
 
     if (shardInfo.size() < 2) {
         LOG(0) << "no need to move top chunk since there's only 1 shard";

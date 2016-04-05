@@ -34,7 +34,8 @@
 
 #include <algorithm>
 
-#include "mongo/client/dbclientcursor.h"
+#include "mongo/base/status_with.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
@@ -160,7 +161,7 @@ Balancer* Balancer::get(OperationContext* operationContext) {
 }
 
 int Balancer::_moveChunks(OperationContext* txn,
-                          const vector<shared_ptr<MigrateInfo>>& candidateChunks,
+                          const vector<MigrateInfo>& candidateChunks,
                           const MigrationSecondaryThrottleOptions& secondaryThrottle,
                           bool waitForDelete) {
     int movedCount = 0;
@@ -198,7 +199,7 @@ int Balancer::_moveChunks(OperationContext* txn,
         //
         // TODO: Handle all these things more cleanly, since they're expected problems
 
-        const NamespaceString nss(migrateInfo->ns);
+        const NamespaceString nss(migrateInfo.ns);
 
         try {
             shared_ptr<DBConfig> cfg =
@@ -206,27 +207,27 @@ int Balancer::_moveChunks(OperationContext* txn,
 
             // NOTE: We purposely do not reload metadata here, since _doBalanceRound already
             // tried to do so once.
-            shared_ptr<ChunkManager> cm = cfg->getChunkManager(txn, migrateInfo->ns);
+            shared_ptr<ChunkManager> cm = cfg->getChunkManager(txn, migrateInfo.ns);
             uassert(28628,
                     str::stream()
-                        << "Collection " << migrateInfo->ns
+                        << "Collection " << migrateInfo.ns
                         << " was deleted while balancing was active. Aborting balancing round.",
                     cm);
 
-            ChunkPtr c = cm->findIntersectingChunk(txn, migrateInfo->chunk.min);
+            ChunkPtr c = cm->findIntersectingChunk(txn, migrateInfo.chunk.min);
 
-            if (c->getMin().woCompare(migrateInfo->chunk.min) ||
-                c->getMax().woCompare(migrateInfo->chunk.max)) {
+            if (c->getMin().woCompare(migrateInfo.chunk.min) ||
+                c->getMax().woCompare(migrateInfo.chunk.max)) {
                 // Likely a split happened somewhere, so force reload the chunk manager
-                cm = cfg->getChunkManager(txn, migrateInfo->ns, true);
+                cm = cfg->getChunkManager(txn, migrateInfo.ns, true);
                 invariant(cm);
 
-                c = cm->findIntersectingChunk(txn, migrateInfo->chunk.min);
+                c = cm->findIntersectingChunk(txn, migrateInfo.chunk.min);
 
-                if (c->getMin().woCompare(migrateInfo->chunk.min) ||
-                    c->getMax().woCompare(migrateInfo->chunk.max)) {
+                if (c->getMin().woCompare(migrateInfo.chunk.min) ||
+                    c->getMax().woCompare(migrateInfo.chunk.max)) {
                     log() << "chunk mismatch after reload, ignoring will retry issue "
-                          << migrateInfo->chunk.toString();
+                          << migrateInfo.chunk.toString();
 
                     continue;
                 }
@@ -234,7 +235,7 @@ int Balancer::_moveChunks(OperationContext* txn,
 
             BSONObj res;
             if (c->moveAndCommit(txn,
-                                 migrateInfo->to,
+                                 migrateInfo.to,
                                  Chunk::MaxChunkSize,
                                  secondaryThrottle,
                                  waitForDelete,
@@ -245,17 +246,17 @@ int Balancer::_moveChunks(OperationContext* txn,
             }
 
             // The move requires acquiring the collection metadata's lock, which can fail.
-            log() << "balancer move failed: " << res << " from: " << migrateInfo->from
-                  << " to: " << migrateInfo->to << " chunk: " << migrateInfo->chunk;
+            log() << "balancer move failed: " << res << " from: " << migrateInfo.from
+                  << " to: " << migrateInfo.to << " chunk: " << migrateInfo.chunk;
 
             Status moveStatus = getStatusFromCommandResult(res);
 
             if (moveStatus == ErrorCodes::ChunkTooBig || res["chunkTooBig"].trueValue()) {
                 // Reload just to be safe
-                cm = cfg->getChunkManager(txn, migrateInfo->ns);
+                cm = cfg->getChunkManager(txn, migrateInfo.ns);
                 invariant(cm);
 
-                c = cm->findIntersectingChunk(txn, migrateInfo->chunk.min);
+                c = cm->findIntersectingChunk(txn, migrateInfo.chunk.min);
 
                 log() << "performing a split because migrate failed for size reasons";
 
@@ -272,7 +273,7 @@ int Balancer::_moveChunks(OperationContext* txn,
                 }
             }
         } catch (const DBException& ex) {
-            warning() << "could not move chunk " << migrateInfo->chunk.toString()
+            warning() << "could not move chunk " << migrateInfo.chunk.toString()
                       << ", continuing balancing round" << causedBy(ex);
         }
     }
@@ -349,23 +350,17 @@ bool Balancer::_checkOIDs(OperationContext* txn) {
     return true;
 }
 
-void Balancer::_doBalanceRound(OperationContext* txn,
-                               DistLockManager::ScopedDistLock* distLock,
-                               vector<shared_ptr<MigrateInfo>>* candidateChunks) {
-    invariant(candidateChunks);
-
+StatusWith<std::vector<MigrateInfo>> Balancer::_doBalanceRound(OperationContext* txn) {
     vector<CollectionType> collections;
+
     Status collsStatus =
         grid.catalogManager(txn)->getCollections(txn, nullptr, &collections, nullptr);
     if (!collsStatus.isOK()) {
-        warning() << "Failed to retrieve the set of collections during balancing round "
-                  << collsStatus;
-        return;
+        return collsStatus;
     }
 
     if (collections.empty()) {
-        LOG(1) << "no collections to balance";
-        return;
+        return vector<MigrateInfo>();
     }
 
     // Get a list of all the shards that are participating in this balance round along with any
@@ -373,19 +368,20 @@ void Balancer::_doBalanceRound(OperationContext* txn,
     // db.serverStatus() (mem.mapped) to all shards.
     //
     // TODO: skip unresponsive shards and mark information as stale.
-    ShardInfoMap shardInfo;
-    Status loadStatus = DistributionStatus::populateShardInfoMap(txn, &shardInfo);
-    if (!loadStatus.isOK()) {
-        warning() << "failed to load shard metadata" << causedBy(loadStatus);
-        return;
+    auto shardInfoStatus = DistributionStatus::populateShardInfoMap(txn);
+    if (!shardInfoStatus.isOK()) {
+        return shardInfoStatus.getStatus();
     }
 
+    const ShardInfoMap shardInfo(std::move(shardInfoStatus.getValue()));
+
     if (shardInfo.size() < 2) {
-        LOG(1) << "can't balance without more active shards";
-        return;
+        return vector<MigrateInfo>();
     }
 
     OCCASIONALLY warnOnMultiVersion(shardInfo);
+
+    std::vector<MigrateInfo> candidateChunks;
 
     // For each collection, check if the balancing policy recommends moving anything around.
     for (const auto& coll : collections) {
@@ -482,11 +478,10 @@ void Balancer::_doBalanceRound(OperationContext* txn,
             log() << "nss: " << nss.ns() << " need to split on " << min
                   << " because there is a range there";
 
-            ChunkPtr c = cm->findIntersectingChunk(txn, min);
-
             vector<BSONObj> splitPoints;
             splitPoints.push_back(min);
 
+            shared_ptr<Chunk> c = cm->findIntersectingChunk(txn, min);
             Status status = c->multiSplit(txn, splitPoints, NULL);
             if (!status.isOK()) {
                 error() << "split failed: " << status;
@@ -505,9 +500,11 @@ void Balancer::_doBalanceRound(OperationContext* txn,
         shared_ptr<MigrateInfo> migrateInfo(
             _policy->balance(nss.ns(), distStatus, _balancedLastTime));
         if (migrateInfo) {
-            candidateChunks->push_back(migrateInfo);
+            candidateChunks.emplace_back(*migrateInfo);
         }
     }
+
+    return candidateChunks;
 }
 
 bool Balancer::_init(OperationContext* txn) {
@@ -589,6 +586,7 @@ void Balancer::run() {
                 warning() << balSettingsResult.getStatus();
                 return;
             }
+
             const SettingsType& balancerConfig =
                 isBalSettingsAbsent ? SettingsType{} : balSettingsResult.getValue();
 
@@ -640,10 +638,9 @@ void Balancer::run() {
                        << "waitForDelete: " << waitForDelete
                        << ", secondaryThrottle: " << secondaryThrottle.toBSON();
 
-                vector<shared_ptr<MigrateInfo>> candidateChunks;
-                _doBalanceRound(txn.get(), &scopedDistLock.getValue(), &candidateChunks);
+                const auto candidateChunks = uassertStatusOK(_doBalanceRound(txn.get()));
 
-                if (candidateChunks.size() == 0) {
+                if (candidateChunks.empty()) {
                     LOG(1) << "no need to move any chunk";
                     _balancedLastTime = 0;
                 } else {

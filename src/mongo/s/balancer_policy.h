@@ -200,7 +200,7 @@ public:
      * Retrieves shard metadata information from the config server as well as some stats
      * from the shards.
      */
-    static Status populateShardInfoMap(OperationContext* txn, ShardInfoMap* shardInfo);
+    static StatusWith<ShardInfoMap> populateShardInfoMap(OperationContext* txn);
 
     /**
      * Note: jumbo and versions are not set.
