@@ -239,8 +239,8 @@ TEST(WiredTigerRecordStoreTest, Isolation1) {
         rs->dataFor(t1.get(), id1);
         rs->dataFor(t2.get(), id1);
 
-        ASSERT_OK(rs->updateRecord(t1.get(), id1, "b", 2, false, NULL).getStatus());
-        ASSERT_OK(rs->updateRecord(t1.get(), id2, "B", 2, false, NULL).getStatus());
+        ASSERT_OK(rs->updateRecord(t1.get(), id1, "b", 2, false, NULL));
+        ASSERT_OK(rs->updateRecord(t1.get(), id2, "B", 2, false, NULL));
 
         try {
             // this should fail
@@ -289,7 +289,7 @@ TEST(WiredTigerRecordStoreTest, Isolation2) {
 
         {
             WriteUnitOfWork w(t1.get());
-            ASSERT_OK(rs->updateRecord(t1.get(), id1, "b", 2, false, NULL).getStatus());
+            ASSERT_OK(rs->updateRecord(t1.get(), id1, "b", 2, false, NULL));
             w.commit();
         }
 

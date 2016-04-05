@@ -707,7 +707,10 @@ void State::insert(const string& ns, const BSONObj& o) {
         if (!res.getValue().isEmpty()) {
             bo = res.getValue();
         }
-        uassertStatusOK(coll->insertDocument(_txn, bo, true));
+
+        // TODO: Consider whether to pass OpDebug for stats tracking under SERVER-23261.
+        OpDebug* const nullOpDebug = nullptr;
+        uassertStatusOK(coll->insertDocument(_txn, bo, nullOpDebug, true));
         wuow.commit();
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(_txn, "M/R insert", ns);
@@ -737,7 +740,10 @@ void State::_insertToInc(BSONObj& o) {
                                     << ". size in bytes: " << o.objsize()
                                     << ", max size: " << BSONObjMaxUserSize);
         }
-        uassertStatusOK(coll->insertDocument(_txn, o, true, false));
+
+        // TODO: Consider whether to pass OpDebug for stats tracking under SERVER-23261.
+        OpDebug* const nullOpDebug = nullptr;
+        uassertStatusOK(coll->insertDocument(_txn, o, nullOpDebug, true, false));
         wuow.commit();
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(_txn, "M/R insertToInc", _config.incLong);

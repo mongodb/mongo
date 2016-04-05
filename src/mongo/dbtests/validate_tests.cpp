@@ -106,13 +106,14 @@ public:
         Collection* coll;
         RecordId id1;
         {
+            OpDebug* const nullOpDebug = nullptr;
             WriteUnitOfWork wunit(&_txn);
             ASSERT_OK(db->dropCollection(&_txn, _ns));
             coll = db->createCollection(&_txn, _ns);
 
-            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 1), true));
+            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 1), nullOpDebug, true));
             id1 = coll->getCursor(&_txn)->next()->id;
-            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 2), true));
+            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 2), nullOpDebug, true));
             wunit.commit();
         }
 
@@ -155,12 +156,13 @@ public:
         Collection* coll;
         RecordId id1;
         {
+            OpDebug* const nullOpDebug = nullptr;
             WriteUnitOfWork wunit(&_txn);
             ASSERT_OK(db->dropCollection(&_txn, _ns));
             coll = db->createCollection(&_txn, _ns);
-            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 1 << "a" << 1), true));
+            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 1 << "a" << 1), nullOpDebug, true));
             id1 = coll->getCursor(&_txn)->next()->id;
-            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 2 << "a" << 2), true));
+            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 2 << "a" << 2), nullOpDebug, true));
             wunit.commit();
         }
 

@@ -93,7 +93,8 @@ public:
         WriteUnitOfWork wuow(&_txn);
 
         const bool enforceQuota = false;
-        ASSERT_OK(collection->insertDocument(&_txn, obj, enforceQuota));
+        OpDebug* const nullOpDebug = nullptr;
+        ASSERT_OK(collection->insertDocument(&_txn, obj, nullOpDebug, enforceQuota));
         wuow.commit();
     }
 

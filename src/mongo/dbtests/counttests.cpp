@@ -90,6 +90,7 @@ protected:
     void insert(const char* s) {
         WriteUnitOfWork wunit(&_txn);
         const BSONObj o = fromjson(s);
+        OpDebug* const nullOpDebug = nullptr;
 
         if (o["_id"].eoo()) {
             BSONObjBuilder b;
@@ -97,9 +98,9 @@ protected:
             oid.init();
             b.appendOID("_id", &oid);
             b.appendElements(o);
-            _collection->insertDocument(&_txn, b.obj(), false);
+            _collection->insertDocument(&_txn, b.obj(), nullOpDebug, false);
         } else {
-            _collection->insertDocument(&_txn, o, false);
+            _collection->insertDocument(&_txn, o, nullOpDebug, false);
         }
         wunit.commit();
     }

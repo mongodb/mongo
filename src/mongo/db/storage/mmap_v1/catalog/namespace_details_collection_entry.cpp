@@ -358,12 +358,30 @@ void NamespaceDetailsCollectionCatalogEntry::_updateSystemNamespaces(OperationCo
     if (!_namespacesRecordStore)
         return;
 
-    RecordData entry = _namespacesRecordStore->dataFor(txn, _namespacesRecordId);
+    RecordId currentRecordId = _namespacesRecordId;
+
+    RecordData entry = _namespacesRecordStore->dataFor(txn, currentRecordId);
     const BSONObj newEntry = applyUpdateOperators(entry.releaseToBson(), update);
-    StatusWith<RecordId> result = _namespacesRecordStore->updateRecord(
-        txn, _namespacesRecordId, newEntry.objdata(), newEntry.objsize(), false, NULL);
-    fassert(17486, result.getStatus());
-    setNamespacesRecordId(txn, result.getValue());
+
+    Status result = _namespacesRecordStore->updateRecord(
+        txn, currentRecordId, newEntry.objdata(), newEntry.objsize(), false, NULL);
+
+    if (ErrorCodes::NeedsDocumentMove == result) {
+        StatusWith<RecordId> newLocation = _namespacesRecordStore->insertRecord(
+            txn, newEntry.objdata(), newEntry.objsize(), false);
+        fassert(40051, newLocation.getStatus().isOK());
+        currentRecordId = newLocation.getValue();
+        setNamespacesRecordId(txn, currentRecordId);
+
+        // Intentionally not deleting the old MMAPv1 record on move. The reasoning for this is:
+        //  - It might be possible that there are other parts in the code base that reference this
+        //    RecordId and removing could introduce an MMAPv1 bug.
+        //  - It is not harmful leaving the old RecordId in place. On document move, the space
+        //    allocated for the new document is double the old. This puts a practical limit on the
+        //    potential number of old 'leaked' documents.
+    } else {
+        fassert(17486, result.isOK());
+    }
 }
 
 void NamespaceDetailsCollectionCatalogEntry::updateFlags(OperationContext* txn, int newValue) {

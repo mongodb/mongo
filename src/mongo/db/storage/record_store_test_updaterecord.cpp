@@ -77,10 +77,19 @@ TEST(RecordStoreTestHarness, UpdateRecord) {
         unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res =
+            Status res =
                 rs->updateRecord(opCtx.get(), loc, data.c_str(), data.size() + 1, false, NULL);
-            ASSERT_OK(res.getStatus());
-            loc = res.getValue();
+
+            if (ErrorCodes::NeedsDocumentMove == res) {
+                StatusWith<RecordId> newLocation =
+                    rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
+                ASSERT_OK(newLocation.getStatus());
+                rs->deleteRecord(opCtx.get(), loc);
+                loc = newLocation.getValue();
+            } else {
+                ASSERT_OK(res);
+            }
+
             uow.commit();
         }
     }
@@ -136,10 +145,19 @@ TEST(RecordStoreTestHarness, UpdateMultipleRecords) {
             string data = ss.str();
 
             WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res =
+            Status res =
                 rs->updateRecord(opCtx.get(), locs[i], data.c_str(), data.size() + 1, false, NULL);
-            ASSERT_OK(res.getStatus());
-            locs[i] = res.getValue();
+
+            if (ErrorCodes::NeedsDocumentMove == res) {
+                StatusWith<RecordId> newLocation =
+                    rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, false);
+                ASSERT_OK(newLocation.getStatus());
+                rs->deleteRecord(opCtx.get(), locs[i]);
+                locs[i] = newLocation.getValue();
+            } else {
+                ASSERT_OK(res);
+            }
+
             uow.commit();
         }
     }
@@ -194,21 +212,21 @@ TEST(RecordStoreTestHarness, UpdateRecordWithMoveNotifier) {
             UpdateNotifierSpy umn(opCtx.get(), loc, oldData.c_str(), oldData.size());
 
             WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res = rs->updateRecord(
+            Status res = rs->updateRecord(
                 opCtx.get(), loc, newData.c_str(), newData.size() + 1, false, &umn);
-            ASSERT_OK(res.getStatus());
-            // UpdateNotifier::recordStoreGoingToMove() called only if
-            // the RecordId for the record changes
-            if (loc == res.getValue()) {
-                ASSERT_EQUALS(0, umn.numMoveCallbacks());
-                // Only MMAP v1 is required to use the UpdateNotifier for in-place updates,
-                // so the number of callbacks is expected to be 0 for non-MMAP storage engines.
-                ASSERT_GTE(1, umn.numInPlaceCallbacks());
-            } else {
-                ASSERT_EQUALS(1, umn.numMoveCallbacks());
+
+            if (ErrorCodes::NeedsDocumentMove == res) {
+                StatusWith<RecordId> newLocation =
+                    rs->insertRecord(opCtx.get(), newData.c_str(), newData.size() + 1, false);
+                ASSERT_OK(newLocation.getStatus());
+                rs->deleteRecord(opCtx.get(), loc);
+                loc = newLocation.getValue();
                 ASSERT_EQUALS(0, umn.numInPlaceCallbacks());
+            } else {
+                ASSERT_OK(res);
+                ASSERT_GTE(1, umn.numInPlaceCallbacks());
             }
-            loc = res.getValue();
+
             uow.commit();
         }
     }

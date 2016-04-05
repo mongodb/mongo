@@ -102,8 +102,8 @@ Status IndexAccessMethod::insert(OperationContext* txn,
                                  const RecordId& loc,
                                  const InsertDeleteOptions& options,
                                  int64_t* numInserted) {
+    invariant(numInserted);
     *numInserted = 0;
-
     BSONObjSet keys;
     // Delegate to the subclass.
     getKeys(obj, &keys);
@@ -179,9 +179,10 @@ Status IndexAccessMethod::remove(OperationContext* txn,
                                  const RecordId& loc,
                                  const InsertDeleteOptions& options,
                                  int64_t* numDeleted) {
+    invariant(numDeleted);
+    *numDeleted = 0;
     BSONObjSet keys;
     getKeys(obj, &keys);
-    *numDeleted = 0;
 
     for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
         removeOneKey(txn, *i, loc, options.dupsAllowed);
@@ -291,7 +292,14 @@ Status IndexAccessMethod::validateUpdate(OperationContext* txn,
 
 Status IndexAccessMethod::update(OperationContext* txn,
                                  const UpdateTicket& ticket,
-                                 int64_t* numUpdated) {
+                                 int64_t* numInserted,
+                                 int64_t* numDeleted) {
+    invariant(numInserted);
+    invariant(numDeleted);
+
+    *numInserted = 0;
+    *numDeleted = 0;
+
     if (!ticket._isValid) {
         return Status(ErrorCodes::InternalError, "Invalid UpdateTicket in update");
     }
@@ -317,7 +325,8 @@ Status IndexAccessMethod::update(OperationContext* txn,
         }
     }
 
-    *numUpdated = ticket.added.size();
+    *numInserted = ticket.added.size();
+    *numDeleted = ticket.removed.size();
 
     return Status::OK();
 }

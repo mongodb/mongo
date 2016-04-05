@@ -178,6 +178,8 @@ Status WriteCmd::explain(OperationContext* txn,
     // Get a reference to the singleton batch item (it's the 0th item in the batch).
     BatchItemRef batchItem(&request, 0);
 
+    OpDebug* opDebug = &CurOp::get(txn)->debug();
+
     if (BatchedCommandRequest::BatchType_Update == _writeType) {
         // Create the update request.
         UpdateRequest updateRequest(request.getNS());
@@ -191,8 +193,6 @@ Status WriteCmd::explain(OperationContext* txn,
 
         // Explained updates can yield.
         updateRequest.setYieldPolicy(PlanExecutor::YIELD_AUTO);
-
-        OpDebug* debug = &CurOp::get(txn)->debug();
 
         ParsedUpdate parsedUpdate(txn, &updateRequest);
         Status parseStatus = parsedUpdate.parseRequest();
@@ -212,7 +212,7 @@ Status WriteCmd::explain(OperationContext* txn,
         }
 
         std::unique_ptr<PlanExecutor> exec =
-            uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, debug));
+            uassertStatusOK(getExecutorUpdate(txn, opDebug, collection, &parsedUpdate));
 
         // Explain the plan tree.
         Explain::explainStages(exec.get(), verbosity, out);
@@ -248,7 +248,7 @@ Status WriteCmd::explain(OperationContext* txn,
         }
 
         std::unique_ptr<PlanExecutor> exec =
-            uassertStatusOK(getExecutorDelete(txn, collection, &parsedDelete));
+            uassertStatusOK(getExecutorDelete(txn, opDebug, collection, &parsedDelete));
 
         // Explain the plan tree.
         Explain::explainStages(exec.get(), verbosity, out);

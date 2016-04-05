@@ -249,9 +249,10 @@ protected:
             coll = db->createCollection(&_txn, ns());
         }
 
+        OpDebug* const nullOpDebug = nullptr;
         if (o.hasField("_id")) {
             _txn.setReplicatedWrites(false);
-            coll->insertDocument(&_txn, o, true);
+            coll->insertDocument(&_txn, o, nullOpDebug, true);
             _txn.setReplicatedWrites(true);
             wunit.commit();
             return;
@@ -263,7 +264,7 @@ protected:
         b.appendOID("_id", &id);
         b.appendElements(o);
         _txn.setReplicatedWrites(false);
-        coll->insertDocument(&_txn, b.obj(), true);
+        coll->insertDocument(&_txn, b.obj(), nullOpDebug, true);
         _txn.setReplicatedWrites(true);
         wunit.commit();
     }

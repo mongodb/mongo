@@ -88,7 +88,8 @@ Status truncateCollection(OperationContext* txn, const NamespaceString& nss) {
 
 void insertRecord(OperationContext* txn, const NamespaceString& nss, const BSONObj& data) {
     Collection* coll = dbHolder().get(txn, nss.db())->getCollection(nss.ns());
-    ASSERT_OK(coll->insertDocument(txn, data, false));
+    OpDebug* const nullOpDebug = nullptr;
+    ASSERT_OK(coll->insertDocument(txn, data, nullOpDebug, false));
 }
 void assertOnlyRecord(OperationContext* txn, const NamespaceString& nss, const BSONObj& data) {
     Collection* coll = dbHolder().get(txn, nss.db())->getCollection(nss.ns());

@@ -459,10 +459,11 @@ public:
 
         // We should have read in the first 'firstRead' recordIds.  Invalidate the first.
         exec->saveState();
+        OpDebug* const nullOpDebug = nullptr;
         set<RecordId>::iterator it = recordIds.begin();
         {
             WriteUnitOfWork wuow(&_txn);
-            coll->deleteDocument(&_txn, *it++);
+            coll->deleteDocument(&_txn, *it++, nullOpDebug);
             wuow.commit();
         }
         exec->restoreState();
@@ -478,7 +479,7 @@ public:
         while (it != recordIds.end()) {
             {
                 WriteUnitOfWork wuow(&_txn);
-                coll->deleteDocument(&_txn, *it++);
+                coll->deleteDocument(&_txn, *it++, nullOpDebug);
                 wuow.commit();
             }
         }

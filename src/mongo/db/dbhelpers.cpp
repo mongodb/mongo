@@ -440,7 +440,8 @@ long long Helpers::removeRange(OperationContext* txn,
             if (callback)
                 callback->goingToDelete(obj);
 
-            collection->deleteDocument(txn, rloc, fromMigrate);
+            OpDebug* const nullOpDebug = nullptr;
+            collection->deleteDocument(txn, rloc, nullOpDebug, fromMigrate);
             wuow.commit();
             numDeleted++;
         }

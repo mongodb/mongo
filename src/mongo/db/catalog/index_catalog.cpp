@@ -1135,7 +1135,8 @@ bool isDupsAllowed(IndexDescriptor* desc) {
 
 Status IndexCatalog::_indexFilteredRecords(OperationContext* txn,
                                            IndexCatalogEntry* index,
-                                           const std::vector<BsonRecord>& bsonRecords) {
+                                           const std::vector<BsonRecord>& bsonRecords,
+                                           int64_t* keysInsertedOut) {
     InsertDeleteOptions options;
     options.logIfError = false;
     options.dupsAllowed = isDupsAllowed(index->descriptor());
@@ -1147,16 +1148,21 @@ Status IndexCatalog::_indexFilteredRecords(OperationContext* txn,
             txn, *bsonRecord.docPtr, bsonRecord.id, options, &inserted);
         if (!status.isOK())
             return status;
+
+        if (keysInsertedOut) {
+            *keysInsertedOut += inserted;
+        }
     }
     return Status::OK();
 }
 
 Status IndexCatalog::_indexRecords(OperationContext* txn,
                                    IndexCatalogEntry* index,
-                                   const std::vector<BsonRecord>& bsonRecords) {
+                                   const std::vector<BsonRecord>& bsonRecords,
+                                   int64_t* keysInsertedOut) {
     const MatchExpression* filter = index->getFilterExpression();
     if (!filter)
-        return _indexFilteredRecords(txn, index, bsonRecords);
+        return _indexFilteredRecords(txn, index, bsonRecords, keysInsertedOut);
 
     std::vector<BsonRecord> filteredBsonRecords;
     for (auto bsonRecord : bsonRecords) {
@@ -1164,14 +1170,15 @@ Status IndexCatalog::_indexRecords(OperationContext* txn,
             filteredBsonRecords.push_back(bsonRecord);
     }
 
-    return _indexFilteredRecords(txn, index, filteredBsonRecords);
+    return _indexFilteredRecords(txn, index, filteredBsonRecords, keysInsertedOut);
 }
 
 Status IndexCatalog::_unindexRecord(OperationContext* txn,
                                     IndexCatalogEntry* index,
                                     const BSONObj& obj,
                                     const RecordId& loc,
-                                    bool logIfError) {
+                                    bool logIfError,
+                                    int64_t* keysDeletedOut) {
     InsertDeleteOptions options;
     options.logIfError = logIfError;
     options.dupsAllowed = isDupsAllowed(index->descriptor());
@@ -1189,15 +1196,24 @@ Status IndexCatalog::_unindexRecord(OperationContext* txn,
               << _collection->ns() << ". Status: " << status.toString();
     }
 
+    if (keysDeletedOut) {
+        *keysDeletedOut += removed;
+    }
+
     return Status::OK();
 }
 
 
 Status IndexCatalog::indexRecords(OperationContext* txn,
-                                  const std::vector<BsonRecord>& bsonRecords) {
+                                  const std::vector<BsonRecord>& bsonRecords,
+                                  int64_t* keysInsertedOut) {
+    if (keysInsertedOut) {
+        *keysInsertedOut = 0;
+    }
+
     for (IndexCatalogEntryContainer::const_iterator i = _entries.begin(); i != _entries.end();
          ++i) {
-        Status s = _indexRecords(txn, *i, bsonRecords);
+        Status s = _indexRecords(txn, *i, bsonRecords, keysInsertedOut);
         if (!s.isOK())
             return s;
     }
@@ -1208,14 +1224,19 @@ Status IndexCatalog::indexRecords(OperationContext* txn,
 void IndexCatalog::unindexRecord(OperationContext* txn,
                                  const BSONObj& obj,
                                  const RecordId& loc,
-                                 bool noWarn) {
+                                 bool noWarn,
+                                 int64_t* keysDeletedOut) {
+    if (keysDeletedOut) {
+        *keysDeletedOut = 0;
+    }
+
     for (IndexCatalogEntryContainer::const_iterator i = _entries.begin(); i != _entries.end();
          ++i) {
         IndexCatalogEntry* entry = *i;
 
         // If it's a background index, we DO NOT want to log anything.
         bool logIfError = entry->isReady(txn) ? !noWarn : false;
-        _unindexRecord(txn, entry, obj, loc, logIfError);
+        _unindexRecord(txn, entry, obj, loc, logIfError, keysDeletedOut);
     }
 }
 
