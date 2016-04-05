@@ -1,4 +1,3 @@
-// utils.cpp
 /*
  *    Copyright (C) 2010 10gen Inc.
  *
@@ -29,7 +28,6 @@
 
 #include "mongo/scripting/engine.h"
 #include "mongo/util/md5.hpp"
-#include "mongo/util/version.h"
 
 namespace mongo {
 
@@ -46,10 +44,6 @@ static BSONObj native_hex_md5(const BSONObj& args, void* data) {
     md5_finish(&st, d);
 
     return BSON("" << digestToString(d));
-}
-
-static BSONObj native_version(const BSONObj& args, void* data) {
-    return BSON("" << versionString);
 }
 
 static BSONObj native_sleep(const mongo::BSONObj& args, void* data) {
@@ -69,7 +63,7 @@ static BSONObj native_sleep(const mongo::BSONObj& args, void* data) {
 
 void installGlobalUtils(Scope& scope) {
     scope.injectNative("hex_md5", native_hex_md5);
-    scope.injectNative("version", native_version);
     scope.injectNative("sleep", native_sleep);
 }
-}
+
+}  // namespace mongo
