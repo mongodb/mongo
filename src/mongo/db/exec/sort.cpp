@@ -38,6 +38,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/index/btree_key_generator.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/query/query_knobs.h"
@@ -55,12 +56,13 @@ using stdx::make_unique;
 // static
 const char* SortStage::kStageType = "SORT";
 
-SortStage::WorkingSetComparator::WorkingSetComparator(BSONObj p) : pattern(p) {}
+SortStage::WorkingSetComparator::WorkingSetComparator(BSONObj p, CollatorInterface* c)
+    : pattern(p), collator(c) {}
 
 bool SortStage::WorkingSetComparator::operator()(const SortableDataItem& lhs,
                                                  const SortableDataItem& rhs) const {
     // False means ignore field names.
-    int result = lhs.sortKey.woCompare(rhs.sortKey, pattern, false);
+    int result = lhs.sortKey.woCompare(rhs.sortKey, pattern, false, collator);
     if (0 != result) {
         return result < 0;
     }
@@ -76,6 +78,7 @@ SortStage::SortStage(OperationContext* opCtx,
       _collection(params.collection),
       _ws(ws),
       _pattern(params.pattern),
+      _collator(params.collator),
       _limit(params.limit),
       _sorted(false),
       _resultIterator(_data.end()),
@@ -83,7 +86,7 @@ SortStage::SortStage(OperationContext* opCtx,
     _children.emplace_back(child);
 
     BSONObj sortComparator = FindCommon::transformSortSpec(_pattern);
-    _sortKeyComparator = stdx::make_unique<WorkingSetComparator>(sortComparator);
+    _sortKeyComparator = stdx::make_unique<WorkingSetComparator>(sortComparator, _collator);
 
     // If limit > 1, we need to initialize _dataSet here to maintain ordered set of data items while
     // fetching from the child stage.

@@ -126,6 +126,7 @@ env.CppUnitTest(
         "exec",
         "$BUILD_DIR/mongo/db/serveronly",
         "$BUILD_DIR/mongo/dbtests/mocklib",
+        "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
         "$BUILD_DIR/mongo/util/ntservice_mock",
     ],
     NO_CRUTCH = True,

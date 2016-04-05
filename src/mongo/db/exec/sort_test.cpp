@@ -34,6 +34,7 @@
 
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/json.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
@@ -72,13 +73,14 @@ TEST(SortStageTest, SortEmptyWorkingSet) {
 
 /**
  * Test function to verify sort stage.
- * SortStageParams will be initialized using patternStr, queryStr and limit.
+ * SortStageParams will be initialized using patternStr, collator, queryStr and limit.
  * inputStr represents the input data set in a BSONObj.
  *     {input: [doc1, doc2, doc3, ...]}
  * expectedStr represents the expected sorted data set.
  *     {output: [docA, docB, docC, ...]}
  */
 void testWork(const char* patternStr,
+              CollatorInterface* collator,
               const char* queryStr,
               int limit,
               const char* inputStr,
@@ -110,6 +112,7 @@ void testWork(const char* patternStr,
     // Setting limit to 0 means no limit
     SortStageParams params;
     params.pattern = fromjson(patternStr);
+    params.collator = collator;
     params.limit = limit;
 
     auto sortKeyGen = stdx::make_unique<SortKeyGeneratorStage>(
@@ -175,6 +178,7 @@ void testWork(const char* patternStr,
 
 TEST(SortStageTest, SortAscending) {
     testWork("{a: 1}",
+             nullptr,
              "{}",
              0,
              "{input: [{a: 2}, {a: 1}, {a: 3}]}",
@@ -183,6 +187,7 @@ TEST(SortStageTest, SortAscending) {
 
 TEST(SortStageTest, SortDescending) {
     testWork("{a: -1}",
+             nullptr,
              "{}",
              0,
              "{input: [{a: 2}, {a: 1}, {a: 3}]}",
@@ -191,6 +196,7 @@ TEST(SortStageTest, SortDescending) {
 
 TEST(SortStageTest, SortIrrelevantSortKey) {
     testWork("{b: 1}",
+             nullptr,
              "{}",
              0,
              "{input: [{a: 2}, {a: 1}, {a: 3}]}",
@@ -204,11 +210,21 @@ TEST(SortStageTest, SortIrrelevantSortKey) {
 //
 
 TEST(SortStageTest, SortAscendingWithLimit) {
-    testWork("{a: 1}", "{}", 2, "{input: [{a: 2}, {a: 1}, {a: 3}]}", "{output: [{a: 1}, {a: 2}]}");
+    testWork("{a: 1}",
+             nullptr,
+             "{}",
+             2,
+             "{input: [{a: 2}, {a: 1}, {a: 3}]}",
+             "{output: [{a: 1}, {a: 2}]}");
 }
 
 TEST(SortStageTest, SortDescendingWithLimit) {
-    testWork("{a: -1}", "{}", 2, "{input: [{a: 2}, {a: 1}, {a: 3}]}", "{output: [{a: 3}, {a: 2}]}");
+    testWork("{a: -1}",
+             nullptr,
+             "{}",
+             2,
+             "{input: [{a: 2}, {a: 1}, {a: 3}]}",
+             "{output: [{a: 3}, {a: 2}]}");
 }
 
 //
@@ -219,6 +235,7 @@ TEST(SortStageTest, SortDescendingWithLimit) {
 
 TEST(SortStageTest, SortAscendingWithLimitGreaterThanInputSize) {
     testWork("{a: 1}",
+             nullptr,
              "{}",
              10,
              "{input: [{a: 2}, {a: 1}, {a: 3}]}",
@@ -227,6 +244,7 @@ TEST(SortStageTest, SortAscendingWithLimitGreaterThanInputSize) {
 
 TEST(SortStageTest, SortDescendingWithLimitGreaterThanInputSize) {
     testWork("{a: -1}",
+             nullptr,
              "{}",
              10,
              "{input: [{a: 2}, {a: 1}, {a: 3}]}",
@@ -239,11 +257,32 @@ TEST(SortStageTest, SortDescendingWithLimitGreaterThanInputSize) {
 //
 
 TEST(SortStageTest, SortAscendingWithLimitOfOne) {
-    testWork("{a: 1}", "{}", 1, "{input: [{a: 2}, {a: 1}, {a: 3}]}", "{output: [{a: 1}]}");
+    testWork("{a: 1}", nullptr, "{}", 1, "{input: [{a: 2}, {a: 1}, {a: 3}]}", "{output: [{a: 1}]}");
 }
 
 TEST(SortStageTest, SortDescendingWithLimitOfOne) {
-    testWork("{a: -1}", "{}", 1, "{input: [{a: 2}, {a: 1}, {a: 3}]}", "{output: [{a: 3}]}");
+    testWork(
+        "{a: -1}", nullptr, "{}", 1, "{input: [{a: 2}, {a: 1}, {a: 3}]}", "{output: [{a: 3}]}");
+}
+
+TEST(SortStageTest, SortAscendingWithCollation) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    testWork("{a: 1}",
+             &collator,
+             "{}",
+             0,
+             "{input: [{a: 'ba'}, {a: 'aa'}, {a: 'ab'}]}",
+             "{output: [{a: 'aa'}, {a: 'ba'}, {a: 'ab'}]}");
+}
+
+TEST(SortStageTest, SortDescendingWithCollation) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    testWork("{a: -1}",
+             &collator,
+             "{}",
+             0,
+             "{input: [{a: 'ba'}, {a: 'aa'}, {a: 'ab'}]}",
+             "{output: [{a: 'ab'}, {a: 'ba'}, {a: 'aa'}]}");
 }
 
 }  // namespace
