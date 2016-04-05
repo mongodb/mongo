@@ -67,7 +67,8 @@ variables:
   - ubuntu1404
   - debian71
   - solaris-64-bit
-  - osx
+  - osx-107
+  - osx-107-ssl
 
 #######################################
 #            Functions                #
