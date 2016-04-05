@@ -1,6 +1,6 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
-@section version_271 Upgrading to Version 2.7.1
+@section version_280 Upgrading to Version 2.8.0
 <dl>
 <dt>LSM metadata</dt>
 <dd>
@@ -14,7 +14,7 @@ format will be upgraded automatically, but once updated to the new version
 <dd>
 Historically, bulk-load of a column-store object ignored any key set in the
 cursor and automatically assigned each inserted row the next sequential
-record number for its key. In the 2.7.1 release, column-store objects match
+record number for its key. In the 2.8.0 release, column-store objects match
 row-store behavior and require the cursor key be set before an insert.
 (This allows sparse tables to be created in column-store objects, any
 skipped records are created as already-deleted rows.) To match the previous
@@ -49,6 +49,13 @@ bulk-loaded, so they do not get named checkpoints that complete during the
 bulk load.
 </dd>
 
+<dt>Remove WT_LSN structure from public API</dt>
+<dd>
+The WiredTiger public API used to define a structure that could encapsulate
+log sequence numbers. That structure is no longer exposed publicly.
+</dd>
+
+<dt>
 </dl><hr>
 @section version_270 Upgrading to Version 2.7.0
 

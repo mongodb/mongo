@@ -67,7 +67,9 @@ CloseHandle
 Comparator
 Config
 Coverity
+CreateFileA
 CreateFileMapping
+CreateFileMappingA
 Crummey
 CustomersPhone
 DECL
@@ -76,11 +78,13 @@ DESC
 DHANDLE
 DNE
 DOI
+DONTNEED
 DUPLICATEV
 DbCursor
 DbEnv
 Decrement
 Decrypt
+DeleteFileA
 EAGAIN
 EBUSY
 EEXIST
@@ -187,6 +191,7 @@ LoadLoad
 LockFile
 Lookaside
 Lookup
+MADV
 MALLOC
 MEM
 MEMALIGN
@@ -242,12 +247,14 @@ Pandis
 Phong
 PlatformSDK
 Posix
+PowerPC
 Pre
 Preload
 Prepend
 Qsort
 RCS
 RDNOLOCK
+RDONLY
 RECNO
 REF's
 REFs
@@ -260,6 +267,7 @@ RNG
 RPC
 RUNDIR
 Radu
+ReadFile
 Readonly
 Rebalance
 RedHat
@@ -317,6 +325,7 @@ UTF
 UltraSparc
 Unbuffered
 UnixLib
+UnlockFile
 Unmap
 UnmapViewOfFile
 Unmarshall
@@ -332,9 +341,11 @@ Vixie
 Vo
 VxWorks
 WAL
+WILLNEED
 WIREDTIGER
 WRLSN
 WRNOLOCK
+WaitForSingleObject
 WakeAllConditionVariable
 Wconditional
 WeakHashLen
@@ -352,6 +363,7 @@ WiredTigerPreplog
 WiredTigerTmplog
 WiredTigerTxn
 WithSeeds
+WriteFile
 Wuninitialized
 Wunused
 XP
@@ -454,6 +466,7 @@ ckpt
 ckptfrag
 ckptlist
 cksum
+cloexec
 clsm
 cmd
 cmp
@@ -595,12 +608,17 @@ fallocate
 fblocks
 fclose
 fcntl
+fd
+fdatasync
+fdopen
 ffc
 fflush
 ffs
+fgetc
 fgetln
 fh
 filefrag
+filehandle
 fileid
 filename
 filenames
@@ -631,7 +649,9 @@ func
 gcc
 gdb
 ge
+getc
 getenv
+getlasterror
 getline
 getone
 getones
@@ -647,6 +667,7 @@ gostring
 gostruct
 goutf
 gt
+handleops
 hashval
 havesize
 hdr
@@ -663,6 +684,7 @@ icount
 idx
 ifdef's
 ikey
+im
 impl
 incase
 incr
@@ -679,6 +701,7 @@ initsize
 initval
 inline
 inmem
+inmemory
 insertK
 insertV
 inserters
@@ -686,6 +709,7 @@ instantiation
 intl
 intnum
 intpack
+intptr
 intrin
 inuse
 io
@@ -838,6 +862,7 @@ optimizations
 optype
 ori
 os
+osfhandle
 ovfl
 ownp
 packv
@@ -863,8 +888,10 @@ postsize
 powerpc
 pragmas
 pre
+pread
 prealloc
 preload
+preloaded
 prepend
 prepended
 prepending
@@ -883,6 +910,7 @@ pushms
 putK
 putV
 pv
+pwrite
 py
 qdown
 qrrSS
@@ -941,6 +969,7 @@ sessionp
 setkv
 setstr
 setv
+setvbuf
 sfence
 sii
 sizeof
@@ -1035,6 +1064,7 @@ undef
 unencrypted
 unesc
 unescaped
+unicode
 uninstantiated
 unistd
 unlinked

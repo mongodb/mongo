@@ -260,8 +260,7 @@ __log_prealloc_once(WT_SESSION_IMPL *session)
 	 * files that may not have been used yet.
 	 */
 	WT_ERR(__wt_dirlist(session, conn->log_path,
-	    WT_LOG_PREPNAME, WT_DIRLIST_INCLUDE,
-	    &recfiles, &reccount));
+	    WT_LOG_PREPNAME, WT_DIRLIST_INCLUDE, &recfiles, &reccount));
 	__wt_log_files_free(session, recfiles, reccount);
 	recfiles = NULL;
 	/*
@@ -399,7 +398,7 @@ __log_file_server(void *arg)
 				 * to move the sync_lsn into the next file for
 				 * later syncs.
 				 */
-				WT_ERR(__wt_fsync(session, close_fh));
+				WT_ERR(__wt_fsync(session, close_fh, true));
 				/*
 				 * We want to make sure the file size reflects
 				 * actual data and has minimal pre-allocated
@@ -451,7 +450,7 @@ __log_file_server(void *arg)
 				    log->bg_sync_lsn.l.file) ||
 				    (log->sync_lsn.l.file < min_lsn.l.file))
 					continue;
-				WT_ERR(__wt_fsync(session, log->log_fh));
+				WT_ERR(__wt_fsync(session, log->log_fh, true));
 				__wt_spin_lock(session, &log->log_sync_lock);
 				locked = true;
 				/*

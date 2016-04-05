@@ -54,7 +54,7 @@ setup_log_file(CONFIG *cfg)
 		return (ret);
 
 	/* Use line buffering for the log file. */
-	(void)setvbuf(cfg->logf, NULL, _IOLBF, 32);
+	__wt_stream_set_line_buffer(cfg->logf);
 	return (0);
 }
 

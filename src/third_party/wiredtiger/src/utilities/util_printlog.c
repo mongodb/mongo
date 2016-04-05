@@ -41,7 +41,7 @@ util_printlog(WT_SESSION *session, int argc, char *argv[])
 	if (argc != 0)
 		return (usage());
 
-	ret = __wt_txn_printlog(session, stdout, flags);
+	ret = __wt_txn_printlog(session, flags);
 
 	if (ret != 0) {
 		fprintf(stderr, "%s: printlog failed: %s\n",

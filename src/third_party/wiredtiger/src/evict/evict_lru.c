@@ -1688,9 +1688,9 @@ __wt_evict_priority_clear(WT_SESSION_IMPL *session)
 int
 __wt_cache_dump(WT_SESSION_IMPL *session, const char *ofile)
 {
-	FILE *fp;
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle, *saved_dhandle;
+	WT_FH *fh;
 	WT_PAGE *page;
 	WT_REF *next_walk;
 	uint64_t dirty_bytes, dirty_pages, intl_bytes, intl_pages;
@@ -1702,12 +1702,13 @@ __wt_cache_dump(WT_SESSION_IMPL *session, const char *ofile)
 	total_bytes = 0;
 
 	if (ofile == NULL)
-		fp = stderr;
+		fh = WT_STDERR(session);
 	else
-		WT_RET(__wt_fopen(session, ofile, WT_FHANDLE_WRITE, 0, &fp));
+		WT_RET(__wt_open(session, ofile, WT_FILE_TYPE_REGULAR,
+		    WT_OPEN_CREATE | WT_STREAM_WRITE, &fh));
 
 	/* Note: odd string concatenation avoids spelling errors. */
-	(void)__wt_fprintf(fp, "==========\n" "cache dump\n");
+	(void)__wt_fprintf(session, fh, "==========\n" "cache dump\n");
 
 	saved_dhandle = session->dhandle;
 	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
@@ -1746,23 +1747,25 @@ __wt_cache_dump(WT_SESSION_IMPL *session, const char *ofile)
 		session->dhandle = NULL;
 
 		if (dhandle->checkpoint == NULL)
-			(void)__wt_fprintf(fp, "%s(<live>): \n", dhandle->name);
+			(void)__wt_fprintf(session, fh,
+			    "%s(<live>): \n", dhandle->name);
 		else
-			(void)__wt_fprintf(fp, "%s(checkpoint=%s): \n",
+			(void)__wt_fprintf(session, fh,
+			    "%s(checkpoint=%s): \n",
 			    dhandle->name, dhandle->checkpoint);
 		if (intl_pages != 0)
-			(void)__wt_fprintf(fp, "\t" "internal pages: "
-			    "%" PRIu64 " pages, %" PRIu64
+			(void)__wt_fprintf(session, fh,
+			    "\t" "internal pages: %" PRIu64 " pages, %" PRIu64
 			    " max, %" PRIu64 "MB total\n",
 			    intl_pages, max_intl_bytes, intl_bytes >> 20);
 		if (leaf_pages != 0)
-			(void)__wt_fprintf(fp, "\t" "leaf pages: "
-			    "%" PRIu64 " pages, %" PRIu64
+			(void)__wt_fprintf(session, fh,
+			    "\t" "leaf pages: %" PRIu64 " pages, %" PRIu64
 			    " max, %" PRIu64 "MB total\n",
 			    leaf_pages, max_leaf_bytes, leaf_bytes >> 20);
 		if (dirty_pages != 0)
-			(void)__wt_fprintf(fp, "\t" "dirty pages: "
-			    "%" PRIu64 " pages, %" PRIu64
+			(void)__wt_fprintf(session, fh,
+			    "\t" "dirty pages: %" PRIu64 " pages, %" PRIu64
 			    " max, %" PRIu64 "MB total\n",
 			    dirty_pages, max_dirty_bytes, dirty_bytes >> 20);
 
@@ -1777,12 +1780,13 @@ __wt_cache_dump(WT_SESSION_IMPL *session, const char *ofile)
 	if (conn->cache->overhead_pct != 0)
 		total_bytes +=
 		    (total_bytes * (uint64_t)conn->cache->overhead_pct) / 100;
-	(void)__wt_fprintf(fp, "cache dump: total found = %" PRIu64 "MB"
-	    " vs tracked inuse %" PRIu64 "MB\n",
+	(void)__wt_fprintf(session, fh,
+	    "cache dump: total found = %" PRIu64
+	    "MB vs tracked inuse %" PRIu64 "MB\n",
 	    total_bytes >> 20, __wt_cache_bytes_inuse(conn->cache) >> 20);
-	(void)__wt_fprintf(fp, "==========\n");
-	if (fp != stderr)
-		WT_RET(__wt_fclose(&fp, WT_FHANDLE_WRITE));
+	(void)__wt_fprintf(session, fh, "==========\n");
+	if (ofile != NULL)
+		WT_RET(__wt_close(session, &fh));
 	return (0);
 }
 #endif

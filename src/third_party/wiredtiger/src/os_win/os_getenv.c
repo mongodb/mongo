@@ -29,7 +29,7 @@ __wt_getenv(WT_SESSION_IMPL *session, const char *variable, const char **envp)
 	ret = GetEnvironmentVariableA(variable, *envp, size);
 	/* We expect the number of bytes not including nul terminator. */
 	if ((ret + 1) != size)
-		WT_RET_MSG(session, __wt_errno(),
+		WT_RET_MSG(session, __wt_getlasterror(),
 		    "GetEnvironmentVariableA failed: %s", variable);
 
 	return (0);

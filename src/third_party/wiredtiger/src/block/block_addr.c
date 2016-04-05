@@ -112,7 +112,7 @@ __wt_block_addr_invalid(WT_SESSION_IMPL *session,
 #endif
 
 	/* Check if the address is past the end of the file. */
-	return (offset + size > block->fh->size ? EINVAL : 0);
+	return (offset + size > block->size ? EINVAL : 0);
 }
 
 /*

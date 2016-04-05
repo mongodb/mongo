@@ -150,9 +150,9 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_reconfigure[] = {
 	    confchk_wiredtiger_open_statistics_log_subconfigs, 6 },
 	{ "verbose", "list",
 	    NULL, "choices=[\"api\",\"block\",\"checkpoint\",\"compact\","
-	    "\"evict\",\"evictserver\",\"fileops\",\"log\",\"lsm\","
-	    "\"lsm_manager\",\"metadata\",\"mutex\",\"overflow\",\"read\","
-	    "\"rebalance\",\"reconcile\",\"recovery\",\"salvage\","
+	    "\"evict\",\"evictserver\",\"fileops\",\"handleops\",\"log\","
+	    "\"lsm\",\"lsm_manager\",\"metadata\",\"mutex\",\"overflow\","
+	    "\"read\",\"rebalance\",\"reconcile\",\"recovery\",\"salvage\","
 	    "\"shared_cache\",\"split\",\"temporary\",\"transaction\","
 	    "\"verify\",\"version\",\"write\"]",
 	    NULL, 0 },
@@ -680,9 +680,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	{ "use_environment_priv", "boolean", NULL, NULL, NULL, 0 },
 	{ "verbose", "list",
 	    NULL, "choices=[\"api\",\"block\",\"checkpoint\",\"compact\","
-	    "\"evict\",\"evictserver\",\"fileops\",\"log\",\"lsm\","
-	    "\"lsm_manager\",\"metadata\",\"mutex\",\"overflow\",\"read\","
-	    "\"rebalance\",\"reconcile\",\"recovery\",\"salvage\","
+	    "\"evict\",\"evictserver\",\"fileops\",\"handleops\",\"log\","
+	    "\"lsm\",\"lsm_manager\",\"metadata\",\"mutex\",\"overflow\","
+	    "\"read\",\"rebalance\",\"reconcile\",\"recovery\",\"salvage\","
 	    "\"shared_cache\",\"split\",\"temporary\",\"transaction\","
 	    "\"verify\",\"version\",\"write\"]",
 	    NULL, 0 },
@@ -761,9 +761,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_all[] = {
 	{ "use_environment_priv", "boolean", NULL, NULL, NULL, 0 },
 	{ "verbose", "list",
 	    NULL, "choices=[\"api\",\"block\",\"checkpoint\",\"compact\","
-	    "\"evict\",\"evictserver\",\"fileops\",\"log\",\"lsm\","
-	    "\"lsm_manager\",\"metadata\",\"mutex\",\"overflow\",\"read\","
-	    "\"rebalance\",\"reconcile\",\"recovery\",\"salvage\","
+	    "\"evict\",\"evictserver\",\"fileops\",\"handleops\",\"log\","
+	    "\"lsm\",\"lsm_manager\",\"metadata\",\"mutex\",\"overflow\","
+	    "\"read\",\"rebalance\",\"reconcile\",\"recovery\",\"salvage\","
 	    "\"shared_cache\",\"split\",\"temporary\",\"transaction\","
 	    "\"verify\",\"version\",\"write\"]",
 	    NULL, 0 },
@@ -837,9 +837,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_basecfg[] = {
 	    confchk_wiredtiger_open_transaction_sync_subconfigs, 2 },
 	{ "verbose", "list",
 	    NULL, "choices=[\"api\",\"block\",\"checkpoint\",\"compact\","
-	    "\"evict\",\"evictserver\",\"fileops\",\"log\",\"lsm\","
-	    "\"lsm_manager\",\"metadata\",\"mutex\",\"overflow\",\"read\","
-	    "\"rebalance\",\"reconcile\",\"recovery\",\"salvage\","
+	    "\"evict\",\"evictserver\",\"fileops\",\"handleops\",\"log\","
+	    "\"lsm\",\"lsm_manager\",\"metadata\",\"mutex\",\"overflow\","
+	    "\"read\",\"rebalance\",\"reconcile\",\"recovery\",\"salvage\","
 	    "\"shared_cache\",\"split\",\"temporary\",\"transaction\","
 	    "\"verify\",\"version\",\"write\"]",
 	    NULL, 0 },
@@ -913,9 +913,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_usercfg[] = {
 	    confchk_wiredtiger_open_transaction_sync_subconfigs, 2 },
 	{ "verbose", "list",
 	    NULL, "choices=[\"api\",\"block\",\"checkpoint\",\"compact\","
-	    "\"evict\",\"evictserver\",\"fileops\",\"log\",\"lsm\","
-	    "\"lsm_manager\",\"metadata\",\"mutex\",\"overflow\",\"read\","
-	    "\"rebalance\",\"reconcile\",\"recovery\",\"salvage\","
+	    "\"evict\",\"evictserver\",\"fileops\",\"handleops\",\"log\","
+	    "\"lsm\",\"lsm_manager\",\"metadata\",\"mutex\",\"overflow\","
+	    "\"read\",\"rebalance\",\"reconcile\",\"recovery\",\"salvage\","
 	    "\"shared_cache\",\"split\",\"temporary\",\"transaction\","
 	    "\"verify\",\"version\",\"write\"]",
 	    NULL, 0 },

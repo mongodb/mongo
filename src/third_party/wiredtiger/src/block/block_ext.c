@@ -462,17 +462,13 @@ static inline int
 __block_extend(
     WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t *offp, wt_off_t size)
 {
-	WT_FH *fh;
-
-	fh = block->fh;
-
 	/*
 	 * Callers of this function are expected to have already acquired any
 	 * locks required to extend the file.
 	 *
 	 * We should never be allocating from an empty file.
 	 */
-	if (fh->size < block->allocsize)
+	if (block->size < block->allocsize)
 		WT_RET_MSG(session, EINVAL,
 		    "file has no description information");
 
@@ -482,12 +478,12 @@ __block_extend(
 	 * 8B bits (we currently check an wt_off_t is 8B in verify_build.h). I
 	 * don't think we're likely to see anything bigger for awhile.
 	 */
-	if (fh->size > (wt_off_t)INT64_MAX - size)
+	if (block->size > (wt_off_t)INT64_MAX - size)
 		WT_RET_MSG(session, WT_ERROR,
 		    "block allocation failed, file cannot grow further");
 
-	*offp = fh->size;
-	fh->size += size;
+	*offp = block->size;
+	block->size += size;
 
 	WT_STAT_FAST_DATA_INCR(session, block_extension);
 	WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
@@ -1343,10 +1339,7 @@ __wt_block_extlist_truncate(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
 {
 	WT_EXT *ext, **astack[WT_SKIP_MAXDEPTH];
-	WT_FH *fh;
 	wt_off_t orig, size;
-
-	fh = block->fh;
 
 	/*
 	 * Check if the last available extent is at the end of the file, and if
@@ -1354,8 +1347,8 @@ __wt_block_extlist_truncate(
 	 */
 	if ((ext = __block_off_srch_last(el->off, astack)) == NULL)
 		return (0);
-	WT_ASSERT(session, ext->off + ext->size <= fh->size);
-	if (ext->off + ext->size < fh->size)
+	WT_ASSERT(session, ext->off + ext->size <= block->size);
+	if (ext->off + ext->size < block->size)
 		return (0);
 
 	/*
@@ -1363,10 +1356,10 @@ __wt_block_extlist_truncate(
 	 * the cached file size, and that can't happen until after the extent
 	 * list removal succeeds.)
 	 */
-	orig = fh->size;
+	orig = block->size;
 	size = ext->off;
 	WT_RET(__block_off_remove(session, block, el, size, NULL));
-	fh->size = size;
+	block->size = size;
 
 	/*
 	 * Truncate the file. The truncate might fail if there's a file mapping
@@ -1376,7 +1369,7 @@ __wt_block_extlist_truncate(
 	WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
 	    "truncate file from %" PRIdMAX " to %" PRIdMAX,
 	    (intmax_t)orig, (intmax_t)size));
-	WT_RET_BUSY_OK(__wt_block_truncate(session, block->fh, size));
+	WT_RET_BUSY_OK(__wt_block_truncate(session, block, size));
 
 	return (0);
 }

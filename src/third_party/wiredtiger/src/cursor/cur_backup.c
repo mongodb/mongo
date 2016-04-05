@@ -251,7 +251,7 @@ __backup_start(
 		 * Close any hot backup file.
 		 * We're about to open the incremental backup file.
 		 */
-		WT_TRET(__wt_fclose(&cb->bfp, WT_FHANDLE_WRITE));
+		WT_TRET(__wt_close(session, &cb->bfh));
 		WT_ERR(__backup_file_create(session, cb, log_only));
 		WT_ERR(__backup_list_append(
 		    session, cb, WT_INCREMENTAL_BACKUP));
@@ -269,7 +269,7 @@ __backup_start(
 	}
 
 err:	/* Close the hot backup file. */
-	WT_TRET(__wt_fclose(&cb->bfp, WT_FHANDLE_WRITE));
+	WT_TRET(__wt_close(session, &cb->bfh));
 	if (ret != 0) {
 		WT_TRET(__backup_cleanup_handles(session, cb));
 		WT_TRET(__backup_stop(session));
@@ -411,9 +411,9 @@ static int
 __backup_file_create(
     WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, bool incremental)
 {
-	return (__wt_fopen(session,
+	return (__wt_open(session,
 	    incremental ? WT_INCREMENTAL_BACKUP : WT_METADATA_BACKUP,
-	    WT_FHANDLE_WRITE, 0, &cb->bfp));
+	    WT_FILE_TYPE_REGULAR, WT_OPEN_CREATE | WT_STREAM_WRITE, &cb->bfh));
 }
 
 /*
@@ -440,6 +440,7 @@ __backup_list_uri_append(
     WT_SESSION_IMPL *session, const char *name, bool *skip)
 {
 	WT_CURSOR_BACKUP *cb;
+	WT_DECL_RET;
 	char *value;
 
 	cb = session->bkp_cursor;
@@ -472,8 +473,9 @@ __backup_list_uri_append(
 
 	/* Add the metadata entry to the backup file. */
 	WT_RET(__wt_metadata_search(session, name, &value));
-	WT_RET(__wt_fprintf(cb->bfp, "%s\n%s\n", name, value));
+	ret = __wt_fprintf(session, cb->bfh, "%s\n%s\n", name, value);
 	__wt_free(session, value);
+	WT_RET(ret);
 
 	/* Add file type objects to the list of files to be copied. */
 	if (WT_PREFIX_MATCH(name, "file:"))

@@ -89,7 +89,7 @@ def printf_line(f, optype, i, ishex):
         ifbegin = 'if (LF_ISSET(WT_TXN_PRINTLOG_HEX)) {' + nl_indent
         if postcomma == '':
             precomma = ',\\n'
-    body = '%s%s(__wt_fprintf(out,' % (
+    body = '%s%s(__wt_fprintf(session, WT_STDOUT(session),' % (
         printf_setup(f, ishex, nl_indent),
         'WT_ERR' if has_escape(optype.fields) else 'WT_RET') + \
         '%s    "%s        \\"%s\\": \\"%s\\"%s",%s));' % (
@@ -292,16 +292,16 @@ __wt_logop_%(name)s_unpack(
     last_field = optype.fields[-1]
     tfile.write('''
 int
-__wt_logop_%(name)s_print(
-    WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
-    FILE *out, uint32_t flags)
+__wt_logop_%(name)s_print(WT_SESSION_IMPL *session,
+    const uint8_t **pp, const uint8_t *end, uint32_t flags)
 {
 %(arg_ret)s\t%(arg_decls)s
 
 \t%(arg_unused)s%(arg_init)sWT_RET(__wt_logop_%(name)s_unpack(
 \t    session, pp, end%(arg_addrs)s));
 
-\tWT_RET(__wt_fprintf(out, " \\"optype\\": \\"%(name)s\\",\\n"));
+\tWT_RET(__wt_fprintf(session, WT_STDOUT(session),
+\t    " \\"optype\\": \\"%(name)s\\",\\n"));
 \t%(print_args)s
 %(arg_fini)s
 }
@@ -324,9 +324,8 @@ __wt_logop_%(name)s_print(
 # Emit the printlog entry point
 tfile.write('''
 int
-__wt_txn_op_printlog(
-    WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
-    FILE *out, uint32_t flags)
+__wt_txn_op_printlog(WT_SESSION_IMPL *session,
+    const uint8_t **pp, const uint8_t *end, uint32_t flags)
 {
 \tuint32_t optype, opsize;
 
@@ -342,8 +341,7 @@ for optype in log_data.optypes:
 
     tfile.write('''
 \tcase %(macro)s:
-\t\tWT_RET(%(print_func)s(session, pp, end, out,
-\t\t    flags));
+\t\tWT_RET(%(print_func)s(session, pp, end, flags));
 \t\tbreak;
 ''' % {
     'macro' : optype.macro_name(),
