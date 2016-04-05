@@ -151,12 +151,12 @@ __im_file_size(
 	__wt_spin_lock(session, &im->lock);
 
 	if (__wt_handle_search(session, name, true, NULL, &fh)) {
-		*sizep = (wt_off_t)fh->buf.size;
-		ret = __wt_close(session, &fh);
+		WT_ERR(__im_handle_size(session, fh, sizep));
+		WT_ERR(__wt_close(session, &fh));
 	} else
 		ret = ENOENT;
 
-	__wt_spin_unlock(session, &im->lock);
+err:	__wt_spin_unlock(session, &im->lock);
 	return (ret);
 }
 
