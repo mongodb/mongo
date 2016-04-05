@@ -64,10 +64,12 @@ variables:
 
 - &debug_symbol_variants
   - enterprise-linux-64-amazon-ami
+  - enterprise-osx-107
   - enterprise-rhel-57-64-bit
   - enterprise-rhel-62-64-bit
   - enterprise-rhel-70-64-bit
   - enterprise-rhel-71-ppc64le
+  - enterprise-rhel-72-s390x
   - enterprise-suse11-64
   - enterprise-suse12-64
   - enterprise-ubuntu1204-64
@@ -83,10 +85,14 @@ variables:
   - suse12
   - ubuntu1204
   - ubuntu1404
+  - ubuntu1404-rocksdb
+  - ubuntu1410-fast-clang
   - debian71
   - debian81
   - solaris-64-bit
-  - osx
+  - osx-107-ssl
+  - osx-107
+
 
 - &packaging_variants
   - enterprise-linux-64-amazon-ami
@@ -6083,4 +6089,3 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
-
