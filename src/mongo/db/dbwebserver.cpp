@@ -290,7 +290,7 @@ public:
 
     Command* _cmd(const string& cmdName) const {
         Command* cmd = Command::findCommand(cmdName);
-        if (cmd->isWebUI()) {
+        if (cmd && cmd->isWebUI()) {
             return cmd;
         }
 
