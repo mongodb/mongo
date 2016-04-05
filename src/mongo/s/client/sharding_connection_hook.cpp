@@ -41,7 +41,7 @@
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/client.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/version_manager.h"
+#include "mongo/s/client/version_manager.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

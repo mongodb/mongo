@@ -169,8 +169,9 @@ env.CppUnitTest(
         'chunk_manager_tests.cpp'
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture',
         'coreshard',
-        '$BUILD_DIR/mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture']
+    ]
 )
 
 # This library contains sharding functionality used by both mongod and mongos. Certain tests,
@@ -184,7 +185,6 @@ env.Library(
         'chunk_manager.cpp',
         'config.cpp',
         'grid.cpp',
-        'version_manager.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/query/cluster_cursor_manager',
@@ -258,7 +258,6 @@ env.CppUnitTest(
 env.Library(
     target='serveronly',
     source=[
-        "d_migrate.cpp",
         'd_sharding_server_status.cpp',
         "d_state.cpp",
     ],

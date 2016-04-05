@@ -48,6 +48,8 @@ env.Library(
     source=[
         'chunk_move_write_concern_options.cpp',
         'collection_sharding_state.cpp',
+        'migration_chunk_cloner_source.cpp',
+        'migration_chunk_cloner_source_legacy.cpp',
         'migration_destination_manager.cpp',
         'migration_source_manager.cpp',
         'move_timing_helper.cpp',
@@ -62,7 +64,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/s/sharding_initialization',
         'metadata',
-        'migration_chunk_cloner_legacy',
         'migration_types',
         'type_shard_identity',
     ],
@@ -80,6 +81,8 @@ env.Library(
         'cleanup_orphaned_cmd.cpp',
         'get_shard_version_command.cpp',
         'merge_chunks_command.cpp',
+        'migration_chunk_cloner_source_legacy_commands.cpp',
+        'migration_destination_manager_legacy_commands.cpp',
         'move_chunk_command.cpp',
         'set_shard_version_command.cpp',
         'sharding_state_command.cpp',
@@ -96,33 +99,6 @@ env.Library(
     ],
     LIBDEPS_TAGS=[
         # Depends on getDeleter, defined in s/serveronly, which would be circular.
-        'incomplete',
-    ],
-)
-
-env.Library(
-    target='migration_chunk_cloner',
-    source=[
-        'migration_chunk_cloner_source.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.Library(
-    target='migration_chunk_cloner_legacy',
-    source=[
-        'migration_chunk_cloner_source_legacy.cpp',
-        'migration_chunk_cloner_source_legacy_commands.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/commands',
-        'migration_chunk_cloner',
-    ],
-    LIBDEPS_TAGS=[
-        # Depends on symbols defined in files in serverOnlyFiles, and has many other missing
-        # dependencies.
         'incomplete',
     ],
 )

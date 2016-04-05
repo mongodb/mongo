@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/version_manager.h"
+#include "mongo/s/client/version_manager.h"
 
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/db/namespace_string.h"

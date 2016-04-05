@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2008-2015 MongoDB Inc.
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -41,8 +41,6 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/s/chunk_move_write_concern_options.h"
@@ -58,38 +56,6 @@ using std::string;
 
 namespace {
 
-/* -----
-   below this are the "to" side commands
-
-   command to initiate
-   worker thread
-     does initial clone
-     pulls initial change set
-     keeps pulling
-     keeps state
-   command to get state
-   commend to "commit"
-*/
-
-/**
- * Command for initiating the recipient side of the migration to start copying data
- * from the donor shard.
- *
- * {
- *   _recvChunkStart: "namespace",
- *   congfigServer: "hostAndPort",
- *   from: "hostAndPort",
- *   fromShardName: "shardName",
- *   toShardName: "shardName",
- *   min: {},
- *   max: {},
- *   shardKeyPattern: {},
- *
- *   // optional
- *   secondaryThrottle: bool, // defaults to true
- *   writeConcern: {} // applies to individual writes.
- * }
- */
 class RecvChunkStartCommand : public Command {
 public:
     RecvChunkStartCommand() : Command("_recvChunkStart") {}
