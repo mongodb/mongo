@@ -44,6 +44,7 @@
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/socket_exception.h"
 
 namespace mongo {
 

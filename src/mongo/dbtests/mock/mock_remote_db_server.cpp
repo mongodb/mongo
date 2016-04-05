@@ -37,7 +37,7 @@
 #include "mongo/rpc/metadata.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/sock.h"
+#include "mongo/util/net/socket_exception.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/assert_util.h"
 

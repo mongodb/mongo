@@ -57,8 +57,9 @@
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/message.h"
-#include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/socket_poll.h"
+#include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/quick_exit.h"
 
 namespace mongo {
@@ -216,8 +217,6 @@ string prettyHostName() {
     return s.str();
 }
 
-// --------- SocketException ----------
-
 #ifdef MSG_NOSIGNAL
 const int portSendFlags = MSG_NOSIGNAL;
 const int portRecvFlags = MSG_NOSIGNAL;
@@ -225,19 +224,6 @@ const int portRecvFlags = MSG_NOSIGNAL;
 const int portSendFlags = 0;
 const int portRecvFlags = 0;
 #endif
-
-string SocketException::toString() const {
-    stringstream ss;
-    ss << _ei.code << " socket exception [" << _getStringType(_type) << "] ";
-
-    if (_server.size())
-        ss << "server [" << _server << "] ";
-
-    if (_extra.size())
-        ss << _extra;
-
-    return ss.str();
-}
 
 // ------------ Socket -----------------
 

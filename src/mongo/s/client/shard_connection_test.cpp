@@ -42,6 +42,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/net/socket_exception.h"
 
 /**
  * Tests for ShardConnection, particularly in connection pool management.

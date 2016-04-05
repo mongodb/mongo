@@ -103,69 +103,6 @@ std::string getHostNameCached();
 std::string prettyHostName();
 
 /**
- * thrown by Socket
- */
-class SocketException : public DBException {
-public:
-    const enum Type {
-        CLOSED,
-        RECV_ERROR,
-        SEND_ERROR,
-        RECV_TIMEOUT,
-        SEND_TIMEOUT,
-        FAILED_STATE,
-        CONNECT_ERROR
-    } _type;
-
-    SocketException(Type t,
-                    const std::string& server,
-                    int code = 9001,
-                    const std::string& extra = "")
-        : DBException(std::string("socket exception [") + _getStringType(t) + "] for " + server,
-                      code),
-          _type(t),
-          _server(server),
-          _extra(extra) {}
-
-    virtual ~SocketException() throw() {}
-
-    bool shouldPrint() const {
-        return _type != CLOSED;
-    }
-    virtual std::string toString() const;
-    virtual const std::string* server() const {
-        return &_server;
-    }
-
-private:
-    // TODO: Allow exceptions better control over their messages
-    static std::string _getStringType(Type t) {
-        switch (t) {
-            case CLOSED:
-                return "CLOSED";
-            case RECV_ERROR:
-                return "RECV_ERROR";
-            case SEND_ERROR:
-                return "SEND_ERROR";
-            case RECV_TIMEOUT:
-                return "RECV_TIMEOUT";
-            case SEND_TIMEOUT:
-                return "SEND_TIMEOUT";
-            case FAILED_STATE:
-                return "FAILED_STATE";
-            case CONNECT_ERROR:
-                return "CONNECT_ERROR";
-            default:
-                return "UNKNOWN";  // should never happen
-        }
-    }
-
-    std::string _server;
-    std::string _extra;
-};
-
-
-/**
  * thin wrapped around file descriptor and system calls
  * todo: ssl
  */

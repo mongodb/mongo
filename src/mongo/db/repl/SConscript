@@ -232,6 +232,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/stats/timer_stats',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        '$BUILD_DIR/mongo/util/net/network',
         'oplog_entry',
         'repl_coordinator_global',
     ],

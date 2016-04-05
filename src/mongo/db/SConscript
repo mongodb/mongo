@@ -677,6 +677,7 @@ serveronlyLibdeps = [
     "$BUILD_DIR/mongo/s/serveronly",
     "$BUILD_DIR/mongo/scripting/scripting_server",
     "$BUILD_DIR/mongo/util/elapsed_tracker",
+    "$BUILD_DIR/mongo/util/net/network",
     "$BUILD_DIR/mongo/db/storage/mmap_v1/file_allocator",
     "$BUILD_DIR/third_party/shim_snappy",
     "auth/authmongod",

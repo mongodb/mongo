@@ -117,6 +117,7 @@ dbtest = env.Program(
         "$BUILD_DIR/mongo/platform/platform",
         "$BUILD_DIR/mongo/db/serveronly",
         "$BUILD_DIR/mongo/util/concurrency/rwlock",
+        "$BUILD_DIR/mongo/util/net/network",
         "mocklib",
         "testframework",
     ],

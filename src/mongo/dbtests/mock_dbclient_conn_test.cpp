@@ -34,6 +34,7 @@
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/timer.h"
+#include "mongo/util/net/socket_exception.h"
 
 #include <ctime>
 #include <string>
