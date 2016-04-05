@@ -4378,7 +4378,7 @@ buildvariants:
   expansions:
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
     tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2)" -tags 'sasl ssl'
-    compile_flags: --ssl MONGO_DISTMOD=rhel71 --release -j$(grep -c processor /proc/cpuinfo) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" CXX=/opt/mongodbtoolchain/v1/bin/g++ CC=/opt/mongodbtoolchain/v1/bin/gcc
+    compile_flags: --ssl MONGO_DISTMOD=rhel71 --release -j$(grep -c processor /proc/cpuinfo) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++
     num_jobs_available: 20
     test_flags: --continueOnFailure
     has_packages: true
@@ -4509,7 +4509,7 @@ buildvariants:
   expansions:
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
     tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2)" -tags 'sasl ssl'
-    compile_flags: --ssl MONGO_DISTMOD=rhel72 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" CXX=/opt/mongodbtoolchain/v1/bin/g++ CC=/opt/mongodbtoolchain/v1/bin/gcc
+    compile_flags: --ssl MONGO_DISTMOD=rhel72 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++
     num_jobs_available: 2
     test_flags: --continueOnFailure --excludeWithAnyTags=requires_mmapv1
     has_packages: true
