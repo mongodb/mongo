@@ -707,7 +707,7 @@ void BackgroundSync::_rollback(OperationContext* txn,
     if (status.isOK()) {
         // When the syncTail thread sees there is no new data by adding something to the buffer.
         _signalNoNewDataForApplier();
-        // Wait until the buffer is emtpy.
+        // Wait until the buffer is empty.
         // This is an indication that syncTail has removed the sentinal marker from the buffer
         // and reset its local lastAppliedOpTime via the replCoord.
         while (!_buffer.empty()) {
@@ -715,6 +715,15 @@ void BackgroundSync::_rollback(OperationContext* txn,
             if (inShutdown()) {
                 return;
             }
+        }
+
+        // It is now safe to clear the ROLLBACK state, which may result in the applier thread
+        // transitioning to SECONDARY.  This is safe because the applier thread has now reloaded
+        // the new rollback minValid from the database.
+        if (!_replCoord->setFollowerMode(MemberState::RS_RECOVERING)) {
+            warning() << "Failed to transition into " << MemberState(MemberState::RS_RECOVERING)
+                      << "; expected to be in state " << MemberState(MemberState::RS_ROLLBACK)
+                      << " but found self in " << _replCoord->getMemberState();
         }
         return;
     }

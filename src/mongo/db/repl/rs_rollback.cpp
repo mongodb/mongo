@@ -879,24 +879,12 @@ Status _syncRollback(OperationContext* txn,
     } catch (...) {
         replCoord->incrementRollbackID();
 
-        if (!replCoord->setFollowerMode(MemberState::RS_RECOVERING)) {
-            warning() << "Failed to transition into " << MemberState(MemberState::RS_RECOVERING)
-                      << "; expected to be in state " << MemberState(MemberState::RS_ROLLBACK)
-                      << " but found self in " << replCoord->getMemberState();
-        }
-
         throw;
     }
     replCoord->incrementRollbackID();
 
-    // success - leave "ROLLBACK" state
-    // can go to SECONDARY once minvalid is achieved
-    if (!replCoord->setFollowerMode(MemberState::RS_RECOVERING)) {
-        warning() << "Failed to transition into " << MemberState(MemberState::RS_RECOVERING)
-                  << "; expected to be in state " << MemberState(MemberState::RS_ROLLBACK)
-                  << " but found self in " << replCoord->getMemberState();
-    }
-
+    // Success; leave "ROLLBACK" state intact until applier thread has reloaded the new minValid.
+    // Otherwise, the applier could transition the node to SECONDARY with an out-of-date minValid.
     return Status::OK();
 }
 
