@@ -250,9 +250,10 @@ static ExitCode runMongosServer() {
         quickExit(EXIT_BADOPTIONS);
     }
 
+    auto opCtx = cc().makeOperationContext();
+
     {
-        auto txn = cc().makeOperationContext();
-        Status status = initializeSharding(txn.get());
+        Status status = initializeSharding(opCtx.get());
         if (!status.isOK()) {
             if (status == ErrorCodes::CallbackCanceled) {
                 invariant(inShutdown());
@@ -263,7 +264,7 @@ static ExitCode runMongosServer() {
             return EXIT_SHARDING_ERROR;
         }
 
-        ConfigServer::reloadSettings(txn.get());
+        ConfigServer::reloadSettings(opCtx.get());
     }
 
 #if !defined(_WIN32)
@@ -287,13 +288,12 @@ static ExitCode runMongosServer() {
         return EXIT_SHARDING_ERROR;
     }
 
-    balancer.go();
+    Balancer::get(opCtx.get())->go();
     clusterCursorCleanupJob.go();
 
     UserCacheInvalidator cacheInvalidatorThread(getGlobalAuthorizationManager());
     {
-        auto txn = cc().makeOperationContext();
-        cacheInvalidatorThread.initialize(txn.get());
+        cacheInvalidatorThread.initialize(opCtx.get());
         cacheInvalidatorThread.go();
     }
 
