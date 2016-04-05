@@ -308,7 +308,12 @@ __im_handle_size(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
 {
 	WT_UNUSED(session);
 
-	*sizep = (wt_off_t)fh->buf.size;
+	/*
+	 * XXX hack - MongoDB assumes that any file with content will have a
+	 * non-zero size. In memory tables generally are zero-sized, make
+	 * MongoDB happy.
+	 */
+	*sizep = fh->buf.size == 0 ? 0 : (wt_off_t)fh->buf.size;
 	return (0);
 }
 
