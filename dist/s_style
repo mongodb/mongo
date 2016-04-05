@@ -60,11 +60,12 @@ else
 		echo "$f: use TAILQ for all lists"
 	fi
 
-	if ! expr "$f" : 'src/os_posix/.*' > /dev/null &&
+	if ! expr "$f" : 'src/os_common/.*' > /dev/null &&
+	   ! expr "$f" : 'src/os_posix/.*' > /dev/null &&
 	   ! expr "$f" : 'src/os_win/.*' > /dev/null &&
 	   ! expr "$f" : 'src/include/extern.h' > /dev/null &&
 	   ! expr "$f" : 'src/include/os.h' > /dev/null &&
-	   grep '__wt_errno' $f > $t; then
+	    grep '__wt_errno' $f > $t; then
 		echo "$f: upper-level code should not call __wt_errno"
 		cat $t
 	fi
@@ -82,6 +83,12 @@ else
 		echo "$f: off_t type declaration, use wt_off_t"
 		cat $t
 	}
+
+	if ! expr "$f" : 'src/.*/os_setvbuf.c' > /dev/null &&
+	    egrep -w 'setvbuf' $f > $t; then
+		echo "$f: setvbuf call, use WiredTiger library replacements"
+		cat $t
+	fi
 
 	# Alignment directive before "struct".
 	egrep 'WT_COMPILER_TYPE_ALIGN.*struct' $f > $t

@@ -103,7 +103,7 @@ __wt_cond_wait_signal(
 		if ((err = GetLastError()) == ERROR_TIMEOUT)
 			*signalled = false;
 		else
-			ret = __wt_errno();
+			ret = __wt_getlasterror();
 	} else
 		ret = 0;
 

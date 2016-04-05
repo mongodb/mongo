@@ -4,13 +4,10 @@
 t=__wt.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
-(
-cat <<EOF
-/* DO NOT EDIT: automatically built by dist/s_prototypes. */
-
-EOF
-
-for i in `sed -e '/^[a-z]/!d' filelist`; do
+# proto --
+#	extract public functions.
+proto()
+{
 	sed -n \
 	    -e '/^__wt_[a-z]/!{' \
 		-e h \
@@ -32,9 +29,34 @@ for i in `sed -e '/^[a-z]/!d' filelist`; do
 	    -e 's/  */ /g' \
 	    -e 's/^/extern /' \
 	    -e 's/WT_GCC_FUNC_/WT_GCC_FUNC_DECL_/' \
-	    -e 's/$/;/p' \
-	    < ../$i
-done) > $t
+	    -e 's/$/;/p' < $1
+}
+
+(
+cat <<EOF
+/* DO NOT EDIT: automatically built by dist/s_prototypes. */
+
+EOF
+
+# First, get prototypes for everything but the OS directories.
+# Second, get prototypes for the OS directories.
+# The reason for this is because the OS directories repeat names (that is, there
+# are common names in both os_posix and os_win), and so we sort the prototypes
+# to avoid repeating them in the output (which some compilers won't tolerate).
+# We'd sort everything and discard duplicates, but we can't sort when function
+# signatures are on multiple lines, that is, #ifdef'd function signatures. Since
+# the OS directories are the only places with repeated names, and they have no
+# #ifdef'd signatures, we do it this way.
+l=`sed -e '/^[a-z]/!d' -e '/src\/os/d' filelist`
+for i in $l; do
+	proto ../$i
+done
+l=`echo ../src\/os*/*.c`
+
+for i in $l; do
+	proto $i
+done | tee xxx | env LC_ALL=C sort -u
+) > $t
 
 f=../src/include/extern.h
 cmp $t $f > /dev/null 2>&1 ||

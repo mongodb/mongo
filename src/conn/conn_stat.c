@@ -209,10 +209,11 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, bool conn_stats)
 	}
 
 	if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_JSON)) {
-		WT_ERR(__wt_fprintf(conn->stat_fp,
+		WT_ERR(__wt_fprintf(session, conn->stat_fh,
 		     "{\"version\":\"%s\",\"localTime\":\"%s\"",
 		     WIREDTIGER_VERSION_STRING, conn->stat_stamp));
-		WT_ERR(__wt_fprintf(conn->stat_fp, ",\"wiredTiger\":{"));
+		WT_ERR(__wt_fprintf(
+		    session, conn->stat_fh, ",\"wiredTiger\":{"));
 		while ((ret = cursor->next(cursor)) == 0) {
 			WT_ERR(cursor->get_value(cursor, &desc, &valstr, &val));
 			/* Check if we are starting a new section. */
@@ -224,23 +225,23 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, bool conn_stats)
 			    strncmp(desc, tmp->data, tmp->size) != 0) {
 				WT_ERR(__wt_buf_set(
 				    session, tmp, desc, prefixlen));
-				WT_ERR(__wt_fprintf(conn->stat_fp,
+				WT_ERR(__wt_fprintf(session, conn->stat_fh,
 				    "%s\"%.*s\":{", first ? "" : "},",
 				    (int)prefixlen, desc));
 				first = false;
 				groupfirst = true;
 			}
-			WT_ERR(__wt_fprintf(conn->stat_fp,
+			WT_ERR(__wt_fprintf(session, conn->stat_fh,
 			    "%s\"%s\":%" PRId64,
 			    groupfirst ? "" : ",", endprefix + 2, val));
 			groupfirst = false;
 		}
 		WT_ERR_NOTFOUND_OK(ret);
-		WT_ERR(__wt_fprintf(conn->stat_fp, "}}}\n"));
+		WT_ERR(__wt_fprintf(session, conn->stat_fh, "}}}\n"));
 	} else {
 		while ((ret = cursor->next(cursor)) == 0) {
 			WT_ERR(cursor->get_value(cursor, &desc, &valstr, &val));
-			WT_ERR(__wt_fprintf(conn->stat_fp,
+			WT_ERR(__wt_fprintf(session, conn->stat_fh,
 			    "%s %" PRId64 " %s %s\n",
 			    conn->stat_stamp, val, name, desc));
 		}
@@ -349,11 +350,11 @@ err:	if (locked)
 static int
 __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 {
-	FILE *log_file;
-	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 	struct timespec ts;
 	struct tm *tm, _tm;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_FH *log_file;
 
 	conn = S2C(session);
 
@@ -366,16 +367,18 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 		WT_RET_MSG(session, ENOMEM, "strftime path conversion");
 
 	/* If the path has changed, cycle the log file. */
-	if ((log_file = conn->stat_fp) == NULL ||
+	if ((log_file = conn->stat_fh) == NULL ||
 	    path == NULL || strcmp(tmp->mem, path->mem) != 0) {
-		conn->stat_fp = NULL;
-		WT_RET(__wt_fclose(&log_file, WT_FHANDLE_APPEND));
+		conn->stat_fh = NULL;
+		WT_RET(__wt_close(session, &log_file));
 		if (path != NULL)
 			(void)strcpy(path->mem, tmp->mem);
-		WT_RET(__wt_fopen(session,
-		    tmp->mem, WT_FHANDLE_APPEND, WT_FOPEN_FIXED, &log_file));
+		WT_RET(__wt_open(session, tmp->mem,
+		    WT_FILE_TYPE_REGULAR,
+		    WT_OPEN_CREATE | WT_OPEN_FIXED | WT_STREAM_APPEND,
+		    &log_file));
 	}
-	conn->stat_fp = log_file;
+	conn->stat_fh = log_file;
 
 	/* Create the entry prefix for this time of day. */
 	if (strftime(tmp->mem, tmp->memsize, conn->stat_format, tm) == 0)
@@ -408,7 +411,7 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 		WT_RET(__statlog_lsm_apply(session));
 
 	/* Flush. */
-	return (__wt_fflush(conn->stat_fp));
+	return (__wt_fsync(session, conn->stat_fh, true));
 }
 
 /*
@@ -594,7 +597,7 @@ __wt_statlog_destroy(WT_SESSION_IMPL *session, bool is_close)
 	conn->stat_session = NULL;
 	conn->stat_tid_set = false;
 	conn->stat_format = NULL;
-	WT_TRET(__wt_fclose(&conn->stat_fp, WT_FHANDLE_APPEND));
+	WT_TRET(__wt_close(session, &conn->stat_fh));
 	conn->stat_path = NULL;
 	conn->stat_sources = NULL;
 	conn->stat_stamp = NULL;
