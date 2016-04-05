@@ -156,6 +156,7 @@ error_code("InconsistentShardIdentity", 154)
 error_code("CannotApplyOplogWhilePrimary", 155)
 
 # Non-sequential error codes (for compatibility only)
+error_code("SocketException", 9001)
 error_code("RecvStaleConfig", 9996)
 error_code("NotMaster", 10107)
 error_code("CannotGrowDocumentInCappedNamespace", 10003)
