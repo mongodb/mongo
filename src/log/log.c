@@ -431,7 +431,7 @@ __log_prealloc(WT_SESSION_IMPL *session, WT_FH *fh)
 
 	conn = S2C(session);
 	log = conn->log;
-	ret = 0;
+
 	/*
 	 * If the user configured zero filling, pre-allocate the log file
 	 * manually.  Otherwise use either fallocate or ftruncate to create
