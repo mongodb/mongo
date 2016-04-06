@@ -1457,12 +1457,10 @@ if env.TargetOSIs('posix'):
 
 mmapv1 = False
 if get_option('mmapv1') == 'auto':
-    # MMapV1 only supports little-endian architectures, and will fail to run on big-endian
-    # so disable MMapV1 on big-endian architectures
-    if endian == 'big':
-        mmapv1 = False
-    else:
-        mmapv1 = True
+    # The mmapv1 storage engine is only supported on x86
+    # targets. Unless explicitly requested, disable it on all other
+    # platforms.
+    mmapv1 = (env['TARGET_ARCH'] in ['i386', 'x86_64'])
 elif get_option('mmapv1') == 'on':
     mmapv1 = True
 
