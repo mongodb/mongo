@@ -30,6 +30,8 @@
 
 #include "mongo/base/secure_allocator.h"
 
+#include <array>
+
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -37,21 +39,50 @@ namespace mongo {
 TEST(SecureAllocator, SecureVector) {
     SecureVector<int> vec;
 
-    vec.push_back(1);
-    vec.push_back(2);
+    vec->push_back(1);
+    vec->push_back(2);
 
-    ASSERT_EQUALS(1, vec[0]);
-    ASSERT_EQUALS(2, vec[1]);
+    ASSERT_EQUALS(1, (*vec)[0]);
+    ASSERT_EQUALS(2, (*vec)[1]);
 
-    vec.resize(2000, 3);
-    ASSERT_EQUALS(3, vec[2]);
+    vec->resize(2000, 3);
+    ASSERT_EQUALS(3, (*vec)[2]);
 }
 
 TEST(SecureAllocator, SecureString) {
     SecureString str;
 
-    str.resize(2000, 'x');
-    ASSERT_EQUALS(0, str.compare(SecureString(2000, 'x')));
+    str->resize(2000, 'x');
+    ASSERT_EQUALS(0, str->compare(*SecureString(2000, 'x')));
+
+    SecureString str2(str);
+    ASSERT_NOT_EQUALS(&*str, &*str2);
+    str2 = str;
+    ASSERT_NOT_EQUALS(&*str, &*str2);
+
+    auto strPtr = &*str;
+    auto str2Ptr = &*str2;
+    SecureString str3(std::move(str));
+    ASSERT_EQUALS(strPtr, &*str3);
+    str3 = std::move(str2);
+    ASSERT_EQUALS(str2Ptr, &*str3);
+}
+
+// Verify that we can make a good number of secure objects.  Under the initial secure allocator
+// design (page per object), you couldn't make more than 8-50 objects before running out of lockable
+// pages.
+TEST(SecureAllocator, ManySecureBytes) {
+    std::array<SecureHandle<char>, 4096> chars;
+    std::vector<SecureHandle<char>> e_chars(4096, 'e');
+}
+
+TEST(SecureAllocator, NonDefaultConstructibleWorks) {
+    struct Foo {
+        Foo(int) {}
+        Foo() = delete;
+    };
+
+    SecureHandle<Foo> foo(10);
 }
 
 }  // namespace mongo
