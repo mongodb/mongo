@@ -282,6 +282,7 @@ void BackgroundSync::_produce(OperationContext* txn) {
 
     // find a target to sync from the last optime fetched
     OpTime lastOpTimeFetched;
+    HostAndPort source;
     {
         stdx::unique_lock<stdx::mutex> lock(_mutex);
         lastOpTimeFetched = _lastOpTimeFetched;
@@ -306,8 +307,11 @@ void BackgroundSync::_produce(OperationContext* txn) {
             warning() << "Failed to transition into " << MemberState(MemberState::RS_RECOVERING)
                       << ". Current state: " << _replCoord->getMemberState();
         }
+        return;
     } else if (syncSourceResp.isOK() && !syncSourceResp.getSyncSource().empty()) {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         _syncSourceHost = syncSourceResp.getSyncSource();
+        source = _syncSourceHost;
     } else {
         if (!syncSourceResp.isOK()) {
             log() << "failed to find sync source, received error "
@@ -341,7 +345,7 @@ void BackgroundSync::_produce(OperationContext* txn) {
                                       this,
                                       stdx::placeholders::_1,
                                       stdx::placeholders::_3,
-                                      stdx::cref(_syncSourceHost),
+                                      stdx::cref(source),
                                       lastOpTimeFetched,
                                       lastHashFetched,
                                       fetcherMaxTimeMS,
@@ -366,23 +370,23 @@ void BackgroundSync::_produce(OperationContext* txn) {
     auto cmdObj = cmdBob.obj();
     auto metadataObj = metadataBob.obj();
     Fetcher fetcher(&_threadPoolTaskExecutor,
-                    _syncSourceHost,
+                    source,
                     dbName,
                     cmdObj,
                     fetcherCallback,
                     metadataObj,
                     _replCoord->getConfig().getElectionTimeoutPeriod());
 
-    LOG(1) << "scheduling fetcher to read remote oplog on " << _syncSourceHost << " starting at "
+    LOG(1) << "scheduling fetcher to read remote oplog on " << source << " starting at "
            << cmdObj["filter"];
     auto scheduleStatus = fetcher.schedule();
     if (!scheduleStatus.isOK()) {
-        warning() << "unable to schedule fetcher to read remote oplog on " << _syncSourceHost
-                  << ": " << scheduleStatus;
+        warning() << "unable to schedule fetcher to read remote oplog on " << source << ": "
+                  << scheduleStatus;
         return;
     }
     fetcher.wait();
-    LOG(1) << "fetcher stopped reading remote oplog on " << _syncSourceHost;
+    LOG(1) << "fetcher stopped reading remote oplog on " << source;
 
     // If the background sync is stopped after the fetcher is started, we need to
     // re-evaluate our sync source and oplog common point.
@@ -405,7 +409,6 @@ void BackgroundSync::_produce(OperationContext* txn) {
         const int messagingPortTags = 0;
         ConnectionPool connectionPool(messagingPortTags);
         std::unique_ptr<ConnectionPool::ConnectionPtr> connection;
-        HostAndPort source = _syncSourceHost;
         auto getConnection = [&connection, &connectionPool, source]() -> DBClientBase* {
             if (!connection.get()) {
                 connection.reset(new ConnectionPool::ConnectionPtr(
