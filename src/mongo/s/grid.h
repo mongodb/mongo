@@ -47,6 +47,12 @@ class ShardRegistry;
 class Grid {
 public:
     Grid();
+    ~Grid();
+
+    /**
+     * Retrieves the instance of Grid associated with the current service context.
+     */
+    static Grid* get(OperationContext* operationContext);
 
     /**
      * Called at startup time so the global sharding services can be set. This method must be called

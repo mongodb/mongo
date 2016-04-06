@@ -284,8 +284,8 @@ StatusWith<ShardInfoMap> DistributionStatus::populateShardInfoMap(OperationConte
         for (const ShardType& shardData : shards) {
             std::set<std::string> dummy;
 
-            const long long shardSizeBytes = uassertStatusOK(
-                shardutil::retrieveTotalShardSize(txn, shardData.getName(), grid.shardRegistry()));
+            const long long shardSizeBytes =
+                uassertStatusOK(shardutil::retrieveTotalShardSize(txn, shardData.getName()));
 
             const std::string shardMongodVersion =
                 retrieveShardMongoDVersion(txn, shardData.getName(), grid.shardRegistry());

@@ -54,6 +54,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/shard_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
@@ -347,14 +348,9 @@ void ChunkManager::calcInitSplitsAndShards(OperationContext* txn,
                                            const set<ShardId>* initShardIds,
                                            vector<BSONObj>* splitPoints,
                                            vector<ShardId>* shardIds) const {
-    verify(_chunkMap.size() == 0);
+    invariant(_chunkMap.empty());
 
-    Chunk c(this,
-            _keyPattern.getKeyPattern().globalMin(),
-            _keyPattern.getKeyPattern().globalMax(),
-            primaryShardId);
-
-    if (!initPoints || !initPoints->size()) {
+    if (!initPoints || initPoints->empty()) {
         // discover split points
         const auto primaryShard = grid.shardRegistry()->getShard(txn, primaryShardId);
         const NamespaceString nss{getns()};
@@ -370,8 +366,18 @@ void ChunkManager::calcInitSplitsAndShards(OperationContext* txn,
         uassertStatusOK(getStatusFromCommandResult(result.getValue()));
         uassertStatusOK(bsonExtractIntegerField(result.getValue(), "n", &numObjects));
 
-        if (numObjects > 0)
-            c.pickSplitVector(txn, *splitPoints, Chunk::MaxChunkSize);
+        if (numObjects > 0) {
+            *splitPoints = uassertStatusOK(
+                shardutil::selectChunkSplitPoints(txn,
+                                                  primaryShardId,
+                                                  NamespaceString(_ns),
+                                                  _keyPattern,
+                                                  _keyPattern.getKeyPattern().globalMin(),
+                                                  _keyPattern.getKeyPattern().globalMax(),
+                                                  Chunk::MaxChunkSize,
+                                                  0,
+                                                  0));
+        }
 
         // since docs already exists, must use primary shard
         shardIds->push_back(primaryShardId);

@@ -46,6 +46,12 @@ Grid grid;
 
 Grid::Grid() : _allowLocalShard(true) {}
 
+Grid::~Grid() = default;
+
+Grid* Grid::get(OperationContext* operationContext) {
+    return &grid;
+}
+
 void Grid::init(std::unique_ptr<CatalogManager> catalogManager,
                 std::unique_ptr<CatalogCache> catalogCache,
                 std::unique_ptr<ShardRegistry> shardRegistry,

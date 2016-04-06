@@ -152,7 +152,7 @@ MONGO_FP_DECLARE(balancerRoundIntervalSetting);
 
 }  // namespace
 
-Balancer::Balancer() : _balancedLastTime(0), _policy(new BalancerPolicy()) {}
+Balancer::Balancer() : _balancedLastTime(0) {}
 
 Balancer::~Balancer() = default;
 
@@ -160,132 +160,181 @@ Balancer* Balancer::get(OperationContext* operationContext) {
     return &getBalancer(operationContext->getServiceContext());
 }
 
-int Balancer::_moveChunks(OperationContext* txn,
-                          const vector<MigrateInfo>& candidateChunks,
-                          const MigrationSecondaryThrottleOptions& secondaryThrottle,
-                          bool waitForDelete) {
-    int movedCount = 0;
+void Balancer::run() {
+    Client::initThread("Balancer");
 
-    for (const auto& migrateInfo : candidateChunks) {
-        // If the balancer was disabled since we started this round, don't start new chunks
-        // moves.
-        const auto balSettingsResult =
-            grid.catalogManager(txn)->getGlobalSettings(txn, SettingsType::BalancerDocKey);
-
-        const bool isBalSettingsAbsent =
-            balSettingsResult.getStatus() == ErrorCodes::NoMatchingDocument;
-
-        if (!balSettingsResult.isOK() && !isBalSettingsAbsent) {
-            warning() << balSettingsResult.getStatus();
-            return movedCount;
+    // This is the body of a BackgroundJob so if we throw here we're basically ending the balancer
+    // thread prematurely.
+    while (!inShutdown()) {
+        auto txn = cc().makeOperationContext();
+        if (!_init(txn.get())) {
+            log() << "will retry to initialize balancer in one minute";
+            sleepsecs(60);
+            continue;
         }
 
-        const SettingsType& balancerConfig =
-            isBalSettingsAbsent ? SettingsType{} : balSettingsResult.getValue();
+        break;
+    }
 
-        if ((!isBalSettingsAbsent && !Chunk::shouldBalance(balancerConfig)) ||
-            MONGO_FAIL_POINT(skipBalanceRound)) {
-            LOG(1) << "Stopping balancing round early as balancing was disabled";
-            return movedCount;
-        }
+    Seconds balanceRoundInterval(kBalanceRoundDefaultInterval);
 
-        // Changes to metadata, borked metadata, and connectivity problems between shards
-        // should cause us to abort this chunk move, but shouldn't cause us to abort the entire
-        // round of chunks.
-        //
-        // TODO(spencer): We probably *should* abort the whole round on issues communicating
-        // with the config servers, but its impossible to distinguish those types of failures
-        // at the moment.
-        //
-        // TODO: Handle all these things more cleanly, since they're expected problems
+    while (!inShutdown()) {
+        auto txn = cc().makeOperationContext();
 
-        const NamespaceString nss(migrateInfo.ns);
+        BalanceRoundDetails roundDetails;
 
         try {
-            shared_ptr<DBConfig> cfg =
-                uassertStatusOK(grid.catalogCache()->getDatabase(txn, nss.db().toString()));
+            // ping has to be first so we keep things in the config server in sync
+            _ping(txn.get());
 
-            // NOTE: We purposely do not reload metadata here, since _doBalanceRound already
-            // tried to do so once.
-            shared_ptr<ChunkManager> cm = cfg->getChunkManager(txn, migrateInfo.ns);
-            uassert(28628,
-                    str::stream()
-                        << "Collection " << migrateInfo.ns
-                        << " was deleted while balancing was active. Aborting balancing round.",
-                    cm);
-
-            ChunkPtr c = cm->findIntersectingChunk(txn, migrateInfo.chunk.min);
-
-            if (c->getMin().woCompare(migrateInfo.chunk.min) ||
-                c->getMax().woCompare(migrateInfo.chunk.max)) {
-                // Likely a split happened somewhere, so force reload the chunk manager
-                cm = cfg->getChunkManager(txn, migrateInfo.ns, true);
-                invariant(cm);
-
-                c = cm->findIntersectingChunk(txn, migrateInfo.chunk.min);
-
-                if (c->getMin().woCompare(migrateInfo.chunk.min) ||
-                    c->getMax().woCompare(migrateInfo.chunk.max)) {
-                    log() << "chunk mismatch after reload, ignoring will retry issue "
-                          << migrateInfo.chunk.toString();
-
-                    continue;
-                }
+            MONGO_FAIL_POINT_BLOCK(balancerRoundIntervalSetting, scopedBalancerRoundInterval) {
+                const BSONObj& data = scopedBalancerRoundInterval.getData();
+                balanceRoundInterval = Seconds(data["sleepSecs"].numberInt());
             }
 
-            BSONObj res;
-            if (c->moveAndCommit(txn,
-                                 migrateInfo.to,
-                                 Chunk::MaxChunkSize,
-                                 secondaryThrottle,
-                                 waitForDelete,
-                                 0, /* maxTimeMS */
-                                 res)) {
-                movedCount++;
+            BSONObj balancerResult;
+
+            // use fresh shard state
+            grid.shardRegistry()->reload(txn.get());
+
+            // refresh chunk size (even though another balancer might be active)
+            Chunk::refreshChunkSize(txn.get());
+
+            auto balSettingsResult = grid.catalogManager(txn.get())->getGlobalSettings(
+                txn.get(), SettingsType::BalancerDocKey);
+            const bool isBalSettingsAbsent =
+                balSettingsResult.getStatus() == ErrorCodes::NoMatchingDocument;
+            if (!balSettingsResult.isOK() && !isBalSettingsAbsent) {
+                warning() << balSettingsResult.getStatus();
+                return;
+            }
+
+            const SettingsType& balancerConfig =
+                isBalSettingsAbsent ? SettingsType{} : balSettingsResult.getValue();
+
+            // now make sure we should even be running
+            if ((!isBalSettingsAbsent && !Chunk::shouldBalance(balancerConfig)) ||
+                MONGO_FAIL_POINT(skipBalanceRound)) {
+                LOG(1) << "skipping balancing round because balancing is disabled";
+
+                // Ping again so scripts can determine if we're active without waiting
+                _ping(txn.get(), true);
+
+                sleepFor(balanceRoundInterval);
                 continue;
             }
 
-            // The move requires acquiring the collection metadata's lock, which can fail.
-            log() << "balancer move failed: " << res << " from: " << migrateInfo.from
-                  << " to: " << migrateInfo.to << " chunk: " << migrateInfo.chunk;
+            uassert(13258, "oids broken after resetting!", _checkOIDs(txn.get()));
 
-            Status moveStatus = getStatusFromCommandResult(res);
+            {
+                auto scopedDistLock = grid.catalogManager(txn.get())
+                                          ->distLock(txn.get(),
+                                                     "balancer",
+                                                     "doing balance round",
+                                                     DistLockManager::kSingleLockAttemptTimeout);
 
-            if (moveStatus == ErrorCodes::ChunkTooBig || res["chunkTooBig"].trueValue()) {
-                // Reload just to be safe
-                cm = cfg->getChunkManager(txn, migrateInfo.ns);
-                invariant(cm);
+                if (!scopedDistLock.isOK()) {
+                    LOG(1) << "skipping balancing round" << causedBy(scopedDistLock.getStatus());
 
-                c = cm->findIntersectingChunk(txn, migrateInfo.chunk.min);
+                    // Ping again so scripts can determine if we're active without waiting
+                    _ping(txn.get(), true);
 
-                log() << "performing a split because migrate failed for size reasons";
-
-                Status status = c->split(txn, Chunk::normal, NULL, NULL);
-                log() << "split results: " << status;
-
-                if (!status.isOK()) {
-                    log() << "marking chunk as jumbo: " << c->toString();
-
-                    c->markAsJumbo(txn);
-
-                    // We increment moveCount so we do another round right away
-                    movedCount++;
+                    sleepFor(balanceRoundInterval);  // no need to wake up soon
+                    continue;
                 }
+
+                const bool waitForDelete =
+                    (balancerConfig.isWaitForDeleteSet() ? balancerConfig.getWaitForDelete()
+                                                         : false);
+
+                MigrationSecondaryThrottleOptions secondaryThrottle(
+                    MigrationSecondaryThrottleOptions::create(
+                        MigrationSecondaryThrottleOptions::kDefault));
+                if (balancerConfig.isKeySet()) {
+                    secondaryThrottle =
+                        uassertStatusOK(MigrationSecondaryThrottleOptions::createFromBalancerConfig(
+                            balancerConfig.toBSON()));
+                }
+
+                LOG(1) << "*** start balancing round. "
+                       << "waitForDelete: " << waitForDelete
+                       << ", secondaryThrottle: " << secondaryThrottle.toBSON();
+
+                const auto candidateChunks = uassertStatusOK(_getCandidateChunks(txn.get()));
+
+                if (candidateChunks.empty()) {
+                    LOG(1) << "no need to move any chunk";
+                    _balancedLastTime = 0;
+                } else {
+                    _balancedLastTime =
+                        _moveChunks(txn.get(), candidateChunks, secondaryThrottle, waitForDelete);
+
+                    roundDetails.setSucceeded(static_cast<int>(candidateChunks.size()),
+                                              _balancedLastTime);
+
+                    grid.catalogManager(txn.get())
+                        ->logAction(txn.get(), "balancer.round", "", roundDetails.toBSON());
+                }
+
+                LOG(1) << "*** End of balancing round";
             }
-        } catch (const DBException& ex) {
-            warning() << "could not move chunk " << migrateInfo.chunk.toString()
-                      << ", continuing balancing round" << causedBy(ex);
+
+            // Ping again so scripts can determine if we're active without waiting
+            _ping(txn.get(), true);
+
+            sleepFor(_balancedLastTime ? kShortBalanceRoundInterval : balanceRoundInterval);
+        } catch (const std::exception& e) {
+            log() << "caught exception while doing balance: " << e.what();
+
+            // Just to match the opening statement if in log level 1
+            LOG(1) << "*** End of balancing round";
+
+            // This round failed, tell the world!
+            roundDetails.setFailed(e.what());
+
+            grid.catalogManager(txn.get())
+                ->logAction(txn.get(), "balancer.round", "", roundDetails.toBSON());
+
+            // Sleep a fair amount before retrying because of the error
+            sleepFor(balanceRoundInterval);
         }
     }
+}
 
-    return movedCount;
+bool Balancer::_init(OperationContext* txn) {
+    log() << "about to contact config servers and shards";
+
+    try {
+        // Contact the config server and refresh shard information. Checks that each shard is indeed
+        // a different process (no hostname mixup)
+        // these checks are redundant in that they're redone at every new round but we want to do
+        // them initially here so to catch any problem soon
+        grid.shardRegistry()->reload(txn);
+        if (!_checkOIDs(txn)) {
+            return false;
+        }
+
+        log() << "config servers and shards contacted successfully";
+
+        StringBuilder buf;
+        buf << getHostNameCached() << ":" << serverGlobalParams.port;
+        _myid = buf.str();
+
+        log() << "balancer id: " << _myid << " started";
+
+        return true;
+    } catch (const std::exception& e) {
+        warning() << "could not initialize balancer, please check that all shards and config "
+                     "servers are up: " << e.what();
+        return false;
+    }
 }
 
 void Balancer::_ping(OperationContext* txn, bool waiting) {
     MongosType mType;
     mType.setName(_myid);
     mType.setPing(jsTime());
-    mType.setUptime(static_cast<int>(time(0) - _started));
+    mType.setUptime(_timer.seconds());
     mType.setWaiting(waiting);
     mType.setMongoVersion(versionString);
 
@@ -350,7 +399,7 @@ bool Balancer::_checkOIDs(OperationContext* txn) {
     return true;
 }
 
-StatusWith<std::vector<MigrateInfo>> Balancer::_doBalanceRound(OperationContext* txn) {
+StatusWith<vector<MigrateInfo>> Balancer::_getCandidateChunks(OperationContext* txn) {
     vector<CollectionType> collections;
 
     Status collsStatus =
@@ -498,7 +547,7 @@ StatusWith<std::vector<MigrateInfo>> Balancer::_doBalanceRound(OperationContext*
         }
 
         shared_ptr<MigrateInfo> migrateInfo(
-            _policy->balance(nss.ns(), distStatus, _balancedLastTime));
+            BalancerPolicy::balance(nss.ns(), distStatus, _balancedLastTime));
         if (migrateInfo) {
             candidateChunks.emplace_back(*migrateInfo);
         }
@@ -507,176 +556,125 @@ StatusWith<std::vector<MigrateInfo>> Balancer::_doBalanceRound(OperationContext*
     return candidateChunks;
 }
 
-bool Balancer::_init(OperationContext* txn) {
-    try {
-        log() << "about to contact config servers and shards";
+int Balancer::_moveChunks(OperationContext* txn,
+                          const vector<MigrateInfo>& candidateChunks,
+                          const MigrationSecondaryThrottleOptions& secondaryThrottle,
+                          bool waitForDelete) {
+    int movedCount = 0;
 
-        // contact the config server and refresh shard information
-        // checks that each shard is indeed a different process (no hostname mixup)
-        // these checks are redundant in that they're redone at every new round but we want to do
-        // them initially here so to catch any problem soon
-        grid.shardRegistry()->reload(txn);
-        if (!_checkOIDs(txn)) {
-            return false;
+    for (const auto& migrateInfo : candidateChunks) {
+        // If the balancer was disabled since we started this round, don't start new chunks
+        // moves.
+        const auto balSettingsResult =
+            grid.catalogManager(txn)->getGlobalSettings(txn, SettingsType::BalancerDocKey);
+
+        const bool isBalSettingsAbsent =
+            balSettingsResult.getStatus() == ErrorCodes::NoMatchingDocument;
+
+        if (!balSettingsResult.isOK() && !isBalSettingsAbsent) {
+            warning() << balSettingsResult.getStatus();
+            return movedCount;
         }
 
-        log() << "config servers and shards contacted successfully";
+        const SettingsType& balancerConfig =
+            isBalSettingsAbsent ? SettingsType{} : balSettingsResult.getValue();
 
-        StringBuilder buf;
-        buf << getHostNameCached() << ":" << serverGlobalParams.port;
-        _myid = buf.str();
-        _started = time(0);
-
-        log() << "balancer id: " << _myid << " started";
-
-        return true;
-
-    } catch (std::exception& e) {
-        warning() << "could not initialize balancer, please check that all shards and config "
-                     "servers are up: " << e.what();
-        return false;
-    }
-}
-
-void Balancer::run() {
-    Client::initThread("Balancer");
-
-    // This is the body of a BackgroundJob so if we throw here we're basically ending the balancer
-    // thread prematurely.
-    while (!inShutdown()) {
-        auto txn = cc().makeOperationContext();
-        if (!_init(txn.get())) {
-            log() << "will retry to initialize balancer in one minute";
-            sleepsecs(60);
-            continue;
+        if ((!isBalSettingsAbsent && !Chunk::shouldBalance(balancerConfig)) ||
+            MONGO_FAIL_POINT(skipBalanceRound)) {
+            LOG(1) << "Stopping balancing round early as balancing was disabled";
+            return movedCount;
         }
 
-        break;
-    }
+        // Changes to metadata, borked metadata, and connectivity problems between shards
+        // should cause us to abort this chunk move, but shouldn't cause us to abort the entire
+        // round of chunks.
+        //
+        // TODO(spencer): We probably *should* abort the whole round on issues communicating
+        // with the config servers, but its impossible to distinguish those types of failures
+        // at the moment.
+        //
+        // TODO: Handle all these things more cleanly, since they're expected problems
 
-    Seconds balanceRoundInterval(kBalanceRoundDefaultInterval);
-
-    while (!inShutdown()) {
-        auto txn = cc().makeOperationContext();
-
-        BalanceRoundDetails roundDetails;
+        const NamespaceString nss(migrateInfo.ns);
 
         try {
-            // ping has to be first so we keep things in the config server in sync
-            _ping(txn.get());
+            shared_ptr<DBConfig> cfg =
+                uassertStatusOK(grid.catalogCache()->getDatabase(txn, nss.db().toString()));
 
-            MONGO_FAIL_POINT_BLOCK(balancerRoundIntervalSetting, scopedBalancerRoundInterval) {
-                const BSONObj& data = scopedBalancerRoundInterval.getData();
-                balanceRoundInterval = Seconds(data["sleepSecs"].numberInt());
+            // NOTE: We purposely do not reload metadata here, since _getCandidateChunks already
+            // tried to do so once
+            shared_ptr<ChunkManager> cm = cfg->getChunkManager(txn, migrateInfo.ns);
+            uassert(28628,
+                    str::stream()
+                        << "Collection " << migrateInfo.ns
+                        << " was deleted while balancing was active. Aborting balancing round.",
+                    cm);
+
+            ChunkPtr c = cm->findIntersectingChunk(txn, migrateInfo.chunk.min);
+
+            if (c->getMin().woCompare(migrateInfo.chunk.min) ||
+                c->getMax().woCompare(migrateInfo.chunk.max)) {
+                // Likely a split happened somewhere, so force reload the chunk manager
+                cm = cfg->getChunkManager(txn, migrateInfo.ns, true);
+                invariant(cm);
+
+                c = cm->findIntersectingChunk(txn, migrateInfo.chunk.min);
+
+                if (c->getMin().woCompare(migrateInfo.chunk.min) ||
+                    c->getMax().woCompare(migrateInfo.chunk.max)) {
+                    log() << "chunk mismatch after reload, ignoring will retry issue "
+                          << migrateInfo.chunk.toString();
+
+                    continue;
+                }
             }
 
-            BSONObj balancerResult;
-
-            // use fresh shard state
-            grid.shardRegistry()->reload(txn.get());
-
-            // refresh chunk size (even though another balancer might be active)
-            Chunk::refreshChunkSize(txn.get());
-
-            auto balSettingsResult = grid.catalogManager(txn.get())->getGlobalSettings(
-                txn.get(), SettingsType::BalancerDocKey);
-            const bool isBalSettingsAbsent =
-                balSettingsResult.getStatus() == ErrorCodes::NoMatchingDocument;
-            if (!balSettingsResult.isOK() && !isBalSettingsAbsent) {
-                warning() << balSettingsResult.getStatus();
-                return;
-            }
-
-            const SettingsType& balancerConfig =
-                isBalSettingsAbsent ? SettingsType{} : balSettingsResult.getValue();
-
-            // now make sure we should even be running
-            if ((!isBalSettingsAbsent && !Chunk::shouldBalance(balancerConfig)) ||
-                MONGO_FAIL_POINT(skipBalanceRound)) {
-                LOG(1) << "skipping balancing round because balancing is disabled";
-
-                // Ping again so scripts can determine if we're active without waiting
-                _ping(txn.get(), true);
-
-                sleepFor(balanceRoundInterval);
+            BSONObj res;
+            if (c->moveAndCommit(txn,
+                                 migrateInfo.to,
+                                 Chunk::MaxChunkSize,
+                                 secondaryThrottle,
+                                 waitForDelete,
+                                 0, /* maxTimeMS */
+                                 res)) {
+                movedCount++;
                 continue;
             }
 
-            uassert(13258, "oids broken after resetting!", _checkOIDs(txn.get()));
+            // The move requires acquiring the collection metadata's lock, which can fail.
+            log() << "balancer move failed: " << res << " from: " << migrateInfo.from
+                  << " to: " << migrateInfo.to << " chunk: " << migrateInfo.chunk;
 
-            {
-                auto scopedDistLock = grid.catalogManager(txn.get())
-                                          ->distLock(txn.get(),
-                                                     "balancer",
-                                                     "doing balance round",
-                                                     DistLockManager::kSingleLockAttemptTimeout);
+            Status moveStatus = getStatusFromCommandResult(res);
 
-                if (!scopedDistLock.isOK()) {
-                    LOG(1) << "skipping balancing round" << causedBy(scopedDistLock.getStatus());
+            if (moveStatus == ErrorCodes::ChunkTooBig || res["chunkTooBig"].trueValue()) {
+                // Reload just to be safe
+                cm = cfg->getChunkManager(txn, migrateInfo.ns);
+                invariant(cm);
 
-                    // Ping again so scripts can determine if we're active without waiting
-                    _ping(txn.get(), true);
+                c = cm->findIntersectingChunk(txn, migrateInfo.chunk.min);
 
-                    sleepFor(balanceRoundInterval);  // no need to wake up soon
-                    continue;
+                log() << "performing a split because migrate failed for size reasons";
+
+                Status status = c->split(txn, Chunk::normal, NULL, NULL);
+                log() << "split results: " << status;
+
+                if (!status.isOK()) {
+                    log() << "marking chunk as jumbo: " << c->toString();
+
+                    c->markAsJumbo(txn);
+
+                    // We increment moveCount so we do another round right away
+                    movedCount++;
                 }
-
-                const bool waitForDelete =
-                    (balancerConfig.isWaitForDeleteSet() ? balancerConfig.getWaitForDelete()
-                                                         : false);
-
-                MigrationSecondaryThrottleOptions secondaryThrottle(
-                    MigrationSecondaryThrottleOptions::create(
-                        MigrationSecondaryThrottleOptions::kDefault));
-                if (balancerConfig.isKeySet()) {
-                    secondaryThrottle =
-                        uassertStatusOK(MigrationSecondaryThrottleOptions::createFromBalancerConfig(
-                            balancerConfig.toBSON()));
-                }
-
-                LOG(1) << "*** start balancing round. "
-                       << "waitForDelete: " << waitForDelete
-                       << ", secondaryThrottle: " << secondaryThrottle.toBSON();
-
-                const auto candidateChunks = uassertStatusOK(_doBalanceRound(txn.get()));
-
-                if (candidateChunks.empty()) {
-                    LOG(1) << "no need to move any chunk";
-                    _balancedLastTime = 0;
-                } else {
-                    _balancedLastTime =
-                        _moveChunks(txn.get(), candidateChunks, secondaryThrottle, waitForDelete);
-
-                    roundDetails.setSucceeded(static_cast<int>(candidateChunks.size()),
-                                              _balancedLastTime);
-
-                    grid.catalogManager(txn.get())
-                        ->logAction(txn.get(), "balancer.round", "", roundDetails.toBSON());
-                }
-
-                LOG(1) << "*** End of balancing round";
             }
-
-            // Ping again so scripts can determine if we're active without waiting
-            _ping(txn.get(), true);
-
-            sleepFor(_balancedLastTime ? kShortBalanceRoundInterval : balanceRoundInterval);
-        } catch (const std::exception& e) {
-            log() << "caught exception while doing balance: " << e.what();
-
-            // Just to match the opening statement if in log level 1
-            LOG(1) << "*** End of balancing round";
-
-            // This round failed, tell the world!
-            roundDetails.setFailed(e.what());
-
-            grid.catalogManager(txn.get())
-                ->logAction(txn.get(), "balancer.round", "", roundDetails.toBSON());
-
-            // Sleep a fair amount before retrying because of the error
-            sleepFor(balanceRoundInterval);
+        } catch (const DBException& ex) {
+            warning() << "could not move chunk " << migrateInfo.chunk.toString()
+                      << ", continuing balancing round" << causedBy(ex);
         }
     }
+
+    return movedCount;
 }
 
 }  // namespace mongo

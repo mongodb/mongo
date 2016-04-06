@@ -32,10 +32,10 @@
 #include <vector>
 
 #include "mongo/util/background.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
-class BalancerPolicy;
 struct MigrateInfo;
 class MigrationSecondaryThrottleOptions;
 class OperationContext;
@@ -81,12 +81,23 @@ private:
     bool _init(OperationContext* txn);
 
     /**
+     * Marks this balancer as being live on the config server(s).
+     */
+    void _ping(OperationContext* txn, bool waiting = false);
+
+    /**
+     * Returns true if all the servers listed in configdb as being shards are reachable and are
+     * distinct processes (no hostname mixup).
+     */
+    bool _checkOIDs(OperationContext* txn);
+
+    /**
      * Gathers all the necessary information about shards and chunks, and decides whether there are
      * candidate chunks to be moved.
      *
      * Returns candidate chunks, one per collection, that could possibly be moved
      */
-    StatusWith<std::vector<MigrateInfo>> _doBalanceRound(OperationContext* txn);
+    StatusWith<std::vector<MigrateInfo>> _getCandidateChunks(OperationContext* txn);
 
     /**
      * Issues chunk migration request, one at a time.
@@ -101,28 +112,14 @@ private:
                     const MigrationSecondaryThrottleOptions& secondaryThrottle,
                     bool waitForDelete);
 
-    /**
-     * Marks this balancer as being live on the config server(s).
-     */
-    void _ping(OperationContext* txn, bool waiting = false);
-
-    /**
-     * @return true if all the servers listed in configdb as being shards are reachable and are
-     *         distinct processes
-     */
-    bool _checkOIDs(OperationContext* txn);
-
     // hostname:port of my mongos
     std::string _myid;
 
-    // time the Balancer started running
-    time_t _started;
+    // Time the Balancer started running
+    Timer _timer;
 
     // number of moved chunks in last round
     int _balancedLastTime;
-
-    // decide which chunks to move; owned here.
-    std::unique_ptr<BalancerPolicy> _policy;
 };
 
 }  // namespace mongo

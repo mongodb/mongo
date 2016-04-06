@@ -505,8 +505,7 @@ StatusWith<ShardId> CatalogManagerCommon::selectShardForNewDatabase(OperationCon
 
     ShardId candidateShardId = allShardIds[0];
 
-    auto candidateSizeStatus =
-        shardutil::retrieveTotalShardSize(txn, candidateShardId, shardRegistry);
+    auto candidateSizeStatus = shardutil::retrieveTotalShardSize(txn, candidateShardId);
     if (!candidateSizeStatus.isOK()) {
         return candidateSizeStatus.getStatus();
     }
@@ -514,7 +513,7 @@ StatusWith<ShardId> CatalogManagerCommon::selectShardForNewDatabase(OperationCon
     for (size_t i = 1; i < allShardIds.size(); i++) {
         const ShardId shardId = allShardIds[i];
 
-        const auto sizeStatus = shardutil::retrieveTotalShardSize(txn, shardId, shardRegistry);
+        const auto sizeStatus = shardutil::retrieveTotalShardSize(txn, shardId);
         if (!sizeStatus.isOK()) {
             return sizeStatus.getStatus();
         }

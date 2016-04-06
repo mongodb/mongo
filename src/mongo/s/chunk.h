@@ -160,26 +160,6 @@ public:
                       const std::vector<BSONObj>& splitPoints,
                       BSONObj* res) const;
 
-    /**
-     * Asks the mongod holding this chunk to find a key that approximately divides this chunk in two
-     *
-     * @param medianKey the key that divides this chunk, if there is one, or empty
-     */
-    void pickMedianKey(OperationContext* txn, BSONObj& medianKey) const;
-
-    /**
-     * Ask the mongod holding this chunk to figure out the split points.
-     * @param splitPoints vector to be filled in
-     * @param chunkSize chunk size to target in bytes
-     * @param maxPoints limits the number of split points that are needed, zero is max (optional)
-     * @param maxObjs limits the number of objects in each chunk, zero is as max (optional)
-     */
-    void pickSplitVector(OperationContext* txn,
-                         std::vector<BSONObj>& splitPoints,
-                         long long chunkSize,
-                         int maxPoints = 0,
-                         int maxObjs = 0) const;
-
     //
     // migration support
     //
@@ -300,9 +280,7 @@ private:
      * @param atMedian perform a single split at the middle of this chunk.
      * @param splitPoints out parameter containing the chosen split points. Can be empty.
      */
-    void determineSplitPoints(OperationContext* txn,
-                              bool atMedian,
-                              std::vector<BSONObj>* splitPoints) const;
+    std::vector<BSONObj> _determineSplitPoints(OperationContext* txn, bool atMedian) const;
 
     /**
      * initializes _dataWritten with a random value so that a mongos restart

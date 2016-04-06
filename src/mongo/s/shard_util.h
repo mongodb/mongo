@@ -29,12 +29,15 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "mongo/s/client/shard.h"
 
 namespace mongo {
 
+class NamespaceString;
 class OperationContext;
+class ShardKeyPattern;
 class ShardRegistry;
 template <typename T>
 class StatusWith;
@@ -43,6 +46,7 @@ class StatusWith;
  * Set of methods used to introspect the state of individual shards.
  */
 namespace shardutil {
+
 /**
  * Executes the listDatabases command against the specified shard and obtains the total data
  * size across all databases in bytes (essentially, the totalSize field).
@@ -51,9 +55,39 @@ namespace shardutil {
  *  ShardNotFound if shard by that id is not available on the registry
  *  NoSuchKey if the total shard size could not be retrieved
  */
-StatusWith<long long> retrieveTotalShardSize(OperationContext* txn,
-                                             ShardId shardId,
-                                             ShardRegistry* shardRegistry);
-};
+StatusWith<long long> retrieveTotalShardSize(OperationContext* txn, const ShardId& shardId);
 
+/**
+ * Asks the mongod holding this chunk to find a key that approximately divides the specified chunk
+ * in two.
+ */
+StatusWith<BSONObj> selectMedianKey(OperationContext* txn,
+                                    const ShardId& shardId,
+                                    const NamespaceString& nss,
+                                    const ShardKeyPattern& shardKeyPattern,
+                                    const BSONObj& minKey,
+                                    const BSONObj& maxKey);
+
+/**
+ * Ask the specified shard to figure out the split points for a given chunk.
+ *
+ * @param shardId The shard id to query.
+ * @param nss Namespace, which owns the chunk.
+ * @param shardKeyPattern The shard key which corresponds to this sharded namespace.
+ * @param minKey/maxKey Bounds of the chunk.
+ * @param chunkSize Chunk size to target in bytes.
+ * @param maxPoints Limits the number of split points that are needed. Zero means max.
+ * @param maxObjs Limits the number of objects in each chunk. Zero means max.
+ */
+StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* txn,
+                                                        const ShardId& shardId,
+                                                        const NamespaceString& nss,
+                                                        const ShardKeyPattern& shardKeyPattern,
+                                                        const BSONObj& minKey,
+                                                        const BSONObj& maxKey,
+                                                        long long chunkSizeBytes,
+                                                        int maxPoints,
+                                                        int maxObjs);
+
+}  // namespace shardutil
 }  // namespace mongo

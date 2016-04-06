@@ -52,7 +52,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
 #include "mongo/s/move_chunk_request.h"
-#include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/shard_util.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -304,98 +304,54 @@ BSONObj Chunk::_getExtremeKey(OperationContext* txn, bool doSplitAtLower) const 
     return _manager->getShardKeyPattern().extractShardKeyFromDoc(end);
 }
 
-void Chunk::pickMedianKey(OperationContext* txn, BSONObj& medianKey) const {
-    // Ask the mongod holding this chunk to figure out the split points.
-    ScopedDbConnection conn(_getShardConnectionString(txn));
-    BSONObj result;
-    BSONObjBuilder cmd;
-    cmd.append("splitVector", _manager->getns());
-    cmd.append("keyPattern", _manager->getShardKeyPattern().toBSON());
-    cmd.append("min", getMin());
-    cmd.append("max", getMax());
-    cmd.appendBool("force", true);
-    BSONObj cmdObj = cmd.obj();
+std::vector<BSONObj> Chunk::_determineSplitPoints(OperationContext* txn, bool atMedian) const {
+    // If splitting is not obligatory we may return early if there are not enough data we cap the
+    // number of objects that would fall in the first half (before the split point) the rationale is
+    // we'll find a split point without traversing all the data.
+    vector<BSONObj> splitPoints;
 
-    if (!conn->runCommand("admin", cmdObj, result)) {
-        conn.done();
-        ostringstream os;
-        os << "splitVector command (median key) failed: " << result;
-        uassert(13503, os.str(), 0);
-    }
-
-    BSONObjIterator it(result.getObjectField("splitKeys"));
-    if (it.more()) {
-        medianKey = it.next().Obj().getOwned();
-    }
-
-    conn.done();
-}
-
-void Chunk::pickSplitVector(OperationContext* txn,
-                            vector<BSONObj>& splitPoints,
-                            long long chunkSize /* bytes */,
-                            int maxPoints,
-                            int maxObjs) const {
-    BSONObjBuilder cmd;
-    cmd.append("splitVector", _manager->getns());
-    cmd.append("keyPattern", _manager->getShardKeyPattern().toBSON());
-    cmd.append("min", getMin());
-    cmd.append("max", getMax());
-    cmd.append("maxChunkSizeBytes", chunkSize);
-    cmd.append("maxSplitPoints", maxPoints);
-    cmd.append("maxChunkObjects", maxObjs);
-
-    BSONObj cmdObj = cmd.obj();
-
-    auto result = grid.shardRegistry()->runIdempotentCommandOnShard(
-        txn,
-        getShardId(),
-        ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-        "admin",
-        cmdObj);
-
-    uassertStatusOK(result.getStatus());
-    uassertStatusOK(getStatusFromCommandResult(result.getValue()));
-
-    BSONObjIterator it(result.getValue().getObjectField("splitKeys"));
-    while (it.more()) {
-        splitPoints.push_back(it.next().Obj().getOwned());
-    }
-}
-
-void Chunk::determineSplitPoints(OperationContext* txn,
-                                 bool atMedian,
-                                 vector<BSONObj>* splitPoints) const {
-    // if splitting is not obligatory we may return early if there are not enough data
-    // we cap the number of objects that would fall in the first half (before the split point)
-    // the rationale is we'll find a split point without traversing all the data
     if (atMedian) {
-        BSONObj medianKey;
-        pickMedianKey(txn, medianKey);
-        if (!medianKey.isEmpty())
-            splitPoints->push_back(medianKey);
+        BSONObj medianKey =
+            uassertStatusOK(shardutil::selectMedianKey(txn,
+                                                       _shardId,
+                                                       NamespaceString(_manager->getns()),
+                                                       _manager->getShardKeyPattern(),
+                                                       _min,
+                                                       _max));
+        if (!medianKey.isEmpty()) {
+            splitPoints.push_back(medianKey);
+        }
     } else {
         long long chunkSize = _manager->getCurrentDesiredChunkSize();
 
         // Note: One split point for every 1/2 chunk size.
         const int estNumSplitPoints = _dataWritten / chunkSize * 2;
-        if (estNumSplitPoints >= kTooManySplitPoints) {
-            // The current desired chunk size will split the chunk into lots of small chunks
-            // (At the worst case, this can result into thousands of chunks); so check and
-            // see if a bigger value can be used.
 
+        if (estNumSplitPoints >= kTooManySplitPoints) {
+            // The current desired chunk size will split the chunk into lots of small chunk and at
+            // the worst case this can result into thousands of chunks. So check and see if a bigger
+            // value can be used.
             chunkSize = std::min(_dataWritten, Chunk::MaxChunkSize);
         }
 
-        pickSplitVector(txn, *splitPoints, chunkSize, 0, MaxObjectPerChunk);
-
-        if (splitPoints->size() <= 1) {
-            // no split points means there isn't enough data to split on
-            // 1 split point means we have between half the chunk size to full chunk size
-            // so we shouldn't split
-            splitPoints->clear();
+        splitPoints =
+            uassertStatusOK(shardutil::selectChunkSplitPoints(txn,
+                                                              _shardId,
+                                                              NamespaceString(_manager->getns()),
+                                                              _manager->getShardKeyPattern(),
+                                                              _min,
+                                                              _max,
+                                                              chunkSize,
+                                                              0,
+                                                              MaxObjectPerChunk));
+        if (splitPoints.size() <= 1) {
+            // No split points means there isn't enough data to split on 1 split point means we have
+            // between half the chunk size to full chunk size so we shouldn't split.
+            splitPoints.clear();
         }
     }
+
+    return splitPoints;
 }
 
 Status Chunk::split(OperationContext* txn,
@@ -408,9 +364,7 @@ Status Chunk::split(OperationContext* txn,
     }
 
     bool atMedian = mode == Chunk::atMedian;
-    vector<BSONObj> splitPoints;
-
-    determineSplitPoints(txn, atMedian, &splitPoints);
+    vector<BSONObj> splitPoints = _determineSplitPoints(txn, atMedian);
     if (splitPoints.empty()) {
         string msg;
         if (atMedian) {

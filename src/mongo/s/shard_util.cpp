@@ -33,15 +33,18 @@
 #include "mongo/base/status_with.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace shardutil {
 
-StatusWith<long long> retrieveTotalShardSize(OperationContext* txn,
-                                             ShardId shardId,
-                                             ShardRegistry* shardRegistry) {
+StatusWith<long long> retrieveTotalShardSize(OperationContext* txn, const ShardId& shardId) {
+    auto shardRegistry = Grid::get(txn)->shardRegistry();
     auto listDatabasesStatus = shardRegistry->runIdempotentCommandOnShard(
         txn,
         shardId,
@@ -58,6 +61,83 @@ StatusWith<long long> retrieveTotalShardSize(OperationContext* txn,
     }
 
     return totalSizeElem.numberLong();
+}
+
+StatusWith<BSONObj> selectMedianKey(OperationContext* txn,
+                                    const ShardId& shardId,
+                                    const NamespaceString& nss,
+                                    const ShardKeyPattern& shardKeyPattern,
+                                    const BSONObj& minKey,
+                                    const BSONObj& maxKey) {
+    BSONObjBuilder cmd;
+    cmd.append("splitVector", nss.ns());
+    cmd.append("keyPattern", shardKeyPattern.toBSON());
+    cmd.append("min", minKey);
+    cmd.append("max", maxKey);
+    cmd.appendBool("force", true);
+
+    auto shardRegistry = Grid::get(txn)->shardRegistry();
+    auto cmdStatus = shardRegistry->runIdempotentCommandOnShard(
+        txn, shardId, ReadPreferenceSetting{ReadPreference::PrimaryPreferred}, "admin", cmd.obj());
+    if (!cmdStatus.isOK()) {
+        return cmdStatus.getStatus();
+    }
+
+    const auto response = std::move(cmdStatus.getValue());
+
+    Status status = getStatusFromCommandResult(response);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    BSONObjIterator it(response.getObjectField("splitKeys"));
+    if (it.more()) {
+        return it.next().Obj().getOwned();
+    }
+
+    return BSONObj();
+}
+
+StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* txn,
+                                                        const ShardId& shardId,
+                                                        const NamespaceString& nss,
+                                                        const ShardKeyPattern& shardKeyPattern,
+                                                        const BSONObj& minKey,
+                                                        const BSONObj& maxKey,
+                                                        long long chunkSizeBytes,
+                                                        int maxPoints,
+                                                        int maxObjs) {
+    BSONObjBuilder cmd;
+    cmd.append("splitVector", nss.ns());
+    cmd.append("keyPattern", shardKeyPattern.toBSON());
+    cmd.append("min", minKey);
+    cmd.append("max", maxKey);
+    cmd.append("maxChunkSizeBytes", chunkSizeBytes);
+    cmd.append("maxSplitPoints", maxPoints);
+    cmd.append("maxChunkObjects", maxObjs);
+
+    auto shardRegistry = Grid::get(txn)->shardRegistry();
+    auto cmdStatus = shardRegistry->runIdempotentCommandOnShard(
+        txn, shardId, ReadPreferenceSetting{ReadPreference::PrimaryPreferred}, "admin", cmd.obj());
+    if (!cmdStatus.isOK()) {
+        return cmdStatus.getStatus();
+    }
+
+    const auto response = std::move(cmdStatus.getValue());
+
+    Status status = getStatusFromCommandResult(response);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    std::vector<BSONObj> splitPoints;
+
+    BSONObjIterator it(response.getObjectField("splitKeys"));
+    while (it.more()) {
+        splitPoints.push_back(it.next().Obj().getOwned());
+    }
+
+    return std::move(splitPoints);
 }
 
 }  // namespace shardutil
