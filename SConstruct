@@ -2315,6 +2315,13 @@ def doConfigure(myenv):
             sslLibName = "ssleay32"
             cryptoLibName = "libeay32"
 
+        # Used to import system certificate keychains
+        if conf.env.TargetOSIs('osx'):
+            conf.env.AppendUnique(FRAMEWORKS=[
+                'CoreFoundation',
+                'Security',
+            ])
+
         if not conf.CheckLibWithHeader(
                 sslLibName,
                 ["openssl/ssl.h"],

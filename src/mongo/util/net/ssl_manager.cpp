@@ -59,12 +59,13 @@
 
 #ifdef MONGO_CONFIG_SSL
 #include <openssl/evp.h>
-#include <openssl/x509v3.h>
-
-#ifdef _WIN32
 #include <openssl/x509_vfy.h>
+#include <openssl/x509v3.h>
+#if defined(_WIN32)
 #include <openssl/pkcs7.h>
 #include <wincrypt.h>
+#elif defined(__APPLE__)
+#include <Security/Security.h>
 #endif
 #endif
 
@@ -813,7 +814,18 @@ Status SSLManager::_setupCA(SSL_CTX* context, const std::string& caFile) {
     return Status::OK();
 }
 
-#ifdef _WIN32
+inline Status checkX509_STORE_error() {
+    const auto errCode = ERR_peek_last_error();
+    if (ERR_GET_LIB(errCode) != ERR_LIB_X509 ||
+        ERR_GET_REASON(errCode) != X509_R_CERT_ALREADY_IN_HASH_TABLE) {
+        return {ErrorCodes::InvalidSSLConfiguration,
+                str::stream() << "Error adding certificate to X509 store: "
+                              << ERR_reason_error_string(errCode)};
+    }
+    return Status::OK();
+}
+
+#if defined(_WIN32)
 // This imports the certificates in a given Windows certificate store into an X509_STORE for
 // openssl to use during certificate validation.
 Status importCertStoreToX509_STORE(LPWSTR storeName, DWORD storeLocation, X509_STORE* verifyStore) {
@@ -879,26 +891,103 @@ Status importCertStoreToX509_STORE(LPWSTR storeName, DWORD storeLocation, X509_S
     STACK_OF(X509)* systemCACerts = p7->d.sign->cert;
     for (auto i = 0; i < sk_X509_num(systemCACerts); i++) {
         if (X509_STORE_add_cert(verifyStore, sk_X509_value(systemCACerts, i)) != 1) {
-            const auto errCode = ERR_peek_last_error();
-            if (ERR_GET_LIB(errCode) != ERR_LIB_X509 ||
-                ERR_GET_REASON(errCode) != X509_R_CERT_ALREADY_IN_HASH_TABLE) {
-                return {ErrorCodes::InvalidSSLConfiguration,
-                        str::stream() << "Error adding certificate to X509 store: "
-                                      << ERR_reason_error_string(errCode)};
-            }
+            auto status = checkX509_STORE_error();
+            if (!status.isOK())
+                return status;
         }
     }
 
     STACK_OF(X509_CRL)* systemCRLs = p7->d.sign->crl;
     for (auto i = 0; i < sk_X509_CRL_num(systemCRLs); i++) {
         if (X509_STORE_add_crl(verifyStore, sk_X509_CRL_value(systemCRLs, i)) != 1) {
-            const auto errCode = ERR_peek_last_error();
-            if (ERR_GET_LIB(errCode) != ERR_LIB_X509 ||
-                ERR_GET_REASON(errCode) != X509_R_CERT_ALREADY_IN_HASH_TABLE) {
-                return {ErrorCodes::InvalidSSLConfiguration,
-                        str::stream() << "Error adding CRL to X509 store: "
-                                      << ERR_reason_error_string(errCode)};
-            }
+            auto status = checkX509_STORE_error();
+            if (!status.isOK())
+                return status;
+        }
+    }
+
+    return Status::OK();
+}
+#elif defined(__APPLE__)
+
+template <typename T>
+class CFTypeRefHolder {
+public:
+    explicit CFTypeRefHolder(T ptr) : ref(static_cast<CFTypeRef>(ptr)) {}
+    ~CFTypeRefHolder() {
+        CFRelease(ref);
+    }
+    operator T() {
+        return static_cast<T>(ref);
+    }
+
+private:
+    CFTypeRef ref = nullptr;
+};
+template <typename T>
+CFTypeRefHolder<T> makeCFTypeRefHolder(T ptr) {
+    return CFTypeRefHolder<T>(ptr);
+}
+
+std::string OSStatusToString(OSStatus status) {
+    auto errMsg = makeCFTypeRefHolder(SecCopyErrorMessageString(status, NULL));
+    return std::string{CFStringGetCStringPtr(errMsg, kCFStringEncodingUTF8)};
+}
+
+Status importKeychainToX509_STORE(X509_STORE* verifyStore) {
+    // First we construct CFDictionary that specifies the search for certificates we want to do.
+    // These std::arrays make up the dictionary elements.
+    // kSecClass -> kSecClassCertificates (search for certificates)
+    // kSecReturnRef -> kCFBooleanTrue (return SecCertificateRefs)
+    // kSecMatchLimit -> kSecMatchLimitAll (return ALL the certificates).
+    static std::array<const void*, 3> searchDictKeys = {kSecClass, kSecReturnRef, kSecMatchLimit};
+    static std::array<const void*, 3> searchDictValues = {
+        kSecClassCertificate, kCFBooleanTrue, kSecMatchLimitAll};
+    static_assert(searchDictKeys.size() == searchDictValues.size(),
+                  "Sizes of the search keys and values dictionaries should be the same size");
+
+    auto searchDict = makeCFTypeRefHolder(CFDictionaryCreate(kCFAllocatorDefault,
+                                                         searchDictKeys.data(),
+                                                         searchDictValues.data(),
+                                                         searchDictKeys.size(),
+                                                         &kCFTypeDictionaryKeyCallBacks,
+                                                         &kCFTypeDictionaryValueCallBacks));
+
+    CFArrayRef result;
+    OSStatus status;
+    // Run the search against the default list of keychains and store the result in a CFArrayRef
+    if ((status = SecItemCopyMatching(searchDict, reinterpret_cast<CFTypeRef*>(&result))) != 0) {
+        return {ErrorCodes::InvalidSSLConfiguration,
+                str::stream() << "Error enumerating certificates: " << OSStatusToString(status)};
+    }
+    const auto resultGuard = makeCFTypeRefHolder(result);
+
+    for (CFIndex i = 0; i < CFArrayGetCount(result); i++) {
+        SecCertificateRef cert =
+            static_cast<SecCertificateRef>(const_cast<void*>(CFArrayGetValueAtIndex(result, i)));
+
+        auto rawData = makeCFTypeRefHolder(SecCertificateCopyData(cert));
+        if (!rawData) {
+            return {
+                ErrorCodes::InvalidSSLConfiguration,
+                str::stream() << "Error enumerating certificates: " << OSStatusToString(status)};
+        }
+        const uint8_t* rawDataPtr = CFDataGetBytePtr(rawData);
+
+        // Parse an openssl X509 object from each returned certificate
+        X509* x509Cert = d2i_X509(nullptr, &rawDataPtr, CFDataGetLength(rawData));
+        if (!x509Cert) {
+            return {ErrorCodes::InvalidSSLConfiguration,
+                    str::stream() << "Error parsing X509 certificate from system keychain: "
+                                  << ERR_reason_error_string(ERR_peek_last_error())};
+        }
+        const auto x509CertGuard = MakeGuard([&x509Cert]() { X509_free(x509Cert); });
+
+        // Add the parsed X509 object to the X509_STORE verification store
+        if (X509_STORE_add_cert(verifyStore, x509Cert) != 1) {
+            auto status = checkX509_STORE_error();
+            if (!status.isOK())
+                return status;
         }
     }
 
@@ -907,9 +996,9 @@ Status importCertStoreToX509_STORE(LPWSTR storeName, DWORD storeLocation, X509_S
 #endif
 
 Status SSLManager::_setupSystemCA(SSL_CTX* context) {
-#ifndef _WIN32
-    // On non-Windows platforms, the OpenSSL libraries should have been configured with default
-    // locations for CA certificates.
+#if !defined(_WIN32) && !defined(__APPLE__)
+    // On non-Windows/non-Apple platforms, the OpenSSL libraries should have been configured
+    // with default locations for CA certificates.
     if (SSL_CTX_set_default_verify_paths(context) != 1) {
         return {
             ErrorCodes::InvalidSSLConfiguration,
@@ -925,11 +1014,14 @@ Status SSLManager::_setupSystemCA(SSL_CTX* context) {
         return {ErrorCodes::InvalidSSLConfiguration,
                 "no X509 store found for SSL context while loading system certificates"};
     }
-
+#if defined(_WIN32)
     auto status = importCertStoreToX509_STORE(L"root", CERT_SYSTEM_STORE_CURRENT_USER, verifyStore);
     if (!status.isOK())
         return status;
     return importCertStoreToX509_STORE(L"CA", CERT_SYSTEM_STORE_CURRENT_USER, verifyStore);
+#elif defined(__APPLE__)
+    return importKeychainToX509_STORE(verifyStore);
+#endif
 #endif
 }
 

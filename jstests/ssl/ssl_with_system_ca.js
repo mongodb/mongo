@@ -5,6 +5,11 @@
     if (HOST_TYPE == "windows") {
         runProgram(
             "certutil.exe", "-addstore", "-user", "-f", "CA", "jstests\\libs\\trusted-ca.pem");
+    } else if (HOST_TYPE == "osx") {
+        runProgram(
+            "/bin/sh",
+            "-c",
+            "/usr/bin/security add-trusted-cert -k ~/Library/Keychains/login.keychain jstests/libs/trusted-ca.pem");
     }
 
     var testWithCerts = function(serverPem) {
@@ -19,7 +24,7 @@
         // Authenticate call will return 1 on success, 0 on error.
         var argv =
             ['./mongo', '--ssl', '--port', conn.port, '--eval', ('db.runCommand({buildInfo: 1})')];
-        if (HOST_TYPE != "windows") {
+        if (HOST_TYPE == "linux") {
             // On Linux we override the default path to the system CA store to point to our
             // "trusted" CA. On Windows, this CA will have been added to the user's trusted CA list
             argv.unshift("env", "SSL_CERT_FILE=jstests/libs/trusted-ca.pem");
