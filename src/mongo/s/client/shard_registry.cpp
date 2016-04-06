@@ -546,7 +546,10 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::_exhaustiveFindOnConfig(
             }
 
             response.opTime = replParseStatus.getValue().getLastOpVisible();
-            grid.advanceConfigOpTime(response.opTime);
+
+            // We return the config opTime that was returned for this particular request, but as a
+            // safeguard we ensure our global configOpTime is at least as large as it.
+            invariant(grid.configOpTime() >= response.opTime);
         }
 
         for (const BSONObj& doc : data.documents) {
@@ -821,21 +824,6 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadat
     CommandResponse cmdResponse;
     cmdResponse.response = response.data.getOwned();
     cmdResponse.metadata = response.metadata.getOwned();
-
-    if (response.metadata.hasField(rpc::kReplSetMetadataFieldName)) {
-        auto replParseStatus = rpc::ReplSetMetadata::readFromMetadata(response.metadata);
-
-        if (!replParseStatus.isOK()) {
-            return replParseStatus.getStatus();
-        }
-
-        const auto& replMetadata = replParseStatus.getValue();
-        cmdResponse.visibleOpTime = replMetadata.getLastOpVisible();
-
-        if (shard->isConfig()) {
-            grid.advanceConfigOpTime(cmdResponse.visibleOpTime);
-        }
-    }
 
     if (errorsToCheck.count(commandSpecificStatus.code())) {
         return commandSpecificStatus;

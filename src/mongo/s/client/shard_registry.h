@@ -327,7 +327,6 @@ private:
     struct CommandResponse {
         BSONObj response;
         BSONObj metadata;
-        repl::OpTime visibleOpTime;
     };
 
     /**

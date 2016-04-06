@@ -56,6 +56,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/set_shard_version_request.h"
+#include "mongo/s/sharding_egress_metadata_hook.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/memory.h"
@@ -67,6 +68,7 @@ using executor::NetworkInterfaceMock;
 using executor::NetworkTestEnv;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
+using rpc::ShardingEgressMetadataHook;
 using unittest::assertGet;
 
 using std::string;
@@ -91,12 +93,14 @@ void ShardingTestFixture::setUp() {
 
     // Set up executor pool used for most operations.
     auto fixedNet = stdx::make_unique<executor::NetworkInterfaceMock>();
+    fixedNet->setEgressMetadataHook(stdx::make_unique<ShardingEgressMetadataHook>());
     _mockNetwork = fixedNet.get();
     auto fixedExec = makeThreadPoolTestExecutor(std::move(fixedNet));
     _networkTestEnv = stdx::make_unique<NetworkTestEnv>(fixedExec.get(), _mockNetwork);
     _executor = fixedExec.get();
 
     auto netForPool = stdx::make_unique<executor::NetworkInterfaceMock>();
+    netForPool->setEgressMetadataHook(stdx::make_unique<ShardingEgressMetadataHook>());
     auto execForPool = makeThreadPoolTestExecutor(std::move(netForPool));
     std::vector<std::unique_ptr<executor::TaskExecutor>> executorsForPool;
     executorsForPool.emplace_back(std::move(execForPool));

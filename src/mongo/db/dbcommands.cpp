@@ -1224,6 +1224,36 @@ const std::array<StringData, 4> neededFieldNames{LiteParsedQuery::cmdOptionMaxTi
                                                  LiteParsedQuery::queryOptionMaxTimeMS};
 }  // namespace
 
+void appendOpTimeMetadata(OperationContext* txn,
+                          const rpc::RequestInterface& request,
+                          BSONObjBuilder* metadataBob) {
+    const bool isShardingAware = ShardingState::get(txn)->enabled();
+    const bool isConfig = serverGlobalParams.clusterRole == ClusterRole::ConfigServer;
+    repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
+    const bool isReplSet =
+        replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+
+    if (isReplSet) {
+        // Attach our own last opTime.
+        repl::OpTime lastOpTimeFromClient =
+            repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
+        replCoord->prepareReplResponseMetadata(request, lastOpTimeFromClient, metadataBob);
+
+        // For commands from mongos, append some info to help getLastError(w) work.
+        // TODO: refactor out of here as part of SERVER-18236
+        if (isShardingAware || isConfig) {
+            rpc::ShardingMetadata(lastOpTimeFromClient, replCoord->getElectionId())
+                .writeToMetadata(metadataBob, request.getProtocol());
+        }
+    }
+
+    // If we're a shard other than the config shard, attach the last configOpTime we know about.
+    if (isShardingAware && !isConfig) {
+        auto opTime = grid.configOpTime();
+        rpc::ConfigServerMetadata(opTime).writeToMetadata(metadataBob);
+    }
+}
+
 /**
  * this handles
  - auth
@@ -1374,15 +1404,10 @@ void Command::execCommand(OperationContext* txn,
                 ->onStaleShardVersion(txn, NamespaceString(sce.getns()), sce.getVersionReceived());
         }
 
-        BSONObj metadata = rpc::makeEmptyMetadata();
-        if (ShardingState::get(txn)->enabled()) {
-            auto opTime = grid.configOpTime();
-            BSONObjBuilder metadataBob;
-            rpc::ConfigServerMetadata(opTime).writeToMetadata(&metadataBob);
-            metadata = metadataBob.obj();
-        }
+        BSONObjBuilder metadataBob;
+        appendOpTimeMetadata(txn, request, &metadataBob);
 
-        Command::generateErrorResponse(txn, replyBuilder, e, request, command, metadata);
+        Command::generateErrorResponse(txn, replyBuilder, e, request, command, metadataBob.done());
     }
 }
 
@@ -1553,27 +1578,7 @@ bool Command::run(OperationContext* txn,
     inPlaceReplyBob.doneFast();
 
     BSONObjBuilder metadataBob;
-
-    const bool isShardingAware = ShardingState::get(txn)->enabled();
-    bool isReplSet = replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
-    if (isReplSet) {
-        repl::OpTime lastOpTimeFromClient =
-            repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
-        replCoord->prepareReplResponseMetadata(request, lastOpTimeFromClient, &metadataBob);
-
-        // For commands from mongos, append some info to help getLastError(w) work.
-        // TODO: refactor out of here as part of SERVER-18326
-        if (isShardingAware || serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            rpc::ShardingMetadata(lastOpTimeFromClient, replCoord->getElectionId())
-                .writeToMetadata(&metadataBob, request.getProtocol());
-        }
-    }
-
-    if (isShardingAware) {
-        auto opTime = grid.configOpTime();
-        rpc::ConfigServerMetadata(opTime).writeToMetadata(&metadataBob);
-    }
-
+    appendOpTimeMetadata(txn, request, &metadataBob);
     replyBuilder->setMetadata(metadataBob.done());
 
     return result;

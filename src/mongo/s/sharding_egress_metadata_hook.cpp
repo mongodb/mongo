@@ -57,8 +57,8 @@ Status ShardingEgressMetadataHook::writeRequestMetadata(bool shardedConnection,
         if (!shardedConnection) {
             return Status::OK();
         }
-        auto shard = grid.shardRegistry()->getShardNoReload(target.toString());
-        return _writeRequestMetadataForShard(shard, metadataBob);
+        rpc::ConfigServerMetadata(grid.configOpTime()).writeToMetadata(metadataBob);
+        return Status::OK();
     } catch (...) {
         return exceptionToStatus();
     }
@@ -68,32 +68,18 @@ Status ShardingEgressMetadataHook::writeRequestMetadata(const HostAndPort& targe
                                                         BSONObjBuilder* metadataBob) {
     try {
         audit::writeImpersonatedUsersToMetadata(metadataBob);
-        auto shard = grid.shardRegistry()->getShardForHostNoReload(target);
-        return _writeRequestMetadataForShard(shard, metadataBob);
+        rpc::ConfigServerMetadata(grid.configOpTime()).writeToMetadata(metadataBob);
+        return Status::OK();
     } catch (...) {
         return exceptionToStatus();
     }
-}
-
-Status ShardingEgressMetadataHook::_writeRequestMetadataForShard(shared_ptr<Shard> shard,
-                                                                 BSONObjBuilder* metadataBob) {
-    if (!shard) {
-        return Status(ErrorCodes::ShardNotFound,
-                      str::stream() << "Shard not found for server: " << shard->toString());
-    }
-    if (shard->isConfig()) {
-        return Status::OK();
-    }
-    rpc::ConfigServerMetadata(grid.configOpTime()).writeToMetadata(metadataBob);
-    return Status::OK();
 }
 
 Status ShardingEgressMetadataHook::readReplyMetadata(const StringData replySource,
                                                      const BSONObj& metadataObj) {
     try {
         _saveGLEStats(metadataObj, replySource);
-        auto shard = grid.shardRegistry()->getShardNoReload(replySource.toString());
-        return _readReplyMetadataForShard(shard, metadataObj);
+        return _advanceConfigOptimeFromShard(replySource.toString(), metadataObj);
     } catch (...) {
         return exceptionToStatus();
     }
@@ -103,29 +89,45 @@ Status ShardingEgressMetadataHook::readReplyMetadata(const HostAndPort& replySou
                                                      const BSONObj& metadataObj) {
     try {
         _saveGLEStats(metadataObj, replySource.toString());
-        auto shard = grid.shardRegistry()->getShardForHostNoReload(replySource);
-        return _readReplyMetadataForShard(shard, metadataObj);
+        return _advanceConfigOptimeFromShard(replySource.toString(), metadataObj);
     } catch (...) {
         return exceptionToStatus();
     }
 }
 
-Status ShardingEgressMetadataHook::_readReplyMetadataForShard(shared_ptr<Shard> shard,
-                                                              const BSONObj& metadataObj) {
+Status ShardingEgressMetadataHook::_advanceConfigOptimeFromShard(ShardId shardId,
+                                                                 const BSONObj& metadataObj) {
     try {
+        auto shard = grid.shardRegistry()->getShardNoReload(shardId);
         if (!shard) {
             return Status::OK();
         }
 
-        // If this host is a known shard of ours, look for a config server optime in the
-        // response metadata to use to update our notion of the current config server optime.
-        auto responseStatus = rpc::ConfigServerMetadata::readFromMetadata(metadataObj);
-        if (!responseStatus.isOK()) {
-            return responseStatus.getStatus();
-        }
-        auto opTime = responseStatus.getValue().getOpTime();
-        if (opTime.is_initialized()) {
-            grid.advanceConfigOpTime(opTime.get());
+        // Update our notion of the config server opTime from the configOpTime in the response.
+        if (shard->isConfig()) {
+            // Config servers return the config opTime as part of their own metadata.
+            if (metadataObj.hasField(rpc::kReplSetMetadataFieldName)) {
+                auto parseStatus = rpc::ReplSetMetadata::readFromMetadata(metadataObj);
+                if (!parseStatus.isOK()) {
+                    return parseStatus.getStatus();
+                }
+
+                const auto& replMetadata = parseStatus.getValue();
+                auto opTime = replMetadata.getLastOpVisible();
+                grid.advanceConfigOpTime(opTime);
+            }
+        } else {
+            // Regular shards return the config opTime as part of ConfigServerMetadata.
+            auto parseStatus = rpc::ConfigServerMetadata::readFromMetadata(metadataObj);
+            if (!parseStatus.isOK()) {
+                return parseStatus.getStatus();
+            }
+
+            const auto& configMetadata = parseStatus.getValue();
+            auto opTime = configMetadata.getOpTime();
+            if (opTime.is_initialized()) {
+                grid.advanceConfigOpTime(opTime.get());
+            }
         }
         return Status::OK();
     } catch (...) {

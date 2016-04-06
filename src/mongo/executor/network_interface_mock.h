@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "mongo/executor/network_interface.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/list.h"
 #include "mongo/stdx/mutex.h"
@@ -90,6 +91,7 @@ public:
     virtual void waitForWork();
     virtual void waitForWorkUntil(Date_t when);
     virtual void setConnectionHook(std::unique_ptr<NetworkConnectionHook> hook);
+    virtual void setEgressMetadataHook(std::unique_ptr<rpc::EgressMetadataHook> metadataHook);
     virtual void signalWorkAvailable();
     virtual Date_t now();
     virtual std::string getHostName();
@@ -319,6 +321,9 @@ private:
 
     // The connection hook.
     std::unique_ptr<NetworkConnectionHook> _hook;  // (R)
+
+    // The metadata hook.
+    std::unique_ptr<rpc::EgressMetadataHook> _metadataHook;  // (R)
 
     // The set of hosts we have seen so far. If we see a new host, we will execute the
     // ConnectionHook's validation and post-connection logic.

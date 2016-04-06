@@ -32,6 +32,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/s/client/shard.h"
 
 namespace mongo {
 
@@ -57,8 +58,7 @@ public:
 private:
     virtual void _saveGLEStats(const BSONObj& metadata, StringData hostString);
 
-    Status _readReplyMetadataForShard(std::shared_ptr<Shard> shard, const BSONObj& metadataObj);
-    Status _writeRequestMetadataForShard(std::shared_ptr<Shard> shard, BSONObjBuilder* metadataBob);
+    Status _advanceConfigOptimeFromShard(ShardId shardId, const BSONObj& metadataObj);
 };
 
 }  // namespace rpc

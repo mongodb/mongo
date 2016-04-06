@@ -271,6 +271,13 @@ void NetworkInterfaceMock::scheduleResponse(NetworkOperationIterator noi,
     while ((insertBefore != _scheduled.end()) && (insertBefore->getResponseDate() <= when)) {
         ++insertBefore;
     }
+
+    // If no RemoteCommandResponse was returned (for example, on a simulated network error), then
+    // do not attempt to run the metadata hook, since there is no returned metadata.
+    if (_metadataHook && response.isOK()) {
+        _metadataHook->readReplyMetadata(noi->getRequest().target, response.getValue().metadata);
+    }
+
     noi->setResponse(when, response);
     _scheduled.splice(insertBefore, _processing, noi);
 }
@@ -430,6 +437,14 @@ void NetworkInterfaceMock::setConnectionHook(std::unique_ptr<NetworkConnectionHo
     invariant(!_hasStarted);
     invariant(!_hook);
     _hook = std::move(hook);
+}
+
+void NetworkInterfaceMock::setEgressMetadataHook(
+    std::unique_ptr<rpc::EgressMetadataHook> metadataHook) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    invariant(!_hasStarted);
+    invariant(!_metadataHook);
+    _metadataHook = std::move(metadataHook);
 }
 
 void NetworkInterfaceMock::signalWorkAvailable() {
