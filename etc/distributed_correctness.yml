@@ -62,7 +62,7 @@ functions:
           set -v
           cd ./clusters/${cluster}
           # create all resources and instances
-          bin/setup-cluster.sh ${cluster}
+          ../../bin/setup-cluster.sh ${cluster}
           echo "EC2 Cluster CREATED."
           touch terraform.tfstate.backup
           tar -czvf cluster_config.tgz ips.sh terraform.tfstate.backup terraform.tfstate
