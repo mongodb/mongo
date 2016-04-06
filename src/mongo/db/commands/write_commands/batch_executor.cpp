@@ -58,6 +58,7 @@
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -1126,7 +1127,8 @@ static void multiUpdate(OperationContext* txn,
             collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
 
             const UpdateStats* updateStats = UpdateStage::getUpdateStats(exec.get());
-            UpdateStage::fillOutOpDebug(updateStats, &summary, debug);
+            UpdateStage::recordUpdateStatsInOpDebug(updateStats, debug);
+            debug->setPlanSummaryMetrics(summary);
 
             UpdateResult res = UpdateStage::makeUpdateResult(updateStats);
 
@@ -1248,8 +1250,7 @@ static void multiRemove(OperationContext* txn,
             if (collection) {
                 collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
             }
-            CurOp::get(txn)->debug().fromMultiPlanner = summary.fromMultiPlanner;
-            CurOp::get(txn)->debug().replanned = summary.replanned;
+            CurOp::get(txn)->debug().setPlanSummaryMetrics(summary);
 
             if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
                 // If this operation has already generated a new lastOp, don't bother setting it

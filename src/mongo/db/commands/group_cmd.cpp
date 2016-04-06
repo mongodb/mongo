@@ -39,6 +39,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/plan_summary_stats.h"
 
 namespace mongo {
 
@@ -172,8 +173,7 @@ private:
         if (coll) {
             coll->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
         }
-        CurOp::get(txn)->debug().fromMultiPlanner = summaryStats.fromMultiPlanner;
-        CurOp::get(txn)->debug().replanned = summaryStats.replanned;
+        CurOp::get(txn)->debug().setPlanSummaryMetrics(summaryStats);
 
         invariant(STAGE_GROUP == planExecutor->getRootStage()->stageType());
         GroupStage* groupStage = static_cast<GroupStage*>(planExecutor->getRootStage());

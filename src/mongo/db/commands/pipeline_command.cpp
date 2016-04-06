@@ -51,6 +51,7 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/scopeguard.h"
@@ -247,8 +248,10 @@ public:
                 PlanSummaryStats stats;
                 Explain::getSummaryStats(*input, &stats);
                 collection->infoCache()->notifyOfQuery(txn, stats.indexesUsed);
-                CurOp::get(txn)->debug().fromMultiPlanner = stats.fromMultiPlanner;
-                CurOp::get(txn)->debug().replanned = stats.replanned;
+
+                // TODO SERVER-23265: Confirm whether this is the correct place to gather all
+                // metrics. There is no harm adding here for the time being.
+                CurOp::get(txn)->debug().setPlanSummaryMetrics(stats);
             }
 
             // Create the PlanExecutor which returns results from the pipeline. The WorkingSet

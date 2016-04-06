@@ -47,6 +47,7 @@ class Client;
 class Command;
 class CurOp;
 class OperationContext;
+struct PlanSummaryStats;
 
 /**
  * stores a copy of a bson obj in a fixed size buffer
@@ -140,6 +141,11 @@ public:
     void append(const CurOp& curop,
                 const SingleThreadedLockStats& lockStats,
                 BSONObjBuilder& builder) const;
+
+    /**
+     * Copies relevant plan summary metrics to this OpDebug instance.
+     */
+    void setPlanSummaryMetrics(const PlanSummaryStats& planSummaryStats);
 
     // -------------------
 

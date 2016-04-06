@@ -48,6 +48,7 @@
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/getmore_request.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -320,6 +321,13 @@ public:
         BSONObj obj;
         PlanExecutor::ExecState state;
         long long numResults = 0;
+
+        // We report keysExamined and docsExamined to OpDebug for a given getMore operation. To
+        // obtain these values we need to take a diff of the pre-execution and post-execution
+        // metrics, as they accumulate over the course of a cursor's lifetime.
+        PlanSummaryStats preExecutionStats;
+        Explain::getSummaryStats(*exec, &preExecutionStats);
+
         Status batchStatus = generateBatch(cursor, request, &nextBatch, &state, &numResults);
         if (!batchStatus.isOK()) {
             return appendCommandStatus(result, batchStatus);
@@ -363,6 +371,12 @@ public:
                 }
             }
         }
+
+        PlanSummaryStats postExecutionStats;
+        Explain::getSummaryStats(*exec, &postExecutionStats);
+        postExecutionStats.totalKeysExamined -= preExecutionStats.totalKeysExamined;
+        postExecutionStats.totalDocsExamined -= preExecutionStats.totalDocsExamined;
+        CurOp::get(txn)->debug().setPlanSummaryMetrics(postExecutionStats);
 
         if (shouldSaveCursorGetMore(state, exec, isCursorTailable(cursor))) {
             respondWithId = request.cursorid;

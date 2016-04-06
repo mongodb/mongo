@@ -5,8 +5,6 @@
 (function() {
     "use strict";
 
-    jsTest.log("Running profile_update under writeMode: " + db.getMongo().writeMode());
-
     load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.
 
     // Setup test db and collection.
@@ -23,6 +21,7 @@
     for (i = 0; i < 10; ++i) {
         assert.writeOK(coll.insert({a: i}));
     }
+    assert.commandWorked(coll.createIndex({a: 1}));
 
     assert.writeOK(coll.update({a: {$gte: 2}}, {$set: {c: 1}}));
 
@@ -31,8 +30,8 @@
     assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
     assert.eq(profileObj.op, "update", tojson(profileObj));
     assert.eq(profileObj.keyUpdates, 0, tojson(profileObj));
-    assert.eq(profileObj.keysExamined, 0, tojson(profileObj));
-    assert.eq(profileObj.docsExamined, 3, tojson(profileObj));
+    assert.eq(profileObj.keysExamined, 1, tojson(profileObj));
+    assert.eq(profileObj.docsExamined, 1, tojson(profileObj));
     assert.eq(profileObj.nMatched, 1, tojson(profileObj));
     assert.eq(profileObj.nModified, 1, tojson(profileObj));
     assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));

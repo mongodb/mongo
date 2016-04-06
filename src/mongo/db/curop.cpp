@@ -40,6 +40,7 @@
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/getmore_request.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
@@ -672,6 +673,15 @@ void OpDebug::append(const CurOp& curop,
     b.append("millis", executionTime);
 
     execStats.append(b, "execStats");
+}
+
+void OpDebug::setPlanSummaryMetrics(const PlanSummaryStats& planSummaryStats) {
+    keysExamined = planSummaryStats.totalKeysExamined;
+    docsExamined = planSummaryStats.totalDocsExamined;
+    idhack = planSummaryStats.isIdhack;
+    hasSortStage = planSummaryStats.hasSortStage;
+    fromMultiPlanner = planSummaryStats.fromMultiPlanner;
+    replanned = planSummaryStats.replanned;
 }
 
 }  // namespace mongo

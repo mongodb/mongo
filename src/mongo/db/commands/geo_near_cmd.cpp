@@ -50,6 +50,7 @@
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/range_preserver.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/util/log.h"
@@ -280,15 +281,11 @@ public:
                                                   << WorkingSetCommon::toStatusString(currObj)));
         }
 
-        // Fill out the stats subobj.
-        BSONObjBuilder stats(result.subobjStart("stats"));
-
-        // Fill in nscanned from the explain.
         PlanSummaryStats summary;
         Explain::getSummaryStats(*exec, &summary);
-        collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
-        CurOp::get(txn)->debug().fromMultiPlanner = summary.fromMultiPlanner;
-        CurOp::get(txn)->debug().replanned = summary.replanned;
+
+        // Fill out the stats subobj.
+        BSONObjBuilder stats(result.subobjStart("stats"));
 
         stats.appendNumber("nscanned", summary.totalKeysExamined);
         stats.appendNumber("objectsLoaded", summary.totalDocsExamined);
@@ -299,6 +296,10 @@ public:
         stats.append("maxDistance", farthestDist);
         stats.append("time", CurOp::get(txn)->elapsedMillis());
         stats.done();
+
+        collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
+
+        CurOp::get(txn)->debug().setPlanSummaryMetrics(summary);
 
         return true;
     }

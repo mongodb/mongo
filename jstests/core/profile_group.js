@@ -1,5 +1,4 @@
 // Confirms that profiled group execution contains all expected metrics with proper values.
-// TODO SERVER-23257: Add keysExamined, docsExamined.
 // TODO SERVER-23259: Add planSummary.
 // TODO SERVER-23264: Add execStats.
 
@@ -9,9 +8,9 @@
     // For getLatestProfilerEntry and getProfilerProtocolStringForCommand
     load("jstests/libs/profiler.js");
 
-    var conn = new Mongo(db.getMongo().host);
-    var testDB = conn.getDB("profile_group");
+    var testDB = db.getSiblingDB("profile_group");
     assert.commandWorked(testDB.dropDatabase());
+    var conn = testDB.getMongo();
     var coll = testDB.getCollection("test");
 
     testDB.setProfilingLevel(2);
@@ -23,12 +22,15 @@
     for (i = 0; i < 10; ++i) {
         assert.writeOK(coll.insert({a: i, b: i % 5}));
     }
+    assert.commandWorked(coll.createIndex({b: 1}));
 
     coll.group({key: {a: 1, b: 1}, cond: {b: 3}, reduce: function() {}, initial: {}});
     var profileObj = getLatestProfilerEntry(testDB);
 
     assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
     assert.eq(profileObj.op, "command", tojson(profileObj));
+    assert.eq(profileObj.keysExamined, 2, tojson(profileObj));
+    assert.eq(profileObj.docsExamined, 2, tojson(profileObj));
     assert.eq(profileObj.protocol, getProfilerProtocolStringForCommand(conn), tojson(profileObj));
     assert.eq(profileObj.command.group.key, {a: 1, b: 1}, tojson(profileObj));
     assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));

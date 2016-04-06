@@ -1,5 +1,4 @@
 // Confirms that profiled geonear execution contains all expected metrics with proper values.
-// TODO SERVER-23257: Add keysExamined, docsExamined.
 // TODO SERVER-23259: Add planSummary.
 // TODO SERVER-23264: Add execStats.
 
@@ -9,9 +8,9 @@
     // For getLatestProfilerEntry and getProfilerProtocolStringForCommand
     load("jstests/libs/profiler.js");
 
-    var conn = new Mongo(db.getMongo().host);
-    var testDB = conn.getDB("profile_geonear");
+    var testDB = db.getSiblingDB("profile_geonear");
     assert.commandWorked(testDB.dropDatabase());
+    var conn = testDB.getMongo();
     var coll = testDB.getCollection("test");
 
     testDB.setProfilingLevel(2);
@@ -32,6 +31,8 @@
 
     assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
     assert.eq(profileObj.op, "command", tojson(profileObj));
+    assert.eq(profileObj.keysExamined, 82, tojson(profileObj));
+    assert.eq(profileObj.docsExamined, 10, tojson(profileObj));
     assert.eq(profileObj.protocol, getProfilerProtocolStringForCommand(conn), tojson(profileObj));
     assert.eq(coll.getName(), profileObj.command.geoNear, tojson(profileObj));
     assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));

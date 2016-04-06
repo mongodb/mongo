@@ -49,6 +49,7 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -153,12 +154,7 @@ void endQueryOp(OperationContext* txn,
     // Fill out curop based on explain summary statistics.
     PlanSummaryStats summaryStats;
     Explain::getSummaryStats(exec, &summaryStats);
-    curop->debug().hasSortStage = summaryStats.hasSortStage;
-    curop->debug().keysExamined = summaryStats.totalKeysExamined;
-    curop->debug().docsExamined = summaryStats.totalDocsExamined;
-    curop->debug().idhack = summaryStats.isIdhack;
-    curop->debug().fromMultiPlanner = summaryStats.fromMultiPlanner;
-    curop->debug().replanned = summaryStats.replanned;
+    curop->debug().setPlanSummaryMetrics(summaryStats);
 
     if (collection) {
         collection->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
@@ -393,6 +389,12 @@ QueryResult::View getMore(OperationContext* txn,
         exec->restoreState();
         PlanExecutor::ExecState state;
 
+        // We report keysExamined and docsExamined to OpDebug for a given getMore operation. To
+        // obtain these values we need to take a diff of the pre-execution and post-execution
+        // metrics, as they accumulate over the course of a cursor's lifetime.
+        PlanSummaryStats preExecutionStats;
+        Explain::getSummaryStats(*exec, &preExecutionStats);
+
         generateBatch(ntoreturn, cc, &bb, &numResults, &slaveReadTill, &state);
 
         // If this is an await data cursor, and we hit EOF without generating any results, then
@@ -419,6 +421,12 @@ QueryResult::View getMore(OperationContext* txn,
             // way, attempt to generate another batch of results.
             generateBatch(ntoreturn, cc, &bb, &numResults, &slaveReadTill, &state);
         }
+
+        PlanSummaryStats postExecutionStats;
+        Explain::getSummaryStats(*exec, &postExecutionStats);
+        postExecutionStats.totalKeysExamined -= preExecutionStats.totalKeysExamined;
+        postExecutionStats.totalDocsExamined -= preExecutionStats.totalDocsExamined;
+        curop.debug().setPlanSummaryMetrics(postExecutionStats);
 
         // We have to do this before re-acquiring locks in the agg case because
         // shouldSaveCursorGetMore() can make a network call for agg cursors.

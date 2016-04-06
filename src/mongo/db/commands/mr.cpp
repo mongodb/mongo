@@ -58,6 +58,7 @@
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/range_preserver.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -1508,11 +1509,14 @@ public:
                 // Record the indexes used by the PlanExecutor.
                 PlanSummaryStats stats;
                 Explain::getSummaryStats(*exec, &stats);
+
+                // TODO SERVER-23261: Confirm whether this is the correct place to gather all
+                // metrics. There is no harm adding here for the time being.
+                CurOp::get(txn)->debug().setPlanSummaryMetrics(stats);
+
                 Collection* coll = scopedAutoDb->getDb()->getCollection(config.ns);
                 invariant(coll);  // 'exec' hasn't been killed, so collection must be alive.
                 coll->infoCache()->notifyOfQuery(txn, stats.indexesUsed);
-                CurOp::get(txn)->debug().fromMultiPlanner = stats.fromMultiPlanner;
-                CurOp::get(txn)->debug().replanned = stats.replanned;
             }
             pm.finished();
 

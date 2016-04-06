@@ -48,6 +48,7 @@
 #include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/update_index_data.h"
@@ -126,7 +127,8 @@ UpdateResult update(OperationContext* txn,
     PlanSummaryStats summaryStats;
     Explain::getSummaryStats(*exec, &summaryStats);
     const UpdateStats* updateStats = UpdateStage::getUpdateStats(exec.get());
-    UpdateStage::fillOutOpDebug(updateStats, &summaryStats, opDebug);
+    UpdateStage::recordUpdateStatsInOpDebug(updateStats, opDebug);
+    opDebug->setPlanSummaryMetrics(summaryStats);
 
     return UpdateStage::makeUpdateResult(updateStats);
 }

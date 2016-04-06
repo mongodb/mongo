@@ -106,12 +106,9 @@ public:
     static const UpdateStats* getUpdateStats(const PlanExecutor* exec);
 
     /**
-     * Populate 'opDebug' with stats from 'updateStats' and 'summaryStats' describing the execution
-     * of this update.
+     * Populate 'opDebug' with stats from 'updateStats' describing the execution of this update.
      */
-    static void fillOutOpDebug(const UpdateStats* updateStats,
-                               const PlanSummaryStats* summaryStats,
-                               OpDebug* opDebug);
+    static void recordUpdateStatsInOpDebug(const UpdateStats* updateStats, OpDebug* opDebug);
 
     /**
      * Converts 'updateStats' into an UpdateResult.

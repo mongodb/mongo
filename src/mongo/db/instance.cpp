@@ -76,6 +76,7 @@
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -730,7 +731,8 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
                 }
 
                 const UpdateStats* updateStats = UpdateStage::getUpdateStats(exec.get());
-                UpdateStage::fillOutOpDebug(updateStats, &summary, &op.debug());
+                UpdateStage::recordUpdateStatsInOpDebug(updateStats, &op.debug());
+                op.debug().setPlanSummaryMetrics(summary);
 
                 UpdateResult res = UpdateStage::makeUpdateResult(updateStats);
 
@@ -794,7 +796,8 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
         collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
 
         const UpdateStats* updateStats = UpdateStage::getUpdateStats(exec.get());
-        UpdateStage::fillOutOpDebug(updateStats, &summary, &op.debug());
+        UpdateStage::recordUpdateStatsInOpDebug(updateStats, &op.debug());
+        op.debug().setPlanSummaryMetrics(summary);
 
         UpdateResult res = UpdateStage::makeUpdateResult(updateStats);
 
@@ -875,8 +878,7 @@ void receivedDelete(OperationContext* txn, const NamespaceString& nsString, Mess
             if (collection) {
                 collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
             }
-            op.debug().fromMultiPlanner = summary.fromMultiPlanner;
-            op.debug().replanned = summary.replanned;
+            CurOp::get(txn)->debug().setPlanSummaryMetrics(summary);
 
             if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
                 // If this operation has already generated a new lastOp, don't bother setting it

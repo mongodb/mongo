@@ -1,5 +1,4 @@
 // Confirms that profiled delete execution contains all expected metrics with proper values.
-// TODO SERVER-23257: Add keysExamined, docsExamined.
 // TODO SERVER-23259: Add planSummary.
 // TODO SERVER-23264: Add execStats.
 
@@ -20,16 +19,19 @@
     //
     var i;
     for (i = 0; i < 10; ++i) {
-        assert.writeOK(coll.insert({a: i}));
+        assert.writeOK(coll.insert({a: i, b: i}));
     }
+    assert.commandWorked(coll.createIndex({a: 1}));
 
-    assert.writeOK(coll.remove({a: {$gte: 2}}, {justOne: true}));
+    assert.writeOK(coll.remove({a: {$gte: 2}, b: {$gte: 2}}, {justOne: true}));
 
     var profileObj = getLatestProfilerEntry(testDB);
 
     assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
     assert.eq(profileObj.op, "remove", tojson(profileObj));
     assert.eq(profileObj.ndeleted, 1, tojson(profileObj));
+    assert.eq(profileObj.keysExamined, 1, tojson(profileObj));
+    assert.eq(profileObj.docsExamined, 1, tojson(profileObj));
     assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("locks"), tojson(profileObj));

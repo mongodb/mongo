@@ -1,5 +1,4 @@
 // Confirms that profiled getMore execution contains all expected metrics with proper values.
-// TODO SERVER-23257: Add keysExamined, docsExamined.
 // TODO SERVER-23259: Add planSummary.
 // TODO SERVER-23264: Add execStats.
 
@@ -35,6 +34,8 @@
 
     assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
     assert.eq(profileObj.op, "getmore", tojson(profileObj));
+    assert.eq(profileObj.keysExamined, 2, tojson(profileObj));
+    assert.eq(profileObj.docsExamined, 2, tojson(profileObj));
     assert.eq(profileObj.cursorid, cursorId, tojson(profileObj));
     assert.eq(profileObj.nreturned, 2, tojson(profileObj));
     assert.eq(profileObj.query.batchSize, 2, tojson(profileObj));
@@ -48,17 +49,33 @@
     assert(!profileObj.hasOwnProperty("cursorExhausted"), tojson(profileObj));
 
     //
-    // Confirm "cursorExhausted" metric
+    // Confirm hasSortStage on getMore with a not-exhausted cursor and in-memory sort.
+    //
+    coll.drop();
+    for (i = 0; i < 10; ++i) {
+        assert.writeOK(coll.insert({a: i}));
+    }
+
+    cursor = coll.find({a: {$gt: 0}}).sort({a: 1}).batchSize(2);
+    cursor.next();  // Perform initial query and consume first of 2 docs returned.
+    cursor.next();  // Consume second of 2 docs from initial query.
+    cursor.next();  // getMore performed, leaving open cursor.
+
+    profileObj = getLatestProfilerEntry(testDB);
+
+    assert.eq(profileObj.hasSortStage, true, tojson(profileObj));
+
+    //
+    // Confirm "cursorExhausted" metric.
     //
     coll.drop();
     for (i = 0; i < 3; ++i) {
-        assert.writeOK(coll.insert({a: i, b: i}));
+        assert.writeOK(coll.insert({a: i}));
     }
-    assert.commandWorked(coll.createIndex({a: 1}));
 
     cursor = coll.find().batchSize(2);
     cursor.next();     // Perform initial query and consume first of 3 docs returned.
-    cursor.itcount();  // Exhaust the cursor
+    cursor.itcount();  // Exhaust the cursor.
 
     profileObj = getLatestProfilerEntry(testDB);
 

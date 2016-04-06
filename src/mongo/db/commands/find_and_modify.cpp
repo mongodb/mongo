@@ -59,6 +59,7 @@
 #include "mongo/db/query/find_and_modify_request.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -404,8 +405,7 @@ public:
                 if (collection) {
                     collection->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
                 }
-                CurOp::get(txn)->debug().fromMultiPlanner = summaryStats.fromMultiPlanner;
-                CurOp::get(txn)->debug().replanned = summaryStats.replanned;
+                CurOp::get(txn)->debug().setPlanSummaryMetrics(summaryStats);
 
                 // Fill out OpDebug with the number of deleted docs.
                 CurOp::get(txn)->debug().ndeleted = getDeleteStats(exec.get())->docsDeleted;
@@ -494,7 +494,8 @@ public:
                 if (collection) {
                     collection->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
                 }
-                UpdateStage::fillOutOpDebug(getUpdateStats(exec.get()), &summaryStats, opDebug);
+                UpdateStage::recordUpdateStatsInOpDebug(getUpdateStats(exec.get()), opDebug);
+                opDebug->setPlanSummaryMetrics(summaryStats);
 
                 boost::optional<BSONObj> value = advanceStatus.getValue();
                 appendCommandResponse(exec.get(), args.isRemove(), value, result);

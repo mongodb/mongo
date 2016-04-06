@@ -38,6 +38,7 @@
 #include "mongo/db/exec/count.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/range_preserver.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/log.h"
@@ -165,8 +166,7 @@ public:
         if (collection) {
             collection->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
         }
-        CurOp::get(txn)->debug().fromMultiPlanner = summaryStats.fromMultiPlanner;
-        CurOp::get(txn)->debug().replanned = summaryStats.replanned;
+        CurOp::get(txn)->debug().setPlanSummaryMetrics(summaryStats);
 
         // Plan is done executing. We just need to pull the count out of the root stage.
         invariant(STAGE_COUNT == exec->getRootStage()->stageType());

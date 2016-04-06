@@ -48,6 +48,7 @@
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
@@ -234,8 +235,7 @@ public:
         if (collection) {
             collection->infoCache()->notifyOfQuery(txn, stats.indexesUsed);
         }
-        CurOp::get(txn)->debug().fromMultiPlanner = stats.fromMultiPlanner;
-        CurOp::get(txn)->debug().replanned = stats.replanned;
+        CurOp::get(txn)->debug().setPlanSummaryMetrics(stats);
 
         verify(start == bb.buf());
 

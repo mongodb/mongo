@@ -1031,20 +1031,12 @@ const UpdateStats* UpdateStage::getUpdateStats(const PlanExecutor* exec) {
     return static_cast<const UpdateStats*>(updateStage->getSpecificStats());
 }
 
-void UpdateStage::fillOutOpDebug(const UpdateStats* updateStats,
-                                 const PlanSummaryStats* summaryStats,
-                                 OpDebug* opDebug) {
+void UpdateStage::recordUpdateStatsInOpDebug(const UpdateStats* updateStats, OpDebug* opDebug) {
     opDebug->nMatched = updateStats->nMatched;
     opDebug->nModified = updateStats->nModified;
     opDebug->upsert = updateStats->inserted;
     opDebug->fastmodinsert = updateStats->fastmodinsert;
     opDebug->fastmod = updateStats->fastmod;
-
-    // Copy summary information about the plan into OpDebug.
-    opDebug->keysExamined = summaryStats->totalKeysExamined;
-    opDebug->docsExamined = summaryStats->totalDocsExamined;
-    opDebug->fromMultiPlanner = summaryStats->fromMultiPlanner;
-    opDebug->replanned = summaryStats->replanned;
 }
 
 UpdateResult UpdateStage::makeUpdateResult(const UpdateStats* updateStats) {

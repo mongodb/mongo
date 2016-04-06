@@ -1,5 +1,4 @@
 // Confirms that profiled count execution contains all expected metrics with proper values.
-// TODO SERVER-23257: Add keysExamined, docsExamined.
 // TODO SERVER-23259: Add planSummary.
 // TODO SERVER-23264: Add execStats.
 
@@ -9,9 +8,9 @@
     // For getLatestProfilerEntry and getProfilerProtocolStringForCommand
     load("jstests/libs/profiler.js");
 
-    var conn = new Mongo(db.getMongo().host);
-    var testDB = conn.getDB("profile_count");
+    var testDB = db.getSiblingDB("profile_count");
     assert.commandWorked(testDB.dropDatabase());
+    var conn = testDB.getMongo();
     var coll = testDB.getCollection("test");
 
     testDB.setProfilingLevel(2);
@@ -38,7 +37,7 @@
     assert(profileObj.hasOwnProperty("locks"), tojson(profileObj));
 
     //
-    // Count with query.
+    // Count with non-indexed query.
     //
     coll.drop();
     for (i = 0; i < 10; ++i) {
@@ -52,6 +51,25 @@
     profileObj = getLatestProfilerEntry(testDB);
 
     assert.eq(profileObj.command.query, query, tojson(profileObj));
+    assert.eq(profileObj.docsExamined, 10, tojson(profileObj));
+
+    //
+    // Count with indexed query.
+    //
+    coll.drop();
+    for (i = 0; i < 10; ++i) {
+        assert.writeOK(coll.insert({a: i}));
+    }
+    assert.commandWorked(coll.createIndex({a: 1}));
+
+    query = {
+        a: {$gte: 5}
+    };
+    assert.eq(5, coll.count(query));
+    profileObj = getLatestProfilerEntry(testDB);
+
+    assert.eq(profileObj.command.query, query, tojson(profileObj));
+    assert.eq(profileObj.keysExamined, 6, tojson(profileObj));
 
     //
     // Confirm "fromMultiPlanner" metric.
