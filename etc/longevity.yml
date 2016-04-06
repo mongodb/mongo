@@ -293,7 +293,7 @@ buildvariants:
     storageEngine: wiredTiger
 
   run_on:
-    - "linux-64-amzn-perf-longevity"
+    - "rhel70-perf-longevity"
   tasks:
     - name: compile
       distros:
@@ -330,7 +330,7 @@ buildvariants:
     storageEngine: mmapv1
 
   run_on:
-    - "linux-64-amzn-perf-longevity"
+    - "rhel70-perf-longevity"
   tasks:
     - name: compile
       distros:

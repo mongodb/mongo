@@ -463,7 +463,7 @@ buildvariants:
     cluster: single
     numShard: 0
   run_on:
-      - "linux-64-amzn-perf-standalone"
+      - "rhel70-perf-standalone"
   tasks:
     - name: industry_benchmarks_WT
     - name: core_workloads_WT
@@ -479,7 +479,7 @@ buildvariants:
     cluster: single
     numShard: 0
   run_on:
-      - "linux-64-amzn-perf-standalone"
+      - "rhel70-perf-standalone"
   tasks:
     - name: compile
       distros:
@@ -498,7 +498,7 @@ buildvariants:
     cluster: shard
     numShard: 3
   run_on:
-      - "linux-64-amzn-perf-standalone"
+      - "rhel70-perf-standalone"
   tasks:
     - name: industry_benchmarks_WT
     - name: core_workloads_WT
@@ -514,7 +514,7 @@ buildvariants:
     cluster: replica
     numMember: 3
   run_on:
-      - "linux-64-amzn-perf-standalone"
+      - "rhel70-perf-standalone"
   tasks:
     - name: industry_benchmarks_WT
     - name: core_workloads_WT
@@ -525,7 +525,7 @@ buildvariants:
   display_name: Linux Oplog Compare
   batchtime: 1440 # 24 hours
   run_on:
-      - "linux-64-amzn-perf-standalone"
+      - "rhel70-perf-standalone"
   tasks:
     - name: industry_benchmarks_WT_oplog_comp
     - name: core_workloads_WT_oplog_comp
