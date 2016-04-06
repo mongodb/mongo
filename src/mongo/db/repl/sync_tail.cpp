@@ -723,8 +723,10 @@ void SyncTail::oplogApplication() {
                 replCoord->signalDrainComplete(&txn);
             }
 
-            // Reset when triggered in case it was from a rollback, safe to do at any time.
+            // Reset some values when triggered in case it was from a rollback.
+            minValidBoundaries = getMinValid(&txn);
             lastWriteOpTime = replCoord->getMyLastAppliedOpTime();
+            originalEndOpTime = minValidBoundaries.end;
 
             continue;  // This wasn't a real op. Don't try to apply it.
         }
