@@ -31,15 +31,19 @@
 
 #include <cstddef>
 #include <limits>
+#include <memory>
 #include <string>
 #include <type_traits>
 #include <vector>
+
+#include "mongo/stdx/type_traits.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
 namespace secure_allocator_details {
 
-void* allocate(std::size_t bytes);
+void* allocate(std::size_t bytes, std::size_t alignOf);
 void deallocate(void* ptr, std::size_t bytes);
 
 }  // namespace secure_allocator_details
@@ -107,7 +111,8 @@ struct SecureAllocator {
     };
 
     pointer allocate(size_type n) {
-        return static_cast<pointer>(secure_allocator_details::allocate(sizeof(value_type) * n));
+        return static_cast<pointer>(secure_allocator_details::allocate(
+            sizeof(value_type) * n, std::alignment_of<T>::value));
     }
 
     pointer allocate(size_type n, const_void_pointer) {
@@ -173,9 +178,114 @@ bool operator!=(const SecureAllocator<T>& lhs, const SecureAllocator<U>& rhs) {
     return !(lhs == rhs);
 }
 
+/**
+ * SecureHandle offers a smart pointer-ish interface to a type.
+ *
+ * It attempts to solve the problem of using container types with small object optimizations that
+ * might accidentally leave important data on the stack if they're too small to spill to the heap.
+ * It uses the secure allocator for allocations and deallocations.
+ *
+ * This type is meant to offer more value like semantics than a unique_ptr:
+ *   - SecureHandle's are only default constructible if their T is
+ *   - You can construct a SecureHandle like the underlying value:
+ *       SecureHandle<Mytype> type(foo, bar baz);
+ *   - SecureHandle's are copyable if their T's are
+ *   - only moving can produce a non-usable T
+ *
+ * While still being cheap and convenient like a unique_ptr:
+ *   - SecureHandle's move by pointer to their secure storage
+ *   - T& operator*()
+ *   - T* operator->()
+ *
+ * In a moved from state, SecureHandle's may be copy or move assigned and the destructor may run,
+ * but all other operations will invariant.
+ */
 template <typename T>
-using SecureVector = std::vector<T, SecureAllocator<T>>;
+class SecureHandle {
+public:
+    // NOTE: (jcarey)
+    //
+    // We have the default ctor and the perfect forwarding ctor because msvc 2013 ice's on some
+    // default constructed types without it (sfinae was falling over for some reason).
+    //
+    // For non-default constructible t's, we'll fail to substitute the forwarded call to new
+    SecureHandle() : _t(_new()) {}
 
-using SecureString = std::basic_string<char, std::char_traits<char>, SecureAllocator<char>>;
+    // Generic constructor that forwards to the underlying T if the first arg isn't a SecureHandle
+    template <
+        typename Arg,
+        typename... Args,
+        stdx::enable_if_t<!std::is_same<SecureHandle<T>, typename std::decay<Arg>::type>::value,
+                          int> = 0>
+    SecureHandle(Arg&& arg, Args&&... args)
+        : _t(_new(std::forward<Arg>(arg), std::forward<Args>(args)...)) {}
+
+    SecureHandle(const SecureHandle& other) : _t(_new(*other)) {}
+
+    SecureHandle& operator=(const SecureHandle& other) {
+        if (_t) {
+            *_t = *other;
+        } else {
+            _t = _new(*other);
+        }
+
+        return *this;
+    }
+
+    SecureHandle(SecureHandle&& other) : _t(other._t) {
+        other._t = nullptr;
+    }
+
+    SecureHandle& operator=(SecureHandle&& other) {
+        if (&other == this) {
+            return *this;
+        }
+
+        _delete();
+
+        _t = other._t;
+        other._t = nullptr;
+
+        return *this;
+    }
+
+    ~SecureHandle() {
+        _delete();
+    }
+
+    T& operator*() const {
+        invariant(_t);
+
+        return *_t;
+    }
+
+    T* operator->() const {
+        invariant(_t);
+
+        return _t;
+    }
+
+private:
+    template <typename... Args>
+    static T* _new(Args&&... args) {
+        return ::new (secure_allocator_details::allocate(sizeof(T), std::alignment_of<T>::value))
+            T(std::forward<Args>(args)...);
+    }
+
+    void _delete() {
+        if (_t) {
+            _t->~T();
+            secure_allocator_details::deallocate(_t, sizeof(T));
+        }
+    }
+
+    T* _t;
+};
+
+template <typename T>
+using SecureVector = SecureHandle<std::vector<T, SecureAllocator<T>>>;
+
+using SecureString =
+    SecureHandle<std::basic_string<char, std::char_traits<char>, SecureAllocator<char>>>;
 
 }  // namespace mongo

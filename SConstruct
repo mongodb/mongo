@@ -2334,6 +2334,32 @@ def doConfigure(myenv):
 
     myenv = conf.Finish()
 
+    def CheckCXX11Align(context):
+        test_body = """
+        #include <memory>
+        int main(int argc, char **argv) {
+            char buf[100];
+            void* ptr = static_cast<void*>(buf);
+            std::size_t size = sizeof(buf);
+            auto foo = std::align(16, 16, ptr, size);
+            return 0;
+        }
+        """
+        context.Message('Checking for C++11 std::align support... ')
+        ret = context.TryCompile(textwrap.dedent(test_body), '.cpp')
+        context.Result(ret)
+        return ret
+
+    # Check for std::align support
+    conf = Configure(myenv, help=False, custom_tests = {
+        'CheckCXX11Align': CheckCXX11Align,
+    })
+
+    if conf.CheckCXX11Align():
+        conf.env.SetConfigHeaderDefine('MONGO_CONFIG_HAVE_STD_ALIGN')
+
+    myenv = conf.Finish()
+
     def CheckBoostMinVersion(context):
         compile_test_body = textwrap.dedent("""
         #include <boost/version.hpp>

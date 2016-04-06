@@ -31,6 +31,9 @@
 
 #include "mongo/base/secure_allocator.h"
 
+#include <memory>
+#include <unordered_map>
+
 #ifdef _WIN32
 #include <windows.h>
 #else
@@ -39,11 +42,18 @@
 #include <sys/types.h>
 #endif
 
+#include "mongo/base/disallow_copying.h"
+#include "mongo/base/init.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/secure_zero_memory.h"
 
 namespace mongo {
+
+namespace {
 
 /**
  * NOTE(jcarey): Why not new/delete?
@@ -53,11 +63,9 @@ namespace mongo {
  * platforms do offer those semantics, they're not available globally, so we
  * have to flow all allocations through page based allocations.
  */
-namespace secure_allocator_details {
-
 #ifdef _WIN32
 
-void* allocate(std::size_t bytes) {
+void* systemAllocate(std::size_t bytes) {
     // Flags:
     //
     // MEM_COMMIT - allocates the memory charges and zeros the underlying
@@ -85,9 +93,7 @@ void* allocate(std::size_t bytes) {
     return ptr;
 }
 
-void deallocate(void* ptr, std::size_t bytes) {
-    secureZeroMemory(ptr, bytes);
-
+void systemDeallocate(void* ptr, std::size_t bytes) {
     if (VirtualUnlock(ptr, bytes) == 0) {
         auto str = errnoWithPrefix("Failed to VirtualUnlock");
         severe() << str;
@@ -121,7 +127,7 @@ void deallocate(void* ptr, std::size_t bytes) {
 #error "Could not determine a way to map anonymous memory, required for secure allocation"
 #endif
 
-void* allocate(std::size_t bytes) {
+void* systemAllocate(std::size_t bytes) {
     // Flags:
     //
     // PROT_READ | PROT_WRITE - allows read write access to the page
@@ -151,9 +157,7 @@ void* allocate(std::size_t bytes) {
     return ptr;
 }
 
-void deallocate(void* ptr, std::size_t bytes) {
-    secureZeroMemory(ptr, bytes);
-
+void systemDeallocate(void* ptr, std::size_t bytes) {
     if (munlock(ptr, bytes) != 0) {
         severe() << errnoWithPrefix("Failed to munlock");
         fassertFailed(28833);
@@ -166,6 +170,106 @@ void deallocate(void* ptr, std::size_t bytes) {
 }
 
 #endif
+
+/**
+ * Each page represent one call to mmap+mlock / VirtualAlloc+VirtualLock on construction and will
+ * match with an equivalent unlock and unmap on destruction.  Pages are rounded up to the nearest
+ * page size and allocate returns aligned pointers.
+ */
+class Allocation {
+    MONGO_DISALLOW_COPYING(Allocation);
+
+public:
+    explicit Allocation(std::size_t initialAllocation) {
+        auto pageSize = ProcessInfo::getPageSize();
+        std::size_t remainder = initialAllocation % pageSize;
+
+        _size = _remaining =
+            remainder ? initialAllocation + pageSize - remainder : initialAllocation;
+        _start = _ptr = systemAllocate(_size);
+    }
+
+    ~Allocation() {
+        systemDeallocate(_start, _size);
+    }
+
+    /**
+     * Allocates an aligned pointer of given size from the locked page we have a pointer to.
+     *
+     * Returns null if the request can't be satisifed.
+     */
+    void* allocate(std::size_t size, std::size_t alignOf) {
+        if (stdx::align(alignOf, size, _ptr, _remaining)) {
+            auto result = _ptr;
+            _ptr = static_cast<char*>(_ptr) + size;
+            _remaining -= size;
+
+            return result;
+        }
+
+        // We'll make a new allocation if this one doesn't have enough room
+        return nullptr;
+    }
+
+private:
+    void* _start;            // Start of the allocation
+    void* _ptr;              // Start of unallocated bytes
+    std::size_t _size;       // Total size
+    std::size_t _remaining;  // Remaining bytes
+};
+
+// See secure_allocator_details::allocate for a more detailed comment on what these are used for
+stdx::mutex allocatorMutex;  // Protects the values below
+std::unordered_map<void*, std::shared_ptr<Allocation>> secureTable;
+std::shared_ptr<Allocation> lastAllocation = nullptr;
+
+}  // namespace
+
+MONGO_INITIALIZER_GENERAL(SecureAllocator,
+                          ("SystemInfo"),
+                          MONGO_NO_DEPENDENTS)(InitializerContext* context) {
+    return Status::OK();
+}
+
+namespace secure_allocator_details {
+
+/**
+ * To save on allocations, we try to serve multiple requests out of the same mlocked page where
+ * possible.  We do this by invoking the system allocator in multiples of a full page, and keep the
+ * last page around, giving out pointers from that page if its possible to do so.  We also keep an
+ * unordered_map of all the allocations we've handed out, which hold shared_ptrs that get rid of
+ * pages when we're not using them anymore.
+ */
+void* allocate(std::size_t bytes, std::size_t alignOf) {
+    stdx::lock_guard<stdx::mutex> lk(allocatorMutex);
+
+    if (lastAllocation) {
+        auto out = lastAllocation->allocate(bytes, alignOf);
+
+        if (out) {
+            secureTable[out] = lastAllocation;
+            return out;
+        }
+    }
+
+    lastAllocation = std::make_shared<Allocation>(bytes);
+    auto out = lastAllocation->allocate(bytes, alignOf);
+    secureTable[out] = lastAllocation;
+    return out;
+}
+
+/**
+ * Deallocates a secure allocation.
+ *
+ * We zero memory before derefing the associated allocation.
+ */
+void deallocate(void* ptr, std::size_t bytes) {
+    secureZeroMemory(ptr, bytes);
+
+    stdx::lock_guard<stdx::mutex> lk(allocatorMutex);
+
+    secureTable.erase(ptr);
+}
 
 }  // namespace secure_allocator_details
 }  // namespace mongo

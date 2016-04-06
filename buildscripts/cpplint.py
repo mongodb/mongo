@@ -1615,6 +1615,7 @@ def make_polyfill_regex():
   polyfill_required_names = [
     '_',
     'adopt_lock',
+    'align',
     'async',
     'bind',
     'chrono',
@@ -1645,8 +1646,8 @@ def make_polyfill_regex():
     'unique_lock',
   ]
 
-  qualified_names = ['boost::' + name + "(?!_)" for name in polyfill_required_names]
-  qualified_names.extend('std::' + name  + "(?!_)" for name in polyfill_required_names)
+  qualified_names = ['boost::' + name + "\\b" for name in polyfill_required_names]
+  qualified_names.extend('std::' + name  + "\\b" for name in polyfill_required_names)
   qualified_names_regex = '|'.join(qualified_names)
   return re.compile(qualified_names_regex)
 _RE_PATTERN_MONGO_POLYFILL=make_polyfill_regex()
