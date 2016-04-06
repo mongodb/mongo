@@ -1,6 +1,9 @@
 /*
  * Tests various combinations of the configsvr field in replica set configurations and the
  * command line options that control whether a node can function as a member of a CSRS.
+ *
+ * This test requires mmapv1.
+ * @tags: [requires_mmapv1]
  */
 
 function expectState(rst, state) {
