@@ -12,24 +12,12 @@ env.SConscript(
     ],
 )
 
-env.Library(
-    target='sharding_egress_metadata_hook',
-    source=[
-        '$BUILD_DIR/mongo/db/s/sharding_egress_metadata_hook_for_mongod.cpp',
-        'sharding_egress_metadata_hook.cpp',
-        'sharding_egress_metadata_hook_for_mongos.cpp',
-    ],
-    LIBDEPS=[
-        'cluster_last_error_info',
-        'coreshard',
-    ],
-)
-
 # Functionality for initializing global sharding state
 env.Library(
     target='sharding_initialization',
     source=[
         'sharding_initialization.cpp',
+        'sharding_egress_metadata_hook_for_mongos.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/executor/network_interface_factory',
@@ -38,7 +26,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/catalog/catalog_manager_impl',
         'client/sharding_connection_hook',
         'coreshard',
-        'sharding_egress_metadata_hook',
+        'cluster_last_error_info',
     ],
 )
 
@@ -186,6 +174,7 @@ env.Library(
         'config.cpp',
         'db_util.cpp',
         'grid.cpp',
+        'sharding_egress_metadata_hook.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/query/cluster_cursor_manager',

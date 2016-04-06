@@ -51,8 +51,8 @@
 #include "mongo/s/client/sharding_network_connection_hook.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_egress_metadata_hook.h"
 #include "mongo/s/sharding_egress_metadata_hook_for_mongos.h"
-#include "mongo/db/s/sharding_egress_metadata_hook_for_mongod.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/dist_lock_catalog_impl.h"
@@ -106,7 +106,7 @@ std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(std::unique_ptr<NetworkIn
         if (isMongos) {
             metadataHook = stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>();
         } else {
-            metadataHook = stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>();
+            metadataHook = stdx::make_unique<rpc::ShardingEgressMetadataHook>();
         };
         auto net = executor::makeNetworkInterface(
             "NetworkInterfaceASIO-TaskExecutorPool-" + std::to_string(i),
@@ -140,7 +140,7 @@ Status initializeGlobalShardingState(OperationContext* txn,
     if (isMongos) {
         metadataHook = stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>();
     } else {
-        metadataHook = stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>();
+        metadataHook = stdx::make_unique<rpc::ShardingEgressMetadataHook>();
     }
 
     auto network =

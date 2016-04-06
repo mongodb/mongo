@@ -55,7 +55,7 @@ public:
                                 BSONObjBuilder* metadataBob);
 
 private:
-    virtual void saveGLEStats(const BSONObj& metadata, StringData hostString) = 0;
+    virtual void _saveGLEStats(const BSONObj& metadata, StringData hostString);
 
     Status _readReplyMetadataForShard(std::shared_ptr<Shard> shard, const BSONObj& metadataObj);
     Status _writeRequestMetadataForShard(std::shared_ptr<Shard> shard, BSONObjBuilder* metadataBob);

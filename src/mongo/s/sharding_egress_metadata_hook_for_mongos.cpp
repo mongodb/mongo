@@ -35,8 +35,8 @@ namespace mongo {
 
 namespace rpc {
 
-void ShardingEgressMetadataHookForMongos::saveGLEStats(const BSONObj& metadata,
-                                                       StringData hostString) {
+void ShardingEgressMetadataHookForMongos::_saveGLEStats(const BSONObj& metadata,
+                                                        StringData hostString) {
     mongo::saveGLEStats(metadata, hostString);
 }
 

@@ -91,7 +91,7 @@ Status ShardingEgressMetadataHook::_writeRequestMetadataForShard(shared_ptr<Shar
 Status ShardingEgressMetadataHook::readReplyMetadata(const StringData replySource,
                                                      const BSONObj& metadataObj) {
     try {
-        saveGLEStats(metadataObj, replySource);
+        _saveGLEStats(metadataObj, replySource);
         auto shard = grid.shardRegistry()->getShardNoReload(replySource.toString());
         return _readReplyMetadataForShard(shard, metadataObj);
     } catch (...) {
@@ -102,7 +102,7 @@ Status ShardingEgressMetadataHook::readReplyMetadata(const StringData replySourc
 Status ShardingEgressMetadataHook::readReplyMetadata(const HostAndPort& replySource,
                                                      const BSONObj& metadataObj) {
     try {
-        saveGLEStats(metadataObj, replySource.toString());
+        _saveGLEStats(metadataObj, replySource.toString());
         auto shard = grid.shardRegistry()->getShardForHostNoReload(replySource);
         return _readReplyMetadataForShard(shard, metadataObj);
     } catch (...) {
@@ -132,6 +132,8 @@ Status ShardingEgressMetadataHook::_readReplyMetadataForShard(shared_ptr<Shard> 
         return exceptionToStatus();
     }
 }
+
+void ShardingEgressMetadataHook::_saveGLEStats(const BSONObj& metadata, StringData hostString) {}
 
 }  // namespace rpc
 }  // namespace mongo
