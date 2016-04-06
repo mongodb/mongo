@@ -450,6 +450,11 @@ void BackgroundSync::_produce(OperationContext* txn) {
 
         _rollback(txn, source, getConnection);
         stop();
+    } else if (fetcherReturnStatus == ErrorCodes::InvalidBSON) {
+        Seconds blacklistDuration(60);
+        warning() << "Fetcher got invalid BSON while querying oplog. Blacklisting sync source "
+                  << source << " for " << blacklistDuration << ".";
+        _replCoord->blacklistSyncSource(source, Date_t::now() + blacklistDuration);
     } else if (!fetcherReturnStatus.isOK()) {
         warning() << "Fetcher error querying oplog: " << fetcherReturnStatus.toString();
     }
@@ -466,6 +471,7 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
     // example, because it stepped down) we might not have a cursor
     if (!result.isOK()) {
         LOG(2) << "Error returned from oplog query: " << result.getStatus();
+        *returnStatus = result.getStatus();
         return;
     }
 
