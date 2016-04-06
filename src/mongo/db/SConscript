@@ -114,30 +114,6 @@ env.CppUnitTest(
 env.CppUnitTest('record_id_test', 'record_id_test.cpp', LIBDEPS=[])
 
 env.Library(
-    target='local_client',
-    source=[
-        'local_client.cpp',
-    ],
-    LIBDEPS=[
-        'query/query',
-    ]
-)
-
-env.CppUnitTest(
-    target='local_client_test',
-    source=[
-        'local_client_test.cpp',
-    ],
-    LIBDEPS=[
-        'local_client',
-        'repl/replmocks',
-        'serveronly',
-        '$BUILD_DIR/mongo/util/ntservice_mock',
-    ],
-    NO_CRUTCH = True,
-)
-
-env.Library(
     target='startup_warnings_common',
     source=[
         'startup_warnings_common.cpp',

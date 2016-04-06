@@ -69,26 +69,23 @@ struct Helpers {
                             bool unique,
                             const char* name);
 
-    /**
-     * Fetches a single BSONObj document from the given collection that matches query.
-     *
-     * @param collection - collection to be queried.
-     * @param query - the query to perform. Note this is the low level portion of query so
-     *                "orderby : ..." won't work.
-     * @param result - holds the found BSONObj document, if found.
-     * @param requireIndex - if true, assert if no index for the query. A way to guard against
-     *                       writing a slow query.
-     * @return true if a document is found.
-     */
+    /* fetch a single object from collection ns that matches query.
+       set your db SavedContext first.
+
+       @param query - the query to perform.  note this is the low level portion of query so
+                      "orderby : ..." won't work.
+
+       @param requireIndex if true, assert if no index for the query.  a way to guard against
+       writing a slow query.
+
+       @return true if object found
+    */
     static bool findOne(OperationContext* txn,
                         Collection* collection,
                         const BSONObj& query,
                         BSONObj& result,
                         bool requireIndex = false);
 
-    /**
-     * Fetches the RecordId location of a single object from collection ns that matches query.
-     */
     static RecordId findOne(OperationContext* txn,
                             Collection* collection,
                             const BSONObj& query,
