@@ -129,11 +129,6 @@ def make_variant_dir_generator():
 #   using the nargs='const' mechanism.
 #
 
-add_option('mute',
-    help='do not display commandlines for compiling and linking, to reduce screen noise',
-    nargs=0,
-)
-
 add_option('prefix',
     default='$BUILD_ROOT/install',
     help='installation prefix',
@@ -455,8 +450,6 @@ def find_mongo_custom_variables():
     for path in sys.path:
         probe = os.path.join(path, 'mongo_custom_variables.py')
         if os.path.isfile(probe):
-            if not has_option('mute'):
-                print "Using mongo variable customization file {0}".format(probe)
             files.append(probe)
     return files
 
@@ -575,8 +568,12 @@ def variable_distsrc_converter(val):
         return val + "/"
     return val
 
+variables_files = variable_shlex_converter(get_option('variables-files'))
+for file in variables_files:
+    print "Using variable customization file %s" % file
+
 env_vars = Variables(
-    files=variable_shlex_converter(get_option('variables-files')),
+    files=variables_files,
     args=ARGUMENTS
 )
 
@@ -714,6 +711,11 @@ env_vars.Add('TOOLS',
 env_vars.Add('VARIANT_DIR',
     help='Sets the name (or generator function) for the variant directory',
     default=default_variant_dir_generator,
+)
+
+env_vars.Add('VERBOSE',
+    help='Control build verbosity (auto, on/off true/false 1/0)',
+    default='auto',
 )
 
 # don't run configure if user calls --help
@@ -855,6 +857,18 @@ def conf_error(env, msg, *args):
 
 env.AddMethod(fatal_error, 'FatalError')
 env.AddMethod(conf_error, 'ConfError')
+
+# Normalize the VERBOSE Option, and make its value available as a
+# function.
+if env['VERBOSE'] == "auto":
+    env['VERBOSE'] = not sys.stdout.isatty()
+elif env['VERBOSE'] in ('1', "ON", "on", "True", "true", True):
+    env['VERBOSE'] = True
+elif env['VERBOSE'] in ('0', "OFF", "off", "False", "false", False):
+    env['VERBOSE'] = False
+else:
+    env.FatalError("Invalid value {0} for VERBOSE Variable", env['VERBOSE'])
+env.AddMethod(lambda env: env['VERBOSE'], 'Verbose')
 
 if has_option('variables-help'):
     print env_vars.GenerateHelpText(env)
@@ -1198,7 +1212,7 @@ if get_option('build-fast-and-loose') == "on" and \
     env.Decider('MD5-timestamp')
     env.SetOption('max_drift', 1)
 
-if has_option('mute'):
+if not env.Verbose():
     env.Append( CCCOMSTR = "Compiling $TARGET" )
     env.Append( CXXCOMSTR = env["CCCOMSTR"] )
     env.Append( SHCCCOMSTR = "Compiling $TARGET" )
