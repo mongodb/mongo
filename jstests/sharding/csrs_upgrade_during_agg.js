@@ -41,7 +41,7 @@ load("jstests/libs/csrs_upgrade_util.js");
 
     var joinParallelShell = startParallelShell(function() {
         db = db.getSiblingDB('csrs_upgrade_during_agg');
-        for (var i = 0; i < 3000; i++) {
+        for (var i = 0; i < 5000; i++) {
             if (i % 100 == 0) {
                 print("Performing aggregation iteration: " + i);
             }

@@ -174,7 +174,7 @@ var CSRSUpgradeCoordinator = function() {
     };
 
     this.waitUntilConfigsCaughtUp = function() {
-        waitUntilAllNodesCaughtUp(csrs, 60000);
+        waitUntilAllNodesCaughtUp(csrs, 120000);
     };
 
     /**

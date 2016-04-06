@@ -41,7 +41,7 @@ load("jstests/libs/csrs_upgrade_util.js");
 
     var joinParallelShell = startParallelShell(function() {
         db = db.getSiblingDB('csrs_upgrade_during_group');
-        for (var i = 0; i < 250; i++) {
+        for (var i = 0; i < 1000; i++) {
             if (i % 10 == 0) {
                 print("Performing group iteration: " + i);
             }

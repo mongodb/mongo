@@ -41,7 +41,7 @@ load("jstests/libs/csrs_upgrade_util.js");
 
     var joinParallelShell = startParallelShell(function() {
         db = db.getSiblingDB('csrs_upgrade_during_mr');
-        for (var i = 0; i < 500; i++) {
+        for (var i = 0; i < 1000; i++) {
             if (i % 10 == 0) {
                 print("Performing map reduce iteration: " + i);
             }
