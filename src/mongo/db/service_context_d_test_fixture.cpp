@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,23 +26,30 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
 
-#pragma once
+#include "mongo/db/service_context_d_test_fixture.h"
 
-#include "mongo/base/disallow_copying.h"
-#include "mongo/db/repl/storage_interface.h"
+#include "mongo/base/checked_cast.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_d.h"
+#include "mongo/db/storage/storage_options.h"
+#include "mongo/unittest/temp_dir.h"
 
 namespace mongo {
-namespace repl {
 
-class StorageInterfaceImpl : public StorageInterface {
-    MONGO_DISALLOW_COPYING(StorageInterfaceImpl);
+void ServiceContextMongoDTest::setUp() {
+    ServiceContext* serviceContext = getGlobalServiceContext();
+    if (!serviceContext->getGlobalStorageEngine()) {
+        // When using the "ephemeralForTest" storage engine, it is fine for the temporary directory
+        // to go away after the global storage engine is initialized.
+        unittest::TempDir tempDir("service_context_d_test_fixture");
+        storageGlobalParams.dbpath = tempDir.path();
+        storageGlobalParams.engine = "ephemeralForTest";
+        storageGlobalParams.engineSetByUser = true;
+        checked_cast<ServiceContextMongoD*>(getGlobalServiceContext())->createLockFile();
+        serviceContext->initializeGlobalStorageEngine();
+    }
+}
 
-public:
-    StorageInterfaceImpl() = default;
-
-    OperationContext* createOperationContext() override;
-};
-
-}  // namespace repl
 }  // namespace mongo

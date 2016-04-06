@@ -48,11 +48,6 @@ env.Library('rslog',
                 '$BUILD_DIR/mongo/base',
             ])
 
-env.Library('storage_interface',
-            'storage_interface.cpp',
-            LIBDEPS=[
-            ])
-
 env.Library(
     target='storage_interface_impl',
     source=[
@@ -61,8 +56,19 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/serveronly', # For OperationContextImpl
         '$BUILD_DIR/mongo/db/service_context',
-        'storage_interface',
         ])
+
+env.CppUnitTest(
+    target='storage_interface_impl_test',
+    source=[
+        'storage_interface_impl_test.cpp',
+    ],
+    LIBDEPS=[
+        'storage_interface_impl',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+    ],
+    NO_CRUTCH = True,
+)
 
 env.Library(
     target='replication_executor',
@@ -74,7 +80,6 @@ env.Library(
     LIBDEPS=[
         'database_task',
         'task_runner',
-        'storage_interface',
         '$BUILD_DIR/mongo/executor/network_interface',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/util/foundation',
@@ -184,8 +189,7 @@ env.CppUnitTest(
         'oplog_interface_mock',
         'replmocks',
         'rs_rollback',
-        '$BUILD_DIR/mongo/db/serveronly',
-        '$BUILD_DIR/mongo/util/ntservice_mock',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
     ],
     NO_CRUTCH = True,
 )
@@ -250,8 +254,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'replmocks',
         'sync_tail',
-        '$BUILD_DIR/mongo/db/serveronly',
-        '$BUILD_DIR/mongo/util/ntservice_mock',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
     ],
     NO_CRUTCH = True,
 )
@@ -471,7 +474,6 @@ env.Library('replmocks',
                 'repl_settings',
                 'replica_set_messages',
                 'replication_executor',
-                'storage_interface',
             ])
 
 env.Library('read_concern_args',

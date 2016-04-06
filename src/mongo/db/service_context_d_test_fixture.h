@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,23 +26,21 @@
  *    it in the license file.
  */
 
-
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
-#include "mongo/db/repl/storage_interface.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
-namespace repl {
 
-class StorageInterfaceImpl : public StorageInterface {
-    MONGO_DISALLOW_COPYING(StorageInterfaceImpl);
-
-public:
-    StorageInterfaceImpl() = default;
-
-    OperationContext* createOperationContext() override;
+/**
+ * Test fixture class for tests that use either the "ephemeralForTest" or "devnull" storage engines.
+ */
+class ServiceContextMongoDTest : public unittest::Test {
+protected:
+    /**
+     * Initializes global storage engine.
+     */
+    void setUp() override;
 };
 
-}  // namespace repl
 }  // namespace mongo

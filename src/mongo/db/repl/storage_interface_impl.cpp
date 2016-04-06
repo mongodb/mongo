@@ -26,8 +26,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/storage_interface_impl.h"
@@ -38,9 +36,6 @@
 
 namespace mongo {
 namespace repl {
-
-StorageInterfaceImpl::StorageInterfaceImpl() : StorageInterface() {}
-StorageInterfaceImpl::~StorageInterfaceImpl() {}
 
 OperationContext* StorageInterfaceImpl::createOperationContext() {
     if (!ClientBasic::getCurrent()) {

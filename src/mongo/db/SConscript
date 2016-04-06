@@ -737,6 +737,19 @@ serveronlyEnv.Library(
 )
 
 env.Library(
+    target= 'service_context_d_test_fixture',
+    source= [
+        'service_context_d_test_fixture.cpp',
+    ],
+    LIBDEPS= [
+        '$BUILD_DIR/mongo/db/serveronly',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/mongo/util/ntservice_mock',
+    ],
+)
+
+env.Library(
     target='log_process_details',
     source=[
         'log_process_details.cpp',

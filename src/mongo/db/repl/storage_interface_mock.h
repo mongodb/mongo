@@ -29,19 +29,17 @@
 
 #pragma once
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/db/repl/storage_interface.h"
 
 namespace mongo {
-
-class OperationContext;
-
 namespace repl {
 
 class StorageInterfaceMock : public StorageInterface {
-public:
-    explicit StorageInterfaceMock();
-    virtual ~StorageInterfaceMock();
+    MONGO_DISALLOW_COPYING(StorageInterfaceMock);
 
+public:
+    StorageInterfaceMock() = default;
     OperationContext* createOperationContext() override;
 };
 

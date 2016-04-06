@@ -33,7 +33,6 @@
 #include <list>
 #include <utility>
 
-#include "mongo/base/checked_cast.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -53,11 +52,8 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/rollback_source.h"
 #include "mongo/db/repl/rs_rollback.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/service_context_d.h"
-#include "mongo/db/storage/storage_options.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -128,7 +124,7 @@ StatusWith<BSONObj> RollbackSourceMock::getCollectionInfo(const NamespaceString&
     return BSON("name" << nss.ns() << "options" << BSONObj());
 }
 
-class RSRollbackTest : public unittest::Test {
+class RSRollbackTest : public ServiceContextMongoDTest {
 protected:
     std::unique_ptr<OperationContext> _txn;
 
@@ -141,19 +137,7 @@ private:
 };
 
 void RSRollbackTest::setUp() {
-    ServiceContext* serviceContext = getGlobalServiceContext();
-    if (!serviceContext->getGlobalStorageEngine()) {
-        // When using the 'devnull' storage engine, it is fine for the temporary directory to
-        // go away after the global storage engine is initialized.
-        unittest::TempDir tempDir("rs_rollback_test");
-        mongo::storageGlobalParams.dbpath = tempDir.path();
-        mongo::storageGlobalParams.dbpath = tempDir.path();
-        mongo::storageGlobalParams.engine = "ephemeralForTest";
-        mongo::storageGlobalParams.engineSetByUser = true;
-        checked_cast<ServiceContextMongoD*>(getGlobalServiceContext())->createLockFile();
-        serviceContext->initializeGlobalStorageEngine();
-    }
-
+    ServiceContextMongoDTest::setUp();
     Client::initThreadIfNotAlready();
     _txn.reset(new OperationContextReplMock(&cc(), 1));
     _coordinator = new ReplicationCoordinatorRollbackMock();
@@ -173,6 +157,7 @@ void RSRollbackTest::tearDown() {
     _txn.reset();
     setGlobalReplicationCoordinator(nullptr);
 }
+
 
 void noSleep(Seconds seconds) {}
 

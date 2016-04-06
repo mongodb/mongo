@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/disallow_copying.h"
 
 namespace mongo {
 
@@ -41,16 +42,16 @@ namespace repl {
  * ReplicationExectutor's ability to take database locks.
  */
 class StorageInterface {
+    MONGO_DISALLOW_COPYING(StorageInterface);
+
 public:
-    virtual ~StorageInterface();
+    StorageInterface() = default;
+    virtual ~StorageInterface() = default;
 
     /**
      * Creates an operation context for running database operations.
      */
     virtual OperationContext* createOperationContext() = 0;
-
-protected:
-    StorageInterface();
 };
 
 }  // namespace repl

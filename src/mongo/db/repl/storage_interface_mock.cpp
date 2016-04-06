@@ -37,10 +37,6 @@
 namespace mongo {
 namespace repl {
 
-StorageInterfaceMock::StorageInterfaceMock() {}
-
-StorageInterfaceMock::~StorageInterfaceMock() {}
-
 OperationContext* StorageInterfaceMock::createOperationContext() {
     return new OperationContextReplMock();
 }

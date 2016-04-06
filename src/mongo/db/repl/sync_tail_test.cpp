@@ -30,7 +30,6 @@
 
 #include <memory>
 
-#include "mongo/base/checked_cast.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -44,10 +43,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/sync_tail.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/service_context_d.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/unittest/temp_dir.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -68,7 +64,7 @@ bool BackgroundSyncMock::peek(BSONObj* op) {
 void BackgroundSyncMock::consume() {}
 void BackgroundSyncMock::waitForMore() {}
 
-class SyncTailTest : public unittest::Test {
+class SyncTailTest : public ServiceContextMongoDTest {
 protected:
     void _testSyncApplyInsertDocument(LockMode expectedMode);
 
@@ -84,17 +80,7 @@ private:
 };
 
 void SyncTailTest::setUp() {
-    ServiceContext* serviceContext = getGlobalServiceContext();
-    if (!serviceContext->getGlobalStorageEngine()) {
-        // When using the 'devnull' storage engine, it is fine for the temporary directory to
-        // go away after the global storage engine is initialized.
-        unittest::TempDir tempDir("sync_tail_test");
-        mongo::storageGlobalParams.dbpath = tempDir.path();
-        mongo::storageGlobalParams.engine = "devnull";
-        mongo::storageGlobalParams.engineSetByUser = true;
-        checked_cast<ServiceContextMongoD*>(getGlobalServiceContext())->createLockFile();
-        serviceContext->initializeGlobalStorageEngine();
-    }
+    ServiceContextMongoDTest::setUp();
     ReplSettings replSettings;
     replSettings.setOplogSizeBytes(5 * 1024 * 1024);
 

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,17 +26,26 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
-
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/storage_interface.h"
+#include <memory>
 
-namespace mongo {
-namespace repl {
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 
-StorageInterface::StorageInterface() {}
-StorageInterface::~StorageInterface() {}
+#include "mongo/unittest/unittest.h"
 
-}  // namespace repl
-}  // namespace mongo
+namespace {
+
+using namespace mongo;
+using namespace mongo::repl;
+
+class StorageInterfaceImplTest : public ServiceContextMongoDTest {};
+
+TEST_F(StorageInterfaceImplTest, CreateOperationContextShouldNotReturnNull) {
+    std::unique_ptr<OperationContext> txn(StorageInterfaceImpl().createOperationContext());
+    ASSERT_TRUE(txn);
+}
+
+}  // namespace
