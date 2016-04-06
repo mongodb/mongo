@@ -67,6 +67,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/stats/timer_stats',
         '$BUILD_DIR/mongo/logger/parse_log_component_settings',
         '$BUILD_DIR/mongo/s/client/sharding_client',
+        '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
         '$BUILD_DIR/mongo/scripting/scripting_common',
         '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
