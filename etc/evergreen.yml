@@ -1550,6 +1550,22 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: sharding_csrs_upgrade
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_csrs_upgrade --storageEngine=mmapv1
+
+- <<: *task_template
+  name: sharding_csrs_upgrade_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_csrs_upgrade --storageEngine=wiredTiger
+
+- <<: *task_template
   name: sharding_csrs_continuous_config_stepdown_WT
   commands:
   - func: "do setup"
@@ -1595,6 +1611,14 @@ tasks:
     vars:
       resmoke_args: --suites=sharding_auth_audit --storageEngine=wiredTiger
       run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_csrs_upgrade_auth_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_csrs_upgrade_auth --storageEngine=wiredTiger
 
 - <<: *task_template
   name: sharding_legacy
@@ -2243,6 +2267,9 @@ buildvariants:
   - name: sharding_legacy_multiversion
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_csrs_upgrade
+  - name: sharding_csrs_upgrade_WT
+  - name: sharding_csrs_upgrade_auth_WT
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -2389,6 +2416,9 @@ buildvariants:
   - name: sharding_legacy
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_csrs_upgrade
+  - name: sharding_csrs_upgrade_WT
+  - name: sharding_csrs_upgrade_auth_WT
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -2461,6 +2491,8 @@ buildvariants:
   - name: replication_auth
   - name: sharding
   - name: sharding_auth
+  - name: sharding_csrs_upgrade
+  - name: sharding_csrs_upgrade_auth_WT
   - name: slow1
   - name: slow2
   - name: sharding_jscore_passthrough
@@ -2513,6 +2545,7 @@ buildvariants:
   - name: replicasets_WT
   - name: replication_WT
   - name: sharding_WT
+  - name: sharding_csrs_upgrade_WT
   - name: slow1_WT
   - name: slow2_WT
   - name: sharded_collections_jscore_passthrough_WT
@@ -2613,6 +2646,9 @@ buildvariants:
   - name: sharding_WT
   - name: sharding_auth
   - name: sharding_legacy_multiversion
+  - name: sharding_csrs_upgrade
+  - name: sharding_csrs_upgrade_WT
+  - name: sharding_csrs_upgrade_auth_WT
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -2720,6 +2756,9 @@ buildvariants:
   - name: sharding_WT
   - name: sharding_auth
   - name: sharding_legacy_multiversion
+  - name: sharding_csrs_upgrade
+  - name: sharding_csrs_upgrade_WT
+  - name: sharding_csrs_upgrade_auth_WT
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -2792,6 +2831,7 @@ buildvariants:
   - name: sharding_auth
   - name: sharding_auth_audit_WT
   - name: sharding_WT_ese
+  - name: sharding_csrs_upgrade_auth_WT
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -2902,6 +2942,9 @@ buildvariants:
   - name: sharding_WT
   - name: sharding_auth
   - name: sharding_legacy_multiversion
+  - name: sharding_csrs_upgrade
+  - name: sharding_csrs_upgrade_WT
+  - name: sharding_csrs_upgrade_auth_WT
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -3062,6 +3105,8 @@ buildvariants:
   - name: replication_WT
   - name: sharding
   - name: sharding_WT
+  - name: sharding_csrs_upgrade
+  - name: sharding_csrs_upgrade_WT
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -3164,6 +3209,8 @@ buildvariants:
   - name: replication_WT
   - name: sharding
   - name: sharding_WT
+  - name: sharding_csrs_upgrade
+  - name: sharding_csrs_upgrade_WT
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -3271,6 +3318,8 @@ buildvariants:
   - name: replication_WT
   - name: sharding
   - name: sharding_WT
+  - name: sharding_csrs_upgrade
+  - name: sharding_csrs_upgrade_WT
   - name: tool
   - name: tool_WT
   - name: unittests
@@ -3309,6 +3358,7 @@ buildvariants:
   - name: jsCore_WT
   - name: jsCore_WT_ese
   - name: sharding_WT_ese
+  - name: sharding_csrs_upgrade_WT
   - name: jsCore_auth
   - name: jstestfuzz
   - name: jstestfuzz_WT
@@ -3320,6 +3370,7 @@ buildvariants:
   - name: sasl
   - name: sharding_auth
   - name: sharding_auth_audit_WT
+  - name: sharding_csrs_upgrade_auth_WT
   - name: snmp
   - name: snmp_WT
   - name: ssl
@@ -3376,6 +3427,7 @@ buildvariants:
   - name: sasl
   - name: sharding_auth
   - name: sharding_auth_audit_WT
+  - name: sharding_csrs_upgrade_auth_WT
   - name: snmp
   - name: ssl
   - name: sslSpecial
@@ -3453,6 +3505,8 @@ buildvariants:
   - name: replication_WT
   - name: sharding
   - name: sharding_WT
+  - name: sharding_csrs_upgrade
+  - name: sharding_csrs_upgrade_WT
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -3581,6 +3635,8 @@ buildvariants:
   - name: replication_WT
   - name: sharding
   - name: sharding_WT
+  - name: sharding_csrs_upgrade
+  - name: sharding_csrs_upgrade_WT
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -3672,6 +3728,8 @@ buildvariants:
   - name: replication_WT
   - name: sharding
   - name: sharding_WT
+  - name: sharding_csrs_upgrade
+  - name: sharding_csrs_upgrade_WT
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -3722,6 +3780,8 @@ buildvariants:
   - name: replication_WT
   - name: sharding
   - name: sharding_WT
+  - name: sharding_csrs_upgrade
+  - name: sharding_csrs_upgrade_WT
   - name: tool
   - name: tool_WT
   - name: unittests
@@ -3757,6 +3817,7 @@ buildvariants:
   - name: sasl
   - name: sharding_auth
   - name: sharding_auth_audit_WT
+  - name: sharding_csrs_upgrade_auth_WT
   - name: snmp
   - name: snmp_WT
   - name: ssl
@@ -3810,6 +3871,7 @@ buildvariants:
   - name: replicasets_auth
   - name: sasl
   - name: sharding_auth
+  - name: sharding_csrs_upgrade_auth_WT
   - name: snmp
   - name: snmp_WT
   - name: ssl
@@ -3933,6 +3995,9 @@ buildvariants:
   - name: sharding_WT_ese
   - name: sharding_auth
   - name: sharding_auth_audit_WT
+  - name: sharding_csrs_upgrade
+  - name: sharding_csrs_upgrade_WT
+  - name: sharding_csrs_upgrade_auth_WT
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
@@ -3997,6 +4062,7 @@ buildvariants:
   - name: replicasets_auth
   - name: sasl
   - name: sharding_auth
+  - name: sharding_csrs_upgrade_auth_WT
   - name: snmp
   - name: snmp_WT
   - name: ssl
@@ -4115,6 +4181,9 @@ buildvariants:
   - name: sharding_WT_ese
   - name: sharding_auth
   - name: sharding_auth_audit_WT
+  - name: sharding_csrs_upgrade
+  - name: sharding_csrs_upgrade_WT
+  - name: sharding_csrs_upgrade_auth_WT
   # - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_WT
   # - name: sharding_gle_auth_basics_passthrough_write_cmd
@@ -4234,6 +4303,9 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_csrs_upgrade
+  - name: sharding_csrs_upgrade_WT
+  - name: sharding_csrs_upgrade_auth_WT
   - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
@@ -4340,6 +4412,9 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_csrs_upgrade
+  - name: sharding_csrs_upgrade_WT
+  - name: sharding_csrs_upgrade_auth_WT
   - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
@@ -4448,6 +4523,9 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_csrs_upgrade
+  - name: sharding_csrs_upgrade_WT
+  - name: sharding_csrs_upgrade_auth_WT
   - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
@@ -4507,6 +4585,7 @@ buildvariants:
   - name: replicasets_auth
   - name: sasl
   - name: sharding_auth
+  - name: sharding_csrs_upgrade_auth_WT
   - name: snmp
   - name: snmp_WT
   - name: ssl
@@ -4555,6 +4634,7 @@ buildvariants:
   - name: replicasets_auth
   - name: sasl
   - name: sharding_auth
+  - name: sharding_csrs_upgrade_auth_WT
   - name: snmp
   - name: snmp_WT
   - name: ssl
@@ -4606,6 +4686,7 @@ buildvariants:
   - name: replicasets_auth
   - name: sasl
   - name: sharding_auth
+  - name: sharding_csrs_upgrade_auth_WT
   - name: mmap
   - name: snmp
   - name: snmp_WT
@@ -4708,6 +4789,9 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_csrs_upgrade
+  - name: sharding_csrs_upgrade_WT
+  - name: sharding_csrs_upgrade_auth_WT
   - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
@@ -4762,6 +4846,7 @@ buildvariants:
   - name: replicasets_auth
   - name: sasl
   - name: sharding_auth
+  - name: sharding_csrs_upgrade_auth_WT
   - name: mmap
   - name: snmp
   - name: snmp_WT
@@ -4864,6 +4949,9 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_csrs_upgrade
+  - name: sharding_csrs_upgrade_WT
+  - name: sharding_csrs_upgrade_auth_WT
   - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
@@ -4943,12 +5031,14 @@ buildvariants:
   - name: replication
   - name: replication_WT
   - name: sharding
+  - name: sharding_csrs_upgrade
   - name: sharded_collections_jscore_passthrough
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
   - name: sharding_WT
+  - name: sharding_csrs_upgrade_WT
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -5003,6 +5093,7 @@ buildvariants:
   - name: replicasets_auth
   - name: sasl
   - name: sharding_auth
+  - name: sharding_csrs_upgrade_auth_WT
   - name: snmp
   - name: snmp_WT
   - name: ssl
@@ -5104,6 +5195,9 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_csrs_upgrade
+  - name: sharding_csrs_upgrade_WT
+  - name: sharding_csrs_upgrade_auth_WT
   - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
@@ -5343,6 +5437,8 @@ buildvariants:
   - name: replication_auth
   - name: sharding
   - name: sharding_auth
+  - name: sharding_csrs_upgrade
+  - name: sharding_csrs_upgrade_auth_WT
   - name: slow1
   - name: slow2
   - name: sharding_jscore_passthrough
@@ -5453,6 +5549,9 @@ buildvariants:
   - name: sharding_WT_ese
   - name: sharding_auth
   - name: sharding_auth_audit_WT
+  - name: sharding_csrs_upgrade
+  - name: sharding_csrs_upgrade_WT
+  - name: sharding_csrs_upgrade_auth_WT
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
@@ -5584,6 +5683,9 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_csrs_upgrade
+  - name: sharding_csrs_upgrade_WT
+  - name: sharding_csrs_upgrade_auth_WT
   - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT

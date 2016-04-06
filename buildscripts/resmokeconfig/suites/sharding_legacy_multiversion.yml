@@ -6,7 +6,6 @@ selector:
     exclude_files:
     # The following tests fails because a certain command or functionality is not supported in v3.0
     # version of mongos:
-    - jstests/sharding/csrs_upgrade*.js
     - jstests/sharding/find_getmore_cmd.js
 
     # The following tests fail because explain format changed. In v3.0, read pref is inside
@@ -52,9 +51,6 @@ selector:
     - jstests/sharding/sync_cluster_config/sync6.js # SERVER-21660
     - jstests/sharding/move_primary_basic.js # SERVER-21851
     - jstests/sharding/enable_sharding_basic.js # SERVER-21853
-
-    # Tests shard upgrade to CSRS mode, nonsensical if using SCCC config servers
-    - jstests/sharding/csrs_upgrade_mongod_using_movechunk.js
 
 executor:
   js_test:
