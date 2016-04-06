@@ -479,9 +479,11 @@ Status Collection::aboutToDeleteCapped(OperationContext* txn,
     return Status::OK();
 }
 
-void Collection::deleteDocument(
-    OperationContext* txn, const RecordId& loc, bool fromMigrate, bool cappedOK, bool noWarn) {
-    if (isCapped() && !cappedOK) {
+void Collection::deleteDocument(OperationContext* txn,
+                                const RecordId& loc,
+                                bool fromMigrate,
+                                bool noWarn) {
+    if (isCapped()) {
         log() << "failing remove on a capped ns " << _ns << endl;
         uasserted(10089, "cannot remove from a capped collection");
         return;
