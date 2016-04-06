@@ -55,6 +55,7 @@ selector:
     - jstests/core/capped6.js # Uses captrunc test command.
     - jstests/core/convert_to_capped_nonexistant.js # Uses convertToCapped and captrunc command.
     - jstests/core/stages_delete.js # Uses stageDebug command for deletes.
+    - jstests/core/update_multi5.js # bulk_api not calling getWriteConcern when writeConcern passed in update
 
 
 executor:
