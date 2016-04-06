@@ -11,7 +11,7 @@ load('jstests/concurrency/fsm_utils/setup_teardown_functions.js');
 var runner = (function() {
 
     function validateExecutionMode(mode) {
-        var allowedKeys = ['composed', 'parallel'];
+        var allowedKeys = ['composed', 'parallel', 'serial'];
 
         Object.keys(mode).forEach(function(option) {
             assert.contains(option,
@@ -26,8 +26,17 @@ var runner = (function() {
         mode.parallel = mode.parallel || false;
         assert.eq('boolean', typeof mode.parallel);
 
-        assert(!mode.composed || !mode.parallel,
-               "properties 'composed' and 'parallel' cannot both be true");
+        mode.serial = mode.serial || false;
+        assert.eq('boolean', typeof mode.serial);
+
+        var numEnabledModes = 0;
+        Object.keys(mode).forEach(key => {
+            if (mode[key]) {
+                numEnabledModes++;
+            }
+        });
+        assert.eq(
+            1, numEnabledModes, "One and only one execution mode can be enabled " + tojson(mode));
 
         return mode;
     }
@@ -134,7 +143,7 @@ var runner = (function() {
      * executed simultaneously, followed by workloads #2 and #3 together.
      */
     function scheduleWorkloads(workloads, executionMode, executionOptions) {
-        if (!executionMode.composed && !executionMode.parallel) {  // serial execution
+        if (executionMode.serial) {
             return Array.shuffle(workloads).map(function(workload) {
                 return [workload];  // run each workload by itself
             });
@@ -742,7 +751,8 @@ var runner = (function() {
             executionOptions = executionOptions || {};
             cleanupOptions = cleanupOptions || {};
 
-            runWorkloads(workloads, clusterOptions, {}, executionOptions, cleanupOptions);
+            runWorkloads(
+                workloads, clusterOptions, {serial: true}, executionOptions, cleanupOptions);
         },
 
         parallel: function parallel(workloads, clusterOptions, executionOptions, cleanupOptions) {
