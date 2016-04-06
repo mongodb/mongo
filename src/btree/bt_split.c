@@ -737,7 +737,6 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 
 	alloc_index = pindex = NULL;
 	parent_decr = 0;
-	parent_entries = 0;
 	empty_parent = false;
 	complete = WT_ERR_RETURN;
 
