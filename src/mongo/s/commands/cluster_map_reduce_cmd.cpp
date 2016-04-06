@@ -48,6 +48,7 @@
 #include "mongo/s/config.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/db_util.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/strategy.h"
 #include "mongo/stdx/chrono.h"
@@ -232,7 +233,7 @@ public:
         shared_ptr<DBConfig> confOut;
         if (customOutDB) {
             // Create the output database implicitly, since we have a custom output requested
-            confOut = uassertStatusOK(grid.implicitCreateDb(txn, outDB));
+            confOut = uassertStatusOK(dbutil::implicitCreateDb(txn, outDB));
         } else {
             confOut = confIn;
         }

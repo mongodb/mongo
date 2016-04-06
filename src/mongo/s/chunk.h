@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
 
@@ -80,6 +81,17 @@ public:
     const BSONObj& getMax() const {
         return _max;
     }
+
+    /**
+    * Returns true if the balancer should be running. Caller is responsible for making sure
+    * settings has the balancer key.
+    */
+    static bool shouldBalance(const SettingsType& balancerSettings);
+
+    /**
+     * Returns true if the config server settings indicate that the balancer should be active.
+     */
+    bool getConfigShouldBalance(OperationContext* txn) const;
 
     // Returns true if this chunk contains the given shard key, and false otherwise
     //

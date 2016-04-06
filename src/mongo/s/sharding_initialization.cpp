@@ -29,6 +29,7 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
 #include "mongo/platform/basic.h"
+#include "mongo/platform/random.h"
 
 #include "mongo/s/sharding_initialization.h"
 
@@ -52,9 +53,11 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_egress_metadata_hook_for_mongos.h"
 #include "mongo/db/s/sharding_egress_metadata_hook_for_mongod.h"
+#include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/dist_lock_catalog_impl.h"
 #include "mongo/s/catalog/replset/replset_dist_lock_manager.h"
+#include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -159,6 +162,7 @@ Status initializeGlobalShardingState(OperationContext* txn,
 
     shardRegistry->startup();
     grid.init(std::move(catalogManager),
+              stdx::make_unique<CatalogCache>(),
               std::move(shardRegistry),
               stdx::make_unique<ClusterCursorManager>(
                   getGlobalServiceContext()->getPreciseClockSource()));

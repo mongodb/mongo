@@ -37,6 +37,7 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
+#include "mongo/s/db_util.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -268,7 +269,7 @@ ChunkManagerTargeter::ChunkManagerTargeter(const NamespaceString& nss, TargeterS
 
 
 Status ChunkManagerTargeter::init(OperationContext* txn) {
-    auto status = grid.implicitCreateDb(txn, _nss.db().toString());
+    auto status = dbutil::implicitCreateDb(txn, _nss.db().toString());
     if (!status.isOK()) {
         return status.getStatus();
     }
@@ -623,7 +624,7 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* txn, bool* wasCha
     ChunkManagerPtr lastManager = _manager;
     ShardPtr lastPrimary = _primary;
 
-    auto status = grid.implicitCreateDb(txn, _nss.db().toString());
+    auto status = dbutil::implicitCreateDb(txn, _nss.db().toString());
     if (!status.isOK()) {
         return status.getStatus();
     }
@@ -684,7 +685,7 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* txn, bool* wasCha
 }
 
 Status ChunkManagerTargeter::refreshNow(OperationContext* txn, RefreshType refreshType) {
-    auto status = grid.implicitCreateDb(txn, _nss.db().toString());
+    auto status = dbutil::implicitCreateDb(txn, _nss.db().toString());
     if (!status.isOK()) {
         return status.getStatus();
     }

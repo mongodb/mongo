@@ -28,24 +28,17 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
+#include <memory>
 
-#include "mongo/s/catalog/catalog_manager.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
-#include "mongo/stdx/memory.h"
+#include "mongo/db/repl/optime.h"
 
 namespace mongo {
 
-class BSONObj;
 class CatalogCache;
-class DBConfig;
+class CatalogManager;
+class ClusterCursorManager;
 class OperationContext;
-class SettingsType;
 class ShardRegistry;
-template <typename T>
-class StatusWith;
-
 
 /**
  * Holds the global sharding context. Single instance exists for a running server. Exists on
@@ -63,14 +56,9 @@ public:
      *       state using clearForUnitTests.
      */
     void init(std::unique_ptr<CatalogManager> catalogManager,
+              std::unique_ptr<CatalogCache> catalogCache,
               std::unique_ptr<ShardRegistry> shardRegistry,
               std::unique_ptr<ClusterCursorManager> cursorManager);
-
-    /**
-     * Implicitly creates the specified database as non-sharded.
-     */
-    StatusWith<std::shared_ptr<DBConfig>> implicitCreateDb(OperationContext* txn,
-                                                           const std::string& dbName);
 
     /**
      * @return true if shards and config servers are allowed to use 'localhost' in address
@@ -81,17 +69,6 @@ public:
      * @param whether to allow shards and config servers to use 'localhost' in address
      */
     void setAllowLocalHost(bool allow);
-
-    /**
-     * Returns true if the balancer should be running. Caller is responsible
-     * for making sure settings has the balancer key.
-     */
-    bool shouldBalance(const SettingsType& balancerSettings) const;
-
-    /**
-     * Returns true if the config server settings indicate that the balancer should be active.
-     */
-    bool getConfigShouldBalance(OperationContext* txn) const;
 
     /**
      * Returns a pointer to a CatalogManager to use for accessing catalog data stored on the config

@@ -41,6 +41,7 @@
 #include "mongo/s/config.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/cluster_explain.h"
+#include "mongo/s/db_util.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/strategy.h"
@@ -145,7 +146,7 @@ public:
 
         // findAndModify should only be creating database if upsert is true, but this would require
         // that the parsing be pulled into this function.
-        auto conf = uassertStatusOK(grid.implicitCreateDb(txn, dbName));
+        auto conf = uassertStatusOK(dbutil::implicitCreateDb(txn, dbName));
         if (!conf->isShardingEnabled() || !conf->isSharded(ns)) {
             return _runCommand(txn, conf, nullptr, conf->getPrimaryId(), ns, cmdObj, result);
         }

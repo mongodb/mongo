@@ -70,6 +70,7 @@
 #include "mongo/s/request.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/s/version_mongos.h"
+#include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/admin_access.h"

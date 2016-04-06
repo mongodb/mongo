@@ -30,6 +30,7 @@
 
 #include "mongo/db/commands/killcursors_common.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query/cluster_cursor_manager.h"
 
 namespace mongo {
 namespace {

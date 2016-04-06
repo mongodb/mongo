@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,35 +26,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/commands/server_status_metric.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
+#include <memory>
+#include <string>
 
 namespace mongo {
-namespace {
 
-//
-// ServerStatus metric cursor counts.
-//
+class DBConfig;
+class OperationContext;
+template <typename T>
+class StatusWith;
 
-class ClusterCursorStats final : public ServerStatusMetric {
-public:
-    ClusterCursorStats() : ServerStatusMetric("cursor.open") {}
+namespace dbutil {
 
-    void appendAtLeaf(BSONObjBuilder& b) const final {
-        BSONObjBuilder openBob(b.subobjStart(_leafName));
-        auto stats = grid.getCursorManager()->stats();
+/**
+ * Implicitly creates the specified database as non-sharded.
+ */
+StatusWith<std::shared_ptr<DBConfig>> implicitCreateDb(OperationContext* txn,
+                                                       const std::string& dbName);
 
-        openBob.append("multiTarget", static_cast<long long>(stats.cursorsSharded));
-        openBob.append("singleTarget", static_cast<long long>(stats.cursorsNotSharded));
-        openBob.append("pinned", static_cast<long long>(stats.cursorsPinned));
-        openBob.append("total",
-                       static_cast<long long>(stats.cursorsSharded + stats.cursorsNotSharded));
-        openBob.done();
-    }
-} clusterCursorStats;
-
-}  // namespace
+}  // namespace dbutil
 }  // namespace mongo

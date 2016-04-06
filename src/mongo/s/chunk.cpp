@@ -209,6 +209,41 @@ bool ChunkRange::containsKey(const BSONObj& shardKey) const {
     return getMin().woCompare(shardKey) <= 0 && shardKey.woCompare(getMax()) < 0;
 }
 
+bool Chunk::shouldBalance(const SettingsType& balancerSettings) {
+    if (balancerSettings.isBalancerStoppedSet() && balancerSettings.getBalancerStopped()) {
+        return false;
+    }
+
+    if (balancerSettings.isBalancerActiveWindowSet()) {
+        boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
+        return balancerSettings.inBalancingWindow(now);
+    }
+
+    return true;
+}
+
+bool Chunk::getConfigShouldBalance(OperationContext* txn) const {
+    auto balSettingsResult =
+        grid.catalogManager(txn)->getGlobalSettings(txn, SettingsType::BalancerDocKey);
+    if (!balSettingsResult.isOK()) {
+        if (balSettingsResult == ErrorCodes::NoMatchingDocument) {
+            // Settings document for balancer does not exist, default to balancing allowed.
+            return true;
+        }
+
+        warning() << balSettingsResult.getStatus();
+        return false;
+    }
+    SettingsType balSettings = balSettingsResult.getValue();
+
+    if (!balSettings.isKeySet()) {
+        // Balancer settings doc does not exist. Default to yes.
+        return true;
+    }
+
+    return shouldBalance(balSettings);
+}
+
 bool Chunk::_minIsInf() const {
     return 0 == _manager->getShardKeyPattern().getKeyPattern().globalMin().woCompare(getMin());
 }
@@ -564,7 +599,7 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) const {
             _dataWritten = 0;
         }
 
-        bool shouldBalance = grid.getConfigShouldBalance(txn);
+        bool shouldBalance = getConfigShouldBalance(txn);
         if (shouldBalance) {
             auto status = grid.catalogManager(txn)->getCollection(txn, _manager->getns());
             if (!status.isOK()) {

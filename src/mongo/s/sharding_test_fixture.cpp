@@ -46,6 +46,7 @@
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
+#include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/type_changelog.h"
@@ -53,6 +54,7 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/set_shard_version_request.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -132,13 +134,13 @@ void ShardingTestFixture::setUp() {
     // For now initialize the global grid object. All sharding objects will be accessible
     // from there until we get rid of it.
     grid.init(std::move(cm),
+              stdx::make_unique<CatalogCache>(),
               std::move(shardRegistry),
               stdx::make_unique<ClusterCursorManager>(_service->getPreciseClockSource()));
 }
 
 void ShardingTestFixture::tearDown() {
-    // This call will shut down the shard registry, which will terminate the underlying executor
-    // and its threads.
+    grid.shardRegistry()->shutdown();
     grid.clearForUnitTests();
 
     _opCtx.reset();

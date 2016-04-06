@@ -28,33 +28,34 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/s/db_util.h"
+
+#include "mongo/base/status_with.h"
+#include "mongo/s/catalog/catalog_cache.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
 
 namespace mongo {
-namespace {
+namespace dbutil {
 
-//
-// ServerStatus metric cursor counts.
-//
-
-class ClusterCursorStats final : public ServerStatusMetric {
-public:
-    ClusterCursorStats() : ServerStatusMetric("cursor.open") {}
-
-    void appendAtLeaf(BSONObjBuilder& b) const final {
-        BSONObjBuilder openBob(b.subobjStart(_leafName));
-        auto stats = grid.getCursorManager()->stats();
-
-        openBob.append("multiTarget", static_cast<long long>(stats.cursorsSharded));
-        openBob.append("singleTarget", static_cast<long long>(stats.cursorsNotSharded));
-        openBob.append("pinned", static_cast<long long>(stats.cursorsPinned));
-        openBob.append("total",
-                       static_cast<long long>(stats.cursorsSharded + stats.cursorsNotSharded));
-        openBob.done();
+StatusWith<std::shared_ptr<DBConfig>> implicitCreateDb(OperationContext* txn,
+                                                       const std::string& dbName) {
+    auto status = grid.catalogCache()->getDatabase(txn, dbName);
+    if (status.isOK()) {
+        return status;
     }
-} clusterCursorStats;
 
-}  // namespace
+    if (status == ErrorCodes::NamespaceNotFound) {
+        auto statusCreateDb = grid.catalogManager(txn)->createDatabase(txn, dbName);
+        if (statusCreateDb.isOK() || statusCreateDb == ErrorCodes::NamespaceExists) {
+            return grid.catalogCache()->getDatabase(txn, dbName);
+        }
+
+        return statusCreateDb;
+    }
+
+    return status;
+}
+
+}  // namespace dbutil
 }  // namespace mongo

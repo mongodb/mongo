@@ -156,7 +156,7 @@ int Balancer::_moveChunks(OperationContext* txn,
         const SettingsType& balancerConfig =
             isBalSettingsAbsent ? SettingsType{} : balSettingsResult.getValue();
 
-        if ((!isBalSettingsAbsent && !grid.shouldBalance(balancerConfig)) ||
+        if ((!isBalSettingsAbsent && !Chunk::shouldBalance(balancerConfig)) ||
             MONGO_FAIL_POINT(skipBalanceRound)) {
             LOG(1) << "Stopping balancing round early as balancing was disabled";
             return movedCount;
@@ -590,7 +590,7 @@ void Balancer::run() {
                 isBalSettingsAbsent ? SettingsType{} : balSettingsResult.getValue();
 
             // now make sure we should even be running
-            if ((!isBalSettingsAbsent && !grid.shouldBalance(balancerConfig)) ||
+            if ((!isBalSettingsAbsent && !Chunk::shouldBalance(balancerConfig)) ||
                 MONGO_FAIL_POINT(skipBalanceRound)) {
                 LOG(1) << "skipping balancing round because balancing is disabled";
 

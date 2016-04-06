@@ -54,6 +54,7 @@
 #include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/commands/run_on_all_shards_cmd.h"
 #include "mongo/s/config.h"
+#include "mongo/s/db_util.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/store_possible_cursor.h"
 #include "mongo/s/stale_exception.h"
@@ -452,7 +453,7 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        auto status = grid.implicitCreateDb(txn, dbName);
+        auto status = dbutil::implicitCreateDb(txn, dbName);
         if (!status.isOK()) {
             return appendCommandStatus(result, status.getStatus());
         }
@@ -573,7 +574,7 @@ public:
                 "invalid todb argument",
                 NamespaceString::validDBName(todb, NamespaceString::DollarInDbNameBehavior::Allow));
 
-        auto confTo = uassertStatusOK(grid.implicitCreateDb(txn, todb));
+        auto confTo = uassertStatusOK(dbutil::implicitCreateDb(txn, todb));
         uassert(ErrorCodes::IllegalOperation,
                 "cannot copy to a sharded database",
                 !confTo->isShardingEnabled());

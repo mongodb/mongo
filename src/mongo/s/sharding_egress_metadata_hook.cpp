@@ -41,6 +41,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_egress_metadata_hook.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 

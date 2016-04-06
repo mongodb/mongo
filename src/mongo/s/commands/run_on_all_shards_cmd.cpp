@@ -39,6 +39,7 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_commands_common.h"
+#include "mongo/s/db_util.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
@@ -78,7 +79,7 @@ bool RunOnAllShardsCommand::run(OperationContext* txn,
     LOG(1) << "RunOnAllShardsCommand db: " << dbName << " cmd:" << cmdObj;
 
     if (_implicitCreateDb) {
-        uassertStatusOK(grid.implicitCreateDb(txn, dbName));
+        uassertStatusOK(dbutil::implicitCreateDb(txn, dbName));
     }
 
     std::vector<ShardId> shardIds;

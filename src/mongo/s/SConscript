@@ -184,6 +184,7 @@ env.Library(
         'chunk.cpp',
         'chunk_manager.cpp',
         'config.cpp',
+        'db_util.cpp',
         'grid.cpp',
     ],
     LIBDEPS=[

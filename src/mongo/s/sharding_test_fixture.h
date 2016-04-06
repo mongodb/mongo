@@ -38,6 +38,7 @@
 namespace mongo {
 
 class BSONObj;
+class CatalogCache;
 class CatalogManager;
 class CatalogManagerReplicaSet;
 struct ChunkVersion;
