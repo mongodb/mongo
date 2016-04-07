@@ -106,68 +106,28 @@ StatusWith<ShardType> validateHostAsShard(OperationContext* txn,
     const std::shared_ptr<Shard> shardConn{shardRegistry->createConnection(connectionString)};
     invariant(shardConn);
 
-    // Check whether any host in the connection is already part of the cluster.
-    for (HostAndPort hostAndPort : connectionString.getServers()) {
-        auto shard = shardRegistry->getShard(txn, hostAndPort.toString());
-        if (shard) {
-            return {ErrorCodes::OperationFailed,
-                    str::stream() << "'" << hostAndPort.toString() << "' "
-                                  << "is already a member of the existing shard '"
-                                  << shard->getConnString().toString() << "' (" << shard->getId()
-                                  << ")."};
-        }
-    }
-
     const ReadPreferenceSetting readPref{ReadPreference::PrimaryOnly};
 
-    // Check for mongos and older version mongod connections, and whether the hosts
-    // can be found for the user specified replset.
+    // Is it mongos?
     auto cmdStatus = shardRegistry->runIdempotentCommandForAddShard(
+        txn, shardConn, readPref, "admin", BSON("isdbgrid" << 1));
+    if (!cmdStatus.isOK()) {
+        return cmdStatus.getStatus();
+    }
+
+    // (ok == 1) implies that it is a mongos
+    if (getStatusFromCommandResult(cmdStatus.getValue()).isOK()) {
+        return {ErrorCodes::OperationFailed, "can't add a mongos process as a shard"};
+    }
+
+    // Is it a replica set?
+    cmdStatus = shardRegistry->runIdempotentCommandForAddShard(
         txn, shardConn, readPref, "admin", BSON("isMaster" << 1));
     if (!cmdStatus.isOK()) {
-        if (cmdStatus == ErrorCodes::RPCProtocolNegotiationFailed) {
-            // Mongos to mongos commands are no longer supported in the wire protocol
-            // (because mongos does not support OP_COMMAND), similarly for a new mongos
-            // and an old mongod. So the call will fail in such cases.
-            // TODO: If/When mongos ever supports opCommands, this logic will break because
-            // cmdStatus will be OK.
-            return {ErrorCodes::RPCProtocolNegotiationFailed,
-                    str::stream() << shardConn->toString()
-                                  << " does not recognize the RPC protocol being used. This is"
-                                  << " likely because it contains a node that is a mongos or an old"
-                                  << " version of mongod."};
-        } else {
-            return cmdStatus.getStatus();
-        }
+        return cmdStatus.getStatus();
     }
 
-    // Check for a command response error
     BSONObj resIsMaster = cmdStatus.getValue();
-    Status resIsMasterStatus = getStatusFromCommandResult(resIsMaster);
-    if (!resIsMasterStatus.isOK()) {
-        return {resIsMasterStatus.code(),
-                str::stream() << "Error running isMaster against " << shardConn->toString()
-                              << causedBy(resIsMasterStatus)};
-    }
-
-    // Check whether there is a master. If there isn't, the replica set may not have been
-    // initiated. If the connection is a standalone, it will return true for isMaster.
-    bool isMaster;
-    Status status = bsonExtractBooleanField(resIsMaster, "ismaster", &isMaster);
-    if (!status.isOK()) {
-        return Status(status.code(),
-                      str::stream() << "isMaster returned invalid 'ismaster' "
-                                    << "field when attempting to add "
-                                    << connectionString.toString()
-                                    << " as a shard: " << status.reason());
-    }
-    if (!isMaster) {
-        return {ErrorCodes::NotMaster,
-                str::stream()
-                    << connectionString.toString()
-                    << " does not have a master. If this is a replica set, ensure that it has a"
-                    << " healthy primary and that the set has been properly initiated."};
-    }
 
     const string providedSetName = connectionString.getSetName();
     const string foundSetName = resIsMaster["setName"].str();
@@ -194,24 +154,37 @@ StatusWith<ShardType> validateHostAsShard(OperationContext* txn,
                               << ") does not match the actual set name " << foundSetName};
     }
 
-
-    // Is it a config server?
-    bool isConfigServer;
-    status = bsonExtractBooleanFieldWithDefault(resIsMaster, "configsvr", false, &isConfigServer);
-    if (!status.isOK()) {
-        return Status(status.code(),
-                      str::stream() << "isMaster returned invalid 'configsvr' "
-                                    << "field when attempting to add "
-                                    << connectionString.toString()
-                                    << " as a shard: " << status.reason());
+    // Is it a mongos config server?
+    cmdStatus = shardRegistry->runIdempotentCommandForAddShard(
+        txn, shardConn, readPref, "admin", BSON("replSetGetStatus" << 1));
+    if (!cmdStatus.isOK()) {
+        return cmdStatus.getStatus();
     }
 
-    if (isConfigServer) {
+    BSONObj res = cmdStatus.getValue();
+
+    if (getStatusFromCommandResult(res).isOK()) {
+        bool isConfigServer;
+        Status status =
+            bsonExtractBooleanFieldWithDefault(res, "configsvr", false, &isConfigServer);
+        if (!status.isOK()) {
+            return Status(status.code(),
+                          str::stream() << "replSetGetStatus returned invalid \"configsvr\" "
+                                        << "field when attempting to add "
+                                        << connectionString.toString()
+                                        << " as a shard: " << status.reason());
+        }
+
+        if (isConfigServer) {
+            return {ErrorCodes::OperationFailed,
+                    str::stream() << "Cannot add " << connectionString.toString()
+                                  << " as a shard since it is part of a config server replica set"};
+        }
+    } else if ((res["info"].type() == String) && (res["info"].String() == "configsvr")) {
         return {ErrorCodes::OperationFailed,
-                str::stream() << "Cannot add " << connectionString.toString()
-                              << " as a shard since it is part of a config server replica set"};
+                "the specified mongod is a legacy-style config "
+                "server and cannot be used as a shard server"};
     }
-
 
     // If the shard is part of a replica set, make sure all the hosts mentioned in the connection
     // string are part of the set. It is fine if not all members of the set are mentioned in the
@@ -374,15 +347,6 @@ StatusWith<string> CatalogManagerCommon::addShard(OperationContext* txn,
     Status result = insertConfigDocument(txn, ShardType::ConfigNS, shardType.toBSON());
     if (!result.isOK()) {
         log() << "error adding shard: " << shardType.toBSON() << " err: " << result.reason();
-        if (result == ErrorCodes::DuplicateKey) {
-            return {ErrorCodes::DuplicateKey,
-                    str::stream() << "Received DuplicateKey error when inserting into the "
-                                  << "config.shards collection. This most likely means that "
-                                  << "either the shard name '" << shardType.getName()
-                                  << "' or the connection string '"
-                                  << shardConnectionString.toString()
-                                  << "' is already in use in this cluster"};
-        }
         return result;
     }
 
