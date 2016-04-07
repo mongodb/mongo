@@ -244,6 +244,15 @@ add_option('dbg',
     type='choice',
 )
 
+add_option('spider-monkey-dbg',
+    choices=['on', 'off'],
+    const='on',
+    default='off',
+    help='Enable SpiderMonkey debug mode',
+    nargs='?',
+    type='choice',
+)
+
 add_option('opt',
     choices=['on', 'off'],
     const='on',
