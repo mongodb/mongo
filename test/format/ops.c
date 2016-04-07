@@ -387,10 +387,10 @@ ops(void *arg)
 
 		/*
 		 * If we're not single-threaded and we're not in a transaction,
-		 * start a transaction 20% of the time.
+		 * start a transaction at the configured frequency.
 		 */
 		if (!SINGLETHREADED &&
-		    !intxn && mmrand(&tinfo->rnd, 1, 10) >= 8) {
+		    !intxn && mmrand(&tinfo->rnd, 1, 100) >= g.c_txn_freq) {
 			testutil_check(
 			    session->begin_transaction(session, NULL));
 			intxn = 1;
@@ -504,7 +504,7 @@ skip_insert:			if (col_update(tinfo,
 		testutil_check(cursor->reset(cursor));
 
 		/*
-		 * If we're in the transaction, commit 40% of the time and
+		 * If we're in a transaction, commit 40% of the time and
 		 * rollback 10% of the time.
 		 */
 		if (intxn)

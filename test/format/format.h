@@ -224,6 +224,7 @@ typedef struct {
 	uint32_t c_statistics_server;
 	uint32_t c_threads;
 	uint32_t c_timer;
+	uint32_t c_txn_freq;
 	uint32_t c_value_max;
 	uint32_t c_value_min;
 	uint32_t c_verify;
