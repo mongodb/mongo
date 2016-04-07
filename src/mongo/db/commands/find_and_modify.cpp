@@ -279,8 +279,7 @@ public:
             Explain::explainStages(exec.get(), verbosity, out);
         } else {
             UpdateRequest request(nsString);
-            const bool ignoreVersion = false;
-            UpdateLifecycleImpl updateLifecycle(ignoreVersion, nsString);
+            UpdateLifecycleImpl updateLifecycle(nsString);
             const bool isExplain = true;
             makeUpdateRequest(args, isExplain, &updateLifecycle, &request);
 
@@ -417,8 +416,7 @@ public:
                 appendCommandResponse(exec.get(), args.isRemove(), value, result);
             } else {
                 UpdateRequest request(nsString);
-                const bool ignoreVersion = false;
-                UpdateLifecycleImpl updateLifecycle(ignoreVersion, nsString);
+                UpdateLifecycleImpl updateLifecycle(nsString);
                 const bool isExplain = false;
                 makeUpdateRequest(args, isExplain, &updateLifecycle, &request);
 

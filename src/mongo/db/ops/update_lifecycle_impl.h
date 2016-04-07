@@ -47,7 +47,7 @@ public:
      *
      * nsString represents the namespace for the
      */
-    UpdateLifecycleImpl(bool ignoreVersion, const NamespaceString& nsString);
+    UpdateLifecycleImpl(const NamespaceString& nsString);
 
     virtual void setCollection(Collection* collection);
 
@@ -59,7 +59,6 @@ public:
 
 private:
     const NamespaceString& _nsString;
-    const ChunkVersion _shardVersion;
 
     Collection* _collection;
 };

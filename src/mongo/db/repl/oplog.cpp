@@ -882,7 +882,7 @@ Status applyOperation_inlock(OperationContext* txn,
                 request.setQuery(b.done());
                 request.setUpdates(o);
                 request.setUpsert();
-                UpdateLifecycleImpl updateLifecycle(true, requestNs);
+                UpdateLifecycleImpl updateLifecycle(requestNs);
                 request.setLifecycle(&updateLifecycle);
 
                 UpdateResult res = update(txn, db, request, &debug);
@@ -913,7 +913,7 @@ Status applyOperation_inlock(OperationContext* txn,
         request.setQuery(updateCriteria);
         request.setUpdates(o);
         request.setUpsert(upsert);
-        UpdateLifecycleImpl updateLifecycle(true, requestNs);
+        UpdateLifecycleImpl updateLifecycle(requestNs);
         request.setLifecycle(&updateLifecycle);
 
         UpdateResult ur = update(txn, db, request, &debug);

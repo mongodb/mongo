@@ -751,7 +751,7 @@ void syncFixUp(OperationContext* txn,
                     request.setUpdates(idAndDoc.second);
                     request.setGod();
                     request.setUpsert();
-                    UpdateLifecycleImpl updateLifecycle(true, requestNs);
+                    UpdateLifecycleImpl updateLifecycle(requestNs);
                     request.setLifecycle(&updateLifecycle);
 
                     update(txn, ctx.db(), request, &debug);

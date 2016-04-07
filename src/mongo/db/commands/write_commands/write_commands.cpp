@@ -187,7 +187,7 @@ Status WriteCmd::explain(OperationContext* txn,
         updateRequest.setUpdates(batchItem.getUpdate()->getUpdateExpr());
         updateRequest.setMulti(batchItem.getUpdate()->getMulti());
         updateRequest.setUpsert(batchItem.getUpdate()->getUpsert());
-        UpdateLifecycleImpl updateLifecycle(true, updateRequest.getNamespaceString());
+        UpdateLifecycleImpl updateLifecycle(updateRequest.getNamespaceString());
         updateRequest.setLifecycle(&updateLifecycle);
         updateRequest.setExplain();
 

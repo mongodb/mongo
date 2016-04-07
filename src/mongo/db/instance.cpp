@@ -673,7 +673,6 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
     verify(query.objsize() + toupdate.objsize() < m.header().dataLen());
     bool upsert = flags & UpdateOption_Upsert;
     bool multi = flags & UpdateOption_Multi;
-    bool broadcast = flags & UpdateOption_Broadcast;
 
     op.debug().query = query;
     {
@@ -692,7 +691,7 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
     request.setMulti(multi);
     request.setQuery(query);
     request.setUpdates(toupdate);
-    UpdateLifecycleImpl updateLifecycle(broadcast, nsString);
+    UpdateLifecycleImpl updateLifecycle(nsString);
     request.setLifecycle(&updateLifecycle);
 
     request.setYieldPolicy(PlanExecutor::YIELD_AUTO);

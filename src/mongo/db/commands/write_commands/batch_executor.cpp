@@ -1004,7 +1004,7 @@ static void multiUpdate(OperationContext* txn,
     request.setUpdates(updateItem.getUpdate()->getUpdateExpr());
     request.setMulti(isMulti);
     request.setUpsert(updateItem.getUpdate()->getUpsert());
-    UpdateLifecycleImpl updateLifecycle(true, request.getNamespaceString());
+    UpdateLifecycleImpl updateLifecycle(request.getNamespaceString());
     request.setLifecycle(&updateLifecycle);
 
     // Updates from the write commands path can yield.

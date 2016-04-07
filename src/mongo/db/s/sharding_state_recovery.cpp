@@ -197,7 +197,7 @@ Status modifyRecoveryDocument(OperationContext* txn,
         updateReq.setQuery(RecoveryDocument::getQuery());
         updateReq.setUpdates(updateObj);
         updateReq.setUpsert();
-        UpdateLifecycleImpl updateLifecycle(true, NamespaceString::kConfigCollectionNamespace);
+        UpdateLifecycleImpl updateLifecycle(NamespaceString::kConfigCollectionNamespace);
         updateReq.setLifecycle(&updateLifecycle);
 
         UpdateResult result = update(txn, autoGetOrCreateDb->getDb(), updateReq, &opDebug);

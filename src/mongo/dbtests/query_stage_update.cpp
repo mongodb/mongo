@@ -195,7 +195,7 @@ public:
             ASSERT_EQUALS(0U, count(BSONObj()));
 
             UpdateRequest request(nss);
-            UpdateLifecycleImpl updateLifecycle(false, nss);
+            UpdateLifecycleImpl updateLifecycle(nss);
             request.setLifecycle(&updateLifecycle);
 
             // Update is the upsert {_id: 0, x: 1}, {$set: {y: 2}}.
@@ -265,7 +265,7 @@ public:
             getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
 
             UpdateRequest request(nss);
-            UpdateLifecycleImpl updateLifecycle(false, nss);
+            UpdateLifecycleImpl updateLifecycle(nss);
             request.setLifecycle(&updateLifecycle);
 
             // Update is a multi-update that sets 'bar' to 3 in every document
@@ -370,7 +370,7 @@ public:
         OldClientWriteContext ctx(&_txn, nss.ns());
         OpDebug* opDebug = &CurOp::get(_txn)->debug();
         Collection* coll = ctx.getCollection();
-        UpdateLifecycleImpl updateLifecycle(false, nss);
+        UpdateLifecycleImpl updateLifecycle(nss);
         UpdateRequest request(nss);
         UpdateDriver driver((UpdateDriver::Options()));
         const int targetDocIndex = 0;  // We'll be working with the first doc in the collection.
@@ -458,7 +458,7 @@ public:
         OldClientWriteContext ctx(&_txn, nss.ns());
         OpDebug* opDebug = &CurOp::get(_txn)->debug();
         Collection* coll = ctx.getCollection();
-        UpdateLifecycleImpl updateLifecycle(false, nss);
+        UpdateLifecycleImpl updateLifecycle(nss);
         UpdateRequest request(nss);
         UpdateDriver driver((UpdateDriver::Options()));
         const int targetDocIndex = 10;
@@ -542,7 +542,7 @@ public:
         OldClientWriteContext ctx(&_txn, nss.ns());
         OpDebug* opDebug = &CurOp::get(_txn)->debug();
         Collection* coll = ctx.getCollection();
-        UpdateLifecycleImpl updateLifecycle(false, nss);
+        UpdateLifecycleImpl updateLifecycle(nss);
         UpdateRequest request(nss);
         UpdateDriver driver((UpdateDriver::Options()));
         const BSONObj query = BSONObj();

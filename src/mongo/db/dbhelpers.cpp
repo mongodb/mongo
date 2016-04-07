@@ -250,7 +250,7 @@ void Helpers::upsert(OperationContext* txn, const string& ns, const BSONObj& o, 
     request.setUpdates(o);
     request.setUpsert();
     request.setFromMigration(fromMigrate);
-    UpdateLifecycleImpl updateLifecycle(true, requestNs);
+    UpdateLifecycleImpl updateLifecycle(requestNs);
     request.setLifecycle(&updateLifecycle);
 
     update(txn, context.db(), request, &debug);
@@ -265,7 +265,7 @@ void Helpers::putSingleton(OperationContext* txn, const char* ns, BSONObj obj) {
 
     request.setUpdates(obj);
     request.setUpsert();
-    UpdateLifecycleImpl updateLifecycle(true, requestNs);
+    UpdateLifecycleImpl updateLifecycle(requestNs);
     request.setLifecycle(&updateLifecycle);
 
     update(txn, context.db(), request, &debug);
