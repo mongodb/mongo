@@ -595,7 +595,6 @@ serverOnlyFiles = [
     "commands/validate.cpp",
     "commands/write_commands/batch_executor.cpp",
     "commands/write_commands/write_commands.cpp",
-    "commands/writeback_compatibility_shim.cpp",
     "curop_metrics.cpp",
     "db_raii.cpp",
     "dbcommands.cpp",
