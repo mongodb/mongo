@@ -117,7 +117,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(FTDCTestInit,
                                      ("ThreadNameInitializer"))(InitializerContext* context) {
     setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
 
-    getGlobalServiceContext()->setClockSource(stdx::make_unique<FTDCClockSourceMock>());
+    getGlobalServiceContext()->setPreciseClockSource(stdx::make_unique<FTDCClockSourceMock>());
 
     Client::initThreadIfNotAlready("UnitTest");
 
