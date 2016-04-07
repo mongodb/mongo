@@ -717,6 +717,7 @@ serveronlyLibdeps = [
     "index/index_descriptor",
     "matcher/expressions_mongod_only",
     "ops/update_driver",
+    "ops/write_ops_parsers",
     "pipeline/document_source",
     "pipeline/pipeline",
     "query/query",

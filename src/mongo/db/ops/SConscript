@@ -233,3 +233,23 @@ env.CppUnitTest(
         'update_driver',
     ],
 )
+
+env.Library(
+    target='write_ops_parsers',
+    source=[
+        'write_ops_parsers.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/dbmessage',
+    ],
+)
+
+env.CppUnitTest(
+    target='write_ops_parsers_test',
+    source='write_ops_parsers_test.cpp',
+    LIBDEPS=[
+        'write_ops_parsers',
+        '$BUILD_DIR/mongo/client/clientdriver',
+    ],
+)
