@@ -254,7 +254,11 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 
 	/* Eviction; the metadata file is never evicted. */
 	if (WT_IS_METADATA(btree->dhandle))
-		F_SET(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
+		/*
+		 * Special settings for metadata: skew eviction so metadata
+		 * almost always stays in cache
+		 */
+		btree->evict_priority = WT_EVICT_INT_SKEW;
 	else {
 		WT_RET(__wt_config_gets(session, cfg, "cache_resident", &cval));
 		if (cval.val)
