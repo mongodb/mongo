@@ -352,7 +352,7 @@ buildvariants:
   display_name: Linux Standalone
   batchtime: 1440 # 24 hours
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ --release
     setup: standalone
     cluster: single-correctness
     numShard: 0
@@ -371,7 +371,7 @@ buildvariants:
   display_name: Linux 3-Node ReplSet
   batchtime: 1440 # 24 hours
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ --release
     setup: replica
     cluster: replica-correctness
     numMember: 3

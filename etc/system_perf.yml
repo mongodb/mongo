@@ -459,7 +459,7 @@ buildvariants:
   display_name: Linux 1-Node ReplSet
   batchtime: 1440 # 24 hours
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ --release
     setup: single-replica
     cluster: single
     platform: linux
@@ -476,7 +476,7 @@ buildvariants:
   display_name: Linux Standalone
   batchtime: 1440 # 24 hours
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ --release
     setup: standalone
     cluster: single
     platform: linux
@@ -528,7 +528,7 @@ buildvariants:
   display_name: Linux 3-Shard Cluster
   batchtime: 1440 # 24 hours
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ --release
     setup: shard
     cluster: shard
     platform: linux
@@ -545,7 +545,7 @@ buildvariants:
   display_name: Linux 3-Node ReplSet
   batchtime: 1440 # 24 hours
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ --release
     setup: replica
     cluster: replica
     platform: linux

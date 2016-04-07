@@ -266,7 +266,7 @@ buildvariants:
   display_name: Linux WT Shard
   batchtime: 40320 # 4 weeks
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ --release
     setup: shard
     cluster: longevity
     numShard: 3
@@ -284,7 +284,7 @@ buildvariants:
   display_name: Linux MMAPv1 Shard
   batchtime: 40320 # 4 week
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ --release
     setup: shard
     cluster: longevity
     numShard: 3
