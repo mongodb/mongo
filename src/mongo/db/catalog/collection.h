@@ -257,6 +257,7 @@ public:
     void deleteDocument(OperationContext* txn,
                         const RecordId& loc,
                         bool fromMigrate = false,
+                        bool cappedOK = false,
                         bool noWarn = false);
 
     /*

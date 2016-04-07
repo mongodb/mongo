@@ -611,7 +611,7 @@ Status Cloner::copyDb(OperationContext* txn,
                 // dupsAllowed in IndexCatalog::_unindexRecord and SERVER-17487.
                 for (set<RecordId>::const_iterator it = dups.begin(); it != dups.end(); ++it) {
                     WriteUnitOfWork wunit(txn);
-                    c->deleteDocument(txn, *it, false, true);
+                    c->deleteDocument(txn, *it, false, false, true);
                     wunit.commit();
                 }
 
