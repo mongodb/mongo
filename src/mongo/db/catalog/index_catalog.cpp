@@ -1112,15 +1112,13 @@ bool isDupsAllowed(IndexDescriptor* desc) {
 Status IndexCatalog::_indexFilteredRecords(OperationContext* txn,
                                            IndexCatalogEntry* index,
                                            const std::vector<BsonRecord>& bsonRecords) {
-    InsertDeleteOptions options;
-    options.logIfError = false;
-    options.dupsAllowed = isDupsAllowed(index->descriptor());
+    bool dupsAllowed = isDupsAllowed(index->descriptor());
 
     for (auto bsonRecord : bsonRecords) {
         int64_t inserted;
         invariant(bsonRecord.id != RecordId());
         Status status = index->accessMethod()->insert(
-            txn, *bsonRecord.docPtr, bsonRecord.id, options, &inserted);
+            txn, *bsonRecord.docPtr, bsonRecord.id, dupsAllowed, &inserted);
         if (!status.isOK())
             return status;
     }
@@ -1143,32 +1141,6 @@ Status IndexCatalog::_indexRecords(OperationContext* txn,
     return _indexFilteredRecords(txn, index, filteredBsonRecords);
 }
 
-Status IndexCatalog::_unindexRecord(OperationContext* txn,
-                                    IndexCatalogEntry* index,
-                                    const BSONObj& obj,
-                                    const RecordId& loc,
-                                    bool logIfError) {
-    InsertDeleteOptions options;
-    options.logIfError = logIfError;
-    options.dupsAllowed = isDupsAllowed(index->descriptor());
-
-    // For unindex operations, dupsAllowed=false really means that it is safe to delete anything
-    // that matches the key, without checking the RecordID, since dups are impossible. We need
-    // to disable this behavior for in-progress indexes. See SERVER-17487 for more details.
-    options.dupsAllowed = options.dupsAllowed || !index->isReady(txn);
-
-    int64_t removed;
-    Status status = index->accessMethod()->remove(txn, obj, loc, options, &removed);
-
-    if (!status.isOK()) {
-        log() << "Couldn't unindex record " << obj.toString() << " from collection "
-              << _collection->ns() << ". Status: " << status.toString();
-    }
-
-    return Status::OK();
-}
-
-
 Status IndexCatalog::indexRecords(OperationContext* txn,
                                   const std::vector<BsonRecord>& bsonRecords) {
     for (IndexCatalogEntryContainer::const_iterator i = _entries.begin(); i != _entries.end();
@@ -1181,17 +1153,19 @@ Status IndexCatalog::indexRecords(OperationContext* txn,
     return Status::OK();
 }
 
-void IndexCatalog::unindexRecord(OperationContext* txn,
-                                 const BSONObj& obj,
-                                 const RecordId& loc,
-                                 bool noWarn) {
-    for (IndexCatalogEntryContainer::const_iterator i = _entries.begin(); i != _entries.end();
-         ++i) {
-        IndexCatalogEntry* entry = *i;
+void IndexCatalog::unindexRecord(OperationContext* txn, const BSONObj& obj, const RecordId& loc) {
+    for (auto index : _entries) {
+        // For unindex operations, dupsAllowed=false really means that it is safe to delete anything
+        // that matches the key, without checking the RecordID, since dups are impossible. We need
+        // to disable this behavior for in-progress indexes. See SERVER-17487 for more details.
+        bool dupsAllowed = isDupsAllowed(index->descriptor()) || !index->isReady(txn);
 
-        // If it's a background index, we DO NOT want to log anything.
-        bool logIfError = entry->isReady(txn) ? !noWarn : false;
-        _unindexRecord(txn, entry, obj, loc, logIfError);
+        int64_t removed;
+        Status status = index->accessMethod()->remove(txn, obj, loc, dupsAllowed, &removed);
+
+        if (!status.isOK())
+            log() << "Couldn't unindex record " << obj.toString() << " from collection "
+                  << _collection->ns() << ". Status: " << status.toString();
     }
 }
 

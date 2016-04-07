@@ -100,7 +100,7 @@ bool IndexAccessMethod::ignoreKeyTooLong(OperationContext* txn) {
 Status IndexAccessMethod::insert(OperationContext* txn,
                                  const BSONObj& obj,
                                  const RecordId& loc,
-                                 const InsertDeleteOptions& options,
+                                 bool dupsAllowed,
                                  int64_t* numInserted) {
     *numInserted = 0;
 
@@ -110,7 +110,7 @@ Status IndexAccessMethod::insert(OperationContext* txn,
 
     Status ret = Status::OK();
     for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
-        Status status = _newInterface->insert(txn, *i, loc, options.dupsAllowed);
+        Status status = _newInterface->insert(txn, *i, loc, dupsAllowed);
 
         // Everything's OK, carry on.
         if (status.isOK()) {
@@ -135,7 +135,7 @@ Status IndexAccessMethod::insert(OperationContext* txn,
 
         // Clean up after ourselves.
         for (BSONObjSet::const_iterator j = keys.begin(); j != i; ++j) {
-            removeOneKey(txn, *j, loc, options.dupsAllowed);
+            removeOneKey(txn, *j, loc, dupsAllowed);
             *numInserted = 0;
         }
 
@@ -177,14 +177,14 @@ std::unique_ptr<SortedDataInterface::Cursor> IndexAccessMethod::newRandomCursor(
 Status IndexAccessMethod::remove(OperationContext* txn,
                                  const BSONObj& obj,
                                  const RecordId& loc,
-                                 const InsertDeleteOptions& options,
+                                 bool dupsAllowed,
                                  int64_t* numDeleted) {
     BSONObjSet keys;
     getKeys(obj, &keys);
     *numDeleted = 0;
 
     for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
-        removeOneKey(txn, *i, loc, options.dupsAllowed);
+        removeOneKey(txn, *i, loc, dupsAllowed);
         ++*numDeleted;
     }
 
@@ -271,7 +271,7 @@ Status IndexAccessMethod::validateUpdate(OperationContext* txn,
                                          const BSONObj& from,
                                          const BSONObj& to,
                                          const RecordId& record,
-                                         const InsertDeleteOptions& options,
+                                         bool dupsAllowed,
                                          UpdateTicket* ticket,
                                          const MatchExpression* indexFilter) {
     if (indexFilter == NULL || indexFilter->matchesBSON(from))
@@ -279,7 +279,7 @@ Status IndexAccessMethod::validateUpdate(OperationContext* txn,
     if (indexFilter == NULL || indexFilter->matchesBSON(to))
         getKeys(to, &ticket->newKeys);
     ticket->loc = record;
-    ticket->dupsAllowed = options.dupsAllowed;
+    ticket->dupsAllowed = dupsAllowed;
 
     setDifference(ticket->oldKeys, ticket->newKeys, &ticket->removed);
     setDifference(ticket->newKeys, ticket->oldKeys, &ticket->added);
@@ -342,9 +342,7 @@ IndexAccessMethod::BulkBuilder::BulkBuilder(const IndexAccessMethod* index,
 
 Status IndexAccessMethod::BulkBuilder::insert(OperationContext* txn,
                                               const BSONObj& obj,
-                                              const RecordId& loc,
-                                              const InsertDeleteOptions& options,
-                                              int64_t* numInserted) {
+                                              const RecordId& loc) {
     BSONObjSet keys;
     _real->getKeys(obj, &keys);
 
@@ -353,10 +351,6 @@ Status IndexAccessMethod::BulkBuilder::insert(OperationContext* txn,
     for (BSONObjSet::iterator it = keys.begin(); it != keys.end(); ++it) {
         _sorter->add(*it, loc);
         _keysInserted++;
-    }
-
-    if (NULL != numInserted) {
-        *numInserted += keys.size();
     }
 
     return Status::OK();
