@@ -88,6 +88,11 @@ public:
     virtual void startInitialSync(OnInitialSyncFinishedFn finished) = 0;
 
     /**
+     * Returns true if an incomplete initial sync is detected.
+     */
+    virtual bool isInitialSyncFlagSet(OperationContext* txn) = 0;
+
+    /**
      * Starts steady state sync for replica set member -- legacy impl not in DataReplicator.
      *
      * NOTE: Use either this or the Master/Slave version, but not both.

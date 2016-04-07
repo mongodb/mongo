@@ -59,6 +59,8 @@ public:
     virtual void startThreads(const ReplSettings& settings) override;
     virtual void startInitialSync(OnInitialSyncFinishedFn finished) override;
     virtual void startSteadyStateReplication() override;
+    virtual bool isInitialSyncFlagSet(OperationContext* txn) override;
+
     virtual void startMasterSlave(OperationContext*);
     virtual void shutdown(OperationContext* txn);
     virtual Status initializeReplSetStorage(OperationContext* txn, const BSONObj& config);

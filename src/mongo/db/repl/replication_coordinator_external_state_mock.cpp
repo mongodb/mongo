@@ -62,6 +62,9 @@ void ReplicationCoordinatorExternalStateMock::startThreads(const ReplSettings& s
     _threadsStarted = true;
 }
 
+bool ReplicationCoordinatorExternalStateMock::isInitialSyncFlagSet(OperationContext* txn) {
+    return false;
+}
 void ReplicationCoordinatorExternalStateMock::startInitialSync(OnInitialSyncFinishedFn finished) {}
 void ReplicationCoordinatorExternalStateMock::startSteadyStateReplication() {}
 

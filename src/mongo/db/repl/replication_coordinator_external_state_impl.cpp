@@ -128,6 +128,11 @@ ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl
     : _startedThreads(false), _nextThreadId(0) {}
 ReplicationCoordinatorExternalStateImpl::~ReplicationCoordinatorExternalStateImpl() {}
 
+bool ReplicationCoordinatorExternalStateImpl::isInitialSyncFlagSet(OperationContext* txn) {
+    const auto si = repl::StorageInterface::get(txn);
+    return (si && si->getInitialSyncFlag(txn));
+}
+
 void ReplicationCoordinatorExternalStateImpl::startInitialSync(OnInitialSyncFinishedFn finished) {
     _initialSyncThread.reset(new stdx::thread{[finished, this]() {
         Client::initThreadIfNotAlready("initial sync");
@@ -362,6 +367,12 @@ void ReplicationCoordinatorExternalStateImpl::cleanUpLastApplyBatch(OperationCon
 StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::loadLastOpTime(OperationContext* txn) {
     // TODO: handle WriteConflictExceptions below
     try {
+        // If we are doing an initial sync do not read from the oplog.
+        const auto si = repl::StorageInterface::get(txn);
+        if (si && si->getInitialSyncFlag(txn)) {
+            return {ErrorCodes::InitialSyncFailure, "In the middle of an initial sync."};
+        }
+
         BSONObj oplogEntry;
         if (!Helpers::getLast(txn, rsOplogName.c_str(), oplogEntry)) {
             return StatusWith<OpTime>(ErrorCodes::NoMatchingDocument,

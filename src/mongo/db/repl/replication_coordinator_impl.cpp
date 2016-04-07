@@ -480,20 +480,20 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     }
 }
 
-void ReplicationCoordinatorImpl::_stopDataReplication() {}
+void ReplicationCoordinatorImpl::_stopDataReplication() {
+    // TODO: Stop replication threads (bgsync, synctail, reporter)
+}
+
 void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn) {
-    // When initial sync is done, callback.
-    OnInitialSyncFinishedFn callback{[this]() {
+    // Check to see if we need to do an initial sync.
+    const auto lastOpTime = getMyLastAppliedOpTime();
+    const auto needsInitialSync = lastOpTime.isNull() || _externalState->isInitialSyncFlagSet(txn);
+    if (!needsInitialSync) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (!_inShutdown) {
-            log() << "Initial sync done, starting steady state replication.";
+            // Start steady replication, since we already have data.
             _externalState->startSteadyStateReplication();
         }
-    }};
-
-    const auto lastApplied = getMyLastAppliedOpTime();
-    if (!lastApplied.isNull()) {
-        callback();
         return;
     }
 
@@ -502,7 +502,12 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn) {
         // TODO: make this async with callback.
         _dr.initialSync(txn);
     } else {
-        _externalState->startInitialSync(callback);
+        _externalState->startInitialSync([this]() {
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            if (!_inShutdown) {
+                _externalState->startSteadyStateReplication();
+            }
+        });
     }
 }
 
