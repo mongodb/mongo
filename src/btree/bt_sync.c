@@ -259,7 +259,7 @@ err:	/* On error, clear any left-over tree walk. */
 	 */
 	if (ret == 0 &&
 	    syncop == WT_SYNC_WRITE_LEAVES && F_ISSET(conn, WT_CONN_CKPT_SYNC))
-		WT_RET(btree->bm->sync(btree->bm, session, true));
+		WT_RET(btree->bm->sync(btree->bm, session, false));
 
 	return (ret);
 }

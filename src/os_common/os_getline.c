@@ -20,7 +20,7 @@
  * (so the caller's EOF marker is a returned line length of 0).
  */
 int
-__wt_getline(WT_SESSION_IMPL *session, WT_ITEM *buf, FILE *fp)
+__wt_getline(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_FH *fh)
 {
 	int c;
 
@@ -30,7 +30,11 @@ __wt_getline(WT_SESSION_IMPL *session, WT_ITEM *buf, FILE *fp)
 	 */
 	WT_RET(__wt_buf_init(session, buf, 100));
 
-	while ((c = fgetc(fp)) != EOF) {
+	for (;;) {
+		WT_RET(fh->fh_getc(session, fh, &c));
+		if (c == EOF)
+			break;
+
 		/* Leave space for a trailing NUL. */
 		WT_RET(__wt_buf_extend(session, buf, buf->size + 2));
 		if (c == '\n') {
@@ -40,8 +44,6 @@ __wt_getline(WT_SESSION_IMPL *session, WT_ITEM *buf, FILE *fp)
 		}
 		((char *)buf->mem)[buf->size++] = (char)c;
 	}
-	if (c == EOF && ferror(fp))
-		WT_RET_MSG(session, __wt_errno(), "file read");
 
 	((char *)buf->mem)[buf->size] = '\0';
 

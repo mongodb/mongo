@@ -135,8 +135,11 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * that was done when the checkpoint was first written (re-writing the
 	 * checkpoint might possibly make it relevant here, but it's unlikely
 	 * enough I don't bother).
+	 *
+	 * If in-memory, we don't read or write the object, and the truncate
+	 * will unnecessarily allocate buffer space.
 	 */
-	if (!checkpoint) {
+	if (!checkpoint && !F_ISSET(S2C(session), WT_CONN_IN_MEMORY)) {
 		/*
 		 * The truncate might fail if there's a file mapping (if there's
 		 * an open checkpoint on the file), that's OK.
@@ -144,7 +147,7 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		WT_ERR(__wt_verbose(session, WT_VERB_CHECKPOINT,
 		    "truncate file to %" PRIuMAX, (uintmax_t)ci->file_size));
 		WT_ERR_BUSY_OK(
-		    __wt_block_truncate(session, block->fh, ci->file_size));
+		    __wt_block_truncate(session, block, ci->file_size));
 	}
 
 	if (0) {
@@ -192,7 +195,7 @@ __wt_block_checkpoint_unload(
 		 * an open checkpoint on the file), that's OK.
 		 */
 		WT_TRET_BUSY_OK(
-		    __wt_block_truncate(session, block->fh, block->fh->size));
+		    __wt_block_truncate(session, block, block->size));
 
 		__wt_spin_lock(session, &block->live_lock);
 		__wt_block_ckpt_destroy(session, &block->live);
@@ -738,7 +741,7 @@ __ckpt_update(WT_SESSION_IMPL *session,
 	 * if there ever is, this will need to be fixed.
 	 */
 	if (is_live)
-		ci->file_size = block->fh->size;
+		ci->file_size = block->size;
 
 	/*
 	 * Copy the checkpoint information into the checkpoint array's address

@@ -9,102 +9,110 @@
 #include "wt_internal.h"
 
 /*
- * __wt_mmap --
+ * __wt_win_map --
  *	Map a file into memory.
  */
 int
-__wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp,
-   void** mappingcookie)
+__wt_win_map(WT_SESSION_IMPL *session,
+    WT_FH *fh, void *mapp, size_t *lenp, void **mappingcookie)
 {
+	WT_DECL_RET;
+	size_t len;
+	wt_off_t file_size;
 	void *map;
-	size_t orig_size;
 
 	/*
-	 * Record the current size and only map and set that as the length, it
-	 * could change between the map call and when we set the return length.
-	 * For the same reason we could actually map past the end of the file;
-	 * we don't read bytes past the end of the file though, so as long as
-	 * the map call succeeds, it's all OK.
+	 * There's no locking here to prevent the underlying file from changing
+	 * underneath us, our caller needs to ensure consistency of the mapped
+	 * region vs. any other file activity.
 	 */
-	orig_size = (size_t)fh->size;
+	WT_RET(__wt_filesize(session, fh, &file_size));
+	len = (size_t)file_size;
+
+	(void)__wt_verbose(session, WT_VERB_HANDLEOPS,
+	    "%s: memory-map: %" WT_SIZET_FMT " bytes", fh->name, len);
+
 	*mappingcookie =
 	    CreateFileMappingA(fh->filehandle, NULL, PAGE_READONLY, 0, 0, NULL);
 	if (*mappingcookie == NULL)
-		WT_RET_MSG(session, __wt_errno(),
-			"%s CreateFileMapping error: failed to map %"
-			WT_SIZET_FMT " bytes",
-			fh->name, orig_size);
+		WT_RET_MSG(session, __wt_getlasterror(),
+		    "%s: memory-map: CreateFileMappingA", fh->name);
 
-	if ((map = MapViewOfFile(
-	    *mappingcookie, FILE_MAP_READ, 0, 0, orig_size)) == NULL) {
+	if ((map =
+	    MapViewOfFile(*mappingcookie, FILE_MAP_READ, 0, 0, len)) == NULL) {
+		/* Retrieve the error before cleaning up. */
+		ret = __wt_getlasterror();
 		CloseHandle(*mappingcookie);
 		*mappingcookie = NULL;
 
-		WT_RET_MSG(session, __wt_errno(),
-		    "%s map error: failed to map %" WT_SIZET_FMT " bytes",
-		    fh->name, orig_size);
+		WT_RET_MSG(session, ret,
+		    "%s: memory-map: MapViewOfFile",  fh->name);
 	}
-	(void)__wt_verbose(session, WT_VERB_FILEOPS,
-	    "%s: MapViewOfFile %p: %" WT_SIZET_FMT " bytes",
-	    fh->name, map, orig_size);
 
 	*(void **)mapp = map;
-	*lenp = orig_size;
+	*lenp = len;
 	return (0);
 }
 
 /*
- * __wt_mmap_preload --
+ * __wt_win_map_preload --
  *	Cause a section of a memory map to be faulted in.
  */
 int
-__wt_mmap_preload(WT_SESSION_IMPL *session, const void *p, size_t size)
+__wt_win_map_preload(
+    WT_SESSION_IMPL *session, WT_FH *fh, const void *p, size_t size)
 {
 	WT_UNUSED(session);
+	WT_UNUSED(fh);
 	WT_UNUSED(p);
 	WT_UNUSED(size);
 
-	return (0);
+	return (ENOTSUP);
 }
 
 /*
- * __wt_mmap_discard --
+ * __wt_win_map_discard --
  *	Discard a chunk of the memory map.
  */
 int
-__wt_mmap_discard(WT_SESSION_IMPL *session, void *p, size_t size)
+__wt_win_map_discard(WT_SESSION_IMPL *session, WT_FH *fh, void *p, size_t size)
 {
 	WT_UNUSED(session);
+	WT_UNUSED(fh);
 	WT_UNUSED(p);
 	WT_UNUSED(size);
-	return (0);
+
+	return (ENOTSUP);
 }
 
 /*
- * __wt_munmap --
+ * __wt_win_map_unmap --
  *	Remove a memory mapping.
  */
 int
-__wt_munmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, size_t len,
-   void** mappingcookie)
+__wt_win_map_unmap(WT_SESSION_IMPL *session,
+    WT_FH *fh, void *map, size_t len, void **mappingcookie)
 {
-	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS,
-	    "%s: UnmapViewOfFile %p: %" WT_SIZET_FMT " bytes",
-	    fh->name, map, len));
+	WT_DECL_RET;
+
+	(void)__wt_verbose(session, WT_VERB_HANDLEOPS,
+	    "%s: memory-unmap: %" WT_SIZET_FMT " bytes", fh->name, len);
+
+	WT_ASSERT(session, *mappingcookie != NULL);
 
 	if (UnmapViewOfFile(map) == 0) {
-		WT_RET_MSG(session, __wt_errno(),
-		    "%s UnmapViewOfFile error: failed to unmap %" WT_SIZET_FMT
-		    " bytes",
-		    fh->name, len);
+		ret = __wt_getlasterror();
+		__wt_err(session, ret,
+		    "%s: memory-unmap: UnmapViewOfFile", fh->name);
 	}
 
 	if (CloseHandle(*mappingcookie) == 0) {
-		WT_RET_MSG(session, __wt_errno(),
-		    "CloseHandle: MapViewOfFile: %s", fh->name);
+		ret = __wt_getlasterror();
+		__wt_err(session, ret,
+		    "%s: memory-unmap: CloseHandle", fh->name);
 	}
 
-	*mappingcookie = 0;
+	*mappingcookie = NULL;
 
-	return (0);
+	return (ret);
 }

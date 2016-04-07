@@ -13,11 +13,11 @@
 #include <sys/syscall.h>
 #endif
 /*
- * __wt_fallocate_config --
- *	Configure file-extension behavior for a file handle.
+ * __wt_posix_handle_allocate_configure --
+ *	Configure POSIX file-extension behavior for a file handle.
  */
 void
-__wt_fallocate_config(WT_SESSION_IMPL *session, WT_FH *fh)
+__wt_posix_handle_allocate_configure(WT_SESSION_IMPL *session, WT_FH *fh)
 {
 	WT_UNUSED(session);
 
@@ -40,11 +40,11 @@ __wt_fallocate_config(WT_SESSION_IMPL *session, WT_FH *fh)
 }
 
 /*
- * __wt_std_fallocate --
+ * __posix_std_fallocate --
  *	Linux fallocate call.
  */
 static int
-__wt_std_fallocate(WT_FH *fh, wt_off_t offset, wt_off_t len)
+__posix_std_fallocate(WT_FH *fh, wt_off_t offset, wt_off_t len)
 {
 #if defined(HAVE_FALLOCATE)
 	WT_DECL_RET;
@@ -60,11 +60,11 @@ __wt_std_fallocate(WT_FH *fh, wt_off_t offset, wt_off_t len)
 }
 
 /*
- * __wt_sys_fallocate --
+ * __posix_sys_fallocate --
  *	Linux fallocate call (system call version).
  */
 static int
-__wt_sys_fallocate(WT_FH *fh, wt_off_t offset, wt_off_t len)
+__posix_sys_fallocate(WT_FH *fh, wt_off_t offset, wt_off_t len)
 {
 #if defined(__linux__) && defined(SYS_fallocate)
 	WT_DECL_RET;
@@ -86,11 +86,11 @@ __wt_sys_fallocate(WT_FH *fh, wt_off_t offset, wt_off_t len)
 }
 
 /*
- * __wt_posix_fallocate --
+ * __posix_posix_fallocate --
  *	POSIX fallocate call.
  */
 static int
-__wt_posix_fallocate(WT_FH *fh, wt_off_t offset, wt_off_t len)
+__posix_posix_fallocate(WT_FH *fh, wt_off_t offset, wt_off_t len)
 {
 #if defined(HAVE_POSIX_FALLOCATE)
 	WT_DECL_RET;
@@ -106,36 +106,29 @@ __wt_posix_fallocate(WT_FH *fh, wt_off_t offset, wt_off_t len)
 }
 
 /*
- * __wt_fallocate --
- *	Extend a file.
+ * __wt_posix_handle_allocate --
+ *	POSIX fallocate.
  */
 int
-__wt_fallocate(
+__wt_posix_handle_allocate(
     WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, wt_off_t len)
 {
 	WT_DECL_RET;
 
-	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 	switch (fh->fallocate_available) {
 	/*
 	 * Check for already configured handles and make the configured call.
 	 */
 	case WT_FALLOCATE_POSIX:
-		WT_RET(__wt_verbose(
-		    session, WT_VERB_FILEOPS, "%s: posix_fallocate", fh->name));
-		if ((ret = __wt_posix_fallocate(fh, offset, len)) == 0)
+		if ((ret = __posix_posix_fallocate(fh, offset, len)) == 0)
 			return (0);
 		WT_RET_MSG(session, ret, "%s: posix_fallocate", fh->name);
 	case WT_FALLOCATE_STD:
-		WT_RET(__wt_verbose(
-		    session, WT_VERB_FILEOPS, "%s: fallocate", fh->name));
-		if ((ret = __wt_std_fallocate(fh, offset, len)) == 0)
+		if ((ret = __posix_std_fallocate(fh, offset, len)) == 0)
 			return (0);
 		WT_RET_MSG(session, ret, "%s: fallocate", fh->name);
 	case WT_FALLOCATE_SYS:
-		WT_RET(__wt_verbose(
-		    session, WT_VERB_FILEOPS, "%s: sys_fallocate", fh->name));
-		if ((ret = __wt_sys_fallocate(fh, offset, len)) == 0)
+		if ((ret = __posix_sys_fallocate(fh, offset, len)) == 0)
 			return (0);
 		WT_RET_MSG(session, ret, "%s: sys_fallocate", fh->name);
 
@@ -152,17 +145,17 @@ __wt_fallocate(
 		 * fallocate (and the system call version of fallocate) first to
 		 * avoid locking on Linux if at all possible.
 		 */
-		if ((ret = __wt_std_fallocate(fh, offset, len)) == 0) {
+		if ((ret = __posix_std_fallocate(fh, offset, len)) == 0) {
 			fh->fallocate_available = WT_FALLOCATE_STD;
 			fh->fallocate_requires_locking = false;
 			return (0);
 		}
-		if ((ret = __wt_sys_fallocate(fh, offset, len)) == 0) {
+		if ((ret = __posix_sys_fallocate(fh, offset, len)) == 0) {
 			fh->fallocate_available = WT_FALLOCATE_SYS;
 			fh->fallocate_requires_locking = false;
 			return (0);
 		}
-		if ((ret = __wt_posix_fallocate(fh, offset, len)) == 0) {
+		if ((ret = __posix_posix_fallocate(fh, offset, len)) == 0) {
 			fh->fallocate_available = WT_FALLOCATE_POSIX;
 #if !defined(__linux__)
 			fh->fallocate_requires_locking = false;

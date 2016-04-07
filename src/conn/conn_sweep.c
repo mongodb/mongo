@@ -369,8 +369,9 @@ __wt_sweep_create(WT_SESSION_IMPL *session)
 	 *
 	 * Don't tap the sweep thread for eviction.
 	 */
-	session_flags = WT_SESSION_CAN_WAIT |
-	    WT_SESSION_LOOKASIDE_CURSOR | WT_SESSION_NO_EVICTION;
+	session_flags = WT_SESSION_CAN_WAIT | WT_SESSION_NO_EVICTION;
+	if (F_ISSET(conn, WT_CONN_LAS_OPEN))
+		session_flags |= WT_SESSION_LOOKASIDE_CURSOR;
 	WT_RET(__wt_open_internal_session(
 	    conn, "sweep-server", true, session_flags, &conn->sweep_session));
 	session = conn->sweep_session;

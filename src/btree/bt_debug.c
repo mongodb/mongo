@@ -19,7 +19,7 @@ typedef struct {
 	 * When using the standard event handlers, the debugging output has to
 	 * do its own message handling because its output isn't line-oriented.
 	 */
-	FILE		*fp;			/* Output file stream */
+	WT_FH		*fh;			/* Output file stream */
 	WT_ITEM		*msg;			/* Buffered message */
 
 	WT_ITEM		*tmp;			/* Temporary space */
@@ -97,11 +97,8 @@ __debug_config(WT_SESSION_IMPL *session, WT_DBG *ds, const char *ofile)
 	if (ofile == NULL)
 		return (__wt_scr_alloc(session, 512, &ds->msg));
 
-	/* If we're using a file, flush on each line. */
-	WT_RET(__wt_fopen(session, ofile, WT_FHANDLE_WRITE, 0, &ds->fp));
-
-	(void)setvbuf(ds->fp, NULL, _IOLBF, 0);
-	return (0);
+	return (__wt_open(session, ofile, WT_FILE_TYPE_REGULAR,
+	    WT_OPEN_CREATE | WT_STREAM_LINE_BUFFER | WT_STREAM_WRITE, &ds->fh));
 }
 
 /*
@@ -130,7 +127,7 @@ __dmsg_wrapup(WT_DBG *ds)
 	}
 
 	/* Close any file we opened. */
-	(void)__wt_fclose(&ds->fp, WT_FHANDLE_WRITE);
+	(void)__wt_close(session, &ds->fh);
 }
 
 /*
@@ -155,7 +152,7 @@ __dmsg(WT_DBG *ds, const char *fmt, ...)
 	 * the output chunk, and pass it to the event handler once we see a
 	 * terminating newline.
 	 */
-	if (ds->fp == NULL) {
+	if (ds->fh == NULL) {
 		msg = ds->msg;
 		for (;;) {
 			p = (char *)msg->mem + msg->size;
@@ -187,7 +184,7 @@ __dmsg(WT_DBG *ds, const char *fmt, ...)
 		}
 	} else {
 		va_start(ap, fmt);
-		(void)__wt_vfprintf(ds->fp, fmt, ap);
+		(void)__wt_vfprintf(session, ds->fh, fmt, ap);
 		va_end(ap);
 	}
 }
@@ -204,7 +201,7 @@ __wt_debug_addr_print(
 	WT_DECL_RET;
 
 	WT_RET(__wt_scr_alloc(session, 128, &buf));
-	ret = __wt_fprintf(stderr,
+	ret = __wt_fprintf(session, WT_STDERR(session),
 	    "%s\n", __wt_addr_string(session, addr, addr_size, buf));
 	__wt_scr_free(session, &buf);
 
