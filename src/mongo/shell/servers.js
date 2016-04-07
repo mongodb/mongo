@@ -1,7 +1,12 @@
-// Wrap whole file in a function to avoid polluting the global namespace
-(function() {
+var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoProgramNoConnect,
+    myPort;
 
-    _parsePath = function() {
+(function() {
+    "use strict";
+
+    var shellVersion = version;
+
+    var _parsePath = function() {
         var dbpath = "";
         for (var i = 0; i < arguments.length; ++i)
             if (arguments[i] == "--dbpath")
@@ -13,7 +18,7 @@
         return dbpath;
     };
 
-    _parsePort = function() {
+    var _parsePort = function() {
         var port = "";
         for (var i = 0; i < arguments.length; ++i)
             if (arguments[i] == "--port")
@@ -24,7 +29,7 @@
         return port;
     };
 
-    createMongoArgs = function(binaryName, args) {
+    var createMongoArgs = function(binaryName, args) {
         if (!Array.isArray(args)) {
             throw new Error("The second argument to createMongoArgs must be an array");
         }
@@ -65,9 +70,37 @@
     MongoRunner.dataDir = "/data/db";
     MongoRunner.dataPath = "/data/db/";
 
-    MongoRunner.VersionSub = function(regex, version) {
-        this.regex = regex;
+    MongoRunner.VersionSub = function(pattern, version) {
+        this.pattern = pattern;
         this.version = version;
+    };
+
+    /**
+     * Returns an array of version elements from a version string.
+     *
+     * "3.3.4-fade3783" -> ["3", "3", "4-fade3783" ]
+     * "3.2" -> [ "3", "2" ]
+     * 3 -> exception: versions must have at least two components.
+     */
+    var convertVersionStringToArray = function(versionString) {
+        assert("" !== versionString, "Version strings must not be empty");
+        var versionArray = versionString.split('.');
+        assert.gt(versionArray.length,
+                  1,
+                  "MongoDB versions must have at least two components to compare, but \"" +
+                      versionString + "\" has " + versionArray.length);
+        return versionArray;
+    };
+
+    /**
+     * Returns the major version string from a version string.
+     *
+     * 3.3.4-fade3783 -> 3.3
+     * 3.2 -> 3.2
+     * 3 -> exception: versions must have at least two components.
+     */
+    var extractMajorVersionFromVersionString = function(versionString) {
+        return convertVersionStringToArray(versionString).slice(0, 2).join('.');
     };
 
     // These patterns allow substituting the binary versions used for each version string to support
@@ -75,14 +108,13 @@
     // dev/stable MongoDB release cycle.
     //
     // If you add a new version substitution to this list, you should add it to the lists of
-    // versions
-    // being checked in '0_test_launching.js' to verify it is susbstituted correctly.
+    // versions being checked in 'verify_versions_test.js' to verify it is susbstituted correctly.
     MongoRunner.binVersionSubs = [
-        new MongoRunner.VersionSub(/^latest$/, ""),
+        new MongoRunner.VersionSub("latest", shellVersion()),
+        new MongoRunner.VersionSub(extractMajorVersionFromVersionString(shellVersion()),
+                                   shellVersion()),
         // To-be-updated when we branch for the next release.
-        new MongoRunner.VersionSub(/^last-stable$/, "3.2"),
-        new MongoRunner.VersionSub(/^3\.3(\..*){0,1}/, ""),
-        new MongoRunner.VersionSub(/^3\.4(\..*){0,1}/, "")
+        new MongoRunner.VersionSub("last-stable", "3.2")
     ];
 
     MongoRunner.getBinVersionFor = function(version) {
@@ -92,35 +124,42 @@
             version = version.toString();
         }
 
-        // No version set means we use no suffix, this is *different* from "latest"
-        // since latest may be mapped to a different version.
         if (version == null)
             version = "";
         version = version.trim();
         if (version === "")
-            return "";
+            version = "latest";
 
         // See if this version is affected by version substitutions
         for (var i = 0; i < MongoRunner.binVersionSubs.length; i++) {
             var sub = MongoRunner.binVersionSubs[i];
-            if (sub.regex.test(version)) {
-                version = sub.version;
+            if (sub.pattern == version) {
+                return sub.version;
             }
         }
 
         return version;
     };
 
+    /**
+     * Returns true if two version strings could represent the same version. This is true
+     * if, after passing the versions through getBinVersionFor, the the versions have the
+     * same value for each version component up through the length of the shorter version.
+     *
+     * That is, 3.2.4 compares equal to 3.2, but 3.2.4 does not compare equal to 3.2.3.
+     */
     MongoRunner.areBinVersionsTheSame = function(versionA, versionB) {
 
-        versionA = MongoRunner.getBinVersionFor(versionA);
-        versionB = MongoRunner.getBinVersionFor(versionB);
+        versionA = convertVersionStringToArray(MongoRunner.getBinVersionFor(versionA));
+        versionB = convertVersionStringToArray(MongoRunner.getBinVersionFor(versionB));
 
-        if (versionA === "" || versionB === "") {
-            return versionA === versionB;
+        var elementsToCompare = Math.min(versionA.length, versionB.length);
+        for (var i = 0; i < elementsToCompare; ++i) {
+            if (versionA[i] != versionB[i]) {
+                return false;
+            }
         }
-
-        return versionA.startsWith(versionB) || versionB.startsWith(versionA);
+        return true;
     };
 
     MongoRunner.logicalOptions = {
@@ -246,7 +285,7 @@
             var o = isObject(args) ? args : args[0];
 
             // If we've specified a particular binary version, use that
-            if (o.binVersion && o.binVersion != "") {
+            if (o.binVersion && o.binVersion != "" && o.binVersion != shellVersion()) {
                 binaryName += "-" + o.binVersion;
             }
 
@@ -706,7 +745,7 @@
 
         if (!port) {
             print("Cannot stop mongo process " + port);
-            return;
+            return null;
         }
 
         signal = parseInt(signal) || 15;
@@ -795,7 +834,7 @@
     // This function's arguments are passed as command line arguments to mongod.
     // The specified 'dbpath' is cleared if it exists, created if not.
     // var conn = _startMongodEmpty("--port", 30000, "--dbpath", "asdf");
-    _startMongodEmpty = function() {
+    var _startMongodEmpty = function() {
         var args = createMongoArgs("mongod", Array.from(arguments));
 
         var dbpath = _parsePath.apply(null, args);
@@ -807,11 +846,6 @@
     _startMongod = function() {
         print("startMongod WARNING DELETES DATA DIRECTORY THIS IS FOR TESTING ONLY");
         return _startMongodEmpty.apply(null, arguments);
-    };
-
-    _startMongodNoReset = function() {
-        var args = createMongoArgs("mongod", Array.from(arguments));
-        return startMongoProgram.apply(null, args);
     };
 
     /**
@@ -826,7 +860,7 @@
             }
             if (jsTest.options().authMechanism && jsTest.options().authMechanism != "SCRAM-SHA-1") {
                 var hasAuthMechs = false;
-                for (i in argArray) {
+                for (var i in argArray) {
                     if (typeof argArray[i] === 'string' &&
                         argArray[i].indexOf('authenticationMechanisms') != -1) {
                         hasAuthMechs = true;

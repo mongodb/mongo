@@ -38,6 +38,7 @@
 #include "mongo/scripting/mozjs/jsstringwrapper.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
+#include "mongo/util/version.h"
 
 namespace mongo {
 namespace mozjs {
@@ -83,7 +84,7 @@ void GlobalInfo::Functions::print::call(JSContext* cx, JS::CallArgs args) {
 }
 
 void GlobalInfo::Functions::version::call(JSContext* cx, JS::CallArgs args) {
-    ValueReader(cx, args.rval()).fromStringData(JS_VersionToString(JS_GetVersion(cx)));
+    ValueReader(cx, args.rval()).fromStringData(versionString);
 }
 
 void GlobalInfo::Functions::gc::call(JSContext* cx, JS::CallArgs args) {
