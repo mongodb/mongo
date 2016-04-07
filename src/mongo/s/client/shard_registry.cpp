@@ -566,6 +566,7 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::_exhaustiveFindOnConfig(
                                               sort,
                                               BSONObj(),  // hint
                                               readConcernObj,
+                                              BSONObj(),    // collation
                                               boost::none,  // skip
                                               limit);
 

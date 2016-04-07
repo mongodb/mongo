@@ -720,6 +720,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                                                                BSONObj(),      // sort
                                                                BSONObj(),      // hint
                                                                BSONObj(),      // readConcern
+                                                               BSONObj(),      // collation
                                                                boost::none,    // skip
                                                                1LL,            // limit
                                                                boost::none,    // batchSize
@@ -826,6 +827,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                                 BSONObj(),  // sort
                                 BSONObj(),  // hint
                                 BSONObj(),  // readConcern
+                                BSONObj(),  // collation
                                 op.skip ? boost::optional<long long>(op.skip) : boost::none,
                                 op.limit ? boost::optional<long long>(op.limit) : boost::none,
                                 op.batchSize ? boost::optional<long long>(op.batchSize)

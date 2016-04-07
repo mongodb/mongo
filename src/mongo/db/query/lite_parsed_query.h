@@ -90,6 +90,7 @@ public:
         const BSONObj& sort = BSONObj(),
         const BSONObj& hint = BSONObj(),
         const BSONObj& readConcern = BSONObj(),
+        const BSONObj& collation = BSONObj(),
         boost::optional<long long> skip = boost::none,
         boost::optional<long long> limit = boost::none,
         boost::optional<long long> batchSize = boost::none,
@@ -187,6 +188,9 @@ public:
     }
     const BSONObj& getReadConcern() const {
         return _readConcern;
+    }
+    const BSONObj& getCollation() const {
+        return _collation;
     }
 
     static const long long kDefaultBatchSize;
@@ -347,6 +351,8 @@ private:
     BSONObj _hint;
     // The read concern is parsed elsewhere.
     BSONObj _readConcern;
+    // The collation is parsed elsewhere.
+    BSONObj _collation;
 
     bool _wantMore = true;
 

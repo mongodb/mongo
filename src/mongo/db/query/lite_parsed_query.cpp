@@ -77,6 +77,7 @@ const char kFilterField[] = "filter";
 const char kProjectionField[] = "projection";
 const char kSortField[] = "sort";
 const char kHintField[] = "hint";
+const char kCollationField[] = "collation";
 const char kSkipField[] = "skip";
 const char kLimitField[] = "limit";
 const char kBatchSizeField[] = "batchSize";
@@ -168,6 +169,14 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
             }
 
             pq->_readConcern = el.Obj().getOwned();
+        } else if (str::equals(fieldName, kCollationField)) {
+            // Collation parsing is handled elsewhere, but we store a copy here.
+            Status status = checkFieldType(el, Object);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            pq->_collation = el.Obj().getOwned();
         } else if (str::equals(fieldName, kSkipField)) {
             if (!el.isNumber()) {
                 str::stream ss;
@@ -420,6 +429,7 @@ std::unique_ptr<LiteParsedQuery> LiteParsedQuery::makeAsFindCmd(
     const BSONObj& sort,
     const BSONObj& hint,
     const BSONObj& readConcern,
+    const BSONObj& collation,
     boost::optional<long long> skip,
     boost::optional<long long> limit,
     boost::optional<long long> batchSize,
@@ -452,6 +462,7 @@ std::unique_ptr<LiteParsedQuery> LiteParsedQuery::makeAsFindCmd(
     pq->_sort = sort;
     pq->_hint = hint;
     pq->_readConcern = readConcern;
+    pq->_collation = collation;
 
     pq->_skip = skip;
     pq->_limit = limit;
@@ -508,6 +519,10 @@ void LiteParsedQuery::asFindCommand(BSONObjBuilder* cmdBuilder) const {
 
     if (!_readConcern.isEmpty()) {
         cmdBuilder->append(repl::ReadConcernArgs::kReadConcernFieldName, _readConcern);
+    }
+
+    if (!_collation.isEmpty()) {
+        cmdBuilder->append(kCollationField, _collation);
     }
 
     if (_skip) {
