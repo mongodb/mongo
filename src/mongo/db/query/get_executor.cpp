@@ -676,8 +676,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* txn,
     deleteStageParams.opDebug = opDebug;
 
     unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
-    PlanExecutor::YieldPolicy policy =
-        parsedDelete->canYield() ? PlanExecutor::YIELD_AUTO : PlanExecutor::YIELD_MANUAL;
+    const PlanExecutor::YieldPolicy policy = parsedDelete->yieldPolicy();
 
     if (!parsedDelete->hasParsedQuery()) {
         // This is the idhack fast-path for getting a PlanExecutor without doing the work
@@ -816,8 +815,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* txn,
         driver->refreshIndexKeys(lifecycle->getIndexKeys(txn));
     }
 
-    PlanExecutor::YieldPolicy policy =
-        parsedUpdate->canYield() ? PlanExecutor::YIELD_AUTO : PlanExecutor::YIELD_MANUAL;
+    const PlanExecutor::YieldPolicy policy = parsedUpdate->yieldPolicy();
 
     unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
     UpdateStageParams updateStageParams(request, driver, opDebug);

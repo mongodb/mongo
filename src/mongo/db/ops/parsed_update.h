@@ -30,6 +30,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/ops/update_driver.h"
 
 namespace mongo {
@@ -89,9 +90,9 @@ public:
     UpdateDriver* getDriver();
 
     /**
-     * Is this update allowed to yield?
+     * Get the YieldPolicy, adjusted for $isolated and GodMode.
      */
-    bool canYield() const;
+    PlanExecutor::YieldPolicy yieldPolicy() const;
 
     /**
      * Is this update supposed to be isolated?

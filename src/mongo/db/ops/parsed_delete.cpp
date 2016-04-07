@@ -107,9 +107,14 @@ const DeleteRequest* ParsedDelete::getRequest() const {
     return _request;
 }
 
-bool ParsedDelete::canYield() const {
-    return !_request->isGod() && PlanExecutor::YIELD_AUTO == _request->getYieldPolicy() &&
-        !isIsolated();
+PlanExecutor::YieldPolicy ParsedDelete::yieldPolicy() const {
+    if (_request->isGod()) {
+        return PlanExecutor::YIELD_MANUAL;
+    }
+    if (_request->getYieldPolicy() == PlanExecutor::YIELD_AUTO && isIsolated()) {
+        return PlanExecutor::WRITE_CONFLICT_RETRY_ONLY;  // Don't yield locks.
+    }
+    return _request->getYieldPolicy();
 }
 
 bool ParsedDelete::isIsolated() const {

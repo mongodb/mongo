@@ -123,9 +123,14 @@ Status ParsedUpdate::parseUpdate() {
     return _driver.parse(_request->getUpdates(), _request->isMulti());
 }
 
-bool ParsedUpdate::canYield() const {
-    return !_request->isGod() && PlanExecutor::YIELD_AUTO == _request->getYieldPolicy() &&
-        !isIsolated();
+PlanExecutor::YieldPolicy ParsedUpdate::yieldPolicy() const {
+    if (_request->isGod()) {
+        return PlanExecutor::YIELD_MANUAL;
+    }
+    if (_request->getYieldPolicy() == PlanExecutor::YIELD_AUTO && isIsolated()) {
+        return PlanExecutor::WRITE_CONFLICT_RETRY_ONLY;  // Don't yield locks.
+    }
+    return _request->getYieldPolicy();
 }
 
 bool ParsedUpdate::isIsolated() const {
