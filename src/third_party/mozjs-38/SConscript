@@ -1,8 +1,8 @@
 # -*- mode: python -*-
 
 Import([
+    "debugBuild",
     "env",
-    "get_option",
     ])
 
 env = env.Clone()
@@ -28,7 +28,7 @@ env.Prepend(CPPDEFINES=[
         'U_NO_DEFAULT_INCLUDE_UTF_HEADERS=1',
         ])
 
-if get_option('spider-monkey-dbg') == "on":
+if debugBuild:
     env.Prepend(CPPDEFINES=[
             'DEBUG',
             'JS_DEBUG',
