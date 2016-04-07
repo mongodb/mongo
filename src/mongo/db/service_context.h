@@ -319,7 +319,12 @@ public:
      * destroyed. So make sure that no one is using the old source when calling this.
      */
     void setTickSource(std::unique_ptr<TickSource> newSource);
-    void setClockSource(std::unique_ptr<ClockSource> newSource);
+
+    /**
+     * Call this method with a ClockSource implementation that is very precise but
+     * may be expensive to call.
+     */
+    void setPreciseClockSource(std::unique_ptr<ClockSource> newSource);
 
 protected:
     ServiceContext() = default;
@@ -343,7 +348,7 @@ private:
     ClientSet _clients;
 
     std::unique_ptr<TickSource> _tickSource;
-    std::unique_ptr<ClockSource> _clockSource;
+    std::unique_ptr<ClockSource> _preciseClockSource;
 };
 
 /**

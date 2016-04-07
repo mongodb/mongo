@@ -81,7 +81,7 @@ const stdx::chrono::seconds ShardingTestFixture::kFutureTimeout{5};
 
 void ShardingTestFixture::setUp() {
     _service = stdx::make_unique<ServiceContextNoop>();
-    _service->setClockSource(stdx::make_unique<ClockSourceMock>());
+    _service->setPreciseClockSource(stdx::make_unique<ClockSourceMock>());
     _messagePort = stdx::make_unique<MessagingPortMock>();
     _client = _service->makeClient("ShardingTestFixture", _messagePort.get());
     _opCtx = _client->makeOperationContext();
