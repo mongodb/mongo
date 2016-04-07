@@ -46,6 +46,7 @@ extern std::atomic<bool> failIndexKeyTooLong;  // NOLINT
 class BSONObjBuilder;
 class MatchExpression;
 class UpdateTicket;
+struct InsertDeleteOptions;
 
 /**
  * An IndexAccessMethod is the interface through which all the mutation, lookup, and
@@ -73,22 +74,23 @@ public:
      * 'loc') into the index.  'obj' is the object at the location 'loc'.  If not NULL,
      * 'numInserted' will be set to the number of keys added to the index for the document.  If
      * there is more than one key for 'obj', either all keys will be inserted or none will.
+     *
+     * The behavior of the insertion can be specified through 'options'.
      */
     Status insert(OperationContext* txn,
                   const BSONObj& obj,
                   const RecordId& loc,
-                  bool dupsAllowed,
+                  const InsertDeleteOptions& options,
                   int64_t* numInserted);
 
     /**
      * Analogous to above, but remove the records instead of inserting them.  If not NULL,
      * numDeleted will be set to the number of keys removed from the index for the document.
-     * If dupsAllowed is false, the record can be unindexed without checking its loc.
      */
     Status remove(OperationContext* txn,
                   const BSONObj& obj,
                   const RecordId& loc,
-                  bool dupsAllowed,
+                  const InsertDeleteOptions& options,
                   int64_t* numDeleted);
 
     /**
@@ -105,7 +107,7 @@ public:
                           const BSONObj& from,
                           const BSONObj& to,
                           const RecordId& loc,
-                          bool dupsAllowed,
+                          const InsertDeleteOptions& options,
                           UpdateTicket* ticket,
                           const MatchExpression* indexFilter);
 
@@ -201,7 +203,11 @@ public:
         /**
          * Insert into the BulkBuilder as-if inserting into an IndexAccessMethod.
          */
-        Status insert(OperationContext* txn, const BSONObj& obj, const RecordId& loc);
+        Status insert(OperationContext* txn,
+                      const BSONObj& obj,
+                      const RecordId& loc,
+                      const InsertDeleteOptions& options,
+                      int64_t* numInserted);
 
     private:
         friend class IndexAccessMethod;
@@ -282,4 +288,18 @@ private:
     RecordId loc;
     bool dupsAllowed;
 };
+
+/**
+ * Flags we can set for inserts and deletes (and updates, which are kind of both).
+ */
+struct InsertDeleteOptions {
+    InsertDeleteOptions() : logIfError(false), dupsAllowed(false) {}
+
+    // If there's an error, log() it.
+    bool logIfError;
+
+    // Are duplicate keys allowed in the index?
+    bool dupsAllowed;
+};
+
 }  // namespace mongo

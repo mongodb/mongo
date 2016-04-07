@@ -193,7 +193,8 @@ Status MultiIndexBlock::init(const std::vector<BSONObj>& indexSpecs) {
 
         const IndexDescriptor* descriptor = index.block->getEntry()->descriptor();
 
-        index.dupsAllowed = !descriptor->unique() || _ignoreUnique ||
+        index.options.logIfError = false;  // logging happens elsewhere if needed.
+        index.options.dupsAllowed = !descriptor->unique() || _ignoreUnique ||
             repl::getGlobalReplicationCoordinator()->shouldIgnoreUniqueIndex(descriptor);
 
         log() << "build index on: " << ns << " properties: " << descriptor->toString();
@@ -312,9 +313,9 @@ Status MultiIndexBlock::insert(const BSONObj& doc, const RecordId& loc) {
         int64_t unused;
         Status idxStatus(ErrorCodes::InternalError, "");
         if (_indexes[i].bulk) {
-            idxStatus = _indexes[i].bulk->insert(_txn, doc, loc);
+            idxStatus = _indexes[i].bulk->insert(_txn, doc, loc, _indexes[i].options, &unused);
         } else {
-            idxStatus = _indexes[i].real->insert(_txn, doc, loc, _indexes[i].dupsAllowed, &unused);
+            idxStatus = _indexes[i].real->insert(_txn, doc, loc, _indexes[i].options, &unused);
         }
 
         if (!idxStatus.isOK())
@@ -332,7 +333,7 @@ Status MultiIndexBlock::doneInserting(std::set<RecordId>* dupsOut) {
         Status status = _indexes[i].real->commitBulk(_txn,
                                                      std::move(_indexes[i].bulk),
                                                      _allowInterruption,
-                                                     _indexes[i].dupsAllowed,
+                                                     _indexes[i].options.dupsAllowed,
                                                      dupsOut);
         if (!status.isOK()) {
             return status;

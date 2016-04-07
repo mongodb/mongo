@@ -474,12 +474,15 @@ Status Collection::aboutToDeleteCapped(OperationContext* txn,
     _cursorManager.invalidateDocument(txn, loc, INVALIDATION_DELETION);
 
     BSONObj doc = data.releaseToBson();
-    _indexCatalog.unindexRecord(txn, doc, loc);
+    _indexCatalog.unindexRecord(txn, doc, loc, false);
 
     return Status::OK();
 }
 
-void Collection::deleteDocument(OperationContext* txn, const RecordId& loc, bool fromMigrate) {
+void Collection::deleteDocument(OperationContext* txn,
+                                const RecordId& loc,
+                                bool fromMigrate,
+                                bool noWarn) {
     if (isCapped()) {
         log() << "failing remove on a capped ns " << _ns << endl;
         uasserted(10089, "cannot remove from a capped collection");
@@ -494,7 +497,7 @@ void Collection::deleteDocument(OperationContext* txn, const RecordId& loc, bool
     /* check if any cursors point to us.  if so, advance them. */
     _cursorManager.invalidateDocument(txn, loc, INVALIDATION_DELETION);
 
-    _indexCatalog.unindexRecord(txn, doc.value(), loc);
+    _indexCatalog.unindexRecord(txn, doc.value(), loc, noWarn);
 
     _recordStore->deleteRecord(txn, loc);
 
@@ -570,7 +573,9 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
             IndexCatalogEntry* entry = ii.catalogEntry(descriptor);
             IndexAccessMethod* iam = ii.accessMethod(descriptor);
 
-            bool dupsAllowed =
+            InsertDeleteOptions options;
+            options.logIfError = false;
+            options.dupsAllowed =
                 !(KeyPattern::isIdKeyPattern(descriptor->keyPattern()) || descriptor->unique()) ||
                 repl::getGlobalReplicationCoordinator()->shouldIgnoreUniqueIndex(descriptor);
             UpdateTicket* updateTicket = new UpdateTicket();
@@ -579,7 +584,7 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
                                              oldDoc.value(),
                                              newDoc,
                                              oldLocation,
-                                             dupsAllowed,
+                                             options,
                                              updateTicket,
                                              entry->getFilterExpression());
             if (!ret.isOK()) {
@@ -653,7 +658,7 @@ Status Collection::recordStoreGoingToMove(OperationContext* txn,
                                           size_t oldSize) {
     moveCounter.increment();
     _cursorManager.invalidateDocument(txn, oldLocation, INVALIDATION_DELETION);
-    _indexCatalog.unindexRecord(txn, BSONObj(oldBuffer), oldLocation);
+    _indexCatalog.unindexRecord(txn, BSONObj(oldBuffer), oldLocation, true);
     return Status::OK();
 }
 

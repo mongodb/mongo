@@ -254,7 +254,10 @@ public:
      * 'noWarn' if unindexing the record causes an error, if noWarn is true the error
      * will not be logged.
      */
-    void deleteDocument(OperationContext* txn, const RecordId& loc, bool fromMigrate = false);
+    void deleteDocument(OperationContext* txn,
+                        const RecordId& loc,
+                        bool fromMigrate = false,
+                        bool noWarn = false);
 
     /*
      * Inserts all documents inside one WUOW.

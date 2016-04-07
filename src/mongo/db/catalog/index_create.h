@@ -217,7 +217,7 @@ private:
         const MatchExpression* filterExpression;  // might be NULL, owned elsewhere
         std::unique_ptr<IndexAccessMethod::BulkBuilder> bulk;
 
-        bool dupsAllowed = false;
+        InsertDeleteOptions options;
     };
 
     std::vector<IndexToBuild> _indexes;

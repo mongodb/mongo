@@ -104,8 +104,8 @@ public:
      * Remove the entry from the index with the specified key and RecordId.
      *
      * @param txn the transaction under which the remove takes place
-     * @param dupsAllowed true if duplicate keys are allowed. If false, no duplicate keys exist
-     *        and it is not necessary to check the RecordId.
+     * @param dupsAllowed true if duplicate keys are allowed, and false
+     *        otherwise
      */
     virtual void unindex(OperationContext* txn,
                          const BSONObj& key,

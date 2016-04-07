@@ -266,7 +266,7 @@ public:
     // this throws for now
     Status indexRecords(OperationContext* txn, const std::vector<BsonRecord>& bsonRecords);
 
-    void unindexRecord(OperationContext* txn, const BSONObj& obj, const RecordId& loc);
+    void unindexRecord(OperationContext* txn, const BSONObj& obj, const RecordId& loc, bool noWarn);
 
     // ------- temp internal -------
 
@@ -302,6 +302,12 @@ private:
     Status _indexRecords(OperationContext* txn,
                          IndexCatalogEntry* index,
                          const std::vector<BsonRecord>& bsonRecords);
+
+    Status _unindexRecord(OperationContext* txn,
+                          IndexCatalogEntry* index,
+                          const BSONObj& obj,
+                          const RecordId& loc,
+                          bool logIfError);
 
     /**
      * this does no sanity checks
