@@ -44,12 +44,12 @@
     assert.commandFailed(mongos.adminCommand({mergeChunks: ns, bounds: [{a: -1}, {a: 10}]}));
 
     // Fail if chunks to be merged are not contiguous on the shard
-    assert.commandWorked(
-        st.s0.adminCommand({moveChunk: ns, bounds: [{a: -1}, {a: 0}], to: shard1}));
+    assert.commandWorked(st.s0.adminCommand(
+        {moveChunk: ns, bounds: [{a: -1}, {a: 0}], to: shard1, _waitForDelete: true}));
     assert.commandFailed(
         st.s0.adminCommand({mergeChunks: ns, bounds: [{a: MinKey()}, {a: MaxKey()}]}));
-    assert.commandWorked(
-        st.s0.adminCommand({moveChunk: ns, bounds: [{a: -1}, {a: 0}], to: shard0}));
+    assert.commandWorked(st.s0.adminCommand(
+        {moveChunk: ns, bounds: [{a: -1}, {a: 0}], to: shard0, _waitForDelete: true}));
 
     // Validate metadata
     // There are four chunks [{$minKey, -1}, {-1, 0}, {0, 1}, {1, $maxKey}]

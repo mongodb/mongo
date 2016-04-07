@@ -64,13 +64,13 @@
     assert.gt(configDB.chunks.find({ns: 'test.user', min: {$lt: {_id: 0}}}).itcount(), 1);
 
     // Mongos must refresh metadata if the chunk version does not match
-    assert.commandWorked(
-        st.s0.adminCommand({moveChunk: 'test.user', find: {_id: -900}, to: shard1}));
+    assert.commandWorked(st.s0.adminCommand(
+        {moveChunk: 'test.user', find: {_id: -900}, to: shard1, _waitForDelete: true}));
     assert.commandWorked(st.s1.adminCommand({split: 'test.user', middle: {_id: -900}}));
-    assert.commandWorked(
-        st.s1.adminCommand({moveChunk: 'test.user', find: {_id: -900}, to: shard0}));
-    assert.commandWorked(
-        st.s1.adminCommand({moveChunk: 'test.user', find: {_id: -901}, to: shard0}));
+    assert.commandWorked(st.s1.adminCommand(
+        {moveChunk: 'test.user', find: {_id: -900}, to: shard0, _waitForDelete: true}));
+    assert.commandWorked(st.s1.adminCommand(
+        {moveChunk: 'test.user', find: {_id: -901}, to: shard0, _waitForDelete: true}));
     assert.eq(0, configDB.chunks.find({ns: 'test.user', shard: shard1}).itcount());
 
     //
