@@ -178,8 +178,8 @@ public:
         return _ownedBuffer.get() != 0;
     }
 
-    /** assure the data buffer is under the control of this BSONObj and not a remote buffer
-        @see isOwned()
+    /** If the data buffer is under the control of this BSONObj, return it.
+        Else return an owned copy.
     */
     BSONObj getOwned() const;
 
