@@ -1347,23 +1347,6 @@ StatusWith<VersionType> CatalogManagerReplicaSet::_getConfigVersion(OperationCon
     }
 
     if (queryResults.empty()) {
-        auto countStatus =
-            _runCountCommandOnConfig(txn, NamespaceString(ShardType::ConfigNS), BSONObj());
-
-        if (!countStatus.isOK()) {
-            return countStatus.getStatus();
-        }
-
-        const auto& shardCount = countStatus.getValue();
-        if (shardCount > 0) {
-            // Version document doesn't exist, but config.shards is not empty. Assuming that
-            // the current config metadata is pre v2.4.
-            VersionType versionInfo;
-            versionInfo.setMinCompatibleVersion(UpgradeHistory_UnreportedVersion);
-            versionInfo.setCurrentVersion(UpgradeHistory_UnreportedVersion);
-            return versionInfo;
-        }
-
         VersionType versionInfo;
         versionInfo.setMinCompatibleVersion(UpgradeHistory_EmptyVersion);
         versionInfo.setCurrentVersion(UpgradeHistory_EmptyVersion);

@@ -182,8 +182,6 @@ TEST_F(CatalogManagerReplSetTestFixture, InitNoVersionDocEmptyConfig) {
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
-    expectCount(HostAndPort("config:123"), NamespaceString("config.shards"), BSONObj(), 0);
-
     onCommand([](const RemoteCommandRequest& request) {
         ASSERT_EQ(HostAndPort("config:123"), request.target);
         ASSERT_EQ("config", request.dbname);
@@ -225,38 +223,6 @@ TEST_F(CatalogManagerReplSetTestFixture, InitNoVersionDocEmptyConfig) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTestFixture, InitNoVersionDocEmptyConfigWithAdmin) {
-    configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
-
-    auto future =
-        launchAsync([this] { ASSERT_OK(catalogManager()->initConfigVersion(operationContext())); });
-
-    onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
-
-    expectCount(HostAndPort("config:123"), NamespaceString("config.shards"), BSONObj(), 0);
-
-    onCommand([](const RemoteCommandRequest& request) {
-        ASSERT_EQ(HostAndPort("config:123"), request.target);
-        ASSERT_EQ("config", request.dbname);
-
-        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
-
-        BatchedUpdateRequest actualBatchedUpdate;
-        std::string errmsg;
-        ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
-        ASSERT_EQUALS(VersionType::ConfigNS, actualBatchedUpdate.getNS().ns());
-
-        BatchedCommandResponse response;
-        response.setOk(true);
-        response.setN(1);
-        response.setNModified(1);
-
-        return response.toBSON();
-    });
-
-    future.timed_get(kFutureTimeout);
-}
-
 TEST_F(CatalogManagerReplSetTestFixture, InitConfigWriteError) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
@@ -267,8 +233,6 @@ TEST_F(CatalogManagerReplSetTestFixture, InitConfigWriteError) {
     });
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
-
-    expectCount(HostAndPort("config:123"), NamespaceString("config.shards"), BSONObj(), 0);
 
     onCommand([](const RemoteCommandRequest& request) {
         return fromjson(R"({
@@ -282,22 +246,6 @@ TEST_F(CatalogManagerReplSetTestFixture, InitConfigWriteError) {
                 }]
             })");
     });
-
-    future.timed_get(kFutureTimeout);
-}
-
-TEST_F(CatalogManagerReplSetTestFixture, InitNoVersionDocNonEmptyConfigServer) {
-    configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
-
-    auto future = launchAsync([this] {
-        auto status = catalogManager()->initConfigVersion(operationContext());
-        ASSERT_EQ(ErrorCodes::IncompatibleShardingConfigVersion, status.code());
-        ASSERT_FALSE(status.reason().empty());
-    });
-
-    onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
-
-    expectCount(HostAndPort("config:123"), NamespaceString("config.shards"), BSONObj(), 1);
 
     future.timed_get(kFutureTimeout);
 }
@@ -336,8 +284,6 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionDuplicateKeyNoOpAfterRetry) 
         launchAsync([this] { ASSERT_OK(catalogManager()->initConfigVersion(operationContext())); });
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
-
-    expectCount(HostAndPort("config:123"), NamespaceString("config.shards"), BSONObj(), 0);
 
     onCommand([](const RemoteCommandRequest& request) {
         ASSERT_EQ(HostAndPort("config:123"), request.target);
@@ -390,8 +336,6 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionDuplicateKeyNoConfigVersionA
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
-    expectCount(HostAndPort("config:123"), NamespaceString("config.shards"), BSONObj(), 0);
-
     onCommand([](const RemoteCommandRequest& request) {
         ASSERT_EQ(HostAndPort("config:123"), request.target);
         ASSERT_EQ("config", request.dbname);
@@ -413,8 +357,6 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionDuplicateKeyNoConfigVersionA
     // Retry starts here
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
-
-    expectCount(HostAndPort("config:123"), NamespaceString("config.shards"), BSONObj(), 0);
 
     onCommand([](const RemoteCommandRequest& request) {
         ASSERT_EQ(HostAndPort("config:123"), request.target);
@@ -467,8 +409,6 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionDuplicateKeyTooNewAfterRetry
     });
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
-
-    expectCount(HostAndPort("config:123"), NamespaceString("config.shards"), BSONObj(), 0);
 
     onCommand([](const RemoteCommandRequest& request) {
         ASSERT_EQ(HostAndPort("config:123"), request.target);
@@ -526,8 +466,6 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionDuplicateKeyMaxRetry) {
     for (int x = 0; x < maxRetry; x++) {
         onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
-        expectCount(HostAndPort("config:123"), NamespaceString("config.shards"), BSONObj(), 0);
-
         onCommand([](const RemoteCommandRequest& request) {
             ASSERT_EQ(HostAndPort("config:123"), request.target);
             ASSERT_EQ("config", request.dbname);
@@ -557,8 +495,6 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionUpsertNoMatchNoOpAfterRetry)
         launchAsync([this] { ASSERT_OK(catalogManager()->initConfigVersion(operationContext())); });
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
-
-    expectCount(HostAndPort("config:123"), NamespaceString("config.shards"), BSONObj(), 0);
 
     onCommand([](const RemoteCommandRequest& request) {
         ASSERT_EQ(HostAndPort("config:123"), request.target);
@@ -606,8 +542,6 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionUpsertNoMatchNoConfigVersion
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
-    expectCount(HostAndPort("config:123"), NamespaceString("config.shards"), BSONObj(), 0);
-
     onCommand([](const RemoteCommandRequest& request) {
         ASSERT_EQ(HostAndPort("config:123"), request.target);
         ASSERT_EQ("config", request.dbname);
@@ -624,8 +558,6 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionUpsertNoMatchNoConfigVersion
     // Retry starts here
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
-
-    expectCount(HostAndPort("config:123"), NamespaceString("config.shards"), BSONObj(), 0);
 
     onCommand([](const RemoteCommandRequest& request) {
         ASSERT_EQ(HostAndPort("config:123"), request.target);
