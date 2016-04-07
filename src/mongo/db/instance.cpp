@@ -40,10 +40,8 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_manager_external_state_d.h"
-#include "mongo/db/background.h"
-#include "mongo/db/catalog/index_create.h"
 #include "mongo/db/client.h"
-#include "mongo/db/clientcursor.h"
+#include "mongo/db/catalog/cursor_manager.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -53,10 +51,7 @@
 #include "mongo/db/db.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/dbhelpers.h"
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/exec/delete.h"
-#include "mongo/db/exec/update.h"
 #include "mongo/db/ftdc/ftdc_mongod.h"
 #include "mongo/db/global_timestamp.h"
 #include "mongo/db/instance.h"
@@ -67,22 +62,11 @@
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
-#include "mongo/db/ops/delete_request.h"
-#include "mongo/db/ops/insert.h"
-#include "mongo/db/ops/parsed_delete.h"
-#include "mongo/db/ops/parsed_update.h"
-#include "mongo/db/ops/update_driver.h"
-#include "mongo/db/ops/update_lifecycle_impl.h"
-#include "mongo/db/ops/update_request.h"
+#include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/run_commands.h"
-#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
@@ -93,7 +77,6 @@
 #include "mongo/platform/process_id.h"
 #include "mongo/rpc/command_reply_builder.h"
 #include "mongo/rpc/command_request.h"
-#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/legacy_reply.h"
 #include "mongo/rpc/legacy_reply_builder.h"
 #include "mongo/rpc/legacy_request.h"
@@ -115,7 +98,6 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-
 using logger::LogComponent;
 using std::endl;
 using std::hex;
@@ -125,6 +107,12 @@ using std::string;
 using std::stringstream;
 using std::unique_ptr;
 using std::vector;
+
+string dbExecCommand;
+
+MONGO_FP_DECLARE(rsStopGetMore);
+
+namespace {
 
 // for diaglog
 inline void opread(Message& m) {
@@ -138,25 +126,6 @@ inline void opwrite(Message& m) {
         _diaglog.writeop(m.singleData().view2ptr(), m.header().getLen());
     }
 }
-
-void receivedKillCursors(OperationContext* txn, Message& m);
-
-void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Message& m, CurOp& op);
-
-void receivedDelete(OperationContext* txn, const NamespaceString& nsString, Message& m, CurOp& op);
-
-void receivedInsert(OperationContext* txn, const NamespaceString& nsString, Message& m, CurOp& op);
-
-bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, CurOp& curop);
-
-int nloggedsome = 0;
-#define LOGWITHRATELIMIT if (++nloggedsome < 1000 || nloggedsome % 100 == 0)
-
-string dbExecCommand;
-
-MONGO_FP_DECLARE(rsStopGetMore);
-
-namespace {
 
 unique_ptr<AuthzManagerExternalState> createAuthzManagerExternalStateMongod() {
     return stdx::make_unique<AuthzManagerExternalStateMongod>();
@@ -231,13 +200,11 @@ void beginCommandOp(OperationContext* txn, const NamespaceString& nss, const BSO
     curop->setNS_inlock(nss.ns());
 }
 
-}  // namespace
-
-static void receivedCommand(OperationContext* txn,
-                            const NamespaceString& nss,
-                            Client& client,
-                            DbResponse& dbResponse,
-                            Message& message) {
+void receivedCommand(OperationContext* txn,
+                     const NamespaceString& nss,
+                     Client& client,
+                     DbResponse& dbResponse,
+                     Message& message) {
     invariant(nss.isCommand());
 
     const int32_t responseToMsgId = message.header().getId();
@@ -281,8 +248,6 @@ static void receivedCommand(OperationContext* txn,
     dbResponse.response = std::move(response);
     dbResponse.responseToMsgId = responseToMsgId;
 }
-
-namespace {
 
 void receivedRpc(OperationContext* txn, Client& client, DbResponse& dbResponse, Message& message) {
     invariant(message.operation() == dbCommand);
@@ -381,14 +346,13 @@ void receivedPseudoCommand(OperationContext* txn,
     receivedCommand(txn, interposedNss, client, dbResponse, interposed);
 }
 
-}  // namespace
-
-static void receivedQuery(OperationContext* txn,
-                          const NamespaceString& nss,
-                          Client& c,
-                          DbResponse& dbResponse,
-                          Message& m) {
+void receivedQuery(OperationContext* txn,
+                   const NamespaceString& nss,
+                   Client& c,
+                   DbResponse& dbResponse,
+                   Message& m) {
     invariant(!nss.isCommand());
+    globalOpCounters.gotQuery();
 
     int32_t responseToMsgId = m.header().getId();
 
@@ -420,216 +384,6 @@ static void receivedQuery(OperationContext* txn,
     dbResponse.responseToMsgId = responseToMsgId;
 }
 
-// Mongod on win32 defines a value for this function. In all other executables it is NULL.
-void (*reportEventToSystem)(const char* msg) = 0;
-
-void mongoAbort(const char* msg) {
-    if (reportEventToSystem)
-        reportEventToSystem(msg);
-    severe() << msg;
-    ::abort();
-}
-
-// Returns false when request includes 'end'
-void assembleResponse(OperationContext* txn,
-                      Message& m,
-                      DbResponse& dbresponse,
-                      const HostAndPort& remote) {
-    // before we lock...
-    NetworkOp op = m.operation();
-    bool isCommand = false;
-
-    DbMessage dbmsg(m);
-
-    Client& c = *txn->getClient();
-    if (!c.isInDirectClient()) {
-        LastError::get(c).startRequest();
-        AuthorizationSession::get(c)->startRequest(txn);
-
-        // We should not be holding any locks at this point
-        invariant(!txn->lockState()->isLocked());
-    }
-
-    const char* ns = dbmsg.messageShouldHaveNs() ? dbmsg.getns() : NULL;
-    const NamespaceString nsString = ns ? NamespaceString(ns) : NamespaceString();
-
-    if (op == dbQuery) {
-        if (nsString.isCommand()) {
-            isCommand = true;
-            opwrite(m);
-        }
-        // TODO: remove this entire code path after 3.2. Refs SERVER-7775
-        else if (nsString.isSpecialCommand()) {
-            opwrite(m);
-
-            if (nsString.coll() == "$cmd.sys.inprog") {
-                receivedPseudoCommand(txn, c, dbresponse, m, "currentOp");
-                return;
-            }
-            if (nsString.coll() == "$cmd.sys.killop") {
-                receivedPseudoCommand(txn, c, dbresponse, m, "killOp");
-                return;
-            }
-            if (nsString.coll() == "$cmd.sys.unlock") {
-                receivedPseudoCommand(txn, c, dbresponse, m, "fsyncUnlock");
-                return;
-            }
-        } else {
-            opread(m);
-        }
-    } else if (op == dbGetMore) {
-        opread(m);
-    } else if (op == dbCommand) {
-        isCommand = true;
-        opwrite(m);
-    } else {
-        opwrite(m);
-    }
-
-    // Increment op counters.
-    switch (op) {
-        case dbQuery:
-            if (!isCommand) {
-                globalOpCounters.gotQuery();
-            } else {
-                // Command counting is deferred, since it is not known yet whether the command
-                // needs counting.
-            }
-            break;
-        case dbGetMore:
-            globalOpCounters.gotGetMore();
-            break;
-        case dbInsert:
-            // Insert counting is deferred, since it is not known yet whether the insert contains
-            // multiple documents (each of which needs to be counted).
-            break;
-        case dbUpdate:
-            globalOpCounters.gotUpdate();
-            break;
-        case dbDelete:
-            globalOpCounters.gotDelete();
-            break;
-        default:
-            break;
-    }
-
-    CurOp& currentOp = *CurOp::get(txn);
-    {
-        stdx::lock_guard<Client> lk(*txn->getClient());
-        // Commands handling code will reset this if the operation is a command
-        // which is logically a basic CRUD operation like query, insert, etc.
-        currentOp.setNetworkOp_inlock(op);
-        currentOp.setLogicalOp_inlock(networkOpToLogicalOp(op));
-    }
-
-    OpDebug& debug = currentOp.debug();
-
-    long long logThreshold = serverGlobalParams.slowMS;
-    bool shouldLogOpDebug = shouldLog(logger::LogSeverity::Debug(1));
-
-    if (op == dbQuery) {
-        if (isCommand) {
-            receivedCommand(txn, nsString, c, dbresponse, m);
-        } else {
-            receivedQuery(txn, nsString, c, dbresponse, m);
-        }
-    } else if (op == dbCommand) {
-        receivedRpc(txn, c, dbresponse, m);
-    } else if (op == dbGetMore) {
-        if (!receivedGetMore(txn, dbresponse, m, currentOp))
-            shouldLogOpDebug = true;
-    } else if (op == dbMsg) {
-        // deprecated - replaced by commands
-        const char* p = dbmsg.getns();
-
-        int len = strlen(p);
-        if (len > 400)
-            log() << curTimeMillis64() % 10000 << " long msg received, len:" << len << endl;
-
-        if (strcmp("end", p) == 0)
-            dbresponse.response.setData(opReply, "dbMsg end no longer supported");
-        else
-            dbresponse.response.setData(opReply, "i am fine - dbMsg deprecated");
-
-        dbresponse.responseToMsgId = m.header().getId();
-    } else {
-        try {
-            // The following operations all require authorization.
-            // dbInsert, dbUpdate and dbDelete can be easily pre-authorized,
-            // here, but dbKillCursors cannot.
-            if (op == dbKillCursors) {
-                currentOp.ensureStarted();
-                logThreshold = 10;
-                receivedKillCursors(txn, m);
-            } else if (op != dbInsert && op != dbUpdate && op != dbDelete) {
-                log() << "    operation isn't supported: " << static_cast<int>(op) << endl;
-                currentOp.done();
-                shouldLogOpDebug = true;
-            } else {
-                if (remote != DBDirectClient::dummyHost) {
-                    const ShardedConnectionInfo* connInfo = ShardedConnectionInfo::get(&c, false);
-                    uassert(18663,
-                            str::stream() << "legacy writeOps not longer supported for "
-                                          << "versioned connections, ns: " << nsString.ns()
-                                          << ", op: " << networkOpToString(op)
-                                          << ", remote: " << remote.toString(),
-                            connInfo == NULL);
-                }
-
-                if (!nsString.isValid()) {
-                    uassert(16257, str::stream() << "Invalid ns [" << ns << "]", false);
-                } else if (op == dbInsert) {
-                    receivedInsert(txn, nsString, m, currentOp);
-                } else if (op == dbUpdate) {
-                    receivedUpdate(txn, nsString, m, currentOp);
-                } else if (op == dbDelete) {
-                    receivedDelete(txn, nsString, m, currentOp);
-                } else {
-                    invariant(false);
-                }
-            }
-        } catch (const UserException& ue) {
-            LastError::get(c).setLastError(ue.getCode(), ue.getInfo().msg);
-            LOG(3) << " Caught Assertion in " << networkOpToString(op) << ", continuing "
-                   << ue.toString() << endl;
-            debug.exceptionInfo = ue.getInfo();
-        } catch (const AssertionException& e) {
-            LastError::get(c).setLastError(e.getCode(), e.getInfo().msg);
-            LOG(3) << " Caught Assertion in " << networkOpToString(op) << ", continuing "
-                   << e.toString() << endl;
-            debug.exceptionInfo = e.getInfo();
-            shouldLogOpDebug = true;
-        }
-    }
-    currentOp.ensureStarted();
-    currentOp.done();
-    debug.executionTime = currentOp.totalTimeMillis();
-
-    logThreshold += currentOp.getExpectedLatencyMs();
-
-    if (shouldLogOpDebug || debug.executionTime > logThreshold) {
-        Locker::LockerInfo lockerInfo;
-        txn->lockState()->getLockerInfo(&lockerInfo);
-
-        log() << debug.report(currentOp, lockerInfo.stats);
-    }
-
-    if (currentOp.shouldDBProfile(debug.executionTime)) {
-        // Performance profiling is on
-        if (txn->lockState()->isReadLocked()) {
-            LOG(1) << "note: not profiling because recursive read lock";
-        } else if (lockedForWriting()) {
-            LOG(1) << "note: not profiling because doing fsync+lock";
-        } else if (storageGlobalParams.readOnly) {
-            LOG(1) << "note: not profiling because server is read-only";
-        } else {
-            profile(txn, op);
-        }
-    }
-
-    recordCurOpMetrics(txn);
-}
-
 void receivedKillCursors(OperationContext* txn, Message& m) {
     LastError::get(txn->getClient()).disable();
     DbMessage dbmessage(m);
@@ -655,29 +409,27 @@ void receivedKillCursors(OperationContext* txn, Message& m) {
     }
 }
 
-void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Message& m, CurOp& op) {
-    uassertStatusOK(userAllowedWriteNS(nsString));
-    auto client = txn->getClient();
-    auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
-    ScopeGuard lastOpSetterGuard = MakeObjGuard(repl::ReplClientInfo::forClient(client),
-                                                &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
-                                                txn);
+void receivedInsert(OperationContext* txn, const NamespaceString& nsString, Message& m) {
+    auto insertOp = parseLegacyInsert(m);
+    invariant(insertOp.ns == nsString);
+    for (const auto& obj : insertOp.documents) {
+        Status status =
+            AuthorizationSession::get(txn->getClient())->checkAuthForInsert(nsString, obj);
+        audit::logInsertAuthzCheck(txn->getClient(), nsString, obj, status.code());
+        uassertStatusOK(status);
+    }
+    performInserts(txn, insertOp);
+}
 
+void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Message& m) {
     auto updateOp = parseLegacyUpdate(m);
     auto& singleUpdate = updateOp.updates[0];
+    invariant(updateOp.ns == nsString);
 
-    uassert(10055, "update object too large", singleUpdate.update.objsize() <= BSONObjMaxUserSize);
-
-    op.debug().query = singleUpdate.query;
-    {
-        stdx::lock_guard<Client> lk(*client);
-        op.setNS_inlock(nsString.ns());
-        op.setQuery_inlock(singleUpdate.query);
-    }
-
-    Status status = AuthorizationSession::get(client)->checkAuthForUpdate(
-        nsString, singleUpdate.query, singleUpdate.update, singleUpdate.upsert);
-    audit::logUpdateAuthzCheck(client,
+    Status status = AuthorizationSession::get(txn->getClient())
+                        ->checkAuthForUpdate(
+                            nsString, singleUpdate.query, singleUpdate.update, singleUpdate.upsert);
+    audit::logUpdateAuthzCheck(txn->getClient(),
                                nsString,
                                singleUpdate.query,
                                singleUpdate.update,
@@ -686,212 +438,24 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
                                status.code());
     uassertStatusOK(status);
 
-    UpdateRequest request(nsString);
-    request.setUpsert(singleUpdate.upsert);
-    request.setMulti(singleUpdate.multi);
-    request.setQuery(singleUpdate.query);
-    request.setUpdates(singleUpdate.update);
-    UpdateLifecycleImpl updateLifecycle(nsString);
-    request.setLifecycle(&updateLifecycle);
-
-    request.setYieldPolicy(PlanExecutor::YIELD_AUTO);
-
-    int attempt = 1;
-    while (1) {
-        try {
-            ParsedUpdate parsedUpdate(txn, &request);
-            uassertStatusOK(parsedUpdate.parseRequest());
-
-            //  Tentatively take an intent lock, fix up if we need to create the collection
-            ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock dbLock(txn->lockState(), nsString.db(), MODE_IX);
-            if (dbHolder().get(txn, nsString.db()) == NULL) {
-                //  If DB doesn't exist, don't implicitly create it in OldClientContext
-                break;
-            }
-            Lock::CollectionLock collLock(
-                txn->lockState(), nsString.ns(), parsedUpdate.isIsolated() ? MODE_X : MODE_IX);
-            OldClientContext ctx(txn, nsString.ns());
-
-            auto collection = ctx.db()->getCollection(nsString);
-
-            //  The common case: no implicit collection creation
-            if (!singleUpdate.upsert || collection != NULL) {
-                unique_ptr<PlanExecutor> exec =
-                    uassertStatusOK(getExecutorUpdate(txn, &op.debug(), collection, &parsedUpdate));
-
-                // Run the plan and get stats out.
-                uassertStatusOK(exec->executePlan());
-
-                PlanSummaryStats summary;
-                Explain::getSummaryStats(*exec, &summary);
-                if (collection) {
-                    collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
-                }
-
-                const UpdateStats* updateStats = UpdateStage::getUpdateStats(exec.get());
-                UpdateStage::recordUpdateStatsInOpDebug(updateStats, &op.debug());
-                op.debug().setPlanSummaryMetrics(summary);
-
-                UpdateResult res = UpdateStage::makeUpdateResult(updateStats);
-
-                // for getlasterror
-                size_t nMatchedOrInserted = res.upserted.isEmpty() ? res.numMatched : 1U;
-                LastError::get(client).recordUpdate(res.existing, nMatchedOrInserted, res.upserted);
-
-                if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
-                    // If this operation has already generated a new lastOp, don't bother setting it
-                    // here. No-op updates will not generate a new lastOp, so we still need the
-                    // guard to fire in that case.
-                    lastOpSetterGuard.Dismiss();
-                }
-                return;
-            }
-            break;
-        } catch (const WriteConflictException& dle) {
-            op.debug().writeConflicts++;
-            if (singleUpdate.multi) {
-                log(LogComponent::kWrite) << "Had WriteConflict during multi update, aborting";
-                throw;
-            }
-            WriteConflictException::logAndBackoff(attempt++, "update", nsString.toString());
-        }
-    }
-
-    //  This is an upsert into a non-existing database, so need an exclusive lock
-    //  to avoid deadlock
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ParsedUpdate parsedUpdate(txn, &request);
-        uassertStatusOK(parsedUpdate.parseRequest());
-
-        ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock dbLock(txn->lockState(), nsString.db(), MODE_X);
-        OldClientContext ctx(txn, nsString.ns());
-        uassert(ErrorCodes::NotMaster,
-                str::stream() << "Not primary while performing update on " << nsString.ns(),
-                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString));
-
-        Database* db = ctx.db();
-        if (db->getCollection(nsString)) {
-            // someone else beat us to it, that's ok
-            // we might race while we unlock if someone drops
-            // but that's ok, we'll just do nothing and error out
-        } else {
-            WriteUnitOfWork wuow(txn);
-            uassertStatusOK(userCreateNS(txn, db, nsString.ns(), BSONObj()));
-            wuow.commit();
-        }
-
-        auto collection = ctx.db()->getCollection(nsString);
-        invariant(collection);
-        unique_ptr<PlanExecutor> exec =
-            uassertStatusOK(getExecutorUpdate(txn, &op.debug(), collection, &parsedUpdate));
-
-        // Run the plan and get stats out.
-        uassertStatusOK(exec->executePlan());
-
-        PlanSummaryStats summary;
-        Explain::getSummaryStats(*exec, &summary);
-        collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
-
-        const UpdateStats* updateStats = UpdateStage::getUpdateStats(exec.get());
-        UpdateStage::recordUpdateStatsInOpDebug(updateStats, &op.debug());
-        op.debug().setPlanSummaryMetrics(summary);
-
-        UpdateResult res = UpdateStage::makeUpdateResult(updateStats);
-
-        size_t nMatchedOrInserted = res.upserted.isEmpty() ? res.numMatched : 1U;
-        LastError::get(client).recordUpdate(res.existing, nMatchedOrInserted, res.upserted);
-
-        if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
-            // If this operation has already generated a new lastOp, don't bother setting it
-            // here. No-op updates will not generate a new lastOp, so we still need the
-            // guard to fire in that case.
-            lastOpSetterGuard.Dismiss();
-        }
-    }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "update", nsString.ns());
+    performUpdates(txn, updateOp);
 }
 
-void receivedDelete(OperationContext* txn, const NamespaceString& nsString, Message& m, CurOp& op) {
-    uassertStatusOK(userAllowedWriteNS(nsString));
-
+void receivedDelete(OperationContext* txn, const NamespaceString& nsString, Message& m) {
     auto deleteOp = parseLegacyDelete(m);
     auto& singleDelete = deleteOp.deletes[0];
+    invariant(deleteOp.ns == nsString);
 
-    auto client = txn->getClient();
-    auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
-    ScopeGuard lastOpSetterGuard = MakeObjGuard(repl::ReplClientInfo::forClient(client),
-                                                &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
-                                                txn);
-
-    op.debug().query = singleDelete.query;
-    {
-        stdx::lock_guard<Client> lk(*client);
-        op.setQuery_inlock(singleDelete.query);
-        op.setNS_inlock(nsString.ns());
-    }
-
-    Status status =
-        AuthorizationSession::get(client)->checkAuthForDelete(nsString, singleDelete.query);
-    audit::logDeleteAuthzCheck(client, nsString, singleDelete.query, status.code());
+    Status status = AuthorizationSession::get(txn->getClient())
+                        ->checkAuthForDelete(nsString, singleDelete.query);
+    audit::logDeleteAuthzCheck(txn->getClient(), nsString, singleDelete.query, status.code());
     uassertStatusOK(status);
 
-    DeleteRequest request(nsString);
-    request.setQuery(singleDelete.query);
-    request.setMulti(singleDelete.multi);
-
-    request.setYieldPolicy(PlanExecutor::YIELD_AUTO);
-
-    int attempt = 1;
-    while (1) {
-        try {
-            ParsedDelete parsedDelete(txn, &request);
-            uassertStatusOK(parsedDelete.parseRequest());
-
-            ScopedTransaction scopedXact(txn, MODE_IX);
-            AutoGetDb autoDb(txn, nsString.db(), MODE_IX);
-            if (!autoDb.getDb()) {
-                break;
-            }
-
-            Lock::CollectionLock collLock(
-                txn->lockState(), nsString.ns(), parsedDelete.isIsolated() ? MODE_X : MODE_IX);
-            OldClientContext ctx(txn, nsString.ns());
-
-            auto collection = ctx.db()->getCollection(nsString);
-
-            unique_ptr<PlanExecutor> exec =
-                uassertStatusOK(getExecutorDelete(txn, &op.debug(), collection, &parsedDelete));
-
-            // Run the plan and get the number of docs deleted.
-            uassertStatusOK(exec->executePlan());
-            long long n = DeleteStage::getNumDeleted(*exec);
-            LastError::get(client).recordDelete(n);
-            op.debug().ndeleted = n;
-
-            PlanSummaryStats summary;
-            Explain::getSummaryStats(*exec, &summary);
-            if (collection) {
-                collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
-            }
-            CurOp::get(txn)->debug().setPlanSummaryMetrics(summary);
-
-            if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
-                // If this operation has already generated a new lastOp, don't bother setting it
-                // here. No-op updates will not generate a new lastOp, so we still need the
-                // guard to fire in that case.
-                lastOpSetterGuard.Dismiss();
-            }
-            break;
-        } catch (const WriteConflictException& dle) {
-            op.debug().writeConflicts++;
-            WriteConflictException::logAndBackoff(attempt++, "delete", nsString.toString());
-        }
-    }
+    performDeletes(txn, deleteOp);
 }
 
 bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, CurOp& curop) {
+    globalOpCounters.gotGetMore();
     DbMessage d(m);
 
     const char* ns = d.getns();
@@ -964,256 +528,189 @@ bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, 
     return true;
 }
 
-void insertMultiSingletons(OperationContext* txn,
-                           OldClientContext& ctx,
-                           bool keepGoing,
-                           StringData ns,
-                           CurOp& op,
-                           vector<BSONObj>::iterator begin,
-                           vector<BSONObj>::iterator end) {
-    for (vector<BSONObj>::iterator it = begin; it != end; it++) {
-        try {
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                WriteUnitOfWork wouw(txn);
-                Collection* collection = ctx.db()->getCollection(ns);
-                if (!collection) {
-                    collection = ctx.db()->createCollection(txn, ns);
-                    invariant(collection);
-                }
+}  // namespace
 
-                uassertStatusOK(collection->insertDocument(txn, *it, &op.debug(), true));
-                wouw.commit();
-            }
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "insert", ns);
+// Mongod on win32 defines a value for this function. In all other executables it is NULL.
+void (*reportEventToSystem)(const char* msg) = 0;
 
-            globalOpCounters.incInsertInWriteLock(1);
-            op.debug().ninserted++;
-
-        } catch (const UserException& ex) {
-            if (!keepGoing)
-                throw;
-            LastError::get(txn->getClient()).setLastError(ex.getCode(), ex.getInfo().msg);
-        }
-    }
+void mongoAbort(const char* msg) {
+    if (reportEventToSystem)
+        reportEventToSystem(msg);
+    severe() << msg;
+    ::abort();
 }
 
-void insertMultiVector(OperationContext* txn,
-                       OldClientContext& ctx,
-                       bool keepGoing,
-                       StringData ns,
-                       CurOp& op,
-                       vector<BSONObj>::iterator begin,
-                       vector<BSONObj>::iterator end) {
-    try {
-        WriteUnitOfWork wunit(txn);
-        Collection* collection = ctx.db()->getCollection(ns);
-        if (!collection) {
-            collection = ctx.db()->createCollection(txn, ns);
-            invariant(collection);
+// Returns false when request includes 'end'
+void assembleResponse(OperationContext* txn,
+                      Message& m,
+                      DbResponse& dbresponse,
+                      const HostAndPort& remote) {
+    // before we lock...
+    NetworkOp op = m.operation();
+    bool isCommand = false;
+
+    DbMessage dbmsg(m);
+
+    Client& c = *txn->getClient();
+    if (c.isInDirectClient()) {
+        invariant(!txn->lockState()->inAWriteUnitOfWork());
+    } else {
+        LastError::get(c).startRequest();
+        AuthorizationSession::get(c)->startRequest(txn);
+
+        // We should not be holding any locks at this point
+        invariant(!txn->lockState()->isLocked());
+    }
+
+    const char* ns = dbmsg.messageShouldHaveNs() ? dbmsg.getns() : NULL;
+    const NamespaceString nsString = ns ? NamespaceString(ns) : NamespaceString();
+
+    if (op == dbQuery) {
+        if (nsString.isCommand()) {
+            isCommand = true;
+            opwrite(m);
         }
+        // TODO: remove this entire code path after 3.2. Refs SERVER-7775
+        else if (nsString.isSpecialCommand()) {
+            opwrite(m);
 
-        uassertStatusOK(collection->insertDocuments(txn, begin, end, &op.debug(), true, false));
-        wunit.commit();
-
-        int inserted = end - begin;
-        globalOpCounters.incInsertInWriteLock(inserted);
-        op.debug().ninserted = inserted;
-    } catch (UserException&) {
-        txn->recoveryUnit()->abandonSnapshot();
-        insertMultiSingletons(txn, ctx, keepGoing, ns, op, begin, end);
-    } catch (WriteConflictException&) {
-        CurOp::get(txn)->debug().writeConflicts++;
-        txn->recoveryUnit()->abandonSnapshot();
-        WriteConflictException::logAndBackoff(0, "insert", ns);
-        insertMultiSingletons(txn, ctx, keepGoing, ns, op, begin, end);
-    }
-}
-
-NOINLINE_DECL void insertMulti(OperationContext* txn,
-                               OldClientContext& ctx,
-                               const InsertOp& insertOp,
-                               CurOp& op) {
-    std::vector<BSONObj> docs;
-    docs.reserve(insertOp.documents.size());
-    for (auto&& doc : insertOp.documents) {
-        // TODO don't fail yet on invalid documents. They should be treated like other errors.
-        BSONObj fixed = uassertStatusOK(fixDocumentForInsert(doc));
-        docs.push_back(fixed.isEmpty() ? doc : std::move(fixed));
-    }
-
-    vector<BSONObj>::iterator chunkBegin = docs.begin();
-    int64_t chunkCount = 0;
-    int64_t chunkSize = 0;
-
-    auto client = txn->getClient();
-    auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
-    ScopeGuard lastOpSetterGuard = MakeObjGuard(repl::ReplClientInfo::forClient(client),
-                                                &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
-                                                txn);
-
-    for (vector<BSONObj>::iterator it = docs.begin(); it != docs.end(); it++) {
-        chunkSize += (*it).objsize();
-        // Limit chunk size, actual size chosen is a tradeoff: larger sizes are more efficient,
-        // but smaller chunk sizes allow yielding to other threads and lower chance of WCEs
-        if ((++chunkCount >= internalQueryExecYieldIterations / 2) ||
-            (chunkSize >= insertVectorMaxBytes)) {
-            if (it == chunkBegin)  // there is only one doc to process, so avoid retry on failure
-                insertMultiSingletons(
-                    txn, ctx, insertOp.continueOnError, insertOp.ns.ns(), op, chunkBegin, it + 1);
-            else
-                insertMultiVector(
-                    txn, ctx, insertOp.continueOnError, insertOp.ns.ns(), op, chunkBegin, it + 1);
-            chunkBegin = it + 1;
-            chunkCount = 0;
-            chunkSize = 0;
-        }
-    }
-    if (chunkBegin != docs.end())
-        insertMultiVector(
-            txn, ctx, insertOp.continueOnError, insertOp.ns.ns(), op, chunkBegin, docs.end());
-
-    if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
-        // If this operation has already generated a new lastOp, don't bother setting it
-        // here. No-op inserts will not generate a new lastOp, so we still need the
-        // guard to fire in that case.
-        lastOpSetterGuard.Dismiss();
-    }
-}
-
-static void convertSystemIndexInsertsToCommands(DbMessage& d, BSONArrayBuilder* allCmdsBuilder) {
-    while (d.moreJSObjs()) {
-        BSONObj spec = d.nextJsObj();
-        BSONElement indexNsElement = spec["ns"];
-        uassert(ErrorCodes::NoSuchKey,
-                str::stream() << "Missing \"ns\" field while inserting into " << d.getns(),
-                !indexNsElement.eoo());
-        uassert(ErrorCodes::TypeMismatch,
-                str::stream() << "Expected \"ns\" field to have type String, not "
-                              << typeName(indexNsElement.type()) << " while inserting into "
-                              << d.getns(),
-                indexNsElement.type() == String);
-        const StringData nsToIndex(indexNsElement.valueStringData());
-        BSONObjBuilder cmdObjBuilder(allCmdsBuilder->subobjStart());
-        cmdObjBuilder << "createIndexes" << nsToCollectionSubstring(nsToIndex);
-        BSONArrayBuilder specArrayBuilder(cmdObjBuilder.subarrayStart("indexes"));
-        while (true) {
-            BSONObjBuilder specBuilder(specArrayBuilder.subobjStart());
-            BSONElement specNsElement = spec["ns"];
-            if ((specNsElement.type() != String) ||
-                (specNsElement.valueStringData() != nsToIndex)) {
-                break;
-            }
-            for (BSONObjIterator iter(spec); iter.more();) {
-                BSONElement element = iter.next();
-                if (element.fieldNameStringData() != "ns") {
-                    specBuilder.append(element);
-                }
-            }
-            if (!d.moreJSObjs()) {
-                break;
-            }
-            spec = d.nextJsObj();
-        }
-    }
-}
-
-static void insertSystemIndexes(OperationContext* txn, DbMessage& d, CurOp& curOp) {
-    BSONArrayBuilder allCmdsBuilder;
-    try {
-        convertSystemIndexInsertsToCommands(d, &allCmdsBuilder);
-    } catch (const DBException& ex) {
-        LastError::get(txn->getClient()).setLastError(ex.getCode(), ex.getInfo().msg);
-        curOp.debug().exceptionInfo = ex.getInfo();
-        return;
-    }
-    BSONArray allCmds(allCmdsBuilder.done());
-    Command* createIndexesCmd = Command::findCommand("createIndexes");
-    invariant(createIndexesCmd);
-    const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
-    for (BSONObjIterator iter(allCmds); iter.more();) {
-        try {
-            BSONObj cmdObj = iter.next().Obj();
-
-            rpc::LegacyRequestBuilder requestBuilder{};
-            auto indexNs = NamespaceString(d.getns());
-            auto cmdRequestMsg = requestBuilder.setDatabase(indexNs.db())
-                                     .setCommandName("createIndexes")
-                                     .setCommandArgs(cmdObj)
-                                     .setMetadata(rpc::makeEmptyMetadata())
-                                     .done();
-            rpc::LegacyRequest cmdRequest{&cmdRequestMsg};
-            rpc::LegacyReplyBuilder cmdReplyBuilder{};
-            Command::execCommand(txn, createIndexesCmd, cmdRequest, &cmdReplyBuilder);
-            auto cmdReplyMsg = cmdReplyBuilder.done();
-            rpc::LegacyReply cmdReply{&cmdReplyMsg};
-            uassertStatusOK(getStatusFromCommandResult(cmdReply.getCommandReply()));
-        } catch (const DBException& ex) {
-            LastError::get(txn->getClient()).setLastError(ex.getCode(), ex.getInfo().msg);
-            curOp.debug().exceptionInfo = ex.getInfo();
-            if (!keepGoing) {
+            if (nsString.coll() == "$cmd.sys.inprog") {
+                receivedPseudoCommand(txn, c, dbresponse, m, "currentOp");
                 return;
             }
-        }
-    }
-}
-
-bool _receivedInsert(OperationContext* txn,
-                     const NamespaceString& nsString,
-                     const InsertOp& insertOp,
-                     CurOp& op,
-                     bool checkCollection) {
-    // CONCURRENCY TODO: is being read locked in big log sufficient here?
-    // writelock is used to synchronize stepdowns w/ writes
-    uassert(
-        10058, "not master", repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString));
-
-    OldClientContext ctx(txn, insertOp.ns.ns());
-    if (checkCollection && !ctx.db()->getCollection(nsString))
-        return false;
-    insertMulti(txn, ctx, insertOp, op);
-    return true;
-}
-
-void receivedInsert(OperationContext* txn, const NamespaceString& nsString, Message& m, CurOp& op) {
-    {
-        stdx::lock_guard<Client>(*txn->getClient());
-        CurOp::get(txn)->setNS_inlock(nsString.ns());
-    }
-
-    uassertStatusOK(userAllowedWriteNS(nsString.ns()));
-    if (nsString.isSystemDotIndexes()) {
-        DbMessage d(m);
-        insertSystemIndexes(txn, d, op);
-        return;
-    }
-
-    auto insertOp = parseLegacyInsert(m);
-
-    for (const auto& obj : insertOp.documents) {
-        // Check auth for insert.
-        Status status =
-            AuthorizationSession::get(txn->getClient())->checkAuthForInsert(nsString, obj);
-        audit::logInsertAuthzCheck(txn->getClient(), nsString, obj, status.code());
-        uassertStatusOK(status);
-    }
-
-    {
-        ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock dbLock(txn->lockState(), nsString.db(), MODE_IX);
-        Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), MODE_IX);
-
-        // OldClientContext may implicitly create a database, so check existence
-        if (dbHolder().get(txn, nsString.db()) != NULL) {
-            if (_receivedInsert(txn, nsString, insertOp, op, true))
+            if (nsString.coll() == "$cmd.sys.killop") {
+                receivedPseudoCommand(txn, c, dbresponse, m, "killOp");
                 return;
+            }
+            if (nsString.coll() == "$cmd.sys.unlock") {
+                receivedPseudoCommand(txn, c, dbresponse, m, "fsyncUnlock");
+                return;
+            }
+        } else {
+            opread(m);
+        }
+    } else if (op == dbGetMore) {
+        opread(m);
+    } else if (op == dbCommand) {
+        isCommand = true;
+        opwrite(m);
+    } else {
+        opwrite(m);
+    }
+
+    CurOp& currentOp = *CurOp::get(txn);
+    {
+        stdx::lock_guard<Client> lk(*txn->getClient());
+        // Commands handling code will reset this if the operation is a command
+        // which is logically a basic CRUD operation like query, insert, etc.
+        currentOp.setNetworkOp_inlock(op);
+        currentOp.setLogicalOp_inlock(networkOpToLogicalOp(op));
+    }
+
+    OpDebug& debug = currentOp.debug();
+
+    long long logThreshold = serverGlobalParams.slowMS;
+    bool shouldLogOpDebug = shouldLog(logger::LogSeverity::Debug(1));
+
+    if (op == dbQuery) {
+        if (isCommand) {
+            receivedCommand(txn, nsString, c, dbresponse, m);
+        } else {
+            receivedQuery(txn, nsString, c, dbresponse, m);
+        }
+    } else if (op == dbCommand) {
+        receivedRpc(txn, c, dbresponse, m);
+    } else if (op == dbGetMore) {
+        if (!receivedGetMore(txn, dbresponse, m, currentOp))
+            shouldLogOpDebug = true;
+    } else if (op == dbMsg) {
+        // deprecated - replaced by commands
+        const char* p = dbmsg.getns();
+
+        int len = strlen(p);
+        if (len > 400)
+            log() << curTimeMillis64() % 10000 << " long msg received, len:" << len << endl;
+
+        if (strcmp("end", p) == 0)
+            dbresponse.response.setData(opReply, "dbMsg end no longer supported");
+        else
+            dbresponse.response.setData(opReply, "i am fine - dbMsg deprecated");
+
+        dbresponse.responseToMsgId = m.header().getId();
+    } else {
+        // The remaining operations do not return any response. They are fire-and-forget.
+        try {
+            if (op == dbKillCursors) {
+                currentOp.ensureStarted();
+                logThreshold = 10;
+                receivedKillCursors(txn, m);
+            } else if (op != dbInsert && op != dbUpdate && op != dbDelete) {
+                log() << "    operation isn't supported: " << static_cast<int>(op) << endl;
+                currentOp.done();
+                shouldLogOpDebug = true;
+            } else {
+                if (remote != DBDirectClient::dummyHost) {
+                    const ShardedConnectionInfo* connInfo = ShardedConnectionInfo::get(&c, false);
+                    uassert(18663,
+                            str::stream() << "legacy writeOps not longer supported for "
+                                          << "versioned connections, ns: " << nsString.ns()
+                                          << ", op: " << networkOpToString(op)
+                                          << ", remote: " << remote.toString(),
+                            connInfo == NULL);
+                }
+
+                if (!nsString.isValid()) {
+                    uassert(16257, str::stream() << "Invalid ns [" << ns << "]", false);
+                } else if (op == dbInsert) {
+                    receivedInsert(txn, nsString, m);
+                } else if (op == dbUpdate) {
+                    receivedUpdate(txn, nsString, m);
+                } else if (op == dbDelete) {
+                    receivedDelete(txn, nsString, m);
+                } else {
+                    invariant(false);
+                }
+            }
+        } catch (const UserException& ue) {
+            LastError::get(c).setLastError(ue.getCode(), ue.getInfo().msg);
+            LOG(3) << " Caught Assertion in " << networkOpToString(op) << ", continuing "
+                   << ue.toString() << endl;
+            debug.exceptionInfo = ue.getInfo();
+        } catch (const AssertionException& e) {
+            LastError::get(c).setLastError(e.getCode(), e.getInfo().msg);
+            LOG(3) << " Caught Assertion in " << networkOpToString(op) << ", continuing "
+                   << e.toString() << endl;
+            debug.exceptionInfo = e.getInfo();
+            shouldLogOpDebug = true;
+        }
+    }
+    currentOp.ensureStarted();
+    currentOp.done();
+    debug.executionTime = currentOp.totalTimeMillis();
+
+    logThreshold += currentOp.getExpectedLatencyMs();
+
+    if (shouldLogOpDebug || debug.executionTime > logThreshold) {
+        Locker::LockerInfo lockerInfo;
+        txn->lockState()->getLockerInfo(&lockerInfo);
+
+        log() << debug.report(currentOp, lockerInfo.stats);
+    }
+
+    if (currentOp.shouldDBProfile(debug.executionTime)) {
+        // Performance profiling is on
+        if (txn->lockState()->isReadLocked()) {
+            LOG(1) << "note: not profiling because recursive read lock";
+        } else if (lockedForWriting()) {
+            LOG(1) << "note: not profiling because doing fsync+lock";
+        } else if (storageGlobalParams.readOnly) {
+            LOG(1) << "note: not profiling because server is read-only";
+        } else {
+            profile(txn, op);
         }
     }
 
-    // Collection didn't exist so try again with MODE_X
-    ScopedTransaction transaction(txn, MODE_IX);
-    Lock::DBLock dbLock(txn->lockState(), nsString.db(), MODE_X);
-
-    _receivedInsert(txn, nsString, insertOp, op, false);
+    recordCurOpMetrics(txn);
 }
 
 // ----- BEGIN Diaglog -----

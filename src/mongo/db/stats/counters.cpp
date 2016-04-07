@@ -43,7 +43,7 @@ using std::endl;
 
 OpCounters::OpCounters() {}
 
-void OpCounters::incInsertInWriteLock(int n) {
+void OpCounters::gotInserts(int n) {
     RARELY _checkWrap();
     _insert.fetchAndAdd(n);
 }

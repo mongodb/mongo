@@ -44,7 +44,6 @@ namespace mongo {
  */
 struct ParsedWriteOp {
     NamespaceString ns;
-    boost::optional<BSONObj> writeConcern;
     bool bypassDocumentValidation = false;
     bool continueOnError = false;
 };

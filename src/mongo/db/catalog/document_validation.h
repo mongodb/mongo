@@ -69,4 +69,18 @@ private:
     OperationContext* const _txn;
     const bool _initialState;
 };
+
+/**
+ * Disables document validation while in scope if the constructor is passed true.
+ */
+class DisableDocumentValidationIfTrue {
+public:
+    DisableDocumentValidationIfTrue(OperationContext* txn, bool shouldDisableValidation) {
+        if (shouldDisableValidation)
+            _documentValidationDisabler.emplace(txn);
+    }
+
+private:
+    boost::optional<DisableDocumentValidation> _documentValidationDisabler;
+};
 }

@@ -54,11 +54,6 @@ void LastError::setLastError(int code, std::string msg) {
     _msg = std::move(msg);
 }
 
-void LastError::recordInsert(long long nObjects) {
-    reset(true);
-    _nObjects = nObjects;
-}
-
 void LastError::recordUpdate(bool updateObjects, long long nObjects, BSONObj upsertedId) {
     reset(true);
     _nObjects = nObjects;

@@ -45,7 +45,7 @@ namespace mongo {
 class OpCounters {
 public:
     OpCounters();
-    void incInsertInWriteLock(int n);
+    void gotInserts(int n);
     void gotInsert();
     void gotQuery();
     void gotUpdate();

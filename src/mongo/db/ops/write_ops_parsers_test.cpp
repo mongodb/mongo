@@ -34,16 +34,6 @@
 
 namespace mongo {
 
-TEST(CommandWriteOpsParsers, CommonFields_WriteConcern) {
-    auto writeConcern = BSON("w" << 2);
-    auto cmd = BSON("insert"
-                    << "bar"
-                    << "documents" << BSON_ARRAY(BSONObj()) << "writeConcern" << writeConcern);
-    auto op = parseInsertCommand("foo", cmd);
-    ASSERT(bool(op.writeConcern));
-    ASSERT_EQ(*op.writeConcern, writeConcern);
-}
-
 TEST(CommandWriteOpsParsers, CommonFields_BypassDocumentValidation) {
     for (bool bypassDocumentValidation : {true, false}) {
         auto cmd = BSON("insert"
@@ -70,7 +60,7 @@ TEST(CommandWriteOpsParsers, CommonFields_IgnoredFields) {
     auto cmd = BSON("insert"
                     << "bar"
                     << "documents" << BSON_ARRAY(BSONObj()) << "maxTimeMS" << 1000 << "shardVersion"
-                    << BSONObj());
+                    << BSONObj() << "writeConcern" << BSONObj());
     parseInsertCommand("foo", cmd);
 }
 
@@ -102,7 +92,6 @@ TEST(CommandWriteOpsParsers, SingleInsert) {
     auto cmd = BSON("insert" << ns.coll() << "documents" << BSON_ARRAY(obj));
     const auto op = parseInsertCommand(ns.db(), cmd);
     ASSERT_EQ(op.ns.ns(), ns.ns());
-    ASSERT(!op.writeConcern);
     ASSERT(!op.bypassDocumentValidation);
     ASSERT(!op.continueOnError);
     ASSERT_EQ(op.documents.size(), 1u);
@@ -122,7 +111,6 @@ TEST(CommandWriteOpsParsers, RealMultiInsert) {
     auto cmd = BSON("insert" << ns.coll() << "documents" << BSON_ARRAY(obj0 << obj1));
     const auto op = parseInsertCommand(ns.db(), cmd);
     ASSERT_EQ(op.ns.ns(), ns.ns());
-    ASSERT(!op.writeConcern);
     ASSERT(!op.bypassDocumentValidation);
     ASSERT(!op.continueOnError);
     ASSERT_EQ(op.documents.size(), 2u);
@@ -141,7 +129,6 @@ TEST(CommandWriteOpsParsers, Update) {
                                                             << upsert << "multi" << multi)));
             auto op = parseUpdateCommand(ns.db(), cmd);
             ASSERT_EQ(op.ns.ns(), ns.ns());
-            ASSERT(!op.writeConcern);
             ASSERT(!op.bypassDocumentValidation);
             ASSERT_EQ(op.continueOnError, false);
             ASSERT_EQ(op.updates.size(), 1u);
@@ -161,7 +148,6 @@ TEST(CommandWriteOpsParsers, Remove) {
                                  << BSON_ARRAY(BSON("q" << query << "limit" << (multi ? 0 : 1))));
         auto op = parseDeleteCommand(ns.db(), cmd);
         ASSERT_EQ(op.ns.ns(), ns.ns());
-        ASSERT(!op.writeConcern);
         ASSERT(!op.bypassDocumentValidation);
         ASSERT_EQ(op.continueOnError, false);
         ASSERT_EQ(op.deletes.size(), 1u);
@@ -235,7 +221,6 @@ TEST(LegacyWriteOpsParsers, SingleInsert) {
         client.insert(ns, obj, continueOnError ? InsertOption_ContinueOnError : 0);
         const auto op = parseLegacyInsert(client.message);
         ASSERT_EQ(op.ns.ns(), ns);
-        ASSERT(!op.writeConcern);
         ASSERT(!op.bypassDocumentValidation);
         ASSERT_EQ(op.continueOnError, continueOnError);
         ASSERT_EQ(op.documents.size(), 1u);
@@ -263,7 +248,6 @@ TEST(LegacyWriteOpsParsers, RealMultiInsert) {
         client.insert(ns, {obj0, obj1}, continueOnError ? InsertOption_ContinueOnError : 0);
         const auto op = parseLegacyInsert(client.message);
         ASSERT_EQ(op.ns.ns(), ns);
-        ASSERT(!op.writeConcern);
         ASSERT(!op.bypassDocumentValidation);
         ASSERT_EQ(op.continueOnError, continueOnError);
         ASSERT_EQ(op.documents.size(), 2u);
@@ -282,7 +266,6 @@ TEST(LegacyWriteOpsParsers, Update) {
             client.update(ns, query, update, upsert, multi);
             const auto op = parseLegacyUpdate(client.message);
             ASSERT_EQ(op.ns.ns(), ns);
-            ASSERT(!op.writeConcern);
             ASSERT(!op.bypassDocumentValidation);
             ASSERT_EQ(op.continueOnError, false);
             ASSERT_EQ(op.updates.size(), 1u);
@@ -302,7 +285,6 @@ TEST(LegacyWriteOpsParsers, Remove) {
         client.remove(ns, query, multi ? 0 : RemoveOption_JustOne);
         const auto op = parseLegacyDelete(client.message);
         ASSERT_EQ(op.ns.ns(), ns);
-        ASSERT(!op.writeConcern);
         ASSERT(!op.bypassDocumentValidation);
         ASSERT_EQ(op.continueOnError, false);
         ASSERT_EQ(op.deletes.size(), 1u);

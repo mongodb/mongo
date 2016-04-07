@@ -95,10 +95,7 @@ void parseWriteCommand(StringData dbName,
         }
 
         const StringData fieldName = field.fieldNameStringData();
-        if (fieldName == "writeConcern") {
-            checkType(Object, field);
-            op->writeConcern = field.Obj();
-        } else if (fieldName == "bypassDocumentValidation") {
+        if (fieldName == "bypassDocumentValidation") {
             checkType(Bool, field);
             op->bypassDocumentValidation = field.Bool();
         } else if (fieldName == "ordered") {
@@ -108,7 +105,8 @@ void parseWriteCommand(StringData dbName,
             haveUniqueField = true;
             *uniqueField = field;
         } else if (fieldName[0] != '$') {
-            std::initializer_list<StringData> ignoredFields = {"maxTimeMS", "shardVersion"};
+            std::initializer_list<StringData> ignoredFields = {
+                "writeConcern", "maxTimeMS", "shardVersion"};
             uassert(ErrorCodes::FailedToParse,
                     str::stream() << "Unknown option to " << cmd.firstElementFieldName()
                                   << " command: " << fieldName,
@@ -134,6 +132,14 @@ InsertOp parseInsertCommand(StringData dbName, const BSONObj& cmd) {
         op.documents.push_back(doc.Obj());
     }
     checkOpCountForCommand(op.documents.size());
+
+    if (op.ns.isSystemDotIndexes()) {
+        // This is only for consistency with sharding.
+        uassert(ErrorCodes::InvalidLength,
+                "Insert commands to system.indexes are limited to a single insert",
+                op.documents.size() == 1);
+    }
+
     return op;
 }
 

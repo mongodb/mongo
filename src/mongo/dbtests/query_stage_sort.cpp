@@ -319,11 +319,7 @@ public:
             wuow.commit();
         }
 
-        {
-            WriteUnitOfWork wuow(&_txn);
-            fillData();
-            wuow.commit();
-        }
+        fillData();
 
         // The data we're going to later invalidate.
         set<RecordId> recordIds;
@@ -432,11 +428,7 @@ public:
             wuow.commit();
         }
 
-        {
-            WriteUnitOfWork wuow(&_txn);
-            fillData();
-            wuow.commit();
-        }
+        fillData();
 
         // The data we're going to later invalidate.
         set<RecordId> recordIds;

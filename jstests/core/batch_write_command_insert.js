@@ -285,7 +285,7 @@ request = {
     documents: [{ns: "invalid." + coll.getName(), key: {x: 1}, name: "x_1", unique: true}]
 };
 result = coll.runCommand(request);
-assert(!result.ok, tojson(result));
+assert(!result.ok || (result.n == 0 && result.writeErrors.length == 1), tojson(result));
 assert.eq(coll.getIndexes().length, 0);
 
 //
@@ -296,7 +296,7 @@ request = {
     documents: [{}]
 };
 result = coll.runCommand(request);
-assert(!result.ok, tojson(result));
+assert(!result.ok || (result.n == 0 && result.writeErrors.length == 1), tojson(result));
 assert.eq(coll.getIndexes().length, 0);
 
 //
