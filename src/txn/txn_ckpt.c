@@ -441,14 +441,15 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Start the checkpoint for real.
 	 *
 	 * Bump the global checkpoint generation, used to figure out whether
-	 * checkpoint has visited a tree.  There is no need for this to be
-	 * atomic: it is only written while holding the checkpoint lock.
+	 * checkpoint has visited a tree.  Use an atomic increment even though
+	 * we are single-threaded because readers of the checkpoint generation
+	 * don't hold the checkpoint lock.
 	 *
 	 * We do need to update it before clearing the checkpoint's entry out
 	 * of the transaction table, or a thread evicting in a tree could
 	 * ignore the checkpoint's transaction.
 	 */
-	++txn_global->checkpoint_gen;
+	(void)__wt_atomic_addv64(&txn_global->checkpoint_gen, 1);
 	WT_STAT_FAST_CONN_SET(session,
 	    txn_checkpoint_generation, txn_global->checkpoint_gen);
 
