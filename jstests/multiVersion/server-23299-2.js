@@ -30,9 +30,8 @@ load('./jstests/multiVersion/libs/verify_versions.js');
         mongod = MongoRunner.runMongod(Object.extend(Object.extend({}, mongod.fullOptions),
                                                      {restart: true, binVersion: "latest"}));
         assert.binVersion(mongod, "latest");
-        assert.eq(expectTempToDrop ? 0 : 1,
-                  mongod.getDB("test").tempcoll.find().itcount(),
-                  priorVersion);
+        assert.eq(
+            expectTempToDrop ? 0 : 1, mongod.getDB("test").tempcoll.find().itcount(), priorVersion);
     }
 
     versionsNotSubjectToSERVER23299.forEach(function(priorVersion) {
