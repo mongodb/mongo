@@ -229,14 +229,15 @@ ops(void *arg)
 	uint32_t op;
 	uint8_t *keybuf, *valbuf;
 	u_int np;
-	int ckpt_available, dir, insert, intxn, notfound, readonly;
+	int dir, notfound;
 	char *ckpt_config, ckpt_name[64];
+	bool ckpt_available, insert, intxn, readonly;
 
 	tinfo = arg;
 
 	conn = g.wts_conn;
 	keybuf = valbuf = NULL;
-	readonly = 0;			/* -Wconditional-uninitialized */
+	readonly = false;		/* -Wconditional-uninitialized */
 
 	/* Initialize the per-thread random number generator. */
 	__wt_random_init(&tinfo->rnd);
@@ -252,12 +253,12 @@ ops(void *arg)
 
 	/* Set the first operation where we'll perform checkpoint operations. */
 	ckpt_op = g.c_checkpoints ? mmrand(&tinfo->rnd, 100, 10000) : 0;
-	ckpt_available = 0;
+	ckpt_available = false;
 
 	/* Set the first operation where we'll reset the session. */
 	reset_op = mmrand(&tinfo->rnd, 100, 10000);
 
-	for (intxn = 0; !tinfo->quit; ++tinfo->ops) {
+	for (intxn = false; !tinfo->quit; ++tinfo->ops) {
 		/*
 		 * We can't checkpoint or swap sessions/cursors while in a
 		 * transaction, resolve any running transaction.
@@ -267,7 +268,7 @@ ops(void *arg)
 			testutil_check(
 			    session->commit_transaction(session, NULL));
 			++tinfo->commit;
-			intxn = 0;
+			intxn = false;
 		}
 
 		/* Open up a new session and cursors. */
@@ -299,7 +300,7 @@ ops(void *arg)
 				session_op += 250;
 
 				/* Checkpoints are read-only. */
-				readonly = 1;
+				readonly = true;
 			} else {
 				/*
 				 * Open two cursors: one for overwriting and one
@@ -325,7 +326,7 @@ ops(void *arg)
 				session_op += mmrand(&tinfo->rnd, 100, 5000);
 
 				/* Updates supported. */
-				readonly = 0;
+				readonly = false;
 			}
 		}
 
@@ -367,7 +368,7 @@ ops(void *arg)
 			else
 				(void)snprintf(ckpt_name, sizeof(ckpt_name),
 				    "checkpoint=thread-%d", tinfo->id);
-			ckpt_available = 1;
+			ckpt_available = true;
 
 			/* Pick the next checkpoint operation. */
 			ckpt_op += mmrand(&tinfo->rnd, 5000, 20000);
@@ -393,10 +394,11 @@ ops(void *arg)
 		    !intxn && mmrand(&tinfo->rnd, 1, 100) >= g.c_txn_freq) {
 			testutil_check(
 			    session->begin_transaction(session, NULL));
-			intxn = 1;
+			intxn = true;
 		}
 
-		insert = notfound = 0;
+		insert = false;
+		notfound = 0;
 
 		keyno = mmrand(&tinfo->rnd, 1, (u_int)g.rows);
 		key.data = keybuf;
@@ -434,7 +436,7 @@ ops(void *arg)
 				if (row_insert(
 				    tinfo, cursor, &key, &value, keyno))
 					goto deadlock;
-				insert = 1;
+				insert = true;
 				break;
 			case FIX:
 			case VAR:
@@ -453,7 +455,7 @@ ops(void *arg)
 				testutil_check(
 				    cursor_insert->reset(cursor_insert));
 
-				insert = 1;
+				insert = true;
 				break;
 			}
 		} else if (
@@ -513,7 +515,7 @@ skip_insert:			if (col_update(tinfo,
 				testutil_check(session->commit_transaction(
 				    session, NULL));
 				++tinfo->commit;
-				intxn = 0;
+				intxn = false;
 				break;
 			case 5:					/* 10% */
 				if (0) {
@@ -522,7 +524,7 @@ deadlock:				++tinfo->deadlock;
 				testutil_check(session->rollback_transaction(
 				    session, NULL));
 				++tinfo->rollback;
-				intxn = 0;
+				intxn = false;
 				break;
 			default:
 				break;
