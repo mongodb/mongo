@@ -217,20 +217,20 @@ __win_handle_close(WT_SESSION_IMPL *session, WT_FH *fh)
 {
 	WT_DECL_RET;
 
-	if (fh->fp == NULL) {
+	if (fh->filehandle != INVALID_HANDLE_VALUE) {
 		/*
 		 * We don't open Windows system handles when opening directories
 		 * for flushing, as it is not necessary (or possible) to flush
 		 * a directory on Windows. Confirm the file handle is set before
 		 * attempting to close it.
 		 */
-		if (fh->filehandle != INVALID_HANDLE_VALUE &&
-		    CloseHandle(fh->filehandle) == 0) {
+		if (CloseHandle(fh->filehandle) == 0) {
 			ret = __wt_getlasterror();
 			__wt_err(session, ret,
 			    "%s: handle-close: CloseHandle", fh->name);
 		}
-	} else {
+	}
+	if (fh->fp != NULL) {
 		/* If the stream was opened for writing, flush the file. */
 		if (F_ISSET(fh, WT_FH_FLUSH_ON_CLOSE) && fflush(fh->fp) != 0) {
 			ret = __wt_errno();
@@ -506,7 +506,7 @@ __win_handle_open(WT_SESSION_IMPL *session,
 	HANDLE filehandle, filehandle_secondary;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	int desired_access, f, fd;
+	int desired_access, f;
 	bool direct_io;
 	const char *stream_mode;
 
@@ -628,12 +628,10 @@ __win_handle_open(WT_SESSION_IMPL *session,
 		break;
 	}
 	if (stream_mode != NULL) {
-		if ((fd = _open_osfhandle((intptr_t)filehandle, f)) == -1)
+		if ((fh->fp = fopen(name, stream_mode)) == NULL)
 			WT_ERR_MSG(session, __wt_errno(),
-			    "%s: handle-open: _open_osfhandle", name);
-		if ((fh->fp = fdopen(fd, stream_mode)) == NULL)
-			WT_ERR_MSG(session, __wt_errno(),
-			    "%s: handle-open: fdopen", name);
+			"%s: handle-open: fopen", name);
+
 		if (LF_ISSET(WT_STREAM_LINE_BUFFER))
 			__wt_stream_set_line_buffer(fh->fp);
 	}
