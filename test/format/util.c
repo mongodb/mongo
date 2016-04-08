@@ -113,9 +113,12 @@ key_gen_setup(uint8_t **keyp)
 }
 
 static void
-key_gen_common(uint8_t *key, size_t *sizep, uint64_t keyno, int suffix)
+key_gen_common(void *keyarg, size_t *sizep, uint64_t keyno, int suffix)
 {
 	int len;
+	uint8_t *key;
+
+	key = keyarg;
 
 	/*
 	 * The key always starts with a 10-digit string (the specified cnt)
@@ -137,13 +140,13 @@ key_gen_common(uint8_t *key, size_t *sizep, uint64_t keyno, int suffix)
 }
 
 void
-key_gen(uint8_t *key, size_t *sizep, uint64_t keyno)
+key_gen(void *key, size_t *sizep, uint64_t keyno)
 {
 	key_gen_common(key, sizep, keyno, 0);
 }
 
 void
-key_gen_insert(WT_RAND_STATE *rnd, uint8_t *key, size_t *sizep, uint64_t keyno)
+key_gen_insert(WT_RAND_STATE *rnd, void *key, size_t *sizep, uint64_t keyno)
 {
 	key_gen_common(key, sizep, keyno, (int)mmrand(rnd, 1, 15));
 }
@@ -177,8 +180,12 @@ val_gen_setup(WT_RAND_STATE *rnd, uint8_t **valp)
 }
 
 void
-val_gen(WT_RAND_STATE *rnd, uint8_t *val, size_t *sizep, uint64_t keyno)
+val_gen(WT_RAND_STATE *rnd, void *valarg, size_t *sizep, uint64_t keyno)
 {
+	uint8_t *val;
+
+	val = valarg;
+
 	/*
 	 * Fixed-length records: take the low N bits from the last digit of
 	 * the record number.

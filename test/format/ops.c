@@ -396,7 +396,7 @@ ops(void *arg)
 		    !intxn && mmrand(&tinfo->rnd, 1, 100) >= g.c_txn_freq) {
 			testutil_check(
 			    session->reconfigure(session,
-			        ops_session_config(&tinfo->rnd)));
+				ops_session_config(&tinfo->rnd)));
 			testutil_check(
 			    session->begin_transaction(session, NULL));
 			intxn = true;
@@ -620,7 +620,7 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int notfound_err)
 		cursor->set_key(cursor, keyno);
 		break;
 	case ROW:
-		key_gen((uint8_t *)key->data, &key->size, keyno);
+		key_gen(key->data, &key->size, keyno);
 		cursor->set_key(cursor, key);
 		break;
 	}
@@ -819,8 +819,8 @@ row_update(TINFO *tinfo,
 
 	session = cursor->session;
 
-	key_gen((uint8_t *)key->data, &key->size, keyno);
-	val_gen(&tinfo->rnd, (uint8_t *)value->data, &value->size, keyno);
+	key_gen(key->data, &key->size, keyno);
+	val_gen(&tinfo->rnd, value->data, &value->size, keyno);
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
@@ -865,7 +865,7 @@ col_update(TINFO *tinfo,
 
 	session = cursor->session;
 
-	val_gen(&tinfo->rnd, (uint8_t *)value->data, &value->size, keyno);
+	val_gen(&tinfo->rnd, value->data, &value->size, keyno);
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS) {
@@ -899,7 +899,7 @@ col_update(TINFO *tinfo,
 	{
 	int notfound;
 
-	key_gen((uint8_t *)key->data, &key->size, keyno);
+	key_gen(key->data, &key->size, keyno);
 	bdb_update(key->data, key->size, value->data, value->size, &notfound);
 	(void)notfound_chk("col_update", ret, notfound, keyno);
 	}
@@ -1022,8 +1022,8 @@ row_insert(TINFO *tinfo,
 
 	session = cursor->session;
 
-	key_gen_insert(&tinfo->rnd, (uint8_t *)key->data, &key->size, keyno);
-	val_gen(&tinfo->rnd, (uint8_t *)value->data, &value->size, keyno);
+	key_gen_insert(&tinfo->rnd, key->data, &key->size, keyno);
+	val_gen(&tinfo->rnd, value->data, &value->size, keyno);
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
@@ -1069,7 +1069,7 @@ col_insert(TINFO *tinfo,
 
 	session = cursor->session;
 
-	val_gen(&tinfo->rnd, (uint8_t *)value->data, &value->size, g.rows + 1);
+	val_gen(&tinfo->rnd, value->data, &value->size, g.rows + 1);
 
 	if (g.type == FIX)
 		cursor->set_value(cursor, *(uint8_t *)value->data);
@@ -1105,7 +1105,7 @@ col_insert(TINFO *tinfo,
 	{
 	int notfound;
 
-	key_gen((uint8_t *)key->data, &key->size, keyno);
+	key_gen(key->data, &key->size, keyno);
 	bdb_update(key->data, key->size, value->data, value->size, &notfound);
 	}
 #else
@@ -1126,7 +1126,7 @@ row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 
 	session = cursor->session;
 
-	key_gen((uint8_t *)key->data, &key->size, keyno);
+	key_gen(key->data, &key->size, keyno);
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
@@ -1200,7 +1200,7 @@ col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 	 * do the same thing for the BDB store.
 	 */
 	if (g.type == FIX) {
-		key_gen((uint8_t *)key->data, &key->size, keyno);
+		key_gen(key->data, &key->size, keyno);
 		bdb_update(key->data, key->size, "\0", 1, &notfound);
 	} else
 		bdb_remove(keyno, &notfound);
