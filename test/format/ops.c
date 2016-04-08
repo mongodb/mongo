@@ -513,26 +513,27 @@ skip_insert:			if (col_update(tinfo,
 		 * If we're in a transaction, commit 40% of the time and
 		 * rollback 10% of the time.
 		 */
-		if (intxn)
-			switch (mmrand(&tinfo->rnd, 1, 10)) {
-			case 1: case 2: case 3: case 4:		/* 40% */
-				testutil_check(session->commit_transaction(
-				    session, NULL));
-				++tinfo->commit;
-				intxn = false;
-				break;
-			case 5:					/* 10% */
-				if (0) {
-deadlock:				++tinfo->deadlock;
-				}
-				testutil_check(session->rollback_transaction(
-				    session, NULL));
-				++tinfo->rollback;
-				intxn = false;
-				break;
-			default:
-				break;
+		if (!intxn)
+			continue;
+		switch (mmrand(&tinfo->rnd, 1, 10)) {
+		case 1: case 2: case 3: case 4:			/* 40% */
+			testutil_check(
+			    session->commit_transaction(session, NULL));
+			++tinfo->commit;
+			intxn = false;
+			break;
+		case 5:						/* 10% */
+			if (0) {
+deadlock:			++tinfo->deadlock;
 			}
+			testutil_check(
+			    session->rollback_transaction(session, NULL));
+			++tinfo->rollback;
+			intxn = false;
+			break;
+		default:
+			break;
+		}
 	}
 
 	if (session != NULL)
