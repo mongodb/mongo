@@ -223,8 +223,9 @@ ops(void *arg)
 	TINFO *tinfo;
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor, *cursor_insert;
-	WT_SESSION *session;
+	WT_DECL_RET;
 	WT_ITEM key, value;
+	WT_SESSION *session;
 	uint64_t keyno, ckpt_op, reset_op, session_op;
 	uint32_t op;
 	uint8_t *keybuf, *valbuf;
@@ -480,9 +481,9 @@ skip_insert:			if (col_update(tinfo,
 			}
 		} else {
 			++tinfo->search;
-			if (read_row(cursor, &key, keyno, 0))
-				if (intxn)
-					goto deadlock;
+			ret = read_row(cursor, &key, keyno, 0);
+			if (intxn && ret == WT_ROLLBACK)
+				goto deadlock;
 			continue;
 		}
 
@@ -503,7 +504,8 @@ skip_insert:			if (col_update(tinfo,
 
 		/* Read to confirm the operation. */
 		++tinfo->search;
-		if (read_row(cursor, &key, keyno, 0))
+		ret = read_row(cursor, &key, keyno, 0);
+		if (intxn && ret == WT_ROLLBACK)
 			goto deadlock;
 
 		/* Reset the cursor: there is no reason to keep pages pinned. */
