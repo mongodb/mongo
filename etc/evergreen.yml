@@ -5942,10 +5942,9 @@ buildvariants:
     - rhel55-test
 
 - name: enterprise-ubuntu-dynamic-1404-64-bit
-  display_name: ~ Shared Library Enterprise Ubuntu 1404
+  display_name: "* Shared Library Enterprise Ubuntu 1404"
   modules:
   - enterprise
-  batchtime: 1440 # 1 day
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
