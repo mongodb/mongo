@@ -31,6 +31,7 @@
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -53,8 +54,9 @@ MergeSortStage::MergeSortStage(OperationContext* opCtx,
       _collection(collection),
       _ws(ws),
       _pattern(params.pattern),
+      _collator(params.collator),
       _dedup(params.dedup),
-      _merging(StageWithValueComparison(ws, params.pattern)) {}
+      _merging(StageWithValueComparison(ws, params.pattern, params.collator)) {}
 
 void MergeSortStage::addChild(PlanStage* child) {
     _children.emplace_back(child);
@@ -213,7 +215,7 @@ bool MergeSortStage::StageWithValueComparison::operator()(const MergingRef& lhs,
         verify(rhsMember->getFieldDotted(fn, &rhsElt));
 
         // false means don't compare field name.
-        int x = lhsElt.woCompare(rhsElt, false);
+        int x = lhsElt.woCompare(rhsElt, false, _collator);
         if (-1 == patternElt.number()) {
             x = -x;
         }
