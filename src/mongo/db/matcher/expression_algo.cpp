@@ -154,7 +154,8 @@ bool _isSubsetOf(const MatchExpression* lhs, const ComparisonMatchExpression* rh
         }
         for (BSONElement elem : arrayEntries.equalities()) {
             // Each element in the $in-array represents an equality predicate.
-            EqualityMatchExpression equality;
+            // TODO SERVER-23618: pass the appropriate collator to EqualityMatchExpression().
+            EqualityMatchExpression equality(nullptr);
             equality.init(lhs->path(), elem);
             if (!_isSubsetOf(&equality, rhs)) {
                 return false;

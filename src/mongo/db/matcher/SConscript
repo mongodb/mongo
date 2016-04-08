@@ -49,6 +49,7 @@ env.Library(
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/fts/fts_query_noop',
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface',
         '$BUILD_DIR/third_party/shim_pcrecpp',
         'path',
     ],
@@ -63,6 +64,7 @@ env.CppUnitTest(
         'expression_tree_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         'expressions',
     ],
 )

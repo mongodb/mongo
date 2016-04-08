@@ -457,7 +457,7 @@ MatchExpression* CanonicalQuery::normalizeTree(MatchExpression* root) {
             return normalizeTree(re.release());
         }
 
-        auto eq = stdx::make_unique<EqualityMatchExpression>();
+        auto eq = stdx::make_unique<EqualityMatchExpression>(in->getCollator());
         eq->init(in->path(), *(inArrayEntries->equalities().begin()));
         if (in->getTag()) {
             eq->setTag(in->getTag()->clone());

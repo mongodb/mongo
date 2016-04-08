@@ -208,6 +208,7 @@ env.CppUnitTest(
         "canonical_query_test.cpp"
     ],
     LIBDEPS=[
+        "collation/collator_interface_mock",
         "query_planner",
     ],
 )

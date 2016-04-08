@@ -40,6 +40,7 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/path.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -72,6 +73,10 @@ bool ComparisonMatchExpression::equivalent(const MatchExpression* other) const {
         return false;
     const ComparisonMatchExpression* realOther =
         static_cast<const ComparisonMatchExpression*>(other);
+
+    if (!CollatorInterface::collatorsMatch(_collator, realOther->_collator)) {
+        return false;
+    }
 
     return path() == realOther->path() && _rhs.valuesEqual(realOther->_rhs);
 }
@@ -143,7 +148,7 @@ bool ComparisonMatchExpression::matchesSingleElement(const BSONElement& e) const
         }
     }
 
-    int x = compareElementValues(e, _rhs);
+    int x = compareElementValues(e, _rhs, _collator);
 
     // log() << "\t\t" << x << endl;
 
@@ -519,10 +524,8 @@ bool TypeMatchExpression::equivalent(const MatchExpression* other) const {
 
 // --------
 
-ArrayFilterEntries::ArrayFilterEntries() {
-    _hasNull = false;
-    _hasEmptyArray = false;
-}
+ArrayFilterEntries::ArrayFilterEntries(CollatorInterface* collator)
+    : _hasNull(false), _hasEmptyArray(false), _equalities(collator), _collator(collator) {}
 
 ArrayFilterEntries::~ArrayFilterEntries() {
     for (unsigned i = 0; i < _regexes.size(); i++)
@@ -563,6 +566,10 @@ bool ArrayFilterEntries::equivalent(const ArrayFilterEntries& other) const {
     for (unsigned i = 0; i < _regexes.size(); i++)
         if (!_regexes[i]->equivalent(other._regexes[i]))
             return false;
+
+    if (!CollatorInterface::collatorsMatch(_collator, other._collator)) {
+        return false;
+    }
 
     return _equalities == other._equalities;
 }
@@ -666,7 +673,8 @@ bool InMatchExpression::equivalent(const MatchExpression* other) const {
 }
 
 std::unique_ptr<MatchExpression> InMatchExpression::shallowClone() const {
-    std::unique_ptr<InMatchExpression> next = stdx::make_unique<InMatchExpression>();
+    std::unique_ptr<InMatchExpression> next =
+        stdx::make_unique<InMatchExpression>(_arrayEntries.getCollator());
     copyTo(next.get());
     if (getTag()) {
         next->setTag(getTag()->clone());

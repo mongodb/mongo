@@ -33,6 +33,7 @@
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/unittest/unittest.h"
 
@@ -634,6 +635,19 @@ TEST(CanonicalQueryTest, NormalizeWithInAndRegexPreservesTags) {
     IndexTag* tag = dynamic_cast<IndexTag*>(matchExpression->getTag());
     ASSERT(tag);
     ASSERT_EQ(2U, tag->index);
+}
+
+TEST(CanonicalQueryTest, NormalizeWithInPreservesCollator) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    auto inMatchExpression = stdx::make_unique<InMatchExpression>(&collator);
+    BSONObj obj = fromjson("{'': 'string'}");
+    inMatchExpression->getArrayFilterEntries()->addEquality(obj.firstElement());
+    unique_ptr<MatchExpression> matchExpression(
+        CanonicalQuery::normalizeTree(inMatchExpression.release()));
+    ASSERT(matchExpression->matchType() == MatchExpression::MatchType::EQ);
+    EqualityMatchExpression* eqMatchExpression =
+        static_cast<EqualityMatchExpression*>(matchExpression.get());
+    ASSERT_EQ(eqMatchExpression->getCollator(), &collator);
 }
 
 TEST(CanonicalQueryTest, CanonicalizeFromBaseQuery) {

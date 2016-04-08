@@ -73,16 +73,6 @@ static bool twoDWontWrap(const Circle& circle, const IndexEntry& index) {
     return ret;
 }
 
-static bool collatorsMatch(const CollatorInterface* lhs, const CollatorInterface* rhs) {
-    if (lhs == nullptr && rhs == nullptr) {
-        return true;
-    }
-    if (lhs == nullptr || rhs == nullptr) {
-        return false;
-    }
-    return (*lhs == *rhs);
-}
-
 // Checks whether 'node' contains any comparison to an element of type 'type'. Nested objects and
 // arrays are not checked recursively. We assume 'node' is bounds-generating or is a recursive child
 // of a bounds-generating node, i.e. it does not contain AND, OR, ELEM_MATCH_OBJECT, or NOR.
@@ -188,7 +178,7 @@ bool QueryPlannerIXSelect::compatible(const BSONElement& elt,
 
     // String comparisons require the collators to match.
     if (boundsGeneratingNodeContainsComparisonToType(node, BSONType::String) &&
-        !collatorsMatch(collator, index.collator)) {
+        !CollatorInterface::collatorsMatch(collator, index.collator)) {
         return false;
     }
 

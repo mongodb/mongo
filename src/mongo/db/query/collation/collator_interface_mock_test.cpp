@@ -54,6 +54,28 @@ TEST(CollatorInterfaceMockSelfTest, MocksOfDifferentTypesAreNotEqual) {
     ASSERT(reverseMock != alwaysEqualMock);
 }
 
+TEST(CollatorInterfaceMockSelfTest, NullMockPointersMatch) {
+    ASSERT(CollatorInterface::collatorsMatch(nullptr, nullptr));
+}
+
+TEST(CollatorInterfaceMockSelfTest, NullMockPointerDoesNotMatchNonNullMockPointer) {
+    CollatorInterfaceMock reverseMock(CollatorInterfaceMock::MockType::kReverseString);
+    ASSERT(!CollatorInterface::collatorsMatch(nullptr, &reverseMock));
+    ASSERT(!CollatorInterface::collatorsMatch(&reverseMock, nullptr));
+}
+
+TEST(CollatorInterfaceMockSelfTest, PointersToMocksOfSameTypeMatch) {
+    CollatorInterfaceMock reverseMock1(CollatorInterfaceMock::MockType::kReverseString);
+    CollatorInterfaceMock reverseMock2(CollatorInterfaceMock::MockType::kReverseString);
+    ASSERT(CollatorInterface::collatorsMatch(&reverseMock1, &reverseMock2));
+}
+
+TEST(CollatorInterfaceMockSelfTest, PointersToMocksOfDifferentTypesDoNotMatch) {
+    CollatorInterfaceMock reverseMock(CollatorInterfaceMock::MockType::kReverseString);
+    CollatorInterfaceMock alwaysEqualMock(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    ASSERT(!CollatorInterface::collatorsMatch(&reverseMock, &alwaysEqualMock));
+}
+
 TEST(CollatorInterfaceMockSelfTest, ReverseMockComparesInReverse) {
     CollatorInterfaceMock reverseMock(CollatorInterfaceMock::MockType::kReverseString);
     ASSERT_EQ(reverseMock.compare("abc", "abc"), 0);

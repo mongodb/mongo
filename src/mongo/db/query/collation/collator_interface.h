@@ -125,6 +125,19 @@ public:
         return _spec;
     }
 
+    /**
+     * Returns true if lhs and rhs are both nullptr, or if they point to equivalent collators.
+     */
+    static bool collatorsMatch(const CollatorInterface* lhs, const CollatorInterface* rhs) {
+        if (lhs == nullptr && rhs == nullptr) {
+            return true;
+        }
+        if (lhs == nullptr || rhs == nullptr) {
+            return false;
+        }
+        return (*lhs == *rhs);
+    }
+
 protected:
     static ComparisonKey makeComparisonKey(std::string key) {
         return ComparisonKey(std::move(key));
