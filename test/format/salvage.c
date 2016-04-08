@@ -36,8 +36,8 @@ static void
 salvage(void)
 {
 	WT_CONNECTION *conn;
+	WT_DECL_RET;
 	WT_SESSION *session;
-	int ret;
 
 	conn = g.wts_conn;
 	track("salvage", 0ULL, NULL);
@@ -141,7 +141,7 @@ found:	if (fstat(fd, &sb) == -1)
 void
 wts_salvage(void)
 {
-	int ret;
+	WT_DECL_RET;
 
 	/* Some data-sources don't support salvage. */
 	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))

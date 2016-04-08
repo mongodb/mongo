@@ -129,7 +129,7 @@ void
 wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 {
 	WT_CONNECTION *conn;
-	int ret;
+	WT_DECL_RET;
 	char *config, *end, *p, helium_config[1024];
 
 	*connp = NULL;
@@ -497,8 +497,8 @@ void
 wts_verify(const char *tag)
 {
 	WT_CONNECTION *conn;
+	WT_DECL_RET;
 	WT_SESSION *session;
-	int ret;
 
 	if (g.c_verify == 0)
 		return;
@@ -531,12 +531,12 @@ wts_stats(void)
 {
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
+	WT_DECL_RET;
 	WT_SESSION *session;
 	FILE *fp;
 	char *stat_name;
 	const char *pval, *desc;
 	uint64_t v;
-	int ret;
 
 	/* Ignore statistics if they're not configured. */
 	if (g.c_statistics == 0)

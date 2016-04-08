@@ -85,9 +85,9 @@ backup(void *arg)
 {
 	WT_CONNECTION *conn;
 	WT_CURSOR *backup_cursor;
+	WT_DECL_RET;
 	WT_SESSION *session;
 	u_int period;
-	int ret;
 	const char *key;
 
 	(void)(arg);

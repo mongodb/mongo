@@ -701,9 +701,9 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int notfound_err)
 static int
 nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 {
+	WT_DECL_RET;
 	WT_ITEM key, value;
 	uint64_t keyno;
-	int ret;
 	uint8_t bitfield;
 	const char *which;
 
@@ -814,8 +814,8 @@ static int
 row_update(TINFO *tinfo,
     WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 {
+	WT_DECL_RET;
 	WT_SESSION *session;
-	int ret;
 
 	session = cursor->session;
 
@@ -860,8 +860,8 @@ static int
 col_update(TINFO *tinfo,
     WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 {
+	WT_DECL_RET;
 	WT_SESSION *session;
-	int ret;
 
 	session = cursor->session;
 
@@ -1017,8 +1017,8 @@ static int
 row_insert(TINFO *tinfo,
     WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 {
+	WT_DECL_RET;
 	WT_SESSION *session;
-	int ret;
 
 	session = cursor->session;
 
@@ -1063,9 +1063,9 @@ static int
 col_insert(TINFO *tinfo,
     WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
 {
+	WT_DECL_RET;
 	WT_SESSION *session;
 	uint64_t keyno;
-	int ret;
 
 	session = cursor->session;
 
@@ -1121,8 +1121,8 @@ col_insert(TINFO *tinfo,
 static int
 row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 {
+	WT_DECL_RET;
 	WT_SESSION *session;
-	int ret;
 
 	session = cursor->session;
 
@@ -1167,8 +1167,8 @@ row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 static int
 col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 {
+	WT_DECL_RET;
 	WT_SESSION *session;
-	int ret;
 
 	session = cursor->session;
 

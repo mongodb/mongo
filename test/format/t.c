@@ -288,7 +288,7 @@ main(int argc, char *argv[])
 static void
 startup(void)
 {
-	int ret;
+	WT_DECL_RET;
 
 	/* Flush/close any logging information. */
 	fclose_and_clear(&g.logfp);
