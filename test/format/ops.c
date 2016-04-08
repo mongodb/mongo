@@ -194,7 +194,7 @@ wts_ops(int lastrun)
 
 /*
  * ops_session_config --
- *	Return the current session configuration.
+ *	Return an isolation configuration.
  */
 static const char *
 ops_session_config(WT_RAND_STATE *rnd)
@@ -277,8 +277,8 @@ ops(void *arg)
 			if (session != NULL)
 				testutil_check(session->close(session, NULL));
 
-			testutil_check(conn->open_session(conn, NULL,
-			    ops_session_config(&tinfo->rnd), &session));
+			testutil_check(
+			    conn->open_session(conn, NULL, NULL, &session));
 
 			/*
 			 * 10% of the time, perform some read-only operations
@@ -387,11 +387,15 @@ ops(void *arg)
 		}
 
 		/*
-		 * If we're not single-threaded and we're not in a transaction,
-		 * start a transaction at the configured frequency.
+		 * If we're not single-threaded and not in a transaction, choose
+		 * an isolation level and start a transaction some percentage of
+		 * the time.
 		 */
 		if (!SINGLETHREADED &&
 		    !intxn && mmrand(&tinfo->rnd, 1, 100) >= g.c_txn_freq) {
+			testutil_check(
+			    session->reconfigure(session,
+			        ops_session_config(&tinfo->rnd)));
 			testutil_check(
 			    session->begin_transaction(session, NULL));
 			intxn = true;
