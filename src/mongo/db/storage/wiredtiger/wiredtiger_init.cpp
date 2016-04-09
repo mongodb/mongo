@@ -62,27 +62,24 @@ public:
         }
 
         size_t cacheSizeGB = wiredTigerGlobalOptions.cacheSizeGB;
-        size_t cacheSizeMB = 256;  // minimum cache size
         if (cacheSizeGB == 0) {
             // Since the user didn't provide a cache size, choose a reasonable default value.
             // We want to reserve 1GB for the system and binaries, but it's not bad to
             // leave a fair amount left over for pagecache since that's compressed storage.
-            // If ProcessInfo indicates that there is < 2GB of memory, allocate 256M for cache.
-            // If ProcessInfo indicates exactly 2GB, allocate 614MB
             ProcessInfo pi;
             double memSizeMB = pi.getMemSizeMB();
-            if (memSizeMB >= 1024 * 2) {
+            if (memSizeMB > 0) {
                 double cacheMB = (memSizeMB - 1024) * 0.6;
-                cacheSizeMB = static_cast<size_t>(cacheMB);
+                cacheSizeGB = static_cast<size_t>(cacheMB / 1024);
+                if (cacheSizeGB < 1)
+                    cacheSizeGB = 1;
             }
-        } else {
-            cacheSizeMB = 1024 * cacheSizeGB;
         }
         const bool ephemeral = false;
         WiredTigerKVEngine* kv = new WiredTigerKVEngine(getCanonicalName().toString(),
                                                         params.dbpath,
                                                         wiredTigerGlobalOptions.engineConfig,
-                                                        cacheSizeMB,
+                                                        cacheSizeGB,
                                                         params.dur,
                                                         ephemeral,
                                                         params.repair,
