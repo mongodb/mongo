@@ -65,8 +65,8 @@ lrt(void *arg)
 	for (pinned = 0;;) {
 		if (pinned) {
 			/* Re-read the record at the end of the table. */
-			while ((ret = read_row(cursor,
-			    &key, saved_keyno, 1)) == WT_ROLLBACK)
+			while ((ret = read_row(
+			    cursor, &key, saved_keyno)) == WT_ROLLBACK)
 				;
 			if (ret != 0)
 				testutil_die(ret,
@@ -109,8 +109,8 @@ lrt(void *arg)
 				saved_keyno = mmrand(NULL,
 				    (u_int)(g.key_cnt - g.key_cnt / 10),
 				    (u_int)g.key_cnt);
-				while ((ret = read_row(cursor,
-				    &key, saved_keyno, 1)) == WT_ROLLBACK)
+				while ((ret = read_row(
+				    cursor, &key, saved_keyno)) == WT_ROLLBACK)
 					;
 			} while (ret == WT_NOTFOUND);
 			if (ret != 0)
@@ -139,8 +139,8 @@ lrt(void *arg)
 			 */
 			do {
 				keyno = mmrand(NULL, 1, (u_int)g.key_cnt / 5);
-				while ((ret = read_row(cursor,
-				    &key, keyno, 1)) == WT_ROLLBACK)
+				while ((ret = read_row(
+				    cursor, &key, keyno)) == WT_ROLLBACK)
 					;
 			} while (ret == WT_NOTFOUND);
 			if (ret != 0)

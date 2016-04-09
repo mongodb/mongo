@@ -29,12 +29,12 @@
 #include "format.h"
 
 static int   col_insert(TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t *);
-static int   col_remove(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
+static int   col_remove(WT_CURSOR *, WT_ITEM *, uint64_t);
 static int   col_update(TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
-static int   nextprev(WT_CURSOR *, int, int *);
+static int   nextprev(WT_CURSOR *, int);
 static void *ops(void *);
 static int   row_insert(TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
-static int   row_remove(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
+static int   row_remove(WT_CURSOR *, WT_ITEM *, uint64_t);
 static int   row_update(TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
 static void  table_append_init(void);
 
@@ -229,9 +229,9 @@ ops(void *arg)
 	uint64_t keyno, ckpt_op, reset_op, session_op;
 	uint32_t op;
 	u_int np;
-	int dir, notfound;
+	int dir;
 	char *ckpt_config, ckpt_name[64];
-	bool ckpt_available, insert, intxn, readonly;
+	bool ckpt_available, intxn, positioned, readonly;
 
 	tinfo = arg;
 
@@ -400,10 +400,8 @@ ops(void *arg)
 			intxn = true;
 		}
 
-		insert = false;
-		notfound = 0;
-
 		keyno = mmrand(&tinfo->rnd, 1, (u_int)g.rows);
+		positioned = false;
 
 		/*
 		 * Perform some number of operations: the percentage of deletes,
@@ -417,27 +415,22 @@ ops(void *arg)
 			++tinfo->remove;
 			switch (g.type) {
 			case ROW:
-				/*
-				 * If deleting a non-existent record, the cursor
-				 * won't be positioned, and so can't do a next.
-				 */
-				if (row_remove(cursor, &key, keyno, &notfound))
-					goto deadlock;
+				ret = row_remove(cursor, &key, keyno);
 				break;
 			case FIX:
 			case VAR:
-				if (col_remove(cursor, &key, keyno, &notfound))
-					goto deadlock;
+				ret = col_remove(cursor, &key, keyno);
 				break;
 			}
+			positioned = ret == 0;
+			if (ret == WT_ROLLBACK && intxn)
+				goto deadlock;
 		} else if (op < g.c_delete_pct + g.c_insert_pct) {
 			++tinfo->insert;
 			switch (g.type) {
 			case ROW:
-				if (row_insert(
-				    tinfo, cursor, &key, &value, keyno))
-					goto deadlock;
-				insert = true;
+				ret = row_insert(
+				    tinfo, cursor, &key, &value, keyno);
 				break;
 			case FIX:
 			case VAR:
@@ -450,37 +443,38 @@ ops(void *arg)
 					goto skip_insert;
 
 				/* Insert, then reset the insert cursor. */
-				if (col_insert(tinfo,
-				    cursor_insert, &key, &value, &keyno))
-					goto deadlock;
+				ret = col_insert(tinfo,
+				    cursor_insert, &key, &value, &keyno);
 				testutil_check(
 				    cursor_insert->reset(cursor_insert));
-
-				insert = true;
 				break;
 			}
+			positioned = false;
+			if (ret == WT_ROLLBACK && intxn)
+				goto deadlock;
 		} else if (
 		    op < g.c_delete_pct + g.c_insert_pct + g.c_write_pct) {
 			++tinfo->update;
 			switch (g.type) {
 			case ROW:
-				if (row_update(
-				    tinfo, cursor, &key, &value, keyno))
-					goto deadlock;
+				ret = row_update(
+				    tinfo, cursor, &key, &value, keyno);
 				break;
 			case FIX:
 			case VAR:
-skip_insert:			if (col_update(tinfo,
-				    cursor, &key, &value, keyno))
-					goto deadlock;
+skip_insert:			ret = col_update(
+				    tinfo, cursor, &key, &value, keyno);
 				break;
 			}
+			positioned = ret == 0;
+			if (ret == WT_ROLLBACK && intxn)
+				goto deadlock;
 		} else {
 			++tinfo->search;
-			ret = read_row(cursor, &key, keyno, 0);
-			if (intxn && ret == WT_ROLLBACK)
+			ret = read_row(cursor, &key, keyno);
+			positioned = ret == 0;
+			if (ret == WT_ROLLBACK && intxn)
 				goto deadlock;
-			continue;
 		}
 
 		/*
@@ -488,20 +482,22 @@ skip_insert:			if (col_update(tinfo,
 		 * insert, do a small number of next/prev cursor operations in
 		 * a random direction.
 		 */
-		if (!insert) {
-			dir = (int)mmrand(&tinfo->rnd, 0, 1);
-			for (np = 0; np < mmrand(&tinfo->rnd, 1, 100); ++np) {
-				if (notfound)
-					break;
-				if (nextprev(cursor, dir, &notfound))
-					goto deadlock;
-			}
+		dir = (int)mmrand(&tinfo->rnd, 0, 1);
+		for (np = 0; np < mmrand(&tinfo->rnd, 1, 100); ++np) {
+			if (!positioned)
+				break;
+
+			ret = nextprev(cursor, dir);
+			positioned = ret == 0;
+			if (ret == WT_ROLLBACK && intxn)
+				goto deadlock;
 		}
 
 		/* Read to confirm the operation. */
 		++tinfo->search;
-		ret = read_row(cursor, &key, keyno, 0);
-		if (intxn && ret == WT_ROLLBACK)
+		ret = read_row(cursor, &key, keyno);
+		positioned = ret == 0;
+		if (ret == WT_ROLLBACK && intxn)
 			goto deadlock;
 
 		/* Reset the cursor: there is no reason to keep pages pinned. */
@@ -553,9 +549,10 @@ wts_read_scan(void)
 {
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
+	WT_DECL_RET;
 	WT_ITEM key;
 	WT_SESSION *session;
-	uint64_t cnt, last_cnt;
+	uint64_t keyno, last_keyno;
 
 	conn = g.wts_conn;
 
@@ -569,17 +566,19 @@ wts_read_scan(void)
 	    session, g.uri, NULL, NULL, &cursor));
 
 	/* Check a random subset of the records using the key. */
-	for (last_cnt = cnt = 0; cnt < g.key_cnt;) {
-		cnt += mmrand(NULL, 1, 17);
-		if (cnt > g.rows)
-			cnt = g.rows;
-		if (cnt - last_cnt > 1000) {
-			track("read row scan", cnt, NULL);
-			last_cnt = cnt;
+	for (last_keyno = keyno = 0; keyno < g.key_cnt;) {
+		keyno += mmrand(NULL, 1, 17);
+		if (keyno > g.rows)
+			keyno = g.rows;
+		if (keyno - last_keyno > 1000) {
+			track("read row scan", keyno, NULL);
+			last_keyno = keyno;
 		}
 
-		testutil_checkfmt(
-		    read_row(cursor, &key, cnt, 0), "%s", "read_scan");
+		ret = read_row(cursor, &key, keyno);
+		if (ret != 0 && ret != WT_NOTFOUND && ret != WT_ROLLBACK)
+			testutil_die(
+			    ret, "wts_read_scan: read row %" PRIu64, keyno);
 	}
 
 	testutil_check(session->close(session, NULL));
@@ -592,7 +591,7 @@ wts_read_scan(void)
  *	Read and verify a single element in a row- or column-store file.
  */
 int
-read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int notfound_err)
+read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 {
 	static int sn = 0;
 	WT_ITEM value;
@@ -640,8 +639,17 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int notfound_err)
 	case WT_ROLLBACK:
 		return (WT_ROLLBACK);
 	case WT_NOTFOUND:
-		if (notfound_err)
-			return (WT_NOTFOUND);
+		/*
+		 * In fixed length stores, zero values at the end of the key
+		 * space are returned as not found.  Treat this the same as
+		 * a zero value in the key space, to match BDB's behavior.
+		 */
+		if (g.type == FIX) {
+			bitfield = 0;
+			value.data = &bitfield;
+			value.size = 1;
+			ret = 0;
+		}
 		break;
 	default:
 		testutil_die(ret, "read_row: read row %" PRIu64, keyno);
@@ -649,19 +657,7 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int notfound_err)
 
 #ifdef HAVE_BERKELEY_DB
 	if (!SINGLETHREADED)
-		return (0);
-
-	/*
-	 * In fixed length stores, zero values at the end of the key space are
-	 * returned as not found.  Treat this the same as a zero value in the
-	 * key space, to match BDB's behavior.
-	 */
-	if (ret == WT_NOTFOUND && g.type == FIX) {
-		bitfield = 0;
-		value.data = &bitfield;
-		value.size = 1;
-		ret = 0;
-	}
+		return (ret);
 
 	/* Retrieve the BDB value. */
 	{
@@ -672,7 +668,7 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int notfound_err)
 
 	/* Check for not-found status. */
 	if (notfound_chk("read_row", ret, notfound, keyno))
-		return (0);
+		return (ret);
 
 	/* Compare the two. */
 	if (value.size != bdb_value.size ||
@@ -685,7 +681,7 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int notfound_err)
 	}
 	}
 #endif
-	return (0);
+	return (ret);
 }
 
 /*
@@ -693,7 +689,7 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int notfound_err)
  *	Read and verify the next/prev element in a row- or column-store file.
  */
 static int
-nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
+nextprev(WT_CURSOR *cursor, int next)
 {
 	WT_DECL_RET;
 	WT_ITEM key, value;
@@ -727,11 +723,10 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 		}
 	if (ret != 0 && ret != WT_NOTFOUND)
 		testutil_die(ret, "%s", which);
-	*notfoundp = (ret == WT_NOTFOUND);
 
 #ifdef HAVE_BERKELEY_DB
 	if (!SINGLETHREADED)
-		return (0);
+		return (ret);
 
 	{
 	WT_ITEM bdb_key, bdb_value;
@@ -746,7 +741,7 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 	    &bdb_value.data, &bdb_value.size, &notfound);
 	if (notfound_chk(
 	    next ? "nextprev(next)" : "nextprev(prev)", ret, notfound, keyno))
-		return (0);
+		return (ret);
 
 	/* Compare the two. */
 	if (g.type == ROW) {
@@ -797,7 +792,7 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 		}
 	}
 #endif
-	return (0);
+	return (ret);
 }
 
 /*
@@ -1113,7 +1108,7 @@ col_insert(TINFO *tinfo,
  *	Remove an row from a row-store file.
  */
 static int
-row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
+row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 {
 	WT_DECL_RET;
 	WT_SESSION *session;
@@ -1136,11 +1131,10 @@ row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 	if (ret != 0 && ret != WT_NOTFOUND)
 		testutil_die(ret,
 		    "row_remove: remove %" PRIu64 " by key", keyno);
-	*notfoundp = (ret == WT_NOTFOUND);
 
 #ifdef HAVE_BERKELEY_DB
 	if (!SINGLETHREADED)
-		return (0);
+		return (ret);
 
 	{
 	int notfound;
@@ -1151,7 +1145,7 @@ row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 #else
 	(void)key;				/* [-Wunused-variable] */
 #endif
-	return (0);
+	return (ret);
 }
 
 /*
@@ -1159,7 +1153,7 @@ row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
  *	Remove a row from a column-store file.
  */
 static int
-col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
+col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 {
 	WT_DECL_RET;
 	WT_SESSION *session;
@@ -1180,11 +1174,10 @@ col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 	if (ret != 0 && ret != WT_NOTFOUND)
 		testutil_die(ret,
 		    "col_remove: remove %" PRIu64 " by key", keyno);
-	*notfoundp = (ret == WT_NOTFOUND);
 
 #ifdef HAVE_BERKELEY_DB
 	if (!SINGLETHREADED)
-		return (0);
+		return (ret);
 
 	{
 	int notfound;
@@ -1203,7 +1196,7 @@ col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 #else
 	(void)key;				/* [-Wunused-variable] */
 #endif
-	return (0);
+	return (ret);
 }
 
 #ifdef HAVE_BERKELEY_DB
