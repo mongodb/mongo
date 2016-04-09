@@ -250,6 +250,7 @@ env.Library(
         "d_state.cpp",
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/db/commands/core",
         "$BUILD_DIR/mongo/db/concurrency/lock_manager",
         "$BUILD_DIR/mongo/db/query/query",
         "$BUILD_DIR/mongo/db/range_deleter",

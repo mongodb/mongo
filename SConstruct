@@ -1,4 +1,5 @@
 # -*- mode: python; -*-
+import atexit
 import copy
 import datetime
 import errno
@@ -23,6 +24,12 @@ from mongo_scons_utils import (
 import libdeps
 
 EnsureSConsVersion( 2, 3, 0 )
+
+def print_build_failures():
+    from SCons.Script import GetBuildFailures
+    for bf in GetBuildFailures():
+        print "%s failed: %s" % (bf.node, bf.errstr)
+atexit.register(print_build_failures)
 
 def versiontuple(v):
     return tuple(map(int, (v.split("."))))
@@ -2149,9 +2156,15 @@ def doConfigure(myenv):
             tsan_options += "suppressions=\"%s\" " % myenv.File("#etc/tsan.suppressions").abspath
             myenv['ENV']['TSAN_OPTIONS'] = tsan_options
 
-        # By default, undefined behavior sanitizer doesn't stop on the first error. Make it so.
         if using_ubsan:
+            # By default, undefined behavior sanitizer doesn't stop on the first error. Make it so.
             AddToCCFLAGSIfSupported(myenv, "-fno-sanitize-recover")
+            # We don't currently target any architectures that require
+            # strict alignment, and we definitely have alignment
+            # issues in both the MMAPv1 and WT storage engines. We
+            # don't want to need to fix those errors before making
+            # UBSAN available.
+            AddToCCFLAGSIfSupported(myenv, "-fno-sanitize=alignment")
 
     if myenv.ToolchainIs('msvc') and optBuild:
         # http://blogs.msdn.com/b/vcblog/archive/2013/09/11/introducing-gw-compiler-switch.aspx

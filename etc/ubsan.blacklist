@@ -14,8 +14,9 @@ src:src/third_party/unicode-*/*
 src:src/third_party/yaml-cpp-*/*
 src:src/third_party/zlib-*/*
 
-# See https://jira.mongodb.org/browse/WT-2402
-src:src/third_party/wiredtiger/*
+# See SERVER-22705. We depend on the C flexible array trick
+# which trips up UBSAN.
+src:src/mongo/db/storage/mmap_v1/*
 
 # See SERVER-23713. The pipeline arith expressions and accumulators need
 # to be re-written to avoid undefined behavior.
@@ -33,3 +34,5 @@ fun:_ZStanSt13_Ios_FmtflagsS_
 # Maybe https://gcc.gnu.org/bugzilla/show_bug.cgi?id=60734 or similar
 fun:_ZNSt8_Rb_tree*_M_get_insert_hint_unique_posESt23*
 fun:_ZNSt8_Rb_tree*_M_insert_I*
+# Maybe https://gcc.gnu.org/bugzilla/show_bug.cgi?id=63345 or similar
+fun:_ZNSt8_Rb_tree*_M_insert_nodeE*
