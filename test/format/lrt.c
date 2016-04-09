@@ -43,16 +43,14 @@ lrt(void *arg)
 	uint64_t keyno, saved_keyno;
 	u_int period;
 	int pinned, ret;
-	uint8_t bitfield, *keybuf;
+	uint8_t bitfield;
 	void *buf;
 
 	(void)(arg);			/* Unused parameter */
 
 	saved_keyno = 0;		/* [-Werror=maybe-uninitialized] */
 
-	key_gen_setup(&keybuf);
-	memset(&key, 0, sizeof(key));
-	key.data = keybuf;
+	key_gen_setup(&key);
 	memset(&value, 0, sizeof(value));
 
 	buf = NULL;
@@ -165,7 +163,7 @@ lrt(void *arg)
 
 	testutil_check(session->close(session, NULL));
 
-	free(keybuf);
+	free(key.mem);
 	free(buf);
 
 	return (NULL);

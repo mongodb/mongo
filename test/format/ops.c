@@ -228,7 +228,6 @@ ops(void *arg)
 	WT_SESSION *session;
 	uint64_t keyno, ckpt_op, reset_op, session_op;
 	uint32_t op;
-	uint8_t *keybuf, *valbuf;
 	u_int np;
 	int dir, notfound;
 	char *ckpt_config, ckpt_name[64];
@@ -237,15 +236,14 @@ ops(void *arg)
 	tinfo = arg;
 
 	conn = g.wts_conn;
-	keybuf = valbuf = NULL;
 	readonly = false;		/* -Wconditional-uninitialized */
 
 	/* Initialize the per-thread random number generator. */
 	__wt_random_init(&tinfo->rnd);
 
 	/* Set up the default key and value buffers. */
-	key_gen_setup(&keybuf);
-	val_gen_setup(&tinfo->rnd, &valbuf);
+	key_gen_setup(&key);
+	val_gen_setup(&tinfo->rnd, &value);
 
 	/* Set the first operation where we'll create sessions and cursors. */
 	session_op = 0;
@@ -406,8 +404,6 @@ ops(void *arg)
 		notfound = 0;
 
 		keyno = mmrand(&tinfo->rnd, 1, (u_int)g.rows);
-		key.data = keybuf;
-		value.data = valbuf;
 
 		/*
 		 * Perform some number of operations: the percentage of deletes,
@@ -541,8 +537,8 @@ deadlock:			++tinfo->deadlock;
 	if (session != NULL)
 		testutil_check(session->close(session, NULL));
 
-	free(keybuf);
-	free(valbuf);
+	free(key.mem);
+	free(value.mem);
 
 	tinfo->state = TINFO_COMPLETE;
 	return (NULL);
@@ -560,12 +556,11 @@ wts_read_scan(void)
 	WT_ITEM key;
 	WT_SESSION *session;
 	uint64_t cnt, last_cnt;
-	uint8_t *keybuf;
 
 	conn = g.wts_conn;
 
 	/* Set up the default key buffer. */
-	key_gen_setup(&keybuf);
+	key_gen_setup(&key);
 
 	/* Open a session and cursor pair. */
 	testutil_check(conn->open_session(
@@ -583,14 +578,13 @@ wts_read_scan(void)
 			last_cnt = cnt;
 		}
 
-		key.data = keybuf;
 		testutil_checkfmt(
 		    read_row(cursor, &key, cnt, 0), "%s", "read_scan");
 	}
 
 	testutil_check(session->close(session, NULL));
 
-	free(keybuf);
+	free(key.mem);
 }
 
 /*
@@ -620,7 +614,7 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int notfound_err)
 		cursor->set_key(cursor, keyno);
 		break;
 	case ROW:
-		key_gen(key->data, &key->size, keyno);
+		key_gen(key, keyno);
 		cursor->set_key(cursor, key);
 		break;
 	}
@@ -819,8 +813,8 @@ row_update(TINFO *tinfo,
 
 	session = cursor->session;
 
-	key_gen(key->data, &key->size, keyno);
-	val_gen(&tinfo->rnd, value->data, &value->size, keyno);
+	key_gen(key, keyno);
+	val_gen(&tinfo->rnd, value, keyno);
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
@@ -865,7 +859,7 @@ col_update(TINFO *tinfo,
 
 	session = cursor->session;
 
-	val_gen(&tinfo->rnd, value->data, &value->size, keyno);
+	val_gen(&tinfo->rnd, value, keyno);
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS) {
@@ -899,7 +893,7 @@ col_update(TINFO *tinfo,
 	{
 	int notfound;
 
-	key_gen(key->data, &key->size, keyno);
+	key_gen(key, keyno);
 	bdb_update(key->data, key->size, value->data, value->size, &notfound);
 	(void)notfound_chk("col_update", ret, notfound, keyno);
 	}
@@ -1022,8 +1016,8 @@ row_insert(TINFO *tinfo,
 
 	session = cursor->session;
 
-	key_gen_insert(&tinfo->rnd, key->data, &key->size, keyno);
-	val_gen(&tinfo->rnd, value->data, &value->size, keyno);
+	key_gen_insert(&tinfo->rnd, key, keyno);
+	val_gen(&tinfo->rnd, value, keyno);
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
@@ -1069,7 +1063,7 @@ col_insert(TINFO *tinfo,
 
 	session = cursor->session;
 
-	val_gen(&tinfo->rnd, value->data, &value->size, g.rows + 1);
+	val_gen(&tinfo->rnd, value, g.rows + 1);
 
 	if (g.type == FIX)
 		cursor->set_value(cursor, *(uint8_t *)value->data);
@@ -1105,7 +1099,7 @@ col_insert(TINFO *tinfo,
 	{
 	int notfound;
 
-	key_gen(key->data, &key->size, keyno);
+	key_gen(key, keyno);
 	bdb_update(key->data, key->size, value->data, value->size, &notfound);
 	}
 #else
@@ -1126,7 +1120,7 @@ row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 
 	session = cursor->session;
 
-	key_gen(key->data, &key->size, keyno);
+	key_gen(key, keyno);
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
@@ -1200,7 +1194,7 @@ col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 	 * do the same thing for the BDB store.
 	 */
 	if (g.type == FIX) {
-		key_gen(key->data, &key->size, keyno);
+		key_gen(key, keyno);
 		bdb_update(key->data, key->size, "\0", 1, &notfound);
 	} else
 		bdb_remove(keyno, &notfound);

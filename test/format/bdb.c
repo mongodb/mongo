@@ -30,7 +30,7 @@
 #include "format.h"
 
 static DBT key, value;
-static uint8_t *keybuf;
+static WT_ITEM keyitem;
 
 static int
 bdb_compare_reverse(DB *dbp, const DBT *k1, const DBT *k2
@@ -78,7 +78,7 @@ bdb_open(void)
 	assert(db->cursor(db, NULL, &dbc, 0) == 0);
 	g.dbc = dbc;
 
-	key_gen_setup(&keybuf);
+	key_gen_setup(&keyitem);
 }
 
 void
@@ -95,8 +95,7 @@ bdb_close(void)
 	assert(db->close(db, 0) == 0);
 	assert(dbenv->close(dbenv, 0) == 0);
 
-	free(keybuf);
-	keybuf = NULL;
+	free(keyitem.mem);
 }
 
 void
@@ -144,12 +143,11 @@ void
 bdb_read(uint64_t keyno, void *valuep, size_t *valuesizep, int *notfoundp)
 {
 	DBC *dbc = g.dbc;
-	size_t size;
 	int ret;
 
-	key_gen(keybuf, &size, keyno);
-	key.data = keybuf;
-	key.size = (uint32_t)size;
+	key_gen(&keyitem, keyno);
+	key.data = (void *)keyitem.data;
+	key.size = keyitem.size;
 
 	*notfoundp = 0;
 	if ((ret = dbc->get(dbc, &key, &value, DB_SET)) != 0) {
@@ -193,9 +191,9 @@ bdb_remove(uint64_t keyno, int *notfoundp)
 	size_t size;
 	int ret;
 
-	key_gen(keybuf, &size, keyno);
-	key.data = keybuf;
-	key.size = (uint32_t)size;
+	key_gen(&keyitem, keyno);
+	key.data = (void *)keyitem.data;
+	key.size = keyitem.size;
 
 	bdb_read(keyno, &value.data, &size, notfoundp);
 	value.size = (uint32_t)size;

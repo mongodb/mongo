@@ -98,68 +98,70 @@ key_len_setup(void)
 }
 
 void
-key_gen_setup(uint8_t **keyp)
+key_gen_setup(WT_ITEM *key)
 {
-	uint8_t *key;
 	size_t i, len;
-
-	*keyp = NULL;
+	char *p;
 
 	len = MAX(KILOBYTE(100), g.c_key_max);
-	key = dmalloc(len);
+	p = dmalloc(len);
 	for (i = 0; i < len; ++i)
-		key[i] = (uint8_t)("abcdefghijklmnopqrstuvwxyz"[i % 26]);
-	*keyp = key;
+		p[i] = "abcdefghijklmnopqrstuvwxyz"[i % 26];
+
+	key->mem = p;
+	key->memsize = len;
+	key->data = key->mem;
+	key->size = 0;
 }
 
 static void
-key_gen_common(void *keyarg, size_t *sizep, uint64_t keyno, int suffix)
+key_gen_common(WT_ITEM *key, uint64_t keyno, int suffix)
 {
 	int len;
-	uint8_t *key;
+	char *p;
 
-	key = keyarg;
+	p = key->mem;
 
 	/*
 	 * The key always starts with a 10-digit string (the specified cnt)
 	 * followed by two digits, a random number between 1 and 15 if it's
 	 * an insert, otherwise 00.
 	 */
-	len = sprintf((char *)key, "%010" PRIu64 ".%02d", keyno, suffix);
+	len = sprintf(p, "%010" PRIu64 ".%02d", keyno, suffix);
 
 	/*
 	 * In a column-store, the key is only used for BDB, and so it doesn't
 	 * need a random length.
 	 */
 	if (g.type == ROW) {
-		key[len] = '/';
+		p[len] = '/';
 		len = (int)g.key_rand_len[keyno %
 		    (sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]))];
 	}
-	*sizep = (size_t)len;
+	key->size = (size_t)len;
 }
 
 void
-key_gen(void *key, size_t *sizep, uint64_t keyno)
+key_gen(WT_ITEM *key, uint64_t keyno)
 {
-	key_gen_common(key, sizep, keyno, 0);
+	key_gen_common(key, keyno, 0);
 }
 
 void
-key_gen_insert(WT_RAND_STATE *rnd, void *key, size_t *sizep, uint64_t keyno)
+key_gen_insert(WT_RAND_STATE *rnd, WT_ITEM *key, uint64_t keyno)
 {
-	key_gen_common(key, sizep, keyno, (int)mmrand(rnd, 1, 15));
+	key_gen_common(key, keyno, (int)mmrand(rnd, 1, 15));
 }
 
 static uint32_t val_dup_data_len;	/* Length of duplicate data items */
 
 void
-val_gen_setup(WT_RAND_STATE *rnd, uint8_t **valp)
+val_gen_setup(WT_RAND_STATE *rnd, WT_ITEM *value)
 {
-	uint8_t *val;
 	size_t i, len;
+	char *p;
 
-	*valp = NULL;
+	memset(value, 0, sizeof(WT_ITEM));
 
 	/*
 	 * Set initial buffer contents to recognizable text.
@@ -169,22 +171,25 @@ val_gen_setup(WT_RAND_STATE *rnd, uint8_t **valp)
 	 * data for column-store run-length encoded files.
 	 */
 	len = MAX(KILOBYTE(100), g.c_value_max) + 20;
-	val = dmalloc(len);
+	p = dmalloc(len);
 	for (i = 0; i < len; ++i)
-		val[i] = (uint8_t)("ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i % 26]);
+		p[i] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i % 26];
 
-	*valp = val;
+	value->mem = p;
+	value->memsize = len;
+	value->data = value->mem;
+	value->size = 0;
 
 	val_dup_data_len = kv_len(rnd,
 	    (uint64_t)mmrand(rnd, 1, 20), g.c_value_min, g.c_value_max);
 }
 
 void
-val_gen(WT_RAND_STATE *rnd, void *valarg, size_t *sizep, uint64_t keyno)
+val_gen(WT_RAND_STATE *rnd, WT_ITEM *value, uint64_t keyno)
 {
-	uint8_t *val;
+	char *p;
 
-	val = valarg;
+	p = value->mem;
 
 	/*
 	 * Fixed-length records: take the low N bits from the last digit of
@@ -192,16 +197,16 @@ val_gen(WT_RAND_STATE *rnd, void *valarg, size_t *sizep, uint64_t keyno)
 	 */
 	if (g.type == FIX) {
 		switch (g.c_bitcnt) {
-		case 8: val[0] = (uint8_t)mmrand(rnd, 1, 0xff); break;
-		case 7: val[0] = (uint8_t)mmrand(rnd, 1, 0x7f); break;
-		case 6: val[0] = (uint8_t)mmrand(rnd, 1, 0x3f); break;
-		case 5: val[0] = (uint8_t)mmrand(rnd, 1, 0x1f); break;
-		case 4: val[0] = (uint8_t)mmrand(rnd, 1, 0x0f); break;
-		case 3: val[0] = (uint8_t)mmrand(rnd, 1, 0x07); break;
-		case 2: val[0] = (uint8_t)mmrand(rnd, 1, 0x03); break;
-		case 1: val[0] = 1; break;
+		case 8: p[0] = (char)mmrand(rnd, 1, 0xff); break;
+		case 7: p[0] = (char)mmrand(rnd, 1, 0x7f); break;
+		case 6: p[0] = (char)mmrand(rnd, 1, 0x3f); break;
+		case 5: p[0] = (char)mmrand(rnd, 1, 0x1f); break;
+		case 4: p[0] = (char)mmrand(rnd, 1, 0x0f); break;
+		case 3: p[0] = (char)mmrand(rnd, 1, 0x07); break;
+		case 2: p[0] = (char)mmrand(rnd, 1, 0x03); break;
+		case 1: p[0] = 1; break;
 		}
-		*sizep = 1;
+		value->size = 1;
 		return;
 	}
 
@@ -210,8 +215,8 @@ val_gen(WT_RAND_STATE *rnd, void *valarg, size_t *sizep, uint64_t keyno)
 	 * test that by inserting a zero-length data item every so often.
 	 */
 	if (keyno % 63 == 0) {
-		val[0] = '\0';
-		*sizep = 0;
+		p[0] = '\0';
+		value->size = 0;
 		return;
 	}
 
@@ -226,13 +231,13 @@ val_gen(WT_RAND_STATE *rnd, void *valarg, size_t *sizep, uint64_t keyno)
 	if ((g.type == ROW || g.type == VAR) &&
 	    g.c_repeat_data_pct != 0 &&
 	    mmrand(rnd, 1, 100) < g.c_repeat_data_pct) {
-		(void)strcpy((char *)val, "DUPLICATEV");
-		val[10] = '/';
-		*sizep = val_dup_data_len;
+		(void)strcpy(p, "DUPLICATEV");
+		p[10] = '/';
+		value->size = val_dup_data_len;
 	} else {
-		(void)sprintf((char *)val, "%010" PRIu64, keyno);
-		val[10] = '/';
-		*sizep = kv_len(rnd, keyno, g.c_value_min, g.c_value_max);
+		(void)sprintf(p, "%010" PRIu64, keyno);
+		p[10] = '/';
+		value->size = kv_len(rnd, keyno, g.c_value_min, g.c_value_max);
 	}
 }
 
