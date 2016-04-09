@@ -28,14 +28,14 @@
 
 #include "format.h"
 
-static int   col_insert(TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t *);
+static int   col_insert(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t *);
 static int   col_remove(WT_CURSOR *, WT_ITEM *, uint64_t);
-static int   col_update(TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
+static int   col_update(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
 static int   nextprev(WT_CURSOR *, int);
 static void *ops(void *);
-static int   row_insert(TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
+static int   row_insert(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
 static int   row_remove(WT_CURSOR *, WT_ITEM *, uint64_t);
-static int   row_update(TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
+static int   row_update(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
 static void  table_append_init(void);
 
 #ifdef HAVE_BERKELEY_DB
@@ -224,7 +224,7 @@ ops(void *arg)
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor, *cursor_insert;
 	WT_DECL_RET;
-	WT_ITEM key, value;
+	WT_ITEM *key, _key, *value, _value;
 	WT_SESSION *session;
 	uint64_t keyno, ckpt_op, reset_op, session_op;
 	uint32_t op;
@@ -242,8 +242,10 @@ ops(void *arg)
 	__wt_random_init(&tinfo->rnd);
 
 	/* Set up the default key and value buffers. */
-	key_gen_setup(&key);
-	val_gen_setup(&tinfo->rnd, &value);
+	key = &_key;
+	key_gen_setup(key);
+	value = &_value;
+	val_gen_setup(&tinfo->rnd, value);
 
 	/* Set the first operation where we'll create sessions and cursors. */
 	session_op = 0;
@@ -415,11 +417,11 @@ ops(void *arg)
 			++tinfo->remove;
 			switch (g.type) {
 			case ROW:
-				ret = row_remove(cursor, &key, keyno);
+				ret = row_remove(cursor, key, keyno);
 				break;
 			case FIX:
 			case VAR:
-				ret = col_remove(cursor, &key, keyno);
+				ret = col_remove(cursor, key, keyno);
 				break;
 			}
 			positioned = ret == 0;
@@ -429,8 +431,9 @@ ops(void *arg)
 			++tinfo->insert;
 			switch (g.type) {
 			case ROW:
-				ret = row_insert(
-				    tinfo, cursor, &key, &value, keyno);
+				key_gen_insert(&tinfo->rnd, key, keyno);
+				val_gen(&tinfo->rnd, value, keyno);
+				ret = row_insert(cursor, key, value, keyno);
 				break;
 			case FIX:
 			case VAR:
@@ -443,8 +446,9 @@ ops(void *arg)
 					goto skip_insert;
 
 				/* Insert, then reset the insert cursor. */
-				ret = col_insert(tinfo,
-				    cursor_insert, &key, &value, &keyno);
+				val_gen(&tinfo->rnd, value, g.rows + 1);
+				ret = col_insert(
+				    cursor_insert, key, value, &keyno);
 				testutil_check(
 				    cursor_insert->reset(cursor_insert));
 				break;
@@ -457,13 +461,14 @@ ops(void *arg)
 			++tinfo->update;
 			switch (g.type) {
 			case ROW:
-				ret = row_update(
-				    tinfo, cursor, &key, &value, keyno);
+				key_gen(key, keyno);
+				val_gen(&tinfo->rnd, value, keyno);
+				ret = row_update(cursor, key, value, keyno);
 				break;
 			case FIX:
 			case VAR:
-skip_insert:			ret = col_update(
-				    tinfo, cursor, &key, &value, keyno);
+skip_insert:			val_gen(&tinfo->rnd, value, keyno);
+				ret = col_update(cursor, key, value, keyno);
 				break;
 			}
 			positioned = ret == 0;
@@ -471,7 +476,7 @@ skip_insert:			ret = col_update(
 				goto deadlock;
 		} else {
 			++tinfo->search;
-			ret = read_row(cursor, &key, keyno);
+			ret = read_row(cursor, key, keyno);
 			positioned = ret == 0;
 			if (ret == WT_ROLLBACK && intxn)
 				goto deadlock;
@@ -495,7 +500,7 @@ skip_insert:			ret = col_update(
 
 		/* Read to confirm the operation. */
 		++tinfo->search;
-		ret = read_row(cursor, &key, keyno);
+		ret = read_row(cursor, key, keyno);
 		positioned = ret == 0;
 		if (ret == WT_ROLLBACK && intxn)
 			goto deadlock;
@@ -533,8 +538,8 @@ deadlock:			++tinfo->deadlock;
 	if (session != NULL)
 		testutil_check(session->close(session, NULL));
 
-	free(key.mem);
-	free(value.mem);
+	free(key->mem);
+	free(value->mem);
 
 	tinfo->state = TINFO_COMPLETE;
 	return (NULL);
@@ -800,16 +805,12 @@ nextprev(WT_CURSOR *cursor, int next)
  *	Update a row in a row-store file.
  */
 static int
-row_update(TINFO *tinfo,
-    WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
+row_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 {
 	WT_DECL_RET;
 	WT_SESSION *session;
 
 	session = cursor->session;
-
-	key_gen(key, keyno);
-	val_gen(&tinfo->rnd, value, keyno);
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
@@ -846,15 +847,12 @@ row_update(TINFO *tinfo,
  *	Update a row in a column-store file.
  */
 static int
-col_update(TINFO *tinfo,
-    WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
+col_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 {
 	WT_DECL_RET;
 	WT_SESSION *session;
 
 	session = cursor->session;
-
-	val_gen(&tinfo->rnd, value, keyno);
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS) {
@@ -1003,16 +1001,12 @@ table_append(uint64_t keyno)
  *	Insert a row in a row-store file.
  */
 static int
-row_insert(TINFO *tinfo,
-    WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
+row_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 {
 	WT_DECL_RET;
 	WT_SESSION *session;
 
 	session = cursor->session;
-
-	key_gen_insert(&tinfo->rnd, key, keyno);
-	val_gen(&tinfo->rnd, value, keyno);
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
@@ -1049,16 +1043,13 @@ row_insert(TINFO *tinfo,
  *	Insert an element in a column-store file.
  */
 static int
-col_insert(TINFO *tinfo,
-    WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
+col_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
 {
 	WT_DECL_RET;
 	WT_SESSION *session;
 	uint64_t keyno;
 
 	session = cursor->session;
-
-	val_gen(&tinfo->rnd, value, g.rows + 1);
 
 	if (g.type == FIX)
 		cursor->set_value(cursor, *(uint8_t *)value->data);
