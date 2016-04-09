@@ -197,6 +197,7 @@ void QueryPlannerTest::runQueryFull(const BSONObj& query,
                                     bool snapshot) {
     // Clean up any previous state from a call to runQueryFull
     solns.clear();
+    cq.reset();
 
     auto statusWithCQ = CanonicalQuery::canonicalize(nss,
                                                      query,
@@ -211,8 +212,9 @@ void QueryPlannerTest::runQueryFull(const BSONObj& query,
                                                      false,  // explain
                                                      ExtensionsCallbackNoop());
     ASSERT_OK(statusWithCQ.getStatus());
+    cq = std::move(statusWithCQ.getValue());
 
-    ASSERT_OK(QueryPlanner::plan(*statusWithCQ.getValue(), params, &solns.mutableVector()));
+    ASSERT_OK(QueryPlanner::plan(*cq, params, &solns.mutableVector()));
 }
 
 void QueryPlannerTest::runInvalidQuery(const BSONObj& query) {
@@ -263,6 +265,7 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
                                            const BSONObj& maxObj,
                                            bool snapshot) {
     solns.clear();
+    cq.reset();
 
     auto statusWithCQ = CanonicalQuery::canonicalize(nss,
                                                      query,
@@ -277,13 +280,15 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
                                                      false,  // explain
                                                      ExtensionsCallbackNoop());
     ASSERT_OK(statusWithCQ.getStatus());
+    cq = std::move(statusWithCQ.getValue());
 
-    Status s = QueryPlanner::plan(*statusWithCQ.getValue(), params, &solns.mutableVector());
+    Status s = QueryPlanner::plan(*cq, params, &solns.mutableVector());
     ASSERT_NOT_OK(s);
 }
 
 void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
     solns.clear();
+    cq.reset();
 
     invariant(nss.isValid());
 
@@ -293,8 +298,9 @@ void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
 
     auto statusWithCQ = CanonicalQuery::canonicalize(lpq.release(), ExtensionsCallbackNoop());
     ASSERT_OK(statusWithCQ.getStatus());
+    cq = std::move(statusWithCQ.getValue());
 
-    Status s = QueryPlanner::plan(*statusWithCQ.getValue(), params, &solns.mutableVector());
+    Status s = QueryPlanner::plan(*cq, params, &solns.mutableVector());
     ASSERT_OK(s);
 }
 
