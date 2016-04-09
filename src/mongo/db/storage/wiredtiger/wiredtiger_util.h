@@ -175,6 +175,13 @@ public:
 
     static int64_t getIdentSize(WT_SESSION* s, const std::string& uri);
 
+
+    /**
+     * Return amount of memory to use for the WiredTiger cache based on either the startup
+     * option chosen or the amount of available memory on the host.
+     */
+    static size_t getCacheSizeMB(int requestedCacheSizeGB);
+
     /**
      * Returns a WT_EVENT_HANDER with MongoDB's default handlers.
      * The default handlers just log so it is recommended that you consider calling them even if

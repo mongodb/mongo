@@ -45,6 +45,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -315,6 +316,20 @@ int64_t WiredTigerUtil::getIdentSize(WT_SESSION* s, const std::string& uri) {
         uassertStatusOK(status);
     }
     return result.getValue();
+}
+
+size_t WiredTigerUtil::getCacheSizeMB(int requestedCacheSizeGB) {
+    double cacheSizeMB;
+    if (requestedCacheSizeGB == 0) {
+        // Choose a reasonable amount of cache when not explicitly specified by user.
+        // Set a minimum of 256MB, otherwise use 60% of available memory over 1GB.
+        ProcessInfo pi;
+        double memSizeMB = pi.getMemSizeMB();
+        cacheSizeMB = std::max((memSizeMB - 1024) * 0.6, 256.0);
+    } else {
+        cacheSizeMB = 1024 * requestedCacheSizeGB;
+    }
+    return static_cast<size_t>(cacheSizeMB);
 }
 
 namespace {
