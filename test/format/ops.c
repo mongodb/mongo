@@ -314,7 +314,7 @@ snap_check(WT_CURSOR *cursor,
 				    cursor->get_value(cursor, value));
 		} else
 			if (ret != WT_NOTFOUND)
-				return (0);
+				return (ret);
 
 		/* Check for simple matches. */
 		if (ret == 0 && !start->deleted &&
