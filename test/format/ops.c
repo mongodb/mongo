@@ -771,7 +771,7 @@ wts_read_scan(void)
 		}
 	}
 
-err:	testutil_check(session->close(session, NULL));
+	testutil_check(session->close(session, NULL));
 
 	free(key.mem);
 	free(value.mem);
