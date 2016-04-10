@@ -1462,7 +1462,7 @@ protected:
     }
 
     DocumentSource* sample() {
-        return static_cast<DocumentSourceSample*>(_sample.get());
+        return _sample.get();
     }
 
     DocumentSourceMock* source() {
