@@ -1243,7 +1243,7 @@ Value Value::deserializeForSorter(BufReader& buf, const SorterDeserializeSetting
         }
 
         case BinData: {
-            BinDataType bdt = BinDataType(buf.read<char>());
+            BinDataType bdt = BinDataType(buf.read<unsigned char>());
             int size = buf.read<LittleEndian<int>>();
             const void* data = buf.skip(size);
             return Value(BSONBinData(data, size, bdt));
