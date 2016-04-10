@@ -47,11 +47,24 @@ dmalloc(size_t len)
 }
 
 /*
+ * drealloc --
+ *	Call realloc, dying on failure.
+ */
+void *
+drealloc(void *p, size_t len)
+{
+	void *t;
+	if ((t = realloc(p, len)) == NULL)
+		testutil_die(errno, "realloc");
+	return (t);
+}
+
+/*
  * dstrdup --
  *	Call strdup, dying on failure.
  */
-char *
-dstrdup(const char *str)
+void *
+dstrdup(const void *str)
 {
 	char *p;
 
@@ -138,6 +151,8 @@ key_gen_common(WT_ITEM *key, uint64_t keyno, int suffix)
 		len = (int)g.key_rand_len[keyno %
 		    (sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]))];
 	}
+
+	key->data = key->mem;
 	key->size = (size_t)len;
 }
 
@@ -190,6 +205,7 @@ val_gen(WT_RAND_STATE *rnd, WT_ITEM *value, uint64_t keyno)
 	char *p;
 
 	p = value->mem;
+	value->data = value->mem;
 
 	/*
 	 * Fixed-length records: take the low N bits from the last digit of
