@@ -339,14 +339,40 @@ snap_check(WT_CURSOR *cursor,
 		}
 
 		/* Things went pear-shaped. */
-		testutil_die(ret,
-		    "snap_check: %.*s search: expected {%.*s}, found {%.*s}",
-		    (int)key->size, key->data,
-		    start->deleted ? (int)strlen("deleted") : (int)start->vsize,
-		    start->deleted ? "deleted" : start->vdata,
-		    ret == WT_NOTFOUND ?
-		    (int)strlen("deleted") : (int)value->size,
-		    ret == WT_NOTFOUND ? "deleted" : value->data);
+		switch (g.type) {
+		case FIX:
+			testutil_die(ret,
+			    "snap_check: %" PRIu64 " search: "
+			    "expected {0x%02x}, found {0x%02x}",
+			    start->keyno,
+			    start->deleted ? 0 : *(uint8_t *)start->vdata,
+			    ret == WT_NOTFOUND ? 0 : *(uint8_t *)value->data);
+			/* NOTREACHED */
+		case ROW:
+			testutil_die(ret,
+			    "snap_check: %.*s search: "
+			    "expected {%.*s}, found {%.*s}",
+			    (int)key->size, key->data,
+			    start->deleted ?
+			    (int)strlen("deleted") : (int)start->vsize,
+			    start->deleted ? "deleted" : start->vdata,
+			    ret == WT_NOTFOUND ?
+			    (int)strlen("deleted") : (int)value->size,
+			    ret == WT_NOTFOUND ? "deleted" : value->data);
+			/* NOTREACHED */
+		case VAR:
+			testutil_die(ret,
+			    "snap_check: %" PRIu64 " search: "
+			    "expected {%.*s}, found {%.*s}",
+			    start->keyno,
+			    start->deleted ?
+			    (int)strlen("deleted") : (int)start->vsize,
+			    start->deleted ? "deleted" : start->vdata,
+			    ret == WT_NOTFOUND ?
+			    (int)strlen("deleted") : (int)value->size,
+			    ret == WT_NOTFOUND ? "deleted" : value->data);
+			/* NOTREACHED */
+		}
 	}
 	return (0);
 }
