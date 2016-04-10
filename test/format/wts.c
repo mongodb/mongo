@@ -273,8 +273,13 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 void
 wts_reopen(void)
 {
+	WT_CONNECTION *conn;
+
 	testutil_checkfmt(wiredtiger_open(g.home, &event_handler,
-	    g.wiredtiger_open_config, &g.wts_conn), "%s", g.home);
+	    g.wiredtiger_open_config, &conn), "%s", g.home);
+
+	g.wt_api = conn->get_extension_api(conn);
+	g.wts_conn = conn;
 }
 
 /*
