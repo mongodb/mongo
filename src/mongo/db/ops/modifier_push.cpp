@@ -314,13 +314,17 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
                         "The $position value in $push must be representable as a 32-bit integer.");
                 }
                 break;
-            case NumberDouble:
-                if (positionElem.numberInt() != positionElem.numberDouble()) {
-                    return Status(
-                        ErrorCodes::BadValue,
-                        "The $position value in $push must be representable as a 32-bit integer.");
+            case NumberDouble: {
+                const auto doubleVal = positionElem.numberDouble();
+                if (doubleVal != 0.0) {
+                    if (!std::isnormal(doubleVal) || (doubleVal != positionElem.numberInt())) {
+                        return Status(ErrorCodes::BadValue,
+                                      "The $position value in $push must be representable as a "
+                                      "32-bit integer.");
+                    }
                 }
                 break;
+            }
             default:
                 return Status(ErrorCodes::BadValue,
                               str::stream() << "The value for $position must "
