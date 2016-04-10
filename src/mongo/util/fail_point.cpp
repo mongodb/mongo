@@ -103,11 +103,6 @@ void FailPoint::setMode(Mode mode, ValType val, const BSONObj& extra) {
         sleepmillis(50);
     }
 
-    // Step 3
-    uassert(16442,
-            str::stream() << "mode not supported " << static_cast<int>(mode),
-            mode >= off && mode < numModes);
-
     _mode = mode;
     _timesOrPeriod.store(val);
 

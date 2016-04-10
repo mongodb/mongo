@@ -68,7 +68,7 @@ class FailPoint {
 
 public:
     typedef AtomicUInt32::WordType ValType;
-    enum Mode { off, alwaysOn, random, nTimes, numModes };
+    enum Mode { off, alwaysOn, random, nTimes };
     enum RetCode { fastOff = 0, slowOff, slowOn };
 
     /**

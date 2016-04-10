@@ -142,16 +142,6 @@ TEST(FailPoint, SetGetParam) {
     }
 }
 
-TEST(FailPoint, SetInvalidMode) {
-    FailPoint failPoint;
-
-    ASSERT_THROWS(failPoint.setMode(static_cast<FailPoint::Mode>(9999)), mongo::UserException);
-    ASSERT_FALSE(failPoint.shouldFail());
-
-    ASSERT_THROWS(failPoint.setMode(static_cast<FailPoint::Mode>(-1)), mongo::UserException);
-    ASSERT_FALSE(failPoint.shouldFail());
-}
-
 class FailPointStress : public mongo::unittest::Test {
 public:
     void setUp() {
