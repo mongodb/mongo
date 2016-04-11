@@ -15,8 +15,11 @@
         ]
     });
 
-    // 2 should be master (give this a while to happen, as 0 will be elected, then demoted)
+    // 2 should be master (give this a while to happen, as other nodes might first be elected)
     replTest.waitForState(nodes[2], ReplSetTest.State.PRIMARY, 120000);
+    // wait for 1 to not appear to be master (we are about to make it master and need a clean slate
+    // here)
+    replTest.waitForState(nodes[1], ReplSetTest.State.SECONDARY, 60000);
 
     // kill 2, 1 should take over
     replTest.stop(2);
