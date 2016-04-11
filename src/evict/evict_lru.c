@@ -1451,7 +1451,7 @@ __evict_check_entry_size(WT_SESSION_IMPL *session, WT_EVICT_ENTRY *entry)
 
 	cache = S2C(session)->cache;
 
-	if(cache->pages_evict == 0)
+	if (cache->pages_evict == 0)
 		return (true);
 
 	max = (cache->bytes_evict / cache->pages_evict) * 4;
