@@ -1344,8 +1344,14 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 	locked = true;
 	for (i = 0; i < lsm_tree->nchunks; i++) {
 		chunk = lsm_tree->chunk[i];
-		if (file_func == __wt_checkpoint &&
-		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
+		/*
+		 * If the chunk is on disk, don't include underlying handles in
+		 * the checkpoint. Checking the "get handles" function is all
+		 * we need to do, no further checkpoint calls are done if the
+		 * handle is not gathered.
+		 */
+		if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
+		    file_func == __wt_checkpoint_get_handles)
 			continue;
 		WT_ERR(__wt_schema_worker(session, chunk->uri,
 		    file_func, name_func, cfg, open_flags));
