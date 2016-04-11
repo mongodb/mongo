@@ -454,7 +454,6 @@ __curjoin_init_iter(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin)
 		    "join cursor has not yet been joined with any other "
 		    "cursors");
 
-	je = &cjoin->entries[0];
 	jeend = &cjoin->entries[cjoin->entries_next];
 
 	/*
