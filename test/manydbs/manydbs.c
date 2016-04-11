@@ -41,7 +41,7 @@
 #include "test_util.i"
 
 #define	HOME_SIZE	512
-#define	HOME_BASE	"WT_HOME"
+#define	HOME_BASE	"WT_TEST"
 static char home[HOME_SIZE];		/* Base home directory */
 static char hometmp[HOME_SIZE];		/* Each conn home directory */
 static const char *progname;		/* Program name */
