@@ -679,7 +679,6 @@ __log_wrlsn_server(void *arg)
 	log = conn->log;
 	yield = 0;
 	WT_INIT_LSN(&prev);
-	did_work = false;
 	while (F_ISSET(conn, WT_CONN_LOG_SERVER_RUN)) {
 		/*
 		 * Write out any log record buffers if anything was done
@@ -694,10 +693,8 @@ __log_wrlsn_server(void *arg)
 		else
 			WT_STAT_FAST_CONN_INCR(session, log_write_lsn_skip);
 		prev = log->alloc_lsn;
-		if (yield == 0)
-			did_work = true;
-		else
-			did_work = false;
+		did_work = yield == 0;
+
 		/*
 		 * If __wt_log_wrlsn did work we want to yield instead of sleep.
 		 */
