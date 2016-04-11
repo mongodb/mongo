@@ -116,19 +116,8 @@ functions:
           set -e
           set -v
           cd ./clusters/${cluster}
-          cat ips.sh
-          ./update_run_config.sh
-          rm -rf ./reports
-          rm -f ../../reports.tgz
-          echo "Run test for ${test} with setup ${setup}"
-          # run test
+          echo "Run test for ${test}-${storageEngine} with setup ${setup}"
           ../../bin/run-${test}.sh ${storageEngine} ${setup} ${cluster}
-          rm -f ../perf.json
-          chmod 766 perf.json
-          cp ./perf.json ..
-          cd ..
-          pwd
-          cat perf.json
           echo "Done test for ${test} with setup ${setup}!"
     - command: "json.send"
       params:
@@ -283,7 +272,7 @@ tasks:
 
 - name: distributed_correctness_suite_1_MMAPv1
   depends_on:
-    - name: distributed_correctness_suite_2_wiredTiger
+    - name: distributed_correctness_suite_1_wiredTiger
       status : "*"
   commands:
     - func: "prepare environment"
@@ -301,44 +290,6 @@ tasks:
     - func: "upload log file"
       vars:
         test: "distributed_correctness_suite_1_MMAPv1"
-    - func: "analyze"
-
-- name: distributed_correctness_suite_2_wiredTiger
-  depends_on:
-    - name: distributed_correctness_suite_1_wiredTiger
-      status : "*"
-  commands:
-    - func: "prepare environment"
-    - func: "restore cluster"
-
-    - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "distributed_correctness_suite_2"
-
-    - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "distributed_correctness_suite_2_wiredTiger"
-    - func: "analyze"
-
-- name: distributed_correctness_suite_2_MMAPv1
-  depends_on:
-    - name: distributed_correctness_suite_1_MMAPv1
-      status : "*"
-  commands:
-    - func: "prepare environment"
-    - func: "restore cluster"
-
-    - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "distributed_correctness_suite_2"
-
-    - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "distributed_correctness_suite_2_MMAPv1"
     - func: "destroy cluster"
     - func: "analyze"
 
@@ -363,9 +314,7 @@ buildvariants:
       distros:
       - rhel55
     - name: distributed_correctness_suite_1_wiredTiger
-    - name: distributed_correctness_suite_2_wiredTiger
     - name: distributed_correctness_suite_1_MMAPv1
-    - name: distributed_correctness_suite_2_MMAPv1
 
 - name: linux-3-node-replSet
   display_name: Linux 3-Node ReplSet
@@ -379,6 +328,4 @@ buildvariants:
       - "rhel70-perf-replset"
   tasks:
     - name: distributed_correctness_suite_1_wiredTiger
-    - name: distributed_correctness_suite_2_wiredTiger
     - name: distributed_correctness_suite_1_MMAPv1
-    - name: distributed_correctness_suite_2_MMAPv1

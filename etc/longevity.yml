@@ -87,18 +87,8 @@ functions:
           set -e
           set -v
           cd ./clusters/${cluster}
-          # show cluster details
-          cat ips.sh
-          ./update_run_config.sh
-          cat run-${test}.json
-          # clean up old artifact from the last test
-          rm -f ../perf.json
-          rm -rf ./reports
-          rm -f ../../reports.tgz
-          echo "Run test for ${test} with setup ${setup}"
-          # run test
+          echo "Run test for ${test}-${storageEngine} with setup ${setup}"
           ../../bin/run-${test}.sh ${storageEngine} ${setup} ${cluster}
-          mv perf.json ..
           cd ..
           cat perf.json >> perf_all.json
           echo "Complete test for ${test} with setup ${setup}!"
@@ -245,27 +235,8 @@ tasks:
         use_csrs: "false"
     - func: "run test"
       vars:
+        storageEngine: "wiredTiger"
         test: "ycsb"
-    - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "ycsb"
-    - func: "destroy cluster"
-    - func: "analyze"
-
-- name: shard_cluster_CSRS_test
-  depends_on:
-    - name: compile
-  exec_timeout_secs: 28800
-  commands:
-    - func: "prepare environment"
-    - func: "bring up 3 shard cluster"
-    - func: "configure mongodb cluster"
-      vars:
-        use_csrs: "true"
-    - func: "run test"
-      vars:
-        test: "ycsb-csrs"
     - func: "make test log artifact"
     - func: "upload log file"
       vars:
@@ -285,7 +256,9 @@ tasks:
         use_csrs: "false"
     - func: "run test"
       vars:
-        test: "ycsb-mmap"
+        test: "ycsb"
+        storageEngine: "mmapv1"
+        test: "ycsb"
     - func: "make test log artifact"
     - func: "upload log file"
       vars:
@@ -311,25 +284,6 @@ buildvariants:
       distros:
       - rhel55
     - name: shard_cluster_test
-
-- name: linux-wt-shard-csrs
-  display_name: Linux WT Shard CSRS
-  batchtime: 20160 # 2 weeks
-  expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
-    setup: shard
-    cluster: longevity
-    numShard: 3
-    storageEngine: wiredTiger
-
-  run_on:
-    - "linux-64-amzn-perf-longevity"
-  tasks:
-    - name: compile
-      distros:
-      - rhel55
-    - name: shard_cluster_CSRS_test
-
 
 - name: linux-mmapv1-shard
   display_name: Linux MMAPv1 Shard
