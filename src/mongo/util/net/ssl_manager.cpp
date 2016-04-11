@@ -62,7 +62,6 @@
 #include <openssl/x509_vfy.h>
 #include <openssl/x509v3.h>
 #if defined(_WIN32)
-#include <openssl/pkcs7.h>
 #include <wincrypt.h>
 #elif defined(__APPLE__)
 #include <Security/Security.h>
@@ -837,73 +836,28 @@ Status importCertStoreToX509_STORE(LPWSTR storeName, DWORD storeLocation, X509_S
     }
     auto systemStoreGuard = MakeGuard([systemStore]() { CertCloseStore(systemStore, 0); });
 
-    CERT_BLOB p7Data = {0, NULL};
-    // We call this the first time to get the size of the PKCS7 object that will be generated
-    if (CertSaveStore(systemStore,
-                      (PKCS_7_ASN_ENCODING | X509_ASN_ENCODING),  // Save it as X509 certs/CRLs
-                                                                  // encoded as PKCS7 objects
-                      CERT_STORE_SAVE_AS_PKCS7,                   // Save as a PKCS7 encoded object
-                      CERT_STORE_SAVE_TO_MEMORY,                  // Save cert store to memory
-                      &p7Data,
-                      0) == 0) {
-        return {ErrorCodes::InvalidSSLConfiguration,
-                str::stream() << "error getting size of PKCS7 object from system CA store"
-                              << errnoWithDescription()};
-    }
+    PCCERT_CONTEXT certCtx = NULL;
+    while ((certCtx = CertEnumCertificatesInStore(systemStore, certCtx)) != NULL) {
+        auto certBytes = static_cast<const unsigned char*>(certCtx->pbCertEncoded);
+        X509* x509Obj = d2i_X509(NULL, &certBytes, certCtx->cbCertEncoded);
+        if (x509Obj == NULL) {
+            return {ErrorCodes::InvalidSSLConfiguration,
+                    str::stream() << "Error parsing X509 object from Windows certificate store"
+                                  << SSLManagerInterface::getSSLErrorMessage(ERR_get_error())};
+        }
+        const auto x509ObjGuard = MakeGuard([&x509Obj]() { X509_free(x509Obj); });
 
-    std::unique_ptr<BYTE[]> pbDataPtr(new BYTE[p7Data.cbData]);
-    p7Data.pbData = pbDataPtr.get();
-
-    // Then we call it again to actually create the PKCS7 object.
-    if (CertSaveStore(systemStore,
-                      (PKCS_7_ASN_ENCODING | X509_ASN_ENCODING),  // Save it as X509 certs/CRLs
-                                                                  // encoded as PKCS7 objects
-                      CERT_STORE_SAVE_AS_PKCS7,                   // Save as a PKCS7 encoded object
-                      CERT_STORE_SAVE_TO_MEMORY,                  // Save cert store to memory
-                      &p7Data,
-                      0) == 0) {
-        return {ErrorCodes::InvalidSSLConfiguration,
-                str::stream() << "error getting system CA store: " << errnoWithDescription()};
-    }
-
-    auto bioDeleter = [](BIO* b) { BIO_free_all(b); };
-    std::unique_ptr<BIO, decltype(bioDeleter)> p7Bio(BIO_new_mem_buf(p7Data.pbData, p7Data.cbData),
-                                                     bioDeleter);
-    if (!p7Bio) {
-        return {ErrorCodes::InvalidSSLConfiguration,
-                "error creating BIO for loading system CA cert store"};
-    }
-    BIO_set_close(p7Bio.get(), BIO_NOCLOSE);
-
-    auto pkcs7Deleter = [](PKCS7* p) { PKCS7_free(p); };
-    std::unique_ptr<PKCS7, decltype(pkcs7Deleter)> p7(d2i_PKCS7_bio(p7Bio.get(), NULL),
-                                                      pkcs7Deleter);
-    if (!p7) {
-        return {ErrorCodes::InvalidSSLConfiguration,
-                "error parsing PKCS7 object from system CA cert store"};
-    }
-
-    if ((OBJ_obj2nid(p7->type) != NID_pkcs7_signed) || (p7->d.sign->cert == NULL)) {
-        return {ErrorCodes::InvalidSSLConfiguration,
-                "invalid pkcs7 object while loading system certificates"};
-    }
-
-    STACK_OF(X509)* systemCACerts = p7->d.sign->cert;
-    for (auto i = 0; i < sk_X509_num(systemCACerts); i++) {
-        if (X509_STORE_add_cert(verifyStore, sk_X509_value(systemCACerts, i)) != 1) {
+        if (X509_STORE_add_cert(verifyStore, x509Obj) != 1) {
             auto status = checkX509_STORE_error();
             if (!status.isOK())
                 return status;
         }
     }
-
-    STACK_OF(X509_CRL)* systemCRLs = p7->d.sign->crl;
-    for (auto i = 0; i < sk_X509_CRL_num(systemCRLs); i++) {
-        if (X509_STORE_add_crl(verifyStore, sk_X509_CRL_value(systemCRLs, i)) != 1) {
-            auto status = checkX509_STORE_error();
-            if (!status.isOK())
-                return status;
-        }
+    int lastError = GetLastError();
+    if (lastError != CRYPT_E_NOT_FOUND) {
+        return {
+            ErrorCodes::InvalidSSLConfiguration,
+            str::stream() << "Error enumerating certificates: " << errnoWithDescription(lastError)};
     }
 
     return Status::OK();
@@ -947,11 +901,11 @@ Status importKeychainToX509_STORE(X509_STORE* verifyStore) {
                   "Sizes of the search keys and values dictionaries should be the same size");
 
     auto searchDict = makeCFTypeRefHolder(CFDictionaryCreate(kCFAllocatorDefault,
-                                                         searchDictKeys.data(),
-                                                         searchDictValues.data(),
-                                                         searchDictKeys.size(),
-                                                         &kCFTypeDictionaryKeyCallBacks,
-                                                         &kCFTypeDictionaryValueCallBacks));
+                                                             searchDictKeys.data(),
+                                                             searchDictValues.data(),
+                                                             searchDictKeys.size(),
+                                                             &kCFTypeDictionaryKeyCallBacks,
+                                                             &kCFTypeDictionaryValueCallBacks));
 
     CFArrayRef result;
     OSStatus status;
