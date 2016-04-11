@@ -300,7 +300,7 @@ if processor == 'i386':
     cpp_defines['ia32'] = '1'
 
 # Using 64 bit
-elif processor == 'x86_64':
+elif processor == 'x86_64' or processor == 'ppc64le':
     cpp_defines['efi2'] = '1'
     cpp_defines['EFI2'] = '1'
 else:
