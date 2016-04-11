@@ -3,6 +3,7 @@ selector:
     roots:
     - jstests/aggregation/*.js
     - jstests/aggregation/bugs/*.js
+    - jstests/aggregation/expressions/*.js
     exclude_files:
     - jstests/aggregation/bugs/server18198.js # Uses a mocked mongo client to test read preference.
     - jstests/aggregation/mongos_slaveok.js # Majority read on secondary requires afterOpTime.

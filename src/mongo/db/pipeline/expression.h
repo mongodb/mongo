@@ -1278,6 +1278,25 @@ public:
 };
 
 
+class ExpressionSwitch final : public ExpressionFixedArity<ExpressionSwitch, 1> {
+public:
+    void addDependencies(DepsTracker* deps, std::vector<std::string>* path = nullptr) const final;
+    Value evaluateInternal(Variables* vars) const final;
+    boost::intrusive_ptr<Expression> optimize() final;
+    static boost::intrusive_ptr<Expression> parse(BSONElement expr,
+                                                  const VariablesParseState& vpsIn);
+    Value serialize(bool explain) const final;
+    const char* getOpName() const final;
+
+private:
+    using ExpressionPair =
+        std::pair<boost::intrusive_ptr<Expression>, boost::intrusive_ptr<Expression>>;
+
+    boost::intrusive_ptr<Expression> _default;
+    std::vector<ExpressionPair> _branches;
+};
+
+
 class ExpressionToLower final : public ExpressionFixedArity<ExpressionToLower, 1> {
 public:
     Value evaluateInternal(Variables* vars) const final;

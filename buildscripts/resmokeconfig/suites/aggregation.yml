@@ -3,6 +3,7 @@ selector:
     roots:
     - jstests/aggregation/*.js
     - jstests/aggregation/bugs/*.js
+    - jstests/aggregation/expressions/*.js
 
 executor:
   js_test:

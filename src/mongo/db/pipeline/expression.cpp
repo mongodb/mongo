@@ -3264,6 +3264,136 @@ const char* ExpressionSubtract::getOpName() const {
     return "$subtract";
 }
 
+/* ------------------------- ExpressionSwitch ------------------------------ */
+
+REGISTER_EXPRESSION(switch, ExpressionSwitch::parse);
+const char* ExpressionSwitch::getOpName() const {
+    return "$switch";
+}
+
+Value ExpressionSwitch::evaluateInternal(Variables* vars) const {
+    for (auto&& branch : _branches) {
+        Value caseExpression(branch.first->evaluateInternal(vars));
+
+        if (caseExpression.coerceToBool()) {
+            return branch.second->evaluateInternal(vars);
+        }
+    }
+
+    uassert(40066,
+            "$switch could not find a matching branch for an input, and no default was specified.",
+            _default);
+
+    return _default->evaluateInternal(vars);
+}
+
+boost::intrusive_ptr<Expression> ExpressionSwitch::parse(BSONElement expr,
+                                                         const VariablesParseState& vps) {
+    uassert(40060,
+            str::stream() << "$switch requires an object as an argument, found: "
+                          << typeName(expr.type()),
+            expr.type() == Object);
+
+    intrusive_ptr<ExpressionSwitch> expression(new ExpressionSwitch());
+
+    for (auto&& elem : expr.Obj()) {
+        auto field = elem.fieldNameStringData();
+
+        if (field == "branches") {
+            // Parse each branch separately.
+            uassert(40061,
+                    str::stream() << "$switch expected an array for 'branches', found: "
+                                  << typeName(elem.type()),
+                    elem.type() == Array);
+
+            for (auto&& branch : elem.Array()) {
+                uassert(40062,
+                        str::stream() << "$switch expected each branch to be an object, found: "
+                                      << typeName(branch.type()),
+                        branch.type() == Object);
+
+                ExpressionPair branchExpression;
+
+                for (auto&& branchElement : branch.Obj()) {
+                    auto branchField = branchElement.fieldNameStringData();
+
+                    if (branchField == "case") {
+                        branchExpression.first = parseOperand(branchElement, vps);
+                    } else if (branchField == "then") {
+                        branchExpression.second = parseOperand(branchElement, vps);
+                    } else {
+                        uasserted(40063,
+                                  str::stream() << "$switch found an unknown argument to a branch: "
+                                                << branchField);
+                    }
+                }
+
+                uassert(40064,
+                        "$switch requires each branch have a 'case' expression",
+                        branchExpression.first);
+                uassert(40065,
+                        "$switch requires each branch have a 'then' expression.",
+                        branchExpression.second);
+
+                expression->_branches.push_back(branchExpression);
+            }
+        } else if (field == "default") {
+            // Optional, arbitrary expression.
+            expression->_default = parseOperand(elem, vps);
+        } else {
+            uasserted(40067, str::stream() << "$switch found an unknown argument: " << field);
+        }
+    }
+
+    uassert(40068, "$switch requires at least one branch.", !expression->_branches.empty());
+
+    return expression;
+}
+
+void ExpressionSwitch::addDependencies(DepsTracker* deps, std::vector<std::string>* path) const {
+    for (auto&& branch : _branches) {
+        branch.first->addDependencies(deps, path);
+        branch.second->addDependencies(deps, path);
+    }
+
+    if (_default) {
+        _default->addDependencies(deps, path);
+    }
+}
+
+boost::intrusive_ptr<Expression> ExpressionSwitch::optimize() {
+    if (_default) {
+        _default = _default->optimize();
+    }
+
+    std::transform(_branches.begin(),
+                   _branches.end(),
+                   _branches.begin(),
+                   [](ExpressionPair branch) -> ExpressionPair {
+                       return {branch.first->optimize(), branch.second->optimize()};
+                   });
+
+    return this;
+}
+
+Value ExpressionSwitch::serialize(bool explain) const {
+    std::vector<Value> serializedBranches;
+    serializedBranches.reserve(_branches.size());
+
+    for (auto&& branch : _branches) {
+        serializedBranches.push_back(Value(Document{{"case", branch.first->serialize(explain)},
+                                                    {"then", branch.second->serialize(explain)}}));
+    }
+
+    if (_default) {
+        return Value(Document{{"$switch",
+                               Document{{"branches", Value(serializedBranches)},
+                                        {"default", _default->serialize(explain)}}}});
+    }
+
+    return Value(Document{{"$switch", Document{{"branches", Value(serializedBranches)}}}});
+}
+
 /* ------------------------- ExpressionToLower ----------------------------- */
 
 Value ExpressionToLower::evaluateInternal(Variables* vars) const {
