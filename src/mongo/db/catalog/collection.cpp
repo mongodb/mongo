@@ -962,9 +962,13 @@ public:
         // Only used to determine if any index validation failed in this function,
         // doesn't include any indexes that have already been marked as invalid.
         bool allIndexesValid = true;
-
+        uint64_t documentCount = 0;
+        int interruptInterval = 4096;
         if (_full) {
             while (const auto& document = documentCursor->next()) {
+                if (!(documentCount % interruptInterval))
+                    txn->checkForInterrupt();
+                documentCount++;
                 IndexCatalog::IndexIterator i = indexCatalog.getIndexIterator(txn, false);
                 RecordId documentRecordId = document->id;
 
@@ -1149,6 +1153,7 @@ Status Collection::validate(OperationContext* txn,
 
             IndexCatalog::IndexIterator i = _indexCatalog.getIndexIterator(txn, false);
             while (i.more()) {
+                txn->checkForInterrupt();
                 const IndexDescriptor* descriptor = i.next();
                 log(LogComponent::kIndex) << "validating index " << descriptor->indexNamespace()
                                           << endl;
@@ -1204,6 +1209,9 @@ Status Collection::validate(OperationContext* txn,
                 output->append("indexDetails", indexDetails->done());
             }
         } catch (DBException& e) {
+            if (ErrorCodes::isInterruption(ErrorCodes::Error(e.getCode()))) {
+                return e.toStatus();
+            }
             string err = str::stream() << "exception during index validate idxn "
                                        << BSONObjBuilder::numStr(idxn) << ": " << e.toString();
             results->errors.push_back(err);

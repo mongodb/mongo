@@ -1504,7 +1504,7 @@ Status WiredTigerRecordStore::validate(OperationContext* txn,
         if (err == EBUSY) {
             const char* msg = "verify() returned EBUSY. Not treating as invalid.";
             warning() << msg;
-            results->errors.push_back(msg);
+            results->warnings.push_back(msg);
         } else if (err) {
             std::string msg = str::stream() << "verify() returned " << wiredtiger_strerror(err)
                                             << ". "
@@ -1521,7 +1521,10 @@ Status WiredTigerRecordStore::validate(OperationContext* txn,
     long long dataSizeTotal = 0;
     results->valid = true;
     Cursor cursor(txn, *this, true);
+    int interruptInterval = 4096;
     while (auto record = cursor.next()) {
+        if (!(nrecords % interruptInterval))
+            txn->checkForInterrupt();
         ++nrecords;
         auto dataSize = record->data.size();
         dataSizeTotal += dataSize;
