@@ -479,11 +479,11 @@ dump_table_config(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 	 */
 	cursor->set_key(cursor, uri);
 	if ((ret = cursor->search(cursor)) != 0)
-		return (util_cerr(cursor, "search", ret));
+		WT_ERR(util_cerr(cursor, "search", ret));
 	if ((ret = cursor->get_value(cursor, &v)) != 0)
-		return (util_cerr(cursor, "get_value", ret));
+		WT_ERR(util_cerr(cursor, "get_value", ret));
 	if ((*--cfg = strdup(v)) == NULL)
-		return (util_err(session, errno, NULL));
+		WT_ERR(util_err(session, errno, NULL));
 
 	/*
 	 * Workaround for WiredTiger "simple" table handling. Simple tables
@@ -497,37 +497,36 @@ dump_table_config(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 	if (WT_PREFIX_MATCH(uri, "table:")) {
 		len = strlen("colgroup:") + strlen(name) + 1;
 		if ((p = malloc(len)) == NULL)
-			return (util_err(session, errno, NULL));
+			WT_ERR(util_err(session, errno, NULL));
 		(void)snprintf(p, len, "colgroup:%s", name);
 		cursor->set_key(cursor, p);
 		if ((ret = cursor->search(cursor)) == 0) {
 			if ((ret = cursor->get_value(cursor, &v)) != 0)
-				return (util_cerr(cursor, "get_value", ret));
+				WT_ERR(util_cerr(cursor, "get_value", ret));
 			if ((*--cfg = strdup(v)) == NULL)
-				return (util_err(session, errno, NULL));
+				WT_ERR(util_err(session, errno, NULL));
 			if ((ret =__wt_config_getones(
 			    (WT_SESSION_IMPL *)session,
 			    *cfg, "source", &cval)) != 0)
-				return (util_err(
+				WT_ERR(util_err(
 				    session, ret, "%s: source entry", p));
 			free(p);
 			len = cval.len + 10;
 			if ((p = malloc(len)) == NULL)
-				return (util_err(session, errno, NULL));
+				WT_ERR(util_err(session, errno, NULL));
 			(void)snprintf(p, len, "%.*s", (int)cval.len, cval.str);
 			cursor->set_key(cursor, p);
 			if ((ret = cursor->search(cursor)) != 0)
-				return (util_cerr(cursor, "search", ret));
+				WT_ERR(util_cerr(cursor, "search", ret));
 			if ((ret = cursor->get_value(cursor, &v)) != 0)
-				return (util_cerr(cursor, "get_value", ret));
+				WT_ERR(util_cerr(cursor, "get_value", ret));
 			if ((*--cfg = strdup(v)) == NULL)
-				return (util_err(session, errno, NULL));
+				WT_ERR(util_err(session, errno, NULL));
 		} else
 			complex_table = true;
 	}
 
-	if (print_config(session, uri, cfg) != 0)
-		return (1);
+	WT_ERR(print_config(session, uri, cfg));
 
 	if (complex_table) {
 		/*
@@ -537,7 +536,7 @@ dump_table_config(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 		 */
 		if ((ret = session->open_cursor(
 		    session, "metadata:", NULL, NULL, &srch)) != 0)
-			return (util_cerr(cursor, "open_cursor", ret));
+			WT_ERR(util_cerr(cursor, "open_cursor", ret));
 
 		if ((ret = dump_table_config_complex(
 		    session, cursor, srch, name, "colgroup:")) == 0)
@@ -551,7 +550,7 @@ dump_table_config(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 		}
 	}
 
-	free(p);
+err:	free(p);
 	free(_cfg[0]);
 	free(_cfg[1]);
 	free(_cfg[2]);
