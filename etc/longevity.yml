@@ -87,18 +87,8 @@ functions:
           set -e
           set -v
           cd ./clusters/${cluster}
-          # show cluster details
-          cat ips.sh
-          ./update_run_config.sh
-          cat run-${test}.json
-          # clean up old artifact from the last test
-          rm -f ../perf.json
-          rm -rf ./reports
-          rm -f ../../reports.tgz
-          echo "Run test for ${test} with setup ${setup}"
-          # run test
+          echo "Run test for ${test}-${storageEngine} with setup ${setup}"
           ../../bin/run-${test}.sh ${storageEngine} ${setup} ${cluster}
-          mv perf.json ..
           cd ..
           cat perf.json >> perf_all.json
           echo "Complete test for ${test} with setup ${setup}!"
@@ -245,6 +235,7 @@ tasks:
         use_csrs: "true"
     - func: "run test"
       vars:
+        storageEngine: "wiredTiger"
         test: "ycsb"
     - func: "make test log artifact"
     - func: "upload log file"
@@ -265,7 +256,8 @@ tasks:
         use_csrs: "true"
     - func: "run test"
       vars:
-        test: "ycsb-mmap"
+        storageEngine: "mmapv1"
+        test: "ycsb"
     - func: "make test log artifact"
     - func: "upload log file"
       vars:

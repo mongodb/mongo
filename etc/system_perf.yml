@@ -117,22 +117,9 @@ functions:
           set -e
           set -v
           cd ./clusters/${cluster}
-          cat ips.sh
-          cat run-${test}.json
-          ./update_run_config.sh
-          cat run-${test}.json
-          rm -rf ./reports
-          rm -f ../../reports.tgz
-          echo "Run test for ${test} with setup ${setup}"
-          # run test
+          echo "Run test for ${test}-${storageEngine} with setup ${setup}"
           ../../bin/run-${test}.sh ${storageEngine} ${setup} ${cluster}
-          rm -f ../perf.json
-          chmod 766 perf.json
-          cp ./perf.json ..
-          cd ..
-          pwd
-          cat perf.json
-          echo "Done test for ${test} with setup ${setup}!"
+          echo "Done test for ${test}-${storageEngine} with setup ${setup}!"
     - command: "json.send"
       params:
          name: "perf"
@@ -349,7 +336,7 @@ tasks:
     - func: "run test"
       vars:
         storageEngine: "mmapv1"
-        test: "ycsb-mmap"
+        test: "ycsb"
     - func: "make test log artifact"
     - func: "upload log file"
       vars:
@@ -383,7 +370,7 @@ tasks:
     - func: "run test"
       vars:
         storageEngine: "mmapv1"
-        test: "benchRun-mmap"
+        test: "benchRun"
     - func: "make test log artifact"
     - func: "upload log file"
       vars:
