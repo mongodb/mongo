@@ -98,6 +98,7 @@ selector:
     - jstests/sharding/sharding_state_after_stepdown.js
     - jstests/sharding/rs_stepdown_and_pooling.js
     - jstests/sharding/mongos_no_replica_set_refresh.js
+    - jstests/sharding/primary_config_server_blackholed_from_mongos.js
     # Nothing is affected by config server step down
     - jstests/sharding/basic_sharding_params.js
     # ShardingTest is never used, so continuous step down thread never starts
