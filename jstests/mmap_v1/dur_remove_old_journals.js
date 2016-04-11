@@ -12,9 +12,26 @@ if (db.serverBuildInfo().bits == 32) {
     });
     db = conn.getDB("test");
 
+    // listFiles can return Access Denied on Windows if the file
+    // is deleted at the same time as listFiles is run, in this
+    // case we sleep and retry.
+    function listFilesRetry(path) {
+        for (var i = 0; i < 5; ++i) {
+            try {
+                return listFiles(path);
+            } catch (e) {
+                print("Exception during listFiles: " + e);
+                // Sleep for 10 milliseconds
+                sleep(10);
+            }
+        }
+
+        throw new Error("listFilesRetry failed");
+    }
+
     // Returns true if j._0 exists.
     function firstJournalFileExists() {
-        var files = listFiles(conn.dbpath + "/journal");
+        var files = listFilesRetry(conn.dbpath + "/journal");
         for (var i = 0; i < files.length; i++) {
             if (files[i].baseName === "j._0") {
                 return true;
@@ -25,7 +42,7 @@ if (db.serverBuildInfo().bits == 32) {
 
     // Represents the cummulative total of the number of journal files created.
     function getLatestJournalFileNum() {
-        var files = listFiles(conn.dbpath + "/journal");
+        var files = listFilesRetry(conn.dbpath + "/journal");
         var latest = 0;
         files.forEach(function(file) {
             if (file.baseName !== "lsn") {
