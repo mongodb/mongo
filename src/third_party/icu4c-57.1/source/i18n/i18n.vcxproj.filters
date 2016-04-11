@@ -1,0 +1,1284 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="collation">
+      <UniqueIdentifier>{68f85997-0019-471f-b155-5eed0137f082}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="formatting">
+      <UniqueIdentifier>{8152306c-460d-49f3-961a-c500eda24e9d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="misc">
+      <UniqueIdentifier>{15349ca9-e31d-4f6b-a4c4-f73892fa5aa6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="regex">
+      <UniqueIdentifier>{faac495b-a9d6-47ad-ae47-a56c30c60b3a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="transforms">
+      <UniqueIdentifier>{e750fa6c-e471-4db0-92f9-81c84d84b5ba}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="charset detect">
+      <UniqueIdentifier>{59edb5a3-26d1-4c91-af50-4aa35e6e9730}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="spoof">
+      <UniqueIdentifier>{7b4a0782-fad3-44cd-b3b4-e75b0356d600}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="coleitr.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="coll.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="search.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="sortkey.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="stsearch.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="ucol.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="ucol_res.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="ucol_sit.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="ucoleitr.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="usearch.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="affixpatternparser.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="dayperiodrules.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="decimfmtimpl.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="digitaffix.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="digitaffixesandpadding.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="digitformatter.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="digitgrouping.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="digitinterval.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="pluralaffix.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="precision.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="smallintformatter.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="valueformatter.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="visibledigits.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="astro.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="basictz.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="buddhcal.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="calendar.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="cecal.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="chnsecal.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="choicfmt.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="coptccal.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="curramt.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="currfmt.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="currpinf.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="currunit.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="dangical.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="datefmt.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="dcfmtsym.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="decContext.c">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="decfmtst.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="decimalformatpattern.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="decimfmt.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="decNumber.c">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="digitlst.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="dtfmtsym.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="dtitvfmt.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="dtitvinf.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="dtptngen.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="dtrule.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="ethpccal.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="fmtable.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="fmtable_cnv.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="format.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="fphdlimp.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="fpositer.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="gender.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="gregocal.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="gregoimp.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="hebrwcal.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="indiancal.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="islamcal.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="japancal.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="measfmt.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="measunit.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="measure.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="msgfmt.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="nfrs.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="nfrule.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="nfsubs.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="numfmt.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="numsys.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="olsontz.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="persncal.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="plurfmt.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="plurrule.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="quantityformatter.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="rbnf.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="rbtz.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="reldatefmt.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="reldtfmt.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="scientificnumberformatter.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="selfmt.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="sharedbreakiterator.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="simpletz.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="smpdtfmt.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="smpdtfst.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="standardplural.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="taiwncal.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="timezone.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="tmunit.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="tmutamt.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="tmutfmt.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="tzrule.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="tztrans.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="ucal.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="udat.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="udateintervalformat.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="udatpg.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="ufieldpositer.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="ulocdata.c">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="umsg.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="unum.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="unumsys.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="upluralrules.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="utmscale.c">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="vtzone.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="vzone.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="windtfmt.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="winnmfmt.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="wintzimpl.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="zonemeta.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="zrule.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="ztrans.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="ucln_in.cpp">
+      <Filter>misc</Filter>
+    </ClCompile>
+    <ClCompile Include="regexcmp.cpp">
+      <Filter>regex</Filter>
+    </ClCompile>
+    <ClCompile Include="regeximp.cpp">
+      <Filter>regex</Filter>
+    </ClCompile>
+    <ClCompile Include="regexst.cpp">
+      <Filter>regex</Filter>
+    </ClCompile>
+    <ClCompile Include="regextxt.cpp">
+      <Filter>regex</Filter>
+    </ClCompile>
+    <ClCompile Include="rematch.cpp">
+      <Filter>regex</Filter>
+    </ClCompile>
+    <ClCompile Include="repattrn.cpp">
+      <Filter>regex</Filter>
+    </ClCompile>
+    <ClCompile Include="uregex.cpp">
+      <Filter>regex</Filter>
+    </ClCompile>
+    <ClCompile Include="uregexc.cpp">
+      <Filter>regex</Filter>
+    </ClCompile>
+    <ClCompile Include="anytrans.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="brktrans.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="casetrn.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="cpdtrans.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="esctrn.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="funcrepl.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="name2uni.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="nortrans.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="nultrans.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="quant.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="rbt.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="rbt_data.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="rbt_pars.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="rbt_rule.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="rbt_set.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="remtrans.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="strmatch.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="strrepl.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="titletrn.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="tolowtrn.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="toupptrn.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="translit.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="transreg.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="tridpars.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="unesctrn.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="uni2name.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="utrans.cpp">
+      <Filter>transforms</Filter>
+    </ClCompile>
+    <ClCompile Include="csdetect.cpp">
+      <Filter>charset detect</Filter>
+    </ClCompile>
+    <ClCompile Include="csmatch.cpp">
+      <Filter>charset detect</Filter>
+    </ClCompile>
+    <ClCompile Include="csr2022.cpp">
+      <Filter>charset detect</Filter>
+    </ClCompile>
+    <ClCompile Include="csrecog.cpp">
+      <Filter>charset detect</Filter>
+    </ClCompile>
+    <ClCompile Include="csrmbcs.cpp">
+      <Filter>charset detect</Filter>
+    </ClCompile>
+    <ClCompile Include="csrsbcs.cpp">
+      <Filter>charset detect</Filter>
+    </ClCompile>
+    <ClCompile Include="csrucode.cpp">
+      <Filter>charset detect</Filter>
+    </ClCompile>
+    <ClCompile Include="csrutf8.cpp">
+      <Filter>charset detect</Filter>
+    </ClCompile>
+    <ClCompile Include="inputext.cpp">
+      <Filter>charset detect</Filter>
+    </ClCompile>
+    <ClCompile Include="ucsdet.cpp">
+      <Filter>charset detect</Filter>
+    </ClCompile>
+    <ClCompile Include="identifier_info.cpp">
+      <Filter>spoof</Filter>
+    </ClCompile>
+    <ClCompile Include="scriptset.cpp">
+      <Filter>spoof</Filter>
+    </ClCompile>
+    <ClCompile Include="uspoof.cpp">
+      <Filter>spoof</Filter>
+    </ClCompile>
+    <ClCompile Include="uspoof_build.cpp">
+      <Filter>spoof</Filter>
+    </ClCompile>
+    <ClCompile Include="uspoof_conf.cpp">
+      <Filter>spoof</Filter>
+    </ClCompile>
+    <ClCompile Include="uspoof_impl.cpp">
+      <Filter>spoof</Filter>
+    </ClCompile>
+    <ClCompile Include="uspoof_wsconf.cpp">
+      <Filter>spoof</Filter>
+    </ClCompile>
+    <ClCompile Include="alphaindex.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="tzfmt.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="tzgnames.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="tznames.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="tznames_impl.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="compactdecimalformat.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="region.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+    <ClCompile Include="uregion.cpp">
+      <Filter>formatting</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="bocsu.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="collation.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="collationbuilder.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="collationcompare.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="collationdata.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="collationdatabuilder.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="collationdatareader.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="collationdatawriter.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="collationfastlatin.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="collationfastlatinbuilder.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="collationfcd.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="collationiterator.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="collationkeys.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="collationroot.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="collationrootelements.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="collationruleparser.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="collationsets.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="collationsettings.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="collationtailoring.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="collationweights.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="rulebasedcollator.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="uitercollationiterator.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="utf8collationiterator.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClCompile Include="utf16collationiterator.cpp">
+      <Filter>collation</Filter>
+    </ClCompile>
+    <ClInclude Include="bocsu.h">
+      <Filter>collation</Filter>
+    </ClInclude>
+    <ClInclude Include="ucol_imp.h">
+      <Filter>collation</Filter>
+    </ClInclude>
+    <ClInclude Include="usrchimp.h">
+      <Filter>collation</Filter>
+    </ClInclude>
+
+    <ClInclude Include="affixpatternparser.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="decimalformatpatternimpl.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="decimfmtimpl.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="digitaffix.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="digitaffixesandpadding.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="digitformatter.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="digitgrouping.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="digitinterval.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="pluralaffix.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="precision.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="significantdigitinterval.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="smallintformatter.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="valueformatter.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="visibledigits.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+
+    <ClInclude Include="astro.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="buddhcal.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="cecal.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="chnsecal.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="coptccal.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="currfmt.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="dangical.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="dayperiodrules.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="decContext.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="decfmtst.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="decimalformatpattern.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="decNumber.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="decNumberLocal.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="digitlst.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="dtitv_impl.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="dtptngen_impl.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="ethpccal.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="fphdlimp.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="gregoimp.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="hebrwcal.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="indiancal.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="islamcal.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="japancal.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="msgfmt_impl.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="nfrlist.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="nfrs.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="nfrule.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="nfsubs.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="olsontz.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="persncal.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="plurrule_impl.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="quantityformatter.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="reldtfmt.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="sharedbreakiterator.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="sharedcalendar.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="shareddateformatsymbols.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="sharednumberformat.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="sharedpluralrules.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="smpdtfst.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="standardplural.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="taiwncal.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="umsg_imp.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="vzone.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="windtfmt.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="winnmfmt.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="wintzimpl.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="zonemeta.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="zrule.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="ztrans.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="ucln_in.h">
+      <Filter>misc</Filter>
+    </ClInclude>
+    <ClInclude Include="regexcmp.h">
+      <Filter>regex</Filter>
+    </ClInclude>
+    <ClInclude Include="regexcst.h">
+      <Filter>regex</Filter>
+    </ClInclude>
+    <ClInclude Include="regeximp.h">
+      <Filter>regex</Filter>
+    </ClInclude>
+    <ClInclude Include="regexst.h">
+      <Filter>regex</Filter>
+    </ClInclude>
+    <ClInclude Include="regextxt.h">
+      <Filter>regex</Filter>
+    </ClInclude>
+    <ClInclude Include="anytrans.h">
+      <Filter>transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="brktrans.h">
+      <Filter>transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="casetrn.h">
+      <Filter>transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="cpdtrans.h">
+      <Filter>transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="esctrn.h">
+      <Filter>transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="funcrepl.h">
+      <Filter>transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="name2uni.h">
+      <Filter>transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="nortrans.h">
+      <Filter>transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="nultrans.h">
+      <Filter>transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="quant.h">
+      <Filter>transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="rbt.h">
+      <Filter>transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="rbt_data.h">
+      <Filter>transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="rbt_pars.h">
+      <Filter>transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="rbt_rule.h">
+      <Filter>transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="rbt_set.h">
+      <Filter>transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="remtrans.h">
+      <Filter>transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="strmatch.h">
+      <Filter>transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="strrepl.h">
+      <Filter>transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="titletrn.h">
+      <Filter>transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="tolowtrn.h">
+      <Filter>transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="toupptrn.h">
+      <Filter>transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="transreg.h">
+      <Filter>transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="tridpars.h">
+      <Filter>transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="unesctrn.h">
+      <Filter>transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="uni2name.h">
+      <Filter>transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="csdetect.h">
+      <Filter>charset detect</Filter>
+    </ClInclude>
+    <ClInclude Include="csmatch.h">
+      <Filter>charset detect</Filter>
+    </ClInclude>
+    <ClInclude Include="csr2022.h">
+      <Filter>charset detect</Filter>
+    </ClInclude>
+    <ClInclude Include="csrecog.h">
+      <Filter>charset detect</Filter>
+    </ClInclude>
+    <ClInclude Include="csrmbcs.h">
+      <Filter>charset detect</Filter>
+    </ClInclude>
+    <ClInclude Include="csrsbcs.h">
+      <Filter>charset detect</Filter>
+    </ClInclude>
+    <ClInclude Include="csrucode.h">
+      <Filter>charset detect</Filter>
+    </ClInclude>
+    <ClInclude Include="csrutf8.h">
+      <Filter>charset detect</Filter>
+    </ClInclude>
+    <ClInclude Include="inputext.h">
+      <Filter>charset detect</Filter>
+    </ClInclude>
+    <ClInclude Include="identifier_info.h">
+      <Filter>spoof</Filter>
+    </ClInclude>
+    <ClInclude Include="scriptset.h">
+      <Filter>spoof</Filter>
+    </ClInclude>
+    <ClInclude Include="uspoof_conf.h">
+      <Filter>spoof</Filter>
+    </ClInclude>
+    <ClInclude Include="uspoof_impl.h">
+      <Filter>spoof</Filter>
+    </ClInclude>
+    <ClInclude Include="uspoof_wsconf.h">
+      <Filter>spoof</Filter>
+    </ClInclude>
+    <ClInclude Include="tzgnames.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="tznames_impl.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="numsys_impl.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="dcfmtimp.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="selfmtimpl.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="region_impl.h">
+      <Filter>formatting</Filter>
+    </ClInclude>
+    <ClInclude Include="collation.h">
+      <Filter>collation</Filter>
+    </ClInclude>
+    <ClInclude Include="collationbuilder.h">
+      <Filter>collation</Filter>
+    </ClInclude>
+    <ClInclude Include="collationcompare.h">
+      <Filter>collation</Filter>
+    </ClInclude>
+    <ClInclude Include="collationdata.h">
+      <Filter>collation</Filter>
+    </ClInclude>
+    <ClInclude Include="collationdatabuilder.h">
+      <Filter>collation</Filter>
+    </ClInclude>
+    <ClInclude Include="collationdatareader.h">
+      <Filter>collation</Filter>
+    </ClInclude>
+    <ClInclude Include="collationdatawriter.h">
+      <Filter>collation</Filter>
+    </ClInclude>
+    <ClInclude Include="collationfastlatin.h">
+      <Filter>collation</Filter>
+    </ClInclude>
+    <ClInclude Include="collationfastlatinbuilder.h">
+      <Filter>collation</Filter>
+    </ClInclude>
+    <ClInclude Include="collationfcd.h">
+      <Filter>collation</Filter>
+    </ClInclude>
+    <ClInclude Include="collationiterator.h">
+      <Filter>collation</Filter>
+    </ClInclude>
+    <ClInclude Include="collationkeys.h">
+      <Filter>collation</Filter>
+    </ClInclude>
+    <ClInclude Include="collationroot.h">
+      <Filter>collation</Filter>
+    </ClInclude>
+    <ClInclude Include="collationrootelements.h">
+      <Filter>collation</Filter>
+    </ClInclude>
+    <ClInclude Include="collationruleparser.h">
+      <Filter>collation</Filter>
+    </ClInclude>
+    <ClInclude Include="collationsets.h">
+      <Filter>collation</Filter>
+    </ClInclude>
+    <ClInclude Include="collationsettings.h">
+      <Filter>collation</Filter>
+    </ClInclude>
+    <ClInclude Include="collationtailoring.h">
+      <Filter>collation</Filter>
+    </ClInclude>
+    <ClInclude Include="collationweights.h">
+      <Filter>collation</Filter>
+    </ClInclude>
+    <ClInclude Include="utf16collationiterator.h">
+      <Filter>collation</Filter>
+    </ClInclude>
+    <ClInclude Include="uitercollationiterator.h">
+      <Filter>collation</Filter>
+    </ClInclude>
+    <ClInclude Include="utf8collationiterator.h">
+      <Filter>collation</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="i18n.rc">
+      <Filter>misc</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="unicode\coleitr.h">
+      <Filter>collation</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\coll.h">
+      <Filter>collation</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\search.h">
+      <Filter>collation</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\sortkey.h">
+      <Filter>collation</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\stsearch.h">
+      <Filter>collation</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\tblcoll.h">
+      <Filter>collation</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\ucol.h">
+      <Filter>collation</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\ucoleitr.h">
+      <Filter>collation</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\usearch.h">
+      <Filter>collation</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\basictz.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\calendar.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\choicfmt.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\curramt.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\currunit.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\datefmt.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\dcfmtsym.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\decimfmt.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\dtfmtsym.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\dtitvfmt.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\dtitvinf.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\dtptngen.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\dtrule.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\fieldpos.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\fmtable.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\format.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\fpositer.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\gender.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\gregocal.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\measfmt.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\measunit.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\measure.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\msgfmt.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\numfmt.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\numsys.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\plurfmt.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\plurrule.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\rbnf.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\rbtz.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\scientificnumberformatter.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\selfmt.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\simpletz.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\smpdtfmt.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\timezone.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\tmunit.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\tmutamt.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\tmutfmt.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\tzrule.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\tztrans.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\ucal.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\udat.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\udateintervalformat.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\udatpg.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\ugender.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\ufieldpositer.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\ulocdata.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\umsg.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\unum.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\unumsys.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\upluralrules.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\ureldatefmt.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\utmscale.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\vtzone.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\regex.h">
+      <Filter>regex</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\uregex.h">
+      <Filter>regex</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\translit.h">
+      <Filter>transforms</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\unirepl.h">
+      <Filter>transforms</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\utrans.h">
+      <Filter>transforms</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\ucsdet.h">
+      <Filter>charset detect</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\uspoof.h">
+      <Filter>spoof</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\alphaindex.h">
+      <Filter>collation</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\tzfmt.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\tznames.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\compactdecimalformat.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\currpinf.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\region.h">
+      <Filter>misc</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\uregion.h">
+      <Filter>misc</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\reldatefmt.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+    <CustomBuild Include="unicode\uformattable.h">
+      <Filter>formatting</Filter>
+    </CustomBuild>
+  </ItemGroup>
+</Project>
