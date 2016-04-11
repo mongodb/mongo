@@ -852,6 +852,13 @@ public:
 };
 
 
+class ExpressionIn final : public ExpressionFixedArity<ExpressionIn, 2> {
+public:
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
+};
+
+
 class ExpressionLet final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;

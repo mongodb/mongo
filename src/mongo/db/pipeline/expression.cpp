@@ -2095,6 +2095,29 @@ const char* ExpressionIfNull::getOpName() const {
     return "$ifNull";
 }
 
+/* ----------------------- ExpressionIn ---------------------------- */
+
+Value ExpressionIn::evaluateInternal(Variables* vars) const {
+    Value argument(vpOperand[0]->evaluateInternal(vars));
+    Value arrayOfValues(vpOperand[1]->evaluateInternal(vars));
+
+    uassert(40081,
+            str::stream() << "$in requires an array as a second argument, found: "
+                          << typeName(arrayOfValues.getType()),
+            arrayOfValues.isArray());
+    for (auto&& value : arrayOfValues.getArray()) {
+        if (argument == value) {
+            return Value(true);
+        }
+    }
+    return Value(false);
+}
+
+REGISTER_EXPRESSION(in, ExpressionIn::parse);
+const char* ExpressionIn::getOpName() const {
+    return "$in";
+}
+
 /* ----------------------- ExpressionLn ---------------------------- */
 
 Value ExpressionLn::evaluateNumericArg(const Value& numericArg) const {
