@@ -32,6 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/s/balancer/cluster_statistics.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard.h"
 
@@ -65,59 +66,6 @@ struct TagRange {
     std::string toString() const;
 };
 
-
-class ShardInfo {
-public:
-    ShardInfo();
-    ShardInfo(long long maxSizeMB,
-              long long currSizeMB,
-              bool draining,
-              const std::set<std::string>& tags = std::set<std::string>(),
-              const std::string& _mongoVersion = std::string(""));
-
-    void addTag(const std::string& tag);
-
-    /** @return true if we have the tag OR if the tag is "" */
-    bool hasTag(const std::string& tag) const;
-
-    /**
-     * @return true if a shard cannot receive any new chunks because it reaches 'shardLimits'.
-     * Expects the optional fields "maxSize", can in size in MB, and "usedSize", currently used size
-     * in MB, on 'shardLimits'.
-     */
-    bool isSizeMaxed() const;
-
-    /**
-     * @return true if 'shardLimist' contains a field "draining". Expects the optional field
-     * "isDraining" on 'shrdLimits'.
-     */
-    bool isDraining() const {
-        return _draining;
-    }
-
-    long long getMaxSizeMB() const {
-        return _maxSizeMB;
-    }
-
-    long long getCurrSizeMB() const {
-        return _currSizeMB;
-    }
-
-    std::string getMongoVersion() const {
-        return _mongoVersion;
-    }
-
-    std::string toString() const;
-
-private:
-    long long _maxSizeMB;
-    long long _currSizeMB;
-    bool _draining;
-    std::set<std::string> _tags;
-    std::string _mongoVersion;
-};
-
-
 struct MigrateInfo {
     MigrateInfo(const std::string& a_ns,
                 const ShardId& a_to,
@@ -131,15 +79,14 @@ struct MigrateInfo {
     const ChunkInfo chunk;
 };
 
-typedef std::map<ShardId, ShardInfo> ShardInfoMap;
+typedef std::vector<ClusterStatistics::ShardStatistics> ShardStatisticsVector;
 typedef std::map<ShardId, std::vector<ChunkType>> ShardToChunksMap;
-
 
 class DistributionStatus {
     MONGO_DISALLOW_COPYING(DistributionStatus);
 
 public:
-    DistributionStatus(const ShardInfoMap& shardInfo, const ShardToChunksMap& shardToChunksMap);
+    DistributionStatus(ShardStatisticsVector shardInfo, const ShardToChunksMap& shardToChunksMap);
 
     // only used when building
 
@@ -185,36 +132,25 @@ public:
     /** @return the right tag for chunk, possibly "" */
     std::string getTagForChunk(const ChunkType& chunk) const;
 
-    /** @return all shard ids we know about */
-    const std::set<ShardId>& shardIds() const {
-        return _shardIds;
-    }
-
-    /** @return the ShardInfo for the shard */
-    const ShardInfo& shardInfo(const ShardId& shardId) const;
-
     /** writes all state to log() */
     void dump() const;
 
-    /**
-     * Retrieves shard metadata information from the config server as well as some stats
-     * from the shards.
-     */
-    static StatusWith<ShardInfoMap> populateShardInfoMap(OperationContext* txn);
+    const ShardStatisticsVector& getStats() const {
+        return _shardInfo;
+    }
 
     /**
      * Note: jumbo and versions are not set.
      */
-    static void populateShardToChunksMap(const ShardInfoMap& allShards,
+    static void populateShardToChunksMap(const ShardStatisticsVector& allShards,
                                          const ChunkManager& chunkMgr,
                                          ShardToChunksMap* shardToChunksMap);
 
 private:
-    const ShardInfoMap& _shardInfo;
+    const ShardStatisticsVector _shardInfo;
     const ShardToChunksMap& _shardChunks;
     std::map<BSONObj, TagRange> _tagRanges;
     std::set<std::string> _allTags;
-    std::set<ShardId> _shardIds;
 };
 
 

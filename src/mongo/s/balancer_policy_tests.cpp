@@ -28,10 +28,11 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/platform/random.h"
 #include "mongo/s/balancer_policy.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/config.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
@@ -44,11 +45,18 @@ using std::string;
 using std::stringstream;
 using std::vector;
 
+using ShardStatistics = ClusterStatistics::ShardStatistics;
 
-TEST(BalancerPolicyTests, SizeMaxedShardTest) {
-    ASSERT(!ShardInfo(0, 0, false).isSizeMaxed());
-    ASSERT(!ShardInfo(100LL, 80LL, false).isSizeMaxed());
-    ASSERT(ShardInfo(100LL, 110LL, false).isSizeMaxed());
+const auto emptyTagSet = std::set<std::string>();
+const std::string emptyShardVersion = "";
+
+ShardStatistics& findStat(std::vector<ShardStatistics>& stats, const ShardId& shardId) {
+    for (auto& stat : stats) {
+        if (stat.shardId == shardId)
+            return stat;
+    }
+
+    MONGO_UNREACHABLE;
 }
 
 TEST(BalancerPolicyTests, BalanceNormalTest) {
@@ -72,14 +80,13 @@ TEST(BalancerPolicyTests, BalanceNormalTest) {
     chunkMap["shard0"] = chunks;
     chunkMap["shard1"] = vector<ChunkType>();
 
-    // no limits
-    ShardInfoMap info;
-    info["shard0"] = ShardInfo(0, 2, false);
-    info["shard1"] = ShardInfo(0, 0, false);
+    // No limits
+    DistributionStatus status(
+        {ShardStatistics("shard0", 0, 2, false, emptyTagSet, emptyShardVersion),
+         ShardStatistics("shard1", 0, 0, false, emptyTagSet, emptyShardVersion)},
+        chunkMap);
 
-    DistributionStatus status(info, chunkMap);
     std::unique_ptr<MigrateInfo> c(BalancerPolicy::balance("ns", status, 1));
-
     ASSERT(c);
 }
 
@@ -129,12 +136,11 @@ TEST(BalancerPolicyTests, BalanceJumbo) {
     chunkMap["shard0"] = chunks;
     chunkMap["shard1"] = vector<ChunkType>();
 
-    // no limits
-    ShardInfoMap info;
-    info["shard0"] = ShardInfo(0, 2, false);
-    info["shard1"] = ShardInfo(0, 0, false);
-
-    DistributionStatus status(info, chunkMap);
+    // No limits
+    DistributionStatus status(
+        {ShardStatistics("shard0", 0, 2, false, emptyTagSet, emptyShardVersion),
+         ShardStatistics("shard1", 0, 0, false, emptyTagSet, emptyShardVersion)},
+        chunkMap);
     std::unique_ptr<MigrateInfo> c(BalancerPolicy::balance("ns", status, 1));
 
     ASSERT(c);
@@ -163,11 +169,10 @@ TEST(BalanceNormalTests, BalanceDrainingTest) {
     chunkMap["shard1"] = vector<ChunkType>();
 
     // shard0 is draining
-    ShardInfoMap limitsMap;
-    limitsMap["shard0"] = ShardInfo(0LL, 2LL, true);
-    limitsMap["shard1"] = ShardInfo(0LL, 0LL, false);
-
-    DistributionStatus status(limitsMap, chunkMap);
+    DistributionStatus status(
+        {ShardStatistics("shard0", 0, 2, true, emptyTagSet, emptyShardVersion),
+         ShardStatistics("shard1", 0, 0, false, emptyTagSet, emptyShardVersion)},
+        chunkMap);
     std::unique_ptr<MigrateInfo> c(BalancerPolicy::balance("ns", status, 0));
 
     ASSERT(c);
@@ -197,12 +202,11 @@ TEST(BalancerPolicyTests, BalanceEndedDrainingTest) {
     chunkMap["shard0"] = chunks;
     chunkMap["shard1"] = vector<ChunkType>();
 
-    // no limits
-    ShardInfoMap limitsMap;
-    limitsMap["shard0"] = ShardInfo(0, 2, false);
-    limitsMap["shard1"] = ShardInfo(0, 0, true);
-
-    DistributionStatus status(limitsMap, chunkMap);
+    // shard1 is draining
+    DistributionStatus status(
+        {ShardStatistics("shard0", 0, 2, false, emptyTagSet, emptyShardVersion),
+         ShardStatistics("shard1", 0, 0, true, emptyTagSet, emptyShardVersion)},
+        chunkMap);
     std::unique_ptr<MigrateInfo> c(BalancerPolicy::balance("ns", status, 0));
 
     ASSERT(!c);
@@ -231,12 +235,11 @@ TEST(BalancerPolicyTests, BalanceImpasseTest) {
     chunkMap["shard2"] = vector<ChunkType>();
 
     // shard0 is draining, shard1 is maxed out, shard2 has writebacks pending
-    ShardInfoMap limitsMap;
-    limitsMap["shard0"] = ShardInfo(0, 2, true);
-    limitsMap["shard1"] = ShardInfo(1, 1, false);
-    limitsMap["shard2"] = ShardInfo(0, 1, true);
-
-    DistributionStatus status(limitsMap, chunkMap);
+    DistributionStatus status(
+        {ShardStatistics("shard0", 0, 2, true, emptyTagSet, emptyShardVersion),
+         ShardStatistics("shard1", 1, 1, false, emptyTagSet, emptyShardVersion),
+         ShardStatistics("shard2", 0, 1, true, emptyTagSet, emptyShardVersion)},
+        chunkMap);
     std::unique_ptr<MigrateInfo> c(BalancerPolicy::balance("ns", status, 0));
 
     ASSERT(!c);
@@ -297,12 +300,10 @@ TEST(BalancerPolicyTests, MultipleDraining) {
     addShard(chunks, 10, false);
     addShard(chunks, 5, true);
 
-    ShardInfoMap shards;
-    shards["shard0"] = ShardInfo(0, 5, true);
-    shards["shard1"] = ShardInfo(0, 5, true);
-    shards["shard2"] = ShardInfo(0, 5, false);
-
-    DistributionStatus d(shards, chunks);
+    DistributionStatus d({ShardStatistics("shard0", 0, 5, true, emptyTagSet, emptyShardVersion),
+                          ShardStatistics("shard1", 0, 5, true, emptyTagSet, emptyShardVersion),
+                          ShardStatistics("shard2", 0, 5, false, emptyTagSet, emptyShardVersion)},
+                         chunks);
     std::unique_ptr<MigrateInfo> m(BalancerPolicy::balance("ns", d, 0));
 
     ASSERT(m);
@@ -316,18 +317,12 @@ TEST(BalancerPolicyTests, TagsDraining) {
     addShard(chunks, 5, false);
     addShard(chunks, 5, true);
 
-    ShardInfoMap shards;
-    shards["shard0"] = ShardInfo(0, 5, false);
-    shards["shard1"] = ShardInfo(0, 5, true);
-    shards["shard2"] = ShardInfo(0, 5, false);
-
-    shards["shard0"].addTag("a");
-    shards["shard1"].addTag("a");
-    shards["shard1"].addTag("b");
-    shards["shard2"].addTag("b");
-
     while (true) {
-        DistributionStatus d(shards, chunks);
+        DistributionStatus d({ShardStatistics("shard0", 0, 5, false, {"a"}, emptyShardVersion),
+                              ShardStatistics("shard1", 0, 5, true, {"a", "b"}, emptyShardVersion),
+                              ShardStatistics("shard2", 0, 5, false, {"b"}, emptyShardVersion)},
+                             chunks);
+
         d.addTagRange(TagRange(BSON("x" << -1), BSON("x" << 7), "a"));
         d.addTagRange(TagRange(BSON("x" << 7), BSON("x" << 1000), "b"));
 
@@ -357,16 +352,12 @@ TEST(BalancerPolicyTests, TagsPolicyChange) {
     addShard(chunks, 5, false);
     addShard(chunks, 5, true);
 
-    ShardInfoMap shards;
-    shards["shard0"] = ShardInfo(0, 5, false);
-    shards["shard1"] = ShardInfo(0, 5, false);
-    shards["shard2"] = ShardInfo(0, 5, false);
-
-    shards["shard0"].addTag("a");
-    shards["shard1"].addTag("a");
-
     while (true) {
-        DistributionStatus d(shards, chunks);
+        DistributionStatus d(
+            {ShardStatistics("shard0", 0, 5, false, {"a"}, emptyShardVersion),
+             ShardStatistics("shard1", 0, 5, false, {"a"}, emptyShardVersion),
+             ShardStatistics("shard2", 0, 5, false, emptyTagSet, emptyShardVersion)},
+            chunks);
         d.addTagRange(TagRange(BSON("x" << -1), BSON("x" << 1000), "a"));
 
         std::unique_ptr<MigrateInfo> m(BalancerPolicy::balance("ns", d, 0));
@@ -388,8 +379,7 @@ TEST(BalancerPolicyTests, TagsPolicyChange) {
 
 TEST(BalancerPolicyTests, TagsSelector) {
     ShardToChunksMap chunks;
-    ShardInfoMap shards;
-    DistributionStatus d(shards, chunks);
+    DistributionStatus d({}, chunks);
 
     ASSERT(d.addTagRange(TagRange(BSON("x" << 1), BSON("x" << 10), "a")));
     ASSERT(d.addTagRange(TagRange(BSON("x" << 10), BSON("x" << 20), "b")));
@@ -455,13 +445,10 @@ TEST(BalancerPolicyTests, MaxSizeRespect) {
 
     // Note that maxSize of shard0 is 1, and it is therefore overloaded with currSize = 3.
     // Other shards have maxSize = 0 = unset.
-
-    ShardInfoMap shards;
-    shards["shard0"] = ShardInfo(1, 3, false);
-    shards["shard1"] = ShardInfo(0, 4, false);
-    shards["shard2"] = ShardInfo(0, 6, false);
-
-    DistributionStatus d(shards, chunks);
+    DistributionStatus d({ShardStatistics("shard0", 1, 3, false, emptyTagSet, emptyShardVersion),
+                          ShardStatistics("shard1", 0, 4, false, emptyTagSet, emptyShardVersion),
+                          ShardStatistics("shard2", 0, 6, false, emptyTagSet, emptyShardVersion)},
+                         chunks);
     std::unique_ptr<MigrateInfo> m(BalancerPolicy::balance("ns", d, 0));
 
     ASSERT(m);
@@ -481,16 +468,12 @@ TEST(BalancerPolicyTests, MaxSizeNoDrain) {
     addShard(chunks, 4, false);
     addShard(chunks, 4, true);
 
-    // Note that maxSize of shard0 is 1, and it is therefore overloaded with currSize = 4.
-    // Other shards have maxSize = 0 = unset.
-
-    ShardInfoMap shards;
-    // ShardInfo(maxSize, currSize, draining, opsQueued)
-    shards["shard0"] = ShardInfo(1, 4, false);
-    shards["shard1"] = ShardInfo(0, 4, false);
-    shards["shard2"] = ShardInfo(0, 4, false);
-
-    DistributionStatus d(shards, chunks);
+    // Note that maxSize of shard0 is 1, and it is therefore overloaded with currSize = 4. Other
+    // shards have maxSize = 0 = unset.
+    DistributionStatus d({ShardStatistics("shard0", 1, 4, false, emptyTagSet, emptyShardVersion),
+                          ShardStatistics("shard1", 0, 4, false, emptyTagSet, emptyShardVersion),
+                          ShardStatistics("shard2", 0, 4, false, emptyTagSet, emptyShardVersion)},
+                         chunks);
     std::unique_ptr<MigrateInfo> m(BalancerPolicy::balance("ns", d, 0));
 
     ASSERT(!m);
@@ -522,7 +505,7 @@ TEST(BalancerPolicyTests, Simulation) {
         int numChunks = 0;
 
         ShardToChunksMap chunks;
-        ShardInfoMap shards;
+        vector<ShardStatistics> shards;
 
         map<string, int> expected;
 
@@ -542,12 +525,16 @@ TEST(BalancerPolicyTests, Simulation) {
             addShard(chunks, numShardChunks, false);
             numChunks += numShardChunks;
 
-            shards[str::stream() << "shard" << i] =
-                ShardInfo(maxed ? numShardChunks + 1 : 0, numShardChunks, draining);
+            shards.emplace_back(str::stream() << "shard" << i,
+                                maxed ? numShardChunks + 1 : 0,
+                                numShardChunks,
+                                draining,
+                                emptyTagSet,
+                                emptyShardVersion);
         }
 
-        for (ShardInfoMap::iterator it = shards.begin(); it != shards.end(); ++it) {
-            log() << it->first << " : " << it->second.toString();
+        for (const auto& stat : shards) {
+            log() << stat.shardId << " : " << stat.toBSON();
         }
 
         // Perform migrations and increment data size as chunks move
@@ -561,55 +548,44 @@ TEST(BalancerPolicyTests, Simulation) {
 
             moveChunk(chunks, m.get());
 
-            {
-                ShardInfo& info = shards[m->from];
-                shards[m->from] =
-                    ShardInfo(info.getMaxSizeMB(), info.getCurrSizeMB() - 1, info.isDraining());
-            }
-
-            {
-                ShardInfo& info = shards[m->to];
-                shards[m->to] =
-                    ShardInfo(info.getMaxSizeMB(), info.getCurrSizeMB() + 1, info.isDraining());
-            }
+            findStat(shards, m->from).currSizeMB -= 1;
+            findStat(shards, m->to).currSizeMB += 1;
         }
 
         // Make sure our balance is correct and our data size is low.
 
         // The balanced value is the count on the last shard, since it's not draining or
         // limited.
-        int balancedSize = (--shards.end())->second.getCurrSizeMB();
+        const int64_t balancedSize = (--shards.end())->currSizeMB;
 
-        for (ShardInfoMap::iterator it = shards.begin(); it != shards.end(); ++it) {
-            log() << it->first << " : " << it->second.toString();
-        }
+        for (const auto& stat : shards) {
+            log() << stat.shardId << " : " << stat.toBSON();
 
-        for (ShardInfoMap::iterator it = shards.begin(); it != shards.end(); ++it) {
-            log() << it->first << " : " << it->second.toString();
+            // Cast the size once and use it from here in order to avoid typecast errors
+            const int shardCurrSizeMB = static_cast<int>(stat.currSizeMB);
 
-            map<string, int>::iterator expectedIt = expected.find(it->first);
+            map<string, int>::iterator expectedIt = expected.find(stat.shardId);
 
             if (expectedIt == expected.end()) {
-                bool isInRange = it->second.getCurrSizeMB() >= balancedSize - 1 &&
-                    it->second.getCurrSizeMB() <= balancedSize + 1;
+                const bool isInRange =
+                    shardCurrSizeMB >= balancedSize - 1 && shardCurrSizeMB <= balancedSize + 1;
                 if (!isInRange) {
-                    warning() << "non-limited and non-draining shard had "
-                              << it->second.getCurrSizeMB() << " chunks, expected near "
-                              << balancedSize;
+                    warning() << "non-limited and non-draining shard had " << shardCurrSizeMB
+                              << " chunks, expected near " << balancedSize;
                 }
 
                 ASSERT(isInRange);
             } else {
                 int expectedSize = expectedIt->second;
-                bool isInRange = it->second.getCurrSizeMB() <= expectedSize;
+                bool isInRange = shardCurrSizeMB <= expectedSize;
 
                 if (isInRange && expectedSize >= balancedSize) {
-                    isInRange = it->second.getCurrSizeMB() >= balancedSize - 1 &&
-                        it->second.getCurrSizeMB() <= balancedSize + 1;
+                    isInRange =
+                        shardCurrSizeMB >= balancedSize - 1 && shardCurrSizeMB <= balancedSize + 1;
                 }
 
                 if (!isInRange) {
-                    warning() << "limited or draining shard had " << it->second.getCurrSizeMB()
+                    warning() << "limited or draining shard had " << shardCurrSizeMB
                               << " chunks, expected less than " << expectedSize
                               << " and (if less than expected) near " << balancedSize;
                 }

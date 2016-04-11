@@ -158,7 +158,10 @@ env.Library(
     target='coreshard',
     source=[
         # This is only here temporarily for auto-split logic in chunk.cpp.
+        'balance.cpp',
         'balancer_policy.cpp',
+        'balancer/cluster_statistics.cpp',
+        'balancer/cluster_statistics_impl.cpp',
         'chunk.cpp',
         'chunk_manager.cpp',
         'config.cpp',
@@ -201,7 +204,6 @@ env.Library(
 env.Library(
     target='mongoscore',
     source=[
-        'balance.cpp',
         'cluster_cursor_stats.cpp',
         'request.cpp',
         's_only.cpp',
@@ -226,6 +228,7 @@ env.CppUnitTest(
     target='mongoscore_test',
     source=[
         'balancer_policy_tests.cpp',
+        'balancer/cluster_statistics_test.cpp',
         'shard_key_pattern_test.cpp',
     ],
     LIBDEPS=[

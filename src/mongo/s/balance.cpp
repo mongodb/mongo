@@ -35,6 +35,7 @@
 #include <algorithm>
 
 #include "mongo/base/status_with.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/client.h"
@@ -45,6 +46,7 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/balancer/cluster_statistics_impl.h"
 #include "mongo/s/balancer_policy.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
@@ -52,13 +54,16 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_mongos.h"
 #include "mongo/s/catalog/type_settings.h"
+#include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/shard_util.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -123,10 +128,10 @@ private:
  * Occasionally prints a log message with shard versions if the versions are not the same
  * in the cluster.
  */
-void warnOnMultiVersion(const ShardInfoMap& shardInfo) {
+void warnOnMultiVersion(const vector<ClusterStatistics::ShardStatistics>& clusterStats) {
     bool isMultiVersion = false;
-    for (ShardInfoMap::const_iterator i = shardInfo.begin(); i != shardInfo.end(); ++i) {
-        if (!isSameMajorVersion(i->second.getMongoVersion().c_str())) {
+    for (const auto& stat : clusterStats) {
+        if (!isSameMajorVersion(stat.mongoVersion.c_str())) {
             isMultiVersion = true;
             break;
         }
@@ -136,10 +141,15 @@ void warnOnMultiVersion(const ShardInfoMap& shardInfo) {
     if (!isMultiVersion)
         return;
 
-    warning() << "multiVersion cluster detected, my version is " << versionString;
-    for (ShardInfoMap::const_iterator i = shardInfo.begin(); i != shardInfo.end(); ++i) {
-        log() << i->first << " is at version " << i->second.getMongoVersion();
+    StringBuilder sb;
+    sb << "Multi version cluster detected. Local version: " << versionString
+       << ", shard versions: ";
+
+    for (const auto& stat : clusterStats) {
+        sb << stat.shardId << " is at " << stat.mongoVersion << "; ";
     }
+
+    warning() << sb.str();
 }
 
 const Seconds kBalanceRoundDefaultInterval(10);
@@ -152,7 +162,8 @@ MONGO_FP_DECLARE(balancerRoundIntervalSetting);
 
 }  // namespace
 
-Balancer::Balancer() : _balancedLastTime(0) {}
+Balancer::Balancer()
+    : _balancedLastTime(0), _clusterStats(stdx::make_unique<ClusterStatisticsImpl>()) {}
 
 Balancer::~Balancer() = default;
 
@@ -185,7 +196,7 @@ void Balancer::run() {
 
         try {
             // ping has to be first so we keep things in the config server in sync
-            _ping(txn.get());
+            _ping(txn.get(), false);
 
             MONGO_FAIL_POINT_BLOCK(balancerRoundIntervalSetting, scopedBalancerRoundInterval) {
                 const BSONObj& data = scopedBalancerRoundInterval.getData();
@@ -412,23 +423,12 @@ StatusWith<vector<MigrateInfo>> Balancer::_getCandidateChunks(OperationContext* 
         return vector<MigrateInfo>();
     }
 
-    // Get a list of all the shards that are participating in this balance round along with any
-    // maximum allowed quotas and current utilization. We get the latter by issuing
-    // db.serverStatus() (mem.mapped) to all shards.
-    //
-    // TODO: skip unresponsive shards and mark information as stale.
-    auto shardInfoStatus = DistributionStatus::populateShardInfoMap(txn);
-    if (!shardInfoStatus.isOK()) {
-        return shardInfoStatus.getStatus();
-    }
-
-    const ShardInfoMap shardInfo(std::move(shardInfoStatus.getValue()));
-
-    if (shardInfo.size() < 2) {
+    const auto clusterStats = uassertStatusOK(_clusterStats->getStats(txn));
+    if (clusterStats.size() < 2) {
         return vector<MigrateInfo>();
     }
 
-    OCCASIONALLY warnOnMultiVersion(shardInfo);
+    OCCASIONALLY warnOnMultiVersion(clusterStats);
 
     std::vector<MigrateInfo> candidateChunks;
 
@@ -459,9 +459,7 @@ StatusWith<vector<MigrateInfo>> Balancer::_getCandidateChunks(OperationContext* 
 
         for (const ChunkType& chunk : allNsChunks) {
             allChunkMinimums.insert(chunk.getMin().getOwned());
-
-            vector<ChunkType>& chunksList = shardToChunksMap[chunk.getShard()];
-            chunksList.push_back(chunk);
+            shardToChunksMap[chunk.getShard()].push_back(chunk);
         }
 
         if (shardToChunksMap.empty()) {
@@ -469,12 +467,12 @@ StatusWith<vector<MigrateInfo>> Balancer::_getCandidateChunks(OperationContext* 
             continue;
         }
 
-        for (ShardInfoMap::const_iterator i = shardInfo.begin(); i != shardInfo.end(); ++i) {
+        for (const auto& stat : clusterStats) {
             // This loop just makes sure there is an entry in shardToChunksMap for every shard
-            shardToChunksMap[i->first];
+            shardToChunksMap[stat.shardId];
         }
 
-        DistributionStatus distStatus(shardInfo, shardToChunksMap);
+        DistributionStatus distStatus(clusterStats, shardToChunksMap);
 
         // TODO: TagRange contains all the information from TagsType except for the namespace,
         //       so maybe the two can be merged at some point in order to avoid the
@@ -610,7 +608,7 @@ int Balancer::_moveChunks(OperationContext* txn,
                         << " was deleted while balancing was active. Aborting balancing round.",
                     cm);
 
-            ChunkPtr c = cm->findIntersectingChunk(txn, migrateInfo.chunk.min);
+            shared_ptr<Chunk> c = cm->findIntersectingChunk(txn, migrateInfo.chunk.min);
 
             if (c->getMin().woCompare(migrateInfo.chunk.min) ||
                 c->getMax().woCompare(migrateInfo.chunk.max)) {

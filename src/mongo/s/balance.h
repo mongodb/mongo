@@ -36,6 +36,7 @@
 
 namespace mongo {
 
+class ClusterStatistics;
 struct MigrateInfo;
 class MigrationSecondaryThrottleOptions;
 class OperationContext;
@@ -62,6 +63,10 @@ public:
      */
     static Balancer* get(OperationContext* operationContext);
 
+    ClusterStatistics* getClusterStatistics() const {
+        return _clusterStats.get();
+    }
+
     // BackgroundJob methods
 
     virtual void run();
@@ -83,7 +88,7 @@ private:
     /**
      * Marks this balancer as being live on the config server(s).
      */
-    void _ping(OperationContext* txn, bool waiting = false);
+    void _ping(OperationContext* txn, bool waiting);
 
     /**
      * Returns true if all the servers listed in configdb as being shards are reachable and are
@@ -120,6 +125,9 @@ private:
 
     // number of moved chunks in last round
     int _balancedLastTime;
+
+    // Source for cluster statistics
+    std::unique_ptr<ClusterStatistics> _clusterStats;
 };
 
 }  // namespace mongo

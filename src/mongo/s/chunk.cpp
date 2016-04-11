@@ -33,7 +33,6 @@
 #include "mongo/s/chunk.h"
 
 #include "mongo/client/connpool.h"
-#include "mongo/client/dbclientcursor.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
@@ -42,7 +41,9 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/platform/random.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/balance.h"
 #include "mongo/s/balancer_policy.h"
+#include "mongo/s/balancer/cluster_statistics.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_settings.h"
@@ -78,25 +79,27 @@ const int kTooManySplitPoints = 4;
 bool tryMoveToOtherShard(OperationContext* txn,
                          const ChunkManager& manager,
                          const ChunkType& chunk) {
-    // reload sharding metadata before starting migration
-    ChunkManagerPtr chunkMgr = manager.reload(txn, false /* just reloaded in mulitsplit */);
-
-    auto shardInfoMapStatus = DistributionStatus::populateShardInfoMap(txn);
-    if (!shardInfoMapStatus.isOK()) {
-        warning() << "failed to load shard metadata while trying to moveChunk after "
-                  << "auto-splitting" << causedBy(shardInfoMapStatus.getStatus());
+    auto clusterStatsStatus(Balancer::get(txn)->getClusterStatistics()->getStats(txn));
+    if (!clusterStatsStatus.isOK()) {
+        warning() << "Could not get cluster statistics "
+                  << causedBy(clusterStatsStatus.getStatus());
         return false;
     }
 
-    const ShardInfoMap shardInfo(std::move(shardInfoMapStatus.getValue()));
+    const auto clusterStats(std::move(clusterStatsStatus.getValue()));
 
-    if (shardInfo.size() < 2) {
+    if (clusterStats.size() < 2) {
         LOG(0) << "no need to move top chunk since there's only 1 shard";
         return false;
     }
 
+    // Reload sharding metadata before starting migration. Only reload the differences though,
+    // because the entire chunk manager was reloaded during the call to split, which immediately
+    // precedes this move logic
+    shared_ptr<ChunkManager> chunkMgr = manager.reload(txn, false);
+
     map<string, vector<ChunkType>> shardToChunkMap;
-    DistributionStatus::populateShardToChunksMap(shardInfo, *chunkMgr, &shardToChunkMap);
+    DistributionStatus::populateShardToChunksMap(clusterStats, *chunkMgr, &shardToChunkMap);
 
     StatusWith<string> tagStatus =
         grid.catalogManager(txn)->getTagForChunk(txn, manager.getns(), chunk);
@@ -106,7 +109,7 @@ bool tryMoveToOtherShard(OperationContext* txn,
         return false;
     }
 
-    DistributionStatus chunkDistribution(shardInfo, shardToChunkMap);
+    DistributionStatus chunkDistribution(clusterStats, shardToChunkMap);
     const string newLocation(chunkDistribution.getBestReceieverShard(tagStatus.getValue()));
 
     if (newLocation.empty()) {
@@ -120,7 +123,7 @@ bool tryMoveToOtherShard(OperationContext* txn,
         return false;
     }
 
-    ChunkPtr toMove = chunkMgr->findIntersectingChunk(txn, chunk.getMin());
+    shared_ptr<Chunk> toMove = chunkMgr->findIntersectingChunk(txn, chunk.getMin());
 
     if (!(toMove->getMin() == chunk.getMin() && toMove->getMax() == chunk.getMax())) {
         LOG(1) << "recently split chunk: " << chunk << " modified before we could migrate "
