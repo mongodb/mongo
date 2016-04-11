@@ -36,17 +36,36 @@ namespace mongo {
 
 int getGtLtOp(const BSONElement& e);
 
-struct BSONElementCmpWithoutField {
+class BSONElementCmpWithoutField {
+public:
+    /**
+     * If 'stringComparator' is null, the default binary comparator will be used for comparing
+     * string elements.  A custom string comparator may be provided, but it must outlive the
+     * constructed BSONElementCmpWithoutField.
+     */
+    BSONElementCmpWithoutField(StringData::ComparatorInterface* stringComparator = nullptr)
+        : _stringComparator(stringComparator) {}
+
     bool operator()(const BSONElement& l, const BSONElement& r) const {
-        return l.woCompare(r, false) < 0;
+        return l.woCompare(r, false, _stringComparator) < 0;
     }
+
+private:
+    StringData::ComparatorInterface* _stringComparator;
 };
 
 class BSONObjCmp {
 public:
-    BSONObjCmp(const BSONObj& order = BSONObj()) : _order(order) {}
+    /**
+     * If 'stringComparator' is null, the default binary comparator will be used for comparing
+     * string elements.  A custom string comparator may be provided, but it must outlive the
+     * constructed BSONElementCmpWithoutField.
+     */
+    BSONObjCmp(const BSONObj& order = BSONObj(),
+               StringData::ComparatorInterface* stringComparator = nullptr)
+        : _order(order), _stringComparator(stringComparator) {}
     bool operator()(const BSONObj& l, const BSONObj& r) const {
-        return l.woCompare(r, _order) < 0;
+        return l.woCompare(r, _order, true, _stringComparator) < 0;
     }
     BSONObj order() const {
         return _order;
@@ -54,6 +73,7 @@ public:
 
 private:
     BSONObj _order;
+    StringData::ComparatorInterface* _stringComparator;
 };
 
 typedef std::set<BSONObj, BSONObjCmp> BSONObjSet;

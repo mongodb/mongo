@@ -37,13 +37,13 @@ namespace mongo {
 
 class BSONArrayBuilder;
 class BSONElement;
+class BSONElementCmpWithoutField;
 class BSONObj;
 class BSONObjBuilder;
 class BSONObjBuilderValueStream;
 class BSONObjIterator;
 class Ordering;
 struct BSONArray;  // empty subclass of BSONObj useful for overloading
-struct BSONElementCmpWithoutField;
 
 extern const BSONObj kMaxBSONKey;
 extern const BSONObj kMinBSONKey;
