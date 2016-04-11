@@ -44,4 +44,22 @@ fi
 
 cp -r $TEMP_DIR/* $DEST_DIR || true
 
+# Prune sources.
+rm -f $DEST_DIR/source/*.in             # Build system.
+rm -f $DEST_DIR/source/*.m4             # Build system.
+rm -f $DEST_DIR/source/install-sh       # Build system.
+rm -f $DEST_DIR/source/mkinstalldirs    # Build system.
+rm -f $DEST_DIR/source/runConfigureICU  # Build system.
+rm -rf $DEST_DIR/as_is/                 # Scripts.
+rm -rf $DEST_DIR/source/allinone/       # Workspace and project files.
+rm -rf $DEST_DIR/source/config*         # Build system.
+rm -rf $DEST_DIR/source/data/           # Source data.
+rm -rf $DEST_DIR/source/extra/          # Non-supported API additions.
+rm -rf $DEST_DIR/source/io/             # ICU I/O library.
+rm -rf $DEST_DIR/source/layout/         # ICU complex text layout engine.
+rm -rf $DEST_DIR/source/layoutex/       # ICU paragraph layout engine.
+rm -rf $DEST_DIR/source/samples/        # Sample programs.
+rm -rf $DEST_DIR/source/test/           # Test suites.
+rm -rf $DEST_DIR/source/tools/          # Tools for generating the data files.
+
 echo "Done"
