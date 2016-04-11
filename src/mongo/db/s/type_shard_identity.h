@@ -30,6 +30,7 @@
 
 #include <string>
 
+#include "mongo/client/connection_string.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
@@ -39,8 +40,8 @@ namespace mongo {
  */
 class ShardIdentityType {
 public:
-    // Name of the collection where the ShardIdentityType document is stored in the shard.
-    static const std::string ConfigNS;
+    // The _id value for this document type.
+    static const std::string IdName;
 
     /**
      * Constructs a new ShardIdentityType object from BSON.
@@ -65,8 +66,8 @@ public:
     std::string toString() const;
 
     bool isConfigsvrConnStringSet() const;
-    const std::string& getConfigsvrConnString() const;
-    void setConfigsvrConnString(std::string connString);
+    const ConnectionString& getConfigsvrConnString() const;
+    void setConfigsvrConnString(ConnectionString connString);
 
     bool isShardNameSet() const;
     const std::string& getShardName() const;
@@ -80,7 +81,7 @@ private:
     // Convention: (M)andatory, (O)ptional, (S)pecial rule.
 
     // (M) connection string to the config server.
-    boost::optional<std::string> _configsvrConnString;
+    boost::optional<ConnectionString> _configsvrConnString;
     // (M) contains the name of the shard.
     boost::optional<std::string> _shardName;
     // (M) contains the (unique) identifier of the cluster.

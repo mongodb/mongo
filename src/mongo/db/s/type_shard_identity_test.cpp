@@ -54,7 +54,7 @@ TEST(ShardIdentityType, RoundTrip) {
 
     auto shardIdentity = result.getValue();
     ASSERT_TRUE(shardIdentity.isConfigsvrConnStringSet());
-    ASSERT_EQ("test/a:123", shardIdentity.getConfigsvrConnString());
+    ASSERT_EQ("test/a:123", shardIdentity.getConfigsvrConnString().toString());
     ASSERT_TRUE(shardIdentity.isShardNameSet());
     ASSERT_EQ("s1", shardIdentity.getShardName());
     ASSERT_TRUE(shardIdentity.isClusterIdSet());
@@ -106,6 +106,32 @@ TEST(ShardIdentityType, ParseMissingClusterId) {
 
     auto result = ShardIdentityType::fromBSON(doc);
     ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(ShardIdentityType, InvalidConnectionString) {
+    auto clusterId(OID::gen());
+    auto doc = BSON("_id"
+                    << "shardIdentity"
+                    << "configsvrConnectionString"
+                    << "test/,,,"
+                    << "shardName"
+                    << "s1"
+                    << "clusterId" << clusterId);
+
+    ASSERT_EQ(ErrorCodes::FailedToParse, ShardIdentityType::fromBSON(doc).getStatus());
+}
+
+TEST(ShardIdentityType, NonReplSetConnectionString) {
+    auto clusterId(OID::gen());
+    auto doc = BSON("_id"
+                    << "shardIdentity"
+                    << "configsvrConnectionString"
+                    << "local:123"
+                    << "shardName"
+                    << "s1"
+                    << "clusterId" << clusterId);
+
+    ASSERT_EQ(ErrorCodes::UnsupportedFormat, ShardIdentityType::fromBSON(doc).getStatus());
 }
 
 }  // namespace mongo

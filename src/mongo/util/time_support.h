@@ -181,6 +181,8 @@ public:
 
     /*
      * Returns a system clock time_point representing the same point in time as this Date_t.
+     * Warning: careful when using with Date_t::max() as it can have a value that is bigger than
+     * time_point can store.
      */
     stdx::chrono::system_clock::time_point toSystemTimePoint() const;
 
@@ -195,6 +197,8 @@ public:
     /**
      * Implicit conversion operator to system clock time point.  Enables use of Date_t with
      * condition_variable::wait_until.
+     * Warning: careful when using with Date_t::max() as it can have a value that is bigger than
+     * time_point can store.
      */
     operator stdx::chrono::system_clock::time_point() const {
         return toSystemTimePoint();

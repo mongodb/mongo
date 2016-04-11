@@ -41,7 +41,7 @@ public:
     CatalogManagerMock();
     ~CatalogManagerMock();
 
-    Status startup(OperationContext* txn) override;
+    Status startup() override;
 
     void shutDown(OperationContext* txn) override;
 

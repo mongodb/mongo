@@ -18,6 +18,8 @@
     }));
     assert.eq(ErrorCodes.ExceededTimeLimit, res.code);
 
+    // Sharding state is now initialized at this point, although with an unreachable config.
+
     var connB = new Mongo(conn.host);
     res = assert.commandFailed(connB.adminCommand({
         moveChunk: 'DummyDB.DummyColl',
@@ -29,7 +31,8 @@
         maxChunkSizeBytes: 1024,
         maxTimeMS: 10000
     }));
-    assert.eq(ErrorCodes.ExceededTimeLimit, res.code);
+    // Cannot reach config server.
+    assert.eq(ErrorCodes.HostUnreachable, res.code);
 
     MongoRunner.stopMongod(conn);
 

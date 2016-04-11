@@ -48,7 +48,7 @@ CatalogManagerMock::CatalogManagerMock() {
 
 CatalogManagerMock::~CatalogManagerMock() = default;
 
-Status CatalogManagerMock::startup(OperationContext* txn) {
+Status CatalogManagerMock::startup() {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 

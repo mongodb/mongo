@@ -100,7 +100,7 @@ public:
      * has been installed into the global 'grid' object. Implementation do not need to guarantee
      * thread safety so callers should employ proper synchronization when calling this method.
      */
-    virtual Status startup(OperationContext* txn) = 0;
+    virtual Status startup() = 0;
 
     /**
      * Performs necessary cleanup when shutting down cleanly.

@@ -60,11 +60,15 @@
             return mongodConn;
         };
 
-        assert.writeOK(mongodConn.getDB('admin').system.version.insert(shardIdentityDoc));
+        assert.writeOK(mongodConn.getDB('admin')
+                           .system.version.update({_id: 'shardIdentity'}, shardIdentityDoc, true));
 
-        //
-        // TODO: add assert checks here when opObserver for shardIdentity is implemented
-        //
+        var res = mongodConn.getDB('admin').runCommand({shardingState: 1});
+
+        assert(res.enabled);
+        assert.eq(shardIdentityDoc.configsvrConnectionString, res.configServer);
+        assert.eq(shardIdentityDoc.shardName, res.shardName);
+        assert.eq(shardIdentityDoc.clusterId, res.clusterId);
 
         //
         // Test normal startup
@@ -76,7 +80,7 @@
         mongodConn = MongoRunner.runMongod(newMongodOptions);
         waitForMaster(mongodConn);
 
-        var res = mongodConn.getDB('admin').runCommand({shardingState: 1});
+        res = mongodConn.getDB('admin').runCommand({shardingState: 1});
 
         assert(res.enabled);
         assert.eq(shardIdentityDoc.configsvrConnectionString, res.configServer);
@@ -87,12 +91,19 @@
         // Test shardIdentity doc without configsvrConnectionString, resulting into parse error
         //
 
+        // Note: modification of the shardIdentity is allowed only when not running with --shardsvr
+        MongoRunner.stopMongod(mongodConn.port);
+        delete newMongodOptions.shardsvr;
+        mongodConn = MongoRunner.runMongod(newMongodOptions);
+        waitForMaster(mongodConn);
+
         assert.writeOK(mongodConn.getDB('admin').system.version.update(
             {_id: 'shardIdentity'},
             {_id: 'shardIdentity', shardName: 'x', clusterId: ObjectId()}));
 
         MongoRunner.stopMongod(mongodConn.port);
 
+        newMongodOptions.shardsvr = '';
         assert.throws(function() {
             mongodConn = MongoRunner.runMongod(newMongodOptions);
             waitForMaster(mongodConn);

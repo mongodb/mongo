@@ -133,8 +133,7 @@ std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(std::unique_ptr<NetworkIn
     return executorPool;
 }
 
-Status initializeGlobalShardingState(OperationContext* txn,
-                                     const ConnectionString& configCS,
+Status initializeGlobalShardingState(const ConnectionString& configCS,
                                      uint64_t maxChunkSizeBytes,
                                      bool isMongos) {
     if (configCS.type() == ConnectionString::INVALID) {
@@ -164,6 +163,7 @@ Status initializeGlobalShardingState(OperationContext* txn,
                                              shardRegistry.get(),
                                              HostAndPort(getHostName(), serverGlobalParams.port));
 
+    auto rawCatalogManager = catalogManager.get();
     grid.init(
         std::move(catalogManager),
         stdx::make_unique<CatalogCache>(),
@@ -173,14 +173,38 @@ Status initializeGlobalShardingState(OperationContext* txn,
         std::move(executorPool),
         networkPtr);
 
-    while (!inShutdown()) {
-        try {
-            Status status = grid.catalogManager(txn)->startup(txn);
-            uassertStatusOK(status);
+    Status status = rawCatalogManager->startup();
+    if (!status.isOK()) {
+        return status;
+    }
 
-            if (serverGlobalParams.configsvrMode == CatalogManager::ConfigServerMode::NONE) {
-                grid.shardRegistry()->reload(txn);
-            }
+    return Status::OK();
+}
+
+}  // namespace
+
+Status initializeGlobalShardingStateForMongos(const ConnectionString& configCS,
+                                              uint64_t maxChunkSizeBytes) {
+    return initializeGlobalShardingState(configCS, maxChunkSizeBytes, true);
+}
+
+Status initializeGlobalShardingStateForMongod(const ConnectionString& configCS) {
+    return initializeGlobalShardingState(configCS, ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes, false);
+}
+
+Status reloadShardRegistryUntilSuccess(OperationContext* txn) {
+    if (serverGlobalParams.configsvrMode != CatalogManager::ConfigServerMode::NONE) {
+        return Status::OK();
+    }
+
+    while (!inShutdown()) {
+        auto stopStatus = txn->checkForInterruptNoAssert();
+        if (!stopStatus.isOK()) {
+            return stopStatus;
+        }
+
+        try {
+            grid.shardRegistry()->reload(txn);
             return Status::OK();
         } catch (const DBException& ex) {
             Status status = ex.toStatus();
@@ -198,21 +222,7 @@ Status initializeGlobalShardingState(OperationContext* txn,
         }
     }
 
-    return Status::OK();
-}
-
-}  // namespace
-
-Status initializeGlobalShardingStateForMongos(OperationContext* txn,
-                                              const ConnectionString& configCS,
-                                              uint64_t maxChunkSizeBytes) {
-    return initializeGlobalShardingState(txn, configCS, maxChunkSizeBytes, true);
-}
-
-Status initializeGlobalShardingStateForMongod(OperationContext* txn,
-                                              const ConnectionString& configCS) {
-    return initializeGlobalShardingState(
-        txn, configCS, ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes, false);
+    return {ErrorCodes::ShutdownInProgress, "aborting shard loading attempt"};
 }
 
 }  // namespace mongo

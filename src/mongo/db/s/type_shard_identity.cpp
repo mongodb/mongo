@@ -26,14 +26,16 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/s/type_shard_identity.h"
 
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-const std::string ShardIdentityType::ConfigNS = "admin.system.version";
-const std::string id("shardIdentity");
+const std::string ShardIdentityType::IdName("shardIdentity");
 const BSONField<std::string> configsvrConnString("configsvrConnectionString");
 const BSONField<std::string> shardName("shardName");
 const BSONField<OID> clusterId("clusterId");
@@ -52,9 +54,9 @@ StatusWith<ShardIdentityType> ShardIdentityType::fromBSON(const BSONObj& source)
             return status;
         }
 
-        if (docId != id) {
+        if (docId != IdName) {
             return {ErrorCodes::FailedToParse,
-                    str::stream() << "got _id: " << docId << " instead of " << id};
+                    str::stream() << "got _id: " << docId << " instead of " << IdName};
         }
     }
 
@@ -65,7 +67,25 @@ StatusWith<ShardIdentityType> ShardIdentityType::fromBSON(const BSONObj& source)
             return status;
         }
 
-        shardIdentity.setConfigsvrConnString(connString);
+        try {
+            // Note: ConnectionString::parse can uassert from HostAndPort constructor.
+            auto parsedConfigConnStrStatus = ConnectionString::parse(connString);
+            if (!parsedConfigConnStrStatus.isOK()) {
+                return parsedConfigConnStrStatus.getStatus();
+            }
+
+            auto configSvrConnStr = parsedConfigConnStrStatus.getValue();
+            if (configSvrConnStr.type() != ConnectionString::SET) {
+                return Status(ErrorCodes::UnsupportedFormat,
+                              str::stream()
+                                  << "config server connection string can only be replica sets: "
+                                  << configSvrConnStr.toString());
+            }
+
+            shardIdentity.setConfigsvrConnString(std::move(configSvrConnStr));
+        } catch (const UserException& parseException) {
+            return parseException.toStatus();
+        }
     }
 
     {
@@ -92,9 +112,15 @@ StatusWith<ShardIdentityType> ShardIdentityType::fromBSON(const BSONObj& source)
 }
 
 Status ShardIdentityType::validate() const {
-    if (!_configsvrConnString || _configsvrConnString->empty()) {
+    if (!_configsvrConnString) {
         return {ErrorCodes::NoSuchKey,
                 str::stream() << "missing " << configsvrConnString() << " field"};
+    }
+
+    if (_configsvrConnString->type() != ConnectionString::SET) {
+        return {ErrorCodes::UnsupportedFormat,
+                str::stream() << "config connection string can only be replica sets, got "
+                              << ConnectionString::typeToString(_configsvrConnString->type())};
     }
 
     if (!_shardName || _shardName->empty()) {
@@ -111,10 +137,10 @@ Status ShardIdentityType::validate() const {
 BSONObj ShardIdentityType::toBSON() const {
     BSONObjBuilder builder;
 
-    builder.append("_id", id);
+    builder.append("_id", IdName);
 
     if (_configsvrConnString) {
-        builder << configsvrConnString(_configsvrConnString.get());
+        builder << configsvrConnString(_configsvrConnString->toString());
     }
 
     if (_shardName) {
@@ -136,12 +162,12 @@ bool ShardIdentityType::isConfigsvrConnStringSet() const {
     return _configsvrConnString.is_initialized();
 }
 
-const std::string& ShardIdentityType::getConfigsvrConnString() const {
+const ConnectionString& ShardIdentityType::getConfigsvrConnString() const {
     invariant(_configsvrConnString);
     return _configsvrConnString.get();
 }
 
-void ShardIdentityType::setConfigsvrConnString(std::string connString) {
+void ShardIdentityType::setConfigsvrConnString(ConnectionString connString) {
     _configsvrConnString = std::move(connString);
 }
 

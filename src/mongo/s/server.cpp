@@ -270,8 +270,13 @@ static void reloadSettings(OperationContext* txn) {
 }
 
 static Status initializeSharding(OperationContext* txn) {
-    Status status = initializeGlobalShardingStateForMongos(
-        txn, mongosGlobalParams.configdbs, mongosGlobalParams.maxChunkSizeBytes);
+    Status status = initializeGlobalShardingStateForMongos(mongosGlobalParams.configdbs,
+                                                           mongosGlobalParams.maxChunkSizeBytes);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    status = reloadShardRegistryUntilSuccess(txn);
     if (!status.isOK()) {
         return status;
     }

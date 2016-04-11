@@ -42,10 +42,36 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/type_shard_identity.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/stale_exception.h"
 
 namespace mongo {
+
+namespace {
+
+/**
+ * Used to perform shard identity initialization once it is certain that the document is committed.
+ */
+class ShardIdentityLopOpHandler final : public RecoveryUnit::Change {
+public:
+    ShardIdentityLopOpHandler(OperationContext* txn, ShardIdentityType shardIdentity)
+        : _txn(txn), _shardIdentity(std::move(shardIdentity)) {}
+
+    void commit() override {
+        fassertNoTrace(
+            40071,
+            ShardingState::get(_txn)->initializeFromShardIdentity(_shardIdentity, Date_t::max()));
+    }
+
+    void rollback() override {}
+
+private:
+    OperationContext* _txn;
+    const ShardIdentityType _shardIdentity;
+};
+
+}  // unnamed namespace
 
 using std::string;
 
@@ -133,6 +159,17 @@ bool CollectionShardingState::isDocumentInMigratingChunk(OperationContext* txn,
 void CollectionShardingState::onInsertOp(OperationContext* txn, const BSONObj& insertedDoc) {
     dassert(txn->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
 
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+        _nss == NamespaceString::kConfigCollectionNamespace) {
+        if (auto idElem = insertedDoc["_id"]) {
+            if (idElem.str() == ShardIdentityType::IdName) {
+                auto shardIdentityDoc = uassertStatusOK(ShardIdentityType::fromBSON(insertedDoc));
+                txn->recoveryUnit()->registerChange(
+                    new ShardIdentityLopOpHandler(txn, std::move(shardIdentityDoc)));
+            }
+        }
+    }
+
     checkShardVersionOrThrow(txn);
 
     if (_sourceMgr) {
@@ -143,6 +180,15 @@ void CollectionShardingState::onInsertOp(OperationContext* txn, const BSONObj& i
 void CollectionShardingState::onUpdateOp(OperationContext* txn, const BSONObj& updatedDoc) {
     dassert(txn->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
 
+    if (txn->writesAreReplicated() && serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+        _nss == NamespaceString::kConfigCollectionNamespace) {
+        if (auto idElem = updatedDoc["_id"]) {
+            uassert(40069,
+                    "cannot update shardIdentity document while in --shardsvr mode",
+                    idElem.str() != ShardIdentityType::IdName);
+        }
+    }
+
     checkShardVersionOrThrow(txn);
 
     if (_sourceMgr) {
@@ -152,6 +198,15 @@ void CollectionShardingState::onUpdateOp(OperationContext* txn, const BSONObj& u
 
 void CollectionShardingState::onDeleteOp(OperationContext* txn, const BSONObj& deletedDocId) {
     dassert(txn->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
+
+    if (txn->writesAreReplicated() && serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+        _nss == NamespaceString::kConfigCollectionNamespace) {
+        if (auto idElem = deletedDocId["_id"]) {
+            uassert(40070,
+                    "cannot delete shardIdentity document while in --shardsvr mode",
+                    idElem.str() != ShardIdentityType::IdName);
+        }
+    }
 
     checkShardVersionOrThrow(txn);
 

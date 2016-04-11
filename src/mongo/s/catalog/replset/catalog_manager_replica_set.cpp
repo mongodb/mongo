@@ -324,7 +324,7 @@ CatalogManagerReplicaSet::CatalogManagerReplicaSet(
 
 CatalogManagerReplicaSet::~CatalogManagerReplicaSet() = default;
 
-Status CatalogManagerReplicaSet::startup(OperationContext* txn) {
+Status CatalogManagerReplicaSet::startup() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_started) {
         return Status::OK();

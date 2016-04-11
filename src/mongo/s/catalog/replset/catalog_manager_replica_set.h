@@ -53,7 +53,7 @@ public:
      * Safe to call multiple times as long as the calls are externally synchronized to be
      * non-overlapping.
      */
-    Status startup(OperationContext* txn) override;
+    Status startup() override;
 
     void shutDown(OperationContext* txn) override;
 

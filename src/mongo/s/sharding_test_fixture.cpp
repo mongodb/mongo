@@ -119,7 +119,7 @@ void ShardingTestFixture::setUp() {
     std::unique_ptr<CatalogManagerReplicaSet> cm(stdx::make_unique<CatalogManagerReplicaSet>(
         std::move(uniqueDistLockManager), std::move(specialExec)));
     _catalogManagerRS = cm.get();
-    cm->startup(_opCtx.get());
+    cm->startup();
 
     ConnectionString configCS = ConnectionString::forReplicaSet(
         "CatalogManagerReplSetTest", {HostAndPort{"TestHost1"}, HostAndPort{"TestHost2"}});

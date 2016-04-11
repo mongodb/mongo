@@ -40,6 +40,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -86,7 +87,7 @@ public:
         OperationContext* const _txn;
     };
 
-    using GlobalInitFunc = stdx::function<Status(OperationContext*, const ConnectionString&)>;
+    using GlobalInitFunc = stdx::function<Status(const ConnectionString&)>;
 
     ShardingState();
     ~ShardingState();
@@ -120,23 +121,30 @@ public:
      *
      * Throws if initialization fails for any reason and the sharding state object becomes unusable
      * afterwards. Any sharding state operations afterwards will fail.
+     *
+     * Note that this will also try to connect to the config servers and will block until it
+     * succeeds.
      */
     void initializeFromConfigConnString(OperationContext* txn, const std::string& configSvr);
 
     /**
      * Initializes the sharding state of this server from the shard identity document from local
      * storage.
+     *
+     * Note that this will also try to connect to the config servers and will block until it
+     * succeeds.
      */
     Status initializeFromShardIdentity(OperationContext* txn);
 
     /**
      * Initializes the sharding state of this server from the shard identity document argument.
      * This is the more genaralized form of the initializeFromShardIdentity(OperationContext*)
-     * method that can accept the shard identity from any source.
-     * This method currently blocks for network and should not be called with database locks held.
+     * method that can accept the shard identity from any source. Note that shardIdentity must
+     * be valid.
+     *
+     * Returns ErrorCodes::ExceededTimeLimit if deadline has passed.
      */
-    Status initializeFromShardIdentity(OperationContext* txn,
-                                       const ShardIdentityType& shardIdentity);
+    Status initializeFromShardIdentity(const ShardIdentityType& shardIdentity, Date_t deadline);
 
     /**
      * Shuts down sharding machinery on the shard.
@@ -283,8 +291,8 @@ private:
      * Blocking method, which waits for the initialization state to become kInitialized or kError
      * and returns the initialization status.
      */
-    Status _waitForInitialization(OperationContext* txn);
-    Status _waitForInitialization_inlock(OperationContext* txn, stdx::unique_lock<stdx::mutex>& lk);
+    Status _waitForInitialization(Date_t deadline);
+    Status _waitForInitialization_inlock(Date_t deadline, stdx::unique_lock<stdx::mutex>& lk);
 
     /**
      * Simple wrapper to cast the initialization state atomic uint64 to InitializationState value

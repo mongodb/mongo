@@ -40,11 +40,15 @@ class Status;
  * Takes in the connection string for reaching the config servers and initializes the global
  * CatalogManager, ShardingRegistry, and grid objects.
  */
-Status initializeGlobalShardingStateForMongos(OperationContext* txn,
-                                              const ConnectionString& configCS,
+Status initializeGlobalShardingStateForMongos(const ConnectionString& configCS,
                                               uint64_t maxChunkSizeBytes);
 
-Status initializeGlobalShardingStateForMongod(OperationContext* txn,
-                                              const ConnectionString& configCS);
+Status initializeGlobalShardingStateForMongod(const ConnectionString& configCS);
+
+/**
+ * Tries to contact the config server and reload the shard registry until it succeeds or
+ * is interrupted.
+ */
+Status reloadShardRegistryUntilSuccess(OperationContext* txn);
 
 }  // namespace mongo
