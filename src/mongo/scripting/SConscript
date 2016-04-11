@@ -1,8 +1,8 @@
 # -*- mode: python -*-
 
 Import([
-    'debugBuild',
     'env',
+    'get_option',
     'serverJs',
     'usemozjs',
 ])
@@ -86,7 +86,7 @@ if usemozjs:
         'STATIC_JS_API=1',
     ])
 
-    if debugBuild:
+    if get_option('spider-monkey-dbg') == "on":
         scriptingEnv.Prepend(CPPDEFINES=[
             'DEBUG',
             'JS_DEBUG',
