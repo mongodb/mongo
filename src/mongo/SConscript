@@ -36,6 +36,7 @@ env.SConscript(
         'scripting',
         'shell',
         'tools',
+        'transport',
         'unittest',
         'util',
     ],
