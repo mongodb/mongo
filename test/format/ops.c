@@ -1034,7 +1034,7 @@ row_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 	ret = cursor->update(cursor);
 	if (ret == WT_ROLLBACK)
 		return (WT_ROLLBACK);
-	if (ret != 0 && ret != WT_NOTFOUND)
+	if (ret != 0)
 		testutil_die(ret,
 		    "row_update: update row %" PRIu64 " by key", keyno);
 
@@ -1042,12 +1042,7 @@ row_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 	if (!SINGLETHREADED)
 		return (0);
 
-	{
-	int notfound;
-
-	bdb_update(key->data, key->size, value->data, value->size, &notfound);
-	(void)notfound_chk("row_update", ret, notfound, keyno);
-	}
+	bdb_update(key->data, key->size, value->data, value->size);
 #endif
 	return (0);
 }
@@ -1086,20 +1081,15 @@ col_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 	ret = cursor->update(cursor);
 	if (ret == WT_ROLLBACK)
 		return (WT_ROLLBACK);
-	if (ret != 0 && ret != WT_NOTFOUND)
+	if (ret != 0)
 		testutil_die(ret, "col_update: %" PRIu64, keyno);
 
 #ifdef HAVE_BERKELEY_DB
 	if (!SINGLETHREADED)
 		return (0);
 
-	{
-	int notfound;
-
 	key_gen(key, keyno);
-	bdb_update(key->data, key->size, value->data, value->size, &notfound);
-	(void)notfound_chk("col_update", ret, notfound, keyno);
-	}
+	bdb_update(key->data, key->size, value->data, value->size);
 #else
 	(void)key;				/* [-Wunused-variable] */
 #endif
@@ -1238,12 +1228,7 @@ row_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 	if (!SINGLETHREADED)
 		return (0);
 
-	{
-	int notfound;
-
-	bdb_update(key->data, key->size, value->data, value->size, &notfound);
-	(void)notfound_chk("row_insert", ret, notfound, keyno);
-	}
+	bdb_update(key->data, key->size, value->data, value->size);
 #endif
 	return (0);
 }
@@ -1292,12 +1277,8 @@ col_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
 	if (!SINGLETHREADED)
 		return (0);
 
-	{
-	int notfound;
-
 	key_gen(key, keyno);
-	bdb_update(key->data, key->size, value->data, value->size, &notfound);
-	}
+	bdb_update(key->data, key->size, value->data, value->size);
 #else
 	(void)key;				/* [-Wunused-variable] */
 #endif
@@ -1380,19 +1361,18 @@ col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 	if (!SINGLETHREADED)
 		return (ret);
 
-	{
-	int notfound;
-
 	/*
 	 * Deleting a fixed-length item is the same as setting the bits to 0;
 	 * do the same thing for the BDB store.
 	 */
 	if (g.type == FIX) {
 		key_gen(key, keyno);
-		bdb_update(key->data, key->size, "\0", 1, &notfound);
-	} else
+		bdb_update(key->data, key->size, "\0", 1);
+	} else {
+		int notfound;
+
 		bdb_remove(keyno, &notfound);
-	(void)notfound_chk("col_remove", ret, notfound, keyno);
+		(void)notfound_chk("col_remove", ret, notfound, keyno);
 	}
 #else
 	(void)key;				/* [-Wunused-variable] */

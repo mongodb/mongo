@@ -298,7 +298,7 @@ void	 bdb_np(int, void *, size_t *, void *, size_t *, int *);
 void	 bdb_open(void);
 void	 bdb_read(uint64_t, void *, size_t *, int *);
 void	 bdb_remove(uint64_t, int *);
-void	 bdb_update(const void *, size_t, const void *, size_t, int *);
+void	 bdb_update(const void *, size_t, const void *, size_t);
 #endif
 
 void	*backup(void *);

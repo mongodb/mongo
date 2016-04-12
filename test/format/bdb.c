@@ -163,7 +163,7 @@ bdb_read(uint64_t keyno, void *valuep, size_t *valuesizep, int *notfoundp)
 
 void
 bdb_update(const void *arg_key, size_t arg_key_size,
-    const void *arg_value, size_t arg_value_size, int *notfoundp)
+    const void *arg_value, size_t arg_value_size)
 {
 	DBC *dbc = g.dbc;
 	int ret;
@@ -173,15 +173,10 @@ bdb_update(const void *arg_key, size_t arg_key_size,
 	value.data = (void *)arg_value;
 	value.size = (uint32_t)arg_value_size;
 
-	*notfoundp = 0;
-	if ((ret = dbc->put(dbc, &key, &value, DB_KEYFIRST)) != 0) {
-		if (ret != DB_NOTFOUND) {
-			testutil_die(ret, "dbc.put: DB_KEYFIRST: {%.*s}{%.*s}",
-			    (int)key.size, (char *)key.data,
-			    (int)value.size, (char *)value.data);
-		}
-		*notfoundp = 1;
-	}
+	if ((ret = dbc->put(dbc, &key, &value, DB_KEYFIRST)) != 0)
+		testutil_die(ret, "dbc.put: DB_KEYFIRST: {%.*s}{%.*s}",
+		    (int)key.size, (char *)key.data,
+		    (int)value.size, (char *)value.data);
 }
 
 void
