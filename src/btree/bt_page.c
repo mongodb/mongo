@@ -135,7 +135,8 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			/*
 			 * Forcibly evict pages that are too big.
 			 */
-			if (force_attempts < 10 &&
+			if (!F_ISSET(session, WT_SESSION_NO_CACHE_CHECK) &&
+			    force_attempts < 10 &&
 			    __evict_force_check(session, page, flags)) {
 				++force_attempts;
 				ret = __wt_page_release_evict(session, ref);
