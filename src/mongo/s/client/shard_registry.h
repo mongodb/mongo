@@ -90,14 +90,11 @@ public:
      * @param executor Asynchronous task executor to use for making calls to shards and
      *     config servers.
      * @param network Network interface backing executor.
-     * @param addShardExecutor Asynchronous task executor to use for making calls to nodes that
-     *     are not yet in the ShardRegistry
      * @param configServerCS ConnectionString used for communicating with the config servers
      */
     ShardRegistry(std::unique_ptr<ShardFactory> shardFactory,
                   std::unique_ptr<executor::TaskExecutorPool> executorPool,
                   executor::NetworkInterface* network,
-                  std::unique_ptr<executor::TaskExecutor> addShardExecutor,
                   ConnectionString configServerCS);
 
     ~ShardRegistry();
@@ -246,17 +243,6 @@ public:
                                                     const std::string& dbName,
                                                     const BSONObj& cmdObj);
 
-
-    /**
-     * Same as runIdempotentCommandOnShard above but used for talking to nodes that are not yet in
-     * the ShardRegistry.
-     */
-    StatusWith<BSONObj> runIdempotentCommandForAddShard(OperationContext* txn,
-                                                        const std::shared_ptr<Shard>& shard,
-                                                        const ReadPreferenceSetting& readPref,
-                                                        const std::string& dbName,
-                                                        const BSONObj& cmdObj);
-
     /**
      * Runs command against a config server that matches the given read preference,  and returns
      * the result.  It is the responsibility of the caller to check the returned BSON
@@ -391,10 +377,6 @@ private:
     // Network interface being used by _executor.  Used for asking questions about the network
     // configuration, such as getting the current server's hostname.
     executor::NetworkInterface* const _network;
-
-    // Executor specifically used for sending commands to servers that are in the process of being
-    // added as shards.  Does not have any connection hook set on it.
-    const std::unique_ptr<executor::TaskExecutor> _executorForAddShard;
 
     // Protects the _reloadState, config server connections string, and the lookup maps below.
     mutable stdx::mutex _mutex;

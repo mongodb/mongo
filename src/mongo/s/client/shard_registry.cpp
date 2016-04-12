@@ -172,12 +172,10 @@ const ShardRegistry::ErrorCodesSet ShardRegistry::kWriteConcernErrors{
 ShardRegistry::ShardRegistry(std::unique_ptr<ShardFactory> shardFactory,
                              std::unique_ptr<executor::TaskExecutorPool> executorPool,
                              executor::NetworkInterface* network,
-                             std::unique_ptr<executor::TaskExecutor> addShardExecutor,
                              ConnectionString configServerCS)
     : _shardFactory(std::move(shardFactory)),
       _executorPool(std::move(executorPool)),
-      _network(network),
-      _executorForAddShard(std::move(addShardExecutor)) {
+      _network(network) {
     updateConfigServerConnectionString(configServerCS);
 }
 
@@ -201,13 +199,10 @@ void ShardRegistry::_updateConfigServerConnectionString_inlock(ConnectionString 
 }
 
 void ShardRegistry::startup() {
-    _executorForAddShard->startup();
     _executorPool->startup();
 }
 
 void ShardRegistry::shutdown() {
-    _executorForAddShard->shutdown();
-    _executorForAddShard->join();
     _executorPool->shutdownAndJoin();
 }
 
@@ -418,8 +413,6 @@ void ShardRegistry::toBSON(BSONObjBuilder* result) {
 void ShardRegistry::appendConnectionStats(executor::ConnectionPoolStats* stats) const {
     // Get stats from the pool of task executors, including fixed executor within.
     _executorPool->appendConnectionStats(stats);
-    // Get stats from the separate executor for addShard.
-    _executorForAddShard->appendConnectionStats(stats);
 }
 
 void ShardRegistry::_addConfigShard_inlock() {
@@ -670,30 +663,6 @@ StatusWith<BSONObj> ShardRegistry::runIdempotentCommandOnShard(
         return {ErrorCodes::ShardNotFound, str::stream() << "shard " << shardId << " not found"};
     }
     return runIdempotentCommandOnShard(txn, shard, readPref, dbName, cmdObj);
-}
-
-
-StatusWith<BSONObj> ShardRegistry::runIdempotentCommandForAddShard(
-    OperationContext* txn,
-    const std::shared_ptr<Shard>& shard,
-    const ReadPreferenceSetting& readPref,
-    const std::string& dbName,
-    const BSONObj& cmdObj) {
-    auto status = _runCommandWithRetries(txn,
-                                         _executorForAddShard.get(),
-                                         shard,
-                                         readPref,
-                                         dbName,
-                                         cmdObj,
-                                         readPref.pref == ReadPreference::PrimaryOnly
-                                             ? rpc::makeEmptyMetadata()
-                                             : kSecondaryOkMetadata,
-                                         kAllRetriableErrors);
-    if (!status.isOK()) {
-        return status.getStatus();
-    }
-
-    return status.getValue().response;
 }
 
 StatusWith<BSONObj> ShardRegistry::runIdempotentCommandOnConfig(

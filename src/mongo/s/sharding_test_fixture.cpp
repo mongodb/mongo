@@ -117,9 +117,10 @@ void ShardingTestFixture::setUp() {
 
     auto uniqueDistLockManager = stdx::make_unique<DistLockManagerMock>();
     _distLockManager = uniqueDistLockManager.get();
-    std::unique_ptr<CatalogManagerReplicaSet> cm(
-        stdx::make_unique<CatalogManagerReplicaSet>(std::move(uniqueDistLockManager)));
+    std::unique_ptr<CatalogManagerReplicaSet> cm(stdx::make_unique<CatalogManagerReplicaSet>(
+        std::move(uniqueDistLockManager), std::move(specialExec)));
     _catalogManagerRS = cm.get();
+    cm->startup(_opCtx.get());
 
     ConnectionString configCS = ConnectionString::forReplicaSet(
         "CatalogManagerReplSetTest", {HostAndPort{"TestHost1"}, HostAndPort{"TestHost2"}});
@@ -128,11 +129,8 @@ void ShardingTestFixture::setUp() {
     _configTargeter = configTargeter.get();
     _shardFactory->addTargeterToReturn(configCS, std::move(configTargeter));
 
-    auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(shardFactory),
-                                                        std::move(executorPool),
-                                                        _mockNetwork,
-                                                        std::move(specialExec),
-                                                        configCS));
+    auto shardRegistry(stdx::make_unique<ShardRegistry>(
+        std::move(shardFactory), std::move(executorPool), _mockNetwork, configCS));
     shardRegistry->startup();
 
     // For now initialize the global grid object. All sharding objects will be accessible
@@ -145,6 +143,7 @@ void ShardingTestFixture::setUp() {
 
 void ShardingTestFixture::tearDown() {
     grid.shardRegistry()->shutdown();
+    grid.catalogManager(_opCtx.get())->shutDown(_opCtx.get());
     grid.clearForUnitTests();
 
     _opCtx.reset();

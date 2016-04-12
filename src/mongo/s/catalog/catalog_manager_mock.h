@@ -168,6 +168,8 @@ public:
     Status appendInfoForConfigServerDatabases(OperationContext* txn,
                                               BSONArrayBuilder* builder) override;
 
+    void appendConnectionStats(executor::ConnectionPoolStats* stats) override;
+
 private:
     std::unique_ptr<DistLockManagerMock> _mockDistLockMgr;
 };

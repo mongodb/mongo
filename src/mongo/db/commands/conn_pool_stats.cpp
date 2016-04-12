@@ -88,6 +88,7 @@ public:
         auto registry = grid.shardRegistry();
         if (registry) {
             registry->appendConnectionStats(&stats);
+            grid.catalogManager(txn)->appendConnectionStats(&stats);
         }
 
         // Output to a BSON object.

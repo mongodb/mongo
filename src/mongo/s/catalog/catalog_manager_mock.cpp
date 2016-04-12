@@ -236,4 +236,6 @@ Status CatalogManagerMock::appendInfoForConfigServerDatabases(OperationContext* 
     return Status::OK();
 }
 
+void CatalogManagerMock::appendConnectionStats(executor::ConnectionPoolStats* stats) {}
+
 }  // namespace mongo

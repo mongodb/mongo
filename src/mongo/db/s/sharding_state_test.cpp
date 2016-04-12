@@ -73,16 +73,8 @@ void initGrid(OperationContext* txn, const ConnectionString& configConnString) {
     auto executorPool = stdx::make_unique<executor::TaskExecutorPool>();
     executorPool->addExecutors(std::move(executorsForPool), std::move(fixedExec));
 
-    // Set up executor used for a few special operations during addShard.
-    auto specialNet(stdx::make_unique<executor::NetworkInterfaceMock>());
-    // auto specialMockNet = specialNet.get();
-    auto specialExec = makeThreadPoolTestExecutor(std::move(specialNet));
-
-    auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(shardFactory),
-                                                        std::move(executorPool),
-                                                        mockNetwork,
-                                                        std::move(specialExec),
-                                                        configConnString));
+    auto shardRegistry(stdx::make_unique<ShardRegistry>(
+        std::move(shardFactory), std::move(executorPool), mockNetwork, configConnString));
     shardRegistry->startup();
 
     grid.init(

@@ -122,15 +122,9 @@ private:
         auto executorPool = stdx::make_unique<executor::TaskExecutorPool>();
         executorPool->addExecutors(std::move(executorsForPool), std::move(fixedExecutor));
 
-        auto addShardExecutor = executor::makeThreadPoolTestExecutor(
-            stdx::make_unique<executor::NetworkInterfaceMock>());
-
         ConnectionString configCS(HostAndPort("dummy:1234"));
-        _shardRegistry = stdx::make_unique<ShardRegistry>(stdx::make_unique<ShardFactoryMock>(),
-                                                          std::move(executorPool),
-                                                          network,
-                                                          std::move(addShardExecutor),
-                                                          configCS);
+        _shardRegistry = stdx::make_unique<ShardRegistry>(
+            stdx::make_unique<ShardFactoryMock>(), std::move(executorPool), network, configCS);
         _shardRegistry->startup();
 
         _distLockCatalog = stdx::make_unique<DistLockCatalogImpl>(_shardRegistry.get());

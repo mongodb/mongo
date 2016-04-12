@@ -72,6 +72,12 @@ using executor::NetworkInterfaceThreadPool;
 using executor::TaskExecutorPool;
 using executor::ThreadPoolTaskExecutor;
 
+std::unique_ptr<ThreadPoolTaskExecutor> makeTaskExecutor(std::unique_ptr<NetworkInterface> net) {
+    auto netPtr = net.get();
+    return stdx::make_unique<ThreadPoolTaskExecutor>(
+        stdx::make_unique<NetworkInterfaceThreadPool>(netPtr), std::move(net));
+}
+
 std::unique_ptr<CatalogManager> makeCatalogManager(ServiceContext* service,
                                                    ShardRegistry* shardRegistry,
                                                    const HostAndPort& thisHost) {
@@ -89,13 +95,10 @@ std::unique_ptr<CatalogManager> makeCatalogManager(ServiceContext* service,
                                                   ReplSetDistLockManager::kDistLockPingInterval,
                                                   ReplSetDistLockManager::kDistLockExpirationTime);
 
-    return stdx::make_unique<CatalogManagerReplicaSet>(std::move(distLockManager));
-}
-
-std::unique_ptr<ThreadPoolTaskExecutor> makeTaskExecutor(std::unique_ptr<NetworkInterface> net) {
-    auto netPtr = net.get();
-    return stdx::make_unique<ThreadPoolTaskExecutor>(
-        stdx::make_unique<NetworkInterfaceThreadPool>(netPtr), std::move(net));
+    return stdx::make_unique<CatalogManagerReplicaSet>(
+        std::move(distLockManager),
+        makeTaskExecutor(
+            executor::makeNetworkInterface("NetworkInterfaceASIO-AddShard-TaskExecutor")));
 }
 
 std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(std::unique_ptr<NetworkInterface> fixedNet,
@@ -152,8 +155,6 @@ Status initializeGlobalShardingState(OperationContext* txn,
         stdx::make_unique<ShardRegistry>(stdx::make_unique<ShardFactoryImpl>(),
                                          makeTaskExecutorPool(std::move(network), isMongos),
                                          networkPtr,
-                                         makeTaskExecutor(executor::makeNetworkInterface(
-                                             "NetworkInterfaceASIO-ShardRegistry-TaskExecutor")),
                                          configCS));
 
     auto catalogManager = makeCatalogManager(getGlobalServiceContext(),

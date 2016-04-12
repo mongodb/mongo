@@ -124,27 +124,13 @@ void toBatchError(const Status& status, BatchedCommandResponse* response) {
     response->setOk(false);
 }
 
-/**
- * Validates that the specified connection string can serve as a shard server. In particular,
- * this function checks that the shard can be contacted, that it is not already member of
- * another sharded cluster and etc.
- *
- * @param shardRegistry Shard registry to use for opening connections to the shards.
- * @param connectionString Connection string to be attempted as a shard host.
- * @param shardProposedName Optional proposed name for the shard. Can be omitted in which case
- *      a unique name for the shard will be generated from the shard's connection string. If it
- *      is not omitted, the value cannot be the empty string.
- *
- * On success returns a partially initialized shard type object corresponding to the requested
- * shard. It will have the hostName field set and optionally the name, if the name could be
- * generated from either the proposed name or the connection string set name. The returned
- * shard's name should be checked and if empty, one should be generated using some uniform
- * algorithm.
- */
-StatusWith<ShardType> validateHostAsShard(OperationContext* txn,
-                                          ShardRegistry* shardRegistry,
-                                          const ConnectionString& connectionString,
-                                          const std::string* shardProposedName) {
+}  // namespace
+
+StatusWith<ShardType> CatalogManagerReplicaSet::_validateHostAsShard(
+    OperationContext* txn,
+    ShardRegistry* shardRegistry,
+    const ConnectionString& connectionString,
+    const std::string* shardProposedName) {
     if (connectionString.type() == ConnectionString::INVALID) {
         return {ErrorCodes::BadValue, "Invalid connection string"};
     }
@@ -153,14 +139,13 @@ StatusWith<ShardType> validateHostAsShard(OperationContext* txn,
         return {ErrorCodes::BadValue, "shard name cannot be empty"};
     }
 
+    // TODO: Don't create a detached Shard object, create a detached RemoteCommandTargeter instead.
     const std::shared_ptr<Shard> shardConn{shardRegistry->createConnection(connectionString)};
     invariant(shardConn);
-
-    const ReadPreferenceSetting readPref{ReadPreference::PrimaryOnly};
+    auto targeter = shardConn->getTargeter();
 
     // Is it mongos?
-    auto cmdStatus = shardRegistry->runIdempotentCommandForAddShard(
-        txn, shardConn, readPref, "admin", BSON("isdbgrid" << 1));
+    auto cmdStatus = _runCommandForAddShard(txn, targeter.get(), "admin", BSON("isdbgrid" << 1));
     if (!cmdStatus.isOK()) {
         return cmdStatus.getStatus();
     }
@@ -171,8 +156,7 @@ StatusWith<ShardType> validateHostAsShard(OperationContext* txn,
     }
 
     // Is it a replica set?
-    cmdStatus = shardRegistry->runIdempotentCommandForAddShard(
-        txn, shardConn, readPref, "admin", BSON("isMaster" << 1));
+    cmdStatus = _runCommandForAddShard(txn, targeter.get(), "admin", BSON("isMaster" << 1));
     if (!cmdStatus.isOK()) {
         return cmdStatus.getStatus();
     }
@@ -205,8 +189,7 @@ StatusWith<ShardType> validateHostAsShard(OperationContext* txn,
     }
 
     // Is it a mongos config server?
-    cmdStatus = shardRegistry->runIdempotentCommandForAddShard(
-        txn, shardConn, readPref, "admin", BSON("replSetGetStatus" << 1));
+    cmdStatus = _runCommandForAddShard(txn, targeter.get(), "admin", BSON("replSetGetStatus" << 1));
     if (!cmdStatus.isOK()) {
         return cmdStatus.getStatus();
     }
@@ -298,22 +281,15 @@ StatusWith<ShardType> validateHostAsShard(OperationContext* txn,
     return shard;
 }
 
-/**
- * Runs the listDatabases command on the specified host and returns the names of all databases
- * it returns excluding those named local and admin, since they serve administrative purpose.
- */
-StatusWith<std::vector<std::string>> getDBNamesListFromShard(
+StatusWith<std::vector<std::string>> CatalogManagerReplicaSet::_getDBNamesListFromShard(
     OperationContext* txn, ShardRegistry* shardRegistry, const ConnectionString& connectionString) {
+    // TODO: Don't create a detached Shard object, create a detached RemoteCommandTargeter instead.
     const std::shared_ptr<Shard> shardConn{
         shardRegistry->createConnection(connectionString).release()};
     invariant(shardConn);
 
-    auto cmdStatus = shardRegistry->runIdempotentCommandForAddShard(
-        txn,
-        shardConn,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        "admin",
-        BSON("listDatabases" << 1));
+    auto cmdStatus = _runCommandForAddShard(
+        txn, shardConn->getTargeter().get(), "admin", BSON("listDatabases" << 1));
     if (!cmdStatus.isOK()) {
         return cmdStatus.getStatus();
     }
@@ -338,15 +314,22 @@ StatusWith<std::vector<std::string>> getDBNamesListFromShard(
     return dbNames;
 }
 
-}  // namespace
-
-CatalogManagerReplicaSet::CatalogManagerReplicaSet(std::unique_ptr<DistLockManager> distLockManager)
-    : _distLockManager(std::move(distLockManager)) {}
+CatalogManagerReplicaSet::CatalogManagerReplicaSet(
+    std::unique_ptr<DistLockManager> distLockManager,
+    std::unique_ptr<executor::TaskExecutor> addShardExecutor)
+    : _distLockManager(std::move(distLockManager)),
+      _executorForAddShard(std::move(addShardExecutor)) {}
 
 CatalogManagerReplicaSet::~CatalogManagerReplicaSet() = default;
 
 Status CatalogManagerReplicaSet::startup(OperationContext* txn) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (_started) {
+        return Status::OK();
+    }
+    _started = true;
     _distLockManager->startUp();
+    _executorForAddShard->startup();
     return Status::OK();
 }
 
@@ -359,6 +342,43 @@ void CatalogManagerReplicaSet::shutDown(OperationContext* txn) {
 
     invariant(_distLockManager);
     _distLockManager->shutDown(txn);
+    _executorForAddShard->shutdown();
+    _executorForAddShard->join();
+}
+
+StatusWith<BSONObj> CatalogManagerReplicaSet::_runCommandForAddShard(
+    OperationContext* txn,
+    RemoteCommandTargeter* targeter,
+    const std::string& dbName,
+    const BSONObj& cmdObj) {
+    auto host = targeter->findHost(ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                   RemoteCommandTargeter::selectFindHostMaxWaitTime(txn));
+    if (!host.isOK()) {
+        return host.getStatus();
+    }
+
+    executor::RemoteCommandRequest request(
+        host.getValue(), dbName, cmdObj, rpc::makeEmptyMetadata(), Seconds(30));
+    StatusWith<executor::RemoteCommandResponse> responseStatus =
+        Status(ErrorCodes::InternalError, "Internal error running command");
+
+    auto callStatus = _executorForAddShard->scheduleRemoteCommand(
+        request,
+        [&responseStatus](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
+            responseStatus = args.response;
+        });
+    if (!callStatus.isOK()) {
+        return callStatus.getStatus();
+    }
+
+    // Block until the command is carried out
+    _executorForAddShard->wait(callStatus.getValue());
+
+    if (!responseStatus.isOK()) {
+        return responseStatus.getStatus();
+    }
+
+    return responseStatus.getValue().data.getOwned();
 }
 
 StatusWith<string> CatalogManagerReplicaSet::addShard(OperationContext* txn,
@@ -367,7 +387,7 @@ StatusWith<string> CatalogManagerReplicaSet::addShard(OperationContext* txn,
                                                       const long long maxSize) {
     // Validate the specified connection string may serve as shard at all
     auto shardStatus =
-        validateHostAsShard(txn, grid.shardRegistry(), shardConnectionString, shardProposedName);
+        _validateHostAsShard(txn, grid.shardRegistry(), shardConnectionString, shardProposedName);
     if (!shardStatus.isOK()) {
         // TODO: This is a workaround for the case were we could have some bad shard being
         // requested to be added and we put that bad connection string on the global replica set
@@ -379,7 +399,7 @@ StatusWith<string> CatalogManagerReplicaSet::addShard(OperationContext* txn,
 
     ShardType& shardType = shardStatus.getValue();
 
-    auto dbNamesStatus = getDBNamesListFromShard(txn, grid.shardRegistry(), shardConnectionString);
+    auto dbNamesStatus = _getDBNamesListFromShard(txn, grid.shardRegistry(), shardConnectionString);
     if (!dbNamesStatus.isOK()) {
         return dbNamesStatus.getStatus();
     }
@@ -1967,6 +1987,10 @@ Status CatalogManagerReplicaSet::appendInfoForConfigServerDatabases(OperationCon
     }
 
     return Status::OK();
+}
+
+void CatalogManagerReplicaSet::appendConnectionStats(executor::ConnectionPoolStats* stats) {
+    _executorForAddShard->appendConnectionStats(stats);
 }
 
 }  // namespace mongo

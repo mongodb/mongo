@@ -63,6 +63,10 @@ template <typename T>
 class StatusWith;
 class TagsType;
 
+namespace executor {
+struct ConnectionPoolStats;
+}
+
 /**
  * Used to indicate to the caller of the removeShard method whether draining of chunks for
  * a particular shard has started, is ongoing, or has been completed.
@@ -438,6 +442,11 @@ public:
      */
     virtual Status appendInfoForConfigServerDatabases(OperationContext* txn,
                                                       BSONArrayBuilder* builder) = 0;
+
+    /**
+     * Append information about the connection pools owned by the CatalogManager.
+     */
+    virtual void appendConnectionStats(executor::ConnectionPoolStats* stats) = 0;
 
 
     virtual StatusWith<DistLockManager::ScopedDistLock> distLock(
