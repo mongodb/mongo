@@ -30,7 +30,7 @@
 
 #include "mongo/client/connection_string.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/s/catalog/catalog_manager_common.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/stdx/mutex.h"
 
@@ -43,7 +43,7 @@ class VersionType;
 /**
  * Implements the catalog manager for talking to replica set config servers.
  */
-class CatalogManagerReplicaSet final : public CatalogManagerCommon {
+class CatalogManagerReplicaSet final : public CatalogManager {
 public:
     explicit CatalogManagerReplicaSet(std::unique_ptr<DistLockManager> distLockManager);
     virtual ~CatalogManagerReplicaSet();
@@ -55,6 +55,39 @@ public:
     Status startup(OperationContext* txn) override;
 
     void shutDown(OperationContext* txn) override;
+
+    Status enableSharding(OperationContext* txn, const std::string& dbName) override;
+
+    StatusWith<std::string> addShard(OperationContext* txn,
+                                     const std::string* shardProposedName,
+                                     const ConnectionString& shardConnectionString,
+                                     const long long maxSize) override;
+
+    Status updateDatabase(OperationContext* txn,
+                          const std::string& dbName,
+                          const DatabaseType& db) override;
+
+    Status updateCollection(OperationContext* txn,
+                            const std::string& collNs,
+                            const CollectionType& coll) override;
+
+    Status createDatabase(OperationContext* txn, const std::string& dbName) override;
+
+    Status logAction(OperationContext* txn,
+                     const std::string& what,
+                     const std::string& ns,
+                     const BSONObj& detail) override;
+
+    Status logChange(OperationContext* txn,
+                     const std::string& what,
+                     const std::string& ns,
+                     const BSONObj& detail) override;
+
+    StatusWith<DistLockManager::ScopedDistLock> distLock(
+        OperationContext* txn,
+        StringData name,
+        StringData whyMessage,
+        stdx::chrono::milliseconds waitFor) override;
 
     Status shardCollection(OperationContext* txn,
                            const std::string& ns,
@@ -155,15 +188,36 @@ public:
                                BSONObjBuilder* result);
 
 private:
-    Status _checkDbDoesNotExist(OperationContext* txn,
-                                const std::string& dbName,
-                                DatabaseType* db) override;
+    /**
+     * Selects an optimal shard on which to place a newly created database from the set of
+     * available shards. Will return ShardNotFound if shard could not be found.
+     */
+    static StatusWith<ShardId> _selectShardForNewDatabase(OperationContext* txn,
+                                                          ShardRegistry* shardRegistry);
 
-    StatusWith<std::string> _generateNewShardName(OperationContext* txn) override;
+    /**
+     * Checks that the given database name doesn't already exist in the config.databases
+     * collection, including under different casing. Optional db can be passed and will
+     * be set with the database details if the given dbName exists.
+     *
+     * Returns OK status if the db does not exist.
+     * Some known errors include:
+     *  NamespaceExists if it exists with the same casing
+     *  DatabaseDifferCase if it exists under different casing.
+     */
+    Status _checkDbDoesNotExist(OperationContext* txn, const std::string& dbName, DatabaseType* db);
 
+    /**
+     * Generates a unique name to be given to a newly added shard.
+     */
+    StatusWith<std::string> _generateNewShardName(OperationContext* txn);
+
+    /**
+     * Creates the specified collection name in the config database.
+     */
     Status _createCappedConfigCollection(OperationContext* txn,
                                          StringData collName,
-                                         int cappedSize) override;
+                                         int cappedSize);
 
     /**
      * Executes the specified batch write command on the current config server's primary and retries
@@ -207,12 +261,30 @@ private:
     StatusWith<repl::OpTimeWith<DatabaseType>> _fetchDatabaseMetadata(
         OperationContext* txn, const std::string& dbName, const ReadPreferenceSetting& readPref);
 
+    /**
+     * Best effort method, which logs diagnostic events on the config server. If the config server
+     * write fails for any reason a warning will be written to the local service log and the method
+     * will return a failed status.
+     *
+     * @param txn Operation context in which the call is running
+     * @param logCollName Which config collection to write to (excluding the database name)
+     * @param what E.g. "split", "migrate" (not interpreted)
+     * @param operationNS To which collection the metadata change is being applied (not interpreted)
+     * @param detail Additional info about the metadata change (not interpreted)
+     */
+    Status _log(OperationContext* txn,
+                const StringData& logCollName,
+                const std::string& what,
+                const std::string& operationNS,
+                const BSONObj& detail);
+
     //
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
     //
     // (M) Must hold _mutex for access.
     // (R) Read only, can only be written during initialization.
+    // (S) Self-synchronizing; access in any way from any context.
     //
 
     stdx::mutex _mutex;
@@ -225,6 +297,12 @@ private:
 
     // Last known highest opTime from the config server.
     repl::OpTime _configOpTime;  // (M)
+
+    // Whether the logAction call should attempt to create the actionlog collection
+    AtomicInt32 _actionLogCollectionCreated{0};  // (S)
+
+    // Whether the logChange call should attempt to create the changelog collection
+    AtomicInt32 _changeLogCollectionCreated{0};  // (S)
 };
 
 }  // namespace mongo

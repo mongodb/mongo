@@ -65,7 +65,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
-        '$BUILD_DIR/mongo/s/catalog/catalog_manager',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager',
         '$BUILD_DIR/mongo/s/client/sharding_client',
     ],
