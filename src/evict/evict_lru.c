@@ -1030,6 +1030,11 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 	 * Now we can set the next queue.
 	 */
 	__wt_spin_lock(session, &cache->evict_queue_lock);
+	if (cache->evict_current == NULL)
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_queue_empty);
+	else
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_queue_not_empty);
+
 	cache->evict_current = evict_queue->evict_queue;
 	cache->evict_current_queue = evict_queue;
 	__wt_spin_unlock(session, &cache->evict_queue_lock);
@@ -1066,11 +1071,6 @@ __evict_walk(WT_SESSION_IMPL *session, uint32_t queue_index)
 	dhandle = NULL;
 	dhandle_locked = incr = false;
 	retries = 0;
-
-	if (cache->evict_current == NULL)
-		WT_STAT_FAST_CONN_INCR(session, cache_eviction_queue_empty);
-	else
-		WT_STAT_FAST_CONN_INCR(session, cache_eviction_queue_not_empty);
 
 	/*
 	 * Set the starting slot in the queue and the maximum pages added
@@ -1495,14 +1495,18 @@ __evict_get_ref(
 	/*
 	 * Avoid the LRU lock if no pages are available.
 	 */
-	if (cache->evict_current == NULL)
+	WT_STAT_FAST_CONN_INCR(session, cache_eviction_get_ref);
+	if (cache->evict_current == NULL) {
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_get_ref_empty);
 		return (WT_NOTFOUND);
+	}
 	__wt_spin_lock(session, &cache->evict_queue_lock);
 	/*
 	 * Verify there are still pages available.
 	 */
 	if (cache->evict_current == NULL) {
 		__wt_spin_unlock(session, &cache->evict_queue_lock);
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_get_ref_empty2);
 		return (WT_NOTFOUND);
 	}
 	/*

@@ -261,6 +261,9 @@ struct __wt_connection_stats {
 	int64_t cache_bytes_read;
 	int64_t cache_bytes_write;
 	int64_t cache_eviction_checkpoint;
+	int64_t cache_eviction_get_ref;
+	int64_t cache_eviction_get_ref_empty;
+	int64_t cache_eviction_get_ref_empty2;
 	int64_t cache_eviction_aggressive_set;
 	int64_t cache_eviction_queue_empty;
 	int64_t cache_eviction_queue_not_empty;

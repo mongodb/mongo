@@ -115,7 +115,6 @@ struct __wt_cache {
 	WT_EVICT_QUEUE *evict_current_queue;/* LRU current queue in use */
 	WT_EVICT_ENTRY *evict_current;	/* LRU current page to be evicted */
 	uint32_t evict_queue_fill;	/* LRU eviction queue index to fill */
-	uint32_t evict_queue_slot;	/* LRU eviction queue index to drain */
 	uint32_t evict_slots;		/* LRU list eviction slots */
 	WT_DATA_HANDLE
 		*evict_file_next;	/* LRU next file to search */
