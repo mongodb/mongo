@@ -772,6 +772,7 @@ extern int __wt_win_map_preload( WT_SESSION_IMPL *session, WT_FH *fh, const void
 extern int __wt_win_map_unmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, size_t len, void **mappingcookie);
 extern uint64_t __wt_strtouq(const char *nptr, char **endptr, int base);
 extern void __wt_abort(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+extern void __wt_fh_method_init(WT_FH *fh);
 extern void __wt_free_int(WT_SESSION_IMPL *session, const void *p_arg);
 extern void __wt_posix_handle_allocate_configure(WT_SESSION_IMPL *session, WT_FH *fh);
 extern void __wt_sleep(uint64_t seconds, uint64_t micro_seconds);
