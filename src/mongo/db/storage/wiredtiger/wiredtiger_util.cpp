@@ -322,10 +322,10 @@ size_t WiredTigerUtil::getCacheSizeMB(int requestedCacheSizeGB) {
     double cacheSizeMB;
     if (requestedCacheSizeGB == 0) {
         // Choose a reasonable amount of cache when not explicitly specified by user.
-        // Set a minimum of 256MB, otherwise use 60% of available memory over 1GB.
+        // Set a minimum of 256MB, otherwise use 50% of available memory over 1GB.
         ProcessInfo pi;
         double memSizeMB = pi.getMemSizeMB();
-        cacheSizeMB = std::max((memSizeMB - 1024) * 0.6, 256.0);
+        cacheSizeMB = std::max((memSizeMB - 1024) * 0.5, 256.0);
     } else {
         cacheSizeMB = 1024 * requestedCacheSizeGB;
     }
