@@ -6,13 +6,7 @@
 (function() {
     "use strict";
 
-    // Only reason for using localhost name is to make the test consistent with naming host so it
-    // will be easier to check for the host name inside error objects.
-    var options = {
-        useHostname: false
-    };
-    var st = new ShardingTest({shards: 2, mongos: 1, config: 3, other: options});
-    st.stopBalancer();
+    var st = new ShardingTest({shards: 2, mongos: 1});
 
     var mongos = st.s0;
     var admin = mongos.getDB("admin");
@@ -115,7 +109,7 @@
     // START SETUP
     var brokenColl = mongos.getCollection("broken.coll");
     assert.commandWorked(admin.runCommand({enableSharding: brokenColl.getDB().toString()}));
-    printjson(admin.runCommand({movePrimary: brokenColl.getDB().toString(), to: shards[0]._id}));
+    st.ensurePrimaryShard(brokenColl.getDB().toString(), shards[0]._id);
     assert.commandWorked(admin.runCommand({shardCollection: brokenColl.toString(), key: {_id: 1}}));
     assert.commandWorked(admin.runCommand({split: brokenColl.toString(), middle: {_id: 0}}));
 
@@ -135,8 +129,12 @@
     // Rewrite the old chunks back to the config server
 
     assert.writeOK(config.chunks.remove({}));
-    for (var i = 0; i < oldChunks.length; i++)
+    for (var i = 0; i < oldChunks.length; i++) {
         assert.writeOK(config.chunks.insert(oldChunks[i]));
+    }
+
+    // Ensure that the inserts have propagated to all secondary nodes
+    st.configRS.awaitReplication();
 
     // Stale mongos can no longer bring itself up-to-date!
     // END SETUP
