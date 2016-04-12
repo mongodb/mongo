@@ -13,6 +13,10 @@ selector:
     - jstests/sharding/update_sharded.js
     # validate() format changes. See SERVER-22588.
     - jstests/sharding/validate_collection.js
+    # Write concern error format changes. See SERVER-22540.
+    - jstests/sharding/move_chunk_wc.js
+    - jstests/sharding/commands_that_write_accept_wc_configRS.js
+    - jstests/sharding/commands_that_write_accept_wc_shards.js
 
 executor:
   js_test:

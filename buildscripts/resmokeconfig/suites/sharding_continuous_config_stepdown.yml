@@ -109,6 +109,9 @@ selector:
     # Temporarily blacklisted until more robust
     - jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js
     - jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js
+    # Expects same secondaries for entire test
+    - jstests/sharding/commands_that_write_accept_wc_configRS.js
+    - jstests/sharding/commands_that_write_accept_wc_shards.js
 executor:
   js_test:
     config:
