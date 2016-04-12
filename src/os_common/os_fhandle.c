@@ -115,10 +115,12 @@ __open_verbose(WT_SESSION_IMPL *session,
 	}
 
 	WT_OPEN_VERBOSE_FLAG(WT_OPEN_CREATE, "create");
+	WT_OPEN_VERBOSE_FLAG(WT_OPEN_DIRECTIO, "direct-IO");
 	WT_OPEN_VERBOSE_FLAG(WT_OPEN_EXCLUSIVE, "exclusive");
 	WT_OPEN_VERBOSE_FLAG(WT_OPEN_FIXED, "fixed");
 	WT_OPEN_VERBOSE_FLAG(WT_OPEN_READONLY, "readonly");
 	WT_OPEN_VERBOSE_FLAG(WT_STREAM_APPEND, "stream-append");
+	WT_OPEN_VERBOSE_FLAG(WT_STREAM_LINE_BUFFER, "stream-line-buffer");
 	WT_OPEN_VERBOSE_FLAG(WT_STREAM_READ, "stream-read");
 	WT_OPEN_VERBOSE_FLAG(WT_STREAM_WRITE, "stream-write");
 
@@ -194,6 +196,14 @@ __wt_open(WT_SESSION_IMPL *session,
 			LF_SET(WT_OPEN_READONLY);
 		WT_ASSERT(session, lock_file || !LF_ISSET(WT_OPEN_CREATE));
 	}
+
+	/*
+	 * Direct I/O: file-type is a flag from the set of possible flags stored
+	 * in the connection handle during configuration, check for a match.
+	 */
+	fh->direct_io = false;
+	if (FLD_ISSET(conn->direct_io, file_type))
+		LF_SET(WT_OPEN_DIRECTIO);
 
 	/* Create the path to the file. */
 	if (!LF_ISSET(WT_OPEN_FIXED))
