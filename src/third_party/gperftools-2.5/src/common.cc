@@ -99,7 +99,7 @@ int AlignmentForSize(size_t size) {
 
 int SizeMap::NumMoveSize(size_t size) {
   if (size == 0) return 0;
-  // Use approx 32k transfers between thread and central caches.
+  // Use a min of (8k, 2 count) transfers between thread and central caches.
   int num = kTargetTransferBytes / size;
   if (num < 2) num = 2;
 
@@ -135,6 +135,8 @@ void SizeMap::Init() {
 
   // Compute the size classes we want to use
   int sc = 1;   // Next size class to assign
+  size_t potential_merge_sizes[kMaxSize];
+  int potential_merge_count = 0;
   int alignment = kAlignment;
   CHECK_CONDITION(kAlignment <= kMinAlign);
   for (size_t size = kAlignment; size <= kMaxSize; size += alignment) {
@@ -142,38 +144,45 @@ void SizeMap::Init() {
     CHECK_CONDITION((size % alignment) == 0);
 
     int min_objects_per_span = kTargetTransferBytes / size;
-    size_t psize = 0;
+    size_t span_size = 0;
     do {
-      psize += kPageSize;
+      span_size += kPageSize;
       // Allocate enough pages so leftover is less than 1/8 of total.
       // This bounds wasted space to at most 12.5%.
-      while ((psize % size) > (psize >> 3)) {
-        psize += kPageSize;
+      while ((span_size % size) > (span_size >> 3)) {
+        span_size += kPageSize;
       }
       // Continue to add pages until there are at least as many objects in
       // the span as are needed when moving objects from the central
       // freelists and spans to the thread caches.
-    } while ((psize / size) < min_objects_per_span);
-    const size_t my_pages = psize >> kPageShift;
+    } while ((span_size / size) < min_objects_per_span);
+    const size_t my_pages = span_size >> kPageShift;
 
-    if (sc > 1 && my_pages == class_to_pages_[sc-1]) {
-      // See if we can merge this into the previous class without
-      // increasing the fragmentation of the previous class.
-      const size_t my_objects = (my_pages << kPageShift) / size;
-      const size_t prev_objects = (class_to_pages_[sc-1] << kPageShift)
-                                  / class_to_size_[sc-1];
-      if (my_objects == prev_objects) {
-        // Adjust last class to include this size
-        class_to_size_[sc-1] = size;
-        continue;
-      }
+    bool merge = (potential_merge_count != 0);
+    for (int i = 0; i < potential_merge_count; i++) {
+      // See if we can merge this into the previous class(es) without
+      // the fragmentation of any of them going over 12.5%.
+      int objects_per_span = span_size / size;
+      size_t waste = span_size - (potential_merge_sizes[i] * objects_per_span);
+      if (waste > (span_size >> 3))
+        merge = false;
     }
 
+    if (merge) {
+      // Adjust last class to include this size
+      class_to_size_[sc-1] = size;
+      potential_merge_sizes[potential_merge_count++] = size;
+      continue;
+    }
+
+    potential_merge_sizes[0] = size;
+    potential_merge_count = 1;
     // Add new class
     class_to_pages_[sc] = my_pages;
     class_to_size_[sc] = size;
     sc++;
   }
+
   if (sc != kNumClasses) {
     Log(kCrash, __FILE__, __LINE__,
         "wrong number of size classes: (found vs. expected )", sc, kNumClasses);

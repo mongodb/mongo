@@ -88,10 +88,10 @@ static const size_t kPageShift  = 15;
 static const size_t kNumClasses = kBaseClasses + 69;
 #elif defined(TCMALLOC_64K_PAGES)
 static const size_t kPageShift  = 16;
-static const size_t kNumClasses = kBaseClasses + 37;
+static const size_t kNumClasses = kBaseClasses + 32;
 #else
 static const size_t kPageShift  = 12;
-static const size_t kNumClasses = kBaseClasses + 43;
+static const size_t kNumClasses = kBaseClasses + 33;
 #endif
 
 static const size_t kMaxThreadCacheSize = 4 << 20;
