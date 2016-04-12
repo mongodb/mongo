@@ -74,6 +74,12 @@ class CentralFreeList {
   // Returns the number of free objects in the transfer cache.
   int tc_length();
 
+  // Returns the number of spans in both the empty and nonempty freelists.
+  int spans() {
+    SpinLockHolder h(&lock_);
+    return num_spans_;
+  }
+
   // Returns the memory overhead (internal fragmentation) attributable
   // to the freelist.  This is memory lost when the size of elements
   // in a freelist doesn't exactly divide the page-size (an 8192-byte
