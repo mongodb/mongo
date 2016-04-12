@@ -134,6 +134,7 @@ env.CppUnitTest(
         'metadata',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',

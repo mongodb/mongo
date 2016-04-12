@@ -1,5 +1,5 @@
-/**
- *    Copyright (C) 2014 MongoDB Inc.
+/*
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,50 +26,21 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
+#include "mongo/base/init.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_context_noop.h"
+#include "mongo/stdx/memory.h"
 
-#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
+namespace {
 
-class ServiceContextNoop : public ServiceContext {
-public:
-    StorageEngine* getGlobalStorageEngine() override;
+MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
+    setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
+    return Status::OK();
+}
 
-    void initializeGlobalStorageEngine() override;
-
-    void shutdownGlobalStorageEngineCleanly() override;
-
-    void registerStorageEngine(const std::string& name,
-                               const StorageEngine::Factory* factory) override;
-
-    bool isRegisteredStorageEngine(const std::string& name) override;
-
-    StorageFactoriesIterator* makeStorageFactoriesIterator() override;
-
-    bool killOperation(unsigned int opId) override;
-
-    void killAllUserOperations(const OperationContext* txn, ErrorCodes::Error killCode) override;
-
-    void setKillAllOperations() override;
-
-    void unsetKillAllOperations() override;
-
-    bool getKillAllOperations() override;
-
-    void registerKillOpListener(KillOpListenerInterface* listener) override;
-
-    void setOpObserver(std::unique_ptr<OpObserver> opObserver) override;
-
-    OpObserver* getOpObserver() override;
-
-protected:
-    AtomicUInt32 _nextOpId{1};
-
-private:
-    std::unique_ptr<OperationContext> _newOpCtx(Client* client) override;
-};
-
+}  // namespace
 }  // namespace mongo

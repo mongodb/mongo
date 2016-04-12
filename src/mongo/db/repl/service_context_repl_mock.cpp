@@ -1,5 +1,5 @@
 /**
- *    Copyright 2015 MongoDB Inc.
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,70 +28,16 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/task_runner_test_fixture.h"
+#include "mongo/db/repl/service_context_repl_mock.h"
 
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/repl/task_runner.h"
-#include "mongo/stdx/functional.h"
+#include "mongo/db/repl/operation_context_repl_mock.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/util/concurrency/old_thread_pool.h"
 
 namespace mongo {
 namespace repl {
 
-using namespace mongo;
-using namespace mongo::repl;
-
-namespace {
-
-const int kNumThreads = 3;
-
-}  // namespace
-
-Status TaskRunnerTest::getDetectableErrorStatus() {
-    return Status(ErrorCodes::InternalError, "Not mutated");
-}
-
-int TaskRunnerTest::getOperationContextId(OperationContext* txn) {
-    if (!txn) {
-        return -1;
-    }
-    return int(txn->getOpID());
-}
-
-ServiceContext::UniqueOperationContext TaskRunnerTest::createOperationContext(
-    Client* client) const {
-    return client->makeOperationContext();
-}
-
-TaskRunner& TaskRunnerTest::getTaskRunner() const {
-    ASSERT(_taskRunner.get());
-    return *_taskRunner;
-}
-
-OldThreadPool& TaskRunnerTest::getThreadPool() const {
-    ASSERT(_threadPool.get());
-    return *_threadPool;
-}
-
-void TaskRunnerTest::resetTaskRunner(TaskRunner* taskRunner) {
-    _taskRunner.reset(taskRunner);
-}
-
-void TaskRunnerTest::destroyTaskRunner() {
-    _taskRunner.reset();
-}
-
-void TaskRunnerTest::setUp() {
-    _threadPool.reset(new OldThreadPool(kNumThreads, "TaskRunnerTest-"));
-    resetTaskRunner(new TaskRunner(
-        _threadPool.get(),
-        stdx::bind(&TaskRunnerTest::createOperationContext, this, stdx::placeholders::_1)));
-}
-
-void TaskRunnerTest::tearDown() {
-    destroyTaskRunner();
-    _threadPool.reset();
+std::unique_ptr<OperationContext> ServiceContextReplMock::_newOpCtx(Client* client) {
+    return stdx::make_unique<OperationContextReplMock>(client, _nextOpId.fetchAndAdd(1));
 }
 
 }  // namespace repl

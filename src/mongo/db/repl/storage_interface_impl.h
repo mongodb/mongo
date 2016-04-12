@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/storage_interface.h"
 
 namespace mongo {
@@ -39,9 +40,36 @@ class StorageInterfaceImpl : public StorageInterface {
     MONGO_DISALLOW_COPYING(StorageInterfaceImpl);
 
 public:
-    StorageInterfaceImpl() = default;
+    static const char kDefaultMinValidNamespace[];
+    static const char kInitialSyncFlagFieldName[];
+    static const char kBeginFieldName[];
 
-    OperationContext* createOperationContext() override;
+    StorageInterfaceImpl();
+    explicit StorageInterfaceImpl(const NamespaceString& minValidNss);
+
+    /**
+     * Returns namespace of collection containing the minvalid boundaries and initial sync flag.
+     */
+    NamespaceString getMinValidNss() const;
+
+    ServiceContext::UniqueOperationContext createOperationContext(Client* client) override;
+
+    bool getInitialSyncFlag(OperationContext* txn) const override;
+
+    void setInitialSyncFlag(OperationContext* txn) override;
+
+    void clearInitialSyncFlag(OperationContext* txn) override;
+
+    BatchBoundaries getMinValid(OperationContext* txn) const override;
+
+    void setMinValid(OperationContext* ctx,
+                     const OpTime& endOpTime,
+                     const DurableRequirement durReq) override;
+
+    void setMinValid(OperationContext* ctx, const BatchBoundaries& boundaries) override;
+
+private:
+    NamespaceString _minValidNss;
 };
 
 }  // namespace repl

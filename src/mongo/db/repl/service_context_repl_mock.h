@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2014 MongoDB Inc.
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,48 +28,19 @@
 
 #pragma once
 
-#include "mongo/db/service_context.h"
-
-#include "mongo/platform/atomic_word.h"
+#include "mongo/db/service_context_noop.h"
 
 namespace mongo {
+namespace repl {
 
-class ServiceContextNoop : public ServiceContext {
-public:
-    StorageEngine* getGlobalStorageEngine() override;
-
-    void initializeGlobalStorageEngine() override;
-
-    void shutdownGlobalStorageEngineCleanly() override;
-
-    void registerStorageEngine(const std::string& name,
-                               const StorageEngine::Factory* factory) override;
-
-    bool isRegisteredStorageEngine(const std::string& name) override;
-
-    StorageFactoriesIterator* makeStorageFactoriesIterator() override;
-
-    bool killOperation(unsigned int opId) override;
-
-    void killAllUserOperations(const OperationContext* txn, ErrorCodes::Error killCode) override;
-
-    void setKillAllOperations() override;
-
-    void unsetKillAllOperations() override;
-
-    bool getKillAllOperations() override;
-
-    void registerKillOpListener(KillOpListenerInterface* listener) override;
-
-    void setOpObserver(std::unique_ptr<OpObserver> opObserver) override;
-
-    OpObserver* getOpObserver() override;
-
-protected:
-    AtomicUInt32 _nextOpId{1};
-
+/**
+ * Testing-only service context that extends ServiceContextNoop so that makeOperationContext()
+ * returns an instance of OperationContextReplMock.
+ */
+class ServiceContextReplMock : public ServiceContextNoop {
 private:
     std::unique_ptr<OperationContext> _newOpCtx(Client* client) override;
 };
 
+}  // namespace repl
 }  // namespace mongo

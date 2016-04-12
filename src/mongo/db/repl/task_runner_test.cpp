@@ -47,9 +47,10 @@ using Task = TaskRunner::Task;
 
 TEST_F(TaskRunnerTest, InvalidConstruction) {
     // Null thread pool.
-    ASSERT_THROWS_CODE(TaskRunner(nullptr, []() -> OperationContext* { return nullptr; }),
-                       UserException,
-                       ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(
+        TaskRunner(nullptr, [](Client*) { return ServiceContext::UniqueOperationContext(); }),
+        UserException,
+        ErrorCodes::BadValue);
 
     // Null function for creating operation contexts.
     ASSERT_THROWS_CODE(TaskRunner(&getThreadPool(), TaskRunner::CreateOperationContextFn()),
@@ -84,8 +85,8 @@ TEST_F(TaskRunnerTest, CallbackValues) {
 }
 
 TEST_F(TaskRunnerTest, OperationContextFactoryReturnsNull) {
-    resetTaskRunner(
-        new TaskRunner(&getThreadPool(), []() -> OperationContext* { return nullptr; }));
+    resetTaskRunner(new TaskRunner(
+        &getThreadPool(), [](Client*) { return ServiceContext::UniqueOperationContext(); }));
     stdx::mutex mutex;
     bool called = false;
     OperationContextNoop opCtxNoop;

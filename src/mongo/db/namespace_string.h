@@ -31,6 +31,7 @@
 #pragma once
 
 #include <algorithm>
+#include <iosfwd>
 #include <string>
 
 #include "mongo/base/string_data.h"
@@ -303,6 +304,8 @@ private:
     std::string _ns;
     size_t _dotIndex;
 };
+
+std::ostream& operator<<(std::ostream& stream, const NamespaceString& nss);
 
 // "database.a.b.c" -> "database"
 inline StringData nsToDatabaseSubstring(StringData ns) {

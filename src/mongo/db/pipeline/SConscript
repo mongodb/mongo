@@ -176,5 +176,6 @@ env.CppUnitTest(
         'pipeline',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
         ],
     )

@@ -26,8 +26,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/storage_interface_mock.h"
@@ -37,8 +35,41 @@
 namespace mongo {
 namespace repl {
 
-OperationContext* StorageInterfaceMock::createOperationContext() {
-    return new OperationContextReplMock();
+ServiceContext::UniqueOperationContext StorageInterfaceMock::createOperationContext(
+    Client* client) {
+    return client->makeOperationContext();
+}
+
+bool StorageInterfaceMock::getInitialSyncFlag(OperationContext* txn) const {
+    stdx::lock_guard<stdx::mutex> lock(_initialSyncFlagMutex);
+    return _initialSyncFlag;
+}
+
+void StorageInterfaceMock::setInitialSyncFlag(OperationContext* txn) {
+    stdx::lock_guard<stdx::mutex> lock(_initialSyncFlagMutex);
+    _initialSyncFlag = true;
+}
+
+void StorageInterfaceMock::clearInitialSyncFlag(OperationContext* txn) {
+    stdx::lock_guard<stdx::mutex> lock(_initialSyncFlagMutex);
+    _initialSyncFlag = false;
+}
+
+BatchBoundaries StorageInterfaceMock::getMinValid(OperationContext* txn) const {
+    stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
+    return _minValidBoundaries;
+}
+
+void StorageInterfaceMock::setMinValid(OperationContext* txn,
+                                       const OpTime& endOpTime,
+                                       const DurableRequirement durReq) {
+    stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
+    _minValidBoundaries = {OpTime(), endOpTime};
+}
+
+void StorageInterfaceMock::setMinValid(OperationContext* txn, const BatchBoundaries& boundaries) {
+    stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
+    _minValidBoundaries = boundaries;
 }
 
 }  // namespace repl

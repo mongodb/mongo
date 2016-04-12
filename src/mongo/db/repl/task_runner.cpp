@@ -34,9 +34,14 @@
 
 #include <memory>
 
+#include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
+#include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
 
@@ -134,11 +139,21 @@ void TaskRunner::cancel() {
 }
 
 void TaskRunner::_runTasks() {
-    std::unique_ptr<OperationContext> txn;
+    Client* client = nullptr;
+    ServiceContext::UniqueOperationContext txn;
 
     while (Task task = _waitForNextTask()) {
         if (!txn) {
-            txn.reset(_createOperationContext());
+            if (!client) {
+                // We initialize cc() because ServiceContextMongoD::_newOpCtx() expects cc()
+                // to be equal to the client used to create the operation context.
+                Client::initThreadIfNotAlready();
+                client = &cc();
+                if (getGlobalAuthorizationManager()->isAuthEnabled()) {
+                    AuthorizationSession::get(client)->grantInternalAuthorization();
+                }
+            }
+            txn = _createOperationContext(client);
         }
 
         NextAction nextAction = runSingleTask(task, txn.get(), Status::OK());

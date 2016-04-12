@@ -31,15 +31,17 @@
 #include <list>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/service_context.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
-class OperationContext;
+class Client;
 class Status;
 class OldThreadPool;
+class OperationContext;
 
 namespace repl {
 
@@ -57,7 +59,8 @@ public:
         kCancel = 3,
     };
 
-    using CreateOperationContextFn = stdx::function<OperationContext*()>;
+    using CreateOperationContextFn =
+        stdx::function<ServiceContext::UniqueOperationContext(Client*)>;
     using Task = stdx::function<NextAction(OperationContext*, const Status&)>;
 
     /**

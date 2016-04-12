@@ -31,6 +31,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 namespace repl {
@@ -40,7 +41,25 @@ class StorageInterfaceMock : public StorageInterface {
 
 public:
     StorageInterfaceMock() = default;
-    OperationContext* createOperationContext() override;
+
+    ServiceContext::UniqueOperationContext createOperationContext(Client* client) override;
+
+    bool getInitialSyncFlag(OperationContext* txn) const override;
+    void setInitialSyncFlag(OperationContext* txn) override;
+    void clearInitialSyncFlag(OperationContext* txn) override;
+
+    BatchBoundaries getMinValid(OperationContext* txn) const override;
+    void setMinValid(OperationContext* txn,
+                     const OpTime& endOpTime,
+                     const DurableRequirement durReq) override;
+    void setMinValid(OperationContext* txn, const BatchBoundaries& boundaries) override;
+
+private:
+    mutable stdx::mutex _initialSyncFlagMutex;
+    bool _initialSyncFlag = false;
+
+    mutable stdx::mutex _minValidBoundariesMutex;
+    BatchBoundaries _minValidBoundaries = {OpTime(), OpTime()};
 };
 
 }  // namespace repl

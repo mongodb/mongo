@@ -30,6 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <ostream>
+
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {
@@ -120,6 +122,11 @@ string NamespaceString::escapeDbName(const StringData dbname) {
         escapedDbName += escapeTable[c];
     }
     return escapedDbName;
+}
+
+
+std::ostream& operator<<(std::ostream& stream, const NamespaceString& nss) {
+    return stream << nss.toString();
 }
 
 }  // namespace mongo

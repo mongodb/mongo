@@ -59,15 +59,16 @@ env.Library('authorization_manager_global',
                 '$BUILD_DIR/mongo/db/service_context',
             ])
 
-env.Library('authorization_manager_mock_init',
-            [
-                'authorization_manager_mock_init.cpp'
-            ],
-            LIBDEPS=[
-                'authcore',
-                'authmocks',
-                '$BUILD_DIR/mongo/db/service_context',
-            ])
+env.Library(
+    target='authorization_manager_mock_init',
+    source=[
+        'authorization_manager_mock_init.cpp'
+    ],
+    LIBDEPS=[
+        'authcore',
+        'authmocks',
+    ],
+)
 
 env.Library('authservercommon',
             [

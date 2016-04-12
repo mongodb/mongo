@@ -28,24 +28,13 @@
 
 #pragma once
 
-#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/storage_interface.h"
 
 namespace mongo {
 class BSONObj;
 class OperationContext;
 
 namespace repl {
-
-struct BatchBoundaries {
-    BatchBoundaries(const OpTime s, const OpTime e) : start(s), end(e) {}
-    OpTime start;
-    OpTime end;
-};
-
-enum class DurableRequirement {
-    None,    // Does not require any durability of the write.
-    Strong,  // Requires journal or checkpoint write.
-};
 
 /**
  * Helper functions for maintaining a single document in the local.replset.minvalid collection.

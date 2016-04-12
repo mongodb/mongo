@@ -49,9 +49,10 @@ env.CppUnitTest(
         "router_stage_skip_test.cpp",
     ],
     LIBDEPS=[
+        'router_exec_stage',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
-        "$BUILD_DIR/mongo/s/mongoscore",
-        "router_exec_stage",
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/s/mongoscore',
     ],
 )
 
@@ -85,12 +86,13 @@ env.CppUnitTest(
         "async_results_merger_test.cpp",
     ],
     LIBDEPS=[
+        'async_results_merger',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
-        "$BUILD_DIR/mongo/db/query/lite_parsed_query",
-        "$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture",
-        "$BUILD_DIR/mongo/s/mongoscore",
-        "$BUILD_DIR/mongo/s/sharding_test_fixture",
-        "async_results_merger",
+        '$BUILD_DIR/mongo/db/query/lite_parsed_query',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
+        '$BUILD_DIR/mongo/s/mongoscore',
+        '$BUILD_DIR/mongo/s/sharding_test_fixture',
     ],
 )
 
@@ -113,10 +115,11 @@ env.CppUnitTest(
         "store_possible_cursor_test.cpp",
     ],
     LIBDEPS=[
+        'store_possible_cursor',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
-        "$BUILD_DIR/mongo/s/mongoscore",
-        "$BUILD_DIR/mongo/util/clock_source_mock",
-        "store_possible_cursor",
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/s/mongoscore',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
     ],
 )
 
@@ -159,8 +162,9 @@ env.CppUnitTest(
         "cluster_client_cursor_impl_test.cpp",
     ],
     LIBDEPS=[
+        'cluster_client_cursor',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
-        "$BUILD_DIR/mongo/s/mongoscore",
-        "cluster_client_cursor",
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/s/mongoscore',
     ],
 )

@@ -61,10 +61,13 @@ ReplicationExecutor::ReplicationExecutor(NetworkInterface* netInterface,
       _inShutdown(false),
       _dblockWorkers(OldThreadPool::DoNotStartThreadsTag(), 3, "replExecDBWorker-"),
       _dblockTaskRunner(&_dblockWorkers,
-                        stdx::bind(&StorageInterface::createOperationContext, storageInterface)),
-      _dblockExclusiveLockTaskRunner(
-          &_dblockWorkers,
-          stdx::bind(&StorageInterface::createOperationContext, storageInterface)) {}
+                        stdx::bind(&StorageInterface::createOperationContext,
+                                   storageInterface,
+                                   stdx::placeholders::_1)),
+      _dblockExclusiveLockTaskRunner(&_dblockWorkers,
+                                     stdx::bind(&StorageInterface::createOperationContext,
+                                                storageInterface,
+                                                stdx::placeholders::_1)) {}
 
 ReplicationExecutor::~ReplicationExecutor() {
     // join must have been called

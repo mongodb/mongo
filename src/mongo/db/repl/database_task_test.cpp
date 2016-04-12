@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/client.h"
 #include "mongo/db/repl/database_task.h"
 #include "mongo/db/repl/operation_context_repl_mock.h"
 #include "mongo/db/repl/task_runner.h"
@@ -46,11 +47,12 @@ const NamespaceString nss(databaseName, collectionName);
 
 class DatabaseTaskTest : public TaskRunnerTest {
 public:
-    OperationContext* createOperationContext() const override;
+    ServiceContext::UniqueOperationContext createOperationContext(Client* client) const override;
 };
 
-OperationContext* DatabaseTaskTest::createOperationContext() const {
-    return new OperationContextReplMock();
+ServiceContext::UniqueOperationContext DatabaseTaskTest::createOperationContext(
+    Client* client) const {
+    return client->makeOperationContext();
 }
 
 TEST_F(DatabaseTaskTest, TaskRunnerErrorStatus) {

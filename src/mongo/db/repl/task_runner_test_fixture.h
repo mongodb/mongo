@@ -31,10 +31,12 @@
 #include <memory>
 
 #include "mongo/base/status.h"
+#include "mongo/db/service_context.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
+class Client;
 class OldThreadPool;
 class OperationContext;
 
@@ -60,7 +62,7 @@ public:
     /**
      * Returns an noop operation context with an embedded numerical ID.
      */
-    virtual OperationContext* createOperationContext() const;
+    virtual ServiceContext::UniqueOperationContext createOperationContext(Client*) const;
 
     OldThreadPool& getThreadPool() const;
     TaskRunner& getTaskRunner() const;

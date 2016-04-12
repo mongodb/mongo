@@ -213,6 +213,7 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
 
 void ServiceContext::OperationContextDeleter::operator()(OperationContext* opCtx) const {
     auto client = opCtx->getClient();
+    invariant(client);
     auto service = client->getServiceContext();
     // // TODO(schwerin): When callers no longer construct their own OperationContexts directly,
     // // but only through the ServiceContext, uncomment the following.  Until then, it must

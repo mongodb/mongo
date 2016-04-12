@@ -167,9 +167,10 @@ env.CppUnitTest(
         'curop_test.cpp',
     ],
     LIBDEPS=[
-        'auth/authorization_manager_mock_init',
-        'curop',
         'commands_test_crutch',
+        'curop',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
     ],
 )
 
@@ -375,11 +376,12 @@ env.CppUnitTest(
         'range_deleter_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        'auth/authorization_manager_mock_init',
         'commands_test_crutch',
         'common',
         'range_deleter',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/repl/replmocks',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
     ],
 )
 
@@ -465,6 +467,16 @@ env.Library(
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         '$BUILD_DIR/mongo/util/decorable',
         '$BUILD_DIR/mongo/util/net/hostandport',
+    ],
+)
+
+env.Library(
+    target='service_context_noop_init',
+    source=[
+        'service_context_noop_init.cpp'
+    ],
+    LIBDEPS=[
+        'service_context',
     ],
 )
 
