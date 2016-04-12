@@ -8,8 +8,6 @@
 
 #include "wt_internal.h"
 
-static int __im_handle_size(WT_SESSION_IMPL *, WT_FH *, wt_off_t *);
-
 /*
  * In-memory information.
  */
@@ -48,22 +46,22 @@ __im_directory_sync(WT_SESSION_IMPL *session, const char *path)
 }
 
 /*
- * __im_file_exist --
+ * __im_fs_exist --
  *	Return if the file exists.
  */
 static int
-__im_file_exist(WT_SESSION_IMPL *session, const char *name, bool *existp)
+__im_fs_exist(WT_SESSION_IMPL *session, const char *name, bool *existp)
 {
 	*existp = __wt_handle_search(session, name, false, NULL, NULL);
 	return (0);
 }
 
 /*
- * __im_file_remove --
+ * __im_fs_remove --
  *	POSIX remove.
  */
 static int
-__im_file_remove(WT_SESSION_IMPL *session, const char *name)
+__im_fs_remove(WT_SESSION_IMPL *session, const char *name)
 {
 	WT_DECL_RET;
 	WT_FH *fh;
@@ -79,11 +77,11 @@ __im_file_remove(WT_SESSION_IMPL *session, const char *name)
 }
 
 /*
- * __im_file_rename --
+ * __im_fs_rename --
  *	POSIX rename.
  */
 static int
-__im_file_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
+__im_fs_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -136,11 +134,11 @@ err:		__wt_free(session, to_name);
 }
 
 /*
- * __im_file_size --
+ * __im_fs_size --
  *	Get the size of a file in bytes, by file name.
  */
 static int
-__im_file_size(
+__im_fs_size(
     WT_SESSION_IMPL *session, const char *name, bool silent, wt_off_t *sizep)
 {
 	WT_DECL_RET;
@@ -153,7 +151,7 @@ __im_file_size(
 	__wt_spin_lock(session, &im->lock);
 
 	if (__wt_handle_search(session, name, true, NULL, &fh)) {
-		WT_ERR(__im_handle_size(session, fh, sizep));
+		WT_ERR(fh->fh_size(session, fh, sizep));
 		WT_ERR(__wt_close(session, &fh));
 	} else
 		ret = ENOENT;
@@ -163,11 +161,11 @@ err:	__wt_spin_unlock(session, &im->lock);
 }
 
 /*
- * __im_handle_close --
- *	ANSI C close/fclose.
+ * __im_file_close --
+ *	ANSI C close.
  */
 static int
-__im_handle_close(WT_SESSION_IMPL *session, WT_FH *fh)
+__im_file_close(WT_SESSION_IMPL *session, WT_FH *fh)
 {
 	__wt_buf_free(session, &fh->buf);
 
@@ -175,32 +173,11 @@ __im_handle_close(WT_SESSION_IMPL *session, WT_FH *fh)
 }
 
 /*
- * __im_handle_getc --
- *	ANSI C fgetc.
- */
-static int
-__im_handle_getc(WT_SESSION_IMPL *session, WT_FH *fh, int *chp)
-{
-	WT_IM *im;
-
-	im = S2C(session)->inmemory;
-	__wt_spin_lock(session, &im->lock);
-
-	if (fh->off >= fh->buf.size)
-		*chp = EOF;
-	else
-		*chp = ((char *)fh->buf.data)[fh->off++];
-
-	__wt_spin_unlock(session, &im->lock);
-	return (0);
-}
-
-/*
- * __im_handle_lock --
+ * __im_file_lock --
  *	Lock/unlock a file.
  */
 static int
-__im_handle_lock(WT_SESSION_IMPL *session, WT_FH *fh, bool lock)
+__im_file_lock(WT_SESSION_IMPL *session, WT_FH *fh, bool lock)
 {
 	/* Locks are always granted. */
 	WT_UNUSED(session);
@@ -210,56 +187,11 @@ __im_handle_lock(WT_SESSION_IMPL *session, WT_FH *fh, bool lock)
 }
 
 /*
- * __im_handle_printf --
- *	ANSI C vfprintf.
- */
-static int
-__im_handle_printf(
-    WT_SESSION_IMPL *session, WT_FH *fh, const char *fmt, va_list ap)
-{
-	va_list ap_copy;
-	WT_DECL_ITEM(tmp);
-	WT_DECL_RET;
-	WT_IM *im;
-	size_t len;
-
-	im = S2C(session)->inmemory;
-
-	/* Build the string we're writing. */
-	WT_RET(__wt_scr_alloc(session, strlen(fmt) * 2 + 128, &tmp));
-	for (;;) {
-		va_copy(ap_copy, ap);
-		len = (size_t)vsnprintf(tmp->mem, tmp->memsize, fmt, ap_copy);
-		va_end(ap_copy);
-		if (len < tmp->memsize) {
-			tmp->data = tmp->mem;
-			tmp->size = len;
-			break;
-		}
-		WT_ERR(__wt_buf_extend(session, tmp, len + 1));
-	}
-
-	__wt_spin_lock(session, &im->lock);
-
-	/* Grow the handle's buffer as necessary. */
-	WT_ERR(__wt_buf_grow(session, &fh->buf, fh->off + len));
-
-	/* Copy the data into place and update the offset. */
-	memcpy((uint8_t *)fh->buf.mem + fh->off, tmp->data, len);
-	fh->off += len;
-
-err:	__wt_spin_unlock(session, &im->lock);
-
-	__wt_scr_free(session, &tmp);
-	return (ret);
-}
-
-/*
- * __im_handle_read --
+ * __im_file_read --
  *	POSIX pread.
  */
 static int
-__im_handle_read(
+__im_file_read(
     WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, void *buf)
 {
 	WT_DECL_RET;
@@ -287,11 +219,11 @@ __im_handle_read(
 }
 
 /*
- * __im_handle_size --
+ * __im_file_size --
  *	Get the size of a file in bytes, by file handle.
  */
 static int
-__im_handle_size(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
+__im_file_size(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
 {
 	WT_UNUSED(session);
 
@@ -305,11 +237,11 @@ __im_handle_size(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
 }
 
 /*
- * __im_handle_sync --
+ * __im_file_sync --
  *	POSIX fflush/fsync.
  */
 static int
-__im_handle_sync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
+__im_file_sync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
 {
 	WT_UNUSED(session);
 	WT_UNUSED(fh);
@@ -322,11 +254,11 @@ __im_handle_sync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
 }
 
 /*
- * __im_handle_truncate --
+ * __im_file_truncate --
  *	POSIX ftruncate.
  */
 static int
-__im_handle_truncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
+__im_file_truncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
 {
 	WT_DECL_RET;
 	WT_IM *im;
@@ -351,11 +283,11 @@ err:	__wt_spin_unlock(session, &im->lock);
 }
 
 /*
- * __im_handle_write --
+ * __im_file_write --
  *	POSIX pwrite.
  */
 static int
-__im_handle_write(WT_SESSION_IMPL *session,
+__im_file_write(WT_SESSION_IMPL *session,
     WT_FH *fh, wt_off_t offset, size_t len, const void *buf)
 {
 	WT_DECL_RET;
@@ -383,11 +315,11 @@ err:	__wt_spin_unlock(session, &im->lock);
 }
 
 /*
- * __im_handle_open --
+ * __im_file_open --
  *	POSIX fopen/open.
  */
 static int
-__im_handle_open(WT_SESSION_IMPL *session,
+__im_file_open(WT_SESSION_IMPL *session,
     WT_FH *fh, const char *path, uint32_t file_type, uint32_t flags)
 {
 	WT_UNUSED(session);
@@ -405,20 +337,13 @@ __im_handle_open(WT_SESSION_IMPL *session,
 	fh->off = 0;
 	F_SET(fh, WT_FH_IN_MEMORY);
 
-	if (LF_ISSET(WT_STREAM_APPEND | WT_STREAM_READ | WT_STREAM_WRITE)) {
-		fh->fh_close = __im_handle_close;
-		fh->fh_getc = __im_handle_getc;
-		fh->fh_printf = __im_handle_printf;
-		fh->fh_sync = __im_handle_sync;
-	} else {
-		fh->fh_close = __im_handle_close;
-		fh->fh_lock = __im_handle_lock;
-		fh->fh_read = __im_handle_read;
-		fh->fh_size = __im_handle_size;
-		fh->fh_sync = __im_handle_sync;
-		fh->fh_truncate = __im_handle_truncate;
-		fh->fh_write = __im_handle_write;
-	}
+	fh->fh_close = __im_file_close;
+	fh->fh_lock = __im_file_lock;
+	fh->fh_read = __im_file_read;
+	fh->fh_size = __im_file_size;
+	fh->fh_sync = __im_file_sync;
+	fh->fh_truncate = __im_file_truncate;
+	fh->fh_write = __im_file_write;
 
 	return (0);
 }
@@ -440,11 +365,11 @@ __wt_os_inmemory(WT_SESSION_IMPL *session)
 	/* Initialize the in-memory jump table. */
 	conn->file_directory_list = __im_directory_list;
 	conn->file_directory_sync = __im_directory_sync;
-	conn->file_exist = __im_file_exist;
-	conn->file_remove = __im_file_remove;
-	conn->file_rename = __im_file_rename;
-	conn->file_size = __im_file_size;
-	conn->handle_open = __im_handle_open;
+	conn->file_exist = __im_fs_exist;
+	conn->file_remove = __im_fs_remove;
+	conn->file_rename = __im_fs_rename;
+	conn->file_size = __im_fs_size;
+	conn->file_open = __im_file_open;
 
 	/* Allocate an in-memory structure. */
 	WT_RET(__wt_calloc_one(session, &im));

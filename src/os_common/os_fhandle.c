@@ -143,37 +143,6 @@ err:	__wt_scr_free(session, &tmp);
 }
 
 /*
- * __open_refresh --
- *	Refresh a file handle.
- */
-static inline int
-__open_refresh(WT_SESSION_IMPL *session,
-    WT_FH *fh, const char *name, uint32_t file_type, uint32_t flags)
-{
-	WT_DECL_RET;
-
-	/*
-	 * !!!
-	 * The in-memory file handle open must repeat if the reference count
-	 * goes to 0, no other file handle requires refresh.
-	 */
-	if (!F_ISSET(fh, WT_FH_IN_MEMORY) || fh->ref > 1)
-		return (0);
-
-	__wt_fh_method_init(fh);
-
-	WT_ERR(S2C(session)->handle_open(session, fh, name, file_type, flags));
-	return (0);
-
-err:	/*
-	 * We've already incremented the handle's reference count, close the
-	 * handle to discard that reference.
-	 */
-	WT_TRET(fh->fh_close(session, fh));
-	return (ret);
-}
-
-/*
  * __wt_open --
  *	Open a file handle.
  */
@@ -198,8 +167,6 @@ __wt_open(WT_SESSION_IMPL *session,
 
 	/* Check if the handle is already open. */
 	if (__wt_handle_search(session, name, true, NULL, &fh)) {
-		WT_RET(__open_refresh(session, fh, name, file_type, flags));
-
 		*fhp = fh;
 		return (0);
 	}
@@ -207,7 +174,6 @@ __wt_open(WT_SESSION_IMPL *session,
 	/* Allocate and initialize the handle. */
 	WT_ERR(__wt_calloc_one(session, &fh));
 	WT_ERR(__wt_strdup(session, name, &fh->name));
-	__wt_fh_method_init(fh);
 
 	/*
 	 * If this is a read-only connection, open all files read-only except
@@ -235,7 +201,7 @@ __wt_open(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_filename(session, name, &path));
 
 	/* Call the underlying open function. */
-	WT_ERR(conn->handle_open(
+	WT_ERR(conn->file_open(
 	    session, fh, path == NULL ? name : path, file_type, flags));
 	open_called = true;
 
