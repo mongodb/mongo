@@ -237,7 +237,7 @@ std::unique_ptr<ShutdownState> OplogFetcherTest::processSingleBatch(
     oplogFetcher.shutdown();
     oplogFetcher.join();
 
-    return std::move(shutdownState);
+    return shutdownState;
 }
 
 std::unique_ptr<ShutdownState> OplogFetcherTest::processSingleBatch(BSONObj obj) {
