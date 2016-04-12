@@ -99,7 +99,7 @@ void Static::InitStaticVars() {
 
   bool aggressive_decommit =
     tcmalloc::commandlineflags::StringToBool(
-      TCMallocGetenvSafe("TCMALLOC_AGGRESSIVE_DECOMMIT"), true);
+      TCMallocGetenvSafe("TCMALLOC_AGGRESSIVE_DECOMMIT"), false);
 
   pageheap_->SetAggressiveDecommit(aggressive_decommit);
 
