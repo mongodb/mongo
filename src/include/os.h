@@ -70,14 +70,15 @@
 #define	POSIX_FADV_WILLNEED	0x02
 #endif
 
-#define	WT_OPEN_CREATE		0x001	/* Create is OK */
-#define	WT_OPEN_EXCLUSIVE	0x002	/* Exclusive open */
-#define	WT_OPEN_FIXED		0x004	/* Path isn't relative to home */
-#define	WT_OPEN_READONLY	0x008	/* Readonly open */
-#define	WT_STREAM_APPEND	0x010	/* Open a stream: append */
-#define	WT_STREAM_LINE_BUFFER	0x020	/* Line buffer the stream */
-#define	WT_STREAM_READ		0x040	/* Open a stream: read */
-#define	WT_STREAM_WRITE		0x080	/* Open a stream: write */
+#define	WT_OPEN_CREATE		0x001	/* Create */
+#define	WT_OPEN_DIRECTIO	0x002	/* Direct I/O (if available) */
+#define	WT_OPEN_EXCLUSIVE	0x004	/* Open exclusively */
+#define	WT_OPEN_FIXED		0x008	/* Path isn't relative to home */
+#define	WT_OPEN_READONLY	0x010	/* Open readonly (internal) */
+#define	WT_STREAM_APPEND	0x020	/* Open a stream: append */
+#define	WT_STREAM_LINE_BUFFER	0x040	/* Line buffer the stream */
+#define	WT_STREAM_READ		0x080	/* Open a stream: read */
+#define	WT_STREAM_WRITE		0x100	/* Open a stream: write */
 
 struct __wt_fh {
 	const char *name;			/* File name */

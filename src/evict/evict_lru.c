@@ -183,6 +183,9 @@ __evict_server(void *arg)
 	conn = S2C(session);
 	cache = conn->cache;
 
+#ifdef HAVE_DIAGNOSTIC
+	WT_ERR(__wt_epoch(session, &stuck_ts));		/* -Wuninitialized */
+#endif
 	while (F_ISSET(conn, WT_CONN_EVICTION_RUN)) {
 		/* Evict pages from the cache as needed. */
 		WT_ERR(__evict_pass(session));

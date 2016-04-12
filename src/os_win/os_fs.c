@@ -572,18 +572,11 @@ __win_handle_open(WT_SESSION_IMPL *session,
 	} else
 		dwCreationDisposition = OPEN_EXISTING;
 
-	/*
-	 * direct_io means no OS file caching. This requires aligned buffer
-	 * allocations like O_DIRECT.
-	 */
-	if (FLD_ISSET(conn->direct_io, file_type) ||
-	    (LF_ISSET(WT_OPEN_READONLY) &&
-	    file_type == WT_FILE_TYPE_DATA &&
-	    FLD_ISSET(conn->direct_io, WT_FILE_TYPE_CHECKPOINT))) {
+	/* Direct I/O. */
+	if (LF_ISSET(WT_OPEN_DIRECTIO)) {
 		f |= FILE_FLAG_NO_BUFFERING;
-		direct_io = true;
+		fh->direct_io = true;
 	}
-	fh->direct_io = direct_io;
 
 	/* FILE_FLAG_WRITE_THROUGH does not require aligned buffers */
 	if (FLD_ISSET(conn->write_through, file_type))
