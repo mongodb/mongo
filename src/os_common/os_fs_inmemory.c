@@ -163,22 +163,6 @@ err:	__wt_spin_unlock(session, &im->lock);
 }
 
 /*
- * __im_handle_advise --
- *	POSIX fadvise.
- */
-static int
-__im_handle_advise(WT_SESSION_IMPL *session,
-    WT_FH *fh, wt_off_t offset, wt_off_t len, int advice)
-{
-	WT_UNUSED(session);
-	WT_UNUSED(fh);
-	WT_UNUSED(offset);
-	WT_UNUSED(len);
-	WT_UNUSED(advice);
-	return (ENOTSUP);
-}
-
-/*
  * __im_handle_close --
  *	ANSI C close/fclose.
  */
@@ -218,6 +202,7 @@ __im_handle_getc(WT_SESSION_IMPL *session, WT_FH *fh, int *chp)
 static int
 __im_handle_lock(WT_SESSION_IMPL *session, WT_FH *fh, bool lock)
 {
+	/* Locks are always granted. */
 	WT_UNUSED(session);
 	WT_UNUSED(fh);
 	WT_UNUSED(lock);
@@ -410,19 +395,30 @@ __im_handle_open(WT_SESSION_IMPL *session,
 	WT_UNUSED(file_type);
 	WT_UNUSED(flags);
 
+	/*
+	 * Unlike other file handle open implementations, the in-memory version
+	 * is called whenever the WT_FH structure reference count goes to 0.
+	 * This is because the in-memory implementation reuses WT_FH structures,
+	 * and so we have to reset the file offset and potentially the list of
+	 * functions, in the case of the file being opened in a different way.
+	 */
 	fh->off = 0;
 	F_SET(fh, WT_FH_IN_MEMORY);
 
-	fh->fh_advise = __im_handle_advise;
-	fh->fh_close = __im_handle_close;
-	fh->fh_getc = __im_handle_getc;
-	fh->fh_lock = __im_handle_lock;
-	fh->fh_printf = __im_handle_printf;
-	fh->fh_read = __im_handle_read;
-	fh->fh_size = __im_handle_size;
-	fh->fh_sync = __im_handle_sync;
-	fh->fh_truncate = __im_handle_truncate;
-	fh->fh_write = __im_handle_write;
+	if (LF_ISSET(WT_STREAM_APPEND | WT_STREAM_READ | WT_STREAM_WRITE)) {
+		fh->fh_close = __im_handle_close;
+		fh->fh_getc = __im_handle_getc;
+		fh->fh_printf = __im_handle_printf;
+		fh->fh_sync = __im_handle_sync;
+	} else {
+		fh->fh_close = __im_handle_close;
+		fh->fh_lock = __im_handle_lock;
+		fh->fh_read = __im_handle_read;
+		fh->fh_size = __im_handle_size;
+		fh->fh_sync = __im_handle_sync;
+		fh->fh_truncate = __im_handle_truncate;
+		fh->fh_write = __im_handle_write;
+	}
 
 	return (0);
 }
