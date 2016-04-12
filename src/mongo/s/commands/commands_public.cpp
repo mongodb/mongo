@@ -388,9 +388,9 @@ public:
 } collectionModCmd;
 
 
-class ValidateCmd : public PublicGridCommand {
+class ValidateCmd : public AllShardsCollectionCommand {
 public:
-    ValidateCmd() : PublicGridCommand("validate") {}
+    ValidateCmd() : AllShardsCollectionCommand("validate") {}
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {
@@ -398,57 +398,28 @@ public:
         actions.addAction(ActionType::validate);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
-
-    bool run(OperationContext* txn,
-             const string& dbName,
-             BSONObj& cmdObj,
-             int options,
-             string& errmsg,
-             BSONObjBuilder& output) {
-        const string ns = parseNsCollectionRequired(dbName, cmdObj);
-
-        auto conf = uassertStatusOK(grid.catalogCache()->getDatabase(txn, dbName));
-        if (!conf->isShardingEnabled() || !conf->isSharded(ns)) {
-            return passthrough(txn, conf, cmdObj, output);
-        }
-
-        ChunkManagerPtr cm = conf->getChunkManager(txn, ns);
-        massert(40051, "chunk manager should not be null", cm);
-
-        vector<Strategy::CommandResult> results;
-        Strategy::commandOp(txn, dbName, cmdObj, options, cm->getns(), BSONObj(), &results);
-
-        BSONObjBuilder rawResBuilder(output.subobjStart("raw"));
-        bool isValid = true;
-        bool errored = false;
-        for (const auto& cmdResult : results) {
-            const string& shardName = cmdResult.shardTargetId;
-            BSONObj result = cmdResult.result;
+    virtual void aggregateResults(const vector<ShardAndReply>& results, BSONObjBuilder& output) {
+        for (vector<ShardAndReply>::const_iterator it(results.begin()), end(results.end());
+             it != end;
+             it++) {
+            const BSONObj& result = std::get<1>(*it);
             const BSONElement valid = result["valid"];
-            if (!valid.trueValue()) {
-                isValid = false;
+            if (!valid.eoo()) {
+                if (!valid.trueValue()) {
+                    output.appendBool("valid", false);
+                    return;
+                }
+            } else {
+                // Support pre-1.9.0 output with everything in a big string
+                const char* s = result["result"].valuestrsafe();
+                if (strstr(s, "exception") || strstr(s, "corrupt")) {
+                    output.appendBool("valid", false);
+                    return;
+                }
             }
-            if (!result["errmsg"].eoo()) {
-                // errmsg indicates a user error, so returning the message from one shard is
-                // sufficient.
-                errmsg = result["errmsg"].toString();
-                errored = true;
-            }
-            rawResBuilder.append(shardName, result);
-        }
-        rawResBuilder.done();
-
-        output.appendBool("valid", isValid);
-
-        int code = getUniqueCodeFromCommandResults(results);
-        if (code != 0) {
-            output.append("code", code);
         }
 
-        if (errored) {
-            return false;
-        }
-        return true;
+        output.appendBool("valid", true);
     }
 } validateCmd;
 
