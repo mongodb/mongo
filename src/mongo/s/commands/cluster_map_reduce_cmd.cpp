@@ -165,6 +165,10 @@ public:
     }
 
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return mr::mrSupportsWriteConcern(cmd);
+    }
+
     virtual void help(std::stringstream& help) const {
         help << "Runs the sharded map/reduce command";
     }

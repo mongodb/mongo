@@ -411,5 +411,11 @@ void addPrivilegesRequiredForMapReduce(Command* commandTemplate,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out);
+
+/**
+ * Returns true if the provided mapReduce command has an 'out' parameter.
+ */
+bool mrSupportsWriteConcern(const BSONObj& cmd);
+
 }  // end mr namespace
 }

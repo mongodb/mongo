@@ -132,5 +132,15 @@ void addPrivilegesRequiredForMapReduce(Command* commandTemplate,
         out->push_back(Privilege(outputResource, outputActions));
     }
 }
+
+bool mrSupportsWriteConcern(const BSONObj& cmd) {
+    if (!cmd.hasField("out")) {
+        return false;
+    } else if (cmd["out"].type() == Object && cmd["out"].Obj().hasField("inline")) {
+        return false;
+    } else {
+        return true;
+    }
+}
 }
 }

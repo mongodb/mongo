@@ -81,6 +81,10 @@ public:
     }
 
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return Pipeline::aggSupportsWriteConcern(cmd);
+    }
+
     virtual void help(std::stringstream& help) const {
         help << "Runs the sharded aggregation command";
     }

@@ -67,6 +67,9 @@ public:
     CmdServerStatus()
         : Command("serverStatus", true), _started(curTimeMillis64()), _runCalled(false) {}
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
     virtual bool slaveOk() const {
         return true;
     }

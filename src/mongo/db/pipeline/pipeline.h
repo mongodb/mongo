@@ -73,6 +73,11 @@ public:
                                       const std::string& dbname,
                                       const BSONObj& cmdObj);
 
+    /**
+     * Returns true if the provided aggregation command has a $out stage.
+     */
+    static bool aggSupportsWriteConcern(const BSONObj& cmd);
+
     const boost::intrusive_ptr<ExpressionContext>& getContext() const {
         return pCtx;
     }

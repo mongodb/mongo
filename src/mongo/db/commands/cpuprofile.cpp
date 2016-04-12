@@ -91,6 +91,9 @@ public:
     // This is an abuse of the global dbmutex.  We only really need to
     // ensure that only one cpuprofiler command runs at once; it would
     // be fine for it to run concurrently with other operations.
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
 };
 
 /**

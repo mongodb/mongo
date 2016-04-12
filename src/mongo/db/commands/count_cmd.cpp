@@ -55,6 +55,9 @@ using std::stringstream;
 class CmdCount : public Command {
 public:
     CmdCount() : Command("count") {}
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
     virtual bool slaveOk() const {
         // ok on --slave setups
         return repl::getGlobalReplicationCoordinator()->getSettings().isSlave();

@@ -63,6 +63,8 @@ protected:
 private:
     virtual bool slaveOk() const;
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override;
+
     virtual Status checkAuthForCommand(ClientBasic* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj);

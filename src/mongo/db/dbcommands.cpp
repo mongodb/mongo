@@ -180,6 +180,10 @@ public:
     }
 
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
+
     CmdDropDatabase() : Command("dropDatabase") {}
 
     bool run(OperationContext* txn,
@@ -235,6 +239,10 @@ public:
         help << "repair database.  also compacts. note: slow.";
     }
 
+
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
 
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
@@ -308,6 +316,10 @@ public:
         help << "http://docs.mongodb.org/manual/reference/command/profile/#dbcmd.profile";
     }
 
+
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
 
     virtual Status checkAuthForCommand(ClientBasic* client,
                                        const std::string& dbname,
@@ -398,6 +410,10 @@ public:
     }
 
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {
@@ -462,6 +478,10 @@ public:
     }
 
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
+
     virtual bool run(OperationContext* txn,
                      const string& dbname,
                      BSONObj& cmdObj,
@@ -498,6 +518,10 @@ public:
         return false;
     }
 
+
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
 
     virtual void help(stringstream& help) const {
         help << "create a collection explicitly\n"
@@ -553,6 +577,10 @@ public:
         help << " example: { filemd5 : ObjectId(aaaaaaa) , root : \"fs\" }";
     }
 
+
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
 
     virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
         std::string collectionName = cmdObj.getStringField("root");
@@ -724,6 +752,9 @@ public:
     virtual bool slaveOk() const {
         return true;
     }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
     virtual void help(stringstream& help) const {
         help << "determine data size for a set of data in a certain range"
                 "\nexample: { dataSize:\"blog.posts\", keyPattern:{x:1}, min:{x:10}, max:{x:55} }"
@@ -869,6 +900,9 @@ public:
     virtual bool slaveOk() const {
         return true;
     }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
     virtual void help(stringstream& help) const {
         help
             << "{ collStats:\"blog.posts\" , scale : 1 } scale divides sizes e.g. for KB use 1024\n"
@@ -976,6 +1010,9 @@ public:
     virtual bool slaveOk() const {
         return false;
     }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
     virtual void help(stringstream& help) const {
         help << "Sets collection options.\n"
                 "Example: { collMod: 'foo', usePowerOf2Sizes:true }\n"
@@ -1008,6 +1045,9 @@ public:
 
     virtual bool slaveOk() const {
         return true;
+    }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
     }
     virtual void help(stringstream& help) const {
         help << "Get stats on a database. Not instantaneous. Slower for databases with large "
@@ -1096,6 +1136,9 @@ public:
     virtual bool slaveOk() const {
         return true;
     }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
     virtual void help(stringstream& help) const {
         help << "{whatsmyuri:1}";
     }
@@ -1119,6 +1162,9 @@ public:
 
     virtual bool slaveOk() const {
         return true;
+    }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
     }
     virtual Status checkAuthForCommand(ClientBasic* client,
                                        const std::string& dbname,
@@ -1459,8 +1505,41 @@ bool Command::run(OperationContext* txn,
     // run expects const db std::string (can't bind to temporary)
     const std::string db = request.getDatabase().toString();
 
+    StatusWith<WriteConcernOptions> wcResult =
+        extractWriteConcern(txn, cmd, db, this->supportsWriteConcern(cmd));
+    if (!wcResult.isOK()) {
+        auto result = appendCommandStatus(inPlaceReplyBob, wcResult.getStatus());
+        inPlaceReplyBob.doneFast();
+        replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+        return result;
+    }
+
+    if (this->supportsWriteConcern(cmd)) {
+        txn->setWriteConcern(wcResult.getValue());
+    }
+
     // TODO: remove queryOptions parameter from command's run method.
     bool result = this->run(txn, db, cmd, 0, errmsg, inPlaceReplyBob);
+
+    if (this->supportsWriteConcern(cmd)) {
+        if (shouldLog(logger::LogSeverity::Debug(1))) {
+            BSONObj oldWC = wcResult.getValue().toBSON();
+            BSONObj newWC = txn->getWriteConcern().toBSON();
+            if (oldWC != newWC) {
+                LOG(1) << "Provided writeConcern was overridden from " << oldWC << " to " << newWC
+                       << " for command " << cmd;
+            }
+        }
+
+        WriteConcernResult res;
+        auto waitForWCStatus =
+            waitForWriteConcern(txn,
+                                repl::ReplClientInfo::forClient(txn->getClient()).getLastOp(),
+                                txn->getWriteConcern(),
+                                &res);
+        appendCommandWCStatus(inPlaceReplyBob, waitForWCStatus, res);
+    }
+
     appendCommandStatus(inPlaceReplyBob, result, errmsg);
     inPlaceReplyBob.doneFast();
 

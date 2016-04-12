@@ -63,6 +63,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/s/d_state.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -214,6 +215,9 @@ public:
     bool slaveOk() const override {
         return false;
     }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,
                                std::vector<Privilege>* out) override {
@@ -332,13 +336,6 @@ public:
         const FindAndModifyRequest& args = parseStatus.getValue();
         const NamespaceString& nsString = args.getNamespaceString();
 
-        StatusWith<WriteConcernOptions> wcResult = extractWriteConcern(txn, cmdObj, dbName);
-        if (!wcResult.isOK()) {
-            return appendCommandStatus(result, wcResult.getStatus());
-        }
-        txn->setWriteConcern(wcResult.getValue());
-        setupSynchronousCommit(txn);
-
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmdObj))
             maybeDisableValidation.emplace(txn);
@@ -349,6 +346,11 @@ public:
             MakeObjGuard(repl::ReplClientInfo::forClient(client),
                          &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
                          txn);
+
+        // If this is the local database, don't set last op.
+        if (dbName == "local") {
+            lastOpSetterGuard.Dismiss();
+        }
 
         // Although usually the PlanExecutor handles WCE internally, it will throw WCEs when it is
         // executing a findAndModify. This is done to ensure that we can always match, modify, and
@@ -506,14 +508,6 @@ public:
             // that case.
             lastOpSetterGuard.Dismiss();
         }
-
-        WriteConcernResult res;
-        auto waitForWCStatus =
-            waitForWriteConcern(txn,
-                                repl::ReplClientInfo::forClient(txn->getClient()).getLastOp(),
-                                txn->getWriteConcern(),
-                                &res);
-        appendCommandWCStatus(result, waitForWCStatus);
 
         return true;
     }

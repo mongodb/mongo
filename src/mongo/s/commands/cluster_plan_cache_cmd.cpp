@@ -62,6 +62,10 @@ public:
     }
 
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+
     void help(stringstream& ss) const {
         ss << _helpText;
     }

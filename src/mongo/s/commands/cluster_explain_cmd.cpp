@@ -56,6 +56,10 @@ class ClusterExplainCmd : public Command {
 public:
     ClusterExplainCmd() : Command("explain") {}
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+
     /**
      * Running an explain on a secondary requires explicitly setting slaveOk.
      */

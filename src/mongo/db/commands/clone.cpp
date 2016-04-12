@@ -60,6 +60,10 @@ public:
     }
 
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
+
     virtual void help(stringstream& help) const {
         help << "clone this database from an instance of the db on another host\n";
         help << "{clone: \"host13\"[, slaveOk: <bool>]}";

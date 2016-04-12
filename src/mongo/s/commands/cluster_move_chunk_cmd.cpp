@@ -69,6 +69,10 @@ public:
     }
 
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
+
     virtual void help(std::stringstream& help) const {
         help << "Example: move chunk that contains the doc {num : 7} to shard001\n"
              << "  { movechunk : 'test.foo' , find : { num : 7 } , to : 'shard0001' }\n"

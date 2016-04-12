@@ -115,6 +115,10 @@ public:
         h << "internal";
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+
     virtual bool slaveOk() const {
         return false;
     }
@@ -173,6 +177,10 @@ public:
 
     void help(std::stringstream& h) const {
         h << "internal";
+    }
+
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
     }
 
     virtual bool slaveOk() const {

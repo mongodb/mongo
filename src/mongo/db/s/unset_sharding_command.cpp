@@ -52,6 +52,10 @@ public:
         help << "internal";
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+
     bool adminOnly() const override {
         return true;
     }

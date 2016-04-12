@@ -74,39 +74,33 @@ const std::string kLocalDB = "local";
 
 StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* txn,
                                                     const BSONObj& cmdObj,
-                                                    const std::string& dbName) {
+                                                    const std::string& dbName,
+                                                    const bool supportsWriteConcern) {
     // The default write concern if empty is w : 1
     // Specifying w : 0 is/was allowed, but is interpreted identically to w : 1
     WriteConcernOptions writeConcern =
         repl::getGlobalReplicationCoordinator()->getGetLastErrorDefault();
-    if (writeConcern.wNumNodes == 0 && writeConcern.wMode.empty()) {
-        writeConcern.wNumNodes = 1;
-    }
 
-    BSONElement writeConcernElement;
-    Status wcStatus = bsonExtractTypedField(cmdObj, "writeConcern", Object, &writeConcernElement);
-    if (!wcStatus.isOK()) {
-        if (wcStatus == ErrorCodes::NoSuchKey) {
-            // Return default write concern if no write concern is given.
-            return writeConcern;
+    auto wcResult = WriteConcernOptions::extractWCFromCommand(cmdObj, dbName, writeConcern);
+    if (!wcResult.isOK()) {
+        return wcResult.getStatus();
+    }
+    writeConcern = wcResult.getValue();
+
+    // We didn't use the default, so the user supplied their own writeConcern.
+    if (!wcResult.getValue().usedDefault) {
+        // If it supports writeConcern and does not use the default, validate the writeConcern.
+        if (supportsWriteConcern) {
+            Status wcStatus = validateWriteConcern(txn, writeConcern, dbName);
+            if (!wcStatus.isOK()) {
+                return wcStatus;
+            }
+        } else {
+            // This command doesn't do writes so it should not be passed a writeConcern.
+            // If we did not use the default writeConcern, one was provided when it shouldn't have
+            // been by the user.
+            return Status(ErrorCodes::InvalidOptions, "Command does not support writeConcern");
         }
-        return wcStatus;
-    }
-
-    BSONObj writeConcernObj = writeConcernElement.Obj();
-    // Empty write concern is interpreted to default.
-    if (writeConcernObj.isEmpty()) {
-        return writeConcern;
-    }
-
-    wcStatus = writeConcern.parse(writeConcernObj);
-    if (!wcStatus.isOK()) {
-        return wcStatus;
-    }
-
-    wcStatus = validateWriteConcern(txn, writeConcern, dbName);
-    if (!wcStatus.isOK()) {
-        return wcStatus;
     }
 
     return writeConcern;

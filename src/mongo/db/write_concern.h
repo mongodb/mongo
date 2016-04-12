@@ -56,7 +56,8 @@ void setupSynchronousCommit(OperationContext* txn);
  */
 StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* txn,
                                                     const BSONObj& cmdObj,
-                                                    const std::string& dbName);
+                                                    const std::string& dbName,
+                                                    const bool supportsWriteConcern);
 
 /**
  * Verifies that a WriteConcern is valid for this particular host.

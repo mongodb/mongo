@@ -56,6 +56,9 @@ public:
     virtual bool slaveOk() const {
         return false;
     }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
     virtual void help(stringstream& help) const {
         help << "{ cloneCollectionAsCapped:<fromName>, toCollection:<toName>, size:<sizeInBytes> }";
     }
@@ -128,6 +131,9 @@ public:
     CmdConvertToCapped() : Command("convertToCapped") {}
     virtual bool slaveOk() const {
         return false;
+    }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
     }
     virtual void help(stringstream& help) const {
         help << "{ convertToCapped:<fromCollectionName>, size:<sizeInBytes> }";

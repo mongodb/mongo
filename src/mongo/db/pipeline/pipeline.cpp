@@ -96,6 +96,11 @@ intrusive_ptr<Pipeline> Pipeline::parseCommand(string& errmsg,
             continue;
         }
 
+        // ignore writeConcern since it's handled externally
+        if (str::equals(pFieldName, "writeConcern")) {
+            continue;
+        }
+
         /* look for the aggregation command */
         if (!strcmp(pFieldName, commandName)) {
             continue;
@@ -252,6 +257,21 @@ Status Pipeline::checkAuthForCommand(ClientBasic* client,
     if (AuthorizationSession::get(client)->isAuthorizedForPrivileges(privileges))
         return Status::OK();
     return Status(ErrorCodes::Unauthorized, "unauthorized");
+}
+
+bool Pipeline::aggSupportsWriteConcern(const BSONObj& cmd) {
+    if (cmd.hasField("pipeline") == false) {
+        return false;
+    }
+
+    auto stages = cmd["pipeline"].Array();
+    for (auto stage : stages) {
+        if (stage.Obj().hasField("$out")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 void Pipeline::detachFromOperationContext() {

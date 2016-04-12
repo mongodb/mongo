@@ -113,6 +113,10 @@ public:
                 "splitKeys : [ {a:150} , ... ]}";
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+
     bool slaveOk() const override {
         return false;
     }

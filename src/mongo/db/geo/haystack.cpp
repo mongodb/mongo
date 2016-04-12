@@ -62,6 +62,9 @@ class GeoHaystackSearchCommand : public Command {
 public:
     GeoHaystackSearchCommand() : Command("geoSearch") {}
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
     bool slaveOk() const {
         return true;
     }

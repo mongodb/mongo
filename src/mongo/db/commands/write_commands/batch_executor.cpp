@@ -121,19 +121,6 @@ private:
     std::unique_ptr<WriteErrorDetail> _error;
 };
 
-unique_ptr<WCErrorDetail> toWriteConcernError(const Status& wcStatus,
-                                              const WriteConcernResult& wcResult) {
-    auto wcError = stdx::make_unique<WCErrorDetail>();
-
-    wcError->setErrCode(wcStatus.code());
-    wcError->setErrMessage(wcStatus.reason());
-    if (wcResult.wTimedOut) {
-        wcError->setErrInfo(BSON("wtimeout" << true));
-    }
-
-    return wcError;
-}
-
 WriteErrorDetail* toWriteError(const Status& status) {
     WriteErrorDetail* error = new WriteErrorDetail;
 
@@ -278,27 +265,6 @@ void WriteBatchExecutor::executeBatch(const BatchedCommandRequest& request,
     bulkExecute(request, &upserted, &writeErrors);
 
     //
-    // Always try to enforce the write concern, even if everything failed.
-    // If something failed, we have already set the lastOp to be the last op to have succeeded
-    // and written to the oplog.
-
-    {
-        stdx::lock_guard<Client> lk(*_txn->getClient());
-        CurOp::get(_txn)->setMessage_inlock("waiting for write concern");
-    }
-
-    unique_ptr<WCErrorDetail> wcError;
-    WriteConcernResult res;
-    Status status =
-        waitForWriteConcern(_txn,
-                            repl::ReplClientInfo::forClient(_txn->getClient()).getLastOp(),
-                            _txn->getWriteConcern(),
-                            &res);
-    if (!status.isOK()) {
-        wcError = toWriteConcernError(status, res);
-    }
-
-    //
     // Refresh metadata if needed
     //
 
@@ -326,10 +292,6 @@ void WriteBatchExecutor::executeBatch(const BatchedCommandRequest& request,
 
         if (writeErrors.size()) {
             response->setErrDetails(writeErrors);
-        }
-
-        if (wcError.get()) {
-            response->setWriteConcernError(wcError.release());
         }
 
         repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
@@ -743,6 +705,11 @@ void WriteBatchExecutor::execInserts(const BatchedCommandRequest& request,
                                                 &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
                                                 _txn);
 
+    // If this is the local database, don't set last op.
+    if (request.getNS().isLocal()) {
+        lastOpSetterGuard.Dismiss();
+    }
+
     int64_t chunkCount = 0;
     int64_t chunkBytes = 0;
     const int64_t chunkMaxCount = internalQueryExecYieldIterations / 2;
@@ -1047,6 +1014,11 @@ static void multiUpdate(OperationContext* txn,
                                                 &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
                                                 txn);
 
+    // If this is the local database, don't set last op.
+    if (nsString.isLocal()) {
+        lastOpSetterGuard.Dismiss();
+    }
+
     int attempt = 0;
     bool createCollection = false;
     for (int fakeLoop = 0; fakeLoop < 1; fakeLoop++) {
@@ -1225,6 +1197,11 @@ static void multiRemove(OperationContext* txn,
     ScopeGuard lastOpSetterGuard = MakeObjGuard(repl::ReplClientInfo::forClient(client),
                                                 &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
                                                 txn);
+
+    // If this is the local database, don't set last op.
+    if (nss.isLocal()) {
+        lastOpSetterGuard.Dismiss();
+    }
 
     int attempt = 1;
     while (1) {

@@ -54,6 +54,10 @@ public:
     CurrentOpCommand() : Command("currentOp") {}
 
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+
     bool slaveOk() const final {
         return true;
     }

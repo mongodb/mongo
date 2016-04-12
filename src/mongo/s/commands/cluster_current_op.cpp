@@ -71,6 +71,10 @@ public:
         return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+
     void aggregateResults(const std::vector<ShardAndReply>& results, BSONObjBuilder& output) final {
         // Each shard responds with a document containing an array of subdocuments.
         // Each subdocument represents an operation running on that shard.

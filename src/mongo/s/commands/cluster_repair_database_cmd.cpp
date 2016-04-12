@@ -45,6 +45,10 @@ public:
         out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+
 } clusterRepairDatabaseCmd;
 
 }  // namespace

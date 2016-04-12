@@ -30,6 +30,7 @@
 #include "mongo/db/write_concern_options.h"
 
 #include "mongo/base/status.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/field_parser.h"
 
 namespace mongo {
@@ -117,6 +118,39 @@ Status WriteConcernOptions::parse(const BSONObj& obj) {
     wTimeout = obj["wtimeout"].numberInt();
 
     return Status::OK();
+}
+
+StatusWith<WriteConcernOptions> WriteConcernOptions::extractWCFromCommand(
+    const BSONObj& cmdObj, const std::string& dbName, const WriteConcernOptions& defaultWC) {
+    WriteConcernOptions writeConcern = defaultWC;
+    writeConcern.usedDefault = true;
+    if (writeConcern.wNumNodes == 0 && writeConcern.wMode.empty()) {
+        writeConcern.wNumNodes = 1;
+    }
+
+    BSONElement writeConcernElement;
+    Status wcStatus = bsonExtractTypedField(cmdObj, "writeConcern", Object, &writeConcernElement);
+    if (!wcStatus.isOK()) {
+        if (wcStatus == ErrorCodes::NoSuchKey) {
+            // Return default write concern if no write concern is given.
+            return writeConcern;
+        }
+        return wcStatus;
+    }
+
+    BSONObj writeConcernObj = writeConcernElement.Obj();
+    // Empty write concern is interpreted to default.
+    if (writeConcernObj.isEmpty()) {
+        return writeConcern;
+    }
+
+    wcStatus = writeConcern.parse(writeConcernObj);
+    writeConcern.usedDefault = false;
+    if (!wcStatus.isOK()) {
+        return wcStatus;
+    }
+
+    return writeConcern;
 }
 
 BSONObj WriteConcernOptions::toBSON() const {

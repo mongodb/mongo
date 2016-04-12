@@ -58,6 +58,10 @@ public:
     }
 
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+
     virtual void help(std::stringstream& help) const {
         help << " example: { getShardVersion : 'alleyinsider.foo'  } ";
     }

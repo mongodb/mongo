@@ -103,6 +103,9 @@ public:
         locked = false;
         pendingUnlock = false;
     }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
     virtual bool slaveOk() const {
         return true;
     }
@@ -184,6 +187,10 @@ class FSyncUnlockCommand : public Command {
 public:
     FSyncUnlockCommand() : Command("fsyncUnlock") {}
 
+
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
 
     bool slaveOk() const override {
         return true;

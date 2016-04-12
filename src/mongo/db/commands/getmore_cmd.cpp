@@ -80,6 +80,10 @@ public:
     GetMoreCmd() : Command("getMore") {}
 
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+
     bool slaveOk() const override {
         return true;
     }

@@ -134,6 +134,9 @@ public:
     bool isSystem() const {
         return coll().startsWith("system.");
     }
+    bool isLocal() const {
+        return db() == "local";
+    }
     bool isSystemDotIndexes() const {
         return coll() == "system.indexes";
     }

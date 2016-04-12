@@ -64,6 +64,8 @@ public:
              std::string& errmsg,
              BSONObjBuilder& result);
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override;
+
     virtual bool slaveOk() const;
 
     virtual bool slaveOverrideOk() const;

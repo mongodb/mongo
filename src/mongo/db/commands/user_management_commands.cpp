@@ -62,12 +62,18 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/unordered_set.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/protocol.h"
+#include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/s/write_ops/batched_delete_request.h"
+#include "mongo/s/write_ops/batched_insert_request.h"
+#include "mongo/s/write_ops/batched_update_request.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/sequence_util.h"
 #include "mongo/util/time_support.h"
 
@@ -260,24 +266,28 @@ Status insertAuthzDocument(OperationContext* txn,
                            const NamespaceString& collectionName,
                            const BSONObj& document,
                            const BSONObj& writeConcern) {
+    // Save and reset the write concern so that it doesn't get changed accidentally by
+    // DBDirectClient.
+    auto oldWC = txn->getWriteConcern();
+    ON_BLOCK_EXIT([txn, oldWC] { txn->setWriteConcern(oldWC); });
+
     try {
         DBDirectClient client(txn);
-        client.insert(collectionName.ns(), document);
 
-        // Handle write concern
-        BSONObjBuilder gleBuilder;
-        gleBuilder.append("getLastError", 1);
-        gleBuilder.appendElements(writeConcern);
+        BatchedInsertRequest req;
+        req.setNS(collectionName);
+        req.addToDocuments(document);
+
         BSONObj res;
-        client.runCommand("admin", gleBuilder.done(), res);
-        string errstr = client.getLastErrorString(res);
-        if (errstr.empty()) {
-            return Status::OK();
+        client.runCommand(collectionName.db().toString(), req.toBSON(), res);
+
+        BatchedCommandResponse response;
+        std::string errmsg;
+        response.parseBSON(res, &errmsg);
+        if (errmsg != "") {
+            return Status(ErrorCodes::FailedToParse, errmsg);
         }
-        if (res.hasField("code") && res["code"].Int() == ASSERT_ID_DUPKEY) {
-            return Status(ErrorCodes::DuplicateKey, errstr);
-        }
-        return Status(ErrorCodes::UnknownError, errstr);
+        return response.toStatus();
     } catch (const DBException& e) {
         return e.toStatus();
     }
@@ -296,23 +306,38 @@ Status updateAuthzDocuments(OperationContext* txn,
                             bool upsert,
                             bool multi,
                             const BSONObj& writeConcern,
-                            int* nMatched) {
+                            long long* nMatched) {
+    // Save and reset the write concern so that it doesn't get changed accidentally by
+    // DBDirectClient.
+    auto oldWC = txn->getWriteConcern();
+    ON_BLOCK_EXIT([txn, oldWC] { txn->setWriteConcern(oldWC); });
+
     try {
         DBDirectClient client(txn);
-        client.update(collectionName.ns(), query, updatePattern, upsert, multi);
 
-        // Handle write concern
-        BSONObjBuilder gleBuilder;
-        gleBuilder.append("getLastError", 1);
-        gleBuilder.appendElements(writeConcern);
+        auto doc = stdx::make_unique<BatchedUpdateDocument>();
+        doc->setQuery(query);
+        doc->setUpdateExpr(updatePattern);
+        doc->setMulti(multi);
+        doc->setUpsert(upsert);
+
+        BatchedUpdateRequest req;
+        req.setNS(collectionName);
+        req.addToUpdates(doc.release());
+
         BSONObj res;
-        client.runCommand("admin", gleBuilder.done(), res);
-        string errstr = client.getLastErrorString(res);
-        if (errstr.empty()) {
-            *nMatched = res["n"].numberInt();
-            return Status::OK();
+        client.runCommand(collectionName.db().toString(), req.toBSON(), res);
+
+        BatchedCommandResponse response;
+        std::string errmsg;
+        response.parseBSON(res, &errmsg);
+        if (errmsg != "") {
+            return Status(ErrorCodes::FailedToParse, errmsg);
         }
-        return Status(ErrorCodes::UnknownError, errstr);
+        if (response.getOk()) {
+            *nMatched = response.getN();
+        }
+        return response.toStatus();
     } catch (const DBException& e) {
         return e.toStatus();
     }
@@ -336,7 +361,7 @@ Status updateOneAuthzDocument(OperationContext* txn,
                               const BSONObj& updatePattern,
                               bool upsert,
                               const BSONObj& writeConcern) {
-    int nMatched;
+    long long nMatched;
     Status status = updateAuthzDocuments(
         txn, collectionName, query, updatePattern, upsert, false, writeConcern, &nMatched);
     if (!status.isOK()) {
@@ -359,23 +384,36 @@ Status removeAuthzDocuments(OperationContext* txn,
                             const NamespaceString& collectionName,
                             const BSONObj& query,
                             const BSONObj& writeConcern,
-                            int* numRemoved) {
+                            long long* numRemoved) {
+    // Save and reset the write concern so that it doesn't get changed accidentally by
+    // DBDirectClient.
+    auto oldWC = txn->getWriteConcern();
+    ON_BLOCK_EXIT([txn, oldWC] { txn->setWriteConcern(oldWC); });
+
     try {
         DBDirectClient client(txn);
-        client.remove(collectionName.ns(), query);
 
-        // Handle write concern
-        BSONObjBuilder gleBuilder;
-        gleBuilder.append("getLastError", 1);
-        gleBuilder.appendElements(writeConcern);
+        auto doc = stdx::make_unique<BatchedDeleteDocument>();
+        doc->setQuery(query);
+        doc->setLimit(0);
+
+        BatchedDeleteRequest req;
+        req.setNS(collectionName);
+        req.addToDeletes(doc.release());
+
         BSONObj res;
-        client.runCommand("admin", gleBuilder.done(), res);
-        string errstr = client.getLastErrorString(res);
-        if (errstr.empty()) {
-            *numRemoved = res["n"].numberInt();
-            return Status::OK();
+        client.runCommand(collectionName.db().toString(), req.toBSON(), res);
+
+        BatchedCommandResponse response;
+        std::string errmsg;
+        response.parseBSON(res, &errmsg);
+        if (errmsg != "") {
+            return Status(ErrorCodes::FailedToParse, errmsg);
         }
-        return Status(ErrorCodes::UnknownError, errstr);
+        if (response.getOk()) {
+            *numRemoved = response.getN();
+        }
+        return response.toStatus();
     } catch (const DBException& e) {
         return e.toStatus();
     }
@@ -445,7 +483,7 @@ Status updateRoleDocument(OperationContext* txn,
 Status removeRoleDocuments(OperationContext* txn,
                            const BSONObj& query,
                            const BSONObj& writeConcern,
-                           int* numRemoved) {
+                           long long* numRemoved) {
     Status status = removeAuthzDocuments(
         txn, AuthorizationManager::rolesCollectionNamespace, query, writeConcern, numRemoved);
     if (status.code() == ErrorCodes::UnknownError) {
@@ -518,7 +556,7 @@ Status updatePrivilegeDocument(OperationContext* txn,
 Status removePrivilegeDocuments(OperationContext* txn,
                                 const BSONObj& query,
                                 const BSONObj& writeConcern,
-                                int* numRemoved) {
+                                long long* numRemoved) {
     Status status = removeAuthzDocuments(
         txn, AuthorizationManager::usersCollectionNamespace, query, writeConcern, numRemoved);
     if (status.code() == ErrorCodes::UnknownError) {
@@ -608,6 +646,9 @@ public:
         return false;
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
 
     virtual void help(stringstream& ss) const {
         ss << "Adds a user to the system" << endl;
@@ -750,6 +791,9 @@ public:
         return false;
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
 
     virtual void help(stringstream& ss) const {
         ss << "Used to update a user, for example to change its password" << endl;
@@ -864,6 +908,9 @@ public:
         return false;
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
 
     virtual void help(stringstream& ss) const {
         ss << "Drops a single user." << endl;
@@ -899,7 +946,7 @@ public:
 
         audit::logDropUser(ClientBasic::getCurrent(), userName);
 
-        int nMatched;
+        long long nMatched;
         status = removePrivilegeDocuments(txn,
                                           BSON(AuthorizationManager::USER_NAME_FIELD_NAME
                                                << userName.getUser()
@@ -933,6 +980,9 @@ public:
         return false;
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
 
     virtual void help(stringstream& ss) const {
         ss << "Drops all users for a single database." << endl;
@@ -967,7 +1017,7 @@ public:
 
         audit::logDropAllUsersFromDatabase(ClientBasic::getCurrent(), dbname);
 
-        int numRemoved;
+        long long numRemoved;
         status = removePrivilegeDocuments(txn,
                                           BSON(AuthorizationManager::USER_DB_FIELD_NAME << dbname),
                                           writeConcern,
@@ -992,6 +1042,9 @@ public:
         return false;
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
 
     virtual void help(stringstream& ss) const {
         ss << "Grants roles to a user." << endl;
@@ -1064,6 +1117,9 @@ public:
         return false;
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
 
     virtual void help(stringstream& ss) const {
         ss << "Revokes roles from a user." << endl;
@@ -1138,6 +1194,9 @@ public:
         return true;
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
 
     CmdUsersInfo() : Command("usersInfo") {}
 
@@ -1289,6 +1348,9 @@ public:
         return false;
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
 
     virtual void help(stringstream& ss) const {
         ss << "Adds a role to the system" << endl;
@@ -1400,6 +1462,9 @@ public:
         return false;
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
 
     virtual void help(stringstream& ss) const {
         ss << "Used to update a role" << endl;
@@ -1496,6 +1561,9 @@ public:
         return false;
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
 
     virtual void help(stringstream& ss) const {
         ss << "Grants privileges to a role" << endl;
@@ -1601,6 +1669,9 @@ public:
         return false;
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
 
     virtual void help(stringstream& ss) const {
         ss << "Revokes privileges from a role" << endl;
@@ -1714,6 +1785,9 @@ public:
         return false;
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
 
     virtual void help(stringstream& ss) const {
         ss << "Grants roles to another role." << endl;
@@ -1806,6 +1880,9 @@ public:
         return false;
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
 
     virtual void help(stringstream& ss) const {
         ss << "Revokes roles from another role." << endl;
@@ -1892,6 +1969,9 @@ public:
         return false;
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
 
     virtual void help(stringstream& ss) const {
         ss << "Drops a single role.  Before deleting the role completely it must remove it "
@@ -1943,7 +2023,7 @@ public:
         }
 
         // Remove this role from all users
-        int nMatched;
+        long long nMatched;
         status = updateAuthzDocuments(
             txn,
             AuthorizationManager::usersCollectionNamespace,
@@ -2043,6 +2123,9 @@ public:
         return false;
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
 
     virtual void help(stringstream& ss) const {
         ss << "Drops all roles from the given database.  Before deleting the roles completely "
@@ -2080,7 +2163,7 @@ public:
         }
 
         // Remove these roles from all users
-        int nMatched;
+        long long nMatched;
         status = updateAuthzDocuments(
             txn,
             AuthorizationManager::usersCollectionNamespace,
@@ -2163,6 +2246,9 @@ public:
         return true;
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
 
     CmdRolesInfo() : Command("rolesInfo") {}
 
@@ -2235,6 +2321,9 @@ public:
         return true;
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
 
     CmdInvalidateUserCache() : Command("invalidateUserCache") {}
 
@@ -2271,6 +2360,9 @@ public:
         return true;
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
 
     CmdGetCacheGeneration() : Command("_getUserCacheGeneration") {}
 
@@ -2315,6 +2407,9 @@ public:
         return false;
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
 
     virtual bool adminOnly() const {
         return true;
@@ -2559,7 +2654,7 @@ public:
         }
 
         if (drop) {
-            int numRemoved;
+            long long numRemoved;
             for (unordered_set<UserName>::iterator it = usersToDrop.begin();
                  it != usersToDrop.end();
                  ++it) {
@@ -2640,7 +2735,7 @@ public:
         }
 
         if (drop) {
-            int numRemoved;
+            long long numRemoved;
             for (unordered_set<RoleName>::iterator it = rolesToDrop.begin();
                  it != rolesToDrop.end();
                  ++it) {
@@ -2897,6 +2992,9 @@ public:
         return true;
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
 
     virtual void help(stringstream& ss) const {
         ss << "Upgrades the auth data storage schema";

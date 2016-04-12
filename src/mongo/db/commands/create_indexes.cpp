@@ -62,6 +62,9 @@ class CmdCreateIndex : public Command {
 public:
     CmdCreateIndex() : Command("createIndexes") {}
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
     virtual bool slaveOk() const {
         return false;
     }  // TODO: this could be made true...

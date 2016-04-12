@@ -188,6 +188,9 @@ public:
         return Status::OK();
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
 
     // Input
     static BSONField<string> nsField;

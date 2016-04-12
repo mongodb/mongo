@@ -68,6 +68,10 @@ public:
     }
 
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+
     virtual void help(std::stringstream& help) const {
         help << " example: - split the shard that contains give key\n"
              << "   { split : 'alleyinsider.blog.posts' , find : { ts : 1 } }\n"

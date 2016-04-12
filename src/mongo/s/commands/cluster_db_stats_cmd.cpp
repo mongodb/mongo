@@ -48,6 +48,10 @@ public:
         out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+
     virtual void aggregateResults(const vector<ShardAndReply>& results, BSONObjBuilder& output) {
         long long objects = 0;
         long long unscaledDataSize = 0;

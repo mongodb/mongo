@@ -602,7 +602,7 @@ long long State::postProcessCollectionNonAtomic(OperationContext* txn,
         ScopedTransaction transaction(txn, MODE_X);
         Lock::GlobalWrite lock(txn->lockState());  // TODO(erh): why global???
         // replace: just rename from temp to final collection name, dropping previous collection
-        _db.dropCollection(_config.outputOptions.finalNamespace);
+        _db.dropCollection(_config.outputOptions.finalNamespace, txn->getWriteConcern());
         BSONObj info;
 
         if (!_db.runCommand("admin",
@@ -613,7 +613,7 @@ long long State::postProcessCollectionNonAtomic(OperationContext* txn,
             uasserted(10076, str::stream() << "rename failed: " << info);
         }
 
-        _db.dropCollection(_config.tempNamespace);
+        _db.dropCollection(_config.tempNamespace, txn->getWriteConcern());
     } else if (_config.outputOptions.outType == Config::MERGE) {
         // merge: upsert new docs into old collection
         {
@@ -632,7 +632,7 @@ long long State::postProcessCollectionNonAtomic(OperationContext* txn,
             Helpers::upsert(_txn, _config.outputOptions.finalNamespace, o);
             pm.hit();
         }
-        _db.dropCollection(_config.tempNamespace);
+        _db.dropCollection(_config.tempNamespace, txn->getWriteConcern());
         pm.finished();
     } else if (_config.outputOptions.outType == Config::REDUCE) {
         // reduce: apply reduce op on new result and existing one
@@ -1287,6 +1287,10 @@ public:
     }
 
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return mrSupportsWriteConcern(cmd);
+    }
+
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {
@@ -1300,6 +1304,11 @@ public:
              string& errmsg,
              BSONObjBuilder& result) {
         Timer t;
+
+        // Save and reset the write concern so that it doesn't get changed accidentally by
+        // DBDirectClient.
+        auto oldWC = txn->getWriteConcern();
+        ON_BLOCK_EXIT([txn, oldWC] { txn->setWriteConcern(oldWC); });
 
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmd))
@@ -1588,6 +1597,9 @@ public:
     virtual bool slaveOverrideOk() const {
         return true;
     }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {
@@ -1608,6 +1620,11 @@ public:
                        str::stream() << "Can not execute mapReduce with output database "
                                      << dbname));
         }
+
+        // Save and reset the write concern so that it doesn't get changed accidentally by
+        // DBDirectClient.
+        auto oldWC = txn->getWriteConcern();
+        ON_BLOCK_EXIT([txn, oldWC] { txn->setWriteConcern(oldWC); });
 
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmdObj))

@@ -50,6 +50,10 @@ public:
     KillOpCommand() : Command("killOp") {}
 
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+
     bool slaveOk() const final {
         return true;
     }

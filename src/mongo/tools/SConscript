@@ -15,6 +15,7 @@ mongobridge = env.Program(
         "$BUILD_DIR/mongo/client/clientdriver",
         "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
         "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/mongo/db/write_concern_options",
         "$BUILD_DIR/mongo/util/net/network",
         "$BUILD_DIR/mongo/util/ntservice_mock",
         "$BUILD_DIR/mongo/util/signal_handlers",

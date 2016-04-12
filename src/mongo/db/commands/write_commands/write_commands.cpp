@@ -92,6 +92,10 @@ bool WriteCmd::slaveOk() const {
 }
 
 
+bool WriteCmd::supportsWriteConcern(const BSONObj& cmd) const {
+    return true;
+}
+
 Status WriteCmd::checkAuthForCommand(ClientBasic* client,
                                      const std::string& dbname,
                                      const BSONObj& cmdObj) {
@@ -127,13 +131,6 @@ bool WriteCmd::run(OperationContext* txn,
     if (!request.parseBSON(dbName, cmdObj, &errMsg) || !request.isValid(&errMsg)) {
         return appendCommandStatus(result, Status(ErrorCodes::FailedToParse, errMsg));
     }
-
-    StatusWith<WriteConcernOptions> wcStatus = extractWriteConcern(txn, cmdObj, dbName);
-
-    if (!wcStatus.isOK()) {
-        return appendCommandStatus(result, wcStatus.getStatus());
-    }
-    txn->setWriteConcern(wcStatus.getValue());
 
     WriteBatchExecutor writeBatchExecutor(
         txn, &globalOpCounters, &LastError::get(txn->getClient()));

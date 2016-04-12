@@ -53,6 +53,9 @@ using std::stringstream;
 class CmdHashElt : public Command {
 public:
     CmdHashElt() : Command("_hashBSONElement"){};
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
     virtual bool slaveOk() const {
         return true;
     }

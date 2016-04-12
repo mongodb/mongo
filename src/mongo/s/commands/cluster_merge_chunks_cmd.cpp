@@ -85,6 +85,9 @@ public:
     virtual bool slaveOk() const {
         return false;
     }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
 
     // Required
     static BSONField<string> nsField;

@@ -77,6 +77,10 @@ public:
     }
 
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+
     virtual void help(std::stringstream& help) const {
         help << "Shard a collection. Requires key. Optional unique."
              << " Sharding must already be enabled for the database.\n"

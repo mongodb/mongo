@@ -53,6 +53,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -154,6 +155,9 @@ public:
     PipelineCommand() : Command(Pipeline::commandName) {}  // command is called "aggregate"
 
     // Locks are managed manually, in particular by DocumentSourceCursor.
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return Pipeline::aggSupportsWriteConcern(cmd);
+    }
     virtual bool slaveOk() const {
         return false;
     }
@@ -198,6 +202,11 @@ public:
         intrusive_ptr<Pipeline> pPipeline = Pipeline::parseCommand(errmsg, cmdObj, pCtx);
         if (!pPipeline.get())
             return false;
+
+        // Save and reset the write concern so that it doesn't get changed accidentally by
+        // DBDirectClient.
+        auto oldWC = txn->getWriteConcern();
+        ON_BLOCK_EXIT([txn, oldWC] { txn->setWriteConcern(oldWC); });
 
         // This is outside of the if block to keep the object alive until the pipeline is finished.
         BSONObj parsed;

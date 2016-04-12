@@ -34,6 +34,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/metadata.h"
@@ -709,17 +710,20 @@ public:
      *  @param info An optional output parameter that receives the result object the database
      *  returns from the drop command.  May be null if the caller doesn't need that info.
      */
-    virtual bool dropCollection(const std::string& ns, BSONObj* info = NULL) {
+    virtual bool dropCollection(const std::string& ns,
+                                const WriteConcernOptions& writeConcern = WriteConcernOptions(),
+                                BSONObj* info = nullptr) {
         std::string db = nsGetDB(ns);
         std::string coll = nsGetCollection(ns);
         uassert(10011, "no collection name", coll.size());
 
         BSONObj temp;
-        if (info == NULL) {
+        if (info == nullptr) {
             info = &temp;
         }
 
-        bool res = runCommand(db.c_str(), BSON("drop" << coll), *info);
+        bool res = runCommand(
+            db.c_str(), BSON("drop" << coll << "writeConcern" << writeConcern.toBSON()), *info);
         return res;
     }
 
@@ -862,8 +866,14 @@ public:
     static std::string genIndexName(const BSONObj& keys);
 
     /** Erase / drop an entire database */
-    virtual bool dropDatabase(const std::string& dbname, BSONObj* info = 0) {
-        return simpleCommand(dbname, info, "dropDatabase");
+    virtual bool dropDatabase(const std::string& dbname,
+                              const WriteConcernOptions& writeConcern = WriteConcernOptions(),
+                              BSONObj* info = nullptr) {
+        BSONObj o;
+        if (info == nullptr)
+            info = &o;
+        return runCommand(
+            dbname, BSON("dropDatabase" << 1 << "writeConcern" << writeConcern.toBSON()), *info);
     }
 
     virtual std::string toString() const = 0;

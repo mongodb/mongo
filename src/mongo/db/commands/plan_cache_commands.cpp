@@ -141,6 +141,10 @@ bool PlanCacheCommand::run(OperationContext* txn,
 }
 
 
+bool PlanCacheCommand::supportsWriteConcern(const BSONObj& cmd) const {
+    return false;
+}
+
 bool PlanCacheCommand::slaveOk() const {
     return false;
 }

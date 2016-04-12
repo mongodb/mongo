@@ -185,11 +185,16 @@ void Command::appendCommandStatus(BSONObjBuilder& result, bool ok, const std::st
     }
 }
 
-void Command::appendCommandWCStatus(BSONObjBuilder& result, const Status& status) {
-    if (!status.isOK()) {
+void Command::appendCommandWCStatus(BSONObjBuilder& result,
+                                    const Status& awaitReplicationStatus,
+                                    const WriteConcernResult& wcResult) {
+    if (!awaitReplicationStatus.isOK() && !result.hasField("writeConcernError")) {
         WCErrorDetail wcError;
-        wcError.setErrCode(status.code());
-        wcError.setErrMessage(status.reason());
+        wcError.setErrCode(awaitReplicationStatus.code());
+        wcError.setErrMessage(awaitReplicationStatus.reason());
+        if (wcResult.wTimedOut) {
+            wcError.setErrInfo(BSON("wtimeout" << true));
+        }
         result.append("writeConcernError", wcError.toBSON());
     }
 }

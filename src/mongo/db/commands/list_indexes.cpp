@@ -82,6 +82,9 @@ public:
     virtual bool adminOnly() const {
         return false;
     }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
 
     virtual void help(stringstream& help) const {
         help << "list indexes for a collection";

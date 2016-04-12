@@ -119,6 +119,9 @@ class StageDebugCmd : public Command {
 public:
     StageDebugCmd() : Command("stageDebug") {}
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
     bool slaveOk() const {
         return false;
     }

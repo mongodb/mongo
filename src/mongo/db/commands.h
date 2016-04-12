@@ -40,6 +40,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/request_interface.h"
 #include "mongo/util/string_map.h"
@@ -140,6 +141,16 @@ public:
     bool run(OperationContext* txn,
              const rpc::RequestInterface& request,
              rpc::ReplyBuilderInterface* replyBuilder);
+
+    /**
+     * supportsWriteConcern returns true if this command should be parsed for a writeConcern
+     * field and wait for that write concern to be satisfied after the command runs.
+     *
+     * @param cmd is a BSONObj representation of the command that is used to determine if the
+     *            the command supports a write concern. Ex. aggregate only supports write concern
+     *            when $out is provided.
+     */
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const = 0;
 
     /* Return true if only the admin ns has privileges to run this command. */
     virtual bool adminOnly() const {
@@ -335,8 +346,17 @@ public:
     /**
      * Helper for setting a writeConcernError field in the command result object if
      * a writeConcern error occurs.
+     *
+     * @param result is the BSONObjBuilder for the command response. This function creates the
+     *               writeConcernError field for the response.
+     * @param awaitReplicationStatus is the status received from awaitReplication.
+     * @param wcResult is the writeConcernResult object that holds other write concern information.
+     *      This is primarily used for populating errInfo when a timeout occurs, and is populated
+     *      by waitForWriteConcern.
      */
-    static void appendCommandWCStatus(BSONObjBuilder& result, const Status& status);
+    static void appendCommandWCStatus(BSONObjBuilder& result,
+                                      const Status& awaitReplicationStatus,
+                                      const WriteConcernResult& wcResult = WriteConcernResult());
 
     /**
      * If true, then testing commands are available. Defaults to false.

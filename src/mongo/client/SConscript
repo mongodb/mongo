@@ -206,6 +206,7 @@ env.CppUnitTest(
         'replica_set_monitor_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/write_concern_options',
         'clientdriver'
     ]
 )

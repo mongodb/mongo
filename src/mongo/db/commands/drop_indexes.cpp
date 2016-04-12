@@ -70,6 +70,9 @@ public:
     virtual bool slaveOk() const {
         return false;
     }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
     virtual void help(stringstream& help) const {
         help << "drop indexes for a collection";
     }
@@ -99,6 +102,9 @@ public:
     virtual bool slaveOk() const {
         return true;
     }  // can reindex on a secondary
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
     virtual void help(stringstream& help) const {
         help << "re-index a collection";
     }

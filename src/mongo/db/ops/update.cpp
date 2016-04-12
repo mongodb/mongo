@@ -74,6 +74,11 @@ UpdateResult update(OperationContext* txn,
     const NamespaceString& nsString = request.getNamespaceString();
     Collection* collection = db->getCollection(nsString.ns());
 
+    // If this is the local database, don't set last op.
+    if (db->name() == "local") {
+        lastOpSetterGuard.Dismiss();
+    }
+
     // The update stage does not create its own collection.  As such, if the update is
     // an upsert, create the collection that the update stage inserts into beforehand.
     if (!collection && request.isUpsert()) {

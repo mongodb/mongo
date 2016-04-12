@@ -252,6 +252,9 @@ public:
         actions.addAction(ActionType::dropIndex);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
 } dropIndexesCmd;
 
 class CreateIndexesCmd : public AllShardsCollectionCommand {
@@ -361,6 +364,10 @@ public:
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
+
 } createIndexesCmd;
 
 class ReIndexCmd : public AllShardsCollectionCommand {
@@ -372,6 +379,10 @@ public:
         ActionSet actions;
         actions.addAction(ActionType::reIndex);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+    }
+
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
     }
 } reIndexCmd;
 
@@ -385,6 +396,10 @@ public:
         actions.addAction(ActionType::collMod);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
+
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
 } collectionModCmd;
 
 
@@ -397,6 +412,10 @@ public:
         ActionSet actions;
         actions.addAction(ActionType::validate);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+    }
+
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
     }
 
     bool run(OperationContext* txn,
@@ -476,6 +495,9 @@ public:
 
         return Status(ErrorCodes::Unauthorized, "unauthorized");
     }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
     bool run(OperationContext* txn,
              const string& dbName,
              BSONObj& cmdObj,
@@ -503,6 +525,10 @@ public:
         ActionSet actions;
         actions.addAction(ActionType::dropCollection);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+    }
+
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
     }
 
     bool run(OperationContext* txn,
@@ -537,7 +563,6 @@ public:
 
         return true;
     }
-
 } dropCmd;
 
 class RenameCollectionCmd : public PublicGridCommand {
@@ -549,6 +574,9 @@ public:
         return rename_collection::checkAuthForRenameCollectionCommand(client, dbname, cmdObj);
     }
     virtual bool adminOnly() const {
+        return true;
+    }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
     bool run(OperationContext* txn,
@@ -589,6 +617,9 @@ public:
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return copydb::checkAuthForCopydbCommand(client, dbname, cmdObj);
+    }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
     }
 
     bool run(OperationContext* txn,
@@ -637,7 +668,6 @@ public:
             return adminPassthrough(txn, confTo, fixed, result);
         }
     }
-
 } clusterCopyDBCmd;
 
 class CollectionStats : public PublicGridCommand {
@@ -649,6 +679,10 @@ public:
         ActionSet actions;
         actions.addAction(ActionType::collStats);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+    }
+
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
     }
 
     bool run(OperationContext* txn,
@@ -815,6 +849,9 @@ public:
         actions.addAction(ActionType::find);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
     bool run(OperationContext* txn,
              const string& dbName,
              BSONObj& cmdObj,
@@ -896,6 +933,10 @@ public:
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
+
 } convertToCappedCmd;
 
 class GroupCmd : public NotAllowedOnShardedCollectionCmd {
@@ -907,6 +948,10 @@ public:
         ActionSet actions;
         actions.addAction(ActionType::find);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+    }
+
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
     }
 
     virtual bool passOptions() const {
@@ -993,6 +1038,9 @@ public:
     virtual bool passOptions() const {
         return true;
     }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
     virtual Status checkAuthForCommand(ClientBasic* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
@@ -1037,6 +1085,9 @@ public:
         ActionSet actions;
         actions.addAction(ActionType::find);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+    }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
     }
 
     bool run(OperationContext* txn,
@@ -1166,6 +1217,10 @@ public:
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), ActionType::find));
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+
     bool run(OperationContext* txn,
              const string& dbName,
              BSONObj& cmdObj,
@@ -1293,6 +1348,9 @@ public:
         actions.addAction(ActionType::find);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
 
     bool run(OperationContext* txn,
              const string& dbName,
@@ -1414,6 +1472,9 @@ public:
         // applyOps can do pretty much anything, so require all privileges.
         RoleGraph::generateUniversalPrivileges(out);
     }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
     virtual bool run(OperationContext* txn,
                      const string& dbName,
                      BSONObj& cmdObj,
@@ -1435,6 +1496,9 @@ public:
         actions.addAction(ActionType::compact);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
     virtual bool run(OperationContext* txn,
                      const string& dbName,
                      BSONObj& cmdObj,
@@ -1454,6 +1518,9 @@ public:
                                        std::vector<Privilege>* out) {
         // $eval can do pretty much anything, so require all privileges.
         RoleGraph::generateUniversalPrivileges(out);
+    }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
     }
     virtual bool run(OperationContext* txn,
                      const string& dbName,
@@ -1500,6 +1567,10 @@ public:
                       str::stream() << "Not authorized to create users on db: " << dbname);
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+
     bool run(OperationContext* txn,
              const string& dbName,
              BSONObj& cmdObj,
@@ -1539,6 +1610,10 @@ public:
                           << "Not authorized to list indexes on collection: " << ns.coll());
     }
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+
     bool run(OperationContext* txn,
              const string& dbName,
              BSONObj& cmdObj,
@@ -1566,6 +1641,9 @@ public:
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return Status::OK();
+    }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
     }
 
     virtual bool run(OperationContext* txn,

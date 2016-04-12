@@ -580,7 +580,7 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
         const auto shard = grid.shardRegistry()->getShard(txn, _primaryId);
         ScopedDbConnection conn(shard->getConnString(), 30.0);
         BSONObj res;
-        if (!conn->dropDatabase(_name, &res)) {
+        if (!conn->dropDatabase(_name, txn->getWriteConcern(), &res)) {
             errmsg = res.toString();
             return 0;
         }
@@ -596,7 +596,7 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
 
         ScopedDbConnection conn(shard->getConnString(), 30.0);
         BSONObj res;
-        if (!conn->dropDatabase(_name, &res)) {
+        if (!conn->dropDatabase(_name, txn->getWriteConcern(), &res)) {
             errmsg = res.toString();
             return 0;
         }

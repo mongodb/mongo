@@ -57,6 +57,9 @@ using std::stringstream;
 
 class TouchCmd : public Command {
 public:
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
     virtual bool adminOnly() const {
         return false;
     }

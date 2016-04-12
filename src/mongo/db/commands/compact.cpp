@@ -56,6 +56,9 @@ using std::stringstream;
 
 class CompactCmd : public Command {
 public:
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
     virtual bool adminOnly() const {
         return false;
     }

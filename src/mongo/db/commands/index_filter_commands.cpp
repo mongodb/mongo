@@ -145,6 +145,10 @@ bool IndexFilterCommand::run(OperationContext* txn,
 }
 
 
+bool IndexFilterCommand::supportsWriteConcern(const BSONObj& cmd) const {
+    return false;
+}
+
 bool IndexFilterCommand::slaveOk() const {
     return false;
 }

@@ -63,6 +63,9 @@ class Geo2dFindNearCmd : public Command {
 public:
     Geo2dFindNearCmd() : Command("geoNear") {}
 
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
     bool slaveOk() const {
         return true;
     }
