@@ -64,9 +64,11 @@ testutil_die(int e, const char *fmt, ...)
 	if (custom_die != NULL)
 		(*custom_die)();
 
-	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
-	va_end(ap);
+	if (fmt != NULL) {
+		va_start(ap, fmt);
+		vfprintf(stderr, fmt, ap);
+		va_end(ap);
+	}
 	if (e != 0)
 		fprintf(stderr, ": %s", wiredtiger_strerror(e));
 	fprintf(stderr, "\n");
