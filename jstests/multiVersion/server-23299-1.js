@@ -30,7 +30,7 @@ load('./jstests/multiVersion/libs/multi_rs.js');
         assert.eq(sz, getTestDbForNode(node).target.find().itcount(), "On node " + node.host);
     }
 
-    var rst = new ReplSetTest({nodes: 2});
+    var rst = new ReplSetTest({nodes: [{}, {}, {arbiter: true}]});
     rst.startSet({binVersion: oldVersion});
     rst.initiate();
     var n0 = rst.getPrimary();
