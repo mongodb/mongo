@@ -4033,7 +4033,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			if (nrecs > 0) {
 				__bit_setv(r->first_free, entry, btree->bitcnt,
 				    upd == NULL ? 0 :
-				    ((uint8_t *)WT_UPDATE_DATA(upd))[0]);
+				    *(uint8_t *)WT_UPDATE_DATA(upd));
 				--nrecs;
 				++entry;
 				++r->recno;
