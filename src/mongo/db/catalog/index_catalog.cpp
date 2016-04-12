@@ -366,6 +366,11 @@ Status IndexCatalog::IndexBuildBlock::init() {
     const bool initFromDisk = false;
     _entry = _catalog->_setupInMemoryStructures(_txn, descriptorCleaner.release(), initFromDisk);
 
+    // Register this index with the CollectionInfoCache to regenerate the cache. This way, updates
+    // occurring while an index is being build in the background will be aware of whether or not
+    // they need to modify any indexes.
+    _collection->infoCache()->addedIndex(_txn, descriptor);
+
     return Status::OK();
 }
 
@@ -414,8 +419,6 @@ void IndexCatalog::IndexBuildBlock::success() {
     });
 
     entry->setIsReady(true);
-
-    collection->infoCache()->addedIndex(_txn, desc);
 }
 
 namespace {
