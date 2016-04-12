@@ -1,3 +1,17 @@
+/**
+ * Compute the result of evaluating 'expression', and compare it to 'result'. Replaces the contents
+ * of 'coll' with a single empty document.
+ */
+function testExpression(coll, expression, result) {
+    coll.remove({});
+    coll.insert({});
+
+    var res = coll.aggregate({$project: {output: expression}}).toArray();
+
+    assert.eq(res.length, 1);
+    assert.eq(res[0].output, result);
+}
+
 /*
   Utility functions used to test aggregation
 */

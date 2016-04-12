@@ -2572,6 +2572,88 @@ const char* ExpressionRange::getOpName() const {
     return "$range";
 }
 
+/* ------------------------ ExpressionReduce ------------------------------ */
+
+REGISTER_EXPRESSION(reduce, ExpressionReduce::parse);
+intrusive_ptr<Expression> ExpressionReduce::parse(BSONElement expr,
+                                                  const VariablesParseState& vps) {
+    uassert(40075,
+            str::stream() << "$reduce requires an object as an argument, found: "
+                          << typeName(expr.type()),
+            expr.type() == Object);
+
+    intrusive_ptr<ExpressionReduce> reduce(new ExpressionReduce());
+
+    // vpsSub is used only to parse 'in', which must have access to $$this and $$value.
+    VariablesParseState vpsSub(vps);
+    reduce->_thisVar = vpsSub.defineVariable("this");
+    reduce->_valueVar = vpsSub.defineVariable("value");
+
+    for (auto&& elem : expr.Obj()) {
+        auto field = elem.fieldNameStringData();
+
+        if (field == "input") {
+            reduce->_input = parseOperand(elem, vps);
+        } else if (field == "initialValue") {
+            reduce->_initial = parseOperand(elem, vps);
+        } else if (field == "in") {
+            reduce->_in = parseOperand(elem, vpsSub);
+        } else {
+            uasserted(40076, str::stream() << "$reduce found an unknown argument: " << field);
+        }
+    }
+
+    uassert(40077, "$reduce requires 'input' to be specified", reduce->_input);
+    uassert(40078, "$reduce requires 'initialValue' to be specified", reduce->_initial);
+    uassert(40079, "$reduce requires 'in' to be specified", reduce->_in);
+
+    return reduce;
+}
+
+Value ExpressionReduce::evaluateInternal(Variables* vars) const {
+    Value inputVal = _input->evaluateInternal(vars);
+
+    if (inputVal.nullish()) {
+        return Value(BSONNULL);
+    }
+
+    uassert(40080,
+            str::stream() << "$reduce requires that 'input' be an array, found: "
+                          << inputVal.toString(),
+            inputVal.isArray());
+
+    Value accumulatedValue = _initial->evaluateInternal(vars);
+
+    for (auto&& elem : inputVal.getArray()) {
+        vars->setValue(_thisVar, elem);
+        vars->setValue(_valueVar, accumulatedValue);
+
+        accumulatedValue = _in->evaluateInternal(vars);
+    }
+
+    return accumulatedValue;
+}
+
+intrusive_ptr<Expression> ExpressionReduce::optimize() {
+    _input = _input->optimize();
+    _initial = _initial->optimize();
+    _in = _in->optimize();
+    return this;
+}
+
+void ExpressionReduce::addDependencies(DepsTracker* deps, vector<string>* path) const {
+    _input->addDependencies(deps);
+    _initial->addDependencies(deps);
+    _in->addDependencies(deps);
+}
+
+Value ExpressionReduce::serialize(bool explain) const {
+    return Value(Document{{"$reduce",
+                           Document{{"input", _input->serialize(explain)},
+                                    {"initialValue", _initial->serialize(explain)},
+                                    {"in", _in->serialize(explain)}}}});
+}
+
 /* ------------------------ ExpressionReverseArray ------------------------ */
 
 Value ExpressionReverseArray::evaluateInternal(Variables* vars) const {
