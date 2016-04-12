@@ -157,8 +157,8 @@ __huffman_confchk_file(
 
 	/* Check the file exists. */
 	WT_RET(__wt_strndup(session, v->str + len, v->len - len, &fname));
-	WT_ERR(__wt_open(session, fname, WT_FILE_TYPE_REGULAR,
-	    WT_OPEN_FIXED | WT_OPEN_READONLY | WT_STREAM_READ, &fh));
+	WT_ERR(__wt_open(session, fname,
+	    WT_FILE_TYPE_REGULAR, WT_OPEN_FIXED | WT_STREAM_READ, &fh));
 
 	/* Optionally return the file handle. */
 	if (fhp == NULL)
