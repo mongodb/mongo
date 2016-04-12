@@ -1538,6 +1538,15 @@ bool Command::run(OperationContext* txn,
                                 txn->getWriteConcern(),
                                 &res);
         appendCommandWCStatus(inPlaceReplyBob, waitForWCStatus, res);
+
+        // SERVER-22421: This code is to ensure error response backwards compatibility with the
+        // user management commands. This can be removed in 3.6.
+        if (!waitForWCStatus.isOK() && isUserManagementCommand(this->getName())) {
+            BSONObj temp = inPlaceReplyBob.asTempObj().copy();
+            inPlaceReplyBob.resetToEmpty();
+            appendCommandStatus(inPlaceReplyBob, waitForWCStatus);
+            inPlaceReplyBob.appendElementsUnique(temp);
+        }
     }
 
     appendCommandStatus(inPlaceReplyBob, result, errmsg);

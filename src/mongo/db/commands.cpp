@@ -388,4 +388,27 @@ void Command::generateErrorResponse(OperationContext* txn,
     _generateErrorResponse(txn, replyBuilder, exception, rpc::makeEmptyMetadata());
 }
 
+namespace {
+const std::unordered_set<std::string> userManagementCommands{"createUser",
+                                                             "updateUser",
+                                                             "dropUser",
+                                                             "dropAllUsersFromDatabase",
+                                                             "grantRolesToUser",
+                                                             "revokeRolesFromUser",
+                                                             "createRole",
+                                                             "updateRole",
+                                                             "dropRole",
+                                                             "dropAllRolesFromDatabase",
+                                                             "grantPrivilegesToRole",
+                                                             "revokePrivilegesFromRole",
+                                                             "grantRolesToRole",
+                                                             "revokeRolesFromRole",
+                                                             "_mergeAuthzCollections",
+                                                             "authSchemaUpgrade"};
+}  // namespace
+
+bool Command::isUserManagementCommand(const std::string& name) {
+    return userManagementCommands.count(name);
+}
+
 }  // namespace mongo

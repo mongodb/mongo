@@ -441,6 +441,11 @@ public:
      */
     static void registerError(OperationContext* txn, const DBException& exception);
 
+    /**
+     * This function checks if a command is a user management command by name.
+     */
+    static bool isUserManagementCommand(const std::string& name);
+
 private:
     /**
      * Checks to see if the client is authorized to run the given command with the given
