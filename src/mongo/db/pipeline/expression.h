@@ -1258,6 +1258,13 @@ public:
 };
 
 
+class ExpressionSplit final : public ExpressionFixedArity<ExpressionSplit, 2> {
+public:
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
+};
+
+
 class ExpressionSqrt final : public ExpressionSingleNumericArg<ExpressionSqrt> {
     Value evaluateNumericArg(const Value& numericArg) const final;
     const char* getOpName() const final;
