@@ -158,10 +158,11 @@ __wt_copy_and_sync(WT_SESSION *wt_session, const char *from, const char *to)
 	}
 
 	/* Close the from handle, then swap the temporary file into place. */
-	WT_ERR(__wt_fsync(session, ffh, true));
 	WT_ERR(__wt_close(session, &ffh));
+	WT_ERR(__wt_fsync(session, tfh, true));
+	WT_ERR(__wt_close(session, &tfh));
 
-	return (__wt_rename_and_sync_directory(session, from, to));
+	ret = __wt_rename_and_sync_directory(session, tmp->data, to);
 
 err:	WT_TRET(__wt_close(session, &ffh));
 	WT_TRET(__wt_close(session, &tfh));
