@@ -163,19 +163,10 @@ public:
     /**
      * Walk the entire index, checking the internal structure for consistency.
      * Set numKeys to the number of keys in the index.
-     *
-     * 'output' is used to store results of validate when 'full' is true.
-     * If 'full' is false, 'output' may be NULL.
-     *
+
      * Return OK if the index is valid.
-     *
-     * Currently wasserts that the index is invalid.  This could/should be changed in
-     * the future to return a Status.
      */
-    Status validate(OperationContext* txn,
-                    bool full,
-                    int64_t* numKeys,
-                    ValidateResults* fullResults);
+    Status validate(OperationContext* txn, int64_t* numKeys, ValidateResults* fullResults);
 
     /**
      * Add custom statistics about this index to BSON object builder, for display.

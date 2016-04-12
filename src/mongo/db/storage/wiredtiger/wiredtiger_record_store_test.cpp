@@ -386,7 +386,7 @@ namespace {
 
 class GoodValidateAdaptor : public ValidateAdaptor {
 public:
-    virtual Status validate(const RecordData& record, size_t* dataSize) {
+    virtual Status validate(const RecordId& recordId, const RecordData& record, size_t* dataSize) {
         *dataSize = static_cast<size_t>(record.size());
         return Status::OK();
     }
@@ -394,7 +394,7 @@ public:
 
 class BadValidateAdaptor : public ValidateAdaptor {
 public:
-    virtual Status validate(const RecordData& record, size_t* dataSize) {
+    virtual Status validate(const RecordId& recordId, const RecordData& record, size_t* dataSize) {
         *dataSize = static_cast<size_t>(record.size());
         return Status(ErrorCodes::UnknownError, "");
     }
@@ -463,7 +463,7 @@ TEST_F(SizeStorerValidateTest, Basic) {
     unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
     ValidateResults results;
     BSONObjBuilder output;
-    ASSERT_OK(rs->validate(opCtx.get(), false, false, NULL, &results, &output));
+    ASSERT_OK(rs->validate(opCtx.get(), kValidateIndex, NULL, &results, &output));
     BSONObj obj = output.obj();
     ASSERT_EQUALS(expectedNumRecords, obj.getIntField("nrecords"));
     ASSERT_EQUALS(expectedNumRecords, getNumRecords());
@@ -476,11 +476,22 @@ TEST_F(SizeStorerValidateTest, FullWithGoodAdaptor) {
     GoodValidateAdaptor adaptor;
     ValidateResults results;
     BSONObjBuilder output;
-    ASSERT_OK(rs->validate(opCtx.get(), true, true, &adaptor, &results, &output));
+    ASSERT_OK(rs->validate(opCtx.get(), kValidateFull, &adaptor, &results, &output));
     BSONObj obj = output.obj();
     ASSERT_EQUALS(expectedNumRecords, obj.getIntField("nrecords"));
     ASSERT_EQUALS(expectedNumRecords, getNumRecords());
     ASSERT_EQUALS(expectedDataSize, getDataSize());
+}
+
+// Basic validation does not use the validation adaptor. So passing a bad adaptor
+// should not cause validate to fail.
+TEST_F(SizeStorerValidateTest, BasicWithBadAdapter) {
+    unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+    BadValidateAdaptor adaptor;
+    ValidateResults results;
+    BSONObjBuilder output;
+    ASSERT_OK(rs->validate(opCtx.get(), kValidateIndex, &adaptor, &results, &output));
+    ASSERT_EQUALS(true, results.valid);
 }
 
 // Full validation with a validation adaptor that fails - size storer data is not updated.
@@ -489,7 +500,7 @@ TEST_F(SizeStorerValidateTest, FullWithBadAdapter) {
     BadValidateAdaptor adaptor;
     ValidateResults results;
     BSONObjBuilder output;
-    ASSERT_OK(rs->validate(opCtx.get(), true, true, &adaptor, &results, &output));
+    ASSERT_OK(rs->validate(opCtx.get(), kValidateFull, &adaptor, &results, &output));
     BSONObj obj = output.obj();
     ASSERT_EQUALS(expectedNumRecords, obj.getIntField("nrecords"));
     ASSERT_EQUALS(0, getNumRecords());
@@ -519,7 +530,7 @@ TEST_F(SizeStorerValidateTest, InvalidSizeStorerAtCreation) {
     GoodValidateAdaptor adaptor;
     ValidateResults results;
     BSONObjBuilder output;
-    ASSERT_OK(rs->validate(opCtx.get(), true, true, &adaptor, &results, &output));
+    ASSERT_OK(rs->validate(opCtx.get(), kValidateFull, &adaptor, &results, &output));
     BSONObj obj = output.obj();
     ASSERT_EQUALS(expectedNumRecords, obj.getIntField("nrecords"));
     ASSERT_EQUALS(expectedNumRecords, getNumRecords());

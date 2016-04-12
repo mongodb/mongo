@@ -135,13 +135,9 @@ public:
     //
 
     /**
-     * 'output' is used to store results of validate when 'full' is true.
-     * If 'full' is false, 'output' may be NULL.
-     *
      * TODO: expose full set of args for testing?
      */
     virtual void fullValidate(OperationContext* txn,
-                              bool full,
                               long long* numKeysOut,
                               ValidateResults* fullResults) const = 0;
 
@@ -185,7 +181,7 @@ public:
      */
     virtual long long numEntries(OperationContext* txn) const {
         long long x = -1;
-        fullValidate(txn, false, &x, NULL);
+        fullValidate(txn, &x, NULL);
         return x;
     }
 

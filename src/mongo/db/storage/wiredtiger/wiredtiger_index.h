@@ -91,7 +91,6 @@ public:
                          bool dupsAllowed);
 
     virtual void fullValidate(OperationContext* txn,
-                              bool full,
                               long long* numKeysOut,
                               ValidateResults* fullResults) const;
     virtual bool appendCustomStats(OperationContext* txn,

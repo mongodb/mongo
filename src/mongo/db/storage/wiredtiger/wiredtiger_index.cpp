@@ -266,7 +266,6 @@ void WiredTigerIndex::unindex(OperationContext* txn,
 }
 
 void WiredTigerIndex::fullValidate(OperationContext* txn,
-                                   bool full,
                                    long long* numKeysOut,
                                    ValidateResults* fullResults) const {
     if (fullResults && !WiredTigerRecoveryUnit::get(txn)->getSessionCache()->isEphemeral()) {

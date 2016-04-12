@@ -70,7 +70,8 @@ protected:
     bool checkValid() {
         ValidateResults results;
         BSONObjBuilder output;
-        ASSERT_OK(collection()->validate(&_txn, _full, false, &results, &output));
+        ASSERT_OK(collection()->validate(
+            &_txn, _full ? kValidateFull : kValidateIndex, &results, &output));
 
         //  Check if errors are reported if and only if valid is set to false.
         ASSERT_EQ(results.valid, results.errors.empty());

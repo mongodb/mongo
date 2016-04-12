@@ -539,8 +539,7 @@ void RecordStoreV1Base::increaseStorageSize(OperationContext* txn, int size, boo
 }
 
 Status RecordStoreV1Base::validate(OperationContext* txn,
-                                   bool full,
-                                   bool scanData,
+                                   ValidateCmdLevel level,
                                    ValidateAdaptor* adaptor,
                                    ValidateResults* results,
                                    BSONObjBuilder* output) {
@@ -591,7 +590,7 @@ Status RecordStoreV1Base::validate(OperationContext* txn,
             extentDiskLoc = _details->firstExtent(txn);
             while (!extentDiskLoc.isNull()) {
                 Extent* thisExtent = _getExtent(txn, extentDiskLoc);
-                if (full) {
+                if (level == kValidateFull) {
                     extentData << thisExtent->dump();
                 }
                 if (!thisExtent->validates(extentDiskLoc, &results->errors)) {
@@ -628,7 +627,7 @@ Status RecordStoreV1Base::validate(OperationContext* txn,
         }
         output->append("extentCount", extentCount);
 
-        if (full)
+        if (level == kValidateFull)
             output->appendArray("extents", extentData.arr());
     }
 
@@ -678,7 +677,7 @@ Status RecordStoreV1Base::validate(OperationContext* txn,
         // 4444444444444444444444444
 
         set<DiskLoc> recs;
-        if (scanData) {
+        if (level == kValidateRecordStore || level == kValidateFull) {
             int n = 0;
             int nInvalid = 0;
             long long nQuantizedSize = 0;
@@ -711,9 +710,10 @@ Status RecordStoreV1Base::validate(OperationContext* txn,
                     ++nQuantizedSize;
                 }
 
-                if (full) {
+                if (level == kValidateFull) {
                     size_t dataSize = 0;
-                    const Status status = adaptor->validate(r->toRecordData(), &dataSize);
+                    const Status status =
+                        adaptor->validate(record->id, r->toRecordData(), &dataSize);
                     if (!status.isOK()) {
                         results->valid = false;
                         if (nInvalid == 0)  // only log once;
@@ -736,7 +736,7 @@ Status RecordStoreV1Base::validate(OperationContext* txn,
             }
             output->append("objectsFound", n);
 
-            if (full) {
+            if (level == kValidateFull) {
                 output->append("invalidObjects", nInvalid);
             }
 
@@ -744,7 +744,7 @@ Status RecordStoreV1Base::validate(OperationContext* txn,
             output->appendNumber("bytesWithHeaders", len);
             output->appendNumber("bytesWithoutHeaders", nlen);
 
-            if (full) {
+            if (level == kValidateFull) {
                 output->appendNumber("bytesBson", bsonLen);
             }
         }  // end scanData
@@ -799,7 +799,7 @@ Status RecordStoreV1Base::validate(OperationContext* txn,
         }
         output->appendNumber("deletedCount", ndel);
         output->appendNumber("deletedSize", delSize);
-        if (full) {
+        if (level == kValidateFull) {
             output->append("delBucketSizes", delBucketSizes.arr());
         }
 

@@ -37,6 +37,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
@@ -90,7 +91,15 @@ public:
 
         NamespaceString ns_string(ns);
         const bool full = cmdObj["full"].trueValue();
-        const bool scanData = full || cmdObj["scandata"].trueValue();
+        const bool scanData = cmdObj["scandata"].trueValue();
+
+        ValidateCmdLevel level = kValidateIndex;
+
+        if (full) {
+            level = kValidateFull;
+        } else if (scanData) {
+            level = kValidateRecordStore;
+        }
 
         if (!ns_string.isNormal() && full) {
             errmsg = "Can only run full validate on a regular collection";
@@ -112,7 +121,7 @@ public:
         result.append("ns", ns);
 
         ValidateResults results;
-        Status status = collection->validate(txn, full, scanData, &results, &result);
+        Status status = collection->validate(txn, level, &results, &result);
         if (!status.isOK())
             return appendCommandStatus(result, status);
 

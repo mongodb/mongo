@@ -92,6 +92,13 @@ struct BsonRecord {
     const BSONObj* docPtr;
 };
 
+enum ValidateCmdLevel : int {
+    kValidateIndex = 0x01,
+    kValidateRecordStore = 0x02,
+    kValidateFull = 0x03
+};
+
+
 /**
  * Retrieves Records from a RecordStore.
  *
@@ -517,15 +524,12 @@ public:
     }
 
     /**
-     * @param full - does more checks
-     * @param scanData - scans each document
      * @return OK if the validate run successfully
      *         OK will be returned even if corruption is found
      *         deatils will be in result
      */
     virtual Status validate(OperationContext* txn,
-                            bool full,
-                            bool scanData,
+                            ValidateCmdLevel level,
                             ValidateAdaptor* adaptor,
                             ValidateResults* results,
                             BSONObjBuilder* output) = 0;
@@ -613,6 +617,8 @@ class ValidateAdaptor {
 public:
     virtual ~ValidateAdaptor() {}
 
-    virtual Status validate(const RecordData& recordData, size_t* dataSize) = 0;
+    virtual Status validate(const RecordId& recordId,
+                            const RecordData& recordData,
+                            size_t* dataSize) = 0;
 };
 }

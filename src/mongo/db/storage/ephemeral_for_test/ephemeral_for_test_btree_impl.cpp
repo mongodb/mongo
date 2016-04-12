@@ -189,7 +189,6 @@ public:
     }
 
     virtual void fullValidate(OperationContext* txn,
-                              bool full,
                               long long* numKeysOut,
                               ValidateResults* fullResults) const {
         // TODO check invariants?

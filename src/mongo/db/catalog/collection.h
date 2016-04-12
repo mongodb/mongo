@@ -346,15 +346,12 @@ public:
     Status truncate(OperationContext* txn);
 
     /**
-     * @param full - does more checks
-     * @param scanData - scans each document
      * @return OK if the validate run successfully
      *         OK will be returned even if corruption is found
      *         deatils will be in result
      */
     Status validate(OperationContext* txn,
-                    bool full,
-                    bool scanData,
+                    ValidateCmdLevel level,
                     ValidateResults* results,
                     BSONObjBuilder* output);
 

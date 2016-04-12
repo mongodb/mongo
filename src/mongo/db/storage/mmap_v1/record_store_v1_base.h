@@ -219,8 +219,7 @@ public:
     void increaseStorageSize(OperationContext* txn, int size, bool enforceQuota);
 
     virtual Status validate(OperationContext* txn,
-                            bool full,
-                            bool scanData,
+                            ValidateCmdLevel level,
                             ValidateAdaptor* adaptor,
                             ValidateResults* results,
                             BSONObjBuilder* output);

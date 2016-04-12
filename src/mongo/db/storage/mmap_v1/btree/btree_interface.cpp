@@ -96,7 +96,6 @@ public:
     }
 
     virtual void fullValidate(OperationContext* txn,
-                              bool full,
                               long long* numKeysOut,
                               ValidateResults* fullResults) const {
         *numKeysOut = _btree->fullValidate(txn, NULL, false, false, 0);

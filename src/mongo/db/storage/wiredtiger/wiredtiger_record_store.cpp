@@ -1494,8 +1494,7 @@ Status WiredTigerRecordStore::compact(OperationContext* txn,
 }
 
 Status WiredTigerRecordStore::validate(OperationContext* txn,
-                                       bool full,
-                                       bool scanData,
+                                       ValidateCmdLevel level,
                                        ValidateAdaptor* adaptor,
                                        ValidateResults* results,
                                        BSONObjBuilder* output) {
@@ -1528,9 +1527,9 @@ Status WiredTigerRecordStore::validate(OperationContext* txn,
         ++nrecords;
         auto dataSize = record->data.size();
         dataSizeTotal += dataSize;
-        if (full && scanData) {
+        if (level == kValidateFull) {
             size_t validatedSize;
-            Status status = adaptor->validate(record->data, &validatedSize);
+            Status status = adaptor->validate(record->id, record->data, &validatedSize);
 
             // The validatedSize equals dataSize below is not a general requirement, but must be
             // true for WT today because we never pad records.

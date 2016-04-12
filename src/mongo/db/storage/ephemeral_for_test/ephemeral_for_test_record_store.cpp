@@ -525,18 +525,17 @@ void EphemeralForTestRecordStore::temp_cappedTruncateAfter(OperationContext* txn
 }
 
 Status EphemeralForTestRecordStore::validate(OperationContext* txn,
-                                             bool full,
-                                             bool scanData,
+                                             ValidateCmdLevel level,
                                              ValidateAdaptor* adaptor,
                                              ValidateResults* results,
                                              BSONObjBuilder* output) {
     results->valid = true;
-    if (scanData && full) {
+    if (level == kValidateFull) {
         for (Records::const_iterator it = _data->records.begin(); it != _data->records.end();
              ++it) {
             const EphemeralForTestRecord& rec = it->second;
             size_t dataSize;
-            const Status status = adaptor->validate(rec.toRecordData(), &dataSize);
+            const Status status = adaptor->validate(it->first, rec.toRecordData(), &dataSize);
             if (!status.isOK()) {
                 results->valid = false;
                 results->errors.push_back("invalid object detected (see logs)");

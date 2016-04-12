@@ -47,7 +47,7 @@ public:
 
     ~ValidateAdaptorSpy() {}
 
-    Status validate(const RecordData& recordData, size_t* dataSize) {
+    Status validate(const RecordId& recordId, const RecordData& recordData, size_t* dataSize) {
         std::string s(recordData.data());
         ASSERT(1 == _remain.erase(s));
 
