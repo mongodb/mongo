@@ -54,7 +54,6 @@ env.Library(
         '$BUILD_DIR/mongo/s/common',
         '$BUILD_DIR/mongo/s/catalog/catalog_types',
         '$BUILD_DIR/mongo/s/client/sharding_client',
-        '$BUILD_DIR/mongo/s/shard_util',
         'dist_lock_manager',
     ],
     LIBDEPS_TAGS=[

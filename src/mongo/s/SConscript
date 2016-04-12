@@ -55,16 +55,6 @@ env.Library(
 )
 
 env.Library(
-    target='shard_util',
-    source=[
-        'shard_util.cpp',
-    ],
-    LIBDEPS=[
-        'client/sharding_client',
-    ]
-)
-
-env.Library(
     target='sharding_test_fixture',
     source=[
         'sharding_test_fixture.cpp',
@@ -175,6 +165,7 @@ env.Library(
         'db_util.cpp',
         'grid.cpp',
         'sharding_egress_metadata_hook.cpp',
+        'shard_util.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/query/cluster_cursor_manager',
@@ -184,7 +175,6 @@ env.Library(
         'client/sharding_client',
         'cluster_ops_impl',
         'common',
-        'shard_util',
     ],
     LIBDEPS_TAGS=[
         'incomplete',
