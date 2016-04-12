@@ -30,64 +30,14 @@
 
 #include <string>
 
-#include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
 
 /**
- * This class represents the layout and content of the error that occurs while trying
- * to satisfy the write concern after executing runCommand.
+ * This function appends the provided writeConcernError BSONElement to the sharded response.
  */
-class WCErrorDetail {
-    MONGO_DISALLOW_COPYING(WCErrorDetail);
-
-public:
-    WCErrorDetail();
-
-    /** Copies all the fields present in 'this' to 'other'. */
-    void cloneTo(WCErrorDetail* other) const;
-
-    //
-    // bson serializable interface implementation
-    //
-
-    bool isValid(std::string* errMsg) const;
-    BSONObj toBSON() const;
-    bool parseBSON(const BSONObj& source, std::string* errMsg);
-    void clear();
-    std::string toString() const;
-
-    //
-    // individual field accessors
-    //
-
-    void setErrCode(ErrorCodes::Error code);
-    ErrorCodes::Error getErrCode() const;
-
-    void setErrInfo(const BSONObj& errInfo);
-    bool isErrInfoSet() const;
-    const BSONObj& getErrInfo() const;
-
-    void setErrMessage(StringData errMessage);
-    bool isErrMessageSet() const;
-    const std::string& getErrMessage() const;
-
-private:
-    // Convention: (M)andatory, (O)ptional
-
-    // (M)  error code for the write concern error.
-    ErrorCodes::Error _errCode;
-    bool _isErrCodeSet;
-
-    // (O)  further details about the write concern error.
-    BSONObj _errInfo;
-    bool _isErrInfoSet;
-
-    // (O)  user readable explanation about the write concern error.
-    std::string _errMessage;
-    bool _isErrMessageSet;
-};
-
+void appendWriteConcernErrorToCmdResponse(const std::string& shardID,
+                                          const BSONElement& wcErrorElem,
+                                          BSONObjBuilder& responseBuilder);
 }  // namespace mongo

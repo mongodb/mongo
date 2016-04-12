@@ -581,10 +581,17 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
         ScopedDbConnection conn(shard->getConnString(), 30.0);
         BSONObj res;
         if (!conn->dropDatabase(_name, txn->getWriteConcern(), &res)) {
-            errmsg = res.toString();
+            errmsg = res.toString() + " at " + _primaryId;
             return 0;
         }
         conn.done();
+        if (auto wcErrorElem = res["writeConcernError"]) {
+            auto wcError = wcErrorElem.Obj();
+            if (auto errMsgElem = wcError["errmsg"]) {
+                errmsg = errMsgElem.str() + " at " + _primaryId;
+                return false;
+            }
+        }
     }
 
     // 4
@@ -597,10 +604,17 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
         ScopedDbConnection conn(shard->getConnString(), 30.0);
         BSONObj res;
         if (!conn->dropDatabase(_name, txn->getWriteConcern(), &res)) {
-            errmsg = res.toString();
+            errmsg = res.toString() + " at " + shardId;
             return 0;
         }
         conn.done();
+        if (auto wcErrorElem = res["writeConcernError"]) {
+            auto wcError = wcErrorElem.Obj();
+            if (auto errMsgElem = wcError["errmsg"]) {
+                errmsg = errMsgElem.str() + " at " + shardId;
+                return false;
+            }
+        }
     }
 
     LOG(1) << "\t dropped primary db for: " << _name;

@@ -499,10 +499,11 @@ Status CatalogManagerReplicaSet::dropCollection(OperationContext* txn, const Nam
             shardEntry.getName(),
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             ns.db().toString(),
-            BSON("drop" << ns.coll()));
+            BSON("drop" << ns.coll() << "writeConcern" << txn->getWriteConcern().toBSON()));
 
         if (!dropResult.isOK()) {
-            return dropResult.getStatus();
+            return Status(dropResult.getStatus().code(),
+                          dropResult.getStatus().reason() + " at " + shardEntry.getName());
         }
 
         auto dropStatus = getStatusFromCommandResult(dropResult.getValue());

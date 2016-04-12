@@ -38,6 +38,7 @@
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/catalog/catalog_cache.h"
+#include "mongo/s/commands/sharded_command_processing.h"
 #include "mongo/s/config.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/cluster_explain.h"
@@ -45,6 +46,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/strategy.h"
+#include "mongo/s/write_ops/wc_error_detail.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -228,7 +230,13 @@ private:
             throw RecvStaleConfigException("FindAndModify", res);
         }
 
-        result.appendElements(res);
+        // First append the properly constructed writeConcernError. It will then be skipped
+        // in appendElementsUnique.
+        if (auto wcErrorElem = res["writeConcernError"]) {
+            appendWriteConcernErrorToCmdResponse(shardId, wcErrorElem, result);
+        }
+
+        result.appendElementsUnique(res);
         return ok;
     }
 

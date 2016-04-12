@@ -26,68 +26,25 @@
  *    then also delete it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include <string>
+#include "mongo/s/commands/sharded_command_processing.h"
 
-#include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/s/write_ops/wc_error_detail.h"
 
 namespace mongo {
 
-/**
- * This class represents the layout and content of the error that occurs while trying
- * to satisfy the write concern after executing runCommand.
- */
-class WCErrorDetail {
-    MONGO_DISALLOW_COPYING(WCErrorDetail);
-
-public:
-    WCErrorDetail();
-
-    /** Copies all the fields present in 'this' to 'other'. */
-    void cloneTo(WCErrorDetail* other) const;
-
-    //
-    // bson serializable interface implementation
-    //
-
-    bool isValid(std::string* errMsg) const;
-    BSONObj toBSON() const;
-    bool parseBSON(const BSONObj& source, std::string* errMsg);
-    void clear();
-    std::string toString() const;
-
-    //
-    // individual field accessors
-    //
-
-    void setErrCode(ErrorCodes::Error code);
-    ErrorCodes::Error getErrCode() const;
-
-    void setErrInfo(const BSONObj& errInfo);
-    bool isErrInfoSet() const;
-    const BSONObj& getErrInfo() const;
-
-    void setErrMessage(StringData errMessage);
-    bool isErrMessageSet() const;
-    const std::string& getErrMessage() const;
-
-private:
-    // Convention: (M)andatory, (O)ptional
-
-    // (M)  error code for the write concern error.
-    ErrorCodes::Error _errCode;
-    bool _isErrCodeSet;
-
-    // (O)  further details about the write concern error.
-    BSONObj _errInfo;
-    bool _isErrInfoSet;
-
-    // (O)  user readable explanation about the write concern error.
-    std::string _errMessage;
-    bool _isErrMessageSet;
-};
-
+void appendWriteConcernErrorToCmdResponse(const std::string& shardID,
+                                          const BSONElement& wcErrorElem,
+                                          BSONObjBuilder& responseBuilder) {
+    WCErrorDetail wcError;
+    std::string errMsg;
+    auto wcErrorObj = wcErrorElem.Obj();
+    if (!wcError.parseBSON(wcErrorObj, &errMsg)) {
+        wcError.setErrMessage("Failed to parse writeConcernError: " + wcErrorObj.toString() +
+                              ", Received error: " + errMsg);
+    }
+    wcError.setErrMessage(wcError.getErrMessage() + " at " + shardID);
+    responseBuilder.append("writeConcernError", wcError.toBSON());
+}
 }  // namespace mongo

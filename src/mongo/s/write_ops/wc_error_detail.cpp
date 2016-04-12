@@ -176,5 +176,4 @@ const string& WCErrorDetail::getErrMessage() const {
     dassert(_isErrMessageSet);
     return _errMessage;
 }
-
 }  // namespace mongo

@@ -163,6 +163,12 @@ const ShardRegistry::ErrorCodesSet ShardRegistry::kAllRetriableErrors{
     ErrorCodes::NetworkTimeout,
     ErrorCodes::InterruptedDueToReplStateChange};
 
+const ShardRegistry::ErrorCodesSet ShardRegistry::kWriteConcernErrors{
+    ErrorCodes::WriteConcernFailed,
+    ErrorCodes::WriteConcernLegacyOK,
+    ErrorCodes::UnknownReplWriteConcern,
+    ErrorCodes::CannotSatisfyWriteConcern};
+
 ShardRegistry::ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory,
                              std::unique_ptr<executor::TaskExecutorPool> executorPool,
                              executor::NetworkInterface* network,

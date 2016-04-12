@@ -46,9 +46,11 @@
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/commands/sharded_command_processing.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/set_shard_version_request.h"
+#include "mongo/s/write_ops/wc_error_detail.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -188,18 +190,24 @@ public:
         // TODO ERH - we need a clone command which replays operations from clone start to now
         //            can just use local.oplog.$main
         BSONObj cloneRes;
-        bool worked = toconn->runCommand(dbname.c_str(),
-                                         BSON("clone" << fromShard->getConnString().toString()
-                                                      << "collsToIgnore" << barr.arr()
-                                                      << bypassDocumentValidationCommandOption()
-                                                      << true << "_checkForCatalogChange" << true),
-                                         cloneRes);
+        bool worked = toconn->runCommand(
+            dbname.c_str(),
+            BSON("clone" << fromShard->getConnString().toString() << "collsToIgnore" << barr.arr()
+                         << bypassDocumentValidationCommandOption() << true
+                         << "_checkForCatalogChange" << true << "writeConcern"
+                         << txn->getWriteConcern().toBSON()),
+            cloneRes);
         toconn.done();
 
         if (!worked) {
             log() << "clone failed" << cloneRes;
             errmsg = "clone failed";
             return false;
+        }
+        bool hasWCError = false;
+        if (auto wcErrorElem = cloneRes["writeConcernError"]) {
+            appendWriteConcernErrorToCmdResponse(toShard->getId(), wcErrorElem, result);
+            hasWCError = true;
         }
 
         const string oldPrimary = fromShard->getConnString().toString();
@@ -215,7 +223,15 @@ public:
                   << ", no sharded collections in " << dbname;
 
             try {
-                fromconn->dropDatabase(dbname.c_str());
+                BSONObj dropDBInfo;
+                fromconn->dropDatabase(dbname.c_str(), txn->getWriteConcern(), &dropDBInfo);
+                if (!hasWCError) {
+                    if (auto wcErrorElem = dropDBInfo["writeConcernError"]) {
+                        appendWriteConcernErrorToCmdResponse(
+                            fromShard->getId(), wcErrorElem, result);
+                        hasWCError = true;
+                    }
+                }
             } catch (DBException& e) {
                 e.addContext(str::stream() << "movePrimary could not drop the database " << dbname
                                            << " on " << oldPrimary);
@@ -239,7 +255,17 @@ public:
                     try {
                         log() << "movePrimary dropping cloned collection " << el.String() << " on "
                               << oldPrimary;
-                        fromconn->dropCollection(el.String());
+                        BSONObj dropCollInfo;
+                        fromconn->dropCollection(
+                            el.String(), txn->getWriteConcern(), &dropCollInfo);
+                        if (!hasWCError) {
+                            if (auto wcErrorElem = dropCollInfo["writeConcernError"]) {
+                                appendWriteConcernErrorToCmdResponse(
+                                    fromShard->getId(), wcErrorElem, result);
+                                hasWCError = true;
+                            }
+                        }
+
                     } catch (DBException& e) {
                         e.addContext(str::stream()
                                      << "movePrimary could not drop the cloned collection "

@@ -72,7 +72,6 @@ public:
         return true;
     }
 
-
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         // This is required to be true to support moveChunk.
         return true;
@@ -199,7 +198,6 @@ public:
     virtual bool adminOnly() const {
         return true;
     }
-
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

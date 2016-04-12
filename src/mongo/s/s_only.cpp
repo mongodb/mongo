@@ -40,6 +40,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/request_interface.h"
@@ -119,6 +120,27 @@ void Command::execCommandClientBasic(OperationContext* txn,
 
     if (c->shouldAffectCommandCounter()) {
         globalOpCounters.gotCommand();
+    }
+
+    StatusWith<WriteConcernOptions> wcResult =
+        WriteConcernOptions::extractWCFromCommand(cmdObj, dbname);
+    if (!wcResult.isOK()) {
+        appendCommandStatus(result, wcResult.getStatus());
+        return;
+    }
+
+    bool supportsWriteConcern = c->supportsWriteConcern(cmdObj);
+    if (!supportsWriteConcern && !wcResult.getValue().usedDefault) {
+        // This command doesn't do writes so it should not be passed a writeConcern.
+        // If we did not use the default writeConcern, one was provided when it shouldn't have
+        // been by the user.
+        appendCommandStatus(
+            result, Status(ErrorCodes::InvalidOptions, "Command does not support writeConcern"));
+        return;
+    }
+
+    if (supportsWriteConcern) {
+        txn->setWriteConcern(wcResult.getValue());
     }
 
     std::string errmsg;
