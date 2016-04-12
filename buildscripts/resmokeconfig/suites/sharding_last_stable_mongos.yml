@@ -11,6 +11,8 @@ selector:
     # v3.4 changes $in shard key extraction.
     - jstests/sharding/upsert_sharded.js
     - jstests/sharding/update_sharded.js
+    # validate() format changes. See SERVER-22588.
+    - jstests/sharding/validate_collection.js
 
 executor:
   js_test:
