@@ -11,6 +11,7 @@ pcreSuffix = "-8.38"
 mozjsSuffix = '-38'
 yamlSuffix = '-0.5.3'
 icuSuffix = '-57.1'
+gperftoolsSuffix = '-2.5'
 
 thirdPartyIncludePathList = [
     ('s2', '#/src/third_party/s2'),
@@ -19,7 +20,7 @@ thirdPartyIncludePathList = [
 
 if not use_system_version_of_library('tcmalloc'):
     thirdPartyIncludePathList.append(
-        ('gperftools', '#/src/third_party/gperftools-2.2/src'))
+        ('gperftools', '#/src/third_party/gperftools' + gperftoolsSuffix + '/src'))
 
 if not use_system_version_of_library('pcre'):
     thirdPartyIncludePathList.append(
@@ -233,10 +234,10 @@ if (gperftoolsEnv['MONGO_ALLOCATOR'] == "tcmalloc"):
         gperftoolsEnv = env.Clone()
         gperftoolsEnv.InjectThirdPartyIncludePaths(libraries=['gperftools'])
         gperftoolsEnv.InjectMongoIncludePaths()
-        gperftoolsEnv.SConscript('gperftools-2.2/SConscript', exports={ 'env' : gperftoolsEnv })
+        gperftoolsEnv.SConscript('gperftools' + gperftoolsSuffix + '/SConscript', exports={ 'env' : gperftoolsEnv })
         gperftoolsEnv = gperftoolsEnv.Clone(
             LIBDEPS=[
-                'gperftools-2.2/tcmalloc_minimal',
+                'gperftools' + gperftoolsSuffix + '/tcmalloc_minimal',
             ])
 
 gperftoolsEnv.Library(

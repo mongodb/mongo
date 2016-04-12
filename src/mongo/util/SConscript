@@ -343,7 +343,7 @@ if has_option('use-cpu-profiler'):
 
     if not use_system_version_of_library('tcmalloc'):
         quick_exit_env.InjectThirdPartyIncludePaths(
-            'tcmalloc'
+            'gperftools'
         )
 
 quick_exit_env.Library(
