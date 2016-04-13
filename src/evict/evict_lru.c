@@ -906,7 +906,7 @@ __evict_lru_pages(WT_SESSION_IMPL *session, bool is_server)
 	 * eviction workers are not keeping up with the work. In that case,
 	 * the ratio will be high and the eviction server will help evict.
 	 */
-	if(is_server && S2C(session)->evict_workers > 1)
+	if (is_server && S2C(session)->evict_workers > 1)
 	{
 		double ratio, rand;
 		double q_empty, q_not_empty;
@@ -915,14 +915,14 @@ __evict_lru_pages(WT_SESSION_IMPL *session, bool is_server)
 				       cache_eviction_queue_empty);
 		q_not_empty = (double) WT_STAT_READ(S2C(session)->stats,
 				       cache_eviction_queue_not_empty);
-		if(q_empty == 0)
+		if (q_empty == 0)
 			ratio = 1;
 		else
 			ratio = q_not_empty / q_empty;
 
 		rand = (double)((__wt_random(&session->rnd) % 100))/100;
 
-		if(rand > ratio) {
+		if (rand > ratio) {
 			WT_STAT_FAST_CONN_INCR(
 				session,
 				cache_eviction_server_not_evicting);
