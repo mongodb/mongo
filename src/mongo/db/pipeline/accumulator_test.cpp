@@ -251,10 +251,10 @@ TEST(Accumulators, Sum) {
           Value(static_cast<long long>(numeric_limits<int>::max()) + 1.0)},
          // An int and a long overflow.
          {{Value(1), Value(numeric_limits<long long>::max())},
-          Value(numeric_limits<long long>::max() + 1)},
+          Value(numeric_limits<long long>::min())},
          // Two longs overflow.
          {{Value(numeric_limits<long long>::max()), Value(numeric_limits<long long>::max())},
-          Value(numeric_limits<long long>::max() + numeric_limits<long long>::max())},
+          Value(-2LL)},
          // A long and a double do not trigger a long overflow.
          {{Value(numeric_limits<long long>::max()), Value(1.0)},
           Value(numeric_limits<long long>::max() + 1.0)},
