@@ -53,27 +53,24 @@ check_copy(void)
 
 /*
  * copy_file --
- *	Copy a single file into the backup directory.
+ *	Copy a single file into the backup directories.
  */
 static void
-copy_file(const char *name)
+copy_file(WT_SESSION *session, const char *name)
 {
 	size_t len;
-	char *cmd;
+	char *to;
 
-	len = strlen(g.home) + strlen(g.home_backup) + strlen(name) * 2 + 20;
-	cmd = dmalloc(len);
-	(void)snprintf(cmd, len,
-	    "cp %s/%s %s/%s", g.home, name, g.home_backup, name);
-	testutil_checkfmt(system(cmd), "backup copy: %s", cmd);
-	free(cmd);
+	len = strlen("BACKUP") + strlen(name) + 10;
+	to = dmalloc(len);
 
-	len = strlen(g.home) + strlen(g.home_backup2) + strlen(name) * 2 + 20;
-	cmd = dmalloc(len);
-	(void)snprintf(cmd, len,
-	    "cp %s/%s %s/%s", g.home, name, g.home_backup2, name);
-	testutil_checkfmt(system(cmd), "backup copy: %s", cmd);
-	free(cmd);
+	(void)snprintf(to, len, "BACKUP/%s", name);
+	testutil_check(__wt_copy_and_sync(session, name, to));
+
+	(void)snprintf(to, len, "BACKUP_COPY/%s", name);
+	testutil_check(__wt_copy_and_sync(session, name, to));
+
+	free(to);
 }
 
 /*
@@ -111,11 +108,13 @@ backup(void *arg)
 			--period;
 			sleep(1);
 		}
-		if (g.workers_finished)
-			break;
 
 		/* Lock out named checkpoints */
 		testutil_check(pthread_rwlock_wrlock(&g.backup_lock));
+		if (g.workers_finished) {
+			testutil_check(pthread_rwlock_unlock(&g.backup_lock));
+			break;
+		}
 
 		/* Re-create the backup directory. */
 		testutil_checkfmt(
@@ -135,8 +134,10 @@ backup(void *arg)
 		while ((ret = backup_cursor->next(backup_cursor)) == 0) {
 			testutil_check(
 			    backup_cursor->get_key(backup_cursor, &key));
-			copy_file(key);
+			copy_file(session, key);
 		}
+		if (ret != WT_NOTFOUND)
+			testutil_die(ret, "backup-cursor");
 
 		testutil_check(backup_cursor->close(backup_cursor));
 		testutil_check(pthread_rwlock_unlock(&g.backup_lock));

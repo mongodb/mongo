@@ -333,15 +333,6 @@ path_setup(const char *home)
 	g.home_stats = dmalloc(len);
 	snprintf(g.home_stats, len, "%s/%s", g.home, "stats");
 
-	/* Backup directory. */
-	len = strlen(g.home) + strlen("BACKUP") + 2;
-	g.home_backup = dmalloc(len);
-	snprintf(g.home_backup, len, "%s/%s", g.home, "BACKUP");
-
-	len = strlen(g.home) + strlen("BACKUP2") + 2;
-	g.home_backup2 = dmalloc(len);
-	snprintf(g.home_backup2, len, "%s/%s", g.home, "BACKUP2");
-
 	/* BDB directory. */
 	len = strlen(g.home) + strlen("bdb") + 2;
 	g.home_bdb = dmalloc(len);
@@ -369,18 +360,27 @@ path_setup(const char *home)
 	g.home_init = dmalloc(len);
 	snprintf(g.home_init, len, CMD, g.home, g.home, g.home);
 
-	/* Backup directory initialize command, remove and re-create it. */
+	/* Primary backup directory. */
+	len = strlen(g.home) + strlen("BACKUP") + 2;
+	g.home_backup = dmalloc(len);
+	snprintf(g.home_backup, len, "%s/%s", g.home, "BACKUP");
+
+	/*
+	 * Backup directory initialize command, remove and re-create the primary
+	 * backup directory, plus a copy we maintain for recovery testing.
+	 */
 #undef	CMD
 #ifdef _WIN32
-#define	CMD	"del /s /q >:nul && mkdir %s %s"
+#define	CMD	"del %s/%s %s/%s /s /q >:nul && mkdir %s/%s %s/%s"
 #else
-#define	CMD	"rm -rf %s %s && mkdir %s %s"
+#define	CMD	"rm -rf %s/%s %s/%s && mkdir %s/%s %s/%s"
 #endif
-	len = strlen(g.home_backup) * 2 +
-	    strlen(g.home_backup2) * 2 + strlen(CMD) + 1;
+	len = strlen(g.home) * 4 +
+	    strlen("BACKUP") * 2 + strlen("BACKUP_COPY") * 2 + strlen(CMD) + 1;
 	g.home_backup_init = dmalloc(len);
-	snprintf(g.home_backup_init, len, CMD, g.home_backup, g.home_backup2,
-	    g.home_backup, g.home_backup2);
+	snprintf(g.home_backup_init, len, CMD,
+	    g.home, "BACKUP", g.home, "BACKUP_COPY",
+	    g.home, "BACKUP", g.home, "BACKUP_COPY");
 
 	/*
 	 * Salvage command, save the interesting files so we can replay the
