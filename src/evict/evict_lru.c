@@ -899,34 +899,30 @@ __evict_lru_pages(WT_SESSION_IMPL *session, bool is_server)
 {
 	WT_DECL_RET;
 
-	/* If this is the server, compute the ratio of occurrences
-	 * when the eviction queue is not empty vs when it is empty.
-	 * The probability of the eviction server evicting is proportional
-	 * to that ratio. If the queue is often not empty, it is a sign that
-	 * eviction workers are not keeping up with the work. In that case,
-	 * the ratio will be high and the eviction server will help evict.
+	/*
+	 * If this is the server, compute the ratio of occurrences when the
+	 * eviction queue is not empty vs when it is empty.  The probability of
+	 * the eviction server evicting is proportional to that ratio.  If the
+	 * queue is often not empty, it is a sign that eviction workers are not
+	 * keeping up with the work.  In that case, the ratio will be high and
+	 * the eviction server will help evict.
 	 */
 	if (is_server && S2C(session)->evict_workers > 1)
 	{
-		double ratio, rand;
-		double q_empty, q_not_empty;
+		int64_t ratio, q_empty, q_not_empty;
 
-		q_empty = (double) WT_STAT_READ(S2C(session)->stats,
-				       cache_eviction_queue_empty);
-		q_not_empty = (double) WT_STAT_READ(S2C(session)->stats,
-				       cache_eviction_queue_not_empty);
-		if (q_empty == 0)
-			ratio = 1;
-		else
-			ratio = q_not_empty / q_empty;
+		q_empty = WT_STAT_READ(S2C(session)->stats,
+		    cache_eviction_queue_empty);
+		q_not_empty = WT_STAT_READ(S2C(session)->stats,
+		    cache_eviction_queue_not_empty);
 
-		rand = (double)((__wt_random(&session->rnd) % 100))/100;
+		ratio = (100 * q_not_empty) / (q_empty + q_not_empty + 1);
 
-		if (rand > ratio) {
+		if (__wt_random(&session->rnd) % 100 > ratio) {
 			WT_STAT_FAST_CONN_INCR(
 				session,
 				cache_eviction_server_not_evicting);
-			return (ret);
+			return (0);
 		}
 	}
 	/*
