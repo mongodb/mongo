@@ -46,9 +46,9 @@ Status WiredTigerGlobalOptions::add(moe::OptionSection* options) {
     // WiredTiger storage engine options
     wiredTigerOptions.addOptionChaining("storage.wiredTiger.engineConfig.cacheSizeGB",
                                         "wiredTigerCacheSizeGB",
-                                        moe::Int,
+                                        moe::Double,
                                         "maximum amount of memory to allocate for cache; "
-                                        "defaults to 1/2 of physical RAM").validRange(1, 10000);
+                                        "defaults to 1/2 of physical RAM");
     wiredTigerOptions.addOptionChaining(
                           "storage.wiredTiger.engineConfig.statisticsLogDelaySecs",
                           "wiredTigerStatisticsLogDelaySecs",
@@ -107,7 +107,7 @@ Status WiredTigerGlobalOptions::store(const moe::Environment& params,
     // WiredTiger storage engine options
     if (params.count("storage.wiredTiger.engineConfig.cacheSizeGB")) {
         wiredTigerGlobalOptions.cacheSizeGB =
-            params["storage.wiredTiger.engineConfig.cacheSizeGB"].as<int>();
+            params["storage.wiredTiger.engineConfig.cacheSizeGB"].as<double>();
     }
     if (params.count("storage.syncPeriodSecs")) {
         wiredTigerGlobalOptions.checkpointDelaySecs =

@@ -318,8 +318,9 @@ int64_t WiredTigerUtil::getIdentSize(WT_SESSION* s, const std::string& uri) {
     return result.getValue();
 }
 
-size_t WiredTigerUtil::getCacheSizeMB(int requestedCacheSizeGB) {
+size_t WiredTigerUtil::getCacheSizeMB(double requestedCacheSizeGB) {
     double cacheSizeMB;
+    const double kMaxSizeCacheMB = 10 * 1000 * 1000;
     if (requestedCacheSizeGB == 0) {
         // Choose a reasonable amount of cache when not explicitly specified by user.
         // Set a minimum of 256MB, otherwise use 50% of available memory over 1GB.
@@ -328,6 +329,11 @@ size_t WiredTigerUtil::getCacheSizeMB(int requestedCacheSizeGB) {
         cacheSizeMB = std::max((memSizeMB - 1024) * 0.5, 256.0);
     } else {
         cacheSizeMB = 1024 * requestedCacheSizeGB;
+    }
+    if (cacheSizeMB > kMaxSizeCacheMB) {
+        log() << "Requested cache size: " << cacheSizeMB << "MB exceeds max; setting to "
+              << kMaxSizeCacheMB << "MB";
+        cacheSizeMB = kMaxSizeCacheMB;
     }
     return static_cast<size_t>(cacheSizeMB);
 }

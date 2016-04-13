@@ -180,7 +180,7 @@ public:
      * Return amount of memory to use for the WiredTiger cache based on either the startup
      * option chosen or the amount of available memory on the host.
      */
-    static size_t getCacheSizeMB(int requestedCacheSizeGB);
+    static size_t getCacheSizeMB(double requestedCacheSizeGB);
 
     /**
      * Returns a WT_EVENT_HANDER with MongoDB's default handlers.
