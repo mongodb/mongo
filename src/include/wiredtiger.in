@@ -3788,7 +3788,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CACHE_EVICTION_QUEUE_NOT_EMPTY	1039
 /*! cache: eviction server evicting pages */
 #define	WT_STAT_CONN_CACHE_EVICTION_SERVER_EVICTING	1040
-/*! cache: eviction server not evicting pages */
+/*! cache: eviction server populating queue, but not evicting pages */
 #define	WT_STAT_CONN_CACHE_EVICTION_SERVER_NOT_EVICTING	1041
 /*! cache: eviction server skipped very large page */
 #define	WT_STAT_CONN_CACHE_EVICTION_SERVER_TOOBIG	1042

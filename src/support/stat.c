@@ -550,7 +550,7 @@ static const char * const __stats_connection_desc[] = {
 	"cache: eviction server candidate queue empty when topping up",
 	"cache: eviction server candidate queue not empty when topping up",
 	"cache: eviction server evicting pages",
-	"cache: eviction server not evicting pages",
+	"cache: eviction server populating queue, but not evicting pages",
 	"cache: eviction server skipped very large page",
 	"cache: eviction server unable to reach eviction goal",
 	"cache: eviction worker thread evicting pages",
