@@ -242,8 +242,13 @@ TEST(KeyStringTest, LotsOfNumbers1) {
         ROUNDTRIP(BSON("" << (static_cast<double>(x) + 1)));
         ROUNDTRIP(BSON("" << (static_cast<double>(x) + 1.1)));
 
-        ROUNDTRIP(BSON("" << -static_cast<long long>(x)));
-        ROUNDTRIP(BSON("" << -static_cast<int>(x)));
+        // Avoid negating signed integral minima
+        if (i < 63)
+            ROUNDTRIP(BSON("" << -static_cast<long long>(x)));
+
+        if (i < 31)
+            ROUNDTRIP(BSON("" << -static_cast<int>(x)));
+
         ROUNDTRIP(BSON("" << -static_cast<double>(x)));
         ROUNDTRIP(BSON("" << -(static_cast<double>(x) + .1)));
 
@@ -742,8 +747,13 @@ TEST(KeyStringTest, NumberOrderLots) {
             numbers.push_back(BSON("" << (static_cast<double>(x) + 1)));
             numbers.push_back(BSON("" << (static_cast<double>(x) + 1.1)));
 
-            numbers.push_back(BSON("" << -static_cast<long long>(x)));
-            numbers.push_back(BSON("" << -static_cast<int>(x)));
+            // Avoid negating signed integral minima
+            if (i < 63)
+                numbers.push_back(BSON("" << -static_cast<long long>(x)));
+
+            if (i < 31)
+                numbers.push_back(BSON("" << -static_cast<int>(x)));
+
             numbers.push_back(BSON("" << -static_cast<double>(x)));
             numbers.push_back(BSON("" << -(static_cast<double>(x) + .1)));
 
