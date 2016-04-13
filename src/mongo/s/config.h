@@ -236,8 +236,6 @@ protected:
 
 class ConfigServer {
 public:
-    static void reloadSettings(OperationContext* txn);
-
     /**
      * For use in mongos and mongod which needs notifications about changes to shard and config
      * server replset membership to update the ShardRegistry.

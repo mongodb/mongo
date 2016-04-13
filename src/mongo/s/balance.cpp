@@ -46,6 +46,7 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/balancer/cluster_statistics_impl.h"
 #include "mongo/s/balancer_policy.h"
 #include "mongo/s/catalog/catalog_cache.h"
@@ -53,7 +54,6 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_mongos.h"
-#include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_manager.h"
@@ -203,29 +203,19 @@ void Balancer::run() {
                 balanceRoundInterval = Seconds(data["sleepSecs"].numberInt());
             }
 
-            BSONObj balancerResult;
+            // Use fresh shard state and balancer settings
+            Grid::get(txn.get())->shardRegistry()->reload(txn.get());
 
-            // use fresh shard state
-            grid.shardRegistry()->reload(txn.get());
-
-            // refresh chunk size (even though another balancer might be active)
-            Chunk::refreshChunkSize(txn.get());
-
-            auto balSettingsResult = grid.catalogManager(txn.get())->getGlobalSettings(
-                txn.get(), SettingsType::BalancerDocKey);
-            const bool isBalSettingsAbsent =
-                balSettingsResult.getStatus() == ErrorCodes::NoMatchingDocument;
-            if (!balSettingsResult.isOK() && !isBalSettingsAbsent) {
-                warning() << balSettingsResult.getStatus();
-                return;
+            auto balancerConfig = Grid::get(txn.get())->getBalancerConfiguration();
+            Status refreshStatus = balancerConfig->refreshAndCheck(txn.get());
+            if (!refreshStatus.isOK()) {
+                warning() << "Skipping balancing round" << causedBy(refreshStatus);
+                sleepFor(balanceRoundInterval);
+                continue;
             }
 
-            const SettingsType& balancerConfig =
-                isBalSettingsAbsent ? SettingsType{} : balSettingsResult.getValue();
-
             // now make sure we should even be running
-            if ((!isBalSettingsAbsent && !Chunk::shouldBalance(balancerConfig)) ||
-                MONGO_FAIL_POINT(skipBalanceRound)) {
+            if (!balancerConfig->isBalancerActive() || MONGO_FAIL_POINT(skipBalanceRound)) {
                 LOG(1) << "skipping balancing round because balancing is disabled";
 
                 // Ping again so scripts can determine if we're active without waiting
@@ -254,22 +244,10 @@ void Balancer::run() {
                     continue;
                 }
 
-                const bool waitForDelete =
-                    (balancerConfig.isWaitForDeleteSet() ? balancerConfig.getWaitForDelete()
-                                                         : false);
-
-                MigrationSecondaryThrottleOptions secondaryThrottle(
-                    MigrationSecondaryThrottleOptions::create(
-                        MigrationSecondaryThrottleOptions::kDefault));
-                if (balancerConfig.isKeySet()) {
-                    secondaryThrottle =
-                        uassertStatusOK(MigrationSecondaryThrottleOptions::createFromBalancerConfig(
-                            balancerConfig.toBSON()));
-                }
-
                 LOG(1) << "*** start balancing round. "
-                       << "waitForDelete: " << waitForDelete
-                       << ", secondaryThrottle: " << secondaryThrottle.toBSON();
+                       << "waitForDelete: " << balancerConfig->waitForDelete()
+                       << ", secondaryThrottle: "
+                       << balancerConfig->getSecondaryThrottle().toBSON();
 
                 const auto candidateChunks = uassertStatusOK(_getCandidateChunks(txn.get()));
 
@@ -277,8 +255,10 @@ void Balancer::run() {
                     LOG(1) << "no need to move any chunk";
                     _balancedLastTime = 0;
                 } else {
-                    _balancedLastTime =
-                        _moveChunks(txn.get(), candidateChunks, secondaryThrottle, waitForDelete);
+                    _balancedLastTime = _moveChunks(txn.get(),
+                                                    candidateChunks,
+                                                    balancerConfig->getSecondaryThrottle(),
+                                                    balancerConfig->waitForDelete());
 
                     roundDetails.setSucceeded(static_cast<int>(candidateChunks.size()),
                                               _balancedLastTime);
@@ -563,21 +543,7 @@ int Balancer::_moveChunks(OperationContext* txn,
     for (const auto& migrateInfo : candidateChunks) {
         // If the balancer was disabled since we started this round, don't start new chunks
         // moves.
-        const auto balSettingsResult =
-            grid.catalogManager(txn)->getGlobalSettings(txn, SettingsType::BalancerDocKey);
-
-        const bool isBalSettingsAbsent =
-            balSettingsResult.getStatus() == ErrorCodes::NoMatchingDocument;
-
-        if (!balSettingsResult.isOK() && !isBalSettingsAbsent) {
-            warning() << balSettingsResult.getStatus();
-            return movedCount;
-        }
-
-        const SettingsType& balancerConfig =
-            isBalSettingsAbsent ? SettingsType{} : balSettingsResult.getValue();
-
-        if ((!isBalSettingsAbsent && !Chunk::shouldBalance(balancerConfig)) ||
+        if (!Grid::get(txn)->getBalancerConfiguration()->isBalancerActive() ||
             MONGO_FAIL_POINT(skipBalanceRound)) {
             LOG(1) << "Stopping balancing round early as balancing was disabled";
             return movedCount;
@@ -630,7 +596,7 @@ int Balancer::_moveChunks(OperationContext* txn,
             BSONObj res;
             if (c->moveAndCommit(txn,
                                  migrateInfo.to,
-                                 Chunk::MaxChunkSize,
+                                 Grid::get(txn)->getBalancerConfiguration()->getMaxChunkSizeBytes(),
                                  secondaryThrottle,
                                  waitForDelete,
                                  0, /* maxTimeMS */

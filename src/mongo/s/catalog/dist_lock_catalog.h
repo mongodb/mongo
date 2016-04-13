@@ -163,4 +163,5 @@ public:
      */
     virtual Status stopPing(OperationContext* txn, StringData processId) = 0;
 };
-}
+
+}  // namespace mongo

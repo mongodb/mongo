@@ -37,16 +37,13 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_database.h"
-#include "mongo/s/catalog/type_lockpings.h"
-#include "mongo/s/catalog/type_locks.h"
-#include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
@@ -265,7 +262,7 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManagerIfExists(OperationContext
         return getChunkManager(txn, ns, shouldReload, forceReload);
     } catch (AssertionException& e) {
         warning() << "chunk manager not found for " << ns << causedBy(e);
-        return ChunkManagerPtr();
+        return nullptr;
     }
 }
 
@@ -275,7 +272,7 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
                                                         bool forceReload) {
     BSONObj key;
     ChunkVersion oldVersion;
-    ChunkManagerPtr oldManager;
+    std::shared_ptr<ChunkManager> oldManager;
 
     const auto currentReloadIteration = _reloadCount.load();
 
@@ -695,87 +692,6 @@ void DBConfig::getAllShardedCollections(set<string>& namespaces) {
 }
 
 /* --- ConfigServer ---- */
-
-void ConfigServer::reloadSettings(OperationContext* txn) {
-    auto catalogManager = grid.catalogManager(txn);
-    auto chunkSizeResult = catalogManager->getGlobalSettings(txn, SettingsType::ChunkSizeDocKey);
-    if (chunkSizeResult.isOK()) {
-        const int csize = chunkSizeResult.getValue().getChunkSizeMB();
-        LOG(1) << "Found MaxChunkSize: " << csize;
-
-        if (!Chunk::setMaxChunkSizeSizeMB(csize)) {
-            warning() << "invalid chunksize: " << csize;
-        }
-    } else if (chunkSizeResult.getStatus() == ErrorCodes::NoMatchingDocument) {
-        const int chunkSize = Chunk::MaxChunkSize / (1024 * 1024);
-        Status result = grid.catalogManager(txn)->insertConfigDocument(
-            txn,
-            SettingsType::ConfigNS,
-            BSON(SettingsType::key(SettingsType::ChunkSizeDocKey)
-                 << SettingsType::chunkSizeMB(chunkSize)));
-        if (!result.isOK()) {
-            warning() << "couldn't set chunkSize on config db" << causedBy(result);
-        }
-    } else {
-        warning() << "couldn't load settings on config db: " << chunkSizeResult.getStatus();
-    }
-
-    // indexes
-    const bool unique = true;
-
-    Status result = clusterCreateIndex(
-        txn, ChunkType::ConfigNS, BSON(ChunkType::ns() << 1 << ChunkType::min() << 1), unique);
-    if (!result.isOK()) {
-        warning() << "couldn't create ns_1_min_1 index on config db" << causedBy(result);
-    }
-
-    result = clusterCreateIndex(
-        txn,
-        ChunkType::ConfigNS,
-        BSON(ChunkType::ns() << 1 << ChunkType::shard() << 1 << ChunkType::min() << 1),
-        unique);
-    if (!result.isOK()) {
-        warning() << "couldn't create ns_1_shard_1_min_1 index on config db" << causedBy(result);
-    }
-
-    result = clusterCreateIndex(txn,
-                                ChunkType::ConfigNS,
-                                BSON(ChunkType::ns() << 1 << ChunkType::DEPRECATED_lastmod() << 1),
-                                unique);
-    if (!result.isOK()) {
-        warning() << "couldn't create ns_1_lastmod_1 index on config db" << causedBy(result);
-    }
-
-    result = clusterCreateIndex(txn, ShardType::ConfigNS, BSON(ShardType::host() << 1), unique);
-    if (!result.isOK()) {
-        warning() << "couldn't create host_1 index on config db" << causedBy(result);
-    }
-
-    result = clusterCreateIndex(txn, LocksType::ConfigNS, BSON(LocksType::lockID() << 1), !unique);
-    if (!result.isOK()) {
-        warning() << "couldn't create lock id index on config db" << causedBy(result);
-    }
-
-    result = clusterCreateIndex(txn,
-                                LocksType::ConfigNS,
-                                BSON(LocksType::state() << 1 << LocksType::process() << 1),
-                                !unique);
-    if (!result.isOK()) {
-        warning() << "couldn't create state and process id index on config db" << causedBy(result);
-    }
-
-    result =
-        clusterCreateIndex(txn, LockpingsType::ConfigNS, BSON(LockpingsType::ping() << 1), !unique);
-    if (!result.isOK()) {
-        warning() << "couldn't create lockping ping time index on config db" << causedBy(result);
-    }
-
-    result = clusterCreateIndex(
-        txn, TagsType::ConfigNS, BSON(TagsType::ns() << 1 << TagsType::min() << 1), unique);
-    if (!result.isOK()) {
-        warning() << "could not create index ns_1_min_1: " << causedBy(result);
-    }
-}
 
 void ConfigServer::replicaSetChangeShardRegistryUpdateHook(const string& setName,
                                                            const string& newConnectionString) {

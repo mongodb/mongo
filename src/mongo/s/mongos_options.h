@@ -31,6 +31,7 @@
 #include "mongo/base/status.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/server_options.h"
+#include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 
@@ -44,9 +45,14 @@ class Environment;
 namespace moe = mongo::optionenvironment;
 
 struct MongosGlobalParams {
+    // The config server connection string
     ConnectionString configdbs;
 
-    MongosGlobalParams() = default;
+    // The max chunk size after which a chunk will be considered jumbo
+    uint64_t maxChunkSizeBytes{BalancerConfiguration::kDefaultMaxChunkSizeBytes};
+
+    // Whether auto-splitting is enabled
+    bool shouldAutoSplit{true};
 };
 
 extern MongosGlobalParams mongosGlobalParams;

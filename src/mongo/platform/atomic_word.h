@@ -160,6 +160,7 @@ _ATOMIC_WORD_DECLARE(AtomicUInt32, unsigned);
 _ATOMIC_WORD_DECLARE(AtomicUInt64, unsigned long long);
 _ATOMIC_WORD_DECLARE(AtomicInt32, int);
 _ATOMIC_WORD_DECLARE(AtomicInt64, long long);
+_ATOMIC_WORD_DECLARE(AtomicBool, bool);
 #undef _ATOMIC_WORD_DECLARE
 
 }  // namespace mongo

@@ -45,6 +45,7 @@
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
+#include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
@@ -132,14 +133,16 @@ void ShardingTestFixture::setUp() {
     auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS));
     executorPool->startup();
 
-    // For now initialize the global grid object. All sharding objects will be accessible
-    // from there until we get rid of it.
-    grid.init(std::move(cm),
-              stdx::make_unique<CatalogCache>(),
-              std::move(shardRegistry),
-              stdx::make_unique<ClusterCursorManager>(_service->getPreciseClockSource()),
-              std::move(executorPool),
-              _mockNetwork);
+    // For now initialize the global grid object. All sharding objects will be accessible from there
+    // until we get rid of it.
+    grid.init(
+        std::move(cm),
+        stdx::make_unique<CatalogCache>(),
+        std::move(shardRegistry),
+        stdx::make_unique<ClusterCursorManager>(_service->getPreciseClockSource()),
+        stdx::make_unique<BalancerConfiguration>(BalancerConfiguration::kDefaultMaxChunkSizeBytes),
+        std::move(executorPool),
+        _mockNetwork);
 }
 
 void ShardingTestFixture::tearDown() {

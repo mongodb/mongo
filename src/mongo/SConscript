@@ -289,18 +289,20 @@ env.Install(
 env.Install(
     '#/',
     env.Program(
-        "mongos",
-        [
-            "s/server.cpp",
-            "s/mongos_options.cpp",
-            "s/mongos_options_init.cpp",
-            "s/client/sharding_connection_hook_for_mongos.cpp",
+        target='mongos',
+        source=[
+            's/client/sharding_connection_hook_for_mongos.cpp',
+            's/mongos_options.cpp',
+            's/mongos_options_init.cpp',
+            's/server.cpp',
+            's/version_mongos.cpp',
         ],
         LIBDEPS=[
             'db/conn_pool_options',
             'db/commands/core',
             'db/mongodandmongos',
             's/client/sharding_connection_hook',
+            's/cluster_ops_impl',
             's/commands/cluster_commands',
             's/commands/shared_cluster_commands',
             's/coreshard',

@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 namespace mongo {
 
 class ConnectionString;
@@ -39,7 +41,8 @@ class Status;
  * CatalogManager, ShardingRegistry, and grid objects.
  */
 Status initializeGlobalShardingStateForMongos(OperationContext* txn,
-                                              const ConnectionString& configCS);
+                                              const ConnectionString& configCS,
+                                              uint64_t maxChunkSizeBytes);
 
 Status initializeGlobalShardingStateForMongod(OperationContext* txn,
                                               const ConnectionString& configCS);

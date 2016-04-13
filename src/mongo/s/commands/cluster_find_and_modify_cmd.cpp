@@ -35,17 +35,19 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/find_and_modify.h"
+#include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/commands/sharded_command_processing.h"
 #include "mongo/s/config.h"
 #include "mongo/s/chunk_manager.h"
-#include "mongo/s/cluster_explain.h"
+#include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/db_util.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/mongos_options.h"
 #include "mongo/s/stale_exception.h"
-#include "mongo/s/strategy.h"
+#include "mongo/s/commands/strategy.h"
 #include "mongo/s/write_ops/wc_error_detail.h"
 #include "mongo/util/timer.h"
 
@@ -87,7 +89,7 @@ public:
                            BSONObjBuilder* out) const {
         const string ns = parseNsCollectionRequired(dbName, cmdObj);
 
-        auto status = grid.catalogCache()->getDatabase(txn, dbName);
+        auto status = Grid::get(txn)->catalogCache()->getDatabase(txn, dbName);
         uassertStatusOK(status);
 
         shared_ptr<DBConfig> conf = status.getValue();
@@ -95,7 +97,7 @@ public:
         shared_ptr<Shard> shard;
 
         if (!conf->isShardingEnabled() || !conf->isSharded(ns)) {
-            shard = grid.shardRegistry()->getShard(txn, conf->getPrimaryId());
+            shard = Grid::get(txn)->shardRegistry()->getShard(txn, conf->getPrimaryId());
         } else {
             chunkMgr = _getChunkManager(txn, conf, ns);
 
@@ -107,9 +109,9 @@ public:
             }
 
             BSONObj shardKey = status.getValue();
-            ChunkPtr chunk = chunkMgr->findIntersectingChunk(txn, shardKey);
+            shared_ptr<Chunk> chunk = chunkMgr->findIntersectingChunk(txn, shardKey);
 
-            shard = grid.shardRegistry()->getShard(txn, chunk->getShardId());
+            shard = Grid::get(txn)->shardRegistry()->getShard(txn, chunk->getShardId());
         }
 
         BSONObjBuilder explainCmd;
@@ -168,12 +170,12 @@ public:
         }
 
         BSONObj shardKey = status.getValue();
-        ChunkPtr chunk = chunkMgr->findIntersectingChunk(txn, shardKey);
+        shared_ptr<Chunk> chunk = chunkMgr->findIntersectingChunk(txn, shardKey);
 
         bool ok = _runCommand(txn, conf, chunkMgr, chunk->getShardId(), ns, cmdObj, result);
         if (ok) {
             // check whether split is necessary (using update object for size heuristic)
-            if (Chunk::ShouldAutoSplit) {
+            if (mongosGlobalParams.shouldAutoSplit) {
                 chunk->splitIfShould(txn, cmdObj.getObjectField("update").objsize());
             }
         }
@@ -219,7 +221,7 @@ private:
                      BSONObjBuilder& result) const {
         BSONObj res;
 
-        const auto shard = grid.shardRegistry()->getShard(txn, shardId);
+        const auto shard = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
         ShardConnection conn(shard->getConnString(), ns, chunkManager);
         bool ok = conn->runCommand(conf->name(), cmdObj, res);
         conn.done();

@@ -39,10 +39,10 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/mr.h"
+#include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/client/shard_connection.h"
-#include "mongo/s/chunk.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/commands/sharded_command_processing.h"
@@ -51,7 +51,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/db_util.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/strategy.h"
+#include "mongo/s/commands/strategy.h"
 #include "mongo/s/write_ops/wc_error_detail.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/util/log.h"
@@ -166,7 +166,6 @@ public:
         return false;
     }
 
-
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return mr::mrSupportsWriteConcern(cmd);
     }
@@ -262,7 +261,8 @@ public:
             // Will need to figure out chunks, ask shards for points
             maxChunkSizeBytes = cmdObj["maxChunkSizeBytes"].numberLong();
             if (maxChunkSizeBytes == 0) {
-                maxChunkSizeBytes = Chunk::MaxChunkSize;
+                maxChunkSizeBytes =
+                    Grid::get(txn)->getBalancerConfiguration()->getMaxChunkSizeBytes();
             }
 
             // maxChunkSizeBytes is sent as int BSON field
@@ -549,8 +549,7 @@ public:
             }
 
             // Do the splitting round
-            ChunkManagerPtr cm = confOut->getChunkManagerIfExists(txn, outputCollNss.ns());
-
+            shared_ptr<ChunkManager> cm = confOut->getChunkManagerIfExists(txn, outputCollNss.ns());
             uassert(34359,
                     str::stream() << "Failed to write mapreduce output to " << outputCollNss.ns()
                                   << "; expected that collection to be sharded, but it was not",
@@ -562,7 +561,7 @@ public:
                 invariant(size < std::numeric_limits<int>::max());
 
                 // key reported should be the chunk's minimum
-                ChunkPtr c = cm->findIntersectingChunk(txn, key);
+                shared_ptr<Chunk> c = cm->findIntersectingChunk(txn, key);
                 if (!c) {
                     warning() << "Mongod reported " << size << " bytes inserted for key " << key
                               << " but can't find chunk";

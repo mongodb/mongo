@@ -42,7 +42,6 @@
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_helpers.h"
-#include "mongo/s/chunk.h"
 #include "mongo/s/version_mongos.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -211,16 +210,18 @@ Status storeMongosOptions(const moe::Environment& params, const std::vector<std:
     }
 
     if (params.count("sharding.chunkSize")) {
-        int csize = params["sharding.chunkSize"].as<int>();
-
-        // validate chunksize before proceeding
-        if (csize == 0) {
-            return Status(ErrorCodes::BadValue, "error: need a non-zero chunksize");
+        const int maxChunkSizeMB = params["sharding.chunkSize"].as<int>();
+        if (maxChunkSizeMB <= 0) {
+            return Status(ErrorCodes::BadValue, "error: need a positive chunksize");
         }
 
-        if (!Chunk::setMaxChunkSizeSizeMB(csize)) {
+        const uint64_t maxChunkSizeBytes = maxChunkSizeMB * 1024 * 1024;
+
+        if (!BalancerConfiguration::checkMaxChunkSizeValid(maxChunkSizeBytes)) {
             return Status(ErrorCodes::BadValue, "MaxChunkSize invalid");
         }
+
+        mongosGlobalParams.maxChunkSizeBytes = maxChunkSizeBytes;
     }
 
     if (params.count("net.port")) {
@@ -244,8 +245,8 @@ Status storeMongosOptions(const moe::Environment& params, const std::vector<std:
     }
 
     if (params.count("sharding.autoSplit")) {
-        Chunk::ShouldAutoSplit = params["sharding.autoSplit"].as<bool>();
-        if (Chunk::ShouldAutoSplit == false) {
+        mongosGlobalParams.shouldAutoSplit = params["sharding.autoSplit"].as<bool>();
+        if (!mongosGlobalParams.shouldAutoSplit) {
             warning() << "running with auto-splitting disabled";
         }
     }

@@ -29,17 +29,21 @@
 #pragma once
 
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
 #include "mongo/db/repl/optime.h"
 #include "mongo/s/chunk.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/concurrency/ticketholder.h"
 
 namespace mongo {
 
 class CanonicalQuery;
+class Chunk;
 class ChunkManager;
 class CollectionType;
 struct QuerySolutionNode;
@@ -89,7 +93,6 @@ private:
 };
 
 typedef std::map<BSONObj, std::shared_ptr<ChunkRange>, BSONObjCmp> ChunkRangeMap;
-
 
 class ChunkRangeManager {
 public:
@@ -245,7 +248,7 @@ public:
 
     void _printChunks() const;
 
-    int getCurrentDesiredChunkSize() const;
+    uint64_t getCurrentDesiredChunkSize() const;
 
     std::shared_ptr<ChunkManager> reload(OperationContext* txn,
                                          bool force = true) const;  // doesn't modify self!

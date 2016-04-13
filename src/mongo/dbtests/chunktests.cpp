@@ -56,8 +56,12 @@ public:
             const string shardId = str::stream() << (i - 1);
             _shardIds.insert(shardId);
 
-            std::shared_ptr<Chunk> chunk(
-                new Chunk(this, mySplitPoints[i - 1], mySplitPoints[i], shardId));
+            std::shared_ptr<Chunk> chunk(new Chunk(this,
+                                                   mySplitPoints[i - 1],
+                                                   mySplitPoints[i],
+                                                   shardId,
+                                                   ChunkVersion(0, 0, OID()),
+                                                   0));
             _chunkMap[mySplitPoints[i]] = chunk;
         }
 

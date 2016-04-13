@@ -28,14 +28,13 @@
 
 #pragma once
 
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
 
 namespace mongo {
 
 class ChunkManager;
+class ChunkType;
 class MigrationSecondaryThrottleOptions;
 class OperationContext;
 
@@ -64,12 +63,14 @@ public:
         autoSplitInternal
     };
 
-    Chunk(OperationContext* txn, const ChunkManager* info, const ChunkType& from);
-    Chunk(const ChunkManager* info,
+    Chunk(OperationContext* txn, ChunkManager* manager, const ChunkType& from);
+
+    Chunk(ChunkManager* manager,
           const BSONObj& min,
           const BSONObj& max,
           const ShardId& shardId,
-          ChunkVersion lastmod = ChunkVersion());
+          ChunkVersion lastmod,
+          uint64_t initialDataWritten);
 
     //
     // chunk boundary support
@@ -78,20 +79,10 @@ public:
     const BSONObj& getMin() const {
         return _min;
     }
+
     const BSONObj& getMax() const {
         return _max;
     }
-
-    /**
-    * Returns true if the balancer should be running. Caller is responsible for making sure
-    * settings has the balancer key.
-    */
-    static bool shouldBalance(const SettingsType& balancerSettings);
-
-    /**
-     * Returns true if the config server settings indicate that the balancer should be active.
-     */
-    bool getConfigShouldBalance(OperationContext* txn) const;
 
     // Returns true if this chunk contains the given shard key, and false otherwise
     //
@@ -109,9 +100,6 @@ public:
     ChunkVersion getLastmod() const {
         return _lastmod;
     }
-    void setLastmod(ChunkVersion v) {
-        _lastmod = v;
-    }
 
     //
     // split support
@@ -120,18 +108,13 @@ public:
     long long getBytesWritten() const {
         return _dataWritten;
     }
-    // Const since _dataWritten is mutable and a heuristic
-    // TODO: Split data tracking and chunk information
-    void setBytesWritten(long long bytesWritten) const {
-        _dataWritten = bytesWritten;
-    }
 
     /**
      * if the amount of data written nears the max size of a shard
      * then we check the real size, and if its too big, we split
      * @return if something was split
      */
-    bool splitIfShould(OperationContext* txn, long dataWritten) const;
+    bool splitIfShould(OperationContext* txn, long dataWritten);
 
     /**
      * Splits this chunk at a non-specificed split key to be chosen by the
@@ -193,25 +176,11 @@ public:
         return _jumbo;
     }
 
-    /**
-     * Attempt to refresh maximum chunk size from config.
-     */
-    static void refreshChunkSize(OperationContext* txn);
-
-    /**
-     * sets MaxChunkSize
-     * 1 <= newMaxChunkSize <= 1024
-     * @return true if newMaxChunkSize is valid and was set
-     */
-    static bool setMaxChunkSizeSizeMB(int newMaxChunkSize);
-
     //
     // public constants
     //
 
-    static long long MaxChunkSize;
     static const int MaxObjectPerChunk{250000};
-    static bool ShouldAutoSplit;
 
     //
     // accessors and helpers
@@ -252,12 +221,11 @@ private:
     BSONObj _min;
     BSONObj _max;
     ShardId _shardId;
-    ChunkVersion _lastmod;
+    const ChunkVersion _lastmod;
     mutable bool _jumbo;
 
-    // transient stuff
-
-    mutable long long _dataWritten;
+    // Statistics for the approximate data written by this chunk
+    uint64_t _dataWritten;
 
     // methods, etc..
 

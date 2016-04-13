@@ -39,6 +39,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/service_context_noop.h"
+#include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager_mock.h"
 #include "mongo/s/client/shard_factory_mock.h"
@@ -81,6 +82,7 @@ void initGrid(OperationContext* txn, const ConnectionString& configConnString) {
         stdx::make_unique<CatalogCache>(),
         std::move(shardRegistry),
         stdx::make_unique<ClusterCursorManager>(txn->getServiceContext()->getPreciseClockSource()),
+        stdx::make_unique<BalancerConfiguration>(BalancerConfiguration::kDefaultMaxChunkSizeBytes),
         std::move(executorPool),
         mockNetwork);
 }

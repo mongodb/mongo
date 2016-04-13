@@ -33,12 +33,13 @@
 #include "mongo/db/query/explain_common.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/s/client/shard.h"
-#include "mongo/s/request.h"
 
 namespace mongo {
 
 class LiteParsedQuery;
 class OperationContext;
+class QueryMessage;
+class Request;
 
 namespace rpc {
 class ServerSelectionMetadata;

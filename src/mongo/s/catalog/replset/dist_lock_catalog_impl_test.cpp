@@ -42,6 +42,7 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager_mock.h"
 #include "mongo/s/catalog/replset/dist_lock_catalog_impl.h"
@@ -137,6 +138,7 @@ private:
                   stdx::make_unique<CatalogCache>(),
                   std::move(shardRegistry),
                   std::unique_ptr<ClusterCursorManager>{nullptr},
+                  std::unique_ptr<BalancerConfiguration>{nullptr},
                   std::move(executorPool),
                   network);
 

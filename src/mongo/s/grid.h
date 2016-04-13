@@ -34,6 +34,7 @@
 
 namespace mongo {
 
+class BalancerConfiguration;
 class CatalogCache;
 class CatalogManager;
 class ClusterCursorManager;
@@ -70,6 +71,7 @@ public:
               std::unique_ptr<CatalogCache> catalogCache,
               std::unique_ptr<ShardRegistry> shardRegistry,
               std::unique_ptr<ClusterCursorManager> cursorManager,
+              std::unique_ptr<BalancerConfiguration> balancerConfig,
               std::unique_ptr<executor::TaskExecutorPool> executorPool,
               executor::NetworkInterface* network);
 
@@ -91,15 +93,15 @@ public:
         return _catalogManager.get();
     }
 
-    CatalogCache* catalogCache() {
+    CatalogCache* catalogCache() const {
         return _catalogCache.get();
     }
 
-    ShardRegistry* shardRegistry() {
+    ShardRegistry* shardRegistry() const {
         return _shardRegistry.get();
     }
 
-    ClusterCursorManager* getCursorManager() {
+    ClusterCursorManager* getCursorManager() const {
         return _cursorManager.get();
     }
 
@@ -111,10 +113,11 @@ public:
         return _network;
     }
 
-    repl::OpTime configOpTime() const {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        return _configOpTime;
+    BalancerConfiguration* getBalancerConfiguration() const {
+        return _balancerConfig.get();
     }
+
+    repl::OpTime configOpTime() const;
 
     void advanceConfigOpTime(repl::OpTime opTime);
 
@@ -134,6 +137,7 @@ private:
     std::unique_ptr<CatalogCache> _catalogCache;
     std::unique_ptr<ShardRegistry> _shardRegistry;
     std::unique_ptr<ClusterCursorManager> _cursorManager;
+    std::unique_ptr<BalancerConfiguration> _balancerConfig;
 
     // Executor pool for scheduling work and remote commands to shards and config servers. Each
     // contained executor has a connection hook set on it for sending/receiving sharding metadata.

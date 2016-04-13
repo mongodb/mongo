@@ -34,6 +34,7 @@
 
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
+#include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/client/shard_registry.h"
@@ -58,12 +59,14 @@ void Grid::init(std::unique_ptr<CatalogManager> catalogManager,
                 std::unique_ptr<CatalogCache> catalogCache,
                 std::unique_ptr<ShardRegistry> shardRegistry,
                 std::unique_ptr<ClusterCursorManager> cursorManager,
+                std::unique_ptr<BalancerConfiguration> balancerConfig,
                 std::unique_ptr<executor::TaskExecutorPool> executorPool,
                 executor::NetworkInterface* network) {
     invariant(!_catalogManager);
     invariant(!_catalogCache);
     invariant(!_shardRegistry);
     invariant(!_cursorManager);
+    invariant(!_balancerConfig);
     invariant(!_executorPool);
     invariant(!_network);
 
@@ -71,6 +74,7 @@ void Grid::init(std::unique_ptr<CatalogManager> catalogManager,
     _catalogCache = std::move(catalogCache);
     _shardRegistry = std::move(shardRegistry);
     _cursorManager = std::move(cursorManager);
+    _balancerConfig = std::move(balancerConfig);
     _executorPool = std::move(executorPool);
     _network = network;
 }
@@ -81,6 +85,11 @@ bool Grid::allowLocalHost() const {
 
 void Grid::setAllowLocalHost(bool allow) {
     _allowLocalShard = allow;
+}
+
+repl::OpTime Grid::configOpTime() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _configOpTime;
 }
 
 void Grid::advanceConfigOpTime(repl::OpTime opTime) {
@@ -95,8 +104,10 @@ void Grid::clearForUnitTests() {
     _catalogCache.reset();
     _shardRegistry.reset();
     _cursorManager.reset();
+    _balancerConfig.reset();
     _executorPool.reset();
     _network = nullptr;
+
     _configOpTime = repl::OpTime();
 }
 

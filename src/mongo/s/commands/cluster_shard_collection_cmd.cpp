@@ -44,6 +44,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/chunk_manager.h"
@@ -75,7 +76,6 @@ public:
     virtual bool adminOnly() const {
         return true;
     }
-
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
@@ -448,14 +448,15 @@ public:
 
                 BSONObj moveResult;
                 WriteConcernOptions noThrottle;
-                if (!chunk->moveAndCommit(txn,
-                                          to->getId(),
-                                          Chunk::MaxChunkSize,
-                                          MigrationSecondaryThrottleOptions::create(
-                                              MigrationSecondaryThrottleOptions::kOff),
-                                          true,
-                                          0,
-                                          moveResult)) {
+                if (!chunk->moveAndCommit(
+                        txn,
+                        to->getId(),
+                        Grid::get(txn)->getBalancerConfiguration()->getMaxChunkSizeBytes(),
+                        MigrationSecondaryThrottleOptions::create(
+                            MigrationSecondaryThrottleOptions::kOff),
+                        true,
+                        0,
+                        moveResult)) {
                     warning() << "couldn't move chunk " << chunk->toString() << " to shard " << *to
                               << " while sharding collection " << ns << "."
                               << " Reason: " << moveResult;

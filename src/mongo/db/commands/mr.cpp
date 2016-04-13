@@ -67,6 +67,7 @@
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/catalog/catalog_cache.h"
+#include "mongo/s/chunk.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
@@ -1701,7 +1702,7 @@ public:
 
         shared_ptr<DBConfig> confOut = status.getValue();
 
-        vector<ChunkPtr> chunks;
+        vector<shared_ptr<Chunk>> chunks;
         if (confOut->isSharded(config.outputOptions.finalNamespace)) {
             ChunkManagerPtr cm = confOut->getChunkManager(txn, config.outputOptions.finalNamespace);
 
@@ -1711,7 +1712,7 @@ public:
             const ChunkMap& chunkMap = cm->getChunkMap();
 
             for (ChunkMap::const_iterator it = chunkMap.begin(); it != chunkMap.end(); ++it) {
-                ChunkPtr chunk = it->second;
+                shared_ptr<Chunk> chunk = it->second;
                 if (chunk->getShardId() == shardName) {
                     chunks.push_back(chunk);
                 }
@@ -1723,7 +1724,7 @@ public:
         BSONObj query;
         BSONArrayBuilder chunkSizes;
         while (true) {
-            ChunkPtr chunk;
+            shared_ptr<Chunk> chunk;
             if (chunks.size() > 0) {
                 chunk = chunks[index];
                 BSONObjBuilder b;

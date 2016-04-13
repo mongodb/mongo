@@ -115,7 +115,6 @@ env.Library(
     target='cluster_ops_impl',
     source=[
         'chunk_manager_targeter.cpp',
-        'cluster_explain.cpp',
         'cluster_write.cpp',
         'dbclient_shard_resolver.cpp',
     ],
@@ -163,6 +162,7 @@ env.Library(
         # This is only here temporarily for auto-split logic in chunk.cpp.
         'balance.cpp',
         'balancer_policy.cpp',
+        'balancer/balancer_configuration.cpp',
         'balancer/cluster_statistics.cpp',
         'balancer/cluster_statistics_impl.cpp',
         'catalog/catalog_cache.cpp',
@@ -180,7 +180,6 @@ env.Library(
         'catalog/catalog_types',
         'catalog/replset/catalog_manager_replica_set',
         'client/sharding_client',
-        'cluster_ops_impl',
         'common',
     ],
     LIBDEPS_TAGS=[
@@ -209,11 +208,8 @@ env.Library(
     target='mongoscore',
     source=[
         'cluster_cursor_stats.cpp',
-        'request.cpp',
         's_only.cpp',
         's_sharding_server_status.cpp',
-        'strategy.cpp',
-        'version_mongos.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmongos',

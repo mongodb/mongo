@@ -43,10 +43,11 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/balance.h"
 #include "mongo/s/balancer_policy.h"
+#include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/balancer/cluster_statistics.h"
 #include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_connection.h"
@@ -69,7 +70,7 @@ using std::vector;
 
 namespace {
 
-const int kTooManySplitPoints = 4;
+const uint64_t kTooManySplitPoints = 4;
 
 /**
  * Attempts to move the given chunk to another shard.
@@ -144,7 +145,7 @@ bool tryMoveToOtherShard(OperationContext* txn,
     if (!toMove->moveAndCommit(
             txn,
             newShard->getId(),
-            Chunk::MaxChunkSize,
+            Grid::get(txn)->getBalancerConfiguration()->getMaxChunkSizeBytes(),
             MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
             false, /* waitForDelete - small chunk, no need */
             0,     /* maxTimeMS - don't time out */
@@ -160,17 +161,11 @@ bool tryMoveToOtherShard(OperationContext* txn,
 
 }  // namespace
 
-long long Chunk::MaxChunkSize = 1024 * 1024 * 64;
-
-// Can be overridden from command line
-bool Chunk::ShouldAutoSplit = true;
-
-Chunk::Chunk(OperationContext* txn, const ChunkManager* manager, const ChunkType& from)
-    : _manager(manager), _lastmod(0, 0, OID()), _dataWritten(mkDataWritten()) {
+Chunk::Chunk(OperationContext* txn, ChunkManager* manager, const ChunkType& from)
+    : _manager(manager), _lastmod(from.getVersion()), _dataWritten(mkDataWritten()) {
     string ns = from.getNS();
     _shardId = from.getShard();
 
-    _lastmod = from.getVersion();
     verify(_lastmod.isSet());
 
     _min = from.getMin().getOwned();
@@ -185,22 +180,24 @@ Chunk::Chunk(OperationContext* txn, const ChunkManager* manager, const ChunkType
     uassert(10171, "Chunk needs a server", grid.shardRegistry()->getShard(txn, _shardId));
 }
 
-Chunk::Chunk(const ChunkManager* info,
+Chunk::Chunk(ChunkManager* info,
              const BSONObj& min,
              const BSONObj& max,
              const ShardId& shardId,
-             ChunkVersion lastmod)
+             ChunkVersion lastmod,
+             uint64_t initialDataWritten)
     : _manager(info),
       _min(min),
       _max(max),
       _shardId(shardId),
       _lastmod(lastmod),
       _jumbo(false),
-      _dataWritten(mkDataWritten()) {}
+      _dataWritten(initialDataWritten) {}
 
 int Chunk::mkDataWritten() {
     PseudoRandom r(static_cast<int64_t>(time(0)));
-    return r.nextInt32(MaxChunkSize / ChunkManager::SplitHeuristics::splitTestFactor);
+    return r.nextInt32(grid.getBalancerConfiguration()->getMaxChunkSizeBytes() /
+                       ChunkManager::SplitHeuristics::splitTestFactor);
 }
 
 bool Chunk::containsKey(const BSONObj& shardKey) const {
@@ -210,41 +207,6 @@ bool Chunk::containsKey(const BSONObj& shardKey) const {
 bool ChunkRange::containsKey(const BSONObj& shardKey) const {
     // same as Chunk method
     return getMin().woCompare(shardKey) <= 0 && shardKey.woCompare(getMax()) < 0;
-}
-
-bool Chunk::shouldBalance(const SettingsType& balancerSettings) {
-    if (balancerSettings.isBalancerStoppedSet() && balancerSettings.getBalancerStopped()) {
-        return false;
-    }
-
-    if (balancerSettings.isBalancerActiveWindowSet()) {
-        boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
-        return balancerSettings.inBalancingWindow(now);
-    }
-
-    return true;
-}
-
-bool Chunk::getConfigShouldBalance(OperationContext* txn) const {
-    auto balSettingsResult =
-        grid.catalogManager(txn)->getGlobalSettings(txn, SettingsType::BalancerDocKey);
-    if (!balSettingsResult.isOK()) {
-        if (balSettingsResult == ErrorCodes::NoMatchingDocument) {
-            // Settings document for balancer does not exist, default to balancing allowed.
-            return true;
-        }
-
-        warning() << balSettingsResult.getStatus();
-        return false;
-    }
-    SettingsType balSettings = balSettingsResult.getValue();
-
-    if (!balSettings.isKeySet()) {
-        // Balancer settings doc does not exist. Default to yes.
-        return true;
-    }
-
-    return shouldBalance(balSettings);
 }
 
 bool Chunk::_minIsInf() const {
@@ -325,16 +287,17 @@ std::vector<BSONObj> Chunk::_determineSplitPoints(OperationContext* txn, bool at
             splitPoints.push_back(medianKey);
         }
     } else {
-        long long chunkSize = _manager->getCurrentDesiredChunkSize();
+        uint64_t chunkSize = _manager->getCurrentDesiredChunkSize();
 
         // Note: One split point for every 1/2 chunk size.
-        const int estNumSplitPoints = _dataWritten / chunkSize * 2;
+        const uint64_t estNumSplitPoints = _dataWritten / chunkSize * 2;
 
         if (estNumSplitPoints >= kTooManySplitPoints) {
             // The current desired chunk size will split the chunk into lots of small chunk and at
             // the worst case this can result into thousands of chunks. So check and see if a bigger
             // value can be used.
-            chunkSize = std::min(_dataWritten, Chunk::MaxChunkSize);
+            chunkSize = std::min(
+                _dataWritten, Grid::get(txn)->getBalancerConfiguration()->getMaxChunkSizeBytes());
         }
 
         splitPoints =
@@ -507,19 +470,19 @@ bool Chunk::moveAndCommit(OperationContext* txn,
     return worked;
 }
 
-bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) const {
-    dassert(ShouldAutoSplit);
+bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {
     LastError::Disabled d(&LastError::get(cc()));
 
     try {
         _dataWritten += dataWritten;
-        int splitThreshold = getManager()->getCurrentDesiredChunkSize();
+        uint64_t splitThreshold = getManager()->getCurrentDesiredChunkSize();
         if (_minIsInf() || _maxIsInf()) {
-            splitThreshold = (int)((double)splitThreshold * .9);
+            splitThreshold = static_cast<uint64_t>((double)splitThreshold * 0.9);
         }
 
-        if (_dataWritten < splitThreshold / ChunkManager::SplitHeuristics::splitTestFactor)
+        if (_dataWritten < splitThreshold / ChunkManager::SplitHeuristics::splitTestFactor) {
             return false;
+        }
 
         if (!getManager()->_splitHeuristics._splitTickets.tryAcquire()) {
             LOG(1) << "won't auto split because not enough tickets: " << getManager()->getns();
@@ -556,16 +519,23 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) const {
             _dataWritten = 0;
         }
 
-        bool shouldBalance = getConfigShouldBalance(txn);
+        Status refreshStatus = Grid::get(txn)->getBalancerConfiguration()->refreshAndCheck(txn);
+        if (!refreshStatus.isOK()) {
+            warning() << "Unable to refresh balancer settings" << causedBy(refreshStatus);
+            return false;
+        }
+
+        bool shouldBalance = Grid::get(txn)->getBalancerConfiguration()->isBalancerActive();
         if (shouldBalance) {
-            auto status = grid.catalogManager(txn)->getCollection(txn, _manager->getns());
-            if (!status.isOK()) {
-                log() << "Auto-split for " << _manager->getns()
-                      << " failed to load collection metadata due to " << status.getStatus();
+            auto collStatus = grid.catalogManager(txn)->getCollection(txn, _manager->getns());
+            if (!collStatus.isOK()) {
+                warning() << "Auto-split for " << _manager->getns()
+                          << " failed to load collection metadata"
+                          << causedBy(collStatus.getStatus());
                 return false;
             }
 
-            shouldBalance = status.getValue().value.getAllowBalance();
+            shouldBalance = collStatus.getValue().value.getAllowBalance();
         }
 
         log() << "autosplitted " << _manager->getns() << " shard: " << toString() << " into "
@@ -592,7 +562,6 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) const {
         }
 
         return true;
-
     } catch (DBException& e) {
         // TODO: Make this better - there are lots of reasons a split could fail
         // Random so that we don't sync up with other failed splits
@@ -645,37 +614,6 @@ void Chunk::markAsJumbo(OperationContext* txn) const {
     if (!status.isOK()) {
         warning() << "couldn't set jumbo for chunk: " << chunkName << causedBy(status.getStatus());
     }
-}
-
-void Chunk::refreshChunkSize(OperationContext* txn) {
-    auto chunkSizeSettingsResult =
-        grid.catalogManager(txn)->getGlobalSettings(txn, SettingsType::ChunkSizeDocKey);
-    if (!chunkSizeSettingsResult.isOK()) {
-        log() << chunkSizeSettingsResult.getStatus();
-        return;
-    }
-    SettingsType chunkSizeSettings = chunkSizeSettingsResult.getValue();
-    int csize = chunkSizeSettings.getChunkSizeMB();
-
-    LOG(1) << "Refreshing MaxChunkSize: " << csize << "MB";
-
-    if (csize != Chunk::MaxChunkSize / (1024 * 1024)) {
-        log() << "MaxChunkSize changing from " << Chunk::MaxChunkSize / (1024 * 1024) << "MB"
-              << " to " << csize << "MB";
-    }
-
-    if (!setMaxChunkSizeSizeMB(csize)) {
-        warning() << "invalid MaxChunkSize: " << csize;
-    }
-}
-
-bool Chunk::setMaxChunkSizeSizeMB(int newMaxChunkSize) {
-    if (newMaxChunkSize < 1)
-        return false;
-    if (newMaxChunkSize > 1024)
-        return false;
-    MaxChunkSize = newMaxChunkSize * 1024 * 1024;
-    return true;
 }
 
 }  // namespace mongo

@@ -45,6 +45,7 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -244,10 +245,12 @@ bool ChunkManager::_load(OperationContext* txn,
         // interesting things here
         for (const auto& oldChunkMapEntry : oldChunkMap) {
             shared_ptr<Chunk> oldC = oldChunkMapEntry.second;
-            shared_ptr<Chunk> newC(new Chunk(
-                this, oldC->getMin(), oldC->getMax(), oldC->getShardId(), oldC->getLastmod()));
-
-            newC->setBytesWritten(oldC->getBytesWritten());
+            shared_ptr<Chunk> newC(new Chunk(this,
+                                             oldC->getMin(),
+                                             oldC->getMax(),
+                                             oldC->getShardId(),
+                                             oldC->getLastmod(),
+                                             oldC->getBytesWritten()));
 
             chunkMap.insert(make_pair(oldC->getMax(), newC));
         }
@@ -367,16 +370,16 @@ void ChunkManager::calcInitSplitsAndShards(OperationContext* txn,
         uassertStatusOK(bsonExtractIntegerField(result.getValue(), "n", &numObjects));
 
         if (numObjects > 0) {
-            *splitPoints = uassertStatusOK(
-                shardutil::selectChunkSplitPoints(txn,
-                                                  primaryShardId,
-                                                  NamespaceString(_ns),
-                                                  _keyPattern,
-                                                  _keyPattern.getKeyPattern().globalMin(),
-                                                  _keyPattern.getKeyPattern().globalMax(),
-                                                  Chunk::MaxChunkSize,
-                                                  0,
-                                                  0));
+            *splitPoints = uassertStatusOK(shardutil::selectChunkSplitPoints(
+                txn,
+                primaryShardId,
+                NamespaceString(_ns),
+                _keyPattern,
+                _keyPattern.getKeyPattern().globalMin(),
+                _keyPattern.getKeyPattern().globalMax(),
+                Grid::get(txn)->getBalancerConfiguration()->getMaxChunkSizeBytes(),
+                0,
+                0));
         }
 
         // since docs already exists, must use primary shard
@@ -814,11 +817,11 @@ void ChunkRangeManager::_insertRange(ChunkMap::const_iterator begin,
     }
 }
 
-int ChunkManager::getCurrentDesiredChunkSize() const {
+uint64_t ChunkManager::getCurrentDesiredChunkSize() const {
     // split faster in early chunks helps spread out an initial load better
-    const int minChunkSize = 1 << 20;  // 1 MBytes
+    const uint64_t minChunkSize = 1 << 20;  // 1 MBytes
 
-    int splitThreshold = Chunk::MaxChunkSize;
+    uint64_t splitThreshold = grid.getBalancerConfiguration()->getMaxChunkSizeBytes();
 
     int nc = numChunks();
 

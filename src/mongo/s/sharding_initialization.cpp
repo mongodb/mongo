@@ -29,7 +29,6 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
 #include "mongo/platform/basic.h"
-#include "mongo/platform/random.h"
 
 #include "mongo/s/sharding_initialization.h"
 
@@ -47,6 +46,7 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/sharding_network_connection_hook.h"
 #include "mongo/s/grid.h"
@@ -133,6 +133,7 @@ std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(std::unique_ptr<NetworkIn
 
 Status initializeGlobalShardingState(OperationContext* txn,
                                      const ConnectionString& configCS,
+                                     uint64_t maxChunkSizeBytes,
                                      bool isMongos) {
     if (configCS.type() == ConnectionString::INVALID) {
         return {ErrorCodes::BadValue, "Unrecognized connection string."};
@@ -165,6 +166,7 @@ Status initializeGlobalShardingState(OperationContext* txn,
         stdx::make_unique<CatalogCache>(),
         std::move(shardRegistry),
         stdx::make_unique<ClusterCursorManager>(getGlobalServiceContext()->getPreciseClockSource()),
+        stdx::make_unique<BalancerConfiguration>(maxChunkSizeBytes),
         std::move(executorPool),
         networkPtr);
 
@@ -199,13 +201,15 @@ Status initializeGlobalShardingState(OperationContext* txn,
 }  // namespace
 
 Status initializeGlobalShardingStateForMongos(OperationContext* txn,
-                                              const ConnectionString& configCS) {
-    return initializeGlobalShardingState(txn, configCS, true);
+                                              const ConnectionString& configCS,
+                                              uint64_t maxChunkSizeBytes) {
+    return initializeGlobalShardingState(txn, configCS, maxChunkSizeBytes, true);
 }
 
 Status initializeGlobalShardingStateForMongod(OperationContext* txn,
                                               const ConnectionString& configCS) {
-    return initializeGlobalShardingState(txn, configCS, false);
+    return initializeGlobalShardingState(
+        txn, configCS, BalancerConfiguration::kDefaultMaxChunkSizeBytes, false);
 }
 
 }  // namespace mongo

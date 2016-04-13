@@ -26,6 +26,7 @@ env.Library(
         'cluster_db_stats_cmd.cpp',
         'cluster_drop_database_cmd.cpp',
         'cluster_enable_sharding_cmd.cpp',
+        'cluster_explain.cpp',
         'cluster_explain_cmd.cpp',
         'cluster_find_cmd.cpp',
         'cluster_find_and_modify_cmd.cpp',
@@ -61,8 +62,10 @@ env.Library(
         'cluster_whats_my_uri_cmd.cpp',
         'cluster_write_cmd.cpp',
         'commands_public.cpp',
+        'request.cpp',
         'run_on_all_shards_cmd.cpp',
         'sharded_command_processing.cpp',
+        'strategy.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/parallel',

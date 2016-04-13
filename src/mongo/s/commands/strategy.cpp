@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/strategy.h"
+#include "mongo/s/commands/strategy.h"
 
 #include "mongo/base/data_cursor.h"
 #include "mongo/base/owned_pointer_vector.h"
@@ -58,14 +58,14 @@
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/version_manager.h"
-#include "mongo/s/cluster_explain.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/commands/cluster_explain.h"
+#include "mongo/s/commands/request.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/cluster_find.h"
-#include "mongo/s/request.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batch_upconvert.h"
@@ -533,4 +533,5 @@ Status Strategy::explainFind(OperationContext* txn,
     return ClusterExplain::buildExplainResult(
         txn, shardResults, mongosStageName, millisElapsed, out);
 }
-}
+
+}  // namespace mongo

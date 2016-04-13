@@ -37,7 +37,7 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/query/cluster_find.h"
-#include "mongo/s/strategy.h"
+#include "mongo/s/commands/strategy.h"
 
 namespace mongo {
 namespace {

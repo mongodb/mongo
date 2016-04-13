@@ -34,6 +34,7 @@
 
 #include <boost/thread/tss.hpp>
 
+#include "mongo/s/chunk.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
@@ -45,7 +46,7 @@
 namespace mongo {
 
 using std::shared_ptr;
-using mongoutils::str::stream;
+using str::stream;
 using std::map;
 using std::set;
 using std::string;
@@ -512,7 +513,7 @@ Status ChunkManagerTargeter::targetShardKey(OperationContext* txn,
                                             ShardEndpoint** endpoint) const {
     invariant(NULL != _manager);
 
-    ChunkPtr chunk = _manager->findIntersectingChunk(txn, shardKey);
+    shared_ptr<Chunk> chunk = _manager->findIntersectingChunk(txn, shardKey);
 
     // Track autosplit stats for sharded collections
     // Note: this is only best effort accounting and is not accurate.
