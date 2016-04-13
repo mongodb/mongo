@@ -545,8 +545,9 @@ Status IndexCatalog::_isSpecOk(OperationContext* txn, const BSONObj& spec) const
             return Status(ErrorCodes::CannotCreateIndex,
                           "\"partialFilterExpression\" for an index must be a document");
         }
+        // TODO SERVER-23618: pass the appropriate CollatorInterface* instead of nullptr.
         StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
-            filterElement.Obj(), ExtensionsCallbackDisallowExtensions());
+            filterElement.Obj(), ExtensionsCallbackDisallowExtensions(), nullptr);
         if (!statusWithMatcher.isOK()) {
             return statusWithMatcher.getStatus();
         }

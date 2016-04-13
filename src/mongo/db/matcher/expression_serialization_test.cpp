@@ -51,8 +51,10 @@ BSONObj serialize(MatchExpression* match) {
 }
 
 TEST(SerializeBasic, AndExpressionWithOneChildSerializesCorrectly) {
-    Matcher original(fromjson("{$and: [{x: 0}]}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{$and: [{x: 0}]}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{$and: [{x: {$eq: 0}}]}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -64,8 +66,10 @@ TEST(SerializeBasic, AndExpressionWithOneChildSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, AndExpressionWithTwoChildrenSerializesCorrectly) {
-    Matcher original(fromjson("{$and: [{x: 1}, {x: 2}]}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{$and: [{x: 1}, {x: 2}]}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{$and: [{x: {$eq: 1}}, {x: {$eq: 2}}]}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -77,8 +81,10 @@ TEST(SerializeBasic, AndExpressionWithTwoChildrenSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, AndExpressionWithTwoIdenticalChildrenSerializesCorrectly) {
-    Matcher original(fromjson("{$and: [{x: 1}, {x: 1}]}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{$and: [{x: 1}, {x: 1}]}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{$and: [{x: {$eq: 1}}, {x: {$eq: 1}}]}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -90,8 +96,10 @@ TEST(SerializeBasic, AndExpressionWithTwoIdenticalChildrenSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionOr) {
-    Matcher original(fromjson("{$or: [{x: 'A'}, {x: 'B'}]}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{$or: [{x: 'A'}, {x: 'B'}]}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{$or: [{x: {$eq: 'A'}}, {x: {$eq: 'B'}}]}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -103,9 +111,12 @@ TEST(SerializeBasic, ExpressionOr) {
 }
 
 TEST(SerializeBasic, ExpressionElemMatchObjectSerializesCorrectly) {
+    CollatorInterface* collator = nullptr;
     Matcher original(fromjson("{x: {$elemMatch: {a: {$gt: 0}, b: {$gt: 0}}}}"),
-                     ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+                     ExtensionsCallbackNoop(),
+                     collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(),
               fromjson("{x: {$elemMatch: {$and: [{a: {$gt: 0}}, {b: {$gt: 0}}]}}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
@@ -118,9 +129,12 @@ TEST(SerializeBasic, ExpressionElemMatchObjectSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionElemMatchObjectWithEmptyStringSerializesCorrectly) {
+    CollatorInterface* collator = nullptr;
     Matcher original(fromjson("{'': {$elemMatch: {a: {$gt: 0}, b: {$gt: 0}}}}"),
-                     ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+                     ExtensionsCallbackNoop(),
+                     collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(),
               fromjson("{'': {$elemMatch: {$and: [{a: {$gt: 0}}, {b: {$gt: 0}}]}}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
@@ -133,8 +147,11 @@ TEST(SerializeBasic, ExpressionElemMatchObjectWithEmptyStringSerializesCorrectly
 }
 
 TEST(SerializeBasic, ExpressionElemMatchValueSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$elemMatch: {$lt: 1, $gt: -1}}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(
+        fromjson("{x: {$elemMatch: {$lt: 1, $gt: -1}}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{x: {$elemMatch: {$lt: 1, $gt: -1}}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -149,8 +166,11 @@ TEST(SerializeBasic, ExpressionElemMatchValueSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionElemMatchValueWithEmptyStringSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$elemMatch: {$lt: 1, $gt: -1}}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(
+        fromjson("{x: {$elemMatch: {$lt: 1, $gt: -1}}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{x: {$elemMatch: {$lt: 1, $gt: -1}}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -165,8 +185,10 @@ TEST(SerializeBasic, ExpressionElemMatchValueWithEmptyStringSerializesCorrectly)
 }
 
 TEST(SerializeBasic, ExpressionSizeSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$size: 2}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$size: 2}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{x: {$size: 2}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -178,8 +200,10 @@ TEST(SerializeBasic, ExpressionSizeSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionAllSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$all: [1, 2]}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$all: [1, 2]}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{$and: [{x: {$eq: 1}}, {x: {$eq: 2}}]}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -191,8 +215,10 @@ TEST(SerializeBasic, ExpressionAllSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionAllWithEmptyArraySerializesCorrectly) {
-    Matcher original(fromjson("{x: {$all: []}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$all: []}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{x: {$all: []}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -201,8 +227,11 @@ TEST(SerializeBasic, ExpressionAllWithEmptyArraySerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionAllWithRegex) {
-    Matcher original(fromjson("{x: {$all: [/a.b.c/, /.d.e./]}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(
+        fromjson("{x: {$all: [/a.b.c/, /.d.e./]}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{$and: [{x: /a.b.c/}, {x: /.d.e./}]}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -214,8 +243,10 @@ TEST(SerializeBasic, ExpressionAllWithRegex) {
 }
 
 TEST(SerializeBasic, ExpressionEqSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$eq: {a: 1}}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$eq: {a: 1}}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{x: {$eq: {a: 1}}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -230,8 +261,10 @@ TEST(SerializeBasic, ExpressionEqSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNeSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$ne: {a: 1}}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$ne: {a: 1}}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{$nor: [{x: {$eq: {a: 1}}}]}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -243,8 +276,10 @@ TEST(SerializeBasic, ExpressionNeSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionLtSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$lt: 3}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$lt: 3}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{x: {$lt: 3}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -256,8 +291,10 @@ TEST(SerializeBasic, ExpressionLtSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionGtSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$gt: 3}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$gt: 3}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{x: {$gt: 3}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -269,8 +306,10 @@ TEST(SerializeBasic, ExpressionGtSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionGteSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$gte: 3}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$gte: 3}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{x: {$gte: 3}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -282,8 +321,10 @@ TEST(SerializeBasic, ExpressionGteSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionLteSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$lte: 3}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$lte: 3}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{x: {$lte: 3}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -295,8 +336,10 @@ TEST(SerializeBasic, ExpressionLteSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionRegexWithObjSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$regex: 'a.b'}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$regex: 'a.b'}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{x: {$regex: 'a.b'}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -308,8 +351,10 @@ TEST(SerializeBasic, ExpressionRegexWithObjSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionRegexWithValueSerializesCorrectly) {
-    Matcher original(fromjson("{x: /a.b/i}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: /a.b/i}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{x: {$regex: 'a.b', $options: 'i'}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -321,8 +366,10 @@ TEST(SerializeBasic, ExpressionRegexWithValueSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionRegexWithValueAndOptionsSerializesCorrectly) {
-    Matcher original(fromjson("{x: /a.b/}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: /a.b/}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{x: {$regex: 'a.b'}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -334,8 +381,10 @@ TEST(SerializeBasic, ExpressionRegexWithValueAndOptionsSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionRegexWithEqObjSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$eq: {$regex: 'a.b'}}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$eq: {$regex: 'a.b'}}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{x: {$eq: {$regex: 'a.b'}}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -350,8 +399,10 @@ TEST(SerializeBasic, ExpressionRegexWithEqObjSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionModSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$mod: [2, 1]}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$mod: [2, 1]}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{x: {$mod: [2, 1]}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -363,8 +414,10 @@ TEST(SerializeBasic, ExpressionModSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionExistsTrueSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$exists: true}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$exists: true}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{x: {$exists: true}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -376,8 +429,10 @@ TEST(SerializeBasic, ExpressionExistsTrueSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionExistsFalseSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$exists: false}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$exists: false}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{$nor: [{x: {$exists: true}}]}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -389,8 +444,10 @@ TEST(SerializeBasic, ExpressionExistsFalseSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionInSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$in: [1, 2, 3]}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$in: [1, 2, 3]}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{x: {$in: [1, 2, 3]}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -405,8 +462,10 @@ TEST(SerializeBasic, ExpressionInSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionInWithEmptyArraySerializesCorrectly) {
-    Matcher original(fromjson("{x: {$in: []}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$in: []}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{x: {$in: []}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -415,8 +474,10 @@ TEST(SerializeBasic, ExpressionInWithEmptyArraySerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionInWithRegexSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$in: [/\\d+/, /\\w+/]}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$in: [/\\d+/, /\\w+/]}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{x: {$in: [/\\d+/, /\\w+/]}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -431,8 +492,10 @@ TEST(SerializeBasic, ExpressionInWithRegexSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNinSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$nin: [1, 2, 3]}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$nin: [1, 2, 3]}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{$nor: [{x: {$in: [1, 2, 3]}}]}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -447,8 +510,10 @@ TEST(SerializeBasic, ExpressionNinSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionBitsAllSetSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$bitsAllSet: [1, 3]}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$bitsAllSet: [1, 3]}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{x: {$bitsAllSet: [1, 3]}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -460,8 +525,10 @@ TEST(SerializeBasic, ExpressionBitsAllSetSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionBitsAllClearSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$bitsAllClear: [1, 3]}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$bitsAllClear: [1, 3]}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{x: {$bitsAllClear: [1, 3]}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -473,8 +540,10 @@ TEST(SerializeBasic, ExpressionBitsAllClearSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionBitsAnySetSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$bitsAnySet: [1, 3]}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$bitsAnySet: [1, 3]}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{x: {$bitsAnySet: [1, 3]}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -486,8 +555,10 @@ TEST(SerializeBasic, ExpressionBitsAnySetSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionBitsAnyClearSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$bitsAnyClear: [1, 3]}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$bitsAnyClear: [1, 3]}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{x: {$bitsAnyClear: [1, 3]}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -502,8 +573,10 @@ TEST(SerializeBasic, ExpressionBitsAnyClearSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNotSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$not: {$eq: 3}}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$not: {$eq: 3}}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{$nor: [{$and: [{x: {$eq: 3}}]}]}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -515,8 +588,10 @@ TEST(SerializeBasic, ExpressionNotSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNotWithMultipleChildrenSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$not: {$lt: 1, $gt: 3}}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$not: {$lt: 1, $gt: 3}}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(),
               fromjson("{$nor: [{$and: [{x: {$lt: 1}}, {x: {$gt: 3}}]}]}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
@@ -529,8 +604,11 @@ TEST(SerializeBasic, ExpressionNotWithMultipleChildrenSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNotWithBitTestSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$not: {$bitsAnySet: [1, 3]}}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(
+        fromjson("{x: {$not: {$bitsAnySet: [1, 3]}}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{$nor: [{$and: [{x: {$bitsAnySet: [1, 3]}}]}]}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -542,8 +620,10 @@ TEST(SerializeBasic, ExpressionNotWithBitTestSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNotWithRegexObjSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$not: {$regex: 'a.b'}}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$not: {$regex: 'a.b'}}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{$nor: [{x: /a.b/}]}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -555,8 +635,10 @@ TEST(SerializeBasic, ExpressionNotWithRegexObjSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNotWithRegexValueSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$not: /a.b/}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$not: /a.b/}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{$nor: [{x: /a.b/}]}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -568,8 +650,10 @@ TEST(SerializeBasic, ExpressionNotWithRegexValueSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNotWithRegexValueAndOptionsSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$not: /a.b/i}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$not: /a.b/i}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{$nor: [{x: /a.b/i}]}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -581,12 +665,15 @@ TEST(SerializeBasic, ExpressionNotWithRegexValueAndOptionsSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNotWithGeoSerializesCorrectly) {
+    CollatorInterface* collator = nullptr;
     Matcher original(fromjson(
                          "{x: {$not: {$geoIntersects: {$geometry: {type: 'Polygon', "
                          "coordinates: [[[0,0], [5,0], "
                          "[5, 5], [0, 5], [0, 0]]]}}}}}"),
-                     ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+                     ExtensionsCallbackNoop(),
+                     collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(),
               fromjson(
                   "{$nor: [{$and: [{x: {$geoIntersects: {$geometry: {type: 'Polygon', coordinates: "
@@ -609,8 +696,11 @@ TEST(SerializeBasic, ExpressionNotWithGeoSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNorSerializesCorrectly) {
-    Matcher original(fromjson("{$nor: [{x: 3}, {x: {$lt: 1}}]}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(
+        fromjson("{$nor: [{x: 3}, {x: {$lt: 1}}]}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{$nor: [{x: {$eq: 3}}, {x: {$lt: 1}}]}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -625,8 +715,10 @@ TEST(SerializeBasic, ExpressionNorSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionTypeSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$type: 2}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$type: 2}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{x: {$type: 2}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -638,8 +730,10 @@ TEST(SerializeBasic, ExpressionTypeSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionTypeWithNumberSerializesCorrectly) {
-    Matcher original(fromjson("{x: {$type: 'number'}}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: {$type: 'number'}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{x: {$type: 'number'}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -651,8 +745,10 @@ TEST(SerializeBasic, ExpressionTypeWithNumberSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionEmptySerializesCorrectly) {
-    Matcher original(fromjson("{}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -661,25 +757,32 @@ TEST(SerializeBasic, ExpressionEmptySerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionWhereSerializesCorrectly) {
-    Matcher original(fromjson("{$where: 'this.a == this.b'}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{$where: 'this.a == this.b'}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(),
               BSONObjBuilder().appendCodeWScope("$where", "this.a == this.b", BSONObj()).obj());
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 
 TEST(SerializeBasic, ExpressionWhereWithScopeSerializesCorrectly) {
+    CollatorInterface* collator = nullptr;
     Matcher original(BSON("$where" << BSONCodeWScope("this.a == this.b", BSON("x" << 3))),
-                     ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+                     ExtensionsCallbackNoop(),
+                     collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(),
               BSON("$where" << BSONCodeWScope("this.a == this.b", BSON("x" << 3))));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 
 TEST(SerializeBasic, ExpressionCommentSerializesCorrectly) {
-    Matcher original(fromjson("{$comment: 'Hello'}"), ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+    CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{$comment: 'Hello'}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(), fromjson("{}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
@@ -691,12 +794,15 @@ TEST(SerializeBasic, ExpressionCommentSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionGeoWithinSerializesCorrectly) {
+    CollatorInterface* collator = nullptr;
     Matcher original(
         fromjson(
             "{x: {$geoWithin: {$geometry: "
             "{type: 'Polygon', coordinates: [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]]}}}}"),
-        ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+        ExtensionsCallbackNoop(),
+        collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(),
               fromjson(
                   "{x: {$geoWithin: {$geometry: {type: 'Polygon', coordinates: [[[0,0], [10,0], "
@@ -711,12 +817,15 @@ TEST(SerializeBasic, ExpressionGeoWithinSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionGeoIntersectsSerializesCorrectly) {
+    CollatorInterface* collator = nullptr;
     Matcher original(
         fromjson(
             "{x: {$geoIntersects: {$geometry: {type: 'Polygon', coordinates: [[[0,0], [5,0], [5, "
             "5], [0, 5], [0, 0]]]}}}}"),
-        ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+        ExtensionsCallbackNoop(),
+        collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(),
               fromjson(
                   "{x: {$geoIntersects: {$geometry: {type: 'Polygon', coordinates: [[[0,0], [5,0], "
@@ -738,12 +847,15 @@ TEST(SerializeBasic, ExpressionGeoIntersectsSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNearSerializesCorrectly) {
+    CollatorInterface* collator = nullptr;
     Matcher original(
         fromjson(
             "{x: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}, $maxDistance: 10, "
             "$minDistance: 1}}}"),
-        ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+        ExtensionsCallbackNoop(),
+        collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(),
               fromjson(
                   "{x: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}, $maxDistance: 10, "
@@ -752,12 +864,15 @@ TEST(SerializeBasic, ExpressionNearSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionNearSphereSerializesCorrectly) {
+    CollatorInterface* collator = nullptr;
     Matcher original(
         fromjson(
             "{x: {$nearSphere: {$geometry: {type: 'Point', coordinates: [0, 0]}, $maxDistance: 10, "
             "$minDistance: 1}}}"),
-        ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+        ExtensionsCallbackNoop(),
+        collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(),
               fromjson(
                   "{x: {$nearSphere: {$geometry: {type: 'Point', coordinates: [0, 0]}, "
@@ -766,9 +881,12 @@ TEST(SerializeBasic, ExpressionNearSphereSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionTextSerializesCorrectly) {
+    CollatorInterface* collator = nullptr;
     Matcher original(fromjson("{$text: {$search: 'a', $language: 'en', $caseSensitive: true}}"),
-                     ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+                     ExtensionsCallbackNoop(),
+                     collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(),
               fromjson(
                   "{$text: {$search: 'a', $language: 'en', $caseSensitive: true, "
@@ -777,9 +895,12 @@ TEST(SerializeBasic, ExpressionTextSerializesCorrectly) {
 }
 
 TEST(SerializeBasic, ExpressionTextWithDefaultLanguageSerializesCorrectly) {
+    CollatorInterface* collator = nullptr;
     Matcher original(fromjson("{$text: {$search: 'a', $caseSensitive: false}}"),
-                     ExtensionsCallbackNoop());
-    Matcher reserialized(serialize(original.getMatchExpression()), ExtensionsCallbackNoop());
+                     ExtensionsCallbackNoop(),
+                     collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(),
               fromjson(
                   "{$text: {$search: 'a', $language: '', $caseSensitive: false, "

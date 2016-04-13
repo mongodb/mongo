@@ -118,8 +118,9 @@ Status ModifierPull::init(const BSONElement& modExpr, const Options& opts, bool*
 
         // Build the matcher around the object we built above. Currently, we do not allow $pull
         // operations to contain $text/$where clauses, so preserving this behaviour.
+        // TODO SERVER-23689: Pass the appropriate CollatorInterface* instead of nullptr.
         StatusWithMatchExpression parseResult =
-            MatchExpressionParser::parse(_exprObj, ExtensionsCallbackDisallowExtensions());
+            MatchExpressionParser::parse(_exprObj, ExtensionsCallbackDisallowExtensions(), nullptr);
         if (!parseResult.isOK()) {
             return parseResult.getStatus();
         }

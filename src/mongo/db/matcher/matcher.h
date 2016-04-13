@@ -41,6 +41,8 @@
 
 namespace mongo {
 
+class CollatorInterface;
+
 /**
  * Matcher is a simple wrapper around a BSONObj and the MatchExpression created from it.
  */
@@ -48,7 +50,12 @@ class Matcher {
     MONGO_DISALLOW_COPYING(Matcher);
 
 public:
-    explicit Matcher(const BSONObj& pattern, const ExtensionsCallback& extensionsCallback);
+    /**
+     * 'collator' must outlive the returned Matcher and any MatchExpression cloned from it.
+     */
+    explicit Matcher(const BSONObj& pattern,
+                     const ExtensionsCallback& extensionsCallback,
+                     CollatorInterface* collator);
 
     bool matches(const BSONObj& doc, MatchDetails* details = NULL) const;
 

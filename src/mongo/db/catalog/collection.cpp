@@ -300,8 +300,9 @@ StatusWithMatchExpression Collection::parseValidator(const BSONObj& validator) c
             return status;
     }
 
+    // TODO SERVER-23687: Pass the appropriate CollatorInterface* instead of nullptr.
     auto statusWithMatcher =
-        MatchExpressionParser::parse(validator, ExtensionsCallbackDisallowExtensions());
+        MatchExpressionParser::parse(validator, ExtensionsCallbackDisallowExtensions(), nullptr);
     if (!statusWithMatcher.isOK())
         return statusWithMatcher.getStatus();
 

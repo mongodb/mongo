@@ -59,8 +59,9 @@ double NaN = numeric_limits<double>::quiet_NaN();
  * Utility function to create MatchExpression
  */
 MatchExpression* parseMatchExpression(const BSONObj& obj) {
+    CollatorInterface* collator = nullptr;
     StatusWithMatchExpression status =
-        MatchExpressionParser::parse(obj, ExtensionsCallbackDisallowExtensions());
+        MatchExpressionParser::parse(obj, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(status.isOK());
     MatchExpression* expr(status.getValue().release());
     return expr;

@@ -78,6 +78,7 @@ env.CppUnitTest(
         'expression_parser_tree_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         'expressions',
     ],
 )

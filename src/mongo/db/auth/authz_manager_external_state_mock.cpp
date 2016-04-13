@@ -274,8 +274,9 @@ Status AuthzManagerExternalStateMock::_queryVector(
     const NamespaceString& collectionName,
     const BSONObj& query,
     std::vector<BSONObjCollection::iterator>* result) {
+    CollatorInterface* collator = nullptr;
     StatusWithMatchExpression parseResult =
-        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions());
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     if (!parseResult.isOK()) {
         return parseResult.getStatus();
     }

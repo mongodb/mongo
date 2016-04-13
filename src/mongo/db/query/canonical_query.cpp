@@ -213,8 +213,9 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     std::unique_ptr<LiteParsedQuery> autoLpq(lpq);
 
     // Make MatchExpression.
+    // TODO SERVER-23610: pass our CollatorInterface* instead of nullptr.
     StatusWithMatchExpression statusWithMatcher =
-        MatchExpressionParser::parse(autoLpq->getFilter(), extensionsCallback);
+        MatchExpressionParser::parse(autoLpq->getFilter(), extensionsCallback, nullptr);
     if (!statusWithMatcher.isOK()) {
         return statusWithMatcher.getStatus();
     }
@@ -292,8 +293,9 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     auto& lpq = lpqStatus.getValue();
 
     // Build a parse tree from the BSONObj in the parsed query.
+    // TODO SERVER-23610: pass our CollatorInterface* instead of nullptr.
     StatusWithMatchExpression statusWithMatcher =
-        MatchExpressionParser::parse(lpq->getFilter(), extensionsCallback);
+        MatchExpressionParser::parse(lpq->getFilter(), extensionsCallback, nullptr);
     if (!statusWithMatcher.isOK()) {
         return statusWithMatcher.getStatus();
     }

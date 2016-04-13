@@ -123,8 +123,9 @@ Status ParsedProjection::make(const BSONObj& spec,
                 invariant(elemMatchObj.isOwned());
 
                 // TODO: Is there a faster way of validating the elemMatchObj?
+                // TODO SERVER-23680: pass the appropriate CollatorInterface* instead of nullptr.
                 StatusWithMatchExpression statusWithMatcher =
-                    MatchExpressionParser::parse(elemMatchObj, extensionsCallback);
+                    MatchExpressionParser::parse(elemMatchObj, extensionsCallback, nullptr);
                 if (!statusWithMatcher.isOK()) {
                     return statusWithMatcher.getStatus();
                 }

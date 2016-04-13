@@ -52,8 +52,9 @@ bool filterMatches(const BSONObj& testFilter, const QuerySolutionNode* trueFilte
     if (NULL == trueFilterNode->filter) {
         return false;
     }
+    CollatorInterface* collator = nullptr;
     StatusWithMatchExpression statusWithMatcher =
-        MatchExpressionParser::parse(testFilter, ExtensionsCallbackDisallowExtensions());
+        MatchExpressionParser::parse(testFilter, ExtensionsCallbackDisallowExtensions(), collator);
     if (!statusWithMatcher.isOK()) {
         return false;
     }

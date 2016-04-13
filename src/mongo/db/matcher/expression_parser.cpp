@@ -95,8 +95,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
     // TODO: these should move to getGtLtOp, or its replacement
 
     if (mongoutils::str::equals("$eq", e.fieldName()))
-        // TODO SERVER-23608: Pass our CollatorInterface* to EqualityMatchExpression().
-        return _parseComparison(name, new EqualityMatchExpression(nullptr), e);
+        return _parseComparison(name, new EqualityMatchExpression(_collator), e);
 
     if (mongoutils::str::equals("$not", e.fieldName())) {
         return _parseNot(name, e, level);
@@ -113,26 +112,21 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
             return {Status(ErrorCodes::BadValue,
                            mongoutils::str::stream() << "unknown operator: " << e.fieldName())};
         case BSONObj::LT:
-            // TODO SERVER-23608: Pass our CollatorInterface* to LTMatchExpression().
-            return _parseComparison(name, new LTMatchExpression(nullptr), e);
+            return _parseComparison(name, new LTMatchExpression(_collator), e);
         case BSONObj::LTE:
-            // TODO SERVER-23608: Pass our CollatorInterface* to LTEMatchExpression().
-            return _parseComparison(name, new LTEMatchExpression(nullptr), e);
+            return _parseComparison(name, new LTEMatchExpression(_collator), e);
         case BSONObj::GT:
-            // TODO SERVER-23608: Pass our CollatorInterface* to GTMatchExpression().
-            return _parseComparison(name, new GTMatchExpression(nullptr), e);
+            return _parseComparison(name, new GTMatchExpression(_collator), e);
         case BSONObj::GTE:
-            // TODO SERVER-23608: Pass our CollatorInterface* to GTEMatchExpression().
-            return _parseComparison(name, new GTEMatchExpression(nullptr), e);
+            return _parseComparison(name, new GTEMatchExpression(_collator), e);
         case BSONObj::NE: {
             if (RegEx == e.type()) {
                 // Just because $ne can be rewritten as the negation of an
                 // equality does not mean that $ne of a regex is allowed. See SERVER-1705.
                 return {Status(ErrorCodes::BadValue, "Can't have regex as arg to $ne.")};
             }
-            // TODO SERVER-23608: Pass our CollatorInterface* to EqualityMatchExpression().
             StatusWithMatchExpression s =
-                _parseComparison(name, new EqualityMatchExpression(nullptr), e);
+                _parseComparison(name, new EqualityMatchExpression(_collator), e);
             if (!s.isOK())
                 return s;
             std::unique_ptr<NotMatchExpression> n = stdx::make_unique<NotMatchExpression>();
@@ -142,14 +136,13 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
             return {std::move(n)};
         }
         case BSONObj::Equality:
-            // TODO SERVER-23608: Pass our CollatorInterface* to EqualityMatchExpression().
-            return _parseComparison(name, new EqualityMatchExpression(nullptr), e);
+            return _parseComparison(name, new EqualityMatchExpression(_collator), e);
 
         case BSONObj::opIN: {
             if (e.type() != Array)
                 return {Status(ErrorCodes::BadValue, "$in needs an array")};
-            // TODO SERVER-23608: Pass our CollatorInterface* to InMatchExpression().
-            std::unique_ptr<InMatchExpression> temp = stdx::make_unique<InMatchExpression>(nullptr);
+            std::unique_ptr<InMatchExpression> temp =
+                stdx::make_unique<InMatchExpression>(_collator);
             Status s = temp->init(name);
             if (!s.isOK())
                 return s;
@@ -162,8 +155,8 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
         case BSONObj::NIN: {
             if (e.type() != Array)
                 return {Status(ErrorCodes::BadValue, "$nin needs an array")};
-            // TODO SERVER-23608: Pass our CollatorInterface* to InMatchExpression().
-            std::unique_ptr<InMatchExpression> temp = stdx::make_unique<InMatchExpression>(nullptr);
+            std::unique_ptr<InMatchExpression> temp =
+                stdx::make_unique<InMatchExpression>(_collator);
             Status s = temp->init(name);
             if (!s.isOK())
                 return s;
@@ -354,10 +347,10 @@ StatusWithMatchExpression MatchExpressionParser::_parse(const BSONObj& obj, int 
             } else if (mongoutils::str::equals("ref", rest) ||
                        mongoutils::str::equals("id", rest) || mongoutils::str::equals("db", rest)) {
                 // DBRef fields.
-                // TODO SERVER-23608: Pass our CollatorInterface* to EqualityMatchExpression() in
-                // the "id" case.
+                // 'id' is collation-aware. 'ref' and 'db' are compared using binary comparison.
+                CollatorInterface* collator = (str::equals("id", rest) ? _collator : nullptr);
                 std::unique_ptr<ComparisonMatchExpression> eq =
-                    stdx::make_unique<EqualityMatchExpression>(nullptr);
+                    stdx::make_unique<EqualityMatchExpression>(collator);
                 Status s = eq->init(e.fieldName(), e);
                 if (!s.isOK())
                     return s;
@@ -387,9 +380,8 @@ StatusWithMatchExpression MatchExpressionParser::_parse(const BSONObj& obj, int 
             continue;
         }
 
-        // TODO SERVER-23608: Pass our CollatorInterface* to EqualityMatchExpression().
         std::unique_ptr<ComparisonMatchExpression> eq =
-            stdx::make_unique<EqualityMatchExpression>(nullptr);
+            stdx::make_unique<EqualityMatchExpression>(_collator);
         Status s = eq->init(e.fieldName(), e);
         if (!s.isOK())
             return s;
@@ -807,9 +799,8 @@ StatusWithMatchExpression MatchExpressionParser::_parseAll(const char* name,
         } else if (e.type() == Object && e.Obj().firstElement().getGtLtOp(-1) != -1) {
             return {Status(ErrorCodes::BadValue, "no $ expressions in $all")};
         } else {
-            // TODO SERVER-23608: Pass our CollatorInterface* to EqualityMatchExpression().
             std::unique_ptr<EqualityMatchExpression> x =
-                stdx::make_unique<EqualityMatchExpression>(nullptr);
+                stdx::make_unique<EqualityMatchExpression>(_collator);
             Status s = x->init(name, e);
             if (!s.isOK())
                 return s;

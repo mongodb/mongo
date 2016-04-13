@@ -78,7 +78,8 @@ Status applyOps(OperationContext* txn,
 
             // Apply-ops would never have a $where/$text matcher. Using the "DisallowExtensions"
             // callback ensures that parsing will throw an error if $where or $text are found.
-            Matcher m(f["res"].Obj(), ExtensionsCallbackDisallowExtensions());
+            // TODO SERVER-23690: Pass the appropriate CollatorInterface* instead of nullptr.
+            Matcher m(f["res"].Obj(), ExtensionsCallbackDisallowExtensions(), nullptr);
             if (!m.matches(realres)) {
                 result->append("got", realres);
                 result->append("whatFailed", f);

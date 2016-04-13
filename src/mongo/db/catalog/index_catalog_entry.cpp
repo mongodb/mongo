@@ -104,8 +104,9 @@ void IndexCatalogEntry::init(OperationContext* txn, IndexAccessMethod* accessMet
     if (BSONElement filterElement = _descriptor->getInfoElement("partialFilterExpression")) {
         invariant(filterElement.isABSONObj());
         BSONObj filter = filterElement.Obj();
+        // TODO SERVER-23618: pass the appropriate CollatorInterface* instead of nullptr.
         StatusWithMatchExpression statusWithMatcher =
-            MatchExpressionParser::parse(filter, ExtensionsCallbackDisallowExtensions());
+            MatchExpressionParser::parse(filter, ExtensionsCallbackDisallowExtensions(), nullptr);
         // this should be checked in create, so can blow up here
         invariantOK(statusWithMatcher.getStatus());
         _filterExpression = std::move(statusWithMatcher.getValue());
