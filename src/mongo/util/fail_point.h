@@ -225,9 +225,11 @@ private:
 #define MONGO_FAIL_POINT(symbol) MONGO_unlikely(symbol.shouldFail())
 
 #define MONGO_FAIL_POINT_PAUSE_WHILE_SET(symbol) \
-    while (MONGO_FAIL_POINT(symbol)) {           \
-        sleepmillis(100);                        \
-    }
+    do {                                         \
+        while (MONGO_FAIL_POINT(symbol)) {       \
+            sleepmillis(100);                    \
+        }                                        \
+    } while (false)
 
 /**
  * Macro for creating a fail point with block context. Also use this when

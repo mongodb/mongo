@@ -39,7 +39,9 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 namespace executor {
@@ -76,6 +78,46 @@ TEST_F(ThreadPoolExecutorTest, TimelyCancelationOfScheduleWorkAt) {
     ASSERT_EQUALS(startTime + Milliseconds(200), net->now());
     executor.shutdown();
     joinExecutorThread();
+}
+
+TEST_F(ThreadPoolExecutorTest, ShutdownAndScheduleRaceDoesNotCrash) {
+    // This is a regression test for SERVER-23686. It works by scheduling a work item in the
+    // ThreadPoolTaskExecutor that blocks waiting to be signaled by this thread. Once that work item
+    // is scheduled, this thread enables a FailPoint that causes future calls of
+    // ThreadPoolTaskExecutor::scheduleIntoPool_inlock to spin until its underlying thread pool
+    // shuts down, forcing the race condition described in the aforementioned server ticket. The
+    // failpoint ensures that this thread spins until the task executor thread begins spinning on
+    // the underlying pool shutting down, then this thread tells the task executor to shut
+    // down. Once the pool shuts down, the previously blocked scheduleIntoPool_inlock unblocks, and
+    // discovers the pool to be shut down. The correct behavior is for all scheduled callbacks to
+    // execute, and for this last callback at least to execute with CallbackCanceled as its status.
+    // Before the fix for SERVER-23686, this test causes an fassert failure.
+
+    unittest::Barrier barrier{2};
+    auto status1 = getDetectableErrorStatus();
+    StatusWith<TaskExecutor::CallbackHandle> cb2 = getDetectableErrorStatus();
+    auto status2 = getDetectableErrorStatus();
+    auto& executor = getExecutor();
+    launchExecutorThread();
+
+    ASSERT_OK(executor.scheduleWork([&](const TaskExecutor::CallbackArgs& cbData) {
+        status1 = cbData.status;
+        if (!status1.isOK())
+            return;
+        barrier.countDownAndWait();
+        cb2 = cbData.executor->scheduleWork(
+            [&status2](const TaskExecutor::CallbackArgs& cbData) { status2 = cbData.status; });
+    }).getStatus());
+
+    auto fpTPTE1 =
+        getGlobalFailPointRegistry()->getFailPoint("scheduleIntoPoolSpinsUntilThreadPoolShutsDown");
+    fpTPTE1->setMode(FailPoint::alwaysOn);
+    barrier.countDownAndWait();
+    MONGO_FAIL_POINT_PAUSE_WHILE_SET((*fpTPTE1));
+    executor.shutdown();
+    joinExecutorThread();
+    ASSERT_OK(status1);
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, status2);
 }
 
 }  // namespace
