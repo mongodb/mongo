@@ -255,6 +255,7 @@ env.Library(
     ],
     LIBDEPS=[
         'task_executor_interface',
+        '$BUILD_DIR/mongo/util/fail_point',
     ]
 )
 
@@ -299,6 +300,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'thread_pool_task_executor_test_fixture',
+        '$BUILD_DIR/mongo/unittest/concurrency',
     ]
 )
 
