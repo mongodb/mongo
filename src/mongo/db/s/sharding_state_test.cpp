@@ -72,16 +72,17 @@ void initGrid(OperationContext* txn, const ConnectionString& configConnString) {
 
     auto executorPool = stdx::make_unique<executor::TaskExecutorPool>();
     executorPool->addExecutors(std::move(executorsForPool), std::move(fixedExec));
+    executorPool->startup();
 
-    auto shardRegistry(stdx::make_unique<ShardRegistry>(
-        std::move(shardFactory), std::move(executorPool), mockNetwork, configConnString));
-    shardRegistry->startup();
+    auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(shardFactory), configConnString));
 
     grid.init(
         stdx::make_unique<CatalogManagerMock>(),
         stdx::make_unique<CatalogCache>(),
         std::move(shardRegistry),
-        stdx::make_unique<ClusterCursorManager>(txn->getServiceContext()->getPreciseClockSource()));
+        stdx::make_unique<ClusterCursorManager>(txn->getServiceContext()->getPreciseClockSource()),
+        std::move(executorPool),
+        mockNetwork);
 }
 
 class ShardingStateTest : public mongo::unittest::Test {
@@ -106,7 +107,7 @@ public:
 
         // Cleanup only if shard registry was initialized
         if (grid.shardRegistry()) {
-            grid.shardRegistry()->shutdown();
+            grid.getExecutorPool()->shutdownAndJoin();
             grid.clearForUnitTests();
         }
     }

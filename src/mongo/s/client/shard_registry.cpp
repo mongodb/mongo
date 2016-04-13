@@ -170,12 +170,8 @@ const ShardRegistry::ErrorCodesSet ShardRegistry::kWriteConcernErrors{
     ErrorCodes::CannotSatisfyWriteConcern};
 
 ShardRegistry::ShardRegistry(std::unique_ptr<ShardFactory> shardFactory,
-                             std::unique_ptr<executor::TaskExecutorPool> executorPool,
-                             executor::NetworkInterface* network,
                              ConnectionString configServerCS)
-    : _shardFactory(std::move(shardFactory)),
-      _executorPool(std::move(executorPool)),
-      _network(network) {
+    : _shardFactory(std::move(shardFactory)) {
     updateConfigServerConnectionString(configServerCS);
 }
 
@@ -196,14 +192,6 @@ void ShardRegistry::_updateConfigServerConnectionString_inlock(ConnectionString 
 
     _configServerCS = std::move(configServerCS);
     _addConfigShard_inlock();
-}
-
-void ShardRegistry::startup() {
-    _executorPool->startup();
-}
-
-void ShardRegistry::shutdown() {
-    _executorPool->shutdownAndJoin();
 }
 
 bool ShardRegistry::reload(OperationContext* txn) {
@@ -410,11 +398,6 @@ void ShardRegistry::toBSON(BSONObjBuilder* result) {
     }
 }
 
-void ShardRegistry::appendConnectionStats(executor::ConnectionPoolStats* stats) const {
-    // Get stats from the pool of task executors, including fixed executor within.
-    _executorPool->appendConnectionStats(stats);
-}
-
 void ShardRegistry::_addConfigShard_inlock() {
     _addShard_inlock("config", _configServerCS);
 }
@@ -579,7 +562,7 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::_exhaustiveFindOnConfig(
     findCmdBuilder.append(LiteParsedQuery::cmdOptionMaxTimeMS,
                           durationCount<Milliseconds>(maxTime));
 
-    QueryFetcher fetcher(_executorPool->getFixedExecutor(),
+    QueryFetcher fetcher(Grid::get(txn)->getExecutorPool()->getFixedExecutor(),
                          host.getValue(),
                          nss,
                          findCmdBuilder.done(),
@@ -636,7 +619,7 @@ StatusWith<BSONObj> ShardRegistry::runIdempotentCommandOnShard(
     const std::string& dbName,
     const BSONObj& cmdObj) {
     auto response = _runCommandWithRetries(txn,
-                                           _executorPool->getFixedExecutor(),
+                                           Grid::get(txn)->getExecutorPool()->getFixedExecutor(),
                                            shard,
                                            readPref,
                                            dbName,
@@ -672,7 +655,7 @@ StatusWith<BSONObj> ShardRegistry::runIdempotentCommandOnConfig(
     const BSONObj& cmdObj) {
     auto response = _runCommandWithRetries(
         txn,
-        _executorPool->getFixedExecutor(),
+        Grid::get(txn)->getExecutorPool()->getFixedExecutor(),
         getConfigShard(),
         readPref,
         dbName,
@@ -693,7 +676,7 @@ StatusWith<BSONObj> ShardRegistry::runCommandOnConfigWithRetries(
     const BSONObj& cmdObj,
     const ShardRegistry::ErrorCodesSet& errorsToCheck) {
     auto response = _runCommandWithRetries(txn,
-                                           _executorPool->getFixedExecutor(),
+                                           Grid::get(txn)->getExecutorPool()->getFixedExecutor(),
                                            getConfigShard(),
                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                            dbname,

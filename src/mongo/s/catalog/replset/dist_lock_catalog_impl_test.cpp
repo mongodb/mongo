@@ -42,12 +42,15 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager_mock.h"
 #include "mongo/s/catalog/replset/dist_lock_catalog_impl.h"
 #include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/client/shard_factory_mock.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/write_ops/batched_update_request.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
@@ -89,7 +92,8 @@ public:
     }
 
     std::shared_ptr<RemoteCommandTargeterMock> targeter() {
-        return RemoteCommandTargeterMock::get(_shardRegistry->getConfigShard()->getTargeter());
+        return RemoteCommandTargeterMock::get(
+            grid.shardRegistry()->getConfigShard()->getTargeter());
     }
 
     DistLockCatalogImpl* catalog() {
@@ -97,10 +101,10 @@ public:
     }
 
     // Not thread safe
-    void shutdownShardRegistry() {
+    void shutdownExecutor() {
         if (!_shutdownCalled) {
             _shutdownCalled = true;
-            _shardRegistry->shutdown();
+            grid.getExecutorPool()->shutdownAndJoin();
         }
     }
 
@@ -121,19 +125,27 @@ private:
 
         auto executorPool = stdx::make_unique<executor::TaskExecutorPool>();
         executorPool->addExecutors(std::move(executorsForPool), std::move(fixedExecutor));
+        executorPool->startup();
 
         ConnectionString configCS(HostAndPort("dummy:1234"));
-        _shardRegistry = stdx::make_unique<ShardRegistry>(
-            stdx::make_unique<ShardFactoryMock>(), std::move(executorPool), network, configCS);
-        _shardRegistry->startup();
+        auto shardRegistry =
+            stdx::make_unique<ShardRegistry>(stdx::make_unique<ShardFactoryMock>(), configCS);
 
-        _distLockCatalog = stdx::make_unique<DistLockCatalogImpl>(_shardRegistry.get());
+        _distLockCatalog = stdx::make_unique<DistLockCatalogImpl>(shardRegistry.get());
+
+        grid.init(stdx::make_unique<CatalogManagerMock>(),
+                  stdx::make_unique<CatalogCache>(),
+                  std::move(shardRegistry),
+                  std::unique_ptr<ClusterCursorManager>{nullptr},
+                  std::move(executorPool),
+                  network);
 
         targeter()->setFindHostReturnValue(dummyHost);
     }
 
     void tearDown() override {
-        shutdownShardRegistry();
+        shutdownExecutor();
+        grid.clearForUnitTests();
     }
 
     bool _shutdownCalled = false;
@@ -142,7 +154,6 @@ private:
 
     CatalogManagerMock _catalogMgr;
 
-    std::unique_ptr<ShardRegistry> _shardRegistry;
     std::unique_ptr<DistLockCatalogImpl> _distLockCatalog;
     OperationContextNoop _txn;
 };
@@ -198,7 +209,7 @@ TEST_F(DistLockCatalogFixture, PingTargetError) {
 }
 
 TEST_F(DistLockCatalogFixture, PingRunCmdError) {
-    shutdownShardRegistry();
+    shutdownExecutor();
 
     auto status = catalog()->ping(txn(), "abcd", Date_t::now());
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
@@ -442,7 +453,7 @@ TEST_F(DistLockCatalogFixture, GrabLockTargetError) {
 }
 
 TEST_F(DistLockCatalogFixture, GrabLockRunCmdError) {
-    shutdownShardRegistry();
+    shutdownExecutor();
 
     auto status = catalog()->grabLock(txn(), "", OID::gen(), "", "", Date_t::now(), "").getStatus();
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
@@ -761,7 +772,7 @@ TEST_F(DistLockCatalogFixture, OvertakeLockTargetError) {
 }
 
 TEST_F(DistLockCatalogFixture, OvertakeLockRunCmdError) {
-    shutdownShardRegistry();
+    shutdownExecutor();
 
     auto status =
         catalog()->overtakeLock(txn(), "", OID(), OID(), "", "", Date_t::now(), "").getStatus();
@@ -936,7 +947,7 @@ TEST_F(DistLockCatalogFixture, UnlockTargetError) {
 }
 
 TEST_F(DistLockCatalogFixture, UnlockRunCmdError) {
-    shutdownShardRegistry();
+    shutdownExecutor();
 
     auto status = catalog()->unlock(txn(), OID());
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
@@ -1144,7 +1155,7 @@ TEST_F(DistLockCatalogFixture, GetServerTargetError) {
 }
 
 TEST_F(DistLockCatalogFixture, GetServerRunCmdError) {
-    shutdownShardRegistry();
+    shutdownExecutor();
 
     auto status = catalog()->getServerInfo(txn()).getStatus();
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
@@ -1290,7 +1301,7 @@ TEST_F(DistLockCatalogFixture, StopPingTargetError) {
 }
 
 TEST_F(DistLockCatalogFixture, StopPingRunCmdError) {
-    shutdownShardRegistry();
+    shutdownExecutor();
 
     auto status = catalog()->stopPing(txn(), "");
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
@@ -1435,7 +1446,7 @@ TEST_F(DistLockCatalogFixture, GetPingTargetError) {
 }
 
 TEST_F(DistLockCatalogFixture, GetPingRunCmdError) {
-    shutdownShardRegistry();
+    shutdownExecutor();
 
     auto status = catalog()->getPing(txn(), "").getStatus();
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
@@ -1520,7 +1531,7 @@ TEST_F(DistLockCatalogFixture, GetLockByTSTargetError) {
 }
 
 TEST_F(DistLockCatalogFixture, GetLockByTSRunCmdError) {
-    shutdownShardRegistry();
+    shutdownExecutor();
     auto status = catalog()->getLockByTS(txn(), OID()).getStatus();
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
     ASSERT_FALSE(status.reason().empty());
@@ -1607,7 +1618,7 @@ TEST_F(DistLockCatalogFixture, GetLockByNameTargetError) {
 }
 
 TEST_F(DistLockCatalogFixture, GetLockByNameRunCmdError) {
-    shutdownShardRegistry();
+    shutdownExecutor();
 
     auto status = catalog()->getLockByName(txn(), "x").getStatus();
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());

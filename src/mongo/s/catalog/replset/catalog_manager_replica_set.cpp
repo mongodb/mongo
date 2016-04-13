@@ -668,8 +668,8 @@ Status CatalogManagerReplicaSet::_log(OperationContext* txn,
                                       const std::string& what,
                                       const std::string& operationNS,
                                       const BSONObj& detail) {
-    Date_t now = grid.shardRegistry()->getExecutor()->now();
-    const std::string hostName = grid.shardRegistry()->getNetwork()->getHostName();
+    Date_t now = Grid::get(txn)->getNetwork()->now();
+    const std::string hostName = Grid::get(txn)->getNetwork()->getHostName();
     const string changeId = str::stream() << hostName << "-" << now.toString() << "-" << OID::gen();
 
     ChangeLogType changeLog;
@@ -1111,7 +1111,7 @@ Status CatalogManagerReplicaSet::dropCollection(OperationContext* txn, const Nam
     coll.setNs(ns);
     coll.setDropped(true);
     coll.setEpoch(ChunkVersion::DROPPED().epoch());
-    coll.setUpdatedAt(grid.shardRegistry()->getNetwork()->now());
+    coll.setUpdatedAt(Grid::get(txn)->getNetwork()->now());
 
     result = updateCollection(txn, ns.ns(), coll);
     if (!result.isOK()) {

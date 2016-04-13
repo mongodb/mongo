@@ -89,6 +89,8 @@ protected:
 
     executor::NetworkInterfaceMock* network() const;
 
+    executor::TaskExecutor* executor() const;
+
     MessagingPortMock* getMessagingPort() const;
 
     DistLockManagerMock* distLock() const;

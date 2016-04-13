@@ -346,9 +346,6 @@ private:
     // True if startup() has been called.
     bool _started = false;  // (M)
 
-    // Last known highest opTime from the config server.
-    repl::OpTime _configOpTime;  // (M)
-
     // Whether the logAction call should attempt to create the actionlog collection
     AtomicInt32 _actionLogCollectionCreated{0};  // (S)
 

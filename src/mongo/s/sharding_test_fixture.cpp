@@ -129,20 +129,21 @@ void ShardingTestFixture::setUp() {
     _configTargeter = configTargeter.get();
     _shardFactory->addTargeterToReturn(configCS, std::move(configTargeter));
 
-    auto shardRegistry(stdx::make_unique<ShardRegistry>(
-        std::move(shardFactory), std::move(executorPool), _mockNetwork, configCS));
-    shardRegistry->startup();
+    auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS));
+    executorPool->startup();
 
     // For now initialize the global grid object. All sharding objects will be accessible
     // from there until we get rid of it.
     grid.init(std::move(cm),
               stdx::make_unique<CatalogCache>(),
               std::move(shardRegistry),
-              stdx::make_unique<ClusterCursorManager>(_service->getPreciseClockSource()));
+              stdx::make_unique<ClusterCursorManager>(_service->getPreciseClockSource()),
+              std::move(executorPool),
+              _mockNetwork);
 }
 
 void ShardingTestFixture::tearDown() {
-    grid.shardRegistry()->shutdown();
+    grid.getExecutorPool()->shutdownAndJoin();
     grid.catalogManager(_opCtx.get())->shutDown(_opCtx.get());
     grid.clearForUnitTests();
 
@@ -188,6 +189,12 @@ executor::NetworkInterfaceMock* ShardingTestFixture::network() const {
     invariant(_mockNetwork);
 
     return _mockNetwork;
+}
+
+executor::TaskExecutor* ShardingTestFixture::executor() const {
+    invariant(_executor);
+
+    return _executor;
 }
 
 MessagingPortMock* ShardingTestFixture::getMessagingPort() const {
@@ -346,7 +353,7 @@ void ShardingTestFixture::expectConfigCollectionInsert(const HostAndPort& config
         const std::string timePiece = changeId.substr(firstDash + 1, lastDash - firstDash - 1);
         const std::string oidPiece = changeId.substr(lastDash + 1);
 
-        ASSERT_EQUALS(shardRegistry()->getNetwork()->getHostName(), serverPiece);
+        ASSERT_EQUALS(grid.getNetwork()->getHostName(), serverPiece);
         ASSERT_EQUALS(timestamp.toString(), timePiece);
 
         OID generatedOID;

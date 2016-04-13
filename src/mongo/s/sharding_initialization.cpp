@@ -151,22 +151,23 @@ Status initializeGlobalShardingState(OperationContext* txn,
                                        stdx::make_unique<ShardingNetworkConnectionHook>(),
                                        std::move(metadataHook));
     auto networkPtr = network.get();
+    auto executorPool = makeTaskExecutorPool(std::move(network), isMongos);
+    executorPool->startup();
+
     auto shardRegistry(
-        stdx::make_unique<ShardRegistry>(stdx::make_unique<ShardFactoryImpl>(),
-                                         makeTaskExecutorPool(std::move(network), isMongos),
-                                         networkPtr,
-                                         configCS));
+        stdx::make_unique<ShardRegistry>(stdx::make_unique<ShardFactoryImpl>(), configCS));
 
     auto catalogManager = makeCatalogManager(getGlobalServiceContext(),
                                              shardRegistry.get(),
                                              HostAndPort(getHostName(), serverGlobalParams.port));
 
-    shardRegistry->startup();
-    grid.init(std::move(catalogManager),
-              stdx::make_unique<CatalogCache>(),
-              std::move(shardRegistry),
-              stdx::make_unique<ClusterCursorManager>(
-                  getGlobalServiceContext()->getPreciseClockSource()));
+    grid.init(
+        std::move(catalogManager),
+        stdx::make_unique<CatalogCache>(),
+        std::move(shardRegistry),
+        stdx::make_unique<ClusterCursorManager>(getGlobalServiceContext()->getPreciseClockSource()),
+        std::move(executorPool),
+        networkPtr);
 
     while (!inShutdown()) {
         try {

@@ -125,7 +125,7 @@ static void cleanupTask() {
 
         auto cursorManager = grid.getCursorManager();
         cursorManager->shutdown();
-        grid.shardRegistry()->shutdown();
+        grid.getExecutorPool()->shutdownAndJoin();
         grid.catalogManager(txn)->shutDown(txn);
     }
 

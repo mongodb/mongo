@@ -174,7 +174,7 @@ void ShardingState::shutDown(OperationContext* txn) {
     }
 
     if (_getInitializationState() == InitializationState::kInitialized) {
-        grid.shardRegistry()->shutdown();
+        grid.getExecutorPool()->shutdownAndJoin();
         grid.catalogManager(txn)->shutDown(txn);
     }
 }

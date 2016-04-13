@@ -86,41 +86,11 @@ public:
      * Instantiates a new shard registry.
      *
      * @param shardFactory Makes shards
-     * @param commandRunner Command runner for executing commands against hosts
-     * @param executor Asynchronous task executor to use for making calls to shards and
-     *     config servers.
-     * @param network Network interface backing executor.
      * @param configServerCS ConnectionString used for communicating with the config servers
      */
-    ShardRegistry(std::unique_ptr<ShardFactory> shardFactory,
-                  std::unique_ptr<executor::TaskExecutorPool> executorPool,
-                  executor::NetworkInterface* network,
-                  ConnectionString configServerCS);
+    ShardRegistry(std::unique_ptr<ShardFactory> shardFactory, ConnectionString configServerCS);
 
     ~ShardRegistry();
-
-    /**
-     * Invokes the executor's startup method, which will start any networking/async execution
-     * threads.
-     */
-    void startup();
-
-    /**
-     * Stops the executor thread and waits for it to join.
-     */
-    void shutdown();
-
-    executor::TaskExecutor* getExecutor() const {
-        return _executorPool->getFixedExecutor();
-    }
-
-    executor::TaskExecutorPool* getExecutorPool() const {
-        return _executorPool.get();
-    }
-
-    executor::NetworkInterface* getNetwork() const {
-        return _network;
-    }
 
     ConnectionString getConfigServerConnectionString() const;
 
@@ -204,11 +174,6 @@ public:
     void getAllShardIds(std::vector<ShardId>* all) const;
 
     void toBSON(BSONObjBuilder* result);
-
-    /**
-     * Append information about the sharding subsystem's connection pools.
-     */
-    void appendConnectionStats(executor::ConnectionPoolStats* stats) const;
 
     /**
      * Executes 'find' command against a config server matching the given read preference, and
@@ -368,15 +333,6 @@ private:
     // Factory to create shards.  Never changed after startup so safe
     // to access outside of _mutex.
     const std::unique_ptr<ShardFactory> _shardFactory;
-
-    // Executor pool for scheduling work and remote commands to shards and config servers. Each
-    // contained executor has a connection hook set on it for initialization sharding data on shards
-    // and detecting if the catalog manager needs swapping.
-    const std::unique_ptr<executor::TaskExecutorPool> _executorPool;
-
-    // Network interface being used by _executor.  Used for asking questions about the network
-    // configuration, such as getting the current server's hostname.
-    executor::NetworkInterface* const _network;
 
     // Protects the _reloadState, config server connections string, and the lookup maps below.
     mutable stdx::mutex _mutex;

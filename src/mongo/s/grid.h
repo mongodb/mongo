@@ -40,6 +40,11 @@ class ClusterCursorManager;
 class OperationContext;
 class ShardRegistry;
 
+namespace executor {
+class NetworkInterface;
+class TaskExecutorPool;
+}  // namespace executor
+
 /**
  * Holds the global sharding context. Single instance exists for a running server. Exists on
  * both MongoD and MongoS.
@@ -64,7 +69,9 @@ public:
     void init(std::unique_ptr<CatalogManager> catalogManager,
               std::unique_ptr<CatalogCache> catalogCache,
               std::unique_ptr<ShardRegistry> shardRegistry,
-              std::unique_ptr<ClusterCursorManager> cursorManager);
+              std::unique_ptr<ClusterCursorManager> cursorManager,
+              std::unique_ptr<executor::TaskExecutorPool> executorPool,
+              executor::NetworkInterface* network);
 
     /**
      * @return true if shards and config servers are allowed to use 'localhost' in address
@@ -96,6 +103,14 @@ public:
         return _cursorManager.get();
     }
 
+    executor::TaskExecutorPool* getExecutorPool() {
+        return _executorPool.get();
+    }
+
+    executor::NetworkInterface* getNetwork() {
+        return _network;
+    }
+
     repl::OpTime configOpTime() const {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _configOpTime;
@@ -119,6 +134,14 @@ private:
     std::unique_ptr<CatalogCache> _catalogCache;
     std::unique_ptr<ShardRegistry> _shardRegistry;
     std::unique_ptr<ClusterCursorManager> _cursorManager;
+
+    // Executor pool for scheduling work and remote commands to shards and config servers. Each
+    // contained executor has a connection hook set on it for sending/receiving sharding metadata.
+    std::unique_ptr<executor::TaskExecutorPool> _executorPool;
+
+    // Network interface being used by the fixed executor in _executorPool.  Used for asking
+    // questions about the network configuration, such as getting the current server's hostname.
+    executor::NetworkInterface* _network;
 
     // Protects _configOpTime.
     mutable stdx::mutex _mutex;

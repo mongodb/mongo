@@ -32,6 +32,8 @@
 
 #include "mongo/s/grid.h"
 
+#include "mongo/executor/task_executor.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/client/shard_registry.h"
@@ -44,7 +46,7 @@ namespace mongo {
 // Global grid instance
 Grid grid;
 
-Grid::Grid() : _allowLocalShard(true) {}
+Grid::Grid() : _network(nullptr), _allowLocalShard(true) {}
 
 Grid::~Grid() = default;
 
@@ -55,16 +57,22 @@ Grid* Grid::get(OperationContext* operationContext) {
 void Grid::init(std::unique_ptr<CatalogManager> catalogManager,
                 std::unique_ptr<CatalogCache> catalogCache,
                 std::unique_ptr<ShardRegistry> shardRegistry,
-                std::unique_ptr<ClusterCursorManager> cursorManager) {
+                std::unique_ptr<ClusterCursorManager> cursorManager,
+                std::unique_ptr<executor::TaskExecutorPool> executorPool,
+                executor::NetworkInterface* network) {
     invariant(!_catalogManager);
     invariant(!_catalogCache);
     invariant(!_shardRegistry);
     invariant(!_cursorManager);
+    invariant(!_executorPool);
+    invariant(!_network);
 
     _catalogManager = std::move(catalogManager);
     _catalogCache = std::move(catalogCache);
     _shardRegistry = std::move(shardRegistry);
     _cursorManager = std::move(cursorManager);
+    _executorPool = std::move(executorPool);
+    _network = network;
 }
 
 bool Grid::allowLocalHost() const {
@@ -87,6 +95,8 @@ void Grid::clearForUnitTests() {
     _catalogCache.reset();
     _shardRegistry.reset();
     _cursorManager.reset();
+    _executorPool.reset();
+    _network = nullptr;
     _configOpTime = repl::OpTime();
 }
 

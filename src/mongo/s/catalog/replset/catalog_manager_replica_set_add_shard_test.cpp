@@ -219,7 +219,7 @@ protected:
 
         // Expect the change log operation
         expectChangeLogInsert(configHost,
-                              shardRegistry()->getNetwork()->now(),
+                              network()->now(),
                               "addShard",
                               "",
                               BSON("name" << shardName << "host" << shardHost));

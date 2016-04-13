@@ -464,17 +464,19 @@ StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::_callRecipient(const BSONO
     StatusWith<executor::RemoteCommandResponse> responseStatus(
         Status{ErrorCodes::InternalError, "Uninitialized value"});
 
-    auto scheduleStatus = grid.shardRegistry()->getExecutor()->scheduleRemoteCommand(
+    auto executor = grid.getExecutorPool()->getArbitraryExecutor();
+    auto scheduleStatus = executor->scheduleRemoteCommand(
         executor::RemoteCommandRequest(_recipientHost, "admin", cmdObj),
         [&responseStatus](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
             responseStatus = args.response;
         });
 
+    // TODO: Update RemoteCommandTargeter on NotMaster errors.
     if (!scheduleStatus.isOK()) {
         return scheduleStatus.getStatus();
     }
 
-    grid.shardRegistry()->getExecutor()->wait(scheduleStatus.getValue());
+    executor->wait(scheduleStatus.getValue());
 
     if (!responseStatus.isOK()) {
         return responseStatus.getStatus();
