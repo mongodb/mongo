@@ -248,9 +248,6 @@ if env['MONGO_ALLOCATOR'] == 'tcmalloc':
         # Add in the include path for our vendored tcmalloc.
         tcmspEnv.InjectThirdPartyIncludePaths('gperftools')
 
-        # Include valgrind since tcmalloc disables itself while running under valgrind
-        tcmspEnv.InjectThirdPartyIncludePaths('valgrind')
-
         # If our changes to tcmalloc are ever upstreamed, this should become set based on a top
         # level configure check, though its effects should still be scoped just to these files.
         tcmspEnv.Append(
@@ -259,6 +256,10 @@ if env['MONGO_ALLOCATOR'] == 'tcmalloc':
                 'MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS'
             ]
         )
+
+    if not use_system_version_of_library('valgrind'):
+        # Include valgrind since tcmalloc disables itself while running under valgrind
+        tcmspEnv.InjectThirdPartyIncludePaths('valgrind')
 
     tcmspEnv.Library(
         target='tcmalloc_set_parameter',
