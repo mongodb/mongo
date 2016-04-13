@@ -64,6 +64,9 @@ Status ScatterGatherRunner::run() {
 StatusWith<EventHandle> ScatterGatherRunner::start() {
     // Callback has a shared pointer to the RunnerImpl, so it's always safe to
     // access the RunnerImpl.
+    // Note: this creates a cycle of shared_ptr:
+    //     RunnerImpl -> Callback in _callbacks -> RunnerImpl
+    // We must remove callbacks after using them, to break this cycle.
     std::shared_ptr<RunnerImpl>& impl = _impl;
     auto cb = [impl](const RemoteCommandCallbackArgs& cbData) { impl->processResponse(cbData); };
     return _impl->start(cb);
@@ -122,21 +125,28 @@ void ScatterGatherRunner::RunnerImpl::cancel() {
 
 void ScatterGatherRunner::RunnerImpl::processResponse(
     const ReplicationExecutor::RemoteCommandCallbackArgs& cbData) {
-    if (cbData.response.getStatus() == ErrorCodes::CallbackCanceled) {
-        return;
-    }
     LockGuard lk(_mutex);
+
     if (!_sufficientResponsesReceived.isValid()) {
         // We've received sufficient responses and it's not safe to access the algorithm any more.
         return;
     }
 
-    ++_actualResponses;
+    // Remove the callback from our vector to break the cycle of shared_ptr.
+    auto iter = std::find(_callbacks.begin(), _callbacks.end(), cbData.myHandle);
+    invariant(iter != _callbacks.end());
+    std::swap(*iter, _callbacks.back());
+    _callbacks.pop_back();
+
+    if (cbData.response.getStatus() == ErrorCodes::CallbackCanceled) {
+        return;
+    }
+
     _algorithm->processResponse(cbData.request, cbData.response);
     if (_algorithm->hasReceivedSufficientResponses()) {
         _signalSufficientResponsesReceived();
     } else {
-        invariant(_actualResponses < _callbacks.size());
+        invariant(!_callbacks.empty());
     }
 }
 
@@ -145,6 +155,8 @@ void ScatterGatherRunner::RunnerImpl::_signalSufficientResponsesReceived() {
         std::for_each(_callbacks.begin(),
                       _callbacks.end(),
                       stdx::bind(&ReplicationExecutor::cancel, _executor, stdx::placeholders::_1));
+        // Clear _callbacks to break the cycle of shared_ptr.
+        _callbacks.clear();
         _executor->signalEvent(_sufficientResponsesReceived);
         _sufficientResponsesReceived = EventHandle();
     }

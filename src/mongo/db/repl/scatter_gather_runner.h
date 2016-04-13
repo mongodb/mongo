@@ -124,7 +124,6 @@ private:
         ScatterGatherAlgorithm* _algorithm;  // Not owned here.
         ReplicationExecutor::EventHandle _sufficientResponsesReceived;
         std::vector<ReplicationExecutor::CallbackHandle> _callbacks;
-        size_t _actualResponses = 0;
         bool _started = false;
         stdx::mutex _mutex;
     };
