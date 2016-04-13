@@ -59,26 +59,6 @@ env.Library(target='network_interface',
                 'task_executor_interface',
             ])
 
-env.Library(target='network_interface_impl', # TODO: rename to thread_pool_network_interface
-            source=['network_interface_impl.cpp',],
-            LIBDEPS=[
-                '$BUILD_DIR/mongo/client/remote_command_runner_impl',
-                '$BUILD_DIR/mongo/util/concurrency/thread_pool',
-                'network_interface',
-                'task_executor_interface',
-            ])
-
-env.CppUnitTest(
-    target='network_interface_impl_test',
-    source=[
-        'network_interface_impl_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
-        'network_interface_impl',
-    ],
-)
-
 env.Library('network_interface_mock',
             [
                 'network_interface_mock.cpp',
@@ -230,7 +210,6 @@ env.CppIntegrationTest(
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/rpc/command_status',
         'network_interface_asio',
-        'network_interface_impl',
     ],
 )
 
@@ -243,7 +222,6 @@ env.Library(
     LIBDEPS=[
         'network_interface',
         'network_interface_asio',
-        'network_interface_impl',
     ])
 
 env.Library(

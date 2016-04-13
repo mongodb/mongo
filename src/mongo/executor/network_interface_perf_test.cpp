@@ -40,7 +40,6 @@
 #include "mongo/executor/async_timer_asio.h"
 #include "mongo/executor/network_interface_asio.h"
 #include "mongo/executor/network_interface_asio_test_utils.h"
-#include "mongo/executor/network_interface_impl.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/integration_test.h"
@@ -108,13 +107,6 @@ TEST(NetworkInterfaceASIO, SerialPerf) {
     int duration = timeNetworkTestMillis(numOperations, &netAsio);
     int result = numOperations * 1000 / duration;
     log() << "THROUGHPUT asio ping ops/s: " << result << std::endl;
-}
-
-TEST(NetworkInterfaceImpl, SerialPerf) {
-    NetworkInterfaceImpl netImpl{};
-    int duration = timeNetworkTestMillis(numOperations, &netImpl);
-    int result = numOperations * 1000 / duration;
-    log() << "THROUGHPUT impl ping ops/s: " << result << std::endl;
 }
 
 }  // namespace
