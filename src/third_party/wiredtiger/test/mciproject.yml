@@ -124,10 +124,10 @@ buildvariants:
     - name: compile-windows-alt
     - name: fops-windows
 
-- name: osx-108
-  display_name: OS X 10.8
+- name: osx-1010
+  display_name: OS X 10.10
   run_on:
-  - osx-108
+  - osx-1010
   expansions:
     smp_command: -j$(sysctl -n hw.logicalcpu)
     configure_env_vars: PATH=/opt/local/bin:$PATH

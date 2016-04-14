@@ -58,8 +58,10 @@ __wt_las_create(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 
-	if (F_ISSET(conn, WT_CONN_READONLY))
+	/* Read-only and in-memory configurations don't need the LAS table. */
+	if (F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY))
 		return (0);
+
 	/*
 	 * Done at startup: we cannot do it on demand because we require the
 	 * schema lock to create and drop the table, and it may not always be
