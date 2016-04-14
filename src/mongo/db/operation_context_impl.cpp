@@ -168,11 +168,6 @@ bool opShouldFail(const OperationContextImpl* opCtx, const BSONObj& failPointInf
 }  // namespace
 
 void OperationContextImpl::checkForInterrupt() {
-    // We cannot interrupt operation, while it's inside of a write unit of work, because logOp
-    // cannot handle being iterrupted.
-    if (lockState()->inAWriteUnitOfWork())
-        return;
-
     uassertStatusOK(checkForInterruptNoAssert());
 }
 
