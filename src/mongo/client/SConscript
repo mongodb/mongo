@@ -197,6 +197,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/net/hostandport',
+        '$BUILD_DIR/mongo/s/coreshard',
     ]
 )
 
