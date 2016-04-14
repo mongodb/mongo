@@ -1,5 +1,8 @@
 /**
  * This test checks the upgrade path from noauth/allowSSL to x509/requireSSL
+ *
+ * This test requires users to persist across a restart.
+ * @tags: [requires_persistence]
  */
 
 load('jstests/ssl/libs/ssl_helpers.js');
