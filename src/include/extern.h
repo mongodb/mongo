@@ -283,8 +283,8 @@ extern int __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **c
 extern int __wt_curfile_update_check(WT_CURSOR *cursor);
 extern int __wt_curfile_create(WT_SESSION_IMPL *session, WT_CURSOR *owner, const char *cfg[], bool bulk, bool bitmap, WT_CURSOR **cursorp);
 extern int __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp);
-extern int __wt_curindex_joined(WT_CURSOR *cursor);
 extern int __wt_curindex_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp);
+extern int __wt_curjoin_joined(WT_CURSOR *cursor);
 extern int __wt_curjoin_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp);
 extern int __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin, WT_INDEX *idx, WT_CURSOR *ref_cursor, uint8_t flags, uint8_t range, uint64_t count, uint32_t bloom_bit_count, uint32_t bloom_hash_count);
 extern int __wt_json_alloc_unpack(WT_SESSION_IMPL *session, const void *buffer, size_t size, const char *fmt, WT_CURSOR_JSON *json, bool iskey, va_list ap);

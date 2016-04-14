@@ -8,20 +8,6 @@
 
 #include "wt_internal.h"
 
- /*
- * __wt_curindex_joined --
- *	Produce an error that this cursor is being used in a join call.
- */
-int
-__wt_curindex_joined(WT_CURSOR *cursor)
-{
-	WT_SESSION_IMPL *session;
-
-	session = (WT_SESSION_IMPL *)cursor->session;
-	__wt_errx(session, "index cursor is being used in a join");
-	return (ENOTSUP);
-}
-
 /*
  * __curindex_get_value --
  *	WT_CURSOR->get_value implementation for index cursors.

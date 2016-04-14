@@ -304,6 +304,9 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_join[] = {
 	    NULL, "choices=[\"eq\",\"ge\",\"gt\",\"le\",\"lt\"]",
 	    NULL, 0 },
 	{ "count", "int", NULL, NULL, NULL, 0 },
+	{ "operation", "string",
+	    NULL, "choices=[\"and\",\"or\"]",
+	    NULL, 0 },
 	{ "strategy", "string",
 	    NULL, "choices=[\"bloom\",\"default\"]",
 	    NULL, 0 },
@@ -1031,8 +1034,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	},
 	{ "WT_SESSION.join",
 	  "bloom_bit_count=16,bloom_hash_count=8,compare=\"eq\",count=,"
-	  "strategy=",
-	  confchk_WT_SESSION_join, 5
+	  "operation=\"and\",strategy=",
+	  confchk_WT_SESSION_join, 6
 	},
 	{ "WT_SESSION.log_flush",
 	  "sync=on",
