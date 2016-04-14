@@ -33,7 +33,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/json.h"
-#include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
@@ -47,6 +46,7 @@
 #include "mongo/s/catalog/replset/dist_lock_catalog_impl.h"
 #include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/s/catalog/type_locks.h"
+#include "mongo/s/client/shard_factory_mock.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/write_ops/batched_update_request.h"
 #include "mongo/stdx/future.h"
@@ -126,12 +126,11 @@ private:
             stdx::make_unique<executor::NetworkInterfaceMock>());
 
         ConnectionString configCS(HostAndPort("dummy:1234"));
-        _shardRegistry =
-            stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryMock>(),
-                                             std::move(executorPool),
-                                             network,
-                                             std::move(addShardExecutor),
-                                             configCS);
+        _shardRegistry = stdx::make_unique<ShardRegistry>(stdx::make_unique<ShardFactoryMock>(),
+                                                          std::move(executorPool),
+                                                          network,
+                                                          std::move(addShardExecutor),
+                                                          configCS);
         _shardRegistry->startup();
 
         _distLockCatalog = stdx::make_unique<DistLockCatalogImpl>(_shardRegistry.get());

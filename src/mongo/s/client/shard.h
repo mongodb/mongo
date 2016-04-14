@@ -55,7 +55,7 @@ public:
      * Instantiates a new shard connection management object for the specified shard.
      */
     Shard(const ShardId& id,
-          const ConnectionString& connStr,
+          const ConnectionString& originalConnString,
           std::unique_ptr<RemoteCommandTargeter> targeter);
 
     ~Shard();
@@ -69,8 +69,18 @@ public:
      */
     bool isConfig() const;
 
-    const ConnectionString getConnString() const {
-        return _cs;
+
+    /**
+     * Returns the current config string.
+     */
+    const ConnectionString getConnString() const;
+
+    /**
+     * Returns the config string that was used on the shard creation. The RS config string may be
+     * different.
+     */
+    const ConnectionString originalConnString() const {
+        return _originalConnString;
     }
 
     std::shared_ptr<RemoteCommandTargeter> getTargeter() const {
@@ -82,6 +92,14 @@ public:
      */
     std::string toString() const;
 
+
+    /**
+     * Notifies the RemoteCommandTargeter owned by the shard of a particular mode of failure for the
+     * specified host.
+     */
+    void updateReplSetMonitor(const HostAndPort& remoteHost, const Status& remoteCommandStatus);
+
+
 private:
     /**
      * Identifier of the shard as obtained from the configuration data (i.e. shard0000).
@@ -89,9 +107,9 @@ private:
     const ShardId _id;
 
     /**
-     * Connection string for the shard.
+     * Connection string for the shard at the creation time.
      */
-    const ConnectionString _cs;
+    const ConnectionString _originalConnString;
 
     /**
      * Targeter for obtaining hosts from which to read or to which to write.

@@ -10,6 +10,7 @@ env.Library(
         'shard_connection.cpp',
         'shard_registry.cpp',
         'version_manager.cpp',
+        'shard_factory_impl.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver',

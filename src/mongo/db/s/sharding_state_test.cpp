@@ -29,7 +29,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/status_with.h"
-#include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/executor/network_interface_mock.h"
@@ -42,6 +41,7 @@
 #include "mongo/db/service_context_noop.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager_mock.h"
+#include "mongo/s/client/shard_factory_mock.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
@@ -56,7 +56,7 @@ namespace {
  * Initializes the grid object with the bare minimum and is not intended to be functional.
  */
 void initGrid(OperationContext* txn, const ConnectionString& configConnString) {
-    auto targeterFactory(stdx::make_unique<RemoteCommandTargeterFactoryMock>());
+    auto shardFactory(stdx::make_unique<ShardFactoryMock>());
 
     // Set up executor pool used for most operations.
     auto fixedNet = stdx::make_unique<executor::NetworkInterfaceMock>();
@@ -78,7 +78,7 @@ void initGrid(OperationContext* txn, const ConnectionString& configConnString) {
     // auto specialMockNet = specialNet.get();
     auto specialExec = makeThreadPoolTestExecutor(std::move(specialNet));
 
-    auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(targeterFactory),
+    auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(shardFactory),
                                                         std::move(executorPool),
                                                         mockNetwork,
                                                         std::move(specialExec),

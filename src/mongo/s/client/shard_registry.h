@@ -51,7 +51,7 @@ class CatalogManager;
 struct HostAndPort;
 class NamespaceString;
 class OperationContext;
-class RemoteCommandTargeterFactory;
+class ShardFactory;
 class Shard;
 class ShardType;
 struct ReadPreferenceSetting;
@@ -85,7 +85,7 @@ public:
     /**
      * Instantiates a new shard registry.
      *
-     * @param targeterFactory Produces targeters for each shard's individual connection string
+     * @param shardFactory Makes shards
      * @param commandRunner Command runner for executing commands against hosts
      * @param executor Asynchronous task executor to use for making calls to shards and
      *     config servers.
@@ -94,7 +94,7 @@ public:
      *     are not yet in the ShardRegistry
      * @param configServerCS ConnectionString used for communicating with the config servers
      */
-    ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory,
+    ShardRegistry(std::unique_ptr<ShardFactory> shardFactory,
                   std::unique_ptr<executor::TaskExecutorPool> executorPool,
                   executor::NetworkInterface* network,
                   std::unique_ptr<executor::TaskExecutor> addShardExecutor,
@@ -332,9 +332,7 @@ private:
     /**
      * Creates a shard based on the specified information and puts it into the lookup maps.
      */
-    void _addShard_inlock(const ShardId& shardId,
-                          const ConnectionString& connString,
-                          std::unique_ptr<RemoteCommandTargeter> targeter);
+    void _addShard_inlock(const ShardId& shardId, const ConnectionString& connString);
 
     /**
      * Adds the "config" shard (representing the config server) to the shard registry.
@@ -381,9 +379,9 @@ private:
                                                        const BSONObj& metadata,
                                                        const ErrorCodesSet& errorsToCheck);
 
-    // Factory to obtain remote command targeters for shards.  Never changed after startup so safe
+    // Factory to create shards.  Never changed after startup so safe
     // to access outside of _mutex.
-    const std::unique_ptr<RemoteCommandTargeterFactory> _targeterFactory;
+    const std::unique_ptr<ShardFactory> _shardFactory;
 
     // Executor pool for scheduling work and remote commands to shards and config servers. Each
     // contained executor has a connection hook set on it for initialization sharding data on shards

@@ -60,7 +60,6 @@ env.Library(
         'sharding_test_fixture.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/remote_command_targeter_mock',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/executor/network_test_env',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
@@ -69,6 +68,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
         '$BUILD_DIR/mongo/s/catalog/catalog_manager_impl',
         '$BUILD_DIR/mongo/s/catalog/replset/catalog_manager_replica_set',
+        '$BUILD_DIR/mongo/client/remote_command_targeter_mock',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/mongoscore',
         '$BUILD_DIR/mongo/util/clock_source_mock',

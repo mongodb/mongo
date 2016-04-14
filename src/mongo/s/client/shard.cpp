@@ -48,9 +48,9 @@ using std::string;
 using std::stringstream;
 
 Shard::Shard(const ShardId& id,
-             const ConnectionString& connStr,
+             const ConnectionString& originalConnString,
              std::unique_ptr<RemoteCommandTargeter> targeter)
-    : _id(id), _cs(connStr), _targeter(targeter.release()) {}
+    : _id(id), _originalConnString(originalConnString), _targeter(targeter.release()) {}
 
 Shard::~Shard() = default;
 
@@ -59,7 +59,28 @@ bool Shard::isConfig() const {
 }
 
 std::string Shard::toString() const {
-    return _id + ":" + _cs.toString();
+    return _id + ":" + _originalConnString.toString();
 }
+
+void Shard::updateReplSetMonitor(const HostAndPort& remoteHost, const Status& remoteCommandStatus) {
+    if (remoteCommandStatus.isOK())
+        return;
+
+    if (ErrorCodes::isNotMasterError(remoteCommandStatus.code()) ||
+        (remoteCommandStatus == ErrorCodes::InterruptedDueToReplStateChange)) {
+        _targeter->markHostNotMaster(remoteHost);
+    } else if (ErrorCodes::isNetworkError(remoteCommandStatus.code())) {
+        _targeter->markHostUnreachable(remoteHost);
+    } else if (remoteCommandStatus == ErrorCodes::NotMasterOrSecondary) {
+        _targeter->markHostUnreachable(remoteHost);
+    } else if (remoteCommandStatus == ErrorCodes::ExceededTimeLimit) {
+        _targeter->markHostUnreachable(remoteHost);
+    }
+}
+
+const ConnectionString Shard::getConnString() const {
+    return _targeter->connectionString();
+}
+
 
 }  // namespace mongo

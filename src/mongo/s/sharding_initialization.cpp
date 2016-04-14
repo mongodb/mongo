@@ -36,7 +36,7 @@
 #include <string>
 
 #include "mongo/base/status.h"
-#include "mongo/client/remote_command_targeter_factory_impl.h"
+#include "mongo/s/client/shard_factory_impl.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -149,7 +149,7 @@ Status initializeGlobalShardingState(OperationContext* txn,
                                        std::move(metadataHook));
     auto networkPtr = network.get();
     auto shardRegistry(
-        stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryImpl>(),
+        stdx::make_unique<ShardRegistry>(stdx::make_unique<ShardFactoryImpl>(),
                                          makeTaskExecutorPool(std::move(network), isMongos),
                                          networkPtr,
                                          makeTaskExecutor(executor::makeNetworkInterface(

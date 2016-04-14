@@ -30,7 +30,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/metadata_loader.h"

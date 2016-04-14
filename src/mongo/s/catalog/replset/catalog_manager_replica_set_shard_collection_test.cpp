@@ -35,7 +35,6 @@
 #include <vector>
 
 #include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/executor/network_interface_mock.h"
@@ -50,6 +49,7 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/client/shard_factory_mock.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/grid.h"
@@ -293,7 +293,7 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
         stdx::make_unique<RemoteCommandTargeterMock>());
     targeter->setConnectionStringReturnValue(ConnectionString(shardHost));
     targeter->setFindHostReturnValue(shardHost);
-    targeterFactory()->addTargeterToReturn(ConnectionString(shardHost), std::move(targeter));
+    shardFactory()->addTargeterToReturn(ConnectionString(shardHost), std::move(targeter));
 
     setupShards(vector<ShardType>{shard});
 
@@ -411,13 +411,13 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
         stdx::make_unique<RemoteCommandTargeterMock>());
     targeter0->setConnectionStringReturnValue(ConnectionString(shard0Host));
     targeter0->setFindHostReturnValue(shard0Host);
-    targeterFactory()->addTargeterToReturn(ConnectionString(shard0Host), std::move(targeter0));
+    shardFactory()->addTargeterToReturn(ConnectionString(shard0Host), std::move(targeter0));
     targeter1->setConnectionStringReturnValue(ConnectionString(shard1Host));
     targeter1->setFindHostReturnValue(shard1Host);
-    targeterFactory()->addTargeterToReturn(ConnectionString(shard1Host), std::move(targeter1));
+    shardFactory()->addTargeterToReturn(ConnectionString(shard1Host), std::move(targeter1));
     targeter2->setConnectionStringReturnValue(ConnectionString(shard2Host));
     targeter2->setFindHostReturnValue(shard2Host);
-    targeterFactory()->addTargeterToReturn(ConnectionString(shard2Host), std::move(targeter2));
+    shardFactory()->addTargeterToReturn(ConnectionString(shard2Host), std::move(targeter2));
 
     setupShards(vector<ShardType>{shard0, shard1, shard2});
 
@@ -572,7 +572,7 @@ TEST_F(ShardCollectionTest, withInitialData) {
         stdx::make_unique<RemoteCommandTargeterMock>());
     targeter->setConnectionStringReturnValue(ConnectionString(shardHost));
     targeter->setFindHostReturnValue(shardHost);
-    targeterFactory()->addTargeterToReturn(ConnectionString(shardHost), std::move(targeter));
+    shardFactory()->addTargeterToReturn(ConnectionString(shardHost), std::move(targeter));
 
     setupShards(vector<ShardType>{shard});
 

@@ -436,8 +436,8 @@ void AsyncResultsMerger::handleBatchResponse(
                                                      << " containing host "
                                                      << remote.getTargetHost().toString());
             } else {
-                ShardRegistry::updateReplSetMonitor(
-                    shard->getTargeter(), remote.getTargetHost(), cursorResponseStatus.getStatus());
+                shard->updateReplSetMonitor(remote.getTargetHost(),
+                                            cursorResponseStatus.getStatus());
             }
         }
 

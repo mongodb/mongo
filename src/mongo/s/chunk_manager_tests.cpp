@@ -29,7 +29,6 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
 #include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/platform/basic.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
 #include "mongo/s/catalog/type_chunk.h"

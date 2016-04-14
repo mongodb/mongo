@@ -45,7 +45,7 @@ struct ChunkVersion;
 class CollectionType;
 class DistLockManagerMock;
 class NamespaceString;
-class RemoteCommandTargeterFactoryMock;
+class ShardFactoryMock;
 class RemoteCommandTargeterMock;
 class ShardRegistry;
 class ShardType;
@@ -83,7 +83,7 @@ protected:
 
     ShardRegistry* shardRegistry() const;
 
-    RemoteCommandTargeterFactoryMock* targeterFactory() const;
+    ShardFactoryMock* shardFactory() const;
 
     RemoteCommandTargeterMock* configTargeter() const;
 
@@ -201,7 +201,7 @@ private:
     ServiceContext::UniqueOperationContext _opCtx;
     std::unique_ptr<MessagingPortMock> _messagePort;
 
-    RemoteCommandTargeterFactoryMock* _targeterFactory;
+    ShardFactoryMock* _shardFactory;
     RemoteCommandTargeterMock* _configTargeter;
 
     executor::NetworkInterfaceMock* _mockNetwork;
