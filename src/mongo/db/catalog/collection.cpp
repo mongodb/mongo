@@ -1000,9 +1000,16 @@ public:
 
                     IndexAccessMethod* iam = indexCatalog.getIndex(descriptor);
                     invariant(iam);
+                    BSONObj documentData = document->data.toBson();
 
+                    if (descriptor->isPartial()) {
+                        const IndexCatalogEntry* ice = indexCatalog.getEntry(descriptor);
+                        if (!ice->getFilterExpression()->matchesBSON(documentData)) {
+                            continue;
+                        }
+                    }
                     BSONObjSet documentKeySet;
-                    iam->getKeys(document->data.toBson(), &documentKeySet);
+                    iam->getKeys(documentData, &documentKeySet);
 
                     if (documentKeySet.size() > 1) {
                         if (!descriptor->isMultikey(txn)) {
@@ -1028,12 +1035,6 @@ public:
                             if ((*_ikc)[indexEntryHash] == 0) {
                                 _ikc->erase(indexEntryHash);
                             }
-                        } else if (descriptor->isPartial()) {
-                            // Partial indexes are treated as regular indexes in
-                            // IndexAccessMethod::getKeys, so documents whose
-                            // field(s) don't match the partial expression are
-                            // still returned.
-                            continue;
                         } else {
                             allIndexesValid = false;
                             results.valid = false;
