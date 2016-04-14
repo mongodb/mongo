@@ -17,16 +17,16 @@ load('jstests/multiVersion/libs/multi_rs.js');
     };
 
     // Undefine the flags we're replacing, otherwise upgradeSet will keep old values.
-    var tryClusterAuthOptions = {
+    var transitionToAuthOptions = {
         noauth: undefined,
         clusterAuthMode: 'keyFile',
         keyFile: keyFilePath,
-        tryClusterAuth: ''
+        transitionToAuth: ''
     };
     var keyFileOptions = {
         clusterAuthMode: 'keyFile',
         keyFile: keyFilePath,
-        tryClusterAuth: undefined
+        transitionToAuth: undefined
     };
 
     var rst = new ReplSetTest({name: 'noauthSet', nodes: 3, nodeOptions: noAuthOptions});
@@ -41,13 +41,13 @@ load('jstests/multiVersion/libs/multi_rs.js');
     rstConn1.getDB('test').a.insert({a: 1, str: 'TESTTESTTEST'});
     assert.eq(1, rstConn1.getDB('test').a.count(), 'Error interacting with replSet');
 
-    print('=== UPGRADE noauth -> tryClusterAuth/keyFile ===');
-    rst.upgradeSet(tryClusterAuthOptions);
+    print('=== UPGRADE noauth -> transitionToAuth/keyFile ===');
+    rst.upgradeSet(transitionToAuthOptions);
     var rstConn2 = rst.getPrimary();
     rstConn2.getDB('test').a.insert({a: 1, str: 'TESTTESTTEST'});
     assert.eq(2, rstConn2.getDB('test').a.count(), 'Error interacting with replSet');
 
-    print('=== UPGRADE tryClusterAuth/keyFile -> keyFile ===');
+    print('=== UPGRADE transitionToAuth/keyFile -> keyFile ===');
     rst.upgradeSet(keyFileOptions, 'root', 'root');
 
     // upgradeSet leaves its connections logged in as root

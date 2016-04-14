@@ -242,7 +242,7 @@ void authX509(RunCommandHook runCommand,
 //
 
 bool isFailedAuthOk(const AuthResponse& response) {
-    return (response == ErrorCodes::AuthenticationFailed && serverGlobalParams.tryClusterAuth);
+    return (response == ErrorCodes::AuthenticationFailed && serverGlobalParams.transitionToAuth);
 }
 
 void auth(RunCommandHook runCommand,
@@ -253,8 +253,8 @@ void auth(RunCommandHook runCommand,
     std::string mechanism;
     auto authCompletionHandler = [handler](AuthResponse response) {
         if (isFailedAuthOk(response)) {
-            // If auth failed in tryClusterAuth, just pretend it succeeded.
-            log() << "Failed to authenticate in tryClusterAuth, falling back to no "
+            // If auth failed in transitionToAuth, just pretend it succeeded.
+            log() << "Failed to authenticate in transitionToAuth, falling back to no "
                      "authentication.";
 
             // We need to mock a successful AuthResponse.

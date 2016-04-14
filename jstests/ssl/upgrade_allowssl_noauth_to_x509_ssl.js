@@ -14,10 +14,10 @@ load('jstests/ssl/libs/ssl_helpers.js');
     var noAuthAllowSSL = Object.merge(allowSSL, {noauth: ''});
 
     // Undefine the flags we're replacing, otherwise upgradeSet will keep old values.
-    var tryX509preferSSL =
-        Object.merge(preferSSL, {noauth: undefined, tryClusterAuth: '', clusterAuthMode: 'x509'});
+    var tryX509preferSSL = Object.merge(
+        preferSSL, {noauth: undefined, transitionToAuth: '', clusterAuthMode: 'x509'});
     var x509RequireSSL =
-        Object.merge(requireSSL, {tryClusterAuth: undefined, clusterAuthMode: 'x509'});
+        Object.merge(requireSSL, {transitionToAuth: undefined, clusterAuthMode: 'x509'});
 
     var rst = new ReplSetTest({name: 'noauthSet', nodes: 3, nodeOptions: noAuthAllowSSL});
     rst.startSet();

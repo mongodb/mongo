@@ -14,8 +14,8 @@ var baseName = "jstests_clone_copyauth";
  *
  * clusterType - type of cluster to start.  Options are "sharded", "repl", or "single".
  * startWithAuth - whether to start the cluster with authentication.
- * startWithTryClusterAuth - whether to start the cluster with --tryClusterAuth (startWithAuth must
- *also be true).
+ * startWithTransitionToAuth - whether to start the cluster with --transitionToAuth (startWithAuth
+ * must also be true).
  *
  * Member variables:
  *
@@ -28,12 +28,12 @@ var baseName = "jstests_clone_copyauth";
  *
  * stop() - stop and cleanup whatever nodes the helper spawned when it was created.
  */
-function ClusterSpawnHelper(clusterType, startWithAuth, startWithTryClusterAuth) {
+function ClusterSpawnHelper(clusterType, startWithAuth, startWithTransitionToAuth) {
     var singleNodeConfig = {};
     if (startWithAuth) {
         singleNodeConfig.keyFile = "jstests/libs/key1";
-        if (startWithTryClusterAuth) {
-            singleNodeConfig.tryClusterAuth = "";
+        if (startWithTransitionToAuth) {
+            singleNodeConfig.transitionToAuth = "";
         }
     }
     if (clusterType === "sharded") {
@@ -105,8 +105,8 @@ function copydbBetweenClustersTest(configObj) {
         'isSourceUsingAuth',
         'targetClusterType',
         'isTargetUsingAuth',
-        'isSourceUsingTryClusterAuth',
-        'isTargetUsingTryClusterAuth'
+        'isSourceUsingTransitionToAuth',
+        'isTargetUsingTransitionToAuth'
     ];
 
     var i;
@@ -118,7 +118,7 @@ function copydbBetweenClustersTest(configObj) {
     // 1. Get a connection to the source database, insert data and setup auth if applicable
     source = new ClusterSpawnHelper(configObj.sourceClusterType,
                                     configObj.isSourceUsingAuth,
-                                    configObj.isSourceUsingTryClusterAuth);
+                                    configObj.isSourceUsingTransitionToAuth);
 
     if (configObj.isSourceUsingAuth) {
         // Create a super user so we can create a regular user and not be locked out afterwards
@@ -139,8 +139,8 @@ function copydbBetweenClustersTest(configObj) {
         var readWhenLoggedOut = function() {
             source.conn.getDB(baseName)[baseName].findOne();
         };
-        if (configObj.isSourceUsingTryClusterAuth) {
-            // tryClusterAuth does not turn on access control
+        if (configObj.isSourceUsingTransitionToAuth) {
+            // transitionToAuth does not turn on access control
             assert.doesNotThrow(readWhenLoggedOut);
         } else {
             assert.throws(readWhenLoggedOut);
@@ -154,7 +154,7 @@ function copydbBetweenClustersTest(configObj) {
     // 2. Get a connection to the target database, and set up auth if necessary
     target = new ClusterSpawnHelper(configObj.targetClusterType,
                                     configObj.isTargetUsingAuth,
-                                    configObj.isTargetUsingTryClusterAuth);
+                                    configObj.isTargetUsingTransitionToAuth);
 
     if (configObj.isTargetUsingAuth) {
         target.conn.getDB("admin")
@@ -163,8 +163,8 @@ function copydbBetweenClustersTest(configObj) {
         var readWhenLoggedOut = function() {
             target.conn.getDB(baseName)[baseName].findOne();
         };
-        if (configObj.isTargetUsingTryClusterAuth) {
-            // tryClusterAuth does not turn on access control
+        if (configObj.isTargetUsingTransitionToAuth) {
+            // transitionToAuth does not turn on access control
             assert.doesNotThrow(readWhenLoggedOut);
         } else {
             assert.throws(readWhenLoggedOut);
@@ -199,10 +199,10 @@ function copydbBetweenClustersTest(configObj) {
 
     var sourceClusterTypeValues = ["single", "repl", "sharded"];
     var isSourceUsingAuthValues = [true, false];
-    var isSourceUsingTryClusterAuthValues = [true, false];
+    var isSourceUsingTransitionToAuthValues = [true, false];
     var targetClusterTypeValues = ["single", "repl", "sharded"];
     var isTargetUsingAuthValues = [true, false];
-    var isTargetUsingTryClusterAuthValues = [true, false];
+    var isTargetUsingTransitionToAuthValues = [true, false];
     for (var i = 0; i < sourceClusterTypeValues.length; i++) {
         for (var j = 0; j < isSourceUsingAuthValues.length; j++) {
             for (var k = 0; k < targetClusterTypeValues.length; k++) {
@@ -230,16 +230,16 @@ function copydbBetweenClustersTest(configObj) {
                         continue;
                     }
 
-                    for (var m = 0; m < isSourceUsingTryClusterAuthValues.length; m++) {
-                        if (isSourceUsingTryClusterAuthValues[m] === true &&
+                    for (var m = 0; m < isSourceUsingTransitionToAuthValues.length; m++) {
+                        if (isSourceUsingTransitionToAuthValues[m] === true &&
                             isSourceUsingAuthValues[j] === false) {
-                            // tryClusterAuth requires auth parameters
+                            // transitionToAuth requires auth parameters
                             continue;
                         }
-                        for (var n = 0; n < isTargetUsingTryClusterAuthValues.length; n++) {
-                            if (isTargetUsingTryClusterAuthValues[n] === true &&
+                        for (var n = 0; n < isTargetUsingTransitionToAuthValues.length; n++) {
+                            if (isTargetUsingTransitionToAuthValues[n] === true &&
                                 isTargetUsingAuthValues[l] === false) {
-                                // tryClusterAuth requires auth parameters
+                                // transitionToAuth requires auth parameters
                                 continue;
                             }
                             var testCase = {
@@ -247,8 +247,10 @@ function copydbBetweenClustersTest(configObj) {
                                 'isSourceUsingAuth': isSourceUsingAuthValues[j],
                                 'targetClusterType': targetClusterTypeValues[k],
                                 'isTargetUsingAuth': isTargetUsingAuthValues[l],
-                                'isSourceUsingTryClusterAuth': isSourceUsingTryClusterAuthValues[m],
-                                'isTargetUsingTryClusterAuth': isTargetUsingTryClusterAuthValues[n]
+                                'isSourceUsingTransitionToAuth':
+                                    isSourceUsingTransitionToAuthValues[m],
+                                'isTargetUsingTransitionToAuth':
+                                    isTargetUsingTransitionToAuthValues[n]
                             };
                             print("Running copydb with auth test:");
                             printjson(testCase);
