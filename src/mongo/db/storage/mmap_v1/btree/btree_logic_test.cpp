@@ -2225,8 +2225,8 @@ public:
         this->checkValidNumKeys(1);
         this->locate(key1, 0, true, this->_helper.headManager.getHead(&txn), 1);
 
-        // Attempt to insert a dup key/value.
-        ASSERT_EQUALS(ErrorCodes::DuplicateKeyValue,
+        // Attempt to insert a dup key/value, which is okay.
+        ASSERT_EQUALS(Status::OK(),
                       this->insert(key1, this->_helper.dummyDiskLoc, true));
         this->checkValidNumKeys(1);
         this->locate(key1, 0, true, this->_helper.headManager.getHead(&txn), 1);

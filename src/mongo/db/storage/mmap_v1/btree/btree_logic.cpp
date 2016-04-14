@@ -2194,7 +2194,10 @@ Status BtreeLogic<BtreeLayout>::_insert(OperationContext* txn,
         // The logic in _find() prohibits finding and returning a position if the 'used' bit
         // in the header is set and dups are disallowed.
         invariant(dupsAllowed);
-        return Status(ErrorCodes::DuplicateKeyValue, "key/value already in index");
+
+        // The key and value are already in the index. Not an error because documents that have
+        // already been indexed may be seen again due to updates during a background index scan.
+        return Status::OK();
     }
 
     DiskLoc childLoc = childLocForPos(bucket, pos);
