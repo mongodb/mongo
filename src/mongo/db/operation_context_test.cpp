@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2014 MongoDB Inc.
+ *    Copyright (C) 2013 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -25,43 +25,48 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#pragma once
 
-#include <string>
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/operation_context.h"
+#include "mongo/db/client.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_noop.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
-class OperationContextImpl final : public OperationContext {
+namespace {
+
+class OperationDeadlineTests : public unittest::Test {
 public:
-    virtual ~OperationContextImpl();
+    void setUp() {
+        auto uniqueMockClock = stdx::make_unique<ClockSourceMock>();
+        mockClock = uniqueMockClock.get();
+        service = stdx::make_unique<ServiceContextNoop>();
+        service->setFastClockSource(std::move(uniqueMockClock));
+    }
 
-    virtual RecoveryUnit* recoveryUnit() const override;
-
-    virtual RecoveryUnit* releaseRecoveryUnit() override;
-
-    virtual RecoveryUnitState setRecoveryUnit(RecoveryUnit* unit, RecoveryUnitState state) override;
-
-    virtual ProgressMeter* setMessage_inlock(const char* msg,
-                                             const std::string& name,
-                                             unsigned long long progressMeterTotal,
-                                             int secondsBetween) override;
-
-    virtual std::string getNS() const override;
-
-    virtual bool isPrimaryFor(StringData ns) override;
-
-    virtual void setReplicatedWrites(bool writesAreReplicated = true) override;
-    virtual bool writesAreReplicated() const override;
-
-private:
-    friend class ServiceContextMongoD;
-
-    OperationContextImpl();
-
-    std::unique_ptr<RecoveryUnit> _recovery;
-    bool _writesAreReplicated;
+    ClockSourceMock* mockClock;
+    std::unique_ptr<ServiceContext> service;
 };
+
+TEST_F(OperationDeadlineTests, OperationDeadlineExpiration) {
+    auto client = service->makeClient("CurOpTest");
+    auto txn = client->makeOperationContext();
+    txn->setMaxTimeMicros(durationCount<Microseconds>(Seconds{1}));
+    mockClock->advance(Milliseconds{500});
+    ASSERT_OK(txn->checkForInterruptNoAssert());
+    mockClock->advance(Milliseconds{499});
+    ASSERT_OK(txn->checkForInterruptNoAssert());
+    mockClock->advance(Milliseconds{1});
+    ASSERT_EQ(ErrorCodes::ExceededTimeLimit, txn->checkForInterruptNoAssert());
+    mockClock->advance(Milliseconds{1});
+    ASSERT_EQ(ErrorCodes::ExceededTimeLimit, txn->checkForInterruptNoAssert());
+}
+
+}  // namespace
 
 }  // namespace mongo

@@ -37,6 +37,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -113,12 +114,12 @@ public:
     /**
      * Raises a UserAssertion if this operation is in a killed state.
      */
-    virtual void checkForInterrupt() = 0;
+    void checkForInterrupt();
 
     /**
      * Returns Status::OK() unless this operation is in a killed state.
      */
-    virtual Status checkForInterruptNoAssert() = 0;
+    Status checkForInterruptNoAssert();
 
     /**
      * Delegates to CurOp, but is included here to break dependencies.
@@ -151,8 +152,6 @@ public:
     Client* getClient() const {
         return _client;
     }
-
-    virtual uint64_t getRemainingMaxTimeMicros() const = 0;
 
     /**
      * Returns the operation ID associated with this operation.
@@ -218,12 +217,79 @@ public:
         return getKillStatus() != ErrorCodes::OK;
     }
 
+    /**
+     * Sets the deadline for this operation to the given point in time.
+     *
+     * To remove a deadline, pass in Date_t::max().
+     */
+    void setDeadlineByDate(Date_t when);
+
+    /**
+     * Sets the deadline for this operation to the maxTimeMs plus the current time reported
+     * by the ServiceContext.
+     */
+    void setDeadlineRelativeToNow(Milliseconds maxTimeMs);
+    template <typename D>
+    void setDeadlineRelativeToNow(D maxTime) {
+        setDeadlineRelativeToNow(duration_cast<Milliseconds>(maxTime));
+    }
+
+    /**
+     * Returns true if this operation has a deadline.
+     */
+    bool hasDeadline() const {
+        return getDeadline() < Date_t::max();
+    }
+
+    /**
+     * Returns the deadline for this operation, or Date_t::max() if there is no deadline.
+     */
+    Date_t getDeadline() const {
+        return _deadline;
+    }
+
+    /**
+     * Returns the amount of time until the deadline, according to the fast clock on
+     * ServiceContext. If this value is less than zero, the deadline has passed.
+     */
+    Milliseconds getTimeUntilDeadline() const;
+
+    //
+    // Legacy "max time" methods for controlling operation deadlines.
+    //
+
+    /**
+     * Sets the amount of time operation this should be allowed to run, units of microseconds.
+     * The special value 0 is "allow to run indefinitely".
+     */
+    void setMaxTimeMicros(uint64_t maxTimeMicros);
+
+    /**
+     * Returns true if a time limit has been set on this operation, and false otherwise.
+     */
+    bool isMaxTimeSet() const;
+
+    /**
+     * Returns the number of microseconds remaining for this operation's time limit, or the
+     * special value 0 if the operation has no time limit.
+     *
+     * This method is virtual because some subclasses used for tests override it. It should not
+     * remain virtual.
+     */
+    virtual uint64_t getRemainingMaxTimeMicros() const;
+
 protected:
     OperationContext(Client* client, unsigned int opId, Locker* locker);
 
     RecoveryUnitState _ruState = kNotInUnitOfWork;
 
 private:
+    /**
+     * Returns true if this operation has a deadline and it has passed according to the fast clock
+     * on ServiceContext.
+     */
+    bool hasDeadlineExpired() const;
+
     friend class WriteUnitOfWork;
     Client* const _client;
     const unsigned int _opId;
@@ -237,6 +303,9 @@ private:
     AtomicWord<ErrorCodes::Error> _killCode{ErrorCodes::OK};
 
     WriteConcernOptions _writeConcern;
+
+    Date_t _deadline =
+        Date_t::max();  // The timepoint at which this operation exceeds its time limit.
 };
 
 class WriteUnitOfWork {

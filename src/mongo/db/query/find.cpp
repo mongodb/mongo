@@ -323,7 +323,7 @@ QueryResult::View getMore(OperationContext* txn,
 
         // If the operation that spawned this cursor had a time limit set, apply leftover
         // time to this getmore.
-        curOp.setMaxTimeMicros(cc->getLeftoverMaxTimeMicros());
+        txn->setMaxTimeMicros(cc->getLeftoverMaxTimeMicros());
         txn->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
 
         // Ensure that the original query or command object is available in the slow query log,
@@ -465,7 +465,7 @@ QueryResult::View getMore(OperationContext* txn,
 
             // If the getmore had a time limit, remaining time is "rolled over" back to the
             // cursor (for use by future getmore ops).
-            cc->setLeftoverMaxTimeMicros(curOp.getRemainingMaxTimeMicros());
+            cc->setLeftoverMaxTimeMicros(txn->getRemainingMaxTimeMicros());
         }
     }
 
@@ -547,7 +547,7 @@ std::string runQuery(OperationContext* txn,
     }
 
     // Handle query option $maxTimeMS (not used with commands).
-    curOp.setMaxTimeMicros(static_cast<unsigned long long>(pq.getMaxTimeMS()) * 1000);
+    txn->setMaxTimeMicros(static_cast<unsigned long long>(pq.getMaxTimeMS()) * 1000);
     txn->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
 
     // uassert if we are not on a primary, and not a secondary with SlaveOk query parameter set.
@@ -664,7 +664,7 @@ std::string runQuery(OperationContext* txn,
 
         // If the query had a time limit, remaining time is "rolled over" to the cursor (for
         // use by future getmore ops).
-        cc->setLeftoverMaxTimeMicros(curOp.getRemainingMaxTimeMicros());
+        cc->setLeftoverMaxTimeMicros(txn->getRemainingMaxTimeMicros());
 
         endQueryOp(txn, collection, *cc->getExecutor(), numResults, ccId);
     } else {

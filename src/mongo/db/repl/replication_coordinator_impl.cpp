@@ -1095,7 +1095,7 @@ ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext
         // for a new snapshot.
         if (isMajorityReadConcern) {
             // Wait for a snapshot that meets our needs (< targetOpTime).
-            const auto waitTime = CurOp::get(txn)->isMaxTimeSet()
+            const auto waitTime = txn->isMaxTimeSet()
                 ? Microseconds(static_cast<int64_t>(txn->getRemainingMaxTimeMicros()))
                 : Microseconds{0};
             const auto waitForever = waitTime == Microseconds{0};
@@ -1116,7 +1116,7 @@ ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext
         WaiterInfo waitInfo(&_opTimeWaiterList, txn->getOpID(), &targetOpTime, nullptr, &condVar);
 
         LOG(3) << "Waiting for OpTime: " << waitInfo;
-        if (CurOp::get(txn)->isMaxTimeSet()) {
+        if (txn->isMaxTimeSet()) {
             condVar.wait_for(lock,
                              Microseconds(static_cast<int64_t>(txn->getRemainingMaxTimeMicros()))
                                  .toSystemDuration());

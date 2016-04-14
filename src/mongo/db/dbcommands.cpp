@@ -1352,7 +1352,7 @@ void Command::execCommand(OperationContext* txn,
                 "no such command option $maxTimeMs; use maxTimeMS instead",
                 extractedFields[kQueryOptionMaxTimeMSField].eoo());
 
-        CurOp::get(txn)->setMaxTimeMicros(static_cast<unsigned long long>(maxTimeMS) * 1000);
+        txn->setMaxTimeMicros(static_cast<unsigned long long>(maxTimeMS) * 1000);
 
         // Operations are only versioned against the primary. We also make sure not to redo shard
         // version handling if this command was issued via the direct client.

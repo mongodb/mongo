@@ -277,7 +277,7 @@ public:
         // Reset timeout timer on the cursor since the cursor is still in use.
         cursor->setIdleTime(0);
 
-        const bool hasOwnMaxTime = curOp->isMaxTimeSet();
+        const bool hasOwnMaxTime = txn->isMaxTimeSet();
 
         if (!hasOwnMaxTime) {
             // There is no time limit set directly on this getMore command. If the cursor is
@@ -286,9 +286,9 @@ public:
             // applying it to this getMore.
             if (isCursorAwaitData(cursor)) {
                 Seconds awaitDataTimeout(1);
-                curOp->setMaxTimeMicros(durationCount<Microseconds>(awaitDataTimeout));
+                txn->setMaxTimeMicros(durationCount<Microseconds>(awaitDataTimeout));
             } else {
-                curOp->setMaxTimeMicros(cursor->getLeftoverMaxTimeMicros());
+                txn->setMaxTimeMicros(cursor->getLeftoverMaxTimeMicros());
             }
         }
         txn->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
@@ -357,7 +357,7 @@ public:
                 ctx.reset();
 
                 // Block waiting for data.
-                Microseconds timeout(static_cast<int64_t>(curOp->getRemainingMaxTimeMicros()));
+                Microseconds timeout(static_cast<int64_t>(txn->getRemainingMaxTimeMicros()));
                 notifier->wait(notifierVersion, timeout);
                 notifier.reset();
 
@@ -400,7 +400,7 @@ public:
             // from a previous find, then don't roll remaining micros over to the next
             // getMore.
             if (!hasOwnMaxTime) {
-                cursor->setLeftoverMaxTimeMicros(curOp->getRemainingMaxTimeMicros());
+                cursor->setLeftoverMaxTimeMicros(txn->getRemainingMaxTimeMicros());
             }
 
             cursor->incPos(numResults);

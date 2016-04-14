@@ -26,8 +26,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/operation_context_impl.h"
@@ -41,10 +39,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/platform/random.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -119,83 +114,6 @@ ProgressMeter* OperationContextImpl::setMessage_inlock(const char* msg,
 
 string OperationContextImpl::getNS() const {
     return CurOp::get(this)->getNS();
-}
-
-uint64_t OperationContextImpl::getRemainingMaxTimeMicros() const {
-    return CurOp::get(this)->getRemainingMaxTimeMicros();
-}
-
-// Enabling the checkForInterruptFail fail point will start a game of random chance on the
-// connection specified in the fail point data, generating an interrupt with a given fixed
-// probability.  Example invocation:
-//
-// {configureFailPoint: "checkForInterruptFail",
-//  mode: "alwaysOn",
-//  data: {conn: 17, chance: .01, allowNested: true}}
-//
-// All three data fields must be specified.  In the above example, all interrupt points on
-// connection 17 will generate a kill on the current operation with probability p(.01),
-// including interrupt points of nested operations.  If "allowNested" is false, nested
-// operations are not targeted.  "chance" must be a double between 0 and 1, inclusive.
-MONGO_FP_DECLARE(checkForInterruptFail);
-
-namespace {
-
-// Helper function for checkForInterrupt fail point.  Decides whether the operation currently
-// being run by the given Client meet the (probabilistic) conditions for interruption as
-// specified in the fail point info.
-bool opShouldFail(const OperationContextImpl* opCtx, const BSONObj& failPointInfo) {
-    // Only target the client with the specified connection number.
-    if (opCtx->getClient()->getConnectionId() != failPointInfo["conn"].safeNumberLong()) {
-        return false;
-    }
-
-    // Only target nested operations if requested.
-    if (!failPointInfo["allowNested"].trueValue() && CurOp::get(opCtx)->parent() != NULL) {
-        return false;
-    }
-
-    // Return true with (approx) probability p = "chance".  Recall: 0 <= chance <= 1.
-    double next = static_cast<double>(std::abs(opCtx->getClient()->getPrng().nextInt64()));
-    double upperBound =
-        std::numeric_limits<int64_t>::max() * failPointInfo["chance"].numberDouble();
-    if (next > upperBound) {
-        return false;
-    }
-    return true;
-}
-
-}  // namespace
-
-void OperationContextImpl::checkForInterrupt() {
-    uassertStatusOK(checkForInterruptNoAssert());
-}
-
-Status OperationContextImpl::checkForInterruptNoAssert() {
-    if (getServiceContext()->getKillAllOperations()) {
-        return Status(ErrorCodes::InterruptedAtShutdown, "interrupted at shutdown");
-    }
-
-    CurOp* curOp = CurOp::get(this);
-    if (curOp->maxTimeHasExpired()) {
-        markKilled();
-        return Status(ErrorCodes::ExceededTimeLimit, "operation exceeded time limit");
-    }
-
-    MONGO_FAIL_POINT_BLOCK(checkForInterruptFail, scopedFailPoint) {
-        if (opShouldFail(this, scopedFailPoint.getData())) {
-            log() << "set pending kill on " << (curOp->parent() ? "nested" : "top-level") << " op "
-                  << getOpID() << ", for checkForInterruptFail";
-            markKilled();
-        }
-    }
-
-    const auto killStatus = getKillStatus();
-    if (killStatus != ErrorCodes::OK) {
-        return Status(killStatus, "operation was interrupted");
-    }
-
-    return Status::OK();
 }
 
 bool OperationContextImpl::isPrimaryFor(StringData ns) {

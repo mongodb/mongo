@@ -41,7 +41,6 @@
 #include "mongo/db/json.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -220,19 +219,6 @@ private:
 const OperationContext::Decoration<CurOp::CurOpStack> CurOp::_curopStack =
     OperationContext::declareDecoration<CurOp::CurOpStack>();
 
-// Enabling the maxTimeAlwaysTimeOut fail point will cause any query or command run with a
-// valid non-zero max time to fail immediately.  Any getmore operation on a cursor already
-// created with a valid non-zero max time will also fail immediately.
-//
-// This fail point cannot be used with the maxTimeNeverTimeOut fail point.
-MONGO_FP_DECLARE(maxTimeAlwaysTimeOut);
-
-// Enabling the maxTimeNeverTimeOut fail point will cause the server to never time out any
-// query, command, or getmore operation, regardless of whether a max time is set.
-//
-// This fail point cannot be used with the maxTimeAlwaysTimeOut fail point.
-MONGO_FP_DECLARE(maxTimeNeverTimeOut);
-
 CurOp* CurOp::get(const OperationContext* opCtx) {
     return get(*opCtx);
 }
@@ -244,10 +230,6 @@ CurOp* CurOp::get(const OperationContext& opCtx) {
 CurOp::CurOp(OperationContext* opCtx) : CurOp(opCtx, &_curopStack(opCtx)) {}
 
 CurOp::CurOp(OperationContext* opCtx, CurOpStack* stack) : _stack(stack) {
-    if (_stack->top()) {
-        // Child operation should inherit the previous operation's timeout.
-        setMaxTimeMicros(_stack->top()->getRemainingMaxTimeMicros());
-    }
     if (opCtx) {
         _stack->push(opCtx, this);
     } else {
@@ -284,13 +266,6 @@ void CurOp::setNS_inlock(StringData ns) {
 void CurOp::ensureStarted() {
     if (_start == 0) {
         _start = curTimeMicros64();
-
-        // If ensureStarted() is invoked after setMaxTimeMicros(), then time limit tracking will
-        // start here.  This is because time limit tracking can only commence after the
-        // operation is assigned a start time.
-        if (_maxTimeMicros > 0) {
-            _maxTimeTracker.setTimeLimit(_start, _maxTimeMicros);
-        }
     }
 }
 
@@ -389,102 +364,6 @@ void CurOp::reportState(BSONObjBuilder* builder) {
     }
 
     builder->append("numYields", _numYields);
-}
-
-void CurOp::setMaxTimeMicros(uint64_t maxTimeMicros) {
-    _maxTimeMicros = maxTimeMicros;
-
-    if (_maxTimeMicros == 0) {
-        // 0 is "allow to run indefinitely".
-        return;
-    }
-
-    // If the operation has a start time, then enable the tracker.
-    //
-    // If the operation has no start time yet, then ensureStarted() will take responsibility for
-    // enabling the tracker.
-    if (isStarted()) {
-        _maxTimeTracker.setTimeLimit(startTime(), _maxTimeMicros);
-    }
-}
-
-bool CurOp::isMaxTimeSet() const {
-    return _maxTimeMicros != 0;
-}
-
-bool CurOp::maxTimeHasExpired() {
-    if (MONGO_FAIL_POINT(maxTimeNeverTimeOut)) {
-        return false;
-    }
-    if (_maxTimeMicros > 0 && MONGO_FAIL_POINT(maxTimeAlwaysTimeOut)) {
-        return true;
-    }
-    return _maxTimeTracker.checkTimeLimit();
-}
-
-uint64_t CurOp::getRemainingMaxTimeMicros() const {
-    return _maxTimeTracker.getRemainingMicros();
-}
-
-void CurOp::MaxTimeTracker::setTimeLimit(uint64_t startEpochMicros, uint64_t durationMicros) {
-    dassert(durationMicros != 0);
-
-    _enabled = true;
-
-    _targetEpochMicros = startEpochMicros + durationMicros;
-
-    uint64_t now = curTimeMicros64();
-    // If our accurate time source thinks time is not up yet, calculate the next target for
-    // our approximate time source.
-    if (_targetEpochMicros > now) {
-        _approxTargetServerMillis = Listener::getElapsedTimeMillis() +
-            static_cast<int64_t>((_targetEpochMicros - now) / 1000);
-    }
-    // Otherwise, set our approximate time source target such that it thinks time is already
-    // up.
-    else {
-        _approxTargetServerMillis = Listener::getElapsedTimeMillis();
-    }
-}
-
-bool CurOp::MaxTimeTracker::checkTimeLimit() {
-    if (!_enabled) {
-        return false;
-    }
-
-    // Does our approximate time source think time is not up yet?  If so, return early.
-    if (_approxTargetServerMillis > Listener::getElapsedTimeMillis()) {
-        return false;
-    }
-
-    uint64_t now = curTimeMicros64();
-    // Does our accurate time source think time is not up yet?  If so, readjust the target for
-    // our approximate time source and return early.
-    if (_targetEpochMicros > now) {
-        _approxTargetServerMillis = Listener::getElapsedTimeMillis() +
-            static_cast<int64_t>((_targetEpochMicros - now) / 1000);
-        return false;
-    }
-
-    // Otherwise, time is up.
-    return true;
-}
-
-uint64_t CurOp::MaxTimeTracker::getRemainingMicros() const {
-    if (!_enabled) {
-        // 0 is "allow to run indefinitely".
-        return 0;
-    }
-
-    // Does our accurate time source think time is up?  If so, claim there is 1 microsecond
-    // left for this operation.
-    uint64_t now = curTimeMicros64();
-    if (_targetEpochMicros <= now) {
-        return 1;
-    }
-
-    // Otherwise, calculate remaining time.
-    return _targetEpochMicros - now;
 }
 
 namespace {

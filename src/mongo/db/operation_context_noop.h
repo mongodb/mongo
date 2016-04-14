@@ -92,11 +92,6 @@ public:
         return &_pm;
     }
 
-    virtual void checkForInterrupt() override {}
-    virtual Status checkForInterruptNoAssert() override {
-        return Status::OK();
-    }
-
     virtual bool isPrimaryFor(StringData ns) override {
         return true;
     }
@@ -109,10 +104,6 @@ public:
 
     bool writesAreReplicated() const override {
         return false;
-    }
-
-    virtual uint64_t getRemainingMaxTimeMicros() const override {
-        return 0;
     }
 
 private:
