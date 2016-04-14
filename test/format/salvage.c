@@ -158,7 +158,7 @@ wts_salvage(void)
 		testutil_die(ret, "salvage copy step failed");
 
 	/* Salvage, then verify. */
-	wts_open(g.home, 1, &g.wts_conn);
+	wts_open(g.home, true, &g.wts_conn);
 	salvage();
 	wts_verify("post-salvage verify");
 	wts_close();
@@ -174,7 +174,7 @@ wts_salvage(void)
 
 	/* Corrupt the file randomly, salvage, then verify. */
 	if (corrupt()) {
-		wts_open(g.home, 1, &g.wts_conn);
+		wts_open(g.home, true, &g.wts_conn);
 		salvage();
 		wts_verify("post-corrupt-salvage verify");
 		wts_close();

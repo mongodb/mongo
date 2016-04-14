@@ -38,7 +38,7 @@ check_copy(void)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 
-	wts_open(g.home_backup, 0, &conn);
+	wts_open(g.home_backup, false, &conn);
 
 	testutil_checkfmt(
 	    conn->open_session(conn, NULL, NULL, &session),
@@ -90,8 +90,9 @@ backup(void *arg)
 	WT_CURSOR *backup_cursor;
 	WT_DECL_RET;
 	WT_SESSION *session;
-	u_int period;
-	const char *key;
+	u_int incremental, period;
+	bool full;
+	const char *config, *key;
 
 	(void)(arg);
 
@@ -105,10 +106,12 @@ backup(void *arg)
 	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
 	/*
-	 * Perform a backup at somewhere under 10 seconds (so we get at
-	 * least one done), and then at 45 second intervals.
+	 * Perform a full backup at somewhere under 10 seconds (that way there's
+	 * at least one), then at larger intervals, optionally do incremental
+	 * backups between full backups.
 	 */
-	for (period = mmrand(NULL, 1, 10);; period = mmrand(NULL, 30, 45)) {
+	incremental = 0;
+	for (period = mmrand(NULL, 1, 10);; period = mmrand(NULL, 20, 45)) {
 		/* Sleep for short periods so we don't make the run wait. */
 		while (period > 0 && !g.workers_finished) {
 			--period;
@@ -122,18 +125,26 @@ backup(void *arg)
 			break;
 		}
 
-		/* Re-create the backup directory. */
-		testutil_checkfmt(
-		    system(g.home_backup_init),
-		    "%s", "backup directory creation failed");
+		if (incremental) {
+			config = "target=(\"log:\")";
+			full = false;
+		} else {
+			/* Re-create the backup directory. */
+			testutil_checkfmt(
+			    system(g.home_backup_init),
+			    "%s", "backup directory creation failed");
+
+			config = NULL;
+			full = true;
+		}
 
 		/*
-		 * open_cursor can return EBUSY if a metadata operation is
-		 * currently happening - retry in that case.
+		 * open_cursor can return EBUSY if concurrent with a metadata
+		 * operation, retry in that case.
 		 */
-		while ((ret = session->open_cursor(session,
-		    "backup:", NULL, NULL, &backup_cursor)) == EBUSY)
-			sleep(1);
+		while ((ret = session->open_cursor(
+		    session, "backup:", NULL, config, &backup_cursor)) == EBUSY)
+			__wt_yield();
 		if (ret != 0)
 			testutil_die(ret, "session.open_cursor: backup");
 
@@ -148,8 +159,20 @@ backup(void *arg)
 		testutil_check(backup_cursor->close(backup_cursor));
 		testutil_check(pthread_rwlock_unlock(&g.backup_lock));
 
-		check_copy();
+		/*
+		 * Do some incremental backups after each full backup. If we're
+		 * not doing any more incrementals, verify the backup (we can't
+		 * verify intermediate states, once we verify, we can't do any
+		 * more incremental backups.
+		 */
+		if (full)
+			incremental = mmrand(NULL, 1, 5);
+		if (--incremental == 0)
+			check_copy();
 	}
+
+	if (incremental != 0)
+		check_copy();
 
 	testutil_check(session->close(session, NULL));
 
