@@ -5,6 +5,7 @@ selector:
     exclude_files:
     # SERVER-22970
     - jstests/noPassthroughWithMongod/index_multi.js
+    - jstests/noPassthroughWithMongod/indexbg_updates.js
 
 executor:
   js_test:
