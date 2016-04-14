@@ -256,12 +256,10 @@ __curjoin_split_key(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 static int
 __curjoin_entry_iter_next(WT_CURSOR_JOIN_ITER *iter, WT_CURSOR *cursor)
 {
-	WT_CURSOR_JOIN *cjoin;
 	WT_CURSOR_JOIN_ENTRY *entry;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	cjoin = iter->cjoin;
 	session = iter->session;
 
 	if (WT_CURJOIN_ITER_CONSUMED(iter))
