@@ -48,11 +48,11 @@
     var backgroundIndexBuildShell = startParallelShell(
         function() {
             var coll = db.getSiblingDB("indexbg_updates").coll;
-            assert.commandWorked(coll.createIndex({ "field0": 1 }, { "background": true }));
+            assert.commandWorked(coll.createIndex({"field0": 1}, {"background": true}));
         },
-        null,   // port -- use default
-        false   // noconnect
-    );
+        null,  // port -- use default
+        false  // noconnect
+        );
 
     print("Do some sets and unsets");
     assert.writeOK(bulk.execute());
@@ -60,6 +60,6 @@
     print("Start background index build");
     backgroundIndexBuildShell();
 
-    var explain = coll.find().hint({ "field0": 1 }).explain();
+    var explain = coll.find().hint({"field0": 1}).explain();
     assert("queryPlanner" in explain, tojson(explain));
 }());
