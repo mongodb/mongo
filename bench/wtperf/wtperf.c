@@ -2178,7 +2178,10 @@ main(int argc, char *argv[])
 
 	monitor_set = ret = 0;
 	config_opts = NULL;
-	cc_buf = tc_buf = user_cconfig = user_tconfig = NULL;
+	cc_buf = tc_buf = user_tconfig = NULL;
+
+	/* XXX mjc: kludge to always enable statistics. */
+	user_cconfig = dstrdup("statistics=(fast)");
 
 	/* Setup the default configuration values. */
 	cfg = &_cfg;
