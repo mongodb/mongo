@@ -16,14 +16,14 @@
     var t = db.js_protection_roundtrip;
 
     function withoutJavaScriptProtection() {
-        var doc = db.foo.findOne({_id: 0});
+        var doc = db.js_protection_roundtrip.findOne({_id: 0});
         assert.neq(doc, null);
         assert.eq(typeof doc.myFunc, "function", "myFunc should have been presented as a function");
         assert.eq(doc.myFunc(), "yes");
     }
 
     function withJavaScriptProtection() {
-        var doc = db.foo.findOne({_id: 0});
+        var doc = db.js_protection_roundtrip.findOne({_id: 0});
         assert.neq(doc, null);
         assert(doc.myFunc instanceof Code, "myFunc should have been a Code object");
         doc.myFunc = eval("(" + doc.myFunc.code + ")");
