@@ -22,7 +22,6 @@ __wt_debug_set_verbose
 __wt_debug_tree
 __wt_debug_tree_all
 __wt_debug_tree_shape
-__wt_fsync
 __wt_lex_compare
 __wt_lex_compare_skip
 __wt_log_scan
@@ -31,6 +30,7 @@ __wt_nlpo2_round
 __wt_print_huffman_code
 __wt_stat_join_aggregate
 __wt_stat_join_clear_all
+__wt_stream_set_no_buffer
 __wt_try_readlock
 wiredtiger_config_parser_open
 wiredtiger_config_validate

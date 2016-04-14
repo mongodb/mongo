@@ -67,7 +67,7 @@ struct __wt_cursor_backup {
 	WT_CURSOR iface;
 
 	size_t next;			/* Cursor position */
-	FILE *bfp;			/* Backup file */
+	WT_FH *bfh;			/* Backup file */
 	uint32_t maxid;			/* Maximum log file ID seen */
 
 	WT_CURSOR_BACKUP_ENTRY *list;	/* List of files to be copied. */

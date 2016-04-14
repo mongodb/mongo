@@ -2409,8 +2409,8 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 		/* Finalize the header information and write the page. */
 		dsk->recno = last->recno;
 		dsk->u.entries = r->entries;
-		dsk->mem_size =
-		    r->disk_image.size = WT_PTRDIFF32(r->first_free, dsk);
+		dsk->mem_size = WT_PTRDIFF32(r->first_free, dsk);
+		r->disk_image.size = dsk->mem_size;
 		WT_RET(
 		    __rec_split_write(session, r, last, &r->disk_image, false));
 
@@ -2790,9 +2790,9 @@ no_slots:
 		WT_STAT_FAST_DATA_INCR(session, compress_raw_fail);
 
 		dsk->recno = last->recno;
-		dsk->mem_size =
-		    r->disk_image.size = WT_PTRDIFF32(r->first_free, dsk);
+		dsk->mem_size = WT_PTRDIFF32(r->first_free, dsk);
 		dsk->u.entries = r->entries;
+		r->disk_image.size = dsk->mem_size;
 
 		r->entries = 0;
 		r->first_free = WT_PAGE_HEADER_BYTE(btree, dsk);
@@ -2972,7 +2972,8 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	dsk = r->disk_image.mem;
 	dsk->recno = bnd->recno;
 	dsk->u.entries = r->entries;
-	dsk->mem_size = r->disk_image.size = WT_PTRDIFF32(r->first_free, dsk);
+	dsk->mem_size = WT_PTRDIFF32(r->first_free, dsk);
+	r->disk_image.size = dsk->mem_size;
 
 	/* If this is a checkpoint, we're done, otherwise write the page. */
 	return (__rec_is_checkpoint(session, r, bnd) ?
@@ -3963,17 +3964,18 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_RET(__rec_split_init(
 	    session, r, page, page->pg_fix_recno, btree->maxleafpage));
 
+	/* Copy the original, disk-image bytes into place. */
+	memcpy(r->first_free, page->pg_fix_bitf,
+	    __bitstr_size((size_t)page->pg_fix_entries * btree->bitcnt));
+
 	/* Update any changes to the original on-page data items. */
 	WT_SKIP_FOREACH(ins, WT_COL_UPDATE_SINGLE(page)) {
 		WT_RET(__rec_txn_read(session, r, ins, NULL, NULL, &upd));
 		if (upd != NULL)
-			__bit_setv_recno(page, WT_INSERT_RECNO(ins),
-			    btree->bitcnt, ((uint8_t *)WT_UPDATE_DATA(upd))[0]);
+			__bit_setv(r->first_free,
+			    WT_INSERT_RECNO(ins) - page->pg_fix_recno,
+			    btree->bitcnt, *(uint8_t *)WT_UPDATE_DATA(upd));
 	}
-
-	/* Copy the updated, disk-image bytes into place. */
-	memcpy(r->first_free, page->pg_fix_bitf,
-	    __bitstr_size((size_t)page->pg_fix_entries * btree->bitcnt));
 
 	/* Calculate the number of entries per page remainder. */
 	entry = page->pg_fix_entries;
@@ -4031,7 +4033,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			if (nrecs > 0) {
 				__bit_setv(r->first_free, entry, btree->bitcnt,
 				    upd == NULL ? 0 :
-				    ((uint8_t *)WT_UPDATE_DATA(upd))[0]);
+				    *(uint8_t *)WT_UPDATE_DATA(upd));
 				--nrecs;
 				++entry;
 				++r->recno;
@@ -6086,8 +6088,9 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 		dsk->u.datalen = (uint32_t)kv->buf.size;
 		memcpy(WT_PAGE_HEADER_BYTE(btree, dsk),
 		    kv->buf.data, kv->buf.size);
-		dsk->mem_size = tmp->size =
+		dsk->mem_size =
 		    WT_PAGE_HEADER_BYTE_SIZE(btree) + (uint32_t)kv->buf.size;
+		tmp->size = dsk->mem_size;
 
 		/* Write the buffer. */
 		addr = buf;

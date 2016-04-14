@@ -59,12 +59,9 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
 	WT_DECL_RET;
 	WT_EXT *ext;
 	WT_EXTLIST *el;
-	WT_FH *fh;
 	wt_off_t avail_eighty, avail_ninety, eighty, ninety;
 
 	*skipp = true;				/* Return a default skip. */
-
-	fh = block->fh;
 
 	/*
 	 * We do compaction by copying blocks from the end of the file to the
@@ -72,7 +69,7 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
 	 * worth doing.  Ignore small files, and files where we are unlikely
 	 * to recover 10% of the file.
 	 */
-	if (fh->size <= WT_MEGABYTE)
+	if (block->size <= WT_MEGABYTE)
 		return (0);
 
 	/*
@@ -93,8 +90,8 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
 
 	/* Sum the available bytes in the initial 80% and 90% of the file. */
 	avail_eighty = avail_ninety = 0;
-	ninety = fh->size - fh->size / 10;
-	eighty = fh->size - ((fh->size / 10) * 2);
+	ninety = block->size - block->size / 10;
+	eighty = block->size - ((block->size / 10) * 2);
 
 	el = &block->live.avail;
 	WT_EXT_FOREACH(ext, el->off)
@@ -117,11 +114,11 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
 	 * less useful.
 	 */
 	if (avail_eighty > WT_MEGABYTE &&
-	    avail_eighty >= ((fh->size / 10) * 2)) {
+	    avail_eighty >= ((block->size / 10) * 2)) {
 		*skipp = false;
 		block->compact_pct_tenths = 2;
 	} else if (avail_ninety > WT_MEGABYTE &&
-	    avail_ninety >= fh->size / 10) {
+	    avail_ninety >= block->size / 10) {
 		*skipp = false;
 		block->compact_pct_tenths = 1;
 	}
@@ -140,7 +137,8 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
 	    "%s: require 10%% or %" PRIuMAX "MB (%" PRIuMAX ") in the first "
 	    "90%% of the file to perform compaction, compaction %s",
 	    block->name,
-	    (uintmax_t)(fh->size / 10) / WT_MEGABYTE, (uintmax_t)fh->size / 10,
+	    (uintmax_t)(block->size / 10) / WT_MEGABYTE,
+	    (uintmax_t)block->size / 10,
 	    *skipp ? "skipped" : "proceeding"));
 
 err:	__wt_spin_unlock(session, &block->live_lock);
@@ -159,14 +157,11 @@ __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_EXT *ext;
 	WT_EXTLIST *el;
-	WT_FH *fh;
 	wt_off_t limit, offset;
 	uint32_t size, cksum;
 
 	WT_UNUSED(addr_size);
 	*skipp = true;				/* Return a default skip. */
-
-	fh = block->fh;
 
 	/* Crack the cookie. */
 	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
@@ -179,7 +174,7 @@ __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
 	 * there's an obvious race if the file is sufficiently busy.
 	 */
 	__wt_spin_lock(session, &block->live_lock);
-	limit = fh->size - ((fh->size / 10) * block->compact_pct_tenths);
+	limit = block->size - ((block->size / 10) * block->compact_pct_tenths);
 	if (offset > limit) {
 		el = &block->live.avail;
 		WT_EXT_FOREACH(ext, el->off) {
@@ -217,7 +212,7 @@ __block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block, bool start)
 	u_int i;
 
 	el = &block->live.avail;
-	size = block->fh->size;
+	size = block->size;
 
 	WT_RET(__wt_verbose(session, WT_VERB_COMPACT,
 	    "============ %s",

@@ -669,9 +669,7 @@ __curjoin_init_next(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	WT_ERR(__wt_open_cursor(session, urimain, (WT_CURSOR *)cjoin, config,
 	    &cjoin->main));
 
-	je = &cjoin->entries[0];
 	jeend = &cjoin->entries[cjoin->entries_next];
-
 	for (je = cjoin->entries; je < jeend; je++) {
 		if (je->subjoin != NULL) {
 			WT_ERR(__curjoin_init_next(session, je->subjoin,

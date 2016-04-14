@@ -43,40 +43,33 @@ win_filelist()
 {
 	f='../build_win/filelist.win'
 
-	# Process the files for which there's a Windows-specific version, then
-	# append Windows-only files and discard POSIX-only files.
-	(sed \
-	    -e 's;os_posix/os_dir.c;os_win/os_dir.c;' \
-	    -e 's;os_posix/os_dlopen.c;os_win/os_dlopen.c;' \
-	    -e 's;os_posix/os_dlopen.c;os_win/os_dlopen.c;' \
-	    -e 's;os_posix/os_dlopen.c;os_win/os_dlopen.c;' \
-	    -e 's;os_posix/os_errno.c;os_win/os_errno.c;' \
-	    -e 's;os_posix/os_exist.c;os_win/os_exist.c;' \
-	    -e 's;os_posix/os_fallocate.c;os_win/os_fallocate.c;' \
-	    -e 's;os_posix/os_filesize.c;os_win/os_filesize.c;' \
-	    -e 's;os_posix/os_flock.c;os_win/os_flock.c;' \
-	    -e 's;os_posix/os_fsync.c;os_win/os_fsync.c;' \
-	    -e 's;os_posix/os_ftruncate.c;os_win/os_ftruncate.c;' \
-	    -e 's;os_posix/os_getenv.c;os_win/os_getenv.c;' \
-	    -e 's;os_posix/os_map.c;os_win/os_map.c;' \
-	    -e 's;os_posix/os_mtx_cond.c;os_win/os_mtx_cond.c;' \
-	    -e 's;os_posix/os_once.c;os_win/os_once.c;' \
-	    -e 's;os_posix/os_open.c;os_win/os_open.c;' \
-	    -e 's;os_posix/os_pagesize.c;os_win/os_pagesize.c;' \
-	    -e 's;os_posix/os_path.c;os_win/os_path.c;' \
-	    -e 's;os_posix/os_priv.c;os_win/os_priv.c;' \
-	    -e 's;os_posix/os_remove.c;os_win/os_remove.c;' \
-	    -e 's;os_posix/os_rename.c;os_win/os_rename.c;' \
-	    -e 's;os_posix/os_rw.c;os_win/os_rw.c;' \
-	    -e 's;os_posix/os_sleep.c;os_win/os_sleep.c;' \
-	    -e 's;os_posix/os_thread.c;os_win/os_thread.c;' \
-	    -e 's;os_posix/os_time.c;os_win/os_time.c;' \
-	    -e 's;os_posix/os_yield.c;os_win/os_yield.c;' \
+	# Discard POSIX-only and PPC-only files, add in Windows-only files.
+	(
+	sed \
+	    -e '/\/os_posix\//d' \
 	    -e '/src\/support\/power8\/crc32.S/d' \
 	    -e '/src\/support\/power8\/crc32_wrapper.c/d'
-	 echo 'src/os_win/os_snprintf.c'
-	 echo 'src/os_win/os_vsnprintf.c') < filelist | sort > $t
-	 cmp $t $f > /dev/null 2>&1 ||
+
+	echo 'src/os_win/os_dir.c'
+	echo 'src/os_win/os_dlopen.c'
+	echo 'src/os_win/os_errno.c'
+	echo 'src/os_win/os_fs.c'
+	echo 'src/os_win/os_getenv.c'
+	echo 'src/os_win/os_map.c'
+	echo 'src/os_win/os_mtx_cond.c'
+	echo 'src/os_win/os_once.c'
+	echo 'src/os_win/os_pagesize.c'
+	echo 'src/os_win/os_path.c'
+	echo 'src/os_win/os_priv.c'
+	echo 'src/os_win/os_setvbuf.c'
+	echo 'src/os_win/os_sleep.c'
+	echo 'src/os_win/os_snprintf.c'
+	echo 'src/os_win/os_thread.c'
+	echo 'src/os_win/os_time.c'
+	echo 'src/os_win/os_vsnprintf.c'
+	echo 'src/os_win/os_yield.c') < filelist | sort > $t
+
+	cmp $t $f > /dev/null 2>&1 ||
 	     (echo "Building $f" && rm -f $f && cp $t $f)
 }
 

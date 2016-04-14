@@ -571,7 +571,6 @@ __wt_cursor_equals(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp)
 	WT_SESSION_IMPL *session;
 	int cmp;
 
-	session = (WT_SESSION_IMPL *)cursor->session;
 	CURSOR_API_CALL(cursor, session, equals, NULL);
 
 	WT_ERR(cursor->compare(cursor, other, &cmp));

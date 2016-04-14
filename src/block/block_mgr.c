@@ -411,11 +411,21 @@ __bm_stat(WT_BM *bm, WT_SESSION_IMPL *session, WT_DSRC_STATS *stats)
  *	Flush a file to disk.
  */
 static int
-__bm_sync(WT_BM *bm, WT_SESSION_IMPL *session, bool async)
+__bm_sync(WT_BM *bm, WT_SESSION_IMPL *session, bool block)
 {
-	return (async ?
-	    __wt_fsync_async(session, bm->block->fh) :
-	    __wt_fsync(session, bm->block->fh));
+	WT_DECL_RET;
+
+	if (!block && !bm->block->nowait_sync_available)
+		return (0);
+
+	if ((ret = __wt_fsync(session, bm->block->fh, block)) == 0)
+		return (0);
+
+	/* Ignore ENOTSUP, but don't try again. */
+	if (ret != ENOTSUP)
+		return (ret);
+	bm->block->nowait_sync_available = false;
+	return (0);
 }
 
 /*
