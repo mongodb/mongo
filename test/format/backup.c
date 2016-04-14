@@ -59,18 +59,24 @@ static void
 copy_file(WT_SESSION *session, const char *name)
 {
 	size_t len;
-	char *to;
+	char *first, *second;
 
 	len = strlen("BACKUP") + strlen(name) + 10;
-	to = dmalloc(len);
+	first = dmalloc(len);
+	(void)snprintf(first, len, "BACKUP/%s", name);
+	testutil_check(__wt_copy_and_sync(session, name, first));
 
-	(void)snprintf(to, len, "BACKUP/%s", name);
-	testutil_check(__wt_copy_and_sync(session, name, to));
+	/*
+	 * Save another copy of the original file to make debugging recovery
+	 * errors easier.
+	 */
+	len = strlen("BACKUP_COPY") + strlen(name) + 10;
+	second = dmalloc(len);
+	(void)snprintf(second, len, "BACKUP_COPY/%s", name);
+	testutil_check(__wt_copy_and_sync(session, first, second));
 
-	(void)snprintf(to, len, "BACKUP_COPY/%s", name);
-	testutil_check(__wt_copy_and_sync(session, name, to));
-
-	free(to);
+	free(first);
+	free(second);
 }
 
 /*
@@ -102,7 +108,7 @@ backup(void *arg)
 	 * Perform a backup at somewhere under 10 seconds (so we get at
 	 * least one done), and then at 45 second intervals.
 	 */
-	for (period = mmrand(NULL, 1, 10);; period = 45) {
+	for (period = mmrand(NULL, 1, 10);; period = mmrand(NULL, 30, 45)) {
 		/* Sleep for short periods so we don't make the run wait. */
 		while (period > 0 && !g.workers_finished) {
 			--period;
