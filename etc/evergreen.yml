@@ -439,10 +439,11 @@ pre:
   - func: "kill processes"
   - command: shell.exec
     params:
-      silent: true
       script: |
+        set -o errexit
+        set -o verbose
+
         rm -rf src /data/db/* mongo-coredumps.tgz
-        exit 0
 
 post:
   - command: attach.results
