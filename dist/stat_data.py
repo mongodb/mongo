@@ -180,6 +180,7 @@ connection_stats = [
     CacheStat('cache_eviction_queue_not_empty', 'eviction server candidate queue not empty when topping up'),
     CacheStat('cache_eviction_server_evicting', 'eviction server evicting pages'),
     CacheStat('cache_eviction_server_not_evicting', 'eviction server populating queue, but not evicting pages'),
+    CacheStat('cache_eviction_server_slept', 'eviction server slept, because we did not make progress with eviction'),
     CacheStat('cache_eviction_server_toobig', 'eviction server skipped very large page'),
     CacheStat('cache_eviction_slow', 'eviction server unable to reach eviction goal'),
     CacheStat('cache_eviction_split_internal', 'internal pages split during eviction'),

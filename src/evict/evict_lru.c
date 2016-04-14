@@ -647,6 +647,9 @@ __evict_pass(WT_SESSION_IMPL *session)
 		 * sleep, it's not something we can fix.
 		 */
 		if (pages_evicted == cache->pages_evict) {
+
+			WT_STAT_FAST_CONN_INCR(session,
+					       cache_eviction_server_slept);
 			/*
 			 * Back off if we aren't making progress: walks hold
 			 * the handle list lock, which blocks other operations
@@ -898,29 +901,33 @@ static int
 __evict_lru_pages(WT_SESSION_IMPL *session, bool is_server)
 {
 	WT_DECL_RET;
-	int64_t q_empty, q_not_empty, ratio;
+	WT_CACHE *cache;
+	uint64_t app_evict_percent, app_evict, server_evict, worker_evict;
 
 	/*
-	 * If this is the server, compute the ratio of occurrences when the
-	 * eviction queue is not empty vs when it is empty.  The probability of
-	 * the eviction server evicting is proportional to that ratio.  If the
-	 * queue is often not empty, it is a sign that eviction workers are not
-	 * keeping up with the work.  In that case, the ratio will be high and
-	 * the eviction server will help evict.
+	 * The server will not help evict if the workers are coping with
+	 * eviction workload, that is, if fewer than 5% of the pages are
+	 * evicted by application threads.
 	 */
 	if (is_server && S2C(session)->evict_workers > 1) {
-		q_empty = WT_STAT_READ(S2C(session)->stats,
-		    cache_eviction_queue_empty);
-		q_not_empty = WT_STAT_READ(S2C(session)->stats,
-		    cache_eviction_queue_not_empty);
+		app_evict = WT_STAT_READ(S2C(session)->stats,
+					 cache_eviction_app);
 
-		ratio = (100 * q_not_empty) / (q_empty + q_not_empty + 1);
-		if (__wt_random(&session->rnd) % 100 > ratio) {
+		server_evict = WT_STAT_READ(S2C(session)->stats,
+					 cache_eviction_server_evicting);
+
+		worker_evict = WT_STAT_READ(S2C(session)->stats,
+					    cache_eviction_worker_evicting);
+
+		app_evict_percent = (100 * app_evict) /
+			(server_evict + worker_evict + 1);
+		if (app_evict_percent < 5) {
 			WT_STAT_FAST_CONN_INCR(session,
 			    cache_eviction_server_not_evicting);
 			return (0);
 		}
 	}
+
 	/*
 	 * Reconcile and discard some pages: EBUSY is returned if a page fails
 	 * eviction because it's unavailable, continue in that case.

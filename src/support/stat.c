@@ -552,6 +552,7 @@ static const char * const __stats_connection_desc[] = {
 	"cache: eviction server evicting pages",
 	"cache: eviction server populating queue, but not evicting pages",
 	"cache: eviction server skipped very large page",
+	"cache: eviction server slept, because we did not make progress with eviction",
 	"cache: eviction server unable to reach eviction goal",
 	"cache: eviction worker thread evicting pages",
 	"cache: failed eviction of pages that exceeded the in-memory maximum",
@@ -753,6 +754,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_server_evicting = 0;
 	stats->cache_eviction_server_not_evicting = 0;
 	stats->cache_eviction_server_toobig = 0;
+	stats->cache_eviction_server_slept = 0;
 	stats->cache_eviction_slow = 0;
 	stats->cache_eviction_worker_evicting = 0;
 	stats->cache_eviction_force_fail = 0;
@@ -954,6 +956,8 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, cache_eviction_server_not_evicting);
 	to->cache_eviction_server_toobig +=
 	    WT_STAT_READ(from, cache_eviction_server_toobig);
+	to->cache_eviction_server_slept +=
+	    WT_STAT_READ(from, cache_eviction_server_slept);
 	to->cache_eviction_slow += WT_STAT_READ(from, cache_eviction_slow);
 	to->cache_eviction_worker_evicting +=
 	    WT_STAT_READ(from, cache_eviction_worker_evicting);
