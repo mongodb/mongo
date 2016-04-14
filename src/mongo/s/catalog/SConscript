@@ -47,29 +47,7 @@ env.Library(
         'catalog_cache.cpp',
     ],
     LIBDEPS=[
-        'catalog_manager_impl',
-    ],
-)
-
-env.Library(
-    target='catalog_manager_impl',
-    source=[
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
-        '$BUILD_DIR/mongo/s/common',
-        '$BUILD_DIR/mongo/s/catalog/catalog_types',
-        '$BUILD_DIR/mongo/s/client/sharding_client',
-        'dist_lock_manager',
-        'replset/catalog_manager_replica_set',
-        'replset/dist_lock_catalog_impl',
-        'replset/replset_dist_lock_manager',
-    ],
-    LIBDEPS_TAGS=[
-        # Circular with coreshard for mongo::grid and mongo::DBConfig.
-        'incomplete',
+        '$BUILD_DIR/mongo/s/coreshard',
     ],
 )
 
@@ -79,7 +57,6 @@ env.Library(
         'catalog_manager_mock.cpp',
     ],
     LIBDEPS=[
-        'catalog_manager_impl',
         'dist_lock_manager_mock',
     ]
 )

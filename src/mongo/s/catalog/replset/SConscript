@@ -55,6 +55,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/s/sharding_test_fixture',
         '$BUILD_DIR/mongo/util/tick_source_mock',
         'dist_lock_catalog_impl',
+        'replset_dist_lock_manager',
     ]
 )
 
