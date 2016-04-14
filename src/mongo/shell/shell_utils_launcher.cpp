@@ -462,6 +462,7 @@ void ProgramRunner::launchProcess(int child_stdout) {
         argv[i] = _argv[i].c_str();
     }
     argv[_argv.size()] = 0;
+    std::string execErrMsg = str::stream() << "Unable to start program " << argv[0];
 
     unique_ptr<const char* []> envStorage(new const char* [2]);
     const char** env = envStorage.get();
@@ -489,7 +490,7 @@ void ProgramRunner::launchProcess(int child_stdout) {
 
         if (dup2(child_stdout, STDOUT_FILENO) == -1 || dup2(child_stdout, STDERR_FILENO) == -1) {
             // Async signal unsafe code reporting a terminal error condition.
-            cout << "Unable to dup2 child output: " << errnoWithDescription() << endl;
+            perror("Unable to dup2 child output: ");
             _exit(-1);  // do not pass go, do not call atexit handlers
         }
 
@@ -498,7 +499,7 @@ void ProgramRunner::launchProcess(int child_stdout) {
         execvp(argv[0], const_cast<char**>(argv));
 
         // Async signal unsafe code reporting a terminal error condition.
-        cout << "Unable to start program " << argv[0] << ' ' << errnoWithDescription() << endl;
+        perror(execErrMsg.c_str());
 
         _exit(-1);
     }
