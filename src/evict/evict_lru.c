@@ -901,7 +901,6 @@ static int
 __evict_lru_pages(WT_SESSION_IMPL *session, bool is_server)
 {
 	WT_DECL_RET;
-	WT_CACHE *cache;
 	uint64_t app_evict_percent, app_evict, server_evict, worker_evict;
 
 	/*
