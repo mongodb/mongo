@@ -54,7 +54,6 @@ class ConnectionString;
 class DatabaseType;
 class NamespaceString;
 class OperationContext;
-class SettingsType;
 class ShardKeyPattern;
 class ShardRegistry;
 class ShardType;
@@ -351,16 +350,16 @@ public:
                              const BSONObj& detail) = 0;
 
     /**
-     * Returns global settings for a certain key.
-     * @param key: key for SettingsType::ConfigNS document.
+     * Reads global sharding settings from the confing.settings collection. The key parameter is
+     * used as the _id of the respective setting document.
      *
-     * Returns ErrorCodes::NoMatchingDocument if no SettingsType::ConfigNS document
-     * with such key exists.
-     * Returns ErrorCodes::FailedToParse if we encountered an error while parsing
-     * the settings document.
+     * NOTE: This method should generally not be used directly and instead the respective
+     * configuration class should be used (e.g. BalancerConfiguration).
+     *
+     * Returns ErrorCodes::NoMatchingDocument if no such key exists or the BSON content of the
+     * setting otherwise.
      */
-    virtual StatusWith<SettingsType> getGlobalSettings(OperationContext* txn,
-                                                       const std::string& key) = 0;
+    virtual StatusWith<BSONObj> getGlobalSettings(OperationContext* txn, StringData key) = 0;
 
     /**
      * Directly sends the specified command to the config server and returns the response.

@@ -32,6 +32,7 @@
 
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 
+#include <iomanip>
 #include <pcrecpp.h>
 
 #include "mongo/base/status.h"
@@ -58,7 +59,6 @@
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_database.h"
-#include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard.h"
@@ -116,6 +116,8 @@ const int kActionLogCollectionSizeMB = 2 * 1024 * 1024;
 
 const std::string kChangeLogCollectionName("changelog");
 const int kChangeLogCollectionSizeMB = 10 * 1024 * 1024;
+
+const NamespaceString kSettingsNamespace("config", "settings");
 
 void toBatchError(const Status& status, BatchedCommandResponse* response) {
     response->clear();
@@ -1169,14 +1171,10 @@ Status CatalogManagerReplicaSet::dropCollection(OperationContext* txn, const Nam
     return Status::OK();
 }
 
-StatusWith<SettingsType> CatalogManagerReplicaSet::getGlobalSettings(OperationContext* txn,
-                                                                     const string& key) {
-    auto findStatus = _exhaustiveFindOnConfig(txn,
-                                              kConfigReadSelector,
-                                              NamespaceString(SettingsType::ConfigNS),
-                                              BSON(SettingsType::key(key)),
-                                              BSONObj(),
-                                              1);
+StatusWith<BSONObj> CatalogManagerReplicaSet::getGlobalSettings(OperationContext* txn,
+                                                                StringData key) {
+    auto findStatus = _exhaustiveFindOnConfig(
+        txn, kConfigReadSelector, kSettingsNamespace, BSON("_id" << key), BSONObj(), 1);
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
     }
@@ -1187,22 +1185,8 @@ StatusWith<SettingsType> CatalogManagerReplicaSet::getGlobalSettings(OperationCo
                 str::stream() << "can't find settings document with key: " << key};
     }
 
-    BSONObj settingsDoc = docs.front();
-    StatusWith<SettingsType> settingsResult = SettingsType::fromBSON(settingsDoc);
-    if (!settingsResult.isOK()) {
-        return {ErrorCodes::FailedToParse,
-                str::stream() << "error while parsing settings document: " << settingsDoc << " : "
-                              << settingsResult.getStatus().toString()};
-    }
-
-    const SettingsType& settings = settingsResult.getValue();
-
-    Status validationStatus = settings.validate();
-    if (!validationStatus.isOK()) {
-        return validationStatus;
-    }
-
-    return settingsResult;
+    invariant(docs.size() == 1);
+    return docs.front();
 }
 
 Status CatalogManagerReplicaSet::getDatabasesForShard(OperationContext* txn,

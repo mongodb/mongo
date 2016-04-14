@@ -109,7 +109,12 @@ Status BalancerConfiguration::_refreshBalancerSettings(OperationContext* txn) {
     auto balanceSettingsStatus =
         Grid::get(txn)->catalogManager(txn)->getGlobalSettings(txn, SettingsType::BalancerDocKey);
     if (balanceSettingsStatus.isOK()) {
-        balancerSettings = std::move(balanceSettingsStatus.getValue());
+        auto settingsTypeStatus =
+            SettingsType::fromBSON(std::move(balanceSettingsStatus.getValue()));
+        if (!settingsTypeStatus.isOK()) {
+            return settingsTypeStatus.getStatus();
+        }
+        balancerSettings = std::move(settingsTypeStatus.getValue());
     } else if (balanceSettingsStatus.getStatus() != ErrorCodes::NoMatchingDocument) {
         return balanceSettingsStatus.getStatus();
     } else {
@@ -158,7 +163,12 @@ Status BalancerConfiguration::_refreshChunkSizeSettings(OperationContext* txn) {
     auto chunkSizeSettingsStatus =
         grid.catalogManager(txn)->getGlobalSettings(txn, SettingsType::ChunkSizeDocKey);
     if (chunkSizeSettingsStatus.isOK()) {
-        chunkSizeSettings = std::move(chunkSizeSettingsStatus.getValue());
+        auto settingsTypeStatus =
+            SettingsType::fromBSON(std::move(chunkSizeSettingsStatus.getValue()));
+        if (!settingsTypeStatus.isOK()) {
+            return settingsTypeStatus.getStatus();
+        }
+        chunkSizeSettings = std::move(settingsTypeStatus.getValue());
     } else if (chunkSizeSettingsStatus.getStatus() != ErrorCodes::NoMatchingDocument) {
         return chunkSizeSettingsStatus.getStatus();
     } else {

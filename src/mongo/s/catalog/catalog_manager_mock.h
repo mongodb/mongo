@@ -132,8 +132,7 @@ public:
                      const std::string& ns,
                      const BSONObj& detail) override;
 
-    StatusWith<SettingsType> getGlobalSettings(OperationContext* txn,
-                                               const std::string& key) override;
+    StatusWith<BSONObj> getGlobalSettings(OperationContext* txn, StringData key) override;
 
     void writeConfigServerDirect(OperationContext* txn,
                                  const BatchedCommandRequest& request,

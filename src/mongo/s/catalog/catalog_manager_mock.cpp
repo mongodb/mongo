@@ -34,7 +34,6 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
-#include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/stdx/memory.h"
 
@@ -190,8 +189,7 @@ Status CatalogManagerMock::logChange(OperationContext* txn,
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-StatusWith<SettingsType> CatalogManagerMock::getGlobalSettings(OperationContext* txn,
-                                                               const string& key) {
+StatusWith<BSONObj> CatalogManagerMock::getGlobalSettings(OperationContext* txn, StringData key) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
