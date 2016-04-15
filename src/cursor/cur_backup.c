@@ -384,11 +384,20 @@ __backup_uri(WT_SESSION_IMPL *session,
 			    uri);
 
 		/*
-		 * Handle log targets.  We do not need to go through the
-		 * schema worker, just call the function to append them.
-		 * Set log_only only if it is our only URI target.
+		 * Handle log targets. We do not need to go through the schema
+		 * worker, just call the function to append them. Set log_only
+		 * only if it is our only URI target.
 		 */
 		if (WT_PREFIX_MATCH(uri, "log:")) {
+			/*
+			 * Log archive cannot mix with incremental backup, don't
+			 * let that happen.
+			 */
+			if (FLD_ISSET(
+			    S2C(session)->log_flags, WT_CONN_LOG_ARCHIVE))
+				WT_ERR_MSG(session, EINVAL,
+				    "incremental backup not possible when "
+				    "automatic log archival configured");
 			*log_only = !target_list;
 			WT_ERR(__backup_list_uri_append(session, uri, NULL));
 		} else {
