@@ -43,13 +43,13 @@ namespace mongo {
 std::unique_ptr<Shard> ShardFactoryImpl::createUniqueShard(const ShardId& shardId,
                                                            const ConnectionString& connStr,
                                                            bool isLocal) {
-    return stdx::make_unique<Shard>(shardId, connStr, std::move(_targeterFactory.create(connStr)));
+    return stdx::make_unique<Shard>(shardId, connStr, _targeterFactory.create(connStr));
 }
 
 std::shared_ptr<Shard> ShardFactoryImpl::createShard(const ShardId& shardId,
                                                      const ConnectionString& connStr,
                                                      bool isLocal) {
-    return std::make_shared<Shard>(shardId, connStr, std::move(_targeterFactory.create(connStr)));
+    return std::make_shared<Shard>(shardId, connStr, _targeterFactory.create(connStr));
 }
 
 }  // namespace mongo
