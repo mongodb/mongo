@@ -149,11 +149,8 @@ Status dropIndexes(OperationContext* txn,
         if (!status.isOK()) {
             return status;
         }
-
-        auto opObserver = getGlobalServiceContext()->getOpObserver();
-        if (opObserver)
-            opObserver->onDropIndex(txn, dbName.toString() + ".$cmd", idxDescriptor);
-
+        getGlobalServiceContext()->getOpObserver()->onDropIndex(
+            txn, dbName.toString() + ".$cmd", idxDescriptor);
         wunit.commit();
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "dropIndexes", dbName);

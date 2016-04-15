@@ -295,9 +295,8 @@ public:
 
             for (size_t i = 0; i < specs.size(); i++) {
                 std::string systemIndexes = ns.getSystemIndexesCollection();
-                auto opObserver = getGlobalServiceContext()->getOpObserver();
-                if (opObserver)
-                    opObserver->onCreateIndex(txn, systemIndexes, specs[i]);
+                getGlobalServiceContext()->getOpObserver()->onCreateIndex(
+                    txn, systemIndexes, specs[i]);
             }
 
             wunit.commit();
