@@ -1037,6 +1037,13 @@ backup(WT_SESSION *session)
 	ret = cursor->close(cursor);
 	/*! [backup]*/
 
+	/*! [incremental backup]*/
+	/* Open the backup data source for incremental backup. */
+	ret = session->open_cursor(
+	    session, "backup:", NULL, "target=(\"log:\")", &cursor);
+	/*! [incremental backup]*/
+	ret = cursor->close(cursor);
+
 	/*! [backup of a checkpoint]*/
 	ret = session->checkpoint(session, "drop=(from=June01),name=June01");
 	/*! [backup of a checkpoint]*/
