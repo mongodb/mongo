@@ -49,11 +49,11 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/initial_sync.h"
-#include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -81,7 +81,7 @@ void truncateAndResetOplog(OperationContext* txn,
                            ReplicationCoordinator* replCoord,
                            BackgroundSync* bgsync) {
     // Clear minvalid
-    setMinValid(txn, OpTime(), DurableRequirement::None);
+    StorageInterface::get(txn)->setMinValid(txn, OpTime(), DurableRequirement::None);
 
     AutoGetDb autoDb(txn, "local", MODE_X);
     massert(28585, "no local database found", autoDb.getDb());
@@ -353,7 +353,7 @@ Status _initialSync() {
     }
 
     // Add field to minvalid document to tell us to restart initial sync if we crash
-    setInitialSyncFlag(&txn);
+    StorageInterface::get(&txn)->setInitialSyncFlag(&txn);
 
     log() << "initial sync drop all databases";
     dropAllDatabasesExceptLocal(&txn);
@@ -439,12 +439,12 @@ Status _initialSync() {
 
         // Initial sync is now complete.  Flag this by setting minValid to the last thing
         // we synced.
-        setMinValid(&txn, lastOpTimeWritten, DurableRequirement::None);
+        StorageInterface::get(&txn)->setMinValid(&txn, lastOpTimeWritten, DurableRequirement::None);
         BackgroundSync::get()->setInitialSyncRequestedFlag(false);
     }
 
     // Clear the initial sync flag -- cannot be done under a db lock, or recursive.
-    clearInitialSyncFlag(&txn);
+    StorageInterface::get(&txn)->clearInitialSyncFlag(&txn);
 
     // Clear maint. mode.
     while (replCoord->getMaintenanceMode()) {

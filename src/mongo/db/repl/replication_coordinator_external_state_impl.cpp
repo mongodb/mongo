@@ -51,13 +51,13 @@
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/member_state.h"
-#include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/rs_initialsync.h"
 #include "mongo/db/repl/snapshot_thread.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/s/sharding_state.h"
@@ -339,7 +339,7 @@ void ReplicationCoordinatorExternalStateImpl::setGlobalTimestamp(const Timestamp
 }
 
 void ReplicationCoordinatorExternalStateImpl::cleanUpLastApplyBatch(OperationContext* txn) {
-    auto mv = getMinValid(txn);
+    auto mv = StorageInterface::get(txn)->getMinValid(txn);
 
     if (!mv.start.isNull()) {
         // If we are in the middle of a batch, and recoveringm then we need to truncate the oplog.

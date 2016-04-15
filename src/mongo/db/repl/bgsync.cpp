@@ -43,7 +43,6 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -51,6 +50,7 @@
 #include "mongo/db/repl/rollback_source_impl.h"
 #include "mongo/db/repl/rs_rollback.h"
 #include "mongo/db/repl/rs_sync.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -297,7 +297,8 @@ void BackgroundSync::_produce(OperationContext* txn) {
         log() << "Our newest OpTime : " << lastOpTimeFetched;
         log() << "Earliest OpTime available is " << syncSourceResp.earliestOpTimeSeen;
         log() << "See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember";
-        setMinValid(txn, {lastOpTimeFetched, syncSourceResp.earliestOpTimeSeen});
+        StorageInterface::get(txn)
+            ->setMinValid(txn, {lastOpTimeFetched, syncSourceResp.earliestOpTimeSeen});
         auto status = _replCoord->setMaintenanceMode(true);
         if (!status.isOK()) {
             warning() << "Failed to transition into maintenance mode.";
@@ -438,7 +439,7 @@ void BackgroundSync::_produce(OperationContext* txn) {
         }
         // check that we are at minvalid, otherwise we cannot roll back as we may be in an
         // inconsistent state
-        BatchBoundaries boundaries = getMinValid(txn);
+        BatchBoundaries boundaries = StorageInterface::get(txn)->getMinValid(txn);
         if (!boundaries.start.isNull() || boundaries.end > lastApplied) {
             fassertNoTrace(18750,
                            Status(ErrorCodes::UnrecoverableRollbackError,

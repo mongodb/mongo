@@ -910,6 +910,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
     auto serviceContext = getGlobalServiceContext();
     serviceContext->registerKillOpListener(replCoord.get());
     repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
+    repl::StorageInterface::set(serviceContext, stdx::make_unique<repl::StorageInterfaceImpl>());
     repl::setOplogCollectionName();
     return Status::OK();
 }

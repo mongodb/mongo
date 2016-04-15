@@ -654,7 +654,6 @@ serverOnlyFiles = [
     "repair_database.cpp",
     "repl/initial_sync.cpp",
     "repl/master_slave.cpp",
-    "repl/minvalid.cpp",
     "repl/oplog.cpp",
     "repl/oplogreader.cpp",
     "repl/sync_source_resolver.cpp", # TODO(dannenberg) move this into DataReplicator in repl/SConscript.
@@ -729,6 +728,7 @@ serveronlyLibdeps = [
     "repl/replset_commands",
     "repl/rs_rollback",
     "repl/rslog",
+    "repl/storage_interface",
     "repl/sync_tail",
     "repl/topology_coordinator_impl",
     "run_commands",
