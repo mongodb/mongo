@@ -333,7 +333,7 @@ private:
     // appropriate, etc.
     static BSONObj _fixIndexSpec(const BSONObj& spec);
 
-    Status _isSpecOk(const BSONObj& spec) const;
+    Status _isSpecOk(OperationContext* txn, const BSONObj& spec) const;
 
     Status _doesSpecConflictWithExisting(OperationContext* txn, const BSONObj& spec) const;
 

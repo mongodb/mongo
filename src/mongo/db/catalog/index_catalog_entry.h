@@ -39,6 +39,7 @@
 
 namespace mongo {
 
+class CollatorInterface;
 class CollectionCatalogEntry;
 class CollectionInfoCache;
 class HeadManager;
@@ -142,6 +143,7 @@ private:
     // Owned here.
     HeadManager* _headManager;
     std::unique_ptr<MatchExpression> _filterExpression;
+    std::unique_ptr<CollatorInterface> _collator;
 
     // cached stuff
 

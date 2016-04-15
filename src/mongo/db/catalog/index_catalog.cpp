@@ -57,6 +57,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/ops/delete.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/operation_context.h"
@@ -132,7 +133,7 @@ IndexCatalogEntry* IndexCatalog::_setupInMemoryStructures(OperationContext* txn,
                                                           bool initFromDisk) {
     unique_ptr<IndexDescriptor> descriptorCleanup(descriptor);
 
-    Status status = _isSpecOk(descriptor->infoObj());
+    Status status = _isSpecOk(txn, descriptor->infoObj());
     if (!status.isOK() && status != ErrorCodes::IndexAlreadyExists) {
         severe() << "Found an invalid index " << descriptor->infoObj() << " on the "
                  << _collection->ns().ns() << " collection: " << status.reason();
@@ -270,14 +271,14 @@ Status IndexCatalog::_upgradeDatabaseMinorVersionIfNeeded(OperationContext* txn,
 
 StatusWith<BSONObj> IndexCatalog::prepareSpecForCreate(OperationContext* txn,
                                                        const BSONObj& original) const {
-    Status status = _isSpecOk(original);
+    Status status = _isSpecOk(txn, original);
     if (!status.isOK())
         return StatusWith<BSONObj>(status);
 
     BSONObj fixed = _fixIndexSpec(original);
 
     // we double check with new index spec
-    status = _isSpecOk(fixed);
+    status = _isSpecOk(txn, fixed);
     if (!status.isOK())
         return StatusWith<BSONObj>(status);
 
@@ -454,7 +455,7 @@ Status _checkValidFilterExpressions(MatchExpression* expression, int level = 0) 
 }
 }
 
-Status IndexCatalog::_isSpecOk(const BSONObj& spec) const {
+Status IndexCatalog::_isSpecOk(OperationContext* txn, const BSONObj& spec) const {
     const NamespaceString& nss = _collection->ns();
 
     BSONElement vElt = spec["v"];
@@ -466,7 +467,7 @@ Status IndexCatalog::_isSpecOk(const BSONObj& spec) const {
         double v = vElt.Number();
 
         // SERVER-16893 Forbid use of v0 indexes with non-mmapv1 engines
-        if (v == 0 && !getGlobalServiceContext()->getGlobalStorageEngine()->isMmapV1()) {
+        if (v == 0 && !txn->getServiceContext()->getGlobalStorageEngine()->isMmapV1()) {
             return Status(ErrorCodes::CannotCreateIndex,
                           str::stream() << "use of v0 indexes is only allowed with the "
                                         << "mmapv1 storage engine");
@@ -554,6 +555,26 @@ Status IndexCatalog::_isSpecOk(const BSONObj& spec) const {
         Status status = _checkValidFilterExpressions(filterExpr.get());
         if (!status.isOK()) {
             return status;
+        }
+    }
+
+    BSONElement collationElement = spec.getField("collation");
+    if (collationElement) {
+        string pluginName = IndexNames::findPluginName(key);
+        if ((pluginName != IndexNames::BTREE) && (pluginName != IndexNames::GEO_2D) &&
+            (pluginName != IndexNames::GEO_2DSPHERE) && (pluginName != IndexNames::HASHED)) {
+            return Status(ErrorCodes::CannotCreateIndex,
+                          str::stream() << "\"collation\" not supported for index type "
+                                        << pluginName);
+        }
+        if (collationElement.type() != BSONType::Object) {
+            return Status(ErrorCodes::CannotCreateIndex,
+                          "\"collation\" for an index must be a document");
+        }
+        auto statusWithCollator = CollatorFactoryInterface::get(txn->getServiceContext())
+                                      ->makeFromBSON(collationElement.Obj());
+        if (!statusWithCollator.isOK()) {
+            return statusWithCollator.getStatus();
         }
     }
 
