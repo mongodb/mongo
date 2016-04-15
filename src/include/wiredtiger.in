@@ -421,6 +421,9 @@ struct __wt_cursor {
 	 * @errors
 	 * In particular, if \c overwrite is not configured and a record with
 	 * the specified key already exists, ::WT_DUPLICATE_KEY is returned.
+	 * Also, if \c in_memory is configured for the database and the insert
+	 * requires more than the configured cache size to complete,
+	 * ::WT_CACHE_FULL is returned.
 	 */
 	int __F(insert)(WT_CURSOR *cursor);
 
@@ -451,6 +454,9 @@ struct __wt_cursor {
 	 * @errors
 	 * In particular, if \c overwrite is not configured and no record with
 	 * the specified key exists, ::WT_NOTFOUND is returned.
+	 * Also, if \c in_memory is configured for the database and the insert
+	 * requires more than the configured cache size to complete,
+	 * ::WT_CACHE_FULL is returned.
 	 */
 	int __F(update)(WT_CURSOR *cursor);
 
@@ -2289,6 +2295,8 @@ struct __wt_connection {
  * @config{ ),,}
  * @config{hazard_max, maximum number of simultaneous hazard pointers per
  * session handle., an integer greater than or equal to 15; default \c 1000.}
+ * @config{in_memory, keep data in-memory only.  See @ref in_memory for more
+ * information., a boolean flag; default \c false.}
  * @config{log = (, enable logging.  Enabling logging uses three sessions from
  * the configured session_max., a set of related configuration options defined
  * below.}
@@ -3003,15 +3011,13 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * if recovery is required to use the database.
  */
 #define	WT_RUN_RECOVERY	-31806
-/*! @cond internal */
 /*!
  * Operation would overflow cache.
- * This error is generated when wiredtiger_open is configured to run in-memory,
- * and an insert or update operation requires more than the configured cache
- * size to complete.
+ * This error is only generated when wiredtiger_open is configured to run in-
+ * memory, and an insert or update operation requires more than the configured
+ * cache size to complete.
  */
 #define	WT_CACHE_FULL	-31807
-/*! @endcond */
 /*! @cond internal */
 /*! Permission denied (internal). */
 #define	WT_PERM_DENIED	-31808
