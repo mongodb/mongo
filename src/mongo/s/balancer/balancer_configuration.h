@@ -28,19 +28,127 @@
 
 #pragma once
 
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/optional.hpp>
 #include <cstdint>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 
+class BSONObj;
 class MigrationSecondaryThrottleOptions;
 class OperationContext;
 class Status;
+template <typename T>
+class StatusWith;
+
+/**
+ * Utility class to parse the balancer settings document, which has the following format:
+ *
+ * balancer: {
+ *  stopped: <true|false>,
+ *  activeWindow: { start: "<HH:MM>", stop: "<HH:MM>" }
+ * }
+ */
+class BalancerSettingsType {
+public:
+    // The key under which this setting is stored on the config server
+    static const char kKey[];
+
+    /**
+     * Constructs a settings object with the default values. To be used when no balancer settings
+     * have been specified.
+     */
+    static BalancerSettingsType createDefault();
+
+    /**
+     * Interprets the BSON content as balancer settings and extracts the respective values.
+     */
+    static StatusWith<BalancerSettingsType> fromBSON(const BSONObj& obj);
+
+    /**
+     * Returns whether the balancer is enabled.
+     */
+    bool shouldBalance() const {
+        return _shouldBalance;
+    }
+
+    /**
+     * Returns true if either 'now' is in the balancing window or if no balancing window exists.
+     */
+    bool isTimeInBalancingWindow(const boost::posix_time::ptime& now) const;
+
+    /**
+     * Returns the secondary throttle options.
+     */
+    const MigrationSecondaryThrottleOptions& getSecondaryThrottle() const {
+        return _secondaryThrottle;
+    }
+
+    /**
+     * Returns whether the balancer should wait for deletions after each completed move.
+     */
+    bool waitForDelete() const {
+        return _waitForDelete;
+    }
+
+
+private:
+    BalancerSettingsType();
+
+    bool _shouldBalance{true};
+
+    boost::optional<boost::posix_time::ptime> _activeWindowStart;
+    boost::optional<boost::posix_time::ptime> _activeWindowStop;
+
+    MigrationSecondaryThrottleOptions _secondaryThrottle;
+
+    bool _waitForDelete{false};
+};
+
+/**
+ * Utility class to parse the chunk size settings document, which has the following format:
+ *
+ * chunksize: { value: <value in MB between 1 and 1024> }
+ */
+class ChunkSizeSettingsType {
+public:
+    // The key under which this setting is stored on the config server
+    static const char kKey[];
+
+    // Default value used for the max chunk size if one is not specified in the balancer
+    // configuration
+    static const uint64_t kDefaultMaxChunkSizeBytes;
+
+    /**
+     * Constructs a settings object with the default values. To be used when no chunk size settings
+     * have been specified.
+     */
+    static ChunkSizeSettingsType createDefault(int maxChunkSizeBytes);
+
+    /**
+     * Interprets the BSON content as chunk size settings and extracts the respective values.
+     */
+    static StatusWith<ChunkSizeSettingsType> fromBSON(const BSONObj& obj);
+
+    uint64_t getMaxChunkSizeBytes() const {
+        return _maxChunkSizeBytes;
+    }
+
+    /**
+     * Validates that the specified max chunk size value (in bytes) is allowed.
+     */
+    static bool checkMaxChunkSizeValid(uint64_t maxChunkSizeBytes);
+
+private:
+    ChunkSizeSettingsType();
+
+    uint64_t _maxChunkSizeBytes{kDefaultMaxChunkSizeBytes};
+};
 
 /**
  * Contains settings, which control the behaviour of the balancer.
@@ -49,13 +157,12 @@ class BalancerConfiguration {
     MONGO_DISALLOW_COPYING(BalancerConfiguration);
 
 public:
-    // Default value used for the max chunk size if one is not specified in the balancer
-    // configuration
-    static const uint64_t kDefaultMaxChunkSizeBytes;
-
     /**
-     * Primes the balancer configuration with some default values. These settings may change at a
-     * later time after a call to refresh().
+     * Primes the balancer configuration with some default values. The effective settings may change
+     * at a later time after a call to refresh().
+     *
+     * defaultMaxChunkSizeBytes indicates the value to be use for the MaxChunkSize parameter if one
+     *  has not been specified in config.settings. This parameter must have been pre-validated.
      */
     BalancerConfiguration(uint64_t defaultMaxChunkSizeBytes);
     ~BalancerConfiguration();
@@ -94,11 +201,6 @@ public:
      */
     Status refreshAndCheck(OperationContext* txn);
 
-    /**
-     * Validates that the specified max chunk size value (in bytes) is allowed.
-     */
-    static bool checkMaxChunkSizeValid(uint64_t maxChunkSizeBytes);
-
 private:
     /**
      * Reloads the balancer configuration from the settings document. Fails if the settings document
@@ -107,37 +209,22 @@ private:
     Status _refreshBalancerSettings(OperationContext* txn);
 
     /**
-     * If the balancer settings document is missing, these are the defaults, which will be used.
-     */
-    void _useDefaultBalancerSettings();
-
-    /**
      * Reloads the chunk sizes configuration from the settings document. Fails if the settings
      * document cannot be read or if any setting contains invalid value, in which case the offending
      * value will remain unchanged.
      */
     Status _refreshChunkSizeSettings(OperationContext* txn);
 
-    /**
-     * If the chunk size settings document is missing, these are the defaults, which will be used.
-     */
-    void _useDefaultChunkSizeSettings();
-
-    // Whether auto-balancing of chunks should happen
-    AtomicBool _shouldBalance{true};
-
-    // The latest read balancer settings (used for the balancer window and secondary throttle) and a
-    // mutex to protect its changes
+    // The latest read balancer settings and a mutex to protect its swaps
     mutable stdx::mutex _balancerSettingsMutex;
-    SettingsType _balancerSettings;
-    bool _waitForDelete{false};
-    MigrationSecondaryThrottleOptions _secondaryThrottle;
+    BalancerSettingsType _balancerSettings;
 
     // Default value for use for the max chunk size if the setting is not present in the balancer
     // configuration
     const uint64_t _defaultMaxChunkSizeBytes;
 
-    // Max chunk size after which a chunk would be considered jumbo and won't be moved
+    // Max chunk size after which a chunk would be considered jumbo and won't be moved. This value
+    // is read on the critical path after each write operation, that's why it is cached.
     AtomicUInt64 _maxChunkSizeBytes;
 };
 

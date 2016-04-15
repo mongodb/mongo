@@ -217,7 +217,7 @@ Status storeMongosOptions(const moe::Environment& params, const std::vector<std:
 
         const uint64_t maxChunkSizeBytes = maxChunkSizeMB * 1024 * 1024;
 
-        if (!BalancerConfiguration::checkMaxChunkSizeValid(maxChunkSizeBytes)) {
+        if (!ChunkSizeSettingsType::checkMaxChunkSizeValid(maxChunkSizeBytes)) {
             return Status(ErrorCodes::BadValue, "MaxChunkSize invalid");
         }
 

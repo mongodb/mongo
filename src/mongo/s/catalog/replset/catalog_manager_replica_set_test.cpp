@@ -48,7 +48,6 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
@@ -831,102 +830,6 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandNotMasterRetrySuc
     });
 
     // Now wait for the runUserManagementWriteCommand call to return
-    future.timed_get(kFutureTimeout);
-}
-
-TEST_F(CatalogManagerReplSetTest, GetGlobalSettingsBalancerDoc) {
-    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
-
-    // sample balancer doc
-    SettingsType st1;
-    st1.setKey(SettingsType::BalancerDocKey);
-    st1.setBalancerStopped(true);
-
-    auto future = launchAsync([this] {
-        return assertGet(
-            catalogManager()->getGlobalSettings(operationContext(), SettingsType::BalancerDocKey));
-    });
-
-    onFindCommand([this, st1](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
-
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.ns(), SettingsType::ConfigNS);
-
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
-
-        ASSERT_EQ(query->ns(), SettingsType::ConfigNS);
-        ASSERT_EQ(query->getFilter(), BSON(SettingsType::key(SettingsType::BalancerDocKey)));
-
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
-
-        return vector<BSONObj>{st1.toBSON()};
-    });
-
-    const auto& actualBalSettings =
-        assertGet(SettingsType::fromBSON(future.timed_get(kFutureTimeout)));
-    ASSERT_EQ(actualBalSettings.toBSON(), st1.toBSON());
-}
-
-TEST_F(CatalogManagerReplSetTest, GetGlobalSettingsChunkSizeDoc) {
-    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
-
-    // sample chunk size doc
-    SettingsType st1;
-    st1.setKey(SettingsType::ChunkSizeDocKey);
-    st1.setChunkSizeMB(80);
-
-    auto future = launchAsync([this] {
-        return assertGet(
-            catalogManager()->getGlobalSettings(operationContext(), SettingsType::ChunkSizeDocKey));
-    });
-
-    onFindCommand([this, st1](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
-
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.ns(), SettingsType::ConfigNS);
-
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
-
-        ASSERT_EQ(query->ns(), SettingsType::ConfigNS);
-        ASSERT_EQ(query->getFilter(), BSON(SettingsType::key(SettingsType::ChunkSizeDocKey)));
-
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
-
-        return vector<BSONObj>{st1.toBSON()};
-    });
-
-    const auto& actualBalSettings =
-        assertGet(SettingsType::fromBSON(future.timed_get(kFutureTimeout)));
-    ASSERT_EQ(actualBalSettings.toBSON(), st1.toBSON());
-}
-
-TEST_F(CatalogManagerReplSetTest, GetGlobalSettingsNonExistent) {
-    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
-
-    auto future = launchAsync([this] {
-        auto status =
-            catalogManager()->getGlobalSettings(operationContext(), SettingsType::ChunkSizeDocKey);
-        ASSERT_EQ(status.getStatus(), ErrorCodes::NoMatchingDocument);
-    });
-
-    onFindCommand([this](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
-
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.ns(), SettingsType::ConfigNS);
-
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
-
-        ASSERT_EQ(query->ns(), SettingsType::ConfigNS);
-        ASSERT_EQ(query->getFilter(), BSON(SettingsType::key(SettingsType::ChunkSizeDocKey)));
-
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
-
-        return vector<BSONObj>{};
-    });
-
     future.timed_get(kFutureTimeout);
 }
 

@@ -212,7 +212,7 @@ Status initializeGlobalShardingStateForMongos(OperationContext* txn,
 Status initializeGlobalShardingStateForMongod(OperationContext* txn,
                                               const ConnectionString& configCS) {
     return initializeGlobalShardingState(
-        txn, configCS, BalancerConfiguration::kDefaultMaxChunkSizeBytes, false);
+        txn, configCS, ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes, false);
 }
 
 }  // namespace mongo

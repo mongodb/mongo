@@ -230,12 +230,14 @@ env.CppUnitTest(
     target='mongoscore_test',
     source=[
         'balancer_policy_tests.cpp',
+        'balancer/balancer_configuration_test.cpp',
         'balancer/cluster_statistics_test.cpp',
         'shard_key_pattern_test.cpp',
     ],
     LIBDEPS=[
         'coreshard',
         'mongoscore',
+        'sharding_test_fixture',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
     ]

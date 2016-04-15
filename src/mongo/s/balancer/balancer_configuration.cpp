@@ -33,48 +33,56 @@
 #include "mongo/s/balancer/balancer_configuration.h"
 
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+namespace {
 
-const uint64_t BalancerConfiguration::kDefaultMaxChunkSizeBytes{64 * 1024 * 1024};
+const char kValue[] = "value";
+const char kStopped[] = "stopped";
+const char kActiveWindow[] = "activeWindow";
+const char kWaitForDelete[] = "_waitForDelete";
+
+}  // namespace
+
+const char BalancerSettingsType::kKey[] = "balancer";
+
+const char ChunkSizeSettingsType::kKey[] = "chunksize";
+const uint64_t ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes{64 * 1024 * 1024};
 
 BalancerConfiguration::BalancerConfiguration(uint64_t defaultMaxChunkSizeBytes)
-    : _secondaryThrottle(
-          MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kDefault)),
+    : _balancerSettings(BalancerSettingsType::createDefault()),
       _defaultMaxChunkSizeBytes(defaultMaxChunkSizeBytes) {
-    invariant(checkMaxChunkSizeValid(defaultMaxChunkSizeBytes));
-
-    _useDefaultBalancerSettings();
-    _useDefaultChunkSizeSettings();
+    // The default must always be created with the max chunk size value prevalidated
+    invariant(ChunkSizeSettingsType::checkMaxChunkSizeValid(_defaultMaxChunkSizeBytes));
+    _maxChunkSizeBytes.store(_defaultMaxChunkSizeBytes);
 }
 
 BalancerConfiguration::~BalancerConfiguration() = default;
 
 bool BalancerConfiguration::isBalancerActive() const {
-    if (!_shouldBalance.loadRelaxed()) {
+    stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
+    if (!_balancerSettings.shouldBalance()) {
         return false;
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
-    if (_balancerSettings.isBalancerActiveWindowSet()) {
-        return _balancerSettings.inBalancingWindow(boost::posix_time::second_clock::local_time());
-    }
-
-    return true;
+    return _balancerSettings.isTimeInBalancingWindow(boost::posix_time::second_clock::local_time());
 }
 
 MigrationSecondaryThrottleOptions BalancerConfiguration::getSecondaryThrottle() const {
     stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
-    return _secondaryThrottle;
+    return _balancerSettings.getSecondaryThrottle();
 }
 
 bool BalancerConfiguration::waitForDelete() const {
     stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
-    return _waitForDelete;
+    return _balancerSettings.waitForDelete();
 }
 
 Status BalancerConfiguration::refreshAndCheck(OperationContext* txn) {
@@ -97,105 +105,203 @@ Status BalancerConfiguration::refreshAndCheck(OperationContext* txn) {
     return Status::OK();
 }
 
-bool BalancerConfiguration::checkMaxChunkSizeValid(uint64_t maxChunkSize) {
-    if (maxChunkSize >= (1024 * 1024) && maxChunkSize <= (1024 * 1024 * 1024)) {
+Status BalancerConfiguration::_refreshBalancerSettings(OperationContext* txn) {
+    BalancerSettingsType settings = BalancerSettingsType::createDefault();
+
+    auto settingsObjStatus =
+        Grid::get(txn)->catalogManager(txn)->getGlobalSettings(txn, BalancerSettingsType::kKey);
+    if (settingsObjStatus.isOK()) {
+        auto settingsStatus = BalancerSettingsType::fromBSON(settingsObjStatus.getValue());
+        if (!settingsStatus.isOK()) {
+            return settingsStatus.getStatus();
+        }
+
+        settings = std::move(settingsStatus.getValue());
+    } else if (settingsObjStatus != ErrorCodes::NoMatchingDocument) {
+        return settingsObjStatus.getStatus();
+    }
+
+    stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
+    _balancerSettings = std::move(settings);
+
+    return Status::OK();
+}
+
+Status BalancerConfiguration::_refreshChunkSizeSettings(OperationContext* txn) {
+    ChunkSizeSettingsType settings =
+        ChunkSizeSettingsType::createDefault(_defaultMaxChunkSizeBytes);
+
+    auto settingsObjStatus =
+        grid.catalogManager(txn)->getGlobalSettings(txn, ChunkSizeSettingsType::kKey);
+    if (settingsObjStatus.isOK()) {
+        auto settingsStatus = ChunkSizeSettingsType::fromBSON(settingsObjStatus.getValue());
+        if (!settingsStatus.isOK()) {
+            return settingsStatus.getStatus();
+        }
+
+        settings = std::move(settingsStatus.getValue());
+    } else if (settingsObjStatus != ErrorCodes::NoMatchingDocument) {
+        return settingsObjStatus.getStatus();
+    }
+
+    if (settings.getMaxChunkSizeBytes() != getMaxChunkSizeBytes()) {
+        log() << "MaxChunkSize changing from " << getMaxChunkSizeBytes() / (1024 * 1024) << "MB"
+              << " to " << settings.getMaxChunkSizeBytes() / (1024 * 1024) << "MB";
+
+        _maxChunkSizeBytes.store(settings.getMaxChunkSizeBytes());
+    }
+
+    return Status::OK();
+}
+
+BalancerSettingsType::BalancerSettingsType()
+    : _secondaryThrottle(
+          MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kDefault)) {}
+
+BalancerSettingsType BalancerSettingsType::createDefault() {
+    return BalancerSettingsType();
+}
+
+StatusWith<BalancerSettingsType> BalancerSettingsType::fromBSON(const BSONObj& obj) {
+    BalancerSettingsType settings;
+
+    {
+        bool stopped;
+        Status status = bsonExtractBooleanFieldWithDefault(obj, kStopped, false, &stopped);
+        if (!status.isOK())
+            return status;
+        settings._shouldBalance = !stopped;
+    }
+
+    {
+        BSONElement activeWindowElem;
+        Status status = bsonExtractTypedField(obj, kActiveWindow, Object, &activeWindowElem);
+        if (status.isOK()) {
+            const BSONObj balancingWindowObj = activeWindowElem.Obj();
+            if (balancingWindowObj.isEmpty()) {
+                return Status(ErrorCodes::BadValue, "activeWindow not specified");
+            }
+
+            // Check if both 'start' and 'stop' are present
+            const std::string start = balancingWindowObj.getField("start").str();
+            const std::string stop = balancingWindowObj.getField("stop").str();
+
+            if (start.empty() || stop.empty()) {
+                return Status(ErrorCodes::BadValue,
+                              str::stream()
+                                  << "must specify both start and stop of balancing window: "
+                                  << balancingWindowObj);
+            }
+
+            // Check that both 'start' and 'stop' are valid time-of-day
+            boost::posix_time::ptime startTime;
+            boost::posix_time::ptime stopTime;
+            if (!toPointInTime(start, &startTime) || !toPointInTime(stop, &stopTime)) {
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << kActiveWindow << " format is "
+                                            << " { start: \"hh:mm\" , stop: \"hh:mm\" }");
+            }
+
+            // Check that start and stop designate different time points
+            if (startTime == stopTime) {
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "start and stop times must be different");
+            }
+
+            settings._activeWindowStart = startTime;
+            settings._activeWindowStop = stopTime;
+        } else if (status != ErrorCodes::NoSuchKey) {
+            return status;
+        }
+    }
+
+    {
+        auto secondaryThrottleStatus =
+            MigrationSecondaryThrottleOptions::createFromBalancerConfig(obj);
+        if (!secondaryThrottleStatus.isOK()) {
+            return secondaryThrottleStatus.getStatus();
+        }
+
+        settings._secondaryThrottle = std::move(secondaryThrottleStatus.getValue());
+    }
+
+    {
+        bool waitForDelete;
+        Status status =
+            bsonExtractBooleanFieldWithDefault(obj, kWaitForDelete, false, &waitForDelete);
+        if (!status.isOK())
+            return status;
+
+        settings._waitForDelete = waitForDelete;
+    }
+
+    return settings;
+}
+
+bool BalancerSettingsType::isTimeInBalancingWindow(const boost::posix_time::ptime& now) const {
+    invariant(!_activeWindowStart == !_activeWindowStop);
+
+    if (!_activeWindowStart) {
+        return true;
+    }
+
+    LOG(1).stream() << "inBalancingWindow: "
+                    << " now: " << now << " startTime: " << *_activeWindowStart
+                    << " stopTime: " << *_activeWindowStop;
+
+    if (*_activeWindowStop > *_activeWindowStart) {
+        if ((now >= *_activeWindowStart) && (now <= *_activeWindowStop)) {
+            return true;
+        }
+    } else if (*_activeWindowStart > *_activeWindowStop) {
+        if ((now >= *_activeWindowStart) || (now <= *_activeWindowStop)) {
+            return true;
+        }
+    } else {
+        MONGO_UNREACHABLE;
+    }
+
+    return false;
+}
+
+ChunkSizeSettingsType::ChunkSizeSettingsType() = default;
+
+ChunkSizeSettingsType ChunkSizeSettingsType::createDefault(int maxChunkSizeBytes) {
+    // The default must always be created with the max chunk size value prevalidated
+    invariant(ChunkSizeSettingsType::checkMaxChunkSizeValid(maxChunkSizeBytes));
+
+    ChunkSizeSettingsType settings;
+    settings._maxChunkSizeBytes = maxChunkSizeBytes;
+
+    return settings;
+}
+
+StatusWith<ChunkSizeSettingsType> ChunkSizeSettingsType::fromBSON(const BSONObj& obj) {
+    long long maxChunkSizeMB;
+    Status status = bsonExtractIntegerField(obj, kValue, &maxChunkSizeMB);
+    if (!status.isOK())
+        return status;
+
+    const uint64_t maxChunkSizeBytes = maxChunkSizeMB * 1024 * 1024;
+
+    if (!checkMaxChunkSizeValid(maxChunkSizeBytes)) {
+        return {ErrorCodes::BadValue,
+                str::stream() << maxChunkSizeMB << " is not a valid value for " << kKey};
+    }
+
+    ChunkSizeSettingsType settings;
+    settings._maxChunkSizeBytes = maxChunkSizeBytes;
+
+    return settings;
+}
+
+bool ChunkSizeSettingsType::checkMaxChunkSizeValid(uint64_t maxChunkSizeBytes) {
+    if (maxChunkSizeBytes >= (1024 * 1024) && maxChunkSizeBytes <= (1024 * 1024 * 1024)) {
         return true;
     }
 
     return false;
 }
 
-Status BalancerConfiguration::_refreshBalancerSettings(OperationContext* txn) {
-    SettingsType balancerSettings;
-
-    auto balanceSettingsStatus =
-        Grid::get(txn)->catalogManager(txn)->getGlobalSettings(txn, SettingsType::BalancerDocKey);
-    if (balanceSettingsStatus.isOK()) {
-        auto settingsTypeStatus =
-            SettingsType::fromBSON(std::move(balanceSettingsStatus.getValue()));
-        if (!settingsTypeStatus.isOK()) {
-            return settingsTypeStatus.getStatus();
-        }
-        balancerSettings = std::move(settingsTypeStatus.getValue());
-    } else if (balanceSettingsStatus.getStatus() != ErrorCodes::NoMatchingDocument) {
-        return balanceSettingsStatus.getStatus();
-    } else {
-        _useDefaultBalancerSettings();
-        return Status::OK();
-    }
-
-    if (balancerSettings.isBalancerStoppedSet() && balancerSettings.getBalancerStopped()) {
-        _shouldBalance.store(false);
-    } else {
-        _shouldBalance.store(true);
-    }
-
-    stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
-    _balancerSettings = std::move(balancerSettings);
-
-    if (_balancerSettings.isKeySet()) {
-        _secondaryThrottle =
-            uassertStatusOK(MigrationSecondaryThrottleOptions::createFromBalancerConfig(
-                _balancerSettings.toBSON()));
-    } else {
-        _secondaryThrottle =
-            MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kDefault);
-    }
-
-    if (_balancerSettings.isWaitForDeleteSet() && _balancerSettings.getWaitForDelete()) {
-        _waitForDelete = true;
-    } else {
-        _waitForDelete = false;
-    }
-
-    return Status::OK();
-}
-
-void BalancerConfiguration::_useDefaultBalancerSettings() {
-    _shouldBalance.store(true);
-    _balancerSettings = SettingsType{};
-    _waitForDelete = false;
-    _secondaryThrottle =
-        MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kDefault);
-}
-
-Status BalancerConfiguration::_refreshChunkSizeSettings(OperationContext* txn) {
-    SettingsType chunkSizeSettings;
-
-    auto chunkSizeSettingsStatus =
-        grid.catalogManager(txn)->getGlobalSettings(txn, SettingsType::ChunkSizeDocKey);
-    if (chunkSizeSettingsStatus.isOK()) {
-        auto settingsTypeStatus =
-            SettingsType::fromBSON(std::move(chunkSizeSettingsStatus.getValue()));
-        if (!settingsTypeStatus.isOK()) {
-            return settingsTypeStatus.getStatus();
-        }
-        chunkSizeSettings = std::move(settingsTypeStatus.getValue());
-    } else if (chunkSizeSettingsStatus.getStatus() != ErrorCodes::NoMatchingDocument) {
-        return chunkSizeSettingsStatus.getStatus();
-    } else {
-        _useDefaultChunkSizeSettings();
-        return Status::OK();
-    }
-
-    const uint64_t newMaxChunkSizeBytes = chunkSizeSettings.getChunkSizeMB() * 1024 * 1024;
-
-    if (!checkMaxChunkSizeValid(newMaxChunkSizeBytes)) {
-        return {ErrorCodes::BadValue,
-                str::stream() << chunkSizeSettings.getChunkSizeMB()
-                              << " is not a valid value for MaxChunkSize"};
-    }
-
-    if (newMaxChunkSizeBytes != getMaxChunkSizeBytes()) {
-        log() << "MaxChunkSize changing from " << getMaxChunkSizeBytes() / (1024 * 1024) << "MB"
-              << " to " << newMaxChunkSizeBytes / (1024 * 1024) << "MB";
-    }
-
-    return Status::OK();
-}
-
-void BalancerConfiguration::_useDefaultChunkSizeSettings() {
-    _maxChunkSizeBytes.store(_defaultMaxChunkSizeBytes);
-}
 
 }  // namespace mongo

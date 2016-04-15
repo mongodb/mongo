@@ -142,7 +142,7 @@ void ShardingTestFixture::setUp() {
         stdx::make_unique<CatalogCache>(),
         std::move(shardRegistry),
         stdx::make_unique<ClusterCursorManager>(_service->getPreciseClockSource()),
-        stdx::make_unique<BalancerConfiguration>(BalancerConfiguration::kDefaultMaxChunkSizeBytes),
+        stdx::make_unique<BalancerConfiguration>(ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes),
         std::move(executorPool),
         _mockNetwork);
 }

@@ -83,7 +83,7 @@ void initGrid(OperationContext* txn, const ConnectionString& configConnString) {
         stdx::make_unique<CatalogCache>(),
         std::move(shardRegistry),
         stdx::make_unique<ClusterCursorManager>(txn->getServiceContext()->getPreciseClockSource()),
-        stdx::make_unique<BalancerConfiguration>(BalancerConfiguration::kDefaultMaxChunkSizeBytes),
+        stdx::make_unique<BalancerConfiguration>(ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes),
         std::move(executorPool),
         mockNetwork);
 }

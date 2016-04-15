@@ -49,7 +49,7 @@ struct MongosGlobalParams {
     ConnectionString configdbs;
 
     // The max chunk size after which a chunk will be considered jumbo
-    uint64_t maxChunkSizeBytes{BalancerConfiguration::kDefaultMaxChunkSizeBytes};
+    uint64_t maxChunkSizeBytes{ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes};
 
     // Whether auto-splitting is enabled
     bool shouldAutoSplit{true};

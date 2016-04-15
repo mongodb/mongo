@@ -686,7 +686,7 @@ TEST_F(ShardCollectionTest, withInitialData) {
         ASSERT_EQUALS(keyPattern.toBSON(), request.cmdObj["keyPattern"].Obj());
         ASSERT_EQUALS(keyPattern.getKeyPattern().globalMin(), request.cmdObj["min"].Obj());
         ASSERT_EQUALS(keyPattern.getKeyPattern().globalMax(), request.cmdObj["max"].Obj());
-        ASSERT_EQUALS(BalancerConfiguration::kDefaultMaxChunkSizeBytes,
+        ASSERT_EQUALS(ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
                       static_cast<uint64_t>(request.cmdObj["maxChunkSizeBytes"].numberLong()));
         ASSERT_EQUALS(0, request.cmdObj["maxSplitPoints"].numberLong());
         ASSERT_EQUALS(0, request.cmdObj["maxChunkObjects"].numberLong());
