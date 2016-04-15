@@ -42,8 +42,8 @@ std::unique_ptr<ClockSource> FastClockSourceFactory::create(Milliseconds granula
     // TODO: Create the fastest to read wall clock available on the system.
     // For now, assume there is no built-in fast wall clock so instead
     // create a background-thread-based timer.
-    return stdx::make_unique<BackgroundThreadClockSource>(
-        std::move(stdx::make_unique<SystemClockSource>()), granularity);
+    return stdx::make_unique<BackgroundThreadClockSource>(stdx::make_unique<SystemClockSource>(),
+                                                          granularity);
 }
 
 }  // namespace mongo
