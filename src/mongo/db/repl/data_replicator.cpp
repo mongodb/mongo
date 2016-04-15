@@ -44,6 +44,7 @@
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
@@ -594,7 +595,7 @@ void DataReplicator::_setInitialSyncStorageInterface(CollectionCloner::StorageIn
     }
 }
 
-TimestampStatus DataReplicator::resync() {
+TimestampStatus DataReplicator::resync(OperationContext* txn) {
     _shutdown();
     // Drop databases and do initialSync();
     CBHStatus cbh = _exec->scheduleDBWork(
@@ -606,14 +607,14 @@ TimestampStatus DataReplicator::resync() {
 
     _exec->wait(cbh.getValue());
 
-    TimestampStatus status = initialSync();
+    TimestampStatus status = initialSync(txn);
     if (status.isOK()) {
         _resetState_inlock(status.getValue());
     }
     return status;
 }
 
-TimestampStatus DataReplicator::initialSync() {
+TimestampStatus DataReplicator::initialSync(OperationContext* txn) {
     Timer t;
     UniqueLock lk(_mutex);
     if (_state != DataReplicatorState::Uninitialized) {
@@ -636,7 +637,7 @@ TimestampStatus DataReplicator::initialSync() {
     _reporterPaused = true;
     _applierPaused = true;
 
-    // TODO: set minvalid doc initial sync state.
+    StorageInterface::get(txn)->setInitialSyncFlag(txn);
 
     const int maxFailedAttempts = 10;
     int failedAttempts = 0;
@@ -751,6 +752,8 @@ TimestampStatus DataReplicator::initialSync() {
             _oplogBuffer.clear();
             _resetState_inlock(_lastTimestampApplied);
     */
+
+    StorageInterface::get(txn)->clearInitialSyncFlag(txn);
     log() << "Initial sync took: " << t.millis() << " milliseconds.";
     return TimestampStatus(_lastTimestampApplied);
 }

@@ -11,6 +11,7 @@ env.Library(
         'repl_coordinator_interface',
         'rollback_source_impl',
         'rs_rollback',
+        'storage_interface',
         '$BUILD_DIR/mongo/client/connection_pool',
         '$BUILD_DIR/mongo/client/fetcher',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
@@ -253,6 +254,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/net/network',
         'oplog_entry',
         'repl_coordinator_global',
+        'storage_interface',
     ],
     LIBDEPS_TAGS=[
         # Many undefined symbols in sync_tail.cpp
@@ -910,6 +912,7 @@ env.Library(
         'oplog_fetcher',
         'optime',
         'reporter',
+        'storage_interface',
         '$BUILD_DIR/mongo/client/fetcher',
     ],
 )

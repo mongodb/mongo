@@ -385,12 +385,12 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* txn) {
     // Use a callback here, because _finishLoadLocalConfig calls isself() which requires
     // that the server's networking layer be up and running and accepting connections, which
     // doesn't happen until startReplication finishes.
-    auto handle = _scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_finishLoadLocalConfig,
-                                           this,
-                                           stdx::placeholders::_1,
-                                           localConfig,
-                                           lastOpTimeStatus,
-                                           lastVote));
+    auto handle = _scheduleDBWork(stdx::bind(&ReplicationCoordinatorImpl::_finishLoadLocalConfig,
+                                             this,
+                                             stdx::placeholders::_1,
+                                             localConfig,
+                                             lastOpTimeStatus,
+                                             lastVote));
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _finishLoadLocalConfigCbh = handle;
@@ -478,12 +478,13 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     _performPostMemberStateUpdateAction(action);
     if (!isArbiter) {
         _externalState->startThreads(_settings);
-        _startDataReplication();
+        invariant(cbData.txn);
+        _startDataReplication(cbData.txn);
     }
 }
 
 void ReplicationCoordinatorImpl::_stopDataReplication() {}
-void ReplicationCoordinatorImpl::_startDataReplication() {
+void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn) {
     // When initial sync is done, callback.
     OnInitialSyncFinishedFn callback{[this]() {
         log() << "Initial sync done, starting steady state replication.";
@@ -499,7 +500,7 @@ void ReplicationCoordinatorImpl::_startDataReplication() {
     // Do initial sync.
     if (false) {
         // TODO: make this async with callback.
-        _dr.initialSync();
+        _dr.initialSync(txn);
     } else {
         _externalState->startInitialSync(callback);
     }
@@ -2412,7 +2413,7 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
         // will fail validation with a "replSet initiate got ... while validating" reason.
         invariant(!newConfig.getMemberAt(myIndex.getValue()).isArbiter());
         _externalState->startThreads(_settings);
-        _startDataReplication();
+        _startDataReplication(txn);
     }
 
     configStateGuard.Dismiss();
@@ -3479,6 +3480,12 @@ void ReplicationCoordinatorImpl::_scheduleWorkAtAndWaitForCompletion(Date_t when
     if (auto handle = _scheduleWorkAt(when, work)) {
         _replExecutor.wait(handle);
     }
+}
+
+CallbackHandle ReplicationCoordinatorImpl::_scheduleDBWork(const CallbackFn& work) {
+    auto scheduleFn =
+        [this](const CallbackFn& workWrapped) { return _replExecutor.scheduleDBWork(workWrapped); };
+    return _wrapAndScheduleWork(scheduleFn, work);
 }
 
 CallbackHandle ReplicationCoordinatorImpl::_wrapAndScheduleWork(ScheduleFn scheduleFn,

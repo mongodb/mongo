@@ -33,6 +33,7 @@
 #include <memory>
 
 #include "mongo/client/fetcher.h"
+#include "mongo/db/client.h"
 #include "mongo/db/json.h"
 #include "mongo/db/repl/base_cloner_test_fixture.h"
 #include "mongo/db/repl/data_replicator.h"
@@ -43,6 +44,8 @@
 #include "mongo/db/repl/replication_executor_test_fixture.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/reporter.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/executor/network_interface_mock.h"
@@ -181,6 +184,8 @@ public:
 protected:
     void setUp() override {
         ReplicationExecutorTest::setUp();
+        StorageInterface::set(getGlobalServiceContext(), stdx::make_unique<StorageInterfaceMock>());
+        Client::initThreadIfNotAlready();
         reset();
 
         launchExecutorThread();
@@ -261,7 +266,7 @@ TEST_F(DataReplicatorTest, StartOk) {
 
 TEST_F(DataReplicatorTest, CannotInitialSyncAfterStart) {
     ASSERT_EQ(getDR().start().code(), ErrorCodes::OK);
-    ASSERT_EQ(getDR().initialSync(), ErrorCodes::AlreadyInitialized);
+    ASSERT_EQ(getDR().initialSync(nullptr), ErrorCodes::AlreadyInitialized);
 }
 
 // Used to run a Initial Sync in a separate thread, to avoid blocking test execution.
@@ -270,9 +275,16 @@ public:
     InitialSyncBackgroundRunner(DataReplicator* dr)
         : _dr(dr), _result(Status(ErrorCodes::BadValue, "failed to set status")) {}
 
+    ~InitialSyncBackgroundRunner() {
+        if (_thread) {
+            _thread->join();
+        }
+    }
+
     // Could block if _sgr has not finished
     TimestampStatus getResult() {
         _thread->join();
+        _thread.reset();
         return _result;
     }
 
@@ -283,7 +295,9 @@ public:
 private:
     void _run() {
         setThreadName("InitialSyncRunner");
-        _result = _dr->initialSync();  // blocking
+        Client::initThreadIfNotAlready();
+        auto txn = getGlobalServiceContext()->makeOperationContext(&cc());
+        _result = _dr->initialSync(txn.get());  // blocking
     }
 
     DataReplicator* _dr;
@@ -339,7 +353,7 @@ protected:
     }
 
 
-    void playResponses() {
+    void playResponses(bool isLastBatchOfResponses) {
         // TODO: Handle network responses
         NetworkInterfaceMock* net = getNet();
         int processedRequests(0);
@@ -390,6 +404,10 @@ protected:
                 log() << "done processing expected requests ";
                 break;  // once we have processed all requests, continue;
             }
+        }
+
+        if (!isLastBatchOfResponses) {
+            return;
         }
 
         net->enterNetwork();
@@ -474,10 +492,30 @@ TEST_F(InitialSyncTest, Complete) {
                           << ", op:'i', o:{_id:1, c:1}}]}}"),
         // Applier starts ...
     };
+
+    // Initial sync flag should not be set before starting.
+    ASSERT_FALSE(StorageInterface::get(getGlobalServiceContext())
+                     ->getInitialSyncFlag(cc().makeOperationContext().get()));
+
     startSync();
-    setResponses(responses);
-    playResponses();
+
+    // Play first response to ensure data replicator has entered initial sync state.
+    setResponses({responses.begin(), responses.begin() + 1});
+    playResponses(false);
+
+    // Initial sync flag should be set.
+    ASSERT_TRUE(StorageInterface::get(getGlobalServiceContext())
+                    ->getInitialSyncFlag(cc().makeOperationContext().get()));
+
+    // Play rest of the responses after checking initial sync flag.
+    setResponses({responses.begin() + 1, responses.end()});
+    playResponses(true);
+
     verifySync();
+
+    // Initial sync flag should not be set after completion.
+    ASSERT_FALSE(StorageInterface::get(getGlobalServiceContext())
+                     ->getInitialSyncFlag(cc().makeOperationContext().get()));
 }
 
 TEST_F(InitialSyncTest, MissingDocOnMultiApplyCompletes) {
@@ -533,7 +571,7 @@ TEST_F(InitialSyncTest, MissingDocOnMultiApplyCompletes) {
     };
     startSync();
     setResponses(responses);
-    playResponses();
+    playResponses(true);
     verifySync(ErrorCodes::OK);
 }
 
@@ -584,7 +622,7 @@ TEST_F(InitialSyncTest, FailsOnClone) {
         fromjson("{ok:0}")};
     startSync();
     setResponses(responses);
-    playResponses();
+    playResponses(true);
     verifySync(ErrorCodes::InitialSyncFailure);
 }
 

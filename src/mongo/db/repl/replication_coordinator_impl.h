@@ -800,7 +800,7 @@ private:
     /**
      * Start replicating data, and does an initial sync if needed first.
      */
-    void _startDataReplication();
+    void _startDataReplication(OperationContext* txn);
 
     /**
      * Stops replicating data by stopping the applier, fetcher and such.
@@ -1074,6 +1074,14 @@ private:
      * Schedules work to be run no sooner than 'when' and waits for completion.
      */
     void _scheduleWorkAtAndWaitForCompletion(Date_t when, const CallbackFn& work);
+
+    /**
+     * Schedules DB work and returns handle to callback.
+     * If work cannot be scheduled due to shutdown, returns empty handle.
+     * All other non-shutdown scheduling failures will abort the process.
+     * Does not run 'work' if callback is canceled.
+     */
+    CallbackHandle _scheduleDBWork(const CallbackFn& work);
 
     /**
      * Does the actual work of scheduling the work with the executor.

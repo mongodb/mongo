@@ -197,10 +197,10 @@ public:
     void slavesHaveProgressed();
 
     // just like initialSync but can be called anytime.
-    TimestampStatus resync();
+    TimestampStatus resync(OperationContext* txn);
 
     // Don't use above methods before these
-    TimestampStatus initialSync();
+    TimestampStatus initialSync(OperationContext* txn);
 
     DataReplicatorState getState() const;
 

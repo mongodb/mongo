@@ -458,7 +458,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
             newConfig.getMemberAt(myIndex.getValue()).isArbiter();
         if (!isArbiter && isFirstConfig) {
             _externalState->startThreads(_settings);
-            _startDataReplication();
+            _startDataReplication(cbd.txn);
         }
     }
 
