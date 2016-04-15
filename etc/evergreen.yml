@@ -5281,7 +5281,7 @@ buildvariants:
   - name: noPassthroughWithMongod
   - name: parallel
   - name: parallel_compatibility
-  - name: read_concern_majority_passthrough_WT
+  # - name: read_concern_majority_passthrough_WT
   - name: replicasets_WT
   - name: replicasets_auth
   - name: replicasets_legacy
