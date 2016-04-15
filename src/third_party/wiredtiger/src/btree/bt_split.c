@@ -1289,6 +1289,15 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	__wt_page_modify_set(session, right);
 
 	/*
+	 * We perform insert splits concurrently with checkpoints, where the
+	 * requirement is a checkpoint must include either the original page
+	 * or both new pages. The page we're splitting is dirty, but that's
+	 * insufficient: set the first dirty transaction to an impossibly old
+	 * value so this page is not skipped by a checkpoint.
+	 */
+	page->modify->first_dirty_txn = WT_TXN_FIRST;
+
+	/*
 	 * We modified the page above, which will have set the first dirty
 	 * transaction to the last transaction current running.  However, the
 	 * updates we installed may be older than that.  Set the first dirty

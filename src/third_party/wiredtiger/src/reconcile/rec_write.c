@@ -29,7 +29,6 @@ typedef struct {
 
 	/* Track whether all changes to the page are written. */
 	uint64_t max_txn;
-	uint64_t skipped_txn;
 	uint32_t orig_write_gen;
 
 	/*
@@ -281,7 +280,7 @@ typedef struct {
 } WT_RECONCILE;
 
 static void __rec_bnd_cleanup(WT_SESSION_IMPL *, WT_RECONCILE *, bool);
-static void __rec_cell_build_addr(
+static void __rec_cell_build_addr(WT_SESSION_IMPL *,
 		WT_RECONCILE *, const void *, size_t, u_int, uint64_t);
 static int  __rec_cell_build_int_key(WT_SESSION_IMPL *,
 		WT_RECONCILE *, const void *, size_t, bool *);
@@ -719,12 +718,6 @@ __rec_write_init(WT_SESSION_IMPL *session,
 	/* Save the page's write generation before reading the page. */
 	WT_ORDERED_READ(r->orig_write_gen, page->modify->write_gen);
 
-	/*
-	 * Running transactions may update the page after we write it, so
-	 * this is the highest ID we can be confident we will see.
-	 */
-	r->skipped_txn = S2C(session)->txn_global.last_running;
-
 	return (0);
 }
 
@@ -901,9 +894,6 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			max_txn = txnid;
 		if (WT_TXNID_LT(txnid, min_txn))
 			min_txn = txnid;
-		if (WT_TXNID_LT(txnid, r->skipped_txn) &&
-		    !__wt_txn_visible_all(session, txnid))
-			r->skipped_txn = txnid;
 
 		/*
 		 * Record whether any updates were skipped on the way to finding
@@ -3373,7 +3363,8 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			val->cell_len = 0;
 			val->len = val->buf.size;
 		} else
-			__rec_cell_build_addr(r, addr->addr, addr->size,
+			__rec_cell_build_addr(session, r,
+			    addr->addr, addr->size,
 			    __rec_vtype(addr), ref->key.recno);
 		WT_CHILD_RELEASE_ERR(session, hazard, ref);
 
@@ -3419,7 +3410,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 		/* Build the value cell. */
 		addr = &multi->addr;
-		__rec_cell_build_addr(r,
+		__rec_cell_build_addr(session, r,
 		    addr->addr, addr->size, __rec_vtype(addr), r->recno);
 
 		/* Boundary: split or write the page. */
@@ -4222,7 +4213,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			vtype = state == WT_CHILD_PROXY ?
 			    WT_CELL_ADDR_DEL : (u_int)vpack->raw;
 		}
-		__rec_cell_build_addr(r, p, size, vtype, 0);
+		__rec_cell_build_addr(session, r, p, size, vtype, 0);
 		WT_CHILD_RELEASE_ERR(session, hazard, ref);
 
 		/*
@@ -4308,7 +4299,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		r->cell_zero = false;
 
 		addr = &multi->addr;
-		__rec_cell_build_addr(
+		__rec_cell_build_addr(session,
 		    r, addr->addr, addr->size, __rec_vtype(addr), 0);
 
 		/* Boundary: split or write the page. */
@@ -5086,8 +5077,6 @@ err:			__wt_scr_free(session, &tkey);
 	 * discarded.
 	 */
 	if (r->leave_dirty) {
-		mod->first_dirty_txn = r->skipped_txn;
-
 		btree->modified = 1;
 		WT_FULL_BARRIER();
 	} else {
@@ -5394,12 +5383,14 @@ __rec_cell_build_leaf_key(WT_SESSION_IMPL *session,
  * on the page.
  */
 static void
-__rec_cell_build_addr(WT_RECONCILE *r,
+__rec_cell_build_addr(WT_SESSION_IMPL *session, WT_RECONCILE *r,
     const void *addr, size_t size, u_int cell_type, uint64_t recno)
 {
 	WT_KV *val;
 
 	val = &r->v;
+
+	WT_ASSERT(session, size != 0 || cell_type == WT_CELL_ADDR_DEL);
 
 	/*
 	 * We don't check the address size because we can't store an address on
