@@ -42,6 +42,12 @@ Copying the database files for a backup does not require any special
 alignment or block size (specifically, Linux or Windows filesystems that
 do not support read/write isolation can be safely read for backups).
 
+The database file may grow in size during the copy, and the file copy
+should not consider that an error. Blocks appended to the file after the
+copy starts can be safely ignored, that is, it is correct for the copy
+to determine an initial size of the file and then copy that many bytes,
+ignoring any bytes appended after the backup cursor was opened.
+
 The cursor must not be closed until all of the files have been copied,
 however, there is no requirement the files be copied in any order or in
 any relationship to the WT_CURSOR::next calls, only that all files have
