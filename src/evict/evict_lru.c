@@ -915,7 +915,7 @@ __evict_lru_pages(WT_SESSION_IMPL *session, bool is_server)
 		    cache->server_evicts + cache->worker_evicts;
 		app_evict_percent = (100 * cache->app_evicts) /
 			(total_evict + 1);
-		if (app_evict_percent < 5) {
+		if (app_evict_percent < 3) {
 			WT_STAT_FAST_CONN_INCR(session,
 			    cache_eviction_server_not_evicting);
 			return (0);
