@@ -66,6 +66,7 @@
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/quick_exit.h"
 
 namespace fs = boost::filesystem;
@@ -108,11 +109,9 @@ static bool forkServer() {
 
         serverGlobalParams.parentProc = ProcessId::getCurrent();
 
-        // We need to make sure that all signals are unmasked so we can signal ourself
-        // that we're fully initialized later on.
-        sigset_t unblockSignalMask;
-        verify(sigemptyset(&unblockSignalMask) == 0);
-        verify(sigprocmask(SIG_SETMASK, &unblockSignalMask, NULL) == 0);
+        // clear signal mask so that SIGUSR2 will always be caught and we can clean up the original
+        // parent process
+        clearSignalMask();
 
         // facilitate clean exit when child starts successfully
         verify(signal(SIGUSR2, launchSignal) != SIG_ERR);

@@ -346,4 +346,13 @@ void reportOutOfMemoryErrorAndExit() {
     writeMallocFreeStreamToLog();
     quickExit(EXIT_ABRUPT);
 }
+
+void clearSignalMask() {
+#ifndef _WIN32
+    // We need to make sure that all signals are unmasked so signals are handled correctly
+    sigset_t unblockSignalMask;
+    invariant(sigemptyset(&unblockSignalMask) == 0);
+    invariant(sigprocmask(SIG_SETMASK, &unblockSignalMask, nullptr) == 0);
+#endif
+}
 }  // namespace mongo
