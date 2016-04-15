@@ -163,7 +163,7 @@ backup(void *arg)
 		 * Do some incremental backups after each full backup. If we're
 		 * not doing any more incrementals, verify the backup (we can't
 		 * verify intermediate states, once we verify, we can't do any
-		 * more incremental backups.
+		 * more incremental backups).
 		 */
 		if (full)
 			incremental = mmrand(NULL, 1, 5);
