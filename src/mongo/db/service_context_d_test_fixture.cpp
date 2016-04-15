@@ -31,8 +31,14 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/db/service_context.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context_d.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/unittest/temp_dir.h"
 
@@ -49,6 +55,27 @@ void ServiceContextMongoDTest::setUp() {
         storageGlobalParams.engineSetByUser = true;
         checked_cast<ServiceContextMongoD*>(getGlobalServiceContext())->createLockFile();
         serviceContext->initializeGlobalStorageEngine();
+    }
+}
+
+void ServiceContextMongoDTest::tearDown() {
+    _dropAllDBs();
+}
+
+void ServiceContextMongoDTest::_dropAllDBs() {
+    OperationContextImpl txn;
+    dropAllDatabasesExceptLocal(&txn);
+
+    ScopedTransaction transaction(&txn, MODE_X);
+    Lock::GlobalWrite lk(txn.lockState());
+    AutoGetDb autoDBLocal(&txn, "local", MODE_X);
+    const auto localDB = autoDBLocal.getDb();
+    if (localDB) {
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            // Do not wrap in a WriteUnitOfWork until SERVER-17103 is addressed.
+            autoDBLocal.getDb()->dropDatabase(&txn, localDB);
+        }
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(&txn, "_dropAllDBs", "local");
     }
 }
 

@@ -41,6 +41,16 @@ protected:
      * Initializes global storage engine.
      */
     void setUp() override;
+
+    /**
+     * Clear all databases
+     */
+    void tearDown() override;
+
+    /**
+     * Drops all databases.
+     */
+    void _dropAllDBs();
 };
 
 }  // namespace mongo
