@@ -78,10 +78,10 @@ public:
     }
 
     /**
-     * This is sort of strange since "durable" has no meaning...
+     * Data stored in memory is not durable.
      */
     virtual bool isDurable() const {
-        return true;
+        return false;
     }
 
     virtual bool isEphemeral() const {

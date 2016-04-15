@@ -3409,7 +3409,7 @@ buildvariants:
     content_type: application/zip
     compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib" -j$(grep -c ^processor /proc/cpuinfo) --dynamic-windows --win-version-min=ws08r2 VARIANT_DIR=win32
     num_jobs_available: 1
-    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence
+    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
     ext: zip
   tasks:
   - name: compile
@@ -5479,7 +5479,7 @@ buildvariants:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
     rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
-    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence
+    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
@@ -5562,7 +5562,7 @@ buildvariants:
   expansions:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
-    test_flags: --storageEngine=ephemeralForTest --excludeWithAnyTags=requires_persistence,requires_fsync,SERVER-21420,SERVER-21658
+    test_flags: --storageEngine=ephemeralForTest --excludeWithAnyTags=requires_persistence,requires_fsync,SERVER-21420,SERVER-21658,requires_journaling
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
   tasks:
@@ -5637,7 +5637,7 @@ buildvariants:
     tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2)" -tags 'sasl ssl'
     compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=rhel71 -j$(grep -c processor /proc/cpuinfo) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++
     num_jobs_available: 20
-    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_mmapv1
+    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_mmapv1,requires_journaling
   tasks:
   - name: compile
     distros:
