@@ -1362,9 +1362,8 @@ __wt_block_extlist_truncate(
 	block->size = size;
 
 	/*
-	 * Truncate the file. The truncate might fail if there's a file mapping
-	 * (if there's an open checkpoint on the file), that's OK, we'll ignore
-	 * those blocks.
+	 * Truncate the file. The truncate might fail, and that's OK, we simply
+	 * ignore those blocks.
 	 */
 	WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
 	    "truncate file from %" PRIdMAX " to %" PRIdMAX,
