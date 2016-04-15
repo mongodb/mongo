@@ -39,29 +39,39 @@ namespace {
 
 using namespace mongo;
 
-TEST(BackgroundThreadClockSource, CreateAndTerminate) {
-    auto clockSource = stdx::make_unique<ClockSourceMock>();
-    auto btClockSource =
-        stdx::make_unique<BackgroundThreadClockSource>(std::move(clockSource), Milliseconds(1));
-    btClockSource.reset();  // destroys the clock source
+class BTCSTest : public mongo::unittest::Test {
+public:
+    void setUpClocks(Milliseconds granularity) {
+        auto csMock = stdx::make_unique<ClockSourceMock>();
+        _csMock = csMock.get();
+        _btcs = stdx::make_unique<BackgroundThreadClockSource>(std::move(csMock), granularity);
+    }
 
-    clockSource = stdx::make_unique<ClockSourceMock>();
-    btClockSource =
-        stdx::make_unique<BackgroundThreadClockSource>(std::move(clockSource), Hours(48));
-    btClockSource.reset();  // destroys the clock source
+protected:
+    std::unique_ptr<ClockSource> _btcs;
+    ClockSourceMock* _csMock;
+};
+
+TEST_F(BTCSTest, CreateAndTerminate) {
+    setUpClocks(Milliseconds(1));
+    _btcs.reset();  // destroys the clock source
+
+    setUpClocks(Hours(48));
+    _btcs.reset();
 }
 
-TEST(BackgroundThreadClockSource, TimeKeeping) {
-    auto clockSource = stdx::make_unique<ClockSourceMock>();
-    ClockSourceMock* clockSourceMock = clockSource.get();
+TEST_F(BTCSTest, TimeKeeping) {
+    setUpClocks(Milliseconds(1));
+    ASSERT_EQUALS(_btcs->now(), _csMock->now());
 
-    auto btClockSource =
-        stdx::make_unique<BackgroundThreadClockSource>(std::move(clockSource), Milliseconds(1));
-    ASSERT_EQUALS(btClockSource->now(), clockSourceMock->now());
+    _csMock->advance(Milliseconds(100));
+    sleepFor(Seconds(1));  // give the _btcs opportunity to read the new time
+    ASSERT_EQUALS(_btcs->now(), _csMock->now());
+}
 
-    clockSourceMock->advance(Milliseconds(100));
-    sleepFor(Milliseconds(10));  // give the btClockSource opportunity to read the new time
-    ASSERT_EQUALS(btClockSource->now(), clockSourceMock->now());
+TEST_F(BTCSTest, GetPrecision) {
+    setUpClocks(Milliseconds(1));
+    ASSERT_EQUALS(_btcs->getPrecision(), Milliseconds(1));
 }
 
 }  // namespace

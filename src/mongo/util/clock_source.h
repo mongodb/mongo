@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include "mongo/util/time_support.h"
+
 namespace mongo {
 
 class Date_t;
@@ -38,6 +40,11 @@ class Date_t;
 class ClockSource {
 public:
     virtual ~ClockSource() = default;
+
+    /**
+     * Returns the minimum time change that the clock can describe.
+     */
+    virtual Milliseconds getPrecision() = 0;
 
     /**
      * Returns the current wall clock time, as defined by this source.

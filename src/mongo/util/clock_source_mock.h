@@ -43,6 +43,7 @@ public:
      */
     ClockSourceMock() = default;
 
+    Milliseconds getPrecision() override;
     Date_t now() final;
 
     /**

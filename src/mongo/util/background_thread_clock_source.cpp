@@ -56,6 +56,10 @@ BackgroundThreadClockSource::~BackgroundThreadClockSource() {
     _timer.join();
 }
 
+Milliseconds BackgroundThreadClockSource::getPrecision() {
+    return _granularity;
+}
+
 Date_t BackgroundThreadClockSource::now() {
     return Date_t::fromMillisSinceEpoch(_current.load());
 }

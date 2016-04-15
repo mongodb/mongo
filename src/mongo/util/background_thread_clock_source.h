@@ -53,6 +53,7 @@ class BackgroundThreadClockSource final : public ClockSource {
 public:
     BackgroundThreadClockSource(std::unique_ptr<ClockSource> clockSource, Milliseconds granularity);
     ~BackgroundThreadClockSource() override;
+    Milliseconds getPrecision() override;
     Date_t now() override;
 
 private:

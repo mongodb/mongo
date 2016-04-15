@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/util/clock_source.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -43,6 +44,7 @@ public:
      * Returns the singleton instance of SystemClockSource.
      */
     static SystemClockSource* get();
+    Milliseconds getPrecision() override;
 };
 
 }  // namespace mongo
