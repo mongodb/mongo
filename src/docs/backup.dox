@@ -118,8 +118,9 @@ and removing log files from the original database home:
    <code>log:</code> and specifying the backup cursor as the start
    cursor to that method. (Note there is no requirement backups be
    coordinated with database checkpoints, however, an incremental backup
-   will not make additional log files available for archival unless there
-   was at least one checkpoint after the previous incremental backup.)
+   will repeatedly copy the same files, and will not make additional log
+   files available for archival, unless there was a checkpoint after the
+   previous incremental backup.)
 
 5. Close the backup cursor.
 
