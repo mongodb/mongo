@@ -116,7 +116,10 @@ and removing log files from the original database home:
 4. If all log files have been successfully copied, archive the log
    files by calling the WT_SESSION::truncate method with the URI
    <code>log:</code> and specifying the backup cursor as the start
-   cursor to that method.
+   cursor to that method. (Note there is no requirement backups be
+   coordinated with database checkpoints, however, an incremental backup
+   will not make additional log files available for archival unless there
+   was at least one checkpoint after the previous incremental backup.)
 
 5. Close the backup cursor.
 
