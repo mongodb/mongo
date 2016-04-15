@@ -893,6 +893,7 @@ __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session)
 	__wt_spin_unlock(session, &cache->evict_walk_lock);
 }
 
+#define	APP_EVICT_THRESHOLD	3	/* Threshold to help evict */
 /*
  * __evict_lru_pages --
  *	Get pages from the LRU queue to evict.
@@ -906,8 +907,8 @@ __evict_lru_pages(WT_SESSION_IMPL *session, bool is_server)
 
 	/*
 	 * The server will not help evict if the workers are coping with
-	 * eviction workload, that is, if fewer than 5% of the pages are
-	 * evicted by application threads.
+	 * eviction workload, that is, if fewer than the threshold of the
+	 * pages are evicted by application threads.
 	 */
 	if (is_server && S2C(session)->evict_workers > 1) {
 		cache = S2C(session)->cache;
@@ -915,7 +916,7 @@ __evict_lru_pages(WT_SESSION_IMPL *session, bool is_server)
 		    cache->server_evicts + cache->worker_evicts;
 		app_evict_percent = (100 * cache->app_evicts) /
 			(total_evict + 1);
-		if (app_evict_percent < 3) {
+		if (app_evict_percent < APP_EVICT_THRESHOLD) {
 			WT_STAT_FAST_CONN_INCR(session,
 			    cache_eviction_server_not_evicting);
 			return (0);

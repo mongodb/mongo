@@ -2180,9 +2180,6 @@ main(int argc, char *argv[])
 	config_opts = NULL;
 	cc_buf = tc_buf = user_tconfig = NULL;
 
-	/* XXX mjc: kludge to always enable statistics. */
-	user_cconfig = dstrdup("statistics=(fast)");
-
 	/* Setup the default configuration values. */
 	cfg = &_cfg;
 	memset(cfg, 0, sizeof(*cfg));
