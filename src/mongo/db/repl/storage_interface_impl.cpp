@@ -67,11 +67,6 @@ NamespaceString StorageInterfaceImpl::getMinValidNss() const {
     return _minValidNss;
 }
 
-ServiceContext::UniqueOperationContext StorageInterfaceImpl::createOperationContext(
-    Client* client) {
-    return client->makeOperationContext();
-}
-
 bool StorageInterfaceImpl::getInitialSyncFlag(OperationContext* txn) const {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         ScopedTransaction transaction(txn, MODE_IS);

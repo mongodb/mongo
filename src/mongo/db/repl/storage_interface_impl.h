@@ -52,8 +52,6 @@ public:
      */
     NamespaceString getMinValidNss() const;
 
-    ServiceContext::UniqueOperationContext createOperationContext(Client* client) override;
-
     bool getInitialSyncFlag(OperationContext* txn) const override;
 
     void setInitialSyncFlag(OperationContext* txn) override;

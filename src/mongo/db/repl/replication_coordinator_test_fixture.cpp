@@ -44,6 +44,7 @@
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
@@ -115,8 +116,7 @@ void ReplCoordTest::init() {
     _topo = new TopologyCoordinatorImpl(settings);
     stdx::function<bool()> _durablityLambda = [this]() -> bool { return _isStorageEngineDurable; };
     _net = new NetworkInterfaceMock;
-    _storage = new StorageInterfaceMock;
-    _replExec.reset(new ReplicationExecutor(_net, _storage, seed));
+    _replExec = stdx::make_unique<ReplicationExecutor>(_net, seed);
     _externalState = new ReplicationCoordinatorExternalStateMock;
     _repl.reset(new ReplicationCoordinatorImpl(
         _settings, _externalState, _topo, _replExec.get(), seed, &_durablityLambda));

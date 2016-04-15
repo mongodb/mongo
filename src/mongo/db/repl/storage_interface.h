@@ -38,7 +38,6 @@
 
 namespace mongo {
 
-class Client;
 class OperationContext;
 
 namespace repl {
@@ -95,11 +94,6 @@ public:
 
     StorageInterface() = default;
     virtual ~StorageInterface() = default;
-
-    /**
-     * Creates an operation context for running database operations.
-     */
-    virtual ServiceContext::UniqueOperationContext createOperationContext(Client* client) = 0;
 
     /**
      * Returns true if initial sync was started but has not not completed.

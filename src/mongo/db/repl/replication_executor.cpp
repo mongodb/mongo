@@ -35,7 +35,6 @@
 #include <limits>
 
 #include "mongo/db/repl/database_task.h"
-#include "mongo/db/repl/storage_interface.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -52,22 +51,13 @@ using executor::NetworkInterface;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 
-ReplicationExecutor::ReplicationExecutor(NetworkInterface* netInterface,
-                                         StorageInterface* storageInterface,
-                                         int64_t prngSeed)
+ReplicationExecutor::ReplicationExecutor(NetworkInterface* netInterface, int64_t prngSeed)
     : _random(prngSeed),
       _networkInterface(netInterface),
-      _storageInterface(storageInterface),
       _inShutdown(false),
       _dblockWorkers(OldThreadPool::DoNotStartThreadsTag(), 3, "replExecDBWorker-"),
-      _dblockTaskRunner(&_dblockWorkers,
-                        stdx::bind(&StorageInterface::createOperationContext,
-                                   storageInterface,
-                                   stdx::placeholders::_1)),
-      _dblockExclusiveLockTaskRunner(&_dblockWorkers,
-                                     stdx::bind(&StorageInterface::createOperationContext,
-                                                storageInterface,
-                                                stdx::placeholders::_1)) {}
+      _dblockTaskRunner(&_dblockWorkers),
+      _dblockExclusiveLockTaskRunner(&_dblockWorkers) {}
 
 ReplicationExecutor::~ReplicationExecutor() {
     // join must have been called

@@ -36,7 +36,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/replication_executor_test_fixture.h"
-#include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/functional.h"
@@ -57,12 +56,11 @@ using unittest::assertGet;
 const int64_t prngSeed = 1;
 
 MONGO_INITIALIZER(ReplExecutorCommonTests)(InitializerContext*) {
-    mongo::executor::addTestsForExecutor(
-        "ReplicationExecutorCommon",
-        [](std::unique_ptr<executor::NetworkInterfaceMock>* net) {
-            return stdx::make_unique<ReplicationExecutor>(
-                net->release(), new StorageInterfaceMock(), prngSeed);
-        });
+    mongo::executor::addTestsForExecutor("ReplicationExecutorCommon",
+                                         [](std::unique_ptr<executor::NetworkInterfaceMock>* net) {
+                                             return stdx::make_unique<ReplicationExecutor>(
+                                                 net->release(), prngSeed);
+                                         });
     return Status::OK();
 }
 

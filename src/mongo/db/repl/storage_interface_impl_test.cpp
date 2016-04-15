@@ -113,10 +113,6 @@ TEST_F(StorageInterfaceImplTest, ServiceContextDecorator) {
     ASSERT_TRUE(storageInterface == StorageInterface::get(serviceContext));
 }
 
-TEST_F(StorageInterfaceImplTest, CreateOperationContextShouldNotReturnNull) {
-    ASSERT_TRUE(StorageInterfaceImpl().createOperationContext(getClient()));
-}
-
 TEST_F(StorageInterfaceImplTest, DefaultMinValidNamespace) {
     ASSERT_EQUALS(NamespaceString(StorageInterfaceImpl::kDefaultMinValidNamespace),
                   StorageInterfaceImpl().getMinValidNss());
@@ -126,7 +122,7 @@ TEST_F(StorageInterfaceImplTest, InitialSyncFlag) {
     NamespaceString nss("local.StorageInterfaceImplTest_InitialSyncFlag");
 
     StorageInterfaceImpl storageInterface(nss);
-    auto txn = storageInterface.createOperationContext(getClient());
+    auto txn = getClient()->makeOperationContext();
 
     // Initial sync flag should be unset after initializing a new storage engine.
     ASSERT_FALSE(storageInterface.getInitialSyncFlag(txn.get()));
@@ -149,7 +145,7 @@ TEST_F(StorageInterfaceImplTest, MinValid) {
     NamespaceString nss("local.StorageInterfaceImplTest_MinValid");
 
     StorageInterfaceImpl storageInterface(nss);
-    auto txn = storageInterface.createOperationContext(getClient());
+    auto txn = getClient()->makeOperationContext();
 
     // MinValid boundaries should be {null optime, null optime} after initializing a new storage
     // engine.

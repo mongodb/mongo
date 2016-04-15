@@ -52,18 +52,6 @@ Status TaskRunnerTest::getDetectableErrorStatus() {
     return Status(ErrorCodes::InternalError, "Not mutated");
 }
 
-int TaskRunnerTest::getOperationContextId(OperationContext* txn) {
-    if (!txn) {
-        return -1;
-    }
-    return int(txn->getOpID());
-}
-
-ServiceContext::UniqueOperationContext TaskRunnerTest::createOperationContext(
-    Client* client) const {
-    return client->makeOperationContext();
-}
-
 TaskRunner& TaskRunnerTest::getTaskRunner() const {
     ASSERT(_taskRunner.get());
     return *_taskRunner;
@@ -74,19 +62,13 @@ OldThreadPool& TaskRunnerTest::getThreadPool() const {
     return *_threadPool;
 }
 
-void TaskRunnerTest::resetTaskRunner(TaskRunner* taskRunner) {
-    _taskRunner.reset(taskRunner);
-}
-
 void TaskRunnerTest::destroyTaskRunner() {
     _taskRunner.reset();
 }
 
 void TaskRunnerTest::setUp() {
-    _threadPool.reset(new OldThreadPool(kNumThreads, "TaskRunnerTest-"));
-    resetTaskRunner(new TaskRunner(
-        _threadPool.get(),
-        stdx::bind(&TaskRunnerTest::createOperationContext, this, stdx::placeholders::_1)));
+    _threadPool = stdx::make_unique<OldThreadPool>(kNumThreads, "TaskRunnerTest-");
+    _taskRunner = stdx::make_unique<TaskRunner>(_threadPool.get());
 }
 
 void TaskRunnerTest::tearDown() {

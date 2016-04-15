@@ -52,22 +52,9 @@ class TaskRunnerTest : public unittest::Test {
 public:
     static Status getDetectableErrorStatus();
 
-    /**
-     * Returns ID of mock operation context returned from createOperationContext().
-     * Returns -1 if txn is null.
-     * Returns -2 if txn cannot be converted to a mock operation context containing an ID.
-     */
-    static int getOperationContextId(OperationContext* txn);
-
-    /**
-     * Returns an noop operation context with an embedded numerical ID.
-     */
-    virtual ServiceContext::UniqueOperationContext createOperationContext(Client*) const;
-
     OldThreadPool& getThreadPool() const;
     TaskRunner& getTaskRunner() const;
 
-    void resetTaskRunner(TaskRunner* taskRunner);
     void destroyTaskRunner();
 
 protected:

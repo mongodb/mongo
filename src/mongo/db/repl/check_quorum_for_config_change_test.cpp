@@ -37,11 +37,11 @@
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
-#include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
@@ -77,7 +77,6 @@ protected:
     bool isQuorumCheckDone();
 
     NetworkInterfaceMock* _net;
-    StorageInterfaceMock* _storage;
     std::unique_ptr<ReplicationExecutor> _executor;
 
 private:
@@ -99,8 +98,7 @@ CheckQuorumTest::CheckQuorumTest()
 
 void CheckQuorumTest::setUp() {
     _net = new NetworkInterfaceMock;
-    _storage = new StorageInterfaceMock;
-    _executor.reset(new ReplicationExecutor(_net, _storage, 1 /* prng */));
+    _executor = stdx::make_unique<ReplicationExecutor>(_net, 1 /* prng seed */);
     _executorThread.reset(new stdx::thread(stdx::bind(&ReplicationExecutor::run, _executor.get())));
 }
 

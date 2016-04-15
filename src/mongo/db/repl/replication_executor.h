@@ -61,8 +61,6 @@ class NetworkInterface;
 
 namespace repl {
 
-class StorageInterface;
-
 /**
  * Implementation of the TaskExecutor interface for providing an event loop for driving state
  * machines in replication.
@@ -100,9 +98,7 @@ public:
      *
      * Takes ownership of the passed NetworkInterface object.
      */
-    ReplicationExecutor(executor::NetworkInterface* netInterface,
-                        StorageInterface* storageInterface,
-                        int64_t pnrgSeed);
+    ReplicationExecutor(executor::NetworkInterface* netInterface, int64_t pnrgSeed);
 
     /**
      * Destroys an executor.
@@ -306,7 +302,6 @@ private:
     PseudoRandom _random;
 
     std::unique_ptr<executor::NetworkInterface> _networkInterface;
-    std::unique_ptr<StorageInterface> _storageInterface;
 
     // Thread which executes the run method. Started by startup and must be jointed after shutdown.
     stdx::thread _executorThread;

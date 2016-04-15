@@ -42,8 +42,6 @@ class StorageInterfaceMock : public StorageInterface {
 public:
     StorageInterfaceMock() = default;
 
-    ServiceContext::UniqueOperationContext createOperationContext(Client* client) override;
-
     bool getInitialSyncFlag(OperationContext* txn) const override;
     void setInitialSyncFlag(OperationContext* txn) override;
     void clearInitialSyncFlag(OperationContext* txn) override;

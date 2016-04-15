@@ -905,7 +905,6 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
         getGlobalReplSettings(),
         new repl::ReplicationCoordinatorExternalStateImpl,
         executor::makeNetworkInterface("NetworkInterfaceASIO-Replication").release(),
-        new repl::StorageInterfaceImpl{},
         new repl::TopologyCoordinatorImpl(topoCoordOptions),
         static_cast<int64_t>(curTimeMillis64()));
     auto serviceContext = getGlobalServiceContext();

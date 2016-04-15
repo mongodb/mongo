@@ -44,7 +44,6 @@
 #include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/sync_source_resolver.h"
-#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/service_context.h"
@@ -98,7 +97,6 @@ public:
     ReplicationCoordinatorImpl(const ReplSettings& settings,
                                ReplicationCoordinatorExternalState* externalState,
                                executor::NetworkInterface* network,
-                               StorageInterface* storage,
                                TopologyCoordinator* topoCoord,
                                int64_t prngSeed);
     // Takes ownership of the "externalState" and "topCoord" objects.
@@ -455,7 +453,6 @@ private:
                                TopologyCoordinator* topCoord,
                                int64_t prngSeed,
                                executor::NetworkInterface* network,
-                               StorageInterface* storage,
                                ReplicationExecutor* replExec,
                                stdx::function<bool()>* isDurableStorageEngineFn);
     /**

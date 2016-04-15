@@ -73,30 +73,16 @@ TaskRunner::Task TaskRunner::makeCancelTask() {
     return [](OperationContext* txn, const Status& status) { return NextAction::kCancel; };
 }
 
-TaskRunner::TaskRunner(OldThreadPool* threadPool,
-                       const CreateOperationContextFn& createOperationContext)
-    : _threadPool(threadPool),
-      _createOperationContext(createOperationContext),
-      _active(false),
-      _cancelRequested(false) {
+TaskRunner::TaskRunner(OldThreadPool* threadPool)
+    : _threadPool(threadPool), _active(false), _cancelRequested(false) {
     uassert(ErrorCodes::BadValue, "null thread pool", threadPool);
-    uassert(ErrorCodes::BadValue, "null operation context factory", createOperationContext);
 }
 
 TaskRunner::~TaskRunner() {
-    try {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-        if (!_active) {
-            return;
-        }
-        _cancelRequested = true;
-        _condition.notify_all();
-        while (_active) {
-            _condition.wait(lk);
-        }
-    } catch (...) {
-        error() << "unexpected exception destroying task runner: " << exceptionToStatus();
-    }
+    DESTRUCTOR_GUARD(stdx::unique_lock<stdx::mutex> lk(_mutex);
+                     if (!_active) { return; } _cancelRequested = true;
+                     _condition.notify_all();
+                     while (_active) { _condition.wait(lk); });
 }
 
 std::string TaskRunner::getDiagnosticString() const {
@@ -153,7 +139,7 @@ void TaskRunner::_runTasks() {
                     AuthorizationSession::get(client)->grantInternalAuthorization();
                 }
             }
-            txn = _createOperationContext(client);
+            txn = client->makeOperationContext();
         }
 
         NextAction nextAction = runSingleTask(task, txn.get(), Status::OK());

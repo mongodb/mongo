@@ -35,11 +35,6 @@
 namespace mongo {
 namespace repl {
 
-ServiceContext::UniqueOperationContext StorageInterfaceMock::createOperationContext(
-    Client* client) {
-    return client->makeOperationContext();
-}
-
 bool StorageInterfaceMock::getInitialSyncFlag(OperationContext* txn) const {
     stdx::lock_guard<stdx::mutex> lock(_initialSyncFlagMutex);
     return _initialSyncFlag;

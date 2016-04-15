@@ -45,15 +45,7 @@ const std::string databaseName = "mydb";
 const std::string collectionName = "mycoll";
 const NamespaceString nss(databaseName, collectionName);
 
-class DatabaseTaskTest : public TaskRunnerTest {
-public:
-    ServiceContext::UniqueOperationContext createOperationContext(Client* client) const override;
-};
-
-ServiceContext::UniqueOperationContext DatabaseTaskTest::createOperationContext(
-    Client* client) const {
-    return client->makeOperationContext();
-}
+class DatabaseTaskTest : public TaskRunnerTest {};
 
 TEST_F(DatabaseTaskTest, TaskRunnerErrorStatus) {
     // Should not attempt to acquire lock on error status from task runner.

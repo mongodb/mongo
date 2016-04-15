@@ -241,14 +241,12 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
     TopologyCoordinator* topCoord,
     int64_t prngSeed,
     NetworkInterface* network,
-    StorageInterface* storage,
     ReplicationExecutor* replExec,
     stdx::function<bool()>* isDurableStorageEngineFn)
     : _settings(settings),
       _replMode(getReplicationModeFromSettings(settings)),
       _topCoord(topCoord),
-      _replExecutorIfOwned(replExec ? nullptr
-                                    : new ReplicationExecutor(network, storage, prngSeed)),
+      _replExecutorIfOwned(replExec ? nullptr : new ReplicationExecutor(network, prngSeed)),
       _replExecutor(replExec ? *replExec : *_replExecutorIfOwned),
       _externalState(externalState),
       _inShutdown(false),
@@ -286,11 +284,10 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
     const ReplSettings& settings,
     ReplicationCoordinatorExternalState* externalState,
     NetworkInterface* network,
-    StorageInterface* storage,
     TopologyCoordinator* topCoord,
     int64_t prngSeed)
     : ReplicationCoordinatorImpl(
-          settings, externalState, topCoord, prngSeed, network, storage, nullptr, nullptr) {}
+          settings, externalState, topCoord, prngSeed, network, nullptr, nullptr) {}
 
 ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
     const ReplSettings& settings,
@@ -303,7 +300,6 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
                                  externalState,
                                  topCoord,
                                  prngSeed,
-                                 nullptr,
                                  nullptr,
                                  replExec,
                                  isDurableStorageEngineFn) {}

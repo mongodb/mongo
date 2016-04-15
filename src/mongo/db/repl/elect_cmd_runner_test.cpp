@@ -34,9 +34,9 @@
 #include "mongo/db/repl/member_heartbeat_data.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
-#include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 
@@ -68,7 +68,6 @@ public:
                               const std::vector<HostAndPort>& hosts);
 
     NetworkInterfaceMock* _net;
-    StorageInterfaceMock* _storage;
     std::unique_ptr<ReplicationExecutor> _executor;
     std::unique_ptr<stdx::thread> _executorThread;
 
@@ -81,8 +80,7 @@ private:
 
 void ElectCmdRunnerTest::setUp() {
     _net = new NetworkInterfaceMock;
-    _storage = new StorageInterfaceMock;
-    _executor.reset(new ReplicationExecutor(_net, _storage, 1 /* prng seed */));
+    _executor = stdx::make_unique<ReplicationExecutor>(_net, 1 /* prng seed */);
     _executorThread.reset(new stdx::thread(stdx::bind(&ReplicationExecutor::run, _executor.get())));
 }
 

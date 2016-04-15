@@ -242,8 +242,6 @@ private:
     TopologyCoordinatorImpl* _topo = nullptr;
     // Owned by ReplicationExecutor
     executor::NetworkInterfaceMock* _net = nullptr;
-    // Owned by ReplicationExecutor
-    StorageInterfaceMock* _storage = nullptr;
     std::unique_ptr<ReplicationExecutor> _replExec;
     // Owned by ReplicationCoordinatorImpl
     ReplicationCoordinatorExternalStateMock* _externalState = nullptr;
