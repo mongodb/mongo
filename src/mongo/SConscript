@@ -250,6 +250,7 @@ mongodLibDeps = [
     "db/repl/storage_interface_impl",
     "executor/network_interface_factory",
     's/commands/shared_cluster_commands',
+    "util/clock_sources",
     "util/ntservice",
 ]
 

@@ -293,6 +293,28 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='clock_sources',
+    source=[
+        'background_thread_clock_source.cpp',
+        'fast_clock_source_factory.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.CppUnitTest(
+    target='background_thread_clock_source_test',
+    source=[
+        'background_thread_clock_source_test.cpp',
+    ],
+    LIBDEPS=[
+        'clock_source_mock',
+        'clock_sources',
+    ],
+)
+
 if env.TargetOSIs('windows'):
     env.CppUnitTest(
         target='ntservice_test',

@@ -147,12 +147,20 @@ TickSource* ServiceContext::getTickSource() const {
     return _tickSource.get();
 }
 
+ClockSource* ServiceContext::getFastClockSource() const {
+    return _fastClockSource.get();
+}
+
 ClockSource* ServiceContext::getPreciseClockSource() const {
     return _preciseClockSource.get();
 }
 
 void ServiceContext::setTickSource(std::unique_ptr<TickSource> newSource) {
     _tickSource = std::move(newSource);
+}
+
+void ServiceContext::setFastClockSource(std::unique_ptr<ClockSource> newSource) {
+    _fastClockSource = std::move(newSource);
 }
 
 void ServiceContext::setPreciseClockSource(std::unique_ptr<ClockSource> newSource) {
