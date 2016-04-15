@@ -160,13 +160,15 @@ backup(void *arg)
 		testutil_check(pthread_rwlock_unlock(&g.backup_lock));
 
 		/*
-		 * Do some incremental backups after each full backup. If we're
-		 * not doing any more incrementals, verify the backup (we can't
-		 * verify intermediate states, once we verify, we can't do any
-		 * more incremental backups).
+		 * If automatic log archival isn't configured, optionally do
+		 * incremental backups after each full backup. If we're not
+		 * doing any more incrementals, verify the backup (we can't
+		 * verify intermediate states, once we perform recovery on the
+		 * backup database, we can't do any more incremental backups).
 		 */
 		if (full)
-			incremental = mmrand(NULL, 1, 5);
+			incremental =
+			    g.c_logging_archive ? 1 : mmrand(NULL, 1, 5);
 		if (--incremental == 0)
 			check_copy();
 	}
