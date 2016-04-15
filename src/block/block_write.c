@@ -30,7 +30,8 @@ __wt_block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t len)
 
 	/*
 	 * Additionally, the truncate might fail if there's a file mapping (if
-	 * there's an open checkpoint on the file), return EBUSY in that case.
+	 * there's an open checkpoint on the file), in which case the underlying
+	 * function returns EBUSY.
 	 */
 	WT_RET(__wt_ftruncate(session, block->fh, len));
 
