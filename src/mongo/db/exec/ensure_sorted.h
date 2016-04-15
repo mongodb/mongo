@@ -32,6 +32,8 @@
 
 namespace mongo {
 
+class CollatorInterface;
+
 /**
  * Takes the output of its child and drops any results that are not in the sort order specified by
  * 'pattern'. Thus, if the pattern is {a: -1} and the following documents are inputted:
@@ -41,7 +43,11 @@ namespace mongo {
  */
 class EnsureSortedStage final : public PlanStage {
 public:
-    EnsureSortedStage(OperationContext* opCtx, BSONObj pattern, WorkingSet* ws, PlanStage* child);
+    EnsureSortedStage(OperationContext* opCtx,
+                      BSONObj pattern,
+                      CollatorInterface* collator,
+                      WorkingSet* ws,
+                      PlanStage* child);
 
     bool isEOF() final;
     StageState doWork(WorkingSetID* out) final;
@@ -67,6 +73,10 @@ private:
 
     // The pattern that we're sorting by.
     BSONObj _pattern;
+
+    // Null if this ensure sorted stage orders strings according to simple binary compare. If
+    // non-null, represents the collator used to compare strings.
+    CollatorInterface* _collator;
 
     // The sort key of the previous result.
     BSONObj _prevSortKey;

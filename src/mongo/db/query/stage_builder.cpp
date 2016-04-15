@@ -331,7 +331,8 @@ PlanStage* buildStages(OperationContext* txn,
         if (NULL == childStage) {
             return NULL;
         }
-        return new EnsureSortedStage(txn, esn->pattern, ws, childStage);
+        // TODO SERVER-23613: pass the appropriate CollatorInterface* instead of nullptr.
+        return new EnsureSortedStage(txn, esn->pattern, nullptr, ws, childStage);
     } else {
         mongoutils::str::stream ss;
         root->appendToString(&ss, 0);

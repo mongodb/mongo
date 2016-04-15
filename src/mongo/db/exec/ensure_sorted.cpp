@@ -32,6 +32,7 @@
 
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_computed_data.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/stdx/memory.h"
 
@@ -44,9 +45,10 @@ const char* EnsureSortedStage::kStageType = "ENSURE_SORTED";
 
 EnsureSortedStage::EnsureSortedStage(OperationContext* opCtx,
                                      BSONObj pattern,
+                                     CollatorInterface* collator,
                                      WorkingSet* ws,
                                      PlanStage* child)
-    : PlanStage(kStageType, opCtx), _ws(ws) {
+    : PlanStage(kStageType, opCtx), _ws(ws), _collator(collator) {
     _children.emplace_back(child);
     _pattern = FindCommon::transformSortSpec(pattern);
 }
@@ -95,7 +97,7 @@ const SpecificStats* EnsureSortedStage::getSpecificStats() const {
 }
 
 bool EnsureSortedStage::isInOrder(const BSONObj& lhsSortKey, const BSONObj& rhsSortKey) const {
-    return lhsSortKey.woCompare(rhsSortKey, _pattern, /*considerFieldName*/ false) <= 0;
+    return lhsSortKey.woCompare(rhsSortKey, _pattern, /*considerFieldName*/ false, _collator) <= 0;
 }
 
 }  // namespace mongo

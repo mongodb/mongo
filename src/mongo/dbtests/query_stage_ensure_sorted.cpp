@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sort_key_generator.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/json.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
@@ -44,7 +45,7 @@ TEST(QueryStageEnsureSorted, EnsureSortedEmptyWorkingSet) {
     auto queuedDataStage = stdx::make_unique<QueuedDataStage>(nullptr, &ws);
     auto sortKeyGen = stdx::make_unique<SortKeyGeneratorStage>(
         nullptr, queuedDataStage.release(), &ws, BSONObj(), BSONObj());
-    EnsureSortedStage ess(nullptr, BSONObj(), &ws, sortKeyGen.release());
+    EnsureSortedStage ess(nullptr, BSONObj(), nullptr, &ws, sortKeyGen.release());
 
     WorkingSetID id = WorkingSet::INVALID_ID;
     PlanStage::StageState state = PlanStage::NEED_TIME;
@@ -62,8 +63,12 @@ TEST(QueryStageEnsureSorted, EnsureSortedEmptyWorkingSet) {
  *     {input: [doc1, doc2, doc3, ...]}
  * expectedStr represents the expected output data set.
  *     {output: [docA, docB, docC, ...]}
+ * collator is passed to EnsureSortedStage() for string comparisons.
  */
-void testWork(const char* patternStr, const char* inputStr, const char* expectedStr) {
+void testWork(const char* patternStr,
+              const char* inputStr,
+              const char* expectedStr,
+              CollatorInterface* collator = nullptr) {
     WorkingSet ws;
     auto queuedDataStage = stdx::make_unique<QueuedDataStage>(nullptr, &ws);
     BSONObj inputObj = fromjson(inputStr);
@@ -86,7 +91,7 @@ void testWork(const char* patternStr, const char* inputStr, const char* expected
     BSONObj pattern = fromjson(patternStr);
     auto sortKeyGen = stdx::make_unique<SortKeyGeneratorStage>(
         nullptr, queuedDataStage.release(), &ws, pattern, BSONObj());
-    EnsureSortedStage ess(nullptr, pattern, &ws, sortKeyGen.release());
+    EnsureSortedStage ess(nullptr, pattern, collator, &ws, sortKeyGen.release());
     WorkingSetID id = WorkingSet::INVALID_ID;
     PlanStage::StageState state = PlanStage::NEED_TIME;
 
@@ -149,6 +154,19 @@ TEST(QueryStageEnsureSorted, EnsureSortedCompoundKey) {
     testWork("{a: -1, b: 1}",
              "{input: [{a: 6, b: 10}, {a: 6, b: 8}, {a: 6, b: 12}, {a: 9, b: 13}, {a: 5, b: 1}]}",
              "{output: [{a: 6, b: 10}, {a: 6, b: 12}, {a: 5, b: 1}]}");
+}
+
+TEST(QueryStageEnsureSorted, EnsureSortedStringsNullCollator) {
+    CollatorInterface* collator = nullptr;
+    testWork("{a: 1}",
+             "{input: [{a: 'abc'}, {a: 'cba'}]}",
+             "{output: [{a: 'abc'}, {a: 'cba'}]}",
+             collator);
+}
+
+TEST(QueryStageEnsureSorted, EnsureSortedStringsCollator) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    testWork("{a: 1}", "{input: [{a: 'abc'}, {a: 'cba'}]}", "{output: [{a: 'abc'}]}", &collator);
 }
 
 }  // namespace
