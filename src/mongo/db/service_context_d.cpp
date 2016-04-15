@@ -324,7 +324,7 @@ std::unique_ptr<OperationContext> ServiceContextMongoD::_newOpCtx(Client* client
 }
 
 void ServiceContextMongoD::setOpObserver(std::unique_ptr<OpObserver> opObserver) {
-    _opObserver.reset(opObserver.get());
+    _opObserver = std::move(opObserver);
 }
 
 OpObserver* ServiceContextMongoD::getOpObserver() {

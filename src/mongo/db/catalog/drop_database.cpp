@@ -85,7 +85,9 @@ Status dropDatabase(OperationContext* txn, const std::string& dbName) {
 
         WriteUnitOfWork wunit(txn);
 
-        getGlobalServiceContext()->getOpObserver()->onDropDatabase(txn, dbName + ".$cmd");
+        auto opObserver = getGlobalServiceContext()->getOpObserver();
+        if (opObserver)
+            opObserver->onDropDatabase(txn, dbName + ".$cmd");
 
         wunit.commit();
     }

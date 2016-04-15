@@ -360,7 +360,9 @@ Status Collection::insertDocuments(OperationContext* txn,
         return status;
     invariant(sid == txn->recoveryUnit()->getSnapshotId());
 
-    getGlobalServiceContext()->getOpObserver()->onInserts(txn, ns(), begin, end, fromMigrate);
+    auto opObserver = getGlobalServiceContext()->getOpObserver();
+    if (opObserver)
+        opObserver->onInserts(txn, ns(), begin, end, fromMigrate);
 
     txn->recoveryUnit()->onCommit([this]() { notifyCappedWaitersIfNeeded(); });
 
@@ -403,7 +405,10 @@ Status Collection::insertDocument(OperationContext* txn,
 
     vector<BSONObj> docs;
     docs.push_back(doc);
-    getGlobalServiceContext()->getOpObserver()->onInserts(txn, ns(), docs.begin(), docs.end());
+
+    auto opObserver = getGlobalServiceContext()->getOpObserver();
+    if (opObserver)
+        opObserver->onInserts(txn, ns(), docs.begin(), docs.end());
 
     txn->recoveryUnit()->onCommit([this]() { notifyCappedWaitersIfNeeded(); });
 
@@ -487,8 +492,10 @@ void Collection::deleteDocument(OperationContext* txn,
 
     Snapshotted<BSONObj> doc = docFor(txn, loc);
 
+    OpObserver::DeleteState deleteState;
     auto opObserver = getGlobalServiceContext()->getOpObserver();
-    OpObserver::DeleteState deleteState = opObserver->aboutToDelete(txn, ns(), doc.value());
+    if (opObserver)
+        deleteState = opObserver->aboutToDelete(txn, ns(), doc.value());
 
     /* check if any cursors point to us.  if so, advance them. */
     _cursorManager.invalidateDocument(txn, loc, INVALIDATION_DELETION);
@@ -497,7 +504,8 @@ void Collection::deleteDocument(OperationContext* txn,
 
     _recordStore->deleteRecord(txn, loc);
 
-    opObserver->onDelete(txn, ns(), std::move(deleteState), fromMigrate);
+    if (opObserver)
+        opObserver->onDelete(txn, ns(), std::move(deleteState), fromMigrate);
 }
 
 Counter64 moveCounter;
@@ -616,7 +624,10 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
             return StatusWith<RecordId>(s);
         invariant(sid == txn->recoveryUnit()->getSnapshotId());
         args->updatedDoc = newDoc;
-        getGlobalServiceContext()->getOpObserver()->onUpdate(txn, *args);
+
+        auto opObserver = getGlobalServiceContext()->getOpObserver();
+        if (opObserver)
+            opObserver->onUpdate(txn, *args);
 
         return newLocation;
     }
@@ -643,7 +654,10 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
 
     invariant(sid == txn->recoveryUnit()->getSnapshotId());
     args->updatedDoc = newDoc;
-    getGlobalServiceContext()->getOpObserver()->onUpdate(txn, *args);
+
+    auto opObserver = getGlobalServiceContext()->getOpObserver();
+    if (opObserver)
+        opObserver->onUpdate(txn, *args);
 
     return newLocation;
 }
@@ -691,7 +705,10 @@ StatusWith<RecordData> Collection::updateDocumentWithDamages(
 
     if (newRecStatus.isOK()) {
         args->updatedDoc = newRecStatus.getValue().toBson();
-        getGlobalServiceContext()->getOpObserver()->onUpdate(txn, *args);
+
+        auto opObserver = getGlobalServiceContext()->getOpObserver();
+        if (opObserver)
+            opObserver->onUpdate(txn, *args);
     }
     return newRecStatus;
 }

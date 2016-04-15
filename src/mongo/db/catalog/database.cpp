@@ -406,7 +406,10 @@ Status Database::dropCollection(OperationContext* txn, StringData fullns) {
         }
     }
 
-    getGlobalServiceContext()->getOpObserver()->onDropCollection(txn, nss);
+    auto opObserver = getGlobalServiceContext()->getOpObserver();
+    if (opObserver)
+        opObserver->onDropCollection(txn, nss);
+
     return Status::OK();
 }
 
@@ -529,7 +532,9 @@ Collection* Database::createCollection(OperationContext* txn,
         }
     }
 
-    getGlobalServiceContext()->getOpObserver()->onCreateCollection(txn, nss, options);
+    auto opObserver = getGlobalServiceContext()->getOpObserver();
+    if (opObserver)
+        opObserver->onCreateCollection(txn, nss, options);
 
     return collection;
 }

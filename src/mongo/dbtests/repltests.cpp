@@ -76,6 +76,8 @@ public:
         replSettings.setMaster(true);
         setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
 
+        getGlobalServiceContext()->setOpObserver(stdx::make_unique<OpObserver>());
+
         setOplogCollectionName();
         createOplog(&_txn);
 
