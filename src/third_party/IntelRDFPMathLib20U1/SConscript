@@ -271,7 +271,7 @@ def float53_object(target, source, extra_defines=None):
     obj_env.Append(CPPDEFINES=defines)
     for to_remove in ['-Werror', '-Wall', '-W']:
         removeIfPresent(obj_env['CCFLAGS'], to_remove)
-    return obj_env.Object(target, source)
+    return obj_env.LibraryObject(target, source)
 
 # Set OS Defines
 if env.TargetOSIs('osx'):

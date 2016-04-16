@@ -476,7 +476,7 @@ add_option('modules',
 
 add_option('runtime-hardening',
     choices=["on", "off"],
-    default="off",
+    default="on",
     help="Enable runtime hardening features (e.g. stack smash protection)",
     type='choice',
 )
@@ -1137,6 +1137,9 @@ if env.TargetOSIs('windows') and link_model != 'object':
 # modes operate in library mode, enabled by setting _LIBDEPS to $_LIBDEPS_LIBS.
 env['_LIBDEPS'] = '$_LIBDEPS_OBJS' if link_model == "object" else '$_LIBDEPS_LIBS'
 
+env['BUILDERS']['ProgramObject'] = env['BUILDERS']['StaticObject']
+env['BUILDERS']['LibraryObject'] = env['BUILDERS']['StaticObject']
+
 if link_model.startswith("dynamic"):
 
     # Add in the abi linking tool if the user requested and it is
@@ -1149,8 +1152,7 @@ if link_model.startswith("dynamic"):
     # Redirect the 'Library' target, which we always use instead of 'StaticLibrary' for things
     # that can be built in either mode, to point to SharedLibrary.
     env['BUILDERS']['Library'] = env['BUILDERS']['SharedLibrary']
-    # Do the same for SharedObject
-    env['BUILDERS']['Object'] = env['BUILDERS']['SharedObject']
+    env['BUILDERS']['LibraryObject'] = env['BUILDERS']['SharedObject']
 
     # TODO: Ideally, the conditions below should be based on a
     # detection of what linker we are using, not the local OS, but I
@@ -1238,6 +1240,16 @@ if get_option('build-fast-and-loose') == "on" and \
     # See http://www.scons.org/wiki/GoFastButton for details
     env.Decider('MD5-timestamp')
     env.SetOption('max_drift', 1)
+
+# On non-windows platforms, we may need to differentiate between flags being used to target an
+# executable (like -fPIE), vs those being used to target a (shared) library (like -fPIC). To do so,
+# we inject a new family of SCons variables PROG*FLAGS, by reaching into the various COMs.
+if not env.TargetOSIs('windows'):
+    env["CCCOM"] = env["CCCOM"].replace("$CFLAGS", "$CFLAGS $PROGCFLAGS")
+    env["CXXCOM"] = env["CXXCOM"].replace("$CXXFLAGS", "$CXXFLAGS $PROGCXXFLAGS")
+    env["CCCOM"] = env["CCCOM"].replace("$CCFLAGS", "$CCFLAGS $PROGCCFLAGS")
+    env["CXXCOM"] = env["CXXCOM"].replace("$CCFLAGS", "$CCFLAGS $PROGCCFLAGS")
+    env["LINKCOM"] = env["LINKCOM"].replace("$LINKFLAGS", "$LINKFLAGS $PROGLINKFLAGS")
 
 if not env.Verbose():
     env.Append( CCCOMSTR = "Compiling $TARGET" )
@@ -1447,12 +1459,20 @@ elif env.TargetOSIs('windows'):
 if env.ToolchainIs('msvc'):
     env['PDB'] = '${TARGET.base}.pdb'
 
-env['STATIC_AND_SHARED_OBJECTS_ARE_THE_SAME'] = 1
 if env.TargetOSIs('posix'):
+
+    # Everything on OS X is position independent by default. Solaris doesn't support PIE.
+    if not env.TargetOSIs('osx', 'solaris'):
+        if get_option('runtime-hardening') == "on":
+            # If runtime hardening is requested, then build anything
+            # destined for an executable with the necessary flags for PIE.
+            env.AppendUnique(
+                PROGCCFLAGS=['-fPIE'],
+                PROGLINKFLAGS=['-pie'],
+            )
 
     # -Winvalid-pch Warn if a precompiled header (see Precompiled Headers) is found in the search path but can't be used.
     env.Append( CCFLAGS=["-fno-omit-frame-pointer",
-                         "-fPIC",
                          "-fno-strict-aliasing",
                          "-ggdb",
                          "-pthread",
@@ -1466,7 +1486,7 @@ if env.TargetOSIs('posix'):
             env.Append( CCFLAGS=["-Werror"] )
 
     env.Append( CXXFLAGS=["-Wnon-virtual-dtor", "-Woverloaded-virtual"] )
-    env.Append( LINKFLAGS=["-fPIC", "-pthread"] )
+    env.Append( LINKFLAGS=["-pthread"] )
 
     # SERVER-9761: Ensure early detection of missing symbols in dependent libraries at program
     # startup.
