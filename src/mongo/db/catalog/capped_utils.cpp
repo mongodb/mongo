@@ -43,7 +43,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index_builder.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/repl/replication_coordinator_global.h"

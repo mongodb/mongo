@@ -28,6 +28,9 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
+#include "mongo/platform/basic.h"
+
+
 #include "mongo/dbtests/framework_options.h"
 
 #include <boost/filesystem/operations.hpp>

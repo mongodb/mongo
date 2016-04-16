@@ -51,13 +51,13 @@
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/client.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/op_observer.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/handshake_args.h"
@@ -1274,7 +1274,8 @@ static void replMasterThread() {
         // Write a keep-alive like entry to the log. This will make things like
         // printReplicationStatus() and printSlaveReplicationStatus() stay up-to-date even
         // when things are idle.
-        OperationContextImpl txn;
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
         AuthorizationSession::get(txn.getClient())->grantInternalAuthorization();
 
         Lock::GlobalWrite globalWrite(txn.lockState(), 1);
@@ -1299,7 +1300,8 @@ static void replSlaveThread() {
     sleepsecs(1);
     Client::initThread("replslave");
 
-    OperationContextImpl txn;
+    const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+    OperationContext& txn = *txnPtr;
     AuthorizationSession::get(txn.getClient())->grantInternalAuthorization();
     DisableDocumentValidation validationDisabler(&txn);
 
@@ -1356,7 +1358,8 @@ int _dummy_z;
 void pretouchN(vector<BSONObj>& v, unsigned a, unsigned b) {
     Client::initThreadIfNotAlready("pretouchN");
 
-    OperationContextImpl txn;  // XXX
+    const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+    OperationContext& txn = *txnPtr;  // XXX
     ScopedTransaction transaction(&txn, MODE_S);
     Lock::GlobalRead lk(txn.lockState());
 

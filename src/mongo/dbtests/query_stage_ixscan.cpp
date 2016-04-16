@@ -34,7 +34,6 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace QueryStageIxscan {
@@ -42,8 +41,7 @@ namespace QueryStageIxscan {
 class IndexScanTest {
 public:
     IndexScanTest()
-        : _txn(),
-          _scopedXact(&_txn, MODE_IX),
+        : _scopedXact(&_txn, MODE_IX),
           _dbLock(_txn.lockState(), nsToDatabaseSubstring(ns()), MODE_X),
           _ctx(&_txn, ns()),
           _coll(NULL) {}
@@ -139,7 +137,8 @@ public:
     }
 
 protected:
-    OperationContextImpl _txn;
+    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
+    OperationContext& _txn = *_txnPtr;
 
     ScopedTransaction _scopedXact;
     Lock::DBLock _dbLock;

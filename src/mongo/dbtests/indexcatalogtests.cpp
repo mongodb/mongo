@@ -16,14 +16,16 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/client.h"
 #include "mongo/db/db.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace IndexCatalogTests {
@@ -33,7 +35,8 @@ static const char* const _ns = "unittests.indexcatalog";
 class IndexIteratorTests {
 public:
     IndexIteratorTests() {
-        OperationContextImpl txn;
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
         ScopedTransaction transaction(&txn, MODE_IX);
         Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
         OldClientContext ctx(&txn, _ns);
@@ -46,7 +49,8 @@ public:
     }
 
     ~IndexIteratorTests() {
-        OperationContextImpl txn;
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
         ScopedTransaction transaction(&txn, MODE_IX);
         Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
         OldClientContext ctx(&txn, _ns);
@@ -57,7 +61,8 @@ public:
     }
 
     void run() {
-        OperationContextImpl txn;
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
         OldClientWriteContext ctx(&txn, _ns);
 
         int numFinishedIndexesStart = _catalog->numIndexesReady(&txn);
@@ -99,7 +104,8 @@ private:
 class RefreshEntry {
 public:
     RefreshEntry() {
-        OperationContextImpl txn;
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
         ScopedTransaction transaction(&txn, MODE_IX);
         Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
         OldClientContext ctx(&txn, _ns);
@@ -112,7 +118,8 @@ public:
     }
 
     ~RefreshEntry() {
-        OperationContextImpl txn;
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
         ScopedTransaction transaction(&txn, MODE_IX);
         Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
         OldClientContext ctx(&txn, _ns);
@@ -123,7 +130,8 @@ public:
     }
 
     void run() {
-        OperationContextImpl txn;
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
         OldClientWriteContext ctx(&txn, _ns);
         const std::string indexName = "x_1";
 

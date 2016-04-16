@@ -32,10 +32,10 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/client.h"
 #include "mongo/db/db.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/json.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/dbtests/dbtests.h"
 
@@ -62,7 +62,8 @@ protected:
         return _context.db()->getCollection(ns());
     }
 
-    OperationContextImpl _txn;
+    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
+    OperationContext& _txn = *_txnPtr;
     ScopedTransaction _scopedXact;
     Lock::GlobalWrite _lk;
     OldClientContext _context;

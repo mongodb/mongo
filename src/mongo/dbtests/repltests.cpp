@@ -36,11 +36,11 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/client.h"
 #include "mongo/db/db.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/json.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h"
@@ -66,7 +66,8 @@ BSONObj f(const char* s) {
 
 class Base {
 protected:
-    mutable OperationContextImpl _txn;
+    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
+    OperationContext& _txn = *_txnPtr;
     mutable DBDirectClient _client;
 
 public:

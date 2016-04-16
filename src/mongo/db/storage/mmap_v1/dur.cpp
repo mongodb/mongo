@@ -81,7 +81,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/lock_state.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/mmap_v1/aligned_builder.h"
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
@@ -716,7 +715,8 @@ static void durThread() {
 
             Timer t;
 
-            OperationContextImpl txn;
+            const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+            OperationContext& txn = *txnPtr;
             AutoAcquireFlushLockForMMAPV1Commit autoFlushLock(txn.lockState());
 
             // We need to snapshot the commitNumber after the flush lock has been obtained,
