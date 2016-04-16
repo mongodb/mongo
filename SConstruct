@@ -1573,14 +1573,14 @@ def doConfigure(myenv):
         }
         """ % compiler_minimum_string)
     elif myenv.ToolchainIs('gcc'):
-        compiler_minimum_string = "GCC 4.8.2"
+        compiler_minimum_string = "GCC 5.3.0"
         compiler_test_body = textwrap.dedent(
         """
         #if !defined(__GNUC__) || defined(__clang__)
         #error
         #endif
 
-        #if (__GNUC__ < 4) || (__GNUC__ == 4 && __GNUC_MINOR__ < 8) || (__GNUC__ == 4 && __GNUC_MINOR__ == 8 && __GNUC_PATCHLEVEL__ < 2)
+        #if (__GNUC__ < 5) || (__GNUC__ == 5 && __GNUC_MINOR__ < 3) || (__GNUC__ == 5 && __GNUC_MINOR__ == 3 && __GNUC_PATCHLEVEL__ < 0)
         #error %s or newer is required to build MongoDB
         #endif
 
@@ -1946,23 +1946,24 @@ def doConfigure(myenv):
 
     conf.Finish()
 
-    # If we are using libstdc++, check to see if we are using a libstdc++ that is older than
-    # our GCC minimum of 4.8.2. This is primarly to help people using clang on OS X but
-    # forgetting to use --libc++ (or set the target OS X version high enough to get it as the
-    # default). We would, ideally, check the __GLIBCXX__ version, but for various reasons this
-    # is not workable. Instead, we switch on the fact that _GLIBCXX_PROFILE_UNORDERED wasn't
-    # introduced until libstdc++ 4.8.2. Yes, this is a terrible hack.
+    # If we are using libstdc++, check to see if we are using a
+    # libstdc++ that is older than our GCC minimum of 5.3.0. This is
+    # primarly to help people using clang on OS X but forgetting to
+    # use --libc++ (or set the target OS X version high enough to get
+    # it as the default). We would, ideally, check the __GLIBCXX__
+    # version, but for various reasons this is not workable. Instead,
+    # we switch on the fact that the <experimental/filesystem> header
+    # wasn't introduced until libstdc++ 5.3.0. Yes, this is a terrible
+    # hack.
     if usingLibStdCxx:
         def CheckModernLibStdCxx(context):
             test_body = """
-            #define _GLIBCXX_PROFILE
-            #include <unordered_map>
-            #if !defined(_GLIBCXX_PROFILE_UNORDERED)
-            #error libstdc++ older than 4.8.2
+            #if !__has_include(<experimental/filesystem>)
+            #error "libstdc++ from GCC 5.3.0 or newer is required"
             #endif
             """
 
-            context.Message('Checking for libstdc++ 4.8.2 or better... ')
+            context.Message('Checking for libstdc++ 5.3.0 or better... ')
             ret = context.TryCompile(textwrap.dedent(test_body), ".cpp")
             context.Result(ret)
             return ret
@@ -1972,7 +1973,7 @@ def doConfigure(myenv):
         })
 
         if not conf.CheckModernLibStdCxx():
-            myenv.ConfError("When using libstdc++, MongoDB requires libstdc++ 4.8.2 or newer")
+            myenv.ConfError("When using libstdc++, MongoDB requires libstdc++ from GCC 5.3.0 or newer")
 
         conf.Finish()
 
