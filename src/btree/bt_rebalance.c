@@ -90,7 +90,7 @@ __rebalance_leaf_append(WT_SESSION_IMPL *session,
 	if (recno == WT_RECNO_OOB)
 		WT_RET(__wt_row_ikey(session, 0, key, key_len, copy));
 	else
-		copy->key.recno = recno;
+		copy->ref_recno = recno;
 
 	copy->page_del = NULL;
 	return (0);
@@ -147,8 +147,7 @@ __rebalance_internal(WT_SESSION_IMPL *session, WT_REBALANCE_STUFF *rs)
 	leaf_next = (uint32_t)rs->leaf_next;
 
 	/* Allocate a row-store root (internal) page and fill it in. */
-	WT_RET(__wt_page_alloc(session, rs->type,
-	    rs->type == WT_PAGE_COL_INT ? 1 : 0, leaf_next, false, &page));
+	WT_RET(__wt_page_alloc(session, rs->type, leaf_next, false, &page));
 	page->pg_intl_parent_ref = &btree->root;
 	WT_ERR(__wt_page_modify_init(session, page));
 	__wt_page_modify_set(session, page);

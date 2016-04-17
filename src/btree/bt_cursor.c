@@ -164,7 +164,7 @@ __cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 		 * column-store pages don't have slots, but map one-to-one to
 		 * keys, check for retrieval past the end of the page.
 		 */
-		if (cbt->recno >= page->pg_fix_recno + page->pg_fix_entries)
+		if (cbt->recno >= cbt->ref->ref_recno + page->pg_fix_entries)
 			return (false);
 
 		/*

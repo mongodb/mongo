@@ -433,7 +433,6 @@ struct __wt_page {
 		 * doesn't read it multiple times).
 		 */
 		struct {
-			uint64_t recno;		/* Starting recno */
 			WT_REF	*parent_ref;	/* Parent reference */
 
 			struct __wt_page_index {
@@ -442,8 +441,7 @@ struct __wt_page {
 				WT_REF	**index;
 			} * volatile __index;	/* Collated children */
 		} intl;
-#undef	pg_intl_recno
-#define	pg_intl_recno			u.intl.recno
+#undef	pg_intl_parent_ref
 #define	pg_intl_parent_ref		u.intl.parent_ref
 
 	/*
@@ -509,13 +507,9 @@ struct __wt_page {
 
 		/* Fixed-length column-store leaf page. */
 		struct {
-			uint64_t recno;		/* Starting recno */
-
 			uint8_t	*bitf;		/* Values */
 			uint32_t entries;	/* Entries */
 		} col_fix;
-#undef	pg_fix_recno
-#define	pg_fix_recno	u.col_fix.recno
 #undef	pg_fix_bitf
 #define	pg_fix_bitf	u.col_fix.bitf
 #undef	pg_fix_entries
@@ -523,8 +517,6 @@ struct __wt_page {
 
 		/* Variable-length column-store leaf page. */
 		struct {
-			uint64_t recno;		/* Starting recno */
-
 			WT_COL *d;		/* Values */
 
 			/*
@@ -537,8 +529,6 @@ struct __wt_page {
 
 			uint32_t    entries;	/* Entries */
 		} col_var;
-#undef	pg_var_recno
-#define	pg_var_recno	u.col_var.recno
 #undef	pg_var_d
 #define	pg_var_d	u.col_var.d
 #undef	pg_var_repeats
@@ -732,6 +722,10 @@ struct __wt_ref {
 		uint64_t recno;		/* Column-store: starting recno */
 		void	*ikey;		/* Row-store: key */
 	} key;
+#undef	ref_recno
+#define	ref_recno	key.recno
+#undef	ref_ikey
+#define	ref_ikey	key.ikey
 
 	WT_PAGE_DELETED	*page_del;	/* Deleted on-disk page information */
 };

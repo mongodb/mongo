@@ -55,7 +55,8 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		 */
 		if (recno == WT_RECNO_OOB ||
 		    recno > (btree->type == BTREE_COL_VAR ?
-		    __col_var_last_recno(page) : __col_fix_last_recno(page)))
+		    __col_var_last_recno(cbt->ref) :
+		    __col_fix_last_recno(cbt->ref)))
 			append = true;
 	}
 
