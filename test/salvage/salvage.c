@@ -159,7 +159,7 @@ int
 usage(void)
 {
 	(void)fprintf(stderr,
-	    "usage: %s [-v] [-r run] [-t fix|rle|var|row]\n", progname);
+	    "usage: %s [-v] [-r run] [-t fix|var|row]\n", progname);
 	return (EXIT_FAILURE);
 }
 
