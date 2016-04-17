@@ -304,13 +304,13 @@ __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 		case WT_PAGE_COL_VAR:
 			WT_WITH_PAGE_INDEX(session,
 			    ret = __slvg_col_build_internal(
-			    session, leaf_cnt, ss));
+				session, leaf_cnt, ss));
 			WT_ERR(ret);
 			break;
 		case WT_PAGE_ROW_LEAF:
 			WT_WITH_PAGE_INDEX(session,
 			    ret = __slvg_row_build_internal(
-			    session, leaf_cnt, ss));
+			        session, leaf_cnt, ss));
 			WT_ERR(ret);
 			break;
 		}
