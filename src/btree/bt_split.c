@@ -1520,7 +1520,7 @@ __split_multi_inmem(
 			/* Build a key. */
 			if (supd->ins == NULL) {
 				slot = WT_ROW_SLOT(orig, supd->rip);
-				upd = orig->pg_row_upd[slot];
+				upd = orig->modify->mod_row_update[slot];
 
 				WT_ERR(__wt_row_leaf_key(
 				    session, orig, supd->rip, key, false));
@@ -1583,7 +1583,7 @@ __split_multi_inmem_final(WT_PAGE *orig, WT_MULTI *multi)
 		case WT_PAGE_ROW_LEAF:
 			if (supd->ins == NULL) {
 				slot = WT_ROW_SLOT(orig, supd->rip);
-				orig->pg_row_upd[slot] = NULL;
+				orig->modify->mod_row_update[slot] = NULL;
 			} else
 				supd->ins->upd = NULL;
 			break;
@@ -1783,8 +1783,10 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	__wt_page_modify_set(session, right);
 
 	if (type == WT_PAGE_ROW_LEAF) {
-		WT_ERR(__wt_calloc_one(session, &right->pg_row_ins));
-		WT_ERR(__wt_calloc_one(session, &right->pg_row_ins[0]));
+		WT_ERR(__wt_calloc_one(
+		    session, &right->modify->mod_row_insert));
+		WT_ERR(__wt_calloc_one(
+		    session, &right->modify->mod_row_insert[0]));
 	} else {
 		WT_ERR(__wt_calloc_one(
 		    session, &right->modify->mod_col_append));
@@ -1840,7 +1842,7 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * can be ignored.)
 	 */
 	tmp_ins_head = type == WT_PAGE_ROW_LEAF ?
-	    right->pg_row_ins[0] : right->modify->mod_col_append[0];
+	    right->modify->mod_row_insert[0] : right->modify->mod_col_append[0];
 	tmp_ins_head->head[0] = tmp_ins_head->tail[0] = moved_ins;
 
 	/*
@@ -1975,8 +1977,8 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * lists have.
 	 */
 	if (type == WT_PAGE_ROW_LEAF)
-		right->pg_row_ins[0]->head[0] =
-		    right->pg_row_ins[0]->tail[0] = NULL;
+		right->modify->mod_row_insert[0]->head[0] =
+		    right->modify->mod_row_insert[0]->tail[0] = NULL;
 	else
 		right->modify->mod_col_append[0]->head[0] =
 		    right->modify->mod_col_append[0]->tail[0] = NULL;

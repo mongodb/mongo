@@ -3431,7 +3431,7 @@ __rec_update_las(WT_SESSION_IMPL *session,
 		case WT_PAGE_ROW_LEAF:
 			if (list->ins == NULL) {
 				slot = WT_ROW_SLOT(page, list->rip);
-				upd = page->pg_row_upd[slot];
+				upd = page->modify->mod_row_update[slot];
 			} else
 				upd = list->ins->upd;
 			break;

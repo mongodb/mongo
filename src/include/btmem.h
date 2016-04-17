@@ -355,6 +355,17 @@ struct __wt_page_modify {
 #define	mod_col_update		u2.column_leaf.update
 #undef	mod_col_split_recno
 #define	mod_col_split_recno	u2.column_leaf.split_recno
+	struct {
+		/* Inserted items for row-store. */
+		WT_INSERT_HEAD	**insert;
+
+		/* Updated items for row-stores. */
+		WT_UPDATE	**update;
+	} row_leaf;
+#undef	mod_row_insert
+#define	mod_row_insert		u2.row_leaf.insert
+#undef	mod_row_update
+#define	mod_row_update		u2.row_leaf.update
 	} u2;
 
 	/*
@@ -487,28 +498,11 @@ struct __wt_page {
 
 		/* Row-store leaf page. */
 		struct {
-			/*
-			 * The column-store leaf page modification structures
-			 * live in the WT_PAGE_MODIFY structure to keep the
-			 * WT_PAGE structure as small as possible for read-only
-			 * pages.  For consistency, we could move the row-store
-			 * modification structures into WT_PAGE_MODIFY too, but
-			 * that doesn't shrink WT_PAGE any further and it would
-			 * require really ugly naming inside of WT_PAGE_MODIFY
-			 * to avoid growing that structure.
-			 */
-			WT_INSERT_HEAD	**ins;	/* Inserts */
-			WT_UPDATE	**upd;	/* Updates */
-
 			WT_ROW *d;		/* Key/value pairs */
 			uint32_t entries;	/* Entries */
 		} row;
 #undef	pg_row_d
 #define	pg_row_d	u.row.d
-#undef	pg_row_ins
-#define	pg_row_ins	u.row.ins
-#undef	pg_row_upd
-#define	pg_row_upd	u.row.upd
 #undef	pg_row_entries
 #define	pg_row_entries	u.row.entries
 
@@ -1008,12 +1002,15 @@ struct __wt_insert_head {
  * of pointers and the specific structure exist, else NULL.
  */
 #define	WT_ROW_INSERT_SLOT(page, slot)					\
-	((page)->pg_row_ins == NULL ? NULL : (page)->pg_row_ins[slot])
+	((page)->modify == NULL ||					\
+	    (page)->modify->mod_row_insert == NULL ?			\
+	    NULL : (page)->modify->mod_row_insert[slot])
 #define	WT_ROW_INSERT(page, ip)						\
 	WT_ROW_INSERT_SLOT(page, WT_ROW_SLOT(page, ip))
 #define	WT_ROW_UPDATE(page, ip)						\
-	((page)->pg_row_upd == NULL ?					\
-	    NULL : (page)->pg_row_upd[WT_ROW_SLOT(page, ip)])
+	((page)->modify == NULL ||					\
+	    (page)->modify->mod_row_update == NULL ?			\
+	    NULL : (page)->modify->mod_row_update[WT_ROW_SLOT(page, ip)])
 /*
  * WT_ROW_INSERT_SMALLEST references an additional slot past the end of the
  * the "one per WT_ROW slot" insert array.  That's because the insert array
@@ -1021,8 +1018,9 @@ struct __wt_insert_head {
  * original page.
  */
 #define	WT_ROW_INSERT_SMALLEST(page)					\
-	((page)->pg_row_ins == NULL ?					\
-	    NULL : (page)->pg_row_ins[(page)->pg_row_entries])
+	((page)->modify == NULL ||					\
+	    (page)->modify->mod_row_insert == NULL ?			\
+	    NULL : (page)->modify->mod_row_insert[(page)->pg_row_entries])
 
 /*
  * The column-store leaf page update lists are arrays of pointers to structures,
@@ -1048,9 +1046,9 @@ struct __wt_insert_head {
  * appends.
  */
 #define	WT_COL_APPEND(page)						\
-	((page)->modify != NULL &&					\
-	    (page)->modify->mod_col_append != NULL ?			\
-	    (page)->modify->mod_col_append[0] : NULL)
+	((page)->modify == NULL ||					\
+	    (page)->modify->mod_col_append == NULL ?			\
+	    NULL : (page)->modify->mod_col_append[0])
 
 /* WT_FIX_FOREACH walks fixed-length bit-fields on a disk page. */
 #define	WT_FIX_FOREACH(btree, dsk, v, i)				\
