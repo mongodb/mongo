@@ -116,8 +116,8 @@ struct __wt_track {
 static int  __slvg_cleanup(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_col_build_internal(WT_SESSION_IMPL *, uint32_t, WT_STUFF *);
 static int  __slvg_col_build_leaf(WT_SESSION_IMPL *, WT_TRACK *, WT_REF *);
-static int  __slvg_col_ovfl(
-		WT_SESSION_IMPL *, WT_TRACK *, WT_REF *, uint64_t, uint64_t);
+static int  __slvg_col_ovfl(WT_SESSION_IMPL *,
+		WT_TRACK *, WT_PAGE *, uint64_t, uint64_t, uint64_t);
 static int  __slvg_col_range(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_col_range_missing(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_col_range_overlap(
@@ -310,7 +310,7 @@ __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 		case WT_PAGE_ROW_LEAF:
 			WT_WITH_PAGE_INDEX(session,
 			    ret = __slvg_row_build_internal(
-			        session, leaf_cnt, ss));
+				session, leaf_cnt, ss));
 			WT_ERR(ret);
 			break;
 		}
@@ -1235,7 +1235,7 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_SALVAGE_COOKIE *cookie, _cookie;
-	uint64_t skip, take;
+	uint64_t recno, skip, take;
 	uint32_t *entriesp, save_entries;
 
 	cookie = &_cookie;
@@ -1255,7 +1255,8 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
 	 * Calculate the number of K/V entries we are going to skip, and
 	 * the total number of K/V entries we'll take from this page.
 	 */
-	cookie->skip = skip = trk->col_start - ref->ref_recno;
+	recno = page->dsk->recno;
+	cookie->skip = skip = trk->col_start - recno;
 	cookie->take = take = (trk->col_stop - trk->col_start) + 1;
 
 	WT_ERR(__wt_verbose(session, WT_VERB_SALVAGE,
@@ -1267,7 +1268,7 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
 
 	/* Set the referenced flag on overflow pages we're using. */
 	if (page->type == WT_PAGE_COL_VAR && trk->trk_ovfl_cnt != 0)
-		WT_ERR(__slvg_col_ovfl(session, trk, ref, skip, take));
+		WT_ERR(__slvg_col_ovfl(session, trk, page, recno, skip, take));
 
 	/*
 	 * If we're missing some part of the range, the real start range is in
@@ -1349,23 +1350,20 @@ __slvg_col_ovfl_single(
  *	Mark overflow items referenced by the merged page.
  */
 static int
-__slvg_col_ovfl(WT_SESSION_IMPL *session,
-    WT_TRACK *trk, WT_REF *ref, uint64_t skip, uint64_t take)
+__slvg_col_ovfl(WT_SESSION_IMPL *session, WT_TRACK *trk,
+    WT_PAGE *page, uint64_t recno,  uint64_t skip, uint64_t take)
 {
 	WT_CELL_UNPACK unpack;
 	WT_CELL *cell;
 	WT_COL *cip;
 	WT_DECL_RET;
-	WT_PAGE *page;
-	uint64_t recno, start, stop;
+	uint64_t start, stop;
 	uint32_t i;
 
 	/*
 	 * Merging a variable-length column-store page, and we took some number
 	 * of records, figure out which (if any) overflow records we used.
 	 */
-	recno = ref->ref_recno;
-	page = ref->page;
 	start = recno + skip;
 	stop = (recno + skip + take) - 1;
 
