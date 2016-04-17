@@ -1786,8 +1786,10 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 		WT_ERR(__wt_calloc_one(session, &right->pg_row_ins));
 		WT_ERR(__wt_calloc_one(session, &right->pg_row_ins[0]));
 	} else {
-		WT_ERR(__wt_calloc_one(session, &right->modify->mod_append));
-		WT_ERR(__wt_calloc_one(session, &right->modify->mod_append[0]));
+		WT_ERR(__wt_calloc_one(
+		    session, &right->modify->mod_col_append));
+		WT_ERR(__wt_calloc_one(
+		    session, &right->modify->mod_col_append[0]));
 	}
 	right_incr += sizeof(WT_INSERT_HEAD);
 	right_incr += sizeof(WT_INSERT_HEAD *);
@@ -1813,8 +1815,8 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 */
 	if (type != WT_PAGE_ROW_LEAF) {
 		WT_ASSERT(session,
-		    page->modify->mod_split_recno == WT_RECNO_OOB);
-		page->modify->mod_split_recno = child->ref_recno;
+		    page->modify->mod_col_split_recno == WT_RECNO_OOB);
+		page->modify->mod_col_split_recno = child->ref_recno;
 	}
 
 	/*
@@ -1838,7 +1840,7 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * can be ignored.)
 	 */
 	tmp_ins_head = type == WT_PAGE_ROW_LEAF ?
-	    right->pg_row_ins[0] : right->modify->mod_append[0];
+	    right->pg_row_ins[0] : right->modify->mod_col_append[0];
 	tmp_ins_head->head[0] = tmp_ins_head->tail[0] = moved_ins;
 
 	/*
@@ -1960,7 +1962,7 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * Reset the split column-store page record.
 	 */
 	if (type != WT_PAGE_ROW_LEAF)
-		page->modify->mod_split_recno = WT_RECNO_OOB;
+		page->modify->mod_col_split_recno = WT_RECNO_OOB;
 
 	/*
 	 * Clear the allocated page's reference to the moved insert list element
@@ -1976,8 +1978,8 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 		right->pg_row_ins[0]->head[0] =
 		    right->pg_row_ins[0]->tail[0] = NULL;
 	else
-		right->modify->mod_append[0]->head[0] =
-		    right->modify->mod_append[0]->tail[0] = NULL;
+		right->modify->mod_col_append[0]->head[0] =
+		    right->modify->mod_col_append[0]->tail[0] = NULL;
 
 	ins_head->tail[0]->next[0] = moved_ins;
 	ins_head->tail[0] = moved_ins;

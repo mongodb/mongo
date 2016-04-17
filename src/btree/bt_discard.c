@@ -194,12 +194,12 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 			__free_skip_list(
 			    session, WT_SKIP_FIRST(append), update_ignore);
 			__wt_free(session, append);
-			__wt_free(session, mod->mod_append);
+			__wt_free(session, mod->mod_col_append);
 		}
 
 		/* Free the insert/update array. */
-		if (mod->mod_update != NULL)
-			__free_skip_array(session, mod->mod_update,
+		if (mod->mod_col_update != NULL)
+			__free_skip_array(session, mod->mod_col_update,
 			    page->type ==
 			    WT_PAGE_COL_FIX ? 1 : page->pg_var_entries,
 			    update_ignore);

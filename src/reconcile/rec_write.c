@@ -4006,7 +4006,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
 			 * the last key on this page, we have to decrement it.
 			 */
 			if ((recno =
-			    page->modify->mod_split_recno) == WT_RECNO_OOB)
+			    page->modify->mod_col_split_recno) == WT_RECNO_OOB)
 				break;
 			recno -= 1;
 
@@ -4569,7 +4569,8 @@ compare:		/*
 			 * first key on the split page, that is, one larger than
 			 * the last key on this page, we have to decrement it.
 			 */
-			if ((n = page->modify->mod_split_recno) == WT_RECNO_OOB)
+			if ((n = page->
+			    modify->mod_col_split_recno) == WT_RECNO_OOB)
 				break;
 			WT_ASSERT(session, n >= src_recno);
 			n -= 1;

@@ -251,6 +251,7 @@ struct __wt_page_modify {
 	 */
 	union {
 	WT_ADDR	 replace;		/* Single, written replacement block */
+#undef	mod_replace
 #define	mod_replace	u1.replace
 
 	struct {			/* Multiple replacement blocks */
@@ -295,7 +296,9 @@ struct __wt_page_modify {
 	} *multi;
 	uint32_t multi_entries;		/* Multiple blocks element count */
 	} m;
+#undef	mod_multi
 #define	mod_multi		u1.m.multi
+#undef	mod_multi_entries
 #define	mod_multi_entries	u1.m.multi_entries
 	} u1;
 
@@ -318,6 +321,7 @@ struct __wt_page_modify {
 		 */
 		WT_PAGE *root_split;	/* Linked list of root split pages */
 	} intl;
+#undef	mod_root_split
 #define	mod_root_split		u2.intl.root_split
 	struct {
 		/*
@@ -344,10 +348,13 @@ struct __wt_page_modify {
 		 * write any implicitly created deleted records for the page.
 		 */
 		uint64_t split_recno;
-	} leaf;
-#define	mod_append		u2.leaf.append
-#define	mod_update		u2.leaf.update
-#define	mod_split_recno		u2.leaf.split_recno
+	} column_leaf;
+#undef	mod_col_append
+#define	mod_col_append		u2.column_leaf.append
+#undef	mod_col_update
+#define	mod_col_update		u2.column_leaf.update
+#undef	mod_col_split_recno
+#define	mod_col_split_recno	u2.column_leaf.split_recno
 	} u2;
 
 	/*
@@ -1023,8 +1030,9 @@ struct __wt_insert_head {
  * of pointers and the specific structure exist, else NULL.
  */
 #define	WT_COL_UPDATE_SLOT(page, slot)					\
-	((page)->modify == NULL || (page)->modify->mod_update == NULL ?	\
-	    NULL : (page)->modify->mod_update[slot])
+	((page)->modify == NULL ||					\
+	    (page)->modify->mod_col_update == NULL ?			\
+	    NULL : (page)->modify->mod_col_update[slot])
 #define	WT_COL_UPDATE(page, ip)						\
 	WT_COL_UPDATE_SLOT(page, WT_COL_SLOT(page, ip))
 
@@ -1040,8 +1048,9 @@ struct __wt_insert_head {
  * appends.
  */
 #define	WT_COL_APPEND(page)						\
-	((page)->modify != NULL && (page)->modify->mod_append != NULL ?	\
-	    (page)->modify->mod_append[0] : NULL)
+	((page)->modify != NULL &&					\
+	    (page)->modify->mod_col_append != NULL ?			\
+	    (page)->modify->mod_col_append[0] : NULL)
 
 /* WT_FIX_FOREACH walks fixed-length bit-fields on a disk page. */
 #define	WT_FIX_FOREACH(btree, dsk, v, i)				\
