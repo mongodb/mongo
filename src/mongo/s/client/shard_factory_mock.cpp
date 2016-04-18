@@ -47,7 +47,7 @@ std::unique_ptr<Shard> ShardFactoryMock::createUniqueShard(const ShardId& shardI
 std::shared_ptr<Shard> ShardFactoryMock::createShard(const ShardId& shardId,
                                                      const ConnectionString& connStr,
                                                      bool isLocal) {
-    return std::make_shared<Shard>(shardId, connStr, std::move(_targeterFactory.create(connStr)));
+    return std::make_shared<Shard>(shardId, connStr, _targeterFactory.create(connStr));
 }
 
 void ShardFactoryMock::addTargeterToReturn(
