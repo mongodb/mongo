@@ -130,9 +130,11 @@
     // Wait for member state to become PRIMARY.
     assert.soon(
         function() {
-            result = assert.commandWorked(
-                mongod.getDB('admin').runCommand({replSetGetStatus: 1}),
-                'failed to get replica set status after restarting server with --replSet option');
+            result = mongod.getDB('admin').runCommand({replSetGetStatus: 1});
+            if (result.ok !== 1) {
+                // Command might fail if we are still loading the config for replset.
+                return false;
+            }
             assert.eq(
                 1, result.members.length, 'replica set status should contain exactly 1 member');
             var member = result.members[0];
