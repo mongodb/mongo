@@ -112,6 +112,7 @@ selector:
     # Expects same secondaries for entire test
     - jstests/sharding/commands_that_write_accept_wc_configRS.js
     - jstests/sharding/commands_that_write_accept_wc_shards.js
+    - jstests/sharding/move_chunk_wc.js
 executor:
   js_test:
     config:
