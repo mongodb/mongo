@@ -739,7 +739,11 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadat
     }
 
     executor::RemoteCommandRequest request(
-        host.getValue(), dbName, cmdObj, metadata, kConfigCommandTimeout);
+        host.getValue(),
+        dbName,
+        cmdObj,
+        metadata,
+        shard->isConfig() ? kConfigCommandTimeout : executor::RemoteCommandRequest::kNoTimeout);
     StatusWith<executor::RemoteCommandResponse> responseStatus =
         Status(ErrorCodes::InternalError, "Internal error running command");
 
