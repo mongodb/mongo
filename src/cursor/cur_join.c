@@ -751,6 +751,7 @@ __curjoin_next(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 	bool skip_left;
 	u_int i;
+	const uint8_t *p;
 
 	cjoin = (WT_CURSOR_JOIN *)cursor;
 
@@ -799,7 +800,14 @@ nextkey:
 		 * retrieve values from the cursor join.
 		 */
 		c = iter->main;
-		c->set_key(c, iter->curkey);
+		if (WT_CURSOR_RECNO(cursor) &&
+		    !F_ISSET(cursor, WT_CURSTD_RAW)) {
+			p = (const uint8_t *)iter->curkey->data;
+			WT_ERR(__wt_vunpack_uint(&p, iter->curkey->size,
+			    &cjoin->iface.recno));
+			c->set_key(c, cjoin->iface.recno);
+		} else
+			c->set_key(c, iter->curkey);
 		if ((ret = c->search(c)) != 0)
 			WT_ERR(c->search(c));
 		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
