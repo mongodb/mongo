@@ -1041,7 +1041,7 @@ row_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 		break;
 	case WT_CACHE_FULL:
 	case WT_ROLLBACK:
-		return (ret);
+		return (WT_ROLLBACK);
 	default:
 		testutil_die(ret,
 		    "row_update: update row %" PRIu64 " by key", keyno);
@@ -1092,7 +1092,7 @@ col_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 		break;
 	case WT_CACHE_FULL:
 	case WT_ROLLBACK:
-		return (ret);
+		return (WT_ROLLBACK);
 	default:
 		testutil_die(ret, "col_update: %" PRIu64, keyno);
 	}
@@ -1235,7 +1235,7 @@ row_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 		break;
 	case WT_CACHE_FULL:
 	case WT_ROLLBACK:
-		return (ret);
+		return (WT_ROLLBACK);
 	default:
 		testutil_die(ret,
 		    "row_insert: insert row %" PRIu64 " by key", keyno);
@@ -1272,7 +1272,7 @@ col_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
 		break;
 	case WT_CACHE_FULL:
 	case WT_ROLLBACK:
-		return (ret);
+		return (WT_ROLLBACK);
 	default:
 		testutil_die(ret, "cursor.insert");
 	}
