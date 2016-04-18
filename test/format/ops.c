@@ -184,6 +184,7 @@ wts_ops(int lastrun)
 		(void)pthread_join(compact_tid, NULL);
 	if (!SINGLETHREADED && g.c_long_running_txn)
 		(void)pthread_join(lrt_tid, NULL);
+	g.workers_finished = 0;
 
 	if (g.logging != 0) {
 		(void)g.wt_api->msg_printf(g.wt_api, session,
