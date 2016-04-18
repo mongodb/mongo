@@ -66,7 +66,7 @@
 // yet. Among other things, using compile-time detection leads to poor
 // results when compiling on a system with MADV_FREE and running on a
 // system without it. See https://github.com/gperftools/gperftools/issues/780.
-#if defined(__linux__) && defined(MADV_FREE)
+#if defined(__linux__) && defined(MADV_FREE) && !defined(TCMALLOC_USE_MADV_FREE)
 # undef MADV_FREE
 #endif
 
