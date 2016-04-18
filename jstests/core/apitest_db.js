@@ -130,22 +130,26 @@ dd("e");
  *  profile level
  */
 
-db.setProfilingLevel(0);
-assert(db.getProfilingLevel() == 0, "prof level 0");
+// A test-specific database is used for profiler testing so as not to interfere with other tests
+// that modify profiler level, when run in parallel.
+var profileLevelDB = db.getSiblingDB("apitest_db_profile_level");
 
-db.setProfilingLevel(1);
-assert(db.getProfilingLevel() == 1, "p1");
+profileLevelDB.setProfilingLevel(0);
+assert(profileLevelDB.getProfilingLevel() == 0, "prof level 0");
 
-db.setProfilingLevel(2);
-assert(db.getProfilingLevel() == 2, "p2");
+profileLevelDB.setProfilingLevel(1);
+assert(profileLevelDB.getProfilingLevel() == 1, "p1");
 
-db.setProfilingLevel(0);
-assert(db.getProfilingLevel() == 0, "prof level 0");
+profileLevelDB.setProfilingLevel(2);
+assert(profileLevelDB.getProfilingLevel() == 2, "p2");
+
+profileLevelDB.setProfilingLevel(0);
+assert(profileLevelDB.getProfilingLevel() == 0, "prof level 0");
 
 dd("f");
 asserted = false;
 try {
-    db.setProfilingLevel(10);
+    profileLevelDB.setProfilingLevel(10);
     assert(false);
 } catch (e) {
     asserted = true;

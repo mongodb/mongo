@@ -1,5 +1,7 @@
 // Test various cursor behaviors
-var t = db.geo_s2getmmm;
+
+var testDB = db.getSiblingDB("geo_s2cursorlimitskip");
+var t = testDB.geo_s2getmmm;
 t.drop();
 t.ensureIndex({geo: "2dsphere"});
 
@@ -42,9 +44,9 @@ assert.eq(cursor.count(), totalPointCount);
 // Disable profiling in order to drop the system.profile collection.
 // Then enable profiling for all operations. This is acceptable because
 // our test is blacklisted from the parallel suite.
-db.setProfilingLevel(0);
-db.system.profile.drop();
-db.setProfilingLevel(2);
+testDB.setProfilingLevel(0);
+testDB.system.profile.drop();
+testDB.setProfilingLevel(2);
 
 for (var j = 0; j < initialAdvance; j++) {
     assert(cursor.hasNext());
@@ -54,8 +56,8 @@ for (var j = 0; j < initialAdvance; j++) {
 assert(cursor.hasNext());
 
 // Cursor was advanced 10 times, batchSize=4 => 1 query + 2 getmore.
-assert.eq(1, db.system.profile.count({op: "query", ns: t.getFullName()}));
-assert.eq(2, db.system.profile.count({op: "getmore", ns: t.getFullName()}));
+assert.eq(1, testDB.system.profile.count({op: "query", ns: t.getFullName()}));
+assert.eq(2, testDB.system.profile.count({op: "getmore", ns: t.getFullName()}));
 
 for (var k = initialAdvance; k < totalPointCount; k++) {
     assert(cursor.hasNext());
@@ -63,12 +65,12 @@ for (var k = initialAdvance; k < totalPointCount; k++) {
 }
 
 // Cursor was advanced 200 times, batchSize=4 => 1 query + 49 getmore.
-assert.eq(1, db.system.profile.count({op: "query", ns: t.getFullName()}));
-assert.eq(49, db.system.profile.count({op: "getmore", ns: t.getFullName()}));
+assert.eq(1, testDB.system.profile.count({op: "query", ns: t.getFullName()}));
+assert.eq(49, testDB.system.profile.count({op: "getmore", ns: t.getFullName()}));
 
 // Disable profiling again - no longer needed for remainder of test
-db.setProfilingLevel(0);
-db.system.profile.drop();
+testDB.setProfilingLevel(0);
+testDB.system.profile.drop();
 
 // Shouldn't be any more points to look at now.
 assert(!cursor.hasNext());
