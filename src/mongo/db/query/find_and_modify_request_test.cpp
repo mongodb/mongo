@@ -151,6 +151,25 @@ TEST(FindAndModifyRequest, UpdateWithSort) {
     ASSERT_EQUALS(expectedObj, request.toBSON());
 }
 
+TEST(FindAndModifyRequest, UpdateWithCollation) {
+    const BSONObj query(BSON("x" << 1));
+    const BSONObj update(BSON("y" << 1));
+    const BSONObj collation(BSON("locale"
+                                 << "en_US"));
+
+    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
+    request.setCollation(collation);
+
+    BSONObj expectedObj(fromjson(R"json({
+            findAndModify: 'user',
+            query: { x: 1 },
+            update: { y: 1 },
+            collation: { locale: 'en_US' }
+        })json"));
+
+    ASSERT_EQUALS(expectedObj, request.toBSON());
+}
+
 TEST(FindAndModifyRequest, UpdateWithWriteConcern) {
     const BSONObj query(BSON("x" << 1));
     const BSONObj update(BSON("y" << 1));
@@ -173,6 +192,8 @@ TEST(FindAndModifyRequest, UpdateWithFullSpec) {
     const BSONObj query(BSON("x" << 1));
     const BSONObj update(BSON("y" << 1));
     const BSONObj sort(BSON("z" << -1));
+    const BSONObj collation(BSON("locale"
+                                 << "en_US"));
     const BSONObj field(BSON("x" << 1 << "y" << 1));
     const WriteConcernOptions writeConcern(2, WriteConcernOptions::SyncMode::FSYNC, 150);
 
@@ -180,6 +201,7 @@ TEST(FindAndModifyRequest, UpdateWithFullSpec) {
     request.setFieldProjection(field);
     request.setShouldReturnNew(true);
     request.setSort(sort);
+    request.setCollation(collation);
     request.setWriteConcern(writeConcern);
     request.setUpsert(true);
 
@@ -190,6 +212,7 @@ TEST(FindAndModifyRequest, UpdateWithFullSpec) {
             upsert: true,
             fields: { x: 1, y: 1 },
             sort: { z: -1 },
+            collation: { locale: 'en_US' },
             new: true,
             writeConcern: { w: 2, fsync: true, wtimeout: 150 }
         })json"));
@@ -244,6 +267,24 @@ TEST(FindAndModifyRequest, RemoveWithSort) {
     ASSERT_EQUALS(expectedObj, request.toBSON());
 }
 
+TEST(FindAndModifyRequest, RemoveWithCollation) {
+    const BSONObj query(BSON("x" << 1));
+    const BSONObj collation(BSON("locale"
+                                 << "en_US"));
+
+    auto request = FindAndModifyRequest::makeRemove(NamespaceString("test.user"), query);
+    request.setCollation(collation);
+
+    BSONObj expectedObj(fromjson(R"json({
+            findAndModify: 'user',
+            query: { x: 1 },
+            remove: true,
+            collation: { locale: 'en_US' }
+        })json"));
+
+    ASSERT_EQUALS(expectedObj, request.toBSON());
+}
+
 TEST(FindAndModifyRequest, RemoveWithWriteConcern) {
     const BSONObj query(BSON("x" << 1));
     const WriteConcernOptions writeConcern(2, WriteConcernOptions::SyncMode::FSYNC, 150);
@@ -264,12 +305,15 @@ TEST(FindAndModifyRequest, RemoveWithWriteConcern) {
 TEST(FindAndModifyRequest, RemoveWithFullSpec) {
     const BSONObj query(BSON("x" << 1));
     const BSONObj sort(BSON("z" << -1));
+    const BSONObj collation(BSON("locale"
+                                 << "en_US"));
     const BSONObj field(BSON("x" << 1 << "y" << 1));
     const WriteConcernOptions writeConcern(2, WriteConcernOptions::SyncMode::FSYNC, 150);
 
     auto request = FindAndModifyRequest::makeRemove(NamespaceString("test.user"), query);
     request.setFieldProjection(field);
     request.setSort(sort);
+    request.setCollation(collation);
     request.setWriteConcern(writeConcern);
 
     BSONObj expectedObj(fromjson(R"json({
@@ -278,6 +322,7 @@ TEST(FindAndModifyRequest, RemoveWithFullSpec) {
             remove: true,
             fields: { x: 1, y: 1 },
             sort: { z: -1 },
+            collation: { locale: 'en_US' },
             writeConcern: { w: 2, fsync: true, wtimeout: 150 }
         })json"));
 
@@ -301,6 +346,7 @@ TEST(FindAndModifyRequest, ParseWithUpdateOnlyRequiredFields) {
     ASSERT_EQUALS(false, request.isRemove());
     ASSERT_EQUALS(BSONObj(), request.getFields());
     ASSERT_EQUALS(BSONObj(), request.getSort());
+    ASSERT_EQUALS(BSONObj(), request.getCollation());
     ASSERT_EQUALS(false, request.shouldReturnNew());
 }
 
@@ -311,6 +357,7 @@ TEST(FindAndModifyRequest, ParseWithUpdateFullSpec) {
             upsert: true,
             fields: { x: 1, y: 1 },
             sort: { z: -1 },
+            collation: {locale: 'en_US' },
             new: true
         })json"));
 
@@ -325,6 +372,9 @@ TEST(FindAndModifyRequest, ParseWithUpdateFullSpec) {
     ASSERT_EQUALS(false, request.isRemove());
     ASSERT_EQUALS(BSON("x" << 1 << "y" << 1), request.getFields());
     ASSERT_EQUALS(BSON("z" << -1), request.getSort());
+    ASSERT_EQUALS(BSON("locale"
+                       << "en_US"),
+                  request.getCollation());
     ASSERT_EQUALS(true, request.shouldReturnNew());
 }
 
@@ -345,6 +395,7 @@ TEST(FindAndModifyRequest, ParseWithRemoveOnlyRequiredFields) {
     ASSERT_EQUALS(true, request.isRemove());
     ASSERT_EQUALS(BSONObj(), request.getFields());
     ASSERT_EQUALS(BSONObj(), request.getSort());
+    ASSERT_EQUALS(BSONObj(), request.getCollation());
     ASSERT_EQUALS(false, request.shouldReturnNew());
 }
 
@@ -354,6 +405,7 @@ TEST(FindAndModifyRequest, ParseWithRemoveFullSpec) {
             remove: true,
             fields: { x: 1, y: 1 },
             sort: { z: -1 },
+            collation: { locale: 'en_US' },
             new: false
         })json"));
 
@@ -368,6 +420,9 @@ TEST(FindAndModifyRequest, ParseWithRemoveFullSpec) {
     ASSERT_EQUALS(true, request.isRemove());
     ASSERT_EQUALS(BSON("x" << 1 << "y" << 1), request.getFields());
     ASSERT_EQUALS(BSON("z" << -1), request.getSort());
+    ASSERT_EQUALS(BSON("locale"
+                       << "en_US"),
+                  request.getCollation());
     ASSERT_EQUALS(false, request.shouldReturnNew());
 }
 
@@ -415,6 +470,17 @@ TEST(FindAndModifyRequest, ParseWithRemoveAndReturnNew) {
 
     auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
     ASSERT_NOT_OK(parseStatus.getStatus());
+}
+
+TEST(FindAndModifyRequest, ParseWithCollationTypeMismatch) {
+    BSONObj cmdObj(fromjson(R"json({
+            query: { x: 1 },
+            update: { y: 1 },
+            collation: 'en_US'
+        })json"));
+
+    auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
+    ASSERT_EQUALS(parseStatus.getStatus(), ErrorCodes::TypeMismatch);
 }
 
 }  // unnamed namespace

@@ -32,6 +32,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/write_concern.h"
 
 namespace mongo {
@@ -40,6 +41,7 @@ namespace {
 const char kCmdName[] = "findAndModify";
 const char kQueryField[] = "query";
 const char kSortField[] = "sort";
+const char kCollationField[] = "collation";
 const char kRemoveField[] = "remove";
 const char kUpdateField[] = "update";
 const char kNewField[] = "new";
@@ -91,6 +93,10 @@ BSONObj FindAndModifyRequest::toBSON() const {
         builder.append(kSortField, _sort.get());
     }
 
+    if (_collation) {
+        builder.append(kCollationField, _collation.get());
+    }
+
     if (_shouldReturnNew) {
         builder.append(kNewField, _shouldReturnNew.get());
     }
@@ -108,6 +114,20 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
     BSONObj fields = cmdObj.getObjectField(kFieldProjectionField);
     BSONObj updateObj = cmdObj.getObjectField(kUpdateField);
     BSONObj sort = cmdObj.getObjectField(kSortField);
+
+    BSONObj collation;
+    {
+        BSONElement collationElt;
+        Status collationEltStatus =
+            bsonExtractTypedField(cmdObj, kCollationField, BSONType::Object, &collationElt);
+        if (!collationEltStatus.isOK() && (collationEltStatus != ErrorCodes::NoSuchKey)) {
+            return collationEltStatus;
+        }
+        if (collationEltStatus.isOK()) {
+            collation = collationElt.Obj();
+        }
+    }
+
     bool shouldReturnNew = cmdObj[kNewField].trueValue();
     bool isUpsert = cmdObj[kUpsertField].trueValue();
     bool isRemove = cmdObj[kRemoveField].trueValue();
@@ -137,6 +157,7 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
     request._isRemove = isRemove;
     request.setFieldProjection(fields);
     request.setSort(sort);
+    request.setCollation(collation);
 
     if (!isRemove) {
         request.setShouldReturnNew(shouldReturnNew);
@@ -152,6 +173,10 @@ void FindAndModifyRequest::setFieldProjection(BSONObj fields) {
 
 void FindAndModifyRequest::setSort(BSONObj sort) {
     _sort = sort.getOwned();
+}
+
+void FindAndModifyRequest::setCollation(BSONObj collation) {
+    _collation = collation.getOwned();
 }
 
 void FindAndModifyRequest::setShouldReturnNew(bool shouldReturnNew) {
@@ -186,6 +211,10 @@ BSONObj FindAndModifyRequest::getUpdateObj() const {
 
 BSONObj FindAndModifyRequest::getSort() const {
     return _sort.value_or(BSONObj());
+}
+
+BSONObj FindAndModifyRequest::getCollation() const {
+    return _collation.value_or(BSONObj());
 }
 
 bool FindAndModifyRequest::shouldReturnNew() const {
