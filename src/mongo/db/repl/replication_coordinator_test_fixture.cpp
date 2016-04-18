@@ -305,12 +305,6 @@ void ReplCoordTest::simulateSuccessfulV1Election() {
                                              << ""
                                              << "term" << request.cmdObj["term"].Long()
                                              << "voteGranted" << true)));
-        } else if (request.cmdObj.firstElement().fieldNameStringData() ==
-                   "replSetDeclareElectionWinner") {
-            net->scheduleResponse(
-                noi,
-                net->now(),
-                makeResponseStatus(BSON("ok" << 1 << "term" << request.cmdObj["term"].Long())));
         } else {
             error() << "Black holing unexpected request to " << request.target << ": "
                     << request.cmdObj;

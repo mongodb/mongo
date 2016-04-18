@@ -75,8 +75,6 @@ class ReadConcernArgs;
 class ReadConcernResponse;
 class ReplicaSetConfig;
 class ReplicationExecutor;
-class ReplSetDeclareElectionWinnerArgs;
-class ReplSetDeclareElectionWinnerResponse;
 class ReplSetHeartbeatArgs;
 class ReplSetHeartbeatArgsV1;
 class ReplSetHeartbeatResponse;
@@ -677,14 +675,6 @@ public:
     virtual Status processReplSetRequestVotes(OperationContext* txn,
                                               const ReplSetRequestVotesArgs& args,
                                               ReplSetRequestVotesResponse* response) = 0;
-
-    /*
-    * Handles an incoming replSetDeclareElectionWinner command.
-    * Returns a Status with either OK or an error message.
-    * Populates responseTerm with the current term from our perspective.
-    */
-    virtual Status processReplSetDeclareElectionWinner(const ReplSetDeclareElectionWinnerArgs& args,
-                                                       long long* responseTerm) = 0;
 
     /**
      * Prepares a metadata object describing the current term, primary, and lastOp information.

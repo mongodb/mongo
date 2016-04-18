@@ -36,7 +36,6 @@
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
-#include "mongo/db/repl/repl_set_declare_election_winner_args.h"
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
@@ -2310,17 +2309,9 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenTermIsStale) {
                  0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
-
-    // set term higher by receiving a replSetDeclareElectionWinnerCommand
-    ReplSetDeclareElectionWinnerArgs winnerArgs;
-    winnerArgs.initialize(BSON("replSetDeclareElectionWinner" << 1 << "setName"
-                                                              << "rs0"
-                                                              << "term" << 2 << "winnerId" << 30));
-    long long responseTerm;
     ASSERT(TopologyCoordinator::UpdateTermResult::kUpdatedTerm ==
-           getTopoCoord().updateTerm(winnerArgs.getTerm(), now()));
-    ASSERT_OK(getTopoCoord().processReplSetDeclareElectionWinner(winnerArgs, &responseTerm));
-    ASSERT_EQUALS(2, responseTerm);
+           getTopoCoord().updateTerm(2, now()));
+    ASSERT_EQUALS(2, getTopoCoord().getTerm());
 
     // stale term
     ReplSetRequestVotesArgs args;
@@ -2599,73 +2590,6 @@ TEST_F(TopoCoordTest, DoNotGrantDryRunVoteWhenOpTimeIsStale) {
     ASSERT_EQUALS("candidate's data is staler than mine", response.getReason());
     ASSERT_EQUALS(1, response.getTerm());
     ASSERT_FALSE(response.getVoteGranted());
-}
-
-// TODO remove this as part of SERVER-19423
-TEST_F(TopoCoordTest, ProcessDeclareElectionWinner) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2") << BSON("_id" << 30 << "host"
-                                                                         << "h3"))),
-                 0);
-    setSelfMemberState(MemberState::RS_SECONDARY);
-
-    // successful
-    ReplSetDeclareElectionWinnerArgs winnerArgs;
-    winnerArgs.initialize(BSON("replSetDeclareElectionWinner" << 1 << "setName"
-                                                              << "rs0"
-                                                              << "term" << 2 << "winnerId" << 30));
-    long long responseTerm = -1;
-    ASSERT(TopologyCoordinator::UpdateTermResult::kUpdatedTerm ==
-           getTopoCoord().updateTerm(winnerArgs.getTerm(), now()));
-    ASSERT_OK(getTopoCoord().processReplSetDeclareElectionWinner(winnerArgs, &responseTerm));
-    ASSERT_EQUALS(2, responseTerm);
-
-    // repeat, should be problem free
-    ReplSetDeclareElectionWinnerArgs winnerArgs2;
-    winnerArgs2.initialize(BSON("replSetDeclareElectionWinner" << 1 << "setName"
-                                                               << "rs0"
-                                                               << "term" << 2 << "winnerId" << 30));
-    long long responseTerm2 = -1;
-    ASSERT_OK(getTopoCoord().processReplSetDeclareElectionWinner(winnerArgs2, &responseTerm2));
-    ASSERT_EQUALS(2, responseTerm2);
-
-    // same term, different primary, should fail
-    ReplSetDeclareElectionWinnerArgs winnerArgs3;
-    winnerArgs3.initialize(BSON("replSetDeclareElectionWinner" << 1 << "setName"
-                                                               << "rs0"
-                                                               << "term" << 2 << "winnerId" << 20));
-    long long responseTerm3 = -1;
-    ASSERT_EQUALS(
-        "term already has a primary",
-        getTopoCoord().processReplSetDeclareElectionWinner(winnerArgs3, &responseTerm3).reason());
-    ASSERT_EQUALS(2, responseTerm3);
-
-    // stale term, should fail
-    ReplSetDeclareElectionWinnerArgs winnerArgs4;
-    winnerArgs4.initialize(BSON("replSetDeclareElectionWinner" << 1 << "setName"
-                                                               << "rs0"
-                                                               << "term" << 0 << "winnerId" << 20));
-    long long responseTerm4 = -1;
-    ASSERT_EQUALS(
-        "term has already passed",
-        getTopoCoord().processReplSetDeclareElectionWinner(winnerArgs4, &responseTerm4).reason());
-    ASSERT_EQUALS(2, responseTerm4);
-
-    // wrong setName
-    ReplSetDeclareElectionWinnerArgs winnerArgs5;
-    winnerArgs5.initialize(BSON("replSetDeclareElectionWinner" << 1 << "setName"
-                                                               << "wrongName"
-                                                               << "term" << 3 << "winnerId" << 20));
-    long long responseTerm5 = -1;
-    ASSERT_EQUALS(
-        "replSet name does not match",
-        getTopoCoord().processReplSetDeclareElectionWinner(winnerArgs5, &responseTerm5).reason());
-    ASSERT_EQUALS(2, responseTerm5);
 }
 
 TEST_F(TopoCoordTest, NodeTransitionsToRemovedIfCSRSButHaveNoReadCommittedSupport) {

@@ -335,7 +335,6 @@ env.Library('repl_coordinator_impl',
             [
                 'check_quorum_for_config_change.cpp',
                 'elect_cmd_runner.cpp',
-                'election_winner_declarer.cpp',
                 'freshness_checker.cpp',
                 'repl_client_info.cpp',
                 'replica_set_config_checks.cpp',
@@ -466,20 +465,6 @@ env.CppUnitTest(
     ],
 )
 
-env.CppUnitTest(
-    target='election_winner_declarer_test',
-    source=[
-        'election_winner_declarer_test.cpp',
-    ],
-    LIBDEPS=[
-        'repl_coordinator_impl',
-        'replica_set_messages',
-        'replmocks',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
-        '$BUILD_DIR/mongo/db/commands_test_crutch',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
-    ],
-)
 
 env.CppUnitTest(
     target='elect_cmd_runner_test',
@@ -579,7 +564,6 @@ env.Library('replica_set_messages',
                 'member_config.cpp',
                 'old_update_position_args.cpp',
                 'read_concern_response.cpp',
-                'repl_set_declare_election_winner_args.cpp',
                 'repl_set_heartbeat_args.cpp',
                 'repl_set_heartbeat_args_v1.cpp',
                 'repl_set_heartbeat_response.cpp',
@@ -627,7 +611,6 @@ env.Library(
         'replset_commands.cpp',
         'repl_set_command.cpp',
         'repl_set_request_votes.cpp',
-        'repl_set_declare_election_winner.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

@@ -35,7 +35,6 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
-#include "mongo/db/repl/election_winner_declarer.h"
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/log.h"
@@ -55,7 +54,6 @@ public:
             return;
         }
         _replCoord->_topCoord->processLoseElection();
-        _replCoord->_electionWinnerDeclarer.reset(nullptr);
         _replCoord->_voteRequester.reset(nullptr);
         if (_isDryRun && _replCoord->_electionDryRunFinishedEvent.isValid()) {
             _replCoord->_replExecutor.signalEvent(_replCoord->_electionDryRunFinishedEvent);
@@ -87,7 +85,6 @@ public:
 
 
 void ReplicationCoordinatorImpl::_startElectSelfV1() {
-    invariant(!_electionWinnerDeclarer);
     invariant(!_voteRequester);
     invariant(!_freshnessChecker);
 
@@ -161,7 +158,6 @@ void ReplicationCoordinatorImpl::_startElectSelfV1() {
 
 void ReplicationCoordinatorImpl::_onDryRunComplete(long long originalTerm) {
     invariant(_voteRequester);
-    invariant(!_electionWinnerDeclarer);
     LoseElectionDryRunGuardV1 lossGuard(this);
 
     LockGuard lk(_topoMutex);
@@ -211,7 +207,6 @@ void ReplicationCoordinatorImpl::_onDryRunComplete(long long originalTerm) {
 void ReplicationCoordinatorImpl::_writeLastVoteForMyElection(
     LastVote lastVote, const ReplicationExecutor::CallbackArgs& cbData) {
     invariant(_voteRequester);
-    invariant(!_electionWinnerDeclarer);
     LoseElectionDryRunGuardV1 lossGuard(this);
 
     if (cbData.status == ErrorCodes::CallbackCanceled) {
@@ -233,7 +228,6 @@ void ReplicationCoordinatorImpl::_writeLastVoteForMyElection(
 
 void ReplicationCoordinatorImpl::_startVoteRequester(long long newTerm) {
     invariant(_voteRequester);
-    invariant(!_electionWinnerDeclarer);
     LoseElectionGuardV1 lossGuard(this);
 
     LockGuard lk(_topoMutex);
@@ -257,7 +251,6 @@ void ReplicationCoordinatorImpl::_startVoteRequester(long long newTerm) {
 
 void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long originalTerm) {
     invariant(_voteRequester);
-    invariant(!_electionWinnerDeclarer);
     LoseElectionGuardV1 lossGuard(this);
 
     LockGuard lk(_topoMutex);

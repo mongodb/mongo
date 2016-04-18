@@ -47,7 +47,6 @@ class Status;
 namespace repl {
 
 class ScatterGatherRunner;
-class ReplSetDeclareRequestVotesArgs;
 
 class VoteRequester {
     MONGO_DISALLOW_COPYING(VoteRequester);

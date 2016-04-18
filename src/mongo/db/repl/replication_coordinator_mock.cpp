@@ -378,11 +378,6 @@ Status ReplicationCoordinatorMock::processReplSetRequestVotes(
     return Status::OK();
 }
 
-Status ReplicationCoordinatorMock::processReplSetDeclareElectionWinner(
-    const ReplSetDeclareElectionWinnerArgs& args, long long* responseTerm) {
-    return Status::OK();
-}
-
 void ReplicationCoordinatorMock::prepareReplResponseMetadata(const rpc::RequestInterface& request,
                                                              const OpTime& lastOpTimeFromClient,
                                                              BSONObjBuilder* builder) {}

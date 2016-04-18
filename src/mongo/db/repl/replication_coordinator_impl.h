@@ -72,13 +72,11 @@ class ReplSetMetadata;
 namespace repl {
 
 class ElectCmdRunner;
-class ElectionWinnerDeclarer;
 class FreshnessChecker;
 class HandshakeArgs;
 class HeartbeatResponseAction;
 class LastVote;
 class OplogReader;
-class ReplSetDeclareElectionWinnerArgs;
 class ReplSetRequestVotesArgs;
 class ReplicaSetConfig;
 class SyncSourceFeedback;
@@ -288,9 +286,6 @@ public:
     virtual Status processReplSetRequestVotes(OperationContext* txn,
                                               const ReplSetRequestVotesArgs& args,
                                               ReplSetRequestVotesResponse* response) override;
-
-    virtual Status processReplSetDeclareElectionWinner(const ReplSetDeclareElectionWinnerArgs& args,
-                                                       long long* responseTerm) override;
 
     void prepareReplResponseMetadata(const rpc::RequestInterface&,
                                      const OpTime& lastOpTimeFromClient,
@@ -857,7 +852,6 @@ private:
      *      _writeLastVoteForMyElection()
      *      _startVoteRequester()
      *      _onVoteRequestComplete()
-     *      _onElectionWinnerDeclarerComplete()
      */
     void _startElectSelf();
     void _startElectSelfV1();
@@ -1233,8 +1227,6 @@ private:
     std::unique_ptr<ElectCmdRunner> _electCmdRunner;  // (X)
 
     std::unique_ptr<VoteRequester> _voteRequester;  // (X)
-
-    std::unique_ptr<ElectionWinnerDeclarer> _electionWinnerDeclarer;  // (X)
 
     // Event that the election code will signal when the in-progress election completes.
     // Unspecified value when _freshnessChecker is NULL.

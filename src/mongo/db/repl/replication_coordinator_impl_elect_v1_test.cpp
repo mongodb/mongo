@@ -454,68 +454,6 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     getExternalState()->setStoreLocalConfigDocumentToHang(false);
 }
 
-// This is disabled because DeclaringElectionWinner has been disabled.
-// TODO(siyuan) SERVER-19423 Remove election winner declarer
-//
-// TEST_F(ReplCoordTest, ElectionSucceedsButDeclaringWinnerFails) {
-//    startCapturingLogMessages();
-//    BSONObj configObj = BSON("_id"
-//                             << "mySet"
-//                             << "version" << 1 << "members"
-//                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-//                                                      << "node1:12345")
-//                                           << BSON("_id" << 2 << "host"
-//                                                         << "node2:12345")
-//                                           << BSON("_id" << 3 << "host"
-//                                                         << "node3:12345"))
-//                             << "protocolVersion" << 1);
-//    assertStartSuccess(configObj, HostAndPort("node1", 12345));
-//    ReplicaSetConfig config = assertMakeRSConfig(configObj);
-//
-//    OperationContextNoop txn;
-//    OpTime time1(Timestamp(100, 1), 0);
-//    getReplCoord()->setMyLastAppliedOpTime(time1);
-//    getReplCoord()->setMyLastDurableOpTime(time1);
-//    ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-//
-//    simulateEnoughHeartbeatsForAllNodesUp();
-//
-//    NetworkInterfaceMock* net = getNet();
-//    net->enterNetwork();
-//    while (net->hasReadyRequests()) {
-//        const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-//        const RemoteCommandRequest& request = noi->getRequest();
-//        log() << request.target.toString() << " processing " << request.cmdObj;
-//        if (request.cmdObj.firstElement().fieldNameStringData() == "replSetRequestVotes") {
-//            net->scheduleResponse(
-//                noi,
-//                net->now(),
-//                makeResponseStatus(BSON("ok" << 1 << "term"
-//                                             << (request.cmdObj["dryRun"].Bool()
-//                                                     ? request.cmdObj["term"].Long() - 1
-//                                                     : request.cmdObj["term"].Long())
-//                                             << "voteGranted" << true)));
-//        } else if (request.cmdObj.firstElement().fieldNameStringData() ==
-//                   "replSetDeclareElectionWinner") {
-//            net->scheduleResponse(
-//                noi,
-//                net->now(),
-//                makeResponseStatus(BSON("ok" << 0 << "code" << ErrorCodes::BadValue << "errmsg"
-//                                             << "term has already passed"
-//                                             << "term" << request.cmdObj["term"].Long() + 1)));
-//        } else {
-//            error() << "Black holing unexpected request to " << request.target << ": "
-//                    << request.cmdObj;
-//            net->blackHole(noi);
-//        }
-//        net->runReadyNetworkOperations();
-//    }
-//    net->exitNetwork();
-//    stopCapturingLogMessages();
-//    ASSERT_EQUALS(1, countLogLinesContaining("stepping down from primary, because:"));
-//}
-
-
 TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringRequestVotes) {
     startCapturingLogMessages();
     BSONObj configObj = BSON("_id"

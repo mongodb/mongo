@@ -217,9 +217,6 @@ public:
                                               const ReplSetRequestVotesArgs& args,
                                               ReplSetRequestVotesResponse* response);
 
-    virtual Status processReplSetDeclareElectionWinner(const ReplSetDeclareElectionWinnerArgs& args,
-                                                       long long* responseTerm);
-
     void prepareReplResponseMetadata(const rpc::RequestInterface& request,
                                      const OpTime& lastOpTimeFromClient,
                                      BSONObjBuilder* builder) override;
