@@ -1398,7 +1398,7 @@ TEST_F(QueryPlannerTest, CanCompoundBoundsWhenSharedPrefixIsMultikeyButHasElemMa
     assertSolutionExists("{cscan: {dir: 1, filter: {a: {$elemMatch: {b: 2, c: 3}}}}}");
     assertSolutionExists(
         "{fetch: {node: {ixscan: {pattern: {'a.b': 1, 'a.c': 1}, "
-        "bounds: {a: [[2, 2, true, true]], b: [[3, 3, true, true]]}}}}}");
+        "bounds: {'a.b': [[2, 2, true, true]], 'a.c': [[3, 3, true, true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, CannotCompoundBoundsWhenSharedPrefixInsideElemMatchIsMultikey) {

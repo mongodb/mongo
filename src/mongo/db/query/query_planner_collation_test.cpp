@@ -207,7 +207,7 @@ TEST_F(QueryPlannerTest, OrQueryCanBeIndexedWhenBothBranchesHaveIndexWithMatchin
     assertSolutionExists(
         "{or: {nodes: ["
         "{fetch: {node: {ixscan: {pattern: {a: 1}, bounds: {a: [['oof','oof',true,true]]}}}}},"
-        "{fetch: {node: {ixscan: {pattern: {b: 1}, bounds: {a: [['rab','rab',true,true]]}}}}}]}}");
+        "{fetch: {node: {ixscan: {pattern: {b: 1}, bounds: {b: [['rab','rab',true,true]]}}}}}]}}");
 }
 
 TEST_F(QueryPlannerTest, ElemMatchObjectResultsInCorrectComparisonKeyBounds) {

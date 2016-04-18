@@ -130,6 +130,9 @@ bool boundsMatch(const BSONObj& testBounds, const IndexBounds trueBounds) {
     int fieldItCount = 0;
     while (fieldIt.more()) {
         BSONElement arrEl = fieldIt.next();
+        if (arrEl.fieldNameStringData() != trueBounds.getFieldName(fieldItCount)) {
+            return false;
+        }
         if (arrEl.type() != Array) {
             return false;
         }
