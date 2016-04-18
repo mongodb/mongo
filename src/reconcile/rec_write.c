@@ -2575,6 +2575,13 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 		    dsk->type == WT_PAGE_COL_VAR)
 			r->raw_recnos[slots] = recno;
 		r->raw_entries[slots] = entry;
+
+		/*
+		 * Don't create an image so large that any future update will
+		 * cause a split in memory.
+		 */
+		if (len > (size_t)btree->splitmempage)
+			break;
 	}
 
 	/*
