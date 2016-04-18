@@ -9,7 +9,7 @@
 #include "wt_internal.h"
 
 /* Buffer size for streamed reads/writes. */
-#define	WT_STREAM_BUFSIZE	4096
+#define	WT_STREAM_BUFSIZE	8192
 
 /*
  * __fstream_close --
@@ -149,7 +149,7 @@ __fstream_printf(
 			buf->size += len;
 
 			return (F_ISSET(fs, WT_STREAM_LINE_BUFFER) ||
-			    buf->size > WT_STREAM_BUFSIZE ?
+			    buf->size >= WT_STREAM_BUFSIZE ?
 			    __wt_fflush(session, fs) : 0);
 		}
 		WT_RET(__wt_buf_extend(session, buf, buf->size + len + 1));
