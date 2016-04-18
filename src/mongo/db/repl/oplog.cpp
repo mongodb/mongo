@@ -499,6 +499,51 @@ OpTime writeOpsToOplog(OperationContext* txn, const std::vector<BSONObj>& ops) {
     return lastOptime;
 }
 
+namespace {
+long long getNewOplogSizeBytes(OperationContext* txn, const ReplSettings& replSettings) {
+    if (replSettings.getOplogSizeBytes() != 0) {
+        return replSettings.getOplogSizeBytes();
+    }
+    /* not specified. pick a default size */
+    ProcessInfo pi;
+    if (pi.getAddrSize() == 32) {
+        const auto sz = 50LL * 1024LL * 1024LL;
+        LOG(3) << "32bit system; choosing " << sz << " bytes oplog";
+        return sz;
+    }
+// First choose a minimum size.
+
+#if defined(__APPLE__)
+    // typically these are desktops (dev machines), so keep it smallish
+    const auto sz = 192 * 1024 * 1024;
+    LOG(3) << "Apple system; choosing " << sz << " bytes oplog";
+    return sz;
+#else
+    long long lowerBound = 0;
+    double bytes = 0;
+    if (txn->getClient()->getServiceContext()->getGlobalStorageEngine()->isEphemeral()) {
+        // in memory: 50MB minimum size
+        lowerBound = 50LL * 1024 * 1024;
+        bytes = pi.getMemSizeMB() * 1024 * 1024;
+        LOG(3) << "Ephemeral storage system; lowerBound: " << lowerBound << " bytes, " << bytes
+               << " bytes total memory";
+    } else {
+        // disk: 990MB minimum size
+        lowerBound = 990LL * 1024 * 1024;
+        bytes = File::freeSpace(storageGlobalParams.dbpath);  //-1 if call not supported.
+        LOG(3) << "Disk storage system; lowerBound: " << lowerBound << " bytes, " << bytes
+               << " bytes free space on device";
+    }
+    long long fivePct = static_cast<long long>(bytes * 0.05);
+    auto sz = std::max(fivePct, lowerBound);
+    // we use 5% of free [disk] space up to 50GB (1TB free)
+    const long long upperBound = 50LL * 1024 * 1024 * 1024;
+    sz = std::min(sz, upperBound);
+    return sz;
+#endif
+}
+}  // namespace
+
 void createOplog(OperationContext* txn, const std::string& oplogCollectionName, bool replEnabled) {
     ScopedTransaction transaction(txn, MODE_X);
     Lock::GlobalWrite lk(txn->lockState());
@@ -530,29 +575,7 @@ void createOplog(OperationContext* txn, const std::string& oplogCollectionName, 
     }
 
     /* create an oplog collection, if it doesn't yet exist. */
-    long long sz = 0;
-    if (replSettings.getOplogSizeBytes() != 0) {
-        sz = replSettings.getOplogSizeBytes();
-    } else {
-        /* not specified. pick a default size */
-        sz = 50LL * 1024LL * 1024LL;
-        if (sizeof(int*) >= 8) {
-#if defined(__APPLE__)
-            // typically these are desktops (dev machines), so keep it smallish
-            sz = (256 - 64) * 1024 * 1024;
-#else
-            sz = 990LL * 1024 * 1024;
-            double free = File::freeSpace(storageGlobalParams.dbpath);  //-1 if call not supported.
-            long long fivePct = static_cast<long long>(free * 0.05);
-            if (fivePct > sz)
-                sz = fivePct;
-            // we use 5% of free space up to 50GB (1TB free)
-            static long long upperBound = 50LL * 1024 * 1024 * 1024;
-            if (fivePct > upperBound)
-                sz = upperBound;
-#endif
-        }
-    }
+    const auto sz = getNewOplogSizeBytes(txn, replSettings);
 
     log() << "******" << endl;
     log() << "creating replication oplog of size: " << (int)(sz / (1024 * 1024)) << "MB..." << endl;
