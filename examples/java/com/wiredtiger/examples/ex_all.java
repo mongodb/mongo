@@ -881,7 +881,7 @@ backup(Session session)
         try {
 	    /*! [incremental backup]*/
             /* Open the backup data source for incremental backup. */
-            cursor = session.open_cursor("backup:", null, target=(\"log:\")");
+            cursor = session.open_cursor("backup:", null, "target=(\"log:\")");
 	    /*! [incremental backup]*/
 
             ret = cursor.close();
