@@ -62,6 +62,14 @@
 # define MAP_ANONYMOUS MAP_ANON
 #endif
 
+// Linux added support for MADV_FREE in 4.5 but we aren't ready to use it
+// yet. Among other things, using compile-time detection leads to poor
+// results when compiling on a system with MADV_FREE and running on a
+// system without it. See https://github.com/gperftools/gperftools/issues/780.
+#if defined(__linux__) && defined(MADV_FREE)
+# undef MADV_FREE
+#endif
+
 // MADV_FREE is specifically designed for use by malloc(), but only
 // FreeBSD supports it; in linux we fall back to the somewhat inferior
 // MADV_DONTNEED.
