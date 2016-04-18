@@ -7,7 +7,6 @@ configured cache size.
 If \c in_memory is configured, WT_CURSOR::insert and WT_CURSOR::update
 methods may return an additional error, ::WT_CACHE_FULL, indicating the
 insert or update operation requires more than the configured cache size
-to complete. The ::WT_CACHE_FULL  error does not require any enclosing
-transaction be rolled back (although that is a common application behavior).
+to complete. If a transaction is in progress, it should be rolled back.
 
  */
