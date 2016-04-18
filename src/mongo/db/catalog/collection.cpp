@@ -536,7 +536,7 @@ public:
         const Status status = validateBSON(obj.objdata(), obj.objsize());
         if (status.isOK())
             *dataSize = obj.objsize();
-        return Status::OK();
+        return status;
     }
 };
 }
