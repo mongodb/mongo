@@ -174,34 +174,6 @@ __win_handle_allocate_configure(WT_SESSION_IMPL *session, WT_FH *fh)
 }
 
 /*
- * __win_handle_close_stream --
- *	ANSI C fclose
- */
-static int
-__win_handle_close_stream(WT_SESSION_IMPL *session, WT_FH *fh)
-{
-	WT_DECL_RET;
-
-	/* Close the stream. */
-	if (fh->fp == NULL)
-		return (0);
-
-	/* If the stream was opened for writing, flush the file. */
-	if (F_ISSET(fh, WT_FH_FLUSH_ON_CLOSE) && fflush(fh->fp) != 0) {
-		ret = __wt_errno();
-		__wt_err(session, ret, "%s: handle-close: fflush", fh->name);
-	}
-
-	/* Close the file. */
-	if (fclose(fh->fp) != 0) {
-		ret = __wt_errno();
-		__wt_err(session, ret, "%s: handle-close: fclose", fh->name);
-	}
-
-	return (ret);
-}
-
-/*
  * __win_handle_close --
  *	ANSI C close.
  */
@@ -232,19 +204,6 @@ __win_handle_close(WT_SESSION_IMPL *session, WT_FH *fh)
 	}
 
 	return (ret);
-}
-
-/*
- * __win_handle_getc --
- *	ANSI C fgetc.
- */
-static int
-__win_handle_getc(WT_SESSION_IMPL *session, WT_FH *fh, int *chp)
-{
-	*chp = fgetc(fh->fp);
-	if (*chp != EOF || !ferror(fh->fp))
-		return (0);
-	WT_RET_MSG(session, __wt_errno(), "%s: handle-getc: fgetc", fh->name);
 }
 
 /*
@@ -284,19 +243,6 @@ __win_handle_lock(WT_SESSION_IMPL *session, WT_FH *fh, bool lock)
 			    "%s: handle-lock: UnlockFile", fh->name);
 		}
 	return (ret);
-}
-
-/*
- * __win_handle_printf --
- *	ANSI C vfprintf.
- */
-static int
-__win_handle_printf(
-    WT_SESSION_IMPL *session, WT_FH *fh, const char *fmt, va_list ap)
-{
-	if (vfprintf(fh->fp, fmt, ap) >= 0)
-		return (0);
-	WT_RET_MSG(session, EIO, "%s: handle-printf: vfprintf", fh->name);
 }
 
 /*
@@ -354,20 +300,6 @@ __win_handle_size(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
 
 	WT_RET_MSG(session,
 	    __wt_getlasterror(), "%s: handle-size: GetFileSizeEx", fh->name);
-}
-
-/*
- * __win_handle_sync_stream --
- *	MSVC fflush.
- */
-static int
-__win_handle_sync_stream(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
-{
-	WT_UNUSED(block);
-
-	if (fflush(fh->fp) == 0)
-		return (0);
-	WT_RET_MSG(session, __wt_errno(), "%s: handle-sync: fflush", fh->name);
 }
 
 /*
@@ -473,48 +405,6 @@ __win_handle_write(WT_SESSION_IMPL *session,
 }
 
 /*
- * __win_open_stream --
- *	Open a stream.
- */
-static int
-__win_open_stream(
-    WT_SESSION_IMPL *session, WT_FH *fh, const char *name, uint32_t flags)
-{
-	const char *stream_mode;
-
-	switch (LF_MASK(WT_STREAM_APPEND | WT_STREAM_READ | WT_STREAM_WRITE)) {
-	case WT_STREAM_APPEND:
-		stream_mode = "a";
-		F_SET(fh, WT_FH_FLUSH_ON_CLOSE);
-		break;
-	case WT_STREAM_READ:
-		stream_mode = "r";
-		break;
-	case WT_STREAM_WRITE:
-		stream_mode = "w";
-		F_SET(fh, WT_FH_FLUSH_ON_CLOSE);
-		break;
-	default:
-		WT_RET_MSG(session,
-		    EINVAL, "%s: handle-open: illegal configuration", name);
-	}
-
-	if ((fh->fp = fopen(name, stream_mode)) == NULL)
-		WT_RET_MSG(
-		    session, __wt_errno(), "%s: handle-open: fopen", name);
-
-	if (LF_ISSET(WT_STREAM_LINE_BUFFER))
-		__wt_stream_set_line_buffer(fh->fp);
-
-	fh->fh_close = __win_handle_close_stream;
-	fh->fh_getc = __win_handle_getc;
-	fh->fh_printf = __win_handle_printf;
-	fh->fh_sync = __win_handle_sync_stream;
-
-	return (0);
-}
-
-/*
  * __win_handle_open --
  *	Open a file handle.
  */
@@ -535,11 +425,6 @@ __win_handle_open(WT_SESSION_IMPL *session,
 	/* Set up error handling. */
 	fh->filehandle = fh->filehandle_secondary =
 	    filehandle = filehandle_secondary = INVALID_HANDLE_VALUE;
-	fh->fp = NULL;
-
-	/* Stream opens are separate. */
-	if (LF_ISSET(WT_STREAM_APPEND | WT_STREAM_READ | WT_STREAM_WRITE))
-	    return (__win_open_stream(session, fh, name, flags));
 
 	/*
 	 * Opening a file handle on a directory is only to support filesystems

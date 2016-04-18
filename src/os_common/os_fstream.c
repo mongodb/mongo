@@ -8,6 +8,9 @@
 
 #include "wt_internal.h"
 
+/* Buffer size for streamed reads/writes. */
+#define	WT_STREAM_BUFSIZE	4096
+
 /*
  * __fstream_close --
  *	Close a stream handle.
@@ -16,6 +19,9 @@ static int
 __fstream_close(WT_SESSION_IMPL *session, WT_FSTREAM *fs)
 {
 	WT_DECL_RET;
+
+	if (!F_ISSET(fs, WT_STREAM_READ))
+		WT_TRET(fs->flush(session, fs));
 
 	WT_TRET(__wt_close(session, &fs->fh));
 	__wt_buf_free(session, &fs->buf);
@@ -30,9 +36,6 @@ __fstream_close(WT_SESSION_IMPL *session, WT_FSTREAM *fs)
 static int
 __fstream_flush(WT_SESSION_IMPL *session, WT_FSTREAM *fs)
 {
-	WT_UNUSED(session);
-	WT_UNUSED(fs);
-
 	if (fs->buf.size > 0) {
 		WT_RET(__wt_write(
 		    session, fs->fh, fs->off, fs->buf.size, fs->buf.data));
@@ -41,6 +44,16 @@ __fstream_flush(WT_SESSION_IMPL *session, WT_FSTREAM *fs)
 	}
 
 	return (0);
+}
+
+/*
+ * __fstream_flush_notsup --
+ *	Stream flush unsupported.
+ */
+static int
+__fstream_flush_notsup(WT_SESSION_IMPL *session, WT_FSTREAM *fs)
+{
+	WT_RET_MSG(session, ENOTSUP, "%s: flush", fs->name);
 }
 
 /*
@@ -57,6 +70,8 @@ __fstream_flush(WT_SESSION_IMPL *session, WT_FSTREAM *fs)
 static int
 __fstream_getline(WT_SESSION_IMPL *session, WT_FSTREAM *fs, WT_ITEM *buf)
 {
+	const char *p;
+	size_t len;
 	char c;
 
 	/*
@@ -66,11 +81,20 @@ __fstream_getline(WT_SESSION_IMPL *session, WT_FSTREAM *fs, WT_ITEM *buf)
 	WT_RET(__wt_buf_init(session, buf, 100));
 
 	for (;;) {
-		/* TODO: buffering. */
-		if (fs->off == fs->size)
-			break;
-		WT_RET(__wt_read(session, fs->fh, fs->off, 1, &c));
-		++fs->off;
+		/* Check if we need to refill the buffer. */
+		if (WT_PTRDIFF(fs->buf.data, fs->buf.mem) >= fs->buf.size) {
+			len = WT_MIN(WT_STREAM_BUFSIZE,
+			    (size_t)(fs->size - fs->off));
+			if (len == 0)
+				break; /* EOF */
+			WT_RET(__wt_buf_initsize(session, &fs->buf, len));
+			WT_RET(__wt_read(
+			    session, fs->fh, fs->off, len, fs->buf.mem));
+			fs->off += (wt_off_t)len;
+		}
+
+		c = *(p = fs->buf.data);
+		fs->buf.data = ++p;
 
 		/* Leave space for a trailing NUL. */
 		WT_RET(__wt_buf_extend(session, buf, buf->size + 2));
@@ -79,12 +103,23 @@ __fstream_getline(WT_SESSION_IMPL *session, WT_FSTREAM *fs, WT_ITEM *buf)
 				continue;
 			break;
 		}
-		((char *)buf->mem)[buf->size++] = (char)c;
+		((char *)buf->mem)[buf->size++] = c;
 	}
 
 	((char *)buf->mem)[buf->size] = '\0';
 
 	return (0);
+}
+
+/*
+ * __fstream_getline_notsup --
+ *	Stream getline unsupported.
+ */
+static int
+__fstream_getline_notsup(WT_SESSION_IMPL *session, WT_FSTREAM *fs, WT_ITEM *buf)
+{
+	WT_UNUSED(buf);
+	WT_RET_MSG(session, ENOTSUP, "%s: getline", fs->name);
 }
 
 /*
@@ -112,11 +147,26 @@ __fstream_printf(
 
 		if (len < space) {
 			buf->size += len;
-			/* TODO: buffering */
-			return (__wt_fflush(session, fs));
+
+			return (F_ISSET(fs, WT_STREAM_LINE_BUFFER) ||
+			    buf->size > WT_STREAM_BUFSIZE ?
+			    __wt_fflush(session, fs) : 0);
 		}
 		WT_RET(__wt_buf_extend(session, buf, buf->size + len + 1));
 	}
+}
+
+/*
+ * __fstream_printf_notsup --
+ *	ANSI C vfprintf unsupported.
+ */
+static int
+__fstream_printf_notsup(
+    WT_SESSION_IMPL *session, WT_FSTREAM *fs, const char *fmt, va_list ap)
+{
+	WT_UNUSED(fmt);
+	WT_UNUSED(ap);
+	WT_RET_MSG(session, ENOTSUP, "%s: printf", fs->name);
 }
 
 /*
@@ -138,13 +188,22 @@ __wt_fopen(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_calloc_one(session, &fs));
 	fs->fh = fh;
 	fs->name = fh->name;
+	fs->flags = flags;
+
 	fs->close = __fstream_close;
-	fs->getline = __fstream_getline;
-	fs->flush = __fstream_flush;
-	fs->printf = __fstream_printf;
 	WT_ERR(__wt_filesize(session, fh, &fs->size));
 	if (LF_ISSET(WT_STREAM_APPEND))
 		fs->off = fs->size;
+	if (LF_ISSET(WT_STREAM_APPEND | WT_STREAM_WRITE)) {
+		fs->flush = __fstream_flush;
+		fs->getline = __fstream_getline_notsup;
+		fs->printf = __fstream_printf;
+	} else {
+		WT_ASSERT(session, LF_ISSET(WT_STREAM_READ));
+		fs->flush = __fstream_flush_notsup;
+		fs->getline = __fstream_getline;
+		fs->printf = __fstream_printf_notsup;
+	}
 	*fsp = fs;
 	return (0);
 

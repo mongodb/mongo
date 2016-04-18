@@ -84,7 +84,7 @@ __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
 
 /*
  * __wt_fsync --
- *	POSIX fflush/fsync.
+ *	POSIX fsync.
  */
 static inline int
 __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
