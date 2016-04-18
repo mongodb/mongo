@@ -74,9 +74,18 @@ class test_reconfig02(wttest.WiredTigerTestCase):
 
         # Now turn on pre-allocation.  Sleep to give the worker thread
         # a chance to run and verify pre-allocated log files exist.
+        #
+        # Potentially loop a few times in case it is a very slow system.
         self.conn.reconfigure("log=(prealloc=true)")
+        max=10
         time.sleep(2)
+        sleeptime = 2
         prep_logs = fnmatch.filter(os.listdir('.'), "*Prep*")
+        while len(prep_logs) == 0 and sleeptime < max:
+                time.sleep(2)
+                sleeptime += 2
+                prep_logs = fnmatch.filter(os.listdir('.'), "*Prep*")
+
         self.assertNotEqual(0, len(prep_logs))
 
     # Logging starts on, but archive is off.  Verify it is off.
