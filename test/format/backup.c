@@ -159,6 +159,11 @@ backup(void *arg)
 		testutil_check(backup_cursor->close(backup_cursor));
 		testutil_check(pthread_rwlock_unlock(&g.backup_lock));
 
+		/* After an incremental backup, truncate the log files. */
+		if (incremental)
+			testutil_check(session->truncate(
+			    session, "log:", backup_cursor, NULL, NULL));
+
 		/*
 		 * If automatic log archival isn't configured, optionally do
 		 * incremental backups after each full backup. If we're not
