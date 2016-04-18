@@ -1400,4 +1400,112 @@ TEST_F(QueryPlanner2dsphereVersionTest, TwoDSphereSparseBelowElemMatch) {
     testMultiple2dsphereIndexVersions(versions, keyPatterns, predicate, solutions);
 }
 
+TEST_F(QueryPlanner2dsphereVersionTest,
+       TwoDSphereSparseGeoPredicateInsideElemMatchWithOneElementOnTrailingField) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+
+    std::vector<int> versions{2, 3};
+    std::vector<BSONObj> keyPatterns = {BSON("a" << 1 << "b.c"
+                                                 << "2dsphere")};
+
+    BSONObj predicate =
+        fromjson("{a: 1, b: {$elemMatch: {c: {$geoWithin: {$centerSphere: [[0, 0], 1]}}}}}");
+    std::vector<std::string> solutions = {
+        "{fetch: {filter: {b: {$elemMatch: {c: {$geoWithin: {$centerSphere: [[0, 0], 1]}}}}}, "
+        "node: {ixscan: {pattern: {a: 1, 'b.c': '2dsphere'}}}}}"};
+
+    testMultiple2dsphereIndexVersions(versions, keyPatterns, predicate, solutions);
+}
+
+TEST_F(QueryPlanner2dsphereVersionTest,
+       TwoDSphereSparseGeoPredicateInsideElemMatchWithTwoElementsOnTrailingField) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+
+    std::vector<int> versions{2, 3};
+    std::vector<BSONObj> keyPatterns = {BSON("a" << 1 << "b.c" << 1 << "b.d"
+                                                 << "2dsphere")};
+
+    BSONObj predicate = fromjson(
+        "{a: 1, f: 2, b: {$elemMatch: {c: 3, d: {$geoWithin: {$centerSphere: [[0, 0], 1]}}}}}");
+    std::vector<std::string> solutions = {
+        "{fetch: {filter: {f: 2, b: {$elemMatch: {c: 3, d: "
+        "{$geoWithin: {$centerSphere: [[0, 0], 1]}}}}}, node: "
+        "{ixscan: {pattern: {a: 1, 'b.c': 1, 'b.d': '2dsphere'}}}}}"};
+
+    testMultiple2dsphereIndexVersions(versions, keyPatterns, predicate, solutions);
+}
+
+TEST_F(QueryPlanner2dsphereVersionTest,
+       TwoDSphereSparseGeoPredicateInsideElemMatchWithUnindexedPredicate) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+
+    std::vector<int> versions{2, 3};
+    std::vector<BSONObj> keyPatterns = {BSON("a" << 1 << "b.c" << 1 << "b.d"
+                                                 << "2dsphere")};
+
+    BSONObj predicate = fromjson(
+        "{a: 1, f: 2, b: {$elemMatch: {zz: 3, d: {$geoWithin: {$centerSphere: [[0, 0], 1]}}}}}");
+    std::vector<std::string> solutions = {
+        "{fetch: {filter: {f: 2, b: {$elemMatch: {zz: 3, d: "
+        "{$geoWithin: {$centerSphere: [[0, 0], 1]}}}}}, node: "
+        "{ixscan: {pattern: {a: 1, 'b.c': 1, 'b.d': '2dsphere'}}}}}"};
+
+    testMultiple2dsphereIndexVersions(versions, keyPatterns, predicate, solutions);
+}
+
+TEST_F(QueryPlanner2dsphereVersionTest, TwoDSphereSparseNestedElemMatch) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+
+    std::vector<int> versions{2, 3};
+    std::vector<BSONObj> keyPatterns = {BSON("a" << 1 << "b.c" << 1 << "b.d.e"
+                                                 << "2dsphere")};
+
+    BSONObj predicate = fromjson(
+        "{a: 1, f: 2, b: {$elemMatch: {c: 3, d: {$elemMatch: {e: "
+        "{$geoWithin: {$centerSphere: [[0, 0], 1]}}}}}}}");
+    std::vector<std::string> solutions = {
+        "{fetch: {filter: {f: 2, b: {$elemMatch: {c: 3, d: {$elemMatch:"
+        "{e: {$geoWithin: {$centerSphere: [[0, 0], 1]}}}}}}}, node: "
+        "{ixscan: {pattern: {a: 1, 'b.c': 1, 'b.d.e': '2dsphere'}}}}}"};
+
+    testMultiple2dsphereIndexVersions(versions, keyPatterns, predicate, solutions);
+}
+
+TEST_F(QueryPlanner2dsphereVersionTest, TwoDSphereSparseNestedElemMatchInsideOr) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+
+    std::vector<int> versions{2, 3};
+    std::vector<BSONObj> keyPatterns = {BSON("a" << 1 << "b.c" << 1 << "b.d.e"
+                                                 << "2dsphere")};
+
+    BSONObj predicate = fromjson(
+        "{$or: [{a: 5, 'b.d.e': {$geoWithin: {$centerSphere: [[1, 1], 2]}}},"
+        "{a: 1, f: 2, b: {$elemMatch: {c: 3, d: {$elemMatch: {e: "
+        "{$geoWithin: {$centerSphere: [[0, 0], 1]}}}}}}}]}");
+    std::vector<std::string> solutions = {
+        "{or: {nodes: ["
+        "{fetch: {filter: {f: 2, b: {$elemMatch: {c: 3, d: {$elemMatch: "
+        "{e: {$geoWithin: {$centerSphere: [[0, 0], 1]}}}}}}}, node: "
+        "{ixscan: {pattern: {a: 1, 'b.c': 1, 'b.d.e': '2dsphere'}}}}}, "
+        "{fetch: {filter: {'b.d.e': {$geoWithin: {$centerSphere: [[1, 1], 2]}}}, node: "
+        "{ixscan: {pattern: {a: 1, 'b.c': 1, 'b.d.e': '2dsphere'}}}}}]}}"};
+
+    testMultiple2dsphereIndexVersions(versions, keyPatterns, predicate, solutions);
+}
+
+TEST_F(QueryPlanner2dsphereVersionTest, NegationWithoutGeoPredCannotUseGeoIndex) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+
+    std::vector<int> versions{2, 3};
+    std::vector<BSONObj> keyPatterns = {BSON("a" << 1 << "b"
+                                                 << "2dsphere")};
+
+    BSONObj predicate = fromjson("{a: {$ne: 3}}");
+
+    // Only a COLLSCAN is possible, but COLLSCANs are prohibited above.
+    std::vector<std::string> solutions = {};
+
+    testMultiple2dsphereIndexVersions(versions, keyPatterns, predicate, solutions);
+}
+
 }  // namespace
