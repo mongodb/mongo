@@ -4181,7 +4181,7 @@ buildvariants:
   - name: sharding_WT_ese
   - name: sharding_auth
   - name: sharding_auth_audit_WT
-  - name: sharding_csrs_upgrade
+  # - name: sharding_csrs_upgrade
   - name: sharding_csrs_upgrade_WT
   - name: sharding_csrs_upgrade_auth_WT
   # - name: sharding_gle_auth_basics_passthrough
