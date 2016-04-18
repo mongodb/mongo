@@ -344,8 +344,10 @@ Status storeSSLServerOptions(const moe::Environment& params) {
         }
     }
     if (sslGlobalParams.sslMode.load() == SSLParams::SSLMode_allowSSL) {
+        // allowSSL and x509 is valid only when we are transitioning to auth.
         if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendX509 ||
-            clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509) {
+            (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509 &&
+             !serverGlobalParams.transitionToAuth)) {
             return Status(ErrorCodes::BadValue,
                           "cannot have x.509 cluster authentication in allowSSL mode");
         }
