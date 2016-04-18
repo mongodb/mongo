@@ -445,6 +445,12 @@ add_option("experimental-decimal-support",
     nargs='?',
 )
 
+add_option("cxx-std",
+    choices=["11", "14"],
+    default="11",
+    help="Select the C++ langauge standard to build with",
+)
+
 def find_mongo_custom_variables():
     files = []
     for path in sys.path:
@@ -1854,13 +1860,17 @@ def doConfigure(myenv):
         conf.Finish()
 
     if not myenv.ToolchainIs('msvc'):
-        if not AddToCXXFLAGSIfSupported(myenv, '-std=c++11'):
-            myenv.ConfError('Compiler does not honor -std=c++11')
+        if get_option('cxx-std') == "11":
+            if not AddToCXXFLAGSIfSupported(myenv, '-std=c++11'):
+                myenv.ConfError('Compiler does not honor -std=c++11')
+        elif get_option('cxx-std') == "14":
+            if not AddToCXXFLAGSIfSupported(myenv, '-std=c++14'):
+                myenv.ConfError('Compiler does not honor -std=c++14')
         if not AddToCFLAGSIfSupported(myenv, '-std=c99'):
             myenv.ConfError("C++11 mode selected for C++ files, but can't enable C99 for C files")
 
     if using_system_version_of_cxx_libraries():
-        print( 'WARNING: System versions of C++ libraries must be compiled with C++11 support' )
+        print( 'WARNING: System versions of C++ libraries must be compiled with C++11/14 support' )
 
     # We appear to have C++11, or at least a flag to enable it. Check that the declared C++
     # language level is not less than C++11, and that we can at least compile an 'auto'
@@ -1883,12 +1893,34 @@ def doConfigure(myenv):
         context.Result(ret)
         return ret
 
+    def CheckCxx14(context):
+        test_body = """
+        #ifndef _MSC_VER
+        #if __cplusplus < 201402L
+        #error
+        #endif
+        #endif
+        auto DeducedReturnTypesAreACXX14Feature() {
+            return 0;
+        }
+        """
+
+        context.Message('Checking for C++14... ')
+        ret = context.TryCompile(textwrap.dedent(test_body), ".cpp")
+        context.Result(ret)
+        return ret
+
     conf = Configure(myenv, help=False, custom_tests = {
         'CheckCxx11' : CheckCxx11,
+        'CheckCxx14' : CheckCxx14,
     })
 
     if not conf.CheckCxx11():
         myenv.ConfError('C++11 support is required to build MongoDB')
+
+    if get_option('cxx-std') == "14":
+        if not conf.CheckCxx14():
+            myenv.ConfError('C++14 does not appear to work with the current toolchain')
 
     conf.Finish()
 

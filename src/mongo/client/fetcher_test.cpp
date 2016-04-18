@@ -504,7 +504,7 @@ TEST_F(FetcherTest, SetNextActionToContinueWhenNextBatchIsNotAvailable) {
                       Fetcher::NextAction* nextAction,
                       BSONObjBuilder* getMoreBob) {
         ASSERT_OK(fetchResult.getStatus());
-        Fetcher::QueryResponse batchData{fetchResult.getValue()};
+        Fetcher::QueryResponse batchData = fetchResult.getValue();
 
         ASSERT(nextAction);
         *nextAction = Fetcher::NextAction::kGetMore;
@@ -856,7 +856,7 @@ void shutdownDuringSecondBatch(const StatusWith<Fetcher::QueryResponse>& fetchRe
 
     // First time during second batch
     ASSERT_OK(fetchResult.getStatus());
-    Fetcher::QueryResponse batchData{fetchResult.getValue()};
+    Fetcher::QueryResponse batchData = fetchResult.getValue();
     ASSERT_EQUALS(1U, batchData.documents.size());
     ASSERT_EQUALS(doc2, batchData.documents.front());
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == *nextAction);
