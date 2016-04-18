@@ -80,6 +80,12 @@ public:
 
     void setHint(BSONObj hint);
 
+    const BSONObj getCollation() const {
+        return _collation.value_or(BSONObj());
+    }
+
+    void setCollation(BSONObj collation);
+
     /**
      * Constructs a BSON representation of this request, which can be used for sending it in
      * commands.
@@ -107,6 +113,9 @@ private:
     // Optional. Indicates to the query planner that it should generate a count plan using a
     // particular index.
     boost::optional<BSONObj> _hint;
+
+    // Optional. The collation used to compare strings.
+    boost::optional<BSONObj> _collation;
 };
 
 }  // namespace mongo

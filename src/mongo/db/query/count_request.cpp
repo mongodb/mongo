@@ -40,6 +40,7 @@ const char kQueryField[] = "query";
 const char kLimitField[] = "limit";
 const char kSkipField[] = "skip";
 const char kHintField[] = "hint";
+const char kCollationField[] = "collation";
 
 }  // namespace
 
@@ -48,6 +49,10 @@ CountRequest::CountRequest(NamespaceString nss, BSONObj query)
 
 void CountRequest::setHint(BSONObj hint) {
     _hint = hint.getOwned();
+}
+
+void CountRequest::setCollation(BSONObj collation) {
+    _collation = collation.getOwned();
 }
 
 BSONObj CountRequest::toBSON() const {
@@ -66,6 +71,10 @@ BSONObj CountRequest::toBSON() const {
 
     if (_hint) {
         builder.append(kHintField, _hint.get());
+    }
+
+    if (_collation) {
+        builder.append(kCollationField, _collation.get());
     }
 
     return builder.obj();
@@ -116,6 +125,13 @@ StatusWith<CountRequest> CountRequest::parseFromBSON(const std::string& dbname,
     } else if (String == cmdObj[kHintField].type()) {
         const std::string hint = cmdObj.getStringField(kHintField);
         request.setHint(BSON("$hint" << hint));
+    }
+
+    // Collation
+    if (Object == cmdObj[kCollationField].type()) {
+        request.setCollation(cmdObj[kCollationField].Obj());
+    } else if (cmdObj[kCollationField].ok()) {
+        return Status(ErrorCodes::BadValue, "collation value is not a document");
     }
 
     return request;

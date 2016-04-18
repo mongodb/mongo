@@ -54,6 +54,7 @@ TEST(CountRequest, ParseDefaults) {
     ASSERT_EQUALS(countRequest.getLimit(), 0);
     ASSERT_EQUALS(countRequest.getSkip(), 0);
     ASSERT(countRequest.getHint().isEmpty());
+    ASSERT(countRequest.getCollation().isEmpty());
 }
 
 TEST(CountRequest, ParseComplete) {
@@ -62,7 +63,9 @@ TEST(CountRequest, ParseComplete) {
                                     BSON("count"
                                          << "TestColl"
                                          << "query" << BSON("a" << BSON("$gte" << 11)) << "limit"
-                                         << 100 << "skip" << 1000 << "hint" << BSON("b" << 5)));
+                                         << 100 << "skip" << 1000 << "hint" << BSON("b" << 5)
+                                         << "collation" << BSON("locale"
+                                                                << "en_US")));
 
     ASSERT_OK(countRequestStatus.getStatus());
 
@@ -73,6 +76,7 @@ TEST(CountRequest, ParseComplete) {
     ASSERT_EQUALS(countRequest.getLimit(), 100);
     ASSERT_EQUALS(countRequest.getSkip(), 1000);
     ASSERT_EQUALS(countRequest.getHint(), fromjson("{ b : 5 }"));
+    ASSERT_EQUALS(countRequest.getCollation(), fromjson("{ locale : 'en_US' }"));
 }
 
 TEST(CountRequest, ParseNegativeLimit) {
@@ -81,7 +85,9 @@ TEST(CountRequest, ParseNegativeLimit) {
                                     BSON("count"
                                          << "TestColl"
                                          << "query" << BSON("a" << BSON("$gte" << 11)) << "limit"
-                                         << -100 << "skip" << 1000 << "hint" << BSON("b" << 5)));
+                                         << -100 << "skip" << 1000 << "hint" << BSON("b" << 5)
+                                         << "collation" << BSON("locale"
+                                                                << "en_US")));
 
     ASSERT_OK(countRequestStatus.getStatus());
 
@@ -92,6 +98,7 @@ TEST(CountRequest, ParseNegativeLimit) {
     ASSERT_EQUALS(countRequest.getLimit(), 100);
     ASSERT_EQUALS(countRequest.getSkip(), 1000);
     ASSERT_EQUALS(countRequest.getHint(), fromjson("{ b : 5 }"));
+    ASSERT_EQUALS(countRequest.getCollation(), fromjson("{ locale : 'en_US' }"));
 }
 
 TEST(CountRequest, FailParseMissingNS) {
@@ -112,11 +119,25 @@ TEST(CountRequest, FailParseBadSkipValue) {
     ASSERT_EQUALS(countRequestStatus.getStatus(), ErrorCodes::BadValue);
 }
 
+TEST(CountRequest, FailParseBadCollationValue) {
+    const auto countRequestStatus =
+        CountRequest::parseFromBSON("TestDB",
+                                    BSON("count"
+                                         << "TestColl"
+                                         << "query" << BSON("a" << BSON("$gte" << 11))
+                                         << "collation"
+                                         << "en_US"));
+
+    ASSERT_EQUALS(countRequestStatus.getStatus(), ErrorCodes::BadValue);
+}
+
 TEST(CountRequest, ToBSON) {
     CountRequest countRequest(NamespaceString("TestDB.TestColl"), BSON("a" << BSON("$gte" << 11)));
     countRequest.setLimit(100);
     countRequest.setSkip(1000);
     countRequest.setHint(BSON("b" << 5));
+    countRequest.setCollation(BSON("locale"
+                                   << "en_US"));
 
     BSONObj actualObj = countRequest.toBSON();
     BSONObj expectedObj(fromjson(
@@ -124,7 +145,8 @@ TEST(CountRequest, ToBSON) {
         "  query : { a : { '$gte' : 11 } },"
         "  limit : 100,"
         "  skip : 1000,"
-        "  hint : { b : 5 } }"));
+        "  hint : { b : 5 },"
+        "  collation : { locale : 'en_US' } },"));
 
     ASSERT_EQUALS(actualObj, expectedObj);
 }
