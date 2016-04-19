@@ -761,13 +761,17 @@ TEST_F(CachePlanSelectionTest, Basic2DSphereGeoNear) {
 
     query = fromjson("{a: {$nearSphere: [0,0], $maxDistance: 0.31 }}");
     runQuery(query);
-    assertPlanCacheRecoversSolution(query, "{geoNear2dsphere: {a: '2dsphere'}}");
+    assertPlanCacheRecoversSolution(query,
+                                    "{geoNear2dsphere: {pattern: {a: '2dsphere'}, "
+                                    "bounds: {a: [['MinKey', 'MaxKey', true, true]]}}}");
 
     query = fromjson(
         "{a: {$geoNear: {$geometry: {type: 'Point', coordinates: [0,0]},"
         "$maxDistance:100}}}");
     runQuery(query);
-    assertPlanCacheRecoversSolution(query, "{geoNear2dsphere: {a: '2dsphere'}}");
+    assertPlanCacheRecoversSolution(query,
+                                    "{geoNear2dsphere: {pattern: {a: '2dsphere'}, "
+                                    "bounds: {a: [['MinKey', 'MaxKey', true, true]]}}}");
 }
 
 TEST_F(CachePlanSelectionTest, Basic2DSphereGeoNearReverseCompound) {
@@ -776,7 +780,10 @@ TEST_F(CachePlanSelectionTest, Basic2DSphereGeoNearReverseCompound) {
                       << "2dsphere"));
     BSONObj query = fromjson("{x:1, a: {$nearSphere: [0,0], $maxDistance: 0.31 }}");
     runQuery(query);
-    assertPlanCacheRecoversSolution(query, "{geoNear2dsphere: {x: 1, a: '2dsphere'}}");
+    assertPlanCacheRecoversSolution(
+        query,
+        "{geoNear2dsphere: {pattern: {x: 1, a: '2dsphere'}, "
+        "bounds: {x: [[1, 1, true, true]], a: [['MinKey', 'MaxKey', true, true]]}}}");
 }
 
 TEST_F(CachePlanSelectionTest, TwoDSphereNoGeoPred) {

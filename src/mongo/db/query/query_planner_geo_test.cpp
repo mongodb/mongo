@@ -80,7 +80,9 @@ TEST_F(QueryPlannerTest, Basic2DSphereCompound) {
         "coordinates : [-81.513743,28.369947] },"
         " $maxDistance :100}},a: 'mouse'}"));
     assertNumSolutions(1U);
-    assertSolutionExists("{fetch: {node: {geoNear2dsphere: {loc: '2dsphere'}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {geoNear2dsphere: {pattern: {loc: '2dsphere'}, "
+        "bounds: {loc: [['MinKey', 'MaxKey', true, true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, Basic2DCompound) {
@@ -113,7 +115,9 @@ TEST_F(QueryPlannerTest, Multikey2DSphereCompound) {
         "coordinates : [-81.513743,28.369947] },"
         " $maxDistance :100}},a: 'mouse'}"));
     assertNumSolutions(1U);
-    assertSolutionExists("{fetch: {node: {geoNear2dsphere: {loc: '2dsphere'}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {geoNear2dsphere: {pattern: {loc: '2dsphere'}, "
+        "bounds: {loc: [['MinKey', 'MaxKey', true, true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, Basic2DSphereNonNear) {
@@ -174,13 +178,17 @@ TEST_F(QueryPlannerTest, Basic2DSphereGeoNear) {
 
     runQuery(fromjson("{a: {$nearSphere: [0,0], $maxDistance: 0.31 }}"));
     ASSERT_EQUALS(getNumSolutions(), 1U);
-    assertSolutionExists("{geoNear2dsphere: {a: '2dsphere'}}");
+    assertSolutionExists(
+        "{geoNear2dsphere: {pattern: {a: '2dsphere'}, "
+        "bounds: {a: [['MinKey', 'MaxKey', true, true]]}}}");
 
     runQuery(fromjson(
         "{a: {$geoNear: {$geometry: {type: 'Point', coordinates: [0,0]},"
         "$maxDistance:100}}}"));
     assertNumSolutions(1U);
-    assertSolutionExists("{geoNear2dsphere: {a: '2dsphere'}}");
+    assertSolutionExists(
+        "{geoNear2dsphere: {pattern: {a: '2dsphere'}, "
+        "bounds: {a: [['MinKey', 'MaxKey', true, true]]}}}");
 }
 
 TEST_F(QueryPlannerTest, Multikey2DSphereGeoNear) {
@@ -192,13 +200,17 @@ TEST_F(QueryPlannerTest, Multikey2DSphereGeoNear) {
 
     runQuery(fromjson("{a: {$nearSphere: [0,0], $maxDistance: 0.31 }}"));
     ASSERT_EQUALS(getNumSolutions(), 1U);
-    assertSolutionExists("{geoNear2dsphere: {a: '2dsphere'}}");
+    assertSolutionExists(
+        "{geoNear2dsphere: {pattern: {a: '2dsphere'}, "
+        "bounds: {a: [['MinKey', 'MaxKey', true, true]]}}}");
 
     runQuery(fromjson(
         "{a: {$geoNear: {$geometry: {type: 'Point', coordinates: [0,0]},"
         "$maxDistance:100}}}"));
     assertNumSolutions(1U);
-    assertSolutionExists("{geoNear2dsphere: {a: '2dsphere'}}");
+    assertSolutionExists(
+        "{geoNear2dsphere: {pattern: {a: '2dsphere'}, "
+        "bounds: {a: [['MinKey', 'MaxKey', true, true]]}}}");
 }
 
 TEST_F(QueryPlannerTest, Basic2DSphereGeoNearReverseCompound) {
@@ -208,7 +220,9 @@ TEST_F(QueryPlannerTest, Basic2DSphereGeoNearReverseCompound) {
     runQuery(fromjson("{x:1, a: {$nearSphere: [0,0], $maxDistance: 0.31 }}"));
 
     assertNumSolutions(1U);
-    assertSolutionExists("{geoNear2dsphere: {x: 1, a: '2dsphere'}}");
+    assertSolutionExists(
+        "{geoNear2dsphere: {pattern: {x: 1, a: '2dsphere'}, "
+        "bounds: {x: [[1, 1, true, true]], a: [['MinKey', 'MaxKey', true, true]]}}}");
 }
 
 TEST_F(QueryPlannerTest, Multikey2DSphereGeoNearReverseCompound) {
@@ -219,7 +233,9 @@ TEST_F(QueryPlannerTest, Multikey2DSphereGeoNearReverseCompound) {
     runQuery(fromjson("{x:1, a: {$nearSphere: [0,0], $maxDistance: 0.31 }}"));
 
     assertNumSolutions(1U);
-    assertSolutionExists("{geoNear2dsphere: {x: 1, a: '2dsphere'}}");
+    assertSolutionExists(
+        "{geoNear2dsphere: {pattern: {x: 1, a: '2dsphere'}, "
+        "bounds: {x: [[1, 1, true, true]], a: [['MinKey', 'MaxKey', true, true]]}}}");
 }
 
 TEST_F(QueryPlannerTest, NearNoIndex) {
@@ -268,7 +284,8 @@ TEST_F(QueryPlannerTest, GeoNearMultipleRelevantIndicesButOnlyOneCompatible) {
     assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {b: {$exists: false}}, node: "
-        "{geoNear2dsphere: {a: '2dsphere'}}}}");
+        "{geoNear2dsphere: {pattern: {a: '2dsphere'}, "
+        "bounds: {a: [['MinKey', 'MaxKey', true, true]]}}}}}");
 }
 
 // SERVER-3984, $or 2d index
@@ -409,7 +426,7 @@ TEST_F(QueryPlannerTest, And2DSphereWithNearSameField) {
 
     // GEO_NEAR must use the index, and GEO predicate becomes a filter.
     assertNumSolutions(1U);
-    assertSolutionExists("{fetch: {node: {geoNear2dsphere: {a: '2dsphere'}}}}");
+    assertSolutionExists("{fetch: {node: {geoNear2dsphere: {pattern: {a: '2dsphere'}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, And2DSphereWithNearSameFieldMultikey) {
@@ -425,7 +442,9 @@ TEST_F(QueryPlannerTest, And2DSphereWithNearSameFieldMultikey) {
 
     // GEO_NEAR must use the index, and GEO predicate becomes a filter.
     assertNumSolutions(1U);
-    assertSolutionExists("{fetch: {node: {geoNear2dsphere: {a: '2dsphere'}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {geoNear2dsphere: {pattern: {a: '2dsphere'}, "
+        "bounds: {a: [['MinKey', 'MaxKey', true, true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, Or2DSphereSameFieldNonNear) {
@@ -468,7 +487,9 @@ TEST_F(QueryPlannerTest, CompoundMultikey2DSphereNear) {
         "{type: 'Point', coordinates: [2, 2]}}}}"));
 
     assertNumSolutions(1U);
-    assertSolutionExists("{geoNear2dsphere: {a: 1, b: '2dsphere'}}");
+    assertSolutionExists(
+        "{geoNear2dsphere: {pattern: {a: 1, b: '2dsphere'}, "
+        "bounds: {a: [[0, Infinity, true, true]], b: [['MinKey', 'MaxKey', true, true]]}}}");
 }
 
 TEST_F(QueryPlannerTest, CompoundMultikey2DSphereNearFetchRequired) {
@@ -483,7 +504,8 @@ TEST_F(QueryPlannerTest, CompoundMultikey2DSphereNearFetchRequired) {
     assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {a:{$gte:0}}, node: "
-        "{geoNear2dsphere: {a: 1, b: '2dsphere'}}}}");
+        "{geoNear2dsphere: {pattern: {a: 1, b: '2dsphere'}, "
+        "bounds: {a: [[-Infinity, 5, true, false]], b: [['MinKey', 'MaxKey', true, true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, CompoundMultikey2DSphereNearMultipleIndices) {
@@ -501,10 +523,12 @@ TEST_F(QueryPlannerTest, CompoundMultikey2DSphereNearMultipleIndices) {
     assertNumSolutions(2U);
     assertSolutionExists(
         "{fetch: {filter: {c:3}, node: "
-        "{geoNear2dsphere: {a: 1, b: '2dsphere'}}}}");
+        "{geoNear2dsphere: {pattern: {a: 1, b: '2dsphere'}, "
+        "bounds: {a: [[0, Infinity, true, true]], b: [['MinKey', 'MaxKey', true, true]]}}}}}");
     assertSolutionExists(
         "{fetch: {filter: {a:{$gte:0}}, node: "
-        "{geoNear2dsphere: {c: 1, b: '2dsphere'}}}}");
+        "{geoNear2dsphere: {pattern: {c: 1, b: '2dsphere'}, "
+        "bounds: {c: [[3, 3, true, true]], b: [['MinKey', 'MaxKey', true, true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, CompoundMultikey2DSphereNearMultipleLeadingFields) {
@@ -519,7 +543,9 @@ TEST_F(QueryPlannerTest, CompoundMultikey2DSphereNearMultipleLeadingFields) {
     assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {a:{$gt:1}}, node: "
-        "{geoNear2dsphere: {a: 1, b: 1, c: '2dsphere'}}}}");
+        "{geoNear2dsphere: {pattern: {a: 1, b: 1, c: '2dsphere'}, "
+        "bounds: {a: [[-Infinity, 5, true, false]], b: [[6, 6, true, true]], "
+        "c: [['MinKey', 'MaxKey', true, true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, CompoundMultikey2DSphereNearMultipleGeoPreds) {
@@ -533,7 +559,10 @@ TEST_F(QueryPlannerTest, CompoundMultikey2DSphereNearMultipleGeoPreds) {
         "{c: {$geoWithin: {$box: [ [1, 1], [3, 3] ] } } } ] }"));
 
     assertNumSolutions(1U);
-    assertSolutionExists("{fetch: {node: {geoNear2dsphere: {a:1, b:1, c:'2dsphere'}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {geoNear2dsphere: {pattern: {a:1, b:1, c:'2dsphere'}, "
+        "bounds: {a: [[1, 1, true, true]], b: [[6, 6, true, true]], "
+        "c: [['MinKey', 'MaxKey', true, true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, CompoundMultikey2DSphereNearCompoundTest) {
@@ -550,7 +579,9 @@ TEST_F(QueryPlannerTest, CompoundMultikey2DSphereNearCompoundTest) {
     assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {d:{$gt:1},c:{$gte:0}}, node: "
-        "{geoNear2dsphere: {a: 1, b: '2dsphere', c: 1, d: 1}}}}");
+        "{geoNear2dsphere: {pattern: {a: 1, b: '2dsphere', c: 1, d: 1}, "
+        "bounds: {a: [[0, Infinity, true, true]], b: [['MinKey', 'MaxKey', true, true]], "
+        "c: [[-Infinity, 4, true, false]], d: [[-Infinity, 5, true, false]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, CompoundMultikey2DNear) {
@@ -725,7 +756,9 @@ TEST_F(QueryPlannerTest, Negation2DSphereGeoNear) {
         "{$and: [{a: {$nearSphere: [0,0], $maxDistance: 0.31}}, "
         "{b: {$ne: 1}}]}"));
     assertNumSolutions(1U);
-    assertSolutionExists("{fetch: {node: {geoNear2dsphere: {a: '2dsphere'}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {geoNear2dsphere: {pattern: {a: '2dsphere'}, "
+        "bounds: {a: [['MinKey', 'MaxKey', true, true]]}}}}}");
 
     runQuery(fromjson(
         "{$and: [{a: {$geoNear: {$geometry: {type: 'Point', "
@@ -733,7 +766,9 @@ TEST_F(QueryPlannerTest, Negation2DSphereGeoNear) {
         "$maxDistance: 100}}},"
         "{b: {$ne: 1}}]}"));
     assertNumSolutions(1U);
-    assertSolutionExists("{fetch: {node: {geoNear2dsphere: {a: '2dsphere'}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {geoNear2dsphere: {pattern: {a: '2dsphere'}, "
+        "bounds: {a: [['MinKey', 'MaxKey', true, true]]}}}}}");
 }
 
 //
@@ -751,7 +786,9 @@ TEST_F(QueryPlannerTest, Negation2DSphereGeoNearMultikey) {
         "{$and: [{a: {$nearSphere: [0,0], $maxDistance: 0.31}}, "
         "{b: {$ne: 1}}]}"));
     assertNumSolutions(1U);
-    assertSolutionExists("{fetch: {node: {geoNear2dsphere: {a: '2dsphere'}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {geoNear2dsphere: {pattern: {a: '2dsphere'}, "
+        "bounds: {a: [['MinKey', 'MaxKey', true, true]]}}}}}");
 
     runQuery(fromjson(
         "{$and: [{a: {$geoNear: {$geometry: {type: 'Point', "
@@ -759,7 +796,9 @@ TEST_F(QueryPlannerTest, Negation2DSphereGeoNearMultikey) {
         "$maxDistance: 100}}},"
         "{b: {$ne: 1}}]}"));
     assertNumSolutions(1U);
-    assertSolutionExists("{fetch: {node: {geoNear2dsphere: {a: '2dsphere'}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {geoNear2dsphere: {pattern: {a: '2dsphere'}, "
+        "bounds: {a: [['MinKey', 'MaxKey', true, true]]}}}}}");
 }
 
 //

@@ -290,7 +290,25 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
             return false;
         }
         BSONObj geoObj = el.Obj();
-        return geoObj == node->indexKeyPattern;
+
+        BSONElement pattern = geoObj["pattern"];
+        if (pattern.eoo() || !pattern.isABSONObj()) {
+            return false;
+        }
+        if (pattern.Obj() != node->indexKeyPattern) {
+            return false;
+        }
+
+        BSONElement bounds = geoObj["bounds"];
+        if (!bounds.eoo()) {
+            if (!bounds.isABSONObj()) {
+                return false;
+            } else if (!boundsMatch(bounds.Obj(), node->baseBounds)) {
+                return false;
+            }
+        }
+
+        return true;
     } else if (STAGE_TEXT == trueSoln->getType()) {
         // {text: {search: "somestr", language: "something", filter: {blah: 1}}}
         const TextNode* node = static_cast<const TextNode*>(trueSoln);
