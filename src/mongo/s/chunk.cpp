@@ -33,6 +33,7 @@
 #include "mongo/s/chunk.h"
 
 #include "mongo/client/connpool.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
@@ -50,7 +51,6 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
 #include "mongo/s/move_chunk_request.h"
@@ -402,26 +402,30 @@ Status Chunk::multiSplit(OperationContext* txn, const vector<BSONObj>& m, BSONOb
     cmd.append("splitKeys", m);
     cmd.append("configdb", grid.shardRegistry()->getConfigServerConnectionString().toString());
     _manager->getVersion().appendForCommands(&cmd);
-    // TODO(SERVER-20742): Remove this after 3.2, now that we're sending version it is redundant
-    cmd.append("epoch", _manager->getVersion().epoch());
-    BSONObj cmdObj = cmd.obj();
 
     BSONObj dummy;
     if (res == NULL) {
         res = &dummy;
     }
 
-    ShardConnection conn(_getShardConnectionString(txn), "");
-    if (!conn->runCommand("admin", cmdObj, *res)) {
-        Status status = getStatusFromCommandResult(*res);
-        warning() << "splitChunk cmd " << cmdObj << " failed" << causedBy(status);
-        conn.done();
+    BSONObj cmdObj = cmd.obj();
 
-        return Status(ErrorCodes::SplitFailed,
-                      str::stream() << "command failed due to " << status.toString());
+    Status status{ErrorCodes::NotYetInitialized, "Uninitialized"};
+
+    auto cmdStatus = Grid::get(txn)->shardRegistry()->runIdempotentCommandOnShard(
+        txn, _shardId, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, "admin", cmdObj);
+    if (cmdStatus.isOK()) {
+        *res = std::move(cmdStatus.getValue());
+        status = getStatusFromCommandResult(*res);
+    } else {
+        status = std::move(cmdStatus.getStatus());
     }
 
-    conn.done();
+    if (!status.isOK()) {
+        warning() << "splitChunk cmd " << cmdObj << " failed" << causedBy(status);
+        return {ErrorCodes::SplitFailed,
+                str::stream() << "command failed due to " << status.toString()};
+    }
 
     // force reload of config
     _manager->reload(txn);
@@ -453,21 +457,26 @@ bool Chunk::moveAndCommit(OperationContext* txn,
     builder.append(LiteParsedQuery::cmdOptionMaxTimeMS, maxTimeMS);
 
     BSONObj cmdObj = builder.obj();
-
     log() << "Moving chunk with the following arguments: " << cmdObj;
 
-    ShardConnection fromconn(_getShardConnectionString(txn), "");
-    bool worked = fromconn->runCommand("admin", cmdObj, res);
-    fromconn.done();
+    Status status{ErrorCodes::NotYetInitialized, "Uninitialized"};
 
-    LOG(worked ? 1 : 0) << "moveChunk result: " << res;
+    auto cmdStatus = Grid::get(txn)->shardRegistry()->runIdempotentCommandOnShard(
+        txn, _shardId, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, "admin", cmdObj);
+    if (!cmdStatus.isOK()) {
+        warning() << "Move chunk failed" << causedBy(cmdStatus.getStatus());
+        status = std::move(cmdStatus.getStatus());
+    } else {
+        res = std::move(cmdStatus.getValue());
+        status = getStatusFromCommandResult(res);
+        LOG(status.isOK() ? 1 : 0) << "moveChunk result: " << res;
+    }
 
-    // if succeeded, needs to reload to pick up the new location
-    // if failed, mongos may be stale
-    // reload is excessive here as the failure could be simply because collection metadata is taken
+    // If succeeded we needs to reload the chunk manager in order to pick up the new location. If
+    // failed, mongos may be stale.
     _manager->reload(txn);
 
-    return worked;
+    return status.isOK();
 }
 
 bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {
