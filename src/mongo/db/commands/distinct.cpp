@@ -63,6 +63,7 @@ namespace {
 
 const char kKeyField[] = "key";
 const char kQueryField[] = "query";
+const char kCollationField[] = "collation";
 
 }  // namespace
 
@@ -128,6 +129,21 @@ public:
                                             << typeName(BSONType::jstNULL) << ", found "
                                             << typeName(queryElt.type()));
             }
+        }
+
+        // Extract the collation field, if it exists.
+        // TODO SERVER-23473: Pass this collation spec object down so that it can be converted into
+        // a CollatorInterface.
+        BSONObj collation;
+        if (BSONElement collationElt = cmdObj[kCollationField]) {
+            if (collationElt.type() != BSONType::Object) {
+                return Status(ErrorCodes::TypeMismatch,
+                              str::stream() << "\"" << kCollationField
+                                            << "\" had the wrong type. Expected "
+                                            << typeName(BSONType::Object) << ", found "
+                                            << typeName(collationElt.type()));
+            }
+            collation = collationElt.embeddedObject();
         }
 
         auto executor = getExecutorDistinct(
