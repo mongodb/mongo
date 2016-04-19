@@ -95,4 +95,3 @@ __wt_sync_and_rename(WT_SESSION_IMPL *session,
 
 	return (__wt_rename_and_sync_directory(session, from, to));
 }
-

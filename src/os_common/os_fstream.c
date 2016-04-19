@@ -211,4 +211,3 @@ err:	__wt_close(session, &fh);
 	__wt_free(session, *fsp);
 	return (ret);
 }
-
