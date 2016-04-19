@@ -40,6 +40,8 @@
 
 namespace mongo {
 
+const uint64_t BalancerConfiguration::kDefaultMaxChunkSizeBytes;
+
 BalancerConfiguration::BalancerConfiguration(uint64_t defaultMaxChunkSizeBytes)
     : _secondaryThrottle(
           MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kDefault)),
