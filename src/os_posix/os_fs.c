@@ -625,10 +625,10 @@ __wt_os_posix(WT_SESSION_IMPL *session)
 	conn->file_directory_list = __wt_posix_directory_list;
 	conn->file_directory_sync = __posix_directory_sync;
 	conn->file_exist = __posix_fs_exist;
+	conn->file_open = __posix_file_open;
 	conn->file_remove = __posix_fs_remove;
 	conn->file_rename = __posix_fs_rename;
 	conn->file_size = __posix_fs_size;
-	conn->file_open = __posix_file_open;
 
 	return (0);
 }

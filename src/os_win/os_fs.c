@@ -405,11 +405,11 @@ __win_handle_write(WT_SESSION_IMPL *session,
 }
 
 /*
- * __win_handle_open --
+ * __win_file_open --
  *	Open a file handle.
  */
 static int
-__win_handle_open(WT_SESSION_IMPL *session,
+__win_file_open(WT_SESSION_IMPL *session,
     WT_FH *fh, const char *name, uint32_t file_type, uint32_t flags)
 {
 	DWORD dwCreationDisposition;
@@ -551,10 +551,10 @@ __wt_os_win(WT_SESSION_IMPL *session)
 	conn->file_directory_list = __wt_win_directory_list;
 	conn->file_directory_sync = __win_directory_sync;
 	conn->file_exist = __win_file_exist;
+	conn->file_open = __win_file_open;
 	conn->file_remove = __win_file_remove;
 	conn->file_rename = __win_file_rename;
 	conn->file_size = __win_file_size;
-	conn->handle_open = __win_handle_open;
 
 	return (0);
 }
