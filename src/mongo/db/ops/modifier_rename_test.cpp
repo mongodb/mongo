@@ -108,6 +108,33 @@ TEST(InvalidInit, FromDbTests) {
         mod.init(fromjson("{'b':'a.'}").firstElement(), ModifierInterface::Options::normal()));
 }
 
+TEST(InvalidInit, ToFieldCannotContainEmbeddedNullByte) {
+    ModifierRename mod;
+    {
+        StringData embeddedNull("a\0b", StringData::LiteralTag());
+        ASSERT_NOT_OK(mod.init(BSON("a" << embeddedNull).firstElement(),
+                               ModifierInterface::Options::normal()));
+    }
+
+    {
+        StringData singleNullByte("\0", StringData::LiteralTag());
+        ASSERT_NOT_OK(mod.init(BSON("a" << singleNullByte).firstElement(),
+                               ModifierInterface::Options::normal()));
+    }
+
+    {
+        StringData leadingNullByte("\0bbbb", StringData::LiteralTag());
+        ASSERT_NOT_OK(mod.init(BSON("a" << leadingNullByte).firstElement(),
+                               ModifierInterface::Options::normal()));
+    }
+
+    {
+        StringData trailingNullByte("bbbb\0", StringData::LiteralTag());
+        ASSERT_NOT_OK(mod.init(BSON("a" << trailingNullByte).firstElement(),
+                               ModifierInterface::Options::normal()));
+    }
+}
+
 TEST(MissingFrom, InitPrepLog) {
     Document doc(fromjson("{a: 2}"));
     Mod setMod(fromjson("{$rename: {'b':'a'}}"));
