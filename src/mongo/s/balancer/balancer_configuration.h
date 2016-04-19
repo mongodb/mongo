@@ -51,7 +51,7 @@ class BalancerConfiguration {
 public:
     // Default value used for the max chunk size if one is not specified in the balancer
     // configuration
-    static const uint64_t kDefaultMaxChunkSizeBytes{64 * 1024 * 1024};
+    static const uint64_t kDefaultMaxChunkSizeBytes;
 
     /**
      * Primes the balancer configuration with some default values. These settings may change at a
