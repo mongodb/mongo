@@ -2578,9 +2578,11 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 
 		/*
 		 * Don't create an image so large that any future update will
-		 * cause a split in memory.
+		 * cause a split in memory.  Use half of the maximum size so
+		 * we split very compressible pages that have reached the
+		 * maximum size in memory into two equal blocks.
 		 */
-		if (len > (size_t)btree->splitmempage)
+		if (len > (size_t)btree->maxmempage / 2)
 			break;
 	}
 
