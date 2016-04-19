@@ -31,12 +31,14 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/executor/task_executor.h"
 
 namespace mongo {
-
-class BSONObj;
-class RemoteCommandTargeter;
 
 using ShardId = std::string;
 
@@ -51,6 +53,16 @@ class Shard {
     MONGO_DISALLOW_COPYING(Shard);
 
 public:
+    struct CommandResponse {
+        BSONObj response;
+        BSONObj metadata;
+    };
+
+    struct QueryResponse {
+        std::vector<BSONObj> docs;
+        repl::OpTime opTime;
+    };
+
     /**
      * Instantiates a new shard connection management object for the specified shard.
      */
@@ -68,7 +80,6 @@ public:
      * Returns true if this shard object represents the config server.
      */
     bool isConfig() const;
-
 
     /**
      * Returns the current config string.
@@ -92,6 +103,22 @@ public:
      */
     std::string toString() const;
 
+    StatusWith<CommandResponse> runCommand(OperationContext* txn,
+                                           const ReadPreferenceSetting& readPref,
+                                           const std::string& dbName,
+                                           const BSONObj& cmdObj,
+                                           const BSONObj& metadata);
+
+    /**
+    * Warning: This method exhausts the cursor and pulls all data into memory.
+    * Do not use other than for very small (i.e., admin or metadata) collections.
+    */
+    StatusWith<QueryResponse> exhaustiveFindOnConfig(OperationContext* txn,
+                                                     const ReadPreferenceSetting& readPref,
+                                                     const NamespaceString& nss,
+                                                     const BSONObj& query,
+                                                     const BSONObj& sort,
+                                                     const boost::optional<long long> limit);
 
     /**
      * Notifies the RemoteCommandTargeter owned by the shard of a particular mode of failure for the
@@ -99,8 +126,22 @@ public:
      */
     void updateReplSetMonitor(const HostAndPort& remoteHost, const Status& remoteCommandStatus);
 
-
 private:
+    // TODO: SERVER-23782 make Shard::_runCommand take a timeout argument.
+    StatusWith<CommandResponse> _runCommand(OperationContext* txn,
+                                            const ReadPreferenceSetting& readPref,
+                                            const std::string& dbname,
+                                            const BSONObj& cmdObj,
+                                            const BSONObj& metadata);
+
+    // TODO: SERVER-23782 make Shard::_exhaustiveFindOnConfig take a timeout argument.
+    StatusWith<QueryResponse> _exhaustiveFindOnConfig(OperationContext* txn,
+                                                      const ReadPreferenceSetting& readPref,
+                                                      const NamespaceString& nss,
+                                                      const BSONObj& query,
+                                                      const BSONObj& sort,
+                                                      boost::optional<long long> limit);
+
     /**
      * Identifier of the shard as obtained from the configuration data (i.e. shard0000).
      */

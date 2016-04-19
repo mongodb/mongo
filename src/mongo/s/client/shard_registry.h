@@ -77,11 +77,6 @@ class ShardRegistry {
     MONGO_DISALLOW_COPYING(ShardRegistry);
 
 public:
-    struct QueryResponse {
-        std::vector<BSONObj> docs;
-        repl::OpTime opTime;
-    };
-
     /**
      * Instantiates a new shard registry.
      *
@@ -184,12 +179,13 @@ public:
      *
      * Note: should never be used outside of CatalogManagerReplicaSet or DistLockCatalogImpl.
      */
-    StatusWith<QueryResponse> exhaustiveFindOnConfig(OperationContext* txn,
-                                                     const ReadPreferenceSetting& readPref,
-                                                     const NamespaceString& nss,
-                                                     const BSONObj& query,
-                                                     const BSONObj& sort,
-                                                     boost::optional<long long> limit);
+    StatusWith<Shard::QueryResponse> exhaustiveFindOnConfig(OperationContext* txn,
+                                                            const ReadPreferenceSetting& readPref,
+                                                            const NamespaceString& nss,
+                                                            const BSONObj& query,
+                                                            const BSONObj& sort,
+                                                            boost::optional<long long> limit);
+
 
     /**
      * Runs a command against a host belonging to the specified shard and matching the given
@@ -275,11 +271,6 @@ public:
 private:
     using ShardMap = std::unordered_map<ShardId, std::shared_ptr<Shard>>;
 
-    struct CommandResponse {
-        BSONObj response;
-        BSONObj metadata;
-    };
-
     /**
      * Creates a shard based on the specified information and puts it into the lookup maps.
      */
@@ -296,39 +287,17 @@ private:
     std::shared_ptr<Shard> _findUsingLookUp_inlock(const ShardId& shardId);
 
     /**
-     * Runs a command against the specified host, checks the returned reply (if any) for
-     * errorsToCheck and returns the result. If the command succeeds, it is the responsibility
-     * of the caller to check the returned BSON for command-specific failures.
-     */
-    StatusWith<CommandResponse> _runCommandWithMetadata(OperationContext* txn,
-                                                        executor::TaskExecutor* executor,
-                                                        const std::shared_ptr<Shard>& shard,
-                                                        const ReadPreferenceSetting& readPref,
-                                                        const std::string& dbName,
-                                                        const BSONObj& cmdObj,
-                                                        const BSONObj& metadata,
-                                                        const ErrorCodesSet& errorsToCheck);
-
-    StatusWith<QueryResponse> _exhaustiveFindOnConfig(OperationContext* txn,
-                                                      const ReadPreferenceSetting& readPref,
-                                                      const NamespaceString& nss,
-                                                      const BSONObj& query,
-                                                      const BSONObj& sort,
-                                                      boost::optional<long long> limit);
-
-
-    /**
      * Runs a command cmdObj, extracts an error code from its result and retries if its in the
      * errorsToCheck set or reaches the max number of retries.
      */
-    StatusWith<CommandResponse> _runCommandWithRetries(OperationContext* txn,
-                                                       executor::TaskExecutor* executor,
-                                                       const std::shared_ptr<Shard>& shard,
-                                                       const ReadPreferenceSetting& readPref,
-                                                       const std::string& dbname,
-                                                       const BSONObj& cmdObj,
-                                                       const BSONObj& metadata,
-                                                       const ErrorCodesSet& errorsToCheck);
+    StatusWith<Shard::CommandResponse> _runCommandWithRetries(OperationContext* txn,
+                                                              executor::TaskExecutor* executor,
+                                                              const std::shared_ptr<Shard>& shard,
+                                                              const ReadPreferenceSetting& readPref,
+                                                              const std::string& dbname,
+                                                              const BSONObj& cmdObj,
+                                                              const BSONObj& metadata,
+                                                              const ErrorCodesSet& errorsToCheck);
 
     // Factory to create shards.  Never changed after startup so safe
     // to access outside of _mutex.
