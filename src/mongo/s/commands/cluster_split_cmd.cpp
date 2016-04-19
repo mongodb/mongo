@@ -101,8 +101,6 @@ public:
                      int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
-        ShardConnection::sync();
-
         const NamespaceString nss(parseNs(dbname, cmdObj));
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << nss.ns() << " is not a valid namespace",

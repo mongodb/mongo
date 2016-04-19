@@ -271,15 +271,6 @@ public:
         s->avail = conn;
     }
 
-    void sync() {
-        for (HostMap::iterator i = _hosts.begin(); i != _hosts.end(); ++i) {
-            string addr = i->first;
-            Status* ss = i->second;
-            if (ss->avail)
-                ss->avail->getLastError();
-        }
-    }
-
     void checkVersions(OperationContext* txn, const string& ns) {
         vector<ShardId> all;
         grid.shardRegistry()->getAllShardIds(&all);
@@ -487,10 +478,6 @@ void ShardConnection::kill() {
         _conn = 0;
         _finishedInit = true;
     }
-}
-
-void ShardConnection::sync() {
-    ClientConnections::threadInstance()->sync();
 }
 
 void ShardConnection::checkMyConnectionVersions(OperationContext* txn, const string& ns) {

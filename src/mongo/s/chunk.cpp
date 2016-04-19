@@ -491,13 +491,6 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {
 
         TicketHolderReleaser releaser(&(getManager()->_splitHeuristics._splitTickets));
 
-        // this is a bit ugly
-        // we need it so that mongos blocks for the writes to actually be committed
-        // this does mean mongos has more back pressure than mongod alone
-        // since it nots 100% tcp queue bound
-        // this was implicit before since we did a splitVector on the same socket
-        ShardConnection::sync();
-
         LOG(1) << "about to initiate autosplit: " << *this << " dataWritten: " << _dataWritten
                << " splitThreshold: " << splitThreshold;
 

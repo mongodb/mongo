@@ -103,20 +103,16 @@ public:
                      int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
-        ShardConnection::sync();
-
         Timer t;
 
         const NamespaceString nss(parseNs(dbname, cmdObj));
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << nss.ns() << " is not a valid namespace",
+                nss.isValid());
 
         std::shared_ptr<DBConfig> config;
 
         {
-            if (nss.size() == 0) {
-                return appendCommandStatus(
-                    result, Status(ErrorCodes::InvalidNamespace, "no namespace specified"));
-            }
-
             auto status = grid.catalogCache()->getDatabase(txn, nss.db().toString());
             if (!status.isOK()) {
                 return appendCommandStatus(result, status.getStatus());

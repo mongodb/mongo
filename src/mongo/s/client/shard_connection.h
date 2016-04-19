@@ -103,8 +103,6 @@ public:
         return _setVersion;
     }
 
-    static void sync();
-
     void donotCheckVersion() {
         _setVersion = false;
         _finishedInit = true;
