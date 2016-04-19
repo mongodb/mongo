@@ -45,7 +45,6 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/op_observer.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/last_vote.h"

@@ -31,6 +31,8 @@
  */
 
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/exec/near.h"
 #include "mongo/db/exec/queued_data_stage.h"

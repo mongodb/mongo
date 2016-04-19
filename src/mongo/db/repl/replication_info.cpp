@@ -32,13 +32,13 @@
 #include <vector>
 
 #include "mongo/client/connpool.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/master_slave.h"

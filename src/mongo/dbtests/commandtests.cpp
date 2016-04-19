@@ -28,9 +28,10 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/dbtests/dbtests.h"
 
 using namespace mongo;
@@ -51,7 +52,8 @@ struct Base {
         return "test.fs.chunks";
     }
 
-    OperationContextImpl _txn;
+    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
+    OperationContext& _txn = *_txnPtr;
     DBDirectClient db;
 };
 struct Type0 : Base {
@@ -126,7 +128,8 @@ public:
         return "symbolarg";
     }
 
-    OperationContextImpl _txn;
+    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
+    OperationContext& _txn = *_txnPtr;
     DBDirectClient db;
 };
 

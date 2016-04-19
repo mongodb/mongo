@@ -41,7 +41,6 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/repl_client_info.h"

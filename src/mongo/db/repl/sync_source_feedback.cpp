@@ -33,7 +33,6 @@
 #include "mongo/db/repl/sync_source_feedback.h"
 
 #include "mongo/db/client.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"

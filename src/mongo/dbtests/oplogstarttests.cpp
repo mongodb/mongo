@@ -20,20 +20,20 @@
  * be replayed from for replication.
  */
 
-#include "mongo/dbtests/dbtests.h"
-
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/client.h"
 #include "mongo/db/db.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/oplogstart.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/service_context.h"
+#include "mongo/dbtests/dbtests.h"
 
 namespace OplogStartTests {
 
@@ -45,8 +45,7 @@ static const NamespaceString nss("unittests.oplogstarttests");
 class Base {
 public:
     Base()
-        : _txn(),
-          _scopedXact(&_txn, MODE_X),
+        : _scopedXact(&_txn, MODE_X),
           _lk(_txn.lockState()),
           _context(&_txn, nss.ns()),
           _client(&_txn) {
@@ -98,7 +97,8 @@ protected:
 
 private:
     // The order of these is important in order to ensure order of destruction
-    OperationContextImpl _txn;
+    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
+    OperationContext& _txn = *_txnPtr;
     ScopedTransaction _scopedXact;
     Lock::GlobalWrite _lk;
     OldClientContext _context;

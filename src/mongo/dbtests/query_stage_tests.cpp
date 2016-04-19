@@ -26,9 +26,12 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/index_scan.h"
@@ -36,7 +39,6 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/stdx/memory.h"
@@ -126,7 +128,8 @@ public:
     }
 
 protected:
-    OperationContextImpl _txn;
+    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
+    OperationContext& _txn = *_txnPtr;
 
 private:
     DBDirectClient _client;

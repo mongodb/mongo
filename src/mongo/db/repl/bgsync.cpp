@@ -42,7 +42,6 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -248,7 +247,8 @@ void BackgroundSync::_producerThread() {
     }
     // we want to start when we're no longer primary
     // start() also loads _lastOpTimeFetched, which we know is set from the "if"
-    OperationContextImpl txn;
+    const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+    OperationContext& txn = *txnPtr;
     if (isStopped()) {
         start(&txn);
     }

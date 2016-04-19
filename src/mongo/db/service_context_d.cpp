@@ -320,7 +320,7 @@ void ServiceContextMongoD::registerKillOpListener(KillOpListenerInterface* liste
 
 std::unique_ptr<OperationContext> ServiceContextMongoD::_newOpCtx(Client* client) {
     invariant(&cc() == client);
-    return stdx::make_unique<OperationContextImpl>();
+    return std::unique_ptr<OperationContextImpl>(new OperationContextImpl());
 }
 
 void ServiceContextMongoD::setOpObserver(std::unique_ptr<OpObserver> opObserver) {

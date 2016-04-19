@@ -33,9 +33,9 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"

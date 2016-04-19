@@ -51,7 +51,6 @@
 #include "mongo/db/db.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/db/storage/mmap_v1/mmap.h"
 #include "mongo/db/storage/storage_options.h"
@@ -106,7 +105,8 @@ protected:
     }
 
 private:
-    OperationContextImpl _txn;
+    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
+    OperationContext& _txn = *_txnPtr;
     DBDirectClient _client;
 };
 
@@ -327,7 +327,8 @@ public:
         srand(++z ^ (unsigned)time(0));
 #endif
         Client::initThreadIfNotAlready("perftestthr");
-        OperationContextImpl txn;
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
         DBDirectClient c(&txn);
 
         const unsigned int Batch = batchSize();

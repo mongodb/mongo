@@ -37,9 +37,9 @@
 #include <limits>
 
 #include "mongo/base/parse_number.h"
+#include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/json.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/scripting/engine.h"
@@ -986,7 +986,8 @@ public:
         string utf8ObjSpec = "{'_id':'\\u0001\\u007f\\u07ff\\uffff'}";
         BSONObj utf8Obj = fromjson(utf8ObjSpec);
 
-        OperationContextImpl txn;
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
         DBDirectClient client(&txn);
 
         client.insert(ns(), utf8Obj);
@@ -1006,7 +1007,8 @@ private:
     }
 
     void reset() {
-        OperationContextImpl txn;
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
         DBDirectClient client(&txn);
 
         client.dropCollection(ns());
@@ -1029,7 +1031,8 @@ public:
         if (!globalScriptEngine->utf8Ok())
             return;
 
-        OperationContextImpl txn;
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
         DBDirectClient client(&txn);
 
         client.eval("unittest",
@@ -1038,7 +1041,8 @@ public:
 
 private:
     void reset() {
-        OperationContextImpl txn;
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
         DBDirectClient client(&txn);
 
         client.dropCollection(ns());
@@ -1117,7 +1121,8 @@ public:
         // Insert in Javascript -> Find using DBDirectClient
 
         // Drop the collection
-        OperationContextImpl txn;
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
         DBDirectClient client(&txn);
 
         client.dropCollection("unittest.testroundtrip");
@@ -2225,7 +2230,8 @@ public:
         update.appendCode("value",
                           "function () { db.test.find().forEach(function(obj) { continue; }); }");
 
-        OperationContextImpl txn;
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
         DBDirectClient client(&txn);
         client.update("test.system.js", query.obj(), update.obj(), true /* upsert */);
 

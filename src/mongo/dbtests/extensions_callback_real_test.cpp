@@ -28,12 +28,12 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_text.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
 
@@ -72,7 +72,8 @@ public:
     }
 
 protected:
-    OperationContextImpl _txn;
+    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
+    OperationContext& _txn = *_txnPtr;
     const NamespaceString _nss;
 };
 

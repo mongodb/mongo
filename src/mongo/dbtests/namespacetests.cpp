@@ -37,12 +37,12 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/json.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details.h"
@@ -68,7 +68,8 @@ namespace MissingFieldTests {
 class BtreeIndexMissingField {
 public:
     void run() {
-        OperationContextImpl txn;
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
         BSONObj spec(BSON("key" << BSON("a" << 1)));
         ASSERT_EQUALS(jstNULL,
                       IndexLegacy::getMissingField(&txn, NULL, spec).firstElement().type());
@@ -79,7 +80,8 @@ public:
 class TwoDIndexMissingField {
 public:
     void run() {
-        OperationContextImpl txn;
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
         BSONObj spec(BSON("key" << BSON("a"
                                         << "2d")));
         ASSERT_EQUALS(jstNULL,
@@ -91,7 +93,8 @@ public:
 class HashedIndexMissingField {
 public:
     void run() {
-        OperationContextImpl txn;
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
         BSONObj spec(BSON("key" << BSON("a"
                                         << "hashed")));
         BSONObj nullObj = BSON("a" << BSONNULL);
@@ -117,7 +120,8 @@ public:
 class HashedIndexMissingFieldAlternateSeed {
 public:
     void run() {
-        OperationContextImpl txn;
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
         BSONObj spec(BSON("key" << BSON("a"
                                         << "hashed") << "seed" << 0x5eed));
         BSONObj nullObj = BSON("a" << BSONNULL);
@@ -149,7 +153,7 @@ namespace NamespaceDetailsTests {
     public:
         Base( const char *ns = "unittests.NamespaceDetailsTests" ) : ns_( ns ) , _context( ns ) {}
         virtual ~Base() {
-            OperationContextImpl txn;
+            const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext(); OperationContext& txn = *txnPtr;
             if ( !nsd() )
                 return;
             _context.db()->dropCollection( &txn, ns() );
@@ -157,7 +161,7 @@ namespace NamespaceDetailsTests {
     protected:
         void create() {
             Lock::GlobalWrite lk;
-            OperationContextImpl txn;
+            const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext(); OperationContext& txn = *txnPtr;
             ASSERT( userCreateNS( &txn, db(), ns(), fromjson( spec() ), false ).isOK() );
         }
         virtual string spec() const = 0;
@@ -240,7 +244,7 @@ namespace NamespaceDetailsTests {
     class SingleAlloc : public Base {
     public:
         void run() {
-            OperationContextImpl txn;
+            const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext(); OperationContext& txn = *txnPtr;
             create();
             BSONObj b = bigObj();
             ASSERT( collection()->insertDocument( &txn, b, true ).isOK() );
@@ -252,7 +256,7 @@ namespace NamespaceDetailsTests {
     class Realloc : public Base {
     public:
         void run() {
-            OperationContextImpl txn;
+            const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext(); OperationContext& txn = *txnPtr;
             create();
 
             const int N = 20;
@@ -277,7 +281,7 @@ namespace NamespaceDetailsTests {
     class TwoExtent : public Base {
     public:
         void run() {
-            OperationContextImpl txn;
+            const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext(); OperationContext& txn = *txnPtr;
             create();
             ASSERT_EQUALS( 2, nExtents() );
 
@@ -325,7 +329,7 @@ namespace NamespaceDetailsTests {
     class AllocCappedNotQuantized : public Base {
     public:
         void run() {
-            OperationContextImpl txn;
+            const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext(); OperationContext& txn = *txnPtr;
             create();
             ASSERT( nsd()->isCapped() );
             ASSERT( !nsd()->isUserFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
@@ -348,7 +352,7 @@ namespace NamespaceDetailsTests {
             return "{\"capped\":true,\"size\":512,\"$nExtents\":2}";
         }
         void pass(int p) {
-            OperationContextImpl txn;
+            const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext(); OperationContext& txn = *txnPtr;
             create();
             ASSERT_EQUALS( 2, nExtents() );
 
@@ -493,7 +497,7 @@ namespace NamespaceDetailsTests {
                 create();
                 NamespaceDetails *nsd = collection()->detailsWritable();
 
-                OperationContextImpl txn;
+                const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext(); OperationContext& txn = *txnPtr;
                 // Set 2 & 54 as multikey
                 nsd->setIndexIsMultikey(&txn, 2, true);
                 nsd->setIndexIsMultikey(&txn, 54, true);
@@ -534,7 +538,8 @@ public:
         const string committedName = dbName + ".committed";
         const string rolledBackName = dbName + ".rolled_back";
 
-        OperationContextImpl txn;
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
 
         ScopedTransaction transaction(&txn, MODE_IX);
         Lock::DBLock lk(txn.lockState(), dbName, MODE_X);
@@ -578,7 +583,8 @@ public:
         const string droppedName = dbName + ".dropped";
         const string rolledBackName = dbName + ".rolled_back";
 
-        OperationContextImpl txn;
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
 
         ScopedTransaction transaction(&txn, MODE_IX);
         Lock::DBLock lk(txn.lockState(), dbName, MODE_X);

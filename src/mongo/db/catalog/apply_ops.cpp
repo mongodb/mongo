@@ -41,7 +41,6 @@
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/op_observer.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/service_context.h"
