@@ -458,7 +458,8 @@ __curjoin_init_bloom(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	    session, WT_SESSION_open_cursor), "raw", NULL };
 	const char *uri;
 	size_t size;
-	int cmp, skip;
+	u_int skip;
+	int cmp;
 
 	c = NULL;
 	skip = 0;
@@ -1064,6 +1065,7 @@ __curjoin_next(WT_CURSOR *cursor)
 	WT_CURSOR_JOIN_ITER *iter;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	const uint8_t *p;
 	int tret;
 
 	cjoin = (WT_CURSOR_JOIN *)cursor;
@@ -1095,7 +1097,14 @@ __curjoin_next(WT_CURSOR *cursor)
 		 * retrieve values from the cursor join.
 		 */
 		c = cjoin->main;
-		c->set_key(c, iter->curkey);
+		if (WT_CURSOR_RECNO(cursor) &&
+		    !F_ISSET(cursor, WT_CURSTD_RAW)) {
+			p = (const uint8_t *)iter->curkey->data;
+			WT_ERR(__wt_vunpack_uint(&p, iter->curkey->size,
+			    &cjoin->iface.recno));
+			c->set_key(c, cjoin->iface.recno);
+		} else
+			c->set_key(c, iter->curkey);
 		WT_ERR(c->search(c));
 		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 	} else if (ret == WT_NOTFOUND &&

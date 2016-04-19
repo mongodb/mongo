@@ -33,7 +33,6 @@ __wt_block_manager_create(
 	WT_FH *fh;
 	int suffix;
 	bool exists;
-	char *path;
 
 	/*
 	 * Create the underlying file and open a handle.
@@ -82,10 +81,8 @@ __wt_block_manager_create(
 	 * Some filesystems require that we sync the directory to be confident
 	 * that the file will appear.
 	 */
-	if (ret == 0 && (ret = __wt_filename(session, filename, &path)) == 0) {
-		ret = __wt_directory_sync(session, path);
-		__wt_free(session, path);
-	}
+	if (ret == 0)
+		WT_TRET(__wt_directory_sync(session, filename));
 
 	/* Undo any create on error. */
 	if (ret != 0)

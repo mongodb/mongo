@@ -647,6 +647,9 @@ __evict_pass(WT_SESSION_IMPL *session)
 		 * sleep, it's not something we can fix.
 		 */
 		if (pages_evicted == cache->pages_evict) {
+
+			WT_STAT_FAST_CONN_INCR(session,
+					       cache_eviction_server_slept);
 			/*
 			 * Back off if we aren't making progress: walks hold
 			 * the handle list lock, which blocks other operations
@@ -890,6 +893,7 @@ __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session)
 	__wt_spin_unlock(session, &cache->evict_walk_lock);
 }
 
+#define	APP_EVICT_THRESHOLD	3	/* Threshold to help evict */
 /*
  * __evict_lru_pages --
  *	Get pages from the LRU queue to evict.
@@ -897,7 +901,27 @@ __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session)
 static int
 __evict_lru_pages(WT_SESSION_IMPL *session, bool is_server)
 {
+	WT_CACHE *cache;
 	WT_DECL_RET;
+	uint64_t app_evict_percent, total_evict;
+
+	/*
+	 * The server will not help evict if the workers are coping with
+	 * eviction workload, that is, if fewer than the threshold of the
+	 * pages are evicted by application threads.
+	 */
+	if (is_server && S2C(session)->evict_workers > 1) {
+		cache = S2C(session)->cache;
+		total_evict = cache->app_evicts +
+		    cache->server_evicts + cache->worker_evicts;
+		app_evict_percent = (100 * cache->app_evicts) /
+			(total_evict + 1);
+		if (app_evict_percent < APP_EVICT_THRESHOLD) {
+			WT_STAT_FAST_CONN_INCR(session,
+			    cache_eviction_server_not_evicting);
+			return (0);
+		}
+	}
 
 	/*
 	 * Reconcile and discard some pages: EBUSY is returned if a page fails
@@ -1592,25 +1616,25 @@ static int
 __evict_page(WT_SESSION_IMPL *session, bool is_server)
 {
 	WT_BTREE *btree;
+	WT_CACHE *cache;
 	WT_DECL_RET;
 	WT_REF *ref;
 
 	WT_RET(__evict_get_ref(session, is_server, &btree, &ref));
 	WT_ASSERT(session, ref->state == WT_REF_LOCKED);
 
+	cache = S2C(session)->cache;
 	/*
 	 * An internal session flags either the server itself or an eviction
 	 * worker thread.
 	 */
 	if (F_ISSET(session, WT_SESSION_INTERNAL)) {
 		if (is_server)
-			WT_STAT_FAST_CONN_INCR(
-			    session, cache_eviction_server_evicting);
+			cache->server_evicts++;
 		else
-			WT_STAT_FAST_CONN_INCR(
-			    session, cache_eviction_worker_evicting);
+			cache->worker_evicts++;
 	} else
-		WT_STAT_FAST_CONN_INCR(session, cache_eviction_app);
+		cache->app_evicts++;
 
 	/*
 	 * In case something goes wrong, don't pick the same set of pages every
@@ -1704,7 +1728,6 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 		/* Evict a page. */
 		switch (ret = __evict_page(session, false)) {
 		case 0:
-			cache->app_evicts++;
 			if (txn_busy)
 				return (0);
 			/* FALLTHROUGH */

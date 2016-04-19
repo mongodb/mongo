@@ -109,7 +109,6 @@ typedef struct {
 
 	char *home;				/* Home directory */
 	char *home_backup;			/* Hot-backup directory */
-	char *home_backup2;			/* Saved Hot-backup directory */
 	char *home_backup_init;			/* Initialize backup command */
 	char *home_bdb;				/* BDB directory */
 	char *home_config;			/* Run CONFIG file path */
@@ -325,10 +324,10 @@ void	 track(const char *, uint64_t, TINFO *);
 void	 val_gen(WT_RAND_STATE *, WT_ITEM *, uint64_t);
 void	 val_gen_setup(WT_RAND_STATE *, WT_ITEM *);
 void	 wts_close(void);
-void	 wts_create(void);
 void	 wts_dump(const char *, int);
+void	 wts_init(void);
 void	 wts_load(void);
-void	 wts_open(const char *, int, WT_CONNECTION **);
+void	 wts_open(const char *, bool, WT_CONNECTION **);
 void	 wts_ops(int);
 void	 wts_read_scan(void);
 void	 wts_rebalance(void);

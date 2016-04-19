@@ -126,7 +126,7 @@ static WT_EVENT_HANDLER event_handler = {
  *	Open a connection to a WiredTiger database.
  */
 void
-wts_open(const char *home, int set_api, WT_CONNECTION **connp)
+wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
 {
 	WT_CONNECTION *conn;
 	WT_DECL_RET;
@@ -138,10 +138,11 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	end = config + sizeof(g.wiredtiger_open_config);
 
 	p += snprintf(p, REMAIN(p, end),
-	    "create,checkpoint_sync=false,cache_size=%" PRIu32 "MB",
-	    g.c_cache);
-
-	p += snprintf(p, REMAIN(p, end), ",error_prefix=\"%s\"", g.progname);
+	    "create=true,"
+	    "cache_size=%" PRIu32 "MB,"
+	    "checkpoint_sync=false,"
+	    "error_prefix=\"%s\"",
+	    g.c_cache, g.progname);
 
 	/* In-memory configuration. */
 	if (g.c_in_memory != 0)
@@ -287,7 +288,7 @@ wts_reopen(void)
  *	Create the underlying store.
  */
 void
-wts_create(void)
+wts_init(void)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
