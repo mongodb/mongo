@@ -131,11 +131,11 @@ err:	__wt_free(session, copy);
 }
 
 /*
- * __posix_file_exist --
+ * __posix_fs_exist --
  *	Return if the file exists.
  */
 static int
-__posix_file_exist(WT_SESSION_IMPL *session, const char *name, bool *existp)
+__posix_fs_exist(WT_SESSION_IMPL *session, const char *name, bool *existp)
 {
 	struct stat sb;
 	WT_DECL_RET;
@@ -158,11 +158,11 @@ __posix_file_exist(WT_SESSION_IMPL *session, const char *name, bool *existp)
 }
 
 /*
- * __posix_file_remove --
+ * __posix_fs_remove --
  *	Remove a file.
  */
 static int
-__posix_file_remove(WT_SESSION_IMPL *session, const char *name)
+__posix_fs_remove(WT_SESSION_IMPL *session, const char *name)
 {
 	WT_DECL_RET;
 	char *path;
@@ -185,11 +185,11 @@ __posix_file_remove(WT_SESSION_IMPL *session, const char *name)
 }
 
 /*
- * __posix_file_rename --
+ * __posix_fs_rename --
  *	Rename a file.
  */
 static int
-__posix_file_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
+__posix_fs_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
 {
 	WT_DECL_RET;
 	char *from_path, *to_path;
@@ -220,11 +220,11 @@ err:	__wt_free(session, from_path);
 }
 
 /*
- * __posix_file_size --
+ * __posix_fs_size --
  *	Get the size of a file in bytes, by file name.
  */
 static int
-__posix_file_size(
+__posix_fs_size(
     WT_SESSION_IMPL *session, const char *name, bool silent, wt_off_t *sizep)
 {
 	struct stat sb;
@@ -250,11 +250,11 @@ __posix_file_size(
 }
 
 /*
- * __posix_handle_advise --
+ * __posix_file_advise --
  *	POSIX fadvise.
  */
 static int
-__posix_handle_advise(WT_SESSION_IMPL *session,
+__posix_file_advise(WT_SESSION_IMPL *session,
     WT_FH *fh, wt_off_t offset, wt_off_t len, int advice)
 {
 #if defined(HAVE_POSIX_FADVISE)
@@ -292,39 +292,11 @@ __posix_handle_advise(WT_SESSION_IMPL *session,
 }
 
 /*
- * __posix_handle_close_stream --
- *	ANSI C fclose.
- */
-static int
-__posix_handle_close_stream(WT_SESSION_IMPL *session, WT_FH *fh)
-{
-	WT_DECL_RET;
-
-	/* Close the stream. */
-	if (fh->fp == NULL)
-		return (0);
-
-	/* If the stream was opened for writing, flush the file. */
-	if (F_ISSET(fh, WT_FH_FLUSH_ON_CLOSE) && fflush(fh->fp) != 0) {
-		ret = __wt_errno();
-		__wt_err(session, ret, "%s: handle-close: fflush", fh->name);
-	}
-
-	/* Close the file. */
-	if (fclose(fh->fp) != 0) {
-		ret = __wt_errno();
-		__wt_err(session, ret, "%s: handle-close: fclose", fh->name);
-	}
-
-	return (ret);
-}
-
-/*
- * __posix_handle_close --
+ * __posix_file_close --
  *	ANSI C close.
  */
 static int
-__posix_handle_close(WT_SESSION_IMPL *session, WT_FH *fh)
+__posix_file_close(WT_SESSION_IMPL *session, WT_FH *fh)
 {
 	WT_DECL_RET;
 
@@ -339,24 +311,11 @@ __posix_handle_close(WT_SESSION_IMPL *session, WT_FH *fh)
 }
 
 /*
- * __posix_handle_getc --
- *	ANSI C fgetc.
- */
-static int
-__posix_handle_getc(WT_SESSION_IMPL *session, WT_FH *fh, int *chp)
-{
-	*chp = fgetc(fh->fp);
-	if (*chp != EOF || !ferror(fh->fp))
-		return (0);
-	WT_RET_MSG(session, __wt_errno(), "%s: handle-getc: fgetc", fh->name);
-}
-
-/*
- * __posix_handle_lock --
+ * __posix_file_lock --
  *	Lock/unlock a file.
  */
 static int
-__posix_handle_lock(WT_SESSION_IMPL *session, WT_FH *fh, bool lock)
+__posix_file_lock(WT_SESSION_IMPL *session, WT_FH *fh, bool lock)
 {
 	struct flock fl;
 	WT_DECL_RET;
@@ -382,24 +341,11 @@ __posix_handle_lock(WT_SESSION_IMPL *session, WT_FH *fh, bool lock)
 }
 
 /*
- * __posix_handle_printf --
- *	ANSI C vfprintf.
- */
-static int
-__posix_handle_printf(
-    WT_SESSION_IMPL *session, WT_FH *fh, const char *fmt, va_list ap)
-{
-	if (vfprintf(fh->fp, fmt, ap) >= 0)
-		return (0);
-	WT_RET_MSG(session, EIO, "%s: handle-printf: vfprintf", fh->name);
-}
-
-/*
- * __posix_handle_read --
+ * __posix_file_read --
  *	POSIX pread.
  */
 static int
-__posix_handle_read(
+__posix_file_read(
     WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, void *buf)
 {
 	size_t chunk;
@@ -428,11 +374,11 @@ __posix_handle_read(
 }
 
 /*
- * __posix_handle_size --
+ * __posix_file_size --
  *	Get the size of a file in bytes, by file handle.
  */
 static int
-__posix_handle_size(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
+__posix_file_size(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
 {
 	struct stat sb;
 	WT_DECL_RET;
@@ -446,36 +392,21 @@ __posix_handle_size(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
 }
 
 /*
- * __posix_handle_sync_stream --
- *	POSIX fflush.
- */
-static int
-__posix_handle_sync_stream(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
-{
-	WT_UNUSED(block);
-
-	if (fflush(fh->fp) == 0)
-		return (0);
-
-	WT_RET_MSG(session, __wt_errno(), "%s: handle-sync: fflush", fh->name);
-}
-
-/*
- * __posix_handle_sync --
+ * __posix_file_sync --
  *	POSIX fsync.
  */
 static int
-__posix_handle_sync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
+__posix_file_sync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
 {
 	return (__posix_sync(session, fh->fd, fh->name, "handle-sync", block));
 }
 
 /*
- * __posix_handle_truncate --
+ * __posix_file_truncate --
  *	POSIX ftruncate.
  */
 static int
-__posix_handle_truncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
+__posix_file_truncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
 {
 	WT_DECL_RET;
 
@@ -486,11 +417,11 @@ __posix_handle_truncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
 }
 
 /*
- * __posix_handle_write --
+ * __posix_file_write --
  *	POSIX pwrite.
  */
 static int
-__posix_handle_write(WT_SESSION_IMPL *session,
+__posix_file_write(WT_SESSION_IMPL *session,
     WT_FH *fh, wt_off_t offset, size_t len, const void *buf)
 {
 	size_t chunk;
@@ -519,11 +450,11 @@ __posix_handle_write(WT_SESSION_IMPL *session,
 }
 
 /*
- * __posix_handle_open_cloexec --
+ * __posix_file_open_cloexec --
  *	Prevent child access to file handles.
  */
 static inline int
-__posix_handle_open_cloexec(WT_SESSION_IMPL *session, int fd, const char *name)
+__posix_file_open_cloexec(WT_SESSION_IMPL *session, int fd, const char *name)
 {
 #if defined(HAVE_FCNTL) && defined(FD_CLOEXEC) && !defined(O_CLOEXEC)
 	int f;
@@ -548,53 +479,11 @@ __posix_handle_open_cloexec(WT_SESSION_IMPL *session, int fd, const char *name)
 }
 
 /*
- * __posix_open_stream --
- *	Open a stream.
- */
-static int
-__posix_open_stream(
-    WT_SESSION_IMPL *session, WT_FH *fh, const char *name, uint32_t flags)
-{
-	const char *stream_mode;
-
-	switch (LF_MASK(WT_STREAM_APPEND | WT_STREAM_READ | WT_STREAM_WRITE)) {
-	case WT_STREAM_APPEND:
-		stream_mode = "a";
-		F_SET(fh, WT_FH_FLUSH_ON_CLOSE);
-		break;
-	case WT_STREAM_READ:
-		stream_mode = "r";
-		break;
-	case WT_STREAM_WRITE:
-		stream_mode = "w";
-		F_SET(fh, WT_FH_FLUSH_ON_CLOSE);
-		break;
-	default:
-		WT_RET_MSG(session,
-		    EINVAL, "%s: handle-open: illegal configuration", name);
-	}
-
-	if ((fh->fp = fopen(name, stream_mode)) == NULL)
-		WT_RET_MSG(
-		    session, __wt_errno(), "%s: handle-open: fopen", name);
-
-	if (LF_ISSET(WT_STREAM_LINE_BUFFER))
-		__wt_stream_set_line_buffer(fh->fp);
-
-	fh->fh_close = __posix_handle_close_stream;
-	fh->fh_getc = __posix_handle_getc;
-	fh->fh_printf = __posix_handle_printf;
-	fh->fh_sync = __posix_handle_sync_stream;
-
-	return (0);
-}
-
-/*
- * __posix_handle_open --
+ * __posix_file_open --
  *	Open a file handle.
  */
 static int
-__posix_handle_open(WT_SESSION_IMPL *session,
+__posix_file_open(WT_SESSION_IMPL *session,
     WT_FH *fh, const char *name, uint32_t file_type, uint32_t flags)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -606,11 +495,6 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 
 	/* Set up error handling. */
 	fh->fd = fd = -1;
-	fh->fp = NULL;
-
-	/* Stream opens are separate. */
-	if (LF_ISSET(WT_STREAM_APPEND | WT_STREAM_READ | WT_STREAM_WRITE))
-		return (__posix_open_stream(session, fh, name, flags));
 
 	if (file_type == WT_FILE_TYPE_DIRECTORY) {
 		f = O_RDONLY;
@@ -626,7 +510,7 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 		    (fd = open(name, f, 0444)) == -1 ? 1 : 0), ret);
 		if (ret != 0)
 			WT_ERR_MSG(session, ret, "%s: handle-open: open", name);
-		WT_ERR(__posix_handle_open_cloexec(session, fd, name));
+		WT_ERR(__posix_file_open_cloexec(session, fd, name));
 		goto directory_open;
 	}
 
@@ -683,7 +567,7 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 		    "%s: handle-open: open: failed with direct I/O configured, "
 		    "some filesystem types do not support direct I/O" :
 		    "%s: handle-open: open", name);
-	WT_ERR(__posix_handle_open_cloexec(session, fd, name));
+	WT_ERR(__posix_file_open_cloexec(session, fd, name));
 
 	/* Disable read-ahead on trees: it slows down random read workloads. */
 #if defined(HAVE_POSIX_FADVISE)
@@ -700,21 +584,21 @@ directory_open:
 	fh->fd = fd;
 
 	/* Configure fallocate calls. */
-	__wt_posix_handle_allocate_configure(session, fh);
+	__wt_posix_file_allocate_configure(session, fh);
 
-	fh->fh_advise = __posix_handle_advise;
-	fh->fh_allocate = __wt_posix_handle_allocate;
-	fh->fh_close = __posix_handle_close;
-	fh->fh_lock = __posix_handle_lock;
+	fh->fh_advise = __posix_file_advise;
+	fh->fh_allocate = __wt_posix_file_allocate;
+	fh->fh_close = __posix_file_close;
+	fh->fh_lock = __posix_file_lock;
 	fh->fh_map = __wt_posix_map;
 	fh->fh_map_discard = __wt_posix_map_discard;
 	fh->fh_map_preload = __wt_posix_map_preload;
 	fh->fh_map_unmap = __wt_posix_map_unmap;
-	fh->fh_read = __posix_handle_read;
-	fh->fh_size = __posix_handle_size;
-	fh->fh_sync = __posix_handle_sync;
-	fh->fh_truncate = __posix_handle_truncate;
-	fh->fh_write = __posix_handle_write;
+	fh->fh_read = __posix_file_read;
+	fh->fh_size = __posix_file_size;
+	fh->fh_sync = __posix_file_sync;
+	fh->fh_truncate = __posix_file_truncate;
+	fh->fh_write = __posix_file_write;
 
 	return (0);
 
@@ -740,11 +624,11 @@ __wt_os_posix(WT_SESSION_IMPL *session)
 	/* Initialize the POSIX jump table. */
 	conn->file_directory_list = __wt_posix_directory_list;
 	conn->file_directory_sync = __posix_directory_sync;
-	conn->file_exist = __posix_file_exist;
-	conn->file_remove = __posix_file_remove;
-	conn->file_rename = __posix_file_rename;
-	conn->file_size = __posix_file_size;
-	conn->handle_open = __posix_handle_open;
+	conn->file_exist = __posix_fs_exist;
+	conn->file_remove = __posix_fs_remove;
+	conn->file_rename = __posix_fs_rename;
+	conn->file_size = __posix_fs_size;
+	conn->file_open = __posix_file_open;
 
 	return (0);
 }

@@ -105,28 +105,6 @@ __wt_rename_and_sync_directory(
 }
 
 /*
- * __wt_sync_handle_and_rename --
- *	Sync and close a handle, and swap it into place.
- */
-int
-__wt_sync_handle_and_rename(
-    WT_SESSION_IMPL *session, WT_FH **fhp, const char *from, const char *to)
-{
-	WT_DECL_RET;
-	WT_FH *fh;
-
-	fh = *fhp;
-	*fhp = NULL;
-
-	/* Flush to disk and close the handle. */
-	ret = __wt_fsync(session, fh, true);
-	WT_TRET(__wt_close(session, &fh));
-	WT_RET(ret);
-
-	return (__wt_rename_and_sync_directory(session, from, to));
-}
-
-/*
  * __wt_copy_and_sync --
  *	Copy a file safely; here to support the wt utility.
  */
@@ -181,7 +159,10 @@ __wt_copy_and_sync(WT_SESSION *wt_session, const char *from, const char *to)
 
 	/* Close the from handle, then swap the temporary file into place. */
 	WT_ERR(__wt_close(session, &ffh));
-	ret = __wt_sync_handle_and_rename(session, &tfh, tmp->data, to);
+	WT_ERR(__wt_fsync(session, tfh, true));
+	WT_ERR(__wt_close(session, &tfh));
+
+	ret = __wt_rename_and_sync_directory(session, tmp->data, to);
 
 err:	WT_TRET(__wt_close(session, &ffh));
 	WT_TRET(__wt_close(session, &tfh));

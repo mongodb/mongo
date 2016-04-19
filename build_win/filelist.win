@@ -105,10 +105,9 @@ src/os_common/filename.c
 src/os_common/os_abort.c
 src/os_common/os_alloc.c
 src/os_common/os_fhandle.c
-src/os_common/os_fs_init.c
 src/os_common/os_fs_inmemory.c
-src/os_common/os_fs_stdio.c
-src/os_common/os_getline.c
+src/os_common/os_fstream.c
+src/os_common/os_fstream_stdio.c
 src/os_common/os_getopt.c
 src/os_common/os_init.c
 src/os_common/os_strtouq.c

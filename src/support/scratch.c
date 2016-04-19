@@ -117,7 +117,7 @@ __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 		p = (char *)((uint8_t *)buf->mem + buf->size);
 		WT_ASSERT(session, buf->memsize >= buf->size);
 		space = buf->memsize - buf->size;
-		len = (size_t)vsnprintf(p, (size_t)space, fmt, ap);
+		len = (size_t)vsnprintf(p, space, fmt, ap);
 		va_end(ap);
 
 		/* Check if there was enough space. */

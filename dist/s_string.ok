@@ -617,6 +617,7 @@ ffs
 fgetc
 fgetln
 fh
+fhandle
 filefrag
 filehandle
 fileid
@@ -639,8 +640,10 @@ fopen
 fp
 fprintf
 free'd
+fs
 fscanf
 fstat
+fstream
 fsync
 fsyncLock
 fsyncs

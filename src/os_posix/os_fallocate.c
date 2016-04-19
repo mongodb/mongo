@@ -13,11 +13,11 @@
 #include <sys/syscall.h>
 #endif
 /*
- * __wt_posix_handle_allocate_configure --
+ * __wt_posix_file_allocate_configure --
  *	Configure POSIX file-extension behavior for a file handle.
  */
 void
-__wt_posix_handle_allocate_configure(WT_SESSION_IMPL *session, WT_FH *fh)
+__wt_posix_file_allocate_configure(WT_SESSION_IMPL *session, WT_FH *fh)
 {
 	WT_UNUSED(session);
 
@@ -106,11 +106,11 @@ __posix_posix_fallocate(WT_FH *fh, wt_off_t offset, wt_off_t len)
 }
 
 /*
- * __wt_posix_handle_allocate --
+ * __wt_posix_file_allocate --
  *	POSIX fallocate.
  */
 int
-__wt_posix_handle_allocate(
+__wt_posix_file_allocate(
     WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, wt_off_t len)
 {
 	WT_DECL_RET;

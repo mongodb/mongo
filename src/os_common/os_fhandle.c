@@ -9,6 +9,199 @@
 #include "wt_internal.h"
 
 /*
+ * __fhandle_advise_notsup --
+ *	POSIX fadvise unsupported.
+ */
+static int
+__fhandle_advise_notsup(WT_SESSION_IMPL *session,
+    WT_FH *fh, wt_off_t offset, wt_off_t len, int advice)
+{
+	WT_UNUSED(session);
+	WT_UNUSED(fh);
+	WT_UNUSED(offset);
+	WT_UNUSED(len);
+	WT_UNUSED(advice);
+
+	/* Quietly fail, callers expect not-supported failures. */
+	return (ENOTSUP);
+}
+
+/*
+ * __fhandle_allocate_notsup --
+ *	POSIX fallocate unsupported.
+ */
+static int
+__fhandle_allocate_notsup(
+    WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, wt_off_t len)
+{
+	WT_UNUSED(offset);
+	WT_UNUSED(len);
+	WT_RET_MSG(session, ENOTSUP, "%s: file-allocate", fh->name);
+}
+
+/*
+ * __fhandle_close_notsup --
+ *	ANSI C close/fclose unsupported.
+ */
+static int
+__fhandle_close_notsup(WT_SESSION_IMPL *session, WT_FH *fh)
+{
+	WT_RET_MSG(session, ENOTSUP, "%s: file-close", fh->name);
+}
+
+/*
+ * __fhandle_lock_notsup --
+ *	Lock/unlock a file unsupported.
+ */
+static int
+__fhandle_lock_notsup(WT_SESSION_IMPL *session, WT_FH *fh, bool lock)
+{
+	WT_UNUSED(lock);
+	WT_RET_MSG(session, ENOTSUP, "%s: file-lock", fh->name);
+}
+
+/*
+ * __fhandle_map_notsup --
+ *	Map a file unsupported.
+ */
+static int
+__fhandle_map_notsup(WT_SESSION_IMPL *session,
+    WT_FH *fh, void *p, size_t *lenp, void **mappingcookie)
+{
+	WT_UNUSED(p);
+	WT_UNUSED(lenp);
+	WT_UNUSED(mappingcookie);
+	WT_RET_MSG(session, ENOTSUP, "%s: file-map", fh->name);
+}
+
+/*
+ * __fhandle_map_discard_notsup --
+ *	Discard a section of a mapped region unsupported.
+ */
+static int
+__fhandle_map_discard_notsup(
+    WT_SESSION_IMPL *session, WT_FH *fh, void *p, size_t len)
+{
+	WT_UNUSED(p);
+	WT_UNUSED(len);
+	WT_RET_MSG(session, ENOTSUP, "%s: file-map-discard", fh->name);
+}
+
+/*
+ * __fhandle_map_preload_notsup --
+ *	Preload a section of a mapped region unsupported.
+ */
+static int
+__fhandle_map_preload_notsup(
+    WT_SESSION_IMPL *session, WT_FH *fh, const void *p, size_t len)
+{
+	WT_UNUSED(p);
+	WT_UNUSED(len);
+	WT_RET_MSG(session, ENOTSUP, "%s: file-map-preload", fh->name);
+}
+
+/*
+ * __fhandle_map_unmap_notsup --
+ *	Unmap a file unsupported.
+ */
+static int
+__fhandle_map_unmap_notsup(WT_SESSION_IMPL *session,
+    WT_FH *fh, void *p, size_t len, void **mappingcookie)
+{
+	WT_UNUSED(p);
+	WT_UNUSED(len);
+	WT_UNUSED(mappingcookie);
+	WT_RET_MSG(session, ENOTSUP, "%s: file-map-unmap", fh->name);
+}
+
+/*
+ * __fhandle_read_notsup --
+ *	POSIX pread unsupported.
+ */
+static int
+__fhandle_read_notsup(
+    WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, void *buf)
+{
+	WT_UNUSED(offset);
+	WT_UNUSED(len);
+	WT_UNUSED(buf);
+	WT_RET_MSG(session, ENOTSUP, "%s: file-read", fh->name);
+}
+
+/*
+ * __fhandle_size_notsup --
+ *	Get the size of a file in bytes unsupported.
+ */
+static int
+__fhandle_size_notsup(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
+{
+	WT_UNUSED(sizep);
+	WT_RET_MSG(session, ENOTSUP, "%s: file-size", fh->name);
+}
+
+/*
+ * __fhandle_sync_notsup --
+ *	POSIX fsync unsupported.
+ */
+static int
+__fhandle_sync_notsup(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
+{
+	WT_UNUSED(block);
+	WT_RET_MSG(session, ENOTSUP, "%s: file-sync", fh->name);
+}
+
+/*
+ * __fhandle_truncate_notsup --
+ *	POSIX ftruncate.
+ */
+static int
+__fhandle_truncate_notsup(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
+{
+	WT_UNUSED(len);
+	WT_RET_MSG(session, ENOTSUP, "%s: file-truncate", fh->name);
+}
+
+/*
+ * __fhandle_write_notsup --
+ *	POSIX pwrite.
+ */
+static int
+__fhandle_write_notsup(WT_SESSION_IMPL *session,
+    WT_FH *fh, wt_off_t offset, size_t len, const void *buf)
+{
+	WT_UNUSED(offset);
+	WT_UNUSED(len);
+	WT_UNUSED(buf);
+	WT_RET_MSG(session, ENOTSUP, "%s: file-write", fh->name);
+}
+
+/*
+ * __fhandle_method_init --
+ *	Initialize the WT_FH structure's methods to not-supported.
+ */
+static void
+__fhandle_method_init(WT_FH *fh)
+{
+	/*
+	 * Set up the initial set of handle methods to standard "not-supported"
+	 * functions, the underlying open functions turn on supported functions.
+	 */
+	fh->fh_advise = __fhandle_advise_notsup;
+	fh->fh_allocate = __fhandle_allocate_notsup;
+	fh->fh_close = __fhandle_close_notsup;
+	fh->fh_lock = __fhandle_lock_notsup;
+	fh->fh_map = __fhandle_map_notsup;
+	fh->fh_map_discard = __fhandle_map_discard_notsup;
+	fh->fh_map_preload = __fhandle_map_preload_notsup;
+	fh->fh_map_unmap = __fhandle_map_unmap_notsup;
+	fh->fh_read = __fhandle_read_notsup;
+	fh->fh_size = __fhandle_size_notsup;
+	fh->fh_sync = __fhandle_sync_notsup;
+	fh->fh_truncate = __fhandle_truncate_notsup;
+	fh->fh_write = __fhandle_write_notsup;
+}
+
+/*
  * __wt_handle_search --
  *	Search for a matching handle.
  */
@@ -119,16 +312,12 @@ __open_verbose(WT_SESSION_IMPL *session,
 	WT_OPEN_VERBOSE_FLAG(WT_OPEN_EXCLUSIVE, "exclusive");
 	WT_OPEN_VERBOSE_FLAG(WT_OPEN_FIXED, "fixed");
 	WT_OPEN_VERBOSE_FLAG(WT_OPEN_READONLY, "readonly");
-	WT_OPEN_VERBOSE_FLAG(WT_STREAM_APPEND, "stream-append");
-	WT_OPEN_VERBOSE_FLAG(WT_STREAM_LINE_BUFFER, "stream-line-buffer");
-	WT_OPEN_VERBOSE_FLAG(WT_STREAM_READ, "stream-read");
-	WT_OPEN_VERBOSE_FLAG(WT_STREAM_WRITE, "stream-write");
 
 	if (tmp->size != 0)
 		WT_ERR(__wt_buf_catfmt(session, tmp, ")"));
 
 	ret = __wt_verbose(session, WT_VERB_FILEOPS,
-	    "%s: handle-open: type %s%s",
+	    "%s: file-open: type %s%s",
 	    name, file_type_tag, tmp->size == 0 ? "" : (char *)tmp->data);
 
 err:	__wt_scr_free(session, &tmp);
@@ -140,37 +329,6 @@ err:	__wt_scr_free(session, &tmp);
 	WT_UNUSED(flags);
 	return (0);
 #endif
-}
-
-/*
- * __open_refresh --
- *	Refresh a file handle.
- */
-static inline int
-__open_refresh(WT_SESSION_IMPL *session,
-    WT_FH *fh, const char *name, uint32_t file_type, uint32_t flags)
-{
-	WT_DECL_RET;
-
-	/*
-	 * !!!
-	 * The in-memory file handle open must repeat if the reference count
-	 * goes to 0, no other file handle requires refresh.
-	 */
-	if (!F_ISSET(fh, WT_FH_IN_MEMORY) || fh->ref > 1)
-		return (0);
-
-	__wt_fh_method_init(fh);
-
-	WT_ERR(S2C(session)->handle_open(session, fh, name, file_type, flags));
-	return (0);
-
-err:	/*
-	 * We've already incremented the handle's reference count, close the
-	 * handle to discard that reference.
-	 */
-	WT_TRET(fh->fh_close(session, fh));
-	return (ret);
 }
 
 /*
@@ -198,8 +356,6 @@ __wt_open(WT_SESSION_IMPL *session,
 
 	/* Check if the handle is already open. */
 	if (__wt_handle_search(session, name, true, NULL, &fh)) {
-		WT_RET(__open_refresh(session, fh, name, file_type, flags));
-
 		*fhp = fh;
 		return (0);
 	}
@@ -207,7 +363,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	/* Allocate and initialize the handle. */
 	WT_ERR(__wt_calloc_one(session, &fh));
 	WT_ERR(__wt_strdup(session, name, &fh->name));
-	__wt_fh_method_init(fh);
+	__fhandle_method_init(fh);
 
 	/*
 	 * If this is a read-only connection, open all files read-only except
@@ -235,7 +391,7 @@ __wt_open(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_filename(session, name, &path));
 
 	/* Call the underlying open function. */
-	WT_ERR(conn->handle_open(
+	WT_ERR(conn->file_open(
 	    session, fh, path == NULL ? name : path, file_type, flags));
 	open_called = true;
 
@@ -277,7 +433,7 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH **fhp)
 
 	/* Track handle-close as a file operation, so open and close match. */
 	WT_RET(__wt_verbose(
-	    session, WT_VERB_FILEOPS, "%s: handle-close", fh->name));
+	    session, WT_VERB_FILEOPS, "%s: file-close", fh->name));
 
 	/*
 	 * If the reference count hasn't gone to 0, or if it's an in-memory
