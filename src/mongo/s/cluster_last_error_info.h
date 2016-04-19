@@ -97,16 +97,4 @@ private:
     RequestInfo* _prev = &_infos[1];
 };
 
-/**
- * Looks for $gleStats in a command's reply metadata, and fills in the ClusterLastErrorInfo
- * for this thread's associated Client with the data, if found.
- *
- * This data will be used by subsequent GLE calls, to ensure we look for the correct
- * write on the correct PRIMARY.
- * result: the result from calling runCommand
- * conn: the std::string name of the hostAndPort where the command ran. This can be a replica
- *       set seed list.
- */
-void saveGLEStats(const BSONObj& metadataObj, StringData conn);
-
 }  // namespace mongo

@@ -26,10 +26,15 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/client.h"
+#include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/sharding_egress_metadata_hook_for_mongos.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -37,7 +42,38 @@ namespace rpc {
 
 void ShardingEgressMetadataHookForMongos::_saveGLEStats(const BSONObj& metadata,
                                                         StringData hostString) {
-    mongo::saveGLEStats(metadata, hostString);
+    if (!haveClient()) {
+        // Client will be present only when write commands are used.
+        return;
+    }
+
+    auto swShardingMetadata = rpc::ShardingMetadata::readFromMetadata(metadata);
+    if (swShardingMetadata.getStatus() == ErrorCodes::NoSuchKey) {
+        return;
+    } else if (!swShardingMetadata.isOK()) {
+        warning() << "Got invalid sharding metadata " << swShardingMetadata.getStatus()
+                  << " metadata object was '" << metadata << "'";
+        return;
+    }
+
+    auto shardConn = ConnectionString::parse(hostString.toString());
+
+    // If we got the reply from this host, we expect that its 'hostString' must be valid.
+    if (!shardConn.isOK()) {
+        severe() << "got bad host string in saveGLEStats: " << hostString;
+    }
+    invariantOK(shardConn.getStatus());
+
+    auto shardingMetadata = std::move(swShardingMetadata.getValue());
+
+    auto& clientInfo = cc();
+    LOG(4) << "saveGLEStats lastOpTime:" << shardingMetadata.getLastOpTime()
+           << " electionId:" << shardingMetadata.getLastElectionId();
+
+    ClusterLastErrorInfo::get(clientInfo)
+        .addHostOpTime(
+            shardConn.getValue(),
+            HostOpTime(shardingMetadata.getLastOpTime(), shardingMetadata.getLastElectionId()));
 }
 
 }  // namespace rpc
