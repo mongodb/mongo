@@ -105,7 +105,7 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern, MatchExpression* filterExpr)
                                         BSONObj()));
 }
 
-void QueryPlannerTest::addIndex(BSONObj keyPattern, MultikeyPaths multikeyPaths) {
+void QueryPlannerTest::addIndex(BSONObj keyPattern, const MultikeyPaths& multikeyPaths) {
     invariant(multikeyPaths.size() == static_cast<size_t>(keyPattern.nFields()));
 
     const bool multikey =

@@ -61,7 +61,7 @@ protected:
 
     void addIndex(BSONObj keyPattern, MatchExpression* filterExpr);
 
-    void addIndex(BSONObj keyPattern, MultikeyPaths multikeyPaths);
+    void addIndex(BSONObj keyPattern, const MultikeyPaths& multikeyPaths);
 
     void addIndex(BSONObj keyPattern, CollatorInterface* collator);
 

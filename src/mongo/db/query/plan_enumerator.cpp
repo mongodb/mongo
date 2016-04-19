@@ -615,7 +615,58 @@ bool PlanEnumerator::enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
 
         const vector<MatchExpression*>& predsOverLeadingField = it->second;
 
-        if (thisIndex.multikey) {
+        if (thisIndex.multikey && thisIndex.multikeyPaths) {
+            // 2dsphere indexes are the only special index type that should ever have path-level
+            // multikey information.
+            invariant(INDEX_2DSPHERE == thisIndex.type);
+
+            if (predsOverLeadingField.end() != std::find(predsOverLeadingField.begin(),
+                                                         predsOverLeadingField.end(),
+                                                         mandatoryPred)) {
+                // The mandatory predicate is on the leading field of 'thisIndex'. We assign it to
+                // 'thisIndex' and skip assigning any other predicates on the leading field to
+                // 'thisIndex' because no additional predicate on the leading field will generate a
+                // more efficient data access plan.
+                indexAssign.preds.push_back(mandatoryPred);
+                indexAssign.positions.push_back(0);
+
+                auto compIt = idxToNotFirst.find(indexAssign.index);
+                if (compIt != idxToNotFirst.end()) {
+                    // Assign any predicates on the non-leading index fields to 'indexAssign' that
+                    // don't violate the intersecting or compounding rules for multikey indexes.
+                    assignMultikeySafePredicates(compIt->second, &indexAssign);
+                }
+            } else {
+                // Assign any predicates on the leading index field to 'indexAssign' that don't
+                // violate the intersecting rules for multikey indexes.
+                assignMultikeySafePredicates(predsOverLeadingField, &indexAssign);
+
+                // Assign the mandatory predicate to 'thisIndex'. Due to how keys are generated for
+                // 2dsphere indexes, it is always safe to assign a predicate on a distinct path to
+                // 'thisIndex' and compound bounds; an index entry is produced for each combination
+                // of unique values along all of the indexed fields, even if they are in separate
+                // array elements. See SERVER-23533 for more details.
+                compound({mandatoryPred}, thisIndex, &indexAssign);
+
+                auto compIt = idxToNotFirst.find(indexAssign.index);
+                if (compIt != idxToNotFirst.end()) {
+                    // Copy the predicates on the non-leading index fields and remove
+                    // 'mandatoryPred' to avoid assigning it twice to 'thisIndex'.
+                    vector<MatchExpression*> predsOverNonLeadingFields = compIt->second;
+
+                    auto mandIt = std::find(predsOverNonLeadingFields.begin(),
+                                            predsOverNonLeadingFields.end(),
+                                            mandatoryPred);
+                    invariant(mandIt != predsOverNonLeadingFields.end());
+
+                    predsOverNonLeadingFields.erase(mandIt);
+
+                    // Assign any predicates on the non-leading index fields to 'indexAssign' that
+                    // don't violate the intersecting or compounding rules for multikey indexes.
+                    assignMultikeySafePredicates(predsOverNonLeadingFields, &indexAssign);
+                }
+            }
+        } else if (thisIndex.multikey) {
             // Special handling for multikey mandatory indices.
             if (predsOverLeadingField.end() != std::find(predsOverLeadingField.begin(),
                                                          predsOverLeadingField.end(),
@@ -1255,16 +1306,20 @@ void PlanEnumerator::assignMultikeySafePredicates(const std::vector<MatchExpress
         const auto* assignedPred = indexAssignment->preds[i];
         const auto posInIdx = indexAssignment->positions[i];
 
-        // enumerateOneIndex() should have only already assigned predicates to 'thisIndex' that on
-        // the leading index field.
-        invariant(posInIdx == 0);
-
         invariant(assignedPred->getTag());
         RelevantTag* rt = static_cast<RelevantTag*>(assignedPred->getTag());
 
         // 'assignedPred' has already been assigned to 'thisIndex', so canAssignPredToIndex() ought
         // to return true.
-        invariant(canAssignPredToIndex(rt, multikeyPaths[posInIdx], &used));
+        const bool shouldHaveAssigned = canAssignPredToIndex(rt, multikeyPaths[posInIdx], &used);
+        if (!shouldHaveAssigned) {
+            // However, there are cases with multikey 2dsphere indexes where the mandatory predicate
+            // is still safe to compound with, even though a prefix of it that causes the index to
+            // be multikey can be shared with the leading index field. The predicates cannot
+            // possibly be joined by an $elemMatch because $near predicates must be specified at the
+            // top-level of the query.
+            invariant(assignedPred->matchType() == MatchExpression::GEO_NEAR);
+        }
     }
 
     size_t posInIdx = 0;
@@ -1279,10 +1334,6 @@ void PlanEnumerator::assignMultikeySafePredicates(const std::vector<MatchExpress
             if (keyElem.fieldNameStringData() != rt->path) {
                 continue;
             }
-
-            // enumerateOneIndex() should only attempt to assign additional predicates to
-            // 'thisIndex' that are on the non-leading index fields.
-            invariant(posInIdx > 0);
 
             if (multikeyPaths[posInIdx].empty()) {
                 // We can always intersect or compound the bounds when no prefix of the queried path
