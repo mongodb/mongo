@@ -66,8 +66,10 @@ wts_load(void)
 	val_gen_setup(NULL, &value);
 
 	for (;;) {
-		if (++g.key_cnt > g.c_rows)
+		if (++g.key_cnt > g.c_rows) {
+			g.key_cnt = g.rows = g.c_rows;
 			break;
+		}
 
 		/* Report on progress every 100 inserts. */
 		if (g.key_cnt % 1000 == 0)
@@ -126,7 +128,8 @@ wts_load(void)
 		if ((ret = cursor->insert(cursor)) != 0) {
 			if (ret != WT_CACHE_FULL)
 				testutil_die(ret, "cursor.insert");
-			g.c_rows = g.key_cnt - 1;
+			g.rows = --g.key_cnt;
+			g.c_rows = (uint32_t)g.key_cnt;
 
 			if (g.c_insert_pct > 5)
 				g.c_insert_pct = 5;
@@ -140,9 +143,6 @@ wts_load(void)
 			bdb_insert(key.data, key.size, value.data, value.size);
 #endif
 	}
-
-	/* Make sure the record counts are consistent in all cases. */
-	g.key_cnt = g.rows = g.c_rows;
 
 	testutil_check(cursor->close(cursor));
 

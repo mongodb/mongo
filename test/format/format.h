@@ -259,8 +259,8 @@ typedef struct {
 #define	ISOLATION_SNAPSHOT		4
 	u_int c_isolation_flag;			/* Isolation flag value */
 
-	uint32_t key_cnt;			/* Keys loaded so far */
-	uint32_t rows;				/* Total rows */
+	uint64_t key_cnt;			/* Keys loaded so far */
+	uint64_t rows;				/* Total rows */
 
 	uint32_t key_rand_len[1031];		/* Key lengths */
 } GLOBAL;
