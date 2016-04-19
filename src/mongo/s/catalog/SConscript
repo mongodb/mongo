@@ -11,7 +11,6 @@ env.SConscript(
 env.Library(
     target='catalog_types',
     source=[
-        'mongo_version_range.cpp',
         'type_changelog.cpp',
         'type_chunk.cpp',
         'type_collection.cpp',
@@ -25,10 +24,31 @@ env.Library(
         'type_tags.cpp',
     ],
     LIBDEPS=[
+        'mongo_version_range',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/common',
     ]
+)
+
+env.Library(
+    target='mongo_version_range',
+    source=[
+        'mongo_version_range.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ]
+)
+
+env.Library(
+    target='catalog_cache',
+    source=[
+        'catalog_cache.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/s/coreshard',
+    ],
 )
 
 env.Library(

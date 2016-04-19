@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/sharding_egress_metadata_hook.h"
 
 namespace mongo {
@@ -36,13 +37,6 @@ namespace rpc {
 
 class ShardingEgressMetadataHookForMongos final : public ShardingEgressMetadataHook {
 private:
-    /**
-     * Looks for $gleStats in a command's reply metadata, and fills in the ClusterLastErrorInfo for
-     *this thread's associated Client with the data, if found. This data will be used by subsequent
-     *GLE calls, to ensure we look for the correct write on the correct PRIMARY.
-     *
-     * Returns the result from calling runCommand
-     */
     void _saveGLEStats(const BSONObj& metadata, StringData hostString) override;
 };
 

@@ -49,6 +49,7 @@
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/sharding_network_connection_hook.h"
+#include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_egress_metadata_hook.h"
 #include "mongo/s/sharding_egress_metadata_hook_for_mongos.h"
