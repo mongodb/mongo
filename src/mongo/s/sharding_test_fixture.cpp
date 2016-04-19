@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/base/status_with.h"
+#include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -52,7 +53,7 @@
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/client/shard_factory_mock.h"
+#include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
@@ -89,9 +90,6 @@ void ShardingTestFixture::setUp() {
     _client = _service->makeClient("ShardingTestFixture", _messagePort.get());
     _opCtx = _client->makeOperationContext();
 
-    auto shardFactory(stdx::make_unique<ShardFactoryMock>());
-    _shardFactory = shardFactory.get();
-
     // Set up executor pool used for most operations.
     auto fixedNet = stdx::make_unique<executor::NetworkInterfaceMock>();
     fixedNet->setEgressMetadataHook(stdx::make_unique<ShardingEgressMetadataHook>());
@@ -126,10 +124,14 @@ void ShardingTestFixture::setUp() {
     ConnectionString configCS = ConnectionString::forReplicaSet(
         "CatalogManagerReplSetTest", {HostAndPort{"TestHost1"}, HostAndPort{"TestHost2"}});
 
+    auto targeterFactory(stdx::make_unique<RemoteCommandTargeterFactoryMock>());
+    _targeterFactory = targeterFactory.get();
+
     auto configTargeter(stdx::make_unique<RemoteCommandTargeterMock>());
     _configTargeter = configTargeter.get();
-    _shardFactory->addTargeterToReturn(configCS, std::move(configTargeter));
+    _targeterFactory->addTargeterToReturn(configCS, std::move(configTargeter));
 
+    auto shardFactory(stdx::make_unique<ShardFactory>(std::move(targeterFactory)));
     auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS));
     executorPool->startup();
 
@@ -176,10 +178,10 @@ ShardRegistry* ShardingTestFixture::shardRegistry() const {
     return grid.shardRegistry();
 }
 
-ShardFactoryMock* ShardingTestFixture::shardFactory() const {
-    invariant(_shardFactory);
+RemoteCommandTargeterFactoryMock* ShardingTestFixture::targeterFactory() const {
+    invariant(_targeterFactory);
 
-    return _shardFactory;
+    return _targeterFactory;
 }
 
 RemoteCommandTargeterMock* ShardingTestFixture::configTargeter() const {

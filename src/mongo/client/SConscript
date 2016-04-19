@@ -193,7 +193,6 @@ env.Library(
     source=[
         'remote_command_targeter_mock.cpp',
         'remote_command_targeter_factory_mock.cpp',
-        '$BUILD_DIR/mongo/s/client/shard_factory_mock.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/net/hostandport',

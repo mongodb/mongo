@@ -46,6 +46,7 @@ class CollectionType;
 class DistLockManagerMock;
 class NamespaceString;
 class ShardFactoryMock;
+class RemoteCommandTargeterFactoryMock;
 class RemoteCommandTargeterMock;
 class ShardRegistry;
 class ShardType;
@@ -83,7 +84,7 @@ protected:
 
     ShardRegistry* shardRegistry() const;
 
-    ShardFactoryMock* shardFactory() const;
+    RemoteCommandTargeterFactoryMock* targeterFactory() const;
 
     RemoteCommandTargeterMock* configTargeter() const;
 
@@ -203,7 +204,7 @@ private:
     ServiceContext::UniqueOperationContext _opCtx;
     std::unique_ptr<MessagingPortMock> _messagePort;
 
-    ShardFactoryMock* _shardFactory;
+    RemoteCommandTargeterFactoryMock* _targeterFactory;
     RemoteCommandTargeterMock* _configTargeter;
 
     executor::NetworkInterfaceMock* _mockNetwork;

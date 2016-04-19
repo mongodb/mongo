@@ -35,7 +35,7 @@
 #include <string>
 
 #include "mongo/base/status.h"
-#include "mongo/s/client/shard_factory_impl.h"
+#include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -47,6 +47,7 @@
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/s/balancer/balancer_configuration.h"
+#include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/sharding_network_connection_hook.h"
 #include "mongo/s/cluster_last_error_info.h"
@@ -155,8 +156,9 @@ Status initializeGlobalShardingState(OperationContext* txn,
     auto executorPool = makeTaskExecutorPool(std::move(network), isMongos);
     executorPool->startup();
 
-    auto shardRegistry(
-        stdx::make_unique<ShardRegistry>(stdx::make_unique<ShardFactoryImpl>(), configCS));
+    auto shardFactory(
+        stdx::make_unique<ShardFactory>(stdx::make_unique<RemoteCommandTargeterFactoryImpl>()));
+    auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS));
 
     auto catalogManager = makeCatalogManager(getGlobalServiceContext(),
                                              shardRegistry.get(),

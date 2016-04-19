@@ -32,6 +32,7 @@
 
 #include <vector>
 
+#include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/lite_parsed_query.h"
@@ -42,7 +43,6 @@
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/client/shard_factory_mock.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/batched_insert_request.h"
@@ -268,7 +268,7 @@ TEST_F(AddShardTest, Standalone) {
     targeter->setConnectionStringReturnValue(ConnectionString(shardTarget));
     targeter->setFindHostReturnValue(shardTarget);
 
-    shardFactory()->addTargeterToReturn(ConnectionString(shardTarget), std::move(targeter));
+    targeterFactory()->addTargeterToReturn(ConnectionString(shardTarget), std::move(targeter));
     std::string expectedShardName = "StandaloneShard";
 
     auto future = launchAsync([this, expectedShardName] {
@@ -343,7 +343,7 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
     targeter->setConnectionStringReturnValue(ConnectionString(shardTarget));
     targeter->setFindHostReturnValue(shardTarget);
 
-    shardFactory()->addTargeterToReturn(ConnectionString(shardTarget), std::move(targeter));
+    targeterFactory()->addTargeterToReturn(ConnectionString(shardTarget), std::move(targeter));
     std::string expectedShardName = "shard0006";
 
     auto future = launchAsync([this, expectedShardName, shardTarget] {
@@ -471,8 +471,8 @@ TEST_F(AddShardTest, UnreachableHost) {
     targeter->setConnectionStringReturnValue(ConnectionString(HostAndPort("StandaloneHost:12345")));
     targeter->setFindHostReturnValue(HostAndPort("StandaloneHost:12345"));
 
-    shardFactory()->addTargeterToReturn(ConnectionString(HostAndPort("StandaloneHost:12345")),
-                                        std::move(targeter));
+    targeterFactory()->addTargeterToReturn(ConnectionString(HostAndPort("StandaloneHost:12345")),
+                                           std::move(targeter));
     std::string expectedShardName = "StandaloneShard";
 
     auto future = launchAsync([this, expectedShardName] {
@@ -500,8 +500,8 @@ TEST_F(AddShardTest, AddMongosAsShard) {
     targeter->setConnectionStringReturnValue(ConnectionString(HostAndPort("StandaloneHost:12345")));
     targeter->setFindHostReturnValue(HostAndPort("StandaloneHost:12345"));
 
-    shardFactory()->addTargeterToReturn(ConnectionString(HostAndPort("StandaloneHost:12345")),
-                                        std::move(targeter));
+    targeterFactory()->addTargeterToReturn(ConnectionString(HostAndPort("StandaloneHost:12345")),
+                                           std::move(targeter));
     std::string expectedShardName = "StandaloneShard";
 
     auto future = launchAsync([this, expectedShardName] {
@@ -533,7 +533,7 @@ TEST_F(AddShardTest, AddReplicaSetShardAsStandalone) {
     targeter->setConnectionStringReturnValue(ConnectionString(shardTarget));
     targeter->setFindHostReturnValue(shardTarget);
 
-    shardFactory()->addTargeterToReturn(ConnectionString(shardTarget), std::move(targeter));
+    targeterFactory()->addTargeterToReturn(ConnectionString(shardTarget), std::move(targeter));
     std::string expectedShardName = "StandaloneShard";
 
     auto future = launchAsync([this, expectedShardName, shardTarget] {
@@ -562,7 +562,7 @@ TEST_F(AddShardTest, AndStandaloneHostShardAsReplicaSet) {
     targeter->setConnectionStringReturnValue(connString);
     targeter->setFindHostReturnValue(shardTarget);
 
-    shardFactory()->addTargeterToReturn(connString, std::move(targeter));
+    targeterFactory()->addTargeterToReturn(connString, std::move(targeter));
     std::string expectedShardName = "StandaloneShard";
 
     auto future = launchAsync([this, expectedShardName, connString] {
@@ -596,7 +596,7 @@ TEST_F(AddShardTest, ReplicaSetMistmatchedSetName) {
     HostAndPort shardTarget = connString.getServers().front();
     targeter->setFindHostReturnValue(shardTarget);
 
-    shardFactory()->addTargeterToReturn(connString, std::move(targeter));
+    targeterFactory()->addTargeterToReturn(connString, std::move(targeter));
     std::string expectedShardName = "StandaloneShard";
 
     auto future = launchAsync([this, expectedShardName, connString] {
@@ -631,7 +631,7 @@ TEST_F(AddShardTest, ShardIsCSRSConfigServer) {
     HostAndPort shardTarget = connString.getServers().front();
     targeter->setFindHostReturnValue(shardTarget);
 
-    shardFactory()->addTargeterToReturn(connString, std::move(targeter));
+    targeterFactory()->addTargeterToReturn(connString, std::move(targeter));
     std::string expectedShardName = "StandaloneShard";
 
     auto future = launchAsync([this, expectedShardName, connString] {
@@ -667,7 +667,7 @@ TEST_F(AddShardTest, ShardIsSCCConfigServer) {
     HostAndPort shardTarget = connString.getServers().front();
     targeter->setFindHostReturnValue(shardTarget);
 
-    shardFactory()->addTargeterToReturn(connString, std::move(targeter));
+    targeterFactory()->addTargeterToReturn(connString, std::move(targeter));
     std::string expectedShardName = "StandaloneShard";
 
     auto future = launchAsync([this, expectedShardName, connString] {
@@ -705,7 +705,7 @@ TEST_F(AddShardTest, ReplicaSetMissingHostsProvidedInSeedList) {
     HostAndPort shardTarget = connString.getServers().front();
     targeter->setFindHostReturnValue(shardTarget);
 
-    shardFactory()->addTargeterToReturn(connString, std::move(targeter));
+    targeterFactory()->addTargeterToReturn(connString, std::move(targeter));
     std::string expectedShardName = "StandaloneShard";
 
     auto future = launchAsync([this, expectedShardName, connString] {
@@ -734,7 +734,7 @@ TEST_F(AddShardTest, ReplicaSetNameIsConfig) {
     HostAndPort shardTarget = connString.getServers().front();
     targeter->setFindHostReturnValue(shardTarget);
 
-    shardFactory()->addTargeterToReturn(connString, std::move(targeter));
+    targeterFactory()->addTargeterToReturn(connString, std::move(targeter));
     std::string expectedShardName = "config";
 
     auto future = launchAsync([this, expectedShardName, connString] {
@@ -763,7 +763,7 @@ TEST_F(AddShardTest, ShardContainsExistingDatabase) {
     HostAndPort shardTarget = connString.getServers().front();
     targeter->setFindHostReturnValue(shardTarget);
 
-    shardFactory()->addTargeterToReturn(connString, std::move(targeter));
+    targeterFactory()->addTargeterToReturn(connString, std::move(targeter));
     std::string expectedShardName = "mySet";
 
     auto future = launchAsync([this, expectedShardName, connString] {
@@ -802,7 +802,7 @@ TEST_F(AddShardTest, ExistingShardName) {
     HostAndPort shardTarget = connString.getServers().front();
     targeter->setFindHostReturnValue(shardTarget);
 
-    shardFactory()->addTargeterToReturn(connString, std::move(targeter));
+    targeterFactory()->addTargeterToReturn(connString, std::move(targeter));
     std::string expectedShardName = "mySet";
 
     auto future = launchAsync([this, expectedShardName, connString] {
@@ -864,7 +864,7 @@ TEST_F(AddShardTest, ReplicaSet) {
     HostAndPort shardTarget = connString.getServers().front();
     targeter->setFindHostReturnValue(shardTarget);
 
-    shardFactory()->addTargeterToReturn(connString, std::move(targeter));
+    targeterFactory()->addTargeterToReturn(connString, std::move(targeter));
     std::string expectedShardName = "mySet";
 
     auto future = launchAsync([this, expectedShardName, connString] {
@@ -918,7 +918,7 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
     HostAndPort shardTarget = connString.getServers().front();
     targeter->setFindHostReturnValue(shardTarget);
 
-    shardFactory()->addTargeterToReturn(connString, std::move(targeter));
+    targeterFactory()->addTargeterToReturn(connString, std::move(targeter));
     std::string expectedShardName = "mySet";
 
     auto future = launchAsync([this, expectedShardName, connString] {
@@ -996,7 +996,7 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
     HostAndPort shardTarget = seedString.getServers().front();
     targeter->setFindHostReturnValue(shardTarget);
 
-    shardFactory()->addTargeterToReturn(seedString, std::move(targeter));
+    targeterFactory()->addTargeterToReturn(seedString, std::move(targeter));
     std::string expectedShardName = "mySet";
 
     auto future = launchAsync([this, expectedShardName, seedString] {

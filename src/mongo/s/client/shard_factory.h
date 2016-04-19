@@ -32,44 +32,41 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/client/remote_command_targeter_factory.h"
 
 namespace mongo {
 
-class Shard;
 class ConnectionString;
+class Shard;
 
 /**
- * An interface to Shard instantiating factory.
+ * A factory for creating ShardRemote or ShardLocal instances.
  */
 class ShardFactory {
     MONGO_DISALLOW_COPYING(ShardFactory);
 
 public:
-    virtual ~ShardFactory() = default;
+    ShardFactory(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory);
+    ~ShardFactory() = default;
 
     /**
-     * Creates a unique_ptr with a new instance of a Shard with the provided shardId
-     * and connection string. This method is currently only used when shard does not exists yet.
-     * Consider using createShard instead.
-     * TODO: currently isLocal argument is ignored until the Shard will provide local and remote
-     * implementations.
+     * Deprecated. Creates a unique_ptr with a new instance of a Shard with the provided shardId
+     * and connection string. This method is currently only used for addShard.
      */
-    virtual std::unique_ptr<Shard> createUniqueShard(const std::string& shardId,
-                                                     const ConnectionString& connStr,
-                                                     bool isLocal) = 0;
+    std::unique_ptr<Shard> createUniqueShard(const std::string& shardId,
+                                             const ConnectionString& connStr,
+                                             bool isLocal);
 
     /**
      * Creates a shared_ptr with a new instance of a Shard with the provided shardId
      * and connection string.
-     * TODO: currently isLocal argument is ignored until the Shard will provide local and remote
-     * implementations.
      */
-    virtual std::shared_ptr<Shard> createShard(const std::string& shardId,
-                                               const ConnectionString& connStr,
-                                               bool isLocal) = 0;
+    std::shared_ptr<Shard> createShard(const std::string& shardId,
+                                       const ConnectionString& connStr,
+                                       bool isLocal);
 
-protected:
-    ShardFactory() = default;
+private:
+    std::unique_ptr<RemoteCommandTargeterFactory> _targeterFactory;
 };
 
 }  // namespace mongo

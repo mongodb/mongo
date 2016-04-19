@@ -26,33 +26,45 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include <memory>
+#include "mongo/platform/basic.h"
 
 #include "mongo/s/client/shard_factory.h"
-#include "mongo/client/remote_command_targeter_factory_impl.h"
+
+#include "mongo/base/status_with.h"
+#include "mongo/client/remote_command_targeter.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_remote.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
+ShardFactory::ShardFactory(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory)
+    : _targeterFactory(std::move(targeterFactory)){};
 
-/**
- *  ShardFactory implementation.
- */
-class ShardFactoryImpl final : public ShardFactory {
-public:
-    ShardFactoryImpl() = default;
+std::unique_ptr<Shard> ShardFactory::createUniqueShard(const ShardId& shardId,
+                                                       const ConnectionString& connStr,
+                                                       bool isLocal) {
+    if (isLocal) {
+        // TODO: Replace with the following line once ShardLocal is implemented.
+        // return stdx::make_unique<ShardLocal>(shardId);
+        MONGO_UNREACHABLE;
+    } else {
+        return stdx::make_unique<ShardRemote>(shardId, connStr, _targeterFactory->create(connStr));
+    }
+}
 
-    virtual std::unique_ptr<Shard> createUniqueShard(const std::string& shardId,
-                                                     const ConnectionString& connStr,
-                                                     bool isLocal);
-
-    virtual std::shared_ptr<Shard> createShard(const std::string& shardId,
-                                               const ConnectionString& connStr,
-                                               bool isLocal);
-
-private:
-    RemoteCommandTargeterFactoryImpl _targeterFactory;
-};
+std::shared_ptr<Shard> ShardFactory::createShard(const ShardId& shardId,
+                                                 const ConnectionString& connStr,
+                                                 bool isLocal) {
+    if (isLocal) {
+        // TODO: Replace with the following line once ShardLocal is implemented.
+        // return stdx::make_shared<ShardLocal>(shardId);
+        MONGO_UNREACHABLE;
+    } else {
+        return std::make_shared<ShardRemote>(shardId, connStr, _targeterFactory->create(connStr));
+    }
+}
 
 }  // namespace mongo

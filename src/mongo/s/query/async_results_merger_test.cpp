@@ -30,6 +30,7 @@
 
 #include "mongo/s/query/async_results_merger.h"
 
+#include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/cursor_response.h"
@@ -40,7 +41,6 @@
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/client/shard_factory_mock.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/sharding_test_fixture.h"
 #include "mongo/stdx/memory.h"
@@ -84,8 +84,8 @@ public:
             targeter->setConnectionStringReturnValue(ConnectionString(kTestShardHosts[i]));
             targeter->setFindHostReturnValue(kTestShardHosts[i]);
 
-            shardFactory()->addTargeterToReturn(ConnectionString(kTestShardHosts[i]),
-                                                std::move(targeter));
+            targeterFactory()->addTargeterToReturn(ConnectionString(kTestShardHosts[i]),
+                                                   std::move(targeter));
         }
 
         setupShards(shards);

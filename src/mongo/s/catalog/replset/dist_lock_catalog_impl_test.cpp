@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/json.h"
+#include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
@@ -48,7 +49,7 @@
 #include "mongo/s/catalog/replset/dist_lock_catalog_impl.h"
 #include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/s/catalog/type_locks.h"
-#include "mongo/s/client/shard_factory_mock.h"
+#include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
@@ -129,8 +130,9 @@ private:
         executorPool->startup();
 
         ConnectionString configCS(HostAndPort("dummy:1234"));
-        auto shardRegistry =
-            stdx::make_unique<ShardRegistry>(stdx::make_unique<ShardFactoryMock>(), configCS);
+        auto shardFactory(
+            stdx::make_unique<ShardFactory>(stdx::make_unique<RemoteCommandTargeterFactoryMock>()));
+        auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS));
 
         _distLockCatalog = stdx::make_unique<DistLockCatalogImpl>(shardRegistry.get());
 

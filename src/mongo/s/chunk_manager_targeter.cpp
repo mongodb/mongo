@@ -229,9 +229,9 @@ CompareResult compareAllShardVersions(const ChunkManager* cachedChunkManager,
  * Whether or not the manager/primary pair is different from the other manager/primary pair.
  */
 bool isMetadataDifferent(const ChunkManagerPtr& managerA,
-                         const ShardPtr& primaryA,
+                         const shared_ptr<Shard>& primaryA,
                          const ChunkManagerPtr& managerB,
-                         const ShardPtr& primaryB) {
+                         const shared_ptr<Shard>& primaryB) {
     if ((managerA && !managerB) || (!managerA && managerB) || (primaryA && !primaryB) ||
         (!primaryA && primaryB))
         return true;
@@ -249,9 +249,9 @@ bool isMetadataDifferent(const ChunkManagerPtr& managerA,
 * of the metadata.
 */
 bool wasMetadataRefreshed(const ChunkManagerPtr& managerA,
-                          const ShardPtr& primaryA,
+                          const shared_ptr<Shard>& primaryA,
                           const ChunkManagerPtr& managerB,
-                          const ShardPtr& primaryB) {
+                          const shared_ptr<Shard>& primaryB) {
     if (isMetadataDifferent(managerA, primaryA, managerB, primaryB))
         return true;
 
@@ -623,7 +623,7 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* txn, bool* wasCha
     //
 
     ChunkManagerPtr lastManager = _manager;
-    ShardPtr lastPrimary = _primary;
+    shared_ptr<Shard> lastPrimary = _primary;
 
     auto status = dbutil::implicitCreateDb(txn, _nss.db().toString());
     if (!status.isOK()) {

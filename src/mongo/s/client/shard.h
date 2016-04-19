@@ -28,30 +28,22 @@
 
 #pragma once
 
-#include <string>
-
-#include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/executor/task_executor.h"
 
 namespace mongo {
 
 using ShardId = std::string;
 
-class Shard;
-using ShardPtr = std::shared_ptr<Shard>;
-
-/*
- * Maintains the targeting and command execution logic for a single shard. Performs polling of
- * the shard (if replica set).
+/**
+ * Presents an interface for talking to shards, regardless of whether that shard is remote or is
+ * the current (local) shard.
  */
 class Shard {
-    MONGO_DISALLOW_COPYING(Shard);
-
 public:
     struct CommandResponse {
         BSONObj response;
@@ -63,18 +55,9 @@ public:
         repl::OpTime opTime;
     };
 
-    /**
-     * Instantiates a new shard connection management object for the specified shard.
-     */
-    Shard(const ShardId& id,
-          const ConnectionString& originalConnString,
-          std::unique_ptr<RemoteCommandTargeter> targeter);
+    virtual ~Shard() = default;
 
-    ~Shard();
-
-    const ShardId getId() const {
-        return _id;
-    }
+    const ShardId getId() const;
 
     /**
      * Returns true if this shard object represents the config server.
@@ -82,26 +65,40 @@ public:
     bool isConfig() const;
 
     /**
-     * Returns the current config string.
+     * Returns the current connection string for the shard.
+     *
+     * This is only valid to call on ShardRemote instances.
      */
-    const ConnectionString getConnString() const;
+    virtual const ConnectionString getConnString() const = 0;
 
     /**
-     * Returns the config string that was used on the shard creation. The RS config string may be
-     * different.
+     * Returns the connection string that was used when the shard was added. The current connection
+     * string may be different for shards that are replica sets.
+     *
+     * This is only valid to call on ShardRemote instances.
      */
-    const ConnectionString originalConnString() const {
-        return _originalConnString;
-    }
+    virtual const ConnectionString originalConnString() const = 0;
 
-    std::shared_ptr<RemoteCommandTargeter> getTargeter() const {
-        return _targeter;
-    }
+    /**
+     * Returns the RemoteCommandTargeter for the hosts in this shard.
+     *
+     * This is only valid to call on ShardRemote instances.
+     */
+    virtual std::shared_ptr<RemoteCommandTargeter> getTargeter() = 0;
+
+    /**
+     * Notifies the RemoteCommandTargeter owned by the shard of a particular mode of failure for
+     * the specified host.
+     *
+     * This is only valid to call on ShardRemote instances.
+     */
+    virtual void updateReplSetMonitor(const HostAndPort& remoteHost,
+                                      const Status& remoteCommandStatus) = 0;
 
     /**
      * Returns a string description of this shard entry.
      */
-    std::string toString() const;
+    virtual std::string toString() const = 0;
 
     StatusWith<CommandResponse> runCommand(OperationContext* txn,
                                            const ReadPreferenceSetting& readPref,
@@ -120,42 +117,29 @@ public:
                                                      const BSONObj& sort,
                                                      const boost::optional<long long> limit);
 
-    /**
-     * Notifies the RemoteCommandTargeter owned by the shard of a particular mode of failure for the
-     * specified host.
-     */
-    void updateReplSetMonitor(const HostAndPort& remoteHost, const Status& remoteCommandStatus);
+protected:
+    Shard(const ShardId& id);
 
 private:
     // TODO: SERVER-23782 make Shard::_runCommand take a timeout argument.
-    StatusWith<CommandResponse> _runCommand(OperationContext* txn,
-                                            const ReadPreferenceSetting& readPref,
-                                            const std::string& dbname,
-                                            const BSONObj& cmdObj,
-                                            const BSONObj& metadata);
+    virtual StatusWith<CommandResponse> _runCommand(OperationContext* txn,
+                                                    const ReadPreferenceSetting& readPref,
+                                                    const std::string& dbname,
+                                                    const BSONObj& cmdObj,
+                                                    const BSONObj& metadata) = 0;
 
     // TODO: SERVER-23782 make Shard::_exhaustiveFindOnConfig take a timeout argument.
-    StatusWith<QueryResponse> _exhaustiveFindOnConfig(OperationContext* txn,
-                                                      const ReadPreferenceSetting& readPref,
-                                                      const NamespaceString& nss,
-                                                      const BSONObj& query,
-                                                      const BSONObj& sort,
-                                                      boost::optional<long long> limit);
+    virtual StatusWith<QueryResponse> _exhaustiveFindOnConfig(OperationContext* txn,
+                                                              const ReadPreferenceSetting& readPref,
+                                                              const NamespaceString& nss,
+                                                              const BSONObj& query,
+                                                              const BSONObj& sort,
+                                                              boost::optional<long long> limit) = 0;
 
     /**
      * Identifier of the shard as obtained from the configuration data (i.e. shard0000).
      */
     const ShardId _id;
-
-    /**
-     * Connection string for the shard at the creation time.
-     */
-    const ConnectionString _originalConnString;
-
-    /**
-     * Targeter for obtaining hosts from which to read or to which to write.
-     */
-    const std::shared_ptr<RemoteCommandTargeter> _targeter;
 };
 
 }  // namespace mongo
