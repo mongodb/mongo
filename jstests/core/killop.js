@@ -55,7 +55,7 @@
               return tojson(db.currentOp().inprog);
           }
         },
-        30000);
+        60000);
 
     var start = new Date();
     jsTestLog("Killing ops");
