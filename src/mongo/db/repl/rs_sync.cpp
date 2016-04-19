@@ -52,6 +52,7 @@
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/timer_stats.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"

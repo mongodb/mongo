@@ -46,6 +46,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/touch_pages.h"
 

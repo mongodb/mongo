@@ -41,15 +41,16 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/bits.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
-#include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/concurrency/rwlock.h"
 #include "mongo/util/concurrency/synchronization.h"
+#include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
@@ -118,8 +119,7 @@ private:
     virtual void subthread(int tnumber) {
         Client::initThread("mongomutextest");
 
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
 
         sleepmillis(0);
         for (int i = 0; i < N; i++) {

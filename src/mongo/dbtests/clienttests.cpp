@@ -28,14 +28,12 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace ClientTests {
@@ -47,16 +45,14 @@ using std::vector;
 class Base {
 public:
     Base(string coll) : _ns("test." + coll) {
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
         DBDirectClient db(&txn);
 
         db.dropDatabase("test");
     }
 
     virtual ~Base() {
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
         DBDirectClient db(&txn);
 
         db.dropCollection(_ns);
@@ -74,8 +70,7 @@ class DropIndex : public Base {
 public:
     DropIndex() : Base("dropindex") {}
     void run() {
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
         DBDirectClient db(&txn);
 
         db.insert(ns(), BSON("x" << 2));
@@ -104,8 +99,7 @@ class BuildIndex : public Base {
 public:
     BuildIndex() : Base("buildIndex") {}
     void run() {
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
 
         OldClientWriteContext ctx(&txn, ns());
         DBDirectClient db(&txn);
@@ -138,8 +132,7 @@ class CS_10 : public Base {
 public:
     CS_10() : Base("CS_10") {}
     void run() {
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
         DBDirectClient db(&txn);
 
         const string longs(770, 'c');
@@ -158,8 +151,7 @@ class PushBack : public Base {
 public:
     PushBack() : Base("PushBack") {}
     void run() {
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
         DBDirectClient db(&txn);
 
         for (int i = 0; i < 10; ++i) {
@@ -204,8 +196,7 @@ class Create : public Base {
 public:
     Create() : Base("Create") {}
     void run() {
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
         DBDirectClient db(&txn);
 
         db.createCollection("unittests.clienttests.create", 4096, true);

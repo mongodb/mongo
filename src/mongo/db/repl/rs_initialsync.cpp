@@ -45,6 +45,8 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/initial_sync.h"
 #include "mongo/db/repl/oplog.h"
@@ -309,8 +311,7 @@ Status _initialSync() {
     log() << "initial sync pending";
 
     BackgroundSync* bgsync(BackgroundSync::get());
-    const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-    OperationContext& txn = *txnPtr;
+    OperationContextImpl txn;
     txn.setReplicatedWrites(false);
     DisableDocumentValidation validationDisabler(&txn);
     ReplicationCoordinator* replCoord(getGlobalReplicationCoordinator());
@@ -466,8 +467,7 @@ void syncDoInitialSync() {
     }
 
     {
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
         createOplog(&txn);
     }
 

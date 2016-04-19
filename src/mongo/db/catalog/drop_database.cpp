@@ -42,6 +42,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/log.h"

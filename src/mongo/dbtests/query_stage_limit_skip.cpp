@@ -31,8 +31,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/exec/limit.h"
 #include "mongo/db/exec/plan_stage.h"

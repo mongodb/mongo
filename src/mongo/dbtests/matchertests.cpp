@@ -29,16 +29,14 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <iostream>
 
-#include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/matcher/matcher.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/timer.h"
 
@@ -215,8 +213,7 @@ template <typename M>
 class WhereSimple1 {
 public:
     void run() {
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
         const NamespaceString nss("unittests.matchertests");
         AutoGetCollectionForRead ctx(&txn, nss);
 

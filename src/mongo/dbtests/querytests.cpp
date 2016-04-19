@@ -34,18 +34,18 @@
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/service_context_d.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/global_timestamp.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/lite_parsed_query.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/service_context_d.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/timer.h"
 
@@ -113,8 +113,7 @@ protected:
     }
 
 
-    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _txn = *_txnPtr;
+    OperationContextImpl _txn;
     ScopedTransaction _scopedXact;
     Lock::GlobalWrite _lk;
     OldClientContext _context;
@@ -233,8 +232,7 @@ protected:
         return !_client.getPrevError().getField("err").isNull();
     }
 
-    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _txn = *_txnPtr;
+    OperationContextImpl _txn;
     DBDirectClient _client;
 };
 

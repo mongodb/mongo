@@ -34,8 +34,8 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/head_manager.h"
 #include "mongo/db/catalog/index_create.h"
-#include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/record_id.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
@@ -145,8 +145,7 @@ class CreateCollection {
 public:
     void run() {
         string ns = "unittests.rollback_create_collection";
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
         NamespaceString nss(ns);
         dropDatabase(&txn, nss);
 
@@ -175,8 +174,7 @@ class DropCollection {
 public:
     void run() {
         string ns = "unittests.rollback_drop_collection";
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
         NamespaceString nss(ns);
         dropDatabase(&txn, nss);
 
@@ -216,8 +214,7 @@ public:
     void run() {
         NamespaceString source("unittests.rollback_rename_collection_src");
         NamespaceString target("unittests.rollback_rename_collection_dest");
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
 
         dropDatabase(&txn, source);
         dropDatabase(&txn, target);
@@ -263,8 +260,7 @@ public:
     void run() {
         NamespaceString source("unittests.rollback_rename_droptarget_collection_src");
         NamespaceString target("unittests.rollback_rename_droptarget_collection_dest");
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
 
         dropDatabase(&txn, source);
         dropDatabase(&txn, target);
@@ -326,8 +322,7 @@ class ReplaceCollection {
 public:
     void run() {
         NamespaceString nss("unittests.rollback_replace_collection");
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
         dropDatabase(&txn, nss);
 
         ScopedTransaction transaction(&txn, MODE_IX);
@@ -377,8 +372,7 @@ class CreateDropCollection {
 public:
     void run() {
         NamespaceString nss("unittests.rollback_create_drop_collection");
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
         dropDatabase(&txn, nss);
 
         ScopedTransaction transaction(&txn, MODE_IX);
@@ -413,8 +407,7 @@ class TruncateCollection {
 public:
     void run() {
         NamespaceString nss("unittests.rollback_truncate_collection");
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
         dropDatabase(&txn, nss);
 
         ScopedTransaction transaction(&txn, MODE_IX);
@@ -463,8 +456,7 @@ class CreateIndex {
 public:
     void run() {
         string ns = "unittests.rollback_create_index";
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
         NamespaceString nss(ns);
         dropDatabase(&txn, nss);
         createCollection(&txn, nss);
@@ -504,8 +496,7 @@ class DropIndex {
 public:
     void run() {
         string ns = "unittests.rollback_drop_index";
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
         NamespaceString nss(ns);
         dropDatabase(&txn, nss);
         createCollection(&txn, nss);
@@ -557,8 +548,7 @@ class CreateDropIndex {
 public:
     void run() {
         string ns = "unittests.rollback_create_drop_index";
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
         NamespaceString nss(ns);
         dropDatabase(&txn, nss);
         createCollection(&txn, nss);
@@ -601,8 +591,7 @@ class SetIndexHead {
 public:
     void run() {
         string ns = "unittests.rollback_set_index_head";
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
         NamespaceString nss(ns);
         dropDatabase(&txn, nss);
         createCollection(&txn, nss);
@@ -664,8 +653,7 @@ class CreateCollectionAndIndexes {
 public:
     void run() {
         string ns = "unittests.rollback_create_collection_and_indexes";
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
         NamespaceString nss(ns);
         dropDatabase(&txn, nss);
 

@@ -26,10 +26,8 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/assert_util.h"
 
@@ -50,8 +48,7 @@ static const char* const _ns = "unittests.gle";
 class GetLastErrorCommandFailure {
 public:
     void run() {
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
         DBDirectClient client(&txn);
 
         client.insert(_ns,
@@ -70,8 +67,7 @@ public:
 class GetLastErrorClean {
 public:
     void run() {
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
         DBDirectClient client(&txn);
 
         client.insert(_ns,
@@ -90,8 +86,7 @@ public:
 class GetLastErrorFromDup {
 public:
     void run() {
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
         DBDirectClient client(&txn);
 
         client.insert(_ns, BSON("_id" << 1));

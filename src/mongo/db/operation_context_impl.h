@@ -35,6 +35,8 @@ namespace mongo {
 
 class OperationContextImpl : public OperationContext {
 public:
+    OperationContextImpl();
+
     virtual ~OperationContextImpl();
 
     virtual RecoveryUnit* recoveryUnit() const override;
@@ -61,10 +63,6 @@ public:
     virtual bool writesAreReplicated() const override;
 
 private:
-    friend class ServiceContextMongoD;
-
-    OperationContextImpl();
-
     std::unique_ptr<RecoveryUnit> _recovery;
     bool _writesAreReplicated;
 };

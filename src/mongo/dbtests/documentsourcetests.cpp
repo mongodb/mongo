@@ -30,17 +30,16 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/dbtests/dbtests.h"
-
 namespace DocumentSourceCursorTests {
 
 using boost::intrusive_ptr;
@@ -67,8 +66,7 @@ public:
     }
 
 protected:
-    const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
-    OperationContext& _opCtx = *_opCtxPtr;
+    OperationContextImpl _opCtx;
     DBDirectClient client;
 };
 

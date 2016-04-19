@@ -32,7 +32,7 @@
 
 #include "mongo/db/storage/mmap_v1/record_store_v1_capped.h"
 
-#include "mongo/db/client.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/mmap_v1/extent.h"
 #include "mongo/db/storage/mmap_v1/extent_manager.h"
 #include "mongo/db/storage/mmap_v1/mmap.h"

@@ -26,20 +26,18 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <cstdint>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_create.h"
-#include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace ValidateTests {
@@ -88,8 +86,7 @@ protected:
         return results.valid;
     }
 
-    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _txn = *_txnPtr;
+    OperationContextImpl _txn;
     OldClientWriteContext _ctx;
     DBDirectClient _client;
     bool _full;

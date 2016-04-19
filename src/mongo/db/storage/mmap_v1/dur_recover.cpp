@@ -40,8 +40,7 @@
 #include <iostream>
 #include <sys/stat.h>
 
-#include "mongo/db/client.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/mmap_v1/compress.h"
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
@@ -629,8 +628,7 @@ void _recover() {
 void replayJournalFilesAtStartup() {
     // we use a lock so that exitCleanly will wait for us
     // to finish (or at least to notice what is up and stop)
-    const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-    OperationContext& txn = *txnPtr;
+    OperationContextImpl txn;
     ScopedTransaction transaction(&txn, MODE_X);
     Lock::GlobalWrite lk(txn.lockState());
 

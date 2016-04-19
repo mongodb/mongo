@@ -40,6 +40,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
@@ -76,8 +77,7 @@ public:
             return false;
         }
 
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
 
         try {
             ScopedTransaction transaction(&txn, MODE_IX);

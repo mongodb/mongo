@@ -30,20 +30,18 @@
  * This file tests db/query/plan_ranker.cpp and db/query/multi_plan_runner.cpp.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <iostream>
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
@@ -154,8 +152,7 @@ protected:
     // determining the number of documents in the tests below.
     static const int N;
 
-    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _txn = *_txnPtr;
+    OperationContextImpl _txn;
 
 private:
     // Holds the value of global "internalQueryForceIntersectionPlans" setParameter flag.

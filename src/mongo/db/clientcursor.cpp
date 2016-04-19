@@ -46,6 +46,7 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
@@ -269,8 +270,7 @@ public:
         const int Secs = 4;
         while (!inShutdown()) {
             {
-                const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-                OperationContext& txn = *txnPtr;
+                OperationContextImpl txn;
                 cursorStatsTimedOut.increment(
                     CursorManager::timeoutCursorsGlobal(&txn, t.millisReset()));
             }

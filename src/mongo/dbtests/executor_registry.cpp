@@ -31,21 +31,19 @@
  * ClientCursor::deregisterExecutor.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/service_context.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace ExecutorRegistry {
@@ -120,8 +118,7 @@ public:
     }
 
     // Order of these is important for initialization
-    const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
-    OperationContext& _opCtx = *_opCtxPtr;
+    OperationContextImpl _opCtx;
     unique_ptr<OldClientWriteContext> _ctx;
     DBDirectClient _client;
 };

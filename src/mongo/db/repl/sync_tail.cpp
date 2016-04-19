@@ -40,18 +40,18 @@
 #include "mongo/base/counter.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/client.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_timestamp.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/prefetch.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/repl/bgsync.h"
@@ -418,8 +418,7 @@ void prefetchOp(const BSONObj& op) {
         try {
             // one possible tweak here would be to stay in the read lock for this database
             // for multiple prefetches if they are for the same database.
-            const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-            OperationContext& txn = *txnPtr;
+            OperationContextImpl txn;
             AutoGetCollectionForRead ctx(&txn, ns);
             Database* db = ctx.getDb();
             if (db) {
@@ -612,8 +611,7 @@ public:
 private:
     void run() {
         Client::initThread("ReplBatcher");
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
         auto replCoord = ReplicationCoordinator::get(&txn);
 
         while (!_inShutdown.load()) {
@@ -685,8 +683,7 @@ private:
 void SyncTail::oplogApplication() {
     OpQueueBatcher batcher(this);
 
-    const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-    OperationContext& txn = *txnPtr;
+    OperationContextImpl txn;
     auto replCoord = ReplicationCoordinator::get(&txn);
     std::unique_ptr<ApplyBatchFinalizer> finalizer{
         getGlobalServiceContext()->getGlobalStorageEngine()->isDurable()
@@ -986,8 +983,7 @@ void multiSyncApply(const std::vector<OplogEntry>& ops) {
     }
     initializeWriterThread();
 
-    const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-    OperationContext& txn = *txnPtr;
+    OperationContextImpl txn;
     txn.setReplicatedWrites(false);
     DisableDocumentValidation validationDisabler(&txn);
 
@@ -1093,8 +1089,7 @@ void multiSyncApply(const std::vector<OplogEntry>& ops) {
 void multiInitialSyncApply(const std::vector<OplogEntry>& ops) {
     initializeWriterThread();
 
-    const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-    OperationContext& txn = *txnPtr;
+    OperationContextImpl txn;
     txn.setReplicatedWrites(false);
     DisableDocumentValidation validationDisabler(&txn);
 

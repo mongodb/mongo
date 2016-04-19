@@ -32,12 +32,9 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/and_hash.h"
@@ -48,6 +45,7 @@
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
@@ -149,8 +147,7 @@ public:
     }
 
 protected:
-    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _txn = *_txnPtr;
+    OperationContextImpl _txn;
 
 private:
     DBDirectClient _client;

@@ -32,14 +32,16 @@
 
 #include "mongo/db/repl/initial_sync.h"
 
-#include "mongo/db/client.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/repl_client_info.h"
+
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
+
 
 namespace mongo {
 namespace repl {

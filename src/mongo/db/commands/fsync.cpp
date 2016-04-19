@@ -39,6 +39,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/db.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -48,7 +49,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -232,8 +233,7 @@ SimpleMutex filesLockedFsync;
 void FSyncLockThread::doRealWork() {
     stdx::lock_guard<SimpleMutex> lkf(filesLockedFsync);
 
-    const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-    OperationContext& txn = *txnPtr;
+    OperationContextImpl txn;
     ScopedTransaction transaction(&txn, MODE_X);
     Lock::GlobalWrite global(txn.lockState());  // No WriteUnitOfWork needed
 

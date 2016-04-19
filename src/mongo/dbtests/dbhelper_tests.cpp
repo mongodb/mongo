@@ -31,10 +31,10 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/dbtests/dbtests.h"
@@ -58,8 +58,7 @@ public:
     RemoveRange() : _min(4), _max(8) {}
 
     void run() {
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        OperationContextImpl txn;
         DBDirectClient client(&txn);
 
         for (int i = 0; i < 10; ++i) {
