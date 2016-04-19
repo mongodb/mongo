@@ -241,7 +241,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/s/catalog/catalog_cache',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/util/net/network',
         'clientdriver',
