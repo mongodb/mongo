@@ -22,6 +22,11 @@ var resetCollection = function() {
         assert.writeOK(staleMongos.getCollection(collNS).insert({x: i, fieldToUpdate: 0}));
         assert.writeOK(staleMongos.getCollection(collNS).insert({x: i, fieldToUpdate: 0}));
     }
+
+    // Make sure data has replicated to all config servers so freshMongos finds a sharded
+    // collection: freshMongos has an older optime and won't wait to see what staleMongos did
+    // (shardCollection).
+    st.configRS.awaitReplication();
 };
 
 // Create a new sharded collection, and split data into two chunks on different shards using the
