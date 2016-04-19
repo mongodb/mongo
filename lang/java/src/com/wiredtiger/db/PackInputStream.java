@@ -43,6 +43,7 @@ public class PackInputStream {
     protected byte[] value;
     protected int valueOff;
     protected int valueLen;
+    protected boolean isRaw;
 
     /**
      * Constructor.
@@ -50,9 +51,10 @@ public class PackInputStream {
      * \param format A String that contains the WiredTiger format that
      *               defines the layout of this packed value.
      * \param value The raw bytes that back the stream.
+     * \param isRaw The stream is opened raw.
      */
-    public PackInputStream(String format, byte[] value) {
-        this(format, value, 0, value.length);
+    public PackInputStream(String format, byte[] value, boolean isRaw) {
+        this(format, value, isRaw, 0, value.length);
     }
 
     /**
@@ -61,14 +63,17 @@ public class PackInputStream {
      * \param format A String that contains the WiredTiger format that
      *               defines the layout of this packed value.
      * \param value The raw bytes that back the stream.
+     * \param isRaw The stream is opened raw.
      * \param off Offset into the value array at which the stream begins.
      * \param len Length of the value array that forms the stream.
      */
-    public PackInputStream(String format, byte[] value, int off, int len) {
-        this.format = new PackFormatInputStream(format);
+    public PackInputStream(
+        String format, byte[] value, boolean isRaw, int off, int len) {
+        this.format = new PackFormatInputStream(format, isRaw);
         this.value = value;
         this.valueOff = off;
         this.valueLen = len;
+        this.isRaw = isRaw;
     }
 
     /**
@@ -117,7 +122,9 @@ public class PackInputStream {
      */
     public void getByteArray(byte[] dest, int off, int len)
     throws WiredTigerPackingException {
-        format.checkType('U', false);
+        if (!isRaw) {
+            format.checkType('U', false);
+        }
         getByteArrayInternal(getByteArrayLength(), dest, off, len);
     }
 
@@ -127,7 +134,9 @@ public class PackInputStream {
      */
     public byte[] getByteArray()
     throws WiredTigerPackingException {
-        format.checkType('U', false);
+        if (!isRaw) {
+            format.checkType('U', false);
+        }
         int itemLen = getByteArrayLength();
         byte[] unpacked = new byte[itemLen];
         getByteArrayInternal(itemLen, unpacked, 0, itemLen);
@@ -142,7 +151,10 @@ public class PackInputStream {
     throws WiredTigerPackingException {
         int itemLen = 0;
 
-        if (format.hasLength()) {
+        if (isRaw) {
+            // The rest of the buffer is a byte array.
+            itemLen = valueLen - valueOff;
+        } else if (format.hasLength()) {
             // If the format has a length, it's always used.
             itemLen = format.getLengthFromFormat(true);
         } else if (format.getType() == 'U') {
