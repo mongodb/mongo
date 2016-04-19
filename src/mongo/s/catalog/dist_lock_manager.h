@@ -138,6 +138,22 @@ public:
         stdx::chrono::milliseconds lockTryInterval = kDefaultLockRetryInterval) = 0;
 
     /**
+     * Same behavior as lock(...) above, except takes a specific lock session ID "lockSessionID"
+     * instead of randomly generating one internally.
+     *
+     * This is useful for a process running on the config primary after a failover. A lock can be
+     * immediately reacquired if "lockSessionID" matches that of the lock, rather than waiting for
+     * the inactive lock to expire.
+     */
+    virtual StatusWith<ScopedDistLock> lockWithSessionID(
+        OperationContext* txn,
+        StringData name,
+        StringData whyMessage,
+        const OID lockSessionID,
+        stdx::chrono::milliseconds waitFor = kDefaultLockTimeout,
+        stdx::chrono::milliseconds lockTryInterval = kDefaultLockRetryInterval) = 0;
+
+    /**
      * Makes a best-effort attempt to unlock all locks owned by the given processID.
      * Only implemented for the ReplSetDistLockManager and only used after catalog manager swap
      * during upgrade to CSRS.

@@ -75,6 +75,14 @@ public:
         stdx::chrono::milliseconds waitFor,
         stdx::chrono::milliseconds lockTryInterval) override;
 
+    virtual StatusWith<ScopedDistLock> lockWithSessionID(
+        OperationContext* txn,
+        StringData name,
+        StringData whyMessage,
+        const OID lockSessionID,
+        stdx::chrono::milliseconds waitFor,
+        stdx::chrono::milliseconds lockTryInterval) override;
+
     virtual void unlockAll(OperationContext* txn, const std::string& processID) override;
 
 protected:
@@ -102,9 +110,9 @@ private:
      * Returns true if the current process that owns the lock has no fresh pings since
      * the lock expiration threshold.
      */
-    StatusWith<bool> canOvertakeLock(OperationContext* txn,
-                                     const LocksType lockDoc,
-                                     const stdx::chrono::milliseconds& lockExpiration);
+    StatusWith<bool> isLockExpired(OperationContext* txn,
+                                   const LocksType lockDoc,
+                                   const stdx::chrono::milliseconds& lockExpiration);
 
     //
     // All member variables are labeled with one of the following codes indicating the

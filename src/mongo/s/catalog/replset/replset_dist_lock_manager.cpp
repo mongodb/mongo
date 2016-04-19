@@ -168,9 +168,9 @@ void ReplSetDistLockManager::doTask() {
     }
 }
 
-StatusWith<bool> ReplSetDistLockManager::canOvertakeLock(OperationContext* txn,
-                                                         LocksType lockDoc,
-                                                         const milliseconds& lockExpiration) {
+StatusWith<bool> ReplSetDistLockManager::isLockExpired(OperationContext* txn,
+                                                       LocksType lockDoc,
+                                                       const milliseconds& lockExpiration) {
     const auto& processID = lockDoc.getProcess();
     auto pingStatus = _catalog->getPing(txn, processID);
 
@@ -267,6 +267,16 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lock(
     StringData whyMessage,
     milliseconds waitFor,
     milliseconds lockTryInterval) {
+    return lockWithSessionID(txn, name, whyMessage, OID::gen(), waitFor, lockTryInterval);
+}
+
+StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lockWithSessionID(
+    OperationContext* txn,
+    StringData name,
+    StringData whyMessage,
+    const OID lockSessionID,
+    milliseconds waitFor,
+    milliseconds lockTryInterval) {
     Timer timer(_serviceContext->getTickSource());
     Timer msgTimer(_serviceContext->getTickSource());
 
@@ -280,7 +290,6 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lock(
     // until the lockTryInterval has been reached. If a network error occurs at each lock
     // acquisition attempt, the lock acquisition will be retried immediately.
     while (waitFor <= milliseconds::zero() || milliseconds(timer.millis()) < waitFor) {
-        const OID lockSessionID = OID::gen();
         const string who = str::stream() << _processID << ":" << getThreadName();
 
         auto lockExpiration = _lockExpiration;
@@ -350,13 +359,13 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lock(
         // found, use the normal grab lock path to acquire it.
         if (getLockStatusResult.isOK()) {
             auto currentLock = getLockStatusResult.getValue();
-            auto canOvertakeResult = canOvertakeLock(txn, currentLock, lockExpiration);
+            auto isLockExpiredResult = isLockExpired(txn, currentLock, lockExpiration);
 
-            if (!canOvertakeResult.isOK()) {
-                return canOvertakeResult.getStatus();
+            if (!isLockExpiredResult.isOK()) {
+                return isLockExpiredResult.getStatus();
             }
 
-            if (canOvertakeResult.getValue()) {
+            if (isLockExpiredResult.getValue() || (lockSessionID == currentLock.getLockID())) {
                 auto overtakeResult = _catalog->overtakeLock(txn,
                                                              name,
                                                              lockSessionID,

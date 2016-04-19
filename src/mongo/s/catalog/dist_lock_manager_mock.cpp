@@ -73,6 +73,17 @@ StatusWith<DistLockManager::ScopedDistLock> DistLockManagerMock::lock(
     StringData whyMessage,
     milliseconds waitFor,
     milliseconds lockTryInterval) {
+    return lockWithSessionID(
+        txn, name, whyMessage, DistLockHandle::gen(), waitFor, lockTryInterval);
+}
+
+StatusWith<DistLockManager::ScopedDistLock> DistLockManagerMock::lockWithSessionID(
+    OperationContext* txn,
+    StringData name,
+    StringData whyMessage,
+    const OID lockSessionID,
+    milliseconds waitFor,
+    milliseconds lockTryInterval) {
     _lockChecker(name, whyMessage, waitFor, lockTryInterval);
     _lockChecker = NoLockFuncSet;
 
@@ -89,7 +100,7 @@ StatusWith<DistLockManager::ScopedDistLock> DistLockManagerMock::lock(
 
     LockInfo info;
     info.name = name.toString();
-    info.lockID = DistLockHandle::gen();
+    info.lockID = lockSessionID;
     _locks.push_back(info);
 
     return DistLockManager::ScopedDistLock(nullptr, info.lockID, this);
