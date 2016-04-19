@@ -5,11 +5,15 @@
     var commandsRan = [];
 
     // Create a new DB object backed by a mock connection.
-    function MockMongo() {};
+    function MockMongo() {
+    }
     MockMongo.prototype = Mongo.prototype;
     MockMongo.prototype.runCommand = function(db, cmd, opts) {
-        commandsRan.push({db: db, cmd: cmd, opts:opts});
-        return {ok: 1, n: 100};
+        commandsRan.push({db: db, cmd: cmd, opts: opts});
+        return {
+            ok: 1,
+            n: 100
+        };
     };
     var db = new DB(new MockMongo(), "test");
 
@@ -31,10 +35,8 @@
 
     // Check that we have wrapped the command and attached the read preference.
     assert.eq(commandsRan.length, 1);
-    assert.docEq(commandsRan[0].cmd,
-                 {query: {count: "foo",
-                           fields: {},
-                           query: {}},
-                  $readPreference: {mode: "secondary"}});
+    assert.docEq(
+        commandsRan[0].cmd,
+        {query: {count: "foo", fields: {}, query: {}}, $readPreference: {mode: "secondary"}});
 
 })();
