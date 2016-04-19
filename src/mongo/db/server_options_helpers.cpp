@@ -949,6 +949,7 @@ Status storeServerOptions(const moe::Environment& params, const std::vector<std:
     if (params.count("security.keyFile")) {
         serverGlobalParams.keyFile =
             boost::filesystem::absolute(params["security.keyFile"].as<string>()).generic_string();
+        serverGlobalParams.authState = ServerGlobalParams::AuthState::kEnabled;
     }
 
     if (params.count("security.authorization") &&
