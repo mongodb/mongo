@@ -2575,6 +2575,15 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 		    dsk->type == WT_PAGE_COL_VAR)
 			r->raw_recnos[slots] = recno;
 		r->raw_entries[slots] = entry;
+
+		/*
+		 * Don't create an image so large that any future update will
+		 * cause a split in memory.  Use half of the maximum size so
+		 * we split very compressible pages that have reached the
+		 * maximum size in memory into two equal blocks.
+		 */
+		if (len > (size_t)btree->maxmempage / 2)
+			break;
 	}
 
 	/*
@@ -3964,17 +3973,18 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_RET(__rec_split_init(
 	    session, r, page, page->pg_fix_recno, btree->maxleafpage));
 
+	/* Copy the original, disk-image bytes into place. */
+	memcpy(r->first_free, page->pg_fix_bitf,
+	    __bitstr_size((size_t)page->pg_fix_entries * btree->bitcnt));
+
 	/* Update any changes to the original on-page data items. */
 	WT_SKIP_FOREACH(ins, WT_COL_UPDATE_SINGLE(page)) {
 		WT_RET(__rec_txn_read(session, r, ins, NULL, NULL, &upd));
 		if (upd != NULL)
-			__bit_setv_recno(page, WT_INSERT_RECNO(ins),
-			    btree->bitcnt, ((uint8_t *)WT_UPDATE_DATA(upd))[0]);
+			__bit_setv(r->first_free,
+			    WT_INSERT_RECNO(ins) - page->pg_fix_recno,
+			    btree->bitcnt, *(uint8_t *)WT_UPDATE_DATA(upd));
 	}
-
-	/* Copy the updated, disk-image bytes into place. */
-	memcpy(r->first_free, page->pg_fix_bitf,
-	    __bitstr_size((size_t)page->pg_fix_entries * btree->bitcnt));
 
 	/* Calculate the number of entries per page remainder. */
 	entry = page->pg_fix_entries;
@@ -4032,7 +4042,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			if (nrecs > 0) {
 				__bit_setv(r->first_free, entry, btree->bitcnt,
 				    upd == NULL ? 0 :
-				    ((uint8_t *)WT_UPDATE_DATA(upd))[0]);
+				    *(uint8_t *)WT_UPDATE_DATA(upd));
 				--nrecs;
 				++entry;
 				++r->recno;

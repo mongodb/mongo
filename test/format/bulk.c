@@ -35,11 +35,9 @@ wts_load(void)
 	WT_CURSOR *cursor;
 	WT_ITEM key, value;
 	WT_SESSION *session;
-	uint8_t *keybuf, *valbuf;
 	bool is_bulk;
 
 	conn = g.wts_conn;
-	keybuf = valbuf = NULL;
 
 	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
@@ -63,8 +61,8 @@ wts_load(void)
 	    is_bulk ? "bulk,append" : NULL, &cursor));
 
 	/* Set up the key/value buffers. */
-	key_gen_setup(&keybuf);
-	val_gen_setup(NULL, &valbuf);
+	key_gen_setup(&key);
+	val_gen_setup(NULL, &value);
 
 	for (;;) {
 		if (++g.key_cnt > g.c_rows) {
@@ -76,10 +74,8 @@ wts_load(void)
 		if (g.key_cnt % 100 == 0)
 			track("bulk load", g.key_cnt, NULL);
 
-		key_gen(keybuf, &key.size, (uint64_t)g.key_cnt);
-		key.data = keybuf;
-		val_gen(NULL, valbuf, &value.size, (uint64_t)g.key_cnt);
-		value.data = valbuf;
+		key_gen(&key, g.key_cnt);
+		val_gen(NULL, &value, g.key_cnt);
 
 		switch (g.type) {
 		case FIX:
@@ -88,7 +84,7 @@ wts_load(void)
 			cursor->set_value(cursor, *(uint8_t *)value.data);
 			if (g.logging == LOG_OPS)
 				(void)g.wt_api->msg_printf(g.wt_api, session,
-				    "%-10s %" PRIu32 " {0x%02" PRIx8 "}",
+				    "%-10s %" PRIu64 " {0x%02" PRIx8 "}",
 				    "bulk V",
 				    g.key_cnt, ((uint8_t *)value.data)[0]);
 			break;
@@ -98,7 +94,7 @@ wts_load(void)
 			cursor->set_value(cursor, &value);
 			if (g.logging == LOG_OPS)
 				(void)g.wt_api->msg_printf(g.wt_api, session,
-				    "%-10s %" PRIu32 " {%.*s}", "bulk V",
+				    "%-10s %" PRIu64 " {%.*s}", "bulk V",
 				    g.key_cnt,
 				    (int)value.size, (char *)value.data);
 			break;
@@ -106,12 +102,12 @@ wts_load(void)
 			cursor->set_key(cursor, &key);
 			if (g.logging == LOG_OPS)
 				(void)g.wt_api->msg_printf(g.wt_api, session,
-				    "%-10s %" PRIu32 " {%.*s}", "bulk K",
+				    "%-10s %" PRIu64 " {%.*s}", "bulk K",
 				    g.key_cnt, (int)key.size, (char *)key.data);
 			cursor->set_value(cursor, &value);
 			if (g.logging == LOG_OPS)
 				(void)g.wt_api->msg_printf(g.wt_api, session,
-				    "%-10s %" PRIu32 " {%.*s}", "bulk V",
+				    "%-10s %" PRIu64 " {%.*s}", "bulk V",
 				    g.key_cnt,
 				    (int)value.size, (char *)value.data);
 			break;
@@ -133,6 +129,6 @@ wts_load(void)
 
 	testutil_check(session->close(session, NULL));
 
-	free(keybuf);
-	free(valbuf);
+	free(key.mem);
+	free(value.mem);
 }

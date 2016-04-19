@@ -36,9 +36,9 @@ void *
 compact(void *arg)
 {
 	WT_CONNECTION *conn;
+	WT_DECL_RET;
 	WT_SESSION *session;
 	u_int period;
-	int ret;
 
 	(void)(arg);
 

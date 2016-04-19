@@ -2034,7 +2034,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	__conn_config_append(cfg, version);
 
 	/* Ignore the base_config file if config_base_set is false. */
-	if (config_base_set || F_ISSET(conn, WT_CONN_READONLY))
+	if (config_base_set)
 		WT_ERR(
 		    __conn_config_file(session, WT_BASECONFIG, false, cfg, i1));
 	__conn_config_append(cfg, config);

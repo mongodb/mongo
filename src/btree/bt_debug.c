@@ -952,8 +952,7 @@ __debug_update(WT_DBG *ds, WT_UPDATE *upd, bool hexbyte)
 			__dmsg(ds, "\tvalue {deleted}\n");
 		else if (hexbyte) {
 			__dmsg(ds, "\t{");
-			__debug_hex_byte(ds,
-			    ((uint8_t *)WT_UPDATE_DATA(upd))[0]);
+			__debug_hex_byte(ds, *(uint8_t *)WT_UPDATE_DATA(upd));
 			__dmsg(ds, "}\n");
 		} else
 			__debug_item(ds,

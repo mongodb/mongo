@@ -109,7 +109,6 @@ typedef struct {
 
 	char *home;				/* Home directory */
 	char *home_backup;			/* Hot-backup directory */
-	char *home_backup2;			/* Saved Hot-backup directory */
 	char *home_backup_init;			/* Initialize backup command */
 	char *home_bdb;				/* BDB directory */
 	char *home_config;			/* Run CONFIG file path */
@@ -224,6 +223,7 @@ typedef struct {
 	uint32_t c_statistics_server;
 	uint32_t c_threads;
 	uint32_t c_timer;
+	uint32_t c_txn_freq;
 	uint32_t c_value_max;
 	uint32_t c_value_min;
 	uint32_t c_verify;
@@ -297,7 +297,7 @@ void	 bdb_np(int, void *, size_t *, void *, size_t *, int *);
 void	 bdb_open(void);
 void	 bdb_read(uint64_t, void *, size_t *, int *);
 void	 bdb_remove(uint64_t, int *);
-void	 bdb_update(const void *, size_t, const void *, size_t, int *);
+void	 bdb_update(const void *, size_t, const void *, size_t);
 #endif
 
 void	*backup(void *);
@@ -309,24 +309,25 @@ void	 config_print(int);
 void	 config_setup(void);
 void	 config_single(const char *, int);
 void	*dmalloc(size_t);
-char	*dstrdup(const char *);
+void	*drealloc(void *, size_t);
+void	*dstrdup(const void *);
 void	 fclose_and_clear(FILE **);
-void	 key_gen(uint8_t *, size_t *, uint64_t);
-void	 key_gen_insert(WT_RAND_STATE *, uint8_t *, size_t *, uint64_t);
-void	 key_gen_setup(uint8_t **);
+void	 key_gen(WT_ITEM *, uint64_t);
+void	 key_gen_insert(WT_RAND_STATE *, WT_ITEM *, uint64_t);
+void	 key_gen_setup(WT_ITEM *);
 void	 key_len_setup(void);
 void	*lrt(void *);
 void	 path_setup(const char *);
-int	 read_row(WT_CURSOR *, WT_ITEM *, uint64_t, int);
+int	 read_row(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
 uint32_t rng(WT_RAND_STATE *);
 void	 track(const char *, uint64_t, TINFO *);
-void	 val_gen(WT_RAND_STATE *, uint8_t *, size_t *, uint64_t);
-void	 val_gen_setup(WT_RAND_STATE *, uint8_t **);
+void	 val_gen(WT_RAND_STATE *, WT_ITEM *, uint64_t);
+void	 val_gen_setup(WT_RAND_STATE *, WT_ITEM *);
 void	 wts_close(void);
-void	 wts_create(void);
 void	 wts_dump(const char *, int);
+void	 wts_init(void);
 void	 wts_load(void);
-void	 wts_open(const char *, int, WT_CONNECTION **);
+void	 wts_open(const char *, bool, WT_CONNECTION **);
 void	 wts_ops(int);
 void	 wts_read_scan(void);
 void	 wts_rebalance(void);

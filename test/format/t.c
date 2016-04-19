@@ -198,8 +198,8 @@ main(int argc, char *argv[])
 		if (SINGLETHREADED)
 			bdb_open();		/* Initial file config */
 #endif
-		wts_open(g.home, 1, &g.wts_conn);
-		wts_create();
+		wts_open(g.home, true, &g.wts_conn);
+		wts_init();
 
 		wts_load();			/* Load initial records */
 		wts_verify("post-bulk verify");	/* Verify */
@@ -288,7 +288,7 @@ main(int argc, char *argv[])
 static void
 startup(void)
 {
-	int ret;
+	WT_DECL_RET;
 
 	/* Flush/close any logging information. */
 	fclose_and_clear(&g.logfp);

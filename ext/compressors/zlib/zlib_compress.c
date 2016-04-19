@@ -307,17 +307,9 @@ zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 		/*
 		 * If there's more compression to do, save a snapshot and keep
 		 * going, otherwise, use the current compression.
-		 *
-		 * Don't let the compression ratio become insanely good (which
-		 * can happen with synthetic workloads).  Once we hit a limit,
-		 * stop so the in-memory size of pages isn't hugely larger than
-		 * the on-disk size, otherwise we can get into trouble where
-		 * every update to a page results in forced eviction based on
-		 * the in-memory size, even though the data fits into a single
-		 * on-disk block.
 		 */
 		last_slot = curr_slot;
-		if (zs.avail_out > 0 && zs.total_in <= zs.total_out * 20) {
+		if (zs.avail_out > 0) {
 			if ((ret = deflateCopy(&last_zs, &zs)) != Z_OK)
 				return (zlib_error(
 				    compressor, session, "deflateCopy", ret));
