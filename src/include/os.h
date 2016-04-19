@@ -138,10 +138,10 @@ struct __wt_fstream {
 	wt_off_t size;				/* File size */
 	WT_ITEM  buf;				/* Data */
 
-#define	WT_STREAM_APPEND	0x01	/* Open a stream for append */
-#define	WT_STREAM_LINE_BUFFER	0x02	/* Line buffer the stream */
-#define	WT_STREAM_READ		0x04	/* Open a stream for read */
-#define	WT_STREAM_WRITE		0x08	/* Open a stream for write */
+#define	WT_STREAM_APPEND	0x01		/* Open a stream for append */
+#define	WT_STREAM_LINE_BUFFER	0x02		/* Line buffer the stream */
+#define	WT_STREAM_READ		0x04		/* Open a stream for read */
+#define	WT_STREAM_WRITE		0x08		/* Open a stream for write */
 	uint32_t flags;
 
 	int (*close)(WT_SESSION_IMPL *, WT_FSTREAM *);
