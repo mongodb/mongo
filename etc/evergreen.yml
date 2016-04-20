@@ -149,6 +149,27 @@ functions:
       script: |
         ${decompress|unzip} mongo-binaries.tgz
 
+  "check binary version" : &check_binary_version
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        mongo_binary=$(find mongodb*/bin -name mongo${exe})
+        # There should only be one mongo shell
+        if [ $(echo $mongo_binary | wc -w) -ne 1 ]; then
+          echo "There is more than 1 extracted mongo binary: $mongo_binary"
+          exit 1
+        fi
+        bin_ver=$(${python|python} -c "import yaml; print(yaml.safe_load(open('compile_expansions.yml'))['version']);" | tr -d '[ \r\n]')
+        # Due to SERVER-23810, we cannot use $mongo_binary --quiet --nodb --eval "version();"
+        mongo_ver=$($mongo_binary --version | cut -f2 -d ':' | tr -d '[ \r\n]')
+        # The versions must match
+        if [ "$bin_ver" != "$mongo_ver" ]; then
+          echo "The mongo version is $mongo_ver, expected version is $bin_ver"
+          exit 1
+        fi
+
   "get buildnumber" : &get_buildnumber
     command: keyval.inc
     params:
@@ -247,6 +268,7 @@ functions:
   - *fetch_artifacts
   - *fetch_binaries
   - *extract_binaries
+  - *check_binary_version
   - *get_buildnumber
   - *setup_credentials
 
