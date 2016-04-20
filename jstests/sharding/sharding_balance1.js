@@ -1,25 +1,22 @@
 (function() {
+    'use strict';
 
-    var s = new ShardingTest({
-        name: "slow_sharding_balance1",
-        shards: 2,
-        mongos: 1,
-        other: {chunkSize: 1, enableBalancer: true}
-    });
+    var s = new ShardingTest({shards: 2, mongos: 1, other: {chunkSize: 1, enableBalancer: true}});
 
-    s.adminCommand({enablesharding: "test"});
+    assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
     s.ensurePrimaryShard('test', 'shard0001');
 
     s.config.settings.find().forEach(printjson);
 
-    db = s.getDB("test");
+    var db = s.getDB("test");
 
-    bigString = "";
-    while (bigString.length < 10000)
+    var bigString = "";
+    while (bigString.length < 10000) {
         bigString += "asdasdasdasdadasdasdasdasdasdasdasdasda";
+    }
 
-    inserted = 0;
-    num = 0;
+    var inserted = 0;
+    var num = 0;
     var bulk = db.foo.initializeUnorderedBulkOp();
     while (inserted < (20 * 1024 * 1024)) {
         bulk.insert({_id: num++, s: bigString});
@@ -27,7 +24,7 @@
     }
     assert.writeOK(bulk.execute());
 
-    s.adminCommand({shardcollection: "test.foo", key: {_id: 1}});
+    assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {_id: 1}}));
     assert.lt(20, s.config.chunks.count(), "setup2");
 
     function diff1() {
@@ -56,7 +53,7 @@
         5000);
 
     var chunkCount = sum();
-    s.adminCommand({removeshard: "shard0000"});
+    assert.commandWorked(s.s0.adminCommand({removeshard: "shard0000"}));
 
     assert.soon(function() {
         printjson(s.chunkCounts("foo"));
@@ -67,5 +64,4 @@
     }, "removeshard didn't happen", 1000 * 60 * 3, 5000);
 
     s.stop();
-
 })();
