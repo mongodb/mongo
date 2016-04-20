@@ -2465,7 +2465,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 	WT_SESSION *wt_session;
 	size_t corrected_page_size, extra_skip, len, result_len;
 	uint64_t recno;
-	uint32_t entry, i, result_slots, slots;
+	uint32_t entry, i, max_image_slot, result_slots, slots;
 	bool last_block;
 	uint8_t *dsk_start;
 
@@ -2525,7 +2525,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 	if (dsk->type == WT_PAGE_COL_VAR)
 		recno = last->recno;
 
-	entry = slots = 0;
+	entry = max_image_slot = slots = 0;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		++entry;
 
@@ -2583,7 +2583,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 		 * maximum size in memory into two equal blocks.
 		 */
 		if (len > (size_t)btree->maxmempage / 2)
-			break;
+			max_image_slot = slots;
 	}
 
 	/*
@@ -2643,21 +2643,32 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 	ret = compressor->compress_raw(compressor, wt_session,
 	    r->page_size_orig, btree->split_pct,
 	    WT_BLOCK_COMPRESS_SKIP + extra_skip,
-	    (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
-	    r->raw_offsets, slots,
+	    (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP, r->raw_offsets,
+	    no_more_rows || max_image_slot == 0 ? slots : max_image_slot,
 	    (uint8_t *)dst->mem + WT_BLOCK_COMPRESS_SKIP,
-	    result_len, no_more_rows, &result_len, &result_slots);
+	    result_len,
+	    no_more_rows || max_image_slot != 0,
+	    &result_len, &result_slots);
 	switch (ret) {
 	case EAGAIN:
 		/*
-		 * The compression function wants more rows; accumulate and
-		 * retry.
+		 * The compression function wants more rows, accumulate and
+		 * retry if possible.
 		 *
-		 * Reset the resulting slots count, just in case the compression
-		 * function modified it before giving up.
+		 * First, reset the resulting slots count, just in case the
+		 * compression function modified it before giving up.
 		 */
 		result_slots = 0;
-		break;
+
+		/*
+		 * If the image is too large and there are more rows to gather,
+		 * act as if the compression engine gave up on this chunk of
+		 * data. That doesn't make sense (we flagged the engine that we
+		 * wouldn't give it any more rows, but it's a possible return).
+		 */
+		if (no_more_rows || max_image_slot == 0)
+			break;
+		/* FALLTHROUGH */
 	case 0:
 		/*
 		 * If the compression function returned zero result slots, it's
