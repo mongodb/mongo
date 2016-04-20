@@ -36,3 +36,6 @@ fun:_ZNSt8_Rb_tree*_M_get_insert_hint_unique_posESt23*
 fun:_ZNSt8_Rb_tree*_M_insert_I*
 # Maybe https://gcc.gnu.org/bugzilla/show_bug.cgi?id=63345 or similar
 fun:_ZNSt8_Rb_tree*_M_insert_nodeE*
+
+# See https://bugzilla.mozilla.org/show_bug.cgi?id=744965
+fun:_ZN7mozilla*NumberEqualsInt32*

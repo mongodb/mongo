@@ -2159,12 +2159,6 @@ def doConfigure(myenv):
         if using_ubsan:
             # By default, undefined behavior sanitizer doesn't stop on the first error. Make it so.
             AddToCCFLAGSIfSupported(myenv, "-fno-sanitize-recover")
-            # We don't currently target any architectures that require
-            # strict alignment, and we definitely have alignment
-            # issues in both the MMAPv1 and WT storage engines. We
-            # don't want to need to fix those errors before making
-            # UBSAN available.
-            AddToCCFLAGSIfSupported(myenv, "-fno-sanitize=alignment")
 
     if myenv.ToolchainIs('msvc') and optBuild:
         # http://blogs.msdn.com/b/vcblog/archive/2013/09/11/introducing-gw-compiler-switch.aspx
