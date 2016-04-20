@@ -26,8 +26,8 @@ if (gle.err === null) {
     assert.eq(gle.code, 2);
 }
 
-gle = mdb.getLastErrorObj(1, 10);
-print('Trying w=1, 10ms timeout');
+gle = mdb.getLastErrorObj(1, 50);
+print('Trying w=1, 50ms timeout');
 printjson(gle);
 assert.eq(gle.ok, 1);
 assert.eq(gle.err, null);
@@ -62,13 +62,13 @@ assert.eq(gle.wtime, null);
 assert.gte(gle.waited, 5);
 assert.eq(gle.wtimeout, true);
 
-gle = mdb.getLastErrorObj("majority", 5);
-print('Trying w=majority, 5ms timeout.');
+gle = mdb.getLastErrorObj("majority", 50);
+print('Trying w=majority, 50ms timeout.');
 printjson(gle);
 assert.eq(gle.ok, 1);
 assert.eq(gle.err, null);
 assert.eq(gle.writtenTo.length, 2);
-assert.lt(gle.wtime, 5);
+assert.lte(gle.wtime, 50);
 assert.eq(gle.waited, null);
 assert.eq(gle.wtimeout, null);
 
