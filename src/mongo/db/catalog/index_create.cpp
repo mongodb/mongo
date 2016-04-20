@@ -259,6 +259,8 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(std::set<RecordId>* dupsO
 
             WriteUnitOfWork wunit(_txn);
             Status ret = insert(objToIndex.value(), loc);
+            if (_buildInBackground)
+                exec->saveState();
             if (ret.isOK()) {
                 wunit.commit();
             } else if (dupsOut && ret.code() == ErrorCodes::DuplicateKey) {
@@ -269,6 +271,8 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(std::set<RecordId>* dupsO
                 // Fail the index build hard.
                 return ret;
             }
+            if (_buildInBackground)
+                exec->restoreState();  // Handles any WCEs internally.
 
             // Go to the next document
             progress->hit();
