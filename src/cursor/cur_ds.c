@@ -16,7 +16,7 @@ static int
 __curds_txn_enter(WT_SESSION_IMPL *session)
 {
 	session->ncursors++;				/* XXX */
-	__wt_txn_cursor_op(session);
+	WT_RET(__wt_txn_cursor_op(session));
 
 	return (0);
 }
