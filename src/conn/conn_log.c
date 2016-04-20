@@ -316,11 +316,12 @@ __wt_log_truncate_files(
 	conn = S2C(session);
 	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
 		return (0);
-	log = conn->log;
 	if (F_ISSET(conn, WT_CONN_SERVER_RUN) &&
 	    FLD_ISSET(conn->log_flags, WT_CONN_LOG_ARCHIVE))
 		WT_RET_MSG(session, EINVAL,
 		    "Attempt to archive manually while a server is running");
+
+	log = conn->log;
 
 	backup_file = 0;
 	if (cursor != NULL)
@@ -329,6 +330,7 @@ __wt_log_truncate_files(
 	WT_RET(__wt_verbose(session, WT_VERB_LOG,
 	    "log_truncate_files: Archive once up to %" PRIu32,
 	    backup_file));
+
 	WT_RET(__wt_writelock(session, log->log_archive_lock));
 	locked = true;
 	WT_ERR(__log_archive_once(session, backup_file));
