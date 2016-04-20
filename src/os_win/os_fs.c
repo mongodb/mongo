@@ -276,7 +276,7 @@ __win_handle_read(
 
 		if (!ReadFile(fh->filehandle, addr, chunk, &nr, &overlapped))
 			WT_RET_MSG(session,
-			    nr == 0 ? WT_ERROR : __wt_getlasterror(),
+			    __wt_getlasterror(),
 			    "%s: handle-read: ReadFile: failed to read %lu "
 			    "bytes at offset %" PRIuMAX,
 			    fh->name, chunk, (uintmax_t)offset);
