@@ -50,7 +50,7 @@ public class PackOutputStream {
      *               defines the layout of this packed value.
      */
     public PackOutputStream(String format) {
-        this.format = new PackFormatInputStream(format);
+        this.format = new PackFormatInputStream(format, false);
         intBuf = new byte[MAX_INT_BYTES];
         packed = new ByteArrayOutputStream(100);
     }

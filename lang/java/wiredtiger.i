@@ -80,6 +80,7 @@ typedef struct {
 	JavaVM *javavm;		/* Used in async threads to craft a jnienv */
 	JNIEnv *jnienv;		/* jni env that created the Session/Cursor */
 	WT_SESSION_IMPL *session; /* session used for alloc/free */
+	bool cursor_raw;	/* is the cursor opened raw? */
 	jobject jobj;		/* the java Session/Cursor/AsyncOp object */
 	jobject jcallback;	/* callback object for async ops */
 	jfieldID cptr_fid;	/* cached Cursor.swigCPtr field id in session */
@@ -574,6 +575,13 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		$self->set_key($self, k);
 		$self->set_value($self, v);
 		return $self->update($self);
+	}
+
+	%javamethodmodifiers is_raw "protected";
+	bool is_raw(JNIEnv *jenv) {
+		(void)jenv;
+		JAVA_CALLBACK *jcb = (JAVA_CALLBACK *)$self->c.lang_private;
+		return jcb->cursor_raw;
 	}
 
 	%javamethodmodifiers java_init "protected";
@@ -1090,7 +1098,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	throws WiredTigerPackingException {
 		if (keyUnpacker == null)
 			keyUnpacker =
-			    new PackInputStream(keyFormat, get_key_wrap());
+			    new PackInputStream(keyFormat, get_key_wrap(),
+			    is_raw());
 		return keyUnpacker;
 	}
 
@@ -1103,7 +1112,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	throws WiredTigerPackingException {
 		if (valueUnpacker == null)
 			valueUnpacker =
-			    new PackInputStream(valueFormat, get_value_wrap());
+			    new PackInputStream(valueFormat, get_value_wrap(),
+			    is_raw());
 		return valueUnpacker;
 	}
 
@@ -1175,6 +1185,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		return $self->update($self);
 	}
 
+	%javamethodmodifiers compare_wrap "protected";
 	int compare_wrap(JNIEnv *jenv, WT_CURSOR *other) {
 		int cmp, ret = $self->compare($self, other, &cmp);
 		if (ret != 0)
@@ -1182,11 +1193,19 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		return cmp;
 	}
 
+	%javamethodmodifiers equals_wrap "protected";
 	int equals_wrap(JNIEnv *jenv, WT_CURSOR *other) {
 		int cmp, ret = $self->equals($self, other, &cmp);
 		if (ret != 0)
 			throwWiredTigerException(jenv, ret);
 		return cmp;
+	}
+
+	%javamethodmodifiers is_raw "protected";
+	bool is_raw(JNIEnv *jenv) {
+		(void)jenv;
+		JAVA_CALLBACK *jcb = (JAVA_CALLBACK *)$self->lang_private;
+		return jcb->cursor_raw;
 	}
 
 	%javamethodmodifiers java_init "protected";
@@ -1773,7 +1792,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		if (!success || keyFormat.equals(""))
 			return null;
 		else
-			return new PackInputStream(keyFormat, get_key_wrap());
+			return new PackInputStream(keyFormat,
+			    get_key_wrap(), is_raw());
 	}
 
 	/**
@@ -1789,7 +1809,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 			return null;
 		else
 			return new PackInputStream(valueFormat,
-			    get_value_wrap());
+			    get_value_wrap(), is_raw());
 	}
 %}
 
@@ -1996,12 +2016,14 @@ err:		if (ret != 0)
 		if ((ret = $self->open_cursor($self, uri, to_dup, config, &cursor)) != 0)
 			goto err;
 
-		if ((cursor->flags & WT_CURSTD_DUMP_JSON) == 0)
-			cursor->flags |= WT_CURSTD_RAW;
-
 		if ((ret = __wt_calloc_def((WT_SESSION_IMPL *)cursor->session,
 			    1, &jcb)) != 0)
 			goto err;
+
+		if ((cursor->flags & WT_CURSTD_RAW) != 0)
+			jcb->cursor_raw = true;
+		if ((cursor->flags & WT_CURSTD_DUMP_JSON) == 0)
+			cursor->flags |= WT_CURSTD_RAW;
 
 		jcb->jnienv = jenv;
 		jcb->session = (WT_SESSION_IMPL *)cursor->session;
