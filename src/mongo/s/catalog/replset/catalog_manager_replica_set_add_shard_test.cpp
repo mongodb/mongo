@@ -78,56 +78,36 @@ protected:
         configTargeter()->setFindHostReturnValue(configHost);
     }
 
-    void expectIsMongosCheck(const HostAndPort& target) {
-        onCommandForAddShard([&](const RemoteCommandRequest& request) {
-            ASSERT_EQ(request.target, target);
-            ASSERT_EQ(request.dbname, "admin");
-            ASSERT_EQ(request.cmdObj, BSON("isdbgrid" << 1));
-
-            ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
-
-            BSONObjBuilder responseBuilder;
-            Command::appendCommandStatus(
-                responseBuilder, Status(ErrorCodes::CommandNotFound, "isdbgrid command not found"));
-
-            return responseBuilder.obj();
-        });
-    }
-
-    void expectReplSetIsMasterCheck(const HostAndPort& target,
-                                    const std::vector<std::string>& hosts) {
-        onCommandForAddShard([&](const RemoteCommandRequest& request) {
+    /**
+     * addShard validates the host as a shard. It calls "isMaster" on the host to determine what
+     * kind of host it is -- mongos, regular mongod, config mongod -- and whether the replica set
+     * details are correct. "isMasterResponse" defines the response of the "isMaster" request and
+     * should be a command response BSONObj, or a failed Status.
+     *
+     * ShardingTestFixture::expectGetShards() should be called before this function, otherwise
+     * addShard will never reach the isMaster command -- a find query is called first.
+     */
+    void expectIsMaster(const HostAndPort& target, StatusWith<BSONObj> isMasterResponse) {
+        onCommandForAddShard([&, target, isMasterResponse](const RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, target);
             ASSERT_EQ(request.dbname, "admin");
             ASSERT_EQ(request.cmdObj, BSON("isMaster" << 1));
-
             ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
 
-            BSONObjBuilder isMasterBuilder;
-            isMasterBuilder.append("ok", 1);
-            isMasterBuilder.append("ismaster", true);
-            isMasterBuilder.append("setName", "mySet");
-
-            if (hosts.size()) {
-                BSONArrayBuilder hostsBuilder(isMasterBuilder.subarrayStart("hosts"));
-                for (const auto& host : hosts) {
-                    hostsBuilder.append(host);
-                }
-            }
-
-            return isMasterBuilder.obj();
+            return isMasterResponse;
         });
     }
 
-    void expectReplSetGetStatusCheck(const HostAndPort& target) {
-        onCommandForAddShard([&](const RemoteCommandRequest& request) {
-            ASSERT_EQ(request.target, target);
-            ASSERT_EQ(request.dbname, "admin");
-            ASSERT_EQ(request.cmdObj, BSON("replSetGetStatus" << 1));
-            ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
-
-            return BSON("ok" << 1);
-        });
+    /**
+     * Sets up the addShard validation checks to return expected results.
+     *
+     * First sets up no shards to be found in the ShardRegistry, and then the isMaster command to
+     * return "isMasterResponse".
+     */
+    void expectValidationCheck(const HostAndPort& target, StatusWith<BSONObj> isMasterResponse) {
+        std::vector<ShardType> noShards{};
+        expectGetShards(noShards);
+        expectIsMaster(target, isMasterResponse);
     }
 
     void expectListDatabases(const HostAndPort& target, const std::vector<BSONObj>& dbs) {
@@ -143,39 +123,6 @@ protected:
             }
 
             return BSON("ok" << 1 << "databases" << arr.obj());
-        });
-    }
-
-    /**
-     * Waits for the new shard validation sequence to run and responds with success and as if it is
-     * a standalone host.
-     */
-    void expectNewShardCheckStandalone(const HostAndPort& target) {
-        expectIsMongosCheck(target);
-
-        onCommandForAddShard([](const RemoteCommandRequest& request) {
-            ASSERT_EQ(request.target, HostAndPort("StandaloneHost:12345"));
-            ASSERT_EQ(request.dbname, "admin");
-            ASSERT_EQ(request.cmdObj, BSON("isMaster" << 1));
-
-            ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
-
-            return BSON("ok" << 1 << "ismaster" << true);
-        });
-
-        onCommandForAddShard([](const RemoteCommandRequest& request) {
-            ASSERT_EQ(request.target, HostAndPort("StandaloneHost:12345"));
-            ASSERT_EQ(request.dbname, "admin");
-            ASSERT_EQ(request.cmdObj, BSON("replSetGetStatus" << 1));
-
-            ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
-
-            BSONObjBuilder responseBuilder;
-            Command::appendCommandStatus(
-                responseBuilder,
-                Status(ErrorCodes::NoReplicationEnabled, "not running with --replSet"));
-
-            return responseBuilder.obj();
         });
     }
 
@@ -280,8 +227,8 @@ TEST_F(AddShardTest, Standalone) {
         ASSERT_EQUALS(expectedShardName, shardName);
     });
 
-    // New shard validation
-    expectNewShardCheckStandalone(shardTarget);
+    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true);
+    expectValidationCheck(shardTarget, commandResponse);
 
     // Get databases list from new shard
     expectListDatabases(shardTarget,
@@ -355,8 +302,8 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
         ASSERT_EQUALS(expectedShardName, shardName);
     });
 
-    // New shard validation
-    expectNewShardCheckStandalone(shardTarget);
+    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true);
+    expectValidationCheck(shardTarget, commandResponse);
 
     // Get databases list from new shard
     expectListDatabases(shardTarget,
@@ -465,14 +412,15 @@ TEST_F(AddShardTest, EmptyShardName) {
     future.timed_get(kFutureTimeout);
 }
 
+// Host is unreachable, cannot verify host.
 TEST_F(AddShardTest, UnreachableHost) {
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
         stdx::make_unique<RemoteCommandTargeterMock>());
-    targeter->setConnectionStringReturnValue(ConnectionString(HostAndPort("StandaloneHost:12345")));
-    targeter->setFindHostReturnValue(HostAndPort("StandaloneHost:12345"));
+    HostAndPort shardTarget("StandaloneHost:12345");
+    targeter->setConnectionStringReturnValue(ConnectionString(shardTarget));
+    targeter->setFindHostReturnValue(shardTarget);
 
-    targeterFactory()->addTargeterToReturn(ConnectionString(HostAndPort("StandaloneHost:12345")),
-                                           std::move(targeter));
+    targeterFactory()->addTargeterToReturn(ConnectionString(shardTarget), std::move(targeter));
     std::string expectedShardName = "StandaloneShard";
 
     auto future = launchAsync([this, expectedShardName] {
@@ -485,23 +433,21 @@ TEST_F(AddShardTest, UnreachableHost) {
         ASSERT_EQUALS("host unreachable", status.getStatus().reason());
     });
 
-    onCommandForAddShard([](const RemoteCommandRequest& request) {
-        ASSERT_EQ(request.target, HostAndPort("StandaloneHost:12345"));
-        return StatusWith<BSONObj>{ErrorCodes::HostUnreachable, "host unreachable"};
-    });
-
+    Status hostUnreachableStatus = Status(ErrorCodes::HostUnreachable, "host unreachable");
+    expectValidationCheck(shardTarget, hostUnreachableStatus);
 
     future.timed_get(kFutureTimeout);
 }
 
+// Cannot add mongos as a shard.
 TEST_F(AddShardTest, AddMongosAsShard) {
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
         stdx::make_unique<RemoteCommandTargeterMock>());
-    targeter->setConnectionStringReturnValue(ConnectionString(HostAndPort("StandaloneHost:12345")));
-    targeter->setFindHostReturnValue(HostAndPort("StandaloneHost:12345"));
+    HostAndPort shardTarget("StandaloneHost:12345");
+    targeter->setConnectionStringReturnValue(ConnectionString(shardTarget));
+    targeter->setFindHostReturnValue(shardTarget);
 
-    targeterFactory()->addTargeterToReturn(ConnectionString(HostAndPort("StandaloneHost:12345")),
-                                           std::move(targeter));
+    targeterFactory()->addTargeterToReturn(ConnectionString(shardTarget), std::move(targeter));
     std::string expectedShardName = "StandaloneShard";
 
     auto future = launchAsync([this, expectedShardName] {
@@ -510,23 +456,18 @@ TEST_F(AddShardTest, AddMongosAsShard) {
                                        &expectedShardName,
                                        assertGet(ConnectionString::parse("StandaloneHost:12345")),
                                        100);
-        ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
-        ASSERT_EQUALS("can't add a mongos process as a shard", status.getStatus().reason());
+        ASSERT_EQUALS(ErrorCodes::RPCProtocolNegotiationFailed, status);
     });
 
-    onCommandForAddShard([](const RemoteCommandRequest& request) {
-        ASSERT_EQ(request.target, HostAndPort("StandaloneHost:12345"));
-        ASSERT_EQ(request.dbname, "admin");
-        ASSERT_EQ(request.cmdObj, BSON("isdbgrid" << 1));
-
-        // the isdbgrid command only exists on mongos, so returning ok:1 implies this is a mongos
-        return BSON("ok" << 1);
-    });
+    Status rpcProtocolNegFailedStatus =
+        Status(ErrorCodes::RPCProtocolNegotiationFailed, "Unable to communicate");
+    expectValidationCheck(shardTarget, rpcProtocolNegFailedStatus);
 
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(AddShardTest, AddReplicaSetShardAsStandalone) {
+// Host is already part of an existing shard.
+TEST_F(AddShardTest, AddExistingShardStandalone) {
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
         stdx::make_unique<RemoteCommandTargeterMock>());
     HostAndPort shardTarget = HostAndPort("host1:12345");
@@ -543,17 +484,77 @@ TEST_F(AddShardTest, AddReplicaSetShardAsStandalone) {
                                        assertGet(ConnectionString::parse(shardTarget.toString())),
                                        100);
         ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
-        ASSERT_STRING_CONTAINS(status.getStatus().reason(), "host is part of set mySet;");
+        ASSERT_STRING_CONTAINS(status.getStatus().reason(),
+                               "is already a member of the existing shard");
     });
 
-    expectIsMongosCheck(shardTarget);
-
-    expectReplSetIsMasterCheck(shardTarget, {});
+    ShardType shard;
+    shard.setName("shard0000");
+    shard.setHost(shardTarget.toString());
+    expectGetShards({shard});
 
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(AddShardTest, AndStandaloneHostShardAsReplicaSet) {
+// Host is already part of an existing replica set shard.
+TEST_F(AddShardTest, AddExistingShardReplicaSet) {
+    std::unique_ptr<RemoteCommandTargeterMock> targeter(
+        stdx::make_unique<RemoteCommandTargeterMock>());
+    ConnectionString connString =
+        assertGet(ConnectionString::parse("mySet/host1:12345,host2:12345"));
+    HostAndPort shardTarget = connString.getServers().front();
+    targeter->setConnectionStringReturnValue(connString);
+    targeter->setFindHostReturnValue(shardTarget);
+
+    targeterFactory()->addTargeterToReturn(connString, std::move(targeter));
+    std::string expectedShardName = "StandaloneShard";
+
+    auto future = launchAsync([this, expectedShardName, connString] {
+        auto status =
+            catalogManager()->addShard(operationContext(), &expectedShardName, connString, 100);
+        ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
+        ASSERT_STRING_CONTAINS(status.getStatus().reason(),
+                               "is already a member of the existing shard");
+    });
+
+    ShardType shard;
+    shard.setName("shard0000");
+    shard.setHost(shardTarget.toString());
+    expectGetShards({shard});
+
+    future.timed_get(kFutureTimeout);
+}
+
+// A replica set name was found for the host but no name was provided with the host.
+TEST_F(AddShardTest, AddReplicaSetShardAsStandalone) {
+    std::unique_ptr<RemoteCommandTargeterMock> targeter(
+        stdx::make_unique<RemoteCommandTargeterMock>());
+    HostAndPort shardTarget = HostAndPort("host1:12345");
+    targeter->setConnectionStringReturnValue(ConnectionString(shardTarget));
+    targeter->setFindHostReturnValue(shardTarget);
+
+    targeterFactory()->addTargeterToReturn(ConnectionString(shardTarget), std::move(targeter));
+    std::string expectedShardName = "Standalone";
+
+    auto future = launchAsync([this, expectedShardName, shardTarget] {
+        auto status =
+            catalogManager()->addShard(operationContext(),
+                                       &expectedShardName,
+                                       assertGet(ConnectionString::parse(shardTarget.toString())),
+                                       100);
+        ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
+        ASSERT_STRING_CONTAINS(status.getStatus().reason(), "use replica set url format");
+    });
+
+    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
+                                        << "myOtherSet");
+    expectValidationCheck(shardTarget, commandResponse);
+
+    future.timed_get(kFutureTimeout);
+}
+
+// A replica set name was provided with the host but no name was found for the host.
+TEST_F(AddShardTest, AddStandaloneHostShardAsReplicaSet) {
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
         stdx::make_unique<RemoteCommandTargeterMock>());
     ConnectionString connString =
@@ -572,22 +573,14 @@ TEST_F(AddShardTest, AndStandaloneHostShardAsReplicaSet) {
         ASSERT_STRING_CONTAINS(status.getStatus().reason(), "host did not return a set name");
     });
 
-    expectIsMongosCheck(shardTarget);
-
-    onCommandForAddShard([](const RemoteCommandRequest& request) {
-        ASSERT_EQ(request.target, HostAndPort("host1:12345"));
-        ASSERT_EQ(request.dbname, "admin");
-        ASSERT_EQ(request.cmdObj, BSON("isMaster" << 1));
-
-        ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
-
-        return BSON("ok" << 1 << "ismaster" << true);
-    });
+    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true);
+    expectValidationCheck(shardTarget, commandResponse);
 
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(AddShardTest, ReplicaSetMistmatchedSetName) {
+// Provided replica set name does not match found replica set name.
+TEST_F(AddShardTest, ReplicaSetMistmatchedReplicaSetName) {
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
         stdx::make_unique<RemoteCommandTargeterMock>());
     ConnectionString connString =
@@ -606,27 +599,19 @@ TEST_F(AddShardTest, ReplicaSetMistmatchedSetName) {
         ASSERT_STRING_CONTAINS(status.getStatus().reason(), "does not match the actual set name");
     });
 
-    expectIsMongosCheck(shardTarget);
-
-    onCommandForAddShard([](const RemoteCommandRequest& request) {
-        ASSERT_EQ(request.target, HostAndPort("host1:12345"));
-        ASSERT_EQ(request.dbname, "admin");
-        ASSERT_EQ(request.cmdObj, BSON("isMaster" << 1));
-
-        ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
-
-        return BSON("ok" << 1 << "ismaster" << true << "setName"
-                         << "myOtherSet");
-    });
+    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
+                                        << "myOtherSet");
+    expectValidationCheck(shardTarget, commandResponse);
 
     future.timed_get(kFutureTimeout);
 }
 
+// Cannot add config server as a shard.
 TEST_F(AddShardTest, ShardIsCSRSConfigServer) {
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
         stdx::make_unique<RemoteCommandTargeterMock>());
     ConnectionString connString =
-        assertGet(ConnectionString::parse("mySet/host1:12345,host2:12345"));
+        assertGet(ConnectionString::parse("config/host1:12345,host2:12345"));
     targeter->setConnectionStringReturnValue(connString);
     HostAndPort shardTarget = connString.getServers().front();
     targeter->setFindHostReturnValue(shardTarget);
@@ -639,63 +624,18 @@ TEST_F(AddShardTest, ShardIsCSRSConfigServer) {
             catalogManager()->addShard(operationContext(), &expectedShardName, connString, 100);
         ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
         ASSERT_STRING_CONTAINS(status.getStatus().reason(),
-                               "since it is part of a config server replica set");
+                               "as a shard since it is a config server");
     });
 
-    expectIsMongosCheck(shardTarget);
-
-    expectReplSetIsMasterCheck(shardTarget, {});
-
-    onCommandForAddShard([](const RemoteCommandRequest& request) {
-        ASSERT_EQ(request.target, HostAndPort("host1:12345"));
-        ASSERT_EQ(request.dbname, "admin");
-        ASSERT_EQ(request.cmdObj, BSON("replSetGetStatus" << 1));
-        ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
-
-        return BSON("ok" << 1 << "configsvr" << true);
-    });
+    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
+                                        << "config"
+                                        << "configsvr" << true);
+    expectValidationCheck(shardTarget, commandResponse);
 
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(AddShardTest, ShardIsSCCConfigServer) {
-    std::unique_ptr<RemoteCommandTargeterMock> targeter(
-        stdx::make_unique<RemoteCommandTargeterMock>());
-    ConnectionString connString =
-        assertGet(ConnectionString::parse("mySet/host1:12345,host2:12345"));
-    targeter->setConnectionStringReturnValue(connString);
-    HostAndPort shardTarget = connString.getServers().front();
-    targeter->setFindHostReturnValue(shardTarget);
-
-    targeterFactory()->addTargeterToReturn(connString, std::move(targeter));
-    std::string expectedShardName = "StandaloneShard";
-
-    auto future = launchAsync([this, expectedShardName, connString] {
-        auto status =
-            catalogManager()->addShard(operationContext(), &expectedShardName, connString, 100);
-        ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
-        ASSERT_EQUALS(status.getStatus().reason(),
-                      "the specified mongod is a legacy-style config server and cannot be used as "
-                      "a shard server");
-    });
-
-    expectIsMongosCheck(shardTarget);
-
-    expectReplSetIsMasterCheck(shardTarget, {});
-
-    onCommandForAddShard([](const RemoteCommandRequest& request) {
-        ASSERT_EQ(request.target, HostAndPort("host1:12345"));
-        ASSERT_EQ(request.dbname, "admin");
-        ASSERT_EQ(request.cmdObj, BSON("replSetGetStatus" << 1));
-        ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
-
-        return BSON("ok" << 0 << "info"
-                         << "configsvr");
-    });
-
-    future.timed_get(kFutureTimeout);
-}
-
+// One of the hosts is not part of the found replica set.
 TEST_F(AddShardTest, ReplicaSetMissingHostsProvidedInSeedList) {
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
         stdx::make_unique<RemoteCommandTargeterMock>());
@@ -716,16 +656,18 @@ TEST_F(AddShardTest, ReplicaSetMissingHostsProvidedInSeedList) {
                                "host2:12345 does not belong to replica set");
     });
 
-    expectIsMongosCheck(shardTarget);
-
-    expectReplSetIsMasterCheck(shardTarget, {"host1:12345"});
-
-    expectReplSetGetStatusCheck(shardTarget);
+    BSONArrayBuilder hosts;
+    hosts.append("host1:12345");
+    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
+                                        << "mySet"
+                                        << "hosts" << hosts.arr());
+    expectValidationCheck(shardTarget, commandResponse);
 
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(AddShardTest, ReplicaSetNameIsConfig) {
+// Cannot add a shard with the shard name "config".
+TEST_F(AddShardTest, ShardNameIsConfig) {
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
         stdx::make_unique<RemoteCommandTargeterMock>());
     ConnectionString connString =
@@ -745,11 +687,13 @@ TEST_F(AddShardTest, ReplicaSetNameIsConfig) {
                       "use of shard replica set with name 'config' is not allowed");
     });
 
-    expectIsMongosCheck(shardTarget);
-
-    expectReplSetIsMasterCheck(shardTarget, {"host1:12345", "host2:12345"});
-
-    expectReplSetGetStatusCheck(shardTarget);
+    BSONArrayBuilder hosts;
+    hosts.append("host1:12345");
+    hosts.append("host2:12345");
+    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
+                                        << "mySet"
+                                        << "hosts" << hosts.arr());
+    expectValidationCheck(shardTarget, commandResponse);
 
     future.timed_get(kFutureTimeout);
 }
@@ -775,11 +719,13 @@ TEST_F(AddShardTest, ShardContainsExistingDatabase) {
             "because a local database 'existing' exists in another existingShard");
     });
 
-    expectIsMongosCheck(shardTarget);
-
-    expectReplSetIsMasterCheck(shardTarget, {"host1:12345", "host2:12345"});
-
-    expectReplSetGetStatusCheck(shardTarget);
+    BSONArrayBuilder hosts;
+    hosts.append("host1:12345");
+    hosts.append("host2:12345");
+    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
+                                        << "mySet"
+                                        << "hosts" << hosts.arr());
+    expectValidationCheck(shardTarget, commandResponse);
 
     expectListDatabases(shardTarget,
                         {BSON("name"
@@ -810,14 +756,16 @@ TEST_F(AddShardTest, ExistingShardName) {
             catalogManager()->addShard(operationContext(), &expectedShardName, connString, 100);
         ASSERT_EQUALS(ErrorCodes::DuplicateKey, status);
         ASSERT_STRING_CONTAINS(status.getStatus().reason(),
-                               "E11000 duplicate key error collection: config.shards");
+                               "Received DuplicateKey error when inserting");
     });
 
-    expectIsMongosCheck(shardTarget);
-
-    expectReplSetIsMasterCheck(shardTarget, {"host1:12345", "host2:12345"});
-
-    expectReplSetGetStatusCheck(shardTarget);
+    BSONArrayBuilder hosts;
+    hosts.append("host1:12345");
+    hosts.append("host2:12345");
+    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
+                                        << "mySet"
+                                        << "hosts" << hosts.arr());
+    expectValidationCheck(shardTarget, commandResponse);
 
     expectListDatabases(shardTarget,
                         {BSON("name"
@@ -855,7 +803,7 @@ TEST_F(AddShardTest, ExistingShardName) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(AddShardTest, ReplicaSet) {
+TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
         stdx::make_unique<RemoteCommandTargeterMock>());
     ConnectionString connString =
@@ -875,11 +823,13 @@ TEST_F(AddShardTest, ReplicaSet) {
         ASSERT_EQUALS(expectedShardName, shardName);
     });
 
-    expectIsMongosCheck(shardTarget);
-
-    expectReplSetIsMasterCheck(shardTarget, {"host1:12345", "host2:12345"});
-
-    expectReplSetGetStatusCheck(shardTarget);
+    BSONArrayBuilder hosts;
+    hosts.append("host1:12345");
+    hosts.append("host2:12345");
+    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
+                                        << "mySet"
+                                        << "hosts" << hosts.arr());
+    expectValidationCheck(shardTarget, commandResponse);
 
     expectListDatabases(shardTarget,
                         {BSON("name"
@@ -929,11 +879,13 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
         ASSERT_EQUALS(expectedShardName, shardName);
     });
 
-    expectIsMongosCheck(shardTarget);
-
-    expectReplSetIsMasterCheck(shardTarget, {"host1:12345", "host2:12345"});
-
-    expectReplSetGetStatusCheck(shardTarget);
+    BSONArrayBuilder hosts;
+    hosts.append("host1:12345");
+    hosts.append("host2:12345");
+    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
+                                        << "mySet"
+                                        << "hosts" << hosts.arr());
+    expectValidationCheck(shardTarget, commandResponse);
 
     expectListDatabases(shardTarget,
                         {BSON("name"
@@ -1007,11 +959,13 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
         ASSERT_EQUALS(expectedShardName, shardName);
     });
 
-    expectIsMongosCheck(shardTarget);
-
-    expectReplSetIsMasterCheck(shardTarget, {"host1:12345", "host2:12345"});
-
-    expectReplSetGetStatusCheck(shardTarget);
+    BSONArrayBuilder hosts;
+    hosts.append("host1:12345");
+    hosts.append("host2:12345");
+    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
+                                        << "mySet"
+                                        << "hosts" << hosts.arr());
+    expectValidationCheck(shardTarget, commandResponse);
 
     expectListDatabases(shardTarget, {});
 
