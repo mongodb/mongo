@@ -6,7 +6,7 @@
 
 set -o errexit
 
-REMOTEBRANCH="${1:-develop}"
+REMOTEBRANCH="${1:-mongodb-3.4}"
 LOCALBRANCH=$(git symbolic-ref HEAD)
 
 # Ensure working directory is TOPLEVEL/src/third_party
@@ -61,7 +61,7 @@ oldhash="`git log --format=%s | grep 'Import wiredtiger' | head -n 1 | sed -e's/
 # - build the changelog; unfortunately the format is branch-dependant
 case ${REMOTEBRANCH} in
     "mongodb-3.0") format="--format=\"%h  %s\"" ;;
-    "mongodb-3.2") format="--grep=\"Merge pull\" --format=\"%h  %b\"" ;;
+    "mongodb-3.2"|"mongodb-3.4") format="--grep=\"Merge pull\" --format=\"%h  %b\"" ;;
     *) echo "${REMOTEBRANCH} is not supported; bailing out" ; exit 1 ;;
 esac
 gitlog="git log $format ${oldhash}..${newhash} wt/${REMOTEBRANCH}"
