@@ -54,6 +54,10 @@ struct GroupRequest {
     // Empty is "keyPattern" is being used instead.
     std::string keyFunctionCode;
 
+    // The collation used for string comparisons. If empty, simple binary comparison with memcmp()
+    // is used.
+    BSONObj collation;
+
     // A Javascript function that takes a (input document, group result) pair and
     // updates the group result document.
     std::string reduceCode;

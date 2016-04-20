@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -225,6 +226,16 @@ private:
             request->keyFunctionCode = p["$keyf"]._asCode();
         } else {
             // No key specified.  Use the entire object as the key.
+        }
+
+        BSONElement collationElt;
+        Status collationEltStatus =
+            bsonExtractTypedField(p, "collation", BSONType::Object, &collationElt);
+        if (!collationEltStatus.isOK() && (collationEltStatus != ErrorCodes::NoSuchKey)) {
+            return collationEltStatus;
+        }
+        if (collationEltStatus.isOK()) {
+            request->collation = collationElt.embeddedObject().getOwned();
         }
 
         BSONElement reduce = p["$reduce"];
