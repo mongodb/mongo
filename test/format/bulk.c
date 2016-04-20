@@ -33,6 +33,7 @@ wts_load(void)
 {
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
+	WT_DECL_RET;
 	WT_ITEM key, value;
 	WT_SESSION *session;
 	bool is_bulk;
@@ -71,7 +72,7 @@ wts_load(void)
 		}
 
 		/* Report on progress every 100 inserts. */
-		if (g.key_cnt % 100 == 0)
+		if (g.key_cnt % 1000 == 0)
 			track("bulk load", g.key_cnt, NULL);
 
 		key_gen(&key, g.key_cnt);
@@ -113,7 +114,29 @@ wts_load(void)
 			break;
 		}
 
-		testutil_check(cursor->insert(cursor));
+		/*
+		 * We don't want to size the cache to ensure the initial data
+		 * set can load in the in-memory case, guaranteeing the load
+		 * succeeds probably means future updates are also guaranteed
+		 * to succeed, which isn't what we want. If we run out of space
+		 * in the initial load, reset the row counter and continue.
+		 *
+		 * Decrease inserts, they can't be successful if we're at the
+		 * cache limit, and increase the delete percentage to get some
+		 * extra space once the run starts.
+		 */
+		if ((ret = cursor->insert(cursor)) != 0) {
+			if (ret != WT_CACHE_FULL)
+				testutil_die(ret, "cursor.insert");
+			g.rows = --g.key_cnt;
+			g.c_rows = (uint32_t)g.key_cnt;
+
+			if (g.c_insert_pct > 5)
+				g.c_insert_pct = 5;
+			if (g.c_delete_pct < 20)
+				g.c_delete_pct += 20;
+			break;
+		}
 
 #ifdef HAVE_BERKELEY_DB
 		if (SINGLETHREADED)

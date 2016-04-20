@@ -57,10 +57,10 @@ config_setup(void)
 	config_clear();
 
 	/*
-	 * Periodically, run in-memory; don't do it on the first run, all our
-	 * smoke tests would hit it.
+	 * Periodically run in-memory. Do in-memory configuration first before
+	 * anything else, it has many related requirements.
 	 */
-	if (!config_is_perm("in_memory") && g.run_cnt % 20 == 19)
+	if (!config_is_perm("in_memory") && mmrand(NULL, 1, 20) == 1)
 		g.c_in_memory = 1;
 
 	/*
@@ -159,7 +159,6 @@ config_setup(void)
 	config_compression("compression");
 	config_compression("logging_compression");
 	config_encryption();
-	config_in_memory();
 	config_isolation();
 	config_lrt();
 
@@ -186,6 +185,9 @@ config_setup(void)
 	/* Ensure there is at least 1MB of cache per thread. */
 	if (!config_is_perm("cache") && g.c_cache < g.c_threads)
 		g.c_cache = g.c_threads;
+
+	/* Give in-memory configuration a final review. */
+	config_in_memory();
 
 	/* Make the default maximum-run length 20 minutes. */
 	if (!config_is_perm("timer"))
@@ -334,6 +336,8 @@ config_encryption(void)
 static void
 config_in_memory(void)
 {
+	size_t cache;
+
 	if (g.c_in_memory == 0)
 		return;
 
@@ -356,16 +360,28 @@ config_in_memory(void)
 		g.c_verify = 0;
 
 	/*
-	 * Ensure there is 250MB of cache per thread; keep keys/values small,
-	 * overflow items aren't an issue for in-memory configurations and it
-	 * keeps us from overflowing the cache.
+	 * Keep keys/values small, overflow items aren't an issue for in-memory
+	 * configurations and it keeps us from overflowing the cache.
 	 */
-	if (!config_is_perm("cache"))
-		g.c_cache = g.c_threads * 250;
 	if (!config_is_perm("key_max"))
-		g.c_value_max = 64;
+		g.c_key_max = 32;
 	if (!config_is_perm("value_max"))
-		g.c_value_max = 128;
+		g.c_value_max = 80;
+
+	/*
+	 * Size the cache relative to the initial data set, use 2x the base
+	 * size as a minimum.
+	 */
+	if (!config_is_perm("cache")) {
+		cache = g.c_value_max;
+		if (g.type == ROW)
+			cache += g.c_key_max;
+		cache *= g.c_rows;
+		cache *= 2;
+		cache /= WT_MEGABYTE;
+		if (g.c_cache < cache)
+			g.c_cache = cache;
+	}
 }
 
 /*

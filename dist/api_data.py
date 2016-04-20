@@ -722,8 +722,8 @@ wiredtiger_open = wiredtiger_open_common + [
         \c create option''',
         type='boolean'),
     Config('in_memory', 'false', r'''
-        keep data in-memory only, minimize disk I/O''',
-        type='boolean', undoc=True),
+        keep data in-memory only. See @ref in_memory for more information''',
+        type='boolean'),
     Config('use_environment', 'true', r'''
         use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME environment
         variables if the process is not running with special privileges.
