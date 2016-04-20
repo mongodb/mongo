@@ -6,8 +6,6 @@
     assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
     s.ensurePrimaryShard('test', 'shard0001');
 
-    s.config.settings.find().forEach(printjson);
-
     var db = s.getDB("test");
 
     var bigString = "";
@@ -51,17 +49,6 @@
         "balance didn't happen",
         1000 * 60 * 5,
         5000);
-
-    var chunkCount = sum();
-    assert.commandWorked(s.s0.adminCommand({removeshard: "shard0000"}));
-
-    assert.soon(function() {
-        printjson(s.chunkCounts("foo"));
-        s.config.shards.find().forEach(function(z) {
-            printjson(z);
-        });
-        return chunkCount == s.config.chunks.count({shard: "shard0001"});
-    }, "removeshard didn't happen", 1000 * 60 * 3, 5000);
 
     s.stop();
 })();
