@@ -283,8 +283,7 @@ Status insertAuthzDocument(OperationContext* txn,
 
         BatchedCommandResponse response;
         std::string errmsg;
-        response.parseBSON(res, &errmsg);
-        if (errmsg != "") {
+        if (!response.parseBSON(res, &errmsg)) {
             return Status(ErrorCodes::FailedToParse, errmsg);
         }
         return response.toStatus();
@@ -330,8 +329,7 @@ Status updateAuthzDocuments(OperationContext* txn,
 
         BatchedCommandResponse response;
         std::string errmsg;
-        response.parseBSON(res, &errmsg);
-        if (errmsg != "") {
+        if (!response.parseBSON(res, &errmsg)) {
             return Status(ErrorCodes::FailedToParse, errmsg);
         }
         if (response.getOk()) {
@@ -406,8 +404,7 @@ Status removeAuthzDocuments(OperationContext* txn,
 
         BatchedCommandResponse response;
         std::string errmsg;
-        response.parseBSON(res, &errmsg);
-        if (errmsg != "") {
+        if (!response.parseBSON(res, &errmsg)) {
             return Status(ErrorCodes::FailedToParse, errmsg);
         }
         if (response.getOk()) {
