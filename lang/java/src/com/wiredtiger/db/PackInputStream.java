@@ -51,6 +51,17 @@ public class PackInputStream {
      * \param format A String that contains the WiredTiger format that
      *               defines the layout of this packed value.
      * \param value The raw bytes that back the stream.
+     */
+    public PackInputStream(String format, byte[] value) {
+        this(format, value, false, 0, value.length);
+    }
+
+    /**
+     * Constructor.
+     *
+     * \param format A String that contains the WiredTiger format that
+     *               defines the layout of this packed value.
+     * \param value The raw bytes that back the stream.
      * \param isRaw The stream is opened raw.
      */
     public PackInputStream(String format, byte[] value, boolean isRaw) {
