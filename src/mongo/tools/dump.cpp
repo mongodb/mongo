@@ -275,6 +275,8 @@ public:
         LogIndentLevel lil2;
         
         set<DiskLoc> seen;
+        const DiskLoc extentBegin = e->myLoc;
+        const DiskLoc extentEnd = DiskLoc(extentBegin.a(), extentBegin.getOfs() + e->length);
 
         DiskLoc loc = forward ? e->firstRecord : e->lastRecord;
         while ( ! loc.isNull() ){
@@ -318,9 +320,7 @@ public:
             loc = forward ? rec->getNext( loc ) : rec->getPrev( loc );
 
             // break when new loc is outside current extent boundary
-            if ( ( forward && loc.compare( e->lastRecord ) > 0 ) || 
-                 ( ! forward && loc.compare( e->firstRecord ) < 0 ) ) 
-            {
+            if (loc.compare(extentBegin) < 0 || loc.compare(extentEnd) > 0) {
                 break;
             }
         }
