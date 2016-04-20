@@ -30,6 +30,7 @@
 
 #include <vector>
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
@@ -165,7 +166,21 @@ public:
         }
         BSONObj rewritten = queryBob.obj();
 
-        // cout << "rewritten query: " << rewritten.toString() << endl;
+        // Extract the collation, if it exists.
+        // TODO SERVER-23473: Pass this collation spec object down so that it can be converted into
+        // a CollatorInterface.
+        BSONObj collation;
+        {
+            BSONElement collationElt;
+            Status collationEltStatus =
+                bsonExtractTypedField(cmdObj, "collation", BSONType::Object, &collationElt);
+            if (!collationEltStatus.isOK() && (collationEltStatus != ErrorCodes::NoSuchKey)) {
+                return appendCommandStatus(result, collationEltStatus);
+            }
+            if (collationEltStatus.isOK()) {
+                collation = collationElt.Obj();
+            }
+        }
 
         long long numWanted = 100;
         const char* limitName = !cmdObj["num"].eoo() ? "num" : "limit";
