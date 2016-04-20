@@ -12,34 +12,32 @@
     jsTestLog("Shard and split collection...");
 
     var admin = mA.getDB("admin");
-    admin.runCommand({enableSharding: coll.getDB() + ""});
-    admin.runCommand({shardCollection: coll + "", key: {_id: 1}});
+    assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
+    assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
     for (var i = -100; i < 100; i++) {
-        admin.runCommand({split: coll + "", middle: {_id: i}});
+        assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: i}}));
     }
 
     jsTestLog("Create versioned connection for each mongos...");
 
-    coll.find().itcount();
-    collB.find().itcount();
+    assert.eq(0, coll.find().itcount());
+    assert.eq(0, collB.find().itcount());
 
     jsTestLog("Dropping sharded collection...");
-    coll.drop();
+    assert(coll.drop());
 
     jsTestLog("Recreating collection...");
 
-    admin.runCommand({shardCollection: coll + "", key: {_id: 1}});
+    assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
     for (var i = -10; i < 10; i++) {
-        admin.runCommand({split: coll + "", middle: {_id: i}});
+        assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: i}}));
     }
 
     jsTestLog("Retrying connections...");
 
-    coll.find().itcount();
-    collB.find().itcount();
-
-    jsTestLog("Done.");
+    assert.eq(0, coll.find().itcount());
+    assert.eq(0, collB.find().itcount());
 
     st.stop();
 
