@@ -183,6 +183,8 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	    session, WT_VERB_MUTEX, "rwlock: readlock %s", rwlock->name));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_read);
 
+	WT_DIAGNOSTIC_YIELD;
+
 	l = &rwlock->rwlock;
 
 	/*
@@ -212,6 +214,12 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * need to be atomic.
 	 */
 	++l->s.readers;
+
+	/*
+	 * Applications depend on a barrier here so that operations holding the
+	 * lock see consistent data.
+	 */
+	WT_READ_BARRIER();
 
 	return (0);
 }
@@ -306,6 +314,12 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 			__wt_sleep(0, 10);
 	}
 
+	/*
+	 * Applications depend on a barrier here so that operations holding the
+	 * lock see consistent data.
+	 */
+	WT_READ_BARRIER();
+
 	return (0);
 }
 
@@ -316,31 +330,32 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 int
 __wt_writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
-	wt_rwlock_t *l, copy;
+	wt_rwlock_t *l, new;
 
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_MUTEX, "rwlock: writeunlock %s", rwlock->name));
 
+	/*
+	 * Ensure that all updates made while the lock was held are visible to
+	 * the next thread to acquire the lock.
+	 */
+	WT_WRITE_BARRIER();
+
 	l = &rwlock->rwlock;
 
-	copy = *l;
+	new = *l;
 
 	/*
 	 * We're the only writer of the writers/readers fields, so the update
 	 * does not need to be atomic; we have to update both values at the
 	 * same time though, otherwise we'd potentially race with the thread
 	 * next granted the lock.
-	 *
-	 * Use a memory barrier to ensure the compiler doesn't mess with these
-	 * instructions and rework the code in a way that avoids the update as
-	 * a unit.
 	 */
-	WT_BARRIER();
+	++new.s.writers;
+	++new.s.readers;
+	l->i.wr = new.i.wr;
 
-	++copy.s.writers;
-	++copy.s.readers;
-
-	l->i.wr = copy.i.wr;
+	WT_DIAGNOSTIC_YIELD;
 
 	return (0);
 }
