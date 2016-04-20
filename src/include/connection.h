@@ -333,7 +333,7 @@ struct __wt_connection_impl {
 	bool		 stat_tid_set;	/* Statistics log thread set */
 	WT_CONDVAR	*stat_cond;	/* Statistics log wait mutex */
 	const char	*stat_format;	/* Statistics log timestamp format */
-	WT_FH		*stat_fh;	/* Statistics log file handle */
+	WT_FSTREAM	*stat_fs;	/* Statistics log stream */
 	char		*stat_path;	/* Statistics log path format */
 	char	       **stat_sources;	/* Statistics log list of objects */
 	const char	*stat_stamp;	/* Statistics log entry timestamp */
@@ -425,7 +425,7 @@ struct __wt_connection_impl {
 
 #define	WT_STDERR(s)	(&S2C(s)->wt_stderr)
 #define	WT_STDOUT(s)	(&S2C(s)->wt_stdout)
-	WT_FH wt_stderr, wt_stdout;
+	WT_FSTREAM wt_stderr, wt_stdout;
 
 	/*
 	 * OS library/system call jump table, to support in-memory and readonly
@@ -438,7 +438,7 @@ struct __wt_connection_impl {
 	int	(*file_remove)(WT_SESSION_IMPL *, const char *);
 	int	(*file_rename)(WT_SESSION_IMPL *, const char *, const char *);
 	int	(*file_size)(WT_SESSION_IMPL *, const char *, bool, wt_off_t *);
-	int	(*handle_open)(WT_SESSION_IMPL *,
+	int	(*file_open)(WT_SESSION_IMPL *,
 		    WT_FH *, const char *, uint32_t, uint32_t);
 
 	uint32_t flags;

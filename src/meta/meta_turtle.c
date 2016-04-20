@@ -71,24 +71,24 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session)
 	WT_DECL_ITEM(key);
 	WT_DECL_ITEM(value);
 	WT_DECL_RET;
-	WT_FH *fh;
+	WT_FSTREAM *fs;
 	bool exist;
 
 	/* Look for a hot backup file: if we find it, load it. */
 	WT_RET(__wt_exist(session, WT_METADATA_BACKUP, &exist));
 	if (!exist)
 		return (0);
-	WT_RET(__wt_open(session,
-	    WT_METADATA_BACKUP, WT_FILE_TYPE_REGULAR, WT_STREAM_READ, &fh));
+	WT_RET(__wt_fopen(session,
+	    WT_METADATA_BACKUP, WT_FILE_TYPE_REGULAR, WT_STREAM_READ, &fs));
 
 	/* Read line pairs and load them into the metadata file. */
 	WT_ERR(__wt_scr_alloc(session, 512, &key));
 	WT_ERR(__wt_scr_alloc(session, 512, &value));
 	for (;;) {
-		WT_ERR(__wt_getline(session, key, fh));
+		WT_ERR(__wt_getline(session, fs, key));
 		if (key->size == 0)
 			break;
-		WT_ERR(__wt_getline(session, value, fh));
+		WT_ERR(__wt_getline(session, fs, value));
 		if (value->size == 0)
 			WT_ERR(__wt_illegal_value(session, WT_METADATA_BACKUP));
 		WT_ERR(__wt_metadata_update(session, key->data, value->data));
@@ -96,7 +96,7 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session)
 
 	F_SET(S2C(session), WT_CONN_WAS_BACKUP);
 
-err:	WT_TRET(__wt_close(session, &fh));
+err:	WT_TRET(__wt_fclose(session, &fs));
 	__wt_scr_free(session, &key);
 	__wt_scr_free(session, &value);
 	return (ret);
@@ -242,7 +242,7 @@ __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
 {
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	WT_FH *fh;
+	WT_FSTREAM *fs;
 	bool exist, match;
 
 	*valuep = NULL;
@@ -257,20 +257,19 @@ __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
 	if (!exist)
 		return (strcmp(key, WT_METAFILE_URI) == 0 ?
 		    __metadata_config(session, valuep) : WT_NOTFOUND);
-	WT_RET(__wt_open(session,
-	    WT_METADATA_TURTLE, WT_FILE_TYPE_REGULAR, WT_STREAM_READ, &fh));
+	WT_RET(__wt_fopen(session, WT_METADATA_TURTLE, 0, WT_STREAM_READ, &fs));
 
 	/* Search for the key. */
 	WT_ERR(__wt_scr_alloc(session, 512, &buf));
 	for (match = false;;) {
-		WT_ERR(__wt_getline(session, buf, fh));
+		WT_ERR(__wt_getline(session, fs, buf));
 		if (buf->size == 0)
 			WT_ERR(WT_NOTFOUND);
 		if (strcmp(key, buf->data) == 0)
 			match = true;
 
 		/* Key matched: read the subsequent line for the value. */
-		WT_ERR(__wt_getline(session, buf, fh));
+		WT_ERR(__wt_getline(session, fs, buf));
 		if (buf->size == 0)
 			WT_ERR(__wt_illegal_value(session, WT_METADATA_TURTLE));
 		if (match)
@@ -280,7 +279,7 @@ __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
 	/* Copy the value for the caller. */
 	WT_ERR(__wt_strdup(session, buf->data, valuep));
 
-err:	WT_TRET(__wt_close(session, &fh));
+err:	WT_TRET(__wt_fclose(session, &fs));
 	__wt_scr_free(session, &buf);
 
 	if (ret != 0)
@@ -295,38 +294,34 @@ err:	WT_TRET(__wt_close(session, &fh));
 int
 __wt_turtle_update(WT_SESSION_IMPL *session, const char *key, const char *value)
 {
-	WT_FH *fh;
-	WT_DECL_ITEM(buf);
+	WT_FSTREAM *fs;
 	WT_DECL_RET;
 	int vmajor, vminor, vpatch;
 	const char *version;
 
-	fh = NULL;
+	fs = NULL;
 
 	/*
 	 * Create the turtle setup file: we currently re-write it from scratch
 	 * every time.
 	 */
-	WT_RET(__wt_open(session, WT_METADATA_TURTLE_SET,
-	    WT_FILE_TYPE_REGULAR, WT_OPEN_CREATE | WT_OPEN_EXCLUSIVE, &fh));
+	WT_RET(__wt_fopen(session, WT_METADATA_TURTLE_SET,
+	    WT_OPEN_CREATE | WT_OPEN_EXCLUSIVE, WT_STREAM_WRITE, &fs));
 
 	version = wiredtiger_version(&vmajor, &vminor, &vpatch);
-	WT_ERR(__wt_scr_alloc(session, 2 * 1024, &buf));
-	WT_ERR(__wt_buf_fmt(session, buf,
+	WT_ERR(__wt_fprintf(session, fs,
 	    "%s\n%s\n%s\n" "major=%d,minor=%d,patch=%d\n%s\n%s\n",
 	    WT_METADATA_VERSION_STR, version,
 	    WT_METADATA_VERSION, vmajor, vminor, vpatch,
 	    key, value));
-	WT_ERR(__wt_write(session, fh, 0, buf->size, buf->data));
 
-	/* Flush the handle and rename the file into place. */
-	ret = __wt_sync_handle_and_rename(
-	    session, &fh, WT_METADATA_TURTLE_SET, WT_METADATA_TURTLE);
+	/* Flush the stream and rename the file into place. */
+	ret = __wt_sync_and_rename(
+	    session, &fs, WT_METADATA_TURTLE_SET, WT_METADATA_TURTLE);
 
 	/* Close any file handle left open, remove any temporary file. */
-err:	WT_TRET(__wt_close(session, &fh));
+err:	WT_TRET(__wt_fclose(session, &fs));
 	WT_TRET(__wt_remove_if_exists(session, WT_METADATA_TURTLE_SET));
 
-	__wt_scr_free(session, &buf);
 	return (ret);
 }

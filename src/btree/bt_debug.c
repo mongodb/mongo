@@ -19,7 +19,7 @@ typedef struct {
 	 * When using the standard event handlers, the debugging output has to
 	 * do its own message handling because its output isn't line-oriented.
 	 */
-	WT_FH		*fh;			/* Output file stream */
+	WT_FSTREAM	*fs;			/* Output file stream */
 	WT_ITEM		*msg;			/* Buffered message */
 
 	WT_ITEM		*tmp;			/* Temporary space */
@@ -97,8 +97,8 @@ __debug_config(WT_SESSION_IMPL *session, WT_DBG *ds, const char *ofile)
 	if (ofile == NULL)
 		return (__wt_scr_alloc(session, 512, &ds->msg));
 
-	return (__wt_open(session, ofile, WT_FILE_TYPE_REGULAR,
-	    WT_OPEN_CREATE | WT_STREAM_LINE_BUFFER | WT_STREAM_WRITE, &ds->fh));
+	return (__wt_fopen(session, ofile, WT_OPEN_CREATE,
+	    WT_STREAM_LINE_BUFFER | WT_STREAM_WRITE, &ds->fs));
 }
 
 /*
@@ -127,7 +127,7 @@ __dmsg_wrapup(WT_DBG *ds)
 	}
 
 	/* Close any file we opened. */
-	(void)__wt_close(session, &ds->fh);
+	(void)__wt_fclose(session, &ds->fs);
 }
 
 /*
@@ -152,7 +152,7 @@ __dmsg(WT_DBG *ds, const char *fmt, ...)
 	 * the output chunk, and pass it to the event handler once we see a
 	 * terminating newline.
 	 */
-	if (ds->fh == NULL) {
+	if (ds->fs == NULL) {
 		msg = ds->msg;
 		for (;;) {
 			p = (char *)msg->mem + msg->size;
@@ -184,7 +184,7 @@ __dmsg(WT_DBG *ds, const char *fmt, ...)
 		}
 	} else {
 		va_start(ap, fmt);
-		(void)__wt_vfprintf(session, ds->fh, fmt, ap);
+		(void)__wt_vfprintf(session, ds->fs, fmt, ap);
 		va_end(ap);
 	}
 }

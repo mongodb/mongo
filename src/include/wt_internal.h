@@ -181,6 +181,8 @@ struct __wt_fair_lock;
     typedef struct __wt_fair_lock WT_FAIR_LOCK;
 struct __wt_fh;
     typedef struct __wt_fh WT_FH;
+struct __wt_fstream;
+    typedef struct __wt_fstream WT_FSTREAM;
 struct __wt_hazard;
     typedef struct __wt_hazard WT_HAZARD;
 struct __wt_ikey;
@@ -353,21 +355,23 @@ union __wt_rand_state;
 
 #include "intpack.i"			/* required by cell.i, packing.i */
 
-#include "buf.i"
+#include "buf.i"                        /* required by cell.i */
 #include "cache.i"			/* required by txn.i */
 #include "cell.i"			/* required by btree.i */
-#include "log.i"
-#include "misc.i"
 #include "mutex.i"			/* required by btree.i */
-#include "packing.i"
 #include "txn.i"			/* required by btree.i */
 
+#include "bitstring.i"
 #include "btree.i"			/* required by cursor.i */
 #include "btree_cmp.i"
-#include "cursor.i"
-
-#include "bitstring.i"
 #include "column.i"
+#include "cursor.i"
+#include "log.i"
+#include "misc.i"
+#include "os_fhandle.i"
+#include "os_fs.i"
+#include "os_fstream.i"
+#include "packing.i"
 #include "serial.i"
 
 #if defined(__cplusplus)

@@ -1753,14 +1753,14 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 static int
 __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_FH *fh;
+	WT_FSTREAM *fs;
 	WT_CONFIG parser;
 	WT_CONFIG_ITEM cval, k, v;
 	WT_DECL_RET;
 	bool exist;
 	const char *base_config;
 
-	fh = NULL;
+	fs = NULL;
 	base_config = NULL;
 
 	/*
@@ -1792,11 +1792,10 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 	if (exist)
 		return (0);
 
-	WT_RET(__wt_open(session,
-	    WT_BASECONFIG_SET, WT_FILE_TYPE_REGULAR,
-	    WT_OPEN_CREATE | WT_OPEN_EXCLUSIVE | WT_STREAM_WRITE, &fh));
+	WT_RET(__wt_fopen(session, WT_BASECONFIG_SET,
+	    WT_OPEN_CREATE | WT_OPEN_EXCLUSIVE, WT_STREAM_WRITE, &fs));
 
-	WT_ERR(__wt_fprintf(session, fh, "%s\n\n",
+	WT_ERR(__wt_fprintf(session, fs, "%s\n\n",
 	    "# Do not modify this file.\n"
 	    "#\n"
 	    "# WiredTiger created this file when the database was created,\n"
@@ -1843,18 +1842,18 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 			--v.str;
 			v.len += 2;
 		}
-		WT_ERR(__wt_fprintf(session, fh,
+		WT_ERR(__wt_fprintf(session, fs,
 		    "%.*s=%.*s\n", (int)k.len, k.str, (int)v.len, v.str));
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
-	/* Flush the handle and rename the file into place. */
-	ret = __wt_sync_handle_and_rename(
-	    session, &fh, WT_BASECONFIG_SET, WT_BASECONFIG);
+	/* Flush the stream and rename the file into place. */
+	ret = __wt_sync_and_rename(
+	    session, &fs, WT_BASECONFIG_SET, WT_BASECONFIG);
 
 	if (0) {
 		/* Close open file handle, remove any temporary file. */
-err:		WT_TRET(__wt_close(session, &fh));
+err:		WT_TRET(__wt_fclose(session, &fs));
 		WT_TRET(__wt_remove_if_exists(session, WT_BASECONFIG_SET));
 	}
 

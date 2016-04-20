@@ -75,10 +75,6 @@
 #define	WT_OPEN_EXCLUSIVE	0x004	/* Open exclusively */
 #define	WT_OPEN_FIXED		0x008	/* Path isn't relative to home */
 #define	WT_OPEN_READONLY	0x010	/* Open readonly (internal) */
-#define	WT_STREAM_APPEND	0x020	/* Open a stream: append */
-#define	WT_STREAM_LINE_BUFFER	0x040	/* Line buffer the stream */
-#define	WT_STREAM_READ		0x080	/* Open a stream: read */
-#define	WT_STREAM_WRITE		0x100	/* Open a stream: write */
 
 struct __wt_fh {
 	const char *name;			/* File name */
@@ -98,11 +94,8 @@ struct __wt_fh {
 #else
 	int	 fd;				/* POSIX file handle */
 #endif
-	FILE	*fp;				/* ANSI C stdio handle */
 
-	/*
-	 * Underlying in-memory handle support.
-	 */
+	/* In-memory specific fields. */
 	size_t	 off;				/* Read/write offset */
 	WT_ITEM  buf;				/* Data */
 
@@ -116,25 +109,43 @@ struct __wt_fh {
 	    WT_FALLOCATE_SYS } fallocate_available;
 	bool fallocate_requires_locking;
 
-#define	WT_FH_FLUSH_ON_CLOSE	0x01		/* Flush when closing */
-#define	WT_FH_IN_MEMORY		0x02		/* In-memory, don't remove */
+#define	WT_FH_IN_MEMORY		0x01		/* In-memory, don't remove */
 	uint32_t flags;
 
 	int (*fh_advise)(WT_SESSION_IMPL *, WT_FH *, wt_off_t, wt_off_t, int);
 	int (*fh_allocate)(WT_SESSION_IMPL *, WT_FH *, wt_off_t, wt_off_t);
 	int (*fh_close)(WT_SESSION_IMPL *, WT_FH *);
-	int (*fh_getc)(WT_SESSION_IMPL *, WT_FH *, int *);
 	int (*fh_lock)(WT_SESSION_IMPL *, WT_FH *, bool);
 	int (*fh_map)(WT_SESSION_IMPL *, WT_FH *, void *, size_t *, void **);
 	int (*fh_map_discard)(WT_SESSION_IMPL *, WT_FH *, void *, size_t);
 	int (*fh_map_preload)(WT_SESSION_IMPL *, WT_FH *, const void *, size_t);
 	int (*fh_map_unmap)(
 	    WT_SESSION_IMPL *, WT_FH *, void *, size_t, void **);
-	int (*fh_printf)(WT_SESSION_IMPL *, WT_FH *, const char *, va_list);
 	int (*fh_read)(WT_SESSION_IMPL *, WT_FH *, wt_off_t, size_t, void *);
 	int (*fh_size)(WT_SESSION_IMPL *, WT_FH *, wt_off_t *);
 	int (*fh_sync)(WT_SESSION_IMPL *, WT_FH *, bool);
 	int (*fh_truncate)(WT_SESSION_IMPL *, WT_FH *, wt_off_t);
 	int (*fh_write)(
 	    WT_SESSION_IMPL *, WT_FH *, wt_off_t, size_t, const void *);
+};
+
+struct __wt_fstream {
+	const char *name;                       /* Stream name */
+
+	FILE *fp;                               /* stdio FILE stream */
+	WT_FH *fh;				/* WT file handle */
+	wt_off_t off;				/* Read/write offset */
+	wt_off_t size;				/* File size */
+	WT_ITEM  buf;				/* Data */
+
+#define	WT_STREAM_APPEND	0x01		/* Open a stream for append */
+#define	WT_STREAM_LINE_BUFFER	0x02		/* Line buffer the stream */
+#define	WT_STREAM_READ		0x04		/* Open a stream for read */
+#define	WT_STREAM_WRITE		0x08		/* Open a stream for write */
+	uint32_t flags;
+
+	int (*close)(WT_SESSION_IMPL *, WT_FSTREAM *);
+	int (*flush)(WT_SESSION_IMPL *, WT_FSTREAM *);
+	int (*getline)(WT_SESSION_IMPL *, WT_FSTREAM *, WT_ITEM *);
+	int (*printf)(WT_SESSION_IMPL *, WT_FSTREAM *, const char *, va_list);
 };

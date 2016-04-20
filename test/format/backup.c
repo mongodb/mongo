@@ -156,13 +156,13 @@ backup(void *arg)
 		if (ret != WT_NOTFOUND)
 			testutil_die(ret, "backup-cursor");
 
-		testutil_check(backup_cursor->close(backup_cursor));
-		testutil_check(pthread_rwlock_unlock(&g.backup_lock));
-
 		/* After an incremental backup, truncate the log files. */
 		if (incremental)
 			testutil_check(session->truncate(
 			    session, "log:", backup_cursor, NULL, NULL));
+
+		testutil_check(backup_cursor->close(backup_cursor));
+		testutil_check(pthread_rwlock_unlock(&g.backup_lock));
 
 		/*
 		 * If automatic log archival isn't configured, optionally do
