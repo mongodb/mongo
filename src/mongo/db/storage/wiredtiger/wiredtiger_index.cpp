@@ -1069,8 +1069,17 @@ void WiredTigerIndexUnique::_unindex(WT_CURSOR* c,
     // dups are allowed, so we have to deal with a vector of RecordIds.
 
     int ret = WT_OP_CHECK(c->search(c));
-    if (ret == WT_NOTFOUND)
+    if (ret == WT_NOTFOUND) {
+        // WT_NOTFOUND is only expected during a background index build. Insert a dummy value and
+        // delete it again to trigger a write conflict in case this is being concurrently indexed by
+        // the background indexer.
+        c->set_key(c, keyItem.Get());
+        c->set_value(c, emptyItem.Get());
+        invariantWTOK(WT_OP_CHECK(c->insert(c)));
+        c->set_key(c, keyItem.Get());
+        invariantWTOK(WT_OP_CHECK(c->remove(c)));
         return;
+    }
     invariantWTOK(ret);
 
     WT_ITEM old;
@@ -1178,6 +1187,15 @@ void WiredTigerIndexStandard::_unindex(WT_CURSOR* c,
     int ret = WT_OP_CHECK(c->remove(c));
     if (ret != WT_NOTFOUND) {
         invariantWTOK(ret);
+    } else {
+        // WT_NOTFOUND is only expected during a background index build. Insert a dummy value and
+        // delete it again to trigger a write conflict in case this is being concurrently indexed by
+        // the background indexer.
+        c->set_key(c, item.Get());
+        c->set_value(c, emptyItem.Get());
+        invariantWTOK(WT_OP_CHECK(c->insert(c)));
+        c->set_key(c, item.Get());
+        invariantWTOK(WT_OP_CHECK(c->remove(c)));
     }
 }
 
