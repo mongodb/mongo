@@ -171,6 +171,9 @@ for (i = 0; i < n; i++) {
 
     checkPrimaryIs(max);
 
+    // Wait for election oplog entry to be replicated, to avoid rollbacks later on.
+    rs.awaitReplication();
+
     print("rs.stop");
 
     rs.stop(max._id);
@@ -182,6 +185,9 @@ for (i = 0; i < n; i++) {
     print("second is " + second.host + " with priority " + second.priority);
     checkPrimaryIs(second);
 
+    // Wait for election oplog entry to be replicated, to avoid rollbacks later on.
+    rs.awaitReplication();
+
     print("restart max " + max._id);
 
     rs.restart(max._id);
@@ -189,6 +195,9 @@ for (i = 0; i < n; i++) {
 
     print("max restarted.  Checking statuses.");
     checkPrimaryIs(max);
+
+    // Wait for election oplog entry to be replicated, to avoid rollbacks later on.
+    rs.awaitReplication();
 }
 
 print("\n\n\n\n\nreplsets_priority1.js SUCCESS!\n\n");
