@@ -52,7 +52,7 @@ public:
     }
 
     bool slaveOk() const override {
-        return false;
+        return true;
     }
 
     bool adminOnly() const override {

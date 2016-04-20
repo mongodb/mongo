@@ -739,9 +739,11 @@ static void _initAndListen(int listenPort) {
     if (!storageGlobalParams.readOnly) {
         startFTDC();
 
+        uassertStatusOK(ShardingState::get(startupOpCtx.get())
+                            ->initializeFromShardIdentity(startupOpCtx.get()));
+
+        // Note: For replica sets, ShardingStateRecovery happens on transition to primary.
         if (!repl::getGlobalReplicationCoordinator()->isReplEnabled()) {
-            uassertStatusOK(ShardingState::get(startupOpCtx.get())
-                                ->initializeFromShardIdentity(startupOpCtx.get()));
             uassertStatusOK(ShardingStateRecovery::recover(startupOpCtx.get()));
         }
 
