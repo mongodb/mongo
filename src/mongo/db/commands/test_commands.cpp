@@ -101,7 +101,8 @@ public:
                 return false;
             }
         }
-        Status status = collection->insertDocument(txn, obj, false);
+        OpDebug* const nullOpDebug = nullptr;
+        Status status = collection->insertDocument(txn, obj, nullOpDebug, false);
         if (status.isOK()) {
             wunit.commit();
         }

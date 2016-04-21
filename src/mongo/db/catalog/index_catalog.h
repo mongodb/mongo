@@ -263,10 +263,25 @@ public:
 
     // ----- data modifiers ------
 
-    // this throws for now
-    Status indexRecords(OperationContext* txn, const std::vector<BsonRecord>& bsonRecords);
+    /**
+     * When 'keysInsertedOut' is not null, it will be set to the number of index keys inserted by
+     * this operation.
+     *
+     * This method may throw.
+     */
+    Status indexRecords(OperationContext* txn,
+                        const std::vector<BsonRecord>& bsonRecords,
+                        int64_t* keysInsertedOut);
 
-    void unindexRecord(OperationContext* txn, const BSONObj& obj, const RecordId& loc, bool noWarn);
+    /**
+     * When 'keysDeletedOut' is not null, it will be set to the number of index keys removed by
+     * this operation.
+     */
+    void unindexRecord(OperationContext* txn,
+                       const BSONObj& obj,
+                       const RecordId& loc,
+                       bool noWarn,
+                       int64_t* keysDeletedOut);
 
     // ------- temp internal -------
 
@@ -297,17 +312,20 @@ private:
 
     Status _indexFilteredRecords(OperationContext* txn,
                                  IndexCatalogEntry* index,
-                                 const std::vector<BsonRecord>& bsonRecords);
+                                 const std::vector<BsonRecord>& bsonRecords,
+                                 int64_t* keysInsertedOut);
 
     Status _indexRecords(OperationContext* txn,
                          IndexCatalogEntry* index,
-                         const std::vector<BsonRecord>& bsonRecords);
+                         const std::vector<BsonRecord>& bsonRecords,
+                         int64_t* keysInsertedOut);
 
     Status _unindexRecord(OperationContext* txn,
                           IndexCatalogEntry* index,
                           const BSONObj& obj,
                           const RecordId& loc,
-                          bool logIfError);
+                          bool logIfError,
+                          int64_t* keysDeletedOut);
 
     /**
      * this does no sanity checks

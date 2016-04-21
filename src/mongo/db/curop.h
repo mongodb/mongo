@@ -184,15 +184,20 @@ public:
 
     long long nMatched{-1};   // number of records that match the query
     long long nModified{-1};  // number of records written (no no-ops)
-    long long nmoved{-1};     // updates resulted in a move (moves are expensive)
     long long ninserted{-1};
     long long ndeleted{-1};
     bool fastmod{false};
     bool fastmodinsert{false};  // upsert of an $operation. builds a default object
     bool upsert{false};         // true if the update actually did an insert
     bool cursorExhausted{
-        false};  // true if the cursor has been closed at end a find/getMore operation
-    int keyUpdates{-1};
+        false};          // true if the cursor has been closed at end a find/getMore operation
+    int keyUpdates{-1};  // TODO SERVER-23272: Remove this metric.
+
+    // The following metrics are initialized with 0 rather than -1 in order to simplify use by the
+    // CRUD path.
+    long long nmoved{0};        // updates resulted in a move (moves are expensive)
+    long long keysInserted{0};  // Number of index keys inserted.
+    long long keysDeleted{0};   // Number of index keys removed.
     long long writeConflicts{0};
 
     // New Query Framework debugging/profiling info

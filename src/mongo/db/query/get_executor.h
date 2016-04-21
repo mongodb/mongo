@@ -145,6 +145,7 @@ StatusWith<std::unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* txn
  * If the query cannot be executed, returns a Status indicating why.
  */
 StatusWith<std::unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* txn,
+                                                            OpDebug* opDebug,
                                                             Collection* collection,
                                                             ParsedDelete* parsedDelete);
 
@@ -164,9 +165,9 @@ StatusWith<std::unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* tx
  * If the query cannot be executed, returns a Status indicating why.
  */
 StatusWith<std::unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* txn,
+                                                            OpDebug* opDebug,
                                                             Collection* collection,
-                                                            ParsedUpdate* parsedUpdate,
-                                                            OpDebug* opDebug);
+                                                            ParsedUpdate* parsedUpdate);
 
 /**
  * Get a PlanExecutor for a group operation.

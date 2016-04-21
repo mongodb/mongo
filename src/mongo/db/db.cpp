@@ -256,7 +256,9 @@ static void logStartup(OperationContext* txn) {
         collection = db->getCollection(startupLogCollectionName);
     }
     invariant(collection);
-    uassertStatusOK(collection->insertDocument(txn, o, false));
+
+    OpDebug* const nullOpDebug = nullptr;
+    uassertStatusOK(collection->insertDocument(txn, o, nullOpDebug, false));
     wunit.commit();
 }
 

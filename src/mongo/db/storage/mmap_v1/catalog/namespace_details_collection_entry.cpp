@@ -360,10 +360,21 @@ void NamespaceDetailsCollectionCatalogEntry::_updateSystemNamespaces(OperationCo
 
     RecordData entry = _namespacesRecordStore->dataFor(txn, _namespacesRecordId);
     const BSONObj newEntry = applyUpdateOperators(entry.releaseToBson(), update);
-    StatusWith<RecordId> result = _namespacesRecordStore->updateRecord(
+
+    Status result = _namespacesRecordStore->updateRecord(
         txn, _namespacesRecordId, newEntry.objdata(), newEntry.objsize(), false, NULL);
-    fassert(17486, result.getStatus());
-    setNamespacesRecordId(txn, result.getValue());
+
+    if (ErrorCodes::NeedsDocumentMove == result) {
+        StatusWith<RecordId> newLocation = _namespacesRecordStore->insertRecord(
+            txn, newEntry.objdata(), newEntry.objsize(), false);
+        fassert(40074, newLocation.getStatus().isOK());
+
+        _namespacesRecordStore->deleteRecord(txn, _namespacesRecordId);
+
+        setNamespacesRecordId(txn, newLocation.getValue());
+    } else {
+        fassert(17486, result.isOK());
+    }
 }
 
 void NamespaceDetailsCollectionCatalogEntry::updateFlags(OperationContext* txn, int newValue) {

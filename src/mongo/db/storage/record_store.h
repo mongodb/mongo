@@ -76,10 +76,6 @@ public:
 class UpdateNotifier {
 public:
     virtual ~UpdateNotifier() {}
-    virtual Status recordStoreGoingToMove(OperationContext* txn,
-                                          const RecordId& oldLocation,
-                                          const char* oldBuffer,
-                                          size_t oldSize) = 0;
     virtual Status recordStoreGoingToUpdateInPlace(OperationContext* txn, const RecordId& loc) = 0;
 };
 
@@ -386,22 +382,23 @@ public:
     }
 
     /**
-     * @param notifier - Only used by record stores which do not support doc-locking.
-     *                   In the case of a document move, this is called after the document
-     *                   has been written to the new location, but before it is deleted from
-     *                   the old location.
-     *                   In the case of an in-place update, this is called just before the
-     *                   in-place write occurs.
-     * @return Status or RecordId, RecordId might be different
+     * @param notifier - Only used by record stores which do not support doc-locking. Called only
+     *                   in the case of an in-place update. Called just before the in-place write
+     *                   occurs.
+     * @return Status  - If a document move is required (MMAPv1 only) then a status of
+     *                   ErrorCodes::NeedsDocumentMove will be returned. On receipt of this status
+     *                   no update will be performed. It is the caller's responsibility to:
+     *                     1. Remove the existing document and associated index keys.
+     *                     2. Insert a new document and index keys.
      *
      * For capped record stores, the record size will never change.
      */
-    virtual StatusWith<RecordId> updateRecord(OperationContext* txn,
-                                              const RecordId& oldLocation,
-                                              const char* data,
-                                              int len,
-                                              bool enforceQuota,
-                                              UpdateNotifier* notifier) = 0;
+    virtual Status updateRecord(OperationContext* txn,
+                                const RecordId& oldLocation,
+                                const char* data,
+                                int len,
+                                bool enforceQuota,
+                                UpdateNotifier* notifier) = 0;
 
     /**
      * @return Returns 'false' if this record store does not implement

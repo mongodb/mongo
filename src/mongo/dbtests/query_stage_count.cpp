@@ -105,13 +105,15 @@ public:
 
     void insert(const BSONObj& doc) {
         WriteUnitOfWork wunit(&_txn);
-        _coll->insertDocument(&_txn, doc, false);
+        OpDebug* const nullOpDebug = nullptr;
+        _coll->insertDocument(&_txn, doc, nullOpDebug, false);
         wunit.commit();
     }
 
     void remove(const RecordId& recordId) {
         WriteUnitOfWork wunit(&_txn);
-        _coll->deleteDocument(&_txn, recordId);
+        OpDebug* const nullOpDebug = nullptr;
+        _coll->deleteDocument(&_txn, recordId, nullOpDebug);
         wunit.commit();
     }
 

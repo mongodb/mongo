@@ -929,7 +929,8 @@ static void insertOne(WriteBatchExecutor::ExecInsertsState* state, WriteOpResult
                         state->getCollection()->ns().ns(), MODE_IX));
 
                     WriteUnitOfWork wunit(txn);
-                    Status status = state->getCollection()->insertDocument(txn, insertDoc, true);
+                    Status status = state->getCollection()->insertDocument(
+                        txn, insertDoc, &CurOp::get(txn)->debug(), true);
 
                     if (status.isOK()) {
                         result->getStats().n++;
@@ -1118,7 +1119,7 @@ static void multiUpdate(OperationContext* txn,
         try {
             invariant(collection);
             std::unique_ptr<PlanExecutor> exec =
-                uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, debug));
+                uassertStatusOK(getExecutorUpdate(txn, debug, collection, &parsedUpdate));
 
             uassertStatusOK(exec->executePlan());
 
@@ -1205,6 +1206,8 @@ static void multiRemove(OperationContext* txn,
         lastOpSetterGuard.Dismiss();
     }
 
+    OpDebug* opDebug = &CurOp::get(txn)->debug();
+
     int attempt = 1;
     while (1) {
         try {
@@ -1239,7 +1242,7 @@ static void multiRemove(OperationContext* txn,
             auto collection = autoDb.getDb()->getCollection(nss);
 
             std::unique_ptr<PlanExecutor> exec =
-                uassertStatusOK(getExecutorDelete(txn, collection, &parsedDelete));
+                uassertStatusOK(getExecutorDelete(txn, opDebug, collection, &parsedDelete));
 
             // Execute the delete and retrieve the number deleted.
             uassertStatusOK(exec->executePlan());
@@ -1250,6 +1253,7 @@ static void multiRemove(OperationContext* txn,
             if (collection) {
                 collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
             }
+
             CurOp::get(txn)->debug().setPlanSummaryMetrics(summary);
 
             if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {

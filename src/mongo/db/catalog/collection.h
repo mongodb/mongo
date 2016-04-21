@@ -250,12 +250,14 @@ public:
      * so should be ignored by the user as an internal maintenance operation and not a
      * real delete.
      * 'loc' key to uniquely identify a record in a collection.
+     * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
      * 'cappedOK' if true, allows deletes on capped collections (Cloner::copyDB uses this).
      * 'noWarn' if unindexing the record causes an error, if noWarn is true the error
      * will not be logged.
      */
     void deleteDocument(OperationContext* txn,
                         const RecordId& loc,
+                        OpDebug* opDebug,
                         bool fromMigrate = false,
                         bool noWarn = false);
 
@@ -263,10 +265,13 @@ public:
      * Inserts all documents inside one WUOW.
      * Caller should ensure vector is appropriately sized for this.
      * If any errors occur (including WCE), caller should retry documents individually.
+     *
+     * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
      */
     Status insertDocuments(OperationContext* txn,
                            std::vector<BSONObj>::const_iterator begin,
                            std::vector<BSONObj>::const_iterator end,
+                           OpDebug* opDebug,
                            bool enforceQuota,
                            bool fromMigrate = false);
 
@@ -274,10 +279,12 @@ public:
      * this does NOT modify the doc before inserting
      * i.e. will not add an _id field for documents that are missing it
      *
-     * If enforceQuota is false, quotas will be ignored.
+     * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
+     * 'enforceQuota' If false, quotas will be ignored.
      */
     Status insertDocument(OperationContext* txn,
                           const BSONObj& doc,
+                          OpDebug* opDebug,
                           bool enforceQuota,
                           bool fromMigrate = false);
 
@@ -298,6 +305,7 @@ public:
      * If the document fits in the old space, it is put there; if not, it is moved.
      * Sets 'args.updatedDoc' to the updated version of the document with damages applied, on
      * success.
+     * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
      * @return the post update location of the doc (may or may not be the same as oldLocation)
      */
     StatusWith<RecordId> updateDocument(OperationContext* txn,
@@ -306,7 +314,7 @@ public:
                                         const BSONObj& newDoc,
                                         bool enforceQuota,
                                         bool indexesAffected,
-                                        OpDebug* debug,
+                                        OpDebug* opDebug,
                                         OplogUpdateEntryArgs* args);
 
     bool updateWithDamagesSupported() const;
@@ -437,11 +445,6 @@ private:
      */
     StatusWithMatchExpression parseValidator(const BSONObj& validator) const;
 
-    Status recordStoreGoingToMove(OperationContext* txn,
-                                  const RecordId& oldLocation,
-                                  const char* oldBuffer,
-                                  size_t oldSize);
-
     Status recordStoreGoingToUpdateInPlace(OperationContext* txn, const RecordId& loc);
 
     Status aboutToDeleteCapped(OperationContext* txn, const RecordId& loc, RecordData data);
@@ -456,7 +459,21 @@ private:
     Status _insertDocuments(OperationContext* txn,
                             std::vector<BSONObj>::const_iterator begin,
                             std::vector<BSONObj>::const_iterator end,
-                            bool enforceQuota);
+                            bool enforceQuota,
+                            OpDebug* opDebug);
+
+
+    /**
+     * Perform update when document move will be required.
+     */
+    StatusWith<RecordId> _updateDocumentWithMove(OperationContext* txn,
+                                                 const RecordId& oldLocation,
+                                                 const Snapshotted<BSONObj>& oldDoc,
+                                                 const BSONObj& newDoc,
+                                                 bool enforceQuota,
+                                                 OpDebug* opDebug,
+                                                 OplogUpdateEntryArgs* args,
+                                                 const SnapshotId& sid);
 
     bool _enforceQuota(bool userEnforeQuota) const;
 

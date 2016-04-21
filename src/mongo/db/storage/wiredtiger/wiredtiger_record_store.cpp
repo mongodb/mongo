@@ -1367,12 +1367,12 @@ StatusWith<RecordId> WiredTigerRecordStore::insertRecord(OperationContext* txn,
     return insertRecord(txn, buf.get(), len, enforceQuota);
 }
 
-StatusWith<RecordId> WiredTigerRecordStore::updateRecord(OperationContext* txn,
-                                                         const RecordId& id,
-                                                         const char* data,
-                                                         int len,
-                                                         bool enforceQuota,
-                                                         UpdateNotifier* notifier) {
+Status WiredTigerRecordStore::updateRecord(OperationContext* txn,
+                                           const RecordId& id,
+                                           const char* data,
+                                           int len,
+                                           bool enforceQuota,
+                                           UpdateNotifier* notifier) {
     WiredTigerCursor curwrap(_uri, _tableId, true, txn);
     curwrap.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
@@ -1402,7 +1402,7 @@ StatusWith<RecordId> WiredTigerRecordStore::updateRecord(OperationContext* txn,
         cappedDeleteAsNeeded(txn, id);
     }
 
-    return StatusWith<RecordId>(id);
+    return Status::OK();
 }
 
 bool WiredTigerRecordStore::updateWithDamagesSupported() const {

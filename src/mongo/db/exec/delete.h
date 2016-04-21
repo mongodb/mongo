@@ -35,6 +35,7 @@
 namespace mongo {
 
 class CanonicalQuery;
+class OpDebug;
 class OperationContext;
 class PlanExecutor;
 
@@ -44,7 +45,8 @@ struct DeleteStageParams {
           fromMigrate(false),
           isExplain(false),
           returnDeleted(false),
-          canonicalQuery(nullptr) {}
+          canonicalQuery(nullptr),
+          opDebug(nullptr) {}
 
     // Should we delete all documents returned from the child (a "multi delete"), or at most one
     // (a "single delete")?
@@ -65,6 +67,9 @@ struct DeleteStageParams {
 
     // The user-requested sort specification. Currently used just for findAndModify.
     BSONObj sort;
+
+    // Optional. When not null, delete metrics are recorded here.
+    OpDebug* opDebug;
 };
 
 /**

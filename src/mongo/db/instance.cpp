@@ -719,7 +719,7 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
             //  The common case: no implicit collection creation
             if (!upsert || collection != NULL) {
                 unique_ptr<PlanExecutor> exec =
-                    uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, &op.debug()));
+                    uassertStatusOK(getExecutorUpdate(txn, &op.debug(), collection, &parsedUpdate));
 
                 // Run the plan and get stats out.
                 uassertStatusOK(exec->executePlan());
@@ -786,7 +786,7 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
         auto collection = ctx.db()->getCollection(nsString);
         invariant(collection);
         unique_ptr<PlanExecutor> exec =
-            uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, &op.debug()));
+            uassertStatusOK(getExecutorUpdate(txn, &op.debug(), collection, &parsedUpdate));
 
         // Run the plan and get stats out.
         uassertStatusOK(exec->executePlan());
@@ -865,7 +865,7 @@ void receivedDelete(OperationContext* txn, const NamespaceString& nsString, Mess
             auto collection = ctx.db()->getCollection(nsString);
 
             unique_ptr<PlanExecutor> exec =
-                uassertStatusOK(getExecutorDelete(txn, collection, &parsedDelete));
+                uassertStatusOK(getExecutorDelete(txn, &op.debug(), collection, &parsedDelete));
 
             // Run the plan and get the number of docs deleted.
             uassertStatusOK(exec->executePlan());
@@ -984,7 +984,7 @@ void insertMultiSingletons(OperationContext* txn,
                     invariant(collection);
                 }
 
-                uassertStatusOK(collection->insertDocument(txn, *it, true));
+                uassertStatusOK(collection->insertDocument(txn, *it, &op.debug(), true));
                 wouw.commit();
             }
             MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "insert", ns);
@@ -1015,7 +1015,7 @@ void insertMultiVector(OperationContext* txn,
             invariant(collection);
         }
 
-        uassertStatusOK(collection->insertDocuments(txn, begin, end, true, false));
+        uassertStatusOK(collection->insertDocuments(txn, begin, end, &op.debug(), true, false));
         wunit.commit();
 
         int inserted = end - begin;

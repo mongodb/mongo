@@ -772,9 +772,12 @@ TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
             coll = autoDb.getDb()->createCollection(_txn.get(), "test.t");
         }
         ASSERT(coll);
-        ASSERT_OK(coll->insertDocument(_txn.get(), BSON("_id" << 1 << "v" << 2), false));
-        ASSERT_OK(coll->insertDocument(_txn.get(), BSON("_id" << 2 << "v" << 4), false));
-        ASSERT_OK(coll->insertDocument(_txn.get(), BSON("_id" << 4), false));
+        OpDebug* const nullOpDebug = nullptr;
+        ASSERT_OK(
+            coll->insertDocument(_txn.get(), BSON("_id" << 1 << "v" << 2), nullOpDebug, false));
+        ASSERT_OK(
+            coll->insertDocument(_txn.get(), BSON("_id" << 2 << "v" << 4), nullOpDebug, false));
+        ASSERT_OK(coll->insertDocument(_txn.get(), BSON("_id" << 4), nullOpDebug, false));
         wuow.commit();
     }
     const auto commonOperation =
