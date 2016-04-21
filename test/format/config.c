@@ -44,6 +44,7 @@ static void	   config_map_compression(const char *, u_int *);
 static void	   config_map_encryption(const char *, u_int *);
 static void	   config_map_file_type(const char *, u_int *);
 static void	   config_map_isolation(const char *, u_int *);
+static void	   config_reset(void);
 
 /*
  * config_setup --
@@ -55,7 +56,7 @@ config_setup(void)
 	CONFIG *cp;
 
 	/* Clear any temporary values. */
-	config_clear();
+	config_reset();
 
 	/* Periodically run in-memory. */
 	config_in_memory();
@@ -550,18 +551,36 @@ config_file(const char *name)
 
 /*
  * config_clear --
- *	Clear per-run values.
+ *	Clear all configuration values.
  */
 void
 config_clear(void)
 {
 	CONFIG *cp;
 
-	/* Clear configuration data. */
+	/* Clear all allocated configuration data. */
+	for (cp = c; cp->name != NULL; ++cp)
+		if (cp->vstr != NULL) {
+			free((void *)*cp->vstr);
+			*cp->vstr = NULL;
+		}
+	free(g.uri);
+	g.uri = NULL;
+}
+
+/*
+ * config_reset --
+ *	Clear per-run configuration values.
+ */
+static void
+config_reset(void)
+{
+	CONFIG *cp;
+
+	/* Clear temporary allocated configuration data. */
 	for (cp = c; cp->name != NULL; ++cp) {
 		F_CLR(cp, C_TEMP);
-		if (!F_ISSET(cp, C_PERM) &&
-		    F_ISSET(cp, C_STRING) && cp->vstr != NULL) {
+		if (!F_ISSET(cp, C_PERM) && cp->vstr != NULL) {
 			free((void *)*cp->vstr);
 			*cp->vstr = NULL;
 		}
