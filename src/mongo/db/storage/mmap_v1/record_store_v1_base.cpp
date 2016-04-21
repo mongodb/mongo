@@ -367,30 +367,49 @@ StatusWith<RecordId> RecordStoreV1Base::_insertRecord(OperationContext* txn,
     return StatusWith<RecordId>(loc.getValue().toRecordId());
 }
 
-Status RecordStoreV1Base::updateRecord(OperationContext* txn,
-                                       const RecordId& oldLocation,
-                                       const char* data,
-                                       int dataSize,
-                                       bool enforceQuota,
-                                       UpdateNotifier* notifier) {
+StatusWith<RecordId> RecordStoreV1Base::updateRecord(OperationContext* txn,
+                                                     const RecordId& oldLocation,
+                                                     const char* data,
+                                                     int dataSize,
+                                                     bool enforceQuota,
+                                                     UpdateNotifier* notifier) {
     MmapV1RecordHeader* oldRecord = recordFor(DiskLoc::fromRecordId(oldLocation));
     if (oldRecord->netLength() >= dataSize) {
         // Make sure to notify other queries before we do an in-place update.
         if (notifier) {
             Status callbackStatus = notifier->recordStoreGoingToUpdateInPlace(txn, oldLocation);
             if (!callbackStatus.isOK())
-                return callbackStatus;
+                return StatusWith<RecordId>(callbackStatus);
         }
 
         // we fit
         memcpy(txn->recoveryUnit()->writingPtr(oldRecord->data(), dataSize), data, dataSize);
-        return Status::OK();
+        return StatusWith<RecordId>(oldLocation);
     }
 
     // We enforce the restriction of unchanging capped doc sizes above the storage layer.
     invariant(!isCapped());
 
-    return {ErrorCodes::NeedsDocumentMove, "Update requires document move"};
+    // we have to move
+    if (dataSize + MmapV1RecordHeader::HeaderSize > MaxAllowedAllocation) {
+        return StatusWith<RecordId>(ErrorCodes::InvalidLength, "record has to be <= 16.5MB");
+    }
+
+    StatusWith<RecordId> newLocation = _insertRecord(txn, data, dataSize, enforceQuota);
+    if (!newLocation.isOK())
+        return newLocation;
+
+    // insert worked, so we delete old record
+    if (notifier) {
+        Status moveStatus = notifier->recordStoreGoingToMove(
+            txn, oldLocation, oldRecord->data(), oldRecord->netLength());
+        if (!moveStatus.isOK())
+            return StatusWith<RecordId>(moveStatus);
+    }
+
+    deleteRecord(txn, oldLocation);
+
+    return newLocation;
 }
 
 bool RecordStoreV1Base::updateWithDamagesSupported() const {

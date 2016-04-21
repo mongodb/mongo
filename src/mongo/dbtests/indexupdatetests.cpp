@@ -351,16 +351,13 @@ public:
             db->dropCollection(&_txn, _ns);
             coll = db->createCollection(&_txn, _ns);
 
-            OpDebug* const nullOpDebug = nullptr;
             coll->insertDocument(&_txn,
                                  BSON("_id" << 1 << "a"
                                             << "dup"),
-                                 nullOpDebug,
                                  true);
             coll->insertDocument(&_txn,
                                  BSON("_id" << 2 << "a"
                                             << "dup"),
-                                 nullOpDebug,
                                  true);
             wunit.commit();
         }
@@ -397,16 +394,13 @@ public:
             db->dropCollection(&_txn, _ns);
             coll = db->createCollection(&_txn, _ns);
 
-            OpDebug* const nullOpDebug = nullptr;
             coll->insertDocument(&_txn,
                                  BSON("_id" << 1 << "a"
                                             << "dup"),
-                                 nullOpDebug,
                                  true);
             coll->insertDocument(&_txn,
                                  BSON("_id" << 2 << "a"
                                             << "dup"),
-                                 nullOpDebug,
                                  true);
             wunit.commit();
         }
@@ -442,16 +436,13 @@ public:
             db->dropCollection(&_txn, _ns);
             coll = db->createCollection(&_txn, _ns);
 
-            OpDebug* const nullOpDebug = nullptr;
             ASSERT_OK(coll->insertDocument(&_txn,
                                            BSON("_id" << 1 << "a"
                                                       << "dup"),
-                                           nullOpDebug,
                                            true));
             ASSERT_OK(coll->insertDocument(&_txn,
                                            BSON("_id" << 2 << "a"
                                                       << "dup"),
-                                           nullOpDebug,
                                            true));
             wunit.commit();
         }
@@ -497,9 +488,8 @@ public:
             coll->getIndexCatalog()->dropAllIndexes(&_txn, true);
             // Insert some documents with enforceQuota=true.
             int32_t nDocs = 1000;
-            OpDebug* const nullOpDebug = nullptr;
             for (int32_t i = 0; i < nDocs; ++i) {
-                coll->insertDocument(&_txn, BSON("a" << i), nullOpDebug, true);
+                coll->insertDocument(&_txn, BSON("a" << i), true);
             }
             wunit.commit();
         }
@@ -530,9 +520,8 @@ public:
             coll->getIndexCatalog()->dropAllIndexes(&_txn, true);
             // Insert some documents.
             int32_t nDocs = 1000;
-            OpDebug* const nullOpDebug = nullptr;
             for (int32_t i = 0; i < nDocs; ++i) {
-                coll->insertDocument(&_txn, BSON("a" << i), nullOpDebug, true);
+                coll->insertDocument(&_txn, BSON("a" << i), true);
             }
             wunit.commit();
         }
@@ -566,9 +555,8 @@ public:
             coll->getIndexCatalog()->dropAllIndexes(&_txn, true);
             // Insert some documents.
             int32_t nDocs = 1000;
-            OpDebug* const nullOpDebug = nullptr;
             for (int32_t i = 0; i < nDocs; ++i) {
-                coll->insertDocument(&_txn, BSON("_id" << i), nullOpDebug, true);
+                coll->insertDocument(&_txn, BSON("_id" << i), true);
             }
             wunit.commit();
         }
@@ -602,9 +590,8 @@ public:
             coll->getIndexCatalog()->dropAllIndexes(&_txn, true);
             // Insert some documents.
             int32_t nDocs = 1000;
-            OpDebug* const nullOpDebug = nullptr;
             for (int32_t i = 0; i < nDocs; ++i) {
-                coll->insertDocument(&_txn, BSON("_id" << i), nullOpDebug, true);
+                coll->insertDocument(&_txn, BSON("_id" << i), true);
             }
             wunit.commit();
         }

@@ -132,8 +132,7 @@ void profile(OperationContext* txn, NetworkOp op) {
             Collection* const coll = db->getCollection(db->getProfilingNS());
             if (coll) {
                 WriteUnitOfWork wuow(txn);
-                OpDebug* const nullOpDebug = nullptr;
-                coll->insertDocument(txn, p, nullOpDebug, false);
+                coll->insertDocument(txn, p, false);
                 wuow.commit();
 
                 break;

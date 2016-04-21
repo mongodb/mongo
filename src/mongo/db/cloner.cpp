@@ -217,8 +217,7 @@ struct Cloner::Fun {
                 WriteUnitOfWork wunit(txn);
 
                 BSONObj doc = tmp;
-                OpDebug* const nullOpDebug = nullptr;
-                Status status = collection->insertDocument(txn, doc, nullOpDebug, true);
+                Status status = collection->insertDocument(txn, doc, true);
                 if (!status.isOK()) {
                     error() << "error: exception cloning object in " << from_collection << ' '
                             << status << " obj:" << doc;
@@ -611,8 +610,7 @@ Status Cloner::copyDb(OperationContext* txn,
                 // dupsAllowed in IndexCatalog::_unindexRecord and SERVER-17487.
                 for (set<RecordId>::const_iterator it = dups.begin(); it != dups.end(); ++it) {
                     WriteUnitOfWork wunit(txn);
-                    OpDebug* const nullOpDebug = nullptr;
-                    c->deleteDocument(txn, *it, nullOpDebug, false, true);
+                    c->deleteDocument(txn, *it, false, true);
                     wunit.commit();
                 }
 

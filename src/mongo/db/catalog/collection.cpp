@@ -36,6 +36,7 @@
 
 #include "mongo/db/catalog/collection.h"
 
+
 #include "mongo/base/counter.h"
 #include "mongo/base/owned_pointer_map.h"
 #include "mongo/bson/ordering.h"
@@ -332,7 +333,6 @@ Status Collection::insertDocument(OperationContext* txn, const DocWriter* doc, b
 Status Collection::insertDocuments(OperationContext* txn,
                                    const vector<BSONObj>::const_iterator begin,
                                    const vector<BSONObj>::const_iterator end,
-                                   OpDebug* opDebug,
                                    bool enforceQuota,
                                    bool fromMigrate) {
     // Should really be done in the collection object at creation and updated on index create.
@@ -355,7 +355,7 @@ Status Collection::insertDocuments(OperationContext* txn,
     if (_mustTakeCappedLockOnInsert)
         synchronizeOnCappedInFlightResource(txn->lockState(), _ns);
 
-    Status status = _insertDocuments(txn, begin, end, enforceQuota, opDebug);
+    Status status = _insertDocuments(txn, begin, end, enforceQuota);
     if (!status.isOK())
         return status;
     invariant(sid == txn->recoveryUnit()->getSnapshotId());
@@ -371,12 +371,11 @@ Status Collection::insertDocuments(OperationContext* txn,
 
 Status Collection::insertDocument(OperationContext* txn,
                                   const BSONObj& docToInsert,
-                                  OpDebug* opDebug,
                                   bool enforceQuota,
                                   bool fromMigrate) {
     vector<BSONObj> docs;
     docs.push_back(docToInsert);
-    return insertDocuments(txn, docs.begin(), docs.end(), opDebug, enforceQuota, fromMigrate);
+    return insertDocuments(txn, docs.begin(), docs.end(), enforceQuota, fromMigrate);
 }
 
 Status Collection::insertDocument(OperationContext* txn,
@@ -419,8 +418,7 @@ Status Collection::insertDocument(OperationContext* txn,
 Status Collection::_insertDocuments(OperationContext* txn,
                                     const vector<BSONObj>::const_iterator begin,
                                     const vector<BSONObj>::const_iterator end,
-                                    bool enforceQuota,
-                                    OpDebug* opDebug) {
+                                    bool enforceQuota) {
     dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
 
     if (isCapped() && _indexCatalog.haveAnyIndexes() && std::distance(begin, end) > 1) {
@@ -459,13 +457,7 @@ Status Collection::_insertDocuments(OperationContext* txn,
         bsonRecords.push_back(bsonRecord);
     }
 
-    int64_t keysInserted;
-    status = _indexCatalog.indexRecords(txn, bsonRecords, &keysInserted);
-    if (opDebug) {
-        opDebug->keysInserted += keysInserted;
-    }
-
-    return status;
+    return _indexCatalog.indexRecords(txn, bsonRecords);
 }
 
 void Collection::notifyCappedWaitersIfNeeded() {
@@ -483,21 +475,13 @@ Status Collection::aboutToDeleteCapped(OperationContext* txn,
     _cursorManager.invalidateDocument(txn, loc, INVALIDATION_DELETION);
 
     BSONObj doc = data.releaseToBson();
-    int64_t* const nullKeysDeleted = nullptr;
-    _indexCatalog.unindexRecord(txn, doc, loc, false, nullKeysDeleted);
-
-    // We are not capturing and reporting to OpDebug the 'keysDeleted' by unindexRecord(). It is
-    // questionable whether reporting will add diagnostic value to users and may instead be
-    // confusing as it depends on our internal capped collection document removal strategy.
-    // We can consider adding either keysDeleted or a new metric reporting document removal if
-    // justified by user demand.
+    _indexCatalog.unindexRecord(txn, doc, loc, false);
 
     return Status::OK();
 }
 
 void Collection::deleteDocument(OperationContext* txn,
                                 const RecordId& loc,
-                                OpDebug* opDebug,
                                 bool fromMigrate,
                                 bool noWarn) {
     if (isCapped()) {
@@ -516,11 +500,7 @@ void Collection::deleteDocument(OperationContext* txn,
     /* check if any cursors point to us.  if so, advance them. */
     _cursorManager.invalidateDocument(txn, loc, INVALIDATION_DELETION);
 
-    int64_t keysDeleted;
-    _indexCatalog.unindexRecord(txn, doc.value(), loc, noWarn, &keysDeleted);
-    if (opDebug) {
-        opDebug->keysDeleted += keysDeleted;
-    }
+    _indexCatalog.unindexRecord(txn, doc.value(), loc, noWarn);
 
     _recordStore->deleteRecord(txn, loc);
 
@@ -537,7 +517,7 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
                                                 const BSONObj& newDoc,
                                                 bool enforceQuota,
                                                 bool indexesAffected,
-                                                OpDebug* opDebug,
+                                                OpDebug* debug,
                                                 OplogUpdateEntryArgs* args) {
     {
         auto status = checkValidation(txn, newDoc);
@@ -617,19 +597,45 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
         }
     }
 
-    Status updateStatus = _recordStore->updateRecord(
+    // This can call back into Collection::recordStoreGoingToMove.  If that happens, the old
+    // object is removed from all indexes.
+    StatusWith<RecordId> newLocation = _recordStore->updateRecord(
         txn, oldLocation, newDoc.objdata(), newDoc.objsize(), _enforceQuota(enforceQuota), this);
 
-    if (updateStatus == ErrorCodes::NeedsDocumentMove) {
-        return _updateDocumentWithMove(
-            txn, oldLocation, oldDoc, newDoc, enforceQuota, opDebug, args, sid);
-    } else if (!updateStatus.isOK()) {
-        return updateStatus;
+    if (!newLocation.isOK()) {
+        return newLocation;
+    }
+
+    // At this point, the old object may or may not still be indexed, depending on if it was
+    // moved. If the object did move, we need to add the new location to all indexes.
+    if (newLocation.getValue() != oldLocation) {
+        if (debug) {
+            if (debug->nmoved == -1)  // default of -1 rather than 0
+                debug->nmoved = 1;
+            else
+                debug->nmoved += 1;
+        }
+
+        std::vector<BsonRecord> bsonRecords;
+        BsonRecord bsonRecord = {newLocation.getValue(), &newDoc};
+        bsonRecords.push_back(bsonRecord);
+        Status s = _indexCatalog.indexRecords(txn, bsonRecords);
+        if (!s.isOK())
+            return StatusWith<RecordId>(s);
+        invariant(sid == txn->recoveryUnit()->getSnapshotId());
+        args->updatedDoc = newDoc;
+
+        auto opObserver = getGlobalServiceContext()->getOpObserver();
+        if (opObserver)
+            opObserver->onUpdate(txn, *args);
+
+        return newLocation;
     }
 
     // Object did not move.  We update each index with each respective UpdateTicket.
-    if (opDebug)
-        opDebug->keyUpdates = 0;
+
+    if (debug)
+        debug->keyUpdates = 0;
 
     if (indexesAffected) {
         IndexCatalog::IndexIterator ii = _indexCatalog.getIndexIterator(txn, true);
@@ -637,17 +643,12 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
             IndexDescriptor* descriptor = ii.next();
             IndexAccessMethod* iam = ii.accessMethod(descriptor);
 
-            int64_t keysInserted;
-            int64_t keysDeleted;
-            Status ret = iam->update(
-                txn, *updateTickets.mutableMap()[descriptor], &keysInserted, &keysDeleted);
+            int64_t updatedKeys;
+            Status ret = iam->update(txn, *updateTickets.mutableMap()[descriptor], &updatedKeys);
             if (!ret.isOK())
                 return StatusWith<RecordId>(ret);
-            if (opDebug) {
-                opDebug->keyUpdates += keysInserted;
-                opDebug->keysInserted += keysInserted;
-                opDebug->keysDeleted += keysDeleted;
-            }
+            if (debug)
+                debug->keyUpdates += updatedKeys;
         }
     }
 
@@ -658,58 +659,17 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
     if (opObserver)
         opObserver->onUpdate(txn, *args);
 
-    return {oldLocation};
+    return newLocation;
 }
 
-StatusWith<RecordId> Collection::_updateDocumentWithMove(OperationContext* txn,
-                                                         const RecordId& oldLocation,
-                                                         const Snapshotted<BSONObj>& oldDoc,
-                                                         const BSONObj& newDoc,
-                                                         bool enforceQuota,
-                                                         OpDebug* opDebug,
-                                                         OplogUpdateEntryArgs* args,
-                                                         const SnapshotId& sid) {
-    // Insert new record.
-    StatusWith<RecordId> newLocation = _recordStore->insertRecord(
-        txn, newDoc.objdata(), newDoc.objsize(), _enforceQuota(enforceQuota));
-    if (!newLocation.isOK()) {
-        return newLocation;
-    }
-
-    invariant(newLocation.getValue() != oldLocation);
-
-    _cursorManager.invalidateDocument(txn, oldLocation, INVALIDATION_DELETION);
-
-    // Remove indexes for old record.
-    int64_t keysDeleted;
-    _indexCatalog.unindexRecord(txn, oldDoc.value(), oldLocation, true, &keysDeleted);
-
-    // Remove old record.
-    _recordStore->deleteRecord(txn, oldLocation);
-
-    std::vector<BsonRecord> bsonRecords;
-    BsonRecord bsonRecord = {newLocation.getValue(), &newDoc};
-    bsonRecords.push_back(bsonRecord);
-
-    // Add indexes for new record.
-    int64_t keysInserted;
-    Status status = _indexCatalog.indexRecords(txn, bsonRecords, &keysInserted);
-    if (!status.isOK()) {
-        return StatusWith<RecordId>(status);
-    }
-
-    invariant(sid == txn->recoveryUnit()->getSnapshotId());
-    args->updatedDoc = newDoc;
-    txn->getServiceContext()->getOpObserver()->onUpdate(txn, *args);
-
+Status Collection::recordStoreGoingToMove(OperationContext* txn,
+                                          const RecordId& oldLocation,
+                                          const char* oldBuffer,
+                                          size_t oldSize) {
     moveCounter.increment();
-    if (opDebug) {
-        opDebug->nmoved++;
-        opDebug->keysInserted += keysInserted;
-        opDebug->keysDeleted += keysDeleted;
-    }
-
-    return newLocation;
+    _cursorManager.invalidateDocument(txn, oldLocation, INVALIDATION_DELETION);
+    _indexCatalog.unindexRecord(txn, BSONObj(oldBuffer), oldLocation, true);
+    return Status::OK();
 }
 
 Status Collection::recordStoreGoingToUpdateInPlace(OperationContext* txn, const RecordId& loc) {

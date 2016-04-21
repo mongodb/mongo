@@ -154,7 +154,6 @@ error_code("OplogOutOfOrder", 152)
 error_code("ChunkTooBig", 153)
 error_code("InconsistentShardIdentity", 154)
 error_code("CannotApplyOplogWhilePrimary", 155)
-error_code("NeedsDocumentMove", 156)
 
 # Non-sequential error codes (for compatibility only)
 error_code("SocketException", 9001)

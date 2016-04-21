@@ -637,7 +637,6 @@ StatusWith<unique_ptr<PlanStage>> applyProjection(OperationContext* txn,
 //
 
 StatusWith<unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* txn,
-                                                       OpDebug* opDebug,
                                                        Collection* collection,
                                                        ParsedDelete* parsedDelete) {
     const DeleteRequest* request = parsedDelete->getRequest();
@@ -673,7 +672,6 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* txn,
     deleteStageParams.isExplain = request->isExplain();
     deleteStageParams.returnDeleted = request->shouldReturnDeleted();
     deleteStageParams.sort = request->getSort();
-    deleteStageParams.opDebug = opDebug;
 
     unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
     PlanExecutor::YieldPolicy policy =
@@ -779,9 +777,9 @@ inline void validateUpdate(const char* ns, const BSONObj& updateobj, const BSONO
 }  // namespace
 
 StatusWith<unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* txn,
-                                                       OpDebug* opDebug,
                                                        Collection* collection,
-                                                       ParsedUpdate* parsedUpdate) {
+                                                       ParsedUpdate* parsedUpdate,
+                                                       OpDebug* opDebug) {
     const UpdateRequest* request = parsedUpdate->getRequest();
     UpdateDriver* driver = parsedUpdate->getDriver();
 

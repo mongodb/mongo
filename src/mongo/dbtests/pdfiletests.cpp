@@ -76,14 +76,13 @@ public:
         BSONObj x = BSON("x" << 1);
         ASSERT(x["_id"].type() == 0);
         Collection* collection = _context.db()->getOrCreateCollection(&_txn, ns());
-        OpDebug* const nullOpDebug = nullptr;
-        ASSERT(!collection->insertDocument(&_txn, x, nullOpDebug, true).isOK());
+        ASSERT(!collection->insertDocument(&_txn, x, true).isOK());
 
         StatusWith<BSONObj> fixed = fixDocumentForInsert(x);
         ASSERT(fixed.isOK());
         x = fixed.getValue();
         ASSERT(x["_id"].type() == jstOID);
-        ASSERT(collection->insertDocument(&_txn, x, nullOpDebug, true).isOK());
+        ASSERT(collection->insertDocument(&_txn, x, true).isOK());
         wunit.commit();
     }
 };

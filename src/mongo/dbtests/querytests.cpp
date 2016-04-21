@@ -99,16 +99,15 @@ protected:
 
     void insert(const BSONObj& o) {
         WriteUnitOfWork wunit(&_txn);
-        OpDebug* const nullOpDebug = nullptr;
         if (o["_id"].eoo()) {
             BSONObjBuilder b;
             OID oid;
             oid.init();
             b.appendOID("_id", &oid);
             b.appendElements(o);
-            _collection->insertDocument(&_txn, b.obj(), nullOpDebug, false);
+            _collection->insertDocument(&_txn, b.obj(), false);
         } else {
-            _collection->insertDocument(&_txn, o, nullOpDebug, false);
+            _collection->insertDocument(&_txn, o, false);
         }
         wunit.commit();
     }

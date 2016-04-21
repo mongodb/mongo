@@ -488,9 +488,8 @@ OpTime writeOpsToOplog(OperationContext* txn, const std::vector<BSONObj>& ops) {
         OldClientContext ctx(txn, rsOplogName, _localDB);
         WriteUnitOfWork wunit(txn);
 
-        OpDebug* const nullOpDebug = nullptr;
-        checkOplogInsert(_localOplogCollection->insertDocuments(
-            txn, ops.begin(), ops.end(), nullOpDebug, false));
+        checkOplogInsert(
+            _localOplogCollection->insertDocuments(txn, ops.begin(), ops.end(), false));
         lastOptime =
             fassertStatusOK(ErrorCodes::InvalidBSON, OpTime::parseFromOplogEntry(ops.back()));
         wunit.commit();
@@ -821,9 +820,7 @@ Status applyOperation_inlock(OperationContext* txn,
             }
 
             WriteUnitOfWork wuow(txn);
-            OpDebug* const nullOpDebug = nullptr;
-            status = collection->insertDocuments(
-                txn, insertObjs.begin(), insertObjs.end(), nullOpDebug, true);
+            status = collection->insertDocuments(txn, insertObjs.begin(), insertObjs.end(), true);
             if (!status.isOK()) {
                 return status;
             }
@@ -854,8 +851,7 @@ Status applyOperation_inlock(OperationContext* txn,
             {
                 WriteUnitOfWork wuow(txn);
                 try {
-                    OpDebug* const nullOpDebug = nullptr;
-                    status = collection->insertDocument(txn, o, nullOpDebug, true);
+                    status = collection->insertDocument(txn, o, true);
                 } catch (DBException dbe) {
                     status = dbe.toStatus();
                 }

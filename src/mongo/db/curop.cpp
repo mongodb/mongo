@@ -517,6 +517,7 @@ string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockSt
     OPDEBUG_TOSTRING_HELP_BOOL(hasSortStage);
     OPDEBUG_TOSTRING_HELP_BOOL(fromMultiPlanner);
     OPDEBUG_TOSTRING_HELP_BOOL(replanned);
+    OPDEBUG_TOSTRING_HELP(nmoved);
     OPDEBUG_TOSTRING_HELP(nMatched);
     OPDEBUG_TOSTRING_HELP(nModified);
     OPDEBUG_TOSTRING_HELP(ninserted);
@@ -526,18 +527,6 @@ string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockSt
     OPDEBUG_TOSTRING_HELP_BOOL(upsert);
     OPDEBUG_TOSTRING_HELP_BOOL(cursorExhausted);
     OPDEBUG_TOSTRING_HELP(keyUpdates);
-
-    if (nmoved > 0) {
-        s << " nmoved:" << nmoved;
-    }
-
-    if (keysInserted > 0) {
-        s << " keysInserted:" << keysInserted;
-    }
-
-    if (keysDeleted > 0) {
-        s << " keysDeleted:" << keysDeleted;
-    }
 
     if (writeConflicts > 0) {
         s << " writeConflicts:" << writeConflicts;
@@ -649,6 +638,8 @@ void OpDebug::append(const CurOp& curop,
     OPDEBUG_APPEND_BOOL(hasSortStage);
     OPDEBUG_APPEND_BOOL(fromMultiPlanner);
     OPDEBUG_APPEND_BOOL(replanned);
+    OPDEBUG_APPEND_BOOL(moved);
+    OPDEBUG_APPEND_NUMBER(nmoved);
     OPDEBUG_APPEND_NUMBER(nMatched);
     OPDEBUG_APPEND_NUMBER(nModified);
     OPDEBUG_APPEND_NUMBER(ninserted);
@@ -658,19 +649,6 @@ void OpDebug::append(const CurOp& curop,
     OPDEBUG_APPEND_BOOL(upsert);
     OPDEBUG_APPEND_BOOL(cursorExhausted);
     OPDEBUG_APPEND_NUMBER(keyUpdates);
-    OPDEBUG_APPEND_BOOL(moved);
-
-    if (nmoved > 0) {
-        b.appendNumber("nmoved", nmoved);
-    }
-
-    if (keysInserted > 0) {
-        b.appendNumber("keysInserted", keysInserted);
-    }
-
-    if (keysDeleted > 0) {
-        b.appendNumber("keysDeleted", keysDeleted);
-    }
 
     if (writeConflicts > 0) {
         b.appendNumber("writeConflicts", writeConflicts);

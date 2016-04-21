@@ -290,8 +290,10 @@ void KVCatalog::putMetaData(OperationContext* opCtx,
     }
 
     LOG(3) << "recording new metadata: " << obj;
-    Status status = _rs->updateRecord(opCtx, loc, obj.objdata(), obj.objsize(), false, NULL);
-    fassert(28521, status.isOK());
+    StatusWith<RecordId> status =
+        _rs->updateRecord(opCtx, loc, obj.objdata(), obj.objsize(), false, NULL);
+    fassert(28521, status.getStatus());
+    invariant(status.getValue() == loc);
 }
 
 Status KVCatalog::renameCollection(OperationContext* opCtx,
@@ -320,8 +322,10 @@ Status KVCatalog::renameCollection(OperationContext* opCtx,
         b.appendElementsUnique(old);
 
         BSONObj obj = b.obj();
-        Status status = _rs->updateRecord(opCtx, loc, obj.objdata(), obj.objsize(), false, NULL);
-        fassert(28522, status.isOK());
+        StatusWith<RecordId> status =
+            _rs->updateRecord(opCtx, loc, obj.objdata(), obj.objsize(), false, NULL);
+        fassert(28522, status.getStatus());
+        invariant(status.getValue() == loc);
     }
 
     stdx::lock_guard<stdx::mutex> lk(_identsLock);

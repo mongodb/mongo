@@ -263,25 +263,10 @@ public:
 
     // ----- data modifiers ------
 
-    /**
-     * When 'keysInsertedOut' is not null, it will be set to the number of index keys inserted by
-     * this operation.
-     *
-     * This method may throw.
-     */
-    Status indexRecords(OperationContext* txn,
-                        const std::vector<BsonRecord>& bsonRecords,
-                        int64_t* keysInsertedOut);
+    // this throws for now
+    Status indexRecords(OperationContext* txn, const std::vector<BsonRecord>& bsonRecords);
 
-    /**
-     * When 'keysDeletedOut' is not null, it will be set to the number of index keys removed by
-     * this operation.
-     */
-    void unindexRecord(OperationContext* txn,
-                       const BSONObj& obj,
-                       const RecordId& loc,
-                       bool noWarn,
-                       int64_t* keysDeletedOut);
+    void unindexRecord(OperationContext* txn, const BSONObj& obj, const RecordId& loc, bool noWarn);
 
     // ------- temp internal -------
 
@@ -312,20 +297,17 @@ private:
 
     Status _indexFilteredRecords(OperationContext* txn,
                                  IndexCatalogEntry* index,
-                                 const std::vector<BsonRecord>& bsonRecords,
-                                 int64_t* keysInsertedOut);
+                                 const std::vector<BsonRecord>& bsonRecords);
 
     Status _indexRecords(OperationContext* txn,
                          IndexCatalogEntry* index,
-                         const std::vector<BsonRecord>& bsonRecords,
-                         int64_t* keysInsertedOut);
+                         const std::vector<BsonRecord>& bsonRecords);
 
     Status _unindexRecord(OperationContext* txn,
                           IndexCatalogEntry* index,
                           const BSONObj& obj,
                           const RecordId& loc,
-                          bool logIfError,
-                          int64_t* keysDeletedOut);
+                          bool logIfError);
 
     /**
      * this does no sanity checks

@@ -114,7 +114,7 @@ UpdateResult update(OperationContext* txn,
     uassertStatusOK(parsedUpdate.parseRequest());
 
     std::unique_ptr<PlanExecutor> exec =
-        uassertStatusOK(getExecutorUpdate(txn, opDebug, collection, &parsedUpdate));
+        uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, opDebug));
 
     uassertStatusOK(exec->executePlan());
     if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {

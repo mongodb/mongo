@@ -39,7 +39,6 @@
 namespace mongo {
 
 class OperationContext;
-class OpDebug;
 struct PlanSummaryStats;
 
 struct UpdateStageParams {

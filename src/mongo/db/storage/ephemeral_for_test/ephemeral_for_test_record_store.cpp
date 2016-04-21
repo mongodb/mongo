@@ -430,12 +430,12 @@ StatusWith<RecordId> EphemeralForTestRecordStore::insertRecord(OperationContext*
     return StatusWith<RecordId>(loc);
 }
 
-Status EphemeralForTestRecordStore::updateRecord(OperationContext* txn,
-                                                 const RecordId& loc,
-                                                 const char* data,
-                                                 int len,
-                                                 bool enforceQuota,
-                                                 UpdateNotifier* notifier) {
+StatusWith<RecordId> EphemeralForTestRecordStore::updateRecord(OperationContext* txn,
+                                                               const RecordId& loc,
+                                                               const char* data,
+                                                               int len,
+                                                               bool enforceQuota,
+                                                               UpdateNotifier* notifier) {
     EphemeralForTestRecord* oldRecord = recordFor(loc);
     int oldLen = oldRecord->size;
 
@@ -447,7 +447,7 @@ Status EphemeralForTestRecordStore::updateRecord(OperationContext* txn,
         // doc-locking), and therefore must notify that it is updating a document.
         Status callbackStatus = notifier->recordStoreGoingToUpdateInPlace(txn, loc);
         if (!callbackStatus.isOK()) {
-            return callbackStatus;
+            return StatusWith<RecordId>(callbackStatus);
         }
     }
 
@@ -460,7 +460,7 @@ Status EphemeralForTestRecordStore::updateRecord(OperationContext* txn,
 
     cappedDeleteAsNeeded(txn);
 
-    return Status::OK();
+    return StatusWith<RecordId>(loc);
 }
 
 bool EphemeralForTestRecordStore::updateWithDamagesSupported() const {

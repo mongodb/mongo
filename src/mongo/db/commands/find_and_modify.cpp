@@ -245,7 +245,6 @@ public:
 
         const FindAndModifyRequest& args = parseStatus.getValue();
         const NamespaceString& nsString = args.getNamespaceString();
-        OpDebug* opDebug = &CurOp::get(txn)->debug();
 
         if (args.isRemove()) {
             DeleteRequest request(nsString);
@@ -270,8 +269,7 @@ public:
             css->checkShardVersionOrThrow(txn);
 
             Collection* const collection = autoColl.getCollection();
-            auto statusWithPlanExecutor =
-                getExecutorDelete(txn, opDebug, collection, &parsedDelete);
+            auto statusWithPlanExecutor = getExecutorDelete(txn, collection, &parsedDelete);
             if (!statusWithPlanExecutor.isOK()) {
                 return statusWithPlanExecutor.getStatus();
             }
@@ -290,6 +288,8 @@ public:
                 return parsedUpdateStatus;
             }
 
+            OpDebug* opDebug = &CurOp::get(txn)->debug();
+
             // Explain calls of the findAndModify command are read-only, but we take write
             // locks so that the timing information is more accurate.
             AutoGetCollection autoColl(txn, nsString, MODE_IX);
@@ -303,7 +303,7 @@ public:
 
             Collection* collection = autoColl.getCollection();
             auto statusWithPlanExecutor =
-                getExecutorUpdate(txn, opDebug, collection, &parsedUpdate);
+                getExecutorUpdate(txn, collection, &parsedUpdate, opDebug);
             if (!statusWithPlanExecutor.isOK()) {
                 return statusWithPlanExecutor.getStatus();
             }
@@ -353,8 +353,6 @@ public:
             lastOpSetterGuard.Dismiss();
         }
 
-        OpDebug* opDebug = &CurOp::get(txn)->debug();
-
         // Although usually the PlanExecutor handles WCE internally, it will throw WCEs when it is
         // executing a findAndModify. This is done to ensure that we can always match, modify, and
         // return the document under concurrency, if a matching document exists.
@@ -389,8 +387,7 @@ public:
                 }
 
                 Collection* const collection = autoDb.getDb()->getCollection(nsString.ns());
-                auto statusWithPlanExecutor =
-                    getExecutorDelete(txn, opDebug, collection, &parsedDelete);
+                auto statusWithPlanExecutor = getExecutorDelete(txn, collection, &parsedDelete);
                 if (!statusWithPlanExecutor.isOK()) {
                     return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
                 }
@@ -427,6 +424,8 @@ public:
                 if (!parsedUpdateStatus.isOK()) {
                     return appendCommandStatus(result, parsedUpdateStatus);
                 }
+
+                OpDebug* opDebug = &CurOp::get(txn)->debug();
 
                 AutoGetOrCreateDb autoDb(txn, dbName, MODE_IX);
                 Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), MODE_IX);
@@ -477,7 +476,7 @@ public:
                 }
 
                 auto statusWithPlanExecutor =
-                    getExecutorUpdate(txn, opDebug, collection, &parsedUpdate);
+                    getExecutorUpdate(txn, collection, &parsedUpdate, opDebug);
                 if (!statusWithPlanExecutor.isOK()) {
                     return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
                 }
