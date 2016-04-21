@@ -127,9 +127,10 @@ __curjoin_iter_set_entry(WT_CURSOR_JOIN_ITER *iter, u_int entry_pos)
 		}
 		WT_ERR(__wt_cursor_dup_position(to_dup, iter->cursor));
 	} else if (iter->cursor != NULL) {
-		iter->cursor->close(iter->cursor);
+		WT_ERR(iter->cursor->close(iter->cursor));
 		iter->cursor = NULL;
 	}
+
 err:	__wt_free(session, uri);
 	return (ret);
 }
