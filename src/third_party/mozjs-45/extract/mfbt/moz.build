@@ -1,0 +1,129 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+TEST_DIRS += ['tests']
+
+# On win we build two mfbt libs - mfbt linked to crt dlls here and in
+# staticruntime we build a statically linked mfbt lib.
+if CONFIG['OS_ARCH'] == 'WINNT':
+    DIRS += ['staticruntime']
+
+Library('mfbt')
+
+EXPORTS.mozilla = [
+    'Alignment.h',
+    'AllocPolicy.h',
+    'AlreadyAddRefed.h',
+    'Array.h',
+    'ArrayUtils.h',
+    'Assertions.h',
+    'Atomics.h',
+    'Attributes.h',
+    'BinarySearch.h',
+    'BloomFilter.h',
+    'Casting.h',
+    'ChaosMode.h',
+    'Char16.h',
+    'CheckedInt.h',
+    'Compiler.h',
+    'Compression.h',
+    'DebugOnly.h',
+    'decimal/Decimal.h',
+    'double-conversion/double-conversion.h',
+    'double-conversion/utils.h',
+    'Endian.h',
+    'EnumeratedArray.h',
+    'EnumeratedRange.h',
+    'EnumSet.h',
+    'FastBernoulliTrial.h',
+    'FloatingPoint.h',
+    'Function.h',
+    'GuardObjects.h',
+    'HashFunctions.h',
+    'IndexSequence.h',
+    'IntegerPrintfMacros.h',
+    'IntegerRange.h',
+    'IntegerTypeTraits.h',
+    'JSONWriter.h',
+    'Likely.h',
+    'LinkedList.h',
+    'MacroArgs.h',
+    'MacroForEach.h',
+    'MathAlgorithms.h',
+    'Maybe.h',
+    'MaybeOneOf.h',
+    'MemoryChecking.h',
+    'MemoryReporting.h',
+    'Move.h',
+    'NullPtr.h',
+    'NumericLimits.h',
+    'Pair.h',
+    'PodOperations.h',
+    'Poison.h',
+    'Range.h',
+    'RangedArray.h',
+    'RangedPtr.h',
+    'ReentrancyGuard.h',
+    'RefCounted.h',
+    'RefCountType.h',
+    'RefPtr.h',
+    'ReverseIterator.h',
+    'RollingMean.h',
+    'Scoped.h',
+    'ScopeExit.h',
+    'SegmentedVector.h',
+    'SHA1.h',
+    'SizePrintfMacros.h',
+    'Snprintf.h',
+    'SplayTree.h',
+    'TaggedAnonymousMemory.h',
+    'TemplateLib.h',
+    'ThreadLocal.h',
+    'ToString.h',
+    'Tuple.h',
+    'TypedEnumBits.h',
+    'Types.h',
+    'TypeTraits.h',
+    'UniquePtr.h',
+    'UniquePtrExtensions.h',
+    'unused.h',
+    'Variant.h',
+    'Vector.h',
+    'WeakPtr.h',
+    'XorShift128PlusRNG.h',
+]
+
+if CONFIG['OS_ARCH'] == 'WINNT':
+    EXPORTS.mozilla += [
+        'WindowsVersion.h',
+    ]
+elif CONFIG['OS_ARCH'] == 'Linux':
+    EXPORTS.mozilla += [
+        'LinuxSignal.h',
+    ]
+
+include('objs.mozbuild')
+
+UNIFIED_SOURCES += mfbt_src_cppsrcs
+
+DEFINES['IMPL_MFBT'] = True
+
+SOURCES += mfbt_nonunified_src_cppsrcs
+
+DISABLE_STL_WRAPPING = True
+
+# Suppress warnings in third-party LZ4 code.
+# TODO: Remove these suppressions after bug 993267 is fixed.
+
+if CONFIG['GNU_CXX']:
+    SOURCES['/mfbt/Compression.cpp'].flags += ['-Wno-unused-function']
+
+if CONFIG['_MSC_VER']:
+    # Error 4804 is "'>' : unsafe use of type 'bool' in operation"
+    SOURCES['/mfbt/Compression.cpp'].flags += ['-wd4804']
+
+if CONFIG['MOZ_NEEDS_LIBATOMIC']:
+    OS_LIBS += ['atomic']

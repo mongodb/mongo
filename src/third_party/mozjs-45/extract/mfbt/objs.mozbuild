@@ -1,0 +1,39 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+mfbt_src_lcppsrcs = [
+    'ChaosMode.cpp',
+    'double-conversion/bignum-dtoa.cc',
+    'double-conversion/bignum.cc',
+    'double-conversion/cached-powers.cc',
+    'double-conversion/diy-fp.cc',
+    'double-conversion/double-conversion.cc',
+    'double-conversion/fast-dtoa.cc',
+    'double-conversion/fixed-dtoa.cc',
+    'double-conversion/strtod.cc',
+    'FloatingPoint.cpp',
+    'HashFunctions.cpp',
+    'JSONWriter.cpp',
+    'Poison.cpp',
+    'SHA1.cpp',
+    'TaggedAnonymousMemory.cpp',
+    'unused.cpp',
+]
+
+mfbt_src_cppsrcs = [
+    '/mfbt/%s' % s for s in mfbt_src_lcppsrcs
+]
+
+# Compression.cpp cannot be built in unified mode because it pulls in Windows system headers.
+# Decimal.cpp doesn't build in unified mode with gcc.
+mfbt_nonunified_src_lcppsrcs = [
+    'Compression.cpp',
+    'decimal/Decimal.cpp',
+]
+
+mfbt_nonunified_src_cppsrcs = [
+    '/mfbt/%s' % s for s in mfbt_nonunified_src_lcppsrcs
+]
