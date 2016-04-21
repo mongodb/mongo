@@ -369,7 +369,7 @@ void NamespaceDetailsCollectionCatalogEntry::_updateSystemNamespaces(OperationCo
     if (ErrorCodes::NeedsDocumentMove == result) {
         StatusWith<RecordId> newLocation = _namespacesRecordStore->insertRecord(
             txn, newEntry.objdata(), newEntry.objsize(), false);
-        fassert(40074, newLocation.getStatus().isOK());
+        fassert(40051, newLocation.getStatus().isOK());
         currentRecordId = newLocation.getValue();
         setNamespacesRecordId(txn, currentRecordId);
 

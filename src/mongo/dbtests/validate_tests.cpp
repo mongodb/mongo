@@ -210,17 +210,16 @@ public:
     void run() {
         // Create a new collection, insert three records.
         Database* db = _ctx.db();
-        OpDebug* const nullOpDebug = nullptr;
         Collection* coll;
         RecordId id1;
         {
             WriteUnitOfWork wunit(&_txn);
             ASSERT_OK(db->dropCollection(&_txn, _ns));
             coll = db->createCollection(&_txn, _ns);
-            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 1 << "a" << 1), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 1 << "a" << 1), true));
             id1 = coll->getCursor(&_txn)->next()->id;
-            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 2 << "a" << 2), nullOpDebug, true));
-            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 3 << "b" << 3), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 2 << "a" << 2), true));
+            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 3 << "b" << 3), true));
             wunit.commit();
         }
 
@@ -242,10 +241,11 @@ public:
         {
             WriteUnitOfWork wunit(&_txn);
             auto doc = BSON("_id" << 1 << "a" << 9);
-            auto updateStatus = rs->updateRecord(
+            auto statusW = rs->updateRecord(
                 &_txn, id1, doc.objdata(), doc.objsize(), /*enforceQuota*/ false, NULL);
-
-            ASSERT_OK(updateStatus);
+            ASSERT_OK(statusW.getStatus());
+            // Assert the RecordId has not changed after an in-place update.
+            ASSERT_EQ(id1, statusW.getValue());
             wunit.commit();
         }
 
@@ -260,7 +260,6 @@ public:
     void run() {
         // Create a new collection, insert records {_id: 1} and {_id: 2} and check it's valid.
         Database* db = _ctx.db();
-        OpDebug* const nullOpDebug = nullptr;
         Collection* coll;
         RecordId id1;
         {
@@ -268,9 +267,9 @@ public:
             ASSERT_OK(db->dropCollection(&_txn, _ns));
             coll = db->createCollection(&_txn, _ns);
 
-            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 1), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 1), true));
             id1 = coll->getCursor(&_txn)->next()->id;
-            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 2), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 2), true));
             wunit.commit();
         }
 
@@ -283,9 +282,11 @@ public:
         {
             WriteUnitOfWork wunit(&_txn);
             auto doc = BSON("_id" << 9);
-            auto updateStatus = rs->updateRecord(
+            auto statusW = rs->updateRecord(
                 &_txn, id1, doc.objdata(), doc.objsize(), /*enforceQuota*/ false, NULL);
-            ASSERT_OK(updateStatus);
+            ASSERT_OK(statusW.getStatus());
+            // Assert the RecordId has not changed after an in-place update.
+            ASSERT_EQ(id1, statusW.getValue());
             wunit.commit();
         }
 
@@ -295,9 +296,10 @@ public:
         {
             WriteUnitOfWork wunit(&_txn);
             auto doc = BSON("_id" << 1);
-            auto updateStatus = rs->updateRecord(
+            auto statusW = rs->updateRecord(
                 &_txn, id1, doc.objdata(), doc.objsize(), /*enforceQuota*/ false, NULL);
-            ASSERT_OK(updateStatus);
+            ASSERT_OK(statusW.getStatus());
+            id1 = statusW.getValue();
             wunit.commit();
         }
 
@@ -326,7 +328,6 @@ public:
     void run() {
         // Create a new collection, insert three records and check it's valid.
         Database* db = _ctx.db();
-        OpDebug* const nullOpDebug = nullptr;
         Collection* coll;
         RecordId id1;
         // {a: [b: 1, c: 2]}, {a: [b: 2, c: 2]}, {a: [b: 1, c: 1]}
@@ -344,10 +345,10 @@ public:
             coll = db->createCollection(&_txn, _ns);
 
 
-            ASSERT_OK(coll->insertDocument(&_txn, doc1, nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(&_txn, doc1, true));
             id1 = coll->getCursor(&_txn)->next()->id;
-            ASSERT_OK(coll->insertDocument(&_txn, doc2, nullOpDebug, true));
-            ASSERT_OK(coll->insertDocument(&_txn, doc3, nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(&_txn, doc2, true));
+            ASSERT_OK(coll->insertDocument(&_txn, doc3, true));
             wunit.commit();
         }
 
@@ -370,9 +371,10 @@ public:
         // Update a document's indexed field without updating the index.
         {
             WriteUnitOfWork wunit(&_txn);
-            auto updateStatus = rs->updateRecord(
+            auto statusW = rs->updateRecord(
                 &_txn, id1, doc1_b.objdata(), doc1_b.objsize(), /*enforceQuota*/ false, NULL);
-            ASSERT_OK(updateStatus);
+            ASSERT_OK(statusW.getStatus());
+            id1 = statusW.getValue();
             wunit.commit();
         }
 
@@ -382,9 +384,9 @@ public:
         // Index validation should still be valid.
         {
             WriteUnitOfWork wunit(&_txn);
-            auto updateStatus = rs->updateRecord(
+            auto statusW = rs->updateRecord(
                 &_txn, id1, doc1_c.objdata(), doc1_c.objsize(), /*enforceQuota*/ false, NULL);
-            ASSERT_OK(updateStatus);
+            ASSERT_OK(statusW.getStatus());
             wunit.commit();
         }
 
@@ -399,7 +401,6 @@ public:
     void run() {
         // Create a new collection, insert three records and check it's valid.
         Database* db = _ctx.db();
-        OpDebug* const nullOpDebug = nullptr;
         Collection* coll;
         RecordId id1;
         {
@@ -407,10 +408,10 @@ public:
             ASSERT_OK(db->dropCollection(&_txn, _ns));
             coll = db->createCollection(&_txn, _ns);
 
-            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 1 << "a" << 1), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 1 << "a" << 1), true));
             id1 = coll->getCursor(&_txn)->next()->id;
-            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 2 << "a" << 2), nullOpDebug, true));
-            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 3 << "b" << 1), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 2 << "a" << 2), true));
+            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 3 << "b" << 1), true));
             wunit.commit();
         }
 
@@ -432,9 +433,9 @@ public:
         {
             WriteUnitOfWork wunit(&_txn);
             auto doc = BSON("_id" << 2 << "a" << 3);
-            auto updateStatus = rs->updateRecord(
+            auto statusW = rs->updateRecord(
                 &_txn, id1, doc.objdata(), doc.objsize(), /*enforceQuota*/ false, NULL);
-            ASSERT_OK(updateStatus);
+            ASSERT_OK(statusW.getStatus());
             wunit.commit();
         }
 
@@ -449,7 +450,6 @@ public:
     void run() {
         // Create a new collection, insert two records and check it's valid.
         Database* db = _ctx.db();
-        OpDebug* const nullOpDebug = nullptr;
         Collection* coll;
         RecordId id1;
         {
@@ -457,9 +457,9 @@ public:
             ASSERT_OK(db->dropCollection(&_txn, _ns));
             coll = db->createCollection(&_txn, _ns);
 
-            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 1 << "a" << 1), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 1 << "a" << 1), true));
             id1 = coll->getCursor(&_txn)->next()->id;
-            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 2 << "a" << 2), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 2 << "a" << 2), true));
             wunit.commit();
         }
 
@@ -482,9 +482,9 @@ public:
         {
             WriteUnitOfWork wunit(&_txn);
             auto doc = BSON("_id" << 1);
-            auto updateStatus = rs->updateRecord(
+            auto statusW = rs->updateRecord(
                 &_txn, id1, doc.objdata(), doc.objsize(), /*enforceQuota*/ false, NULL);
-            ASSERT_OK(updateStatus);
+            ASSERT_OK(statusW.getStatus());
             wunit.commit();
         }
 
@@ -499,7 +499,6 @@ public:
     void run() {
         // Create a new collection, insert five records and check it's valid.
         Database* db = _ctx.db();
-        OpDebug* const nullOpDebug = nullptr;
         Collection* coll;
         RecordId id1;
         {
@@ -507,14 +506,12 @@ public:
             ASSERT_OK(db->dropCollection(&_txn, _ns));
             coll = db->createCollection(&_txn, _ns);
 
-            ASSERT_OK(coll->insertDocument(
-                &_txn, BSON("_id" << 1 << "a" << 1 << "b" << 4), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 1 << "a" << 1 << "b" << 4), true));
             id1 = coll->getCursor(&_txn)->next()->id;
-            ASSERT_OK(coll->insertDocument(
-                &_txn, BSON("_id" << 2 << "a" << 2 << "b" << 5), nullOpDebug, true));
-            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 3 << "a" << 3), nullOpDebug, true));
-            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 4 << "b" << 6), nullOpDebug, true));
-            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 5 << "c" << 7), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 2 << "a" << 2 << "b" << 5), true));
+            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 3 << "a" << 3), true));
+            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 4 << "b" << 6), true));
+            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 5 << "c" << 7), true));
             wunit.commit();
         }
 
@@ -546,9 +543,9 @@ public:
         {
             WriteUnitOfWork wunit(&_txn);
             auto doc = BSON("_id" << 1 << "a" << 1 << "b" << 3);
-            auto updateStatus = rs->updateRecord(
+            auto statusW = rs->updateRecord(
                 &_txn, id1, doc.objdata(), doc.objsize(), /*enforceQuota*/ false, NULL);
-            ASSERT_OK(updateStatus);
+            ASSERT_OK(statusW.getStatus());
             wunit.commit();
         }
 
