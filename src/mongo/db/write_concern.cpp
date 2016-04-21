@@ -122,15 +122,6 @@ Status validateWriteConcern(OperationContext* txn,
         repl::getGlobalReplicationCoordinator()->getReplicationMode();
 
     if (isConfigServer) {
-        auto protocol = rpc::getOperationProtocol(txn);
-        // This here only for v3.0 backwards compatibility.
-        if (serverGlobalParams.configsvrMode != CatalogManager::ConfigServerMode::CSRS &&
-            replMode != repl::ReplicationCoordinator::modeReplSet &&
-            protocol == rpc::Protocol::kOpQuery && writeConcern.wNumNodes == 0 &&
-            writeConcern.wMode.empty()) {
-            return Status::OK();
-        }
-
         if (!writeConcern.validForConfigServers()) {
             return Status(
                 ErrorCodes::BadValue,
@@ -138,8 +129,8 @@ Status validateWriteConcern(OperationContext* txn,
                     << "w:1 and w:'majority' are the only valid write concerns when writing to "
                        "config servers, got: " << writeConcern.toBSON().toString());
         }
-        if (serverGlobalParams.configsvrMode == CatalogManager::ConfigServerMode::CSRS &&
-            replMode == repl::ReplicationCoordinator::modeReplSet && !isLocalDb &&
+
+        if (replMode == repl::ReplicationCoordinator::modeReplSet && !isLocalDb &&
             writeConcern.wMode.empty()) {
             invariant(writeConcern.wNumNodes == 1);
             return Status(

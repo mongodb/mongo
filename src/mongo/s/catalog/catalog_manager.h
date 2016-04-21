@@ -87,12 +87,6 @@ class CatalogManager {
     MONGO_DISALLOW_COPYING(CatalogManager);
 
 public:
-    enum class ConfigServerMode {
-        NONE,
-        SCCC,
-        CSRS,
-    };
-
     virtual ~CatalogManager() = default;
 
     /**

@@ -231,10 +231,8 @@ public:
 
         appendReplicationInfo(txn, result, 0);
 
-        if (serverGlobalParams.configsvrMode == CatalogManager::ConfigServerMode::CSRS) {
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             result.append("configsvr", 1);
-        } else if (serverGlobalParams.configsvrMode == CatalogManager::ConfigServerMode::SCCC) {
-            result.append("configsvr", 0);
         }
 
         result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);

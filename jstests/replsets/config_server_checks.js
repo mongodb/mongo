@@ -42,28 +42,6 @@ function expectState(rst, state) {
     })();
 
     (function() {
-        // Test that node with --configsvr cmd line and configsvr in replset config does NOT go
-        // into REMOVED state if storage engine is not WiredTiger but we're running in SCCC mode
-        jsTestLog(
-            "configsvr in rs config and --configsvr cmd line, but mmapv1 with configSvrMode=sccc");
-        var rst = new ReplSetTest({
-            name: "configrs4",
-            nodes: 1,
-            nodeOptions:
-                {configsvr: "", journal: "", storageEngine: "mmapv1", configsvrMode: "sccc"}
-        });
-
-        rst.startSet();
-        var conf = rst.getReplSetConfig();
-        conf.configsvr = true;
-        assert.commandWorked(rst.nodes[0].adminCommand({replSetInitiate: conf}));
-
-        rst.getPrimary();
-        expectState(rst, ReplSetTest.State.PRIMARY);
-        rst.stopSet();
-    })();
-
-    (function() {
         // Test that node with --configsvr cmd line and configsvr in replset config and using
         // wiredTiger
         // does NOT go into REMOVED state.

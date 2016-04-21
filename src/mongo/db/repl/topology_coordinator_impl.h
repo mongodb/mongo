@@ -127,9 +127,8 @@ public:
         // A sync source is re-evaluated after it lags behind further than this amount.
         Seconds maxSyncSourceLagSecs{0};
 
-        // Whether or not this node is running as a config server, and if so whether it was started
-        // with --configsvrMode=SCCC.
-        CatalogManager::ConfigServerMode configServerMode{CatalogManager::ConfigServerMode::NONE};
+        // Whether or not this node is running as a config server.
+        ClusterRole clusterRole{ClusterRole::None};
     };
 
     /**

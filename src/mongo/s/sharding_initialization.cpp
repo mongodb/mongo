@@ -194,7 +194,7 @@ Status initializeGlobalShardingStateForMongod(const ConnectionString& configCS) 
 }
 
 Status reloadShardRegistryUntilSuccess(OperationContext* txn) {
-    if (serverGlobalParams.configsvrMode != CatalogManager::ConfigServerMode::NONE) {
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         return Status::OK();
     }
 

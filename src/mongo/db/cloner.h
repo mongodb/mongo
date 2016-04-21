@@ -111,7 +111,6 @@ struct CloneOptions {
     bool syncData = true;
     bool syncIndexes = true;
     bool checkForCatalogChange = false;
-    CatalogManager::ConfigServerMode initialCatalogMode = CatalogManager::ConfigServerMode::NONE;
 };
 
 }  // namespace mongo

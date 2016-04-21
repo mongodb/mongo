@@ -440,14 +440,6 @@ Status addMongodOptions(moe::OptionSection* options) {
         .incompatibleWith("shardsvr")
         .incompatibleWith("nojournal");
 
-    sharding_options.addOptionChaining("sharding.configsvrMode",
-                                       "configsvrMode",
-                                       moe::String,
-                                       "Controls what config server protocol is in use. When set to"
-                                       " \"sccc\" keeps server in legacy SyncClusterConnection mode"
-                                       " even when the service is running as a replSet")
-        .setSources(moe::SourceAll);
-
     sharding_options.addOptionChaining(
                          "shardsvr",
                          "shardsvr",
@@ -1227,10 +1219,7 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
         auto clusterRoleParam = params["sharding.clusterRole"].as<std::string>();
         if (clusterRoleParam == "configsvr") {
             serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
-            serverGlobalParams.configsvrMode = replSettings.getReplSetString().empty()
-                ? CatalogManager::ConfigServerMode::SCCC
-                : CatalogManager::ConfigServerMode::CSRS;
-            mmapv1GlobalOptions.smallfiles = true;  // config server implies small files
+            replSettings.setMajorityReadConcernEnabled(true);
 
             // If we haven't explicitly specified a journal option, default journaling to true for
             // the config server role
@@ -1241,33 +1230,9 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
             if (!params.count("storage.dbPath")) {
                 storageGlobalParams.dbpath = storageGlobalParams.kDefaultConfigDbPath;
             }
-            if (serverGlobalParams.configsvrMode == CatalogManager::ConfigServerMode::SCCC) {
-                // Set to true to force SCCC config servers to have an oplog for backup.
-                replSettings.setMaster(true);
-                if (!params.count("replication.oplogSizeMB"))
-                    replSettings.setOplogSizeBytes(5 * 1024 * 1024);
-            }
         } else if (clusterRoleParam == "shardsvr") {
             serverGlobalParams.clusterRole = ClusterRole::ShardServer;
         }
-    }
-
-    if (params.count("sharding.configsvrMode")) {
-        if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            return Status(ErrorCodes::BadValue,
-                          "Cannot set \"sharding.configsvrMode\" without "
-                          "setting \"sharding.clusterRole\" to \"configsvr\"");
-        }
-        if (params["sharding.configsvrMode"].as<std::string>() != "sccc") {
-            return Status(ErrorCodes::BadValue,
-                          "Bad value for sharding.configsvrMode.  "
-                          " Only supported value is \"sccc\"");
-        }
-        serverGlobalParams.configsvrMode = CatalogManager::ConfigServerMode::SCCC;
-    }
-
-    if (serverGlobalParams.configsvrMode == CatalogManager::ConfigServerMode::CSRS) {
-        replSettings.setMajorityReadConcernEnabled(true);
     }
 
     if (params.count("sharding.archiveMovedChunks")) {

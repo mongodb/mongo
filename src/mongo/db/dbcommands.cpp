@@ -1292,7 +1292,7 @@ void Command::execCommand(OperationContext* txn,
             CurOp::get(txn)->ensureStarted();
             // We disable last-error for help requests due to SERVER-11492, because config servers
             // use help requests to determine which commands are database writes, and so must be
-            // forwarded to all mirrored (SCCC) config servers.
+            // forwarded to all config servers.
             LastError::get(txn->getClient()).disable();
             generateHelpResponse(txn, request, replyBuilder, *command);
             return;

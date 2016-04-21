@@ -901,7 +901,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
 (InitializerContext* context) {
     repl::TopologyCoordinatorImpl::Options topoCoordOptions;
     topoCoordOptions.maxSyncSourceLagSecs = Seconds(repl::maxSyncSourceLagSecs);
-    topoCoordOptions.configServerMode = serverGlobalParams.configsvrMode;
+    topoCoordOptions.clusterRole = serverGlobalParams.clusterRole;
 
     auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorImpl>(
         getGlobalReplSettings(),

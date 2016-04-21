@@ -2115,17 +2115,16 @@ MemberState TopologyCoordinatorImpl::getMemberState() const {
     }
 
     if (_rsConfig.isConfigServer()) {
-        if (_options.configServerMode == CatalogManager::ConfigServerMode::NONE) {
+        if (_options.clusterRole != ClusterRole::ConfigServer) {
             return MemberState::RS_REMOVED;
-        }
-        if (_options.configServerMode == CatalogManager::ConfigServerMode::CSRS) {
+        } else {
             invariant(_storageEngineSupportsReadCommitted != ReadCommittedSupport::kUnknown);
             if (_storageEngineSupportsReadCommitted == ReadCommittedSupport::kNo) {
                 return MemberState::RS_REMOVED;
             }
         }
     } else {
-        if (_options.configServerMode != CatalogManager::ConfigServerMode::NONE) {
+        if (_options.clusterRole == ClusterRole::ConfigServer) {
             return MemberState::RS_REMOVED;
         }
     }

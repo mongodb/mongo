@@ -57,8 +57,6 @@ struct ServerGlobalParams {
     std::atomic<bool> quiet{false};  // --quiet NOLINT
 
     ClusterRole clusterRole = ClusterRole::None;  // --configsvr/--shardsvr
-    CatalogManager::ConfigServerMode configsvrMode =
-        CatalogManager::ConfigServerMode::NONE;  // -- configsvrMode
 
     bool cpu = false;  // --cpu show cpu time periodically
 

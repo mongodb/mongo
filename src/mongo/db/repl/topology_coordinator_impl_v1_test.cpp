@@ -2596,7 +2596,7 @@ TEST_F(TopoCoordTest, NodeTransitionsToRemovedIfCSRSButHaveNoReadCommittedSuppor
     ON_BLOCK_EXIT([]() { serverGlobalParams.clusterRole = ClusterRole::None; });
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
     TopologyCoordinatorImpl::Options options;
-    options.configServerMode = CatalogManager::ConfigServerMode::CSRS;
+    options.clusterRole = ClusterRole::ConfigServer;
     setOptions(options);
     getTopoCoord().setStorageEngineSupportsReadCommitted(false);
 
@@ -2613,35 +2613,11 @@ TEST_F(TopoCoordTest, NodeTransitionsToRemovedIfCSRSButHaveNoReadCommittedSuppor
     ASSERT_EQUALS(MemberState::RS_REMOVED, getTopoCoord().getMemberState().s);
 }
 
-TEST_F(TopoCoordTest, NoReadCommittedSupportShouldNotTriggerRemovedStateInSCCC) {
-    ON_BLOCK_EXIT([]() { serverGlobalParams.clusterRole = ClusterRole::None; });
-    serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
-    TopologyCoordinatorImpl::Options options;
-    options.configServerMode = CatalogManager::ConfigServerMode::SCCC;
-    setOptions(options);
-    getTopoCoord().setStorageEngineSupportsReadCommitted(false);
-
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "protocolVersion" << 1 << "version" << 1 << "configsvr" << true
-                      << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2") << BSON("_id" << 30 << "host"
-                                                                         << "h3"))),
-                 0);
-
-    ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
-    getTopoCoord().setFollowerMode(MemberState::RS_SECONDARY);
-    ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
-}
-
 TEST_F(TopoCoordTest, NodeBecomesSecondaryAsNormalWhenReadCommittedSupportedAndCSRS) {
     ON_BLOCK_EXIT([]() { serverGlobalParams.clusterRole = ClusterRole::None; });
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
     TopologyCoordinatorImpl::Options options;
-    options.configServerMode = CatalogManager::ConfigServerMode::CSRS;
+    options.clusterRole = ClusterRole::ConfigServer;
     setOptions(options);
     getTopoCoord().setStorageEngineSupportsReadCommitted(true);
 

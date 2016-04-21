@@ -5801,28 +5801,7 @@ TEST_F(TopoCoordTest, CSRSConfigServerRejectsPV0Config) {
     ON_BLOCK_EXIT([]() { serverGlobalParams.clusterRole = ClusterRole::None; });
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
     TopologyCoordinatorImpl::Options options;
-    options.configServerMode = CatalogManager::ConfigServerMode::CSRS;
-    setOptions(options);
-    getTopoCoord().setStorageEngineSupportsReadCommitted(false);
-
-    auto configObj = BSON("_id"
-                          << "rs0"
-                          << "version" << 1 << "configsvr" << true << "members"
-                          << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                                   << "hself")
-                                        << BSON("_id" << 20 << "host"
-                                                      << "h2") << BSON("_id" << 30 << "host"
-                                                                             << "h3")));
-    ReplicaSetConfig config;
-    ASSERT_OK(config.initialize(configObj, false));
-    ASSERT_EQ(ErrorCodes::BadValue, config.validate());
-}
-
-TEST_F(TopoCoordTest, SCCCConfigServerRejectsPV0Config) {
-    ON_BLOCK_EXIT([]() { serverGlobalParams.clusterRole = ClusterRole::None; });
-    serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
-    TopologyCoordinatorImpl::Options options;
-    options.configServerMode = CatalogManager::ConfigServerMode::SCCC;
+    options.clusterRole = ClusterRole::ConfigServer;
     setOptions(options);
     getTopoCoord().setStorageEngineSupportsReadCommitted(false);
 

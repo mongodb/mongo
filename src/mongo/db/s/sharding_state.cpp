@@ -202,7 +202,7 @@ void ShardingState::shutDown(OperationContext* txn) {
 
 void ShardingState::updateConfigServerOpTimeFromMetadata(OperationContext* txn) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    if (serverGlobalParams.configsvrMode != CatalogManager::ConfigServerMode::NONE) {
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         // Nothing to do if we're a config server ourselves.
         return;
     }
