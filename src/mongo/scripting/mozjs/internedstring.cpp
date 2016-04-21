@@ -42,7 +42,7 @@ InternedStringTable::InternedStringTable(JSContext* cx) {
 
 #define MONGO_MOZJS_INTERNED_STRING(name, str)                                        \
     do {                                                                              \
-        auto s = JS_InternString(cx, str);                                            \
+        auto s = JS_AtomizeAndPinString(cx, str);                                     \
         if (!s) {                                                                     \
             uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS_InternString"); \
         }                                                                             \

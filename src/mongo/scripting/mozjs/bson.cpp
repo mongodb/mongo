@@ -119,7 +119,10 @@ void BSONInfo::finalize(JSFreeOp* fop, JSObject* obj) {
     delete holder;
 }
 
-void BSONInfo::enumerate(JSContext* cx, JS::HandleObject obj, JS::AutoIdVector& properties) {
+void BSONInfo::enumerate(JSContext* cx,
+                         JS::HandleObject obj,
+                         JS::AutoIdVector& properties,
+                         bool enumerableOnly) {
     auto holder = getValidHolder(cx, obj);
 
     if (!holder)
@@ -148,13 +151,17 @@ void BSONInfo::enumerate(JSContext* cx, JS::HandleObject obj, JS::AutoIdVector& 
     }
 }
 
-void BSONInfo::setProperty(
-    JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool strict, JS::MutableHandleValue vp) {
+void BSONInfo::setProperty(JSContext* cx,
+                           JS::HandleObject obj,
+                           JS::HandleId id,
+                           JS::MutableHandleValue vp,
+                           JS::ObjectOpResult& result) {
     auto holder = getValidHolder(cx, obj);
 
     if (holder) {
         if (holder->_readOnly) {
             uasserted(ErrorCodes::BadValue, "Read only object");
+            return;
         }
 
         auto iter = holder->_removed.find(IdWrapper(cx, id).toString());
@@ -167,14 +174,19 @@ void BSONInfo::setProperty(
     }
 
     ObjectWrapper(cx, obj).defineProperty(id, vp, JSPROP_ENUMERATE);
+    result.succeed();
 }
 
-void BSONInfo::delProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* succeeded) {
+void BSONInfo::delProperty(JSContext* cx,
+                           JS::HandleObject obj,
+                           JS::HandleId id,
+                           JS::ObjectOpResult& result) {
     auto holder = getValidHolder(cx, obj);
 
     if (holder) {
         if (holder->_readOnly) {
             uasserted(ErrorCodes::BadValue, "Read only object");
+            return;
         }
 
         holder->_altered = true;
@@ -183,7 +195,7 @@ void BSONInfo::delProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
         holder->_removed[IdWrapper(cx, id).toStringData(&jsstr)] = true;
     }
 
-    *succeeded = true;
+    result.succeed();
 }
 
 void BSONInfo::resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* resolvedp) {

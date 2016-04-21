@@ -34,6 +34,7 @@
 
 #include <cstdio>
 #include <js/CharacterEncoding.h>
+#include <js/Date.h>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/platform/decimal128.h"
@@ -117,7 +118,7 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
             return;
         case mongo::Date:
             _value.setObjectOrNull(
-                JS_NewDateObjectMsec(_context, elem.Date().toMillisSinceEpoch()));
+                JS::NewDateObject(_context, JS::TimeClip(elem.Date().toMillisSinceEpoch())));
             return;
         case mongo::Bool:
             _value.setBoolean(elem.Bool());

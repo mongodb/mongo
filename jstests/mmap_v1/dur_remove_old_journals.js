@@ -73,6 +73,7 @@ if (db.serverBuildInfo().bits == 32) {
             db.adminCommand({fsync: 1});
             db.foo.remove({});
             db.adminCommand({fsync: 1});
+            gc();
         }
     }
 

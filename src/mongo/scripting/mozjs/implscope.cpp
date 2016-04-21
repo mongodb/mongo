@@ -34,6 +34,7 @@
 
 #include <jscustomallocator.h>
 #include <jsfriendapi.h>
+#include <js/CharacterEncoding.h>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/operation_context.h"
@@ -242,10 +243,11 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
         if (engine->isJITEnabled()) {
             JS::RuntimeOptionsRef(_runtime)
                 .setAsmJS(true)
+                .setThrowOnAsmJSValidationFailure(true)
                 .setBaseline(true)
                 .setIon(true)
-                .setNativeRegExp(true)
-                .setUnboxedObjects(true);
+                .setAsyncStack(false)
+                .setNativeRegExp(true);
         }
 
         const StackLocator locator;
@@ -470,7 +472,7 @@ void MozJSImplScope::newFunction(StringData raw, JS::MutableHandleValue out) {
 
     JS::CompileOptions co(_context);
     setCompileOptions(&co);
-    _checkErrorState(JS::Evaluate(_context, _global, co, code.c_str(), code.length(), out));
+    _checkErrorState(JS::Evaluate(_context, co, code.c_str(), code.length(), out));
 }
 
 BSONObj MozJSImplScope::callThreadArgs(const BSONObj& args) {
@@ -526,7 +528,7 @@ void MozJSImplScope::_MozJSCreateFunction(const char* raw,
     JS::CompileOptions co(_context);
     setCompileOptions(&co);
 
-    _checkErrorState(JS::Evaluate(_context, _global, co, code.c_str(), code.length(), fun));
+    _checkErrorState(JS::Evaluate(_context, co, code.c_str(), code.length(), fun));
     uassert(10232,
             "not a function",
             fun.isObject() && JS_ObjectIsFunction(_context, fun.toObjectOrNull()));
@@ -635,7 +637,7 @@ bool MozJSImplScope::exec(StringData code,
     co.setFile(name.c_str());
     JS::RootedScript script(_context);
 
-    bool success = JS::Compile(_context, _global, co, code.rawData(), code.size(), &script);
+    bool success = JS::Compile(_context, co, code.rawData(), code.size(), &script);
 
     if (_checkErrorState(success, reportError, assertOnError))
         return false;
@@ -645,7 +647,7 @@ bool MozJSImplScope::exec(StringData code,
 
     JS::RootedValue out(_context);
 
-    success = JS_ExecuteScript(_context, _global, script, &out);
+    success = JS_ExecuteScript(_context, script, &out);
 
     if (timeoutMs)
         _engine->getDeadlineMonitor().stopDeadline(this);

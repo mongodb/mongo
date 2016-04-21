@@ -537,13 +537,19 @@ ObjectWrapper::WriteFieldRecursionFrame::WriteFieldRecursionFrame(JSContext* cx,
                                                                   JSObject* obj,
                                                                   BSONObjBuilder* parent,
                                                                   StringData sd)
-    : thisv(cx, obj), ids(cx, JS_Enumerate(cx, thisv)) {
+    : thisv(cx, obj), ids(cx, JS::IdVector(cx)) {
     if (parent) {
-        subbob.emplace(JS_IsArrayObject(cx, thisv) ? parent->subarrayStart(sd)
-                                                   : parent->subobjStart(sd));
+        bool isArray;
+
+        if (!JS_IsArrayObject(cx, thisv, &isArray)) {
+            throwCurrentJSException(
+                cx, ErrorCodes::JSInterpreterFailure, "Failure to check object is an array");
+        }
+
+        subbob.emplace(isArray ? parent->subarrayStart(sd) : parent->subobjStart(sd));
     }
 
-    if (!ids) {
+    if (!JS_Enumerate(cx, thisv, &ids)) {
         throwCurrentJSException(
             cx, ErrorCodes::JSInterpreterFailure, "Failure to enumerate object");
     }

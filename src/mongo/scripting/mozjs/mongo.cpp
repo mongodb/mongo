@@ -269,29 +269,39 @@ void MongoBase::Functions::insert::call(JSContext* cx, JS::CallArgs args) {
         return ValueWriter(cx, value).toBSON();
     };
 
-    if (args.get(1).isObject() && JS_IsArrayObject(cx, args.get(1))) {
-        JS::RootedObject obj(cx, args.get(1).toObjectOrNull());
-        ObjectWrapper array(cx, obj);
+    if (args.get(1).isObject()) {
+        bool isArray;
 
-        std::vector<BSONObj> bos;
+        if (!JS_IsArrayObject(cx, args.get(1), &isArray)) {
+            uasserted(ErrorCodes::BadValue, "Failure to check is object an array");
+        }
 
-        bool foundElement = false;
+        if (isArray) {
+            JS::RootedObject obj(cx, args.get(1).toObjectOrNull());
+            ObjectWrapper array(cx, obj);
 
-        array.enumerate([&](JS::HandleId id) {
-            foundElement = true;
+            std::vector<BSONObj> bos;
 
-            JS::RootedValue value(cx);
-            array.getValue(id, &value);
+            bool foundElement = false;
 
-            bos.push_back(addId(value));
+            array.enumerate([&](JS::HandleId id) {
+                foundElement = true;
 
-            return true;
-        });
+                JS::RootedValue value(cx);
+                array.getValue(id, &value);
 
-        if (!foundElement)
-            uasserted(ErrorCodes::BadValue, "attempted to insert an empty array");
+                bos.push_back(addId(value));
 
-        conn->insert(ns, bos, flags);
+                return true;
+            });
+
+            if (!foundElement)
+                uasserted(ErrorCodes::BadValue, "attempted to insert an empty array");
+
+            conn->insert(ns, bos, flags);
+        } else {
+            conn->insert(ns, addId(args.get(1)));
+        }
     } else {
         conn->insert(ns, addId(args.get(1)));
     }

@@ -32,6 +32,8 @@
 
 #include "mongo/scripting/mozjs/engine.h"
 
+#include <js/Initialization.h>
+
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/scripting/mozjs/implscope.h"

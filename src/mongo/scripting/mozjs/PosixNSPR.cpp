@@ -77,6 +77,15 @@ void PR_DestroyFakeThread(PRThread* thread) {
 }  // namespace mongo
 
 
+// In mozjs-45, js_delete takes a const pointer which is incompatible with std::unique_ptr.
+template <class T>
+static MOZ_ALWAYS_INLINE void js_delete_nonconst(T* p) {
+    if (p) {
+        p->~T();
+        js_free(p);
+    }
+}
+
 PRThread* PR_CreateThread(PRThreadType type,
                           void (*start)(void* arg),
                           void* arg,
@@ -90,7 +99,7 @@ PRThread* PR_CreateThread(PRThreadType type,
     try {
         std::unique_ptr<nspr::Thread, void (*)(nspr::Thread*)> t(
             js_new<nspr::Thread>(start, arg, state != PR_UNJOINABLE_THREAD),
-            js_delete<nspr::Thread>);
+            js_delete_nonconst<nspr::Thread>);
 
         t->thread() = mongo::stdx::thread(&nspr::Thread::ThreadRoutine, t.get());
 

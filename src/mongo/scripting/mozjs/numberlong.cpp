@@ -215,7 +215,7 @@ void NumberLongInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::Han
             proto,
             getScope(cx)->getInternedStringId(InternedString::floatApprox),
             undef,
-            JSPROP_READONLY | JSPROP_ENUMERATE | JSPROP_SHARED,
+            JSPROP_ENUMERATE | JSPROP_SHARED,
             smUtils::wrapConstrainedMethod<Functions::floatApprox, true, NumberLongInfo>,
             nullptr)) {
         uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS_DefinePropertyById");
@@ -226,7 +226,7 @@ void NumberLongInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::Han
                                proto,
                                getScope(cx)->getInternedStringId(InternedString::top),
                                undef,
-                               JSPROP_READONLY | JSPROP_ENUMERATE | JSPROP_SHARED,
+                               JSPROP_ENUMERATE | JSPROP_SHARED,
                                smUtils::wrapConstrainedMethod<Functions::top, true, NumberLongInfo>,
                                nullptr)) {
         uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS_DefinePropertyById");
@@ -238,7 +238,7 @@ void NumberLongInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::Han
             proto,
             getScope(cx)->getInternedStringId(InternedString::bottom),
             undef,
-            JSPROP_READONLY | JSPROP_ENUMERATE | JSPROP_SHARED,
+            JSPROP_ENUMERATE | JSPROP_SHARED,
             smUtils::wrapConstrainedMethod<Functions::bottom, true, NumberLongInfo>,
             nullptr)) {
         uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS_DefinePropertyById");

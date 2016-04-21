@@ -71,7 +71,7 @@ void MongoHelpersInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::H
     // Initialize the reflection API and move it under the MongoHelpers object
     uassert(ErrorCodes::JSInterpreterFailure,
             "Error initializing javascript reflection API",
-            JS_InitReflect(cx, global));
+            JS_InitReflectParse(cx, global));
     JS::RootedValue reflectValue(cx);
     globalWrapper.getValue(kReflectName, &reflectValue);
     globalWrapper.deleteProperty(kReflectName);
