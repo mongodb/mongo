@@ -47,6 +47,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'document_source',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
         ],
     )
 

@@ -40,17 +40,24 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/unittest/temp_dir.h"
 
 namespace mongo {
 bool isMongos() {
     return false;
 }
+
+std::unique_ptr<ServiceContextNoop> makeTestServiceContext() {
+    auto service = stdx::make_unique<ServiceContextNoop>();
+    service->setFastClockSource(stdx::make_unique<ClockSourceMock>());
+    return service;
+}
 }
 
 // Stub to avoid including the server environment library.
 MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
-    setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
+    setGlobalServiceContext(makeTestServiceContext());
     return Status::OK();
 }
 
@@ -165,8 +172,8 @@ using mongo::DocumentSourceMock;
 class Base {
 public:
     Base()
-        : _service(),
-          _client(_service.makeClient("DocumentSourceTest")),
+        : _service(makeTestServiceContext()),
+          _client(_service->makeClient("DocumentSourceTest")),
           _opCtx(_client->makeOperationContext()),
           _ctx(new ExpressionContext(_opCtx.get(), NamespaceString(ns))) {}
 
@@ -175,7 +182,7 @@ protected:
         return _ctx;
     }
 
-    ServiceContextNoop _service;
+    std::unique_ptr<ServiceContextNoop> _service;
     ServiceContext::UniqueClient _client;
     ServiceContext::UniqueOperationContext _opCtx;
 
