@@ -574,7 +574,6 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                 newObj = uassertStatusOK(std::move(newRecStatus)).releaseToBson();
             }
 
-            _specificStats.fastmod = true;
             newRecordId = recordId;
         } else {
             // The updates were not in place. Apply them through the file manager.
@@ -1036,7 +1035,6 @@ void UpdateStage::recordUpdateStatsInOpDebug(const UpdateStats* updateStats, OpD
     opDebug->nModified = updateStats->nModified;
     opDebug->upsert = updateStats->inserted;
     opDebug->fastmodinsert = updateStats->fastmodinsert;
-    opDebug->fastmod = updateStats->fastmod;
 }
 
 UpdateResult UpdateStage::makeUpdateResult(const UpdateStats* updateStats) {

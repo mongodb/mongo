@@ -625,9 +625,6 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
     }
 
     // Object did not move.  We update each index with each respective UpdateTicket.
-    if (opDebug)
-        opDebug->keyUpdates = 0;
-
     if (indexesAffected) {
         IndexCatalog::IndexIterator ii = _indexCatalog.getIndexIterator(txn, true);
         while (ii.more()) {
@@ -641,7 +638,6 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
             if (!ret.isOK())
                 return StatusWith<RecordId>(ret);
             if (opDebug) {
-                opDebug->keyUpdates += keysInserted;
                 opDebug->keysInserted += keysInserted;
                 opDebug->keysDeleted += keysDeleted;
             }

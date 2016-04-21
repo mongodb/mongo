@@ -29,7 +29,6 @@
 
     assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
     assert.eq(profileObj.op, "update", tojson(profileObj));
-    assert.eq(profileObj.keyUpdates, 1, tojson(profileObj));
     assert.eq(profileObj.keysExamined, 1, tojson(profileObj));
     assert.eq(profileObj.docsExamined, 1, tojson(profileObj));
     assert.eq(profileObj.keysInserted, 1, tojson(profileObj));
@@ -52,7 +51,6 @@
     assert.writeOK(coll.update({a: {$gte: 5}}, {$set: {c: 1}, $inc: {a: -10}}, {multi: true}));
     profileObj = getLatestProfilerEntry(testDB);
 
-    assert.eq(profileObj.keyUpdates, 1, tojson(profileObj));
     assert.eq(profileObj.keysExamined, 5, tojson(profileObj));
     assert.eq(profileObj.docsExamined, 5, tojson(profileObj));
     assert.eq(profileObj.keysInserted, 5, tojson(profileObj));

@@ -521,11 +521,9 @@ string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockSt
     OPDEBUG_TOSTRING_HELP(nModified);
     OPDEBUG_TOSTRING_HELP(ninserted);
     OPDEBUG_TOSTRING_HELP(ndeleted);
-    OPDEBUG_TOSTRING_HELP_BOOL(fastmod);
     OPDEBUG_TOSTRING_HELP_BOOL(fastmodinsert);
     OPDEBUG_TOSTRING_HELP_BOOL(upsert);
     OPDEBUG_TOSTRING_HELP_BOOL(cursorExhausted);
-    OPDEBUG_TOSTRING_HELP(keyUpdates);
 
     if (nmoved > 0) {
         s << " nmoved:" << nmoved;
@@ -638,8 +636,6 @@ void OpDebug::append(const CurOp& curop,
         appendAsObjOrString("updateobj", updateobj, maxElementSize, &b);
     }
 
-    const bool moved = (nmoved >= 1);
-
     OPDEBUG_APPEND_NUMBER(cursorid);
     OPDEBUG_APPEND_BOOL(exhaust);
 
@@ -653,12 +649,9 @@ void OpDebug::append(const CurOp& curop,
     OPDEBUG_APPEND_NUMBER(nModified);
     OPDEBUG_APPEND_NUMBER(ninserted);
     OPDEBUG_APPEND_NUMBER(ndeleted);
-    OPDEBUG_APPEND_BOOL(fastmod);
     OPDEBUG_APPEND_BOOL(fastmodinsert);
     OPDEBUG_APPEND_BOOL(upsert);
     OPDEBUG_APPEND_BOOL(cursorExhausted);
-    OPDEBUG_APPEND_NUMBER(keyUpdates);
-    OPDEBUG_APPEND_BOOL(moved);
 
     if (nmoved > 0) {
         b.appendNumber("nmoved", nmoved);
