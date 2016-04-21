@@ -1247,18 +1247,21 @@ struct __wt_session {
 	 * @param join_cursor a cursor that was opened using a
 	 * \c "join:" URI. It may not have been used for any operations
 	 * other than other join calls.
-	 * @param ref_cursor either an index cursor having the same base table
-	 * as the join_cursor, or a table cursor open on the same base table.
-	 * The ref_cursor must be positioned.
+	 * @param ref_cursor an index cursor having the same base table
+	 * as the join_cursor, or a table cursor open on the same base table,
+	 * or another join cursor. Unless the ref_cursor is another join
+	 * cursor, it must be positioned.
 	 *
 	 * The ref_cursor limits the results seen by iterating the
 	 * join_cursor to table items referred to by the key in this
 	 * index. The set of keys referred to is modified by the compare
 	 * config option.
 	 *
-	 * Multiple join calls builds up a set of ref_cursors, and the
-	 * results seen by iteration are the intersection of the cursor
-	 * ranges participating in the join.
+	 * Multiple join calls builds up a set of ref_cursors, and
+	 * by default, the results seen by iteration are the intersection
+	 * of the cursor ranges participating in the join. When configured
+	 * with \c "operation=or", the results seen are the union of
+	 * the participating cursor ranges.
 	 *
 	 * After the join call completes, the ref_cursor cursor may not be
 	 * used for any purpose other than get_key and get_value. Any other
@@ -1281,6 +1284,13 @@ struct __wt_session {
 	 * also influences evaluation order for cursors in the join.  When the
 	 * count is equal for multiple bloom filters in a composition of joins\,
 	 * the bloom filter may be shared., an integer; default \c .}
+	 * @config{operation, the operation applied between this and other
+	 * joined cursors.  When "operation=and" is specified\, all the
+	 * conditions implied by joins must be satisfied for an entry to be
+	 * returned by the join cursor; when "operation=or" is specified\, only
+	 * one must be satisfied.  All cursors joined to a join cursor must have
+	 * matching operations., a string\, chosen from the following options:
+	 * \c "and"\, \c "or"; default \c "and".}
 	 * @config{strategy, when set to bloom\, a bloom filter is created and
 	 * populated for this index.  This has an up front cost but may reduce
 	 * the number of accesses to the main table when iterating the joined

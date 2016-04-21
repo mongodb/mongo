@@ -794,12 +794,15 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 	WT_INDEX *idx;
 	WT_SESSION_IMPL *session;
 	WT_TABLE *table;
+	bool nested;
 	uint64_t count;
 	uint32_t bloom_bit_count, bloom_hash_count;
 	uint8_t flags, range;
 
 	count = 0;
 	firstcg = NULL;
+	flags = 0;
+	nested = false;
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, join, config, cfg);
 	table = NULL;
@@ -817,19 +820,25 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 		ctable = (WT_CURSOR_TABLE *)ref_cursor;
 		table = ctable->table;
 		firstcg = ctable->cg_cursors[0];
+	} else if (WT_PREFIX_MATCH(ref_cursor->uri, "join:")) {
+		idx = NULL;
+		table = ((WT_CURSOR_JOIN *)ref_cursor)->table;
+		nested = true;
 	} else
-		WT_ERR_MSG(session, EINVAL, "not an index or table cursor");
+		WT_ERR_MSG(session, EINVAL,
+		    "ref_cursor must be an index, table or join cursor");
 
-	if (!F_ISSET(firstcg, WT_CURSTD_KEY_SET))
+	if (firstcg != NULL && !F_ISSET(firstcg, WT_CURSTD_KEY_SET))
 		WT_ERR_MSG(session, EINVAL,
 		    "requires reference cursor be positioned");
 	cjoin = (WT_CURSOR_JOIN *)join_cursor;
 	if (cjoin->table != table)
 		WT_ERR_MSG(session, EINVAL,
-		    "table for join cursor does not match table for index");
+		    "table for join cursor does not match table for "
+		    "ref_cursor");
 	if (F_ISSET(ref_cursor, WT_CURSTD_JOINED))
 		WT_ERR_MSG(session, EINVAL,
-		    "index cursor already used in a join");
+		    "cursor already used in a join");
 
 	/* "ge" is the default */
 	range = WT_CURJOIN_END_GT | WT_CURJOIN_END_EQ;
@@ -868,15 +877,20 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 		WT_ERR_MSG(session, EINVAL,
 		    "bloom_hash_count: value too large");
 	bloom_hash_count = (uint32_t)cval.val;
-	if (LF_ISSET(WT_CURJOIN_ENTRY_BLOOM)) {
-		if (count == 0)
-			WT_ERR_MSG(session, EINVAL,
-			    "count must be nonzero when strategy=bloom");
-		if (cjoin->entries_next == 0)
-			WT_ERR_MSG(session, EINVAL,
-			    "the first joined cursor cannot specify "
-			    "strategy=bloom");
-	}
+	if (LF_ISSET(WT_CURJOIN_ENTRY_BLOOM) && count == 0)
+		WT_ERR_MSG(session, EINVAL,
+		    "count must be nonzero when strategy=bloom");
+
+	WT_ERR(__wt_config_gets(session, cfg, "operation", &cval));
+	if (cval.len != 0 && WT_STRING_MATCH("or", cval.str, cval.len))
+		LF_SET(WT_CURJOIN_ENTRY_DISJUNCTION);
+
+	if (nested && (count != 0 || range != WT_CURJOIN_END_EQ ||
+	    LF_ISSET(WT_CURJOIN_ENTRY_BLOOM)))
+		WT_ERR_MSG(session, EINVAL,
+		    "joining a nested join cursor is incompatible with "
+		    "setting \"strategy\", \"compare\" or \"count\"");
+
 	WT_ERR(__wt_curjoin_join(session, cjoin, idx, ref_cursor, flags,
 	    range, count, bloom_bit_count, bloom_hash_count));
 	/*
