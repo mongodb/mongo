@@ -189,7 +189,8 @@ Status initializeGlobalShardingStateForMongos(const ConnectionString& configCS,
 }
 
 Status initializeGlobalShardingStateForMongod(const ConnectionString& configCS) {
-    return initializeGlobalShardingState(configCS, ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes, false);
+    return initializeGlobalShardingState(
+        configCS, ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes, false);
 }
 
 Status reloadShardRegistryUntilSuccess(OperationContext* txn) {
