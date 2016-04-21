@@ -948,57 +948,6 @@ TEST(GteOp, ElemMatchKey) {
     ASSERT_EQUALS("1", details.elemMatchKey());
 }
 
-/**
-   TEST( GteOp, MatchesIndexKeyScalar ) {
-   BSONObj operand = BSON( "$gte" << 6 );
-   GteOp gte;
-   ASSERT( gte.init( "a", operand[ "$gte" ] ).isOK() );
-   IndexSpec indexSpec( BSON( "a" << 1 ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-   gte.matchesIndexKey( BSON( "" << 6 ), indexSpec ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_False ==
-   gte.matchesIndexKey( BSON( "" << 5 ), indexSpec ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_False ==
-   gte.matchesIndexKey( BSON( "" << BSON_ARRAY( 7 ) ), indexSpec ) );
-   }
-
-   TEST( GteOp, MatchesIndexKeyMissing ) {
-   BSONObj operand = BSON( "$gte" << 6 );
-   GteOp gte;
-   ASSERT( gte.init( "a", operand[ "$gte" ] ).isOK() );
-   IndexSpec indexSpec( BSON( "b" << 1 ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-   gte.matchesIndexKey( BSON( "" << 6 ), indexSpec ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-   gte.matchesIndexKey( BSON( "" << 4 ), indexSpec ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-   gte.matchesIndexKey( BSON( "" << BSON_ARRAY( 8 << 6 ) ), indexSpec ) );
-   }
-
-   TEST( GteOp, MatchesIndexKeyArray ) {
-   BSONObj operand = BSON( "$gte" << BSON_ARRAY( 4 << 5 ) );
-   GteOp gte;
-   ASSERT( gte.init( "a", operand[ "$gte" ] ).isOK() );
-   IndexSpec indexSpec( BSON( "a" << 1 ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-   gte.matchesIndexKey( BSON( "" << 6 ), indexSpec ) );
-   }
-
-   TEST( GteOp, MatchesIndexKeyArrayValue ) {
-   BSONObj operand = BSON( "$gte" << 6 );
-   GteOp gte;
-   ASSERT( gte.init( "a", operand[ "$gte" ] ).isOK() );
-   IndexSpec indexSpec( BSON( "loc" << "mockarrayvalue" << "a" << 1 ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-   gte.matchesIndexKey( BSON( "" << "dummygeohash" << "" << 6 ), indexSpec ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_False ==
-   gte.matchesIndexKey( BSON( "" << "dummygeohash" << "" << 3 ), indexSpec ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-   gte.matchesIndexKey( BSON( "" << "dummygeohash" <<
-   "" << BSON_ARRAY( 8 << 6 << 4 ) ), indexSpec ) );
-   }
-*/
-
 TEST(RegexMatchExpression, MatchesElementExact) {
     BSONObj match = BSON("a"
                          << "b");
@@ -1234,44 +1183,51 @@ TEST(RegexMatchExpression, Equality1) {
     ASSERT(!r1.equivalent(&r4));
 }
 
-/**
-   TEST( RegexMatchExpression, MatchesIndexKeyScalar ) {
-   RegexMatchExpression regex;
-   ASSERT( regex.init( "a", "xyz", "" ).isOK() );
-   IndexSpec indexSpec( BSON( "a" << 1 ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-   regex.matchesIndexKey( BSON( "" << "z xyz" ), indexSpec ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_False ==
-   regex.matchesIndexKey( BSON( "" << "xy" ), indexSpec ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_False ==
-   regex.matchesIndexKey( BSON( "" << BSON_ARRAY( "xyz" ) ), indexSpec ) );
-   }
+TEST(RegexMatchExpression, RegexCannotContainEmbeddedNullByte) {
+    RegexMatchExpression regex;
+    {
+        StringData embeddedNull("a\0b", StringData::LiteralTag());
+        ASSERT_NOT_OK(regex.init("path", embeddedNull, ""));
+    }
 
-   TEST( RegexMatchExpression, MatchesIndexKeyMissing ) {
-   RegexMatchExpression regex;
-   ASSERT( regex.init( "a", "xyz", "" ).isOK() );
-   IndexSpec indexSpec( BSON( "b" << 1 ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-   regex.matchesIndexKey( BSON( "" << "z xyz" ), indexSpec ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-   regex.matchesIndexKey( BSON( "" << "xy" ), indexSpec ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-   regex.matchesIndexKey( BSON( "" << BSON_ARRAY( 8 << "xyz" ) ), indexSpec ) );
-   }
+    {
+        StringData singleNullByte("\0", StringData::LiteralTag());
+        ASSERT_NOT_OK(regex.init("path", singleNullByte, ""));
+    }
 
-   TEST( RegexMatchExpression, MatchesIndexKeyArrayValue ) {
-   RegexMatchExpression regex;
-   ASSERT( regex.init( "a", "xyz", "" ).isOK() );
-   IndexSpec indexSpec( BSON( "loc" << "mockarrayvalue" << "a" << 1 ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-   regex.matchesIndexKey( BSON( "" << "dummygeohash" << "" << "xyz" ), indexSpec ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_False ==
-   regex.matchesIndexKey( BSON( "" << "dummygeohash" << "" << "z" ), indexSpec ) );
-   ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-   regex.matchesIndexKey( BSON( "" << "dummygeohash" <<
-   "" << BSON_ARRAY( "r" << 6 << "xyz" ) ), indexSpec ) );
-   }
-*/
+    {
+        StringData leadingNullByte("\0bbbb", StringData::LiteralTag());
+        ASSERT_NOT_OK(regex.init("path", leadingNullByte, ""));
+    }
+
+    {
+        StringData trailingNullByte("bbbb\0", StringData::LiteralTag());
+        ASSERT_NOT_OK(regex.init("path", trailingNullByte, ""));
+    }
+}
+
+TEST(RegexMatchExpression, RegexOptionsStringCannotContainEmbeddedNullByte) {
+    RegexMatchExpression regex;
+    {
+        StringData embeddedNull("a\0b", StringData::LiteralTag());
+        ASSERT_NOT_OK(regex.init("path", "pattern", embeddedNull));
+    }
+
+    {
+        StringData singleNullByte("\0", StringData::LiteralTag());
+        ASSERT_NOT_OK(regex.init("path", "pattern", singleNullByte));
+    }
+
+    {
+        StringData leadingNullByte("\0bbbb", StringData::LiteralTag());
+        ASSERT_NOT_OK(regex.init("path", "pattern", leadingNullByte));
+    }
+
+    {
+        StringData trailingNullByte("bbbb\0", StringData::LiteralTag());
+        ASSERT_NOT_OK(regex.init("path", "pattern", trailingNullByte));
+    }
+}
 
 TEST(ModMatchExpression, MatchesElement) {
     BSONObj match = BSON("a" << 1);
