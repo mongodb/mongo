@@ -878,7 +878,7 @@ FORCE_INLINE int LZ4_decompress_generic(
                  )
 {
     /* Local Variables */
-    const BYTE* restrict ip = (const BYTE*) source;
+    const BYTE* ip = (const BYTE*) source;
     const BYTE* ref;
     const BYTE* const iend = ip + inputSize;
 

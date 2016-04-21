@@ -199,8 +199,14 @@ BaselineCompiler::compile()
                             epilogueOffset_.offset(),
                             profilerEnterFrameToggleOffset_.offset(),
                             profilerExitFrameToggleOffset_.offset(),
+// MONGODB MODIFICATION: Support debug spidermonkey builds with ENABLE_TRACE_LOGGING disabled
+#ifdef ENABLE_TRACE_LOGGING
                             traceLoggerEnterToggleOffset_.offset(),
                             traceLoggerExitToggleOffset_.offset(),
+#else
+                            -1,
+                            -1,
+#endif
                             postDebugPrologueOffset_.offset(),
                             icEntries_.length(),
                             pcMappingIndexEntries.length(),

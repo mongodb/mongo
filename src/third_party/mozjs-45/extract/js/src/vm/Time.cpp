@@ -27,7 +27,8 @@
 #include <mmsystem.h> /* for timeBegin/EndPeriod */
 #include <stdlib.h>   /* for _set_invalid_parameter_handler */
 
-#include "prinit.h"
+// MONGODB MODIFICATION: Remove unneeded dependency on NSPR
+//#include "prinit.h"
 
 #endif
 
@@ -133,7 +134,8 @@ PRMJ_NowInit()
     InitializeCriticalSectionAndSpinCount(&calibration.data_lock, DataLockSpinCount);
 
     // Windows 8 has a new API function we can use.
-    if (HMODULE h = GetModuleHandle("kernel32.dll")) {
+    // MONGODB MODIFICATION: Use ANSI version of WINAPI
+    if (HMODULE h = GetModuleHandleA("kernel32.dll")) {
         pGetSystemTimePreciseAsFileTime =
             (void (WINAPI*)(LPFILETIME))GetProcAddress(h, "GetSystemTimePreciseAsFileTime");
     }

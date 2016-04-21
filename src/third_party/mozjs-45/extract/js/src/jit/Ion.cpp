@@ -1263,8 +1263,12 @@ void
 IonScript::Destroy(FreeOp* fop, IonScript* script)
 {
     script->unlinkFromRuntime(fop);
+#ifdef ENABLE_TRACE_LOGGING
+    // MONGODB HACK - The statement below needs operator= which is in
+    // tracelogging.cpp which we do not include in our builds.
     // Frees the potential event we have set.
     script->traceLoggerScriptEvent_ = TraceLoggerEvent();
+#endif
     fop->free_(script);
 }
 

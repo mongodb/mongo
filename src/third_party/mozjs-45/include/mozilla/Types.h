@@ -37,7 +37,10 @@
  * These macros are designed for use by library interfaces -- not for normal
  * methods or data used cross-file.
  */
-#if defined(WIN32)
+// MONGOD MODIFICATION - SERVER-20311
+// Disable all visibility hints since we are statically linking on Windows.
+// This prevents mongod.exe and other binaries from exporting these functions.
+#if 0 //defined(WIN32)
 #  define MOZ_EXPORT   __declspec(dllexport)
 #else /* Unix */
 #  ifdef HAVE_VISIBILITY_ATTRIBUTE
