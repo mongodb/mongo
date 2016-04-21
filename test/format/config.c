@@ -345,6 +345,8 @@ config_in_memory(void)
 		return;
 	if (config_is_perm("compression"))
 		return;
+	if (config_is_perm("data_source") && DATASOURCE("lsm"))
+		return;
 	if (config_is_perm("logging"))
 		return;
 	if (config_is_perm("rebalance"))
