@@ -194,15 +194,32 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 			__free_skip_list(
 			    session, WT_SKIP_FIRST(append), update_ignore);
 			__wt_free(session, append);
-			__wt_free(session, mod->mod_append);
+			__wt_free(session, mod->mod_col_append);
 		}
 
 		/* Free the insert/update array. */
-		if (mod->mod_update != NULL)
-			__free_skip_array(session, mod->mod_update,
+		if (mod->mod_col_update != NULL)
+			__free_skip_array(session, mod->mod_col_update,
 			    page->type ==
 			    WT_PAGE_COL_FIX ? 1 : page->pg_var_entries,
 			    update_ignore);
+		break;
+	case WT_PAGE_ROW_LEAF:
+		/*
+		 * Free the insert array.
+		 *
+		 * Row-store tables have one additional slot in the insert array
+		 * (the insert array has an extra slot to hold keys that sort
+		 * before keys found on the original page).
+		 */
+		if (mod->mod_row_insert != NULL)
+			__free_skip_array(session, mod->mod_row_insert,
+			    page->pg_row_entries + 1, update_ignore);
+
+		/* Free the update array. */
+		if (mod->mod_row_update != NULL)
+			__free_update(session, mod->mod_row_update,
+			    page->pg_row_entries, update_ignore);
 		break;
 	}
 
@@ -324,10 +341,6 @@ __free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_ROW *rip;
 	uint32_t i;
 	void *copy;
-	bool update_ignore;
-
-	/* In some failed-split cases, we can't discard updates. */
-	update_ignore = F_ISSET_ATOMIC(page, WT_PAGE_UPDATE_IGNORE);
 
 	/*
 	 * Free the in-memory index array.
@@ -342,22 +355,6 @@ __free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 		    page, copy, &ikey, NULL, NULL, NULL);
 		__wt_free(session, ikey);
 	}
-
-	/*
-	 * Free the insert array.
-	 *
-	 * Row-store tables have one additional slot in the insert array (the
-	 * insert array has an extra slot to hold keys that sort before keys
-	 * found on the original page).
-	 */
-	if (page->pg_row_ins != NULL)
-		__free_skip_array(session,
-		    page->pg_row_ins, page->pg_row_entries + 1, update_ignore);
-
-	/* Free the update array. */
-	if (page->pg_row_upd != NULL)
-		__free_update(session,
-		    page->pg_row_upd, page->pg_row_entries, update_ignore);
 }
 
 /*

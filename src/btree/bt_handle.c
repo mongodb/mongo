@@ -371,7 +371,7 @@ __wt_root_ref_init(WT_REF *root_ref, WT_PAGE *root, bool is_recno)
 	root_ref->page = root;
 	root_ref->state = WT_REF_MEM;
 
-	root_ref->key.recno = is_recno ? 1 : WT_RECNO_OOB;
+	root_ref->ref_recno = is_recno ? 1 : WT_RECNO_OOB;
 
 	root->pg_intl_parent_ref = root_ref;
 }
@@ -495,7 +495,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, bool creation)
 	case BTREE_COL_FIX:
 	case BTREE_COL_VAR:
 		WT_ERR(__wt_page_alloc(
-		    session, WT_PAGE_COL_INT, 1, 1, true, &root));
+		    session, WT_PAGE_COL_INT, 1, true, &root));
 		root->pg_intl_parent_ref = &btree->root;
 
 		pindex = WT_INTL_INDEX_GET_SAFE(root);
@@ -504,11 +504,11 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, bool creation)
 		ref->page = NULL;
 		ref->addr = NULL;
 		ref->state = WT_REF_DELETED;
-		ref->key.recno = 1;
+		ref->ref_recno = 1;
 		break;
 	case BTREE_ROW:
 		WT_ERR(__wt_page_alloc(
-		    session, WT_PAGE_ROW_INT, 0, 1, true, &root));
+		    session, WT_PAGE_ROW_INT, 1, true, &root));
 		root->pg_intl_parent_ref = &btree->root;
 
 		pindex = WT_INTL_INDEX_GET_SAFE(root);
@@ -524,7 +524,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, bool creation)
 
 	/* Bulk loads require a leaf page for reconciliation: create it now. */
 	if (F_ISSET(btree, WT_BTREE_BULK)) {
-		WT_ERR(__wt_btree_new_leaf_page(session, 1, &leaf));
+		WT_ERR(__wt_btree_new_leaf_page(session, &leaf));
 		ref->page = leaf;
 		ref->state = WT_REF_MEM;
 		WT_ERR(__wt_page_modify_init(session, leaf));
@@ -548,8 +548,7 @@ err:	if (leaf != NULL)
  *	Create an empty leaf page.
  */
 int
-__wt_btree_new_leaf_page(
-    WT_SESSION_IMPL *session, uint64_t recno, WT_PAGE **pagep)
+__wt_btree_new_leaf_page(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 {
 	WT_BTREE *btree;
 
@@ -558,15 +557,15 @@ __wt_btree_new_leaf_page(
 	switch (btree->type) {
 	case BTREE_COL_FIX:
 		WT_RET(__wt_page_alloc(
-		    session, WT_PAGE_COL_FIX, recno, 0, false, pagep));
+		    session, WT_PAGE_COL_FIX, 0, false, pagep));
 		break;
 	case BTREE_COL_VAR:
 		WT_RET(__wt_page_alloc(
-		    session, WT_PAGE_COL_VAR, recno, 0, false, pagep));
+		    session, WT_PAGE_COL_VAR, 0, false, pagep));
 		break;
 	case BTREE_ROW:
 		WT_RET(__wt_page_alloc(
-		    session, WT_PAGE_ROW_LEAF, WT_RECNO_OOB, 0, false, pagep));
+		    session, WT_PAGE_ROW_LEAF, 0, false, pagep));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -639,7 +638,7 @@ __btree_get_last_recno(WT_SESSION_IMPL *session)
 
 	page = next_walk->page;
 	btree->last_recno = page->type == WT_PAGE_COL_VAR ?
-	    __col_var_last_recno(page) : __col_fix_last_recno(page);
+	    __col_var_last_recno(next_walk) : __col_fix_last_recno(next_walk);
 
 	return (__wt_page_release(session, next_walk, 0));
 }

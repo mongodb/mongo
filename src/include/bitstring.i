@@ -261,10 +261,10 @@ __bit_getv(uint8_t *bitf, uint64_t entry, uint8_t width)
  *	Return a record number's bit-field value.
  */
 static inline uint8_t
-__bit_getv_recno(WT_PAGE *page, uint64_t recno, uint8_t width)
+__bit_getv_recno(WT_REF *ref, uint64_t recno, uint8_t width)
 {
 	return (__bit_getv(
-	    page->pg_fix_bitf, recno - page->pg_fix_recno, width));
+	    ref->page->pg_fix_bitf, recno - ref->ref_recno, width));
 }
 
 /*

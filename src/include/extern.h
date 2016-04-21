@@ -118,9 +118,9 @@ extern int __wt_debug_offset_blind( WT_SESSION_IMPL *session, wt_off_t offset, c
 extern int __wt_debug_offset(WT_SESSION_IMPL *session, wt_off_t offset, uint32_t size, uint32_t cksum, const char *ofile);
 extern int __wt_debug_disk( WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, const char *ofile);
 extern int __wt_debug_tree_shape( WT_SESSION_IMPL *session, WT_PAGE *page, const char *ofile);
-extern int __wt_debug_tree_all( WT_SESSION_IMPL *session, WT_BTREE *btree, WT_PAGE *page, const char *ofile);
-extern int __wt_debug_tree( WT_SESSION_IMPL *session, WT_BTREE *btree, WT_PAGE *page, const char *ofile);
-extern int __wt_debug_page(WT_SESSION_IMPL *session, WT_PAGE *page, const char *ofile);
+extern int __wt_debug_tree_all( WT_SESSION_IMPL *session, WT_BTREE *btree, WT_REF *ref, const char *ofile);
+extern int __wt_debug_tree( WT_SESSION_IMPL *session, WT_BTREE *btree, WT_REF *ref, const char *ofile);
+extern int __wt_debug_page(WT_SESSION_IMPL *session, WT_REF *ref, const char *ofile);
 extern int __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp);
 extern void __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref);
 extern bool __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all);
@@ -134,7 +134,7 @@ extern int __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[]);
 extern int __wt_btree_close(WT_SESSION_IMPL *session);
 extern void __wt_root_ref_init(WT_REF *root_ref, WT_PAGE *root, bool is_recno);
 extern int __wt_btree_tree_open( WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size);
-extern int __wt_btree_new_leaf_page( WT_SESSION_IMPL *session, uint64_t recno, WT_PAGE **pagep);
+extern int __wt_btree_new_leaf_page(WT_SESSION_IMPL *session, WT_PAGE **pagep);
 extern void __wt_btree_evictable(WT_SESSION_IMPL *session, bool on);
 extern int __wt_btree_huffman_open(WT_SESSION_IMPL *session);
 extern void __wt_btree_huffman_close(WT_SESSION_IMPL *session);
@@ -148,7 +148,7 @@ extern const char *__wt_buf_set_printable( WT_SESSION_IMPL *session, const void 
 extern int __wt_ovfl_read(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack, WT_ITEM *store);
 extern int __wt_ovfl_cache(WT_SESSION_IMPL *session, WT_PAGE *page, void *cookie, WT_CELL_UNPACK *vpack);
 extern int __wt_ovfl_discard(WT_SESSION_IMPL *session, WT_CELL *cell);
-extern int __wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type, uint64_t recno, uint32_t alloc_entries, bool alloc_refs, WT_PAGE **pagep);
+extern int __wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type, uint32_t alloc_entries, bool alloc_refs, WT_PAGE **pagep);
 extern int __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, size_t memsize, uint32_t flags, WT_PAGE **pagep);
 extern int __wt_las_remove_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor, uint32_t btree_id, const uint8_t *addr, size_t addr_size);
 extern int
