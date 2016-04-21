@@ -87,7 +87,7 @@ public:
                            ExplainCommon::Verbosity verbosity,
                            const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                            BSONObjBuilder* out) const {
-        const string ns = parseNsCollectionRequired(dbName, cmdObj);
+        const NamespaceString nss = parseNsCollectionRequired(dbName, cmdObj);
 
         auto status = Grid::get(txn)->catalogCache()->getDatabase(txn, dbName);
         uassertStatusOK(status);
@@ -96,10 +96,10 @@ public:
         shared_ptr<ChunkManager> chunkMgr;
         shared_ptr<Shard> shard;
 
-        if (!conf->isShardingEnabled() || !conf->isSharded(ns)) {
+        if (!conf->isShardingEnabled() || !conf->isSharded(nss.ns())) {
             shard = Grid::get(txn)->shardRegistry()->getShard(txn, conf->getPrimaryId());
         } else {
-            chunkMgr = _getChunkManager(txn, conf, ns);
+            chunkMgr = _getChunkManager(txn, conf, nss);
 
             const BSONObj query = cmdObj.getObjectField("query");
 
@@ -123,7 +123,7 @@ public:
         Timer timer;
 
         BSONObjBuilder result;
-        bool ok = _runCommand(txn, conf, chunkMgr, shard->getId(), ns, explainCmd.obj(), result);
+        bool ok = _runCommand(txn, conf, chunkMgr, shard->getId(), nss, explainCmd.obj(), result);
         long long millisElapsed = timer.millis();
 
         if (!ok) {
@@ -150,16 +150,16 @@ public:
                      int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
-        const string ns = parseNsCollectionRequired(dbName, cmdObj);
+        const NamespaceString nss = parseNsCollectionRequired(dbName, cmdObj);
 
         // findAndModify should only be creating database if upsert is true, but this would require
         // that the parsing be pulled into this function.
         auto conf = uassertStatusOK(dbutil::implicitCreateDb(txn, dbName));
-        if (!conf->isShardingEnabled() || !conf->isSharded(ns)) {
-            return _runCommand(txn, conf, nullptr, conf->getPrimaryId(), ns, cmdObj, result);
+        if (!conf->isShardingEnabled() || !conf->isSharded(nss.ns())) {
+            return _runCommand(txn, conf, nullptr, conf->getPrimaryId(), nss, cmdObj, result);
         }
 
-        shared_ptr<ChunkManager> chunkMgr = _getChunkManager(txn, conf, ns);
+        shared_ptr<ChunkManager> chunkMgr = _getChunkManager(txn, conf, nss);
 
         const BSONObj query = cmdObj.getObjectField("query");
 
@@ -172,7 +172,7 @@ public:
         BSONObj shardKey = status.getValue();
         shared_ptr<Chunk> chunk = chunkMgr->findIntersectingChunk(txn, shardKey);
 
-        bool ok = _runCommand(txn, conf, chunkMgr, chunk->getShardId(), ns, cmdObj, result);
+        bool ok = _runCommand(txn, conf, chunkMgr, chunk->getShardId(), nss, cmdObj, result);
         if (ok) {
             // check whether split is necessary (using update object for size heuristic)
             if (mongosGlobalParams.shouldAutoSplit) {
@@ -186,8 +186,8 @@ public:
 private:
     shared_ptr<ChunkManager> _getChunkManager(OperationContext* txn,
                                               shared_ptr<DBConfig> conf,
-                                              const string& ns) const {
-        shared_ptr<ChunkManager> chunkMgr = conf->getChunkManager(txn, ns);
+                                              const NamespaceString& nss) const {
+        shared_ptr<ChunkManager> chunkMgr = conf->getChunkManager(txn, nss.ns());
         massert(13002, "shard internal error chunk manager should never be null", chunkMgr);
 
         return chunkMgr;
@@ -216,13 +216,13 @@ private:
                      shared_ptr<DBConfig> conf,
                      shared_ptr<ChunkManager> chunkManager,
                      const ShardId& shardId,
-                     const string& ns,
+                     const NamespaceString& nss,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) const {
         BSONObj res;
 
         const auto shard = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
-        ShardConnection conn(shard->getConnString(), ns, chunkManager);
+        ShardConnection conn(shard->getConnString(), nss.ns(), chunkManager);
         bool ok = conn->runCommand(conf->name(), cmdObj, res);
         conn.done();
 

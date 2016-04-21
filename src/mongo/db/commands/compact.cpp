@@ -92,7 +92,7 @@ public:
                      int,
                      string& errmsg,
                      BSONObjBuilder& result) {
-        const std::string nsToCompact = parseNsCollectionRequired(db, cmdObj);
+        NamespaceString nss = parseNsCollectionRequired(db, cmdObj);
 
         repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
         if (replCoord->getMemberState().primary() && !cmdObj["force"].trueValue()) {
@@ -102,7 +102,6 @@ public:
             return false;
         }
 
-        NamespaceString nss(nsToCompact);
         if (!nss.isNormal()) {
             errmsg = "bad namespace name";
             return false;

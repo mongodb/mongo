@@ -223,7 +223,7 @@ public:
                      int,
                      string& errmsg,
                      BSONObjBuilder& result) {
-        const std::string fullNs = parseNsCollectionRequired(dbname, cmdObj);
+        const NamespaceString fullNs = parseNsCollectionRequired(dbname, cmdObj);
         int n = cmdObj.getIntField("n");
         bool inc = cmdObj.getBoolField("inc");  // inclusive range?
 
@@ -232,14 +232,14 @@ public:
                                        {ErrorCodes::BadValue, "n must be a positive integer"});
         }
 
-        OldClientWriteContext ctx(txn, fullNs);
+        OldClientWriteContext ctx(txn, fullNs.ns());
         Collection* collection = ctx.getCollection();
 
         if (!collection) {
             return appendCommandStatus(
                 result,
                 {ErrorCodes::NamespaceNotFound,
-                 str::stream() << "collection " << fullNs << " does not exist"});
+                 str::stream() << "collection " << fullNs.ns() << " does not exist"});
         }
 
         if (!collection->isCapped()) {
@@ -252,8 +252,12 @@ public:
             // Scan backwards through the collection to find the document to start truncating from.
             // We will remove 'n' documents, so start truncating from the (n + 1)th document to the
             // end.
-            std::unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
-                txn, fullNs, collection, PlanExecutor::YIELD_MANUAL, InternalPlanner::BACKWARD));
+            std::unique_ptr<PlanExecutor> exec(
+                InternalPlanner::collectionScan(txn,
+                                                fullNs.ns(),
+                                                collection,
+                                                PlanExecutor::YIELD_MANUAL,
+                                                InternalPlanner::BACKWARD));
 
             for (int i = 0; i < n + 1; ++i) {
                 PlanExecutor::ExecState state = exec->getNext(nullptr, &end);
@@ -294,9 +298,9 @@ public:
                      int,
                      string& errmsg,
                      BSONObjBuilder& result) {
-        const std::string ns = parseNsCollectionRequired(dbname, cmdObj);
+        const NamespaceString nss = parseNsCollectionRequired(dbname, cmdObj);
 
-        return appendCommandStatus(result, emptyCapped(txn, NamespaceString(ns)));
+        return appendCommandStatus(result, emptyCapped(txn, nss));
     }
 };
 

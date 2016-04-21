@@ -611,11 +611,11 @@ void createOplog(OperationContext* txn) {
 namespace {
 NamespaceString parseNs(const string& ns, const BSONObj& cmdObj) {
     BSONElement first = cmdObj.firstElement();
-    uassert(28635,
-            "no collection name specified",
-            first.canonicalType() == canonicalizeBSONType(mongo::String) &&
-                first.valuestrsize() > 0);
+    uassert(40073,
+            str::stream() << "collection name has invalid type " << typeName(first.type()),
+            first.canonicalType() == canonicalizeBSONType(mongo::String));
     std::string coll = first.valuestr();
+    uassert(28635, "no collection name specified", !coll.empty());
     return NamespaceString(NamespaceString(ns).db().toString(), coll);
 }
 

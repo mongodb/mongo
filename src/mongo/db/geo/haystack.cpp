@@ -93,9 +93,9 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        const std::string ns = parseNsCollectionRequired(dbname, cmdObj);
+        const NamespaceString nss = parseNsCollectionRequired(dbname, cmdObj);
 
-        AutoGetCollectionForRead ctx(txn, ns);
+        AutoGetCollectionForRead ctx(txn, nss.ns());
 
         Collection* collection = ctx.getCollection();
         if (!collection) {

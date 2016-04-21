@@ -488,21 +488,21 @@ public:
                      int,
                      string& errmsg,
                      BSONObjBuilder& result) {
-        const std::string nsToDrop = parseNsCollectionRequired(dbname, cmdObj);
+        const NamespaceString nsToDrop = parseNsCollectionRequired(dbname, cmdObj);
 
-        if (NamespaceString::virtualized(nsToDrop)) {
+        if (NamespaceString::virtualized(nsToDrop.ns())) {
             errmsg = "can't drop a virtual collection";
             return false;
         }
 
         if ((repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
              repl::ReplicationCoordinator::modeNone) &&
-            NamespaceString(nsToDrop).isOplog()) {
+            nsToDrop.isOplog()) {
             errmsg = "can't drop live oplog while replicating";
             return false;
         }
 
-        return appendCommandStatus(result, dropCollection(txn, NamespaceString(nsToDrop), result));
+        return appendCommandStatus(result, dropCollection(txn, nsToDrop, result));
     }
 
 } cmdDrop;
@@ -1033,8 +1033,8 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        const std::string ns = parseNsCollectionRequired(dbname, jsobj);
-        return appendCommandStatus(result, collMod(txn, NamespaceString(ns), jsobj, &result));
+        const NamespaceString nss = parseNsCollectionRequired(dbname, jsobj);
+        return appendCommandStatus(result, collMod(txn, nss, jsobj, &result));
     }
 
 } collectionModCommand;

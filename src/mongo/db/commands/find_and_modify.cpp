@@ -231,14 +231,14 @@ public:
                    ExplainCommon::Verbosity verbosity,
                    const rpc::ServerSelectionMetadata&,
                    BSONObjBuilder* out) const override {
-        const std::string fullNs = parseNsCollectionRequired(dbName, cmdObj);
-        Status allowedWriteStatus = userAllowedWriteNS(fullNs);
+        const NamespaceString fullNs = parseNsCollectionRequired(dbName, cmdObj);
+        Status allowedWriteStatus = userAllowedWriteNS(fullNs.ns());
         if (!allowedWriteStatus.isOK()) {
             return allowedWriteStatus;
         }
 
         StatusWith<FindAndModifyRequest> parseStatus =
-            FindAndModifyRequest::parseFromBSON(NamespaceString(fullNs), cmdObj);
+            FindAndModifyRequest::parseFromBSON(NamespaceString(fullNs.ns()), cmdObj);
         if (!parseStatus.isOK()) {
             return parseStatus.getStatus();
         }
@@ -322,14 +322,14 @@ public:
              BSONObjBuilder& result) override {
         // findAndModify command is not replicated directly.
         invariant(txn->writesAreReplicated());
-        const std::string fullNs = parseNsCollectionRequired(dbName, cmdObj);
-        Status allowedWriteStatus = userAllowedWriteNS(fullNs);
+        const NamespaceString fullNs = parseNsCollectionRequired(dbName, cmdObj);
+        Status allowedWriteStatus = userAllowedWriteNS(fullNs.ns());
         if (!allowedWriteStatus.isOK()) {
             return appendCommandStatus(result, allowedWriteStatus);
         }
 
         StatusWith<FindAndModifyRequest> parseStatus =
-            FindAndModifyRequest::parseFromBSON(NamespaceString(fullNs), cmdObj);
+            FindAndModifyRequest::parseFromBSON(NamespaceString(fullNs.ns()), cmdObj);
         if (!parseStatus.isOK()) {
             return appendCommandStatus(result, parseStatus.getStatus());
         }

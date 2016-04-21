@@ -89,9 +89,7 @@ public:
                      int,
                      string& errmsg,
                      BSONObjBuilder& result) {
-        const std::string ns = parseNsCollectionRequired(dbname, cmdObj);
-
-        const NamespaceString nss(ns);
+        const NamespaceString nss = parseNsCollectionRequired(dbname, cmdObj);
         if (!nss.isNormal()) {
             errmsg = "bad namespace name";
             return false;

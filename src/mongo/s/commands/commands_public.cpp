@@ -430,14 +430,14 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& output) {
-        const string ns = parseNsCollectionRequired(dbName, cmdObj);
+        const NamespaceString nss = parseNsCollectionRequired(dbName, cmdObj);
 
         auto conf = uassertStatusOK(grid.catalogCache()->getDatabase(txn, dbName));
-        if (!conf->isShardingEnabled() || !conf->isSharded(ns)) {
+        if (!conf->isShardingEnabled() || !conf->isSharded(nss.ns())) {
             return passthrough(txn, conf, cmdObj, output);
         }
 
-        ChunkManagerPtr cm = conf->getChunkManager(txn, ns);
+        ChunkManagerPtr cm = conf->getChunkManager(txn, nss.ns());
         massert(40051, "chunk manager should not be null", cm);
 
         vector<Strategy::CommandResult> results;
@@ -552,20 +552,20 @@ public:
             return appendCommandStatus(result, status.getStatus());
         }
 
-        const string fullns = dbName + "." + cmdObj.firstElement().valuestrsafe();
+        const NamespaceString fullns = parseNsCollectionRequired(dbName, cmdObj);
 
         log() << "DROP: " << fullns;
 
         const auto& db = status.getValue();
-        if (!db->isShardingEnabled() || !db->isSharded(fullns)) {
+        if (!db->isShardingEnabled() || !db->isSharded(fullns.ns())) {
             log() << "\tdrop going to do passthrough";
             return passthrough(txn, db, cmdObj, result);
         }
 
-        uassertStatusOK(grid.catalogManager(txn)->dropCollection(txn, NamespaceString(fullns)));
+        uassertStatusOK(grid.catalogManager(txn)->dropCollection(txn, fullns));
 
         // Force a full reload next time the just dropped namespace is accessed
-        db->invalidateNs(fullns);
+        db->invalidateNs(fullns.ns());
 
         return true;
     }
