@@ -42,6 +42,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/security_key.h"
+#include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
@@ -366,6 +367,29 @@ Status AuthorizationSession::checkAuthorizedToRevokePrivilege(const Privilege& p
                       " must be authorized to revoke roles from the admin database");
     }
     return Status::OK();
+}
+
+bool AuthorizationSession::isAuthorizedToCreateRole(
+    const struct auth::CreateOrUpdateRoleArgs& args) {
+    // A user is allowed to create a role under either of two conditions.
+
+    // The user may create a role if the authorization system says they are allowed to.
+    if (isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(args.roleName.getDB()),
+                                         ActionType::createRole)) {
+        return true;
+    }
+
+    // The user may create a role if the localhost exception is enabled, and they already own the
+    // role. This implies they have obtained the role through an external authorization mechanism.
+    if (_externalState->shouldAllowLocalhost()) {
+        for (const User* const user : _authenticatedUsers) {
+            if (user->hasRole(args.roleName)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 bool AuthorizationSession::isAuthorizedToGrantRole(const RoleName& role) {

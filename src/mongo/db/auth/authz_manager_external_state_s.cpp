@@ -169,9 +169,9 @@ Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(OperationContex
 
 bool AuthzManagerExternalStateMongos::hasAnyPrivilegeDocuments(OperationContext* txn) {
     BSONObj usersInfoCmd = BSON("usersInfo" << 1);
-    BSONObjBuilder builder;
-    const bool ok = grid.catalogManager(txn)
-                        ->runUserManagementReadCommand(txn, "admin", usersInfoCmd, &builder);
+    BSONObjBuilder userBuilder;
+    bool ok = grid.catalogManager(txn)
+                  ->runUserManagementReadCommand(txn, "admin", usersInfoCmd, &userBuilder);
     if (!ok) {
         // If we were unable to complete the query,
         // it's best to assume that there _are_ privilege documents.  This might happen
@@ -180,9 +180,22 @@ bool AuthzManagerExternalStateMongos::hasAnyPrivilegeDocuments(OperationContext*
         return true;
     }
 
-    BSONObj cmdResult = builder.obj();
+    BSONObj cmdResult = userBuilder.obj();
     std::vector<BSONElement> foundUsers = cmdResult["users"].Array();
-    return foundUsers.size() > 0;
+    if (foundUsers.size() > 0) {
+        return true;
+    }
+
+    BSONObj rolesInfoCmd = BSON("rolesInfo" << 1);
+    BSONObjBuilder roleBuilder;
+    ok = grid.catalogManager(txn)
+             ->runUserManagementReadCommand(txn, "admin", rolesInfoCmd, &roleBuilder);
+    if (!ok) {
+        return true;
+    }
+    cmdResult = roleBuilder.obj();
+    std::vector<BSONElement> foundRoles = cmdResult["roles"].Array();
+    return foundRoles.size() > 0;
 }
 
 }  // namespace mongo

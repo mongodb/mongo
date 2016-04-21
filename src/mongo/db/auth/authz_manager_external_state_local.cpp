@@ -131,11 +131,17 @@ void addPrivilegeObjectsOrWarningsToArrayElement(mutablebson::Element privileges
 
 bool AuthzManagerExternalStateLocal::hasAnyPrivilegeDocuments(OperationContext* txn) {
     BSONObj userBSONObj;
-    Status status =
+    Status statusFindUsers =
         findOne(txn, AuthorizationManager::usersCollectionNamespace, BSONObj(), &userBSONObj);
+
     // If we were unable to complete the query,
     // it's best to assume that there _are_ privilege documents.
-    return status != ErrorCodes::NoMatchingDocument;
+    if (statusFindUsers != ErrorCodes::NoMatchingDocument) {
+        return true;
+    }
+    Status statusFindRoles =
+        findOne(txn, AuthorizationManager::rolesCollectionNamespace, BSONObj(), &userBSONObj);
+    return statusFindRoles != ErrorCodes::NoMatchingDocument;
 }
 
 Status AuthzManagerExternalStateLocal::getUserDescription(OperationContext* txn,

@@ -204,8 +204,7 @@ Status checkAuthForCreateRoleCommand(ClientBasic* client,
         return status;
     }
 
-    if (!authzSession->isAuthorizedForActionsOnResource(
-            ResourcePattern::forDatabaseName(args.roleName.getDB()), ActionType::createRole)) {
+    if (!authzSession->isAuthorizedToCreateRole(args)) {
         return Status(ErrorCodes::Unauthorized,
                       str::stream()
                           << "Not authorized to create roles on db: " << args.roleName.getDB());

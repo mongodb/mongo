@@ -44,6 +44,11 @@
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {
+
+namespace auth {
+
+struct CreateOrUpdateRoleArgs;
+}
 class ClientBasic;
 
 /**
@@ -176,6 +181,9 @@ public:
     // Checks if this connection has the privileges necessary to revoke the given privilege
     // from a role.
     Status checkAuthorizedToRevokePrivilege(const Privilege& privilege);
+
+    // Checks if this connection has the privileges necessary to create a new role
+    bool isAuthorizedToCreateRole(const auth::CreateOrUpdateRoleArgs& args);
 
     // Utility function for isAuthorizedForActionsOnResource(
     //         ResourcePattern::forDatabaseName(role.getDB()), ActionType::grantAnyRole)
