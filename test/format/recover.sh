@@ -32,7 +32,7 @@ while true; do
 	fi
 
 	rm -rf $rundir2
-	$tcmd $config -q abort=1 logging=1 timer=$timer
+	$tcmd $config -q abort=1 in_memory=0 logging=1 timer=$timer
 
 	# Save a copy of the database directory exactly as it was at the crash.
 	cp -rp RUNDIR $rundir2
