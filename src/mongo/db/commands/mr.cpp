@@ -336,6 +336,16 @@ Config::Config(const string& _dbname, const BSONObj& cmdObj) {
         else
             uassert(13609, "sort has to be blank or an Object", !s.trueValue());
 
+        BSONElement collationElt = cmdObj["collation"];
+        if (collationElt.type() == Object)
+            collation = collationElt.embeddedObjectUserCheck();
+        else
+            uassert(40082,
+                    str::stream()
+                        << "mapReduce 'collation' parameter must be of type Object but found type: "
+                        << typeName(collationElt.type()),
+                    collationElt.eoo());
+
         if (cmdObj["limit"].isNumber())
             limit = cmdObj["limit"].numberLong();
         else

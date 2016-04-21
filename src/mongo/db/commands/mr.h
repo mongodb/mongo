@@ -206,6 +206,7 @@ public:
 
     BSONObj filter;
     BSONObj sort;
+    BSONObj collation;
     long long limit;
 
     // functions
