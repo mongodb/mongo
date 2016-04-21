@@ -595,3 +595,22 @@ buildvariants:
     - name: industry_benchmarks_MMAPv1
     - name: core_workloads_MMAPv1
 
+- name: windows-1-node-replSet
+  display_name: Windows 1-node ReplSet (trial)
+  batchtime: 480 # 8 hours
+  expansions:
+    setup: replica-win
+    cluster: windows-single
+    numShard: 0
+    extension: ".exe"
+    platform: windows
+  run_on:
+      - "rhel70-perf-standalone"
+  tasks:
+    - name: industry_benchmarks_WT
+      depends_on:
+        - name: compile
+          variant: windows-standalone
+    - name: core_workloads_WT
+    - name: industry_benchmarks_MMAPv1
+    - name: core_workloads_MMAPv1
