@@ -33,6 +33,7 @@
     assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
     assert.eq(profileObj.op, "insert", tojson(profileObj));
     assert.eq(profileObj.ninserted, 1, tojson(profileObj));
+    assert.eq(profileObj.keysInserted, 1, tojson(profileObj));
     if (isWriteCommand) {
         assert.eq(profileObj.query.documents.length, 1, tojson(profileObj));
         assert.eq(profileObj.query.documents[0], doc, tojson(profileObj));
@@ -66,10 +67,12 @@
 
     if (isWriteCommand) {
         assert.eq(profileObj.ninserted, 2, tojson(profileObj));
+        assert.eq(profileObj.keysInserted, 2, tojson(profileObj));
         assert.eq(profileObj.query.documents, docArray, tojson(profileObj));
     } else {
-        assert.eq(
-            profileObj.ninserted, 1, tojson(profileObj));  // Documents were inserted one at a time.
+        // Documents were inserted one at a time.
+        assert.eq(profileObj.ninserted, 1, tojson(profileObj));
+        assert.eq(profileObj.keysInserted, 1, tojson(profileObj));
     }
 
     //

@@ -18,10 +18,11 @@
     //
     coll.drop();
     for (var i = 0; i < 3; i++) {
-        assert.writeOK(coll.insert({_id: i, a: i}));
+        assert.writeOK(coll.insert({_id: i, a: i, b: i}));
     }
+    assert.commandWorked(coll.createIndex({b: 1}));
 
-    assert.eq({_id: 2, a: 2}, coll.findAndModify({query: {a: 2}, update: {$inc: {b: 1}}}));
+    assert.eq({_id: 2, a: 2, b: 2}, coll.findAndModify({query: {a: 2}, update: {$inc: {b: 1}}}));
 
     var profileObj = getLatestProfilerEntry(testDB);
 
@@ -34,6 +35,8 @@
     assert.eq(profileObj.docsExamined, 3, tojson(profileObj));
     assert.eq(profileObj.nMatched, 1, tojson(profileObj));
     assert.eq(profileObj.nModified, 1, tojson(profileObj));
+    assert.eq(profileObj.keysInserted, 1, tojson(profileObj));
+    assert.eq(profileObj.keysDeleted, 1, tojson(profileObj));
     assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));
 
@@ -55,6 +58,7 @@
     assert.eq(profileObj.keysExamined, 0, tojson(profileObj));
     assert.eq(profileObj.docsExamined, 3, tojson(profileObj));
     assert.eq(profileObj.ndeleted, 1, tojson(profileObj));
+    assert.eq(profileObj.keysDeleted, 1, tojson(profileObj));
 
     //
     // Update with {upsert: true} as findAndModify.
@@ -80,6 +84,7 @@
     assert.eq(profileObj.nMatched, 0, tojson(profileObj));
     assert.eq(profileObj.nModified, 0, tojson(profileObj));
     assert.eq(profileObj.upsert, true, tojson(profileObj));
+    assert.eq(profileObj.keysInserted, 1, tojson(profileObj));
 
     //
     // Idhack update as findAndModify.

@@ -23,15 +23,17 @@
     }
     assert.commandWorked(coll.createIndex({a: 1}));
 
-    assert.writeOK(coll.update({a: {$gte: 2}}, {$set: {c: 1}}));
+    assert.writeOK(coll.update({a: {$gte: 2}}, {$set: {c: 1}, $inc: {a: -10}}));
 
     var profileObj = getLatestProfilerEntry(testDB);
 
     assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
     assert.eq(profileObj.op, "update", tojson(profileObj));
-    assert.eq(profileObj.keyUpdates, 0, tojson(profileObj));
+    assert.eq(profileObj.keyUpdates, 1, tojson(profileObj));
     assert.eq(profileObj.keysExamined, 1, tojson(profileObj));
     assert.eq(profileObj.docsExamined, 1, tojson(profileObj));
+    assert.eq(profileObj.keysInserted, 1, tojson(profileObj));
+    assert.eq(profileObj.keysDeleted, 1, tojson(profileObj));
     assert.eq(profileObj.nMatched, 1, tojson(profileObj));
     assert.eq(profileObj.nModified, 1, tojson(profileObj));
     assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));
@@ -47,24 +49,33 @@
     }
     assert.commandWorked(coll.createIndex({a: 1}));
 
-    assert.writeOK(coll.update({a: {$gte: 5}}, {$set: {c: 1}}, {multi: true}));
+    assert.writeOK(coll.update({a: {$gte: 5}}, {$set: {c: 1}, $inc: {a: -10}}, {multi: true}));
     profileObj = getLatestProfilerEntry(testDB);
 
-    assert.eq(profileObj.keyUpdates, 0, tojson(profileObj));
+    assert.eq(profileObj.keyUpdates, 1, tojson(profileObj));
     assert.eq(profileObj.keysExamined, 5, tojson(profileObj));
     assert.eq(profileObj.docsExamined, 5, tojson(profileObj));
+    assert.eq(profileObj.keysInserted, 5, tojson(profileObj));
+    assert.eq(profileObj.keysDeleted, 5, tojson(profileObj));
     assert.eq(profileObj.nMatched, 5, tojson(profileObj));
     assert.eq(profileObj.nModified, 5, tojson(profileObj));
 
     //
     // Confirm metrics for insert on update with "upsert: true".
     //
+    coll.drop();
+    for (i = 0; i < 10; ++i) {
+        assert.writeOK(coll.insert({a: i}));
+    }
+    assert.commandWorked(coll.createIndex({a: 1}));
+
     coll.update({_id: "new value", a: 4}, {$inc: {b: 1}}, {upsert: true});
     profileObj = getLatestProfilerEntry(testDB);
     assert.eq(profileObj.query, {_id: "new value", a: 4}, tojson(profileObj));
     assert.eq(profileObj.updateobj, {$inc: {b: 1}}, tojson(profileObj));
     assert.eq(profileObj.keysExamined, 0, tojson(profileObj));
     assert.eq(profileObj.docsExamined, 0, tojson(profileObj));
+    assert.eq(profileObj.keysInserted, 2, tojson(profileObj));
     assert.eq(profileObj.nMatched, 0, tojson(profileObj));
     assert.eq(profileObj.nModified, 0, tojson(profileObj));
     assert.eq(profileObj.upsert, true, tojson(profileObj));

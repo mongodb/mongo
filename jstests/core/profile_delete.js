@@ -32,6 +32,7 @@
     assert.eq(profileObj.ndeleted, 1, tojson(profileObj));
     assert.eq(profileObj.keysExamined, 1, tojson(profileObj));
     assert.eq(profileObj.docsExamined, 1, tojson(profileObj));
+    assert.eq(profileObj.keysDeleted, 2, tojson(profileObj));
     assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("locks"), tojson(profileObj));
@@ -48,6 +49,7 @@
     profileObj = getLatestProfilerEntry(testDB);
 
     assert.eq(profileObj.ndeleted, 8, tojson(profileObj));
+    assert.eq(profileObj.keysDeleted, 8, tojson(profileObj));
 
     //
     // Confirm "fromMultiPlanner" metric.
