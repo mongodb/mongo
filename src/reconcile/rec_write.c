@@ -5459,7 +5459,15 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 			__wt_free(session, multi->key.ikey);
 			break;
 		}
-		if (multi->disk_image == NULL) {
+
+		/*
+		 * If the page was written free the backing disk blocks, else
+		 * it's a set of saved updates and a disk image. The disk
+		 * image may be handed off to another page as part of resolving
+		 * the split, use the saved updates to determine which it is.
+		 */
+		if (multi->supd == NULL) {
+			WT_ASSERT(session, multi->disk_image == NULL);
 			if (multi->addr.reuse)
 				multi->addr.addr = NULL;
 			else {
