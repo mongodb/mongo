@@ -796,17 +796,18 @@ __curjoin_entries_in_range(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		fastret = WT_NOTFOUND;
 		slowret = 0;
 	}
-	pos = (iter == NULL ? 0 : iter->entry_pos);
+	pos = iter == NULL ? 0 : iter->entry_pos;
 	for (entry = &cjoin->entries[pos]; pos < cjoin->entries_next;
 		entry++, pos++) {
 		ret = __curjoin_entry_member(session, entry, curkey, iter);
 		if (ret == fastret)
 			return (fastret);
 		if (ret != slowret)
-			WT_ERR(ret);
+			break;
 		iter = NULL;
 	}
-err:	return (ret == 0 ? slowret : ret);
+
+	return (ret == 0 ? slowret : ret);
 }
 
 /*
