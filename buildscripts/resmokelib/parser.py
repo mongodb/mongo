@@ -258,6 +258,13 @@ def get_suites(values, args):
 
     # If there are no suites specified, but there are args, assume they are jstests.
     if args:
+        # Do not change the execution order of the jstests passed as args, unless a tag option is
+        # specified. If an option is specified, then sort the tests for consistent execution order.
+        _config.ORDER_TESTS_BY_NAME = any(tag_filter is not None for
+                                          tag_filter in (_config.EXCLUDE_WITH_ALL_TAGS,
+                                                         _config.EXCLUDE_WITH_ANY_TAGS,
+                                                         _config.INCLUDE_WITH_ALL_TAGS,
+                                                         _config.INCLUDE_WITH_ANY_TAGS))
         # No specified config, just use the following, and default the logging and executor.
         suite_config = _make_jstests_config(args)
         _ensure_executor(suite_config, values.executor_file)

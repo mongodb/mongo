@@ -163,3 +163,10 @@ WT_ENGINE_CONFIG = None
 # If set, then all mongod's started by resmoke.py and by the mongo shell will use the specified
 # WiredTiger index configuration settings.
 WT_INDEX_CONFIG = None
+
+##
+# Internally used configuration options that aren't exposed to the user
+##
+
+# Default sort order for test execution. Will only be changed if --suites wasn't specified.
+ORDER_TESTS_BY_NAME = True
