@@ -574,20 +574,20 @@ int Balancer::_moveChunks(OperationContext* txn,
                         << " was deleted while balancing was active. Aborting balancing round.",
                     cm);
 
-            shared_ptr<Chunk> c = cm->findIntersectingChunk(txn, migrateInfo.chunk.min);
+            shared_ptr<Chunk> c = cm->findIntersectingChunk(txn, migrateInfo.minKey);
 
-            if (c->getMin().woCompare(migrateInfo.chunk.min) ||
-                c->getMax().woCompare(migrateInfo.chunk.max)) {
+            if (c->getMin().woCompare(migrateInfo.minKey) ||
+                c->getMax().woCompare(migrateInfo.maxKey)) {
                 // Likely a split happened somewhere, so force reload the chunk manager
                 cm = cfg->getChunkManager(txn, migrateInfo.ns, true);
                 invariant(cm);
 
-                c = cm->findIntersectingChunk(txn, migrateInfo.chunk.min);
+                c = cm->findIntersectingChunk(txn, migrateInfo.minKey);
 
-                if (c->getMin().woCompare(migrateInfo.chunk.min) ||
-                    c->getMax().woCompare(migrateInfo.chunk.max)) {
+                if (c->getMin().woCompare(migrateInfo.minKey) ||
+                    c->getMax().woCompare(migrateInfo.maxKey)) {
                     log() << "chunk mismatch after reload, ignoring will retry issue "
-                          << migrateInfo.chunk.toString();
+                          << migrateInfo;
 
                     continue;
                 }
@@ -605,9 +605,7 @@ int Balancer::_moveChunks(OperationContext* txn,
                 continue;
             }
 
-            // The move requires acquiring the collection metadata's lock, which can fail.
-            log() << "balancer move failed: " << res << " from: " << migrateInfo.from
-                  << " to: " << migrateInfo.to << " chunk: " << migrateInfo.chunk;
+            log() << "balancer move failed: " << res << ", migrate: " << migrateInfo;
 
             Status moveStatus = getStatusFromCommandResult(res);
 
@@ -616,7 +614,7 @@ int Balancer::_moveChunks(OperationContext* txn,
                 cm = cfg->getChunkManager(txn, migrateInfo.ns);
                 invariant(cm);
 
-                c = cm->findIntersectingChunk(txn, migrateInfo.chunk.min);
+                c = cm->findIntersectingChunk(txn, migrateInfo.minKey);
 
                 log() << "performing a split because migrate failed for size reasons";
 
@@ -633,8 +631,7 @@ int Balancer::_moveChunks(OperationContext* txn,
                 }
             }
         } catch (const DBException& ex) {
-            warning() << "could not move chunk " << migrateInfo.chunk.toString()
-                      << ", continuing balancing round" << causedBy(ex);
+            log() << "balancer move " << migrateInfo << " failed" << causedBy(ex);
         }
     }
 

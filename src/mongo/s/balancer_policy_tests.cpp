@@ -65,7 +65,7 @@ TEST(BalancerPolicyTests, BalanceNormalTest) {
 
     {
         ChunkType chunk;
-        chunk.setMin(BSON("x" << BSON("$minKey" << 1)));
+        chunk.setMin(BSON("x" << BSON("$maxKey" << 1)));
         chunk.setMax(BSON("x" << 49));
         chunks.push_back(chunk);
     }
@@ -97,7 +97,7 @@ TEST(BalancerPolicyTests, BalanceJumbo) {
 
     {
         ChunkType chunk;
-        chunk.setMin(BSON("x" << BSON("$minKey" << 1)));
+        chunk.setMin(BSON("x" << BSON("$maxKey" << 1)));
         chunk.setMax(BSON("x" << 10));
         chunk.setJumbo(true);
         chunks.push_back(chunk);
@@ -144,7 +144,7 @@ TEST(BalancerPolicyTests, BalanceJumbo) {
     std::unique_ptr<MigrateInfo> c(BalancerPolicy::balance("ns", status, 1));
 
     ASSERT(c);
-    ASSERT_EQUALS(30, c->chunk.max["x"].numberInt());
+    ASSERT_EQUALS(30, c->maxKey["x"].numberInt());
 }
 
 TEST(BalanceNormalTests, BalanceDrainingTest) {
@@ -153,7 +153,7 @@ TEST(BalanceNormalTests, BalanceDrainingTest) {
 
     {
         ChunkType chunk;
-        chunk.setMin(BSON("x" << BSON("$minKey" << 1)));
+        chunk.setMin(BSON("x" << BSON("$maxKey" << 1)));
         chunk.setMax(BSON("x" << 49));
         chunks.push_back(chunk);
     }
@@ -178,7 +178,7 @@ TEST(BalanceNormalTests, BalanceDrainingTest) {
     ASSERT(c);
     ASSERT_EQUALS(c->to, "shard1");
     ASSERT_EQUALS(c->from, "shard0");
-    ASSERT(!c->chunk.min.isEmpty());
+    ASSERT(!c->minKey.isEmpty());
 }
 
 TEST(BalancerPolicyTests, BalanceEndedDrainingTest) {
@@ -187,7 +187,7 @@ TEST(BalancerPolicyTests, BalanceEndedDrainingTest) {
 
     {
         ChunkType chunk;
-        chunk.setMin(BSON("x" << BSON("$minKey" << 1)));
+        chunk.setMin(BSON("x" << BSON("$maxKey" << 1)));
         chunk.setMax(BSON("x" << 49));
         chunks.push_back(chunk);
     }
@@ -218,7 +218,7 @@ TEST(BalancerPolicyTests, BalanceImpasseTest) {
 
     {
         ChunkType chunk;
-        chunk.setMin(BSON("x" << BSON("$minKey" << 1)));
+        chunk.setMin(BSON("x" << BSON("$maxKey" << 1)));
         chunk.setMax(BSON("x" << 49));
         chunks.push_back(chunk);
     }
@@ -262,7 +262,7 @@ void addShard(ShardToChunksMap& shardToChunks, unsigned numChunks, bool last) {
         ChunkType chunk;
 
         if (i == 0 && total == 0) {
-            chunk.setMin(BSON("x" << BSON("$minKey" << 1)));
+            chunk.setMin(BSON("x" << BSON("$maxKey" << 1)));
         } else {
             chunk.setMin(BSON("x" << total + i));
         }
@@ -283,7 +283,7 @@ void moveChunk(ShardToChunksMap& shardToChunks, MigrateInfo* m) {
     vector<ChunkType>& chunks = shardToChunks[m->from];
 
     for (vector<ChunkType>::iterator i = chunks.begin(); i != chunks.end(); ++i) {
-        if (i->getMin() == m->chunk.min) {
+        if (i->getMin() == m->minKey) {
             shardToChunks[m->to].push_back(*i);
             chunks.erase(i);
             return;
@@ -331,7 +331,7 @@ TEST(BalancerPolicyTests, TagsDraining) {
             break;
         }
 
-        if (m->chunk.min["x"].numberInt() < 7) {
+        if (m->minKey["x"].numberInt() < 7) {
             ASSERT_EQUALS("shard0", m->to);
         } else {
             ASSERT_EQUALS("shard2", m->to);

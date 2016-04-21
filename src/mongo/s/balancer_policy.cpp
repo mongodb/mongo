@@ -56,10 +56,6 @@ using std::set;
 using std::string;
 using std::vector;
 
-string TagRange::toString() const {
-    return str::stream() << min << " -->> " << max << "  on  " << tag;
-}
-
 DistributionStatus::DistributionStatus(ShardStatisticsVector shardInfo,
                                        const ShardToChunksMap& shardToChunksMap)
     : _shardInfo(std::move(shardInfo)), _shardChunks(shardToChunksMap) {}
@@ -302,7 +298,7 @@ MigrateInfo* BalancerPolicy::balance(const string& ns,
                       << ")"
                       << " to " << to;
 
-                return new MigrateInfo(ns, to, stat.shardId, chunkToMove.toBSON());
+                return new MigrateInfo(ns, to, stat.shardId, chunkToMove);
             }
 
             warning() << "can't find any chunk to move from: " << stat.shardId
@@ -338,7 +334,7 @@ MigrateInfo* BalancerPolicy::balance(const string& ns,
 
                 invariant(to != stat.shardId);
                 log() << " going to move to: " << to;
-                return new MigrateInfo(ns, to, stat.shardId, chunk.toBSON());
+                return new MigrateInfo(ns, to, stat.shardId, chunk);
             }
         }
     }
@@ -406,7 +402,7 @@ MigrateInfo* BalancerPolicy::balance(const string& ns,
 
             log() << " ns: " << ns << " going to move " << chunk << " from: " << from
                   << " to: " << to << " tag [" << tag << "]";
-            return new MigrateInfo(ns, to, from, chunk.toBSON());
+            return new MigrateInfo(ns, to, from, chunk);
         }
 
         if (numJumboChunks) {
@@ -423,11 +419,13 @@ MigrateInfo* BalancerPolicy::balance(const string& ns,
     return NULL;
 }
 
-string ChunkInfo::toString() const {
-    StringBuilder buf;
-    buf << " min: " << min;
-    buf << " max: " << max;
-    return buf.str();
+string TagRange::toString() const {
+    return str::stream() << min << " -->> " << max << "  on  " << tag;
+}
+
+string MigrateInfo::toString() const {
+    return str::stream() << ns << ": [" << minKey << ", " << maxKey << "), from " << from << ", to "
+                         << to;
 }
 
 }  // namespace mongo

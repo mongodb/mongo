@@ -41,42 +41,33 @@ namespace mongo {
 class ChunkManager;
 class OperationContext;
 
-struct ChunkInfo {
-    const BSONObj min;
-    const BSONObj max;
-
-    ChunkInfo(const BSONObj& chunk)
-        : min(chunk[ChunkType::min()].Obj().getOwned()),
-          max(chunk[ChunkType::max()].Obj().getOwned()) {}
-
-    std::string toString() const;
-};
-
-
 struct TagRange {
-    BSONObj min;
-    BSONObj max;
-    std::string tag;
-
-    TagRange() {}
+    TagRange() = default;
 
     TagRange(const BSONObj& a_min, const BSONObj& a_max, const std::string& a_tag)
         : min(a_min.getOwned()), max(a_max.getOwned()), tag(a_tag) {}
 
     std::string toString() const;
+
+    BSONObj min;
+    BSONObj max;
+    std::string tag;
 };
 
 struct MigrateInfo {
     MigrateInfo(const std::string& a_ns,
                 const ShardId& a_to,
                 const ShardId& a_from,
-                const BSONObj& a_chunk)
-        : ns(a_ns), to(a_to), from(a_from), chunk(a_chunk) {}
+                const ChunkType& a_chunk)
+        : ns(a_ns), to(a_to), from(a_from), minKey(a_chunk.getMin()), maxKey(a_chunk.getMax()) {}
 
-    const std::string ns;
-    const ShardId to;
-    const ShardId from;
-    const ChunkInfo chunk;
+    std::string toString() const;
+
+    std::string ns;
+    ShardId to;
+    ShardId from;
+    BSONObj minKey;
+    BSONObj maxKey;
 };
 
 typedef std::vector<ClusterStatistics::ShardStatistics> ShardStatisticsVector;
