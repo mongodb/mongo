@@ -21,6 +21,9 @@
     // here)
     replTest.waitForState(nodes[1], ReplSetTest.State.SECONDARY, 60000);
 
+    // Wait for election oplog entry to be replicated, to ensure 0 will vote for 1 after stopping 2.
+    replTest.awaitReplication();
+
     // kill 2, 1 should take over
     replTest.stop(2);
 
