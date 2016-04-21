@@ -1600,13 +1600,13 @@ __split_multi_inmem_fail(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_REF *ref)
 	/*
 	 * We failed creating new in-memory pages. For error-handling reasons,
 	 * we've left the update chains referenced by both the original and
-	 * new pages. Discard the new pages, setting a flag so the discard code
-	 * doesn't discard the updates on the page.
+	 * new pages. Discard the new allocated WT_REF structures and their
+	 * pages (setting a flag so the discard code doesn't discard the updates
+	 * on the page).
 	 */
-	if (ref->page != NULL) {
+	if (ref->page != NULL)
 		F_SET_ATOMIC(ref->page, WT_PAGE_UPDATE_IGNORE);
-		__wt_free_ref(session, ref, orig->type, true);
-	}
+	__wt_free_ref(session, ref, orig->type, true);
 }
 
 /*
@@ -2164,7 +2164,7 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
-	WT_REF new;
+	WT_REF *new;
 
 	page = ref->page;
 	mod = page->modify;
@@ -2180,10 +2180,11 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * to re-create a page in memory after it's been reconciled, and that's
 	 * exactly what we want to do.
 	 *
-	 * Build the new page.
+	 * Build the new page. (Allocate a WT_REF because the error path uses
+	 * routines that want to free memory).
 	 */
-	memset(&new, 0, sizeof(new));
-	WT_ERR(__split_multi_inmem(session, page, &new, &mod->mod_multi[0]));
+	WT_RET(__wt_calloc_one(session, &new));
+	WT_ERR(__split_multi_inmem(session, page, new, &mod->mod_multi[0]));
 
 	/*
 	 * The rewrite succeeded, we can no longer fail.
@@ -2203,11 +2204,12 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
 	__wt_ref_out(session, ref);
 
 	/* Swap the new page into place. */
-	ref->page = new.page;
+	ref->page = new->page;
 	WT_PUBLISH(ref->state, WT_REF_MEM);
 
+	__wt_free(session, new);
 	return (0);
 
-err:	__split_multi_inmem_fail(session, page, &new);
+err:	__split_multi_inmem_fail(session, page, new);
 	return (ret);
 }
