@@ -1,4 +1,0 @@
-#!/bin/sh
-
-cd $SOURCE
-exec ./mach build

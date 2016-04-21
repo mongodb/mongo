@@ -1,7 +1,0 @@
---enable-optimize
---enable-debug
---enable-stdcxx-compat
---disable-shared-js
---enable-arm-simulator
---target=i686-apple-darwin10.0.0
---host=i686-apple-darwin10.0.0

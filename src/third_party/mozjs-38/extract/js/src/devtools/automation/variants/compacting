@@ -1,5 +1,0 @@
---enable-optimize
---enable-debug
---enable-stdcxx-compat
---enable-ctypes
---disable-shared-js

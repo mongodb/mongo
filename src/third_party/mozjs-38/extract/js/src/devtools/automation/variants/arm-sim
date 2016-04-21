@@ -1,7 +1,0 @@
---enable-optimize
---enable-debug
---enable-stdcxx-compat
---disable-shared-js
---enable-arm-simulator
---target=i686-pc-linux
---host=i686-pc-linux
