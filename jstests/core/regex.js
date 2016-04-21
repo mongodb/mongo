@@ -34,4 +34,7 @@
     assert.throws(function() {
         t.find({a: {$regex: "ab", $options: "i\0"}}).itcount();
     });
+    assert.throws(function() {
+        t.find({key: {$regex: 'abcd\0xyz'}}).explain();
+    });
 })();
