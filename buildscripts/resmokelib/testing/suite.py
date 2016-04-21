@@ -8,6 +8,7 @@ import time
 
 from . import summary as _summary
 from . import testgroup
+from .. import config as _config
 from .. import selector as _selector
 
 
@@ -63,7 +64,9 @@ class Suite(object):
         else:  # test_kind == "js_test":
             tests = _selector.filter_jstests(**test_info)
 
-        return sorted(tests, key=str.lower)
+        if _config.ORDER_TESTS_BY_NAME:
+            return sorted(tests, key=str.lower)
+        return tests
 
     def get_name(self):
         """
