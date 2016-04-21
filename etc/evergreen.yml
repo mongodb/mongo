@@ -5751,6 +5751,7 @@ buildvariants:
   - rhel71-power8-build
   - rhel71-power8-test
   batchtime: 10080 # 7 days
+  stepback: false
   expansions:
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
     tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2)" -tags 'sasl ssl'
