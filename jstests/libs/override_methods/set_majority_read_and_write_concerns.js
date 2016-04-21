@@ -6,8 +6,29 @@
     "use strict";
     var defaultWriteConcern = {
         w: "majority",
-        wtimeout: 60000
+        // Use a "signature" value that won't typically match a value assigned in normal use.
+        wtimeout: 60321
     };
+    var defaultReadConcern = {
+        level: "majority"
+    };
+
+    var originalDBQuery = DBQuery;
+
+    DBQuery = function(mongo, db, collection, ns, query, fields, limit, skip, batchSize, options) {
+        if (ns.endsWith("$cmd")) {
+            if (query.hasOwnProperty("writeConcern") &&
+                bsonWoCompare(query.writeConcern, defaultWriteConcern) !== 0) {
+                jsTestLog("Warning: DBQuery overriding existing writeConcern of: " +
+                          tojson(query.writeConcern));
+                query.writeConcern = defaultWriteConcern;
+            }
+        }
+
+        return originalDBQuery.apply(this, arguments);
+    };
+
+    DBQuery.Option = originalDBQuery.Option;
 
     var originalStartParallelShell = startParallelShell;
     startParallelShell = function(jsCode, port, noConnect) {
@@ -85,19 +106,25 @@
 
         if (forceWriteConcern) {
             if (obj.hasOwnProperty("writeConcern")) {
-                jsTestLog("Warning: overriding existing writeConcern of: " +
-                          tojson(obj.writeConcern));
+                if (bsonWoCompare(obj.writeConcern, defaultWriteConcern) !== 0) {
+                    jsTestLog("Warning: _runCommandImpl overriding existing writeConcern of: " +
+                              tojson(obj.writeConcern));
+                    obj.writeConcern = defaultWriteConcern;
+                }
+            } else {
+                obj.writeConcern = defaultWriteConcern;
             }
-            obj.writeConcern = defaultWriteConcern;
 
         } else if (forceReadConcern) {
             if (obj.hasOwnProperty("readConcern")) {
-                jsTestLog("Warning: overriding existing readConcern of: " +
-                          tojson(obj.readConcern));
+                if (bsonWoCompare(obj.readConcern, defaultReadConcern) !== 0) {
+                    jsTestLog("Warning: _runCommandImpl overriding existing readConcern of: " +
+                              tojson(obj.readConcern));
+                    obj.readConcern = defaultReadConcern;
+                }
+            } else {
+                obj.readConcern = defaultReadConcern;
             }
-            obj.readConcern = {
-                level: "majority"
-            };
         }
 
         var res = this.getMongo().runCommand(dbName, obj, options);

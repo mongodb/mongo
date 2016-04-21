@@ -60,13 +60,12 @@ selector:
     - jstests/core/shellkillop.js # db.eval() used
     - jstests/core/shell_writeconcern.js # checks write concern shell helpers
     - jstests/core/storefunc.js # db.eval() used
+    - jstests/core/write_result.js # Tests invalid writeConcern, we shouldn't override.
     # Tests that need triaging & remediation | blacklist decision
     # Comments list possible problem point under review.
     - jstests/core/capped6.js # Uses captrunc test command.
     - jstests/core/convert_to_capped_nonexistant.js # Uses convertToCapped and captrunc command.
     - jstests/core/stages_delete.js # Uses stageDebug command for deletes.
-    - jstests/core/update_multi5.js # bulk_api not calling getWriteConcern when writeConcern passed in update
-
 
 executor:
   js_test:
