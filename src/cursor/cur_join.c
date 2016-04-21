@@ -127,9 +127,10 @@ __curjoin_iter_set_entry(WT_CURSOR_JOIN_ITER *iter, u_int entry_pos)
 		}
 		WT_ERR(__wt_cursor_dup_position(to_dup, iter->cursor));
 	} else if (iter->cursor != NULL) {
-		iter->cursor->close(iter->cursor);
+		WT_ERR(iter->cursor->close(iter->cursor));
 		iter->cursor = NULL;
 	}
+
 err:	__wt_free(session, uri);
 	return (ret);
 }
@@ -795,17 +796,18 @@ __curjoin_entries_in_range(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		fastret = WT_NOTFOUND;
 		slowret = 0;
 	}
-	pos = (iter == NULL ? 0 : iter->entry_pos);
+	pos = iter == NULL ? 0 : iter->entry_pos;
 	for (entry = &cjoin->entries[pos]; pos < cjoin->entries_next;
 		entry++, pos++) {
 		ret = __curjoin_entry_member(session, entry, curkey, iter);
 		if (ret == fastret)
 			return (fastret);
 		if (ret != slowret)
-			WT_ERR(ret);
+			break;
 		iter = NULL;
 	}
-err:	return (ret == 0 ? slowret : ret);
+
+	return (ret == 0 ? slowret : ret);
 }
 
 /*
@@ -1338,7 +1340,6 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	WT_CURSOR_JOIN_ENDPOINT *end;
 	WT_CURSOR_JOIN_ENTRY *entry;
 	WT_CURSOR_JOIN *child;
-	WT_DECL_RET;
 	bool hasins, needbloom, nested, range_eq;
 	size_t len;
 	u_int i, ins, nonbloom;
@@ -1346,19 +1347,18 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 
 	entry = NULL;
 	hasins = needbloom = false;
-	ins = 0; /* -Wuninitialized */
-	nonbloom = 0; /* -Wuninitialized */
+	ins = nonbloom = 0;				/* -Wuninitialized */
 
 	if (cjoin->entries_next == 0) {
 		if (LF_ISSET(WT_CURJOIN_ENTRY_DISJUNCTION))
 			F_SET(cjoin, WT_CURJOIN_DISJUNCTION);
 	} else if (LF_ISSET(WT_CURJOIN_ENTRY_DISJUNCTION) &&
 	    !F_ISSET(cjoin, WT_CURJOIN_DISJUNCTION))
-		WT_ERR_MSG(session, EINVAL,
+		WT_RET_MSG(session, EINVAL,
 		    "operation=or does not match previous operation=and");
 	else if (!LF_ISSET(WT_CURJOIN_ENTRY_DISJUNCTION) &&
 	    F_ISSET(cjoin, WT_CURJOIN_DISJUNCTION))
-		WT_ERR_MSG(session, EINVAL,
+		WT_RET_MSG(session, EINVAL,
 		    "operation=and does not match previous operation=or");
 
 	nested = WT_PREFIX_MATCH(ref_cursor->uri, "join:");
@@ -1378,12 +1378,12 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		}
 	else {
 		if (LF_ISSET(WT_CURJOIN_ENTRY_BLOOM))
-			WT_ERR_MSG(session, EINVAL,
+			WT_RET_MSG(session, EINVAL,
 			    "Bloom filters cannot be used with subjoins");
 	}
 
 	if (entry == NULL) {
-		WT_ERR(__wt_realloc_def(session, &cjoin->entries_allocated,
+		WT_RET(__wt_realloc_def(session, &cjoin->entries_allocated,
 		    cjoin->entries_next + 1, &cjoin->entries));
 		if (LF_ISSET(WT_CURJOIN_ENTRY_BLOOM) && needbloom) {
 			/*
@@ -1412,13 +1412,13 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	} else {
 		/* Merge the join into an existing entry for this index */
 		if (count != 0 && entry->count != 0 && entry->count != count)
-			WT_ERR_MSG(session, EINVAL,
+			WT_RET_MSG(session, EINVAL,
 			    "count=%" PRIu64 " does not match "
 			    "previous count=%" PRIu64 " for this index",
 			    count, entry->count);
 		if (LF_MASK(WT_CURJOIN_ENTRY_BLOOM) !=
 		    F_MASK(entry, WT_CURJOIN_ENTRY_BLOOM))
-			WT_ERR_MSG(session, EINVAL,
+			WT_RET_MSG(session, EINVAL,
 			    "join has incompatible strategy "
 			    "values for the same index");
 
@@ -1449,12 +1449,12 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 			    (endrange == WT_CURJOIN_END_EQ &&
 			    (range & (WT_CURJOIN_END_LT | WT_CURJOIN_END_GT))
 			    != 0))
-				WT_ERR_MSG(session, EINVAL,
+				WT_RET_MSG(session, EINVAL,
 				    "join has overlapping ranges");
 			if (range == WT_CURJOIN_END_EQ &&
 			    endrange == WT_CURJOIN_END_EQ &&
 			    !F_ISSET(entry, WT_CURJOIN_ENTRY_DISJUNCTION))
-				WT_ERR_MSG(session, EINVAL,
+				WT_RET_MSG(session, EINVAL,
 				    "compare=eq can only be combined "
 				    "using operation=or");
 
@@ -1483,7 +1483,7 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		entry->subjoin = child;
 		child->parent = cjoin;
 	} else {
-		WT_ERR(__curjoin_insert_endpoint(session, entry,
+		WT_RET(__curjoin_insert_endpoint(session, entry,
 		    hasins ? ins : entry->ends_next, &end));
 		end->cursor = ref_cursor;
 		F_SET(end, range);
@@ -1493,7 +1493,7 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 			 * Open the main file with a projection of the
 			 * indexed columns.
 			 */
-			WT_ERR(__curjoin_open_main(session, cjoin, entry));
+			WT_RET(__curjoin_open_main(session, cjoin, entry));
 
 			/*
 			 * When we are repacking index keys to remove the
@@ -1502,14 +1502,13 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 			 */
 			cindex = (WT_CURSOR_INDEX *)ref_cursor;
 			len = strlen(cindex->iface.key_format) + 3;
-			WT_ERR(__wt_calloc(session, len, 1,
+			WT_RET(__wt_calloc(session, len, 1,
 			    &entry->repack_format));
 			snprintf(entry->repack_format, len, "%s0x",
 			    cindex->iface.key_format);
 		}
 	}
-
-err:	return (ret);
+	return (0);
 }
 
 /*

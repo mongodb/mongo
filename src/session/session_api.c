@@ -785,8 +785,8 @@ static int
 __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
     WT_CURSOR *ref_cursor, const char *config)
 {
-	WT_CURSOR *firstcg;
 	WT_CONFIG_ITEM cval;
+	WT_CURSOR *firstcg;
 	WT_CURSOR_INDEX *cindex;
 	WT_CURSOR_JOIN *cjoin;
 	WT_CURSOR_TABLE *ctable;
@@ -799,13 +799,13 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 	uint32_t bloom_bit_count, bloom_hash_count;
 	uint8_t flags, range;
 
-	count = 0;
-	firstcg = NULL;
-	flags = 0;
-	nested = false;
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, join, config, cfg);
+
+	firstcg = NULL;
 	table = NULL;
+	nested = false;
+	count = 0;
 
 	if (!WT_PREFIX_MATCH(join_cursor->uri, "join:"))
 		WT_ERR_MSG(session, EINVAL, "not a join cursor");
