@@ -368,7 +368,7 @@ config_in_memory(void)
 static void
 config_in_memory_check(void)
 {
-	size_t cache;
+	uint32_t cache;
 
 	if (g.c_in_memory == 0)
 		return;
