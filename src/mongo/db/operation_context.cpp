@@ -203,5 +203,4 @@ Status OperationContext::checkForInterruptNoAssert() {
 
     return Status::OK();
 }
-
 }  // namespace mongo

@@ -52,16 +52,12 @@ public:
 
     virtual bool isPrimaryFor(StringData ns) override;
 
-    virtual void setReplicatedWrites(bool writesAreReplicated = true) override;
-    virtual bool writesAreReplicated() const override;
-
 private:
     friend class ServiceContextMongoD;
 
     OperationContextImpl();
 
     std::unique_ptr<RecoveryUnit> _recovery;
-    bool _writesAreReplicated;
 };
 
 }  // namespace mongo

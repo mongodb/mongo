@@ -100,12 +100,6 @@ public:
         return std::string();
     };
 
-    void setReplicatedWrites(bool writesAreReplicated = true) override {}
-
-    bool writesAreReplicated() const override {
-        return false;
-    }
-
 private:
     std::unique_ptr<RecoveryUnit> _recoveryUnit;
     std::unique_ptr<Locker> _locker;

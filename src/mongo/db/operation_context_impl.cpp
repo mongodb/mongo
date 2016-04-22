@@ -72,8 +72,7 @@ using std::string;
 
 OperationContextImpl::OperationContextImpl()
     : OperationContext(
-          &cc(), nextOpId.fetchAndAdd(1), clientOperationInfoDecoration(cc()).getLocker()),
-      _writesAreReplicated(true) {
+          &cc(), nextOpId.fetchAndAdd(1), clientOperationInfoDecoration(cc()).getLocker()) {
     StorageEngine* storageEngine = getServiceContext()->getGlobalStorageEngine();
     _recovery.reset(storageEngine->newRecoveryUnit());
 
@@ -120,11 +119,4 @@ bool OperationContextImpl::isPrimaryFor(StringData ns) {
     return repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(NamespaceString(ns));
 }
 
-void OperationContextImpl::setReplicatedWrites(bool writesAreReplicated) {
-    _writesAreReplicated = writesAreReplicated;
-}
-
-bool OperationContextImpl::writesAreReplicated() const {
-    return _writesAreReplicated;
-}
 }  // namespace mongo

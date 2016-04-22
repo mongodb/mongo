@@ -521,7 +521,6 @@ env.Library('repl_coordinator_global',
 env.Library(
     target='replmocks',
     source=[
-        'operation_context_repl_mock.cpp',
         'replication_coordinator_external_state_mock.cpp',
         'replication_coordinator_mock.cpp',
         'service_context_repl_mock.cpp',

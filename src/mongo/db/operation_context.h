@@ -180,12 +180,16 @@ public:
     /**
      * Set whether or not operations should generate oplog entries.
      */
-    virtual void setReplicatedWrites(bool writesAreReplicated = true) = 0;
+    void setReplicatedWrites(bool writesAreReplicated = true) {
+        _writesAreReplicated = writesAreReplicated;
+    }
 
     /**
      * Returns true if operations should generate oplog entries.
      */
-    virtual bool writesAreReplicated() const = 0;
+    bool writesAreReplicated() const {
+        return _writesAreReplicated;
+    }
 
     /**
      * Marks this operation as killed so that subsequent calls to checkForInterrupt and
@@ -318,6 +322,8 @@ private:
 
     // Timer counting the elapsed time since the construction of this OperationContext.
     Timer _elapsedTime;
+
+    bool _writesAreReplicated = true;
 };
 
 class WriteUnitOfWork {

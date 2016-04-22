@@ -32,14 +32,16 @@
 
 #include <memory>
 
-#include "mongo/db/repl/operation_context_repl_mock.h"
+#include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/operation_context_noop.h"
 
 namespace mongo {
 namespace repl {
 
 std::unique_ptr<OperationContext> ServiceContextReplMock::_newOpCtx(Client* client) {
-    return std::unique_ptr<OperationContextReplMock>(
-        new OperationContextReplMock(client, _nextOpId.fetchAndAdd(1)));
+    return std::unique_ptr<OperationContext>(
+        new OperationContextNoop(client, _nextOpId.fetchAndAdd(1), new MMAPV1LockerImpl()));
 }
 
 }  // namespace repl
