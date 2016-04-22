@@ -325,39 +325,6 @@ if env.TargetOSIs('windows'):
     extra_defines = ['WINDOWS', 'WNT', 'winnt']
     env.Append(CPPDEFINES=extra_defines)
 
-    # Compile extra Float53 files
-    extra_objects = [
-        float53_object('dpml_asinh_t', 'dpml_asinh',
-                       [('ASINH', '1'),('BUILD_FILE_NAME', 'dpml_asinh_t.h')]),
-        float53_object('dpml_acosh_t', 'dpml_asinh', [('ACOSH', '1')]),
-        float53_object('dpml_cbrt_t', 'dpml_cbrt',
-                       [('CBRT', '1'),('BUILD_FILE_NAME', 'dpml_cbrt_t_table.c')]),
-        float53_object('dpml_erf_t', 'dpml_erf',
-                       [('ERF', '1'),('BUILD_FILE_NAME', 'dpml_erf_t.h')]),
-        float53_object('dpml_erfc_t', 'dpml_erf',
-                       [('ERFC', '1'),('BUILD_FILE_NAME', 'dpml_erf_t.h')]),
-        float53_object('dpml_expm1_t', 'dpml_expm1', [('EXPM1', '1'),('USE_CONTROL87', '1')]),
-        float53_object('dpml_exp10_t', 'dpml_exp', [('EXP10', '1'),('USE_CONTROL87', '1')]),
-        # float53_object('dpml_exp2_t', 'dpml_exp', [('EXP2', '1'),('USE_CONTROL87', '1')]),
-        float53_object('dpml_lgamma_t', 'dpml_lgamma',
-                       [('DBUILD_FILE_NAME', 'dpml_lgamma_t.h'), ('DO_LGAMMA', '1'),
-                        ('HACK_GAMMA_INLINE', '0')]),
-        float53_object('dpml_log1p_t', 'dpml_log', [('LOG1P', '1')]),
-        float53_object('dpml_tgamma_t', 'dpml_tgamma', [('TGAMMA', '1')]),
-        float53_object('dpml_rt_lgamma_t', 'dpml_lgamma',
-                       [('DBUILD_FILE_NAME', 'dpml_lgamma_t.h')]),
-        float53_object('dpml_pow_t_table', 'dpml_pow_t_table'),
-        float53_object('dpml_cbrt_t_table', 'dpml_cbrt_t_table'),
-        float53_object('dpml_special_exp_t', 'dpml_exp', [('SPECIAL_EXP', '1')]),
-    ]
-
-    if processor == 'i386':
-        extra_objects += [
-            float53_object('dpml_log2_t', 'dpml_log', ['LOG2'])
-        ]
-
-    files += extra_objects
-
 for to_remove in ['-Werror', '-Wall', '-W']:
     removeIfPresent(env['CCFLAGS'], to_remove)
 
