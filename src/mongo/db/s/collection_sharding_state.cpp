@@ -180,15 +180,6 @@ void CollectionShardingState::onInsertOp(OperationContext* txn, const BSONObj& i
 void CollectionShardingState::onUpdateOp(OperationContext* txn, const BSONObj& updatedDoc) {
     dassert(txn->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
 
-    if (txn->writesAreReplicated() && serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
-        _nss == NamespaceString::kConfigCollectionNamespace) {
-        if (auto idElem = updatedDoc["_id"]) {
-            uassert(40069,
-                    "cannot update shardIdentity document while in --shardsvr mode",
-                    idElem.str() != ShardIdentityType::IdName);
-        }
-    }
-
     checkShardVersionOrThrow(txn);
 
     if (_sourceMgr) {

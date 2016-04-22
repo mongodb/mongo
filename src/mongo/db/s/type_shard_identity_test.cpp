@@ -134,5 +134,12 @@ TEST(ShardIdentityType, NonReplSetConnectionString) {
     ASSERT_EQ(ErrorCodes::UnsupportedFormat, ShardIdentityType::fromBSON(doc).getStatus());
 }
 
+TEST(ShardIdentityType, CreateUpdateObject) {
+    auto updateObj = ShardIdentityType::createConfigServerUpdateObject("test/a:1,b:2");
+    auto expectedObj = BSON("$set" << BSON("configsvrConnectionString"
+                                           << "test/a:1,b:2"));
+    ASSERT_EQ(expectedObj, updateObj);
+}
+
 }  // namespace mongo
 }  // unnamed namespace

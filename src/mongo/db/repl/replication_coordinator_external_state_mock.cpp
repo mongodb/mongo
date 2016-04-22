@@ -199,6 +199,9 @@ void ReplicationCoordinatorExternalStateMock::clearShardingState() {}
 
 void ReplicationCoordinatorExternalStateMock::recoverShardingState(OperationContext* txn) {}
 
+void ReplicationCoordinatorExternalStateMock::updateShardIdentityConfigString(
+    OperationContext* txn) {}
+
 void ReplicationCoordinatorExternalStateMock::signalApplierToChooseNewSyncSource() {}
 
 void ReplicationCoordinatorExternalStateMock::signalApplierToCancelFetcher() {

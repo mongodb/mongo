@@ -63,6 +63,8 @@
 #include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
@@ -403,6 +405,20 @@ void ReplicationCoordinatorExternalStateImpl::recoverShardingState(OperationCont
     // There is a slight chance that some stale metadata might have been loaded before the latest
     // optime has been recovered, so throw out everything that we have up to now
     ShardingState::get(txn)->clearCollectionMetadata();
+}
+
+void ReplicationCoordinatorExternalStateImpl::updateShardIdentityConfigString(
+    OperationContext* txn) {
+    if (ShardingState::get(txn)->enabled()) {
+        const auto configsvrConnStr =
+            Grid::get(txn)->shardRegistry()->getConfigShard()->getConnString();
+        auto status = ShardingState::get(txn)
+                          ->updateShardIdentityConfigString(txn, configsvrConnStr.toString());
+        if (!status.isOK()) {
+            warning() << "error encountered while trying to update config connection string to "
+                      << configsvrConnStr << causedBy(status);
+        }
+    }
 }
 
 void ReplicationCoordinatorExternalStateImpl::signalApplierToChooseNewSyncSource() {

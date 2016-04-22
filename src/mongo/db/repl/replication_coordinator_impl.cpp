@@ -751,6 +751,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
     _drainFinishedCond.notify_all();
     lk.unlock();
 
+    _externalState->updateShardIdentityConfigString(txn);
     _externalState->dropAllTempCollections(txn);
 
     // This is done for compatibility with PV0 replicas wrt how "n" ops are processed.

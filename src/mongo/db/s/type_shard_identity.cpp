@@ -30,15 +30,21 @@
 
 #include "mongo/db/s/type_shard_identity.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 
 const std::string ShardIdentityType::IdName("shardIdentity");
+
+namespace {
+
 const BSONField<std::string> configsvrConnString("configsvrConnectionString");
 const BSONField<std::string> shardName("shardName");
 const BSONField<OID> clusterId("clusterId");
+
+}  // unnamed namespace
 
 StatusWith<ShardIdentityType> ShardIdentityType::fromBSON(const BSONObj& source) {
     if (!source.hasField("_id")) {
@@ -196,6 +202,14 @@ const OID& ShardIdentityType::getClusterId() const {
 
 void ShardIdentityType::setClusterId(OID clusterId) {
     _clusterId = std::move(clusterId);
+}
+
+BSONObj ShardIdentityType::createConfigServerUpdateObject(const std::string& newConnString) {
+    BSONObjBuilder builder;
+    BSONObjBuilder setConfigBuilder(builder.subobjStart("$set"));
+    setConfigBuilder.append(configsvrConnString(), newConnString);
+    setConfigBuilder.doneFast();
+    return builder.obj();
 }
 
 }  // namespace mongo

@@ -41,7 +41,10 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/ops/update.h"
+#include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/metadata_loader.h"
@@ -137,6 +140,32 @@ Date_t getDeadlineFromMaxTimeMS(OperationContext* txn) {
     }
 
     return Date_t::now() + Microseconds(remainingTime);
+}
+
+/**
+ * Updates the config server field of the shardIdentity document with the given connection string
+ * if setName is equal to the config server replica set name.
+ *
+ * Note: This is intended to be used on a new thread that hasn't called Client::initThread.
+ * One example use case is for the ReplicaSetMonitor asynchronous callback when it detects changes
+ * to replica set membership.
+ */
+void updateShardIdentityConfigStringCB(const string& setName, const string& newConnectionString) {
+    auto configsvrConnStr = grid.shardRegistry()->getConfigServerConnectionString();
+    if (configsvrConnStr.getSetName() != setName) {
+        // Ignore all change notification for other sets that are not the config server.
+        return;
+    }
+
+    Client::initThread("updateShardIdentityConfigConnString");
+    auto uniqOpCtx = getGlobalServiceContext()->makeOperationContext(&cc());
+
+    auto status = ShardingState::get(uniqOpCtx.get())
+                      ->updateShardIdentityConfigString(uniqOpCtx.get(), newConnectionString);
+    if (!status.isOK() && !ErrorCodes::isNotMasterError(status.code())) {
+        warning() << "error encountered while trying to update config connection string to "
+                  << newConnectionString << causedBy(status);
+    }
 }
 
 }  // namespace
@@ -524,8 +553,6 @@ Status ShardingState::initializeFromShardIdentity(const ShardIdentityType& shard
 
     if (_getInitializationState() == InitializationState::kNew) {
         ShardedConnectionInfo::addHook();
-        ReplicaSetMonitor::setSynchronousConfigChangeHook(
-            &ConfigServer::replicaSetChangeShardRegistryUpdateHook);
 
         try {
             Status status = _globalInit(configSvrConnStr);
@@ -533,6 +560,10 @@ Status ShardingState::initializeFromShardIdentity(const ShardIdentityType& shard
             // For backwards compatibility with old style inits from metadata commands.
             if (status.isOK()) {
                 _setInitializationState_inlock(InitializationState::kInitialized);
+                ReplicaSetMonitor::setSynchronousConfigChangeHook(
+                    &ConfigServer::replicaSetChangeShardRegistryUpdateHook);
+                ReplicaSetMonitor::setAsynchronousConfigChangeHook(
+                    &updateShardIdentityConfigStringCB);
             } else {
                 _initializationStatus = status;
                 _setInitializationState_inlock(InitializationState::kError);
@@ -560,12 +591,18 @@ void ShardingState::_initializeImpl(ConnectionString configSvr) {
     // Do this initialization outside of the lock, since we are already protected by having entered
     // the kInitializing state.
     ShardedConnectionInfo::addHook();
-    ReplicaSetMonitor::setSynchronousConfigChangeHook(
-        &ConfigServer::replicaSetChangeShardRegistryUpdateHook);
 
     try {
         Status status = _globalInit(configSvr);
+
+        if (status.isOK()) {
+            ReplicaSetMonitor::setSynchronousConfigChangeHook(
+                &ConfigServer::replicaSetChangeShardRegistryUpdateHook);
+            ReplicaSetMonitor::setAsynchronousConfigChangeHook(&updateShardIdentityConfigStringCB);
+        }
+
         _signalInitializationComplete(status);
+
     } catch (const DBException& ex) {
         _signalInitializationComplete(ex.toStatus());
     }
@@ -968,6 +1005,36 @@ ShardingState::ScopedRegisterMigration::ScopedRegisterMigration(OperationContext
 
 ShardingState::ScopedRegisterMigration::~ScopedRegisterMigration() {
     ShardingState::get(_txn)->_clearMigration();
+}
+
+Status ShardingState::updateShardIdentityConfigString(OperationContext* txn,
+                                                      const std::string& newConnectionString) {
+    BSONObj updateObj(ShardIdentityType::createConfigServerUpdateObject(newConnectionString));
+
+    UpdateRequest updateReq(NamespaceString::kConfigCollectionNamespace);
+    updateReq.setQuery(BSON("_id" << ShardIdentityType::IdName));
+    updateReq.setUpdates(updateObj);
+    UpdateLifecycleImpl updateLifecycle(NamespaceString::kConfigCollectionNamespace);
+    updateReq.setLifecycle(&updateLifecycle);
+
+    OpDebug opDebug;
+
+    try {
+        AutoGetOrCreateDb autoDb(txn, NamespaceString::kConfigCollectionNamespace.db(), MODE_X);
+
+        auto result = update(txn, autoDb.getDb(), updateReq, &opDebug);
+        if (result.numMatched == 0) {
+            warning() << "failed to update config string of shard identity document because "
+                      << "it does not exist. This shard could have been removed from the cluster";
+        } else {
+            LOG(2) << "Updated config server connection string in shardIdentity document to"
+                   << newConnectionString;
+        }
+    } catch (const DBException& exception) {
+        return exception.toStatus();
+    }
+
+    return Status::OK();
 }
 
 /**

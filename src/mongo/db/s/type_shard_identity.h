@@ -77,6 +77,12 @@ public:
     const OID& getClusterId() const;
     void setClusterId(OID clusterId);
 
+    /**
+     * Returns an update object that can be used to update the config server field of the
+     * shardIdentity document with the new connection string.
+     */
+    static BSONObj createConfigServerUpdateObject(const std::string& newConnString);
+
 private:
     // Convention: (M)andatory, (O)ptional, (S)pecial rule.
 

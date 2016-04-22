@@ -76,6 +76,7 @@ public:
     virtual void killAllUserOperations(OperationContext* txn);
     virtual void clearShardingState();
     virtual void recoverShardingState(OperationContext* txn);
+    virtual void updateShardIdentityConfigString(OperationContext* txn) override;
     virtual void signalApplierToChooseNewSyncSource();
     virtual void signalApplierToCancelFetcher();
     virtual void dropAllTempCollections(OperationContext* txn);

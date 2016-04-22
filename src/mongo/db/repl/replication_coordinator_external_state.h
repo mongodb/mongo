@@ -208,6 +208,12 @@ public:
     virtual void recoverShardingState(OperationContext* txn) = 0;
 
     /**
+     * Called when the instance transitions to primary in order to update the config server
+     * connection string of the shard identity document.
+     */
+    virtual void updateShardIdentityConfigString(OperationContext* txn) = 0;
+
+    /**
      * Notifies the bgsync and syncSourceFeedback threads to choose a new sync source.
      */
     virtual void signalApplierToChooseNewSyncSource() = 0;

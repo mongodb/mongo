@@ -219,6 +219,15 @@ public:
     std::shared_ptr<CollectionMetadata> getCollectionMetadata(const std::string& ns);
 
     /**
+     * Updates the config server field of the shardIdentity document with the given connection
+     * string.
+     *
+     * Note: this can return NotMaster error.
+     */
+    Status updateShardIdentityConfigString(OperationContext* txn,
+                                           const std::string& newConnectionString);
+
+    /**
      * TESTING ONLY
      * Uninstalls the metadata for a given collection.
      */
