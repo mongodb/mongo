@@ -647,7 +647,8 @@ __curjoin_init_next(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	const char *raw_cfg[] = { WT_CONFIG_BASE(
 	    session, WT_SESSION_open_cursor), "raw", NULL };
 	const char **config, *proj, *urimain;
-	uint32_t f, k, size;
+	size_t size;
+	uint32_t f, k;
 
 	mainbuf = NULL;
 	if (cjoin->entries_next == 0)
