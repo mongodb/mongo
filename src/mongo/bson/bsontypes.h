@@ -51,7 +51,7 @@ extern const BSONObj kMinBSONKey;
 /**
     determines BSON types considered valid by validate
 */
-enum class BSONVersion  { kV1_0, kV1_1, kLatest = kV1_1 };
+enum class BSONVersion { kV1_0, kV1_1, kLatest = kV1_1 };
 
 // Flag that determines whether we should accept decimal types in object validation, and default
 // to KeyString V1 indexes on non-MMAP storage engines. Set by enableBSON1_1 server parameter.
