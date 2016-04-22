@@ -185,3 +185,7 @@ error_class("Interruption", ["Interrupted",
 error_class("NotMasterError", ["NotMaster", "NotMasterNoSlaveOk"])
 error_class("StaleShardingError",
             ["RecvStaleConfig", "SendStaleConfig", "StaleShardVersion", "StaleEpoch"])
+error_class("WriteConcernError", ["WriteConcernFailed",
+                                  "WriteConcernLegacyOK",
+                                  "UnknownReplWriteConcern",
+                                  "CannotSatisfyWriteConcern"])

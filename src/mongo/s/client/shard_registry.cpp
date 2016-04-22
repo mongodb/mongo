@@ -172,12 +172,6 @@ const ShardRegistry::ErrorCodesSet ShardRegistry::kAllRetriableErrors{
     ErrorCodes::NetworkTimeout,
     ErrorCodes::InterruptedDueToReplStateChange};
 
-const ShardRegistry::ErrorCodesSet ShardRegistry::kWriteConcernErrors{
-    ErrorCodes::WriteConcernFailed,
-    ErrorCodes::WriteConcernLegacyOK,
-    ErrorCodes::UnknownReplWriteConcern,
-    ErrorCodes::CannotSatisfyWriteConcern};
-
 ShardRegistry::ShardRegistry(std::unique_ptr<ShardFactory> shardFactory,
                              ConnectionString configServerCS)
     : _shardFactory(std::move(shardFactory)) {

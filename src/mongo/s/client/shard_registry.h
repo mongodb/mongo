@@ -263,11 +263,6 @@ public:
      */
     static const ErrorCodesSet kAllRetriableErrors;
 
-    /**
-     * Set of error codes that specify write concern related errors.
-     */
-    static const ErrorCodesSet kWriteConcernErrors;
-
 private:
     using ShardMap = std::unordered_map<ShardId, std::shared_ptr<Shard>>;
 

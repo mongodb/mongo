@@ -929,7 +929,7 @@ public:
             if (!status.isOK()) {
                 // If the status is a write concern error, append a writeConcernError instead of
                 // and error message.
-                if (ShardRegistry::kWriteConcernErrors.count(status.code())) {
+                if (ErrorCodes::isWriteConcernError(status.code())) {
                     WCErrorDetail wcError;
                     wcError.setErrMessage(status.reason());
                     wcError.setErrCode(status.code());
