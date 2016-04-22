@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/data_type_validated.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/db/server_options.h"
 
@@ -43,10 +44,14 @@ class Status;
  */
 template <>
 struct Validator<BSONObj> {
+    static BSONVersion validateVersion();
+
     inline static Status validateLoad(const char* ptr, size_t length) {
-        return serverGlobalParams.objcheck ? validateBSON(ptr, length) : Status::OK();
+        return serverGlobalParams.objcheck
+            ? validateBSON(ptr, length, enableBSON1_1 ? BSONVersion::kV1_1 : BSONVersion::kV1_0)
+            : Status::OK();
     }
+
     static Status validateStore(const BSONObj& toStore);
 };
-
 }  // namespace mongo

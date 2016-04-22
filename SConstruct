@@ -444,14 +444,6 @@ add_option('cache-dir',
     help='Specify the directory to use for caching objects if --cache is in use',
 )
 
-add_option("experimental-decimal-support",
-    choices=['on', 'off'],
-    default='off',
-    const='on',
-    help="Enable experimental decimal128 type support",
-    nargs='?',
-)
-
 add_option("cxx-std",
     choices=["11", "14"],
     default="11",
@@ -1510,9 +1502,6 @@ if get_option('wiredtiger') == 'on':
     else:
         wiredtiger = True
         env.SetConfigHeaderDefine("MONGO_CONFIG_WIREDTIGER_ENABLED")
-
-if get_option('experimental-decimal-support') == 'on':
-    env.SetConfigHeaderDefine("MONGO_CONFIG_EXPERIMENTAL_DECIMAL_SUPPORT")
 
 icuEnabled = False
 if get_option('icu') == 'on':

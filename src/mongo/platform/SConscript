@@ -27,6 +27,4 @@ env.CppUnitTest('endian_test', 'endian_test.cpp')
 env.CppUnitTest('process_id_test', 'process_id_test.cpp', LIBDEPS=['platform'])
 env.CppUnitTest('random_test', 'random_test.cpp', LIBDEPS=['$BUILD_DIR/mongo/base'])
 env.CppUnitTest('stack_locator_test', 'stack_locator_test.cpp', LIBDEPS=['platform'])
-
-if GetOption('experimental-decimal-support') == 'on':
-    env.CppUnitTest('decimal128_test', 'decimal128_test.cpp', LIBDEPS=['$BUILD_DIR/mongo/base'])
+env.CppUnitTest('decimal128_test', 'decimal128_test.cpp', LIBDEPS=['$BUILD_DIR/mongo/base'])

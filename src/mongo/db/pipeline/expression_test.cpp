@@ -4589,11 +4589,9 @@ TEST(ExpressionTypeTest, WithIntValue) {
     assertExpectedResults("$type", {{{Value(1)}, Value("int")}});
 }
 
-#ifdef MONGO_CONFIG_EXPERIMENTAL_DECIMAL_SUPPORT
 TEST(ExpressionTypeTest, WithDecimalValue) {
     assertExpectedResults("$type", {{{Value(Decimal128(0.3))}, Value("decimal")}});
 }
-#endif
 
 TEST(ExpressionTypeTest, WithLongValue) {
     assertExpectedResults("$type", {{{Value(1LL)}, Value("long")}});

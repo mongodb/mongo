@@ -328,10 +328,9 @@ if env.TargetOSIs('windows'):
 for to_remove in ['-Werror', '-Wall', '-W']:
     removeIfPresent(env['CCFLAGS'], to_remove)
 
-if GetOption('experimental-decimal-support') == 'on':
-    env.Library(
-        target='intel_decimal128',
-        source=source_files,
-        LIBS=libs,
-    )
+env.Library(
+    target='intel_decimal128',
+    source=source_files,
+    LIBS=libs,
+)
 

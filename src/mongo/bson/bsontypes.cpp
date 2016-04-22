@@ -34,6 +34,8 @@
 
 namespace mongo {
 
+bool enableBSON1_1 = false;
+
 const char kMaxKeyData[] = {7, 0, 0, 0, static_cast<char>(MaxKey), 0, 0};
 const BSONObj kMaxBSONKey(kMaxKeyData);
 
@@ -115,9 +117,7 @@ bool isValidBSONType(int type) {
         case NumberInt:
         case bsonTimestamp:
         case NumberLong:
-#ifdef MONGO_CONFIG_EXPERIMENTAL_DECIMAL_SUPPORT
         case NumberDecimal:
-#endif
         case MaxKey:
             return true;
         default:

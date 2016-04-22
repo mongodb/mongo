@@ -426,9 +426,7 @@ const std::unordered_map<std::string, BSONType> TypeMatchExpression::typeAliasMa
     {typeName(NumberInt), NumberInt},
     {typeName(bsonTimestamp), bsonTimestamp},
     {typeName(NumberLong), NumberLong},
-#ifdef MONGO_CONFIG_EXPERIMENTAL_DECIMAL_SUPPORT
     {typeName(NumberDecimal), NumberDecimal},
-#endif
     {typeName(MaxKey), MaxKey},
     {typeName(MinKey), MinKey}};
 

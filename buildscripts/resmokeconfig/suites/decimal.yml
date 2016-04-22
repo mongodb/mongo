@@ -17,3 +17,4 @@ executor:
       mongod_options:
         set_parameters:
           enableTestCommands: 1
+          enableBSON1_1: 1

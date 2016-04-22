@@ -34,9 +34,6 @@
 // Define if building a debug build
 @mongo_config_debug_build@
 
-// Defined if experimental decimal support is enabled
-@mongo_config_experimental_decimal_support@
-
 // Defined if thread_local storage class is available
 @mongo_config_have_thread_local@
 

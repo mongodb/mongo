@@ -49,13 +49,13 @@ namespace mongo {
 class Decimal128 {
 public:
 /**
- * This boolean is used as a master switch to enable and disable decimal support
- * and is set by the build flag --experimental-decimal-support.
+ * This boolean is used as a master switch to enable and disable decimal support.
+ * TODO(SERVER-23553): Remove once s390 decimal support is working
  */
-#ifdef MONGO_CONFIG_EXPERIMENTAL_DECIMAL_SUPPORT
-    static const bool enabled = true;
-#else
+#if defined(__s390x__)
     static const bool enabled = false;
+#else
+    static const bool enabled = true;
 #endif
 
     /**

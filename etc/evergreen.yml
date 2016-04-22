@@ -1775,7 +1775,7 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
-  name: jsDecimalCore
+  name: jsCore_decimal
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -1784,7 +1784,7 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
-  name: jsDecimalCore_WT
+  name: jsCore_decimal_WT
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -2314,6 +2314,8 @@ buildvariants:
   - name: jsCore_op_query_WT
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_decimal
+  - name: jsCore_decimal_WT
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
@@ -2446,6 +2448,8 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_decimal
+  - name: jsCore_decimal_WT
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
@@ -2682,6 +2686,8 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_decimal
+  - name: jsCore_decimal_WT
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
@@ -2789,6 +2795,8 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_decimal
+  - name: jsCore_decimal_WT
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
@@ -2973,6 +2981,8 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_decimal
+  - name: jsCore_decimal_WT
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
@@ -3032,32 +3042,6 @@ buildvariants:
     distros:
     - rhel55-test
 
-- name: linux-64-decimal
-  display_name: Linux (Decimal Enabled)
-  modules: ~
-  run_on:
-  - rhel55
-  batchtime: 1440 # 1 day
-  expansions:
-    gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
-    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
-    push_path: linux
-    push_bucket: downloads.mongodb.org
-    push_name: linux
-    push_arch: x86_64-decimal
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ --release --experimental-decimal-support=on
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-  tasks:
-  - name: compile
-    distros:
-    - rhel55
-  - name: dbtest
-  - name: dbtest_WT
-  - name: jsCore
-  - name: jsDecimalCore
-  - name: jsDecimalCore_WT
-  - name: unittests
-
 ###########################################
 #         Windows buildvariants           #
 ###########################################
@@ -3108,6 +3092,8 @@ buildvariants:
   - name: jsCore_WT
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_decimal
+  - name: jsCore_decimal_WT
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
@@ -3208,6 +3194,8 @@ buildvariants:
   - name: jsCore_WT
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_decimal
+  - name: jsCore_decimal_WT
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
@@ -3307,6 +3295,8 @@ buildvariants:
   - name: jsCore_WT
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_decimal
+  - name: jsCore_decimal_WT
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
@@ -3595,6 +3585,8 @@ buildvariants:
   - name: jsCore_WT
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_decimal
+  - name: jsCore_decimal_WT
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
@@ -3694,6 +3686,8 @@ buildvariants:
   - name: jsCore_WT
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_decimal
+  - name: jsCore_decimal_WT
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
@@ -3786,6 +3780,8 @@ buildvariants:
   - name: jsCore_WT
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_decimal
+  - name: jsCore_decimal_WT
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
@@ -3863,6 +3859,8 @@ buildvariants:
   - name: jsCore_WT
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_decimal
+  - name: jsCore_decimal_WT
   - name: mmap
   - name: mongosTest
   - name: replicasets
@@ -4043,6 +4041,8 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_decimal
+  - name: jsCore_decimal_WT
   - name: jsCore_minimum_batch_size_WT
   - name: jsCore_op_query
   - name: jsCore_op_query_WT
@@ -4217,6 +4217,8 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_decimal
+  - name: jsCore_decimal_WT
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
@@ -4325,6 +4327,8 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_decimal
+  - name: jsCore_decimal_WT
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
@@ -4433,6 +4437,8 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_decimal
+  - name: jsCore_decimal_WT
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
@@ -4563,6 +4569,7 @@ buildvariants:
   # - name: jsCore_auth
   # - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_decimal_WT
   # - name: jsCore_minimum_batch_size_WT
   # - name: jsCore_op_query
   - name: jsCore_op_query_WT
