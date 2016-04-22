@@ -209,7 +209,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm, bool reset, bool update)
 				goto open;
 
 			if (txn->isolation == WT_ISO_SNAPSHOT)
-				__wt_txn_cursor_op(session);
+				WT_RET(__wt_txn_cursor_op(session));
 
 			/*
 			 * Figure out how many updates are required for

@@ -261,14 +261,14 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		 * eviction, it's better to do it beforehand.
 		 */
 		WT_RET(__wt_cache_eviction_check(session, false, NULL));
-
-		__wt_txn_get_snapshot(session);
+		WT_RET(__wt_txn_get_snapshot(session));
 	}
 
 	F_SET(txn, WT_TXN_RUNNING);
 	if (F_ISSET(S2C(session), WT_CONN_READONLY))
 		F_SET(txn, WT_TXN_READONLY);
-	return (false);
+
+	return (0);
 }
 
 /*
@@ -450,7 +450,7 @@ __wt_txn_read_last(WT_SESSION_IMPL *session)
  * __wt_txn_cursor_op --
  *	Called for each cursor operation.
  */
-static inline void
+static inline int
 __wt_txn_cursor_op(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
@@ -482,7 +482,9 @@ __wt_txn_cursor_op(WT_SESSION_IMPL *session)
 		if (txn_state->snap_min == WT_TXN_NONE)
 			txn_state->snap_min = txn_global->last_running;
 	} else if (!F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
-		__wt_txn_get_snapshot(session);
+		WT_RET(__wt_txn_get_snapshot(session));
+
+	return (0);
 }
 
 /*

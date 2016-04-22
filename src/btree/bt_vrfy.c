@@ -355,7 +355,7 @@ __verify_tree(WT_SESSION_IMPL *session, WT_REF *ref, WT_VSTUFF *vs)
 	if (vs->dump_blocks)
 		WT_RET(__wt_debug_disk(session, page->dsk, NULL));
 	if (vs->dump_pages)
-		WT_RET(__wt_debug_page(session, page, NULL));
+		WT_RET(__wt_debug_page(session, ref, NULL));
 #endif
 
 	/*
@@ -364,13 +364,11 @@ __verify_tree(WT_SESSION_IMPL *session, WT_REF *ref, WT_VSTUFF *vs)
 	 */
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
-		recno = page->pg_fix_recno;
-		goto recno_chk;
 	case WT_PAGE_COL_INT:
-		recno = page->pg_intl_recno;
+		recno = ref->ref_recno;
 		goto recno_chk;
 	case WT_PAGE_COL_VAR:
-		recno = page->pg_var_recno;
+		recno = ref->ref_recno;
 recno_chk:	if (recno != vs->record_total + 1)
 			WT_RET_MSG(session, WT_ERROR,
 			    "page at %s has a starting record of %" PRIu64
@@ -485,7 +483,7 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 			 * reviewed to this point.
 			 */
 			++entry;
-			if (child_ref->key.recno != vs->record_total + 1) {
+			if (child_ref->ref_recno != vs->record_total + 1) {
 				WT_RET_MSG(session, WT_ERROR,
 				    "the starting record number in entry %"
 				    PRIu32 " of the column internal page at "
@@ -494,7 +492,7 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 				    entry,
 				    __wt_page_addr_string(
 				    session, child_ref, vs->tmp1),
-				    child_ref->key.recno,
+				    child_ref->ref_recno,
 				    vs->record_total + 1);
 			}
 

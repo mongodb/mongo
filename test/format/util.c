@@ -73,28 +73,11 @@ dstrdup(const void *str)
 	return (p);
 }
 
-static inline uint32_t
-kv_len(WT_RAND_STATE *rnd, uint64_t keyno, uint32_t min, uint32_t max)
-{
-	/*
-	 * Focus on relatively small key/value items, admitting the possibility
-	 * of larger items.  Pick a size close to the minimum most of the time,
-	 * only create a larger item 1 in 20 times, and a really big item 1 in
-	 * 1000 times. (Configuration can force large key/value minimum sizes,
-	 * where every key/value item is an overflow.)
-	 */
-	if (keyno % 1000 == 0 && max < KILOBYTE(80)) {
-		min = KILOBYTE(80);
-		max = KILOBYTE(100);
-	} else if (keyno % 20 != 0 && max > min + 20)
-		max = min + 20;
-	return (mmrand(rnd, min, max));
-}
-
 void
 key_len_setup(void)
 {
 	size_t i;
+	uint32_t max;
 
 	/*
 	 * The key is a variable length item with a leading 10-digit value.
@@ -104,10 +87,18 @@ key_len_setup(void)
 	 * the pre-loaded lengths.
 	 *
 	 * Fill in the random key lengths.
+	 *
+	 * Focus on relatively small items, admitting the possibility of larger
+	 * items. Pick a size close to the minimum most of the time, only create
+	 * a larger item 1 in 20 times.
 	 */
-	for (i = 0; i < sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]); ++i)
-		g.key_rand_len[i] =
-		    kv_len(NULL, (uint64_t)i, g.c_key_min, g.c_key_max);
+	for (i = 0;
+	    i < sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]); ++i) {
+		max = g.c_key_max;
+		if (i % 20 != 0 && max > g.c_key_min + 20)
+			max = g.c_key_min + 20;
+		g.key_rand_len[i] = mmrand(NULL, g.c_key_min, max);
+	}
 }
 
 void
@@ -143,13 +134,22 @@ key_gen_common(WT_ITEM *key, uint64_t keyno, int suffix)
 	len = sprintf(p, "%010" PRIu64 ".%02d", keyno, suffix);
 
 	/*
-	 * In a column-store, the key is only used for BDB, and so it doesn't
-	 * need a random length.
+	 * In a column-store, the key is only used for Berkeley DB inserts,
+	 * and so it doesn't need a random length.
 	 */
 	if (g.type == ROW) {
 		p[len] = '/';
-		len = (int)g.key_rand_len[keyno %
-		    (sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]))];
+
+		/*
+		 * Because we're doing table lookup for key sizes, we weren't
+		 * able to set really big keys sizes in the table, the table
+		 * isn't big enough to keep our hash from selecting too many
+		 * big keys and blowing out the cache. Handle that here, use a
+		 * really big key 1 in 2500 times.
+		 */
+		len = keyno % 2500 == 0 && g.c_key_max < KILOBYTE(80) ?
+		    KILOBYTE(80) :
+		    (int)g.key_rand_len[keyno % WT_ELEMENTS(g.key_rand_len)];
 	}
 
 	key->data = key->mem;
@@ -169,6 +169,23 @@ key_gen_insert(WT_RAND_STATE *rnd, WT_ITEM *key, uint64_t keyno)
 }
 
 static uint32_t val_dup_data_len;	/* Length of duplicate data items */
+
+static inline uint32_t
+value_len(WT_RAND_STATE *rnd, uint64_t keyno, uint32_t min, uint32_t max)
+{
+	/*
+	 * Focus on relatively small items, admitting the possibility of larger
+	 * items. Pick a size close to the minimum most of the time, only create
+	 * a larger item 1 in 20 times, and a really big item 1 in somewhere
+	 * around 2500 items.
+	 */
+	if (keyno % 2500 == 0 && max < KILOBYTE(80)) {
+		min = KILOBYTE(80);
+		max = KILOBYTE(100);
+	} else if (keyno % 20 != 0 && max > min + 20)
+		max = min + 20;
+	return (mmrand(rnd, min, max));
+}
 
 void
 val_gen_setup(WT_RAND_STATE *rnd, WT_ITEM *value)
@@ -195,7 +212,7 @@ val_gen_setup(WT_RAND_STATE *rnd, WT_ITEM *value)
 	value->data = value->mem;
 	value->size = 0;
 
-	val_dup_data_len = kv_len(rnd,
+	val_dup_data_len = value_len(rnd,
 	    (uint64_t)mmrand(rnd, 1, 20), g.c_value_min, g.c_value_max);
 }
 
@@ -253,7 +270,8 @@ val_gen(WT_RAND_STATE *rnd, WT_ITEM *value, uint64_t keyno)
 	} else {
 		(void)sprintf(p, "%010" PRIu64, keyno);
 		p[10] = '/';
-		value->size = kv_len(rnd, keyno, g.c_value_min, g.c_value_max);
+		value->size =
+		    value_len(rnd, keyno, g.c_value_min, g.c_value_max);
 	}
 }
 

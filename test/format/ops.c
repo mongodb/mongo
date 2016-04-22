@@ -788,10 +788,8 @@ wts_read_scan(void)
 		switch (ret = read_row(cursor, &key, &value, keyno)) {
 		case 0:
 		case WT_NOTFOUND:
-			break;
 		case WT_ROLLBACK:
-			/* Shouldn't happen, we're the only thread operating. */
-			/* FALLTHROUGH */
+			break;
 		default:
 			testutil_die(
 			    ret, "wts_read_scan: read row %" PRIu64, keyno);
@@ -853,8 +851,6 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 		} else
 			testutil_check(cursor->get_value(cursor, value));
 		break;
-	case WT_ROLLBACK:
-		return (WT_ROLLBACK);
 	case WT_NOTFOUND:
 		/*
 		 * In fixed length stores, zero values at the end of the key
@@ -867,6 +863,8 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 			ret = 0;
 		}
 		break;
+	case WT_ROLLBACK:
+		return (WT_ROLLBACK);
 	default:
 		testutil_die(ret, "read_row: read row %" PRIu64, keyno);
 	}
@@ -913,13 +911,11 @@ nextprev(WT_CURSOR *cursor, int next)
 	uint8_t bitfield;
 	const char *which;
 
+	keyno = 0;
 	which = next ? "next" : "prev";
 
-	keyno = 0;
-	ret = next ? cursor->next(cursor) : cursor->prev(cursor);
-	if (ret == WT_ROLLBACK)
-		return (WT_ROLLBACK);
-	if (ret == 0)
+	switch (ret = (next ? cursor->next(cursor) : cursor->prev(cursor))) {
+	case 0:
 		switch (g.type) {
 		case FIX:
 			if ((ret = cursor->get_key(cursor, &keyno)) == 0 &&
@@ -937,8 +933,16 @@ nextprev(WT_CURSOR *cursor, int next)
 				ret = cursor->get_value(cursor, &value);
 			break;
 		}
-	if (ret != 0 && ret != WT_NOTFOUND)
+		if (ret != 0)
+			testutil_die(ret, "nextprev: get_key/get_value");
+		break;
+	case WT_NOTFOUND:
+		break;
+	case WT_ROLLBACK:
+		return (WT_ROLLBACK);
+	default:
 		testutil_die(ret, "%s", which);
+	}
 
 #ifdef HAVE_BERKELEY_DB
 	if (!SINGLETHREADED)
@@ -1032,12 +1036,16 @@ row_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
-	ret = cursor->update(cursor);
-	if (ret == WT_ROLLBACK)
+	switch (ret = cursor->update(cursor)) {
+	case 0:
+		break;
+	case WT_CACHE_FULL:
+	case WT_ROLLBACK:
 		return (WT_ROLLBACK);
-	if (ret != 0)
+	default:
 		testutil_die(ret,
 		    "row_update: update row %" PRIu64 " by key", keyno);
+	}
 
 #ifdef HAVE_BERKELEY_DB
 	if (!SINGLETHREADED)
@@ -1079,11 +1087,15 @@ col_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 		cursor->set_value(cursor, *(uint8_t *)value->data);
 	else
 		cursor->set_value(cursor, value);
-	ret = cursor->update(cursor);
-	if (ret == WT_ROLLBACK)
+	switch (ret = cursor->update(cursor)) {
+	case 0:
+		break;
+	case WT_CACHE_FULL:
+	case WT_ROLLBACK:
 		return (WT_ROLLBACK);
-	if (ret != 0)
+	default:
 		testutil_die(ret, "col_update: %" PRIu64, keyno);
+	}
 
 #ifdef HAVE_BERKELEY_DB
 	if (!SINGLETHREADED)
@@ -1218,12 +1230,16 @@ row_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
-	ret = cursor->insert(cursor);
-	if (ret == WT_ROLLBACK)
+	switch (ret = cursor->insert(cursor)) {
+	case 0:
+		break;
+	case WT_CACHE_FULL:
+	case WT_ROLLBACK:
 		return (WT_ROLLBACK);
-	if (ret != 0 && ret != WT_NOTFOUND)
+	default:
 		testutil_die(ret,
 		    "row_insert: insert row %" PRIu64 " by key", keyno);
+	}
 
 #ifdef HAVE_BERKELEY_DB
 	if (!SINGLETHREADED)
@@ -1251,9 +1267,13 @@ col_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
 		cursor->set_value(cursor, *(uint8_t *)value->data);
 	else
 		cursor->set_value(cursor, value);
-	if ((ret = cursor->insert(cursor)) != 0) {
-		if (ret == WT_ROLLBACK)
-			return (WT_ROLLBACK);
+	switch (ret = cursor->insert(cursor)) {
+	case 0:
+		break;
+	case WT_CACHE_FULL:
+	case WT_ROLLBACK:
+		return (WT_ROLLBACK);
+	default:
 		testutil_die(ret, "cursor.insert");
 	}
 	testutil_check(cursor->get_key(cursor, &keyno));
@@ -1309,11 +1329,16 @@ row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 	/* We use the cursor in overwrite mode, check for existence. */
 	if ((ret = cursor->search(cursor)) == 0)
 		ret = cursor->remove(cursor);
-	if (ret == WT_ROLLBACK)
+	switch (ret) {
+	case 0:
+	case WT_NOTFOUND:
+		break;
+	case WT_ROLLBACK:
 		return (WT_ROLLBACK);
-	if (ret != 0 && ret != WT_NOTFOUND)
+	default:
 		testutil_die(ret,
 		    "row_remove: remove %" PRIu64 " by key", keyno);
+	}
 
 #ifdef HAVE_BERKELEY_DB
 	if (!SINGLETHREADED)
@@ -1352,11 +1377,16 @@ col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 	/* We use the cursor in overwrite mode, check for existence. */
 	if ((ret = cursor->search(cursor)) == 0)
 		ret = cursor->remove(cursor);
-	if (ret == WT_ROLLBACK)
+	switch (ret) {
+	case 0:
+	case WT_NOTFOUND:
+		break;
+	case WT_ROLLBACK:
 		return (WT_ROLLBACK);
-	if (ret != 0 && ret != WT_NOTFOUND)
+	default:
 		testutil_die(ret,
 		    "col_remove: remove %" PRIu64 " by key", keyno);
+	}
 
 #ifdef HAVE_BERKELEY_DB
 	if (!SINGLETHREADED)

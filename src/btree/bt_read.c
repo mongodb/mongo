@@ -326,7 +326,7 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
 	__wt_page_evict_soon(page);
 
 	/* Bump the oldest ID, we're about to do some visibility checks. */
-	__wt_txn_update_oldest(session, false);
+	WT_RET(__wt_txn_update_oldest(session, false));
 
 	/* If eviction cannot succeed, don't try. */
 	return (__wt_page_can_evict(session, ref, NULL));
@@ -377,9 +377,7 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref)
 	if (addr == NULL) {
 		WT_ASSERT(session, previous_state == WT_REF_DELETED);
 
-		WT_ERR(__wt_btree_new_leaf_page(session,
-		    btree->type == BTREE_ROW ? WT_RECNO_OOB : ref->key.recno,
-		    &page));
+		WT_ERR(__wt_btree_new_leaf_page(session, &page));
 		ref->page = page;
 		goto done;
 	}
