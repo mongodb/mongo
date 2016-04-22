@@ -99,8 +99,4 @@ string OperationContextImpl::getNS() const {
     return CurOp::get(this)->getNS();
 }
 
-bool OperationContextImpl::isPrimaryFor(StringData ns) {
-    return repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(NamespaceString(ns));
-}
-
 }  // namespace mongo

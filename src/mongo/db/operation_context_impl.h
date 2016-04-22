@@ -44,8 +44,6 @@ public:
 
     virtual std::string getNS() const override;
 
-    virtual bool isPrimaryFor(StringData ns) override;
-
 private:
     friend class ServiceContextMongoD;
 

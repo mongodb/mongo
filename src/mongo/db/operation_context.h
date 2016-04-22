@@ -164,11 +164,6 @@ public:
     }
 
     /**
-     * @return true if this instance is primary for this namespace
-     */
-    virtual bool isPrimaryFor(StringData ns) = 0;
-
-    /**
      * Returns WriteConcernOptions of the current operation
      */
     const WriteConcernOptions& getWriteConcern() const {

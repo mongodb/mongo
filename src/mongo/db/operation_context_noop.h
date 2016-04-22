@@ -77,10 +77,6 @@ public:
         return &_pm;
     }
 
-    virtual bool isPrimaryFor(StringData ns) override {
-        return true;
-    }
-
     virtual std::string getNS() const override {
         return std::string();
     };
