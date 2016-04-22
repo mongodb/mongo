@@ -43,7 +43,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/repl/operation_context_repl_mock.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface.h"
 #include "mongo/db/repl/oplog_interface_mock.h"
@@ -127,7 +126,7 @@ StatusWith<BSONObj> RollbackSourceMock::getCollectionInfo(const NamespaceString&
 
 class RSRollbackTest : public ServiceContextMongoDTest {
 protected:
-    std::unique_ptr<OperationContext> _txn;
+    ServiceContext::UniqueOperationContext _txn;
 
     // Owned by service context
     ReplicationCoordinator* _coordinator;
@@ -140,7 +139,7 @@ private:
 void RSRollbackTest::setUp() {
     ServiceContextMongoDTest::setUp();
     Client::initThreadIfNotAlready();
-    _txn.reset(new OperationContextReplMock(&cc(), 1));
+    _txn = cc().makeOperationContext();
     _coordinator = new ReplicationCoordinatorRollbackMock();
 
     auto serviceContext = mongo::getGlobalServiceContext();

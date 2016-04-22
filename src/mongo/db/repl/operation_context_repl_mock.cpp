@@ -36,14 +36,8 @@
 namespace mongo {
 namespace repl {
 
-OperationContextReplMock::OperationContextReplMock() : OperationContextReplMock(0) {}
-
-OperationContextReplMock::OperationContextReplMock(unsigned int opNum)
-    : OperationContextReplMock(nullptr, opNum) {}
-
 OperationContextReplMock::OperationContextReplMock(Client* client, unsigned int opNum)
     : OperationContextNoop(client, opNum, new MMAPV1LockerImpl()),
-      _checkForInterruptStatus(Status::OK()),
       _maxTimeMicrosRemaining(0),
       _writesAreReplicated(true) {}
 

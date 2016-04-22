@@ -33,7 +33,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/is_master_response.h"
-#include "mongo/db/repl/operation_context_repl_mock.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/replica_set_config.h"
@@ -54,7 +53,6 @@ using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 
 TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
-    OperationContextReplMock txn;
     assertStartSuccess(
         BSON("_id"
              << "mySet"
@@ -102,6 +100,9 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
         << getReplCoord()->getMemberState().toString();
     ASSERT(getReplCoord()->isWaitingForApplierToDrain());
 
+    const auto txnPtr = makeOperationContext();
+    auto& txn = *txnPtr;
+
     // Since we're still in drain mode, expect that we report ismaster: false, issecondary:true.
     IsMasterResponse imResponse;
     getReplCoord()->fillIsMasterForReplSet(&imResponse);
@@ -138,7 +139,6 @@ TEST_F(ReplCoordTest, StartElectionDoesNotStartAnElectionWhenNodeIsRecovering) {
 }
 
 TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
-    OperationContextReplMock txn;
     startCapturingLogMessages();
     assertStartSuccess(BSON("_id"
                             << "mySet"
@@ -154,6 +154,9 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
     ASSERT(getReplCoord()->getMemberState().primary())
         << getReplCoord()->getMemberState().toString();
     ASSERT(getReplCoord()->isWaitingForApplierToDrain());
+
+    const auto txnPtr = makeOperationContext();
+    auto& txn = *txnPtr;
 
     // Since we're still in drain mode, expect that we report ismaster: false, issecondary:true.
     IsMasterResponse imResponse;

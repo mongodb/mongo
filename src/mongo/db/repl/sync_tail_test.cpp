@@ -39,7 +39,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/bgsync.h"
-#include "mongo/db/repl/operation_context_repl_mock.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/sync_tail.h"
@@ -68,7 +67,7 @@ class SyncTailTest : public ServiceContextMongoDTest {
 protected:
     void _testSyncApplyInsertDocument(LockMode expectedMode);
 
-    std::unique_ptr<OperationContext> _txn;
+    ServiceContext::UniqueOperationContext _txn;
     unsigned int _opsApplied;
     SyncTail::ApplyOperationInLockFn _applyOp;
     SyncTail::ApplyCommandInLockFn _applyCmd;
@@ -87,7 +86,7 @@ void SyncTailTest::setUp() {
     setGlobalReplicationCoordinator(new ReplicationCoordinatorMock(replSettings));
 
     Client::initThreadIfNotAlready();
-    _txn.reset(new OperationContextReplMock(&cc(), 0));
+    _txn = cc().makeOperationContext();
     _opsApplied = 0;
     _applyOp = [](OperationContext* txn,
                   Database* db,

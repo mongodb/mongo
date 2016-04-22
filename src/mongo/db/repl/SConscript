@@ -546,6 +546,7 @@ env.Library(
     ],
     LIBDEPS=[
         'replmocks',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
     ],
 )
 

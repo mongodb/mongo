@@ -34,7 +34,6 @@
 
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/is_master_response.h"
-#include "mongo/db/repl/operation_context_repl_mock.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
@@ -139,8 +138,8 @@ void ReplCoordTest::start() {
         init();
     }
 
-    OperationContextNoop txn;
-    _repl->startup(&txn);
+    const auto txn = makeOperationContext();
+    _repl->startup(txn.get());
     _repl->waitForStartUpComplete();
     _callShutdown = true;
 }
@@ -267,7 +266,8 @@ void ReplCoordTest::simulateSuccessfulDryRun() {
 }
 
 void ReplCoordTest::simulateSuccessfulV1Election() {
-    OperationContextReplMock txn;
+    const auto txnPtr = makeOperationContext();
+    auto& txn = *txnPtr;
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
     NetworkInterfaceMock* net = getNet();
 
@@ -330,7 +330,8 @@ void ReplCoordTest::simulateSuccessfulV1Election() {
 }
 
 void ReplCoordTest::simulateSuccessfulElection() {
-    OperationContextReplMock txn;
+    const auto txnPtr = makeOperationContext();
+    auto& txn = *txnPtr;
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
     NetworkInterfaceMock* net = getNet();
     ReplicaSetConfig rsConfig = replCoord->getReplicaSetConfig_forTest();

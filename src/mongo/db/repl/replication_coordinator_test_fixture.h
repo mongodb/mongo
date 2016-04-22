@@ -30,6 +30,7 @@
 
 #include <string>
 
+#include "mongo/db/client.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_executor.h"
@@ -125,6 +126,13 @@ protected:
      */
     ReplicationCoordinatorExternalStateMock* getExternalState() {
         return _externalState;
+    }
+
+    /**
+     * Returns a Client object for use in this test.
+     */
+    ServiceContext::UniqueOperationContext makeOperationContext() {
+        return _client->makeOperationContext();
     }
 
     /**
@@ -248,6 +256,7 @@ private:
     ReplSettings _settings;
     bool _callShutdown = false;
     bool _isStorageEngineDurable = true;
+    ServiceContext::UniqueClient _client = getGlobalServiceContext()->makeClient("testClient");
 };
 
 }  // namespace repl

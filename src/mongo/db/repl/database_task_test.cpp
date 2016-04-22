@@ -29,8 +29,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/database_task.h"
-#include "mongo/db/repl/operation_context_repl_mock.h"
 #include "mongo/db/repl/task_runner.h"
 #include "mongo/db/repl/task_runner_test_fixture.h"
 #include "mongo/stdx/mutex.h"

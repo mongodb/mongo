@@ -41,7 +41,6 @@
 #include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/old_update_position_args.h"
-#include "mongo/db/repl/operation_context_repl_mock.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_response.h"
@@ -97,7 +96,8 @@ struct OpTimeWithTermZero {
     Timestamp timestamp;
 };
 
-void runSingleNodeElection(ReplicationCoordinatorImpl* replCoord) {
+void runSingleNodeElection(ServiceContext::UniqueOperationContext txn,
+                           ReplicationCoordinatorImpl* replCoord) {
     replCoord->setMyLastAppliedOpTime(OpTime(Timestamp(1, 0), 0));
     replCoord->setMyLastDurableOpTime(OpTime(Timestamp(1, 0), 0));
     ASSERT(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
@@ -106,8 +106,7 @@ void runSingleNodeElection(ReplicationCoordinatorImpl* replCoord) {
     ASSERT(replCoord->isWaitingForApplierToDrain());
     ASSERT(replCoord->getMemberState().primary()) << replCoord->getMemberState().toString();
 
-    OperationContextReplMock txn;
-    replCoord->signalDrainComplete(&txn);
+    replCoord->signalDrainComplete(txn.get());
 }
 
 TEST_F(ReplCoordTest, NodeEntersStartup2StateWhenStartingUpWithValidLocalConfig) {
@@ -1284,7 +1283,6 @@ TEST_F(ReplCoordTest,
 TEST_F(ReplCoordTest, NodeReturnsNotMasterWhenSteppingDownBeforeSatisfyingAWriteConcern) {
     // Test that a thread blocked in awaitReplication will be woken up and return NotMaster
     // if the node steps down while it is waiting.
-    OperationContextReplMock txn;
     assertStartSuccess(BSON("_id"
                             << "mySet"
                             << "version" << 2 << "members"
@@ -1302,7 +1300,8 @@ TEST_F(ReplCoordTest, NodeReturnsNotMasterWhenSteppingDownBeforeSatisfyingAWrite
     getReplCoord()->setMyLastDurableOpTime(OpTimeWithTermZero(100, 0));
     simulateSuccessfulV1Election();
 
-    ReplicationAwaiter awaiter(getReplCoord(), &txn);
+    const auto txn = makeOperationContext();
+    ReplicationAwaiter awaiter(getReplCoord(), txn.get());
 
     OpTimeWithTermZero time1(100, 1);
     OpTimeWithTermZero time2(100, 2);
@@ -1314,10 +1313,10 @@ TEST_F(ReplCoordTest, NodeReturnsNotMasterWhenSteppingDownBeforeSatisfyingAWrite
     // 2 nodes waiting for time2
     awaiter.setOpTime(time2);
     awaiter.setWriteConcern(writeConcern);
-    awaiter.start(&txn);
+    awaiter.start(txn.get());
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 1, time1));
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 2, time1));
-    getReplCoord()->stepDown(&txn, true, Milliseconds(0), Milliseconds(1000));
+    getReplCoord()->stepDown(txn.get(), true, Milliseconds(0), Milliseconds(1000));
     ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
     ASSERT_EQUALS(ErrorCodes::NotMaster, statusAndDur.status);
     awaiter.reset();
@@ -1326,8 +1325,6 @@ TEST_F(ReplCoordTest, NodeReturnsNotMasterWhenSteppingDownBeforeSatisfyingAWrite
 TEST_F(ReplCoordTest,
        NodeReturnsInterruptedWhenAnOpWaitingForWriteConcernToBeSatisfiedIsInterrupted) {
     // Tests that a thread blocked in awaitReplication can be killed by a killOp operation
-    const unsigned int opID = 100;
-    OperationContextReplMock txn{opID};
     assertStartSuccess(BSON("_id"
                             << "mySet"
                             << "version" << 2 << "members"
@@ -1342,7 +1339,9 @@ TEST_F(ReplCoordTest,
     getReplCoord()->setMyLastDurableOpTime(OpTimeWithTermZero(100, 0));
     simulateSuccessfulV1Election();
 
-    ReplicationAwaiter awaiter(getReplCoord(), &txn);
+    const auto txn = makeOperationContext();
+    const auto opID = txn->getOpID();
+    ReplicationAwaiter awaiter(getReplCoord(), txn.get());
 
     OpTimeWithTermZero time1(100, 1);
     OpTimeWithTermZero time2(100, 2);
@@ -1355,11 +1354,11 @@ TEST_F(ReplCoordTest,
     // 2 nodes waiting for time2
     awaiter.setOpTime(time2);
     awaiter.setWriteConcern(writeConcern);
-    awaiter.start(&txn);
+    awaiter.start(txn.get());
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 1, time1));
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 2, time1));
 
-    txn.markKilled(ErrorCodes::Interrupted);
+    txn->markKilled(ErrorCodes::Interrupted);
     getReplCoord()->interrupt(opID);
     ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
     ASSERT_EQUALS(ErrorCodes::Interrupted, statusAndDur.status);
@@ -1520,7 +1519,8 @@ TEST_F(ReplCoordTest, ConcurrentStepDownShouldNotSignalTheSameFinishEventMoreTha
 }
 
 TEST_F(StepDownTest, NodeReturnsNotMasterWhenAskedToStepDownAsANonPrimaryNode) {
-    OperationContextReplMock txn;
+    const auto txnPtr = makeOperationContext();
+    auto& txn = *txnPtr;
     OpTimeWithTermZero optime1(100, 1);
     // All nodes are caught up
     getReplCoord()->setMyLastAppliedOpTime(optime1);
@@ -1535,7 +1535,6 @@ TEST_F(StepDownTest, NodeReturnsNotMasterWhenAskedToStepDownAsANonPrimaryNode) {
 
 TEST_F(StepDownTest,
        NodeReturnsExceededTimeLimitWhenStepDownFailsToObtainTheGlobalLockWithinTheAllottedTime) {
-    OperationContextReplMock txn;
     OpTimeWithTermZero optime1(100, 1);
     // All nodes are caught up
     getReplCoord()->setMyLastAppliedOpTime(optime1);
@@ -1544,6 +1543,9 @@ TEST_F(StepDownTest,
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(1, 2, optime1));
 
     simulateSuccessfulV1Election();
+
+    const auto txnPtr = makeOperationContext();
+    auto& txn = *txnPtr;
 
     // Make sure stepDown cannot grab the global shared lock
     Lock::GlobalWrite lk(txn.lockState());
@@ -1555,7 +1557,6 @@ TEST_F(StepDownTest,
 
 TEST_F(StepDownTest,
        NodeTransitionsToSecondaryImmediatelyWhenStepDownIsRunAndAnUpToDateElectableNodeExists) {
-    OperationContextReplMock txn;
     OpTimeWithTermZero optime1(100, 1);
     // All nodes are caught up
     getReplCoord()->setMyLastAppliedOpTime(optime1);
@@ -1590,6 +1591,8 @@ TEST_F(StepDownTest,
     getNet()->runReadyNetworkOperations();
     exitNetwork();
 
+    const auto txnPtr = makeOperationContext();
+    auto& txn = *txnPtr;
 
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
     ASSERT_OK(getReplCoord()->stepDown(&txn, false, Milliseconds(0), Milliseconds(1000)));
@@ -1609,8 +1612,9 @@ TEST_F(ReplCoordTest, NodeBecomesPrimaryAgainWhenStepDownTimeoutExpiresInASingle
                             << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                      << "test1:1234"))),
                        HostAndPort("test1", 1234));
-    OperationContextReplMock txn;
-    runSingleNodeElection(getReplCoord());
+    runSingleNodeElection(makeOperationContext(), getReplCoord());
+    const auto txnPtr = makeOperationContext();
+    auto& txn = *txnPtr;
     ASSERT_OK(getReplCoord()->stepDown(&txn, true, Milliseconds(0), Milliseconds(1000)));
     getNet()->enterNetwork();  // Must do this before inspecting the topocoord
     Date_t stepdownUntil = getNet()->now() + Seconds(1);
@@ -1629,7 +1633,6 @@ TEST_F(ReplCoordTest, NodeBecomesPrimaryAgainWhenStepDownTimeoutExpiresInASingle
 
 TEST_F(StepDownTest,
        NodeReturnsExceededTimeLimitWhenNoSecondaryIsCaughtUpWithinStepDownsSecondaryCatchUpPeriod) {
-    OperationContextReplMock txn;
     OpTimeWithTermZero optime1(100, 1);
     OpTimeWithTermZero optime2(100, 2);
     // No secondary is caught up
@@ -1640,6 +1643,9 @@ TEST_F(StepDownTest,
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(1, 2, optime1));
 
     simulateSuccessfulV1Election();
+
+    const auto txnPtr = makeOperationContext();
+    auto& txn = *txnPtr;
 
     // Try to stepDown but time out because no secondaries are caught up.
     auto status = repl->stepDown(&txn, false, Milliseconds(0), Milliseconds(1000));
@@ -1664,7 +1670,6 @@ TEST_F(StepDownTest,
 
 TEST_F(StepDownTest,
        NodeTransitionsToSecondaryWhenASecondaryCatchesUpAfterTheFirstRoundOfHeartbeats) {
-    OperationContextReplMock txn;
     OpTimeWithTermZero optime1(100, 1);
     OpTimeWithTermZero optime2(100, 2);
     // No secondary is caught up
@@ -1675,6 +1680,9 @@ TEST_F(StepDownTest,
     ASSERT_OK(repl->setLastAppliedOptime_forTest(1, 2, optime1));
 
     simulateSuccessfulV1Election();
+
+    const auto txnPtr = makeOperationContext();
+    auto& txn = *txnPtr;
 
     // Step down where the secondary actually has to catch up before the stepDown can succeed.
     // On entering the network, _stepDownContinue should cancel the heartbeats scheduled for
@@ -1723,7 +1731,6 @@ TEST_F(StepDownTest,
 
 TEST_F(StepDownTest,
        NodeTransitionsToSecondaryWhenASecondaryCatchesUpDuringStepDownsSecondaryCatchupPeriod) {
-    OperationContextReplMock txn;
     OpTimeWithTermZero optime1(100, 1);
     OpTimeWithTermZero optime2(100, 2);
     // No secondary is caught up
@@ -1734,6 +1741,9 @@ TEST_F(StepDownTest,
     ASSERT_OK(repl->setLastAppliedOptime_forTest(1, 2, optime1));
 
     simulateSuccessfulV1Election();
+
+    const auto txnPtr = makeOperationContext();
+    auto& txn = *txnPtr;
 
     // Step down where the secondary actually has to catch up before the stepDown can succeed.
     // On entering the network, _stepDownContinue should cancel the heartbeats scheduled for
@@ -1807,8 +1817,6 @@ TEST_F(StepDownTest,
 }
 
 TEST_F(StepDownTest, NodeReturnsInterruptedWhenInterruptedDuringStepDown) {
-    const unsigned int opID = 100;
-    OperationContextReplMock txn{opID};
     OpTimeWithTermZero optime1(100, 1);
     OpTimeWithTermZero optime2(100, 2);
     // No secondary is caught up
@@ -1819,6 +1827,11 @@ TEST_F(StepDownTest, NodeReturnsInterruptedWhenInterruptedDuringStepDown) {
     ASSERT_OK(repl->setLastAppliedOptime_forTest(1, 2, optime1));
 
     simulateSuccessfulV1Election();
+
+    const auto txnPtr = makeOperationContext();
+    auto& txn = *txnPtr;
+    const unsigned int opID = txn.getOpID();
+
     ASSERT_TRUE(repl->getMemberState().primary());
 
     // stepDown where the secondary actually has to catch up before the stepDown can succeed.
@@ -2452,8 +2465,7 @@ TEST_F(ReplCoordTest, IsMasterWithCommittedSnapshot) {
                             << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                      << "test1:1234"))),
                        HostAndPort("test1", 1234));
-    OperationContextReplMock txn;
-    runSingleNodeElection(getReplCoord());
+    runSingleNodeElection(makeOperationContext(), getReplCoord());
 
     time_t lastWriteDate = 101;
     OpTime opTime = OpTime(Timestamp(lastWriteDate, 2), 1);
@@ -3178,7 +3190,6 @@ TEST_F(ReplCoordTest, NodeReturnsShutdownInProgressWhenWaitingUntilAnOpTimeDurin
 }
 
 TEST_F(ReplCoordTest, NodeReturnsInterruptedWhenWaitingUntilAnOpTimeIsInterrupted) {
-    OperationContextReplMock txn;
     assertStartSuccess(BSON("_id"
                             << "mySet"
                             << "version" << 2 << "members" << BSON_ARRAY(BSON("host"
@@ -3188,6 +3199,9 @@ TEST_F(ReplCoordTest, NodeReturnsInterruptedWhenWaitingUntilAnOpTimeIsInterrupte
 
     getReplCoord()->setMyLastAppliedOpTime(OpTimeWithTermZero(10, 0));
     getReplCoord()->setMyLastDurableOpTime(OpTimeWithTermZero(10, 0));
+
+    const auto txnPtr = makeOperationContext();
+    auto& txn = *txnPtr;
 
     txn.markKilled(ErrorCodes::Interrupted);
 
@@ -3284,7 +3298,7 @@ TEST_F(ReplCoordTest, ReadAfterCommittedWhileShutdown) {
                                                                               << "node1:12345"
                                                                               << "_id" << 0))),
                        HostAndPort("node1", 12345));
-    runSingleNodeElection(getReplCoord());
+    runSingleNodeElection(makeOperationContext(), getReplCoord());
 
     getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(10, 0), 0));
     getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(10, 0), 0));
@@ -3299,14 +3313,15 @@ TEST_F(ReplCoordTest, ReadAfterCommittedWhileShutdown) {
 }
 
 TEST_F(ReplCoordTest, ReadAfterCommittedInterrupted) {
-    OperationContextReplMock txn;
     assertStartSuccess(BSON("_id"
                             << "mySet"
                             << "version" << 2 << "members" << BSON_ARRAY(BSON("host"
                                                                               << "node1:12345"
                                                                               << "_id" << 0))),
                        HostAndPort("node1", 12345));
-    runSingleNodeElection(getReplCoord());
+    runSingleNodeElection(makeOperationContext(), getReplCoord());
+    const auto txnPtr = makeOperationContext();
+    auto& txn = *txnPtr;
 
     getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(10, 0), 0));
     getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(10, 0), 0));
@@ -3328,7 +3343,7 @@ TEST_F(ReplCoordTest, ReadAfterCommittedGreaterOpTime) {
                                                                               << "node1:12345"
                                                                               << "_id" << 0))),
                        HostAndPort("node1", 12345));
-    runSingleNodeElection(getReplCoord());
+    runSingleNodeElection(makeOperationContext(), getReplCoord());
 
     getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(100, 0), 1));
     getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(100, 0), 1));
@@ -3348,7 +3363,7 @@ TEST_F(ReplCoordTest, ReadAfterCommittedEqualOpTime) {
                                                                               << "node1:12345"
                                                                               << "_id" << 0))),
                        HostAndPort("node1", 12345));
-    runSingleNodeElection(getReplCoord());
+    runSingleNodeElection(makeOperationContext(), getReplCoord());
     OpTime time(Timestamp(100, 0), 1);
     getReplCoord()->setMyLastAppliedOpTime(time);
     getReplCoord()->setMyLastDurableOpTime(time);
@@ -3368,7 +3383,7 @@ TEST_F(ReplCoordTest, ReadAfterCommittedDeferredGreaterOpTime) {
                                                                               << "node1:12345"
                                                                               << "_id" << 0))),
                        HostAndPort("node1", 12345));
-    runSingleNodeElection(getReplCoord());
+    runSingleNodeElection(makeOperationContext(), getReplCoord());
     getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(0, 0), 1));
     getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(0, 0), 1));
     OpTime committedOpTime(Timestamp(200, 0), 1);
@@ -3398,7 +3413,7 @@ TEST_F(ReplCoordTest, ReadAfterCommittedDeferredEqualOpTime) {
                                                                               << "node1:12345"
                                                                               << "_id" << 0))),
                        HostAndPort("node1", 12345));
-    runSingleNodeElection(getReplCoord());
+    runSingleNodeElection(makeOperationContext(), getReplCoord());
     getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(0, 0), 1));
     getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(0, 0), 1));
 
@@ -3873,8 +3888,7 @@ TEST_F(ReplCoordTest, AdvanceCommittedSnapshotToMostRecentSnapshotPriorToOpTimeW
                             << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                      << "test1:1234"))),
                        HostAndPort("test1", 1234));
-    OperationContextReplMock txn;
-    runSingleNodeElection(getReplCoord());
+    runSingleNodeElection(makeOperationContext(), getReplCoord());
 
     OpTime time1(Timestamp(100, 1), 1);
     OpTime time2(Timestamp(100, 2), 1);
@@ -3905,8 +3919,7 @@ TEST_F(ReplCoordTest, DoNotAdvanceCommittedSnapshotWhenAnOpTimeIsNewerThanOurLat
                             << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                      << "test1:1234"))),
                        HostAndPort("test1", 1234));
-    OperationContextReplMock txn;
-    runSingleNodeElection(getReplCoord());
+    runSingleNodeElection(makeOperationContext(), getReplCoord());
 
     OpTime time1(Timestamp(100, 1), 1);
     OpTime time2(Timestamp(100, 2), 1);
@@ -3935,8 +3948,7 @@ TEST_F(ReplCoordTest,
                             << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                      << "test1:1234"))),
                        HostAndPort("test1", 1234));
-    OperationContextReplMock txn;
-    runSingleNodeElection(getReplCoord());
+    runSingleNodeElection(makeOperationContext(), getReplCoord());
 
     OpTime time1(Timestamp(100, 1), 1);
     OpTime time2(Timestamp(100, 2), 1);
@@ -3967,8 +3979,7 @@ TEST_F(ReplCoordTest, ZeroCommittedSnapshotWhenAllSnapshotsAreDropped) {
                             << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                      << "test1:1234"))),
                        HostAndPort("test1", 1234));
-    OperationContextReplMock txn;
-    runSingleNodeElection(getReplCoord());
+    runSingleNodeElection(makeOperationContext(), getReplCoord());
 
     OpTime time1(Timestamp(100, 1), 1);
     OpTime time2(Timestamp(100, 2), 1);
@@ -3995,8 +4006,7 @@ TEST_F(ReplCoordTest, DoNotAdvanceCommittedSnapshotWhenAppliedOpTimeChanges) {
                             << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                      << "test1:1234"))),
                        HostAndPort("test1", 1234));
-    OperationContextReplMock txn;
-    runSingleNodeElection(getReplCoord());
+    runSingleNodeElection(makeOperationContext(), getReplCoord());
 
     OpTime time1(Timestamp(100, 1), 1);
     OpTime time2(Timestamp(100, 2), 1);
@@ -4304,7 +4314,8 @@ TEST_F(ReplCoordTest, WaitForDrainFinish) {
 
     ASSERT_EQUALS(ErrorCodes::BadValue, replCoord->waitForDrainFinish(Milliseconds(-1)));
 
-    OperationContextReplMock txn;
+    const auto txnPtr = makeOperationContext();
+    auto& txn = *txnPtr;
     replCoord->signalDrainComplete(&txn);
     ASSERT_OK(replCoord->waitForDrainFinish(timeout));
 

@@ -30,8 +30,6 @@
 
 #include "mongo/db/repl/storage_interface_mock.h"
 
-#include "mongo/db/repl/operation_context_repl_mock.h"
-
 namespace mongo {
 namespace repl {
 

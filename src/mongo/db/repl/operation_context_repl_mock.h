@@ -44,9 +44,6 @@ namespace repl {
  */
 class OperationContextReplMock : public OperationContextNoop {
 public:
-    OperationContextReplMock();
-    explicit OperationContextReplMock(unsigned int opNum);
-    OperationContextReplMock(Client* client, unsigned int opNum);
     virtual ~OperationContextReplMock();
 
     void setReplicatedWrites(bool writesAreReplicated = true) override;
@@ -54,7 +51,9 @@ public:
     bool writesAreReplicated() const override;
 
 private:
-    Status _checkForInterruptStatus;
+    friend class ServiceContextReplMock;
+    OperationContextReplMock(Client* client, unsigned int opNum);
+
     uint64_t _maxTimeMicrosRemaining;
     bool _writesAreReplicated;
 };

@@ -30,14 +30,16 @@
 
 #include "mongo/db/repl/service_context_repl_mock.h"
 
+#include <memory>
+
 #include "mongo/db/repl/operation_context_repl_mock.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 namespace repl {
 
 std::unique_ptr<OperationContext> ServiceContextReplMock::_newOpCtx(Client* client) {
-    return stdx::make_unique<OperationContextReplMock>(client, _nextOpId.fetchAndAdd(1));
+    return std::unique_ptr<OperationContextReplMock>(
+        new OperationContextReplMock(client, _nextOpId.fetchAndAdd(1)));
 }
 
 }  // namespace repl
