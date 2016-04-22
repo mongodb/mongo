@@ -299,10 +299,15 @@ if processor == 'i386':
     cpp_defines['IA32'] = '1'
     cpp_defines['ia32'] = '1'
 
-# Using 64 bit
+# Using 64 bit little endian
 elif processor == 'x86_64' or processor == 'ppc64le':
     cpp_defines['efi2'] = '1'
     cpp_defines['EFI2'] = '1'
+# Using 64 bit big endian
+elif processor == 's390x':
+    cpp_defines['efi2'] = '1'
+    cpp_defines['EFI2'] = '1'
+    cpp_defines['BID_BIG_ENDIAN'] = '1'
 else:
     assert False, "Unsupported architecture: " + processor
 
