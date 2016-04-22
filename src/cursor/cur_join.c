@@ -24,7 +24,7 @@ static int __curjoin_pack_recno(WT_SESSION_IMPL *, uint64_t, uint8_t *,
     size_t, WT_ITEM *);
 static int __curjoin_split_key(WT_SESSION_IMPL *, WT_CURSOR_JOIN *, WT_ITEM *,
     WT_CURSOR *, WT_CURSOR *, const char *, bool);
- 
+
 #define	WT_CURJOIN_ITER_CONSUMED(iter) \
 	((iter)->entry_pos >= (iter)->entry_count)
 
