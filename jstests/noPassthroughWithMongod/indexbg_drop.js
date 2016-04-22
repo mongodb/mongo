@@ -86,7 +86,7 @@ assert.soon(function() {
 jsTest.log("dropping index");
 masterDB.runCommand({dropIndexes: collection, index: "*"});
 jsTest.log("Waiting on replication");
-replTest.awaitReplication();
+replTest.awaitReplication(60000);
 
 print("index list on master:");
 masterDB.getCollection(collection).getIndexes().forEach(printjson);
