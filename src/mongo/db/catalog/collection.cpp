@@ -987,15 +987,13 @@ public:
         _keyCounts[descriptor->indexNamespace()] = numKeys;
 
         if (_full) {
-            const auto& key = descriptor->keyPattern();
-            const bool forward = key.firstElement().number() >= 0;
-            std::unique_ptr<SortedDataInterface::Cursor> cursor = iam->newCursor(txn, forward);
-            cursor->setEndPosition(kMaxBSONKey, true);
-            auto indexEntry = cursor->seek(kMinBSONKey, true);
-            while (indexEntry) {
+            std::unique_ptr<SortedDataInterface::Cursor> cursor = iam->newCursor(txn, true);
+
+            // Seeking to BSONObj() is equivalent to seeking to the first entry of an index.
+            for (auto indexEntry = cursor->seek(BSONObj(), true); indexEntry;
+                 indexEntry = cursor->next()) {
                 uint32_t keyHash = hashIndexEntry(indexEntry->key, indexEntry->loc);
                 (*_ikc)[keyHash]++;
-                indexEntry = cursor->next();
             }
         }
     }
