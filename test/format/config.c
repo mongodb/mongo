@@ -623,6 +623,15 @@ config_single(const char *s, int perm)
 			    exit(EXIT_FAILURE);
 		}
 
+		/*
+		 * Free the previous setting if a configuration has been
+		 * passed in twice.
+		 */
+		if (*cp->vstr != NULL) {
+			free(*cp->vstr);
+			*cp->vstr = NULL;
+		}
+
 		if (strncmp(s, "checksum", strlen("checksum")) == 0) {
 			config_map_checksum(ep, &g.c_checksum_flag);
 			*cp->vstr = strdup(ep);
