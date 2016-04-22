@@ -143,7 +143,7 @@ config_setup(void)
 
 	/* Some data-sources don't support user-specified collations. */
 	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
-		g.c_reverse = 0;
+		config_single("reverse=off", 0);
 
 	/*
 	 * Periodically, run single-threaded so we can compare the results to
@@ -166,7 +166,7 @@ config_setup(void)
 	 * Don't do it on the first run, all our smoke tests would hit it.
 	 */
 	if (!g.replay && g.run_cnt % 10 == 9 && !config_is_perm("delete_pct"))
-		g.c_delete_pct = 0;
+		config_single("delete_pct=0", 0);
 
 	/*
 	 * If this is an LSM run, set the cache size and crank up the insert
@@ -189,7 +189,7 @@ config_setup(void)
 
 	/* Make the default maximum-run length 20 minutes. */
 	if (!config_is_perm("timer"))
-		g.c_timer = 20;
+		config_single("timer=20", 0);
 
 	/*
 	 * Key/value minimum/maximum are related, correct unless specified by
@@ -375,30 +375,28 @@ config_in_memory_check(void)
 
 	/* Turn off a lot of stuff. */
 	if (!config_is_perm("backups"))
-		g.c_backups = 0;
+		config_single("backups=off", 0);
 	if (!config_is_perm("checkpoints"))
-		g.c_checkpoints = 0;
-	if (!config_is_perm("compression")) {
-		g.c_compression = dstrdup("none");
-		g.c_compression_flag = COMPRESS_NONE;
-	}
+		config_single("checkpoints=off", 0);
+	if (!config_is_perm("compression"))
+		config_single("compression=none", 0);
 	if (!config_is_perm("logging"))
-		g.c_logging = 0;
+		config_single("logging=off", 0);
 	if (!config_is_perm("rebalance"))
-		g.c_rebalance = 0;
+		config_single("rebalance=off", 0);
 	if (!config_is_perm("salvage"))
-		g.c_salvage = 0;
+		config_single("salvage=off", 0);
 	if (!config_is_perm("verify"))
-		g.c_verify = 0;
+		config_single("verify=off", 0);
 
 	/*
 	 * Keep keys/values small, overflow items aren't an issue for in-memory
 	 * configurations and it keeps us from overflowing the cache.
 	 */
 	if (!config_is_perm("key_max"))
-		g.c_key_max = 32;
+		config_single("key_max=32", 0);
 	if (!config_is_perm("value_max"))
-		g.c_value_max = 80;
+		config_single("value_max=80", 0);
 
 	/*
 	 * Size the cache relative to the initial data set, use 2x the base
@@ -461,11 +459,11 @@ config_lrt(void)
 	 * stores.
 	 */
 	if (g.type == FIX) {
-		if (g.c_long_running_txn && config_is_perm("long_running_txn"))
+		if (config_is_perm("long_running_txn"))
 			testutil_die(EINVAL,
 			    "long_running_txn not supported with fixed-length "
 			    "column store");
-		g.c_long_running_txn = 0;
+		config_single("long_running_txn=off", 0);
 	}
 }
 
@@ -597,7 +595,7 @@ void
 config_single(const char *s, int perm)
 {
 	CONFIG *cp;
-	uint32_t v;
+	long v;
 	char *p;
 	const char *ep;
 
@@ -664,11 +662,20 @@ config_single(const char *s, int perm)
 		return;
 	}
 
-	v = (uint32_t)strtoul(ep, &p, 10);
-	if (*p != '\0') {
-		fprintf(stderr, "%s: %s: illegal numeric value\n",
-		    g.progname, s);
-		exit(EXIT_FAILURE);
+	v = -1;
+	if (F_ISSET(cp, C_BOOL)) {
+		if (strncmp(ep, "off", strlen("off")) == 0)
+			v = 0;
+		else if (strncmp(ep, "on", strlen("on")) == 0)
+			v = 1;
+	}
+	if (v == -1) {
+		v = strtol(ep, &p, 10);
+		if (*p != '\0') {
+			fprintf(stderr, "%s: %s: illegal numeric value\n",
+			    g.progname, s);
+			exit(EXIT_FAILURE);
+		}
 	}
 	if (F_ISSET(cp, C_BOOL)) {
 		if (v != 0 && v != 1) {
@@ -682,7 +689,7 @@ config_single(const char *s, int perm)
 		    g.progname, s, cp->min, cp->maxset);
 		exit(EXIT_FAILURE);
 	}
-	*cp->v = v;
+	*cp->v = (uint32_t)v;
 }
 
 /*
