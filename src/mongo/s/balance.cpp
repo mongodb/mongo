@@ -32,6 +32,8 @@
 
 #include "mongo/s/balance.h"
 
+#include <set>
+
 #include "mongo/base/status_with.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
@@ -40,6 +42,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/balancer/balancer_chunk_selection_policy_impl.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/balancer/cluster_statistics_impl.h"
 #include "mongo/s/catalog/catalog_cache.h"
@@ -154,7 +157,10 @@ MONGO_FP_DECLARE(balancerRoundIntervalSetting);
 }  // namespace
 
 Balancer::Balancer()
-    : _balancedLastTime(0), _clusterStats(stdx::make_unique<ClusterStatisticsImpl>()) {}
+    : _balancedLastTime(0),
+      _chunkSelectionPolicy(stdx::make_unique<BalancerChunkSelectionPolicyImpl>(
+          stdx::make_unique<ClusterStatisticsImpl>())),
+      _clusterStats(stdx::make_unique<ClusterStatisticsImpl>()) {}
 
 Balancer::~Balancer() = default;
 
@@ -240,7 +246,18 @@ void Balancer::run() {
                        << ", secondaryThrottle: "
                        << balancerConfig->getSecondaryThrottle().toBSON();
 
-                const auto candidateChunks = uassertStatusOK(_getCandidateChunks(txn.get()));
+                OCCASIONALLY warnOnMultiVersion(
+                    uassertStatusOK(_clusterStats->getStats(txn.get())));
+
+                Status status = _enforceTagRanges(txn.get());
+                if (!status.isOK()) {
+                    warning() << "Failed to enforce tag ranges" << causedBy(status);
+                } else {
+                    LOG(1) << "Done enforcing tag range boundaries.";
+                }
+
+                const auto candidateChunks = uassertStatusOK(
+                    _chunkSelectionPolicy->selectChunksToMove(txn.get(), _balancedLastTime));
 
                 if (candidateChunks.empty()) {
                     LOG(1) << "no need to move any chunk";
@@ -381,157 +398,52 @@ bool Balancer::_checkOIDs(OperationContext* txn) {
     return true;
 }
 
-StatusWith<MigrateInfoVector> Balancer::_getCandidateChunks(OperationContext* txn) {
-    vector<CollectionType> collections;
-
-    Status collsStatus =
-        grid.catalogManager(txn)->getCollections(txn, nullptr, &collections, nullptr);
-    if (!collsStatus.isOK()) {
-        return collsStatus;
+Status Balancer::_enforceTagRanges(OperationContext* txn) {
+    auto chunksToSplitStatus = _chunkSelectionPolicy->selectChunksToSplit(txn);
+    if (!chunksToSplitStatus.isOK()) {
+        return chunksToSplitStatus.getStatus();
     }
 
-    if (collections.empty()) {
-        return MigrateInfoVector();
-    }
-
-    const auto clusterStats = uassertStatusOK(_clusterStats->getStats(txn));
-    if (clusterStats.size() < 2) {
-        return MigrateInfoVector();
-    }
-
-    OCCASIONALLY warnOnMultiVersion(clusterStats);
-
-    MigrateInfoVector candidateChunks;
-
-    // For each collection, check if the balancing policy recommends moving anything around.
-    for (const auto& coll : collections) {
-        // Skip collections for which balancing is disabled
-        const NamespaceString& nss = coll.getNs();
-
-        if (!coll.getAllowBalance()) {
-            LOG(1) << "Not balancing collection " << nss << "; explicitly disabled.";
-            continue;
+    for (const auto& splitInfo : chunksToSplitStatus.getValue()) {
+        // Ensure the database exists
+        auto dbStatus =
+            Grid::get(txn)->catalogCache()->getDatabase(txn, splitInfo.nss.db().toString());
+        if (!dbStatus.isOK()) {
+            return {dbStatus.getStatus().code(),
+                    str::stream() << "Database " << splitInfo.nss.ns() << " was not found due to "
+                                  << dbStatus.getStatus().toString()};
         }
 
-        std::vector<ChunkType> allNsChunks;
-        Status status = grid.catalogManager(txn)->getChunks(txn,
-                                                            BSON(ChunkType::ns(nss.ns())),
-                                                            BSON(ChunkType::min() << 1),
-                                                            boost::none,  // all chunks
-                                                            &allNsChunks,
-                                                            nullptr);
-        if (!status.isOK()) {
-            warning() << "failed to load chunks for ns " << nss.ns() << causedBy(status);
-            continue;
-        }
+        shared_ptr<DBConfig> db = dbStatus.getValue();
+        invariant(db);
 
-        set<BSONObj> allChunkMinimums;
-        map<string, vector<ChunkType>> shardToChunksMap;
-
-        for (const ChunkType& chunk : allNsChunks) {
-            allChunkMinimums.insert(chunk.getMin().getOwned());
-            shardToChunksMap[chunk.getShard()].push_back(chunk);
-        }
-
-        if (shardToChunksMap.empty()) {
-            LOG(1) << "skipping empty collection (" << nss.ns() << ")";
-            continue;
-        }
-
-        for (const auto& stat : clusterStats) {
-            // This loop just makes sure there is an entry in shardToChunksMap for every shard
-            shardToChunksMap[stat.shardId];
-        }
-
-        DistributionStatus distStatus(clusterStats, shardToChunksMap);
-
-        // TODO: TagRange contains all the information from TagsType except for the namespace,
-        //       so maybe the two can be merged at some point in order to avoid the
-        //       transformation below.
-        vector<TagRange> ranges;
-
-        {
-            vector<TagsType> collectionTags;
-            uassertStatusOK(
-                grid.catalogManager(txn)->getTagsForCollection(txn, nss.ns(), &collectionTags));
-            for (const auto& tt : collectionTags) {
-                ranges.push_back(
-                    TagRange(tt.getMinKey().getOwned(), tt.getMaxKey().getOwned(), tt.getTag()));
-                uassert(16356,
-                        str::stream() << "tag ranges not valid for: " << nss.ns(),
-                        distStatus.addTagRange(ranges.back()));
-            }
-        }
-
-        auto statusGetDb = grid.catalogCache()->getDatabase(txn, nss.db().toString());
-        if (!statusGetDb.isOK()) {
-            warning() << "could not load db config to balance collection [" << nss.ns()
-                      << "]: " << statusGetDb.getStatus();
-            continue;
-        }
-
-        shared_ptr<DBConfig> cfg = statusGetDb.getValue();
-
-        // This line reloads the chunk manager once if this process doesn't know the collection
-        // is sharded yet.
-        shared_ptr<ChunkManager> cm = cfg->getChunkManagerIfExists(txn, nss.ns(), true);
+        // Ensure that the collection is sharded
+        shared_ptr<ChunkManager> cm = db->getChunkManagerIfExists(txn, splitInfo.nss.ns(), true);
         if (!cm) {
-            warning() << "could not load chunks to balance " << nss.ns() << " collection";
-            continue;
+            return {ErrorCodes::NamespaceNotSharded,
+                    str::stream() << "Collection " << splitInfo.nss.ns()
+                                  << " does not exist or is not sharded."};
         }
 
-        // Loop through tags to make sure no chunk spans tags. Split on tag min for all chunks.
-        bool didAnySplits = false;
-
-        for (const TagRange& range : ranges) {
-            BSONObj min =
-                cm->getShardKeyPattern().getKeyPattern().extendRangeBound(range.min, false);
-
-            if (allChunkMinimums.count(min) > 0) {
-                continue;
-            }
-
-            didAnySplits = true;
-
-            log() << "nss: " << nss.ns() << " need to split on " << min
-                  << " because there is a range there";
-
-            shared_ptr<Chunk> c = cm->findIntersectingChunk(txn, min);
-
-            auto splitStatus = shardutil::splitChunkAtMultiplePoints(txn,
-                                                                     c->getShardId(),
-                                                                     nss,
-                                                                     cm->getShardKeyPattern(),
-                                                                     cm->getVersion(),
-                                                                     c->getMin(),
-                                                                     c->getMax(),
-                                                                     {min});
-            if (!status.isOK()) {
-                error() << "split failed: " << status;
-            } else {
-                LOG(1) << "split worked";
-            }
-
-            break;
-        }
-
-        if (didAnySplits) {
-            // State change, just wait till next round
-            continue;
-        }
-
-        shared_ptr<MigrateInfo> migrateInfo(
-            BalancerPolicy::balance(nss.ns(), distStatus, _balancedLastTime));
-        if (migrateInfo) {
-            candidateChunks.emplace_back(*migrateInfo);
+        auto splitStatus = shardutil::splitChunkAtMultiplePoints(txn,
+                                                                 splitInfo.shardId,
+                                                                 splitInfo.nss,
+                                                                 cm->getShardKeyPattern(),
+                                                                 splitInfo.collectionVersion,
+                                                                 splitInfo.minKey,
+                                                                 splitInfo.maxKey,
+                                                                 {splitInfo.splitKey});
+        if (!splitStatus.isOK()) {
+            warning() << "Failed to enforce tag range for chunk " << splitInfo
+                      << causedBy(splitStatus.getStatus());
         }
     }
 
-    return candidateChunks;
+    return Status::OK();
 }
 
 int Balancer::_moveChunks(OperationContext* txn,
-                          const MigrateInfoVector& candidateChunks,
+                          const BalancerChunkSelectionPolicy::MigrateInfoVector& candidateChunks,
                           const MigrationSecondaryThrottleOptions& secondaryThrottle,
                           bool waitForDelete) {
     int movedCount = 0;
