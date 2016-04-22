@@ -1407,8 +1407,8 @@ elif env.TargetOSIs('windows'):
         # without having been initialized (implies /Od: no optimizations)
         env.Append( CCFLAGS=["/RTC1"] )
 
-        # Support large object files since some unit-test sources contain a lot of code
-        env.Append( CCFLAGS=["/bigobj"] )
+    # Support large object files since some unit-test sources contain a lot of code
+    env.Append( CCFLAGS=["/bigobj"] )
 
     # This gives 32-bit programs 4 GB of user address space in WOW64, ignored in 64-bit builds
     env.Append( LINKFLAGS=["/LARGEADDRESSAWARE"] )
