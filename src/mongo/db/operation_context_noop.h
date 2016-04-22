@@ -52,7 +52,8 @@ public:
         : OperationContextNoop(client, opId, locker, new RecoveryUnitNoop()) {}
 
     OperationContextNoop(Client* client, unsigned int opId, Locker* locker, RecoveryUnit* ru)
-        : OperationContext(client, opId, locker), _recoveryUnit(ru) {
+        : OperationContext(client, opId, locker) {
+        setRecoveryUnit(ru, kNotInUnitOfWork);
         _locker.reset(lockState());
 
         if (client) {
@@ -67,22 +68,6 @@ public:
             stdx::lock_guard<Client> lk(*client);
             client->resetOperationContext();
         }
-    }
-
-    virtual RecoveryUnit* recoveryUnit() const override {
-        return _recoveryUnit.get();
-    }
-
-    virtual RecoveryUnit* releaseRecoveryUnit() override {
-        return _recoveryUnit.release();
-    }
-
-    virtual RecoveryUnitState setRecoveryUnit(RecoveryUnit* unit,
-                                              RecoveryUnitState state) override {
-        RecoveryUnitState oldState = _ruState;
-        _recoveryUnit.reset(unit);
-        _ruState = state;
-        return oldState;
     }
 
     virtual ProgressMeter* setMessage_inlock(const char* msg,
@@ -101,7 +86,6 @@ public:
     };
 
 private:
-    std::unique_ptr<RecoveryUnit> _recoveryUnit;
     std::unique_ptr<Locker> _locker;
     ProgressMeter _pm;
 };

@@ -79,7 +79,9 @@ public:
     /**
      * Interface for durability.  Caller DOES NOT own pointer.
      */
-    virtual RecoveryUnit* recoveryUnit() const = 0;
+    RecoveryUnit* recoveryUnit() const {
+        return _recoveryUnit.get();
+    }
 
     /**
      * Returns the RecoveryUnit (same return value as recoveryUnit()) but the caller takes
@@ -93,7 +95,7 @@ public:
      * We rely on active cursors being killed when collections or databases are dropped,
      * or when collection metadata changes.
      */
-    virtual RecoveryUnit* releaseRecoveryUnit() = 0;
+    RecoveryUnit* releaseRecoveryUnit();
 
     /**
      * Associates the OperatingContext with a different RecoveryUnit for getMore or
@@ -101,7 +103,7 @@ public:
      * returned separately even though the state logically belongs to the RecoveryUnit,
      * as it is managed by the OperationContext.
      */
-    virtual RecoveryUnitState setRecoveryUnit(RecoveryUnit* unit, RecoveryUnitState state) = 0;
+    RecoveryUnitState setRecoveryUnit(RecoveryUnit* unit, RecoveryUnitState state);
 
     /**
      * Interface for locking.  Caller DOES NOT own pointer.
@@ -281,8 +283,6 @@ public:
 protected:
     OperationContext(Client* client, unsigned int opId, Locker* locker);
 
-    RecoveryUnitState _ruState = kNotInUnitOfWork;
-
 private:
     /**
      * Returns true if this operation has a deadline and it has passed according to the fast clock
@@ -302,6 +302,9 @@ private:
 
     // Not owned.
     Locker* const _locker;
+
+    std::unique_ptr<RecoveryUnit> _recoveryUnit;
+    RecoveryUnitState _ruState = kNotInUnitOfWork;
 
     // Follows the values of ErrorCodes::Error. The default value is 0 (OK), which means the
     // operation is not killed. If killed, it will contain a specific code. This value changes only

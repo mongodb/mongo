@@ -74,7 +74,7 @@ OperationContextImpl::OperationContextImpl()
     : OperationContext(
           &cc(), nextOpId.fetchAndAdd(1), clientOperationInfoDecoration(cc()).getLocker()) {
     StorageEngine* storageEngine = getServiceContext()->getGlobalStorageEngine();
-    _recovery.reset(storageEngine->newRecoveryUnit());
+    setRecoveryUnit(storageEngine->newRecoveryUnit(), kNotInUnitOfWork);
 
     auto client = getClient();
     stdx::lock_guard<Client> lk(*client);
@@ -86,22 +86,6 @@ OperationContextImpl::~OperationContextImpl() {
     auto client = getClient();
     stdx::lock_guard<Client> lk(*client);
     client->resetOperationContext();
-}
-
-RecoveryUnit* OperationContextImpl::recoveryUnit() const {
-    return _recovery.get();
-}
-
-RecoveryUnit* OperationContextImpl::releaseRecoveryUnit() {
-    return _recovery.release();
-}
-
-OperationContext::RecoveryUnitState OperationContextImpl::setRecoveryUnit(RecoveryUnit* unit,
-                                                                          RecoveryUnitState state) {
-    _recovery.reset(unit);
-    RecoveryUnitState oldState = _ruState;
-    _ruState = state;
-    return oldState;
 }
 
 ProgressMeter* OperationContextImpl::setMessage_inlock(const char* msg,

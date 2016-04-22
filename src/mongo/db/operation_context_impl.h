@@ -37,12 +37,6 @@ class OperationContextImpl final : public OperationContext {
 public:
     virtual ~OperationContextImpl();
 
-    virtual RecoveryUnit* recoveryUnit() const override;
-
-    virtual RecoveryUnit* releaseRecoveryUnit() override;
-
-    virtual RecoveryUnitState setRecoveryUnit(RecoveryUnit* unit, RecoveryUnitState state) override;
-
     virtual ProgressMeter* setMessage_inlock(const char* msg,
                                              const std::string& name,
                                              unsigned long long progressMeterTotal,
@@ -56,8 +50,6 @@ private:
     friend class ServiceContextMongoD;
 
     OperationContextImpl();
-
-    std::unique_ptr<RecoveryUnit> _recovery;
 };
 
 }  // namespace mongo

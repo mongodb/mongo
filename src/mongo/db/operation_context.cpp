@@ -203,4 +203,17 @@ Status OperationContext::checkForInterruptNoAssert() {
 
     return Status::OK();
 }
+
+RecoveryUnit* OperationContext::releaseRecoveryUnit() {
+    return _recoveryUnit.release();
+}
+
+OperationContext::RecoveryUnitState OperationContext::setRecoveryUnit(RecoveryUnit* unit,
+                                                                      RecoveryUnitState state) {
+    _recoveryUnit.reset(unit);
+    RecoveryUnitState oldState = _ruState;
+    _ruState = state;
+    return oldState;
+}
+
 }  // namespace mongo
