@@ -524,6 +524,30 @@ tasks:
     - func: "build new tools" # noop if ${newtools} is not "true"
     - func: "build rocksdb" # noop if ${build_rocksdb} is not "true"
     - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          # We get the raw version string (r1.2.3-45-gabcdef) from git
+          MONGO_VERSION=$(git describe)
+          # If this is a patch build, we add the patch version id to the version string so we know
+          # this build was a patch, and which evergreen task it came from
+          if [ "${is_patch|}" = "true" ]; then
+            MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
+          fi
+
+          # This script converts the generated version string into a sanitized version string for
+          # use by scons and uploading artifacts.
+          echo $MONGO_VERSION | ${python|python} buildscripts/generate_compile_expansions.py | tee compile_expansions.yml
+
+    # Then we load the generated version data into the agent so we can use it in task definitions
+    - command: expansions.update
+      params:
+        file: src/compile_expansions.yml
+
+    - command: shell.exec
       type: test
       params:
         working_dir: src
@@ -532,9 +556,7 @@ tasks:
           set -o verbose
 
           rm -rf ${install_directory|/data/mongo-install-directory}
-          ${scons|scons} ${compile_flags|} --use-new-tools all dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|}
-
-          ${gitvars} git describe | ${python|python} buildscripts/generate_compile_expansions.py | tee compile_expansions.yml
+          ${scons|scons} ${compile_flags|} --use-new-tools all dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|} MONGO_VERSION=${version}
 
           mv mongodb-src-*.${ext|tgz} distsrc.${ext|tgz}
           mv mongodb-*-debugsymbols.${ext|tgz} mongo-debugsymbols.tgz || true
@@ -552,9 +574,6 @@ tasks:
           # On windows we need to make sure the paths in unittests.txt are compatible with cygwin tar
           sed 's|\\|/|g' build/unittests.txt > build/unittests-tarlist.txt
           ${tar|tar} -czvf mongodb-unittests.tgz -T build/unittests-tarlist.txt build/unittests.txt
-    - command: expansions.update
-      params:
-        file: src/compile_expansions.yml
     - command: shell.exec
       params:
         working_dir: src
