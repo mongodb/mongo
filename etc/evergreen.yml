@@ -5826,6 +5826,85 @@ buildvariants:
   - name: tool
   - name: unittests
 
+- name: enterprise-rhel-72-s390x-inmem
+  display_name: Enterprise RHEL 7.2 s390x (inMemory) DEBUG
+  modules:
+  - enterprise
+  run_on:
+  - rhel72-zseries-build
+  - rhel72-zseries-test
+  batchtime: 10080 # 7 days
+  stepback: false
+  expansions:
+    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
+    tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2)" -tags 'sasl ssl'
+    compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=rhel72 -j3 CCFLAGS="-march=z196 -mtune=zEC12" CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++
+    num_jobs_available: 2
+    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_mmapv1,requires_journaling
+  tasks:
+  - name: compile
+    distros:
+    - rhel72-zseries-build
+  - name: aggregation_WT
+  - name: aggregation_auth
+  - name: aggregation_read_concern_majority_passthrough_WT
+  - name: audit
+  - name: auth
+  - name: auth_audit
+  - name: bulk_gle_passthrough
+  - name: concurrency
+    - rhel72-zseries-build
+  - name: concurrency_replication
+    - rhel72-zseries-build
+  - name: concurrency_sharded
+    - rhel72-zseries-build
+  - name: concurrency_simultaneous
+    - rhel72-zseries-build
+  - name: dbtest
+  - name: failpoints
+  - name: failpoints_auth
+  - name: gle_auth
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: gle_auth_write_cmd
+  - name: integration_tests_replset
+  - name: integration_tests_standalone
+  - name: jsCore
+  - name: jsCore_WT
+  - name: jsCore_auth
+  - name: jsCore_compatibility
+  - name: jsCore_op_query
+  - name: jsCore_small_oplog
+  - name: jsCore_small_oplog_rs
+  - name: mongosTest
+  - name: noPassthrough
+  - name: noPassthroughWithMongod
+  - name: parallel
+  - name: parallel_compatibility
+  - name: read_concern_majority_passthrough_WT
+  - name: replicasets_WT
+  - name: replicasets_auth
+  - name: replicasets_legacy
+  - name: replication_WT
+  - name: replication_auth
+  - name: sasl
+  - name: sharded_collections_jscore_passthrough
+  - name: sharding
+  - name: sharding_auth
+  - name: sharding_auth_audit_WT
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_wire_ops_WT
+  - name: sharding_op_query_WT
+  - name: slow1
+  - name: serial_run
+  - name: snmp
+  - name: ssl
+  - name: sslSpecial
+  - name: tool
+  - name: unittests
+
 - name: ubuntu1404-rocksdb
   display_name: Ubuntu 14.04 (RocksDB)
   modules:
