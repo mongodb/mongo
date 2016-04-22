@@ -206,7 +206,7 @@ __wt_fopen(WT_SESSION_IMPL *session,
 	*fsp = fs;
 	return (0);
 
-err:	__wt_close(session, &fh);
+err:	WT_TRET(__wt_close(session, &fh));
 	__wt_free(session, *fsp);
 	return (ret);
 }
