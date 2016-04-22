@@ -42,7 +42,8 @@ class Status;
  * @param buf - bson data
  * @param maxLength - maxLength of buffer
  *                    this is NOT the bson size, but how far we know the buffer is valid
+ * @param version - newest version to accept
  */
-Status validateBSON(const char* buf, uint64_t maxLength);
+Status validateBSON(const char* buf, uint64_t maxLength, BSONVersion version = BSONVersion::kLatest);
 
 }  // namespace mongo

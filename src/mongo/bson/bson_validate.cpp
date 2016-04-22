@@ -35,6 +35,7 @@
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/platform/decimal128.h"
 
 namespace mongo {
@@ -56,8 +57,8 @@ Status makeError(std::string baseMsg, BSONElement idElem) {
 
 class Buffer {
 public:
-    Buffer(const char* buffer, uint64_t maxLength)
-        : _buffer(buffer), _position(0), _maxLength(maxLength) {}
+    Buffer(const char* buffer, uint64_t maxLength, BSONVersion version)
+        : _buffer(buffer), _position(0), _maxLength(maxLength), _version(version) {}
 
     template <typename N>
     bool readNumber(N* out) {
@@ -125,6 +126,10 @@ public:
         return _buffer;
     }
 
+    BSONVersion version() const {
+        return _version;
+    }
+
     /**
      * WARNING: only pass in a non-EOO idElem if it has been fully validated already!
      */
@@ -137,6 +142,7 @@ private:
     uint64_t _position;
     uint64_t _maxLength;
     BSONElement _idElem;
+    BSONVersion _version;
 };
 
 struct ValidationState {
@@ -223,14 +229,14 @@ Status validateElementInfo(Buffer* buffer, ValidationState::State* nextState, BS
             return Status::OK();
 
         case NumberDecimal:
-            if (Decimal128::enabled) {
+            if (Decimal128::enabled && buffer->version() != BSONVersion::kV1_0) {
                 if (!buffer->skip(sizeof(Decimal128::Value)))
                     return makeError("Invalid bson", idElem);
                 return Status::OK();
             } else {
-                return Status(ErrorCodes::InvalidBSON,
-                              "Attempt to use a decimal BSON type when experimental decimal "
-                              "server support is not currently enabled.");
+                return Status(
+                    ErrorCodes::InvalidBSON,
+                    "Attempt to use a decimal BSON type when support is not currently enabled.");
             }
 
         case DBRef:
@@ -380,12 +386,12 @@ Status validateBSONIterative(Buffer* buffer) {
 
 }  // namespace
 
-Status validateBSON(const char* originalBuffer, uint64_t maxLength) {
+Status validateBSON(const char* originalBuffer, uint64_t maxLength, BSONVersion version) {
     if (maxLength < 5) {
         return Status(ErrorCodes::InvalidBSON, "bson data has to be at least 5 bytes");
     }
 
-    Buffer buf(originalBuffer, maxLength);
+    Buffer buf(originalBuffer, maxLength, version);
     return validateBSONIterative(&buf);
 }
 

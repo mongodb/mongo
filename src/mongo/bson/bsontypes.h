@@ -49,6 +49,11 @@ extern const BSONObj kMaxBSONKey;
 extern const BSONObj kMinBSONKey;
 
 /**
+    determines BSON types considered valid by validate
+*/
+enum class BSONVersion  { kV1_0, kV1_1, kLatest = kV1_1 };
+
+/**
     the complete list of valid BSON types
     see also bsonspec.org
 */
