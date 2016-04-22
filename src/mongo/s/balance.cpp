@@ -32,29 +32,21 @@
 
 #include "mongo/s/balance.h"
 
-#include <algorithm>
-
 #include "mongo/base/status_with.h"
-#include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/client.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/write_concern.h"
-#include "mongo/db/write_concern_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/balancer/cluster_statistics_impl.h"
-#include "mongo/s/balancer_policy.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_mongos.h"
-#include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/config.h"
@@ -62,7 +54,6 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/shard_util.h"
-#include "mongo/s/migration_secondary_throttle_options.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
@@ -80,6 +71,11 @@ using std::unique_ptr;
 using std::vector;
 
 namespace {
+
+const Seconds kBalanceRoundDefaultInterval(10);
+const Seconds kShortBalanceRoundInterval(1);
+
+const auto getBalancer = ServiceContext::declareDecoration<Balancer>();
 
 /**
  * Utility class to generate timing and statistics for a single balancer round.
@@ -151,11 +147,6 @@ void warnOnMultiVersion(const vector<ClusterStatistics::ShardStatistics>& cluste
 
     warning() << sb.str();
 }
-
-const Seconds kBalanceRoundDefaultInterval(10);
-const Seconds kShortBalanceRoundInterval(1);
-
-const auto getBalancer = ServiceContext::declareDecoration<Balancer>();
 
 MONGO_FP_DECLARE(skipBalanceRound);
 MONGO_FP_DECLARE(balancerRoundIntervalSetting);
@@ -390,7 +381,7 @@ bool Balancer::_checkOIDs(OperationContext* txn) {
     return true;
 }
 
-StatusWith<vector<MigrateInfo>> Balancer::_getCandidateChunks(OperationContext* txn) {
+StatusWith<MigrateInfoVector> Balancer::_getCandidateChunks(OperationContext* txn) {
     vector<CollectionType> collections;
 
     Status collsStatus =
@@ -400,17 +391,17 @@ StatusWith<vector<MigrateInfo>> Balancer::_getCandidateChunks(OperationContext* 
     }
 
     if (collections.empty()) {
-        return vector<MigrateInfo>();
+        return MigrateInfoVector();
     }
 
     const auto clusterStats = uassertStatusOK(_clusterStats->getStats(txn));
     if (clusterStats.size() < 2) {
-        return vector<MigrateInfo>();
+        return MigrateInfoVector();
     }
 
     OCCASIONALLY warnOnMultiVersion(clusterStats);
 
-    std::vector<MigrateInfo> candidateChunks;
+    MigrateInfoVector candidateChunks;
 
     // For each collection, check if the balancing policy recommends moving anything around.
     for (const auto& coll : collections) {
@@ -535,7 +526,7 @@ StatusWith<vector<MigrateInfo>> Balancer::_getCandidateChunks(OperationContext* 
 }
 
 int Balancer::_moveChunks(OperationContext* txn,
-                          const vector<MigrateInfo>& candidateChunks,
+                          const MigrateInfoVector& candidateChunks,
                           const MigrationSecondaryThrottleOptions& secondaryThrottle,
                           bool waitForDelete) {
     int movedCount = 0;

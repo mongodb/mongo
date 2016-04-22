@@ -1,5 +1,3 @@
-// @file balancer_policy.h
-
 /**
 *    Copyright (C) 2010 10gen Inc.
 *
@@ -70,6 +68,7 @@ struct MigrateInfo {
     BSONObj maxKey;
 };
 
+typedef std::vector<MigrateInfo> MigrateInfoVector;
 typedef std::vector<ClusterStatistics::ShardStatistics> ShardStatisticsVector;
 typedef std::map<ShardId, std::vector<ChunkType>> ShardToChunksMap;
 

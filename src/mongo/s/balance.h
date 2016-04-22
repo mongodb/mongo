@@ -31,13 +31,13 @@
 #include <string>
 #include <vector>
 
+#include "mongo/s/balancer_policy.h"
 #include "mongo/util/background.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
 
 class ClusterStatistics;
-struct MigrateInfo;
 class MigrationSecondaryThrottleOptions;
 class OperationContext;
 template <typename T>
@@ -67,15 +67,15 @@ public:
         return _clusterStats.get();
     }
 
-    // BackgroundJob methods
+private:
+    // BackgroundJob methods implementation
 
-    virtual void run();
+    void run() override;
 
-    virtual std::string name() const {
+    std::string name() const override {
         return "Balancer";
     }
 
-private:
     /**
      * Checks that the balancer can connect to all servers it needs to do its job.
      *
@@ -102,7 +102,7 @@ private:
      *
      * Returns candidate chunks, one per collection, that could possibly be moved
      */
-    StatusWith<std::vector<MigrateInfo>> _getCandidateChunks(OperationContext* txn);
+    StatusWith<MigrateInfoVector> _getCandidateChunks(OperationContext* txn);
 
     /**
      * Issues chunk migration request, one at a time.
@@ -113,7 +113,7 @@ private:
      * @return number of chunks effectively moved
      */
     int _moveChunks(OperationContext* txn,
-                    const std::vector<MigrateInfo>& candidateChunks,
+                    const MigrateInfoVector& candidateChunks,
                     const MigrationSecondaryThrottleOptions& secondaryThrottle,
                     bool waitForDelete);
 
