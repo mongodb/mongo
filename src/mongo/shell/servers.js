@@ -641,11 +641,10 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             opts = MongoRunner.arrOptions("mongod", opts);
         }
 
-        var mongod = MongoRunner.startWithArgs(opts, waitForConnect);
-        if (!waitForConnect)
-            mongod = {};
-        if (!mongod)
+        var mongod = MongoRunner._startWithArgs(opts, waitForConnect);
+        if (!mongod) {
             return null;
+        }
 
         mongod.commandLine = MongoRunner.arrToOpts(opts);
         mongod.name = (useHostName ? getHostName() : "localhost") + ":" + mongod.commandLine.port;
@@ -678,11 +677,10 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             opts = MongoRunner.arrOptions("mongos", opts);
         }
 
-        var mongos = MongoRunner.startWithArgs(opts, waitForConnect);
-        if (!waitForConnect)
-            mongos = {};
-        if (!mongos)
+        var mongos = MongoRunner._startWithArgs(opts, waitForConnect);
+        if (!mongos) {
             return null;
+        }
 
         mongos.commandLine = MongoRunner.arrToOpts(opts);
         mongos.name = (useHostName ? getHostName() : "localhost") + ":" + mongos.commandLine.port;
@@ -933,33 +931,41 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
     }
 
     /**
-     * Start a mongo process with a particular argument array.  If we aren't waiting for connect,
-     * return null.
+     * Start a mongo process with a particular argument array.
+     * If we aren't waiting for connect, return {pid: <pid>}.
+     * If we are not waiting for connect:
+     *     returns connection to process on success;
+     *     otherwise returns null if we fail to connect.
      */
-    MongoRunner.startWithArgs = function(argArray, waitForConnect) {
+    MongoRunner._startWithArgs = function(argArray, waitForConnect) {
         // TODO: Make there only be one codepath for starting mongo processes
 
         argArray = appendSetParameterArgs(argArray);
         var port = _parsePort.apply(null, argArray);
         var pid = _startMongoProgram.apply(null, argArray);
 
-        var conn = null;
-        if (waitForConnect) {
-            assert.soon(function() {
-                try {
-                    conn = new Mongo("127.0.0.1:" + port);
-                    return true;
-                } catch (e) {
-                    if (!checkProgram(pid)) {
-                        print("Could not start mongo program at " + port + ", process ended");
-
-                        // Break out
-                        return true;
-                    }
-                }
-                return false;
-            }, "unable to connect to mongo program on port " + port, 600 * 1000);
+        if (!waitForConnect) {
+            return {
+                pid: pid,
+            };
         }
+
+        var conn = null;
+        assert.soon(function() {
+            try {
+                conn = new Mongo("127.0.0.1:" + port);
+                conn.pid = pid;
+                return true;
+            } catch (e) {
+                if (!checkProgram(pid)) {
+                    print("Could not start mongo program at " + port + ", process ended");
+
+                    // Break out
+                    return true;
+                }
+            }
+            return false;
+        }, "unable to connect to mongo program on port " + port, 600 * 1000);
 
         return conn;
     };

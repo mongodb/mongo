@@ -131,10 +131,14 @@ function expectState(rst, state) {
         var options = node.savedOptions;
         delete options.configsvr;
         options.noCleanData = true;
+        options.waitForConnect = false;
 
         MongoRunner.stopMongod(node);
-        var conn = MongoRunner.runMongod(options);
-        assert.eq(null, conn, "Mongod should have failed to start, but didn't");
+
+        var mongod = MongoRunner.runMongod(options);
+        var exitCode = waitProgram(mongod.pid);
+        assert.eq(
+            MongoRunner.EXIT_ABRUPT, exitCode, "Mongod should have failed to start, but didn't");
 
         rst.stopSet();
     })();
