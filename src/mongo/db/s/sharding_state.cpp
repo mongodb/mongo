@@ -120,7 +120,6 @@ VersionChoice chooseNewestVersion(ChunkVersion prevLocalVersion,
 
 Date_t getDeadlineFromMaxTimeMS(OperationContext* txn) {
     auto remainingTime = txn->getRemainingMaxTimeMicros();
-    log() << "REN: remaining: " << remainingTime;
     if (remainingTime == 0) {
         return Date_t::max();
     }
