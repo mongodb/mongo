@@ -69,8 +69,9 @@
     }
     assert.commandWorked(coll.createIndex({a: 1}));
 
-    coll.update({_id: "new value", a: 4}, {$inc: {b: 1}}, {upsert: true});
+    assert.writeOK(coll.update({_id: "new value", a: 4}, {$inc: {b: 1}}, {upsert: true}));
     profileObj = getLatestProfilerEntry(testDB);
+
     assert.eq(profileObj.query, {_id: "new value", a: 4}, tojson(profileObj));
     assert.eq(profileObj.updateobj, {$inc: {b: 1}}, tojson(profileObj));
     assert.eq(profileObj.keysExamined, 0, tojson(profileObj));
@@ -79,6 +80,23 @@
     assert.eq(profileObj.nMatched, 0, tojson(profileObj));
     assert.eq(profileObj.nModified, 0, tojson(profileObj));
     assert.eq(profileObj.upsert, true, tojson(profileObj));
+
+    //
+    // Confirm 'nmoved' for MMAPv1.
+    //
+    if (db.serverStatus().storageEngine.name === "mmapv1") {
+        coll.drop();
+        assert.writeOK(coll.insert({_id: 1}));
+
+        assert.writeOK(coll.update({_id: 1}, {$set: {b: new Array(128).toString()}}));
+        profileObj = getLatestProfilerEntry(testDB);
+
+        assert.eq(profileObj.keysInserted, 1, tojson(profileObj));
+        assert.eq(profileObj.keysDeleted, 1, tojson(profileObj));
+        assert.eq(profileObj.nMatched, 1, tojson(profileObj));
+        assert.eq(profileObj.nModified, 1, tojson(profileObj));
+        assert.eq(profileObj.nmoved, 1, tojson(profileObj));
+    }
 
     //
     // Confirm "fromMultiPlanner" metric.
