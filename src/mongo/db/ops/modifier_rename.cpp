@@ -84,6 +84,12 @@ namespace mongo {
                                         << modExpr);
         }
 
+        StringData valueStringData(modExpr.valuestr(), modExpr.valuestrsize() - 1);
+        if (valueStringData.find('\0') != std::string::npos) {
+            return Status(ErrorCodes::BadValue,
+                          "The 'to' field for $rename cannot contain an embedded null byte");
+        }
+
         // Extract the field names from the mod expression
 
         _fromFieldRef.parse(modExpr.fieldName());
