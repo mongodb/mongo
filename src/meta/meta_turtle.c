@@ -189,14 +189,15 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 		if (exist_incr)
 			WT_RET_MSG(session, EINVAL,
 			    "Incremental backup after running recovery "
-			    "is not allowed.");
+			    "is not allowed");
 		/*
 		 * If we have a backup file and metadata and turtle files,
 		 * we want to recreate the metadata from the backup.
 		 */
 		if (exist_backup) {
-			WT_RET(__wt_msg(session, "Both %s and %s exist. "
-			    "Recreating metadata from backup.",
+			WT_RET(__wt_msg(session,
+			    "Both %s and %s exist; recreating metadata from "
+			    "backup",
 			    WT_METADATA_TURTLE, WT_METADATA_BACKUP));
 			WT_RET(__wt_remove_if_exists(session, WT_METAFILE));
 			WT_RET(__wt_remove_if_exists(

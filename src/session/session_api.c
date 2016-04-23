@@ -1109,7 +1109,7 @@ __session_truncate(WT_SESSION *wt_session,
 			if (!WT_STREQ(uri, "log:"))
 				WT_ERR_MSG(session, EINVAL,
 				    "the truncate method should not specify any"
-				    "target after the log: URI prefix.");
+				    "target after the log: URI prefix");
 			WT_ERR(__wt_log_truncate_files(session, start, cfg));
 		} else if (WT_PREFIX_MATCH(uri, "file:"))
 			WT_ERR(__wt_session_range_truncate(
