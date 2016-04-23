@@ -67,10 +67,6 @@ using std::vector;
 class Client;
 class OperationContext;
 
-DBClientBase* createDirectClient(OperationContext* txn) {
-    return NULL;
-}
-
 namespace {
 
 const string TARGET_HOST = "localhost:27017";

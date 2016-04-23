@@ -10,6 +10,7 @@ Import([
 env.Library(
     target='scripting_common',
     source=[
+        'dbdirectclient_factory.cpp',
         'engine.cpp',
         'utils.cpp',
     ],
@@ -20,11 +21,6 @@ env.Library(
         '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/util/md5',
     ],
-    LIBDEPS_TAGS=[
-        # Depends on mongo::createDirectClient, which is not uniquely defined
-        'incomplete'
-    ],
-
 )
 
 env.Library(
@@ -153,7 +149,7 @@ if usemozjs:
             '$BUILD_DIR/mongo/db/service_context',
         ],
         LIBDEPS_TAGS=[
-            # Depends on haveLocalShardingInfo and createDirectClient, which are not
+            # Depends on haveLocalShardingInfo, which are not
             # uniquely defined.
             'incomplete',
         ],

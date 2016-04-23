@@ -217,11 +217,6 @@ public:
     }
 };
 
-DBClientBase* createDirectClient(OperationContext* txn) {
-    uassert(10197, "createDirectClient not implemented for sharding yet", 0);
-    return nullptr;
-}
-
 }  // namespace mongo
 
 using namespace mongo;

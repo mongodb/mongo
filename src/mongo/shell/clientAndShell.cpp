@@ -51,8 +51,4 @@ bool haveLocalShardingInfo(OperationContext* txn, const string& ns) {
     return false;
 }
 
-DBClientBase* createDirectClient(OperationContext* txn) {
-    uassert(10256, "no createDirectClient in clientOnly", 0);
-    return 0;
-}
 }

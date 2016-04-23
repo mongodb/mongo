@@ -37,6 +37,8 @@
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/client/sasl_client_session.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/mozjs/cursor.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
@@ -597,9 +599,8 @@ void MongoLocalInfo::construct(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 0)
         uasserted(ErrorCodes::BadValue, "local Mongo constructor takes no args");
 
-    std::unique_ptr<DBClientBase> conn;
-
-    conn.reset(createDirectClient(scope->getOpContext()));
+    auto txn = scope->getOpContext();
+    auto conn = DBDirectClientFactory::get(txn).create(txn);
 
     JS::RootedObject thisv(cx);
     scope->getProto<MongoLocalInfo>().newObject(&thisv);

@@ -45,11 +45,6 @@ class Client;
 
 class OperationContext;
 
-DBClientBase* createDirectClient(OperationContext* txn) {
-    fassertFailed(17249);
-    return NULL;
-}
-
 bool haveLocalShardingInfo(OperationContext* txn, const std::string& ns) {
     return false;
 }

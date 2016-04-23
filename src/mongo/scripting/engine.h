@@ -293,7 +293,5 @@ void installGlobalUtils(Scope& scope);
 bool hasJSReturn(const std::string& s);
 const char* jsSkipWhiteSpace(const char* raw);
 
-DBClientBase* createDirectClient(OperationContext* txn);
-
 extern ScriptEngine* globalScriptEngine;
 }

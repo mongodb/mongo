@@ -46,11 +46,6 @@ namespace mongo {
 using std::unique_ptr;
 using std::string;
 
-// Called from scripting/engine.cpp and scripting/v8_db.cpp.
-DBClientBase* createDirectClient(OperationContext* txn) {
-    return new DBDirectClient(txn);
-}
-
 namespace {
 
 class DirectClientScope {

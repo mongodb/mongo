@@ -41,6 +41,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/unordered_set.h"
+#include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
 #include "mongo/util/text.h"
@@ -211,7 +212,8 @@ void Scope::loadStored(OperationContext* txn, bool ignoreNotConnected) {
     _loadedVersion = lastVersion;
     string coll = _localDBName + ".system.js";
 
-    unique_ptr<DBClientBase> directDBClient(createDirectClient(txn));
+    auto directDBClient = DBDirectClientFactory::get(txn).create(txn);
+
     unique_ptr<DBClientCursor> c =
         directDBClient->query(coll, Query(), 0, 0, NULL, QueryOption_SlaveOk, 0);
     massert(16669, "unable to get db client cursor from query", c.get());

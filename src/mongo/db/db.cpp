@@ -109,6 +109,7 @@
 #include "mongo/platform/process_id.h"
 #include "mongo/s/balancer/balancer.h"
 #include "mongo/s/sharding_initialization.h"
+#include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
@@ -530,8 +531,15 @@ static void _initAndListen(int listenPort) {
     Client::initThread("initandlisten");
 
     _initWireSpec();
-    getGlobalServiceContext()->setFastClockSource(FastClockSourceFactory::create(Milliseconds(10)));
-    getGlobalServiceContext()->setOpObserver(stdx::make_unique<OpObserver>());
+    auto globalServiceContext = getGlobalServiceContext();
+
+    globalServiceContext->setFastClockSource(FastClockSourceFactory::create(Milliseconds(10)));
+    globalServiceContext->setOpObserver(stdx::make_unique<OpObserver>());
+
+    DBDirectClientFactory::get(globalServiceContext)
+        .registerImplementation([](OperationContext* txn) {
+            return std::unique_ptr<DBClientBase>(new DBDirectClient(txn));
+        });
 
     const repl::ReplSettings& replSettings = repl::getGlobalReplicationCoordinator()->getSettings();
 
