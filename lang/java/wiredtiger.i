@@ -577,15 +577,15 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		return $self->update($self);
 	}
 
-	%javamethodmodifiers is_raw "protected";
-	bool is_raw(JNIEnv *jenv) {
+	%javamethodmodifiers _java_raw "protected";
+	bool _java_raw(JNIEnv *jenv) {
 		(void)jenv;
 		JAVA_CALLBACK *jcb = (JAVA_CALLBACK *)$self->c.lang_private;
 		return jcb->cursor_raw;
 	}
 
-	%javamethodmodifiers java_init "protected";
-	int java_init(jobject jasyncop) {
+	%javamethodmodifiers _java_init "protected";
+	int _java_init(jobject jasyncop) {
 		JAVA_CALLBACK *jcb =
 		    (JAVA_CALLBACK *)$self->c.lang_private;
 		jcb->jobj = JCALL1(NewGlobalRef, jcb->jnienv, jasyncop);
@@ -612,7 +612,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
    valueFormat = getValue_format();
    keyPacker = new PackOutputStream(keyFormat);
    valuePacker = new PackOutputStream(valueFormat);
-   wiredtigerJNI.AsyncOp_java_init(swigCPtr, this, this);
+   wiredtigerJNI.AsyncOp__java_init(swigCPtr, this, this);
  }
 
  protected static long getCPtr($javaclassname obj) {
@@ -1099,7 +1099,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		if (keyUnpacker == null)
 			keyUnpacker =
 			    new PackInputStream(keyFormat, get_key_wrap(),
-			    is_raw());
+			    _java_raw());
 		return keyUnpacker;
 	}
 
@@ -1113,7 +1113,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		if (valueUnpacker == null)
 			valueUnpacker =
 			    new PackInputStream(valueFormat, get_value_wrap(),
-			    is_raw());
+			    _java_raw());
 		return valueUnpacker;
 	}
 
@@ -1201,15 +1201,15 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		return cmp;
 	}
 
-	%javamethodmodifiers is_raw "protected";
-	bool is_raw(JNIEnv *jenv) {
+	%javamethodmodifiers _java_raw "protected";
+	bool _java_raw(JNIEnv *jenv) {
 		(void)jenv;
 		JAVA_CALLBACK *jcb = (JAVA_CALLBACK *)$self->lang_private;
 		return jcb->cursor_raw;
 	}
 
-	%javamethodmodifiers java_init "protected";
-	int java_init(jobject jcursor) {
+	%javamethodmodifiers _java_init "protected";
+	int _java_init(jobject jcursor) {
 		JAVA_CALLBACK *jcb = (JAVA_CALLBACK *)$self->lang_private;
 		jcb->jobj = JCALL1(NewGlobalRef, jcb->jnienv, jcursor);
 		JCALL1(DeleteLocalRef, jcb->jnienv, jcursor);
@@ -1235,7 +1235,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
    valueFormat = getValue_format();
    keyPacker = new PackOutputStream(keyFormat);
    valuePacker = new PackOutputStream(valueFormat);
-   wiredtigerJNI.Cursor_java_init(swigCPtr, this, this);
+   wiredtigerJNI.Cursor__java_init(swigCPtr, this, this);
  }
 
  protected static long getCPtr($javaclassname obj) {
@@ -1793,7 +1793,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 			return null;
 		else
 			return new PackInputStream(keyFormat,
-			    get_key_wrap(), is_raw());
+			    get_key_wrap(), _java_raw());
 	}
 
 	/**
@@ -1809,7 +1809,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 			return null;
 		else
 			return new PackInputStream(valueFormat,
-			    get_value_wrap(), is_raw());
+			    get_value_wrap(), _java_raw());
 	}
 %}
 
@@ -1819,20 +1819,22 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
  */
 %javaexception("com.wiredtiger.db.WiredTigerException") { $action; }
 %javaexception("") wiredtiger_strerror { $action; }
+%javaexception("") __wt_async_op::_java_raw { $action; }
 %javaexception("") __wt_async_op::connection { $action; }
 %javaexception("") __wt_async_op::get_type { $action; }
 %javaexception("") __wt_async_op::get_id { $action; }
 %javaexception("") __wt_async_op::key_format { $action; }
 %javaexception("") __wt_async_op::value_format { $action; }
+%javaexception("") __wt_connection::_java_init { $action; }
 %javaexception("") __wt_connection::get_home { $action; }
 %javaexception("") __wt_connection::is_new { $action; }
-%javaexception("") __wt_connection::java_init { $action; }
+%javaexception("") __wt_cursor::_java_raw { $action; }
 %javaexception("") __wt_cursor::key_format { $action; }
 %javaexception("") __wt_cursor::session { $action; }
 %javaexception("") __wt_cursor::uri { $action; }
 %javaexception("") __wt_cursor::value_format { $action; }
+%javaexception("") __wt_session::_java_init { $action; }
 %javaexception("") __wt_session::connection { $action; }
-%javaexception("") __wt_session::java_init { $action; }
 
 /* Remove / rename parts of the C API that we don't want in Java. */
 %immutable __wt_cursor::session;
@@ -1910,8 +1912,8 @@ REQUIRE_WRAP(WT_ASYNC_OP::get_id, __wt_async_op::get_id,getId)
 %}
 
 %extend ctypename {
-	%javamethodmodifiers java_init "protected";
-	int java_init(jobject jsess) {
+	%javamethodmodifiers _java_init "protected";
+	int _java_init(jobject jsess) {
 		implclass *session = (implclass *)$self;
 		JAVA_CALLBACK *jcb = (JAVA_CALLBACK *)session->lang_private;
 		jcb->jobj = JCALL1(NewGlobalRef, jcb->jnienv, jsess);
@@ -1921,8 +1923,8 @@ REQUIRE_WRAP(WT_ASYNC_OP::get_id, __wt_async_op::get_id,getId)
 }
 %enddef
 
-TRACKED_CLASS(Session, __wt_session, wiredtigerJNI.Session_java_init, WT_SESSION_IMPL)
-TRACKED_CLASS(Connection, __wt_connection, wiredtigerJNI.Connection_java_init, WT_CONNECTION_IMPL)
+TRACKED_CLASS(Session, __wt_session, wiredtigerJNI.Session__java_init, WT_SESSION_IMPL)
+TRACKED_CLASS(Connection, __wt_connection, wiredtigerJNI.Connection__java_init, WT_CONNECTION_IMPL)
 /* Note: Cursor incorporates the elements of TRACKED_CLASS into its
  * custom constructor and %extend clause.
  */
