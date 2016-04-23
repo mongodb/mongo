@@ -64,7 +64,6 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/write_concern.h"
-#include "mongo/s/d_state.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 

@@ -45,10 +45,6 @@ class Client;
 
 class OperationContext;
 
-bool haveLocalShardingInfo(OperationContext* txn, const std::string& ns) {
-    return false;
-}
-
 #ifdef _WIN32
 namespace ntservice {
 bool shouldStartService() {

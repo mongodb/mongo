@@ -1,5 +1,5 @@
 /*
- *    Copyright (C) 2010 10gen Inc.
+ *    Copyright (C) 2016 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -30,9 +30,20 @@
 
 #include <string>
 
+#include "mongo/stdx/functional.h"
+
 namespace mongo {
 
+class ServiceContext;
 class OperationContext;
+
+/**
+ * Register a hook function that will implement
+ * 'haveLocalShardingInfo' below. If no hook is registered,
+ * haveLocalShardingInfo will always return 'false'.
+ */
+void enableLocalShardingInfo(ServiceContext* context,
+                             stdx::function<bool(OperationContext*, const std::string&)> handler);
 
 /**
  * @return true if we have any shard info for the ns

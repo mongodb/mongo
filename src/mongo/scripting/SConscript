@@ -147,11 +147,7 @@ if usemozjs:
             '$BUILD_DIR/third_party/shim_mozjs',
             '$BUILD_DIR/mongo/shell/mongojs',
             '$BUILD_DIR/mongo/db/service_context',
-        ],
-        LIBDEPS_TAGS=[
-            # Depends on haveLocalShardingInfo, which are not
-            # uniquely defined.
-            'incomplete',
+            '$BUILD_DIR/mongo/s/local_sharding_info',
         ],
     )
 else:

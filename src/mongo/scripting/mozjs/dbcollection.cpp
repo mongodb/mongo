@@ -32,7 +32,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/s/d_state.h"
+#include "mongo/s/local_sharding_info.h"
 #include "mongo/scripting/mozjs/bson.h"
 #include "mongo/scripting/mozjs/db.h"
 #include "mongo/scripting/mozjs/implscope.h"

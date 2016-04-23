@@ -1,5 +1,5 @@
-/**
- *    Copyright (C) 2008-2015 MongoDB Inc.
+/*
+ *    Copyright (C) 2016 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,64 +26,46 @@
  *    then also delete it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
-
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/init.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/s/collection_metadata.h"
-#include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/sharded_connection_info.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/db/service_context.h"
 #include "mongo/s/local_sharding_info.h"
-#include "mongo/util/log.h"
-#include "mongo/util/stringutils.h"
+
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 
 namespace mongo {
-
-using std::shared_ptr;
-using std::string;
-using std::stringstream;
-
 namespace {
 
-bool haveLocalShardingInfo(OperationContext* txn, const string& ns) {
-    if (!ShardingState::get(txn)->enabled()) {
-        return false;
+using Handler = stdx::function<bool(OperationContext*, const std::string&)>;
+
+class LocalShardingInfo {
+public:
+    void registerHandler(Handler handler) {
+        _handler = handler;
     }
 
-    const auto& oss = OperationShardingState::get(txn);
-    if (oss.hasShardVersion()) {
-        return true;
+    const Handler& getHandler() const {
+        return _handler;
     }
 
-    const auto& sci = ShardedConnectionInfo::get(txn->getClient(), false);
-    if (sci && !sci->getVersion(ns).isStrictlyEqualTo(ChunkVersion::UNSHARDED())) {
-        return true;
-    }
+private:
+    Handler _handler;
+};
 
-    return false;
-}
-
-MONGO_INITIALIZER_WITH_PREREQUISITES(MongoDLocalShardingInfo, ("SetGlobalEnvironment"))
-(InitializerContext* context) {
-    enableLocalShardingInfo(getGlobalServiceContext(), &haveLocalShardingInfo);
-    return Status::OK();
-}
+const ServiceContext::Decoration<LocalShardingInfo> forService =
+    ServiceContext::declareDecoration<LocalShardingInfo>();
 
 }  // namespace
 
-void usingAShardConnection(const string& addr) {}
+void enableLocalShardingInfo(ServiceContext* context, Handler handler) {
+    forService(context).registerHandler(handler);
+}
+
+bool haveLocalShardingInfo(OperationContext* txn, const std::string& ns) {
+    auto handler = forService(txn->getServiceContext()).getHandler();
+    if (handler)
+        return handler(txn, ns);
+    return false;
+}
 
 }  // namespace mongo

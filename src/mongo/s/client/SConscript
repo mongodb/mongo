@@ -24,8 +24,7 @@ env.Library(
     ],
     LIBDEPS_TAGS=[
         # Circular with both coreshard and coredb! Also relies on some
-        # symbols like usingAShardConnection that are not uniquely
-        # defined.
+        # symbols that are not uniquely defined.
         'incomplete',
     ],
 )

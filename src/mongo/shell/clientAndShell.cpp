@@ -47,8 +47,4 @@ class Client;
 class DBClientBase;
 class OperationContext;
 
-bool haveLocalShardingInfo(OperationContext* txn, const string& ns) {
-    return false;
-}
-
 }
