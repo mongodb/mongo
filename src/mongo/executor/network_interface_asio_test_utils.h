@@ -54,7 +54,7 @@ public:
     }
 };
 
-TaskExecutor::CallbackHandle makeCallbackHandle() {
+inline TaskExecutor::CallbackHandle makeCallbackHandle() {
     return TaskExecutor::CallbackHandle(std::make_shared<MockCallbackState>());
 }
 
