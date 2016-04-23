@@ -88,7 +88,7 @@ class test_backup05(wttest.WiredTigerTestCase, suite_subprocess):
                 self.session.verify(self.uri)
 
     def test_backup(self):
-        with self.expectedStdoutPattern('Recreating metadata'):
+        with self.expectedStdoutPattern('recreating metadata'):
             self.backup()
 
 if __name__ == '__main__':
