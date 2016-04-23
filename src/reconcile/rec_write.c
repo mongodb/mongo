@@ -5466,13 +5466,11 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * write). The page may instead have been a disk image with
 		 * associated saved updates: ownership of the disk image is
 		 * transferred when rewriting the page in-memory and there may
-		 * not have been saved updaates. We've gotten this wrong a few
+		 * not have been saved updates. We've gotten this wrong a few
 		 * times, so use the existence of an address to confirm backing
 		 * blocks we care about, and free any disk image/saved updates.
 		 */
-		if (multi->addr.addr != NULL && multi->addr.reuse)
-			multi->addr.addr = NULL;
-		if (multi->addr.addr != NULL) {
+		if (multi->addr.addr != NULL && !multi->addr.reuse) {
 			WT_RET(__wt_btree_block_free(
 			    session, multi->addr.addr, multi->addr.size));
 			__wt_free(session, multi->addr.addr);
