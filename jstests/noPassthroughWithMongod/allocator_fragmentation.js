@@ -5,12 +5,6 @@
 (function() {
     "use strict";
 
-    // Skip this test if not running with WiredTiger
-    if (jsTest.options().storageEngine && jsTest.options().storageEngine !== "wiredTiger") {
-        jsTest.log("Skipping test because storageEngine is not 'wiredTiger'");
-        return;
-    }
-
     var jobs = [];
     var numUpdaterJobs = 16;
 
