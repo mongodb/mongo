@@ -107,9 +107,8 @@ functions:
           set -e
           set -o verbose
           cd ./clusters/${cluster}
-          # configure mongodb cluster with wiredTiger
-          ../../bin/config-${setup}.sh mongodb ${storageEngine} ${numShard} ${test}
-          echo "${cluster} MongoDB Replica Cluster STARTED."
+          ../../bin/configure-mongodb-cluster.sh ${setup} ${storageEngine}
+          echo "${cluster} MongoDB Cluster STARTED."
   "run test":
     - command: shell.exec
       params:
@@ -311,7 +310,6 @@ tasks:
     - func: "configure mongodb cluster"
       vars:
         storageEngine: "wiredTiger"
-        test: "ycsb"
     - func: "run test"
       vars:
         storageEngine: "wiredTiger"
@@ -332,7 +330,6 @@ tasks:
     - func: "configure mongodb cluster"
       vars:
         storageEngine: "mmapv1"
-        test: "ycsb"
     - func: "run test"
       vars:
         storageEngine: "mmapv1"
@@ -488,7 +485,6 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     setup: single-replica
     cluster: single
-    numShard: 0
   run_on:
       - "rhel70-perf-standalone"
   tasks:
@@ -505,7 +501,6 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     setup: standalone
     cluster: single
-    numShard: 0
   run_on:
       - "rhel70-perf-standalone"
   tasks:
@@ -525,7 +520,6 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     setup: shard
     cluster: shard
-    numShard: 3
   run_on:
       - "rhel70-perf-standalone"
   tasks:
@@ -542,7 +536,6 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     setup: replica
     cluster: replica
-    numMember: 3
   run_on:
       - "rhel70-perf-standalone"
   tasks:
