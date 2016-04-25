@@ -687,7 +687,13 @@ void OpDebug::append(const CurOp& curop,
     }
     b.append("millis", executionTime);
 
-    execStats.append(b, "execStats");
+    if (!curop.getPlanSummary().empty()) {
+        b.append("planSummary", curop.getPlanSummary());
+    }
+
+    if (execStats.have()) {
+        execStats.append(b, "execStats");
+    }
 }
 
 void OpDebug::setPlanSummaryMetrics(const PlanSummaryStats& planSummaryStats) {

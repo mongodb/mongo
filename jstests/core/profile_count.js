@@ -1,5 +1,4 @@
 // Confirms that profiled count execution contains all expected metrics with proper values.
-// TODO SERVER-23259: Add planSummary.
 // TODO SERVER-23264: Add execStats.
 
 (function() {
@@ -31,6 +30,7 @@
     assert.eq(profileObj.op, "command", tojson(profileObj));
     assert.eq(profileObj.protocol, getProfilerProtocolStringForCommand(conn), tojson(profileObj));
     assert.eq(profileObj.command.count, coll.getName(), tojson(profileObj));
+    assert.eq(profileObj.planSummary, "COUNT", tojson(profileObj));
     assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));
@@ -70,6 +70,7 @@
 
     assert.eq(profileObj.command.query, query, tojson(profileObj));
     assert.eq(profileObj.keysExamined, 6, tojson(profileObj));
+    assert.eq(profileObj.planSummary, "COUNT_SCAN { a: 1.0 }", tojson(profileObj));
 
     //
     // Confirm "fromMultiPlanner" metric.

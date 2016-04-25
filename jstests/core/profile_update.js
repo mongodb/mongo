@@ -1,5 +1,4 @@
 // Confirms that profiled update execution contains all expected metrics with proper values.
-// TODO SERVER-23259: Add planSummary.
 // TODO SERVER-23264: Add execStats.
 
 (function() {
@@ -35,6 +34,7 @@
     assert.eq(profileObj.keysDeleted, 1, tojson(profileObj));
     assert.eq(profileObj.nMatched, 1, tojson(profileObj));
     assert.eq(profileObj.nModified, 1, tojson(profileObj));
+    assert.eq(profileObj.planSummary, "IXSCAN { a: 1.0 }", tojson(profileObj));
     assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("locks"), tojson(profileObj));
@@ -57,6 +57,7 @@
     assert.eq(profileObj.keysDeleted, 5, tojson(profileObj));
     assert.eq(profileObj.nMatched, 5, tojson(profileObj));
     assert.eq(profileObj.nModified, 5, tojson(profileObj));
+    assert.eq(profileObj.planSummary, "IXSCAN { a: 1.0 }", tojson(profileObj));
 
     //
     // Confirm metrics for insert on update with "upsert: true".
@@ -78,6 +79,7 @@
     assert.eq(profileObj.nMatched, 0, tojson(profileObj));
     assert.eq(profileObj.nModified, 0, tojson(profileObj));
     assert.eq(profileObj.upsert, true, tojson(profileObj));
+    assert.eq(profileObj.planSummary, "IXSCAN { _id: 1 }", tojson(profileObj));
 
     //
     // Confirm 'nmoved' for MMAPv1.

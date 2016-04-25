@@ -498,6 +498,12 @@ static WriteResult::SingleResult performSingleUpdateOp(OperationContext* txn,
 
     auto exec = uassertStatusOK(
         getExecutorUpdate(txn, &curOp.debug(), collection->getCollection(), &parsedUpdate));
+
+    {
+        stdx::lock_guard<Client>(*txn->getClient());
+        CurOp::get(txn)->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
+    }
+
     uassertStatusOK(exec->executePlan());
 
     PlanSummaryStats summary;
@@ -585,6 +591,12 @@ static WriteResult::SingleResult performSingleDeleteOp(OperationContext* txn,
 
     auto exec = uassertStatusOK(
         getExecutorDelete(txn, &curOp.debug(), collection.getCollection(), &parsedDelete));
+
+    {
+        stdx::lock_guard<Client>(*txn->getClient());
+        CurOp::get(txn)->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
+    }
+
     uassertStatusOK(exec->executePlan());
     long long n = DeleteStage::getNumDeleted(*exec);
     curOp.debug().ndeleted = n;

@@ -396,6 +396,11 @@ public:
                 const std::unique_ptr<PlanExecutor> exec =
                     std::move(statusWithPlanExecutor.getValue());
 
+                {
+                    stdx::lock_guard<Client>(*txn->getClient());
+                    CurOp::get(txn)->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
+                }
+
                 StatusWith<boost::optional<BSONObj>> advanceStatus =
                     advanceExecutor(txn, exec.get(), args.isRemove());
                 if (!advanceStatus.isOK()) {
@@ -481,6 +486,11 @@ public:
                 }
                 const std::unique_ptr<PlanExecutor> exec =
                     std::move(statusWithPlanExecutor.getValue());
+
+                {
+                    stdx::lock_guard<Client>(*txn->getClient());
+                    CurOp::get(txn)->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
+                }
 
                 StatusWith<boost::optional<BSONObj>> advanceStatus =
                     advanceExecutor(txn, exec.get(), args.isRemove());

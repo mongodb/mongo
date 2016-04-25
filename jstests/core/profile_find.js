@@ -1,5 +1,4 @@
 // Confirms that profiled find execution contains all expected metrics with proper values.
-// TODO SERVER-23259: Add planSummary.
 
 (function() {
     "use strict";
@@ -33,6 +32,7 @@
     assert.eq(profileObj.keysExamined, 1, tojson(profileObj));
     assert.eq(profileObj.docsExamined, 1, tojson(profileObj));
     assert.eq(profileObj.nreturned, 1, tojson(profileObj));
+    assert.eq(profileObj.planSummary, "IXSCAN { a: 1.0 }", tojson(profileObj));
     assert.eq(profileObj.query.filter, {a: 1}, tojson(profileObj));
     if (isLegacyReadMode) {
         assert.eq(profileObj.query.ntoreturn, -1, tojson(profileObj));

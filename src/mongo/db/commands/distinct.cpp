@@ -39,6 +39,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
@@ -50,6 +51,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
@@ -192,6 +194,12 @@ public:
         auto executor = getPlanExecutor(txn, collection, ns, cmdObj, false);
         if (!executor.isOK()) {
             return appendCommandStatus(result, executor.getStatus());
+        }
+
+        {
+            stdx::lock_guard<Client>(*txn->getClient());
+            CurOp::get(txn)
+                ->setPlanSummary_inlock(Explain::getPlanSummary(executor.getValue().get()));
         }
 
         string key = cmdObj[kKeyField].valuestrsafe();

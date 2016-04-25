@@ -1,10 +1,7 @@
 // Confirms that profiled insert execution contains all expected metrics with proper values.
-// TODO SERVER-23264: Confirm execStats is not written for insert.
 
 (function() {
     "use strict";
-
-    jsTest.log("Running profile_insert under writeMode: " + db.getMongo().writeMode());
 
     // For getLatestProfilerEntry and getProfilerProtocolStringForCommand
     load("jstests/libs/profiler.js");

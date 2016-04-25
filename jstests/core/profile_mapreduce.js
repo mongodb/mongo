@@ -1,5 +1,4 @@
 // Confirms that profiled findAndModify execution contains all expected metrics with proper values.
-// TODO SERVER-23261: Add planSummary.
 
 (function() {
     "use strict";
@@ -39,6 +38,7 @@
     assert.eq(profileObj.op, "command", tojson(profileObj));
     assert.eq(profileObj.keysExamined, 3, tojson(profileObj));
     assert.eq(profileObj.docsExamined, 3, tojson(profileObj));
+    assert.eq(profileObj.planSummary, "IXSCAN { a: 1.0 }", tojson(profileObj));
     assert.eq(profileObj.protocol, getProfilerProtocolStringForCommand(conn), tojson(profileObj));
     assert.eq(coll.getName(), profileObj.command.mapreduce, tojson(profileObj));
     assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));

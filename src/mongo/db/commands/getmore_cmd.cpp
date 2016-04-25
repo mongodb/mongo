@@ -301,6 +301,11 @@ public:
         exec->reattachToOperationContext(txn);
         exec->restoreState();
 
+        {
+            stdx::lock_guard<Client>(*txn->getClient());
+            CurOp::get(txn)->setPlanSummary_inlock(Explain::getPlanSummary(exec));
+        }
+
         uint64_t notifierVersion = 0;
         std::shared_ptr<CappedInsertNotifier> notifier;
         if (isCursorAwaitData(cursor)) {

@@ -229,6 +229,11 @@ public:
 
         unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
+        {
+            stdx::lock_guard<Client>(*txn->getClient());
+            CurOp::get(txn)->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
+        }
+
         double totalDistance = 0;
         BSONObjBuilder resultBuilder(result.subarrayStart("results"));
         double farthestDist = 0;

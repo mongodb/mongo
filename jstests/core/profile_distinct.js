@@ -1,5 +1,4 @@
 // Confirms that profiled distinct execution contains all expected metrics with proper values.
-// TODO SERVER-23259: Add planSummary.
 // TODO SERVER-23264: Add execStats.
 
 (function() {
@@ -31,6 +30,7 @@
     assert.eq(profileObj.op, "command", tojson(profileObj));
     assert.eq(profileObj.keysExamined, 5, tojson(profileObj));
     assert.eq(profileObj.docsExamined, 5, tojson(profileObj));
+    assert.eq(profileObj.planSummary, "IXSCAN { b: 1.0 }", tojson(profileObj));
     assert.eq(profileObj.protocol, getProfilerProtocolStringForCommand(conn), tojson(profileObj));
     assert.eq(coll.getName(), profileObj.command.distinct, tojson(profileObj));
     assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));

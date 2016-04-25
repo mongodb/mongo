@@ -249,6 +249,11 @@ public:
                 Explain::getSummaryStats(*input, &stats);
                 collection->infoCache()->notifyOfQuery(txn, stats.indexesUsed);
 
+                {
+                    stdx::lock_guard<Client>(*txn->getClient());
+                    CurOp::get(txn)->setPlanSummary_inlock(Explain::getPlanSummary(input.get()));
+                }
+
                 // TODO SERVER-23265: Confirm whether this is the correct place to gather all
                 // metrics. There is no harm adding here for the time being.
                 CurOp::get(txn)->debug().setPlanSummaryMetrics(stats);

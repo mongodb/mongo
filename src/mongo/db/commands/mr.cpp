@@ -1452,6 +1452,11 @@ public:
                     exec = std::move(statusWithPlanExecutor.getValue());
                 }
 
+                {
+                    stdx::lock_guard<Client>(*txn->getClient());
+                    CurOp::get(txn)->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
+                }
+
                 Timer mt;
 
                 // go through each doc
