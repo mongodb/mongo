@@ -263,7 +263,6 @@ public:
         }
 
         txn->setWriteConcern(writeConcern);
-        setupSynchronousCommit(txn);
         {
             stdx::lock_guard<Client> lk(*txn->getClient());
             txn->setMessage_inlock("waiting for write concern");

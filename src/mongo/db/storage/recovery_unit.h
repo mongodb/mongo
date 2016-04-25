@@ -74,13 +74,6 @@ public:
     virtual bool waitUntilDurable() = 0;
 
     /**
-     * This is a hint to the engine that this transaction is going to call waitUntilDurable at
-     * the end.  This should be called before any work is done so that transactions can be
-     * configured correctly.
-     */
-    virtual void goingToWaitUntilDurable() {}
-
-    /**
      * When this is called, if there is an open transaction, it is closed. On return no
      * transaction is active. This cannot be called inside of a WriteUnitOfWork, and should
      * fail if it is.

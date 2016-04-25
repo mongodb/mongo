@@ -58,16 +58,6 @@ static ServerStatusMetricField<TimerStats> displayGleLatency("getLastError.wtime
 static Counter64 gleWtimeouts;
 static ServerStatusMetricField<Counter64> gleWtimeoutsDisplay("getLastError.wtimeouts",
                                                               &gleWtimeouts);
-
-void setupSynchronousCommit(OperationContext* txn) {
-    const WriteConcernOptions& writeConcern = txn->getWriteConcern();
-
-    if (writeConcern.syncMode == WriteConcernOptions::SyncMode::JOURNAL ||
-        writeConcern.syncMode == WriteConcernOptions::SyncMode::FSYNC) {
-        txn->recoveryUnit()->goingToWaitUntilDurable();
-    }
-}
-
 namespace {
 const std::string kLocalDB = "local";
 }  // namespace

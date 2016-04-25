@@ -263,7 +263,6 @@ void ApplyBatchFinalizerForJournal::_run() {
         }
 
         auto txn = cc().makeOperationContext();
-        txn->recoveryUnit()->goingToWaitUntilDurable();
         txn->recoveryUnit()->waitUntilDurable();
         // We have to use setMyLastDurableOpTimeForward since this thread races with
         // logTransitionToPrimaryToOplog.
