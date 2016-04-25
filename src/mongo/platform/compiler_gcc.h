@@ -66,3 +66,5 @@
 #define MONGO_unlikely(x) static_cast<bool>(__builtin_expect(static_cast<bool>(x), 0))
 
 #define MONGO_COMPILER_ALWAYS_INLINE [[gnu::always_inline]]
+
+#define MONGO_COMPILER_UNREACHABLE __builtin_unreachable()

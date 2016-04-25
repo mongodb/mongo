@@ -124,6 +124,16 @@
  *
  *    Overrides compiler heuristics to force that a particular function should always
  *    be inlined.
+ *
+ *
+ * MONGO_COMPILER_UNREACHABLE
+ *
+ *    Tells the compiler that it can assume that this line will never execute. Unlike with
+ *    MONGO_UNREACHABLE, there is no runtime check and reaching this macro is completely undefined
+ *    behavior. It should only be used where it is provably impossible to reach, even in the face of
+ *    adversarial inputs, but for some reason the compiler cannot figure this out on its own, for
+ *    example after a call to a function that never returns but cannot be labeled with
+ *    MONGO_COMPILER_NORETURN. In almost all cases MONGO_UNREACHABLE is preferred.
  */
 
 #if defined(_MSC_VER)

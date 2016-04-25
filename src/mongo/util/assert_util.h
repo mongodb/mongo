@@ -227,26 +227,41 @@ inline void fassertNoTrace(int msgid, const Status& status) {
     }
 }
 
-
-/* "user assert".  if asserts, user did something wrong, not our code */
-#define MONGO_uassert(msgid, msg, expr)     \
-    do {                                    \
-        if (MONGO_unlikely(!(expr))) {      \
-            ::mongo::uasserted(msgid, msg); \
-        }                                   \
+/**
+ * "user assert".  if asserts, user did something wrong, not our code.
+ *
+ * Using an immediately invoked lambda to give the compiler an easy way to inline the check (expr)
+ * and out-of-line the error path. This is most helpful when the error path involves building a
+ * complex error message in the expansion of msg. The call to the lambda is followed by
+ * MONGO_COMPILER_UNREACHABLE as it is impossible to mark a lambda noreturn.
+ */
+#define MONGO_uassert(msgid, msg, expr)                  \
+    do {                                                 \
+        if (MONGO_unlikely(!(expr))) {                   \
+            [&]() { ::mongo::uasserted(msgid, msg); }(); \
+            MONGO_COMPILER_UNREACHABLE;                  \
+        }                                                \
     } while (false)
 
 inline void uassertStatusOK(const Status& status) {
     if (MONGO_unlikely(!status.isOK())) {
-        uasserted((status.location() != 0 ? status.location() : status.code()), status.reason());
+        [&]() {
+            uasserted((status.location() != 0 ? status.location() : status.code()),
+                      status.reason());
+        }();
+        MONGO_COMPILER_UNREACHABLE;
     }
 }
 
 template <typename T>
 inline T uassertStatusOK(StatusWith<T> sw) {
     if (MONGO_unlikely(!sw.isOK())) {
-        const auto& status = sw.getStatus();
-        uasserted((status.location() != 0 ? status.location() : status.code()), status.reason());
+        [&]() {
+            const auto& status = sw.getStatus();
+            uasserted((status.location() != 0 ? status.location() : status.code()),
+                      status.reason());
+        }();
+        MONGO_COMPILER_UNREACHABLE;
     }
     return std::move(sw.getValue());
 }
@@ -278,23 +293,31 @@ inline void fassertStatusOK(int msgid, const Status& s) {
    easy way to throw an exception and log something without our stack trace
    display happening.
 */
-#define MONGO_massert(msgid, msg, expr)       \
-    do {                                      \
-        if (MONGO_unlikely(!(expr))) {        \
-            ::mongo::msgasserted(msgid, msg); \
-        }                                     \
+#define MONGO_massert(msgid, msg, expr)                  \
+    do {                                                 \
+        if (MONGO_unlikely(!(expr))) {                   \
+            [&] { ::mongo::msgasserted(msgid, msg); }(); \
+            MONGO_COMPILER_UNREACHABLE;                  \
+        }                                                \
     } while (false)
 
 inline void massertStatusOK(const Status& status) {
     if (MONGO_unlikely(!status.isOK())) {
-        msgasserted((status.location() != 0 ? status.location() : status.code()), status.reason());
+        [&]() {
+            msgasserted((status.location() != 0 ? status.location() : status.code()),
+                        status.reason());
+        }();
+        MONGO_COMPILER_UNREACHABLE;
     }
 }
 
 inline void massertNoTraceStatusOK(const Status& status) {
     if (MONGO_unlikely(!status.isOK())) {
-        msgassertedNoTrace((status.location() != 0 ? status.location() : status.code()),
-                           status.reason());
+        [&] {
+            msgassertedNoTrace((status.location() != 0 ? status.location() : status.code()),
+                               status.reason());
+        }();
+        MONGO_COMPILER_UNREACHABLE;
     }
 }
 
