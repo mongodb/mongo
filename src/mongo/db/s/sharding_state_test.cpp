@@ -91,6 +91,7 @@ void initGrid(OperationContext* txn, const ConnectionString& configConnString) {
 class ShardingStateTest : public mongo::unittest::Test {
 public:
     void setUp() override {
+        _service.setFastClockSource(stdx::make_unique<ClockSourceMock>());
         _service.setPreciseClockSource(stdx::make_unique<ClockSourceMock>());
 
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;

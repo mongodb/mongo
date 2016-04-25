@@ -302,6 +302,7 @@ env.Install(
             's/coreshard',
             's/mongoscore',
             's/sharding_initialization',
+            'util/clock_sources',
             'util/ntservice',
             'util/options_parser/options_parser_init',
         ]))

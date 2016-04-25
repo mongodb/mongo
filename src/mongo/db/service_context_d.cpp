@@ -39,6 +39,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
@@ -57,8 +58,11 @@ namespace mongo {
 
 MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
     setGlobalServiceContext(stdx::make_unique<ServiceContextMongoD>());
-    getGlobalServiceContext()->setTickSource(stdx::make_unique<SystemTickSource>());
-    getGlobalServiceContext()->setPreciseClockSource(stdx::make_unique<SystemClockSource>());
+    auto service = getGlobalServiceContext();
+
+    service->setTickSource(stdx::make_unique<SystemTickSource>());
+    service->setFastClockSource(stdx::make_unique<SystemClockSource>());
+    service->setPreciseClockSource(stdx::make_unique<SystemClockSource>());
     return Status::OK();
 }
 

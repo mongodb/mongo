@@ -53,6 +53,7 @@
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/ramlog.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/version.h"
 
 namespace mongo {
@@ -64,8 +65,7 @@ using std::stringstream;
 
 class CmdServerStatus : public Command {
 public:
-    CmdServerStatus()
-        : Command("serverStatus", true), _started(curTimeMillis64()), _runCalled(false) {}
+    CmdServerStatus() : Command("serverStatus", true), _started(Date_t::now()), _runCalled(false) {}
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
@@ -92,11 +92,12 @@ public:
              BSONObjBuilder& result) {
         _runCalled = true;
 
-        long long start = Listener::getElapsedTimeMillis();
+        const auto service = txn->getServiceContext();
+        const auto clock = service->getFastClockSource();
+        const auto runStart = clock->now();
         BSONObjBuilder timeBuilder(256);
 
         const auto authSession = AuthorizationSession::get(ClientBasic::getCurrent());
-        auto service = txn->getServiceContext();
         auto canonicalizer = HostnameCanonicalizationWorker::get(service);
 
         // --- basic fields that are global
@@ -108,11 +109,13 @@ public:
         result.append("process", serverGlobalParams.binaryName);
         result.append("pid", ProcessId::getCurrent().asLongLong());
         result.append("uptime", (double)(time(0) - serverGlobalParams.started));
-        result.append("uptimeMillis", (long long)(curTimeMillis64() - _started));
-        result.append("uptimeEstimate", (double)(start / 1000));
+        auto uptime = clock->now() - _started;
+        result.append("uptimeMillis", durationCount<Milliseconds>(uptime));
+        result.append("uptimeEstimate", durationCount<Seconds>(uptime));
         result.appendDate("localTime", jsTime());
 
-        timeBuilder.appendNumber("after basic", Listener::getElapsedTimeMillis() - start);
+        timeBuilder.appendNumber("after basic",
+                                 durationCount<Milliseconds>(clock->now() - runStart));
 
         // --- all sections
 
@@ -141,7 +144,7 @@ public:
             result.append(section->getSectionName(), data);
             timeBuilder.appendNumber(
                 static_cast<string>(str::stream() << "after " << section->getSectionName()),
-                Listener::getElapsedTimeMillis() - start);
+                durationCount<Milliseconds>(clock->now() - runStart));
         }
 
         // --- counters
@@ -166,8 +169,9 @@ public:
             }
         }
 
-        timeBuilder.appendNumber("at end", Listener::getElapsedTimeMillis() - start);
-        if (Listener::getElapsedTimeMillis() - start > 1000) {
+        auto runElapsed = clock->now() - runStart;
+        timeBuilder.appendNumber("at end", durationCount<Milliseconds>(runElapsed));
+        if (runElapsed > Milliseconds(1000)) {
             BSONObj t = timeBuilder.obj();
             log() << "serverStatus was very slow: " << t << endl;
             result.append("timing", t);
@@ -185,7 +189,7 @@ public:
     }
 
 private:
-    const unsigned long long _started;
+    const Date_t _started;
     bool _runCalled;
 
     typedef map<string, ServerStatusSection*> SectionMap;

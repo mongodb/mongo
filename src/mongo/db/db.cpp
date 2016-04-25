@@ -116,6 +116,7 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/fast_clock_source_factory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/hostname_canonicalization_worker.h"
 #include "mongo/util/net/message_server.h"
@@ -509,6 +510,7 @@ static void _initAndListen(int listenPort) {
     Client::initThread("initandlisten");
 
     _initWireSpec();
+    getGlobalServiceContext()->setFastClockSource(FastClockSourceFactory::create(Milliseconds(10)));
     getGlobalServiceContext()->setOpObserver(stdx::make_unique<OpObserver>());
 
     const repl::ReplSettings& replSettings = repl::getGlobalReplicationCoordinator()->getSettings();

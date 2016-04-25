@@ -37,7 +37,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/util/time_support.h"
-#include "mongo/util/net/listen.h"  // for Listener::getElapsedTimeMillis()
 
 namespace mongo {
 
