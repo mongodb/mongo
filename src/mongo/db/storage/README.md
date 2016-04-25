@@ -105,13 +105,13 @@ Classes to implement
 A storage engine should generally implement the following classes. See their definition for more
 details.
 
-* KVEngine
-* RecordStore
-* RecoveryUnit
-* SeekableRecordCursor
-* SortedDataInterface
-* ServerStatusSection
-* ServerParameter
+* [KVEngine](kv/kv_engine.h)
+* [RecordStore](record_store.h)
+* [RecoveryUnit](ecovery_unit.h)
+* [SeekableRecordCursor](record_store.h)
+* [SortedDataInterface](sorted_data_interface.h)
+* [ServerStatusSection](../commands/server_status.h)
+* [ServerParameter](../server_parameters.h)
 
 
 [Concurrency FAQ]: http://docs.mongodb.org/manual/faq/concurrency/
