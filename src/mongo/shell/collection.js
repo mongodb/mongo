@@ -279,11 +279,15 @@ DBCollection.prototype.find = function(query, fields, limit, skip, batchSize, op
     return cursor;
 };
 
-DBCollection.prototype.findOne = function(query, fields, options, readConcern) {
+DBCollection.prototype.findOne = function(query, fields, options, readConcern, collation) {
     var cursor = this.find(query, fields, -1 /* limit */, 0 /* skip*/, 0 /* batchSize */, options);
 
     if (readConcern) {
         cursor = cursor.readConcern(readConcern);
+    }
+
+    if (collation) {
+        cursor = cursor.collation(collation);
     }
 
     if (!cursor.hasNext())
@@ -408,10 +412,12 @@ DBCollection.prototype._parseRemove = function(t, justOne) {
     var query = this._massageObject(t);
 
     var wc = undefined;
+    var collation = undefined;
     if (typeof(justOne) === "object") {
         var opts = justOne;
         wc = opts.writeConcern;
         justOne = opts.justOne;
+        collation = opts.collation;
     }
 
     // Normalize "justOne" to a bool.
@@ -425,7 +431,8 @@ DBCollection.prototype._parseRemove = function(t, justOne) {
     return {
         "query": query,
         "justOne": justOne,
-        "wc": wc
+        "wc": wc,
+        "collation": collation
     };
 };
 
@@ -434,6 +441,7 @@ DBCollection.prototype.remove = function(t, justOne) {
     var query = parsed.query;
     var justOne = parsed.justOne;
     var wc = parsed.wc;
+    var collation = parsed.collation;
 
     var result = undefined;
     var startTime =
@@ -442,6 +450,10 @@ DBCollection.prototype.remove = function(t, justOne) {
     if (this.getMongo().writeMode() != "legacy") {
         var bulk = this.initializeOrderedBulkOp();
         var removeOp = bulk.find(query);
+
+        if (collation) {
+            removeOp.collation(collation);
+        }
 
         if (justOne) {
             removeOp.removeOne();
@@ -460,6 +472,10 @@ DBCollection.prototype.remove = function(t, justOne) {
             }
         }
     } else {
+        if (collation) {
+            throw new Error("collation requires use of write commands");
+        }
+
         this._validateRemoveDoc(t);
         this.getMongo().remove(this._fullName, query, justOne);
 
@@ -505,6 +521,7 @@ DBCollection.prototype._parseUpdate = function(query, obj, upsert, multi) {
         throw Error("need an object");
 
     var wc = undefined;
+    var collation = undefined;
     // can pass options via object for improved readability
     if (typeof(upsert) === "object") {
         if (multi) {
@@ -516,6 +533,7 @@ DBCollection.prototype._parseUpdate = function(query, obj, upsert, multi) {
         multi = opts.multi;
         wc = opts.writeConcern;
         upsert = opts.upsert;
+        collation = opts.collation;
     }
 
     // Normalize 'upsert' and 'multi' to booleans.
@@ -531,7 +549,8 @@ DBCollection.prototype._parseUpdate = function(query, obj, upsert, multi) {
         "obj": obj,
         "upsert": upsert,
         "multi": multi,
-        "wc": wc
+        "wc": wc,
+        "collation": collation
     };
 };
 
@@ -542,6 +561,7 @@ DBCollection.prototype.update = function(query, obj, upsert, multi) {
     var upsert = parsed.upsert;
     var multi = parsed.multi;
     var wc = parsed.wc;
+    var collation = parsed.collation;
 
     var result = undefined;
     var startTime =
@@ -553,6 +573,10 @@ DBCollection.prototype.update = function(query, obj, upsert, multi) {
 
         if (upsert) {
             updateOp = updateOp.upsert();
+        }
+
+        if (collation) {
+            updateOp.collation(collation);
         }
 
         if (multi) {
@@ -572,6 +596,10 @@ DBCollection.prototype.update = function(query, obj, upsert, multi) {
             }
         }
     } else {
+        if (collation) {
+            throw new Error("collation requires use of write commands");
+        }
+
         this._validateUpdateDoc(obj);
         this.getMongo().update(this._fullName, query, obj, upsert, multi);
 
@@ -1684,6 +1712,8 @@ DBCollection.prototype.unsetWriteConcern = function() {
 * @param {string|object} [options.hint=null] An index name hint or specification for the query.
 * @param {number} [options.maxTimeMS=null] The maximum amount of time to allow the query to run.
 * @param {string} [options.readConcern=null] The level of readConcern passed to the count command
+* @param {object} [options.collation=null] The collation that should be used for string comparisons
+* for this count op.
 * @return {number}
 */
 DBCollection.prototype.count = function(query, options) {
@@ -1708,6 +1738,10 @@ DBCollection.prototype.count = function(query, options) {
 
     if (typeof opts.readConcern == 'string') {
         query.readConcern(opts.readConcern);
+    }
+
+    if (typeof opts.collation == 'object') {
+        query.collation(opts.collation);
     }
 
     // Return the result of the find
@@ -1751,6 +1785,10 @@ DBCollection.prototype.distinct = function(keyString, query, options) {
     // Set maxTimeMS if provided
     if (opts.maxTimeMS) {
         cmd.maxTimeMS = opts.maxTimeMS;
+    }
+
+    if (opts.collation) {
+        cmd.collation = opts.collation;
     }
 
     // Execute distinct command

@@ -96,6 +96,7 @@ var DBExplainQuery = (function() {
         var delegationFuncNames = [
             "addOption",
             "batchSize",
+            "collation",
             "comment",
             "hint",
             "limit",
@@ -226,6 +227,7 @@ var DBExplainQuery = (function() {
             print("\t.addOption(n)");
             print("\t.batchSize(n)");
             print("\t.comment(comment)");
+            print("\t.collation(collationSpec)");
             print("\t.count()");
             print("\t.hint(hintSpec)");
             print("\t.limit(n)");

@@ -29,6 +29,7 @@ DBQuery.prototype.help = function() {
     print("\t.limit(<n>)");
     print("\t.skip(<n>)");
     print("\t.batchSize(<n>) - sets the number of docs to return per getMore");
+    print("\t.collation({...})");
     print("\t.hint({...})");
     print("\t.readConcern(<level>)");
     print("\t.readPref(<mode>, <tagset>)");
@@ -119,6 +120,10 @@ DBQuery.prototype._exec = function() {
         } else {
             if (this._special && this._query.readConcern) {
                 throw new Error("readConcern requires use of read commands");
+            }
+
+            if (this._special && this._query.collation) {
+                throw new Error("collation requires use of read commands");
             }
 
             this._cursor = this._mongo.find(this._ns,
@@ -221,6 +226,10 @@ DBQuery.prototype._convertToCommand = function(canAttachReadPref) {
 
     if ("readConcern" in this._query) {
         cmd["readConcern"] = this._query.readConcern;
+    }
+
+    if ("collation" in this._query) {
+        cmd["collation"] = this._query.collation;
     }
 
     if ((this._options & DBQuery.Option.tailable) != 0) {
@@ -350,6 +359,9 @@ DBQuery.prototype._convertToCountCmd = function(applySkipLimit) {
             if (this._query.readConcern) {
                 cmd.readConcern = this._query.readConcern;
             }
+            if (this._query.collation) {
+                cmd.collation = this._query.collation;
+            }
         } else {
             cmd.query = this._query;
         }
@@ -465,6 +477,10 @@ DBQuery.prototype.readConcern = function(level) {
     };
 
     return this._addSpecial("readConcern", readConcernObj);
+};
+
+DBQuery.prototype.collation = function(collationSpec) {
+    return this._addSpecial("collation", collationSpec);
 };
 
 /**

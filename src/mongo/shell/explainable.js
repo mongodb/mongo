@@ -147,12 +147,17 @@ var Explainable = (function() {
             return throwOrReturn(explainResult);
         };
 
-        this.distinct = function(keyString, query) {
+        this.distinct = function(keyString, query, options) {
             var distinctCmd = {
                 distinct: this._collection.getName(),
                 key: keyString,
                 query: query || {}
             };
+
+            if (options && options.hasOwnProperty("collation")) {
+                distinctCmd.collation = options.collation;
+            }
+
             var explainCmd = {
                 explain: distinctCmd,
                 verbosity: this._verbosity
@@ -165,9 +170,15 @@ var Explainable = (function() {
             var parsed = this._collection._parseRemove.apply(this._collection, arguments);
             var query = parsed.query;
             var justOne = parsed.justOne;
+            var collation = parsed.collation;
 
             var bulk = this._collection.initializeOrderedBulkOp();
             var removeOp = bulk.find(query);
+
+            if (collation) {
+                removeOp.collation(collation);
+            }
+
             if (justOne) {
                 removeOp.removeOne();
             } else {
@@ -185,12 +196,17 @@ var Explainable = (function() {
             var obj = parsed.obj;
             var upsert = parsed.upsert;
             var multi = parsed.multi;
+            var collation = parsed.collation;
 
             var bulk = this._collection.initializeOrderedBulkOp();
             var updateOp = bulk.find(query);
 
             if (upsert) {
                 updateOp = updateOp.upsert();
+            }
+
+            if (collation) {
+                updateOp.collation(collation);
             }
 
             if (multi) {

@@ -674,6 +674,11 @@ var _bulk_api_module = (function() {
                     upsert: upsert
                 };
 
+                // Copy over the collation, if we have one.
+                if (currentOp.hasOwnProperty('collation')) {
+                    document.collation = currentOp.collation;
+                }
+
                 // Clear out current Op
                 currentOp = null;
                 // Add the update document to the list
@@ -692,6 +697,11 @@ var _bulk_api_module = (function() {
                     multi: false,
                     upsert: upsert
                 };
+
+                // Copy over the collation, if we have one.
+                if (currentOp.hasOwnProperty('collation')) {
+                    document.collation = currentOp.collation;
+                }
 
                 // Clear out current Op
                 currentOp = null;
@@ -718,6 +728,11 @@ var _bulk_api_module = (function() {
                     limit: 1
                 };
 
+                // Copy over the collation, if we have one.
+                if (currentOp.hasOwnProperty('collation')) {
+                    document.collation = currentOp.collation;
+                }
+
                 // Clear out current Op
                 currentOp = null;
                 // Add the remove document to the list
@@ -733,11 +748,31 @@ var _bulk_api_module = (function() {
                     limit: 0
                 };
 
+                // Copy over the collation, if we have one.
+                if (currentOp.hasOwnProperty('collation')) {
+                    document.collation = currentOp.collation;
+                }
+
                 // Clear out current Op
                 currentOp = null;
                 // Add the remove document to the list
                 return addToOperationsList(REMOVE, document);
-            }
+            },
+
+            collation: function(collationSpec) {
+                if (!collection.getMongo().hasWriteCommands()) {
+                    throw new Error(
+                        "cannot use collation if server does not support write commands");
+                }
+
+                if (collection.getMongo().writeMode() !== "commands") {
+                    throw new Error("write mode must be 'commands' in order to use collation, " +
+                                    "but found write mode: " + collection.getMongo().writeMode());
+                }
+
+                currentOp.collation = collationSpec;
+                return findOperations;
+            },
         };
 
         //
