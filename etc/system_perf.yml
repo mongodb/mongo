@@ -106,8 +106,7 @@ functions:
           set -e
           set -o verbose
           cd ./clusters/${cluster}
-          # configure mongodb cluster with wiredTiger
-          ../../bin/config-${setup}.sh mongodb ${storageEngine} ${numShard} ${test}
+          ../../bin/configure-mongodb-cluster.sh ${setup} ${storageEngine}
           echo "${cluster} MongoDB Cluster STARTED."
   "run test":
     - command: shell.exec
@@ -311,7 +310,6 @@ tasks:
     - func: "configure mongodb cluster"
       vars:
         storageEngine: "wiredTiger"
-        test: "ycsb"
     - func: "run test"
       vars:
         storageEngine: "wiredTiger"
@@ -332,7 +330,6 @@ tasks:
     - func: "configure mongodb cluster"
       vars:
         storageEngine: "mmapv1"
-        test: "ycsb"
     - func: "run test"
       vars:
         storageEngine: "mmapv1"
@@ -461,7 +458,6 @@ buildvariants:
     setup: single-replica
     cluster: single
     platform: linux
-    numShard: 0
   run_on:
       - "rhel70-perf-standalone"
   tasks:
@@ -478,7 +474,6 @@ buildvariants:
     setup: standalone
     cluster: single
     platform: linux
-    numShard: 0
   run_on:
       - "rhel70-perf-standalone"
   tasks:
@@ -497,7 +492,6 @@ buildvariants:
     setup: standalone
     cluster: single-c3-4xlarge
     platform: linux
-    numShard: 0
   run_on:
       - "rhel70-perf-standalone"
   tasks:
@@ -513,7 +507,6 @@ buildvariants:
     setup: standalone
     cluster: single-c3-2xlarge
     platform: linux
-    numShard: 0
   run_on:
       - "rhel70-perf-standalone"
   tasks:
@@ -530,7 +523,6 @@ buildvariants:
     setup: shard
     cluster: shard
     platform: linux
-    numShard: 3
   run_on:
       - "rhel70-perf-standalone"
   tasks:
@@ -547,7 +539,6 @@ buildvariants:
     setup: replica
     cluster: replica
     platform: linux
-    numMember: 3
   run_on:
       - "rhel70-perf-standalone"
   tasks:
@@ -578,7 +569,6 @@ buildvariants:
   expansions:
     setup: standalone-win
     cluster: windows-single
-    numShard: 0
     extension: ".exe"
     compile_flags: --release --win-version-min=ws08r2 -j$(grep -c ^processor /proc/cpuinfo) MONGO_DISTMOD=2008plus VARIANT_DIR=win32
     platform: windows

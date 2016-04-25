@@ -104,8 +104,7 @@ functions:
           set -e
           set -v
           cd ./clusters/${cluster}
-          # configure mongodb cluster with ${storageEngine}
-          ../../bin/config-${setup}.sh mongodb ${storageEngine} ${numShard}
+          ../../bin/configure-mongodb-cluster.sh ${setup} ${storageEngine}
           echo "${cluster} MongoDB Cluster STARTED."
 
   "run test":
@@ -306,7 +305,6 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ --release
     setup: standalone
     cluster: single-correctness
-    numShard: 0
   run_on:
       - "rhel70-perf-standalone"
   tasks:
@@ -323,7 +321,6 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ --release
     setup: replica
     cluster: replica-correctness
-    numMember: 3
   run_on:
       - "rhel70-perf-replset"
   tasks:

@@ -75,8 +75,7 @@ functions:
           set -e
           set -o verbose
           cd ./clusters/${cluster}
-          # configure mongodb cluster with wiredTiger
-          USE_CSRS=${use_csrs} ../../bin/config-${setup}.sh mongodb ${storageEngine} ${numShard}
+          ../../bin/configure-mongodb-cluster.sh ${setup} ${storageEngine}
           echo "${cluster} MongoDB Cluster STARTED."
 
   "run test":
@@ -231,8 +230,6 @@ tasks:
     - func: "prepare environment"
     - func: "bring up 3 shard cluster"
     - func: "configure mongodb cluster"
-      vars:
-        use_csrs: "true"
     - func: "run test"
       vars:
         storageEngine: "wiredTiger"
@@ -252,8 +249,6 @@ tasks:
     - func: "prepare environment"
     - func: "bring up 3 shard cluster"
     - func: "configure mongodb cluster"
-      vars:
-        use_csrs: "true"
     - func: "run test"
       vars:
         storageEngine: "mmapv1"
