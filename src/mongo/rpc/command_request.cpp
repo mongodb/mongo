@@ -96,6 +96,12 @@ CommandRequest::CommandRequest(const Message* message) : _message(message) {
     Validated<BSONObj> obj;
     uassertStatusOK(cur.readAndAdvance<>(&obj));
     _commandArgs = std::move(obj.val);
+    uassert(39950,
+            str::stream() << "Command name parsed in OP_COMMAND message '" << _commandName
+                          << "' doesn't match command name from object '"
+                          << _commandArgs.firstElementFieldName() << '\'',
+            _commandArgs.firstElementFieldName() == _commandName);
+
     uassertStatusOK(cur.readAndAdvance<>(&obj));
     _metadata = std::move(obj.val);
 

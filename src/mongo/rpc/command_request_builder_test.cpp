@@ -47,7 +47,7 @@ TEST(RequestBuilder, RoundTrip) {
     auto metadata = metadataBob.done();
 
     BSONObjBuilder commandArgsBob{};
-    commandArgsBob.append("bar", "baz");
+    commandArgsBob.append(commandName, "baz");
     auto commandArgs = commandArgsBob.done();
 
     BSONObjBuilder inputDoc1Bob{};
