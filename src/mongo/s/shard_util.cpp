@@ -26,11 +26,14 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/shard_util.h"
 
 #include "mongo/base/status_with.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/namespace_string.h"
@@ -39,9 +42,14 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace shardutil {
+namespace {
+
+const char kShouldMigrate[] = "shouldMigrate";
+}
 
 StatusWith<long long> retrieveTotalShardSize(OperationContext* txn, const ShardId& shardId) {
     auto shardRegistry = Grid::get(txn)->shardRegistry();
@@ -138,6 +146,84 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* txn,
     }
 
     return std::move(splitPoints);
+}
+
+StatusWith<boost::optional<std::pair<BSONObj, BSONObj>>> splitChunkAtMultiplePoints(
+    OperationContext* txn,
+    const ShardId& shardId,
+    const NamespaceString& nss,
+    const ShardKeyPattern& shardKeyPattern,
+    ChunkVersion collectionVersion,
+    const BSONObj& minKey,
+    const BSONObj& maxKey,
+    const std::vector<BSONObj>& splitPoints) {
+    invariant(!splitPoints.empty());
+    invariant(minKey.woCompare(maxKey) < 0);
+
+    const size_t kMaxSplitPoints = 8192;
+
+    if (splitPoints.size() > kMaxSplitPoints) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Cannot split chunk in more than " << kMaxSplitPoints
+                              << " parts at a time."};
+    }
+
+    BSONObjBuilder cmd;
+    cmd.append("splitChunk", nss.ns());
+    cmd.append("configdb", grid.shardRegistry()->getConfigServerConnectionString().toString());
+    cmd.append("from", shardId);
+    cmd.append("keyPattern", shardKeyPattern.toBSON());
+    collectionVersion.appendForCommands(&cmd);
+    cmd.append("min", minKey);
+    cmd.append("max", maxKey);
+    cmd.append("splitKeys", splitPoints);
+
+    BSONObj cmdObj = cmd.obj();
+
+    Status status{ErrorCodes::InternalError, "Uninitialized value"};
+
+    auto cmdStatus = Grid::get(txn)->shardRegistry()->runIdempotentCommandOnShard(
+        txn, shardId, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, "admin", cmdObj);
+    if (!cmdStatus.isOK()) {
+        status = std::move(cmdStatus.getStatus());
+    } else {
+        status = getStatusFromCommandResult(cmdStatus.getValue());
+    }
+
+    if (!status.isOK()) {
+        log() << "splitChunk cmd " << cmdObj << " failed" << causedBy(status);
+        return {status.code(), str::stream() << "split failed due to " << status.toString()};
+    }
+
+    BSONObj cmdResponse = std::move(cmdStatus.getValue());
+
+    BSONElement shouldMigrateElement;
+    status = bsonExtractTypedField(cmdResponse, kShouldMigrate, Object, &shouldMigrateElement);
+    if (status.isOK()) {
+        BSONObj shouldMigrateBounds = shouldMigrateElement.embeddedObject();
+        BSONElement minKey, maxKey;
+
+        Status minKeyStatus = bsonExtractTypedField(shouldMigrateBounds, "min", Object, &minKey);
+        Status maxKeyStatus = bsonExtractTypedField(shouldMigrateBounds, "max", Object, &maxKey);
+
+        if (minKeyStatus.isOK() && maxKeyStatus.isOK()) {
+            return boost::optional<std::pair<BSONObj, BSONObj>>(
+                std::make_pair(minKey.Obj().getOwned(), maxKey.Obj().getOwned()));
+        } else if (!minKeyStatus.isOK()) {
+            status = minKeyStatus;
+        } else {
+            status = maxKeyStatus;
+        }
+    }
+
+    if (!status.isOK()) {
+        warning()
+            << "Chunk migration will be skipped because splitChunk returned invalid response: "
+            << cmdResponse << ". Extracting " << kShouldMigrate << " field failed"
+            << causedBy(status);
+    }
+
+    return boost::optional<std::pair<BSONObj, BSONObj>>();
 }
 
 }  // namespace shardutil

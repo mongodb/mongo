@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
 
@@ -126,22 +128,9 @@ public:
      *
      * @throws UserException
      */
-    Status split(OperationContext* txn,
-                 SplitPointMode mode,
-                 size_t* resultingSplits,
-                 BSONObj* res) const;
-
-    /**
-     * Splits this chunk at the given key (or keys)
-     *
-     * @param splitPoints the vector of keys that should be used to divide this chunk
-     * @param res the object containing details about the split execution
-     *
-     * @throws UserException
-     */
-    Status multiSplit(OperationContext* txn,
-                      const std::vector<BSONObj>& splitPoints,
-                      BSONObj* res) const;
+    StatusWith<boost::optional<std::pair<BSONObj, BSONObj>>> split(OperationContext* txn,
+                                                                   SplitPointMode mode,
+                                                                   size_t* resultingSplits) const;
 
     //
     // migration support

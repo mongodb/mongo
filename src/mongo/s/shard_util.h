@@ -28,9 +28,11 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <string>
 #include <vector>
 
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
 
 namespace mongo {
@@ -71,13 +73,13 @@ StatusWith<BSONObj> selectMedianKey(OperationContext* txn,
 /**
  * Ask the specified shard to figure out the split points for a given chunk.
  *
- * @param shardId The shard id to query.
- * @param nss Namespace, which owns the chunk.
- * @param shardKeyPattern The shard key which corresponds to this sharded namespace.
- * @param minKey/maxKey Bounds of the chunk.
- * @param chunkSize Chunk size to target in bytes.
- * @param maxPoints Limits the number of split points that are needed. Zero means max.
- * @param maxObjs Limits the number of objects in each chunk. Zero means max.
+ * shardId The shard id to query.
+ * nss Namespace, which owns the chunk.
+ * shardKeyPattern The shard key which corresponds to this sharded namespace.
+ * minKey/maxKey Bounds of the chunk.
+ * chunkSize Chunk size to target in bytes.
+ * maxPoints Limits the number of split points that are needed. Zero means max.
+ * maxObjs Limits the number of objects in each chunk. Zero means max.
  */
 StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* txn,
                                                         const ShardId& shardId,
@@ -88,6 +90,28 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* txn,
                                                         long long chunkSizeBytes,
                                                         int maxPoints,
                                                         int maxObjs);
+
+/**
+ * Asks the specified shard to split the chunk described by min/maxKey into the respective split
+ * points. If split was successful and the shard indicated that one of the resulting chunks should
+ * be moved off the currently owning shard, the return value will contain the bounds of this chunk.
+ *
+ * shardId The shard, which currently owns the chunk.
+ * nss Namespace, which owns the chunk.
+ * shardKeyPattern The shard key which corresponds to this sharded namespace.
+ * collectionVersion The expected collection version when doing the split.
+ * minKey/maxKey Bounds of the chunk to be split.
+ * splitPoints The set of points at which the chunk should be split.
+ */
+StatusWith<boost::optional<std::pair<BSONObj, BSONObj>>> splitChunkAtMultiplePoints(
+    OperationContext* txn,
+    const ShardId& shardId,
+    const NamespaceString& nss,
+    const ShardKeyPattern& shardKeyPattern,
+    ChunkVersion collectionVersion,
+    const BSONObj& minKey,
+    const BSONObj& maxKey,
+    const std::vector<BSONObj>& splitPoints);
 
 }  // namespace shardutil
 }  // namespace mongo

@@ -496,11 +496,16 @@ StatusWith<MigrateInfoVector> Balancer::_getCandidateChunks(OperationContext* tx
             log() << "nss: " << nss.ns() << " need to split on " << min
                   << " because there is a range there";
 
-            vector<BSONObj> splitPoints;
-            splitPoints.push_back(min);
-
             shared_ptr<Chunk> c = cm->findIntersectingChunk(txn, min);
-            Status status = c->multiSplit(txn, splitPoints, NULL);
+
+            auto splitStatus = shardutil::splitChunkAtMultiplePoints(txn,
+                                                                     c->getShardId(),
+                                                                     nss,
+                                                                     cm->getShardKeyPattern(),
+                                                                     cm->getVersion(),
+                                                                     c->getMin(),
+                                                                     c->getMax(),
+                                                                     {min});
             if (!status.isOK()) {
                 error() << "split failed: " << status;
             } else {
@@ -609,10 +614,8 @@ int Balancer::_moveChunks(OperationContext* txn,
 
                 log() << "performing a split because migrate failed for size reasons";
 
-                Status status = c->split(txn, Chunk::normal, NULL, NULL);
-                log() << "split results: " << status;
-
-                if (!status.isOK()) {
+                auto splitStatus = c->split(txn, Chunk::normal, NULL);
+                if (!splitStatus.isOK()) {
                     log() << "marking chunk as jumbo: " << c->toString();
 
                     c->markAsJumbo(txn);

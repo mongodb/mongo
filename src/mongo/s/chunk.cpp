@@ -320,10 +320,8 @@ std::vector<BSONObj> Chunk::_determineSplitPoints(OperationContext* txn, bool at
     return splitPoints;
 }
 
-Status Chunk::split(OperationContext* txn,
-                    SplitPointMode mode,
-                    size_t* resultingSplits,
-                    BSONObj* res) const {
+StatusWith<boost::optional<std::pair<BSONObj, BSONObj>>> Chunk::split(
+    OperationContext* txn, SplitPointMode mode, size_t* resultingSplits) const {
     size_t dummy;
     if (resultingSplits == NULL) {
         resultingSplits = &dummy;
@@ -380,57 +378,22 @@ Status Chunk::split(OperationContext* txn,
         return Status(ErrorCodes::CannotSplit, msg);
     }
 
-    Status status = multiSplit(txn, splitPoints, res);
-    *resultingSplits = splitPoints.size();
-    return status;
-}
-
-Status Chunk::multiSplit(OperationContext* txn, const vector<BSONObj>& m, BSONObj* res) const {
-    const size_t maxSplitPoints = 8192;
-
-    uassert(10165, "can't split as shard doesn't have a manager", _manager);
-    uassert(13332, "need a split key to split chunk", !m.empty());
-    uassert(13333, "can't split a chunk in that many parts", m.size() < maxSplitPoints);
-    uassert(13003, "can't split a chunk with only one distinct value", _min.woCompare(_max));
-
-    BSONObjBuilder cmd;
-    cmd.append("splitChunk", _manager->getns());
-    cmd.append("keyPattern", _manager->getShardKeyPattern().toBSON());
-    cmd.append("min", getMin());
-    cmd.append("max", getMax());
-    cmd.append("from", getShardId());
-    cmd.append("splitKeys", m);
-    cmd.append("configdb", grid.shardRegistry()->getConfigServerConnectionString().toString());
-    _manager->getVersion().appendForCommands(&cmd);
-
-    BSONObj dummy;
-    if (res == NULL) {
-        res = &dummy;
+    auto splitStatus = shardutil::splitChunkAtMultiplePoints(txn,
+                                                             _shardId,
+                                                             NamespaceString(_manager->getns()),
+                                                             _manager->getShardKeyPattern(),
+                                                             _manager->getVersion(),
+                                                             _min,
+                                                             _max,
+                                                             splitPoints);
+    if (!splitStatus.isOK()) {
+        return splitStatus.getStatus();
     }
 
-    BSONObj cmdObj = cmd.obj();
-
-    Status status{ErrorCodes::NotYetInitialized, "Uninitialized"};
-
-    auto cmdStatus = Grid::get(txn)->shardRegistry()->runIdempotentCommandOnShard(
-        txn, _shardId, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, "admin", cmdObj);
-    if (cmdStatus.isOK()) {
-        *res = std::move(cmdStatus.getValue());
-        status = getStatusFromCommandResult(*res);
-    } else {
-        status = std::move(cmdStatus.getStatus());
-    }
-
-    if (!status.isOK()) {
-        warning() << "splitChunk cmd " << cmdObj << " failed" << causedBy(status);
-        return {ErrorCodes::SplitFailed,
-                str::stream() << "command failed due to " << status.toString()};
-    }
-
-    // force reload of config
     _manager->reload(txn);
 
-    return Status::OK();
+    *resultingSplits = splitPoints.size();
+    return splitStatus.getValue();
 }
 
 bool Chunk::moveAndCommit(OperationContext* txn,
@@ -503,10 +466,9 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {
         LOG(1) << "about to initiate autosplit: " << *this << " dataWritten: " << _dataWritten
                << " splitThreshold: " << splitThreshold;
 
-        BSONObj res;
         size_t splitCount = 0;
-        Status status = split(txn, Chunk::autoSplitInternal, &splitCount, &res);
-        if (!status.isOK()) {
+        auto splitStatus = split(txn, Chunk::autoSplitInternal, &splitCount);
+        if (!splitStatus.isOK()) {
             // Split would have issued a message if we got here. This means there wasn't enough
             // data to split, so don't want to try again until considerable more data
             _dataWritten = 0;
@@ -540,25 +502,24 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {
             shouldBalance = collStatus.getValue().value.getAllowBalance();
         }
 
+        const auto suggestedMigrateChunk = std::move(splitStatus.getValue());
+
         log() << "autosplitted " << _manager->getns() << " shard: " << toString() << " into "
               << (splitCount + 1) << " (splitThreshold " << splitThreshold << ")"
-              << (res["shouldMigrate"].eoo() ? "" : (string) " (migrate suggested" +
+              << (suggestedMigrateChunk ? "" : (string) " (migrate suggested" +
                           (shouldBalance ? ")" : ", but no migrations allowed)"));
 
-        // Top chunk optimization - try to move the top chunk out of this shard
-        // to prevent the hot spot from staying on a single shard. This is based on
-        // the assumption that succeeding inserts will fall on the top chunk.
-        BSONElement shouldMigrate = res["shouldMigrate"];  // not in mongod < 1.9.1 but that is ok
-        if (!shouldMigrate.eoo() && shouldBalance) {
-            BSONObj range = shouldMigrate.embeddedObject();
-
+        // Top chunk optimization - try to move the top chunk out of this shard to prevent the hot
+        // spot from staying on a single shard. This is based on the assumption that succeeding
+        // inserts will fall on the top chunk.
+        if (suggestedMigrateChunk && shouldBalance) {
             ChunkType chunkToMove;
             {
                 const auto shard = grid.shardRegistry()->getShard(txn, getShardId());
                 chunkToMove.setShard(shard->toString());
             }
-            chunkToMove.setMin(range["min"].embeddedObject());
-            chunkToMove.setMax(range["max"].embeddedObject());
+            chunkToMove.setMin(suggestedMigrateChunk->first);
+            chunkToMove.setMax(suggestedMigrateChunk->second);
 
             tryMoveToOtherShard(txn, *_manager, chunkToMove);
         }

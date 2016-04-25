@@ -45,6 +45,7 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/shard_util.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -176,8 +177,8 @@ public:
         }
 
         // This refreshes the chunk metadata if stale.
-        ChunkManagerPtr info = config->getChunkManager(txn, nss.ns(), true);
-        ChunkPtr chunk;
+        shared_ptr<ChunkManager> info = config->getChunkManager(txn, nss.ns(), true);
+        shared_ptr<Chunk> chunk;
 
         if (!find.isEmpty()) {
             StatusWith<BSONObj> status = info->getShardKeyPattern().extractShardKeyFromQuery(find);
@@ -194,7 +195,6 @@ public:
             }
 
             chunk = info->findIntersectingChunk(txn, shardKey);
-            invariant(chunk.get());
         } else if (!bounds.isEmpty()) {
             if (!info->getShardKeyPattern().isShardKey(bounds[0].Obj()) ||
                 !info->getShardKeyPattern().isShardKey(bounds[1].Obj())) {
@@ -245,28 +245,27 @@ public:
         }
 
         invariant(chunk.get());
+
         log() << "splitting chunk [" << chunk->getMin() << "," << chunk->getMax() << ")"
               << " in collection " << nss.ns() << " on shard " << chunk->getShardId();
 
         BSONObj res;
         if (middle.isEmpty()) {
-            Status status = chunk->split(txn, Chunk::atMedian, NULL, NULL);
-            if (!status.isOK()) {
-                errmsg = "split failed";
-                result.append("cause", status.toString());
-                return false;
-            }
+            uassertStatusOK(chunk->split(txn, Chunk::atMedian, nullptr));
         } else {
-            vector<BSONObj> splitPoints;
-            splitPoints.push_back(middle);
-
-            Status status = chunk->multiSplit(txn, splitPoints, NULL);
-            if (!status.isOK()) {
-                errmsg = "split failed";
-                result.append("cause", status.toString());
-                return false;
-            }
+            uassertStatusOK(shardutil::splitChunkAtMultiplePoints(txn,
+                                                                  chunk->getShardId(),
+                                                                  nss,
+                                                                  info->getShardKeyPattern(),
+                                                                  info->getVersion(),
+                                                                  chunk->getMin(),
+                                                                  chunk->getMax(),
+                                                                  {middle}));
         }
+
+        // Proactively refresh the chunk manager. Not really necessary, but this way it's
+        // immediately up-to-date the next time it's used.
+        info->reload(txn);
 
         return true;
     }

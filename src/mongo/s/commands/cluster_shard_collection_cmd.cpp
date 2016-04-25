@@ -53,6 +53,7 @@
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
+#include "mongo/s/shard_util.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -478,10 +479,19 @@ public:
             for (unsigned i = 0; i <= allSplits.size(); i++) {
                 if (i == allSplits.size() || !currentChunk->containsKey(allSplits[i])) {
                     if (!subSplits.empty()) {
-                        Status status = currentChunk->multiSplit(txn, subSplits, NULL);
-                        if (!status.isOK()) {
+                        auto splitStatus = shardutil::splitChunkAtMultiplePoints(
+                            txn,
+                            currentChunk->getShardId(),
+                            NamespaceString(ns),
+                            chunkManager->getShardKeyPattern(),
+                            chunkManager->getVersion(),
+                            currentChunk->getMin(),
+                            currentChunk->getMax(),
+                            subSplits);
+                        if (!splitStatus.isOK()) {
                             warning() << "couldn't split chunk " << currentChunk->toString()
-                                      << " while sharding collection " << ns << causedBy(status);
+                                      << " while sharding collection " << ns
+                                      << causedBy(splitStatus.getStatus());
                         }
 
                         subSplits.clear();
