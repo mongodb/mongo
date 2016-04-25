@@ -139,6 +139,18 @@ string WCErrorDetail::toString() const {
                          << ". Error details: " << (_isErrInfoSet ? _errInfo.toString() : "<none>");
 }
 
+Status WCErrorDetail::toStatus() const {
+    str::stream ss;
+    if (_isErrMessageSet) {
+        ss << _errMessage << ". ";
+    }
+    if (_isErrInfoSet) {
+        ss << "Error details: " << _errInfo.toString();
+    }
+
+    return Status((_isErrCodeSet ? _errCode : ErrorCodes::UnknownError), ss);
+}
+
 void WCErrorDetail::setErrCode(ErrorCodes::Error code) {
     _errCode = code;
     _isErrCodeSet = true;

@@ -48,13 +48,29 @@ using ShardId = std::string;
 class Shard {
 public:
     struct CommandResponse {
+        CommandResponse(BSONObj _response,
+                        BSONObj _metadata,
+                        Status _commandStatus,
+                        Status _writeConcernStatus)
+            : response(std::move(_response)),
+              metadata(std::move(_metadata)),
+              commandStatus(std::move(_commandStatus)),
+              writeConcernStatus(std::move(_writeConcernStatus)) {}
         BSONObj response;
         BSONObj metadata;
+        Status commandStatus;
+        Status writeConcernStatus;  // Only valid to check when commandStatus is OK.
     };
 
     struct QueryResponse {
         std::vector<BSONObj> docs;
         repl::OpTime opTime;
+    };
+
+    enum class RetryPolicy {
+        kIdempotent,
+        kNotIdempotent,
+        kNoRetry,
     };
 
     virtual ~Shard() = default;
@@ -102,15 +118,22 @@ public:
      */
     virtual std::string toString() const = 0;
 
+    /**
+     * Runs a command against this shard and returns the BSON command response, as well as the
+     * already-parsed out Status of the command response and write concern error (if present).
+     * Retries failed operations according to the given "retryPolicy".
+     */
     StatusWith<CommandResponse> runCommand(OperationContext* txn,
                                            const ReadPreferenceSetting& readPref,
                                            const std::string& dbName,
                                            const BSONObj& cmdObj,
-                                           const BSONObj& metadata);
+                                           const BSONObj& metadata,
+                                           RetryPolicy retryPolicy);
 
     /**
     * Warning: This method exhausts the cursor and pulls all data into memory.
     * Do not use other than for very small (i.e., admin or metadata) collections.
+    * Performs retries if the query fails in accordance with the kIdempotent RetryPolicy.
     */
     StatusWith<QueryResponse> exhaustiveFindOnConfig(OperationContext* txn,
                                                      const ReadPreferenceSetting& readPref,
@@ -123,14 +146,20 @@ protected:
     Shard(const ShardId& id);
 
 private:
-    // TODO: SERVER-23782 make Shard::_runCommand take a timeout argument.
+    /**
+     * Returns whether a server operation which failed with the given error code should be retried
+     * (i.e. is safe to retry and has the potential to succeed next time).  The 'options' argument
+     * describes whether the operation that generated the given code was idempotent, which affects
+     * which codes are safe to retry on.
+     */
+    virtual bool _isRetriableError(ErrorCodes::Error code, RetryPolicy options) = 0;
+
     virtual StatusWith<CommandResponse> _runCommand(OperationContext* txn,
                                                     const ReadPreferenceSetting& readPref,
                                                     const std::string& dbname,
                                                     const BSONObj& cmdObj,
                                                     const BSONObj& metadata) = 0;
 
-    // TODO: SERVER-23782 make Shard::_exhaustiveFindOnConfig take a timeout argument.
     virtual StatusWith<QueryResponse> _exhaustiveFindOnConfig(OperationContext* txn,
                                                               const ReadPreferenceSetting& readPref,
                                                               const NamespaceString& nss,

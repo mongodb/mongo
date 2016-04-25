@@ -45,6 +45,11 @@
 
 namespace mongo {
 
+namespace {
+const Status kInternalErrorStatus{ErrorCodes::InternalError,
+                                  "Invalid to check for write concern error if command failed"};
+}  // namespace
+
 const ConnectionString ShardLocal::getConnString() const {
     MONGO_UNREACHABLE;
 }
@@ -66,6 +71,19 @@ std::string ShardLocal::toString() const {
     return getId() + ":<local>";
 }
 
+bool ShardLocal::_isRetriableError(ErrorCodes::Error code, RetryPolicy options) {
+    if (options == RetryPolicy::kNoRetry) {
+        return false;
+    }
+
+    if (options == RetryPolicy::kIdempotent) {
+        return code == ErrorCodes::WriteConcernFailed;
+    } else {
+        invariant(options == RetryPolicy::kNotIdempotent);
+        return false;
+    }
+}
+
 StatusWith<Shard::CommandResponse> ShardLocal::_runCommand(OperationContext* txn,
                                                            const ReadPreferenceSetting& unused,
                                                            const std::string& dbName,
@@ -77,7 +95,17 @@ StatusWith<Shard::CommandResponse> ShardLocal::_runCommand(OperationContext* txn
             client.runCommandWithMetadata(dbName, cmdObj.firstElementFieldName(), metadata, cmdObj);
         BSONObj responseReply = commandResponse->getCommandReply().getOwned();
         BSONObj responseMetadata = commandResponse->getMetadata().getOwned();
-        return Shard::CommandResponse{responseReply, responseMetadata};
+
+        Status commandStatus = getStatusFromCommandResult(responseReply);
+        Status writeConcernStatus = kInternalErrorStatus;
+        if (commandStatus.isOK()) {
+            writeConcernStatus = getWriteConcernStatusFromCommandResult(responseReply);
+        }
+
+        return Shard::CommandResponse{std::move(responseReply),
+                                      std::move(responseMetadata),
+                                      std::move(commandStatus),
+                                      std::move(writeConcernStatus)};
     } catch (const DBException& ex) {
         return ex.toStatus();
     }

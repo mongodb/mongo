@@ -45,4 +45,10 @@ class Status;
  */
 Status getStatusFromCommandResult(const BSONObj& result);
 
+
+/**
+ * Extracts the write concern error from a command response.
+ */
+Status getWriteConcernStatusFromCommandResult(const BSONObj& cmdResponse);
+
 }  // namespace mongo

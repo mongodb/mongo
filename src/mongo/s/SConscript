@@ -32,12 +32,21 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='chunk_version',
+    source=[
+        'chunk_version.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/common',
+    ]
+)
+
 # Functionality shared between mongod and mongos
 env.Library(
     target='common',
     source=[
         'chunk_diff.cpp',
-        'chunk_version.cpp',
         'migration_secondary_throttle_options.cpp',
         'move_chunk_request.cpp',
         'set_shard_version_request.cpp',
@@ -53,6 +62,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/rpc/metadata',
         'catalog/catalog_types',
+        'chunk_version',
     ]
 )
 

@@ -157,8 +157,9 @@ Status checkForWriteConcernError(const BSONObj& obj) {
 
 }  // unnamed namespace
 
-const ShardRegistry::ErrorCodesSet ShardRegistry::kNotMasterErrors{ErrorCodes::NotMaster,
-                                                                   ErrorCodes::NotMasterNoSlaveOk};
+const ShardRegistry::ErrorCodesSet ShardRegistry::kNotMasterErrors{
+    ErrorCodes::NotMaster, ErrorCodes::NotMasterNoSlaveOk, ErrorCodes::NotMasterOrSecondary};
+
 const ShardRegistry::ErrorCodesSet ShardRegistry::kAllRetriableErrors{
     ErrorCodes::NotMaster,
     ErrorCodes::NotMasterNoSlaveOk,
@@ -486,21 +487,8 @@ StatusWith<Shard::QueryResponse> ShardRegistry::exhaustiveFindOnConfig(
     const BSONObj& query,
     const BSONObj& sort,
     boost::optional<long long> limit) {
-    for (int retry = 1; retry <= kOnErrorNumRetries; retry++) {
-        const auto configShard = getConfigShard();
-        auto result = configShard->exhaustiveFindOnConfig(txn, readPref, nss, query, sort, limit);
-        if (result.isOK()) {
-            return result;
-        }
-
-        if (kAllRetriableErrors.count(result.getStatus().code()) && retry < kOnErrorNumRetries) {
-            continue;
-        }
-
-        return result.getStatus();
-    }
-
-    MONGO_UNREACHABLE;
+    const auto configShard = getConfigShard();
+    return configShard->exhaustiveFindOnConfig(txn, readPref, nss, query, sort, limit);
 }
 
 StatusWith<BSONObj> ShardRegistry::runIdempotentCommandOnShard(
@@ -597,8 +585,8 @@ StatusWith<Shard::CommandResponse> ShardRegistry::_runCommandWithRetries(
             (isConfigShard ? appendMaxTimeToCmdObj(txn->getRemainingMaxTimeMicros(), cmdObj)
                            : cmdObj);
 
-        const auto swCmdResponse =
-            shard->runCommand(txn, readPref, dbname, cmdWithMaxTimeMS, metadata);
+        const auto swCmdResponse = shard->runCommand(
+            txn, readPref, dbname, cmdWithMaxTimeMS, metadata, Shard::RetryPolicy::kNoRetry);
 
         // First, check if the request failed to even reach the shard, and if we should retry.
         Status requestStatus = swCmdResponse.getStatus();
@@ -616,7 +604,6 @@ StatusWith<Shard::CommandResponse> ShardRegistry::_runCommandWithRetries(
         // status.
         const auto cmdResponse = std::move(swCmdResponse.getValue());
         Status commandStatus = getStatusFromCommandResult(cmdResponse.response);
-        Status writeConcernStatus = checkForWriteConcernError(cmdResponse.response);
 
         // Next, check if the command failed with a retriable error.
         if (!commandStatus.isOK() && errorsToCheck.count(commandStatus.code())) {
@@ -634,6 +621,7 @@ StatusWith<Shard::CommandResponse> ShardRegistry::_runCommandWithRetries(
 
         // If the command succeeded, or it failed with a non-retriable error, check if the write
         // concern failed.
+        Status writeConcernStatus = checkForWriteConcernError(cmdResponse.response);
         if (!writeConcernStatus.isOK()) {
             if (errorsToCheck.count(writeConcernStatus.code()) && retry < kOnErrorNumRetries) {
                 // If the write concern failed with a retriable error and we can retry, retry.

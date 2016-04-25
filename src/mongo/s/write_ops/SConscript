@@ -19,7 +19,8 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/s/common',
+        '$BUILD_DIR/mongo/db/repl/optime',
+        '$BUILD_DIR/mongo/s/chunk_version',
     ],
 )
 

@@ -58,6 +58,7 @@ public:
     bool parseBSON(const BSONObj& source, std::string* errMsg);
     void clear();
     std::string toString() const;
+    Status toStatus() const;
 
     //
     // individual field accessors

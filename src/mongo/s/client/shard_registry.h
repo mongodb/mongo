@@ -91,7 +91,7 @@ public:
 
     /**
      * Reloads the ShardRegistry based on the contents of the config server's config.shards
-     * collection. Returns true if this call perfomed a reload and false if this call only waited
+     * collection. Returns true if this call performed a reload and false if this call only waited
      * for another thread to perform the reload and did not actually reload. Because of this, it is
      * possible that calling reload once may not result in the most up to date view. If strict
      * reloading is required, the caller should call this method one more time if the first call

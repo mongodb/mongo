@@ -32,7 +32,34 @@
 
 #include "mongo/s/client/shard.h"
 
+#include "mongo/util/log.h"
+
 namespace mongo {
+
+namespace {
+
+const int kOnErrorNumRetries = 3;
+
+Status _getEffectiveCommandStatus(StatusWith<Shard::CommandResponse> cmdResponse) {
+    // Make sure the command even received a valid response
+    if (!cmdResponse.isOK()) {
+        return cmdResponse.getStatus();
+    }
+
+    // If the request reached the shard, check if the command itself failed.
+    if (!cmdResponse.getValue().commandStatus.isOK()) {
+        return cmdResponse.getValue().commandStatus;
+    }
+
+    // Finally check if the write concern failed
+    if (!cmdResponse.getValue().writeConcernStatus.isOK()) {
+        return cmdResponse.getValue().writeConcernStatus;
+    }
+
+    return Status::OK();
+}
+
+}  // namespace
 
 Shard::Shard(const ShardId& id) : _id(id) {}
 
@@ -48,8 +75,21 @@ StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* txn,
                                                      const ReadPreferenceSetting& readPref,
                                                      const std::string& dbName,
                                                      const BSONObj& cmdObj,
-                                                     const BSONObj& metadata) {
-    return _runCommand(txn, readPref, dbName, cmdObj, metadata);
+                                                     const BSONObj& metadata,
+                                                     RetryPolicy retryPolicy) {
+    for (int retry = 1; retry <= kOnErrorNumRetries; ++retry) {
+        auto swCmdResponse = _runCommand(txn, readPref, dbName, cmdObj, metadata);
+        auto commandStatus = _getEffectiveCommandStatus(swCmdResponse);
+
+        if (retry < kOnErrorNumRetries && _isRetriableError(commandStatus.code(), retryPolicy)) {
+            LOG(3) << "Command " << cmdObj << " failed with retriable error and will be retried"
+                   << causedBy(commandStatus);
+            continue;
+        }
+
+        return swCmdResponse;
+    }
+    MONGO_UNREACHABLE;
 }
 
 StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
@@ -59,7 +99,18 @@ StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
     const BSONObj& query,
     const BSONObj& sort,
     const boost::optional<long long> limit) {
-    return _exhaustiveFindOnConfig(txn, readPref, nss, query, sort, limit);
+    for (int retry = 1; retry <= kOnErrorNumRetries; retry++) {
+        auto result = _exhaustiveFindOnConfig(txn, readPref, nss, query, sort, limit);
+
+        if (retry < kOnErrorNumRetries &&
+            _isRetriableError(result.getStatus().code(), RetryPolicy::kIdempotent)) {
+            continue;
+        }
+
+        return result;
+    }
+
+    MONGO_UNREACHABLE;
 }
 
 }  // namespace mongo

@@ -55,11 +55,13 @@ public:
     std::string toString() const override;
 
 private:
+    bool _isRetriableError(ErrorCodes::Error code, RetryPolicy options) final;
+
     StatusWith<Shard::CommandResponse> _runCommand(OperationContext* txn,
                                                    const ReadPreferenceSetting& unused,
                                                    const std::string& dbName,
                                                    const BSONObj& cmdObj,
-                                                   const BSONObj& metadata) override;
+                                                   const BSONObj& metadata) final;
 
     StatusWith<Shard::QueryResponse> _exhaustiveFindOnConfig(
         OperationContext* txn,
@@ -67,7 +69,7 @@ private:
         const NamespaceString& nss,
         const BSONObj& query,
         const BSONObj& sort,
-        boost::optional<long long> limit) override;
+        boost::optional<long long> limit) final;
 };
 
 }  // namespace mongo

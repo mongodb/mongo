@@ -43,6 +43,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/executor/task_executor_pool.h"
+#include "mongo/platform/unordered_set.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
@@ -60,6 +61,9 @@ using executor::TaskExecutor;
 using RemoteCommandCallbackArgs = TaskExecutor::RemoteCommandCallbackArgs;
 
 namespace {
+
+const Status kInternalErrorStatus{ErrorCodes::InternalError,
+                                  "Invalid to check for write concern error if command failed"};
 
 const Seconds kConfigCommandTimeout{30};
 
@@ -79,6 +83,79 @@ const BSONObj kReplSecondaryOkMetadata{[] {
     return o.obj();
 }()};
 
+class ErrorCodesHash {
+public:
+    size_t operator()(ErrorCodes::Error e) const {
+        return std::hash<typename std::underlying_type<ErrorCodes::Error>::type>()(e);
+    }
+};
+
+using ErrorCodesSet = unordered_set<ErrorCodes::Error, ErrorCodesHash>;
+
+const ErrorCodesSet kNotMasterErrors{
+    ErrorCodes::NotMaster, ErrorCodes::NotMasterNoSlaveOk, ErrorCodes::NotMasterOrSecondary};
+
+const ErrorCodesSet kAllRetriableErrors{
+    ErrorCodes::NotMaster,
+    ErrorCodes::NotMasterNoSlaveOk,
+    ErrorCodes::NotMasterOrSecondary,
+    // If write concern failed to be satisfied on the remote server, this most probably means that
+    // some of the secondary nodes were unreachable or otherwise unresponsive, so the call is safe
+    // to be retried if idempotency can be guaranteed.
+    ErrorCodes::WriteConcernFailed,
+    ErrorCodes::HostUnreachable,
+    ErrorCodes::HostNotFound,
+    ErrorCodes::NetworkTimeout,
+    ErrorCodes::InterruptedDueToReplStateChange};
+
+/**
+ * Returns a new BSONObj describing the same command and arguments as 'cmdObj', but with a maxTimeMS
+ * set on it that is the minimum of the maxTimeMS in 'cmdObj' (if present), 'maxTimeMicros', and
+ * 30 seconds.
+ */
+BSONObj appendMaxTimeToCmdObj(long long maxTimeMicros, const BSONObj& cmdObj) {
+    Milliseconds maxTime = duration_cast<Milliseconds>(kConfigCommandTimeout);
+
+    Milliseconds remainingTxnMaxTime = duration_cast<Milliseconds>(Microseconds(maxTimeMicros));
+    bool hasTxnMaxTime(remainingTxnMaxTime != Microseconds::zero());
+    bool hasUserMaxTime = !cmdObj[LiteParsedQuery::cmdOptionMaxTimeMS].eoo();
+
+    if (hasTxnMaxTime) {
+        if (remainingTxnMaxTime < maxTime) {
+            maxTime = remainingTxnMaxTime;
+        }
+    }
+
+    if (hasUserMaxTime) {
+        Milliseconds userMaxTime(cmdObj[LiteParsedQuery::cmdOptionMaxTimeMS].numberLong());
+        if (userMaxTime == maxTime) {
+            return cmdObj;
+        }
+        if (userMaxTime < maxTime) {
+            maxTime = userMaxTime;
+        }
+    }
+
+    BSONObjBuilder updatedCmdBuilder;
+    if (hasUserMaxTime) {  // Need to remove user provided maxTimeMS.
+        BSONObjIterator cmdObjIter(cmdObj);
+        const char* maxTimeFieldName = LiteParsedQuery::cmdOptionMaxTimeMS;
+        while (cmdObjIter.more()) {
+            BSONElement e = cmdObjIter.next();
+            if (str::equals(e.fieldName(), maxTimeFieldName)) {
+                continue;
+            }
+            updatedCmdBuilder.append(e);
+        }
+    } else {
+        updatedCmdBuilder.appendElements(cmdObj);
+    }
+
+    updatedCmdBuilder.append(LiteParsedQuery::cmdOptionMaxTimeMS,
+                             durationCount<Milliseconds>(maxTime));
+    return updatedCmdBuilder.obj();
+}
+
 }  // unnamed namespace
 
 ShardRemote::ShardRemote(const ShardId& id,
@@ -87,6 +164,19 @@ ShardRemote::ShardRemote(const ShardId& id,
     : Shard(id), _originalConnString(originalConnString), _targeter(targeter.release()) {}
 
 ShardRemote::~ShardRemote() = default;
+
+bool ShardRemote::_isRetriableError(ErrorCodes::Error code, RetryPolicy options) {
+    if (options == RetryPolicy::kNoRetry) {
+        return false;
+    }
+
+    if (options == RetryPolicy::kIdempotent) {
+        return kAllRetriableErrors.count(code);
+    } else {
+        invariant(options == RetryPolicy::kNotIdempotent);
+        return kNotMasterErrors.count(code);
+    }
+}
 
 const ConnectionString ShardRemote::getConnString() const {
     return _targeter->connectionString();
@@ -118,6 +208,9 @@ StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* tx
                                                             const string& dbName,
                                                             const BSONObj& cmdObj,
                                                             const BSONObj& metadata) {
+    const BSONObj cmdWithMaxTimeMS =
+        (isConfig() ? appendMaxTimeToCmdObj(txn->getRemainingMaxTimeMicros(), cmdObj) : cmdObj);
+
     const auto host =
         _targeter->findHost(readPref, RemoteCommandTargeter::selectFindHostMaxWaitTime(txn));
     if (!host.isOK()) {
@@ -126,7 +219,7 @@ StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* tx
 
     RemoteCommandRequest request(host.getValue(),
                                  dbName,
-                                 cmdObj,
+                                 cmdWithMaxTimeMS,
                                  metadata,
                                  isConfig() ? kConfigCommandTimeout
                                             : executor::RemoteCommandRequest::kNoTimeout);
@@ -153,14 +246,19 @@ StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* tx
         return swResponse.getStatus();
     }
 
-    CommandResponse cmdResponse;
-    cmdResponse.response = swResponse.getValue().data.getOwned();
-    cmdResponse.metadata = swResponse.getValue().metadata.getOwned();
+    BSONObj responseObj = swResponse.getValue().data.getOwned();
+    BSONObj responseMetadata = swResponse.getValue().metadata.getOwned();
+    Status commandStatus = getStatusFromCommandResult(responseObj);
+    Status writeConcernStatus = kInternalErrorStatus;
+    if (commandStatus.isOK()) {
+        writeConcernStatus = getWriteConcernStatusFromCommandResult(responseObj);
+    }
+    updateReplSetMonitor(host.getValue(), commandStatus);
 
-    auto commandSpecificStatus = getStatusFromCommandResult(cmdResponse.response);
-    updateReplSetMonitor(host.getValue(), commandSpecificStatus);
-
-    return StatusWith<CommandResponse>(std::move(cmdResponse));
+    return CommandResponse(std::move(responseObj),
+                           std::move(responseMetadata),
+                           std::move(commandStatus),
+                           std::move(writeConcernStatus));
 }
 
 StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(

@@ -69,18 +69,20 @@ public:
     std::string toString() const override;
 
 private:
+    bool _isRetriableError(ErrorCodes::Error code, RetryPolicy options) final;
+
     StatusWith<CommandResponse> _runCommand(OperationContext* txn,
                                             const ReadPreferenceSetting& readPref,
                                             const std::string& dbname,
                                             const BSONObj& cmdObj,
-                                            const BSONObj& metadata) override;
+                                            const BSONObj& metadata) final;
 
     StatusWith<QueryResponse> _exhaustiveFindOnConfig(OperationContext* txn,
                                                       const ReadPreferenceSetting& readPref,
                                                       const NamespaceString& nss,
                                                       const BSONObj& query,
                                                       const BSONObj& sort,
-                                                      boost::optional<long long> limit) override;
+                                                      boost::optional<long long> limit) final;
 
     /**
      * Connection string for the shard at the creation time.
