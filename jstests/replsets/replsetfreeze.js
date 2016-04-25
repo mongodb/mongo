@@ -57,7 +57,7 @@ replTest.awaitSecondaryNodes();
 
 print("2: step down m1");
 try {
-    master.getDB("admin").runCommand({replSetStepDown: 1, force: 1});
+    master.getDB("admin").runCommand({replSetStepDown: 10, force: 1});
 } catch (e) {
     print(e);
 }
@@ -83,7 +83,7 @@ master = replTest.getPrimary();
 
 print("6: step down new master");
 try {
-    master.getDB("admin").runCommand({replSetStepDown: 1, force: 1});
+    master.getDB("admin").runCommand({replSetStepDown: 10, force: 1});
 } catch (e) {
     print(e);
 }

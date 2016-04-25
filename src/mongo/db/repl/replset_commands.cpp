@@ -511,7 +511,7 @@ public:
     virtual void help(stringstream& help) const {
         help << "{ replSetStepDown : <seconds> }\n";
         help << "Step down as primary.  Will not try to reelect self for the specified time period "
-                "(1 minute if no numeric secs value specified).\n";
+                "(1 minute if no numeric secs value specified, or secs is 0).\n";
         help << "(If another member with same priority takes over in the meantime, it will stay "
                 "primary.)\n";
         help << "http://dochub.mongodb.org/core/replicasetcommands";
