@@ -193,7 +193,7 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
         self.hot_backup(self.uri, committed)
 
     def test_ops(self):
-        with self.expectedStdoutPattern('Recreating metadata'):
+        with self.expectedStdoutPattern('recreating metadata'):
             self.ops()
 
 if __name__ == '__main__':

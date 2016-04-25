@@ -479,7 +479,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	    lsm_rows_merged, insert_count % LSM_MERGE_CHECK_INTERVAL);
 	++lsm_tree->merge_progressing;
 	WT_ERR(__wt_verbose(session, WT_VERB_LSM,
-	    "Bloom size for %" PRIu64 " has %" PRIu64 " items inserted.",
+	    "Bloom size for %" PRIu64 " has %" PRIu64 " items inserted",
 	    record_count, insert_count));
 
 	/*
