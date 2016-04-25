@@ -184,9 +184,8 @@ Status checkAuthForGrantRolesToUserCommand(ClientBasic* client,
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
     std::vector<RoleName> roles;
     std::string unusedUserNameString;
-    BSONObj unusedWriteConcern;
     Status status = auth::parseRolePossessionManipulationCommands(
-        cmdObj, "grantRolesToUser", dbname, &unusedUserNameString, &roles, &unusedWriteConcern);
+        cmdObj, "grantRolesToUser", dbname, &unusedUserNameString, &roles);
     if (!status.isOK()) {
         return status;
     }
@@ -251,9 +250,8 @@ Status checkAuthForGrantRolesToRoleCommand(ClientBasic* client,
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
     std::vector<RoleName> roles;
     std::string unusedUserNameString;
-    BSONObj unusedWriteConcern;
     Status status = auth::parseRolePossessionManipulationCommands(
-        cmdObj, "grantRolesToRole", dbname, &unusedUserNameString, &roles, &unusedWriteConcern);
+        cmdObj, "grantRolesToRole", dbname, &unusedUserNameString, &roles);
     if (!status.isOK()) {
         return status;
     }
@@ -267,9 +265,8 @@ Status checkAuthForGrantPrivilegesToRoleCommand(ClientBasic* client,
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
     PrivilegeVector privileges;
     RoleName unusedRoleName;
-    BSONObj unusedWriteConcern;
     Status status = auth::parseAndValidateRolePrivilegeManipulationCommands(
-        cmdObj, "grantPrivilegesToRole", dbname, &unusedRoleName, &privileges, &unusedWriteConcern);
+        cmdObj, "grantPrivilegesToRole", dbname, &unusedRoleName, &privileges);
     if (!status.isOK()) {
         return status;
     }
@@ -282,9 +279,7 @@ Status checkAuthForDropUserCommand(ClientBasic* client,
                                    const BSONObj& cmdObj) {
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
     UserName userName;
-    BSONObj unusedWriteConcern;
-    Status status =
-        auth::parseAndValidateDropUserCommand(cmdObj, dbname, &userName, &unusedWriteConcern);
+    Status status = auth::parseAndValidateDropUserCommand(cmdObj, dbname, &userName);
     if (!status.isOK()) {
         return status;
     }
@@ -303,8 +298,7 @@ Status checkAuthForDropRoleCommand(ClientBasic* client,
                                    const BSONObj& cmdObj) {
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
     RoleName roleName;
-    BSONObj unusedWriteConcern;
-    Status status = auth::parseDropRoleCommand(cmdObj, dbname, &roleName, &unusedWriteConcern);
+    Status status = auth::parseDropRoleCommand(cmdObj, dbname, &roleName);
     if (!status.isOK()) {
         return status;
     }
@@ -335,9 +329,8 @@ Status checkAuthForRevokeRolesFromUserCommand(ClientBasic* client,
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
     std::vector<RoleName> roles;
     std::string unusedUserNameString;
-    BSONObj unusedWriteConcern;
     Status status = auth::parseRolePossessionManipulationCommands(
-        cmdObj, "revokeRolesFromUser", dbname, &unusedUserNameString, &roles, &unusedWriteConcern);
+        cmdObj, "revokeRolesFromUser", dbname, &unusedUserNameString, &roles);
     if (!status.isOK()) {
         return status;
     }
@@ -351,9 +344,8 @@ Status checkAuthForRevokeRolesFromRoleCommand(ClientBasic* client,
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
     std::vector<RoleName> roles;
     std::string unusedUserNameString;
-    BSONObj unusedWriteConcern;
     Status status = auth::parseRolePossessionManipulationCommands(
-        cmdObj, "revokeRolesFromRole", dbname, &unusedUserNameString, &roles, &unusedWriteConcern);
+        cmdObj, "revokeRolesFromRole", dbname, &unusedUserNameString, &roles);
     if (!status.isOK()) {
         return status;
     }
@@ -401,14 +393,8 @@ Status checkAuthForRevokePrivilegesFromRoleCommand(ClientBasic* client,
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
     PrivilegeVector privileges;
     RoleName unusedRoleName;
-    BSONObj unusedWriteConcern;
-    Status status =
-        auth::parseAndValidateRolePrivilegeManipulationCommands(cmdObj,
-                                                                "revokePrivilegesFromRole",
-                                                                dbname,
-                                                                &unusedRoleName,
-                                                                &privileges,
-                                                                &unusedWriteConcern);
+    Status status = auth::parseAndValidateRolePrivilegeManipulationCommands(
+        cmdObj, "revokePrivilegesFromRole", dbname, &unusedRoleName, &privileges);
     if (!status.isOK()) {
         return status;
     }

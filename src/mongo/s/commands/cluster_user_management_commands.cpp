@@ -175,9 +175,7 @@ public:
              string& errmsg,
              BSONObjBuilder& result) {
         UserName userName;
-        BSONObj unusedWriteConcern;
-        Status status =
-            auth::parseAndValidateDropUserCommand(cmdObj, dbname, &userName, &unusedWriteConcern);
+        Status status = auth::parseAndValidateDropUserCommand(cmdObj, dbname, &userName);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -265,9 +263,8 @@ public:
              BSONObjBuilder& result) {
         string userNameString;
         vector<RoleName> roles;
-        BSONObj unusedWriteConcern;
         Status status = auth::parseRolePossessionManipulationCommands(
-            cmdObj, getName(), dbname, &userNameString, &roles, &unusedWriteConcern);
+            cmdObj, getName(), dbname, &userNameString, &roles);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -314,9 +311,8 @@ public:
              BSONObjBuilder& result) {
         string userNameString;
         vector<RoleName> unusedRoles;
-        BSONObj unusedWriteConcern;
         Status status = auth::parseRolePossessionManipulationCommands(
-            cmdObj, getName(), dbname, &userNameString, &unusedRoles, &unusedWriteConcern);
+            cmdObj, getName(), dbname, &userNameString, &unusedRoles);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }

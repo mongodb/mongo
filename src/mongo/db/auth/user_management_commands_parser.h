@@ -78,18 +78,16 @@ Status parseRolePossessionManipulationCommands(const BSONObj& cmdObj,
                                                StringData cmdName,
                                                const std::string& dbname,
                                                std::string* parsedName,
-                                               std::vector<RoleName>* parsedRoleNames,
-                                               BSONObj* parsedWriteConcern);
+                                               std::vector<RoleName>* parsedRoleNames);
 
 /**
  * Takes a command object describing an invocation of the "dropUser" command and parses out
- * the UserName of the user to be removed and the writeConcern.
+ * the UserName of the user to be removed.
  * Also validates the input and returns a non-ok Status if there is anything wrong.
  */
 Status parseAndValidateDropUserCommand(const BSONObj& cmdObj,
                                        const std::string& dbname,
-                                       UserName* parsedUserName,
-                                       BSONObj* parsedWriteConcern);
+                                       UserName* parsedUserName);
 
 /**
  * Takes a command object describing an invocation of the "dropAllUsersFromDatabase" command and
@@ -97,8 +95,7 @@ Status parseAndValidateDropUserCommand(const BSONObj& cmdObj,
  * Also validates the input and returns a non-ok Status if there is anything wrong.
  */
 Status parseAndValidateDropAllUsersFromDatabaseCommand(const BSONObj& cmdObj,
-                                                       const std::string& dbname,
-                                                       BSONObj* parsedWriteConcern);
+                                                       const std::string& dbname);
 
 struct UsersInfoArgs {
     std::vector<UserName> userNames;
@@ -157,25 +154,21 @@ Status parseAndValidateRolePrivilegeManipulationCommands(const BSONObj& cmdObj,
                                                          StringData cmdName,
                                                          const std::string& dbname,
                                                          RoleName* parsedRoleName,
-                                                         PrivilegeVector* parsedPrivileges,
-                                                         BSONObj* parsedWriteConcern);
+                                                         PrivilegeVector* parsedPrivileges);
 
 /**
  * Takes a command object describing an invocation of the "dropRole" command and parses out
- * the RoleName of the role to be removed and the writeConcern.
+ * the RoleName of the role to be removed.
  */
 Status parseDropRoleCommand(const BSONObj& cmdObj,
                             const std::string& dbname,
-                            RoleName* parsedRoleName,
-                            BSONObj* parsedWriteConcern);
+                            RoleName* parsedRoleName);
 
 /**
  * Takes a command object describing an invocation of the "dropAllRolesFromDatabase" command and
  * parses out the write concern.
  */
-Status parseDropAllRolesFromDatabaseCommand(const BSONObj& cmdObj,
-                                            const std::string& dbname,
-                                            BSONObj* parsedWriteConcern);
+Status parseDropAllRolesFromDatabaseCommand(const BSONObj& cmdObj, const std::string& dbname);
 
 /**
  * Parses the privileges described in "privileges" into a vector of Privilege objects.
@@ -214,8 +207,7 @@ struct MergeAuthzCollectionsArgs {
 /**
  * Takes a command object describing an invocation of the "_mergeAuthzCollections" command and
  * parses out the name of the temporary collections to use for user and role data, whether or
- * not to drop the existing users/roles, the database if this is a for a db-specific restore,
- * and the writeConcern.
+ * not to drop the existing users/roles, the database if this is a for a db-specific restore.
  * Returns ErrorCodes::OutdatedClient if the "db" field is missing, as that likely indicates
  * the command was sent by an outdated (pre 2.6.4) version of mongorestore.
  * Returns other codes indicating missing or incorrectly typed fields.
