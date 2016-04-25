@@ -5853,12 +5853,16 @@ buildvariants:
   - name: auth_audit
   - name: bulk_gle_passthrough
   - name: concurrency
+    distros:
     - rhel72-zseries-build
   - name: concurrency_replication
+    distros:
     - rhel72-zseries-build
   - name: concurrency_sharded
+    distros:
     - rhel72-zseries-build
   - name: concurrency_simultaneous
+    distros:
     - rhel72-zseries-build
   - name: dbtest
   - name: failpoints
