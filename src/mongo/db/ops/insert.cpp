@@ -45,12 +45,12 @@ StatusWith<BSONObj> fixDocumentForInsert(const BSONObj& doc) {
                                                  << ". size in bytes: " << doc.objsize()
                                                  << ", max size: " << BSONObjMaxUserSize);
 
-    bool firstElementIsId = doc.firstElement().fieldNameStringData() == "_id";
+    bool firstElementIsId = false;
     bool hasTimestampToFix = false;
     bool hadId = false;
     {
         BSONObjIterator i(doc);
-        while (i.more()) {
+        for (bool isFirstElement = true; i.more(); isFirstElement = false) {
             BSONElement e = i.next();
 
             if (e.type() == bsonTimestamp && e.timestampValue() == 0) {
@@ -59,19 +59,18 @@ StatusWith<BSONObj> fixDocumentForInsert(const BSONObj& doc) {
                 hasTimestampToFix = true;
             }
 
-            const char* fieldName = e.fieldName();
+            auto fieldName = e.fieldNameStringData();
 
             if (fieldName[0] == '$') {
-                return StatusWith<BSONObj>(ErrorCodes::BadValue,
-                                           str::stream()
-                                               << "Document can't have $ prefixed field names: "
-                                               << e.fieldName());
+                return StatusWith<BSONObj>(
+                    ErrorCodes::BadValue,
+                    str::stream() << "Document can't have $ prefixed field names: " << fieldName);
             }
 
             // check no regexp for _id (SERVER-9502)
             // also, disallow undefined and arrays
             // Make sure _id isn't duplicated (SERVER-19361).
-            if (str::equals(fieldName, "_id")) {
+            if (fieldName == "_id") {
                 if (e.type() == RegEx) {
                     return StatusWith<BSONObj>(ErrorCodes::BadValue, "can't use a regex for _id");
                 }
@@ -93,6 +92,7 @@ StatusWith<BSONObj> fixDocumentForInsert(const BSONObj& doc) {
                                                "can't have multiple _id fields in one document");
                 } else {
                     hadId = true;
+                    firstElementIsId = isFirstElement;
                 }
             }
         }
