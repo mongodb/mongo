@@ -102,7 +102,8 @@
                      + __GNUC_MINOR__ * 100           \
                      + __GNUC_PATCHLEVEL__)
 
-#if defined(TCMALLOC_PREFER_GCC_ATOMICS) && defined(__GNUC__) && GCC_VERSION >= 40700
+// MongoDB modification: We always have a new enough toolchain to use the GCC atomics
+#if defined(__GNUC__)
 #include "base/atomicops-internals-gcc.h"
 #elif defined(__MACH__) && defined(__APPLE__)
 #include "base/atomicops-internals-macosx.h"

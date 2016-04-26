@@ -5,7 +5,6 @@ Import("has_option")
 Import("debugBuild")
 
 files = [
-    'src/base/atomicops-internals-x86.cc',
     'src/base/dynamic_annotations.c',
     'src/base/elf_mem_image.cc',
     'src/base/logging.cc',

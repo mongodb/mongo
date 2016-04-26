@@ -934,13 +934,13 @@ elif endian == "big":
 # NOTE: Remember to add a trailing comma to form any required one
 # element tuples, or your configure checks will fail in strange ways.
 processor_macros = {
-    'arm'    : { 'endian': 'little', 'defines': ('__arm__',) },
-    'arm64'  : { 'endian': 'little', 'defines': ('__arm64__', '__aarch64__')},
-    'i386'   : { 'endian': 'little', 'defines': ('__i386', '_M_IX86')},
-    'ppc64le': { 'endian': 'little', 'defines': ('__powerpc64__',)},
-    's390x'  : { 'endian': 'big',    'defines': ('__s390x__',)},
-    'sparc'  : { 'endian': 'big',    'defines': ('__sparc',)},
-    'x86_64' : { 'endian': 'little', 'defines': ('__x86_64', '_M_AMD64')},
+    'arm'     : { 'endian': 'little', 'defines': ('__arm__',) },
+    'aarch64' : { 'endian': 'little', 'defines': ('__arm64__', '__aarch64__')},
+    'i386'    : { 'endian': 'little', 'defines': ('__i386', '_M_IX86')},
+    'ppc64le' : { 'endian': 'little', 'defines': ('__powerpc64__',)},
+    's390x'   : { 'endian': 'big',    'defines': ('__s390x__',)},
+    'sparc'   : { 'endian': 'big',    'defines': ('__sparc',)},
+    'x86_64'  : { 'endian': 'little', 'defines': ('__x86_64', '_M_AMD64')},
 }
 
 def CheckForProcessor(context, which_arch):

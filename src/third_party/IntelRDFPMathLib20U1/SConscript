@@ -298,7 +298,12 @@ processor = env['TARGET_ARCH']
 if processor == 'i386':
     cpp_defines['IA32'] = '1'
     cpp_defines['ia32'] = '1'
-
+elif processor == 'arm':
+    cpp_defines['IA32'] = '1'
+    cpp_defines['ia32'] = '1'
+elif processor == "aarch64":
+    cpp_defines['efi2'] = '1'
+    cpp_defines['EFI2'] = '1'
 # Using 64 bit little endian
 elif processor == 'x86_64' or processor == 'ppc64le':
     cpp_defines['efi2'] = '1'
