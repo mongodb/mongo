@@ -235,6 +235,7 @@ inline void fassertNoTrace(int msgid, const Status& status) {
  * complex error message in the expansion of msg. The call to the lambda is followed by
  * MONGO_COMPILER_UNREACHABLE as it is impossible to mark a lambda noreturn.
  */
+#define uassert MONGO_uassert
 #define MONGO_uassert(msgid, msg, expr)                  \
     do {                                                 \
         if (MONGO_unlikely(!(expr))) {                   \
@@ -244,25 +245,14 @@ inline void fassertNoTrace(int msgid, const Status& status) {
     } while (false)
 
 inline void uassertStatusOK(const Status& status) {
-    if (MONGO_unlikely(!status.isOK())) {
-        [&]() {
-            uasserted((status.location() != 0 ? status.location() : status.code()),
-                      status.reason());
-        }();
-        MONGO_COMPILER_UNREACHABLE;
-    }
+    uassert((status.location() != 0 ? status.location() : status.code()),
+            status.reason(),
+            status.isOK());
 }
 
 template <typename T>
 inline T uassertStatusOK(StatusWith<T> sw) {
-    if (MONGO_unlikely(!sw.isOK())) {
-        [&]() {
-            const auto& status = sw.getStatus();
-            uasserted((status.location() != 0 ? status.location() : status.code()),
-                      status.reason());
-        }();
-        MONGO_COMPILER_UNREACHABLE;
-    }
+    uassertStatusOK(sw.getStatus());
     return std::move(sw.getValue());
 }
 
@@ -281,6 +271,7 @@ inline void fassertStatusOK(int msgid, const Status& s) {
 }
 
 /* warning only - keeps going */
+#define wassert MONGO_wassert
 #define MONGO_wassert(_Expression)                                \
     do {                                                          \
         if (MONGO_unlikely(!(_Expression))) {                     \
@@ -293,6 +284,7 @@ inline void fassertStatusOK(int msgid, const Status& s) {
    easy way to throw an exception and log something without our stack trace
    display happening.
 */
+#define massert MONGO_massert
 #define MONGO_massert(msgid, msg, expr)                  \
     do {                                                 \
         if (MONGO_unlikely(!(expr))) {                   \
@@ -302,13 +294,9 @@ inline void fassertStatusOK(int msgid, const Status& s) {
     } while (false)
 
 inline void massertStatusOK(const Status& status) {
-    if (MONGO_unlikely(!status.isOK())) {
-        [&]() {
-            msgasserted((status.location() != 0 ? status.location() : status.code()),
-                        status.reason());
-        }();
-        MONGO_COMPILER_UNREACHABLE;
-    }
+    massert((status.location() != 0 ? status.location() : status.code()),
+            status.reason(),
+            status.isOK());
 }
 
 inline void massertNoTraceStatusOK(const Status& status) {
@@ -322,6 +310,7 @@ inline void massertNoTraceStatusOK(const Status& status) {
 }
 
 /* same as massert except no msgid */
+#define verify(expression) MONGO_verify(expression)
 #define MONGO_verify(_Expression)                                    \
     do {                                                             \
         if (MONGO_unlikely(!(_Expression))) {                        \
@@ -329,7 +318,7 @@ inline void massertNoTraceStatusOK(const Status& status) {
         }                                                            \
     } while (false)
 
-
+#define invariantOK MONGO_invariantOK
 #define MONGO_invariantOK(expression)                                                         \
     do {                                                                                      \
         const ::mongo::Status _invariantOK_status = expression;                               \
@@ -337,12 +326,6 @@ inline void massertNoTraceStatusOK(const Status& status) {
             ::mongo::invariantOKFailed(#expression, _invariantOK_status, __FILE__, __LINE__); \
         }                                                                                     \
     } while (false)
-
-#define verify(expression) MONGO_verify(expression)
-#define invariantOK MONGO_invariantOK
-#define uassert MONGO_uassert
-#define wassert MONGO_wassert
-#define massert MONGO_massert
 
 // some special ids that we want to duplicate
 
