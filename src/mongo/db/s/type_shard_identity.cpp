@@ -42,7 +42,8 @@ const BSONField<OID> clusterId("clusterId");
 
 StatusWith<ShardIdentityType> ShardIdentityType::fromBSON(const BSONObj& source) {
     if (!source.hasField("_id")) {
-        return {ErrorCodes::NoSuchKey, str::stream() << "missing _id field"};
+        return {ErrorCodes::NoSuchKey,
+                str::stream() << "missing _id field for shardIdentity document"};
     }
 
     ShardIdentityType shardIdentity;

@@ -91,6 +91,7 @@
 #include "mongo/db/restapi.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_state_recovery.h"
+#include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
@@ -107,6 +108,7 @@
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/platform/process_id.h"
+#include "mongo/s/sharding_initialization.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
@@ -748,6 +750,12 @@ static void _initAndListen(int listenPort) {
         }
 
         logStartup(startupOpCtx.get());
+    } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        auto parseStatus = ShardIdentityType::fromBSON(serverGlobalParams.overrideShardIdentity);
+        uassertStatusOK(parseStatus);
+        uassertStatusOK(ShardingState::get(startupOpCtx.get())
+                            ->initializeFromShardIdentity(parseStatus.getValue(), Date_t::max()));
+        uassertStatusOK(reloadShardRegistryUntilSuccess(startupOpCtx.get()));
     }
 
     // MessageServer::run will return when exit code closes its socket and we don't need the

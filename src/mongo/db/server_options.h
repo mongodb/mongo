@@ -133,6 +133,10 @@ struct ServerGlobalParams {
         */
         ClusterAuthMode_x509
     };
+
+    // for the YAML config, sharding._overrideShardIdentity. Can only be used when in
+    // queryableBackupMode.
+    BSONObj overrideShardIdentity;
 };
 
 extern ServerGlobalParams serverGlobalParams;

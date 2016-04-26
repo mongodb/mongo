@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/config.h"
 #include "mongo/db/db.h"
@@ -461,6 +462,17 @@ Status addMongodOptions(moe::OptionSection* options) {
         .setSources(moe::SourceYAMLConfig)
         .format("(:?configsvr)|(:?shardsvr)", "(configsvr/shardsvr)");
 
+    sharding_options
+        .addOptionChaining(
+             "sharding._overrideShardIdentity",
+             "",
+             moe::String,
+             "overrides the shardIdentity document settings stored in the local storage with "
+             "a MongoDB Extended JSON document in string format")
+        .setSources(moe::SourceYAMLConfig)
+        .incompatibleWith("configsvr")
+        .requires("storage.queryableBackupMode");
+
     sharding_options.addOptionChaining(
                          "noMoveParanoia",
                          "noMoveParanoia",
@@ -669,7 +681,21 @@ Status validateMongodOptions(const moe::Environment& params) {
                                             << disallowedOption);
             }
         }
+
+        bool isClusterRoleShard = false;
+        if (params.count("sharding.clusterRole")) {
+            auto clusterRole = params["sharding.clusterRole"].as<std::string>();
+            isClusterRoleShard = (clusterRole == "shardsvr");
+        }
+
+        if ((isClusterRoleShard || params.count("shardsvr")) &&
+            !params.count("sharding._overrideShardIdentity")) {
+            return Status(
+                ErrorCodes::BadValue,
+                "shardsvr cluster role with queryableBackupMode requires _overrideShardIdentity");
+        }
     }
+
     return Status::OK();
 }
 
@@ -1237,6 +1263,17 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
 
     if (params.count("sharding.archiveMovedChunks")) {
         serverGlobalParams.moveParanoia = params["sharding.archiveMovedChunks"].as<bool>();
+    }
+
+    if (params.count("sharding._overrideShardIdentity")) {
+        auto docAsString = params["sharding._overrideShardIdentity"].as<std::string>();
+
+        try {
+            serverGlobalParams.overrideShardIdentity = fromjson(docAsString);
+        } catch (const DBException& exception) {
+            return exception.toStatus(
+                "Error encountered while parsing _overrideShardIdentity JSON document");
+        }
     }
 
     if (params.count("pairwith") || params.count("arbiter") || params.count("opIdMem")) {
