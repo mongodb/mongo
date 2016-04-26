@@ -29,8 +29,9 @@
 #include "mongo/db/exec/projection_exec.h"
 
 #include "mongo/db/exec/working_set_computed_data.h"
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -74,6 +75,7 @@ ProjectionExec::ProjectionExec()
 
 ProjectionExec::ProjectionExec(const BSONObj& spec,
                                const MatchExpression* queryExpression,
+                               CollatorInterface* collator,
                                const ExtensionsCallback& extensionsCallback)
     : _include(true),
       _special(false),
@@ -83,7 +85,8 @@ ProjectionExec::ProjectionExec(const BSONObj& spec,
       _limit(-1),
       _arrayOpType(ARRAY_OP_NORMAL),
       _queryExpression(queryExpression),
-      _hasReturnKey(false) {
+      _hasReturnKey(false),
+      _collator(collator) {
     // Whether we're including or excluding fields.
     enum class IncludeExclude { kUninitialized, kInclude, kExclude };
     IncludeExclude includeExclude = IncludeExclude::kUninitialized;
@@ -125,9 +128,8 @@ ProjectionExec::ProjectionExec(const BSONObj& spec,
                 BSONObj elemMatchObj = e.wrap();
                 verify(elemMatchObj.isOwned());
                 _elemMatchObjs.push_back(elemMatchObj);
-                // TODO SERVER-23680: pass the appropriate CollatorInterface* instead of nullptr.
                 StatusWithMatchExpression statusWithMatcher =
-                    MatchExpressionParser::parse(elemMatchObj, extensionsCallback, nullptr);
+                    MatchExpressionParser::parse(elemMatchObj, extensionsCallback, _collator);
                 verify(statusWithMatcher.isOK());
                 // And store it in _matchers.
                 _matchers[mongoutils::str::before(e.fieldName(), '.').c_str()] =

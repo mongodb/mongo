@@ -268,6 +268,7 @@ Status prepareExecution(OperationContext* opCtx,
         // document, so we don't support covered projections. However, we might use the
         // simple inclusion fast path.
         if (NULL != canonicalQuery->getProj()) {
+            // TODO SERVER-23613: pass the appropriate collator to ProjectionStageParams.
             ProjectionStageParams params(ExtensionsCallbackReal(opCtx, &collection->ns()));
             params.projObj = canonicalQuery->getProj()->getProjObj();
 
@@ -624,6 +625,7 @@ StatusWith<unique_ptr<PlanStage>> applyProjection(OperationContext* txn,
                 "Cannot use a $meta sortKey projection in findAndModify commands."};
     }
 
+    // TODO SERVER-23613: pass the appropriate collator to ProjectionStageParams.
     ProjectionStageParams params(ExtensionsCallbackReal(txn, &nsString));
     params.projObj = proj;
     params.fullExpression = cq->root();

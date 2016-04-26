@@ -138,9 +138,10 @@ env.CppUnitTest(
         "projection_exec_test.cpp",
     ],
     LIBDEPS = [
-        "exec",
+        "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
         "$BUILD_DIR/mongo/db/serveronly",
         "$BUILD_DIR/mongo/util/ntservice_mock",
+        "exec",
     ],
     NO_CRUTCH = True,
 )

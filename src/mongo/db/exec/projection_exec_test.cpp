@@ -37,6 +37,7 @@
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
 
 using namespace mongo;
@@ -77,13 +78,15 @@ void testTransform(const char* specStr,
                    const char* queryStr,
                    const char* objStr,
                    WorkingSetComputedData* data,
+                   CollatorInterface* collator,
                    bool expectedStatusOK,
                    const char* expectedObjStr) {
     // Create projection exec object.
     BSONObj spec = fromjson(specStr);
     BSONObj query = fromjson(queryStr);
     unique_ptr<MatchExpression> queryExpression = parseMatchExpression(query);
-    ProjectionExec exec(spec, queryExpression.get(), ExtensionsCallbackDisallowExtensions());
+    ProjectionExec exec(
+        spec, queryExpression.get(), collator, ExtensionsCallbackDisallowExtensions());
 
     // Create working set member.
     WorkingSetMember wsm;
@@ -134,14 +137,14 @@ void testTransform(const char* specStr,
 }
 
 /**
- * testTransform without computed data argument.
+ * testTransform without computed data or collator arguments.
  */
 void testTransform(const char* specStr,
                    const char* queryStr,
                    const char* objStr,
                    bool expectedStatusOK,
                    const char* expectedObjStr) {
-    testTransform(specStr, queryStr, objStr, NULL, expectedStatusOK, expectedObjStr);
+    testTransform(specStr, queryStr, objStr, nullptr, nullptr, expectedStatusOK, expectedObjStr);
 }
 
 /**
@@ -166,7 +169,8 @@ BSONObj transformMetaSortKeyCovered(const BSONObj& sortKey,
     wsm->addComputed(new SortKeyComputedData(sortKey));
     ws.transitionToRecordIdAndIdx(wsid);
 
-    ProjectionExec projExec(fromjson(projSpec), nullptr, ExtensionsCallbackDisallowExtensions());
+    ProjectionExec projExec(
+        fromjson(projSpec), nullptr, nullptr, ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(projExec.transform(wsm));
 
     return wsm->obj.value();
@@ -210,6 +214,17 @@ TEST(ProjectionExecTest, TransformElemMatch) {
     testTransform("{a: {$elemMatch: {z: 1}}}", "{}", s, true, "{}");
 }
 
+TEST(ProjectionExecTest, ElemMatchProjectionRespectsCollator) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    testTransform("{a: {$elemMatch: {$gte: 'abc'}}}",
+                  "{}",
+                  "{a: ['zaa', 'zbb', 'zdd', 'zee']}",
+                  nullptr,  // WSM computed data
+                  &collator,
+                  true,
+                  "{a: ['zdd']}");
+}
+
 //
 // $slice
 //
@@ -250,6 +265,7 @@ TEST(ProjectionExecTest, TransformMetaTextScore) {
                   "{}",
                   "{a: 'hello'}",
                   new mongo::TextScoreComputedData(100),
+                  nullptr,  // collator
                   true,
                   "{a: 'hello', b: 100}");
     // Projected meta field should overwrite existing field.
@@ -257,6 +273,7 @@ TEST(ProjectionExecTest, TransformMetaTextScore) {
                   "{}",
                   "{a: 'hello', b: -1}",
                   new mongo::TextScoreComputedData(100),
+                  nullptr,  // collator
                   true,
                   "{a: 'hello', b: 100}");
 }
@@ -266,6 +283,7 @@ TEST(ProjectionExecTest, TransformMetaSortKey) {
                   "{}",
                   "{a: 'hello'}",
                   new mongo::SortKeyComputedData(BSON("" << 99)),
+                  nullptr,  // collator
                   true,
                   "{a: 'hello', b: {'': 99}}");
 
@@ -274,6 +292,7 @@ TEST(ProjectionExecTest, TransformMetaSortKey) {
                   "{}",
                   "{a: 'hello'}",
                   new mongo::SortKeyComputedData(BSON("" << 99)),
+                  nullptr,  // collator
                   true,
                   "{a: {'': 99}}");
 }

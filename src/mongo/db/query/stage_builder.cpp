@@ -135,6 +135,7 @@ PlanStage* buildStages(OperationContext* txn,
             return NULL;
         }
 
+        // TODO SERVER-23613: add the appropriate CollatorInterface* to ProjectionStageParams.
         ProjectionStageParams params(ExtensionsCallbackReal(txn, &collection->ns()));
         params.projObj = pn->projection;
 

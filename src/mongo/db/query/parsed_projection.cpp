@@ -122,10 +122,14 @@ Status ParsedProjection::make(const BSONObj& spec,
                 BSONObj elemMatchObj = elem.wrap();
                 invariant(elemMatchObj.isOwned());
 
+                // We pass a null pointer instead of threading through the CollatorInterface. This
+                // is ok because the parsed MatchExpression is not used after being created. We are
+                // only parsing here in order to ensure that the elemMatch projection is valid.
+                //
                 // TODO: Is there a faster way of validating the elemMatchObj?
-                // TODO SERVER-23680: pass the appropriate CollatorInterface* instead of nullptr.
+                CollatorInterface* collator = nullptr;
                 StatusWithMatchExpression statusWithMatcher =
-                    MatchExpressionParser::parse(elemMatchObj, extensionsCallback, nullptr);
+                    MatchExpressionParser::parse(elemMatchObj, extensionsCallback, collator);
                 if (!statusWithMatcher.isOK()) {
                     return statusWithMatcher.getStatus();
                 }
