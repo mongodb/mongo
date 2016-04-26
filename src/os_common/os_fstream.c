@@ -148,8 +148,7 @@ __fstream_printf(
 		if (len < space) {
 			buf->size += len;
 
-			return (F_ISSET(fs, WT_STREAM_LINE_BUFFER) ||
-			    buf->size >= WT_STREAM_BUFSIZE ?
+			return (buf->size >= WT_STREAM_BUFSIZE ?
 			    __wt_fflush(session, fs) : 0);
 		}
 		WT_RET(__wt_buf_extend(session, buf, buf->size + len + 1));
@@ -207,7 +206,7 @@ __wt_fopen(WT_SESSION_IMPL *session,
 	*fsp = fs;
 	return (0);
 
-err:	__wt_close(session, &fh);
+err:	WT_TRET(__wt_close(session, &fh));
 	__wt_free(session, *fsp);
 	return (ret);
 }
