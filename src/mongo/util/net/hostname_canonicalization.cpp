@@ -88,10 +88,8 @@ std::vector<std::string> getHostFQDNs(std::string hostName, HostnameCanonicaliza
     shim_addrinfo* info;
     auto nativeHostName = shim_toNativeString(hostName.c_str());
     if ((err = shim_getaddrinfo(nativeHostName.c_str(), nullptr, &hints, &info)) != 0) {
-        ONCE {
-            warning() << "Failed to obtain address information for hostname " << hostName << ": "
-                      << getAddrInfoStrError(err);
-        }
+        LOG(3) << "Failed to obtain address information for hostname " << hostName << ": "
+               << getAddrInfoStrError(err);
         return results;
     }
     const auto guard = MakeGuard([&shim_freeaddrinfo, &info] { shim_freeaddrinfo(info); });
@@ -141,9 +139,7 @@ std::vector<std::string> getHostFQDNs(std::string hostName, HostnameCanonicaliza
     }
 
     if (encounteredErrors) {
-        OCCASIONALLY {
-            warning() << getNameInfoErrors.str() << " ]";
-        }
+        LOG(3) << getNameInfoErrors.str() << " ]";
     }
 
     // Deduplicate the results list

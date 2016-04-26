@@ -60,14 +60,14 @@ void HostnameCanonicalizationWorker::_doWork() {
     log() << "Starting hostname canonicalization worker";
     try {
         while (true) {
-            LOG(3) << "Hostname Canonicalizer is acquiring host FQDNs";
+            LOG(5) << "Hostname Canonicalizer is acquiring host FQDNs";
             auto fqdns =
                 getHostFQDNs(getHostNameCached(), HostnameCanonicalizationMode::kForwardAndReverse);
             {
                 stdx::lock_guard<stdx::mutex> lock(_canonicalizationMutex);
                 _cachedFQDNs = std::move(fqdns);
             }
-            LOG(3) << "Hostname Canonicalizer acquired FQDNs";
+            LOG(5) << "Hostname Canonicalizer acquired FQDNs";
 
             sleepsecs(60);
         }
