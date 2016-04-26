@@ -448,7 +448,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	if (WT_CURSOR_RECNO(cursor))
 		WT_ERR_MSG(session, WT_ERROR,
 		    "Column store indexes based on a record number primary "
-		    "key are not supported.");
+		    "key are not supported");
 
 	/* Handle projections. */
 	if (columns != NULL) {

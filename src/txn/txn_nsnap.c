@@ -343,7 +343,7 @@ __wt_txn_named_snapshot_config(WT_SESSION_IMPL *session,
 	if (!*has_create && !*has_drops)
 		WT_RET_MSG(session, EINVAL,
 		    "WT_SESSION::snapshot API called without any drop or "
-		    "name option.");
+		    "name option");
 
 	return (0);
 }
