@@ -396,6 +396,53 @@ TEST_F(NetworkInterfaceMockTest, SetAlarmReturnsNotOKIfShutdownHasStarted) {
     ASSERT_NOT_OK(net().setAlarm(net().now() + Milliseconds(100), [] {}));
 }
 
+TEST_F(NetworkInterfaceMockTest, CommandTimeout) {
+    startNetwork();
+
+    TaskExecutor::CallbackHandle cb;
+    RemoteCommandRequest request;
+    request.timeout = Milliseconds(2000);
+
+    ErrorCodes::Error statusPropagated = ErrorCodes::OK;
+    auto finishFn =
+        [&](StatusWith<RemoteCommandResponse> resp) { statusPropagated = resp.getStatus().code(); };
+
+    //
+    // Command times out.
+    //
+    ASSERT_OK(net().startCommand(cb, request, finishFn));
+    net().enterNetwork();
+    ASSERT(net().hasReadyRequests());
+    net().blackHole(net().getNextReadyRequest());
+    net().runUntil(net().now() + Milliseconds(2010));
+    net().exitNetwork();
+    ASSERT_NOT_EQUALS(ErrorCodes::OK, statusPropagated);
+
+    //
+    // Command finishes before timeout.
+    //
+    Date_t start = net().now();
+
+    ASSERT_OK(net().startCommand(cb, request, finishFn));
+    net().enterNetwork();
+    // Consume the request. We'll schedule a successful response later.
+    ASSERT(net().hasReadyRequests());
+    auto noi = net().getNextReadyRequest();
+
+    // Assert the command hasn't timed out after 1000ms.
+    net().runUntil(start + Milliseconds(1000));
+    ASSERT_EQUALS(start + Milliseconds(1000), net().now());
+    ASSERT_NOT_EQUALS(ErrorCodes::OK, statusPropagated);
+    // Reply with a successful response.
+    StatusWith<RemoteCommandResponse> responseStatus(RemoteCommandResponse{});
+    net().scheduleResponse(noi, net().now(), responseStatus);
+    net().runReadyNetworkOperations();
+    net().exitNetwork();
+    ASSERT_EQUALS(ErrorCodes::OK, statusPropagated);
+    ASSERT_EQUALS(start + Milliseconds(1000), net().now());
+}
+
+
 }  // namespace
 }  // namespace executor
 }  // namespace mongo

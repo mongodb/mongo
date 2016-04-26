@@ -202,6 +202,12 @@ public:
      */
     void setHandshakeReplyForHost(const HostAndPort& host, RemoteCommandResponse&& reply);
 
+    /**
+     * Cancel a command with specified response, e.g. NetworkTimeout or CallbackCanceled errors.
+     */
+    void _cancelCommand_inlock(const TaskExecutor::CallbackHandle& cbHandle,
+                               const TaskExecutor::ResponseStatus& response);
+
 private:
     /**
      * Information describing a scheduled alarm.

@@ -439,14 +439,12 @@ COMMON_EXECUTOR_TEST(RemoteCommandWithTimeout) {
     const Date_t startTime = net->now();
     NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
     net->scheduleResponse(
-        noi,
-        startTime + Milliseconds(2),
-        TaskExecutor::ResponseStatus(ErrorCodes::ExceededTimeLimit, "I took too long"));
+        noi, startTime + Milliseconds(2), TaskExecutor::ResponseStatus(RemoteCommandResponse{}));
     net->runUntil(startTime + Milliseconds(2));
     ASSERT_EQUALS(startTime + Milliseconds(2), net->now());
     net->exitNetwork();
     executor.wait(cbHandle);
-    ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, status);
+    ASSERT_EQUALS(ErrorCodes::NetworkTimeout, status);
 }
 
 COMMON_EXECUTOR_TEST(CallbackHandleComparison) {

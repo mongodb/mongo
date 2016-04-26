@@ -44,6 +44,9 @@
 namespace mongo {
 namespace executor {
 
+using CallbackHandle = TaskExecutor::CallbackHandle;
+using ResponseStatus = TaskExecutor::ResponseStatus;
+
 NetworkInterfaceMock::NetworkInterfaceMock()
     : _waitingToRunMask(0),
       _currentlyRunning(kNoThread),
@@ -75,7 +78,7 @@ std::string NetworkInterfaceMock::getHostName() {
     return "thisisourhostname";
 }
 
-Status NetworkInterfaceMock::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
+Status NetworkInterfaceMock::startCommand(const CallbackHandle& cbHandle,
                                           const RemoteCommandRequest& request,
                                           const RemoteCommandCompletionFn& onFinish) {
     if (inShutdown()) {
@@ -109,37 +112,25 @@ void NetworkInterfaceMock::setHandshakeReplyForHost(
     }
 }
 
-static bool findAndCancelIf(
-    const stdx::function<bool(const NetworkInterfaceMock::NetworkOperation&)>& matchFn,
-    NetworkInterfaceMock::NetworkOperationList* other,
-    NetworkInterfaceMock::NetworkOperationList* scheduled,
-    const Date_t now) {
-    const NetworkInterfaceMock::NetworkOperationIterator noi =
-        std::find_if(other->begin(), other->end(), matchFn);
-    if (noi == other->end()) {
-        return false;
-    }
-    scheduled->splice(scheduled->begin(), *other, noi);
-    noi->setResponse(
-        now,
-        TaskExecutor::ResponseStatus(ErrorCodes::CallbackCanceled, "Network operation canceled"));
-    return true;
-}
-
-void NetworkInterfaceMock::cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) {
+void NetworkInterfaceMock::cancelCommand(const CallbackHandle& cbHandle) {
     invariant(!inShutdown());
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    stdx::function<bool(const NetworkOperation&)> matchesHandle =
-        stdx::bind(&NetworkOperation::isForCallback, stdx::placeholders::_1, cbHandle);
-    const Date_t now = _now_inlock();
-    if (findAndCancelIf(matchesHandle, &_unscheduled, &_scheduled, now)) {
-        return;
-    }
-    if (findAndCancelIf(matchesHandle, &_blackHoled, &_scheduled, now)) {
-        return;
-    }
-    if (findAndCancelIf(matchesHandle, &_scheduled, &_scheduled, now)) {
+    ResponseStatus response(ErrorCodes::CallbackCanceled, "Network operation canceled");
+    _cancelCommand_inlock(cbHandle, response);
+}
+
+
+void NetworkInterfaceMock::_cancelCommand_inlock(const CallbackHandle& cbHandle,
+                                                 const ResponseStatus& response) {
+    auto matchFn = stdx::bind(&NetworkOperation::isForCallback, stdx::placeholders::_1, cbHandle);
+    for (auto list : {&_unscheduled, &_blackHoled, &_scheduled}) {
+        auto noi = std::find_if(list->begin(), list->end(), matchFn);
+        if (noi == list->end()) {
+            continue;
+        }
+        _scheduled.splice(_scheduled.begin(), *list, noi);
+        noi->setResponse(_now_inlock(), response);
         return;
     }
     // No not-in-progress network command matched cbHandle.  Oh, well.
@@ -191,9 +182,8 @@ void NetworkInterfaceMock::shutdown() {
     _waitingToRunMask |= kExecutorThread;  // Prevents network thread from scheduling.
     lk.unlock();
     for (NetworkOperationIterator iter = todo.begin(); iter != todo.end(); ++iter) {
-        iter->setResponse(now,
-                          TaskExecutor::ResponseStatus(ErrorCodes::ShutdownInProgress,
-                                                       "Shutting down mock network"));
+        iter->setResponse(
+            now, ResponseStatus(ErrorCodes::ShutdownInProgress, "Shutting down mock network"));
         iter->finishResponse();
     }
     lk.lock();
@@ -264,7 +254,7 @@ NetworkInterfaceMock::NetworkOperationIterator NetworkInterfaceMock::getFrontOfU
 
 void NetworkInterfaceMock::scheduleResponse(NetworkOperationIterator noi,
                                             Date_t when,
-                                            const TaskExecutor::ResponseStatus& response) {
+                                            const ResponseStatus& response) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_currentlyRunning == kNetworkThread);
     NetworkOperationIterator insertBefore = _scheduled.begin();
@@ -363,6 +353,14 @@ void NetworkInterfaceMock::_enqueueOperation_inlock(
                          });
 
     _unscheduled.emplace(insertBefore, std::move(op));
+
+    if (op.getRequest().timeout != RemoteCommandRequest::kNoTimeout) {
+        invariant(op.getRequest().timeout >= Milliseconds(0));
+        ResponseStatus response(ErrorCodes::NetworkTimeout, "Network timeout");
+        auto action = stdx::bind(
+            &NetworkInterfaceMock::_cancelCommand_inlock, this, op.getCallbackHandle(), response);
+        _alarms.emplace(_now_inlock() + op.getRequest().timeout, action);
+    }
 }
 
 void NetworkInterfaceMock::_connectThenEnqueueOperation_inlock(const HostAndPort& target,
@@ -528,11 +526,10 @@ NetworkInterfaceMock::NetworkOperation::NetworkOperation()
       _response(kUnsetResponse),
       _onFinish() {}
 
-NetworkInterfaceMock::NetworkOperation::NetworkOperation(
-    const TaskExecutor::CallbackHandle& cbHandle,
-    const RemoteCommandRequest& theRequest,
-    Date_t theRequestDate,
-    const RemoteCommandCompletionFn& onFinish)
+NetworkInterfaceMock::NetworkOperation::NetworkOperation(const CallbackHandle& cbHandle,
+                                                         const RemoteCommandRequest& theRequest,
+                                                         Date_t theRequestDate,
+                                                         const RemoteCommandCompletionFn& onFinish)
     : _requestDate(theRequestDate),
       _nextConsiderationDate(theRequestDate),
       _responseDate(),
@@ -549,8 +546,8 @@ void NetworkInterfaceMock::NetworkOperation::setNextConsiderationDate(
     _nextConsiderationDate = nextConsiderationDate;
 }
 
-void NetworkInterfaceMock::NetworkOperation::setResponse(
-    Date_t responseDate, const TaskExecutor::ResponseStatus& response) {
+void NetworkInterfaceMock::NetworkOperation::setResponse(Date_t responseDate,
+                                                         const ResponseStatus& response) {
     invariant(responseDate >= _requestDate);
     _responseDate = responseDate;
     _response = response;
