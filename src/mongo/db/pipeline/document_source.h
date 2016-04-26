@@ -1524,6 +1524,7 @@ private:
     FieldPath _localField;
     FieldPath _foreignField;
     std::string _foreignFieldFieldName;
+    boost::optional<BSONObj> _additionalFilter;
 
     boost::intrusive_ptr<DocumentSourceMatch> _matchSrc;
     boost::intrusive_ptr<DocumentSourceUnwind> _unwindSrc;

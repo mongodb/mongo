@@ -90,6 +90,14 @@ boost::optional<Document> DocumentSourceLookUp::getNext() {
 
     uassert(4567, "from collection cannot be sharded", !_mongod->isSharded(_fromNs));
 
+    if (!_additionalFilter && _matchSrc) {
+        // We have internalized a $match, but have not yet computed the descended $match that should
+        // be applied to our queries.
+        _additionalFilter = DocumentSourceMatch::descendMatchOnPath(_matchSrc->getMatchExpression(),
+                                                                    _as.getPath(false),
+                                                                    pExpCtx)->getQuery();
+    }
+
     if (_handlingUnwind) {
         return unwindResult();
     }
@@ -98,8 +106,11 @@ boost::optional<Document> DocumentSourceLookUp::getNext() {
     if (!input)
         return {};
 
-    BSONObj filter = _matchSrc ? _matchSrc->getQuery() : BSONObj();
-    BSONObj query = queryForInput(*input, _localField, _foreignFieldFieldName, filter);
+    // If we have not absorbed a $unwind, we cannot absorb a $match. If we have absorbed a $unwind,
+    // '_handlingUnwind' would be set to true, and we would not have made it here.
+    invariant(!_matchSrc);
+
+    BSONObj query = queryForInput(*input, _localField, _foreignFieldFieldName, BSONObj());
     std::unique_ptr<DBClientCursor> cursor = _mongod->directClient()->query(_fromNs.ns(), query);
 
     std::vector<Value> results;
@@ -242,14 +253,11 @@ Pipeline::SourceContainer::iterator DocumentSourceLookUp::optimizeAt(
 
     // We can internalize the entire $match.
     if (!_handlingMatch) {
-        _matchSrc = DocumentSourceMatch::descendMatchOnPath(
-            dependent->getMatchExpression(), outputPath, pExpCtx);
+        _matchSrc = dependent;
         _handlingMatch = true;
     } else {
         // We have already absorbed a $match. We need to join it with 'dependent'.
-        auto descended = DocumentSourceMatch::descendMatchOnPath(
-            dependent->getMatchExpression(), outputPath, pExpCtx);
-        _matchSrc->joinMatchWith(descended);
+        _matchSrc->joinMatchWith(dependent);
     }
     return locationOfNextPossibleOptimization;
 }
@@ -355,7 +363,7 @@ boost::optional<Document> DocumentSourceLookUp::unwindResult() {
         if (!_input)
             return {};
 
-        BSONObj filter = _matchSrc ? _matchSrc->getQuery() : BSONObj();
+        BSONObj filter = _additionalFilter.value_or(BSONObj());
         _cursor = _mongod->directClient()->query(
             _fromNs.ns(),
             DocumentSourceLookUp::queryForInput(
@@ -395,25 +403,37 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array, bool expl
         DOC(getSourceName() << DOC("from" << _fromNs.coll() << "as" << _as.getPath(false)
                                           << "localField" << _localField.getPath(false)
                                           << "foreignField" << _foreignField.getPath(false))));
-    if (_handlingUnwind && explain) {
-        const boost::optional<FieldPath> indexPath = _unwindSrc->indexPath();
-        output[getSourceName()]["unwinding"] =
-            Value(DOC("preserveNullAndEmptyArrays"
-                      << _unwindSrc->preserveNullAndEmptyArrays() << "includeArrayIndex"
-                      << (indexPath ? Value((*indexPath).getPath(false)) : Value())));
-    }
+    if (explain) {
+        if (_handlingUnwind) {
+            const boost::optional<FieldPath> indexPath = _unwindSrc->indexPath();
+            output[getSourceName()]["unwinding"] =
+                Value(DOC("preserveNullAndEmptyArrays"
+                          << _unwindSrc->preserveNullAndEmptyArrays() << "includeArrayIndex"
+                          << (indexPath ? Value(indexPath->getPath(false)) : Value())));
+        }
 
-    if (_matchSrc && explain) {
-        output[getSourceName()]["matching"] = Value(_matchSrc->getQuery());
-    }
+        if (_matchSrc) {
+            // Our output does not have to be parseable, so include a "matching" field with the
+            // descended match expression.
+            output[getSourceName()]["matching"] = Value(
+                DocumentSourceMatch::descendMatchOnPath(
+                    _matchSrc->getMatchExpression(), _as.getPath(false), pExpCtx)->getQuery());
+        }
 
-    array.push_back(Value(output.freeze()));
-    if (_handlingUnwind && !explain) {
-        _unwindSrc->serializeToArray(array);
-    }
+        array.push_back(Value(output.freeze()));
+    } else {
+        array.push_back(Value(output.freeze()));
 
-    if (_matchSrc && !explain) {
-        _matchSrc->serializeToArray(array);
+        if (_handlingUnwind) {
+            _unwindSrc->serializeToArray(array);
+        }
+
+        if (_matchSrc) {
+            // '_matchSrc' tracks the originally specified $match. We descend upon the $match in the
+            // first call to getNext(), at which point we are confident that we no longer need to
+            // serialize the $lookup again.
+            _matchSrc->serializeToArray(array);
+        }
     }
 }
 
