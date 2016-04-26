@@ -15,6 +15,7 @@ var curShardIndex = 0;
 
 for (var i = 0; i < 100; i += 10) {
     assert.commandWorked(st.s0.getDB('admin').runCommand({split: testNs, middle: {_id: i}}));
+    st.configRS.awaitLastOpCommitted();  // Ensure that other mongos sees the split
     var nextShardIndex = (curShardIndex + 1) % shards.length;
     assert.commandWorked(st.s1.getDB('admin').runCommand({
         moveChunk: testNs,
@@ -23,6 +24,7 @@ for (var i = 0; i < 100; i += 10) {
         _waitForDelete: true
     }));
     curShardIndex = nextShardIndex;
+    st.configRS.awaitLastOpCommitted();  // Ensure that other mongos sees the move
 }
 
 st.stop();
