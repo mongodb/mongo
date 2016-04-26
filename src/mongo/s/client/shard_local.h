@@ -26,40 +26,48 @@
  * then also delete it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#pragma once
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/disallow_copying.h"
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/s/client/shard.h"
 
 namespace mongo {
 
-Shard::Shard(const ShardId& id) : _id(id) {}
+class ShardLocal : public Shard {
+    MONGO_DISALLOW_COPYING(ShardLocal);
 
-const ShardId Shard::getId() const {
-    return _id;
-}
+public:
+    explicit ShardLocal(const ShardId& id) : Shard(id) {}
 
-bool Shard::isConfig() const {
-    return _id == "config";
-}
+    ~ShardLocal() = default;
 
-StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* txn,
-                                                     const ReadPreferenceSetting& readPref,
-                                                     const std::string& dbName,
-                                                     const BSONObj& cmdObj,
-                                                     const BSONObj& metadata) {
-    return _runCommand(txn, readPref, dbName, cmdObj, metadata);
-}
+    /**
+     * These functions are implemented for the Shard interface's sake. They should not be called on
+     * ShardLocal because doing so triggers invariants.
+     */
+    const ConnectionString getConnString() const override;
+    const ConnectionString originalConnString() const override;
+    std::shared_ptr<RemoteCommandTargeter> getTargeter() const override;
+    void updateReplSetMonitor(const HostAndPort& remoteHost,
+                              const Status& remoteCommandStatus) override;
 
-StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
-    OperationContext* txn,
-    const ReadPreferenceSetting& readPref,
-    const NamespaceString& nss,
-    const BSONObj& query,
-    const BSONObj& sort,
-    const boost::optional<long long> limit) {
-    return _exhaustiveFindOnConfig(txn, readPref, nss, query, sort, limit);
-}
+    std::string toString() const override;
+
+private:
+    StatusWith<Shard::CommandResponse> _runCommand(OperationContext* txn,
+                                                   const ReadPreferenceSetting& unused,
+                                                   const std::string& dbName,
+                                                   const BSONObj& cmdObj,
+                                                   const BSONObj& metadata) override;
+
+    StatusWith<Shard::QueryResponse> _exhaustiveFindOnConfig(
+        OperationContext* txn,
+        const ReadPreferenceSetting& readPref,
+        const NamespaceString& nss,
+        const BSONObj& query,
+        const BSONObj& sort,
+        boost::optional<long long> limit) override;
+};
 
 }  // namespace mongo

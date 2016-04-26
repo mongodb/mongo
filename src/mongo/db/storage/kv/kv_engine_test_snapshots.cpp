@@ -204,7 +204,6 @@ TEST_F(SnapshotManagerTests, ConsistentIfNotSupported) {
     auto ru = op->recoveryUnit();
     ASSERT(!ru->isReadingFromMajorityCommittedSnapshot());
     ASSERT(!ru->getMajorityCommittedSnapshot());
-    ASSERT_EQ(ru->setReadFromMajorityCommittedSnapshot(), ErrorCodes::CommandNotSupported);
 }
 
 TEST_F(SnapshotManagerTests, FailsWithNoCommittedSnapshot) {

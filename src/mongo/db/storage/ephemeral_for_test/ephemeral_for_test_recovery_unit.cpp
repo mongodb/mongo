@@ -32,6 +32,7 @@
 
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
 
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/util/log.h"
 
@@ -64,6 +65,15 @@ void EphemeralForTestRecoveryUnit::abortUnitOfWork() {
         _changes.clear();
     } catch (...) {
         std::terminate();
+    }
+}
+
+Status EphemeralForTestRecoveryUnit::setReadFromMajorityCommittedSnapshot() {
+    if (!repl::getGlobalReplicationCoordinator()->isReplEnabled()) {
+        return Status::OK();
+    } else {
+        return {ErrorCodes::CommandNotSupported,
+                "Current storage engine does not support majority readConcerns"};
     }
 }
 }

@@ -190,4 +190,10 @@ TEST_F(StorageInterfaceImplTest, MinValid) {
     ASSERT_TRUE(recoveryUnit->waitUntilDurableCalled);
 }
 
+TEST_F(StorageInterfaceImplTest, SnapshotNotSupported) {
+    auto txn = getClient()->makeOperationContext();
+    Status status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
+    ASSERT_EQUALS(status, ErrorCodes::CommandNotSupported);
+}
+
 }  // namespace

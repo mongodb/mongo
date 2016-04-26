@@ -58,6 +58,8 @@ public:
 
     virtual void abandonSnapshot() {}
 
+    Status setReadFromMajorityCommittedSnapshot() final;
+
     virtual void registerChange(Change* change) {
         _changes.push_back(ChangePtr(change));
     }

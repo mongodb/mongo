@@ -36,8 +36,6 @@
 
 namespace mongo {
 
-using ShardId = std::string;
-
 /*
  * Maintains the targeting and command execution logic for a single shard. Performs polling of
  * the shard (if replica set).
@@ -61,7 +59,7 @@ public:
         return _originalConnString;
     }
 
-    std::shared_ptr<RemoteCommandTargeter> getTargeter() override {
+    std::shared_ptr<RemoteCommandTargeter> getTargeter() const override {
         return _targeter;
     }
 
