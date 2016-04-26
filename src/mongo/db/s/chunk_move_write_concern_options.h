@@ -35,6 +35,7 @@ namespace mongo {
 class MigrationSecondaryThrottleOptions;
 template <typename T>
 class StatusWith;
+class OperationContext;
 
 /**
  * Returns the default write concern for migration cleanup on the donor shard and for cloning
@@ -59,7 +60,7 @@ public:
      *    concern.
      */
     static StatusWith<WriteConcernOptions> getEffectiveWriteConcern(
-        const MigrationSecondaryThrottleOptions& options);
+        OperationContext* txn, const MigrationSecondaryThrottleOptions& options);
 };
 
 }  // namespace mongo

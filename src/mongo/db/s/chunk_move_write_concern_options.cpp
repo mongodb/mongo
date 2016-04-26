@@ -33,7 +33,9 @@
 #include "mongo/db/s/chunk_move_write_concern_options.h"
 
 #include "mongo/base/status_with.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/service_context.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
 #include "mongo/util/log.h"
 
@@ -64,8 +66,17 @@ WriteConcernOptions getDefaultWriteConcernForMigration() {
 }  // namespace
 
 StatusWith<WriteConcernOptions> ChunkMoveWriteConcernOptions::getEffectiveWriteConcern(
-    const MigrationSecondaryThrottleOptions& options) {
-    if (options.getSecondaryThrottle() == MigrationSecondaryThrottleOptions::kOff) {
+    OperationContext* txn, const MigrationSecondaryThrottleOptions& options) {
+    auto secondaryThrottle = options.getSecondaryThrottle();
+    if (secondaryThrottle == MigrationSecondaryThrottleOptions::kDefault) {
+        if (txn->getServiceContext()->getGlobalStorageEngine()->supportsDocLocking()) {
+            secondaryThrottle = MigrationSecondaryThrottleOptions::kOff;
+        } else {
+            secondaryThrottle = MigrationSecondaryThrottleOptions::kOn;
+        }
+    }
+
+    if (secondaryThrottle == MigrationSecondaryThrottleOptions::kOff) {
         return kWriteConcernLocal;
     }
 
