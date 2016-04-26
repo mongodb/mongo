@@ -48,11 +48,9 @@ ServerStatusMetricField<Counter64> displayScanned("queryExecutor.scanned", &scan
 ServerStatusMetricField<Counter64> displayScannedObjects("queryExecutor.scannedObjects",
                                                          &scannedObjectCounter);
 
-Counter64 idhackCounter;
 Counter64 scanAndOrderCounter;
 Counter64 writeConflictsCounter;
 
-ServerStatusMetricField<Counter64> displayIdhack("operation.idhack", &idhackCounter);
 ServerStatusMetricField<Counter64> displayScanAndOrder("operation.scanAndOrder",
                                                        &scanAndOrderCounter);
 ServerStatusMetricField<Counter64> displayWriteConflicts("operation.writeConflicts",
@@ -75,8 +73,6 @@ void recordCurOpMetrics(OperationContext* opCtx) {
     if (debug.docsExamined > 0)
         scannedObjectCounter.increment(debug.docsExamined);
 
-    if (debug.idhack)
-        idhackCounter.increment();
     if (debug.hasSortStage)
         scanAndOrderCounter.increment();
     if (debug.writeConflicts)

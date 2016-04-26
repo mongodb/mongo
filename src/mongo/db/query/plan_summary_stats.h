@@ -48,9 +48,6 @@ struct PlanSummaryStats {
     // The number of milliseconds spent inside the root stage's work() method.
     long long executionTimeMillis = 0;
 
-    // Did this plan use the fast path for key-value retrievals on the _id index?
-    bool isIdhack = false;
-
     // Did this plan use an in-memory sort stage?
     bool hasSortStage = false;
 

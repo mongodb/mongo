@@ -769,9 +769,6 @@ void Explain::getSummaryStats(const PlanExecutor& exec, PlanSummaryStats* statsO
         statsOut->totalDocsExamined +=
             getDocsExamined(stages[i]->stageType(), stages[i]->getSpecificStats());
 
-        if (STAGE_IDHACK == stages[i]->stageType()) {
-            statsOut->isIdhack = true;
-        }
         if (STAGE_SORT == stages[i]->stageType()) {
             statsOut->hasSortStage = true;
         }

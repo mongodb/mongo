@@ -170,9 +170,6 @@ public:
     long long keysExamined{-1};
     long long docsExamined{-1};
 
-    // indicates short circuited code path on an update to make the update faster
-    bool idhack{false};
-
     bool hasSortStage{false};  // true if the query plan involves an in-memory sort
 
     // True if the plan came from the multi-planner (not from the plan cache and not a query with a

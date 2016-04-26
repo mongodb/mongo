@@ -513,7 +513,6 @@ string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockSt
 
     OPDEBUG_TOSTRING_HELP(keysExamined);
     OPDEBUG_TOSTRING_HELP(docsExamined);
-    OPDEBUG_TOSTRING_HELP_BOOL(idhack);
     OPDEBUG_TOSTRING_HELP_BOOL(hasSortStage);
     OPDEBUG_TOSTRING_HELP_BOOL(fromMultiPlanner);
     OPDEBUG_TOSTRING_HELP_BOOL(replanned);
@@ -641,7 +640,6 @@ void OpDebug::append(const CurOp& curop,
 
     OPDEBUG_APPEND_NUMBER(keysExamined);
     OPDEBUG_APPEND_NUMBER(docsExamined);
-    OPDEBUG_APPEND_BOOL(idhack);
     OPDEBUG_APPEND_BOOL(hasSortStage);
     OPDEBUG_APPEND_BOOL(fromMultiPlanner);
     OPDEBUG_APPEND_BOOL(replanned);
@@ -699,7 +697,6 @@ void OpDebug::append(const CurOp& curop,
 void OpDebug::setPlanSummaryMetrics(const PlanSummaryStats& planSummaryStats) {
     keysExamined = planSummaryStats.totalKeysExamined;
     docsExamined = planSummaryStats.totalDocsExamined;
-    idhack = planSummaryStats.isIdhack;
     hasSortStage = planSummaryStats.hasSortStage;
     fromMultiPlanner = planSummaryStats.fromMultiPlanner;
     replanned = planSummaryStats.replanned;
