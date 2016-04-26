@@ -192,8 +192,14 @@ class ScopedFailPoint {
     MONGO_DISALLOW_COPYING(ScopedFailPoint);
 
 public:
-    ScopedFailPoint(FailPoint* failPoint);
-    ~ScopedFailPoint();
+    ScopedFailPoint(FailPoint* failPoint)
+        : _failPoint(failPoint), _once(false), _shouldClose(false) {}
+
+    ~ScopedFailPoint() {
+        if (_shouldClose) {
+            _failPoint->shouldFailCloseBlock();
+        }
+    }
 
     /**
      * @return true if fail point is on. This will be true at most once.
@@ -214,7 +220,11 @@ public:
      * @return the data stored in the fail point. #isActive must be true
      *     before you can call this.
      */
-    const BSONObj& getData() const;
+    const BSONObj& getData() const {
+        // Assert when attempting to get data without incrementing ref counter.
+        fassert(16445, _shouldClose);
+        return _failPoint->getData();
+    }
 
 private:
     FailPoint* _failPoint;

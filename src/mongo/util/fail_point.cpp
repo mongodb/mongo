@@ -186,19 +186,4 @@ BSONObj FailPoint::toBSON() const {
 
     return builder.obj();
 }
-
-ScopedFailPoint::ScopedFailPoint(FailPoint* failPoint)
-    : _failPoint(failPoint), _once(false), _shouldClose(false) {}
-
-ScopedFailPoint::~ScopedFailPoint() {
-    if (_shouldClose) {
-        _failPoint->shouldFailCloseBlock();
-    }
-}
-
-const BSONObj& ScopedFailPoint::getData() const {
-    // Assert when attempting to get data without incrementing ref counter.
-    fassert(16445, _shouldClose);
-    return _failPoint->getData();
-}
 }
