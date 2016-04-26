@@ -187,4 +187,46 @@ TEST(CollectionOptions, ModifyStorageEngineField) {
     BSONObj storageEngine1 = storageEngine.getObjectField("storageEngine1");
     ASSERT_EQUALS(1, storageEngine1.getIntField("x"));
 }
+
+TEST(CollectionOptions, FailToParseCollationThatIsNotAnObject) {
+    CollectionOptions options;
+    ASSERT_NOT_OK(options.parse(fromjson("{collation: 'notAnObject'}")));
+}
+
+TEST(CollectionOptions, CollationFieldParsesCorrectly) {
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{collation: {locale: 'en'}}")));
+    ASSERT_EQ(options.collation, fromjson("{locale: 'en'}"));
+    ASSERT_TRUE(options.isValid());
+    ASSERT_OK(options.validate());
+}
+
+TEST(CollectionOptions, ParsedCollationObjShouldBeOwned) {
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{collation: {locale: 'en'}}")));
+    ASSERT_EQ(options.collation, fromjson("{locale: 'en'}"));
+    ASSERT_TRUE(options.collation.isOwned());
+}
+
+TEST(CollectionOptions, ResetClearsCollationField) {
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{collation: {locale: 'en'}}")));
+    ASSERT_FALSE(options.collation.isEmpty());
+    options.reset();
+    ASSERT_TRUE(options.collation.isEmpty());
+}
+
+TEST(CollectionOptions, CollationFieldLeftEmptyWhenOmitted) {
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{validator: {a: 1}}")));
+    ASSERT_TRUE(options.collation.isEmpty());
+}
+
+TEST(CollectionOptions, CollationFieldNotDumpedToBSONWhenOmitted) {
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{validator: {a: 1}}")));
+    ASSERT_TRUE(options.collation.isEmpty());
+    BSONObj asBSON = options.toBSON();
+    ASSERT_FALSE(asBSON["collation"]);
+}
 }

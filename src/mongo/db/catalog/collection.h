@@ -44,6 +44,7 @@
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/capped_callback.h"
 #include "mongo/db/storage/record_store.h"
@@ -434,6 +435,12 @@ public:
      */
     void notifyCappedWaitersIfNeeded();
 
+    /**
+     * Get a pointer to the collection's default collator. The pointer must not be used after this
+     * Collection is destroyed.
+     */
+    CollatorInterface* getDefaultCollator() const;
+
 private:
     /**
      * Returns a non-ok Status if document does not pass this collection's validator.
@@ -512,6 +519,10 @@ private:
 
     // The earliest snapshot that is allowed to use this collection.
     boost::optional<SnapshotName> _minVisibleSnapshot;
+
+    // The default collation which is applied to operations and indices which have no collation of
+    // their own. If null, the default collation is simple binary compare.
+    std::unique_ptr<CollatorInterface> _collator;
 
     friend class Database;
     friend class IndexCatalog;

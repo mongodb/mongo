@@ -55,6 +55,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update_driver.h"
 #include "mongo/db/ops/update_request.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
@@ -90,6 +91,18 @@ Status checkValidatorForBannedExpressions(const BSONObj& validator) {
     }
 
     return Status::OK();
+}
+
+// Uses the collator factory to convert the BSON representation of a collator to a
+// CollatorInterface. Returns null if the BSONObj is empty. Returns a non-OK status if the collation
+// fails to parse.
+StatusWith<std::unique_ptr<CollatorInterface>> parseCollation(OperationContext* txn,
+                                                              BSONObj collationSpec) {
+    if (collationSpec.isEmpty()) {
+        return {nullptr};
+    }
+
+    return CollatorFactoryInterface::get(txn->getServiceContext())->makeFromBSON(collationSpec);
 }
 }
 
@@ -193,7 +206,9 @@ Collection::Collection(OperationContext* txn,
           _parseValidationLevel(_details->getCollectionOptions(txn).validationLevel))),
       _cursorManager(fullNS),
       _cappedNotifier(_recordStore->isCapped() ? new CappedInsertNotifier() : nullptr),
-      _mustTakeCappedLockOnInsert(isCapped() && !_ns.isSystemDotProfile() && !_ns.isOplog()) {
+      _mustTakeCappedLockOnInsert(isCapped() && !_ns.isSystemDotProfile() && !_ns.isOplog()),
+      _collator(
+          uassertStatusOK(parseCollation(txn, _details->getCollectionOptions(txn).collation))) {
     _magic = 1357924;
     _indexCatalog.init(txn);
     if (isCapped())
@@ -953,6 +968,10 @@ Status Collection::setValidationAction(OperationContext* txn, StringData newActi
     _details->updateValidator(txn, _validatorDoc, getValidationLevel(), getValidationAction());
 
     return Status::OK();
+}
+
+CollatorInterface* Collection::getDefaultCollator() const {
+    return _collator.get();
 }
 
 namespace {

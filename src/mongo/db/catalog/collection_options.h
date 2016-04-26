@@ -105,5 +105,8 @@ struct CollectionOptions {
     BSONObj validator;
     std::string validationAction;
     std::string validationLevel;
+
+    // The collection's default collation.
+    BSONObj collation;
 };
 }

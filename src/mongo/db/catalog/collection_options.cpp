@@ -105,6 +105,7 @@ void CollectionOptions::reset() {
     validator = BSONObj();
     validationLevel = "";
     validationAction = "";
+    collation = BSONObj();
 }
 
 bool CollectionOptions::isValid() const {
@@ -209,6 +210,12 @@ Status CollectionOptions::parse(const BSONObj& options) {
             }
 
             validationLevel = e.String();
+        } else if (fieldName == "collation") {
+            if (e.type() != mongo::Object) {
+                return Status(ErrorCodes::BadValue, "'collation' has to be a document.");
+            }
+
+            collation = e.Obj().getOwned();
         }
     }
 
@@ -257,6 +264,10 @@ BSONObj CollectionOptions::toBSON() const {
 
     if (!validationAction.empty()) {
         b.append("validationAction", validationAction);
+    }
+
+    if (!collation.isEmpty()) {
+        b.append("collation", collation);
     }
 
     return b.obj();
