@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/base/counter.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"

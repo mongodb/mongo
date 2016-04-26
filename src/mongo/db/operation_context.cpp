@@ -38,21 +38,9 @@ namespace mongo {
 OperationContext::OperationContext(Client* client, unsigned int opId, Locker* locker)
     : _client(client), _opId(opId), _locker(locker) {}
 
-ServiceContext* OperationContext::getServiceContext() const {
-    return _client->getServiceContext();
-}
-
-Client* OperationContext::getClient() const {
-    return _client;
-}
-
 void OperationContext::markKilled(ErrorCodes::Error killCode) {
     invariant(killCode != ErrorCodes::OK);
     _killCode.compareAndSwap(ErrorCodes::OK, killCode);
-}
-
-ErrorCodes::Error OperationContext::getKillStatus() const {
-    return _killCode.loadRelaxed();
 }
 
 }  // namespace mongo

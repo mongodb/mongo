@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/rpc/metadata/config_server_metadata.h"
 
 #include "mongo/bson/util/bson_check.h"

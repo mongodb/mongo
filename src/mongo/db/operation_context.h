@@ -30,6 +30,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
@@ -140,12 +141,16 @@ public:
     /**
      * Returns the service context under which this operation context runs.
      */
-    ServiceContext* getServiceContext() const;
+    ServiceContext* getServiceContext() const {
+        return _client->getServiceContext();
+    }
 
     /**
      * Returns the client under which this context runs.
      */
-    Client* getClient() const;
+    Client* getClient() const {
+        return _client;
+    }
 
     virtual uint64_t getRemainingMaxTimeMicros() const = 0;
 
@@ -201,7 +206,9 @@ public:
      * May be called by any thread that has locked the Client owning this operation context, or
      * without lock by the thread executing on behalf of this operation context.
      */
-    ErrorCodes::Error getKillStatus() const;
+    ErrorCodes::Error getKillStatus() const {
+        return _killCode.loadRelaxed();
+    }
 
     /**
      * Shortcut method, which checks whether getKillStatus returns a non-OK value. Has the same

@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/storage/kv/kv_database_catalog_entry.h"
 
 #include "mongo/db/operation_context.h"

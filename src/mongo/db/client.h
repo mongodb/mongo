@@ -38,7 +38,6 @@
 
 #include "mongo/db/client_basic.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/random.h"
 #include "mongo/platform/unordered_set.h"
@@ -48,8 +47,9 @@
 
 namespace mongo {
 
-class Collection;
 class AbstractMessagingPort;
+class Collection;
+class OperationContext;
 
 typedef long long ConnectionId;
 

@@ -79,7 +79,7 @@ OperationContextImpl::OperationContextImpl()
     : OperationContext(
           &cc(), nextOpId.fetchAndAdd(1), clientOperationInfoDecoration(cc()).getLocker()),
       _writesAreReplicated(true) {
-    StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
+    StorageEngine* storageEngine = getServiceContext()->getGlobalStorageEngine();
     _recovery.reset(storageEngine->newRecoveryUnit());
 
     auto client = getClient();
@@ -172,7 +172,7 @@ void OperationContextImpl::checkForInterrupt() {
 }
 
 Status OperationContextImpl::checkForInterruptNoAssert() {
-    if (getGlobalServiceContext()->getKillAllOperations()) {
+    if (getServiceContext()->getKillAllOperations()) {
         return Status(ErrorCodes::InterruptedAtShutdown, "interrupted at shutdown");
     }
 

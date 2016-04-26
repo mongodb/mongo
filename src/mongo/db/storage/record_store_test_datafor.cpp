@@ -28,8 +28,9 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/record_store_test_harness.h"
+#include "mongo/platform/basic.h"
 
+#include "mongo/db/storage/record_store_test_harness.h"
 
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_data.h"

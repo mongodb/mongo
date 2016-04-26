@@ -33,7 +33,7 @@
 
 namespace mongo {
 
-class OperationContextImpl : public OperationContext {
+class OperationContextImpl final : public OperationContext {
 public:
     virtual ~OperationContextImpl();
 
