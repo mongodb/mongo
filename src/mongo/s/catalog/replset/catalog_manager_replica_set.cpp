@@ -2010,8 +2010,8 @@ StatusWith<repl::OpTimeWith<vector<BSONObj>>> CatalogManagerReplicaSet::_exhaust
     const BSONObj& query,
     const BSONObj& sort,
     boost::optional<long long> limit) {
-    auto response =
-        grid.shardRegistry()->exhaustiveFindOnConfig(txn, readPref, nss, query, sort, limit);
+    auto response = Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+        txn, readPref, nss, query, sort, limit);
     if (!response.isOK()) {
         return response.getStatus();
     }
