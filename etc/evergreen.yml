@@ -22,6 +22,8 @@
 # - 'builder_num'
 # - 'builder_phase'
 
+disable_cleanup: true
+
 functions:
   "fetch source" :
     command: git.get_project
