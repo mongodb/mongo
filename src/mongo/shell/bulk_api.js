@@ -43,8 +43,11 @@ var _bulk_api_module = (function() {
      */
     var WriteConcern = function(wValue, wTimeout, jValue) {
 
-        if (!(this instanceof WriteConcern))
-            return new WriteConcern(wValue, wTimeout, jValue);
+        if (!(this instanceof WriteConcern)) {
+            var writeConcern = Object.create(WriteConcern.prototype);
+            WriteConcern.apply(writeConcern, arguments);
+            return writeConcern;
+        }
 
         var opts = {};
         if (typeof wValue == 'object') {
