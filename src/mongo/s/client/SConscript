@@ -73,6 +73,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/db/serveronly',
         'shard_interface'
     ],
 )
@@ -85,7 +86,6 @@ env.CppUnitTest(
     LIBDEPS=[
         'shard_local',
         '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/serveronly',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
     ],
     NO_CRUTCH = True,
