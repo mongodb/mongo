@@ -259,22 +259,13 @@ public:
         boost::optional<IndexKeyEntry> seek(const BSONObj& key,
                                             bool inclusive,
                                             RequestedInfo parts) override {
-            if (key.isEmpty()) {
-                _it = _data.begin();
-                _isEOF = (_it == _data.end());
-                if (_isEOF) {
-                    return {};
-                }
-            } else {
-                const BSONObj query = stripFieldNames(key);
-                locate(query, _forward == inclusive ? RecordId::min() : RecordId::max());
-                _lastMoveWasRestore = false;
-                if (_isEOF)
-                    return {};
-                dassert(inclusive ? compareKeys(_it->key, query) >= 0
-                                  : compareKeys(_it->key, query) > 0);
-            }
-
+            const BSONObj query = stripFieldNames(key);
+            locate(query, _forward == inclusive ? RecordId::min() : RecordId::max());
+            _lastMoveWasRestore = false;
+            if (_isEOF)
+                return {};
+            dassert(inclusive ? compareKeys(_it->key, query) >= 0
+                              : compareKeys(_it->key, query) > 0);
             return *_it;
         }
 
