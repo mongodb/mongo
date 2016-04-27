@@ -705,8 +705,7 @@ void KeyString::_appendNumberDecimal(const Decimal128 dec, bool invert) {
         if (!has8bytes) {
             // A Fraction byte follows, but the leading 7 bytes already encode 53 bits of the
             // coefficient, so just store the DCM.
-            uint8_t dcm = hasFraction ? kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits
-                                      : kDCMEqualToDouble;
+            uint8_t dcm = kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits;
             _append(dcm, isNegative ? !invert : invert);
         }
 
