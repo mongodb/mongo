@@ -341,20 +341,17 @@ Status DistLockCatalogImpl::unlockAll(OperationContext* txn, const std::string& 
 }
 
 StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo(OperationContext* txn) {
-    auto resultStatus =
-        _client->runIdempotentCommandOnConfig(txn, kReadPref, "admin", BSON("serverStatus" << 1));
+    auto resultStatus = _client->getConfigShard()->runCommand(
+        txn, kReadPref, "admin", BSON("serverStatus" << 1), Shard::RetryPolicy::kIdempotent);
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
     }
-
-    BSONObj responseObj(resultStatus.getValue());
-
-    auto cmdStatus = getStatusFromCommandResult(responseObj);
-
-    if (!cmdStatus.isOK()) {
-        return cmdStatus;
+    if (!resultStatus.getValue().commandStatus.isOK()) {
+        return resultStatus.getValue().commandStatus;
     }
+
+    BSONObj responseObj(std::move(resultStatus.getValue().response));
 
     BSONElement localTimeElem;
     auto localTimeStatus =

@@ -1445,11 +1445,11 @@ bool CatalogManagerReplicaSet::runReadCommandForTest(OperationContext* txn,
     cmdBuilder.appendElements(cmdObj);
     _appendReadConcern(&cmdBuilder);
 
-    auto resultStatus = grid.shardRegistry()->runIdempotentCommandOnConfig(
-        txn, kConfigReadSelector, dbname, cmdBuilder.done());
+    auto resultStatus = Grid::get(txn)->shardRegistry()->getConfigShard()->runCommand(
+        txn, kConfigReadSelector, dbname, cmdBuilder.done(), Shard::RetryPolicy::kIdempotent);
     if (resultStatus.isOK()) {
-        result->appendElements(resultStatus.getValue());
-        return getStatusFromCommandResult(resultStatus.getValue()).isOK();
+        result->appendElements(resultStatus.getValue().response);
+        return resultStatus.getValue().commandStatus.isOK();
     }
 
     return Command::appendCommandStatus(*result, resultStatus.getStatus());
@@ -1459,11 +1459,11 @@ bool CatalogManagerReplicaSet::runUserManagementReadCommand(OperationContext* tx
                                                             const std::string& dbname,
                                                             const BSONObj& cmdObj,
                                                             BSONObjBuilder* result) {
-    auto resultStatus = grid.shardRegistry()->runIdempotentCommandOnConfig(
-        txn, kConfigPrimaryPreferredSelector, dbname, cmdObj);
+    auto resultStatus = Grid::get(txn)->shardRegistry()->getConfigShard()->runCommand(
+        txn, kConfigPrimaryPreferredSelector, dbname, cmdObj, Shard::RetryPolicy::kIdempotent);
     if (resultStatus.isOK()) {
-        result->appendElements(resultStatus.getValue());
-        return getStatusFromCommandResult(resultStatus.getValue()).isOK();
+        result->appendElements(resultStatus.getValue().response);
+        return resultStatus.getValue().commandStatus.isOK();
     }
 
     return Command::appendCommandStatus(*result, resultStatus.getStatus());
@@ -1831,13 +1831,20 @@ StatusWith<long long> CatalogManagerReplicaSet::_runCountCommandOnConfig(Operati
     countBuilder.append("query", query);
     _appendReadConcern(&countBuilder);
 
-    auto resultStatus = grid.shardRegistry()->runIdempotentCommandOnConfig(
-        txn, kConfigReadSelector, ns.db().toString(), countBuilder.done());
+    auto resultStatus = Grid::get(txn)->shardRegistry()->getConfigShard()->runCommand(
+        txn,
+        kConfigReadSelector,
+        ns.db().toString(),
+        countBuilder.done(),
+        Shard::RetryPolicy::kIdempotent);
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
     }
+    if (!resultStatus.getValue().commandStatus.isOK()) {
+        return resultStatus.getValue().commandStatus;
+    }
 
-    auto responseObj = std::move(resultStatus.getValue());
+    auto responseObj = std::move(resultStatus.getValue().response);
 
     long long result;
     auto status = bsonExtractIntegerField(responseObj, "n", &result);
@@ -1968,14 +1975,21 @@ void CatalogManagerReplicaSet::_appendReadConcern(BSONObjBuilder* builder) {
 
 Status CatalogManagerReplicaSet::appendInfoForConfigServerDatabases(OperationContext* txn,
                                                                     BSONArrayBuilder* builder) {
-    auto resultStatus = grid.shardRegistry()->runIdempotentCommandOnConfig(
-        txn, kConfigPrimaryPreferredSelector, "admin", BSON("listDatabases" << 1));
+    auto resultStatus = Grid::get(txn)->shardRegistry()->getConfigShard()->runCommand(
+        txn,
+        kConfigPrimaryPreferredSelector,
+        "admin",
+        BSON("listDatabases" << 1),
+        Shard::RetryPolicy::kIdempotent);
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
     }
+    if (!resultStatus.getValue().commandStatus.isOK()) {
+        return resultStatus.getValue().commandStatus;
+    }
 
-    auto listDBResponse = resultStatus.getValue();
+    auto listDBResponse = std::move(resultStatus.getValue().response);
     BSONElement dbListArray;
     auto dbListStatus = bsonExtractTypedField(listDBResponse, "databases", Array, &dbListArray);
     if (!dbListStatus.isOK()) {
