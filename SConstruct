@@ -1972,7 +1972,8 @@ def doConfigure(myenv):
             'CheckModernLibStdCxx' : CheckModernLibStdCxx,
         })
 
-        if not conf.CheckModernLibStdCxx():
+        suppress_invalid = has_option("disable-minimum-compiler-version-enforcement")
+        if not conf.CheckModernLibStdCxx() and not suppress_invalid:
             myenv.ConfError("When using libstdc++, MongoDB requires libstdc++ from GCC 5.3.0 or newer")
 
         conf.Finish()
