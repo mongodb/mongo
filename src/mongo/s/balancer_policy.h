@@ -68,6 +68,7 @@ struct MigrateInfo {
     BSONObj maxKey;
 };
 
+typedef std::vector<MigrateInfo> MigrateInfoVector;
 typedef std::vector<ClusterStatistics::ShardStatistics> ShardStatisticsVector;
 typedef std::map<ShardId, std::vector<ChunkType>> ShardToChunksMap;
 

@@ -78,7 +78,7 @@ const uint64_t kTooManySplitPoints = 4;
  * Returns true if the chunk was actually moved.
  */
 bool tryMoveToOtherShard(OperationContext* txn,
-                         const ChunkManager* manager,
+                         const ChunkManager& manager,
                          const ChunkType& chunk) {
     auto clusterStatsStatus(Balancer::get(txn)->getClusterStatistics()->getStats(txn));
     if (!clusterStatsStatus.isOK()) {
@@ -97,13 +97,13 @@ bool tryMoveToOtherShard(OperationContext* txn,
     // Reload sharding metadata before starting migration. Only reload the differences though,
     // because the entire chunk manager was reloaded during the call to split, which immediately
     // precedes this move logic
-    shared_ptr<ChunkManager> chunkMgr = manager->reload(txn, false);
+    shared_ptr<ChunkManager> chunkMgr = manager.reload(txn, false);
 
     map<string, vector<ChunkType>> shardToChunkMap;
     DistributionStatus::populateShardToChunksMap(clusterStats, *chunkMgr, &shardToChunkMap);
 
     StatusWith<string> tagStatus =
-        grid.catalogManager(txn)->getTagForChunk(txn, manager->getns(), chunk);
+        grid.catalogManager(txn)->getTagForChunk(txn, manager.getns(), chunk);
     if (!tagStatus.isOK()) {
         warning() << "Not auto-moving chunk because of an error encountered while "
                   << "checking tag for chunk: " << tagStatus.getStatus();
@@ -154,7 +154,7 @@ bool tryMoveToOtherShard(OperationContext* txn,
     }
 
     // update our config
-    manager->reload(txn);
+    manager.reload(txn);
 
     return true;
 }
@@ -521,7 +521,7 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {
             chunkToMove.setMin(suggestedMigrateChunk->first);
             chunkToMove.setMax(suggestedMigrateChunk->second);
 
-            tryMoveToOtherShard(txn, _manager, chunkToMove);
+            tryMoveToOtherShard(txn, *_manager, chunkToMove);
         }
 
         return true;

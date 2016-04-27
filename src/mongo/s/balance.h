@@ -31,7 +31,7 @@
 #include <string>
 #include <vector>
 
-#include "mongo/s/balancer/balancer_chunk_selection_policy.h"
+#include "mongo/s/balancer_policy.h"
 #include "mongo/util/background.h"
 #include "mongo/util/timer.h"
 
@@ -97,10 +97,12 @@ private:
     bool _checkOIDs(OperationContext* txn);
 
     /**
-     * Iterates through all chunks in all collections and ensures that no chunks straddle tag
-     * boundary. If any do, they will be split.
+     * Gathers all the necessary information about shards and chunks, and decides whether there are
+     * candidate chunks to be moved.
+     *
+     * Returns candidate chunks, one per collection, that could possibly be moved
      */
-    Status _enforceTagRanges(OperationContext* txn);
+    StatusWith<MigrateInfoVector> _getCandidateChunks(OperationContext* txn);
 
     /**
      * Issues chunk migration request, one at a time.
@@ -111,7 +113,7 @@ private:
      * @return number of chunks effectively moved
      */
     int _moveChunks(OperationContext* txn,
-                    const BalancerChunkSelectionPolicy::MigrateInfoVector& candidateChunks,
+                    const MigrateInfoVector& candidateChunks,
                     const MigrationSecondaryThrottleOptions& secondaryThrottle,
                     bool waitForDelete);
 
@@ -123,9 +125,6 @@ private:
 
     // number of moved chunks in last round
     int _balancedLastTime;
-
-    // Balancer policy
-    std::unique_ptr<BalancerChunkSelectionPolicy> _chunkSelectionPolicy;
 
     // Source for cluster statistics
     std::unique_ptr<ClusterStatistics> _clusterStats;
