@@ -82,24 +82,6 @@ const char kCmdResponseWriteConcernField[] = "writeConcernError";
 const Seconds kConfigCommandTimeout{30};
 const int kOnErrorNumRetries = 3;
 
-// TODO: This has been moved into Shard(Remote). Remove this from here once
-// ShardRegistry::runIdempotentCommandOnConfig and ShardRegistry::runCommandOnConfigWithRetries
-// are removed.
-const BSONObj kReplMetadata(BSON(rpc::kReplSetMetadataFieldName << 1));
-
-// TODO: This has been moved into Shard(Remote). Remove this from here once
-// ShardRegistry::runIdempotentCommandOnShard is removed.
-const BSONObj kSecondaryOkMetadata{rpc::ServerSelectionMetadata(true, boost::none).toBSON()};
-
-// TODO: This has been moved into Shard(Remote). Remove this from here once
-// ShardRegistry::runIdempotentCommandOnConfig is removed.
-const BSONObj kReplSecondaryOkMetadata{[] {
-    BSONObjBuilder o;
-    o.appendElements(kSecondaryOkMetadata);
-    o.appendElements(kReplMetadata);
-    return o.obj();
-}()};
-
 BSONObj appendMaxTimeToCmdObj(long long maxTimeMicros, const BSONObj& cmdObj) {
     Seconds maxTime = kConfigCommandTimeout;
 
@@ -503,9 +485,6 @@ StatusWith<BSONObj> ShardRegistry::runIdempotentCommandOnShard(
                                            readPref,
                                            dbName,
                                            cmdObj,
-                                           readPref.pref == ReadPreference::PrimaryOnly
-                                               ? rpc::makeEmptyMetadata()
-                                               : kSecondaryOkMetadata,
                                            kAllRetriableErrors);
     if (!response.isOK()) {
         return response.getStatus();
@@ -532,15 +511,13 @@ StatusWith<BSONObj> ShardRegistry::runIdempotentCommandOnConfig(
     const ReadPreferenceSetting& readPref,
     const std::string& dbName,
     const BSONObj& cmdObj) {
-    auto response = _runCommandWithRetries(
-        txn,
-        Grid::get(txn)->getExecutorPool()->getFixedExecutor(),
-        getConfigShard(),
-        readPref,
-        dbName,
-        cmdObj,
-        readPref.pref == ReadPreference::PrimaryOnly ? kReplMetadata : kReplSecondaryOkMetadata,
-        kAllRetriableErrors);
+    auto response = _runCommandWithRetries(txn,
+                                           Grid::get(txn)->getExecutorPool()->getFixedExecutor(),
+                                           getConfigShard(),
+                                           readPref,
+                                           dbName,
+                                           cmdObj,
+                                           kAllRetriableErrors);
 
     if (!response.isOK()) {
         return response.getStatus();
@@ -560,7 +537,6 @@ StatusWith<BSONObj> ShardRegistry::runCommandOnConfigWithRetries(
                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                            dbname,
                                            cmdObj,
-                                           kReplMetadata,
                                            errorsToCheck);
     if (!response.isOK()) {
         return response.getStatus();
@@ -576,7 +552,6 @@ StatusWith<Shard::CommandResponse> ShardRegistry::_runCommandWithRetries(
     const ReadPreferenceSetting& readPref,
     const std::string& dbname,
     const BSONObj& cmdObj,
-    const BSONObj& metadata,
     const ShardRegistry::ErrorCodesSet& errorsToCheck) {
     const bool isConfigShard = shard->isConfig();
 
@@ -586,7 +561,7 @@ StatusWith<Shard::CommandResponse> ShardRegistry::_runCommandWithRetries(
                            : cmdObj);
 
         const auto swCmdResponse = shard->runCommand(
-            txn, readPref, dbname, cmdWithMaxTimeMS, metadata, Shard::RetryPolicy::kNoRetry);
+            txn, readPref, dbname, cmdWithMaxTimeMS, Shard::RetryPolicy::kNoRetry);
 
         // First, check if the request failed to even reach the shard, and if we should retry.
         Status requestStatus = swCmdResponse.getStatus();

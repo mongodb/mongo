@@ -87,12 +87,11 @@ bool ShardLocal::_isRetriableError(ErrorCodes::Error code, RetryPolicy options) 
 StatusWith<Shard::CommandResponse> ShardLocal::_runCommand(OperationContext* txn,
                                                            const ReadPreferenceSetting& unused,
                                                            const std::string& dbName,
-                                                           const BSONObj& cmdObj,
-                                                           const BSONObj& metadata) {
+                                                           const BSONObj& cmdObj) {
     try {
         DBDirectClient client(txn);
-        rpc::UniqueReply commandResponse =
-            client.runCommandWithMetadata(dbName, cmdObj.firstElementFieldName(), metadata, cmdObj);
+        rpc::UniqueReply commandResponse = client.runCommandWithMetadata(
+            dbName, cmdObj.firstElementFieldName(), rpc::makeEmptyMetadata(), cmdObj);
         BSONObj responseReply = commandResponse->getCommandReply().getOwned();
         BSONObj responseMetadata = commandResponse->getMetadata().getOwned();
 

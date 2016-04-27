@@ -75,10 +75,9 @@ StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* txn,
                                                      const ReadPreferenceSetting& readPref,
                                                      const std::string& dbName,
                                                      const BSONObj& cmdObj,
-                                                     const BSONObj& metadata,
                                                      RetryPolicy retryPolicy) {
     for (int retry = 1; retry <= kOnErrorNumRetries; ++retry) {
-        auto swCmdResponse = _runCommand(txn, readPref, dbName, cmdObj, metadata);
+        auto swCmdResponse = _runCommand(txn, readPref, dbName, cmdObj);
         auto commandStatus = _getEffectiveCommandStatus(swCmdResponse);
 
         if (retry < kOnErrorNumRetries && _isRetriableError(commandStatus.code(), retryPolicy)) {

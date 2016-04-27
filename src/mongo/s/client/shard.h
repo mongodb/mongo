@@ -127,7 +127,6 @@ public:
                                            const ReadPreferenceSetting& readPref,
                                            const std::string& dbName,
                                            const BSONObj& cmdObj,
-                                           const BSONObj& metadata,
                                            RetryPolicy retryPolicy);
 
     /**
@@ -157,8 +156,7 @@ private:
     virtual StatusWith<CommandResponse> _runCommand(OperationContext* txn,
                                                     const ReadPreferenceSetting& readPref,
                                                     const std::string& dbname,
-                                                    const BSONObj& cmdObj,
-                                                    const BSONObj& metadata) = 0;
+                                                    const BSONObj& cmdObj) = 0;
 
     virtual StatusWith<QueryResponse> _exhaustiveFindOnConfig(OperationContext* txn,
                                                               const ReadPreferenceSetting& readPref,

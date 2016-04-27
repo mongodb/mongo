@@ -99,7 +99,6 @@ StatusWith<Shard::CommandResponse> ShardLocalTest::runFindAndModifyRunCommand(Na
                                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                    nss.db().toString(),
                                    findAndModifyRequest.toBSON(),
-                                   BSONObj(),
                                    Shard::RetryPolicy::kNoRetry);
 }
 

@@ -60,8 +60,7 @@ private:
     StatusWith<Shard::CommandResponse> _runCommand(OperationContext* txn,
                                                    const ReadPreferenceSetting& unused,
                                                    const std::string& dbName,
-                                                   const BSONObj& cmdObj,
-                                                   const BSONObj& metadata) final;
+                                                   const BSONObj& cmdObj) final;
 
     StatusWith<Shard::QueryResponse> _exhaustiveFindOnConfig(
         OperationContext* txn,

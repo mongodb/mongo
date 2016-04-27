@@ -67,6 +67,8 @@ const Status kInternalErrorStatus{ErrorCodes::InternalError,
 
 const Seconds kConfigCommandTimeout{30};
 
+const BSONObj kNoMetadata(rpc::makeEmptyMetadata());
+
 // Include kReplSetMetadataFieldName in a request to get the shard's ReplSetMetadata in the
 // response.
 const BSONObj kReplMetadata(BSON(rpc::kReplSetMetadataFieldName << 1));
@@ -203,11 +205,26 @@ std::string ShardRemote::toString() const {
     return getId() + ":" + _originalConnString.toString();
 }
 
+const BSONObj& ShardRemote::_getMetadataForCommand(const ReadPreferenceSetting& readPref) {
+    if (isConfig()) {
+        if (readPref.pref == ReadPreference::PrimaryOnly) {
+            return kReplMetadata;
+        } else {
+            return kReplSecondaryOkMetadata;
+        }
+    } else {
+        if (readPref.pref == ReadPreference::PrimaryOnly) {
+            return kNoMetadata;
+        } else {
+            return kSecondaryOkMetadata;
+        }
+    }
+}
+
 StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* txn,
                                                             const ReadPreferenceSetting& readPref,
                                                             const string& dbName,
-                                                            const BSONObj& cmdObj,
-                                                            const BSONObj& metadata) {
+                                                            const BSONObj& cmdObj) {
     const BSONObj cmdWithMaxTimeMS =
         (isConfig() ? appendMaxTimeToCmdObj(txn->getRemainingMaxTimeMicros(), cmdObj) : cmdObj);
 
@@ -220,7 +237,7 @@ StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* tx
     RemoteCommandRequest request(host.getValue(),
                                  dbName,
                                  cmdWithMaxTimeMS,
-                                 metadata,
+                                 _getMetadataForCommand(readPref),
                                  isConfig() ? kConfigCommandTimeout
                                             : executor::RemoteCommandRequest::kNoTimeout);
     StatusWith<RemoteCommandResponse> swResponse =
@@ -354,8 +371,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
                          nss,
                          findCmdBuilder.done(),
                          fetcherCallback,
-                         readPref.pref == ReadPreference::PrimaryOnly ? kReplMetadata
-                                                                      : kReplSecondaryOkMetadata,
+                         _getMetadataForCommand(readPref),
                          maxTime);
     Status scheduleStatus = fetcher.schedule();
     if (!scheduleStatus.isOK()) {

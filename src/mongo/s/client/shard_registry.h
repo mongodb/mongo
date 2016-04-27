@@ -291,7 +291,6 @@ private:
                                                               const ReadPreferenceSetting& readPref,
                                                               const std::string& dbname,
                                                               const BSONObj& cmdObj,
-                                                              const BSONObj& metadata,
                                                               const ErrorCodesSet& errorsToCheck);
 
     // Factory to create shards.  Never changed after startup so safe

@@ -71,11 +71,19 @@ public:
 private:
     bool _isRetriableError(ErrorCodes::Error code, RetryPolicy options) final;
 
+    /**
+     * Returns the metadata that should be used when running commands against this shard with
+     * the given read preference.
+     *
+     * NOTE: This method returns a reference to a constant defined in shard_remote.cpp.  Be careful
+     * to never change it to return a reference to a temporary.
+     */
+    const BSONObj& _getMetadataForCommand(const ReadPreferenceSetting& readPref);
+
     StatusWith<CommandResponse> _runCommand(OperationContext* txn,
                                             const ReadPreferenceSetting& readPref,
                                             const std::string& dbname,
-                                            const BSONObj& cmdObj,
-                                            const BSONObj& metadata) final;
+                                            const BSONObj& cmdObj) final;
 
     StatusWith<QueryResponse> _exhaustiveFindOnConfig(OperationContext* txn,
                                                       const ReadPreferenceSetting& readPref,
