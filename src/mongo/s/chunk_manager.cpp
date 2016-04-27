@@ -543,6 +543,7 @@ void ChunkManager::getShardIdsForQuery(OperationContext* txn,
 void ChunkManager::getShardIdsForRange(set<ShardId>& shardIds,
                                        const BSONObj& min,
                                        const BSONObj& max) const {
+    using ChunkRangeMap = ChunkRangeManager::ChunkRangeMap;
     ChunkRangeMap::const_iterator it = _chunkRanges.upper_bound(min);
     ChunkRangeMap::const_iterator end = _chunkRanges.upper_bound(max);
 
@@ -706,8 +707,8 @@ string ChunkManager::toString() const {
     return sb.str();
 }
 
-
-ChunkRange::ChunkRange(ChunkMap::const_iterator begin, const ChunkMap::const_iterator end)
+ChunkManager::ChunkRange::ChunkRange(ChunkMap::const_iterator begin,
+                                     const ChunkMap::const_iterator end)
     : _manager(begin->second->getManager()),
       _shardId(begin->second->getShardId()),
       _min(begin->second->getMin()),
@@ -721,7 +722,7 @@ ChunkRange::ChunkRange(ChunkMap::const_iterator begin, const ChunkMap::const_ite
     }
 }
 
-ChunkRange::ChunkRange(const ChunkRange& min, const ChunkRange& max)
+ChunkManager::ChunkRange::ChunkRange(const ChunkRange& min, const ChunkRange& max)
     : _manager(min.getManager()),
       _shardId(min.getShardId()),
       _min(min.getMin()),
@@ -731,15 +732,18 @@ ChunkRange::ChunkRange(const ChunkRange& min, const ChunkRange& max)
     invariant(min.getMax() == max.getMin());
 }
 
-string ChunkRange::toString() const {
+string ChunkManager::ChunkRange::toString() const {
     StringBuilder sb;
     sb << "ChunkRange(min=" << _min << ", max=" << _max << ", shard=" << _shardId << ")";
 
     return sb.str();
 }
 
+bool ChunkManager::ChunkRange::containsKey(const BSONObj& shardKey) const {
+    return getMin().woCompare(shardKey) <= 0 && shardKey.woCompare(getMax()) < 0;
+}
 
-void ChunkRangeManager::assertValid() const {
+void ChunkManager::ChunkRangeManager::_assertValid() const {
     if (_ranges.empty())
         return;
 
@@ -769,7 +773,7 @@ void ChunkRangeManager::assertValid() const {
         }
 
         // Make sure we match the original chunks
-        const ChunkMap chunks = _ranges.begin()->second->getManager()->_chunkMap;
+        const ChunkMap chunks = _ranges.begin()->second->getManager()->getChunkMap();
         for (ChunkMap::const_iterator i = chunks.begin(); i != chunks.end(); ++i) {
             const ChunkPtr chunk = i->second;
 
@@ -797,15 +801,15 @@ void ChunkRangeManager::assertValid() const {
     }
 }
 
-void ChunkRangeManager::reloadAll(const ChunkMap& chunks) {
+void ChunkManager::ChunkRangeManager::reloadAll(const ChunkMap& chunks) {
     _ranges.clear();
     _insertRange(chunks.begin(), chunks.end());
 
-    DEV assertValid();
+    DEV _assertValid();
 }
 
-void ChunkRangeManager::_insertRange(ChunkMap::const_iterator begin,
-                                     const ChunkMap::const_iterator end) {
+void ChunkManager::ChunkRangeManager::_insertRange(ChunkMap::const_iterator begin,
+                                                   const ChunkMap::const_iterator end) {
     while (begin != end) {
         ChunkMap::const_iterator first = begin;
         ShardId shardId = first->second->getShardId();

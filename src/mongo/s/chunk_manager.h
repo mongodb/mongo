@@ -54,82 +54,6 @@ typedef std::shared_ptr<ChunkManager> ChunkManagerPtr;
 // The key for the map is max for each Chunk or ChunkRange
 typedef std::map<BSONObj, std::shared_ptr<Chunk>, BSONObjCmp> ChunkMap;
 
-class ChunkRange {
-public:
-    ChunkRange(ChunkMap::const_iterator begin, const ChunkMap::const_iterator end);
-
-    // Merge min and max (must be adjacent ranges)
-    ChunkRange(const ChunkRange& min, const ChunkRange& max);
-
-    const ChunkManager* getManager() const {
-        return _manager;
-    }
-    ShardId getShardId() const {
-        return _shardId;
-    }
-
-    const BSONObj& getMin() const {
-        return _min;
-    }
-    const BSONObj& getMax() const {
-        return _max;
-    }
-
-    // clones of Chunk methods
-    // Returns true if this ChunkRange contains the given shard key, and false otherwise
-    //
-    // Note: this function takes an extracted *key*, not an original document
-    // (the point may be computed by, say, hashing a given field or projecting
-    //  to a subset of fields).
-    bool containsKey(const BSONObj& shardKey) const;
-
-    std::string toString() const;
-
-private:
-    const ChunkManager* _manager;
-    const ShardId _shardId;
-    const BSONObj _min;
-    const BSONObj _max;
-};
-
-typedef std::map<BSONObj, std::shared_ptr<ChunkRange>, BSONObjCmp> ChunkRangeMap;
-
-class ChunkRangeManager {
-public:
-    const ChunkRangeMap& ranges() const {
-        return _ranges;
-    }
-
-    void clear() {
-        _ranges.clear();
-    }
-
-    void reloadAll(const ChunkMap& chunks);
-
-    // Slow operation -- wrap with DEV
-    void assertValid() const;
-
-    ChunkRangeMap::const_iterator upper_bound(const BSONObj& o) const {
-        return _ranges.upper_bound(o);
-    }
-    ChunkRangeMap::const_iterator lower_bound(const BSONObj& o) const {
-        return _ranges.lower_bound(o);
-    }
-
-private:
-    // assumes nothing in this range exists in _ranges
-    void _insertRange(ChunkMap::const_iterator begin, const ChunkMap::const_iterator end);
-
-    ChunkRangeMap _ranges;
-};
-
-
-/* config.sharding
-     { ns: 'alleyinsider.fs.chunks' ,
-       key: { ts : 1 } ,
-       shards: [ { min: 1, max: 100, server: a } , { min: 101, max: 200 , server : b } ]
-     }
-*/
 class ChunkManager {
 public:
     typedef std::map<std::string, ChunkVersion> ShardVersionMap;
@@ -259,6 +183,78 @@ public:
     repl::OpTime getConfigOpTime() const;
 
 private:
+    class ChunkRange {
+    public:
+        ChunkRange(ChunkMap::const_iterator begin, const ChunkMap::const_iterator end);
+
+        // Merge min and max (must be adjacent ranges)
+        ChunkRange(const ChunkRange& min, const ChunkRange& max);
+
+        const ChunkManager* getManager() const {
+            return _manager;
+        }
+
+        ShardId getShardId() const {
+            return _shardId;
+        }
+
+        const BSONObj& getMin() const {
+            return _min;
+        }
+
+        const BSONObj& getMax() const {
+            return _max;
+        }
+
+        // clones of Chunk methods
+        // Returns true if this ChunkRange contains the given shard key, and false otherwise
+        //
+        // Note: this function takes an extracted *key*, not an original document
+        // (the point may be computed by, say, hashing a given field or projecting
+        //  to a subset of fields).
+        bool containsKey(const BSONObj& shardKey) const;
+
+        std::string toString() const;
+
+    private:
+        const ChunkManager* _manager;
+        const ShardId _shardId;
+        const BSONObj _min;
+        const BSONObj _max;
+    };
+
+    class ChunkRangeManager {
+    public:
+        using ChunkRangeMap = std::map<BSONObj, std::shared_ptr<ChunkRange>, BSONObjCmp>;
+
+        const ChunkRangeMap& ranges() const {
+            return _ranges;
+        }
+
+        void clear() {
+            _ranges.clear();
+        }
+
+        void reloadAll(const ChunkMap& chunks);
+
+        ChunkRangeMap::const_iterator upper_bound(const BSONObj& o) const {
+            return _ranges.upper_bound(o);
+        }
+
+        ChunkRangeMap::const_iterator lower_bound(const BSONObj& o) const {
+            return _ranges.lower_bound(o);
+        }
+
+    private:
+        // assumes nothing in this range exists in _ranges
+        void _insertRange(ChunkMap::const_iterator begin, const ChunkMap::const_iterator end);
+
+        // Slow operation -- wrap with DEV
+        void _assertValid() const;
+
+        ChunkRangeMap _ranges;
+    };
+
     // returns true if load was consistent
     bool _load(OperationContext* txn,
                ChunkMap& chunks,
@@ -321,7 +317,6 @@ private:
     //
 
     friend class Chunk;
-    friend class ChunkRangeManager;  // only needed for CRM::assertValid()
     static AtomicUInt32 NextSequenceNumber;
 
     friend class TestableChunkManager;

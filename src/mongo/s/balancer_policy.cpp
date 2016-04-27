@@ -186,7 +186,7 @@ bool DistributionStatus::addTagRange(const TagRange& range) {
 }
 
 string DistributionStatus::getTagForChunk(const ChunkType& chunk) const {
-    if (_tagRanges.size() == 0)
+    if (_tagRanges.empty())
         return "";
 
     const BSONObj min(chunk.getMin());
@@ -297,7 +297,7 @@ MigrateInfo* BalancerPolicy::balance(const string& ns,
                       << ")"
                       << " to " << to;
 
-                return new MigrateInfo(ns, to, stat.shardId, chunkToMove);
+                return new MigrateInfo(ns, to, chunkToMove);
             }
 
             warning() << "can't find any chunk to move from: " << stat.shardId
@@ -333,7 +333,7 @@ MigrateInfo* BalancerPolicy::balance(const string& ns,
 
                 invariant(to != stat.shardId);
                 log() << " going to move to: " << to;
-                return new MigrateInfo(ns, to, stat.shardId, chunk);
+                return new MigrateInfo(ns, to, chunk);
             }
         }
     }
@@ -401,7 +401,7 @@ MigrateInfo* BalancerPolicy::balance(const string& ns,
 
             log() << " ns: " << ns << " going to move " << chunk << " from: " << from
                   << " to: " << to << " tag [" << tag << "]";
-            return new MigrateInfo(ns, to, from, chunk);
+            return new MigrateInfo(ns, to, chunk);
         }
 
         if (numJumboChunks) {

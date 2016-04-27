@@ -204,11 +204,6 @@ bool Chunk::containsKey(const BSONObj& shardKey) const {
     return getMin().woCompare(shardKey) <= 0 && shardKey.woCompare(getMax()) < 0;
 }
 
-bool ChunkRange::containsKey(const BSONObj& shardKey) const {
-    // same as Chunk method
-    return getMin().woCompare(shardKey) <= 0 && shardKey.woCompare(getMax()) < 0;
-}
-
 bool Chunk::_minIsInf() const {
     return 0 == _manager->getShardKeyPattern().getKeyPattern().globalMin().woCompare(getMin());
 }

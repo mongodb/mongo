@@ -228,9 +228,9 @@ CompareResult compareAllShardVersions(const ChunkManager* cachedChunkManager,
 /**
  * Whether or not the manager/primary pair is different from the other manager/primary pair.
  */
-bool isMetadataDifferent(const ChunkManagerPtr& managerA,
+bool isMetadataDifferent(const shared_ptr<ChunkManager>& managerA,
                          const shared_ptr<Shard>& primaryA,
-                         const ChunkManagerPtr& managerB,
+                         const shared_ptr<ChunkManager>& managerB,
                          const shared_ptr<Shard>& primaryB) {
     if ((managerA && !managerB) || (!managerA && managerB) || (primaryA && !primaryB) ||
         (!primaryA && primaryB))
@@ -248,9 +248,9 @@ bool isMetadataDifferent(const ChunkManagerPtr& managerA,
 * Whether or not the manager/primary pair was changed or refreshed from a previous version
 * of the metadata.
 */
-bool wasMetadataRefreshed(const ChunkManagerPtr& managerA,
+bool wasMetadataRefreshed(const shared_ptr<ChunkManager>& managerA,
                           const shared_ptr<Shard>& primaryA,
-                          const ChunkManagerPtr& managerB,
+                          const shared_ptr<ChunkManager>& managerB,
                           const shared_ptr<Shard>& primaryB) {
     if (isMetadataDifferent(managerA, primaryA, managerB, primaryB))
         return true;
@@ -622,7 +622,7 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* txn, bool* wasCha
     // Get the latest metadata information from the cache if there were issues
     //
 
-    ChunkManagerPtr lastManager = _manager;
+    shared_ptr<ChunkManager> lastManager = _manager;
     shared_ptr<Shard> lastPrimary = _primary;
 
     auto status = dbutil::implicitCreateDb(txn, _nss.db().toString());

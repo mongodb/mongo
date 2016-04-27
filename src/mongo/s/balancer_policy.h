@@ -53,11 +53,12 @@ struct TagRange {
 };
 
 struct MigrateInfo {
-    MigrateInfo(const std::string& a_ns,
-                const ShardId& a_to,
-                const ShardId& a_from,
-                const ChunkType& a_chunk)
-        : ns(a_ns), to(a_to), from(a_from), minKey(a_chunk.getMin()), maxKey(a_chunk.getMax()) {}
+    MigrateInfo(const std::string& a_ns, const ShardId& a_to, const ChunkType& a_chunk)
+        : ns(a_ns),
+          to(a_to),
+          from(a_chunk.getShard()),
+          minKey(a_chunk.getMin()),
+          maxKey(a_chunk.getMax()) {}
 
     std::string toString() const;
 
