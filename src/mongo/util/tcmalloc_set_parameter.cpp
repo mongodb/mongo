@@ -32,7 +32,8 @@
 
 #include "mongo/platform/basic.h"
 
-#include "gperftools/malloc_extension.h"
+#include <algorithm>
+#include <gperftools/malloc_extension.h>
 #include <valgrind/valgrind.h>
 
 #include "mongo/base/disallow_copying.h"
@@ -42,6 +43,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/processinfo.h"
 
 namespace mongo {
 namespace {
@@ -125,14 +127,22 @@ TcmallocNumericPropertyServerParameter tcmallocAggressiveMemoryDecommit(
     "tcmallocAggressiveMemoryDecommit", "tcmalloc.aggressive_memory_decommit");
 
 MONGO_INITIALIZER_GENERAL(TcmallocConfigurationDefaults,
-                          MONGO_NO_PREREQUISITES,
+                          ("SystemInfo"),
                           ("BeginStartupOptionHandling"))(InitializerContext*) {
     // Before processing the command line options, if the user has not specified a value in via
     // the environment, set tcmalloc.max_total_thread_cache_bytes to its default value.
     if (getenv("TCMALLOC_MAX_TOTAL_THREAD_CACHE_BYTES")) {
         return Status::OK();
     }
-    return tcmallocMaxTotalThreadCacheBytesParameter.setFromString("0x40000000" /* 1024MB */);
+
+    ProcessInfo pi;
+    size_t systemMemorySizeMB = pi.getMemSizeMB();
+    size_t defaultTcMallocCacheSize = 1024 * 1024 * 1024;  // 1024MB in bytes
+    size_t derivedTcMallocCacheSize =
+        (systemMemorySizeMB / 8) * 1024 * 1024;  // 1/8 of system memory in bytes
+    size_t cacheSize = std::min(defaultTcMallocCacheSize, derivedTcMallocCacheSize);
+
+    return tcmallocMaxTotalThreadCacheBytesParameter.setFromString(std::to_string(cacheSize));
 }
 
 }  // namespace
