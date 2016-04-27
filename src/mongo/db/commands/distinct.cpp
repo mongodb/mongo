@@ -253,13 +253,21 @@ public:
         }
 
 
+        auto curOp = CurOp::get(txn);
+
         // Get summary information about the plan.
         PlanSummaryStats stats;
         Explain::getSummaryStats(*executor.getValue(), &stats);
         if (collection) {
             collection->infoCache()->notifyOfQuery(txn, stats.indexesUsed);
         }
-        CurOp::get(txn)->debug().setPlanSummaryMetrics(stats);
+        curOp->debug().setPlanSummaryMetrics(stats);
+
+        if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
+            BSONObjBuilder execStatsBob;
+            Explain::getWinningPlanStats(executor.getValue().get(), &execStatsBob);
+            curOp->debug().execStats.set(execStatsBob.obj());
+        }
 
         verify(start == bb.buf());
 

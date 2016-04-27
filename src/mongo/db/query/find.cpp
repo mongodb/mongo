@@ -129,50 +129,40 @@ void beginQueryOp(OperationContext* txn,
                   const BSONObj& queryObj,
                   long long ntoreturn,
                   long long ntoskip) {
-    auto curop = CurOp::get(txn);
-    curop->debug().query = queryObj;
-    curop->debug().ntoreturn = ntoreturn;
-    curop->debug().ntoskip = ntoskip;
+    auto curOp = CurOp::get(txn);
+    curOp->debug().query = queryObj;
+    curOp->debug().ntoreturn = ntoreturn;
+    curOp->debug().ntoskip = ntoskip;
     stdx::lock_guard<Client> lk(*txn->getClient());
-    curop->setQuery_inlock(queryObj);
-    curop->setNS_inlock(nss.ns());
+    curOp->setQuery_inlock(queryObj);
+    curOp->setNS_inlock(nss.ns());
 }
 
 void endQueryOp(OperationContext* txn,
                 Collection* collection,
                 const PlanExecutor& exec,
-                int dbProfilingLevel,
                 long long numResults,
                 CursorId cursorId) {
-    auto curop = CurOp::get(txn);
+    auto curOp = CurOp::get(txn);
 
-    // Fill out basic curop query exec properties.
-    curop->debug().nreturned = numResults;
-    curop->debug().cursorid = (0 == cursorId ? -1 : cursorId);
-    curop->debug().cursorExhausted = (0 == cursorId);
+    // Fill out basic CurOp query exec properties.
+    curOp->debug().nreturned = numResults;
+    curOp->debug().cursorid = (0 == cursorId ? -1 : cursorId);
+    curOp->debug().cursorExhausted = (0 == cursorId);
 
-    // Fill out curop based on explain summary statistics.
+    // Fill out CurOp based on explain summary statistics.
     PlanSummaryStats summaryStats;
     Explain::getSummaryStats(exec, &summaryStats);
-    curop->debug().setPlanSummaryMetrics(summaryStats);
+    curOp->debug().setPlanSummaryMetrics(summaryStats);
 
     if (collection) {
         collection->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
     }
 
-    // Set debug information for consumption by the profiler only.
-    if (dbProfilingLevel > 0) {
-        // Get BSON stats.
+    if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
         BSONObjBuilder statsBob;
         Explain::getWinningPlanStats(&exec, &statsBob);
-        curop->debug().execStats.set(statsBob.obj());
-
-        // Replace exec stats with plan summary if stats cannot fit into CachedBSONObj.
-        if (curop->debug().execStats.tooBig() && !curop->getPlanSummary().empty()) {
-            BSONObjBuilder bob;
-            bob.append("summary", curop->getPlanSummary());
-            curop->debug().execStats.set(bob.done());
-        }
+        curOp->debug().execStats.set(statsBob.obj());
     }
 }
 
@@ -242,7 +232,7 @@ QueryResult::View getMore(OperationContext* txn,
                           bool* isCursorAuthorized) {
     invariant(ntoreturn >= 0);
 
-    CurOp& curop = *CurOp::get(txn);
+    CurOp& curOp = *CurOp::get(txn);
 
     // For testing, we may want to fail if we receive a getmore.
     if (MONGO_FAIL_POINT(failReceivedGetmore)) {
@@ -334,15 +324,15 @@ QueryResult::View getMore(OperationContext* txn,
 
         // If the operation that spawned this cursor had a time limit set, apply leftover
         // time to this getmore.
-        curop.setMaxTimeMicros(cc->getLeftoverMaxTimeMicros());
+        curOp.setMaxTimeMicros(cc->getLeftoverMaxTimeMicros());
         txn->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
 
         // Ensure that the original query or command object is available in the slow query log,
         // profiler, and currentOp.
-        curop.debug().query = cc->getQuery();
+        curOp.debug().query = cc->getQuery();
         {
             stdx::lock_guard<Client> lk(*txn->getClient());
-            curop.setQuery_inlock(cc->getQuery());
+            curOp.setQuery_inlock(cc->getQuery());
         }
 
         cc->updateSlaveLocation(txn);
@@ -406,7 +396,7 @@ QueryResult::View getMore(OperationContext* txn,
 
             // Set expected latency to match wait time. This makes sure the logs aren't spammed
             // by awaitData queries that exceed slowms due to blocking on the CappedInsertNotifier.
-            curop.setExpectedLatencyMs(durationCount<Milliseconds>(timeout));
+            curOp.setExpectedLatencyMs(durationCount<Milliseconds>(timeout));
 
             // Reacquiring locks.
             ctx = make_unique<AutoGetCollectionForRead>(txn, nss);
@@ -421,7 +411,13 @@ QueryResult::View getMore(OperationContext* txn,
         Explain::getSummaryStats(*exec, &postExecutionStats);
         postExecutionStats.totalKeysExamined -= preExecutionStats.totalKeysExamined;
         postExecutionStats.totalDocsExamined -= preExecutionStats.totalDocsExamined;
-        curop.debug().setPlanSummaryMetrics(postExecutionStats);
+        curOp.debug().setPlanSummaryMetrics(postExecutionStats);
+
+        if (curOp.shouldDBProfile(curOp.elapsedMillis())) {
+            BSONObjBuilder execStatsBob;
+            Explain::getWinningPlanStats(exec, &execStatsBob);
+            curOp.debug().execStats.set(execStatsBob.obj());
+        }
 
         // We have to do this before re-acquiring locks in the agg case because
         // shouldSaveCursorGetMore() can make a network call for agg cursors.
@@ -450,7 +446,7 @@ QueryResult::View getMore(OperationContext* txn,
             // cc is now invalid, as is the executor
             cursorid = 0;
             cc = NULL;
-            curop.debug().cursorExhausted = true;
+            curOp.debug().cursorExhausted = true;
 
             LOG(5) << "getMore NOT saving client cursor, ended with state "
                    << PlanExecutor::statestr(state) << endl;
@@ -471,7 +467,7 @@ QueryResult::View getMore(OperationContext* txn,
 
             // If the getmore had a time limit, remaining time is "rolled over" back to the
             // cursor (for use by future getmore ops).
-            cc->setLeftoverMaxTimeMicros(curop.getRemainingMaxTimeMicros());
+            cc->setLeftoverMaxTimeMicros(curOp.getRemainingMaxTimeMicros());
         }
     }
 
@@ -491,14 +487,14 @@ std::string runQuery(OperationContext* txn,
                      QueryMessage& q,
                      const NamespaceString& nss,
                      Message& result) {
-    CurOp& curop = *CurOp::get(txn);
+    CurOp& curOp = *CurOp::get(txn);
 
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid ns [" << nss.ns() << "]",
             nss.isValid());
     invariant(!nss.isCommand());
 
-    // Set curop information.
+    // Set CurOp information.
     beginQueryOp(txn, nss, q.query, q.ntoreturn, q.ntoskip);
 
     // Parse the qm into a CanonicalQuery.
@@ -518,9 +514,6 @@ std::string runQuery(OperationContext* txn,
     // Parse, canonicalize, plan, transcribe, and get a plan executor.
     AutoGetCollectionForRead ctx(txn, nss);
     Collection* collection = ctx.getCollection();
-
-    const int dbProfilingLevel =
-        ctx.getDb() ? ctx.getDb()->getProfilingLevel() : serverGlobalParams.defaultProfile;
 
     // We have a parsed query. Time to get the execution plan for it.
     std::unique_ptr<PlanExecutor> exec = uassertStatusOK(
@@ -542,14 +535,14 @@ std::string runQuery(OperationContext* txn,
         bb.appendBuf((void*)explainObj.objdata(), explainObj.objsize());
 
         // TODO: Does this get overwritten/do we really need to set this twice?
-        curop.debug().query = q.query;
+        curOp.debug().query = q.query;
 
         // Set query result fields.
         QueryResult::View qr = bb.buf();
         bb.decouple();
         qr.setResultFlagsToOk();
         qr.msgdata().setLen(bb.len());
-        curop.debug().responseLength = bb.len();
+        curOp.debug().responseLength = bb.len();
         qr.msgdata().setOperation(opReply);
         qr.setCursorId(0);
         qr.setStartingFrom(0);
@@ -559,7 +552,7 @@ std::string runQuery(OperationContext* txn,
     }
 
     // Handle query option $maxTimeMS (not used with commands).
-    curop.setMaxTimeMicros(static_cast<unsigned long long>(pq.getMaxTimeMS()) * 1000);
+    curOp.setMaxTimeMicros(static_cast<unsigned long long>(pq.getMaxTimeMS()) * 1000);
     txn->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
 
     // uassert if we are not on a primary, and not a secondary with SlaveOk query parameter set.
@@ -587,7 +580,7 @@ std::string runQuery(OperationContext* txn,
     // Get summary info about which plan the executor is using.
     {
         stdx::lock_guard<Client> lk(*txn->getClient());
-        curop.setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
+        curOp.setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
     }
 
     while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
@@ -639,7 +632,7 @@ std::string runQuery(OperationContext* txn,
     auto css = CollectionShardingState::get(txn, nss);
     css->checkShardVersionOrThrow(txn);
 
-    // Fill out curop based on query results. If we have a cursorid, we will fill out curop with
+    // Fill out CurOp based on query results. If we have a cursorid, we will fill out CurOp with
     // this cursorid later.
     long long ccId = 0;
 
@@ -669,19 +662,19 @@ std::string runQuery(OperationContext* txn,
 
         // TODO document
         if (pq.isExhaust()) {
-            curop.debug().exhaust = true;
+            curOp.debug().exhaust = true;
         }
 
         cc->setPos(numResults);
 
         // If the query had a time limit, remaining time is "rolled over" to the cursor (for
         // use by future getmore ops).
-        cc->setLeftoverMaxTimeMicros(curop.getRemainingMaxTimeMicros());
+        cc->setLeftoverMaxTimeMicros(curOp.getRemainingMaxTimeMicros());
 
-        endQueryOp(txn, collection, *cc->getExecutor(), dbProfilingLevel, numResults, ccId);
+        endQueryOp(txn, collection, *cc->getExecutor(), numResults, ccId);
     } else {
         LOG(5) << "Not caching executor but returning " << numResults << " results.\n";
-        endQueryOp(txn, collection, *exec, dbProfilingLevel, numResults, ccId);
+        endQueryOp(txn, collection, *exec, numResults, ccId);
     }
 
     // Add the results from the query into the output buffer.
@@ -696,8 +689,8 @@ std::string runQuery(OperationContext* txn,
     qr.setStartingFrom(0);
     qr.setNReturned(numResults);
 
-    // curop.debug().exhaust is set above.
-    return curop.debug().exhaust ? nss.ns() : "";
+    // curOp.debug().exhaust is set above.
+    return curOp.debug().exhaust ? nss.ns() : "";
 }
 
 }  // namespace mongo

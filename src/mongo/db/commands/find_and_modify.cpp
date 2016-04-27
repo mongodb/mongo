@@ -352,7 +352,8 @@ public:
             lastOpSetterGuard.Dismiss();
         }
 
-        OpDebug* opDebug = &CurOp::get(txn)->debug();
+        auto curOp = CurOp::get(txn);
+        OpDebug* opDebug = &curOp->debug();
 
         // Although usually the PlanExecutor handles WCE internally, it will throw WCEs when it is
         // executing a findAndModify. This is done to ensure that we can always match, modify, and
@@ -412,10 +413,16 @@ public:
                 if (collection) {
                     collection->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
                 }
-                CurOp::get(txn)->debug().setPlanSummaryMetrics(summaryStats);
+                opDebug->setPlanSummaryMetrics(summaryStats);
 
                 // Fill out OpDebug with the number of deleted docs.
-                CurOp::get(txn)->debug().ndeleted = getDeleteStats(exec.get())->docsDeleted;
+                opDebug->ndeleted = getDeleteStats(exec.get())->docsDeleted;
+
+                if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
+                    BSONObjBuilder execStatsBob;
+                    Explain::getWinningPlanStats(exec.get(), &execStatsBob);
+                    opDebug->execStats.set(execStatsBob.obj());
+                }
 
                 boost::optional<BSONObj> value = advanceStatus.getValue();
                 appendCommandResponse(exec.get(), args.isRemove(), value, result);
@@ -505,6 +512,12 @@ public:
                 }
                 UpdateStage::recordUpdateStatsInOpDebug(getUpdateStats(exec.get()), opDebug);
                 opDebug->setPlanSummaryMetrics(summaryStats);
+
+                if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
+                    BSONObjBuilder execStatsBob;
+                    Explain::getWinningPlanStats(exec.get(), &execStatsBob);
+                    opDebug->execStats.set(execStatsBob.obj());
+                }
 
                 boost::optional<BSONObj> value = advanceStatus.getValue();
                 appendCommandResponse(exec.get(), args.isRemove(), value, result);

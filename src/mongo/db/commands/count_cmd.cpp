@@ -150,8 +150,8 @@ public:
         unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
         // Store the plan summary string in CurOp.
+        auto curOp = CurOp::get(txn);
         {
-            auto curOp = CurOp::get(txn);
             stdx::lock_guard<Client> lk(*txn->getClient());
             curOp->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
         }
@@ -166,7 +166,13 @@ public:
         if (collection) {
             collection->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
         }
-        CurOp::get(txn)->debug().setPlanSummaryMetrics(summaryStats);
+        curOp->debug().setPlanSummaryMetrics(summaryStats);
+
+        if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
+            BSONObjBuilder execStatsBob;
+            Explain::getWinningPlanStats(exec.get(), &execStatsBob);
+            curOp->debug().execStats.set(execStatsBob.obj());
+        }
 
         // Plan is done executing. We just need to pull the count out of the root stage.
         invariant(STAGE_COUNT == exec->getRootStage()->stageType());

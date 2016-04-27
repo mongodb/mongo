@@ -249,14 +249,21 @@ public:
                 Explain::getSummaryStats(*input, &stats);
                 collection->infoCache()->notifyOfQuery(txn, stats.indexesUsed);
 
+                auto curOp = CurOp::get(txn);
                 {
                     stdx::lock_guard<Client>(*txn->getClient());
-                    CurOp::get(txn)->setPlanSummary_inlock(Explain::getPlanSummary(input.get()));
+                    curOp->setPlanSummary_inlock(Explain::getPlanSummary(input.get()));
                 }
 
                 // TODO SERVER-23265: Confirm whether this is the correct place to gather all
                 // metrics. There is no harm adding here for the time being.
-                CurOp::get(txn)->debug().setPlanSummaryMetrics(stats);
+                curOp->debug().setPlanSummaryMetrics(stats);
+
+                if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
+                    BSONObjBuilder execStatsBob;
+                    Explain::getWinningPlanStats(input.get(), &execStatsBob);
+                    curOp->debug().execStats.set(execStatsBob.obj());
+                }
             }
 
             // Create the PlanExecutor which returns results from the pipeline. The WorkingSet

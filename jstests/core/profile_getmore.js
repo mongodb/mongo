@@ -1,5 +1,4 @@
 // Confirms that profiled getMore execution contains all expected metrics with proper values.
-// TODO SERVER-23264: Add execStats.
 
 (function() {
     "use strict";
@@ -39,6 +38,7 @@
     assert.eq(profileObj.nreturned, 2, tojson(profileObj));
     assert.eq(profileObj.query.batchSize, 2, tojson(profileObj));
     assert.eq(profileObj.planSummary, "IXSCAN { a: 1.0 }", tojson(profileObj));
+    assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("locks"), tojson(profileObj));

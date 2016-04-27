@@ -1,6 +1,5 @@
 // Confirms that profiled aggregation execution contains all expected metrics with proper values.
 // TODO SERVER-23265: Fix keysExamined, docsExamined & hasSortStage.
-// TODO SERVER-23264: Add execStats.
 
 (function() {
     "use strict";
@@ -35,7 +34,7 @@
     assert.eq(profileObj.docsExamined, 0, tojson(profileObj));
 
     assert.eq(profileObj.planSummary, "IXSCAN { a: 1.0 }", tojson(profileObj));
-
+    assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
     assert.eq(profileObj.protocol, getProfilerProtocolStringForCommand(conn), tojson(profileObj));
     assert.eq(profileObj.command.aggregate, coll.getName(), tojson(profileObj));
     assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));

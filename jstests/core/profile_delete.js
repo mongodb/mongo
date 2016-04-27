@@ -1,5 +1,4 @@
 // Confirms that profiled delete execution contains all expected metrics with proper values.
-// TODO SERVER-23264: Add execStats.
 
 (function() {
     "use strict";
@@ -33,6 +32,7 @@
     assert.eq(profileObj.docsExamined, 1, tojson(profileObj));
     assert.eq(profileObj.keysDeleted, 2, tojson(profileObj));
     assert.eq(profileObj.planSummary, "IXSCAN { a: 1.0 }", tojson(profileObj));
+    assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("locks"), tojson(profileObj));

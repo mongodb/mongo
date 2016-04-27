@@ -88,14 +88,10 @@ void beginQueryOp(OperationContext* txn,
  * 2) Reports index usage to the CollectionInfoCache.
  *
  * Uses explain functionality to extract stats from 'exec'.
- *
- * The database profiling level, 'dbProfilingLevel', is used to conditionalize whether or not we
- * do expensive stats gathering.
  */
 void endQueryOp(OperationContext* txn,
                 Collection* collection,
                 const PlanExecutor& exec,
-                int dbProfilingLevel,
                 long long numResults,
                 CursorId cursorId);
 

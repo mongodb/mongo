@@ -242,9 +242,6 @@ public:
         AutoGetCollectionForRead ctx(txn, nss);
         Collection* collection = ctx.getCollection();
 
-        const int dbProfilingLevel =
-            ctx.getDb() ? ctx.getDb()->getProfilingLevel() : serverGlobalParams.defaultProfile;
-
         // Get the execution plan for the query.
         auto statusWithPlanExecutor =
             getExecutorFind(txn, collection, nss, std::move(cq), PlanExecutor::YIELD_AUTO);
@@ -264,7 +261,7 @@ public:
             // there is no ClientCursor id, and then return.
             const long long numResults = 0;
             const CursorId cursorId = 0;
-            endQueryOp(txn, collection, *exec, dbProfilingLevel, numResults, cursorId);
+            endQueryOp(txn, collection, *exec, numResults, cursorId);
             appendCursorResponseObject(cursorId, nss.ns(), BSONArray(), &result);
             return true;
         }
@@ -338,9 +335,9 @@ public:
             cursor->setPos(numResults);
 
             // Fill out curop based on the results.
-            endQueryOp(txn, collection, *cursorExec, dbProfilingLevel, numResults, cursorId);
+            endQueryOp(txn, collection, *cursorExec, numResults, cursorId);
         } else {
-            endQueryOp(txn, collection, *exec, dbProfilingLevel, numResults, cursorId);
+            endQueryOp(txn, collection, *exec, numResults, cursorId);
         }
 
         // Generate the response object to send to the client.

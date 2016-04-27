@@ -229,9 +229,10 @@ public:
 
         unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
+        auto curOp = CurOp::get(txn);
         {
             stdx::lock_guard<Client>(*txn->getClient());
-            CurOp::get(txn)->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
+            curOp->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
         }
 
         double totalDistance = 0;
@@ -314,12 +315,18 @@ public:
             stats.append("avgDistance", totalDistance / results);
         }
         stats.append("maxDistance", farthestDist);
-        stats.append("time", CurOp::get(txn)->elapsedMillis());
+        stats.append("time", curOp->elapsedMillis());
         stats.done();
 
         collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
 
-        CurOp::get(txn)->debug().setPlanSummaryMetrics(summary);
+        curOp->debug().setPlanSummaryMetrics(summary);
+
+        if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
+            BSONObjBuilder execStatsBob;
+            Explain::getWinningPlanStats(exec.get(), &execStatsBob);
+            curOp->debug().execStats.set(execStatsBob.obj());
+        }
 
         return true;
     }

@@ -162,7 +162,8 @@ public:
         }
         const GetMoreRequest& request = parseStatus.getValue();
 
-        CurOp::get(txn)->debug().cursorid = request.cursorid;
+        auto curOp = CurOp::get(txn);
+        curOp->debug().cursorid = request.cursorid;
 
         // Disable shard version checking - getmore commands are always unversioned
         OperationShardingState::get(txn).setShardVersion(request.nss, ChunkVersion::IGNORED());
@@ -276,7 +277,7 @@ public:
         // Reset timeout timer on the cursor since the cursor is still in use.
         cursor->setIdleTime(0);
 
-        const bool hasOwnMaxTime = CurOp::get(txn)->isMaxTimeSet();
+        const bool hasOwnMaxTime = curOp->isMaxTimeSet();
 
         if (!hasOwnMaxTime) {
             // There is no time limit set directly on this getMore command. If the cursor is
@@ -285,9 +286,9 @@ public:
             // applying it to this getMore.
             if (isCursorAwaitData(cursor)) {
                 Seconds awaitDataTimeout(1);
-                CurOp::get(txn)->setMaxTimeMicros(durationCount<Microseconds>(awaitDataTimeout));
+                curOp->setMaxTimeMicros(durationCount<Microseconds>(awaitDataTimeout));
             } else {
-                CurOp::get(txn)->setMaxTimeMicros(cursor->getLeftoverMaxTimeMicros());
+                curOp->setMaxTimeMicros(cursor->getLeftoverMaxTimeMicros());
             }
         }
         txn->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
@@ -303,7 +304,7 @@ public:
 
         {
             stdx::lock_guard<Client>(*txn->getClient());
-            CurOp::get(txn)->setPlanSummary_inlock(Explain::getPlanSummary(exec));
+            curOp->setPlanSummary_inlock(Explain::getPlanSummary(exec));
         }
 
         uint64_t notifierVersion = 0;
@@ -356,14 +357,14 @@ public:
                 ctx.reset();
 
                 // Block waiting for data.
-                Microseconds timeout(CurOp::get(txn)->getRemainingMaxTimeMicros());
+                Microseconds timeout(curOp->getRemainingMaxTimeMicros());
                 notifier->wait(notifierVersion, timeout);
                 notifier.reset();
 
                 // Set expected latency to match wait time. This makes sure the logs aren't spammed
                 // by awaitData queries that exceed slowms due to blocking on the
                 // CappedInsertNotifier.
-                CurOp::get(txn)->setExpectedLatencyMs(durationCount<Milliseconds>(timeout));
+                curOp->setExpectedLatencyMs(durationCount<Milliseconds>(timeout));
 
                 ctx.reset(new AutoGetCollectionForRead(txn, request.nss));
                 exec->restoreState();
@@ -381,7 +382,13 @@ public:
         Explain::getSummaryStats(*exec, &postExecutionStats);
         postExecutionStats.totalKeysExamined -= preExecutionStats.totalKeysExamined;
         postExecutionStats.totalDocsExamined -= preExecutionStats.totalDocsExamined;
-        CurOp::get(txn)->debug().setPlanSummaryMetrics(postExecutionStats);
+        curOp->debug().setPlanSummaryMetrics(postExecutionStats);
+
+        if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
+            BSONObjBuilder execStatsBob;
+            Explain::getWinningPlanStats(exec, &execStatsBob);
+            curOp->debug().execStats.set(execStatsBob.obj());
+        }
 
         if (shouldSaveCursorGetMore(state, exec, isCursorTailable(cursor))) {
             respondWithId = request.cursorid;
@@ -393,19 +400,19 @@ public:
             // from a previous find, then don't roll remaining micros over to the next
             // getMore.
             if (!hasOwnMaxTime) {
-                cursor->setLeftoverMaxTimeMicros(CurOp::get(txn)->getRemainingMaxTimeMicros());
+                cursor->setLeftoverMaxTimeMicros(curOp->getRemainingMaxTimeMicros());
             }
 
             cursor->incPos(numResults);
         } else {
-            CurOp::get(txn)->debug().cursorExhausted = true;
+            curOp->debug().cursorExhausted = true;
         }
 
         nextBatch.done(respondWithId, request.nss.ns());
 
         // Ensure log and profiler include the number of results returned in this getMore's response
         // batch.
-        CurOp::get(txn)->debug().nreturned = numResults;
+        curOp->debug().nreturned = numResults;
 
         if (respondWithId) {
             cursorFreer.Dismiss();

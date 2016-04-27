@@ -152,9 +152,10 @@ private:
 
         unique_ptr<PlanExecutor> planExecutor = std::move(statusWithPlanExecutor.getValue());
 
+        auto curOp = CurOp::get(txn);
         {
             stdx::lock_guard<Client>(*txn->getClient());
-            CurOp::get(txn)->setPlanSummary_inlock(Explain::getPlanSummary(planExecutor.get()));
+            curOp->setPlanSummary_inlock(Explain::getPlanSummary(planExecutor.get()));
         }
 
         // Group executors return ADVANCED exactly once, with the entire group result.
@@ -180,7 +181,13 @@ private:
         if (coll) {
             coll->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
         }
-        CurOp::get(txn)->debug().setPlanSummaryMetrics(summaryStats);
+        curOp->debug().setPlanSummaryMetrics(summaryStats);
+
+        if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
+            BSONObjBuilder execStatsBob;
+            Explain::getWinningPlanStats(planExecutor.get(), &execStatsBob);
+            curOp->debug().execStats.set(execStatsBob.obj());
+        }
 
         invariant(STAGE_GROUP == planExecutor->getRootStage()->stageType());
         GroupStage* groupStage = static_cast<GroupStage*>(planExecutor->getRootStage());

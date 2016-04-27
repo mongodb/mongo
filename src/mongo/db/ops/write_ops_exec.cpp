@@ -529,6 +529,12 @@ static WriteResult::SingleResult performSingleUpdateOp(OperationContext* txn,
         collection->getCollection()->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
     }
 
+    if (curOp.shouldDBProfile(curOp.elapsedMillis())) {
+        BSONObjBuilder execStatsBob;
+        Explain::getWinningPlanStats(exec.get(), &execStatsBob);
+        curOp.debug().execStats.set(execStatsBob.obj());
+    }
+
     const UpdateStats* updateStats = UpdateStage::getUpdateStats(exec.get());
     UpdateStage::recordUpdateStatsInOpDebug(updateStats, &curOp.debug());
     curOp.debug().setPlanSummaryMetrics(summary);
@@ -624,6 +630,13 @@ static WriteResult::SingleResult performSingleDeleteOp(OperationContext* txn,
         collection.getCollection()->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
     }
     curOp.debug().setPlanSummaryMetrics(summary);
+
+    if (curOp.shouldDBProfile(curOp.elapsedMillis())) {
+        BSONObjBuilder execStatsBob;
+        Explain::getWinningPlanStats(exec.get(), &execStatsBob);
+        curOp.debug().execStats.set(execStatsBob.obj());
+    }
+
     LastError::get(txn->getClient()).recordDelete(n);
 
     return {n};
