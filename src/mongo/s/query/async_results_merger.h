@@ -207,7 +207,13 @@ private:
          */
         Status resolveShardIdToHostAndPort(const ReadPreferenceSetting& readPref);
 
+        /**
+         * Returns the Shard object associated with this remote cursor.
+         */
+        std::shared_ptr<Shard> getShard();
+
         // ShardId on which a cursor will be created.
+        // TODO: This should always be set.
         const boost::optional<ShardId> shardId;
 
         // The command object for sending to the remote to establish the cursor. If a remote cursor

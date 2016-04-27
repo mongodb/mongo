@@ -40,6 +40,7 @@
 #include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -285,6 +286,7 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lockWithSess
     // independent write operations.
     int networkErrorRetries = 0;
 
+    auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
     // Distributed lock acquisition works by tring to update the state of the lock to 'taken'. If
     // the lock is currently taken, we will back off and try the acquisition again, repeating this
     // until the lockTryInterval has been reached. If a network error occurs at each lock
@@ -318,7 +320,7 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lockWithSess
         }
 
         // If a network error occurred, unlock the lock synchronously and try again
-        if (ShardRegistry::kAllRetriableErrors.count(status.code()) &&
+        if (configShard->isRetriableError(status.code(), Shard::RetryPolicy::kIdempotent) &&
             networkErrorRetries < kMaxNumLockAcquireRetries) {
             LOG(1) << "Failed to acquire distributed lock because of retriable error. Retrying "
                       "acquisition by first unlocking the stale entry, which possibly exists now"

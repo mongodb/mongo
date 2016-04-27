@@ -1651,11 +1651,19 @@ Status CatalogManagerReplicaSet::insertConfigDocument(OperationContext* txn,
     request.setNS(nss);
     request.setWriteConcern(kMajorityWriteConcern.toBSON());
 
+    auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
     for (int retry = 1; retry <= kMaxWriteRetry; retry++) {
         BatchedCommandResponse response;
-        _runBatchWriteCommand(txn, request, &response, Shard::RetryPolicy::kNotIdempotent);
+        _runBatchWriteCommand(txn, request, &response, Shard::RetryPolicy::kNoRetry);
 
         Status status = response.toStatus();
+
+        if (retry < kMaxWriteRetry &&
+            configShard->isRetriableError(status.code(), Shard::RetryPolicy::kIdempotent)) {
+            // Pretend like the operation is idempotent because we're handling DuplicateKey errors
+            // specially
+            continue;
+        }
 
         // If we get DuplicateKey error on the first attempt to insert, this definitively means that
         // we are trying to insert the same entry a second time, so error out. If it happens on a
@@ -1692,10 +1700,6 @@ Status CatalogManagerReplicaSet::insertConfigDocument(OperationContext* txn,
                 // Documents match, so treat the operation as success
                 return Status::OK();
             }
-        }
-
-        if (ShardRegistry::kAllRetriableErrors.count(status.code()) && (retry < kMaxWriteRetry)) {
-            continue;
         }
 
         return status;
