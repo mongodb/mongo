@@ -32,9 +32,10 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/bson/mutable/damage_vector.h"
+#include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/json.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
 
@@ -3252,6 +3253,106 @@ TEST(DocumentComparison, SimpleComparisonWithDeserializedElements) {
     // Ensure that the two deserialized documents compare with each other correctly.
     ASSERT_EQUALS(0, doc1.compareWith(doc2));
     ASSERT_EQUALS(0, doc2.compareWith(doc1));
+}
+
+TEST(DocumentComparison, DocumentCompareWithRespectsCollation) {
+    mongo::CollatorInterfaceMock collator(mongo::CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const mmb::Document doc1(mongo::fromjson("{a: 'foo'}"));
+    const mmb::Document doc2(mongo::fromjson("{a: 'bar'}"));
+    // Pass true to indicate that we should compare field names. The two documents should be unequal
+    // without the collator, but equal when using the "always equal" collator.
+    ASSERT_NE(0, doc1.compareWith(doc2, true));
+    ASSERT_EQ(0, doc1.compareWith(doc2, true, &collator));
+}
+
+TEST(DocumentComparison, DocumentCompareWithBSONObjRespectsCollation) {
+    mongo::CollatorInterfaceMock collator(mongo::CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const mmb::Document doc1(mongo::fromjson("{a: 'foo'}"));
+    const mongo::BSONObj doc2 = mongo::fromjson("{a: 'bar'}");
+    // Pass true to indicate that we should compare field names. The two documents should be unequal
+    // without the collator, but equal when using the "always equal" collator.
+    ASSERT_NE(0, doc1.compareWithBSONObj(doc2, true));
+    ASSERT_EQ(0, doc1.compareWithBSONObj(doc2, true, &collator));
+}
+
+TEST(DocumentComparison, ElementCompareWithElementRespectsCollator) {
+    mongo::CollatorInterfaceMock collator(mongo::CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const mmb::Document doc1(mongo::fromjson("{a: 'foo'}"));
+    const mmb::Document doc2(mongo::fromjson("{a: 'bar'}"));
+    const mmb::ConstElement element1 = doc1.root().leftChild();
+    const mmb::ConstElement element2 = doc2.root().leftChild();
+    // Pass true to indicate that we should compare field names. The two documents should be unequal
+    // without the collator, but equal when using the "always equal" collator.
+    ASSERT_NE(0, element1.compareWithElement(element2, true));
+    ASSERT_EQ(0, element1.compareWithElement(element2, true, &collator));
+}
+
+TEST(DocumentComparison, ElementCompareWithBSONElementRespectsCollator) {
+    mongo::CollatorInterfaceMock collator(mongo::CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const mmb::Document doc1(mongo::fromjson("{a: 'foo'}"));
+    const mongo::BSONObj doc2 = mongo::fromjson("{a: 'bar'}");
+    const mmb::ConstElement element1 = doc1.root().leftChild();
+    const mongo::BSONElement element2 = doc2["a"];
+    // Pass true to indicate that we should compare field names. The two documents should be unequal
+    // without the collator, but equal when using the "always equal" collator.
+    ASSERT_NE(0, element1.compareWithBSONElement(element2, true));
+    ASSERT_EQ(0, element1.compareWithBSONElement(element2, true, &collator));
+}
+
+TEST(DocumentComparison, ElementCompareWithBSONObjRespectsCollator) {
+    mongo::CollatorInterfaceMock collator(mongo::CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const mmb::Document doc1(mongo::fromjson("{b: {c: 'foo'}}"));
+    const mongo::BSONObj doc2 = mongo::fromjson("{c: 'bar'}");
+    const mmb::ConstElement element1 = doc1.root().leftChild();
+    // Pass true to indicate that we should compare field names. The two documents should be unequal
+    // without the collator, but equal when using the "always equal" collator.
+    ASSERT_NE(0, element1.compareWithBSONObj(doc2, true));
+    ASSERT_EQ(0, element1.compareWithBSONObj(doc2, true, &collator));
+}
+
+TEST(DocumentComparison, DocumentCompareWithRespectsCollationRecursively) {
+    mongo::CollatorInterfaceMock collator(mongo::CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const mmb::Document doc1(mongo::fromjson("{a: [{b: 'foo'}, {b: 'bar'}]}"));
+    const mmb::Document doc2(mongo::fromjson("{a: [{b: 'notFoo'}, {b: 'notBar'}]}"));
+    // Pass true to indicate that we should compare field names. The two documents should be unequal
+    // without the collator, but equal when using the "always equal" collator.
+    ASSERT_NE(0, doc1.compareWith(doc2, true));
+    ASSERT_EQ(0, doc1.compareWith(doc2, true, &collator));
+}
+
+TEST(DocumentComparison, DocumentCompareWithRespectsCollationWithDeserializedElement) {
+    mongo::CollatorInterfaceMock collator(mongo::CollatorInterfaceMock::MockType::kAlwaysEqual);
+    mmb::Document doc1(mongo::fromjson("{a: ['foo', 'foo']}"));
+    mmb::Document doc2(mongo::fromjson("{a: ['bar', 'bar']}"));
+
+    // With the always equal collator, the documents should start out comparing equal.
+    ASSERT_EQ(0, doc1.compareWith(doc2, true, &collator));
+    ASSERT_EQ(0, doc2.compareWith(doc1, true, &collator));
+
+    // They should still be equal after causing deserialization of one of the leaf elements of
+    // 'doc1'.
+    {
+        mmb::Element elementA = doc1.root()["a"];
+        ASSERT_TRUE(elementA.ok());
+        mmb::Element elementA0 = elementA[0];
+        ASSERT_TRUE(elementA0.ok());
+        ASSERT_OK(elementA0.remove());
+        ASSERT_OK(elementA.pushBack(elementA0));
+        ASSERT_EQ(0, doc1.compareWith(doc2, true, &collator));
+        ASSERT_EQ(0, doc2.compareWith(doc1, true, &collator));
+    }
+
+    // And they should remain equal after doing the same to 'doc2'.
+    {
+        mmb::Element elementA = doc2.root()["a"];
+        ASSERT_TRUE(elementA.ok());
+        mmb::Element elementA0 = elementA[0];
+        ASSERT_TRUE(elementA0.ok());
+        ASSERT_OK(elementA0.remove());
+        ASSERT_OK(elementA.pushBack(elementA0));
+        ASSERT_EQ(0, doc1.compareWith(doc2, true, &collator));
+        ASSERT_EQ(0, doc2.compareWith(doc1, true, &collator));
+    }
 }
 
 TEST(UnorderedEqualityChecker, Identical) {

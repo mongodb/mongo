@@ -118,7 +118,9 @@ Status ParsedUpdate::parseUpdate() {
         !(!_txn->writesAreReplicated() || ns.isConfigDB() || _request->isFromMigration());
 
     _driver.setLogOp(true);
-    _driver.setModOptions(ModifierInterface::Options(!_txn->writesAreReplicated(), shouldValidate));
+    // TODO SERVER-23610: pass down the CollatorInterface as an option to ModifierInterface.
+    _driver.setModOptions(
+        ModifierInterface::Options(!_txn->writesAreReplicated(), shouldValidate, nullptr));
 
     return _driver.parse(_request->getUpdates(), _request->isMulti());
 }

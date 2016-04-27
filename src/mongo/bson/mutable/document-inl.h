@@ -30,15 +30,19 @@
 namespace mongo {
 namespace mutablebson {
 
-inline int Document::compareWith(const Document& other, bool considerFieldName) const {
+inline int Document::compareWith(const Document& other,
+                                 bool considerFieldName,
+                                 StringData::ComparatorInterface* comparator) const {
     // We cheat and use Element::compareWithElement since we know that 'other' is a
     // Document and has a 'hidden' fieldname that is always indentical across all Document
     // instances.
-    return root().compareWithElement(other.root(), considerFieldName);
+    return root().compareWithElement(other.root(), considerFieldName, comparator);
 }
 
-inline int Document::compareWithBSONObj(const BSONObj& other, bool considerFieldName) const {
-    return root().compareWithBSONObj(other, considerFieldName);
+inline int Document::compareWithBSONObj(const BSONObj& other,
+                                        bool considerFieldName,
+                                        StringData::ComparatorInterface* comparator) const {
+    return root().compareWithBSONObj(other, considerFieldName, comparator);
 }
 
 inline void Document::writeTo(BSONObjBuilder* builder) const {

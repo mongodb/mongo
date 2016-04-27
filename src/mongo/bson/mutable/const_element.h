@@ -88,12 +88,17 @@ public:
     inline bool isValueMaxKey() const;
     inline SafeNum getValueSafeNum() const;
 
-    inline int compareWithElement(const ConstElement& other, bool considerFieldName = true) const;
+    inline int compareWithElement(const ConstElement& other,
+                                  bool considerFieldName = true,
+                                  StringData::ComparatorInterface* comparator = nullptr) const;
 
     inline int compareWithBSONElement(const BSONElement& other,
-                                      bool considerFieldName = true) const;
+                                      bool considerFieldName = true,
+                                      StringData::ComparatorInterface* comparator = nullptr) const;
 
-    inline int compareWithBSONObj(const BSONObj& other, bool considerFieldName = true) const;
+    inline int compareWithBSONObj(const BSONObj& other,
+                                  bool considerFieldName = true,
+                                  StringData::ComparatorInterface* comparator = nullptr) const;
 
     inline void writeTo(BSONObjBuilder* builder) const;
     inline void writeArrayTo(BSONArrayBuilder* builder) const;

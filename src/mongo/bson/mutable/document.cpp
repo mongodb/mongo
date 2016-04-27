@@ -1485,7 +1485,9 @@ SafeNum Element::getValueSafeNum() const {
     }
 }
 
-int Element::compareWithElement(const ConstElement& other, bool considerFieldName) const {
+int Element::compareWithElement(const ConstElement& other,
+                                bool considerFieldName,
+                                StringData::ComparatorInterface* comparator) const {
     verify(ok());
     verify(other.ok());
 
@@ -1507,13 +1509,15 @@ int Element::compareWithElement(const ConstElement& other, bool considerFieldNam
     // TODO: Andy has suggested that this may not be legal since woCompare is not reflexive
     // in all cases.
     if (impl.hasValue(thisRep))
-        return -other.compareWithBSONElement(impl.getSerializedElement(thisRep), considerFieldName);
+        return -other.compareWithBSONElement(
+            impl.getSerializedElement(thisRep), considerFieldName, comparator);
 
     const Document::Impl& oimpl = other.getDocument().getImpl();
     const ElementRep& otherRep = oimpl.getElementRep(other.getIdx());
 
     if (oimpl.hasValue(otherRep))
-        return compareWithBSONElement(oimpl.getSerializedElement(otherRep), considerFieldName);
+        return compareWithBSONElement(
+            oimpl.getSerializedElement(otherRep), considerFieldName, comparator);
 
     // Leaf elements should always have a value, so we should only be dealing with Objects
     // or Arrays here.
@@ -1554,7 +1558,8 @@ int Element::compareWithElement(const ConstElement& other, bool considerFieldNam
         if (!otherIter.ok())
             return 1;
 
-        const int result = thisIter.compareWithElement(otherIter, considerChildFieldNames);
+        const int result =
+            thisIter.compareWithElement(otherIter, considerChildFieldNames, comparator);
         if (result != 0)
             return result;
 
@@ -1563,7 +1568,9 @@ int Element::compareWithElement(const ConstElement& other, bool considerFieldNam
     }
 }
 
-int Element::compareWithBSONElement(const BSONElement& other, bool considerFieldName) const {
+int Element::compareWithBSONElement(const BSONElement& other,
+                                    bool considerFieldName,
+                                    StringData::ComparatorInterface* comparator) const {
     verify(ok());
 
     const Document::Impl& impl = getDocument().getImpl();
@@ -1572,7 +1579,7 @@ int Element::compareWithBSONElement(const BSONElement& other, bool considerField
     // If we have a representation as a BSONElement, we can just use BSONElement::woCompare
     // to do the entire comparison.
     if (impl.hasValue(thisRep))
-        return impl.getSerializedElement(thisRep).woCompare(other, considerFieldName);
+        return impl.getSerializedElement(thisRep).woCompare(other, considerFieldName, comparator);
 
     // Leaf elements should always have a value, so we should only be dealing with Objects
     // or Arrays here.
@@ -1599,10 +1606,12 @@ int Element::compareWithBSONElement(const BSONElement& other, bool considerField
     const bool considerChildFieldNames =
         (impl.getType(thisRep) != mongo::Array) && (other.type() != mongo::Array);
 
-    return compareWithBSONObj(other.Obj(), considerChildFieldNames);
+    return compareWithBSONObj(other.Obj(), considerChildFieldNames, comparator);
 }
 
-int Element::compareWithBSONObj(const BSONObj& other, bool considerFieldName) const {
+int Element::compareWithBSONObj(const BSONObj& other,
+                                bool considerFieldName,
+                                StringData::ComparatorInterface* comparator) const {
     verify(ok());
 
     const Document::Impl& impl = getDocument().getImpl();
@@ -1624,7 +1633,7 @@ int Element::compareWithBSONObj(const BSONObj& other, bool considerFieldName) co
         if (otherVal.eoo())
             return 1;
 
-        const int result = thisIter.compareWithBSONElement(otherVal, considerFieldName);
+        const int result = thisIter.compareWithBSONElement(otherVal, considerFieldName, comparator);
         if (result != 0)
             return result;
 
