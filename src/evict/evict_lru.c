@@ -1628,12 +1628,19 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
 	 * worker thread.
 	 */
 	if (F_ISSET(session, WT_SESSION_INTERNAL)) {
-		if (is_server)
+		if (is_server) {
+			WT_STAT_FAST_CONN_INCR(
+			    session, cache_eviction_server_evicting);
 			cache->server_evicts++;
-		else
+		} else {
+			WT_STAT_FAST_CONN_INCR(
+			    session, cache_eviction_worker_evicting);
 			cache->worker_evicts++;
-	} else
+		}
+	} else {
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_app);
 		cache->app_evicts++;
+	}
 
 	/*
 	 * In case something goes wrong, don't pick the same set of pages every

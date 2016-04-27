@@ -209,12 +209,6 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
 	WT_STAT_SET(session, stats, cache_bytes_max, conn->cache_size);
 	WT_STAT_SET(session, stats, cache_bytes_inuse, inuse);
 
-	WT_STAT_SET(session, stats, cache_eviction_app, cache->app_evicts);
-	WT_STAT_SET(session,
-	    stats, cache_eviction_server_evicting, cache->server_evicts);
-	WT_STAT_SET(session,
-	    stats, cache_eviction_worker_evicting, cache->worker_evicts);
-
 	WT_STAT_SET(session, stats, cache_overhead, cache->overhead_pct);
 	WT_STAT_SET(
 	    session, stats, cache_pages_inuse, __wt_cache_pages_inuse(cache));
