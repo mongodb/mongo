@@ -274,14 +274,15 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
     ChunkVersion oldVersion;
     std::shared_ptr<ChunkManager> oldManager;
 
-    const auto currentReloadIteration = _reloadCount.load();
-
     {
         stdx::lock_guard<stdx::mutex> lk(_lock);
 
         bool earlyReload = !_collections[ns].isSharded() && (shouldReload || forceReload);
         if (earlyReload) {
-            // This is to catch cases where there this is a new sharded collection
+            // This is to catch cases where there this is a new sharded collection.
+            // Note: read the _reloadCount inside the _lock mutex, so _loadIfNeeded will always
+            // be forced to perform a reload.
+            const auto currentReloadIteration = _reloadCount.load();
             _loadIfNeeded(txn, currentReloadIteration);
         }
 
