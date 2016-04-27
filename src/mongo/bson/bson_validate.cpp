@@ -377,7 +377,7 @@ Status validateBSONIterative(Buffer* buffer) {
                 break;
             }
             case ValidationState::Done:
-                break;
+                MONGO_UNREACHABLE;
         }
     }
 
