@@ -720,12 +720,12 @@ Status CatalogManagerReplicaSet::shardCollection(OperationContext* txn,
         return scopedDistLock.getStatus();
     }
 
-    auto status = getDatabase(txn, nsToDatabase(ns));
-    if (!status.isOK()) {
-        return status.getStatus();
+    auto getDBStatus = getDatabase(txn, nsToDatabase(ns));
+    if (!getDBStatus.isOK()) {
+        return getDBStatus.getStatus();
     }
 
-    ShardId dbPrimaryShardId = status.getValue().value.getPrimary();
+    ShardId dbPrimaryShardId = getDBStatus.getValue().value.getPrimary();
     const auto primaryShard = grid.shardRegistry()->getShard(txn, dbPrimaryShardId);
 
     {
@@ -789,15 +789,22 @@ Status CatalogManagerReplicaSet::shardCollection(OperationContext* txn,
         manager->getVersion(),
         true);
 
-    auto ssvStatus = grid.shardRegistry()->runIdempotentCommandOnShard(
-        txn,
-        dbPrimaryShardId,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        "admin",
-        ssv.toBSON());
-    if (!ssvStatus.isOK()) {
+    auto shard = Grid::get(txn)->shardRegistry()->getShard(txn, dbPrimaryShardId);
+    if (!shard) {
+        return {ErrorCodes::ShardNotFound,
+                str::stream() << "shard " << dbPrimaryShardId << " not found"};
+    }
+
+    auto ssvResponse = shard->runCommand(txn,
+                                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                         "admin",
+                                         ssv.toBSON(),
+                                         Shard::RetryPolicy::kIdempotent);
+    auto status = ssvResponse.isOK() ? std::move(ssvResponse.getValue().commandStatus)
+                                     : std::move(ssvResponse.getStatus());
+    if (!status.isOK()) {
         warning() << "could not update initial version of " << ns << " on shard primary "
-                  << dbPrimaryShardId << ssvStatus.getStatus();
+                  << dbPrimaryShardId << causedBy(status);
     }
 
     logChange(txn, "shardCollection.end", ns, BSON("version" << manager->getVersion().toString()));
@@ -1064,25 +1071,38 @@ Status CatalogManagerReplicaSet::dropCollection(OperationContext* txn, const Nam
     auto* shardRegistry = grid.shardRegistry();
 
     for (const auto& shardEntry : allShards) {
-        auto dropResult = shardRegistry->runIdempotentCommandOnShard(
+        auto shard = shardRegistry->getShard(txn, shardEntry.getName());
+        if (!shard) {
+            return {ErrorCodes::ShardNotFound,
+                    str::stream() << "shard " << shardEntry.getName() << " not found"};
+        }
+        auto dropResult = shard->runCommand(
             txn,
-            shardEntry.getName(),
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             ns.db().toString(),
-            BSON("drop" << ns.coll() << "writeConcern" << txn->getWriteConcern().toBSON()));
+            BSON("drop" << ns.coll() << "writeConcern" << txn->getWriteConcern().toBSON()),
+            Shard::RetryPolicy::kIdempotent);
 
         if (!dropResult.isOK()) {
             return Status(dropResult.getStatus().code(),
                           dropResult.getStatus().reason() + " at " + shardEntry.getName());
         }
 
-        auto dropStatus = getStatusFromCommandResult(dropResult.getValue());
-        if (!dropStatus.isOK()) {
-            if (dropStatus.code() == ErrorCodes::NamespaceNotFound) {
+        auto dropStatus = std::move(dropResult.getValue().commandStatus);
+        auto wcStatus = std::move(dropResult.getValue().writeConcernStatus);
+        if (!dropStatus.isOK() || !wcStatus.isOK()) {
+            if (dropStatus.code() == ErrorCodes::NamespaceNotFound && wcStatus.isOK()) {
+                // Generally getting NamespaceNotFound is okay to ignore as it simply means that
+                // the collection has already been dropped or doesn't exist on this shard.
+                // If, however, we get NamespaceNotFound but also have a write concern error then we
+                // can't confirm whether the fact that the namespace doesn't exist is actually
+                // committed.  Thus we must still fail on NamespaceNotFound if there is also a write
+                // concern error. This can happen if we call drop, it succeeds but with a write
+                // concern error, then we retry the drop.
                 continue;
             }
 
-            errors.emplace(shardEntry.getHost(), dropResult.getValue());
+            errors.emplace(shardEntry.getHost(), std::move(dropResult.getValue().response));
         }
     }
 
@@ -1134,34 +1154,39 @@ Status CatalogManagerReplicaSet::dropCollection(OperationContext* txn, const Nam
             ChunkVersion::DROPPED(),
             true);
 
-        auto ssvResult = shardRegistry->runIdempotentCommandOnShard(
-            txn,
-            shardEntry.getName(),
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            "admin",
-            ssv.toBSON());
+        auto shard = shardRegistry->getShard(txn, shardEntry.getName());
+        if (!shard) {
+            return {ErrorCodes::ShardNotFound,
+                    str::stream() << "shard " << shardEntry.getName() << " not found"};
+        }
+
+        auto ssvResult = shard->runCommand(txn,
+                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                           "admin",
+                                           ssv.toBSON(),
+                                           Shard::RetryPolicy::kIdempotent);
 
         if (!ssvResult.isOK()) {
             return ssvResult.getStatus();
         }
 
-        auto ssvStatus = getStatusFromCommandResult(ssvResult.getValue());
+        auto ssvStatus = std::move(ssvResult.getValue().commandStatus);
         if (!ssvStatus.isOK()) {
             return ssvStatus;
         }
 
-        auto unsetShardingStatus = shardRegistry->runIdempotentCommandOnShard(
-            txn,
-            shardEntry.getName(),
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            "admin",
-            BSON("unsetSharding" << 1));
+        auto unsetShardingStatus =
+            shard->runCommand(txn,
+                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                              "admin",
+                              BSON("unsetSharding" << 1),
+                              Shard::RetryPolicy::kIdempotent);
 
         if (!unsetShardingStatus.isOK()) {
             return unsetShardingStatus.getStatus();
         }
 
-        auto unsetShardingResult = getStatusFromCommandResult(unsetShardingStatus.getValue());
+        auto unsetShardingResult = std::move(unsetShardingStatus.getValue().commandStatus);
         if (!unsetShardingResult.isOK()) {
             return unsetShardingResult;
         }

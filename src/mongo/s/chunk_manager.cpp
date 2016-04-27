@@ -357,17 +357,17 @@ void ChunkManager::calcInitSplitsAndShards(OperationContext* txn,
         // discover split points
         const auto primaryShard = grid.shardRegistry()->getShard(txn, primaryShardId);
         const NamespaceString nss{getns()};
-        auto result = grid.shardRegistry()->runIdempotentCommandOnShard(
-            txn,
-            primaryShard,
-            ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-            nss.db().toString(),
-            BSON("count" << nss.coll()));
+
+        auto result = uassertStatusOK(
+            primaryShard->runCommand(txn,
+                                     ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+                                     nss.db().toString(),
+                                     BSON("count" << nss.coll()),
+                                     Shard::RetryPolicy::kIdempotent));
 
         long long numObjects = 0;
-        uassertStatusOK(result.getStatus());
-        uassertStatusOK(getStatusFromCommandResult(result.getValue()));
-        uassertStatusOK(bsonExtractIntegerField(result.getValue(), "n", &numObjects));
+        uassertStatusOK(result.commandStatus);
+        uassertStatusOK(bsonExtractIntegerField(result.response, "n", &numObjects));
 
         if (numObjects > 0) {
             *splitPoints = uassertStatusOK(shardutil::selectChunkSplitPoints(

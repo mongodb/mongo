@@ -266,10 +266,7 @@ StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* tx
     BSONObj responseObj = swResponse.getValue().data.getOwned();
     BSONObj responseMetadata = swResponse.getValue().metadata.getOwned();
     Status commandStatus = getStatusFromCommandResult(responseObj);
-    Status writeConcernStatus = kInternalErrorStatus;
-    if (commandStatus.isOK()) {
-        writeConcernStatus = getWriteConcernStatusFromCommandResult(responseObj);
-    }
+    Status writeConcernStatus = getWriteConcernStatusFromCommandResult(responseObj);
     updateReplSetMonitor(host.getValue(), commandStatus);
 
     return CommandResponse(std::move(responseObj),

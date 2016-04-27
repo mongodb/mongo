@@ -354,12 +354,15 @@ bool Balancer::_checkOIDs(OperationContext* txn) {
             continue;
         }
 
-        BSONObj f = uassertStatusOK(grid.shardRegistry()->runIdempotentCommandOnShard(
-            txn,
-            s,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            "admin",
-            BSON("features" << 1)));
+        auto result =
+            uassertStatusOK(s->runCommand(txn,
+                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                          "admin",
+                                          BSON("features" << 1),
+                                          Shard::RetryPolicy::kIdempotent));
+        uassertStatusOK(result.commandStatus);
+        BSONObj f = std::move(result.response);
+
         if (f["oidMachine"].isNumber()) {
             int x = f["oidMachine"].numberInt();
             if (oids.count(x) == 0) {
@@ -368,21 +371,23 @@ bool Balancer::_checkOIDs(OperationContext* txn) {
                 log() << "error: 2 machines have " << x << " as oid machine piece: " << shardId
                       << " and " << oids[x];
 
-                uassertStatusOK(grid.shardRegistry()->runIdempotentCommandOnShard(
-                    txn,
-                    s,
-                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                    "admin",
-                    BSON("features" << 1 << "oidReset" << 1)));
+                result = uassertStatusOK(
+                    s->runCommand(txn,
+                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                  "admin",
+                                  BSON("features" << 1 << "oidReset" << 1),
+                                  Shard::RetryPolicy::kIdempotent));
+                uassertStatusOK(result.commandStatus);
 
                 const auto otherShard = grid.shardRegistry()->getShard(txn, oids[x]);
                 if (otherShard) {
-                    uassertStatusOK(grid.shardRegistry()->runIdempotentCommandOnShard(
-                        txn,
-                        otherShard,
-                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                        "admin",
-                        BSON("features" << 1 << "oidReset" << 1)));
+                    result = uassertStatusOK(
+                        otherShard->runCommand(txn,
+                                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                               "admin",
+                                               BSON("features" << 1 << "oidReset" << 1),
+                                               Shard::RetryPolicy::kIdempotent));
+                    uassertStatusOK(result.commandStatus);
                 }
 
                 return false;

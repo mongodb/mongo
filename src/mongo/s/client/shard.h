@@ -59,7 +59,7 @@ public:
         BSONObj response;
         BSONObj metadata;
         Status commandStatus;
-        Status writeConcernStatus;  // Only valid to check when commandStatus is OK.
+        Status writeConcernStatus;
     };
 
     struct QueryResponse {

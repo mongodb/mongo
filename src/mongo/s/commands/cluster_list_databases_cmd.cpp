@@ -100,12 +100,14 @@ public:
                 continue;
             }
 
-            BSONObj x = uassertStatusOK(grid.shardRegistry()->runIdempotentCommandOnShard(
-                txn,
-                s,
-                ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-                "admin",
-                BSON("listDatabases" << 1)));
+            auto result = uassertStatusOK(
+                s->runCommand(txn,
+                              ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+                              "admin",
+                              BSON("listDatabases" << 1),
+                              Shard::RetryPolicy::kIdempotent));
+            uassertStatusOK(result.commandStatus);
+            BSONObj x = std::move(result.response);
 
             BSONObjIterator j(x["databases"].Obj());
             while (j.more()) {

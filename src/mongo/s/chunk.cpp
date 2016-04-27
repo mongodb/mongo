@@ -419,15 +419,28 @@ bool Chunk::moveAndCommit(OperationContext* txn,
 
     Status status{ErrorCodes::NotYetInitialized, "Uninitialized"};
 
-    auto cmdStatus = Grid::get(txn)->shardRegistry()->runIdempotentCommandOnShard(
-        txn, _shardId, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, "admin", cmdObj);
-    if (!cmdStatus.isOK()) {
-        warning() << "Move chunk failed" << causedBy(cmdStatus.getStatus());
-        status = std::move(cmdStatus.getStatus());
+    auto shard = Grid::get(txn)->shardRegistry()->getShard(txn, _shardId);
+    if (!shard) {
+        status = Status(ErrorCodes::ShardNotFound,
+                        str::stream() << "shard " << _shardId << " not found");
     } else {
-        res = std::move(cmdStatus.getValue());
-        status = getStatusFromCommandResult(res);
-        LOG(status.isOK() ? 1 : 0) << "moveChunk result: " << res;
+        auto response = shard->runCommand(txn,
+                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                          "admin",
+                                          cmdObj,
+                                          Shard::RetryPolicy::kNotIdempotent);
+        if (!response.isOK()) {
+            status = std::move(response.getStatus());
+        } else {
+            status = std::move(response.getValue().commandStatus);
+            res = std::move(response.getValue().response);
+        }
+    }
+
+    if (status.isOK()) {
+        LOG(1) << "moveChunk result: " << res;
+    } else {
+        warning() << "Move chunk failed" << causedBy(status);
     }
 
     // If succeeded we needs to reload the chunk manager in order to pick up the new location. If

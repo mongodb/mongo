@@ -851,18 +851,27 @@ Status runUpgradeOnAllShards(OperationContext* txn,
 
     bool hasWCError = false;
     for (const auto& shardId : shardIds) {
-        auto cmdResult = shardRegistry->runIdempotentCommandOnShard(
-            txn, shardId, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, "admin", cmdObj);
-
-        if (!cmdResult.isOK()) {
-            return Status(cmdResult.getStatus().code(),
+        auto shard = shardRegistry->getShard(txn, shardId);
+        if (!shard) {
+            return {ErrorCodes::ShardNotFound,
+                    str::stream() << "shard " << shardId << " not found"};
+        }
+        auto cmdResult = shard->runCommand(txn,
+                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                           "admin",
+                                           cmdObj,
+                                           Shard::RetryPolicy::kIdempotent);
+        auto status = cmdResult.isOK() ? std::move(cmdResult.getValue().commandStatus)
+                                       : std::move(cmdResult.getStatus());
+        if (!status.isOK()) {
+            return Status(status.code(),
                           str::stream() << "Failed to run authSchemaUpgrade on shard " << shardId
                                         << causedBy(cmdResult.getStatus()));
         }
 
         // If the result has a writeConcernError, append it.
         if (!hasWCError) {
-            if (auto wcErrorElem = cmdResult.getValue()["writeConcernError"]) {
+            if (auto wcErrorElem = cmdResult.getValue().response["writeConcernError"]) {
                 appendWriteConcernErrorToCmdResponse(shardId, wcErrorElem, result);
                 hasWCError = true;
             }

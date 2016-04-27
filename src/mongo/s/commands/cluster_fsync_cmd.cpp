@@ -92,12 +92,14 @@ public:
                 continue;
             }
 
-            BSONObj x = uassertStatusOK(grid.shardRegistry()->runIdempotentCommandOnShard(
-                txn,
-                s,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                "admin",
-                BSON("fsync" << 1)));
+            auto result =
+                uassertStatusOK(s->runCommand(txn,
+                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                              "admin",
+                                              BSON("fsync" << 1),
+                                              Shard::RetryPolicy::kIdempotent));
+            uassertStatusOK(result.commandStatus);
+            BSONObj x = std::move(result.response);
 
             sub.append(s->getId(), x);
 
