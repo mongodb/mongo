@@ -59,23 +59,23 @@ void ServiceContextMongoDTest::setUp() {
 }
 
 void ServiceContextMongoDTest::tearDown() {
-    _dropAllDBs();
+    auto txn = cc().makeOperationContext();
+    _dropAllDBs(txn.get());
 }
 
-void ServiceContextMongoDTest::_dropAllDBs() {
-    const auto txn = cc().makeOperationContext();
-    dropAllDatabasesExceptLocal(txn.get());
+void ServiceContextMongoDTest::_dropAllDBs(OperationContext* txn) {
+    dropAllDatabasesExceptLocal(txn);
 
-    ScopedTransaction transaction(txn.get(), MODE_X);
+    ScopedTransaction transaction(txn, MODE_X);
     Lock::GlobalWrite lk(txn->lockState());
-    AutoGetDb autoDBLocal(txn.get(), "local", MODE_X);
+    AutoGetDb autoDBLocal(txn, "local", MODE_X);
     const auto localDB = autoDBLocal.getDb();
     if (localDB) {
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             // Do not wrap in a WriteUnitOfWork until SERVER-17103 is addressed.
-            autoDBLocal.getDb()->dropDatabase(txn.get(), localDB);
+            autoDBLocal.getDb()->dropDatabase(txn, localDB);
         }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn.get(), "_dropAllDBs", "local");
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "_dropAllDBs", "local");
     }
 }
 

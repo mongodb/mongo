@@ -32,6 +32,8 @@
 
 namespace mongo {
 
+class OperationContext;
+
 /**
  * Test fixture class for tests that use either the "ephemeralForTest" or "devnull" storage engines.
  */
@@ -43,14 +45,15 @@ protected:
     void setUp() override;
 
     /**
-     * Clear all databases
+     * Clear all databases.
      */
     void tearDown() override;
 
     /**
-     * Drops all databases.
+     * Drops all databases. Call this before global ReplicationCoordinator is destroyed -- it is
+     * used to drop the databases.
      */
-    void _dropAllDBs();
+    void _dropAllDBs(OperationContext* txn);
 };
 
 }  // namespace mongo
