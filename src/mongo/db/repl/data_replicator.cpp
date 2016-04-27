@@ -35,7 +35,7 @@
 #include <algorithm>
 
 #include "mongo/base/status.h"
-#include "mongo/client/query_fetcher.h"
+#include "mongo/client/fetcher.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
@@ -224,9 +224,7 @@ struct InitialSyncState {
                                             const NamespaceString& oplogNS);
     void setStatus(const Status& s);
     void setStatus(const CBHStatus& s);
-    void _setTimestampStatus(const QueryResponseStatus& fetchResult,
-                             Fetcher::NextAction* nextAction,
-                             TimestampStatus* status);
+    void _setTimestampStatus(const QueryResponseStatus& fetchResult, TimestampStatus* status);
 };
 
 // Initial Sync state
@@ -244,7 +242,6 @@ TimestampStatus InitialSyncState::getLatestOplogTimestamp(ReplicationExecutor* e
               stdx::bind(&InitialSyncState::_setTimestampStatus,
                          this,
                          stdx::placeholders::_1,
-                         stdx::placeholders::_2,
                          &timestampStatus));
     Status s = f.schedule();
     if (!s.isOK()) {
@@ -257,7 +254,6 @@ TimestampStatus InitialSyncState::getLatestOplogTimestamp(ReplicationExecutor* e
 }
 
 void InitialSyncState::_setTimestampStatus(const QueryResponseStatus& fetchResult,
-                                           Fetcher::NextAction* nextAction,
                                            TimestampStatus* status) {
     if (!fetchResult.isOK()) {
         *status = TimestampStatus(fetchResult.getStatus());
@@ -771,25 +767,22 @@ void DataReplicator::_onDataClonerFinish(const Status& status) {
                                 << "limit" << 1);
 
     TimestampStatus timestampStatus(ErrorCodes::BadValue, "");
-    _tmpFetcher.reset(new QueryFetcher(_exec,
-                                       _syncSource,
-                                       _opts.remoteOplogNS,
-                                       query,
-                                       stdx::bind(&DataReplicator::_onApplierReadyStart,
-                                                  this,
-                                                  stdx::placeholders::_1,
-                                                  stdx::placeholders::_2)));
+    _tmpFetcher = stdx::make_unique<Fetcher>(
+        _exec,
+        _syncSource,
+        _opts.remoteOplogNS.db().toString(),
+        query,
+        stdx::bind(&DataReplicator::_onApplierReadyStart, this, stdx::placeholders::_1));
     Status s = _tmpFetcher->schedule();
     if (!s.isOK()) {
         _initialSyncState->setStatus(s);
     }
 }
 
-void DataReplicator::_onApplierReadyStart(const QueryResponseStatus& fetchResult,
-                                          NextAction* nextAction) {
+void DataReplicator::_onApplierReadyStart(const QueryResponseStatus& fetchResult) {
     // Data clone done, move onto apply.
     TimestampStatus ts(ErrorCodes::OplogStartMissing, "");
-    _initialSyncState->_setTimestampStatus(fetchResult, nextAction, &ts);
+    _initialSyncState->_setTimestampStatus(fetchResult, &ts);
     if (ts.isOK()) {
         // TODO: set minvalid?
         LockGuard lk(_mutex);
@@ -1075,16 +1068,12 @@ void DataReplicator::_scheduleApplyAfterFetch(const Operations& ops) {
     const BSONElement missingIdElem = ops.begin()->getIdElement();
     const NamespaceString nss(ops.begin()->ns);
     const BSONObj query = BSON("find" << nss.coll() << "filter" << missingIdElem.wrap());
-    _tmpFetcher.reset(new QueryFetcher(_exec,
-                                       _syncSource,
-                                       nss,
-                                       query,
-                                       stdx::bind(&DataReplicator::_onMissingFetched,
-                                                  this,
-                                                  stdx::placeholders::_1,
-                                                  stdx::placeholders::_2,
-                                                  ops,
-                                                  nss)));
+    _tmpFetcher = stdx::make_unique<Fetcher>(
+        _exec,
+        _syncSource,
+        nss.db().toString(),
+        query,
+        stdx::bind(&DataReplicator::_onMissingFetched, this, stdx::placeholders::_1, ops, nss));
     Status s = _tmpFetcher->schedule();
     if (!s.isOK()) {
         // record error and take next step based on it.
@@ -1094,7 +1083,6 @@ void DataReplicator::_scheduleApplyAfterFetch(const Operations& ops) {
 }
 
 void DataReplicator::_onMissingFetched(const QueryResponseStatus& fetchResult,
-                                       Fetcher::NextAction* nextAction,
                                        const Operations& ops,
                                        const NamespaceString nss) {
     if (!fetchResult.isOK()) {

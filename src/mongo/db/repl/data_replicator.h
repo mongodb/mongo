@@ -264,14 +264,12 @@ private:
     // Fetches the last doc from the first operation, and reschedules the apply for the ops.
     void _scheduleApplyAfterFetch(const Operations&);
     void _onMissingFetched(const QueryResponseStatus& fetchResult,
-                           Fetcher::NextAction* nextAction,
                            const Operations& ops,
                            const NamespaceString nss);
 
     void _onDataClonerFinish(const Status& status);
     // Called after _onDataClonerFinish when the new Timestamp is avail, to use for minvalid
-    void _onApplierReadyStart(const QueryResponseStatus& fetchResult,
-                              Fetcher::NextAction* nextAction);
+    void _onApplierReadyStart(const QueryResponseStatus& fetchResult);
 
     Status _scheduleApplyBatch();
     Status _scheduleApplyBatch_inlock();
@@ -317,9 +315,9 @@ private:
     CollectionCloner::StorageInterface* _storage;         // (M)
 
     // set during scheduling and onFinish
-    bool _fetcherPaused;                        // (X)
-    std::unique_ptr<OplogFetcher> _fetcher;     // (S)
-    std::unique_ptr<QueryFetcher> _tmpFetcher;  // (S)
+    bool _fetcherPaused;                     // (X)
+    std::unique_ptr<OplogFetcher> _fetcher;  // (S)
+    std::unique_ptr<Fetcher> _tmpFetcher;    // (S)
 
     bool _reporterPaused;                 // (M)
     Handle _reporterHandle;               // (M)

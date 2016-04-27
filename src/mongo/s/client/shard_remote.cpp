@@ -34,7 +34,7 @@
 
 #include <string>
 
-#include "mongo/client/query_fetcher.h"
+#include "mongo/client/fetcher.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/replica_set_monitor.h"
@@ -296,40 +296,48 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     // If for some reason the callback never gets invoked, we will return this status in response.
     Status status = Status(ErrorCodes::InternalError, "Internal error running find command");
 
-    auto fetcherCallback = [this, &status, &response](
-        const Fetcher::QueryResponseStatus& dataStatus, Fetcher::NextAction* nextAction) {
+    auto fetcherCallback =
+        [this, &status, &response](const Fetcher::QueryResponseStatus& dataStatus,
+                                   Fetcher::NextAction* nextAction,
+                                   BSONObjBuilder* getMoreBob) {
 
-        // Throw out any accumulated results on error
-        if (!dataStatus.isOK()) {
-            status = dataStatus.getStatus();
-            response.docs.clear();
-            return;
-        }
-
-        auto& data = dataStatus.getValue();
-        if (data.otherFields.metadata.hasField(rpc::kReplSetMetadataFieldName)) {
-            auto replParseStatus =
-                rpc::ReplSetMetadata::readFromMetadata(data.otherFields.metadata);
-
-            if (!replParseStatus.isOK()) {
-                status = replParseStatus.getStatus();
+            // Throw out any accumulated results on error
+            if (!dataStatus.isOK()) {
+                status = dataStatus.getStatus();
                 response.docs.clear();
                 return;
             }
 
-            response.opTime = replParseStatus.getValue().getLastOpVisible();
+            auto& data = dataStatus.getValue();
+            if (data.otherFields.metadata.hasField(rpc::kReplSetMetadataFieldName)) {
+                auto replParseStatus =
+                    rpc::ReplSetMetadata::readFromMetadata(data.otherFields.metadata);
 
-            // We return the config opTime that was returned for this particular request, but as a
-            // safeguard we ensure our global configOpTime is at least as large as it.
-            invariant(grid.configOpTime() >= response.opTime);
-        }
+                if (!replParseStatus.isOK()) {
+                    status = replParseStatus.getStatus();
+                    response.docs.clear();
+                    return;
+                }
 
-        for (const BSONObj& doc : data.documents) {
-            response.docs.push_back(doc.getOwned());
-        }
+                response.opTime = replParseStatus.getValue().getLastOpVisible();
 
-        status = Status::OK();
-    };
+                // We return the config opTime that was returned for this particular request, but as
+                // a safeguard we ensure our global configOpTime is at least as large as it.
+                invariant(grid.configOpTime() >= response.opTime);
+            }
+
+            for (const BSONObj& doc : data.documents) {
+                response.docs.push_back(doc.getOwned());
+            }
+
+            status = Status::OK();
+
+            if (!getMoreBob) {
+                return;
+            }
+            getMoreBob->append("getMore", data.cursorId);
+            getMoreBob->append("collection", data.nss.coll());
+        };
 
     BSONObj readConcernObj;
     {
@@ -363,13 +371,13 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     findCmdBuilder.append(LiteParsedQuery::cmdOptionMaxTimeMS,
                           durationCount<Milliseconds>(maxTime));
 
-    QueryFetcher fetcher(Grid::get(txn)->getExecutorPool()->getFixedExecutor(),
-                         host.getValue(),
-                         nss,
-                         findCmdBuilder.done(),
-                         fetcherCallback,
-                         _getMetadataForCommand(readPref),
-                         maxTime);
+    Fetcher fetcher(Grid::get(txn)->getExecutorPool()->getFixedExecutor(),
+                    host.getValue(),
+                    nss.db().toString(),
+                    findCmdBuilder.done(),
+                    fetcherCallback,
+                    _getMetadataForCommand(readPref),
+                    maxTime);
     Status scheduleStatus = fetcher.schedule();
     if (!scheduleStatus.isOK()) {
         return scheduleStatus;

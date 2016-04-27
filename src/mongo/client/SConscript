@@ -250,7 +250,6 @@ env.Library(
     target='fetcher',
     source=[
         'fetcher.cpp',
-        'query_fetcher.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/executor/task_executor_interface',
