@@ -146,8 +146,8 @@ protected:
 
             try {
                 checkAllSets();
-            } catch (std::exception& e) {
-                error() << "check failed: " << e.what();
+            } catch (const std::exception& e) {
+                error() << "check all sets failed: " << e.what();
             } catch (...) {
                 error() << "unknown error";
             }
@@ -163,14 +163,14 @@ protected:
 
     void checkAllSets() {
         for (const string& setName : globalRSMonitorManager.getAllSetNames()) {
-            LOG(1) << "checking replica set: " << setName;
-
             shared_ptr<ReplicaSetMonitor> m = globalRSMonitorManager.getMonitor(setName);
             if (!m) {
                 continue;
             }
 
+            Timer t;
             m->startOrContinueRefresh().refreshAll();
+            LOG(1) << "Refreshing replica set " << setName << " took " << t.millis() << " msec";
 
             if (!m->isSetUsable()) {
                 log() << "Stopping periodic monitoring of set " << m->getName()
