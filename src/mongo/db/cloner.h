@@ -30,6 +30,9 @@
 
 #pragma once
 
+#include <vector>
+#include <string>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/s/catalog/catalog_manager.h"
@@ -54,18 +57,35 @@ public:
 
     /**
      * Copies an entire database from the specified host.
+     * clonedColls: when not-null, the function will return with this populated with a list of
+     *              the collections that were cloned.  This is for the user-facing clone command.
+     * collectionsToClone: When opts.createCollections is false, this list reflects the collections
+     *              that are cloned.  When opts.createCollections is true, this parameter is
+     *              ignored and the collection list is fetched from the remote via _conn.
      */
     Status copyDb(OperationContext* txn,
                   const std::string& toDBName,
                   const std::string& masterHost,
                   const CloneOptions& opts,
-                  std::set<std::string>* clonedColls);
+                  std::set<std::string>* clonedColls,
+                  std::vector<BSONObj> collectionsToClone = std::vector<BSONObj>());
 
     bool copyCollection(OperationContext* txn,
                         const std::string& ns,
                         const BSONObj& query,
                         std::string& errmsg,
                         bool copyIndexes);
+
+    // Filters a database's collection list and removes collections that should not be cloned.
+    // CloneOptions should be populated with a fromDB and a list of collections to ignore, which
+    // will be filtered out.
+    StatusWith<std::vector<BSONObj>> filterCollectionsForClone(
+        const CloneOptions& opts, const std::list<BSONObj>& initialCollections);
+
+    // Executes 'createCollection' for each collection specified in 'collections', in 'dbName'.
+    Status createCollectionsForDb(OperationContext* txn,
+                                  const std::vector<BSONObj>& collections,
+                                  const std::string& dbName);
 
 private:
     void copy(OperationContext* txn,
@@ -99,6 +119,8 @@ private:
  *                holding a distributed lock (such as movePrimary).  Indicates that we need to
  *                be periodically checking to see if the catalog manager has swapped and fail
  *                if it has so that we don't block the mongos that initiated the command.
+ *  createCollections - When 'true', will fetch a list of collections from the remote and create
+ *                them.  When 'false', assumes collections have already been created ahead of time.
  */
 struct CloneOptions {
     std::string fromDB;
@@ -111,6 +133,7 @@ struct CloneOptions {
     bool syncData = true;
     bool syncIndexes = true;
     bool checkForCatalogChange = false;
+    bool createCollections = true;
 };
 
 }  // namespace mongo

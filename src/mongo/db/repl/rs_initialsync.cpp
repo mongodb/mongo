@@ -166,42 +166,40 @@ void checkAdminDatabasePostClone(OperationContext* txn, Database* adminDb) {
 bool _initialSyncClone(OperationContext* txn,
                        Cloner& cloner,
                        const std::string& host,
-                       const list<string>& dbs,
+                       const std::string& db,
+                       std::vector<BSONObj>& collections,
                        bool dataPass) {
-    for (list<string>::const_iterator i = dbs.begin(); i != dbs.end(); i++) {
-        const string db = *i;
-        if (db == "local")
-            continue;
+    if (db == "local")
+        return true;
 
-        if (dataPass)
-            log() << "initial sync cloning db: " << db;
-        else
-            log() << "initial sync cloning indexes for : " << db;
+    if (dataPass)
+        log() << "initial sync cloning db: " << db;
+    else
+        log() << "initial sync cloning indexes for : " << db;
 
-        CloneOptions options;
-        options.fromDB = db;
-        options.slaveOk = true;
-        options.useReplAuth = true;
-        options.snapshot = false;
-        options.syncData = dataPass;
-        options.syncIndexes = !dataPass;
+    CloneOptions options;
+    options.fromDB = db;
+    options.slaveOk = true;
+    options.useReplAuth = true;
+    options.snapshot = false;
+    options.syncData = dataPass;
+    options.syncIndexes = !dataPass;
+    options.createCollections = false;
 
-        // Make database stable
-        ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock dbWrite(txn->lockState(), db, MODE_X);
+    // Make database stable
+    ScopedTransaction transaction(txn, MODE_IX);
+    Lock::DBLock dbWrite(txn->lockState(), db, MODE_X);
 
-        Status status = cloner.copyDb(txn, db, host, options, NULL);
-        if (!status.isOK()) {
-            log() << "initial sync: error while " << (dataPass ? "cloning " : "indexing ") << db
-                  << ".  " << status.toString();
-            return false;
-        }
-
-        if (db == "admin") {
-            checkAdminDatabasePostClone(txn, dbHolder().get(txn, db));
-        }
+    Status status = cloner.copyDb(txn, db, host, options, nullptr, collections);
+    if (!status.isOK()) {
+        log() << "initial sync: error while " << (dataPass ? "cloning " : "indexing ") << db
+              << ".  " << status.toString();
+        return false;
     }
 
+    if (dataPass && (db == "admin")) {
+        checkAdminDatabasePostClone(txn, dbHolder().get(txn, db));
+    }
     return true;
 }
 
@@ -366,11 +364,42 @@ Status _initialSync() {
         if (admin != dbs.end()) {
             dbs.splice(dbs.begin(), dbs, admin);
         }
+        // Ignore local db
+        dbs.erase(std::remove(dbs.begin(), dbs.end(), "local"), dbs.end());
     }
 
     Cloner cloner;
-    if (!_initialSyncClone(&txn, cloner, r.conn()->getServerAddress(), dbs, true)) {
-        return Status(ErrorCodes::InitialSyncFailure, "initial sync failed data cloning");
+    std::map<std::string, std::vector<BSONObj>> collectionsPerDb;
+    for (auto&& db : dbs) {
+        CloneOptions options;
+        options.fromDB = db;
+        log() << "fetching and creating collections for " << db;
+        std::list<BSONObj> initialCollections =
+            r.conn()->getCollectionInfos(options.fromDB);  // may uassert
+        auto fetchStatus = cloner.filterCollectionsForClone(options, initialCollections);
+        if (!fetchStatus.isOK()) {
+            return fetchStatus.getStatus();
+        }
+        auto collections = fetchStatus.getValue();
+
+        ScopedTransaction transaction(&txn, MODE_IX);
+        Lock::DBLock dbWrite(txn.lockState(), db, MODE_X);
+
+        auto createStatus = cloner.createCollectionsForDb(&txn, collections, db);
+        if (!createStatus.isOK()) {
+            return createStatus;
+        }
+        collectionsPerDb.emplace(db, std::move(collections));
+    }
+    for (auto&& dbCollsPair : collectionsPerDb) {
+        if (!_initialSyncClone(&txn,
+                               cloner,
+                               r.conn()->getServerAddress(),
+                               dbCollsPair.first,
+                               dbCollsPair.second,
+                               true)) {
+            return Status(ErrorCodes::InitialSyncFailure, "initial sync failed data cloning");
+        }
     }
 
     log() << "initial sync data copy, starting syncup";
@@ -388,9 +417,9 @@ Status _initialSync() {
                       str::stream() << "initial sync failed: " << msg);
     }
 
-    // Now we sync to the latest op on the sync target _again_, as we may have recloned ops
-    // that were "from the future" from the data clone. During this second application,
-    // nothing should need to be recloned.
+    // Now we sync to the latest op on the sync target _again_, as we may have recloned ops that
+    // were "from the future" from the data clone. During this second application, nothing should
+    // need to be recloned.
     // TODO: replace with "tail" instance below, since we don't need to retry/reclone missing docs.
     msg = "oplog sync 2 of 3";
     log() << msg;
@@ -402,15 +431,21 @@ Status _initialSync() {
 
     msg = "initial sync building indexes";
     log() << msg;
-    if (!_initialSyncClone(&txn, cloner, r.conn()->getServerAddress(), dbs, false)) {
-        return Status(ErrorCodes::InitialSyncFailure,
-                      str::stream() << "initial sync failed: " << msg);
+    for (auto&& dbCollsPair : collectionsPerDb) {
+        if (!_initialSyncClone(&txn,
+                               cloner,
+                               r.conn()->getServerAddress(),
+                               dbCollsPair.first,
+                               dbCollsPair.second,
+                               false)) {
+            return Status(ErrorCodes::InitialSyncFailure,
+                          str::stream() << "initial sync failed: " << msg);
+        }
     }
 
-    // WARNING: If the 3rd oplog sync step is removed we must reset minValid
-    // to the last entry on the source server so that we don't come
-    // out of recovering until we get there (since the previous steps
-    // could have fetched newer document than the oplog entry we were applying from).
+    // WARNING: If the 3rd oplog sync step is removed we must reset minValid to the last entry on
+    // the source server so that we don't come out of recovering until we get there (since the
+    // previous steps could have fetched newer document than the oplog entry we were applying from).
     msg = "oplog sync 3 of 3";
     log() << msg;
 
@@ -436,8 +471,7 @@ Status _initialSync() {
         OpTime lastOpTimeWritten(getGlobalReplicationCoordinator()->getMyLastAppliedOpTime());
         log() << "set minValid=" << lastOpTimeWritten;
 
-        // Initial sync is now complete.  Flag this by setting minValid to the last thing
-        // we synced.
+        // Initial sync is now complete.  Flag this by setting minValid to the last thing we synced.
         StorageInterface::get(&txn)->setMinValid(&txn, lastOpTimeWritten, DurableRequirement::None);
         BackgroundSync::get()->setInitialSyncRequestedFlag(false);
     }
