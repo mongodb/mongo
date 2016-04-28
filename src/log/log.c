@@ -310,7 +310,7 @@ __wt_log_get_all_files(WT_SESSION_IMPL *session,
 	*countp = count;
 
 	if (0) {
-err:		WT_TRET(__wt_fs_directory_list_free(session, &files, &count));
+err:		WT_TRET(__wt_fs_directory_list_free(session, &files, count));
 	}
 	return (ret);
 }
@@ -765,7 +765,7 @@ __log_alloc_prealloc(WT_SESSION_IMPL *session, uint32_t to_num)
 
 err:	__wt_scr_free(session, &from_path);
 	__wt_scr_free(session, &to_path);
-	WT_TRET(__wt_fs_directory_list_free(session, &logfiles, &logcount));
+	WT_TRET(__wt_fs_directory_list_free(session, &logfiles, logcount));
 	return (ret);
 }
 
@@ -987,7 +987,7 @@ __log_truncate(WT_SESSION_IMPL *session,
 		}
 	}
 err:	WT_TRET(__wt_close(session, &log_fh));
-	WT_TRET(__wt_fs_directory_list_free(session, &logfiles, &logcount));
+	WT_TRET(__wt_fs_directory_list_free(session, &logfiles, logcount));
 	return (ret);
 }
 
@@ -1116,7 +1116,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 			    session, WT_LOG_TMPNAME, lognum));
 		}
 		WT_ERR(
-		    __wt_fs_directory_list_free(session, &logfiles, &logcount));
+		    __wt_fs_directory_list_free(session, &logfiles, logcount));
 		WT_ERR(__log_get_files(session,
 		    WT_LOG_PREPNAME, &logfiles, &logcount));
 		for (i = 0; i < logcount; i++) {
@@ -1126,7 +1126,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 			    session, WT_LOG_PREPNAME, lognum));
 		}
 		WT_ERR(
-		    __wt_fs_directory_list_free(session, &logfiles, &logcount));
+		    __wt_fs_directory_list_free(session, &logfiles, logcount));
 	}
 
 	/*
@@ -1164,7 +1164,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 		FLD_SET(conn->log_flags, WT_CONN_LOG_EXISTED);
 	}
 
-err:	WT_TRET(__wt_fs_directory_list_free(session, &logfiles, &logcount));
+err:	WT_TRET(__wt_fs_directory_list_free(session, &logfiles, logcount));
 	return (ret);
 }
 
@@ -1549,7 +1549,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		WT_SET_LSN(&start_lsn, firstlog, 0);
 		WT_SET_LSN(&end_lsn, lastlog, 0);
 		WT_ERR(
-		    __wt_fs_directory_list_free(session, &logfiles, &logcount));
+		    __wt_fs_directory_list_free(session, &logfiles, logcount));
 	}
 	WT_ERR(__log_openfile(
 	    session, false, &log_fh, WT_LOG_FILENAME, start_lsn.l.file));
@@ -1745,7 +1745,7 @@ advance:
 
 err:	WT_STAT_FAST_CONN_INCR(session, log_scans);
 
-	WT_TRET(__wt_fs_directory_list_free(session, &logfiles, &logcount));
+	WT_TRET(__wt_fs_directory_list_free(session, &logfiles, logcount));
 
 	__wt_scr_free(session, &buf);
 	__wt_scr_free(session, &decryptitem);

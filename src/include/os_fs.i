@@ -43,7 +43,7 @@ __wt_fs_directory_list(WT_SESSION_IMPL *session,
  */
 static inline int
 __wt_fs_directory_list_free(
-    WT_SESSION_IMPL *session, char ***dirlistp, u_int *countp)
+    WT_SESSION_IMPL *session, char ***dirlistp, u_int count)
 {
 	WT_DECL_RET;
 	WT_FILE_SYSTEM *file_system;
@@ -53,11 +53,10 @@ __wt_fs_directory_list_free(
 		file_system = S2C(session)->file_system;
 		wt_session = (WT_SESSION *)session;
 		ret = file_system->directory_list_free(
-		    file_system, wt_session, *dirlistp, *countp);
+		    file_system, wt_session, *dirlistp, count);
 	}
 
 	*dirlistp = NULL;
-	*countp = 0;
 	return (ret);
 }
 
