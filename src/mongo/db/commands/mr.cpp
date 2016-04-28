@@ -983,7 +983,7 @@ BSONObj _nativeToTemp(const BSONObj& args, void* data) {
  * After calling this method, the temp collection will be completed.
  * If inline, the results will be in the in memory map
  */
-void State::finalReduce(CurOp* curOp, ProgressMeterHolder& pm) {
+void State::finalReduce(OperationContext* txn, CurOp* curOp, ProgressMeterHolder& pm) {
     if (_jsMode) {
         // apply the reduce within JS
         if (_onDisk) {
@@ -1061,7 +1061,7 @@ void State::finalReduce(CurOp* curOp, ProgressMeterHolder& pm) {
     const ExtensionsCallbackReal extensionsCallback(_txn, &nss);
 
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(nss, BSONObj(), sortKey, BSONObj(), extensionsCallback);
+        CanonicalQuery::canonicalize(txn, nss, BSONObj(), sortKey, BSONObj(), extensionsCallback);
     verify(statusWithCQ.isOK());
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -1430,7 +1430,7 @@ public:
                 const ExtensionsCallbackReal extensionsCallback(txn, &nss);
 
                 auto statusWithCQ = CanonicalQuery::canonicalize(
-                    nss, config.filter, config.sort, BSONObj(), extensionsCallback);
+                    txn, nss, config.filter, config.sort, BSONObj(), extensionsCallback);
                 if (!statusWithCQ.isOK()) {
                     uasserted(17238, "Can't canonicalize query " + config.filter.toString());
                     return 0;
@@ -1572,7 +1572,7 @@ public:
             // if not inline: dump the in memory map to inc collection, all data is on disk
             state.dumpToInc();
             // final reduce
-            state.finalReduce(curOp, pm);
+            state.finalReduce(txn, curOp, pm);
             reduceTime += rt.micros();
             countsBuilder.appendNumber("reduce", state.numReduces());
             timingBuilder.appendNumber("reduceTime", reduceTime / 1000);

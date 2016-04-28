@@ -26,21 +26,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/query/collation/collator_factory_mock.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/client.h"
+#include "mongo/db/service_context_noop.h"
 
-namespace {
+namespace mongo {
 
-using namespace mongo;
+/**
+ * QueryTestServiceContext is a helper class for tests that require only a single Client under a
+ * single ServiceContext for their execution context. The owned ServiceContext is decorated with a
+ * CollatorFactoryMock.
+ */
+class QueryTestServiceContext {
+public:
+    QueryTestServiceContext();
 
-TEST(CollatorFactoryMockTest, CollatorFactoryMockConstructsReverseStringCollator) {
-    CollatorFactoryMock factory;
-    auto collator = factory.makeFromBSON(BSONObj());
-    ASSERT_OK(collator.getStatus());
-    ASSERT_GT(collator.getValue()->compare("abc", "cba"), 0);
-}
+    ServiceContext::UniqueOperationContext makeOperationContext();
 
-}  // namespace
+private:
+    ServiceContextNoop _serviceContext;
+    ServiceContext::UniqueClient _uniqueClient;
+};
+
+}  // namespace mongo

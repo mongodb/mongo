@@ -35,6 +35,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/query_settings.h"
+#include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -52,11 +53,14 @@ static const NamespaceString nss("test.collection");
 unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
                                         const char* sortStr,
                                         const char* projStr) {
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
+
     BSONObj queryObj = fromjson(queryStr);
     BSONObj sortObj = fromjson(sortStr);
     BSONObj projObj = fromjson(projStr);
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        nss, queryObj, sortObj, projObj, ExtensionsCallbackDisallowExtensions());
+        txn.get(), nss, queryObj, sortObj, projObj, ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }

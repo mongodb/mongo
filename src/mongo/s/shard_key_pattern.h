@@ -40,6 +40,7 @@ namespace mongo {
 
 class CanonicalQuery;
 class FieldRef;
+class OperationContext;
 
 /**
  * Helper struct when generating flattened bounds below
@@ -163,7 +164,8 @@ public:
      *   { a : { b : { $eq : "hi" } } } --> returns {} because the query language treats this as
      *                                                 a : { $eq : { b : ... } }
      */
-    StatusWith<BSONObj> extractShardKeyFromQuery(const BSONObj& basicQuery) const;
+    StatusWith<BSONObj> extractShardKeyFromQuery(OperationContext* txn,
+                                                 const BSONObj& basicQuery) const;
     StatusWith<BSONObj> extractShardKeyFromQuery(const CanonicalQuery& query) const;
 
     /**

@@ -100,6 +100,10 @@ public:
         wuow.commit();
     }
 
+    OperationContext* txn() {
+        return &_txn;
+    }
+
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
     OperationContext& _txn = *_txnPtr;
@@ -119,7 +123,7 @@ public:
 
         // Query can be answered by either index on "a" or index on "b".
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            nss, fromjson("{a: {$gte: 8}, b: 1}"), ExtensionsCallbackDisallowExtensions());
+            txn(), nss, fromjson("{a: {$gte: 8}, b: 1}"), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -184,7 +188,7 @@ public:
 
         // Query can be answered by either index on "a" or index on "b".
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            nss, fromjson("{a: {$gte: 8}, b: 1}"), ExtensionsCallbackDisallowExtensions());
+            txn(), nss, fromjson("{a: {$gte: 8}, b: 1}"), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 

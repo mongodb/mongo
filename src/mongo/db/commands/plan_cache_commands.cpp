@@ -212,7 +212,7 @@ StatusWith<unique_ptr<CanonicalQuery>> PlanCacheCommand::canonicalize(OperationC
     const ExtensionsCallbackReal extensionsCallback(txn, &nss);
 
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        std::move(nss), queryObj, sortObj, projObj, extensionsCallback);
+        txn, std::move(nss), queryObj, sortObj, projObj, extensionsCallback);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }

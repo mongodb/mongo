@@ -35,6 +35,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/index_tag.h"
+#include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -428,13 +429,16 @@ TEST(CanonicalQueryTest, IsValidTextAndSnapshot) {
 }
 
 TEST(CanonicalQueryTest, IsValidSortKeyMetaProjection) {
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
+
     // Passing a sortKey meta-projection without a sort is an error.
     {
         const bool isExplain = false;
         auto lpq = assertGet(LiteParsedQuery::makeFromFindCommand(
             nss, fromjson("{find: 'testcoll', projection: {foo: {$meta: 'sortKey'}}}"), isExplain));
-        auto cq =
-            CanonicalQuery::canonicalize(lpq.release(), ExtensionsCallbackDisallowExtensions());
+        auto cq = CanonicalQuery::canonicalize(
+            txn.get(), lpq.release(), ExtensionsCallbackDisallowExtensions());
         ASSERT_NOT_OK(cq.getStatus());
     }
 
@@ -445,8 +449,8 @@ TEST(CanonicalQueryTest, IsValidSortKeyMetaProjection) {
             nss,
             fromjson("{find: 'testcoll', projection: {foo: {$meta: 'sortKey'}}, sort: {bar: 1}}"),
             isExplain));
-        auto cq =
-            CanonicalQuery::canonicalize(lpq.release(), ExtensionsCallbackDisallowExtensions());
+        auto cq = CanonicalQuery::canonicalize(
+            txn.get(), lpq.release(), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(cq.getStatus());
     }
 }
@@ -538,9 +542,12 @@ TEST(CanonicalQueryTest, SortTreeNumChildrenComparison) {
  * Utility function to create a CanonicalQuery
  */
 unique_ptr<CanonicalQuery> canonicalize(const char* queryStr) {
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
+
     BSONObj queryObj = fromjson(queryStr);
-    auto statusWithCQ =
-        CanonicalQuery::canonicalize(nss, queryObj, ExtensionsCallbackDisallowExtensions());
+    auto statusWithCQ = CanonicalQuery::canonicalize(
+        txn.get(), nss, queryObj, ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -548,11 +555,14 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr) {
 std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
                                              const char* sortStr,
                                              const char* projStr) {
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
+
     BSONObj queryObj = fromjson(queryStr);
     BSONObj sortObj = fromjson(sortStr);
     BSONObj projObj = fromjson(projStr);
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        nss, queryObj, sortObj, projObj, ExtensionsCallbackDisallowExtensions());
+        txn.get(), nss, queryObj, sortObj, projObj, ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -653,16 +663,19 @@ TEST(CanonicalQueryTest, NormalizeWithInPreservesCollator) {
 }
 
 TEST(CanonicalQueryTest, CanonicalizeFromBaseQuery) {
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
+
     const bool isExplain = true;
     const std::string cmdStr =
         "{find:'bogusns', filter:{$or:[{a:1,b:1},{a:1,c:1}]}, projection:{a:1}, sort:{b:1}}";
     auto lpq = assertGet(LiteParsedQuery::makeFromFindCommand(nss, fromjson(cmdStr), isExplain));
-    auto baseCq = assertGet(
-        CanonicalQuery::canonicalize(lpq.release(), ExtensionsCallbackDisallowExtensions()));
+    auto baseCq = assertGet(CanonicalQuery::canonicalize(
+        txn.get(), lpq.release(), ExtensionsCallbackDisallowExtensions()));
 
     MatchExpression* firstClauseExpr = baseCq->root()->getChild(0);
     auto childCq = assertGet(CanonicalQuery::canonicalize(
-        *baseCq, firstClauseExpr, ExtensionsCallbackDisallowExtensions()));
+        txn.get(), *baseCq, firstClauseExpr, ExtensionsCallbackDisallowExtensions()));
 
     // Descriptive test. The childCq's filter should be the relevant $or clause, rather than the
     // entire query predicate.

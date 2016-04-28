@@ -105,7 +105,7 @@ public:
 
     unique_ptr<CanonicalQuery> canonicalize(const BSONObj& query) {
         auto statusWithCQ =
-            CanonicalQuery::canonicalize(nss, query, ExtensionsCallbackDisallowExtensions());
+            CanonicalQuery::canonicalize(&_txn, nss, query, ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         return std::move(statusWithCQ.getValue());
     }

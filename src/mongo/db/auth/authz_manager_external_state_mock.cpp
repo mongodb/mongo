@@ -204,7 +204,7 @@ Status AuthzManagerExternalStateMock::updateOne(OperationContext* txn,
         if (query.hasField("_id")) {
             document.root().appendElement(query["_id"]);
         }
-        status = driver.populateDocumentWithQueryFields(query, NULL, document);
+        status = driver.populateDocumentWithQueryFields(txn, query, NULL, document);
         if (!status.isOK()) {
             return status;
         }

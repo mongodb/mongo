@@ -38,6 +38,7 @@
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/unittest.h"
 
 using namespace mongo;
@@ -112,7 +113,8 @@ PlanRankingDecision* createDecision(size_t numPlans) {
 /**
  * Injects an entry into plan cache for query shape.
  */
-void addQueryShapeToPlanCache(PlanCache* planCache,
+void addQueryShapeToPlanCache(OperationContext* txn,
+                              PlanCache* planCache,
                               const char* queryStr,
                               const char* sortStr,
                               const char* projectionStr) {
@@ -122,7 +124,7 @@ void addQueryShapeToPlanCache(PlanCache* planCache,
 
     // Create canonical query.
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        nss, queryObj, sortObj, projectionObj, ExtensionsCallbackDisallowExtensions());
+        txn, nss, queryObj, sortObj, projectionObj, ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -141,13 +143,16 @@ bool planCacheContains(const PlanCache& planCache,
                        const char* queryStr,
                        const char* sortStr,
                        const char* projectionStr) {
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
+
     BSONObj queryObj = fromjson(queryStr);
     BSONObj sortObj = fromjson(sortStr);
     BSONObj projectionObj = fromjson(projectionStr);
 
     // Create canonical query.
     auto statusWithInputQuery = CanonicalQuery::canonicalize(
-        nss, queryObj, sortObj, projectionObj, ExtensionsCallbackDisallowExtensions());
+        txn.get(), nss, queryObj, sortObj, projectionObj, ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithInputQuery.getStatus());
     unique_ptr<CanonicalQuery> inputQuery = std::move(statusWithInputQuery.getValue());
 
@@ -163,7 +168,8 @@ bool planCacheContains(const PlanCache& planCache,
         // Alternatively, we could add key to PlanCacheEntry but that would be used in one place
         // only.
         auto statusWithCurrentQuery =
-            CanonicalQuery::canonicalize(nss,
+            CanonicalQuery::canonicalize(txn.get(),
+                                         nss,
                                          entry->query,
                                          entry->sort,
                                          entry->projection,
@@ -296,13 +302,14 @@ TEST(IndexFilterCommandsTest, SetFilterInvalidParameter) {
 TEST(IndexFilterCommandsTest, SetAndClearFilters) {
     QuerySettings querySettings;
     PlanCache planCache;
-    OperationContextNoop txn;
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
 
     // Inject query shape into plan cache.
-    addQueryShapeToPlanCache(&planCache, "{a: 1, b: 1}", "{a: -1}", "{_id: 0, a: 1}");
+    addQueryShapeToPlanCache(txn.get(), &planCache, "{a: 1, b: 1}", "{a: -1}", "{_id: 0, a: 1}");
     ASSERT_TRUE(planCacheContains(planCache, "{a: 1, b: 1}", "{a: -1}", "{_id: 0, a: 1}"));
 
-    ASSERT_OK(SetFilter::set(&txn,
+    ASSERT_OK(SetFilter::set(txn.get(),
                              &querySettings,
                              &planCache,
                              nss.ns(),
@@ -322,7 +329,7 @@ TEST(IndexFilterCommandsTest, SetAndClearFilters) {
 
     // Replacing the hint for the same query shape ({a: 1, b: 1} and {b: 2, a: 3}
     // share same shape) should not change the query settings size.
-    ASSERT_OK(SetFilter::set(&txn,
+    ASSERT_OK(SetFilter::set(txn.get(),
                              &querySettings,
                              &planCache,
                              nss.ns(),
@@ -333,7 +340,7 @@ TEST(IndexFilterCommandsTest, SetAndClearFilters) {
     ASSERT_EQUALS(filters.size(), 1U);
 
     // Add hint for different query shape.
-    ASSERT_OK(SetFilter::set(&txn,
+    ASSERT_OK(SetFilter::set(txn.get(),
                              &querySettings,
                              &planCache,
                              nss.ns(),
@@ -342,7 +349,7 @@ TEST(IndexFilterCommandsTest, SetAndClearFilters) {
     ASSERT_EQUALS(filters.size(), 2U);
 
     // Add hint for 3rd query shape. This is to prepare for ClearHint tests.
-    ASSERT_OK(SetFilter::set(&txn,
+    ASSERT_OK(SetFilter::set(txn.get(),
                              &querySettings,
                              &planCache,
                              nss.ns(),
@@ -351,12 +358,12 @@ TEST(IndexFilterCommandsTest, SetAndClearFilters) {
     ASSERT_EQUALS(filters.size(), 3U);
 
     // Add 2 entries to plan cache and check plan cache after clearing one/all filters.
-    addQueryShapeToPlanCache(&planCache, "{a: 1}", "{}", "{}");
-    addQueryShapeToPlanCache(&planCache, "{b: 1}", "{}", "{}");
+    addQueryShapeToPlanCache(txn.get(), &planCache, "{a: 1}", "{}", "{}");
+    addQueryShapeToPlanCache(txn.get(), &planCache, "{b: 1}", "{}", "{}");
 
     // Clear single hint.
     ASSERT_OK(ClearFilters::clear(
-        &txn, &querySettings, &planCache, nss.ns(), fromjson("{query: {a: 1}}")));
+        txn.get(), &querySettings, &planCache, nss.ns(), fromjson("{query: {a: 1}}")));
     filters = getFilters(querySettings);
     ASSERT_EQUALS(filters.size(), 2U);
 
@@ -365,7 +372,7 @@ TEST(IndexFilterCommandsTest, SetAndClearFilters) {
     ASSERT_TRUE(planCacheContains(planCache, "{b: 1}", "{}", "{}"));
 
     // Clear all filters
-    ASSERT_OK(ClearFilters::clear(&txn, &querySettings, &planCache, nss.ns(), fromjson("{}")));
+    ASSERT_OK(ClearFilters::clear(txn.get(), &querySettings, &planCache, nss.ns(), fromjson("{}")));
     filters = getFilters(querySettings);
     ASSERT_TRUE(filters.empty());
 

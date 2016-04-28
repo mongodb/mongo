@@ -499,7 +499,7 @@ std::string runQuery(OperationContext* txn,
 
     // Parse the qm into a CanonicalQuery.
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(q, ExtensionsCallbackReal(txn, &nss));
+    auto statusWithCQ = CanonicalQuery::canonicalize(txn, q, ExtensionsCallbackReal(txn, &nss));
     if (!statusWithCQ.isOK()) {
         uasserted(
             17287,

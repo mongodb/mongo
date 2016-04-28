@@ -44,6 +44,7 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
@@ -62,8 +63,11 @@ static const NamespaceString nss("test.collection");
  * Utility functions to create a CanonicalQuery
  */
 unique_ptr<CanonicalQuery> canonicalize(const BSONObj& queryObj) {
-    auto statusWithCQ =
-        CanonicalQuery::canonicalize(nss, queryObj, ExtensionsCallbackDisallowExtensions());
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
+
+    auto statusWithCQ = CanonicalQuery::canonicalize(
+        txn.get(), nss, queryObj, ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -76,11 +80,14 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr) {
 unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
                                         const char* sortStr,
                                         const char* projStr) {
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
+
     BSONObj queryObj = fromjson(queryStr);
     BSONObj sortObj = fromjson(sortStr);
     BSONObj projObj = fromjson(projStr);
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        nss, queryObj, sortObj, projObj, ExtensionsCallbackDisallowExtensions());
+        txn.get(), nss, queryObj, sortObj, projObj, ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -93,13 +100,17 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
                                         const char* hintStr,
                                         const char* minStr,
                                         const char* maxStr) {
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
+
     BSONObj queryObj = fromjson(queryStr);
     BSONObj sortObj = fromjson(sortStr);
     BSONObj projObj = fromjson(projStr);
     BSONObj hintObj = fromjson(hintStr);
     BSONObj minObj = fromjson(minStr);
     BSONObj maxObj = fromjson(maxStr);
-    auto statusWithCQ = CanonicalQuery::canonicalize(nss,
+    auto statusWithCQ = CanonicalQuery::canonicalize(txn.get(),
+                                                     nss,
                                                      queryObj,
                                                      sortObj,
                                                      projObj,
@@ -125,13 +136,17 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
                                         const char* maxStr,
                                         bool snapshot,
                                         bool explain) {
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
+
     BSONObj queryObj = fromjson(queryStr);
     BSONObj sortObj = fromjson(sortStr);
     BSONObj projObj = fromjson(projStr);
     BSONObj hintObj = fromjson(hintStr);
     BSONObj minObj = fromjson(minStr);
     BSONObj maxObj = fromjson(maxStr);
-    auto statusWithCQ = CanonicalQuery::canonicalize(nss,
+    auto statusWithCQ = CanonicalQuery::canonicalize(txn.get(),
+                                                     nss,
                                                      queryObj,
                                                      sortObj,
                                                      projObj,
@@ -516,6 +531,9 @@ protected:
                       const BSONObj& minObj,
                       const BSONObj& maxObj,
                       bool snapshot) {
+        QueryTestServiceContext serviceContext;
+        auto txn = serviceContext.makeOperationContext();
+
         // Clean up any previous state from a call to runQueryFull
         for (vector<QuerySolution*>::iterator it = solns.begin(); it != solns.end(); ++it) {
             delete *it;
@@ -523,7 +541,8 @@ protected:
 
         solns.clear();
 
-        auto statusWithCQ = CanonicalQuery::canonicalize(nss,
+        auto statusWithCQ = CanonicalQuery::canonicalize(txn.get(),
+                                                         nss,
                                                          query,
                                                          sort,
                                                          proj,
@@ -605,8 +624,11 @@ protected:
                                       const BSONObj& sort,
                                       const BSONObj& proj,
                                       const QuerySolution& soln) const {
+        QueryTestServiceContext serviceContext;
+        auto txn = serviceContext.makeOperationContext();
+
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            nss, query, sort, proj, ExtensionsCallbackDisallowExtensions());
+            txn.get(), nss, query, sort, proj, ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
 

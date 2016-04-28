@@ -155,7 +155,7 @@ void Strategy::queryOp(OperationContext* txn, Request& request) {
         uassertStatusOK(readPrefExtractStatus);
     }
 
-    auto canonicalQuery = CanonicalQuery::canonicalize(q, ExtensionsCallbackNoop());
+    auto canonicalQuery = CanonicalQuery::canonicalize(txn, q, ExtensionsCallbackNoop());
     uassertStatusOK(canonicalQuery.getStatus());
 
     // If the $explain flag was set, we must run the operation on the shards as an explain command

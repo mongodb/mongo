@@ -28,19 +28,23 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/bson/bsonobj.h"
+#include "mongo/base/init.h"
 #include "mongo/db/query/collation/collator_factory_mock.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/service_context.h"
+#include "mongo/stdx/memory.h"
+
+namespace mongo {
 
 namespace {
 
-using namespace mongo;
-
-TEST(CollatorFactoryMockTest, CollatorFactoryMockConstructsReverseStringCollator) {
-    CollatorFactoryMock factory;
-    auto collator = factory.makeFromBSON(BSONObj());
-    ASSERT_OK(collator.getStatus());
-    ASSERT_GT(collator.getValue()->compare("abc", "cba"), 0);
+// TODO SERVER-22371: We should decorate with a CollatorFactoryICU instead.
+MONGO_INITIALIZER_WITH_PREREQUISITES(CreateCollatorFactory,
+                                     ("SetGlobalEnvironment"))(InitializerContext* context) {
+    CollatorFactoryInterface::set(getGlobalServiceContext(),
+                                  stdx::make_unique<CollatorFactoryMock>());
+    return Status::OK();
 }
 
 }  // namespace
+
+}  // namespace mongo

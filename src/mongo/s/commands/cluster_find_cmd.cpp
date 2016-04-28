@@ -144,7 +144,8 @@ public:
             return appendCommandStatus(result, lpq.getStatus());
         }
 
-        auto cq = CanonicalQuery::canonicalize(lpq.getValue().release(), ExtensionsCallbackNoop());
+        auto cq =
+            CanonicalQuery::canonicalize(txn, lpq.getValue().release(), ExtensionsCallbackNoop());
         if (!cq.isOK()) {
             return appendCommandStatus(result, cq.getStatus());
         }

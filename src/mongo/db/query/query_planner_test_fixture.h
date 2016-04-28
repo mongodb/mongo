@@ -39,6 +39,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -46,6 +47,8 @@ namespace mongo {
 class QueryPlannerTest : public mongo::unittest::Test {
 protected:
     void setUp();
+
+    OperationContext* txn();
 
     //
     // Build up test.
@@ -197,6 +200,8 @@ protected:
 
     static const NamespaceString nss;
 
+    QueryTestServiceContext serviceContext;
+    ServiceContext::UniqueOperationContext opCtx;
     BSONObj queryObj;
     std::unique_ptr<CanonicalQuery> cq;
     QueryPlannerParams params;

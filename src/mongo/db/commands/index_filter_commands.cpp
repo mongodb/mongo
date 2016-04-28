@@ -323,7 +323,7 @@ Status ClearFilters::clear(OperationContext* txn,
 
         // Create canonical query.
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            nss, entry->query, entry->sort, entry->projection, extensionsCallback);
+            txn, nss, entry->query, entry->sort, entry->projection, extensionsCallback);
         invariant(statusWithCQ.isOK());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 

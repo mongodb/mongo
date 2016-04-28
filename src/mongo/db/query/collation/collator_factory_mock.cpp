@@ -31,23 +31,11 @@
 #include "mongo/db/query/collation/collator_factory_mock.h"
 
 #include "mongo/base/init.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
-
-namespace {
-
-// TODO SERVER-22371: We should decorate with a CollatorFactoryICU instead.
-MONGO_INITIALIZER_WITH_PREREQUISITES(CreateCollatorFactory,
-                                     ("SetGlobalEnvironment"))(InitializerContext* context) {
-    CollatorFactoryInterface::set(getGlobalServiceContext(),
-                                  stdx::make_unique<CollatorFactoryMock>());
-    return Status::OK();
-}
-
-}  // namespace
 
 StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryMock::makeFromBSON(
     const BSONObj& spec) {

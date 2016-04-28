@@ -98,6 +98,7 @@ env.CppUnitTest(
         "index_filter_commands_test.cpp",
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query/query_test_service_context",
         "$BUILD_DIR/mongo/db/serveronly",
         "$BUILD_DIR/mongo/util/ntservice_mock",
     ],
@@ -122,6 +123,7 @@ env.CppUnitTest(
         "plan_cache_commands_test.cpp",
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query/query_test_service_context",
         "$BUILD_DIR/mongo/db/serveronly",
         "$BUILD_DIR/mongo/util/ntservice_mock",
     ],

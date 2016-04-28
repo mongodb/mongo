@@ -490,7 +490,7 @@ void ChunkManager::getShardIdsForQuery(OperationContext* txn,
                                        const BSONObj& query,
                                        set<ShardId>* shardIds) const {
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(NamespaceString(_ns), query, ExtensionsCallbackNoop());
+        CanonicalQuery::canonicalize(txn, NamespaceString(_ns), query, ExtensionsCallbackNoop());
 
     uassertStatusOK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());

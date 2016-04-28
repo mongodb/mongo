@@ -28,19 +28,20 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/bson/bsonobj.h"
+#include "mongo/db/query/query_test_service_context.h"
+
 #include "mongo/db/query/collation/collator_factory_mock.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/stdx/memory.h"
 
-namespace {
+namespace mongo {
 
-using namespace mongo;
-
-TEST(CollatorFactoryMockTest, CollatorFactoryMockConstructsReverseStringCollator) {
-    CollatorFactoryMock factory;
-    auto collator = factory.makeFromBSON(BSONObj());
-    ASSERT_OK(collator.getStatus());
-    ASSERT_GT(collator.getValue()->compare("abc", "cba"), 0);
+QueryTestServiceContext::QueryTestServiceContext() {
+    CollatorFactoryInterface::set(&_serviceContext, stdx::make_unique<CollatorFactoryMock>());
+    _uniqueClient = _serviceContext.makeClient("QueryTest");
 }
 
-}  // namespace
+ServiceContext::UniqueOperationContext QueryTestServiceContext::makeOperationContext() {
+    return _uniqueClient->makeOperationContext();
+}
+
+}  // namespace mongo

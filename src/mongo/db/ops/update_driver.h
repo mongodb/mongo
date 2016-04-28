@@ -43,6 +43,8 @@
 
 namespace mongo {
 
+class OperationContext;
+
 class UpdateDriver {
 public:
     struct Options;
@@ -67,7 +69,8 @@ public:
      * Returns Status::OK() if the document can be used. If there are any error or
      * conflicts along the way then those errors will be returned.
      */
-    Status populateDocumentWithQueryFields(const BSONObj& query,
+    Status populateDocumentWithQueryFields(OperationContext* txn,
+                                           const BSONObj& query,
                                            const std::vector<FieldRef*>* immutablePaths,
                                            mutablebson::Document& doc) const;
 

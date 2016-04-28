@@ -186,7 +186,8 @@ Status SubplanStage::planSubqueries() {
         MatchExpression* orChild = _orExpression->getChild(i);
 
         // Turn the i-th child into its own query.
-        auto statusWithCQ = CanonicalQuery::canonicalize(*_query, orChild, extensionsCallback);
+        auto statusWithCQ =
+            CanonicalQuery::canonicalize(getOpCtx(), *_query, orChild, extensionsCallback);
         if (!statusWithCQ.isOK()) {
             mongoutils::str::stream ss;
             ss << "Can't canonicalize subchild " << orChild->toString() << " "

@@ -29,6 +29,7 @@
 
 #include "mongo/db/hasher.h"
 #include "mongo/db/json.h"
+#include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -249,7 +250,10 @@ TEST(ShardKeyPattern, ExtractDocShardKeyHashed) {
 }
 
 static BSONObj queryKey(const ShardKeyPattern& pattern, const BSONObj& query) {
-    StatusWith<BSONObj> status = pattern.extractShardKeyFromQuery(query);
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
+
+    StatusWith<BSONObj> status = pattern.extractShardKeyFromQuery(txn.get(), query);
     if (!status.isOK())
         return BSONObj();
     return status.getValue();

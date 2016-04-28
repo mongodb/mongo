@@ -102,8 +102,8 @@ public:
         unique_ptr<WorkingSet> ws(new WorkingSet());
 
         // Canonicalize the query.
-        auto statusWithCQ =
-            CanonicalQuery::canonicalize(nss, filterObj, ExtensionsCallbackDisallowExtensions());
+        auto statusWithCQ = CanonicalQuery::canonicalize(
+            &_txn, nss, filterObj, ExtensionsCallbackDisallowExtensions());
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         verify(NULL != cq.get());
@@ -147,8 +147,8 @@ public:
         IndexScan* ix = new IndexScan(&_txn, ixparams, ws.get(), NULL);
         unique_ptr<PlanStage> root(new FetchStage(&_txn, ws.get(), ix, NULL, coll));
 
-        auto statusWithCQ =
-            CanonicalQuery::canonicalize(nss, BSONObj(), ExtensionsCallbackDisallowExtensions());
+        auto statusWithCQ = CanonicalQuery::canonicalize(
+            &_txn, nss, BSONObj(), ExtensionsCallbackDisallowExtensions());
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         verify(NULL != cq.get());

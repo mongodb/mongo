@@ -631,7 +631,8 @@ public:
 
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             auto statusWithCQ =
-                CanonicalQuery::canonicalize(NamespaceString(ns),
+                CanonicalQuery::canonicalize(txn,
+                                             NamespaceString(ns),
                                              query,
                                              sort,
                                              BSONObj(),

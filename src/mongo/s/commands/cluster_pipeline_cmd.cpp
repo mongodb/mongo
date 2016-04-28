@@ -144,7 +144,7 @@ public:
         BSONObj firstMatchQuery = pipeline->getInitialQuery();
         ChunkManagerPtr chunkMgr = conf->getChunkManager(txn, fullns);
         BSONObj shardKeyMatches = uassertStatusOK(
-            chunkMgr->getShardKeyPattern().extractShardKeyFromQuery(firstMatchQuery));
+            chunkMgr->getShardKeyPattern().extractShardKeyFromQuery(txn, firstMatchQuery));
 
         // Don't need to split pipeline if the first $match is an exact match on shard key, unless
         // there is a stage that needs to be run on the primary shard.

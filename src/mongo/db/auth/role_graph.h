@@ -41,6 +41,8 @@
 
 namespace mongo {
 
+class OperationContext;
+
 /**
  * A graph of role and privilege relationships.
  *
@@ -240,7 +242,8 @@ public:
      * operation is not supported, and other codes (typically BadValue) if the oplog operation
      * is ill-described.
      */
-    Status handleLogOp(const char* op,
+    Status handleLogOp(OperationContext* txn,
+                       const char* op,
                        const NamespaceString& ns,
                        const BSONObj& o,
                        const BSONObj* o2);

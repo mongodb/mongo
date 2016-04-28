@@ -97,7 +97,8 @@ protected:
         OldClientWriteContext ctx(&_opCtx, nss.ns());
 
         auto cq =
-            uassertStatusOK(CanonicalQuery::canonicalize(nss,
+            uassertStatusOK(CanonicalQuery::canonicalize(&_opCtx,
+                                                         nss,
                                                          /*query=*/BSONObj(),
                                                          /*sort=*/BSONObj(),
                                                          /*proj=*/BSONObj(),

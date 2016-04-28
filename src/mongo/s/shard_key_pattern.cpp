@@ -262,12 +262,13 @@ static BSONElement findEqualityElement(const EqualityMatches& equalities, const 
     return extractKeyElementFromMatchable(matchable, suffixStr);
 }
 
-StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(const BSONObj& basicQuery) const {
+StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(OperationContext* txn,
+                                                              const BSONObj& basicQuery) const {
     if (!isValid())
         return StatusWith<BSONObj>(BSONObj());
 
-    auto statusWithCQ =
-        CanonicalQuery::canonicalize(NamespaceString(""), basicQuery, ExtensionsCallbackNoop());
+    auto statusWithCQ = CanonicalQuery::canonicalize(
+        txn, NamespaceString(""), basicQuery, ExtensionsCallbackNoop());
     if (!statusWithCQ.isOK()) {
         return StatusWith<BSONObj>(statusWithCQ.getStatus());
     }

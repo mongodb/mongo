@@ -370,14 +370,16 @@ Status AuthzManagerExternalStateLocal::_initializeRoleGraph(OperationContext* tx
 
 class AuthzManagerExternalStateLocal::AuthzManagerLogOpHandler : public RecoveryUnit::Change {
 public:
-    // None of the parameters below (except externalState) need to live longer than
-    // the instantiations of this class
-    AuthzManagerLogOpHandler(AuthzManagerExternalStateLocal* externalState,
+    // None of the parameters below (except txn and externalState) need to live longer than the
+    // instantiations of this class
+    AuthzManagerLogOpHandler(OperationContext* txn,
+                             AuthzManagerExternalStateLocal* externalState,
                              const char* op,
                              const char* ns,
                              const BSONObj& o,
                              const BSONObj* o2)
-        : _externalState(externalState),
+        : _txn(txn),
+          _externalState(externalState),
           _op(op),
           _ns(ns),
           _o(o.getOwned()),
@@ -388,7 +390,7 @@ public:
     virtual void commit() {
         stdx::lock_guard<stdx::mutex> lk(_externalState->_roleGraphMutex);
         Status status = _externalState->_roleGraph.handleLogOp(
-            _op.c_str(), NamespaceString(_ns.c_str()), _o, _isO2Set ? &_o2 : NULL);
+            _txn, _op.c_str(), NamespaceString(_ns.c_str()), _o, _isO2Set ? &_o2 : NULL);
 
         if (status == ErrorCodes::OplogOperationUnsupported) {
             _externalState->_roleGraph = RoleGraph();
@@ -419,6 +421,7 @@ public:
     virtual void rollback() {}
 
 private:
+    OperationContext* _txn;
     AuthzManagerExternalStateLocal* _externalState;
     const std::string _op;
     const std::string _ns;
@@ -432,7 +435,7 @@ void AuthzManagerExternalStateLocal::logOp(
     OperationContext* txn, const char* op, const char* ns, const BSONObj& o, const BSONObj* o2) {
     if (ns == AuthorizationManager::rolesCollectionNamespace.ns() ||
         ns == AuthorizationManager::adminCommandNamespace.ns()) {
-        txn->recoveryUnit()->registerChange(new AuthzManagerLogOpHandler(this, op, ns, o, o2));
+        txn->recoveryUnit()->registerChange(new AuthzManagerLogOpHandler(txn, this, op, ns, o, o2));
     }
 }
 

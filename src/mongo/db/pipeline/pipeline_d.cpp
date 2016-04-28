@@ -209,7 +209,7 @@ StatusWith<std::unique_ptr<PlanExecutor>> attemptToGetExecutor(
     const ExtensionsCallbackReal extensionsCallback(pExpCtx->opCtx, &pExpCtx->ns);
 
     auto cq = CanonicalQuery::canonicalize(
-        pExpCtx->ns, queryObj, sortObj, projectionObj, extensionsCallback);
+        txn, pExpCtx->ns, queryObj, sortObj, projectionObj, extensionsCallback);
 
     if (!cq.isOK()) {
         // Return an error instead of uasserting, since there are cases where the combination of

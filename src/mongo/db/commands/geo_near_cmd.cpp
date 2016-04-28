@@ -209,7 +209,7 @@ public:
 
         const ExtensionsCallbackReal extensionsCallback(txn, &nss);
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            nss, rewritten, BSONObj(), projObj, 0, numWanted, BSONObj(), extensionsCallback);
+            txn, nss, rewritten, BSONObj(), projObj, 0, numWanted, BSONObj(), extensionsCallback);
         if (!statusWithCQ.isOK()) {
             errmsg = "Can't parse filter / create query";
             return false;

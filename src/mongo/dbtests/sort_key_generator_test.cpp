@@ -31,6 +31,7 @@
 #include "mongo/db/exec/sort_key_generator.h"
 #include "mongo/db/json.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -46,12 +47,15 @@ namespace {
  * Returns the BSON representation of the sort key, to be checked against the expected sort key.
  */
 BSONObj extractSortKey(const char* sortSpec, const char* doc) {
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
+
     WorkingSetMember wsm;
     wsm.obj = Snapshotted<BSONObj>(SnapshotId(), fromjson(doc));
     wsm.transitionToOwnedObj();
 
     BSONObj sortKey;
-    auto sortKeyGen = stdx::make_unique<SortKeyGenerator>(fromjson(sortSpec), BSONObj());
+    auto sortKeyGen = stdx::make_unique<SortKeyGenerator>(txn.get(), fromjson(sortSpec), BSONObj());
     ASSERT_OK(sortKeyGen->getSortKey(wsm, &sortKey));
 
     return sortKey;
@@ -67,6 +71,9 @@ BSONObj extractSortKey(const char* sortSpec, const char* doc) {
  * Returns the BSON representation of the sort key, to be checked against the expected sort key.
  */
 BSONObj extractSortKeyCovered(const char* sortSpec, const IndexKeyDatum& ikd) {
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
+
     WorkingSet ws;
     WorkingSetID wsid = ws.allocate();
     WorkingSetMember* wsm = ws.get(wsid);
@@ -74,7 +81,7 @@ BSONObj extractSortKeyCovered(const char* sortSpec, const IndexKeyDatum& ikd) {
     ws.transitionToRecordIdAndIdx(wsid);
 
     BSONObj sortKey;
-    auto sortKeyGen = stdx::make_unique<SortKeyGenerator>(fromjson(sortSpec), BSONObj());
+    auto sortKeyGen = stdx::make_unique<SortKeyGenerator>(txn.get(), fromjson(sortSpec), BSONObj());
     ASSERT_OK(sortKeyGen->getSortKey(*wsm, &sortKey));
 
     return sortKey;

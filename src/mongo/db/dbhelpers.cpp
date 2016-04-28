@@ -134,7 +134,8 @@ RecordId Helpers::findOne(OperationContext* txn,
 
     const ExtensionsCallbackReal extensionsCallback(txn, &collection->ns());
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(collection->ns(), query, extensionsCallback);
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(txn, collection->ns(), query, extensionsCallback);
     massert(17244, "Could not canonicalize " + query.toString(), statusWithCQ.isOK());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 

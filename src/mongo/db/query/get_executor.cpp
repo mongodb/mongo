@@ -937,7 +937,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorGroup(OperationContext* txn,
     const ExtensionsCallbackReal extensionsCallback(txn, &nss);
 
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(nss, request.query, request.explain, extensionsCallback);
+        CanonicalQuery::canonicalize(txn, nss, request.query, request.explain, extensionsCallback);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }
@@ -1155,6 +1155,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* txn,
     unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
 
     auto cq = CanonicalQuery::canonicalize(
+        txn,
         request.getNs(),
         request.getQuery(),
         BSONObj(),  // sort
@@ -1330,8 +1331,8 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
     // If there are no suitable indices for the distinct hack bail out now into regular planning
     // with no projection.
     if (plannerParams.indices.empty()) {
-        auto statusWithCQ =
-            CanonicalQuery::canonicalize(collection->ns(), query, isExplain, extensionsCallback);
+        auto statusWithCQ = CanonicalQuery::canonicalize(
+            txn, collection->ns(), query, isExplain, extensionsCallback);
         if (!statusWithCQ.isOK()) {
             return statusWithCQ.getStatus();
         }
@@ -1349,7 +1350,8 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
     BSONObj projection = getDistinctProjection(field);
 
     // Apply a projection of the key.  Empty BSONObj() is for the sort.
-    auto statusWithCQ = CanonicalQuery::canonicalize(collection->ns(),
+    auto statusWithCQ = CanonicalQuery::canonicalize(txn,
+                                                     collection->ns(),
                                                      query,
                                                      BSONObj(),  // sort
                                                      projection,
@@ -1447,7 +1449,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
 
     // We drop the projection from the 'cq'.  Unfortunately this is not trivial.
     statusWithCQ =
-        CanonicalQuery::canonicalize(collection->ns(), query, isExplain, extensionsCallback);
+        CanonicalQuery::canonicalize(txn, collection->ns(), query, isExplain, extensionsCallback);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }

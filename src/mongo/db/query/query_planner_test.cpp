@@ -4138,7 +4138,7 @@ TEST_F(QueryPlannerTest, KeyPatternOverflowsInt) {
 // Test bad input to query planner helpers.
 //
 
-TEST(BadInputTest, CacheDataFromTaggedTree) {
+TEST_F(QueryPlannerTest, CacheDataFromTaggedTreeFailsOnBadInput) {
     PlanCacheIndexTree* indexTree;
 
     // Null match expression.
@@ -4150,8 +4150,10 @@ TEST(BadInputTest, CacheDataFromTaggedTree) {
     // No relevant index matching the index tag.
     relevantIndices.push_back(IndexEntry(BSON("a" << 1)));
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(
-        NamespaceString("test.collection"), BSON("a" << 3), ExtensionsCallbackDisallowExtensions());
+    auto statusWithCQ = CanonicalQuery::canonicalize(txn(),
+                                                     NamespaceString("test.collection"),
+                                                     BSON("a" << 3),
+                                                     ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
     scopedCq->root()->setTag(new IndexTag(1));
@@ -4161,11 +4163,11 @@ TEST(BadInputTest, CacheDataFromTaggedTree) {
     ASSERT(NULL == indexTree);
 }
 
-TEST(BadInputTest, TagAccordingToCache) {
+TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
     const NamespaceString nss("test.collection");
 
-    auto statusWithCQ =
-        CanonicalQuery::canonicalize(nss, BSON("a" << 3), ExtensionsCallbackDisallowExtensions());
+    auto statusWithCQ = CanonicalQuery::canonicalize(
+        txn(), nss, BSON("a" << 3), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
 
@@ -4192,8 +4194,8 @@ TEST(BadInputTest, TagAccordingToCache) {
     ASSERT_OK(s);
 
     // Regenerate canonical query in order to clear tags.
-    statusWithCQ =
-        CanonicalQuery::canonicalize(nss, BSON("a" << 3), ExtensionsCallbackDisallowExtensions());
+    statusWithCQ = CanonicalQuery::canonicalize(
+        txn(), nss, BSON("a" << 3), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     scopedCq = std::move(statusWithCQ.getValue());
 

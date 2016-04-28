@@ -289,7 +289,7 @@ private:
         BSONObj query =
             BSON(keyFieldName << BSON("$gte" << kDawnOfTime << "$lte" << expirationTime));
         auto canonicalQuery =
-            CanonicalQuery::canonicalize(nss, query, ExtensionsCallbackDisallowExtensions());
+            CanonicalQuery::canonicalize(txn, nss, query, ExtensionsCallbackDisallowExtensions());
         invariantOK(canonicalQuery.getStatus());
 
         DeleteStageParams params;

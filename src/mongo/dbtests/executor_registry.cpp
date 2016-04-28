@@ -77,8 +77,8 @@ public:
         unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, params, ws.get(), NULL));
 
         // Create a plan executor to hold it
-        auto statusWithCQ =
-            CanonicalQuery::canonicalize(nss, BSONObj(), ExtensionsCallbackDisallowExtensions());
+        auto statusWithCQ = CanonicalQuery::canonicalize(
+            &_opCtx, nss, BSONObj(), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 

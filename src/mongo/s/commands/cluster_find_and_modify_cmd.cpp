@@ -102,7 +102,7 @@ public:
 
             const BSONObj query = cmdObj.getObjectField("query");
 
-            StatusWith<BSONObj> status = _getShardKey(chunkMgr, query);
+            StatusWith<BSONObj> status = _getShardKey(txn, chunkMgr, query);
             if (!status.isOK()) {
                 return status.getStatus();
             }
@@ -164,7 +164,7 @@ public:
 
         const BSONObj query = cmdObj.getObjectField("query");
 
-        StatusWith<BSONObj> status = _getShardKey(chunkMgr, query);
+        StatusWith<BSONObj> status = _getShardKey(txn, chunkMgr, query);
         if (!status.isOK()) {
             // Bad query
             return appendCommandStatus(result, status.getStatus());
@@ -194,10 +194,12 @@ private:
         return chunkMgr;
     }
 
-    StatusWith<BSONObj> _getShardKey(shared_ptr<ChunkManager> chunkMgr,
+    StatusWith<BSONObj> _getShardKey(OperationContext* txn,
+                                     shared_ptr<ChunkManager> chunkMgr,
                                      const BSONObj& query) const {
         // Verify that the query has an equality predicate using the shard key
-        StatusWith<BSONObj> status = chunkMgr->getShardKeyPattern().extractShardKeyFromQuery(query);
+        StatusWith<BSONObj> status =
+            chunkMgr->getShardKeyPattern().extractShardKeyFromQuery(txn, query);
 
         if (!status.isOK()) {
             return status;

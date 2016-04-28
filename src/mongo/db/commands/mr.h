@@ -306,7 +306,7 @@ public:
 
     void finalReduce(BSONList& values);
 
-    void finalReduce(CurOp* op, ProgressMeterHolder& pm);
+    void finalReduce(OperationContext* txn, CurOp* op, ProgressMeterHolder& pm);
 
     // ------- cleanup/data positioning ----------
 
