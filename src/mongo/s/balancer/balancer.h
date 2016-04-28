@@ -72,14 +72,25 @@ public:
      */
     Status rebalanceSingleChunk(OperationContext* txn, const ChunkType& chunk);
 
+    /**
+     * Blocking call, which requests the balancer to move a single chunk to the specified location
+     * in accordance with the active balancer policy. An error will be returned if the attempt to
+     * move fails for any reason.
+     *
+     * NOTE: This call disregards the balancer enabled/disabled status and will proceed with the
+     *       move regardless. If should be used only for user-initiated moves.
+     */
+    Status moveSingleChunk(OperationContext* txn,
+                           const ChunkType& chunk,
+                           const ShardId& newShardId,
+                           uint64_t maxChunkSizeBytes,
+                           const MigrationSecondaryThrottleOptions& secondaryThrottle,
+                           bool waitForDelete);
+
 private:
-    // BackgroundJob methods implementation
+    std::string name() const final;
 
-    void run() override;
-
-    std::string name() const override {
-        return "Balancer";
-    }
+    void run() final;
 
     /**
      * Checks that the balancer can connect to all servers it needs to do its job.

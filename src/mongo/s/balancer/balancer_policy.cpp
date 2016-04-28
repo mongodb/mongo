@@ -97,23 +97,35 @@ unsigned DistributionStatus::numberOfChunksInShardWithTag(const ShardId& shardId
     return total;
 }
 
+Status DistributionStatus::isShardSuitableReceiver(const ClusterStatistics::ShardStatistics& stat,
+                                                   const string& chunkTag) {
+    if (stat.isSizeMaxed()) {
+        return {ErrorCodes::IllegalOperation,
+                str::stream() << stat.shardId
+                              << " has already reached the maximum total chunk size."};
+    }
+
+    if (stat.isDraining) {
+        return {ErrorCodes::IllegalOperation,
+                str::stream() << stat.shardId << " is currently draining."};
+    }
+
+    if (!chunkTag.empty() && !stat.shardTags.count(chunkTag)) {
+        return {ErrorCodes::IllegalOperation,
+                str::stream() << stat.shardId << " doesn't have right tag"};
+    }
+
+    return Status::OK();
+}
+
 string DistributionStatus::getBestReceieverShard(const string& tag) const {
     string best;
     unsigned minChunks = numeric_limits<unsigned>::max();
 
     for (const auto& stat : _shardInfo) {
-        if (stat.isSizeMaxed()) {
-            LOG(1) << stat.shardId << " has already reached the maximum total chunk size.";
-            continue;
-        }
-
-        if (stat.isDraining) {
-            LOG(1) << stat.shardId << " is currently draining.";
-            continue;
-        }
-
-        if (!tag.empty() && !stat.shardTags.count(tag)) {
-            LOG(1) << stat.shardId << " doesn't have right tag";
+        auto status = isShardSuitableReceiver(stat, tag);
+        if (!status.isOK()) {
+            LOG(1) << status.codeString();
             continue;
         }
 

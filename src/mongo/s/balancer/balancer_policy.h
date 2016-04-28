@@ -78,20 +78,24 @@ class DistributionStatus {
 public:
     DistributionStatus(ShardStatisticsVector shardInfo, const ShardToChunksMap& shardToChunksMap);
 
-    // only used when building
-
     /**
      * @return if range is valid
      */
     bool addTagRange(const TagRange& range);
 
-    // ---- these methods might be better suiting in BalancerPolicy
+    /**
+     * Determines whether a shard with the specified utilization statistics would be able to accept
+     * a chunk with the specified tag. According to the policy a shard cannot accept chunks if its
+     * size is maxed out and if the chunk's tag conflicts with the tag of the shard.
+     */
+    static Status isShardSuitableReceiver(const ClusterStatistics::ShardStatistics& stat,
+                                          const std::string& chunkTag);
 
     /**
      * @param forTag "" if you don't care, or a tag
      * @return shard best suited to receive a chunk
      */
-    std::string getBestReceieverShard(const std::string& forTag) const;
+    std::string getBestReceieverShard(const std::string& tag) const;
 
     /**
      * @return the shard with the most chunks

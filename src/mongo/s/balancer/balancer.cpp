@@ -33,11 +33,13 @@
 #include "mongo/s/balancer/balancer.h"
 
 #include "mongo/base/status_with.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/server_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/balancer/balancer_chunk_selection_policy_impl.h"
@@ -52,6 +54,7 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/move_chunk_request.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/s/sharding_raii.h"
 #include "mongo/stdx/memory.h"
@@ -74,6 +77,8 @@ namespace {
 
 const Seconds kBalanceRoundDefaultInterval(10);
 const Seconds kShortBalanceRoundInterval(1);
+
+const char kChunkTooBig[] = "chunkTooBig";
 
 const auto getBalancer = ServiceContext::declareDecoration<Balancer>();
 
@@ -148,6 +153,82 @@ void warnOnMultiVersion(const vector<ClusterStatistics::ShardStatistics>& cluste
     warning() << sb.str();
 }
 
+/**
+ * Blocking method, which requests a single chunk migration to run.
+ */
+Status executeSingleMigration(OperationContext* txn,
+                              const MigrateInfo& migrateInfo,
+                              uint64_t maxChunkSizeBytes,
+                              const MigrationSecondaryThrottleOptions& secondaryThrottle,
+                              bool waitForDelete) {
+    const NamespaceString nss(migrateInfo.ns);
+
+    auto scopedCMStatus = ScopedChunkManager::getExisting(txn, nss);
+    if (!scopedCMStatus.isOK()) {
+        return scopedCMStatus.getStatus();
+    }
+
+    ChunkManager* const cm = scopedCMStatus.getValue().cm();
+
+    shared_ptr<Chunk> c = cm->findIntersectingChunk(txn, migrateInfo.minKey);
+
+    BSONObjBuilder builder;
+    MoveChunkRequest::appendAsCommand(
+        &builder,
+        nss,
+        cm->getVersion(),
+        Grid::get(txn)->shardRegistry()->getConfigServerConnectionString(),
+        migrateInfo.from,
+        migrateInfo.to,
+        c->getMin(),
+        c->getMax(),
+        maxChunkSizeBytes,
+        secondaryThrottle,
+        waitForDelete);
+    builder.append(LiteParsedQuery::cmdOptionMaxTimeMS,
+                   durationCount<Milliseconds>(Microseconds(txn->getRemainingMaxTimeMicros())));
+
+    BSONObj cmdObj = builder.obj();
+
+    Status status{ErrorCodes::NotYetInitialized, "Uninitialized"};
+
+    auto shard = Grid::get(txn)->shardRegistry()->getShard(txn, migrateInfo.from);
+    if (!shard) {
+        status = {ErrorCodes::ShardNotFound,
+                  str::stream() << "shard " << migrateInfo.from << " not found"};
+    } else {
+        auto cmdStatus = shard->runCommand(txn,
+                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                           "admin",
+                                           cmdObj,
+                                           Shard::RetryPolicy::kNotIdempotent);
+        if (!cmdStatus.isOK()) {
+            status = std::move(cmdStatus.getStatus());
+        } else {
+            status = std::move(cmdStatus.getValue().commandStatus);
+            BSONObj cmdResponse = std::move(cmdStatus.getValue().response);
+
+            // For backwards compatibility with 3.2 and earlier, where the move chunk command
+            // instead of returning a ChunkTooBig status includes an extra field in the response
+            bool chunkTooBig = false;
+            bsonExtractBooleanFieldWithDefault(cmdResponse, kChunkTooBig, false, &chunkTooBig);
+            if (chunkTooBig) {
+                invariant(!status.isOK());
+                status = {ErrorCodes::ChunkTooBig, status.reason()};
+            }
+        }
+    }
+
+    if (!status.isOK()) {
+        log() << "Move chunk " << cmdObj << " failed" << causedBy(status);
+        return {status.code(), str::stream() << "move failed due to " << status.toString()};
+    }
+
+    cm->reload(txn);
+
+    return Status::OK();
+}
+
 MONGO_FP_DECLARE(skipBalanceRound);
 MONGO_FP_DECLARE(balancerRoundIntervalSetting);
 
@@ -183,15 +264,34 @@ Status Balancer::rebalanceSingleChunk(OperationContext* txn, const ChunkType& ch
         return refreshStatus;
     }
 
-    try {
-        _moveChunks(txn,
-                    {*migrateInfo},
-                    balancerConfig->getSecondaryThrottle(),
-                    balancerConfig->waitForDelete());
-        return Status::OK();
-    } catch (const DBException& e) {
-        return e.toStatus();
+    _moveChunks(txn,
+                {*migrateInfo},
+                balancerConfig->getSecondaryThrottle(),
+                balancerConfig->waitForDelete());
+
+    return Status::OK();
+}
+
+Status Balancer::moveSingleChunk(OperationContext* txn,
+                                 const ChunkType& chunk,
+                                 const ShardId& newShardId,
+                                 uint64_t maxChunkSizeBytes,
+                                 const MigrationSecondaryThrottleOptions& secondaryThrottle,
+                                 bool waitForDelete) {
+    auto moveAllowedStatus = _chunkSelectionPolicy->checkMoveAllowed(txn, chunk, newShardId);
+    if (!moveAllowedStatus.isOK()) {
+        return moveAllowedStatus;
     }
+
+    return executeSingleMigration(txn,
+                                  MigrateInfo(chunk.getNS(), newShardId, chunk),
+                                  maxChunkSizeBytes,
+                                  secondaryThrottle,
+                                  waitForDelete);
+}
+
+std::string Balancer::name() const {
+    return "Balancer";
 }
 
 void Balancer::run() {
@@ -468,8 +568,10 @@ int Balancer::_moveChunks(OperationContext* txn,
     int movedCount = 0;
 
     for (const auto& migrateInfo : candidateChunks) {
+        auto balancerConfig = Grid::get(txn)->getBalancerConfiguration();
+
         // If the balancer was disabled since we started this round, don't start new chunk moves
-        if (!Grid::get(txn)->getBalancerConfiguration()->isBalancerActive()) {
+        if (!balancerConfig->isBalancerActive()) {
             LOG(1) << "Stopping balancing round early as balancing was disabled";
             return movedCount;
         }
@@ -487,47 +589,33 @@ int Balancer::_moveChunks(OperationContext* txn,
         const NamespaceString nss(migrateInfo.ns);
 
         try {
-            auto scopedCM = uassertStatusOK(ScopedChunkManager::getExisting(txn, nss));
-            ChunkManager* const cm = scopedCM.cm();
-
-            shared_ptr<Chunk> c = cm->findIntersectingChunk(txn, migrateInfo.minKey);
-
-            if (c->getMin().woCompare(migrateInfo.minKey) ||
-                c->getMax().woCompare(migrateInfo.maxKey)) {
-                log() << "Migration " << migrateInfo
-                      << " will be skipped this round due to chunk metadata mismatch.";
-                scopedCM.db()->getChunkManager(txn, nss.ns(), true);
-                continue;
-            }
-
-            BSONObj res;
-            if (c->moveAndCommit(txn,
-                                 migrateInfo.to,
-                                 Grid::get(txn)->getBalancerConfiguration()->getMaxChunkSizeBytes(),
-                                 secondaryThrottle,
-                                 waitForDelete,
-                                 0, /* maxTimeMS */
-                                 res)) {
+            Status status = executeSingleMigration(txn,
+                                                   migrateInfo,
+                                                   balancerConfig->getMaxChunkSizeBytes(),
+                                                   balancerConfig->getSecondaryThrottle(),
+                                                   balancerConfig->waitForDelete());
+            if (status.isOK()) {
                 movedCount++;
-                continue;
-            }
+            } else if (status == ErrorCodes::ChunkTooBig) {
+                log() << "Performing a split because migrate failed for size reasons"
+                      << causedBy(status);
 
-            log() << "balancer move failed: " << res << ", migrate: " << migrateInfo;
+                auto scopedCM = uassertStatusOK(ScopedChunkManager::getExisting(txn, nss));
+                ChunkManager* const cm = scopedCM.cm();
 
-            Status moveStatus = getStatusFromCommandResult(res);
+                shared_ptr<Chunk> c = cm->findIntersectingChunk(txn, migrateInfo.minKey);
 
-            if (moveStatus == ErrorCodes::ChunkTooBig || res["chunkTooBig"].trueValue()) {
-                log() << "Performing a split because migrate failed for size reasons";
-
-                auto splitStatus = c->split(txn, Chunk::normal, NULL);
+                auto splitStatus = c->split(txn, Chunk::normal, nullptr);
                 if (!splitStatus.isOK()) {
-                    log() << "marking chunk as jumbo: " << c->toString();
+                    log() << "Marking chunk " << c->toString() << " as jumbo.";
 
                     c->markAsJumbo(txn);
 
                     // We increment moveCount so we do another round right away
                     movedCount++;
                 }
+            } else {
+                log() << "Balancer move failed" << causedBy(status);
             }
         } catch (const DBException& ex) {
             log() << "balancer move " << migrateInfo << " failed" << causedBy(ex);

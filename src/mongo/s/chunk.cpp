@@ -33,11 +33,9 @@
 #include "mongo/s/chunk.h"
 
 #include "mongo/client/connpool.h"
-#include "mongo/client/read_preference.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/platform/random.h"
-#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/balancer/balancer.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_manager.h"
@@ -46,7 +44,6 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/move_chunk_request.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/util/log.h"
 
@@ -295,65 +292,6 @@ StatusWith<boost::optional<std::pair<BSONObj, BSONObj>>> Chunk::split(
 
     *resultingSplits = splitPoints.size();
     return splitStatus.getValue();
-}
-
-bool Chunk::moveAndCommit(OperationContext* txn,
-                          const ShardId& toShardId,
-                          long long chunkSize /* bytes */,
-                          const MigrationSecondaryThrottleOptions& secondaryThrottle,
-                          bool waitForDelete,
-                          int maxTimeMS,
-                          BSONObj& res) const {
-    uassert(10167, "can't move shard to its current location!", getShardId() != toShardId);
-
-    BSONObjBuilder builder;
-    MoveChunkRequest::appendAsCommand(&builder,
-                                      NamespaceString(_manager->getns()),
-                                      _manager->getVersion(),
-                                      grid.shardRegistry()->getConfigServerConnectionString(),
-                                      _shardId,
-                                      toShardId,
-                                      _min,
-                                      _max,
-                                      chunkSize,
-                                      secondaryThrottle,
-                                      waitForDelete);
-    builder.append(LiteParsedQuery::cmdOptionMaxTimeMS, maxTimeMS);
-
-    BSONObj cmdObj = builder.obj();
-    log() << "Moving chunk with the following arguments: " << cmdObj;
-
-    Status status{ErrorCodes::NotYetInitialized, "Uninitialized"};
-
-    auto shard = Grid::get(txn)->shardRegistry()->getShard(txn, _shardId);
-    if (!shard) {
-        status = Status(ErrorCodes::ShardNotFound,
-                        str::stream() << "shard " << _shardId << " not found");
-    } else {
-        auto response = shard->runCommand(txn,
-                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                          "admin",
-                                          cmdObj,
-                                          Shard::RetryPolicy::kNotIdempotent);
-        if (!response.isOK()) {
-            status = std::move(response.getStatus());
-        } else {
-            status = std::move(response.getValue().commandStatus);
-            res = std::move(response.getValue().response);
-        }
-    }
-
-    if (status.isOK()) {
-        LOG(1) << "moveChunk result: " << res;
-    } else {
-        warning() << "Move chunk failed" << causedBy(status);
-    }
-
-    // If succeeded we needs to reload the chunk manager in order to pick up the new location. If
-    // failed, mongos may be stale.
-    _manager->reload(txn);
-
-    return status.isOK();
 }
 
 bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {

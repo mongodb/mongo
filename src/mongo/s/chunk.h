@@ -37,7 +37,6 @@ namespace mongo {
 
 class ChunkManager;
 class ChunkType;
-class MigrationSecondaryThrottleOptions;
 class OperationContext;
 
 /**
@@ -131,29 +130,6 @@ public:
     StatusWith<boost::optional<std::pair<BSONObj, BSONObj>>> split(OperationContext* txn,
                                                                    SplitPointMode mode,
                                                                    size_t* resultingSplits) const;
-
-    //
-    // migration support
-    //
-
-    /**
-     * Issues a migrate request for this chunk
-     *
-     * @param to shard to move this chunk to
-     * @param chunSize maximum number of bytes beyond which the migrate should no go trhough
-     * @param writeConcern detailed write concern. NULL means the default write concern.
-     * @param waitForDelete whether chunk move should wait for cleanup or return immediately
-     * @param maxTimeMS max time for the migrate request
-     * @param res the object containing details about the migrate execution
-     * @return true if move was successful
-     */
-    bool moveAndCommit(OperationContext* txn,
-                       const ShardId& to,
-                       long long chunkSize,
-                       const MigrationSecondaryThrottleOptions& secondaryThrottle,
-                       bool waitForDelete,
-                       int maxTimeMS,
-                       BSONObj& res) const;
 
     /**
      * marks this chunk as a jumbo chunk

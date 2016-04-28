@@ -44,6 +44,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/balancer/balancer.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
@@ -110,33 +111,17 @@ public:
                      int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
-        const string ns = parseNs(dbname, cmdObj);
-        if (ns.size() == 0) {
-            errmsg = "no ns";
-            return false;
-        }
+        const NamespaceString nss(parseNs(dbname, cmdObj));
+        uassert(ErrorCodes::InvalidNamespace, "Invalid namespace", nss.isValid());
 
-        const NamespaceString nsStr(ns);
-        if (!nsStr.isValid()) {
-            return appendCommandStatus(
-                result,
-                Status(ErrorCodes::InvalidNamespace, "invalid collection namespace [" + ns + "]"));
-        }
+        auto config = uassertStatusOK(grid.catalogCache()->getDatabase(txn, nss.db().toString()));
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << "sharding not enabled for db " << nss.db(),
+                config->isShardingEnabled());
 
-        auto config = uassertStatusOK(grid.catalogCache()->getDatabase(txn, nsStr.db().toString()));
-        if (!config->isShardingEnabled()) {
-            return appendCommandStatus(
-                result,
-                Status(ErrorCodes::IllegalOperation,
-                       str::stream() << "sharding not enabled for db " << nsStr.db()));
-        }
-
-        if (config->isSharded(ns)) {
-            return appendCommandStatus(
-                result,
-                Status(ErrorCodes::IllegalOperation,
-                       str::stream() << "sharding already enabled for collection " << ns));
-        }
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << "sharding already enabled for collection " << nss.ns(),
+                !config->isSharded(nss.ns()));
 
         // NOTE: We *must* take ownership of the key here - otherwise the shared BSONObj
         // becomes corrupt as soon as the command ends.
@@ -166,10 +151,7 @@ public:
             return false;
         }
 
-        if (ns.find(".system.") != string::npos) {
-            errmsg = "can't shard system namespaces";
-            return false;
-        }
+        uassert(ErrorCodes::IllegalOperation, "can't shard system namespaces", !nss.isSystem());
 
         vector<ShardId> shardIds;
         grid.shardRegistry()->getAllShardIds(&shardIds);
@@ -200,8 +182,8 @@ public:
         // check that collection is not capped
         BSONObj res;
         {
-            list<BSONObj> all = conn->getCollectionInfos(
-                config->name(), BSON("name" << nsToCollectionSubstring(ns)));
+            list<BSONObj> all =
+                conn->getCollectionInfos(config->name(), BSON("name" << nss.coll()));
             if (!all.empty()) {
                 res = all.front().getOwned();
             }
@@ -241,7 +223,7 @@ public:
         // 5. If the collection is empty, and it's still possible to create an index
         //    on the proposed key, we go ahead and do so.
 
-        list<BSONObj> indexes = conn->getIndexSpecs(ns);
+        list<BSONObj> indexes = conn->getIndexSpecs(nss.ns());
 
         // 1.  Verify consistency with existing unique indexes
         ShardKeyPattern proposedShardKey(proposedKey);
@@ -251,7 +233,7 @@ public:
             bool isUnique = idx["unique"].trueValue();
 
             if (isUnique && !proposedShardKey.isUniqueIndexCompatible(currentKey)) {
-                errmsg = str::stream() << "can't shard collection '" << ns << "' "
+                errmsg = str::stream() << "can't shard collection '" << nss.ns() << "' "
                                        << "with unique index on " << currentKey << " "
                                        << "and proposed shard key " << proposedKey << ". "
                                        << "Uniqueness can't be maintained unless "
@@ -276,7 +258,7 @@ public:
                 // per field per collection.
                 if (isHashedShardKey && !idx["seed"].eoo() &&
                     idx["seed"].numberInt() != BSONElementHasher::DEFAULT_HASH_SEED) {
-                    errmsg = str::stream() << "can't shard collection " << ns
+                    errmsg = str::stream() << "can't shard collection " << nss.ns()
                                            << " with hashed shard key " << proposedKey
                                            << " because the hashed index uses a non-default"
                                            << " seed of " << idx["seed"].numberInt();
@@ -291,7 +273,7 @@ public:
         // 3. If proposed key is required to be unique, additionally check for exact match.
         bool careAboutUnique = cmdObj["unique"].trueValue();
         if (hasUsefulIndexForKey && careAboutUnique) {
-            BSONObj eqQuery = BSON("ns" << ns << "key" << proposedKey);
+            BSONObj eqQuery = BSON("ns" << nss.ns() << "key" << proposedKey);
             BSONObj eqQueryResult;
 
             for (list<BSONObj>::iterator it = indexes.begin(); it != indexes.end(); ++it) {
@@ -311,8 +293,8 @@ public:
                 bool isCurrentID = str::equals(currKey.firstElementFieldName(), "_id");
 
                 if (!isExplicitlyUnique && !isCurrentID) {
-                    errmsg = str::stream() << "can't shard collection " << ns << ", " << proposedKey
-                                           << " index not unique, "
+                    errmsg = str::stream() << "can't shard collection " << nss.ns() << ", "
+                                           << proposedKey << " index not unique, "
                                            << "and unique index explicitly specified";
                     conn.done();
                     return false;
@@ -324,7 +306,7 @@ public:
             // Check 2.iii and 2.iv. Make sure no null entries in the sharding index
             // and that there is a useful, non-multikey index available
             BSONObjBuilder checkShardingIndexCmd;
-            checkShardingIndexCmd.append("checkShardingIndex", ns);
+            checkShardingIndexCmd.append("checkShardingIndex", nss.ns());
             checkShardingIndexCmd.append("keyPattern", proposedKey);
 
             if (!conn.get()->runCommand("admin", checkShardingIndexCmd.obj(), res)) {
@@ -332,7 +314,7 @@ public:
                 conn.done();
                 return false;
             }
-        } else if (conn->count(ns) != 0) {
+        } else if (conn->count(nss.ns()) != 0) {
             // 4. if no useful index, and collection is non-empty, fail
             errmsg = str::stream() << "please create an index that starts with the "
                                    << "shard key before sharding.";
@@ -344,7 +326,7 @@ public:
             // 5. If no useful index exists, and collection empty, create one on proposedKey.
             //    Only need to call ensureIndex on primary shard, since indexes get copied to
             //    receiving shard whenever a migrate occurs.
-            Status status = clusterCreateIndex(txn, ns, proposedKey, careAboutUnique);
+            Status status = clusterCreateIndex(txn, nss.ns(), proposedKey, careAboutUnique);
             if (!status.isOK()) {
                 errmsg = str::stream() << "ensureIndex failed to create index on "
                                        << "primary shard: " << status.reason();
@@ -353,7 +335,7 @@ public:
             }
         }
 
-        bool isEmpty = (conn->count(ns) == 0);
+        bool isEmpty = (conn->count(nss.ns()) == 0);
 
         conn.done();
 
@@ -419,25 +401,26 @@ public:
 
         LOG(0) << "CMD: shardcollection: " << cmdObj;
 
-        audit::logShardCollection(ClientBasic::getCurrent(), ns, proposedKey, careAboutUnique);
+        audit::logShardCollection(
+            ClientBasic::getCurrent(), nss.ns(), proposedKey, careAboutUnique);
 
         Status status = grid.catalogManager(txn)->shardCollection(
-            txn, ns, proposedShardKey, careAboutUnique, initSplits, std::set<ShardId>{});
+            txn, nss.ns(), proposedShardKey, careAboutUnique, initSplits, {});
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
 
         // Make sure the cached metadata for the collection knows that we are now sharded
-        config = uassertStatusOK(grid.catalogCache()->getDatabase(txn, nsStr.db().toString()));
-        config->getChunkManager(txn, nsStr.ns(), true /* force */);
+        config = uassertStatusOK(grid.catalogCache()->getDatabase(txn, nss.db().toString()));
+        config->getChunkManager(txn, nss.ns(), true /* force */);
 
-        result << "collectionsharded" << ns;
+        result << "collectionsharded" << nss.ns();
 
         // Only initially move chunks when using a hashed shard key
         if (isHashedShardKey && isEmpty) {
             // Reload the new config info.  If we created more than one initial chunk, then
             // we need to move them around to balance.
-            shared_ptr<ChunkManager> chunkManager = config->getChunkManager(txn, ns, true);
+            shared_ptr<ChunkManager> chunkManager = config->getChunkManager(txn, nss.ns(), true);
             ChunkMap chunkMap = chunkManager->getChunkMap();
 
             // 2. Move and commit each "big chunk" to a different shard.
@@ -451,25 +434,30 @@ public:
 
                 shared_ptr<Chunk> chunk = c->second;
 
-                // can't move chunk to shard it's already on
+                // Can't move chunk to shard it's already on
                 if (to->getId() == chunk->getShardId()) {
                     continue;
                 }
 
-                BSONObj moveResult;
-                WriteConcernOptions noThrottle;
-                if (!chunk->moveAndCommit(
-                        txn,
-                        to->getId(),
-                        Grid::get(txn)->getBalancerConfiguration()->getMaxChunkSizeBytes(),
-                        MigrationSecondaryThrottleOptions::create(
-                            MigrationSecondaryThrottleOptions::kOff),
-                        true,
-                        0,
-                        moveResult)) {
+                ChunkType chunkType;
+                chunkType.setNS(nss.ns());
+                chunkType.setName(ChunkType::genID(nss.ns(), chunk->getMin()));
+                chunkType.setMin(chunk->getMin());
+                chunkType.setMax(chunk->getMax());
+                chunkType.setShard(chunk->getShardId());
+                chunkType.setVersion(chunkManager->getVersion());
+
+                Status moveStatus = Balancer::get(txn)->moveSingleChunk(
+                    txn,
+                    chunkType,
+                    to->getId(),
+                    Grid::get(txn)->getBalancerConfiguration()->getMaxChunkSizeBytes(),
+                    MigrationSecondaryThrottleOptions::create(
+                        MigrationSecondaryThrottleOptions::kOff),
+                    true);
+                if (!moveStatus.isOK()) {
                     warning() << "couldn't move chunk " << chunk->toString() << " to shard " << *to
-                              << " while sharding collection " << ns << "."
-                              << " Reason: " << moveResult;
+                              << " while sharding collection " << nss.ns() << causedBy(moveStatus);
                 }
             }
 
@@ -478,7 +466,7 @@ public:
             }
 
             // Reload the config info, after all the migrations
-            chunkManager = config->getChunkManager(txn, ns, true);
+            chunkManager = config->getChunkManager(txn, nss.ns(), true);
 
             // 3. Subdivide the big chunks by splitting at each of the points in "allSplits"
             //    that we haven't already split by.
@@ -491,7 +479,7 @@ public:
                         auto splitStatus = shardutil::splitChunkAtMultiplePoints(
                             txn,
                             currentChunk->getShardId(),
-                            NamespaceString(ns),
+                            nss,
                             chunkManager->getShardKeyPattern(),
                             chunkManager->getVersion(),
                             currentChunk->getMin(),
@@ -499,7 +487,7 @@ public:
                             subSplits);
                         if (!splitStatus.isOK()) {
                             warning() << "couldn't split chunk " << currentChunk->toString()
-                                      << " while sharding collection " << ns
+                                      << " while sharding collection " << nss.ns()
                                       << causedBy(splitStatus.getStatus());
                         }
 
@@ -523,7 +511,7 @@ public:
 
             // Proactively refresh the chunk manager. Not really necessary, but this way it's
             // immediately up-to-date the next time it's used.
-            config->getChunkManager(txn, ns, true);
+            config->getChunkManager(txn, nss.ns(), true);
         }
 
         return true;

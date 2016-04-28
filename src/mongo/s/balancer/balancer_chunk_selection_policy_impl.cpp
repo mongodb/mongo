@@ -217,6 +217,38 @@ BalancerChunkSelectionPolicyImpl::selectSpecificChunkToMove(OperationContext* tx
     return boost::optional<MigrateInfo>{MigrateInfo(nss.ns(), newShardId, chunk)};
 }
 
+Status BalancerChunkSelectionPolicyImpl::checkMoveAllowed(OperationContext* txn,
+                                                          const ChunkType& chunk,
+                                                          const ShardId& newShardId) {
+    auto tagForChunkStatus =
+        Grid::get(txn)->catalogManager(txn)->getTagForChunk(txn, chunk.getNS(), chunk);
+    if (!tagForChunkStatus.isOK()) {
+        return tagForChunkStatus.getStatus();
+    }
+
+    auto shardStatsStatus = _clusterStats->getStats(txn);
+    if (!shardStatsStatus.isOK()) {
+        return shardStatsStatus.getStatus();
+    }
+
+    const auto& shardStats = shardStatsStatus.getValue();
+
+    auto newShardIterator =
+        std::find_if(shardStats.begin(),
+                     shardStats.end(),
+                     [&newShardId](const ClusterStatistics::ShardStatistics& stat) {
+                         return stat.shardId == newShardId;
+                     });
+    if (newShardIterator == shardStats.end()) {
+        return {ErrorCodes::ShardNotFound,
+                str::stream() << "Unable to find constraints information for shard " << newShardId
+                              << ". Move to this shard will be disallowed."};
+    }
+
+    return DistributionStatus::isShardSuitableReceiver(*newShardIterator,
+                                                       tagForChunkStatus.getValue());
+}
+
 StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::_getSplitCandidatesForCollection(
     OperationContext* txn, const NamespaceString& nss) {
     auto scopedCMStatus = ScopedChunkManager::getExisting(txn, nss);

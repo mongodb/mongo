@@ -38,6 +38,7 @@
 #include "mongo/db/client_basic.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/balancer/balancer.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
@@ -213,39 +214,30 @@ public:
             }
         }
 
-        LOG(0) << "CMD: movechunk: " << cmdObj;
-
-        StatusWith<int> maxTimeMS =
-            LiteParsedQuery::parseMaxTimeMS(cmdObj[LiteParsedQuery::cmdOptionMaxTimeMS]);
-
-        if (!maxTimeMS.isOK()) {
-            errmsg = maxTimeMS.getStatus().reason();
-            return false;
-        }
-
         const auto secondaryThrottle =
             uassertStatusOK(MigrationSecondaryThrottleOptions::createFromCommand(cmdObj));
 
-        BSONObj res;
-        if (!chunk->moveAndCommit(txn,
-                                  to->getId(),
-                                  maxChunkSizeBytes,
-                                  secondaryThrottle,
-                                  cmdObj["_waitForDelete"].trueValue(),
-                                  maxTimeMS.getValue(),
-                                  res)) {
-            errmsg = "move failed";
-            result.append("cause", res);
+        log() << "CMD: movechunk: " << cmdObj;
 
-            if (!res["code"].eoo()) {
-                result.append(res["code"]);
-            }
+        {
+            ChunkType chunkType;
+            chunkType.setNS(nss.ns());
+            chunkType.setName(ChunkType::genID(nss.ns(), chunk->getMin()));
+            chunkType.setMin(chunk->getMin());
+            chunkType.setMax(chunk->getMax());
+            chunkType.setShard(chunk->getShardId());
+            chunkType.setVersion(info->getVersion());
 
-            return false;
+            uassertStatusOK(
+                Balancer::get(txn)->moveSingleChunk(txn,
+                                                    chunkType,
+                                                    to->getId(),
+                                                    maxChunkSizeBytes,
+                                                    secondaryThrottle,
+                                                    cmdObj["_waitForDelete"].trueValue()));
         }
 
         result.append("millis", t.millis());
-
         return true;
     }
 
