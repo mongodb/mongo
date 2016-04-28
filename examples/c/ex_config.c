@@ -71,10 +71,11 @@ main(void)
 	    "table:access", "key_format=S,value_format=S");
 	/*! [create a table] */
 
+	ret = session->open_cursor(
+	    session, "table:access", NULL, NULL, &cursor);
+
 	/*! [transaction] */
 	ret = session->begin_transaction(session, "priority=100,name=mytxn");
-
-	ret = session->open_cursor(session, "config:", NULL, NULL, &cursor);
 
 	while ((ret = cursor->next(cursor)) == 0) {
 		ret = cursor->get_key(cursor, &key);
