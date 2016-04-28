@@ -186,6 +186,7 @@ if mmapv1:
     env.CppUnitTest(target = 'record_access_tracker_test',
                     source = ['record_access_tracker_test.cpp'],
                     LIBDEPS = ['record_access_tracker',
+                               '$BUILD_DIR/mongo/util/clock_source_mock',
                                '$BUILD_DIR/mongo/util/processinfo',
                                '$BUILD_DIR/mongo/util/net/network'])
 

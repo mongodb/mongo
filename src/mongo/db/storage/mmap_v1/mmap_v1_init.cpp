@@ -45,7 +45,7 @@ public:
     virtual ~MMAPV1Factory() {}
     virtual StorageEngine* create(const StorageGlobalParams& params,
                                   const StorageEngineLockFile* lockFile) const {
-        return new MMAPV1Engine(lockFile);
+        return new MMAPV1Engine(lockFile, getGlobalServiceContext()->getFastClockSource());
     }
 
     virtual StringData getCanonicalName() const {

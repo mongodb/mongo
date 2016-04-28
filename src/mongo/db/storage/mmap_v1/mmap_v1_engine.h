@@ -39,14 +39,13 @@
 
 namespace mongo {
 
+class ClockSource;
 class JournalListener;
 class MMAPV1DatabaseCatalogEntry;
 
 class MMAPV1Engine : public StorageEngine {
 public:
-    MMAPV1Engine(const StorageEngineLockFile* lockFile);
-    MMAPV1Engine(const StorageEngineLockFile* lockFile,
-                 std::unique_ptr<ExtentManager::Factory> extentManagerFactory);
+    MMAPV1Engine(const StorageEngineLockFile* lockFile, ClockSource* cs);
     virtual ~MMAPV1Engine();
 
     void finishInit();
