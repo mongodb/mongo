@@ -60,6 +60,7 @@ static const char * const __stats_dsrc_desc[] = {
 	"cache: page written requiring lookaside records",
 	"cache: pages read into cache",
 	"cache: pages read into cache requiring lookaside entries",
+	"cache: pages requested from the cache",
 	"cache: pages written from cache",
 	"cache: pages written requiring in-memory restoration",
 	"cache: unmodified pages evicted",
@@ -189,6 +190,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
 	stats->cache_write_lookaside = 0;
 	stats->cache_read = 0;
 	stats->cache_read_lookaside = 0;
+	stats->cache_pages_requested = 0;
 	stats->cache_write = 0;
 	stats->cache_write_restore = 0;
 	stats->cache_eviction_clean = 0;
@@ -316,6 +318,7 @@ __wt_stat_dsrc_aggregate_single(
 	to->cache_write_lookaside += from->cache_write_lookaside;
 	to->cache_read += from->cache_read;
 	to->cache_read_lookaside += from->cache_read_lookaside;
+	to->cache_pages_requested += from->cache_pages_requested;
 	to->cache_write += from->cache_write;
 	to->cache_write_restore += from->cache_write_restore;
 	to->cache_eviction_clean += from->cache_eviction_clean;
@@ -455,6 +458,8 @@ __wt_stat_dsrc_aggregate(
 	    WT_STAT_READ(from, cache_write_lookaside);
 	to->cache_read += WT_STAT_READ(from, cache_read);
 	to->cache_read_lookaside += WT_STAT_READ(from, cache_read_lookaside);
+	to->cache_pages_requested +=
+	    WT_STAT_READ(from, cache_pages_requested);
 	to->cache_write += WT_STAT_READ(from, cache_write);
 	to->cache_write_restore += WT_STAT_READ(from, cache_write_restore);
 	to->cache_eviction_clean += WT_STAT_READ(from, cache_eviction_clean);
@@ -575,6 +580,7 @@ static const char * const __stats_connection_desc[] = {
 	"cache: pages evicted by application threads",
 	"cache: pages read into cache",
 	"cache: pages read into cache requiring lookaside entries",
+	"cache: pages requested from the cache",
 	"cache: pages selected for eviction unable to be evicted",
 	"cache: pages walked for eviction",
 	"cache: pages written from cache",
@@ -777,6 +783,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_app = 0;
 	stats->cache_read = 0;
 	stats->cache_read_lookaside = 0;
+	stats->cache_pages_requested = 0;
 	stats->cache_eviction_fail = 0;
 	stats->cache_eviction_walk = 0;
 	stats->cache_write = 0;
@@ -993,6 +1000,8 @@ __wt_stat_connection_aggregate(
 	to->cache_eviction_app += WT_STAT_READ(from, cache_eviction_app);
 	to->cache_read += WT_STAT_READ(from, cache_read);
 	to->cache_read_lookaside += WT_STAT_READ(from, cache_read_lookaside);
+	to->cache_pages_requested +=
+	    WT_STAT_READ(from, cache_pages_requested);
 	to->cache_eviction_fail += WT_STAT_READ(from, cache_eviction_fail);
 	to->cache_eviction_walk += WT_STAT_READ(from, cache_eviction_walk);
 	to->cache_write += WT_STAT_READ(from, cache_write);

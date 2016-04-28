@@ -293,6 +293,7 @@ struct __wt_connection_stats {
 	int64_t cache_eviction_app;
 	int64_t cache_read;
 	int64_t cache_read_lookaside;
+	int64_t cache_pages_requested;
 	int64_t cache_eviction_fail;
 	int64_t cache_eviction_walk;
 	int64_t cache_write;
@@ -463,6 +464,7 @@ struct __wt_dsrc_stats {
 	int64_t cache_write_lookaside;
 	int64_t cache_read;
 	int64_t cache_read_lookaside;
+	int64_t cache_pages_requested;
 	int64_t cache_write;
 	int64_t cache_write_restore;
 	int64_t cache_eviction_clean;

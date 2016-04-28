@@ -461,6 +461,8 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 
 	btree = S2BT(session);
 
+	WT_STAT_FAST_CONN_INCR(session, cache_pages_requested);
+	WT_STAT_FAST_DATA_INCR(session, cache_pages_requested);
 	for (evict_soon = stalled = false,
 	    force_attempts = 0, sleep_cnt = wait_cnt = 0;;) {
 		switch (ref->state) {
