@@ -36,9 +36,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
+namespace mongo {
 namespace {
-
-using namespace mongo;
 
 using std::map;
 using std::string;
@@ -67,6 +66,7 @@ TEST(BalancerPolicyTests, BalanceNormalTest) {
         ChunkType chunk;
         chunk.setMin(BSON("x" << BSON("$maxKey" << 1)));
         chunk.setMax(BSON("x" << 49));
+        chunk.setShard("shard0");
         chunks.push_back(chunk);
     }
 
@@ -74,6 +74,7 @@ TEST(BalancerPolicyTests, BalanceNormalTest) {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 49));
         chunk.setMax(BSON("x" << BSON("$maxKey" << 1)));
+        chunk.setShard("shard0");
         chunks.push_back(chunk);
     }
 
@@ -100,6 +101,7 @@ TEST(BalancerPolicyTests, BalanceJumbo) {
         chunk.setMin(BSON("x" << BSON("$maxKey" << 1)));
         chunk.setMax(BSON("x" << 10));
         chunk.setJumbo(true);
+        chunk.setShard("shard0");
         chunks.push_back(chunk);
     }
 
@@ -108,6 +110,7 @@ TEST(BalancerPolicyTests, BalanceJumbo) {
         chunk.setMin(BSON("x" << 10));
         chunk.setMax(BSON("x" << 20));
         chunk.setJumbo(true);
+        chunk.setShard("shard0");
         chunks.push_back(chunk);
     }
 
@@ -115,6 +118,7 @@ TEST(BalancerPolicyTests, BalanceJumbo) {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 20));
         chunk.setMax(BSON("x" << 30));
+        chunk.setShard("shard0");
         chunks.push_back(chunk);
     }
 
@@ -123,6 +127,7 @@ TEST(BalancerPolicyTests, BalanceJumbo) {
         chunk.setMin(BSON("x" << 30));
         chunk.setMax(BSON("x" << 40));
         chunk.setJumbo(true);
+        chunk.setShard("shard0");
         chunks.push_back(chunk);
     }
 
@@ -130,6 +135,7 @@ TEST(BalancerPolicyTests, BalanceJumbo) {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 40));
         chunk.setMax(BSON("x" << BSON("$maxKey" << 1)));
+        chunk.setShard("shard0");
         chunks.push_back(chunk);
     }
 
@@ -155,6 +161,7 @@ TEST(BalanceNormalTests, BalanceDrainingTest) {
         ChunkType chunk;
         chunk.setMin(BSON("x" << BSON("$maxKey" << 1)));
         chunk.setMax(BSON("x" << 49));
+        chunk.setShard("shard0");
         chunks.push_back(chunk);
     }
 
@@ -162,6 +169,7 @@ TEST(BalanceNormalTests, BalanceDrainingTest) {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 49));
         chunk.setMax(BSON("x" << BSON("$maxKey" << 1)));
+        chunk.setShard("shard0");
         chunks.push_back(chunk);
     }
 
@@ -189,6 +197,7 @@ TEST(BalancerPolicyTests, BalanceEndedDrainingTest) {
         ChunkType chunk;
         chunk.setMin(BSON("x" << BSON("$maxKey" << 1)));
         chunk.setMax(BSON("x" << 49));
+        chunk.setShard("shard0");
         chunks.push_back(chunk);
     }
 
@@ -196,6 +205,7 @@ TEST(BalancerPolicyTests, BalanceEndedDrainingTest) {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 49));
         chunk.setMax(BSON("x" << BSON("$maxKey" << 1)));
+        chunk.setShard("shard0");
         chunks.push_back(chunk);
     }
 
@@ -220,6 +230,7 @@ TEST(BalancerPolicyTests, BalanceImpasseTest) {
         ChunkType chunk;
         chunk.setMin(BSON("x" << BSON("$maxKey" << 1)));
         chunk.setMax(BSON("x" << 49));
+        chunk.setShard("shard1");
         chunks.push_back(chunk);
     }
 
@@ -227,6 +238,7 @@ TEST(BalancerPolicyTests, BalanceImpasseTest) {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 49));
         chunk.setMax(BSON("x" << BSON("$maxKey" << 1)));
+        chunk.setShard("shard1");
         chunks.push_back(chunk);
     }
 
@@ -244,7 +256,6 @@ TEST(BalancerPolicyTests, BalanceImpasseTest) {
 
     ASSERT(!c);
 }
-
 
 void addShard(ShardToChunksMap& shardToChunks, unsigned numChunks, bool last) {
     unsigned total = 0;
@@ -273,6 +284,8 @@ void addShard(ShardToChunksMap& shardToChunks, unsigned numChunks, bool last) {
             chunk.setMax(BSON("x" << 1 + total + i));
         }
 
+        chunk.setShard(myName);
+
         chunksList.push_back(chunk);
     }
 
@@ -292,7 +305,6 @@ void moveChunk(ShardToChunksMap& shardToChunks, MigrateInfo* m) {
 
     invariant(false);
 }
-
 
 TEST(BalancerPolicyTests, MultipleDraining) {
     ShardToChunksMap chunks;
@@ -597,3 +609,4 @@ TEST(BalancerPolicyTests, Simulation) {
 }
 
 }  // namespace
+}  // namespace mongo
