@@ -7,6 +7,7 @@ on whether they apply to C++ unit tests, dbtests, or JS tests.
 
 from __future__ import absolute_import
 
+import errno
 import fnmatch
 import os.path
 import subprocess
@@ -43,14 +44,16 @@ def _filter_cpp_tests(kind, root, include_files, exclude_files):
         return list(remaining)
     return tests
 
-def filter_cpp_unit_tests(root="build/unittests.txt", include_files=None, exclude_files=None):
+def filter_cpp_unit_tests(root=config.DEFAULT_UNIT_TEST_LIST,
+                          include_files=None,
+                          exclude_files=None):
     """
     Filters out what C++ unit tests to run.
     """
     return _filter_cpp_tests("C++ unit test", root, include_files, exclude_files)
 
 
-def filter_cpp_integration_tests(root="build/integration_tests.txt",
+def filter_cpp_integration_tests(root=config.DEFAULT_INTEGRATION_TEST_LIST,
                                  include_files=None,
                                  exclude_files=None):
     """
@@ -77,6 +80,9 @@ def filter_dbtests(binary=None, include_suites=None):
     # Ensure that executable files on Windows have a ".exe" extension.
     if sys.platform == "win32" and os.path.splitext(binary)[1] != ".exe":
         binary += ".exe"
+
+    if not os.path.isfile(binary):
+        raise IOError(errno.ENOENT, "File not found", binary)
 
     program = subprocess.Popen([binary, "--list"], stdout=subprocess.PIPE)
     stdout = program.communicate()[0]

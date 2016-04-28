@@ -115,6 +115,20 @@ def _dump_suite_config(suite, logging_config):
     return "\n".join(sb)
 
 
+def find_suites_by_test(suites):
+    """
+    Looks up what other resmoke suites run the tests specified in the suites
+    parameter. Returns a dict keyed by test name, value is array of suite names.
+    """
+
+    memberships = {}
+    test_membership = resmokelib.parser.create_test_membership_map()
+    for suite in suites:
+        for group in suite.test_groups:
+            for test in group.tests:
+                memberships[test] = test_membership[test]
+    return memberships
+
 def _write_report_file(suites, pathname):
     """
     Writes the report.json file if requested.
@@ -151,6 +165,15 @@ def main():
 
     interrupted = False
     suites = resmokelib.parser.get_suites(values, args)
+
+    # Run the suite finder after the test suite parsing is complete.
+    if values.find_suites:
+        suites_by_test = find_suites_by_test(suites)
+        for test in sorted(suites_by_test):
+            suite_names = suites_by_test[test]
+            resmoke_logger.info("%s will be run by the following suite(s): %s", test, suite_names)
+        sys.exit(0)
+
     try:
         for suite in suites:
             resmoke_logger.info(_dump_suite_config(suite, logging_config))
