@@ -150,7 +150,7 @@ public:
         }
 
         // This refreshes the chunk metadata if stale.
-        ChunkManagerPtr manager = config->getChunkManagerIfExists(txn, nss.ns(), true);
+        shared_ptr<ChunkManager> manager = config->getChunkManagerIfExists(txn, nss.ns(), true);
         if (!manager) {
             return appendCommandStatus(
                 result,
@@ -169,7 +169,7 @@ public:
         minKey = manager->getShardKeyPattern().normalizeShardKey(minKey);
         maxKey = manager->getShardKeyPattern().normalizeShardKey(maxKey);
 
-        ChunkPtr firstChunk = manager->findIntersectingChunk(txn, minKey);
+        shared_ptr<Chunk> firstChunk = manager->findIntersectingChunk(txn, minKey);
         verify(firstChunk);
 
         BSONObjBuilder remoteCmdObjB;

@@ -179,9 +179,9 @@ env.Library(
         'chunk.cpp',
         'chunk_manager.cpp',
         'config.cpp',
-        'db_util.cpp',
         'grid.cpp',
         'sharding_egress_metadata_hook.cpp',
+        'sharding_raii.cpp',
         'shard_util.cpp',
     ],
     LIBDEPS=[

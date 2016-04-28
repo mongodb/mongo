@@ -428,7 +428,7 @@ public:
         if (isHashedShardKey && isEmpty) {
             // Reload the new config info.  If we created more than one initial chunk, then
             // we need to move them around to balance.
-            ChunkManagerPtr chunkManager = config->getChunkManager(txn, ns, true);
+            shared_ptr<ChunkManager> chunkManager = config->getChunkManager(txn, ns, true);
             ChunkMap chunkMap = chunkManager->getChunkMap();
 
             // 2. Move and commit each "big chunk" to a different shard.
@@ -440,7 +440,7 @@ public:
                     continue;
                 }
 
-                ChunkPtr chunk = c->second;
+                shared_ptr<Chunk> chunk = c->second;
 
                 // can't move chunk to shard it's already on
                 if (to->getId() == chunk->getShardId()) {
@@ -473,7 +473,7 @@ public:
 
             // 3. Subdivide the big chunks by splitting at each of the points in "allSplits"
             //    that we haven't already split by.
-            ChunkPtr currentChunk = chunkManager->findIntersectingChunk(txn, allSplits[0]);
+            shared_ptr<Chunk> currentChunk = chunkManager->findIntersectingChunk(txn, allSplits[0]);
 
             vector<BSONObj> subSplits;
             for (unsigned i = 0; i <= allSplits.size(); i++) {

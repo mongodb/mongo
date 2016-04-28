@@ -49,9 +49,9 @@
 #include "mongo/s/config.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/db_util.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/commands/strategy.h"
+#include "mongo/s/sharding_raii.h"
 #include "mongo/s/write_ops/wc_error_detail.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/util/log.h"
@@ -238,7 +238,8 @@ public:
         shared_ptr<DBConfig> confOut;
         if (customOutDB) {
             // Create the output database implicitly, since we have a custom output requested
-            confOut = uassertStatusOK(dbutil::implicitCreateDb(txn, outDB));
+            auto scopedDb = uassertStatusOK(ScopedShardDatabase::getOrCreate(txn, outDB));
+            confOut = scopedDb.getSharedDbReference();
         } else {
             confOut = confIn;
         }

@@ -35,11 +35,11 @@
 #include <boost/thread/tss.hpp>
 
 #include "mongo/s/chunk.h"
-#include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
-#include "mongo/s/db_util.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_raii.h"
+#include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -270,13 +270,13 @@ ChunkManagerTargeter::ChunkManagerTargeter(const NamespaceString& nss, TargeterS
 
 
 Status ChunkManagerTargeter::init(OperationContext* txn) {
-    auto status = dbutil::implicitCreateDb(txn, _nss.db().toString());
-    if (!status.isOK()) {
-        return status.getStatus();
+    auto dbStatus = ScopedShardDatabase::getOrCreate(txn, _nss.db());
+    if (!dbStatus.isOK()) {
+        return dbStatus.getStatus();
     }
 
-    shared_ptr<DBConfig> config = status.getValue();
-    config->getChunkManagerOrPrimary(txn, _nss.ns(), _manager, _primary);
+    auto scopedDb = std::move(dbStatus.getValue());
+    scopedDb.db()->getChunkManagerOrPrimary(txn, _nss.ns(), _manager, _primary);
 
     return Status::OK();
 }
@@ -625,13 +625,13 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* txn, bool* wasCha
     shared_ptr<ChunkManager> lastManager = _manager;
     shared_ptr<Shard> lastPrimary = _primary;
 
-    auto status = dbutil::implicitCreateDb(txn, _nss.db().toString());
-    if (!status.isOK()) {
-        return status.getStatus();
+    auto dbStatus = ScopedShardDatabase::getOrCreate(txn, _nss.db());
+    if (!dbStatus.isOK()) {
+        return dbStatus.getStatus();
     }
 
-    shared_ptr<DBConfig> config = status.getValue();
-    config->getChunkManagerOrPrimary(txn, _nss.ns(), _manager, _primary);
+    auto scopedDb = std::move(dbStatus.getValue());
+    scopedDb.db()->getChunkManagerOrPrimary(txn, _nss.ns(), _manager, _primary);
 
     // We now have the latest metadata from the cache.
 
@@ -686,12 +686,12 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* txn, bool* wasCha
 }
 
 Status ChunkManagerTargeter::refreshNow(OperationContext* txn, RefreshType refreshType) {
-    auto status = dbutil::implicitCreateDb(txn, _nss.db().toString());
-    if (!status.isOK()) {
-        return status.getStatus();
+    auto dbStatus = ScopedShardDatabase::getOrCreate(txn, _nss.db());
+    if (!dbStatus.isOK()) {
+        return dbStatus.getStatus();
     }
 
-    shared_ptr<DBConfig> config = status.getValue();
+    auto scopedDb = std::move(dbStatus.getValue());
 
     // Try not to spam the configs
     refreshBackoff();
@@ -699,23 +699,23 @@ Status ChunkManagerTargeter::refreshNow(OperationContext* txn, RefreshType refre
     // TODO: Improve synchronization and make more explicit
     if (refreshType == RefreshType_RefreshChunkManager) {
         try {
-            // Forces a remote check of the collection info, synchronization between threads
-            // happens internally.
-            config->getChunkManagerIfExists(txn, _nss.ns(), true);
-        } catch (const DBException& ex) {
-            return Status(ErrorCodes::UnknownError, ex.toString());
-        }
-        config->getChunkManagerOrPrimary(txn, _nss.ns(), _manager, _primary);
-    } else if (refreshType == RefreshType_ReloadDatabase) {
-        try {
-            // Dumps the db info, reloads it all, synchronization between threads happens
-            // internally.
-            config->reload(txn);
+            // Forces a remote check of the collection info, synchronization between threads happens
+            // internally
+            scopedDb.db()->getChunkManagerIfExists(txn, _nss.ns(), true);
         } catch (const DBException& ex) {
             return Status(ErrorCodes::UnknownError, ex.toString());
         }
 
-        config->getChunkManagerOrPrimary(txn, _nss.ns(), _manager, _primary);
+        scopedDb.db()->getChunkManagerOrPrimary(txn, _nss.ns(), _manager, _primary);
+    } else if (refreshType == RefreshType_ReloadDatabase) {
+        try {
+            // Dumps the db info, reloads it all, synchronization between threads happens internally
+            scopedDb.db()->reload(txn);
+        } catch (const DBException& ex) {
+            return Status(ErrorCodes::UnknownError, ex.toString());
+        }
+
+        scopedDb.db()->getChunkManagerOrPrimary(txn, _nss.ns(), _manager, _primary);
     }
 
     return Status::OK();
