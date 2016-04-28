@@ -109,8 +109,13 @@ __wt_posix_file_fallocate(WT_FILE_HANDLE *file_handle,
     WT_SESSION *wt_session, wt_off_t offset, wt_off_t len)
 {
 	/*
-	 * The first fallocate call: figure out what allocation call this
-	 * system/filesystem supports, if any.
+	 * The first fallocate call: figure out what fallocate call this system
+	 * supports, if any.
+	 *
+	 * The function is configured as a locking fallocate call, so we know
+	 * we're single-threaded through here. Set the nolock function first,
+	 * then publish the NULL replacement to ensure the handle functions are
+	 * always correct.
 	 *
 	 * We've seen Linux systems where posix_fallocate has corrupted
 	 * existing file data (even though that is explicitly disallowed
@@ -120,26 +125,28 @@ __wt_posix_file_fallocate(WT_FILE_HANDLE *file_handle,
 	 * avoid locking on Linux if at all possible.
 	 */
 	if (__posix_std_fallocate(file_handle, wt_session, offset, len) == 0) {
-		file_handle->fallocate = NULL;
 		file_handle->fallocate_nolock = __posix_std_fallocate;
+		WT_PUBLISH(file_handle->fallocate, NULL);
 		return (0);
 	}
 	if (__posix_sys_fallocate(file_handle, wt_session, offset, len) == 0) {
-		file_handle->fallocate = NULL;
 		file_handle->fallocate_nolock = __posix_sys_fallocate;
+		WT_PUBLISH(file_handle->fallocate, NULL);
 		return (0);
 	}
 	if (__posix_posix_fallocate(
 	    file_handle, wt_session, offset, len) == 0) {
 #if defined(__linux__)
 		file_handle->fallocate = __posix_posix_fallocate;
+		WT_WRITE_BARRIER();
 #else
-		file_handle->fallocate = NULL;
 		file_handle->fallocate_nolock = __posix_posix_fallocate;
+		WT_PUBLISH(file_handle->fallocate, NULL);
 #endif
 		return (0);
 	}
 
 	file_handle->fallocate = NULL;
+	WT_WRITE_BARRIER();
 	return (ENOTSUP);
 }
