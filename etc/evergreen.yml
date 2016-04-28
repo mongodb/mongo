@@ -3069,7 +3069,7 @@ buildvariants:
   display_name: Windows Vista
   modules: ~
   run_on:
-  - windows-64-vs2013-test
+  - windows-64-vs2015-test
   batchtime: 1440 # 1 day
   expansions:
     exe: ".exe"
@@ -3080,12 +3080,12 @@ buildvariants:
     msi_target: msi
     content_type: application/zip
     compile_flags: --release -j$(grep -c ^processor /proc/cpuinfo) VARIANT_DIR=win32
-    num_jobs_available: 1
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
   tasks:
   - name: compile
     distros:
-    - windows-64-vs2013-compile
+    - windows-64-vs2015-compile
   - name: aggregation
   - name: aggregation_WT
   - name: auth
@@ -3169,7 +3169,7 @@ buildvariants:
   display_name: Windows 2008R2
   modules: ~
   run_on:
-  - windows-64-vs2013-test
+  - windows-64-vs2015-test
   batchtime: 1440 # 1 day
   expansions:
     exe: ".exe"
@@ -3181,108 +3181,7 @@ buildvariants:
     msi_target: msi
     content_type: application/zip
     compile_flags: --release --win-version-min=ws08r2 -j$(grep -c ^processor /proc/cpuinfo) MONGO_DISTMOD=2008plus VARIANT_DIR=win32
-    num_jobs_available: 1
-    ext: zip
-  tasks:
-  - name: compile
-    distros:
-    - windows-64-vs2013-compile
-  - name: aggregation
-  - name: aggregation_WT
-  - name: aggregation_read_concern_majority_passthrough_WT
-  - name: auth
-  - name: auth_WT
-  - name: dbtest
-  - name: dbtest_WT
-  - name: disk
-  - name: durability
-  - name: failpoints
-  - name: gle_auth
-  - name: gle_auth_WT
-  - name: gle_auth_write_cmd
-  - name: gle_auth_write_cmd_WT
-  - name: gle_auth_basics_passthrough
-  - name: gle_auth_basics_passthrough_WT
-  - name: gle_auth_basics_passthrough_write_cmd
-  - name: gle_auth_basics_passthrough_write_cmd_WT
-  - name: sharding_gle_auth_basics_passthrough
-  - name: sharding_gle_auth_basics_passthrough_WT
-  - name: sharding_gle_auth_basics_passthrough_write_cmd
-  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
-  - name: jsCore
-  - name: jsCore_WT
-  - name: jsCore_compatibility
-  - name: jsCore_compatibility_WT
-  - name: jsCore_decimal
-  - name: jsCore_decimal_WT
-  - name: jsCore_small_oplog
-  - name: jsCore_small_oplog_WT
-  - name: jsCore_small_oplog_rs
-  - name: jsCore_small_oplog_rs_WT
-  - name: jstestfuzz
-  - name: jstestfuzz_WT
-  - name: jstestfuzz_replication
-  - name: jstestfuzz_replication_WT
-  - name: jstestfuzz_sharded
-  - name: jstestfuzz_sharded_WT
-  - name: mmap
-  - name: mongosTest
-  - name: multiversion
-  - name: noPassthrough
-  - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
-  - name: bulk_gle_passthrough
-  - name: bulk_gle_passthrough_WT
-  - name: parallel
-  - name: parallel_WT
-  - name: parallel_compatibility
-  - name: parallel_compatibility_WT
-  - name: concurrency
-  - name: concurrency_WT
-  - name: concurrency_replication
-  - name: concurrency_replication_WT
-  - name: concurrency_sharded
-  - name: concurrency_sharded_WT
-  - name: concurrency_simultaneous
-  - name: concurrency_simultaneous_WT
-  - name: read_concern_majority_passthrough_WT
-  - name: replicasets
-  - name: replicasets_WT
-  - name: replication
-  - name: replication_WT
-  - name: sharding
-  - name: sharding_WT
-  - name: slow1
-  - name: slow1_WT
-  - name: serial_run
-  - name: serial_run_WT
-  - name: sharded_collections_jscore_passthrough
-  - name: sharded_collections_jscore_passthrough_WT
-  - name: sharding_jscore_passthrough
-  - name: sharding_jscore_passthrough_WT
-  - name: sharding_jscore_passthrough_wire_ops_WT
-  - name: sharding_last_stable_mongos
-  - name: tool
-  - name: tool_WT
-  - name: unittests
-  - name: push
-    distros:
-    - rhel55-test
-
-- name: windows-64-2k8-2015
-  display_name: Windows 2008R2 VS2015
-  modules: ~
-  run_on:
-  - windows-64-vs2015-test
-  batchtime: 1440 # 1 day
-  expansions:
-    exe: ".exe"
-    multiversion_platform_arch: "win32/x86_64-2008plus"
-    msi_target: msi
-    content_type: application/zip
-    compile_flags: --win-version-min=ws08r2 -j$(grep -c ^processor /proc/cpuinfo) VARIANT_DIR=win32
-    num_jobs_available: 2
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
   tasks:
   - name: compile
@@ -3367,12 +3266,15 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: push
+    distros:
+    - rhel55-test
 
 - name: windows-64-2k8-debug
   display_name: "* Windows 2008R2 DEBUG"
   modules: ~
   run_on:
-  - windows-64-vs2013-test
+  - windows-64-vs2015-test
   expansions:
     exe: ".exe"
     push_path: win32
@@ -3380,13 +3282,13 @@ buildvariants:
     push_name: win32-debug
     push_arch: x86_64-2008plus
     content_type: application/zip
-    num_jobs_available: 1
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     compile_flags: --dbg=on --opt=on --win-version-min=ws08r2 -j$(grep -c ^processor /proc/cpuinfo) MONGO_DISTMOD=2008plus
     ext: zip
   tasks:
   - name: compile
     distros:
-    - windows-64-vs2013-compile
+    - windows-64-vs2015-compile
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_read_concern_majority_passthrough_WT
@@ -3424,28 +3326,28 @@ buildvariants:
     # Some concurrency workloads require a lot of memory, so we use machines
     # with more RAM for these suites.
     distros:
-    - windows-64-vs2013-compile
+    - windows-64-vs2015-compile
   - name: concurrency_WT
     distros:
-    - windows-64-vs2013-compile
+    - windows-64-vs2015-compile
   - name: concurrency_replication
     distros:
-    - windows-64-vs2013-compile
+    - windows-64-vs2015-compile
   - name: concurrency_replication_WT
     distros:
-    - windows-64-vs2013-compile
+    - windows-64-vs2015-compile
   - name: concurrency_sharded
     distros:
-    - windows-64-vs2013-compile
+    - windows-64-vs2015-compile
   - name: concurrency_sharded_WT
     distros:
-    - windows-64-vs2013-compile
+    - windows-64-vs2015-compile
   - name: concurrency_simultaneous
     distros:
-    - windows-64-vs2013-compile
+    - windows-64-vs2015-compile
   - name: concurrency_simultaneous_WT
     distros:
-    - windows-64-vs2013-compile
+    - windows-64-vs2015-compile
   - name: read_concern_majority_passthrough_WT
   - name: read_only
   - name: read_only_WT
@@ -3466,7 +3368,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - windows-64-vs2013-test
+  - windows-64-vs2015-test
   expansions:
     tooltags: "-tags 'ssl sasl'"
     exe: ".exe"
@@ -3478,12 +3380,12 @@ buildvariants:
     msi_target: msi
     content_type: application/zip
     compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib" -j$(grep -c ^processor /proc/cpuinfo) --dynamic-windows --win-version-min=ws08r2 VARIANT_DIR=win32
-    num_jobs_available: 1
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
   tasks:
   - name: compile
     distros:
-    - windows-64-vs2013-compile
+    - windows-64-vs2015-compile
   - name: audit
   - name: audit_WT
   - name: auth_audit
@@ -3522,7 +3424,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - windows-64-vs2013-test
+  - windows-64-vs2015-test
   batchtime: 1440 # 1 day
   expansions:
     tooltags: "-tags 'ssl sasl'"
@@ -3535,20 +3437,20 @@ buildvariants:
     msi_target: msi
     content_type: application/zip
     compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib" -j$(grep -c ^processor /proc/cpuinfo) --dynamic-windows --win-version-min=ws08r2 VARIANT_DIR=win32
-    num_jobs_available: 1
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
     ext: zip
   tasks:
   - name: compile
     distros:
-    - windows-64-vs2013-compile
+    - windows-64-vs2015-compile
   - name: audit
   - name: audit_WT
   - name: auth_audit
   - name: dbtest
   - name: concurrency
     distros:
-    - windows-64-vs2013-compile  # Some workloads require a lot of memory, use a bigger machine for this suite.
+    - windows-64-vs2015-compile  # Some workloads require a lot of memory, use a bigger machine for this suite.
   - name: concurrency_replication
   - name: concurrency_sharded
   - name: concurrency_simultaneous
@@ -3572,7 +3474,7 @@ buildvariants:
   display_name: SSL Windows 2008R2
   modules: ~
   run_on:
-  - windows-64-vs2013-test
+  - windows-64-vs2015-test
   batchtime: 1440 # 1 day
   expansions:
     exe: ".exe"
@@ -3585,12 +3487,12 @@ buildvariants:
     msi_target: msi
     content_type: application/zip
     compile_flags: --release --ssl MONGO_DISTMOD=2008plus-ssl CPPPATH="c:/openssl/include" LIBPATH="c:/openssl/lib" -j$(grep -c ^processor /proc/cpuinfo) --dynamic-windows --win-version-min=ws08r2 VARIANT_DIR=win32
-    num_jobs_available: 1
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
   tasks:
   - name: compile
     distros:
-    - windows-64-vs2013-compile
+    - windows-64-vs2015-compile
   - name: aggregation
   - name: aggregation_WT
   - name: auth

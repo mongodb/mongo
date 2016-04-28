@@ -577,7 +577,7 @@ buildvariants:
   tasks:
     - name: compile
       distros:
-      - windows-64-vs2013-compile
+      - windows-64-vs2015-compile
     - name: industry_benchmarks_WT
       depends_on:
         - name: compile

@@ -1557,14 +1557,14 @@ def doConfigure(myenv):
     # bare compilers, and we should re-check at the very end that TryCompile and TryLink still
     # work with the flags we have selected.
     if myenv.ToolchainIs('msvc'):
-        compiler_minimum_string = "Microsoft Visual Studio 2013 Update 4"
+        compiler_minimum_string = "Microsoft Visual Studio 2015 Update 2"
         compiler_test_body = textwrap.dedent(
         """
         #if !defined(_MSC_VER)
         #error
         #endif
 
-        #if _MSC_VER < 1800 || (_MSC_VER == 1800 && _MSC_FULL_VER < 180031101)
+        #if _MSC_VER < 1900 || (_MSC_VER == 1900 && _MSC_FULL_VER < 190023918)
         #error %s or newer is required to build MongoDB
         #endif
 
