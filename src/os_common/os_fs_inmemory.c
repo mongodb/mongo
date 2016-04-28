@@ -317,7 +317,7 @@ __im_file_read(WT_FILE_HANDLE *file_handle,
 	WT_RET_MSG(session, WT_ERROR,
 	    "%s: handle-read: failed to read %" WT_SIZET_FMT " bytes at "
 	    "offset %" WT_SIZET_FMT,
-	    im_fh->iface.name, len, off);
+	    file_handle->name, len, off);
 }
 
 /*
@@ -419,7 +419,7 @@ err:	__wt_spin_unlock(session, &im_fs->lock);
 	WT_RET_MSG(session, ret,
 	    "%s: handle-write: failed to write %" WT_SIZET_FMT " bytes at "
 	    "offset %" WT_SIZET_FMT,
-	    im_fh->iface.name, len, off);
+	    file_handle->name, len, off);
 }
 
 /*

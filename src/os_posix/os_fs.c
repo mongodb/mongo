@@ -18,8 +18,6 @@ __posix_sync(
 {
 	WT_DECL_RET;
 
-	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
-
 #if defined(F_FULLFSYNC)
 	/*
 	 * OS X fsync documentation:
