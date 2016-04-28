@@ -64,6 +64,9 @@ env.Library(
     source=[
         'shard.cpp',
     ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ]
 )
 
 env.Library(
