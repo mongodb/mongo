@@ -30,6 +30,12 @@ DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/$NAME-$VERSION
 UNAME=$(uname | tr A-Z a-z)
 UNAME_PROCESSOR=$(uname -p)
 
+# Our build system chooses different names in this case so we need to match them
+if [ $UNAME == "darwin" ]; then
+    UNAME=osx
+    UNAME_PROCESSOR=x86_64
+fi
+
 TARGET_UNAME=${UNAME}_${UNAME_PROCESSOR}
 
 if [ ! -f $TARBALL ]; then
