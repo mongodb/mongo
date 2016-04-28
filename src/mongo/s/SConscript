@@ -172,6 +172,8 @@ env.Library(
         # This is only here temporarily for auto-split logic in chunk.cpp.
         'balance.cpp',
         'balancer_policy.cpp',
+        'balancer/balancer_chunk_selection_policy.cpp',
+        'balancer/balancer_chunk_selection_policy_impl.cpp',
         'balancer/balancer_configuration.cpp',
         'balancer/cluster_statistics.cpp',
         'balancer/cluster_statistics_impl.cpp',

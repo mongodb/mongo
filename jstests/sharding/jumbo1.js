@@ -1,39 +1,40 @@
 (function() {
+    'use strict';
 
-    var s = new ShardingTest({name: "jumbo1", shards: 2, mongos: 1, other: {chunkSize: 1}});
+    var s = new ShardingTest({shards: 2, mongos: 1, other: {chunkSize: 1}});
 
-    s.adminCommand({enablesharding: "test"});
+    assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
     s.ensurePrimaryShard('test', 'shard0001');
-    s.adminCommand({shardcollection: "test.foo", key: {x: 1}});
+    assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {x: 1}}));
 
-    db = s.getDB("test");
+    var db = s.getDB("test");
 
-    big = "";
-    while (big.length < 10000)
+    var big = "";
+    while (big.length < 10000) {
         big += ".";
+    }
 
-    x = 0;
+    var x = 0;
     var bulk = db.foo.initializeUnorderedBulkOp();
-    for (; x < 500; x++)
+    for (; x < 500; x++) {
         bulk.insert({x: x, big: big});
+    }
 
-    for (i = 0; i < 500; i++)
+    for (var i = 0; i < 500; i++) {
         bulk.insert({x: x, big: big});
+    }
 
-    for (; x < 2000; x++)
+    for (; x < 2000; x++) {
         bulk.insert({x: x, big: big});
+    }
 
     assert.writeOK(bulk.execute());
 
     s.printShardingStatus(true);
-
-    res = sh.moveChunk("test.foo", {x: 0}, "shard0001");
-    if (!res.ok)
-        res = sh.moveChunk("test.foo", {x: 0}, "shard0000");
-
+    assert.commandWorked(s.s0.adminCommand({moveChunk: 'test.foo', find: {x: 0}, to: 'shard0000'}));
     s.printShardingStatus(true);
 
-    sh.setBalancerState(true);
+    s.startBalancer();
 
     function diff1() {
         var x = s.chunkCounts("foo");
