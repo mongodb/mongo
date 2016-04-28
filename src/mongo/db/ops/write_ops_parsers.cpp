@@ -96,8 +96,7 @@ void parseWriteCommand(StringData dbName,
 
         const StringData fieldName = field.fieldNameStringData();
         if (fieldName == "bypassDocumentValidation") {
-            checkType(Bool, field);
-            op->bypassDocumentValidation = field.Bool();
+            op->bypassDocumentValidation = field.trueValue();
         } else if (fieldName == "ordered") {
             checkType(Bool, field);
             op->continueOnError = !field.Bool();

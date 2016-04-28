@@ -29,19 +29,20 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
 TEST(CommandWriteOpsParsers, CommonFields_BypassDocumentValidation) {
-    for (bool bypassDocumentValidation : {true, false}) {
+    for (BSONElement bypassDocumentValidation : BSON_ARRAY(true << false << 1 << 0 << 1.0 << 0.0)) {
         auto cmd = BSON("insert"
                         << "bar"
                         << "documents" << BSON_ARRAY(BSONObj()) << "bypassDocumentValidation"
                         << bypassDocumentValidation);
         auto op = parseInsertCommand("foo", cmd);
-        ASSERT_EQ(op.bypassDocumentValidation, bypassDocumentValidation);
+        ASSERT_EQ(op.bypassDocumentValidation, shouldBypassDocumentValidationForCommand(cmd));
     }
 }
 
