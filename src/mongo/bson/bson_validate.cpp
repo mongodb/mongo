@@ -28,7 +28,7 @@
  */
 
 #include <cstring>
-#include <deque>
+#include <vector>
 #include <limits>
 
 #include "mongo/base/data_view.h"
@@ -46,13 +46,14 @@ namespace {
  * Creates a status with InvalidBSON code and adds information about _id if available.
  * WARNING: only pass in a non-EOO idElem if it has been fully validated already!
  */
-Status makeError(std::string baseMsg, BSONElement idElem) {
+Status NOINLINE_DECL makeError(StringData baseMsg, BSONElement idElem) {
+    std::string msg = baseMsg.toString();
     if (idElem.eoo()) {
-        baseMsg += " in object with unknown _id";
+        msg += " in object with unknown _id";
     } else {
-        baseMsg += " in object with " + idElem.toString(/*field name=*/true, /*full=*/true);
+        msg += " in object with " + idElem.toString(/*field name=*/true, /*full=*/true);
     }
-    return Status(ErrorCodes::InvalidBSON, baseMsg);
+    return Status(ErrorCodes::InvalidBSON, msg);
 }
 
 class Buffer {
@@ -178,7 +179,10 @@ private:
 /**
  * WARNING: only pass in a non-EOO idElem if it has been fully validated already!
  */
-Status validateElementInfo(Buffer* buffer, ValidationState::State* nextState, BSONElement idElem) {
+Status validateElementInfo(Buffer* buffer,
+                           ValidationState::State* nextState,
+                           BSONElement idElem,
+                           StringData* elemName) {
     Status status = Status::OK();
 
     signed char type;
@@ -190,8 +194,7 @@ Status validateElementInfo(Buffer* buffer, ValidationState::State* nextState, BS
         return Status::OK();
     }
 
-    StringData name;
-    status = buffer->readCString(&name);
+    status = buffer->readCString(elemName);
     if (!status.isOK())
         return status;
 
@@ -288,7 +291,8 @@ Status validateElementInfo(Buffer* buffer, ValidationState::State* nextState, BS
 }
 
 Status validateBSONIterative(Buffer* buffer) {
-    std::deque<ValidationObjectFrame> frames;
+    std::vector<ValidationObjectFrame> frames;
+    frames.reserve(16);
     ValidationObjectFrame* curr = NULL;
     ValidationState::State state = ValidationState::BeginObj;
 
@@ -318,14 +322,15 @@ Status validateBSONIterative(Buffer* buffer) {
 
                 const uint64_t elemStartPos = buffer->position();
                 ValidationState::State nextState = state;
-                Status status = validateElementInfo(buffer, &nextState, idElem);
+                StringData elemName;
+                Status status = validateElementInfo(buffer, &nextState, idElem, &elemName);
                 if (!status.isOK())
                     return status;
 
                 // we've already validated that fieldname is safe to access as long as we aren't
                 // at the end of the object, since EOO doesn't have a fieldname.
                 if (nextState != ValidationState::EndObj && idElem.eoo() && atTopLevel) {
-                    if (strcmp(buffer->getBasePtr() + elemStartPos + 1 /*type*/, "_id") == 0) {
+                    if (elemName == "_id") {
                         idElemStartPos = elemStartPos;
                     }
                 }
