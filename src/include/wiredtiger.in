@@ -71,6 +71,8 @@ struct __wt_encryptor;	    typedef struct __wt_encryptor WT_ENCRYPTOR;
 struct __wt_event_handler;  typedef struct __wt_event_handler WT_EVENT_HANDLER;
 struct __wt_extension_api;  typedef struct __wt_extension_api WT_EXTENSION_API;
 struct __wt_extractor;	    typedef struct __wt_extractor WT_EXTRACTOR;
+struct __wt_file_handle;    typedef struct __wt_file_handle WT_FILE_HANDLE;
+struct __wt_file_system;    typedef struct __wt_file_system WT_FILE_SYSTEM;
 struct __wt_item;	    typedef struct __wt_item WT_ITEM;
 struct __wt_session;	    typedef struct __wt_session WT_SESSION;
 
@@ -2034,6 +2036,10 @@ struct __wt_connection {
 	 * @configstart{WT_CONNECTION.load_extension, see dist/api_data.py}
 	 * @config{config, configuration string passed to the entry point of the
 	 * extension as its WT_CONFIG_ARG argument., a string; default empty.}
+	 * @config{early_load, whether this extension should be loaded at the
+	 * beginning of ::wiredtiger_open.  Only applicable to extensions loaded
+	 * via the wiredtiger_open configurations string., a boolean flag;
+	 * default \c false.}
 	 * @config{entry, the entry point of the extension\, called to
 	 * initialize the extension when it is loaded.  The signature of the
 	 * function must match ::wiredtiger_extension_init., a string; default
@@ -2143,6 +2149,23 @@ struct __wt_connection {
 	 */
 	int __F(add_extractor)(WT_CONNECTION *connection, const char *name,
 	    WT_EXTRACTOR *extractor, const char *config);
+
+	/*!
+	 * Configure a custom file system.
+	 *
+	 * This method can only be called from an early loaded extension
+	 * module. The application must first implement the WT_FILE_SYSTEM
+	 * interface and then register the implementation with WiredTiger:
+	 *
+	 * @snippet ex_file_system.c WT_FILE_SYSTEM register
+	 *
+	 * @param connection the connection handle
+	 * @param fs the populated file system structure
+	 * @configempty{WT_CONNECTION.set_file_system, see dist/api_data.py}
+	 * @errors
+	 */
+	int __F(set_file_system)(
+	    WT_CONNECTION *connection, WT_FILE_SYSTEM *fs, const char *config);
 
 	/*!
 	 * Return a reference to the WiredTiger extension functions.
@@ -3056,7 +3079,7 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
 /*******************************************
  * Forward structure declarations for the extension API
  *******************************************/
-struct __wt_config_arg;     typedef struct __wt_config_arg WT_CONFIG_ARG;
+struct __wt_config_arg;	typedef struct __wt_config_arg WT_CONFIG_ARG;
 
 /*!
  * The interface implemented by applications to provide custom ordering of
@@ -3587,7 +3610,7 @@ struct __wt_encryptor {
 	 * number of bytes needed.
 	 *
 	 * @param[out] expansion_constantp the additional number of bytes needed
-	 *             when encrypting.
+	 *    when encrypting.
 	 * @returns zero for success, non-zero to indicate an error.
 	 *
 	 * @snippet nop_encrypt.c WT_ENCRYPTOR sizing
@@ -3606,8 +3629,7 @@ struct __wt_encryptor {
 	 * is used instead of this one for any callbacks.
 	 *
 	 * @param[in] encrypt_config the "encryption" portion of the
-	 *            configuration from the wiredtiger_open or
-	 *            WT_SESSION::create call
+	 *    configuration from the wiredtiger_open or WT_SESSION::create call
 	 * @param[out] customp the new modified encryptor, or NULL.
 	 * @returns zero for success, non-zero to indicate an error.
 	 */
@@ -3681,6 +3703,466 @@ struct __wt_extractor {
 	 */
 	int (*terminate)(WT_EXTRACTOR *extractor, WT_SESSION *session);
 };
+
+#if !defined(SWIG)
+/*! WT_FILE_SYSTEM::open_file file types */
+typedef enum {
+	WT_OPEN_FILE_TYPE_CHECKPOINT,	/*!< open a data file checkpoint */
+	WT_OPEN_FILE_TYPE_DATA,		/*!< open a data file */
+	WT_OPEN_FILE_TYPE_DIRECTORY,	/*!< open a directory */
+	WT_OPEN_FILE_TYPE_LOG,		/*!< open a log file */
+	WT_OPEN_FILE_TYPE_REGULAR	/*!< open a regular file */
+} WT_OPEN_FILE_TYPE;
+
+/*! WT_FILE_SYSTEM::open_file flags: create if does not exist */
+#define	WT_OPEN_CREATE		0x001
+/*! WT_FILE_SYSTEM::open_file flags: direct I/O requested */
+#define	WT_OPEN_DIRECTIO	0x002
+/*! WT_FILE_SYSTEM::open_file flags: error if exclusive use not available */
+#define	WT_OPEN_EXCLUSIVE	0x004
+#ifndef DOXYGEN
+#define	WT_OPEN_FIXED		0x008	/* Path not home relative (internal) */
+#endif
+/*! WT_FILE_SYSTEM::open_file flags: open is read-only */
+#define	WT_OPEN_READONLY	0x010
+
+/*!
+ * The interface implemented by applications to provide a custom file system
+ * implementation.
+ *
+ * <b>Thread safety:</b> WiredTiger may invoke methods on the WT_FILE_SYSTEM
+ * interface from multiple threads concurrently. It is the responsibility of
+ * the implementation to protect any shared data.
+ *
+ * Applications register implementations with WiredTiger by calling
+ * WT_CONNECTION::add_file_system.  See @ref custom_file_systems for more
+ * information.
+ *
+ * @snippet ex_file_system.c WT_FILE_SYSTEM register
+ */
+struct __wt_file_system {
+	/*!
+	 * Return a list of file names for the named directory.
+	 *
+	 * @errors
+	 *
+	 * @param file_system the WT_FILE_SYSTEM
+	 * @param session the current WiredTiger session
+	 * @param directory the name of the directory
+	 * @param prefix if not NULL, only files with names matching the prefix
+	 *    are returned
+	 * @param[out] dirlist the method returns an allocated array of
+	 *    individually allocated strings, one for each entry in the
+	 *    directory.
+	 * @param[out] countp the method the number of entries returned
+	 */
+	int (*directory_list)(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
+	    const char *directory, const char *prefix, char ***dirlist,
+	    uint32_t *countp);
+
+	/*!
+	 * Free memory allocated by WT_FILE_SYSTEM::directory_list.
+	 *
+	 * @errors
+	 *
+	 * @param file_system the WT_FILE_SYSTEM
+	 * @param session the current WiredTiger session
+	 * @param dirlist array returned by WT_FILE_SYSTEM::directory_list
+	 * @param count count returned by WT_FILE_SYSTEM::directory_list
+	 */
+	int (*directory_list_free)(WT_FILE_SYSTEM *file_system,
+	    WT_SESSION *session, char **dirlist, uint32_t count);
+
+	/*!
+	 * Flush the named directory.
+	 *
+	 * This method is not required for readonly file systems or file systems
+	 * where it is not necessary to flush a file's directory to ensure the
+	 * durability of file system operations, and should be set to NULL when
+	 * not required by the file system.
+	 *
+	 * @errors
+	 *
+	 * @param file_system the WT_FILE_SYSTEM
+	 * @param session the current WiredTiger session
+	 * @param directory the name of the directory
+	 */
+	int (*directory_sync)(WT_FILE_SYSTEM *file_system,
+	    WT_SESSION *session, const char *directory);
+
+	/*!
+	 * Return if the named file system object exists.
+	 *
+	 * @errors
+	 *
+	 * @param file_system the WT_FILE_SYSTEM
+	 * @param session the current WiredTiger session
+	 * @param name the name of the file
+	 * @param[out] existp If the named file system object exists
+	 */
+	int (*exist)(WT_FILE_SYSTEM *file_system,
+	    WT_SESSION *session, const char *name, bool *existp);
+
+	/*!
+	 * Open a handle for a named file system object
+	 *
+	 * @errors
+	 *
+	 * @param file_system the WT_FILE_SYSTEM
+	 * @param session the current WiredTiger session
+	 * @param name the name of the file system object
+	 * @param file_type the type of the file
+	 *    The file type is provided to allow optimization for different file
+	 *    access patterns.
+	 * @param flags flags indicating how to open the file, one or more of
+	 *    ::WT_OPEN_CREATE, ::WT_OPEN_DIRECTIO, ::WT_OPEN_EXCLUSIVE or
+	 *    ::WT_OPEN_READONLY.
+	 * @param[out] file_handlep the handle to the newly opened file. File
+	 *    system implementations must allocate memory for the handle and
+	 *    the WT_FILE_HANDLE::name field, and fill in the WT_FILE_HANDLE::
+	 *    fields. Applications wanting to associate private information
+	 *    with the WT_FILE_HANDLE:: structure should declare and allocate
+	 *    their own structure as a superset of a WT_FILE_HANDLE:: structure.
+	 */
+	int (*open_file)(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
+	    const char *name, WT_OPEN_FILE_TYPE file_type, uint32_t flags,
+	    WT_FILE_HANDLE **file_handlep);
+
+	/*!
+	 * Remove a named file system object
+	 *
+	 * This method is not required for readonly file systems and should be
+	 * set to NULL when not required by the file system.
+	 *
+	 * @errors
+	 *
+	 * @param file_system the WT_FILE_SYSTEM
+	 * @param session the current WiredTiger session
+	 * @param name the name of the file system object
+	 */
+	int (*remove)(
+	    WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name);
+
+	/*!
+	 * Rename a named file system object
+	 *
+	 * This method is not required for readonly file systems and should be
+	 * set to NULL when not required by the file system.
+	 *
+	 * @errors
+	 *
+	 * @param file_system the WT_FILE_SYSTEM
+	 * @param session the current WiredTiger session
+	 * @param from the original name of the object
+	 * @param to the new name for the object
+	 */
+	int (*rename)(WT_FILE_SYSTEM *file_system,
+	    WT_SESSION *session, const char *from, const char *to);
+
+	/*!
+	 * Return the size of a named file system object
+	 *
+	 * @errors
+	 *
+	 * @param file_system the WT_FILE_SYSTEM
+	 * @param session the current WiredTiger session
+	 * @param name the name of the file system object
+	 * @param[out] sizep the size of the file system entry
+	 */
+	int (*size)(WT_FILE_SYSTEM *file_system,
+	    WT_SESSION *session, const char *name, wt_off_t *sizep);
+
+	/*!
+	 * A callback performed when the file system is closed and will no
+	 * longer be accessed by the WiredTiger database.
+	 *
+	 * This method is not required and should be set to NULL when not
+	 * required by the file system.
+	 *
+	 * The WT_FILE_SYSTEM::terminate callback is intended to allow cleanup,
+	 * the handle will not be subsequently accessed by WiredTiger.
+	 */
+	int (*terminate)(WT_FILE_SYSTEM *file_system, WT_SESSION *session);
+};
+
+/*! WT_FILE_HANDLE::fadvise flags: no longer need */
+#define	WT_FILE_HANDLE_DONTNEED	1
+/*! WT_FILE_HANDLE::fadvise flags: will need */
+#define	WT_FILE_HANDLE_WILLNEED	2
+
+/*!
+ * A file handle implementation returned by WT_FILE_SYSTEM::open_file.
+ *
+ * <b>Thread safety:</b> Unless explicitly stated otherwise, WiredTiger may
+ * invoke methods on the WT_FILE_HANDLE interface from multiple threads
+ * concurrently. It is the responsibility of the implementation to protect
+ * any shared data.
+ *
+ * See @ref custom_file_systems for more information.
+ */
+struct __wt_file_handle {
+	/*!
+	 * The enclosing file system, set by WT_FILE_SYSTEM::open_file.
+	 */
+	WT_FILE_SYSTEM *file_system;
+
+	/*!
+	 * The name of the file, set by WT_FILE_SYSTEM::open_file.
+	 */
+	char *name;
+
+	/*!
+	 * Close a file handle, the handle will not be further accessed by
+	 * WiredTiger.
+	 *
+	 * @errors
+	 *
+	 * @param file_handle the WT_FILE_HANDLE
+	 * @param session the current WiredTiger session
+	 */
+	int (*close)(WT_FILE_HANDLE *file_handle, WT_SESSION *session);
+
+	/*!
+	 * Indicate expected future use of file ranges, based on the POSIX
+	 * 1003.1 standard fadvise.
+	 *
+	 * This method is not required, and should be set to NULL when not
+	 * supported by the file.
+	 *
+	 * @errors
+	 *
+	 * @param file_handle the WT_FILE_HANDLE
+	 * @param session the current WiredTiger session
+	 * @param offset the file offset
+	 * @param len the size of the advisory
+	 * @param advice one of ::WT_FILE_HANDLE_WILLNEED or
+	 *    ::WT_FILE_HANDLE_DONTNEED.
+	 */
+	int (*fadvise)(WT_FILE_HANDLE *file_handle,
+	    WT_SESSION *session, wt_off_t offset, wt_off_t len, int advice);
+
+	/*!
+	 * Ensure disk space is allocated for the file, based on the POSIX
+	 * 1003.1 standard fallocate.
+	 *
+	 * This method is not required, and should be set to NULL when not
+	 * supported by the file.
+	 *
+	 * This method is not called by multiple threads concurrently (on the
+	 * same file handle). If the file handle's fallocate method supports
+	 * concurrent calls, set the WT_FILE_HANDLE::fallocate_nolock method
+	 * instead.
+	 *
+	 * @errors
+	 *
+	 * @param file_handle the WT_FILE_HANDLE
+	 * @param session the current WiredTiger session
+	 * @param offset the file offset
+	 * @param len the size of the advisory
+	 */
+	int (*fallocate)(WT_FILE_HANDLE *file_handle,
+	    WT_SESSION *session, wt_off_t, wt_off_t);
+
+	/*!
+	 * Ensure disk space is allocated for the file, based on the POSIX
+	 * 1003.1 standard fallocate.
+	 *
+	 * This method is not required, and should be set to NULL when not
+	 * supported by the file.
+	 *
+	 * This method may be called by multiple threads concurrently (on the
+	 * same file handle). If the file handle's fallocate method does not
+	 * support concurrent calls, set the WT_FILE_HANDLE::fallocate method
+	 * instead.
+	 *
+	 * @errors
+	 *
+	 * @param file_handle the WT_FILE_HANDLE
+	 * @param session the current WiredTiger session
+	 * @param offset the file offset
+	 * @param len the size of the advisory
+	 */
+	int (*fallocate_nolock)(WT_FILE_HANDLE *file_handle,
+	    WT_SESSION *session, wt_off_t, wt_off_t);
+
+	/*!
+	 * Lock/unlock a file from the perspective of other processes running
+	 * in the system.
+	 *
+	 * @errors
+	 *
+	 * @param file_handle the WT_FILE_HANDLE
+	 * @param session the current WiredTiger session
+	 * @param lock whether to lock or unlock
+	 */
+	int (*lock)(
+	    WT_FILE_HANDLE *file_handle, WT_SESSION *session, bool lock);
+
+	/*!
+	 * Map a file into memory, based on the POSIX 1003.1 standard mmap.
+	 *
+	 * This method is not required, and should be set to NULL when not
+	 * supported by the file.
+	 *
+	 * @errors
+	 *
+	 * @param file_handle the WT_FILE_HANDLE
+	 * @param session the current WiredTiger session
+	 * @param[out] mapped_regionp a reference to a memory location into
+	 *    which should be stored a pointer to the start of the mapped region
+	 * @param[out] lengthp a reference to a memory location into which
+	 *    should be stored the length of the region
+	 * @param[out] mapped_cookiep a reference to a memory location into
+	 *    which can be optionally stored a pointer to an opaque cookie
+	 *    which is subsequently passed to WT_FILE_HANDLE::unmap.
+	 */
+	int (*map)(WT_FILE_HANDLE *file_handle, WT_SESSION *session,
+	    void *mapped_regionp, size_t *lengthp, void *mapped_cookiep);
+
+	/*!
+	 * Unmap part of a memory mapped file, based on the POSIX 1003.1
+	 * standard madvise.
+	 *
+	 * This method is not required, and should be set to NULL when not
+	 * supported by the file.
+	 *
+	 * @errors
+	 *
+	 * @param file_handle the WT_FILE_HANDLE
+	 * @param session the current WiredTiger session
+	 * @param map a location in the mapped region unlikely to be used in the
+	 *    near future
+	 * @param length the length of the mapped region to discard
+	 * @param mapped_cookie any cookie set by the WT_FILE_HANDLE::map method
+	 */
+	int (*map_discard)(WT_FILE_HANDLE *file_handle,
+	    WT_SESSION *session, void *map, size_t length, void *mapped_cookie);
+
+	/*!
+	 * Preload part of a memory mapped file, based on the POSIX 1003.1
+	 * standard madvise.
+	 *
+	 * This method is not required, and should be set to NULL when not
+	 * supported by the file.
+	 *
+	 * @errors
+	 *
+	 * @param file_handle the WT_FILE_HANDLE
+	 * @param session the current WiredTiger session
+	 * @param map a location in the mapped region likely to be used in the
+	 *    near future
+	 * @param length the size of the mapped region to preload
+	 * @param mapped_cookie any cookie set by the WT_FILE_HANDLE::map method
+	 */
+	int (*map_preload)(WT_FILE_HANDLE *file_handle, WT_SESSION *session,
+	    const void *map, size_t length, void *mapped_cookie);
+
+	/*!
+	 * Unmap a memory mapped file, based on the POSIX 1003.1 standard
+	 * munmap.
+	 *
+	 * This method is only required if a valid implementation of map is
+	 * provided by the file, and should be set to NULL otherwise.
+	 *
+	 * @errors
+	 *
+	 * @param file_handle the WT_FILE_HANDLE
+	 * @param session the current WiredTiger session
+	 * @param mapped_region a pointer to the start of the mapped region
+	 * @param length the length of the mapped region
+	 * @param mapped_cookie any cookie set by the WT_FILE_HANDLE::map method
+	 */
+	int (*unmap)(WT_FILE_HANDLE *file_handle, WT_SESSION *session,
+	    void *mapped_region, size_t length, void *mapped_cookie);
+
+	/*!
+	 * Read from a file, based on the POSIX 1003.1 standard pread.
+	 *
+	 * @errors
+	 *
+	 * @param file_handle the WT_FILE_HANDLE
+	 * @param session the current WiredTiger session
+	 * @param offset the offset in the file to start reading from
+	 * @param len the amount to read
+	 * @param[out] buf buffer to hold the content read from file
+	 */
+	int (*read)(WT_FILE_HANDLE *file_handle,
+	    WT_SESSION *session, wt_off_t offset, size_t len, void *buf);
+
+	/*!
+	 * Return the size of a file.
+	 *
+	 * @errors
+	 *
+	 * @param file_handle the WT_FILE_HANDLE
+	 * @param session the current WiredTiger session
+	 * @param sizep the size of the file
+	 */
+	int (*size)(
+	    WT_FILE_HANDLE *file_handle, WT_SESSION *session, wt_off_t *sizep);
+
+	/*!
+	 * Make outstanding file writes durable and do not return until writes
+	 * are complete.
+	 *
+	 * This method is not required for read-only files, and should be set
+	 * to NULL when not supported by the file.
+	 *
+	 * @errors
+	 *
+	 * @param file_handle the WT_FILE_HANDLE
+	 * @param session the current WiredTiger session
+	 */
+	int (*sync)(WT_FILE_HANDLE *file_handle, WT_SESSION *session);
+
+	/*!
+	 * Schedule the outstanding file writes required for durability and
+	 * return immediately.
+	 *
+	 * This method is not required, and should be set to NULL when not
+	 * supported by the file.
+	 *
+	 * @errors
+	 *
+	 * @param file_handle the WT_FILE_HANDLE
+	 * @param session the current WiredTiger session
+	 */
+	int (*sync_nowait)(WT_FILE_HANDLE *file_handle, WT_SESSION *session);
+
+	/*!
+	 * Lengthen or shorten a file to the specified length, based on the
+	 * POSIX 1003.1 standard ftruncate.
+	 *
+	 * This method is not required for read-only files, and should be set
+	 * to NULL when not supported by the file.
+	 *
+	 * @errors
+	 *
+	 * @param file_handle the WT_FILE_HANDLE
+	 * @param session the current WiredTiger session
+	 * @param length desired file size after truncate
+	 */
+	int (*truncate)(
+	    WT_FILE_HANDLE *file_handle, WT_SESSION *session, wt_off_t length);
+
+	/*!
+	 * Write to a file, based on the POSIX 1003.1 standard pwrite.
+	 *
+	 * This method is not required for read-only files, and should be set
+	 * to NULL when not supported by the file.
+	 *
+	 * @errors
+	 *
+	 * @param file_handle the WT_FILE_HANDLE
+	 * @param session the current WiredTiger session
+	 * @param offset offset at which to start writing
+	 * @param length amount of data to write
+	 * @param buf content to be written to the file
+	 */
+	int (*write)(WT_FILE_HANDLE *file_handle, WT_SESSION *session,
+	    wt_off_t offset, size_t length, const void *buf);
+};
+#endif /* !defined(SWIG) */
 
 /*!
  * Entry point to an extension, called when the extension is loaded.

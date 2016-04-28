@@ -75,11 +75,11 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session)
 	bool exist;
 
 	/* Look for a hot backup file: if we find it, load it. */
-	WT_RET(__wt_exist(session, WT_METADATA_BACKUP, &exist));
+	WT_RET(__wt_fs_exist(session, WT_METADATA_BACKUP, &exist));
 	if (!exist)
 		return (0);
 	WT_RET(__wt_fopen(session,
-	    WT_METADATA_BACKUP, WT_FILE_TYPE_REGULAR, WT_STREAM_READ, &fs));
+	    WT_METADATA_BACKUP, 0, WT_STREAM_READ, &fs));
 
 	/* Read line pairs and load them into the metadata file. */
 	WT_ERR(__wt_scr_alloc(session, 512, &key));
@@ -128,7 +128,7 @@ __metadata_load_bulk(WT_SESSION_IMPL *session)
 			continue;
 
 		/* If the file exists, it's all good. */
-		WT_ERR(__wt_exist(session, key, &exist));
+		WT_ERR(__wt_fs_exist(session, key, &exist));
 		if (exist)
 			continue;
 
@@ -182,9 +182,9 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 	 * that is an error.  Otherwise, if there's already a turtle file, we're
 	 * done.
 	 */
-	WT_RET(__wt_exist(session, WT_INCREMENTAL_BACKUP, &exist_incr));
-	WT_RET(__wt_exist(session, WT_METADATA_BACKUP, &exist_backup));
-	WT_RET(__wt_exist(session, WT_METADATA_TURTLE, &exist_turtle));
+	WT_RET(__wt_fs_exist(session, WT_INCREMENTAL_BACKUP, &exist_incr));
+	WT_RET(__wt_fs_exist(session, WT_METADATA_BACKUP, &exist_backup));
+	WT_RET(__wt_fs_exist(session, WT_METADATA_TURTLE, &exist_turtle));
 	if (exist_turtle) {
 		if (exist_incr)
 			WT_RET_MSG(session, EINVAL,
@@ -254,7 +254,7 @@ __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
 	 * the turtle file, and that means returning the default configuration
 	 * string for the metadata file.
 	 */
-	WT_RET(__wt_exist(session, WT_METADATA_TURTLE, &exist));
+	WT_RET(__wt_fs_exist(session, WT_METADATA_TURTLE, &exist));
 	if (!exist)
 		return (strcmp(key, WT_METAFILE_URI) == 0 ?
 		    __metadata_config(session, valuep) : WT_NOTFOUND);

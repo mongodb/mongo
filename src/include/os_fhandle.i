@@ -7,18 +7,24 @@
  */
 
 /*
- * __wt_directory_sync_fh --
- *	Flush a directory file handle to ensure file creation is durable.
- *
- * We don't use the normal sync path because many file systems don't require
- * this step and we don't want to penalize them.
+ * __wt_fsync --
+ *	POSIX fsync.
  */
 static inline int
-__wt_directory_sync_fh(WT_SESSION_IMPL *session, WT_FH *fh)
+__wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
 {
-	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
+	WT_FILE_HANDLE *handle;
 
-	return (fh->fh_sync(session, fh, true));
+	WT_RET(__wt_verbose(
+	    session, WT_VERB_HANDLEOPS, "%s: handle-sync", fh->handle->name));
+
+	handle = fh->handle;
+	if (block)
+		return (handle->sync == NULL ? 0 :
+		    handle->sync(handle, (WT_SESSION *)session));
+	else
+		return (handle->sync_nowait == NULL ? 0 :
+		    handle->sync_nowait(handle, (WT_SESSION *)session));
 }
 
 /*
@@ -29,14 +35,34 @@ static inline int
 __wt_fallocate(
     WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, wt_off_t len)
 {
+	WT_DECL_RET;
+	WT_FILE_HANDLE *handle;
+
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
 
 	WT_RET(__wt_verbose(session, WT_VERB_HANDLEOPS,
 	    "%s: handle-allocate: %" PRIuMAX " at %" PRIuMAX,
-	    fh->name, (uintmax_t)len, (uintmax_t)offset));
+	    fh->handle->name, (uintmax_t)len, (uintmax_t)offset));
 
-	return (fh->fh_allocate(session, fh, offset, len));
+	/*
+	 * Our caller is responsible for handling any locking issues, all we
+	 * have to do is find a function to call.
+	 *
+	 * Be cautious, the underlying system might have configured the nolock
+	 * flavor, that failed, and we have to fallback to the locking flavor.
+	 */
+	handle = fh->handle;
+	if (handle->fallocate_nolock != NULL) {
+		if ((ret = handle->fallocate_nolock(
+		    handle, (WT_SESSION *)session, offset, len)) == 0)
+			return (0);
+		WT_RET_ERROR_OK(ret, ENOTSUP);
+	}
+	if (handle->fallocate != NULL)
+		return (handle->fallocate(
+		    handle, (WT_SESSION *)session, offset, len));
+	return (ENOTSUP);
 }
 
 /*
@@ -46,10 +72,14 @@ __wt_fallocate(
 static inline int
 __wt_file_lock(WT_SESSION_IMPL * session, WT_FH *fh, bool lock)
 {
-	WT_RET(__wt_verbose(session, WT_VERB_HANDLEOPS,
-	    "%s: handle-lock: %s", fh->name, lock ? "lock" : "unlock"));
+	WT_FILE_HANDLE *handle;
 
-	return (fh->fh_lock(session, fh, lock));
+	WT_RET(__wt_verbose(session, WT_VERB_HANDLEOPS,
+	    "%s: handle-lock: %s", fh->handle->name, lock ? "lock" : "unlock"));
+
+	handle = fh->handle;
+	return (handle->lock == NULL ? 0 :
+	    handle->lock(handle, (WT_SESSION*)session, lock));
 }
 
 /*
@@ -62,11 +92,12 @@ __wt_read(
 {
 	WT_RET(__wt_verbose(session, WT_VERB_HANDLEOPS,
 	    "%s: handle-read: %" WT_SIZET_FMT " at %" PRIuMAX,
-	    fh->name, len, (uintmax_t)offset));
+	    fh->handle->name, len, (uintmax_t)offset));
 
 	WT_STAT_FAST_CONN_INCR(session, read_io);
 
-	return (fh->fh_read(session, fh, offset, len, buf));
+	return (fh->handle->read(
+	    fh->handle, (WT_SESSION *)session, offset, len, buf));
 }
 
 /*
@@ -77,22 +108,9 @@ static inline int
 __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
 {
 	WT_RET(__wt_verbose(
-	    session, WT_VERB_HANDLEOPS, "%s: handle-size", fh->name));
+	    session, WT_VERB_HANDLEOPS, "%s: handle-size", fh->handle->name));
 
-	return (fh->fh_size(session, fh, sizep));
-}
-
-/*
- * __wt_fsync --
- *	POSIX fsync.
- */
-static inline int
-__wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
-{
-	WT_RET(__wt_verbose(
-	    session, WT_VERB_HANDLEOPS, "%s: handle-sync", fh->name));
-
-	return (fh->fh_sync(session, fh, block));
+	return (fh->handle->size(fh->handle, (WT_SESSION *)session, sizep));
 }
 
 /*
@@ -105,9 +123,10 @@ __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 
 	WT_RET(__wt_verbose(session, WT_VERB_HANDLEOPS,
-	    "%s: handle-truncate: %" PRIuMAX, fh->name, (uintmax_t)len));
+	    "%s: handle-truncate: %" PRIuMAX,
+	    fh->handle->name, (uintmax_t)len));
 
-	return (fh->fh_truncate(session, fh, len));
+	return (fh->handle->truncate(fh->handle, (WT_SESSION *)session, len));
 }
 
 /*
@@ -124,9 +143,10 @@ __wt_write(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_verbose(session, WT_VERB_HANDLEOPS,
 	    "%s: handle-write: %" WT_SIZET_FMT " at %" PRIuMAX,
-	    fh->name, len, (uintmax_t)offset));
+	    fh->handle->name, len, (uintmax_t)offset));
 
 	WT_STAT_FAST_CONN_INCR(session, write_io);
 
-	return (fh->fh_write(session, fh, offset, len, buf));
+	return (fh->handle->write(
+	    fh->handle, (WT_SESSION *)session, offset, len, buf));
 }

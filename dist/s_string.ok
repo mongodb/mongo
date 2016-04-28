@@ -76,6 +76,7 @@ DECL
 DECR
 DESC
 DHANDLE
+DIRECTIO
 DNE
 DOI
 DONTNEED
@@ -255,6 +256,7 @@ Qsort
 RCS
 RDNOLOCK
 RDONLY
+READONLY
 RECNO
 REF's
 REFs
@@ -487,9 +489,11 @@ conn
 connectionp
 const
 constantp
+cookiep
 copydoc
 copyin
 copyout
+countp
 cp
 cpuid
 crc
@@ -601,6 +605,7 @@ evictserver
 exactp
 exe
 execop
+existp
 extern
 extlist
 fadvise
@@ -671,11 +676,13 @@ gostruct
 goutf
 gt
 handleops
+handlep
 hashval
 havesize
 hdr
 highjack
 hotbackup
+hselasky
 html
 huffman
 hval
@@ -700,6 +707,7 @@ infeasible
 inflateInit
 infmt
 init
+initializers
 initn
 initsize
 initval
@@ -742,6 +750,7 @@ lbracket
 ld
 le
 len
+lengthp
 lenp
 level's
 leveldb
@@ -847,6 +856,7 @@ noraw
 notfound
 notsup
 notused
+nowait
 nset
 nsnap
 nul
@@ -942,6 +952,7 @@ recsize
 rectype
 recurse
 refp
+regionp
 reinitialization
 relocked
 resize

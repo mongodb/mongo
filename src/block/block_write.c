@@ -48,27 +48,28 @@ int
 __wt_block_discard(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t added_size)
 {
 	WT_DECL_RET;
+	WT_FILE_HANDLE *handle;
 
+	/* The file may not support this call. */
+	handle = block->fh->handle;
+	if (handle->fadvise == NULL)
+		return (0);
+
+	/* The call may not be configured. */
 	if (block->os_cache_max == 0)
 		return (0);
 
 	/*
 	 * We're racing on the addition, but I'm not willing to serialize on it
-	 * in the standard read path with more evidence it's needed.
+	 * in the standard read path without evidence it's needed.
 	 */
 	if ((block->os_cache += added_size) <= block->os_cache_max)
 		return (0);
 
 	block->os_cache = 0;
-	WT_ERR(block->fh->fh_advise(session,
-	    block->fh, (wt_off_t)0, (wt_off_t)0, POSIX_FADV_DONTNEED));
-	return (0);
-
-err:	/* Ignore ENOTSUP, but don't try again. */
-	if (ret != ENOTSUP)
-		return (ret);
-	block->os_cache_max = 0;
-	return (0);
+	ret = handle->fadvise(handle, (WT_SESSION *)session,
+	    (wt_off_t)0, (wt_off_t)0, WT_FILE_HANDLE_DONTNEED);
+	return (ret == EBUSY || ret == ENOTSUP ? 0 : ret);
 }
 
 /*
@@ -80,6 +81,7 @@ __wt_block_extend(WT_SESSION_IMPL *session, WT_BLOCK *block,
     WT_FH *fh, wt_off_t offset, size_t align_size, bool *release_lockp)
 {
 	WT_DECL_RET;
+	WT_FILE_HANDLE *handle;
 	bool locked;
 
 	/*
@@ -125,7 +127,8 @@ __wt_block_extend(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * based on the filesystem type, fall back to ftruncate in that case,
 	 * and remember that ftruncate requires locking.
 	 */
-	if (fh->fallocate_available != WT_FALLOCATE_NOT_AVAILABLE) {
+	handle = fh->handle;
+	if (handle->fallocate != NULL || handle->fallocate_nolock != NULL) {
 		/*
 		 * Release any locally acquired lock if not needed to extend the
 		 * file, extending the file may require updating on-disk file's
@@ -133,7 +136,7 @@ __wt_block_extend(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		 * configure for file extension on systems that require locking
 		 * over the extend call.)
 		 */
-		if (!fh->fallocate_requires_locking && *release_lockp) {
+		if (handle->fallocate_nolock != NULL && *release_lockp) {
 			*release_lockp = locked = false;
 			__wt_spin_unlock(session, &block->live_lock);
 		}
@@ -149,8 +152,7 @@ __wt_block_extend(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		if ((ret = __wt_fallocate(
 		    session, fh, block->size, block->extend_len * 2)) == 0)
 			return (0);
-		if (ret != ENOTSUP)
-			return (ret);
+		WT_RET_ERROR_OK(ret, ENOTSUP);
 	}
 
 	/*
@@ -173,9 +175,8 @@ __wt_block_extend(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * The truncate might fail if there's a mapped file (in other words, if
 	 * there's an open checkpoint on the file), that's OK.
 	 */
-	if ((ret = __wt_ftruncate(session, fh, block->extend_size)) == EBUSY)
-		ret = 0;
-	return (ret);
+	WT_RET_BUSY_OK(__wt_ftruncate(session, fh, block->extend_size));
+	return (0);
 }
 
 /*

@@ -211,9 +211,8 @@ err:	__wt_free(session, uri);
 
 /*
  * __curjoin_iter_bump --
- *	Called to advance the iterator to the next endpoint,
- *	which may in turn advance to the next entry.
- *
+ *	Called to advance the iterator to the next endpoint, which may in turn
+ * advance to the next entry.
  */
 static int
 __curjoin_iter_bump(WT_CURSOR_JOIN_ITER *iter)

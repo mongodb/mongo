@@ -235,7 +235,7 @@ __wt_lsm_tree_set_chunk_size(
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		WT_RET_MSG(session, EINVAL,
 		    "Expected a 'file:' URI: %s", chunk->uri);
-	WT_RET(__wt_filesize_name(session, filename, false, &size));
+	WT_RET(__wt_fs_size(session, filename, &size));
 
 	chunk->size = (uint64_t)size;
 
@@ -256,7 +256,7 @@ __lsm_tree_cleanup_old(WT_SESSION_IMPL *session, const char *uri)
 	    { WT_CONFIG_BASE(session, WT_SESSION_drop), "force", NULL };
 	bool exists;
 
-	WT_RET(__wt_exist(session, uri + strlen("file:"), &exists));
+	WT_RET(__wt_fs_exist(session, uri + strlen("file:"), &exists));
 	if (exists)
 		WT_WITH_SCHEMA_LOCK(session, ret,
 		    ret = __wt_schema_drop(session, uri, cfg));

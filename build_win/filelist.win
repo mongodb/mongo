@@ -109,7 +109,6 @@ src/os_common/os_fs_inmemory.c
 src/os_common/os_fstream.c
 src/os_common/os_fstream_stdio.c
 src/os_common/os_getopt.c
-src/os_common/os_init.c
 src/os_common/os_strtouq.c
 src/os_win/os_dir.c
 src/os_win/os_dlopen.c
