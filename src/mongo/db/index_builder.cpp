@@ -175,7 +175,9 @@ Status IndexBuilder::_build(OperationContext* txn,
                         dbLock->relockWithMode(MODE_IX);
                     }
 
-                    Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);
+                    // We need an X lock and not an IX lock for background index building. See the
+                    // createIndexes command for a detailed example.
+                    Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_X);
                     status = indexer.insertAllDocumentsInCollection();
                 }
 

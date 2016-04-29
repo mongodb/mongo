@@ -233,7 +233,16 @@ public:
         }
 
         try {
-            Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);
+            // We need an X lock and not an IX lock due to a race with concurrent updates. Consider
+            // the following scenario:
+            //
+            // 1. A document is about to be indexed by a background index builder.
+            // 2. An update concurrently reads the same document.
+            // 3. The update unindexes the old value of the document. However, this is a no-op
+            // because the document wasn't previously indexed, so no write conflict is thrown.
+            // 4. Both the update and the index builder insert their respective index keys into the
+            // index, resulting in more keys in the index than expected.
+            Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_X);
             uassertStatusOK(indexer.insertAllDocumentsInCollection());
         } catch (const DBException& e) {
             invariant(e.getCode() != ErrorCodes::WriteConflict);
