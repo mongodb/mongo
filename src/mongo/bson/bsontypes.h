@@ -53,9 +53,16 @@ extern const BSONObj kMinBSONKey;
 */
 enum class BSONVersion { kV1_0, kV1_1, kLatest = kV1_1 };
 
-// Flag that determines whether we should accept decimal types in object validation, and default
-// to KeyString V1 indexes on non-MMAP storage engines. Set by enableBSON1_1 server parameter.
+/**
+    Flag that determines whether we should accept decimal types in object validation, and default
+    to KeyString V1 indexes on non-MMAP storage engines. Set by enableBSON1_1 server parameter.
+*/
 extern bool enableBSON1_1;
+
+/**
+    For use by mongo shell, which does not use server parameters.
+*/
+void enableLatestBSONVersion();
 
 /**
     the complete list of valid BSON types

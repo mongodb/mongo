@@ -586,6 +586,7 @@ int _main(int argc, char* argv[], char** envp) {
     mongo::shell_utils::RecordMyLocation(argv[0]);
 
     shellGlobalParams.url = "test";
+    mongo::enableLatestBSONVersion();  // No need to limit shell, as server will check on ingress.
 
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
 
