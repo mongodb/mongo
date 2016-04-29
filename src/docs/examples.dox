@@ -9,9 +9,6 @@ Show how to configure and use asynchronous operations.
 A more complex schema based on a call center example, showing how to map
 some SQL constructs onto the WiredTiger API.
 
-@example ex_config.c
-Shows how to configure some properties of the database and tables.
-
 @example ex_cursor.c
 Shows some common cursor types and operations.
 
