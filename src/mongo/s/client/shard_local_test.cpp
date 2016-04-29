@@ -46,7 +46,7 @@ namespace {
 class ShardLocalTest : public ServiceContextMongoDTest {
 protected:
     ServiceContext::UniqueOperationContext _txn;
-    ShardLocal* _shardLocal;
+    std::unique_ptr<ShardLocal> _shardLocal;
 
     /**
      * Sets up and runs a FindAndModify command with ShardLocal's runCommand. Finds a document in
@@ -75,7 +75,7 @@ void ShardLocalTest::setUp() {
     ServiceContextMongoDTest::setUp();
     Client::initThreadIfNotAlready();
     _txn = getGlobalServiceContext()->makeOperationContext(&cc());
-    _shardLocal = new ShardLocal("shardOrConfig");
+    _shardLocal = stdx::make_unique<ShardLocal>("shardOrConfig");
     const repl::ReplSettings replSettings = {};
     repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
 }
