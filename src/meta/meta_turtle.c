@@ -156,7 +156,7 @@ int
 __wt_turtle_init(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
-	bool exist_backup, exist_incr, exist_turtle, load;
+	bool exist_backup, exist_incr, exist_isrc, exist_turtle, load;
 	char *metaconf;
 
 	metaconf = NULL;
@@ -183,10 +183,16 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 	 * done.
 	 */
 	WT_RET(__wt_fs_exist(session, WT_INCREMENTAL_BACKUP, &exist_incr));
+	WT_RET(__wt_fs_exist(session, WT_INCREMENTAL_SRC, &exist_isrc));
 	WT_RET(__wt_fs_exist(session, WT_METADATA_BACKUP, &exist_backup));
 	WT_RET(__wt_fs_exist(session, WT_METADATA_TURTLE, &exist_turtle));
 	if (exist_turtle) {
-		if (exist_incr)
+		/*
+		 * We need to detect the difference between a source database
+		 * that may have crashed with an incremental backup file
+		 * and a destination database that incorrectly ran recovery.
+		 */
+		if (exist_incr && !exist_isrc)
 			WT_RET_MSG(session, EINVAL,
 			    "Incremental backup after running recovery "
 			    "is not allowed");
