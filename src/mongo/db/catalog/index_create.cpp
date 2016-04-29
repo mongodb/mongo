@@ -34,7 +34,6 @@
 
 #include "mongo/db/catalog/index_create.h"
 
-
 #include "mongo/base/error_codes.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/audit.h"
@@ -49,15 +48,20 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/progress_meter.h"
+#include "mongo/util/quick_exit.h"
 
 namespace mongo {
 
 using std::unique_ptr;
 using std::string;
 using std::endl;
+
+MONGO_FP_DECLARE(crashAfterStartingIndexBuild);
 
 /**
  * On rollback sets MultiIndexBlock::_needToCleanup to true.
@@ -213,6 +217,17 @@ Status MultiIndexBlock::init(const std::vector<BSONObj>& indexSpecs) {
         _backgroundOperation.reset(new BackgroundOperation(ns));
 
     wunit.commit();
+
+    if (MONGO_FAIL_POINT(crashAfterStartingIndexBuild)) {
+        log() << "Index build interrupted due to 'crashAfterStartingIndexBuild' failpoint. Exiting "
+                 "after waiting for changes to become durable.";
+        Locker::LockSnapshot lockInfo;
+        _txn->lockState()->saveLockStateAndUnlock(&lockInfo);
+        if (_txn->recoveryUnit()->waitUntilDurable()) {
+            quickExit(EXIT_TEST);
+        }
+    }
+
     return Status::OK();
 }
 
