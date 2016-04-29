@@ -42,6 +42,8 @@ namespace mongo {
 
 namespace {
 
+const char kFallbackLocaleName[] = "root";
+
 // Helper methods for converting between ICU attributes and types used by CollationSpec.
 
 UColAttributeValue boolToAttribute(bool value) {
@@ -529,26 +531,17 @@ StatusWith<CollationSpec> parseToCollationSpec(const BSONObj& spec,
     return parsedSpec;
 }
 
-// Checks if localeID is recognized by ICU.
-// TODO: Determine if there is a better way to validate the locale string.
-bool isValidLocale(const std::string& localeID) {
-    size_t bufferSize = 100;
-    UErrorCode status = U_BUFFER_OVERFLOW_ERROR;
-    while (status == U_BUFFER_OVERFLOW_ERROR) {
-        status = U_ZERO_ERROR;
-        UChar buffer[bufferSize];
-        uloc_getDisplayName(localeID.c_str(), NULL, &buffer[0], bufferSize, &status);
-        bufferSize = 10 * bufferSize;
-    }
-    return !U_FAILURE(status) && status != U_USING_DEFAULT_WARNING;
-}
-
 // Extracts the localeID from 'spec', if present.
 StatusWith<std::string> parseLocaleID(const BSONObj& spec) {
     std::string localeID;
     Status status = bsonExtractStringField(spec, CollationSpec::kLocaleField, &localeID);
     if (!status.isOK()) {
         return status;
+    }
+    if (localeID.find('\0') != std::string::npos) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Field '" << CollationSpec::kLocaleField
+                              << "' cannot contain null byte. Collation spec: " << spec};
     }
     return localeID;
 }
@@ -568,25 +561,24 @@ StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryICU::makeFromBSON(
     if (parsedLocaleID.getValue() == CollationSpec::kSimpleBinaryComparison) {
         if (spec.nFields() > 1) {
             return {ErrorCodes::FailedToParse,
-                    str::stream() << "If locale=default, no other fields should be present in: "
-                                  << spec};
+                    str::stream() << "If " << CollationSpec::kLocaleField << "="
+                                  << CollationSpec::kSimpleBinaryComparison
+                                  << ", no other fields should be present in: " << spec};
         }
         return {nullptr};
     }
 
-    // Check that the locale ID is recognizable by ICU.
-    if (!isValidLocale(parsedLocaleID.getValue())) {
+    // Construct an icu::Locale.
+    auto userLocale = icu::Locale::createFromName(parsedLocaleID.getValue().c_str());
+    if (userLocale.isBogus()) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Field '" << CollationSpec::kLocaleField
-                              << "' is not a valid ICU locale in: " << spec};
+                              << "' is not valid in: " << spec};
     }
-
-    // Construct an icu::Locale.
-    auto locale = icu::Locale::createFromName(parsedLocaleID.getValue().c_str());
 
     // Construct an icu::Collator.
     UErrorCode status = U_ZERO_ERROR;
-    std::unique_ptr<icu::Collator> icuCollator(icu::Collator::createInstance(locale, status));
+    std::unique_ptr<icu::Collator> icuCollator(icu::Collator::createInstance(userLocale, status));
     if (U_FAILURE(status)) {
         icu::ErrorCode icuError;
         icuError.set(status);
@@ -595,9 +587,27 @@ StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryICU::makeFromBSON(
                               << ". Collation spec: " << spec};
     }
 
+    // Check that the locale ID is recognized by ICU. Constructing an icu::Collator from an
+    // unrecognized locale will cause the collator to fall back on the default locale.
+    icu::Locale collatorLocale = icuCollator->getLocale(ULOC_VALID_LOCALE, status);
+    if (U_FAILURE(status)) {
+        icu::ErrorCode icuError;
+        icuError.set(status);
+        return {ErrorCodes::OperationFailed,
+                str::stream() << "Failed to get locale from icu::Collator: " << icuError.errorName()
+                              << ". Collation spec: " << spec};
+    }
+    const char* collatorLocaleBaseName = collatorLocale.getBaseName();
+    if (str::equals("", collatorLocaleBaseName) ||
+        str::equals(kFallbackLocaleName, collatorLocaleBaseName)) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Field '" << CollationSpec::kLocaleField
+                              << "' is not a recognized ICU locale in: " << spec};
+    }
+
     // Construct a CollationSpec using the options provided in spec or the defaults in icuCollator.
-    // Use locale.getName() for the localeID, since it is canonicalized and includes options.
-    auto parsedSpec = parseToCollationSpec(spec, locale.getName(), icuCollator.get());
+    // Use userLocale.getName() for the localeID, since it is canonicalized and includes options.
+    auto parsedSpec = parseToCollationSpec(spec, userLocale.getName(), icuCollator.get());
     if (!parsedSpec.isOK()) {
         return parsedSpec.getStatus();
     }

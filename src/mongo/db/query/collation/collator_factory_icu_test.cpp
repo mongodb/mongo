@@ -53,16 +53,6 @@ TEST(CollatorFactoryICUTest, LocaleStringCanonicalizesSuccessfully) {
     ASSERT_EQ("en_US", collator.getValue()->getSpec().localeID);
 }
 
-TEST(CollatorFactoryICUTest, LocaleKeywordsParseSuccessfully) {
-    CollatorFactoryICU factory;
-    auto collator = factory.makeFromBSON(
-        BSON("locale"
-             << "en_US@calendar=islamic;collation=phonebook;currency=IEP;numbers=arab"));
-    ASSERT_OK(collator.getStatus());
-    ASSERT_EQ("en_US@calendar=islamic;collation=phonebook;currency=IEP;numbers=arab",
-              collator.getValue()->getSpec().localeID);
-}
-
 TEST(CollatorFactoryICUTest, SimpleLocaleReturnsNullPointer) {
     CollatorFactoryICU factory;
     auto collator = factory.makeFromBSON(BSON("locale"
@@ -87,7 +77,7 @@ TEST(CollatorFactoryICUTest, LocaleFieldNotAStringFailsToParse) {
     ASSERT_EQ(collator.getStatus(), ErrorCodes::TypeMismatch);
 }
 
-TEST(CollatorFactoryICUTest, InvalidLocaleFieldFailsToParse) {
+TEST(CollatorFactoryICUTest, UnrecognizedLocaleFieldFailsToParse) {
     CollatorFactoryICU factory;
     auto collator = factory.makeFromBSON(BSON("locale"
                                               << "garbage"));
@@ -95,18 +85,50 @@ TEST(CollatorFactoryICUTest, InvalidLocaleFieldFailsToParse) {
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
-TEST(CollatorFactoryICUTest, InvalidLocaleKeywordFailsToParse) {
+TEST(CollatorFactoryICUTest, LocaleEmptyStringDisallowed) {
     CollatorFactoryICU factory;
     auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US@invalid=phonebook"));
+                                              << ""));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
-TEST(CollatorFactoryICUTest, InvalidLocaleKeywordValueFailsToParse) {
+TEST(CollatorFactoryICUTest, LongLocaleFieldDisallowed) {
     CollatorFactoryICU factory;
     auto collator = factory.makeFromBSON(BSON("locale"
-                                              << "en_US@calendar=invalid"));
+                                              << "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"));
+    ASSERT_NOT_OK(collator.getStatus());
+    ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
+}
+
+TEST(CollatorFactoryICUTest, LongLocaleFieldWithKeywordsDisallowed) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US@xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=y"));
+    ASSERT_NOT_OK(collator.getStatus());
+    ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
+}
+
+TEST(CollatorFactoryICUTest, LocaleRootDisallowed) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "root"));
+    ASSERT_NOT_OK(collator.getStatus());
+    ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
+}
+
+TEST(CollatorFactoryICUTest, LocaleRootCanonicalizedDisallowed) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "ROOT@collation=search"));
+    ASSERT_NOT_OK(collator.getStatus());
+    ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
+}
+
+TEST(CollatorFactoryICUTest, LocaleStringCannotContainNullByte) {
+    CollatorFactoryICU factory;
+    auto collator =
+        factory.makeFromBSON(BSON("locale" << StringData("en_US\0", StringData::LiteralTag())));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
@@ -996,6 +1018,24 @@ TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithVietnameseLocale) 
     CollatorFactoryICU factory;
     ASSERT_OK(factory.makeFromBSON(BSON("locale"
                                         << "vi")).getStatus());
+}
+
+TEST(CollatorFactoryICUTest, FactoryInitializationFailsWithAfrikaansLocale) {
+    CollatorFactoryICU factory;
+    ASSERT_NOT_OK(factory.makeFromBSON(BSON("locale"
+                                            << "af")).getStatus());
+}
+
+TEST(CollatorFactoryICUTest, FactoryInitializationFailsWithEsperantoLocale) {
+    CollatorFactoryICU factory;
+    ASSERT_NOT_OK(factory.makeFromBSON(BSON("locale"
+                                            << "eo")).getStatus());
+}
+
+TEST(CollatorFactoryICUTest, FactoryInitializationFailsWithSwahiliLocale) {
+    CollatorFactoryICU factory;
+    ASSERT_NOT_OK(factory.makeFromBSON(BSON("locale"
+                                            << "sw")).getStatus());
 }
 
 }  // namespace
