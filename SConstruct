@@ -346,7 +346,6 @@ examples = [
     "ex_all",
     "ex_async",
     "ex_call_center",
-    "ex_config",
     "ex_config_parse",
     "ex_cursor",
     "ex_data_source",
