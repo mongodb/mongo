@@ -34,10 +34,19 @@
  * The following macros are provided in all compiler environments:
  *
  *
+ * MONGO_COMPILER_COLD_FUNCTION
+ *
+ *   Informs the compiler that the function is cold. This can have the following effects:
+ *   - The function is optimized for size over speed.
+ *   - The function may be placed in a special cold section of the binary, away from other code.
+ *   - Code paths that call this function are considered implicitly unlikely.
+ *
+ *
  * MONGO_COMPILER_NORETURN
  *
  *   Instructs the compiler that the decorated function will not return through the normal return
- *   path.
+ *   path. All noreturn functions are also implicitly cold since they are either run-once code
+ *   executed at startup or shutdown or code that handles errors by throwing an exception.
  *
  *   Correct: MONGO_COMPILER_NORETURN void myAbortFunction();
  *

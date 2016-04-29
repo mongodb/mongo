@@ -34,7 +34,10 @@
 
 #pragma once
 
-#define MONGO_COMPILER_NORETURN __attribute__((__noreturn__))
+
+#define MONGO_COMPILER_COLD_FUNCTION __attribute__((__cold__))
+
+#define MONGO_COMPILER_NORETURN __attribute__((__noreturn__, __cold__))
 
 #define MONGO_COMPILER_VARIABLE_UNUSED __attribute__((__unused__))
 

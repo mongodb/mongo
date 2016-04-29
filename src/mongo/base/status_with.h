@@ -67,13 +67,15 @@ public:
     /**
      * for the error case
      */
-    StatusWith(ErrorCodes::Error code, std::string reason, int location = 0)
+    MONGO_COMPILER_COLD_FUNCTION StatusWith(ErrorCodes::Error code,
+                                            std::string reason,
+                                            int location = 0)
         : _status(code, std::move(reason), location) {}
 
     /**
      * for the error case
      */
-    StatusWith(Status status) : _status(std::move(status)) {
+    MONGO_COMPILER_COLD_FUNCTION StatusWith(Status status) : _status(std::move(status)) {
         dassert(!isOK());
     }
 

@@ -236,12 +236,12 @@ inline void fassertNoTrace(int msgid, const Status& status) {
  * MONGO_COMPILER_UNREACHABLE as it is impossible to mark a lambda noreturn.
  */
 #define uassert MONGO_uassert
-#define MONGO_uassert(msgid, msg, expr)                  \
-    do {                                                 \
-        if (MONGO_unlikely(!(expr))) {                   \
-            [&]() { ::mongo::uasserted(msgid, msg); }(); \
-            MONGO_COMPILER_UNREACHABLE;                  \
-        }                                                \
+#define MONGO_uassert(msgid, msg, expr)                                               \
+    do {                                                                              \
+        if (MONGO_unlikely(!(expr))) {                                                \
+            [&]() MONGO_COMPILER_COLD_FUNCTION { ::mongo::uasserted(msgid, msg); }(); \
+            MONGO_COMPILER_UNREACHABLE;                                               \
+        }                                                                             \
     } while (false)
 
 inline void uassertStatusOK(const Status& status) {
@@ -285,12 +285,12 @@ inline void fassertStatusOK(int msgid, const Status& s) {
    display happening.
 */
 #define massert MONGO_massert
-#define MONGO_massert(msgid, msg, expr)                  \
-    do {                                                 \
-        if (MONGO_unlikely(!(expr))) {                   \
-            [&] { ::mongo::msgasserted(msgid, msg); }(); \
-            MONGO_COMPILER_UNREACHABLE;                  \
-        }                                                \
+#define MONGO_massert(msgid, msg, expr)                                                 \
+    do {                                                                                \
+        if (MONGO_unlikely(!(expr))) {                                                  \
+            [&]() MONGO_COMPILER_COLD_FUNCTION { ::mongo::msgasserted(msgid, msg); }(); \
+            MONGO_COMPILER_UNREACHABLE;                                                 \
+        }                                                                               \
     } while (false)
 
 inline void massertStatusOK(const Status& status) {
@@ -301,7 +301,7 @@ inline void massertStatusOK(const Status& status) {
 
 inline void massertNoTraceStatusOK(const Status& status) {
     if (MONGO_unlikely(!status.isOK())) {
-        [&] {
+        [&]() MONGO_COMPILER_COLD_FUNCTION {
             msgassertedNoTrace((status.location() != 0 ? status.location() : status.code()),
                                status.reason());
         }();

@@ -34,6 +34,11 @@
 
 #pragma once
 
+
+// Microsoft seems opposed to implementing this:
+// https://connect.microsoft.com/VisualStudio/feedback/details/804542
+#define MONGO_COMPILER_COLD_FUNCTION
+
 #define MONGO_COMPILER_NORETURN __declspec(noreturn)
 
 #define MONGO_COMPILER_VARIABLE_UNUSED
