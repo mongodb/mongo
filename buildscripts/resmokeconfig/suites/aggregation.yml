@@ -4,7 +4,6 @@ selector:
     - jstests/aggregation/*.js
     - jstests/aggregation/bugs/*.js
     - jstests/aggregation/expressions/*.js
-    - jstests/aggregation/sources/*/*.js
 
 executor:
   js_test:

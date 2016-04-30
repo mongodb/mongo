@@ -116,18 +116,6 @@ public:
         return collection->infoCache()->getIndexUsageStats();
     }
 
-    bool hasUniqueIdIndex(const NamespaceString& ns) const final {
-        AutoGetCollectionForRead ctx(_ctx->opCtx, ns.ns());
-        Collection* collection = ctx.getCollection();
-
-        if (!collection) {
-            // Collection doesn't exist; the correct return value is questionable.
-            return false;
-        }
-
-        return collection->getIndexCatalog()->findIdIndex(_ctx->opCtx);
-    }
-
 private:
     intrusive_ptr<ExpressionContext> _ctx;
     DBDirectClient _client;

@@ -30,6 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/optional.hpp>
+#include <boost/intrusive_ptr.hpp>
 #include <deque>
 #include <list>
 #include <string>
@@ -44,11 +46,10 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/pipeline/accumulator.h"
-#include "mongo/db/pipeline/lookup_set_cache.h"
-#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/sorter/sorter.h"
@@ -227,13 +228,6 @@ public:
      */
     static BSONObjSet allPrefixes(BSONObj obj);
 
-    /**
-     * Given a BSONObjSet, where each BSONObj represents a sort key, return the BSONObjSet that
-     * results from truncating each sort key before the first path that is a member of 'fields', or
-     * is a child of a member of 'fields'.
-     */
-    static BSONObjSet truncateSortSet(const BSONObjSet& sorts, const std::set<std::string>& fields);
-
 protected:
     /**
        Base constructor.
@@ -322,8 +316,6 @@ public:
 
         virtual CollectionIndexUsageMap getIndexStats(OperationContext* opCtx,
                                                       const NamespaceString& ns) = 0;
-
-        virtual bool hasUniqueIdIndex(const NamespaceString& ns) const = 0;
 
         // Add new methods as needed.
     };
@@ -1542,139 +1534,5 @@ private:
     std::unique_ptr<DBClientCursor> _cursor;
     long long _cursorIndex = 0;
     boost::optional<Document> _input;
-};
-
-class DocumentSourceGraphLookUp final : public DocumentSource, public DocumentSourceNeedsMongod {
-public:
-    boost::optional<Document> getNext() final;
-    const char* getSourceName() const final;
-    void dispose() final;
-    BSONObjSet getOutputSorts() final;
-    void serializeToArray(std::vector<Value>& array, bool explain = false) const final;
-
-    /**
-     * Attempts to combine with a subsequent $unwind stage, setting the internal '_unwind' field.
-     */
-    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                   Pipeline::SourceContainer* container) final;
-
-    GetDepsReturn getDependencies(DepsTracker* deps) const final {
-        _startWith->addDependencies(deps, nullptr);
-        return SEE_NEXT;
-    };
-
-    bool needsPrimaryShard() const final {
-        return true;
-    }
-
-    void addInvolvedCollections(std::vector<NamespaceString>* collections) const final {
-        collections->push_back(_from);
-    }
-
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
-private:
-    DocumentSourceGraphLookUp(NamespaceString from,
-                              std::string as,
-                              std::string connectFromField,
-                              std::string connectToField,
-                              boost::intrusive_ptr<Expression> startWith,
-                              boost::optional<FieldPath> depthField,
-                              boost::optional<long long> maxDepth,
-                              const boost::intrusive_ptr<ExpressionContext>& expCtx);
-
-    Value serialize(bool explain = false) const final {
-        // Should not be called; use serializeToArray instead.
-        MONGO_UNREACHABLE;
-    }
-
-    /**
-     * Prepare the query to execute on the 'from' collection, using the contents of '_frontier'.
-     *
-     * Fills 'cached' with any values that were retrieved from the cache.
-     *
-     * Returns boost::none if no query is necessary, i.e., all values were retrieved from the cache.
-     * Otherwise, returns a query object.
-     */
-    boost::optional<BSONObj> constructQuery(BSONObjSet* cached);
-
-    /**
-     * If we have internalized a $unwind, getNext() dispatches to this function.
-     */
-    boost::optional<Document> getNextUnwound();
-
-    /**
-     * Perform a breadth-first search of the 'from' collection. '_frontier' should already be
-     * populated with the values for the initial query. Populates '_discovered' with the result(s)
-     * of the query.
-     */
-    void doBreadthFirstSearch();
-
-    /**
-     * Populates '_frontier' with the '_startWith' value(s) from '_input' and then performs a
-     * breadth-first search. Caller should check that _input is not boost::none.
-     */
-    void performSearch();
-
-    /**
-     * Updates '_cache' with 'result' appropriately, given that 'result' was retrieved when querying
-     * for 'queried'.
-     */
-    void addToCache(const BSONObj& result, const unordered_set<Value, Value::Hash>& queried);
-
-    /**
-     * Assert that '_visited' and '_frontier' have not exceeded the maximum meory usage, and then
-     * evict from '_cache' until this source is using less than '_maxMemoryUsageBytes'.
-     */
-    void checkMemoryUsage();
-
-    /**
-     * Process 'result', adding it to '_visited' with the given 'depth', and updating '_frontier'
-     * with the object's 'connectTo' values.
-     *
-     * Returns whether '_visited' was updated, and thus, whether the search should recurse.
-     */
-    bool addToVisitedAndFrontier(BSONObj result, long long depth);
-
-    // $graphLookup options.
-    NamespaceString _from;
-    FieldPath _as;
-    FieldPath _connectFromField;
-    FieldPath _connectToField;
-    boost::intrusive_ptr<Expression> _startWith;
-    boost::optional<FieldPath> _depthField;
-    boost::optional<long long> _maxDepth;
-
-    size_t _maxMemoryUsageBytes = 100 * 1024 * 1024;
-
-    // Track memory usage to ensure we don't exceed '_maxMemoryUsageBytes'.
-    size_t _visitedUsageBytes = 0;
-    size_t _frontierUsageBytes = 0;
-
-    // Only used during the breadth-first search, tracks the set of values on the current frontier.
-    std::unordered_set<Value, Value::Hash> _frontier;
-
-    // Tracks nodes that have been discovered for a given input. Keys are the '_id' value of the
-    // document from the foreign collection, value is the document itself.
-    std::unordered_map<Value, BSONObj, Value::Hash> _visited;
-
-    // Caches query results to avoid repeating any work. This structure is maintained across calls
-    // to getNext().
-    LookupSetCache _cache;
-
-    // When we have internalized a $unwind, we must keep track of the input document, since we will
-    // need it for multiple "getNext()" calls.
-    boost::optional<Document> _input;
-
-    // The variables that are in scope to be used by the '_startWith' expression.
-    std::unique_ptr<Variables> _variables;
-
-    // Keep track of a $unwind that was absorbed into this stage.
-    boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> _unwind;
-
-    // If we absorbed a $unwind that specified 'includeArrayIndex', this is used to populate that
-    // field, tracking how many results we've returned so far for the current input document.
-    long long _outputIndex;
 };
 }

@@ -100,7 +100,6 @@ docSourceEnv.Library(
     source=[
         'document_source.cpp',
         'document_source_geo_near.cpp',
-        'document_source_graph_lookup.cpp',
         'document_source_group.cpp',
         'document_source_index_stats.cpp',
         'document_source_limit.cpp',
@@ -181,14 +180,3 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         ],
     )
-
-env.CppUnitTest(
-    target='lookup_set_cache_test',
-    source=[
-        'lookup_set_cache_test.cpp',
-    ],
-    LIBDEPS=[
-        'document_value',
-        '$BUILD_DIR/mongo/base',
-    ]
-)

@@ -85,35 +85,6 @@ BSONObj toBson(const intrusive_ptr<DocumentSource>& source) {
 namespace DocumentSourceClass {
 using mongo::DocumentSource;
 
-TEST(TruncateSort, SortTruncatesNormalField) {
-    BSONObj sortKey = BSON("a" << 1 << "b" << 1 << "c" << 1);
-    auto truncated = DocumentSource::truncateSortSet({sortKey}, {"b"});
-    ASSERT_EQUALS(truncated.size(), 1U);
-    ASSERT_EQUALS(truncated.count(BSON("a" << 1)), 1U);
-}
-
-TEST(TruncateSort, SortTruncatesOnSubfield) {
-    BSONObj sortKey = BSON("a" << 1 << "b.c" << 1 << "d" << 1);
-    auto truncated = DocumentSource::truncateSortSet({sortKey}, {"b"});
-    ASSERT_EQUALS(truncated.size(), 1U);
-    ASSERT_EQUALS(truncated.count(BSON("a" << 1)), 1U);
-}
-
-TEST(TruncateSort, SortDoesNotTruncateOnParent) {
-    BSONObj sortKey = BSON("a" << 1 << "b" << 1 << "d" << 1);
-    auto truncated = DocumentSource::truncateSortSet({sortKey}, {"b.c"});
-    ASSERT_EQUALS(truncated.size(), 1U);
-    ASSERT_EQUALS(truncated.count(BSON("a" << 1 << "b" << 1 << "d" << 1)), 1U);
-}
-
-TEST(TruncateSort, TruncateSortDedupsSortCorrectly) {
-    BSONObj sortKeyOne = BSON("a" << 1 << "b" << 1);
-    BSONObj sortKeyTwo = BSON("a" << 1);
-    auto truncated = DocumentSource::truncateSortSet({sortKeyOne, sortKeyTwo}, {"b"});
-    ASSERT_EQUALS(truncated.size(), 1U);
-    ASSERT_EQUALS(truncated.count(BSON("a" << 1)), 1U);
-}
-
 template <size_t ArrayLen>
 set<string> arrayToSet(const char*(&array)[ArrayLen]) {
     set<string> out;
@@ -193,9 +164,7 @@ public:
         }
     }
 };
-
-
-}  // namespace DocumentSourceClass
+}
 
 namespace Mock {
 using mongo::DocumentSourceMock;
