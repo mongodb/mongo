@@ -145,20 +145,6 @@ struct __wt_named_extractor {
 } while (0)
 
 /*
- * Macros to ensure the file handle is inserted or removed from both the
- * main queue and the hashed queue.
- */
-#define	WT_CONN_FILE_INSERT(conn, fh, bucket) do {			\
-	TAILQ_INSERT_HEAD(&(conn)->fhqh, fh, q);			\
-	TAILQ_INSERT_HEAD(&(conn)->fhhash[bucket], fh, hashq);		\
-} while (0)
-
-#define	WT_CONN_FILE_REMOVE(conn, fh, bucket) do {			\
-	TAILQ_REMOVE(&(conn)->fhqh, fh, q);				\
-	TAILQ_REMOVE(&(conn)->fhhash[bucket], fh, hashq);		\
-} while (0)
-
-/*
  * WT_CONNECTION_IMPL --
  *	Implementation of WT_CONNECTION
  */

@@ -50,6 +50,20 @@
 	     (t1).tv_nsec < (t2).tv_nsec ? -1 :				\
 	     (t1).tv_nsec == (t2).tv_nsec ? 0 : 1 : 1)
 
+/*
+ * Macros to ensure a file handle is inserted or removed from both the main and
+ * the hashed queue, used by connection-level and in-memory data structures.
+ */
+#define	WT_FILE_HANDLE_INSERT(h, fh, bucket) do {			\
+	TAILQ_INSERT_HEAD(&(h)->fhqh, fh, q);				\
+	TAILQ_INSERT_HEAD(&(h)->fhhash[bucket], fh, hashq);		\
+} while (0)
+
+#define	WT_FILE_HANDLE_REMOVE(h, fh, bucket) do {			\
+	TAILQ_REMOVE(&(h)->fhqh, fh, q);				\
+	TAILQ_REMOVE(&(h)->fhhash[bucket], fh, hashq);			\
+} while (0)
+
 struct __wt_fh {
 	/*
 	 * There is a file name field in both the WT_FH and WT_FILE_HANDLE
@@ -73,6 +87,7 @@ struct __wt_fh {
 #ifdef _WIN32
 struct __wt_file_handle_win {
 	WT_FILE_HANDLE iface;
+
 	/*
 	 * Windows specific file handle fields
 	 */
@@ -98,10 +113,13 @@ struct __wt_file_handle_posix {
 
 struct __wt_file_handle_inmem {
 	WT_FILE_HANDLE iface;
+
 	/*
 	 * In memory specific file handle fields
 	 */
-	TAILQ_ENTRY(__wt_file_handle_inmem) q;	/* Closed file queue */
+	uint64_t name_hash;			/* hash of name */
+	TAILQ_ENTRY(__wt_file_handle_inmem) q;	/* internal queue, hash queue */
+	TAILQ_ENTRY(__wt_file_handle_inmem) hashq;
 
 	size_t	 off;				/* Read/write offset */
 	WT_ITEM  buf;				/* Data */

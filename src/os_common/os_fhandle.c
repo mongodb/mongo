@@ -115,7 +115,7 @@ __handle_search(
 	/* If we don't find a match, optionally add a new entry. */
 	if (!found && newfh != NULL) {
 		newfh->name_hash = hash;
-		WT_CONN_FILE_INSERT(conn, newfh, bucket);
+		WT_FILE_HANDLE_INSERT(conn, newfh, bucket);
 		(void)__wt_atomic_add32(&conn->open_file_count, 1);
 
 		++newfh->ref;
@@ -318,7 +318,7 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH **fhp)
 
 	/* Remove from the list. */
 	bucket = fh->name_hash % WT_HASH_ARRAY_SIZE;
-	WT_CONN_FILE_REMOVE(conn, fh, bucket);
+	WT_FILE_HANDLE_REMOVE(conn, fh, bucket);
 	(void)__wt_atomic_sub32(&conn->open_file_count, 1);
 
 	__wt_spin_unlock(session, &conn->fh_lock);
