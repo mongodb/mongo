@@ -627,50 +627,72 @@ class UnwindBeforeDoubleMatchShouldRepeatedlyOptimize : public Base {
 };
 
 class GraphLookupShouldCoalesceWithUnwindOnAs : public Base {
-    string inputPipeJson() {
+    string inputPipeJson() final {
         return "[{$graphLookup: {from: 'a', as: 'out', connectToField: 'b', connectFromField: 'c', "
                "                 startWith: '$d'}}, "
                " {$unwind: '$out'}]";
     }
-    string outputPipeJson() {
+
+    string outputPipeJson() final {
         return "[{$graphLookup: {from: 'a', as: 'out', connectToField: 'b', connectFromField: 'c', "
                "                 startWith: '$d', unwinding: {preserveNullAndEmptyArrays: "
                "false}}}]";
     }
+
+    string serializedPipeJson() final {
+        return "[{$graphLookup: {from: 'a', as: 'out', connectToField: 'b', connectFromField: 'c', "
+               "                 startWith: '$d'}}, "
+               " {$unwind: {path: '$out'}}]";
+    }
 };
 
 class GraphLookupShouldCoalesceWithUnwindOnAsWithPreserveEmpty : public Base {
-    string inputPipeJson() {
+    string inputPipeJson() final {
         return "[{$graphLookup: {from: 'a', as: 'out', connectToField: 'b', connectFromField: 'c', "
                "                 startWith: '$d'}}, "
                " {$unwind: {path: '$out', preserveNullAndEmptyArrays: true}}]";
     }
-    string outputPipeJson() {
+
+    string outputPipeJson() final {
         return "[{$graphLookup: {from: 'a', as: 'out', connectToField: 'b', connectFromField: 'c', "
                "                 startWith: '$d', unwinding: {preserveNullAndEmptyArrays: true}}}]";
+    }
+
+    string serializedPipeJson() final {
+        return "[{$graphLookup: {from: 'a', as: 'out', connectToField: 'b', connectFromField: 'c', "
+               "                 startWith: '$d'}}, "
+               " {$unwind: {path: '$out', preserveNullAndEmptyArrays: true}}]";
     }
 };
 
 class GraphLookupShouldCoalesceWithUnwindOnAsWithIncludeArrayIndex : public Base {
-    string inputPipeJson() {
+    string inputPipeJson() final {
         return "[{$graphLookup: {from: 'a', as: 'out', connectToField: 'b', connectFromField: 'c', "
                "                 startWith: '$d'}}, "
                " {$unwind: {path: '$out', includeArrayIndex: 'index'}}]";
     }
-    string outputPipeJson() {
+
+    string outputPipeJson() final {
         return "[{$graphLookup: {from: 'a', as: 'out', connectToField: 'b', connectFromField: 'c', "
                "                 startWith: '$d', unwinding: {preserveNullAndEmptyArrays: false, "
                "                                             includeArrayIndex: 'index'}}}]";
     }
+
+    string serializedPipeJson() final {
+        return "[{$graphLookup: {from: 'a', as: 'out', connectToField: 'b', connectFromField: 'c', "
+               "                 startWith: '$d'}}, "
+               " {$unwind: {path: '$out', includeArrayIndex: 'index'}}]";
+    }
 };
 
 class GraphLookupShouldNotCoalesceWithUnwindNotOnAs : public Base {
-    string inputPipeJson() {
+    string inputPipeJson() final {
         return "[{$graphLookup: {from: 'a', as: 'out', connectToField: 'b', connectFromField: 'c', "
                "                 startWith: '$d'}}, "
                " {$unwind: '$nottherightthing'}]";
     }
-    string outputPipeJson() {
+
+    string outputPipeJson() final {
         return "[{$graphLookup: {from: 'a', as: 'out', connectToField: 'b', connectFromField: 'c', "
                "                 startWith: '$d'}}, "
                " {$unwind: {path: '$nottherightthing'}}]";
