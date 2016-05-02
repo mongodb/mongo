@@ -1044,13 +1044,23 @@ public:
                 results.valid = false;
             }
 
+            if (descriptor->isPartial()) {
+                const IndexCatalogEntry* ice = _indexCatalog->getEntry(descriptor);
+                if (!ice->getFilterExpression()->matchesBSON(recordBson)) {
+                    continue;
+                }
+            }
+
+            uint32_t indexNsHash;
+            MurmurHash3_x86_32(indexNs.c_str(), indexNs.size(), 0, &indexNsHash);
+
             for (const auto& key : documentKeySet) {
                 if (key.objsize() >= IndexKeyMaxSize) {
                     // Index keys >= 1024 bytes are not indexed.
                     _longKeys[indexNs]++;
                     continue;
                 }
-                uint32_t indexEntryHash = hashIndexEntry(key, recordId);
+                uint32_t indexEntryHash = hashIndexEntry(key, recordId, indexNsHash);
                 uint64_t& indexEntryCount = (*_ikc)[indexEntryHash];
 
                 if (indexEntryCount != 0) {
@@ -1077,14 +1087,17 @@ public:
     }
 
     /**
-     * Create one hash map of all entries for all indexes in a collection.
-     * This ensures that we only need to do one collection scan when validating
-     * a document against all the indexes that point to it.
+     * Traverse the index to validate the entries and cache index keys for later use.
      */
-    void cacheIndexInfo(const IndexAccessMethod* iam,
-                        const IndexDescriptor* descriptor,
-                        long long numKeys) {
-        _keyCounts[descriptor->indexNamespace()] = numKeys;
+    void traverseIndex(const IndexAccessMethod* iam,
+                       const IndexDescriptor* descriptor,
+                       ValidateResults& results,
+                       long long numKeys) {
+        auto indexNs = descriptor->indexNamespace();
+        _keyCounts[indexNs] = numKeys;
+
+        uint32_t indexNsHash;
+        MurmurHash3_x86_32(indexNs.c_str(), indexNs.size(), 0, &indexNsHash);
 
         if (_level == kValidateFull) {
             const auto& key = descriptor->keyPattern();
@@ -1107,7 +1120,8 @@ public:
                 isFirstEntry = false;
                 prevIndexEntryKey = indexEntry->key;
 
-                uint32_t keyHash = hashIndexEntry(indexEntry->key, indexEntry->loc);
+                // Cache the index keys to cross-validate with documents later.
+                uint32_t keyHash = hashIndexEntry(indexEntry->key, indexEntry->loc, indexNsHash);
                 if ((*_ikc)[keyHash] == 0) {
                     _indexKeyCountTableNumEntries++;
                 }
@@ -1186,11 +1200,10 @@ private:
     IndexCatalog* _indexCatalog;             // Not owned.
     ValidateResultsMap* _indexNsResultsMap;  // Not owned.
 
-    uint32_t hashIndexEntry(const BSONObj& key, const RecordId& loc) {
-        uint32_t hash;
+    uint32_t hashIndexEntry(const BSONObj& key, const RecordId& loc, uint32_t hash) {
         // We're only using KeyString to get something hashable here, so version doesn't matter.
         KeyString ks(KeyString::Version::V1, key, Ordering::make(BSONObj()), loc);
-        MurmurHash3_x86_32(ks.getTypeBits().getBuffer(), ks.getTypeBits().getSize(), 0, &hash);
+        MurmurHash3_x86_32(ks.getTypeBits().getBuffer(), ks.getTypeBits().getSize(), hash, &hash);
         MurmurHash3_x86_32(ks.getBuffer(), ks.getSize(), hash, &hash);
         return hash % kKeyCountTableSize;
     }
@@ -1224,12 +1237,12 @@ Status Collection::validate(OperationContext* txn,
             keysPerIndex.appendNumber(descriptor->indexNamespace(),
                                       static_cast<long long>(numKeys));
 
-            indexNsResultsMap[descriptor->indexNamespace()] = curIndexResults;
             if (curIndexResults.valid) {
-                indexValidator->cacheIndexInfo(iam, descriptor, numKeys);
+                indexValidator->traverseIndex(iam, descriptor, curIndexResults, numKeys);
             } else {
                 results->valid = false;
             }
+            indexNsResultsMap[descriptor->indexNamespace()] = curIndexResults;
         }
 
         // Validate RecordStore and, if `level == kValidateFull`, cross validate indexes and
