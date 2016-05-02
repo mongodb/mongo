@@ -63,14 +63,16 @@ public:
 
         size_t cacheMB = WiredTigerUtil::getCacheSizeMB(wiredTigerGlobalOptions.cacheSizeGB);
         const bool ephemeral = false;
-        WiredTigerKVEngine* kv = new WiredTigerKVEngine(getCanonicalName().toString(),
-                                                        params.dbpath,
-                                                        wiredTigerGlobalOptions.engineConfig,
-                                                        cacheMB,
-                                                        params.dur,
-                                                        ephemeral,
-                                                        params.repair,
-                                                        params.readOnly);
+        WiredTigerKVEngine* kv =
+            new WiredTigerKVEngine(getCanonicalName().toString(),
+                                   params.dbpath,
+                                   getGlobalServiceContext()->getFastClockSource(),
+                                   wiredTigerGlobalOptions.engineConfig,
+                                   cacheMB,
+                                   params.dur,
+                                   ephemeral,
+                                   params.repair,
+                                   params.readOnly);
         kv->setRecordStoreExtraOptions(wiredTigerGlobalOptions.collectionConfig);
         kv->setSortedDataInterfaceExtraOptions(wiredTigerGlobalOptions.indexConfig);
         // Intentionally leaked.

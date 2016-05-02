@@ -39,9 +39,9 @@ namespace mongo {
 
 class WiredTigerKVHarnessHelper : public KVHarnessHelper {
 public:
-    WiredTigerKVHarnessHelper() : _dbpath("wt-kv-harness") {
+    WiredTigerKVHarnessHelper(ClockSource* cs) : _clock(cs), _dbpath("wt-kv-harness") {
         _engine.reset(new WiredTigerKVEngine(
-            kWiredTigerEngineName, _dbpath.path(), "", 1, false, false, false, false));
+            kWiredTigerEngineName, _dbpath.path(), _clock, "", 1, false, false, false, false));
     }
 
     virtual ~WiredTigerKVHarnessHelper() {
@@ -51,7 +51,7 @@ public:
     virtual KVEngine* restartEngine() {
         _engine.reset(NULL);
         _engine.reset(new WiredTigerKVEngine(
-            kWiredTigerEngineName, _dbpath.path(), "", 1, false, false, false, false));
+            kWiredTigerEngineName, _dbpath.path(), _clock, "", 1, false, false, false, false));
         return _engine.get();
     }
 
@@ -60,11 +60,12 @@ public:
     }
 
 private:
+    ClockSource* _clock;
     unittest::TempDir _dbpath;
     std::unique_ptr<WiredTigerKVEngine> _engine;
 };
 
-KVHarnessHelper* KVHarnessHelper::create() {
-    return new WiredTigerKVHarnessHelper();
+KVHarnessHelper* KVHarnessHelper::create(ClockSource* cs) {
+    return new WiredTigerKVHarnessHelper(cs);
 }
 }
