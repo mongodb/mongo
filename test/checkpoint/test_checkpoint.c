@@ -61,8 +61,7 @@ main(int argc, char *argv[])
 	working_dir = NULL;
 	ttype = MIX;
 	g.checkpoint_name = "WiredTigerCheckpoint";
-	if ((g.home = malloc(512)) == NULL)
-		testutil_die(ENOMEM, "Unable to allocate memory");
+	g.home = dmalloc(512);
 	g.nkeys = 10000;
 	g.nops = 100000;
 	g.ntables = 3;

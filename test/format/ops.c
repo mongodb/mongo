@@ -103,8 +103,7 @@ wts_ops(int lastrun)
 	}
 
 	/* Create thread structure; start the worker threads. */
-	if ((tinfo = calloc((size_t)g.c_threads, sizeof(*tinfo))) == NULL)
-		testutil_die(errno, "calloc");
+	tinfo = dcalloc((size_t)g.c_threads, sizeof(*tinfo));
 	for (i = 0; i < g.c_threads; ++i) {
 		tinfo[i].id = (int)i + 1;
 		tinfo[i].state = TINFO_RUNNING;
@@ -1121,8 +1120,7 @@ table_append_init(void)
 	g.append_cnt = 0;
 
 	free(g.append);
-	if ((g.append = calloc(g.append_max, sizeof(uint64_t))) == NULL)
-		testutil_die(errno, "calloc");
+	g.append = dcalloc(g.append_max, sizeof(uint64_t));
 }
 
 /*

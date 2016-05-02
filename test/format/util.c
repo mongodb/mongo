@@ -32,47 +32,6 @@
 #define	MAX(a, b)	(((a) > (b)) ? (a) : (b))
 #endif
 
-/*
- * dmalloc --
- *	Call malloc, dying on failure.
- */
-void *
-dmalloc(size_t len)
-{
-	void *p;
-
-	if ((p = malloc(len)) == NULL)
-		testutil_die(errno, "malloc");
-	return (p);
-}
-
-/*
- * drealloc --
- *	Call realloc, dying on failure.
- */
-void *
-drealloc(void *p, size_t len)
-{
-	void *t;
-	if ((t = realloc(p, len)) == NULL)
-		testutil_die(errno, "realloc");
-	return (t);
-}
-
-/*
- * dstrdup --
- *	Call strdup, dying on failure.
- */
-void *
-dstrdup(const void *str)
-{
-	char *p;
-
-	if ((p = strdup(str)) == NULL)
-		testutil_die(errno, "strdup");
-	return (p);
-}
-
 void
 key_len_setup(void)
 {

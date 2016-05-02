@@ -632,32 +632,30 @@ config_single(const char *s, int perm)
 
 		if (strncmp(s, "checksum", strlen("checksum")) == 0) {
 			config_map_checksum(ep, &g.c_checksum_flag);
-			*cp->vstr = strdup(ep);
+			*cp->vstr = dstrdup(ep);
 		} else if (strncmp(
 		    s, "compression", strlen("compression")) == 0) {
 			config_map_compression(ep, &g.c_compression_flag);
-			*cp->vstr = strdup(ep);
+			*cp->vstr = dstrdup(ep);
 		} else if (strncmp(
 		    s, "encryption", strlen("encryption")) == 0) {
 			config_map_encryption(ep, &g.c_encryption_flag);
-			*cp->vstr = strdup(ep);
+			*cp->vstr = dstrdup(ep);
 		} else if (strncmp(s, "isolation", strlen("isolation")) == 0) {
 			config_map_isolation(ep, &g.c_isolation_flag);
-			*cp->vstr = strdup(ep);
+			*cp->vstr = dstrdup(ep);
 		} else if (strncmp(s, "file_type", strlen("file_type")) == 0) {
 			config_map_file_type(ep, &g.type);
-			*cp->vstr = strdup(config_file_type(g.type));
+			*cp->vstr = dstrdup(config_file_type(g.type));
 		} else if (strncmp(s, "logging_compression",
 		    strlen("logging_compression")) == 0) {
 			config_map_compression(ep,
 			    &g.c_logging_compression_flag);
-			*cp->vstr = strdup(ep);
+			*cp->vstr = dstrdup(ep);
 		} else {
 			free((void *)*cp->vstr);
-			*cp->vstr = strdup(ep);
+			*cp->vstr = dstrdup(ep);
 		}
-		if (*cp->vstr == NULL)
-			testutil_die(errno, "malloc");
 
 		return;
 	}

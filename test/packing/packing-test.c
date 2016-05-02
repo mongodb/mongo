@@ -26,7 +26,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "wt_internal.h"			/* For __wt_XXX */
 #include "test_util.i"
 
 void (*custom_die)(void) = NULL;
