@@ -80,7 +80,7 @@ StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* txn,
         auto swCmdResponse = _runCommand(txn, readPref, dbName, cmdObj);
         auto commandStatus = _getEffectiveCommandStatus(swCmdResponse);
 
-        if (retry < kOnErrorNumRetries && _isRetriableError(commandStatus.code(), retryPolicy)) {
+        if (retry < kOnErrorNumRetries && isRetriableError(commandStatus.code(), retryPolicy)) {
             LOG(3) << "Command " << cmdObj << " failed with retriable error and will be retried"
                    << causedBy(commandStatus);
             continue;
@@ -102,7 +102,7 @@ StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
         auto result = _exhaustiveFindOnConfig(txn, readPref, nss, query, sort, limit);
 
         if (retry < kOnErrorNumRetries &&
-            _isRetriableError(result.getStatus().code(), RetryPolicy::kIdempotent)) {
+            isRetriableError(result.getStatus().code(), RetryPolicy::kIdempotent)) {
             continue;
         }
 

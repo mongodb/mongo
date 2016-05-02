@@ -119,6 +119,14 @@ public:
     virtual std::string toString() const = 0;
 
     /**
+     * Returns whether a server operation which failed with the given error code should be retried
+     * (i.e. is safe to retry and has the potential to succeed next time).  The 'options' argument
+     * describes whether the operation that generated the given code was idempotent, which affects
+     * which codes are safe to retry on.
+     */
+    virtual bool isRetriableError(ErrorCodes::Error code, RetryPolicy options) = 0;
+
+    /**
      * Runs a command against this shard and returns the BSON command response, as well as the
      * already-parsed out Status of the command response and write concern error (if present).
      * Retries failed operations according to the given "retryPolicy".
@@ -145,14 +153,6 @@ protected:
     Shard(const ShardId& id);
 
 private:
-    /**
-     * Returns whether a server operation which failed with the given error code should be retried
-     * (i.e. is safe to retry and has the potential to succeed next time).  The 'options' argument
-     * describes whether the operation that generated the given code was idempotent, which affects
-     * which codes are safe to retry on.
-     */
-    virtual bool _isRetriableError(ErrorCodes::Error code, RetryPolicy options) = 0;
-
     virtual StatusWith<CommandResponse> _runCommand(OperationContext* txn,
                                                     const ReadPreferenceSetting& readPref,
                                                     const std::string& dbname,

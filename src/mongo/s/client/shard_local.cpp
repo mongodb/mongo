@@ -71,7 +71,7 @@ std::string ShardLocal::toString() const {
     return getId() + ":<local>";
 }
 
-bool ShardLocal::_isRetriableError(ErrorCodes::Error code, RetryPolicy options) {
+bool ShardLocal::isRetriableError(ErrorCodes::Error code, RetryPolicy options) {
     if (options == RetryPolicy::kNoRetry) {
         return false;
     }

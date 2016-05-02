@@ -54,9 +54,9 @@ public:
 
     std::string toString() const override;
 
-private:
-    bool _isRetriableError(ErrorCodes::Error code, RetryPolicy options) final;
+    bool isRetriableError(ErrorCodes::Error code, RetryPolicy options) final;
 
+private:
     StatusWith<Shard::CommandResponse> _runCommand(OperationContext* txn,
                                                    const ReadPreferenceSetting& unused,
                                                    const std::string& dbName,

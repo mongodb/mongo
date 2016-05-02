@@ -167,7 +167,7 @@ ShardRemote::ShardRemote(const ShardId& id,
 
 ShardRemote::~ShardRemote() = default;
 
-bool ShardRemote::_isRetriableError(ErrorCodes::Error code, RetryPolicy options) {
+bool ShardRemote::isRetriableError(ErrorCodes::Error code, RetryPolicy options) {
     if (options == RetryPolicy::kNoRetry) {
         return false;
     }

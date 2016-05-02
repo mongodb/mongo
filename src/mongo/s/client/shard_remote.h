@@ -68,9 +68,9 @@ public:
 
     std::string toString() const override;
 
-private:
-    bool _isRetriableError(ErrorCodes::Error code, RetryPolicy options) final;
+    bool isRetriableError(ErrorCodes::Error code, RetryPolicy options) final;
 
+private:
     /**
      * Returns the metadata that should be used when running commands against this shard with
      * the given read preference.

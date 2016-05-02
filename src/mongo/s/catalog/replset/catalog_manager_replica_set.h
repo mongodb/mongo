@@ -259,7 +259,7 @@ private:
     void _runBatchWriteCommand(OperationContext* txn,
                                const BatchedCommandRequest& request,
                                BatchedCommandResponse* response,
-                               const ShardRegistry::ErrorCodesSet& errorsToCheck);
+                               Shard::RetryPolicy retryPolicy);
 
     /**
      * Helper method for running a count command against the config server with appropriate

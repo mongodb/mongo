@@ -126,6 +126,37 @@ void toBatchError(const Status& status, BatchedCommandResponse* response) {
     response->setOk(false);
 }
 
+/**
+ * Takes the response from running a batch write command and writes the appropriate response into
+ * *batchResponse, while also returning the Status of the operation.
+ */
+Status _processBatchWriteResponse(StatusWith<Shard::CommandResponse> response,
+                                  BatchedCommandResponse* batchResponse) {
+    Status status(ErrorCodes::InternalError, "status not set");
+
+    if (!response.isOK()) {
+        status = response.getStatus();
+    } else if (!response.getValue().commandStatus.isOK()) {
+        status = response.getValue().commandStatus;
+    } else if (!response.getValue().writeConcernStatus.isOK()) {
+        status = response.getValue().writeConcernStatus;
+    } else {
+        string errmsg;
+        if (!batchResponse->parseBSON(response.getValue().response, &errmsg)) {
+            status = Status(ErrorCodes::FailedToParse,
+                            str::stream() << "Failed to parse config server response: " << errmsg);
+        } else {
+            status = batchResponse->toStatus();
+        }
+    }
+
+    if (!status.isOK()) {
+        toBatchError(status, batchResponse);
+    }
+
+    return status;
+}
+
 }  // namespace
 
 StatusWith<ShardType> CatalogManagerReplicaSet::_validateHostAsShard(
@@ -555,7 +586,7 @@ Status CatalogManagerReplicaSet::logAction(OperationContext* txn,
     if (_actionLogCollectionCreated.load() == 0) {
         Status result = _createCappedConfigCollection(
             txn, kActionLogCollectionName, kActionLogCollectionSizeMB);
-        if (result.isOK() || result == ErrorCodes::NamespaceExists) {
+        if (result.isOK()) {
             _actionLogCollectionCreated.store(1);
         } else {
             log() << "couldn't create config.actionlog collection:" << causedBy(result);
@@ -573,7 +604,7 @@ Status CatalogManagerReplicaSet::logChange(OperationContext* txn,
     if (_changeLogCollectionCreated.load() == 0) {
         Status result = _createCappedConfigCollection(
             txn, kChangeLogCollectionName, kChangeLogCollectionSizeMB);
-        if (result.isOK() || result == ErrorCodes::NamespaceExists) {
+        if (result.isOK()) {
             _changeLogCollectionCreated.store(1);
         } else {
             log() << "couldn't create config.changelog collection:" << causedBy(result);
@@ -1426,15 +1457,25 @@ bool CatalogManagerReplicaSet::runUserManagementWriteCommand(OperationContext* t
         cmdToRun = modifiedCmd.obj();
     }
 
-    auto response = grid.shardRegistry()->runCommandOnConfigWithRetries(
-        txn, dbname, cmdToRun, ShardRegistry::kNotMasterErrors);
+    auto response = Grid::get(txn)->shardRegistry()->getConfigShard()->runCommand(
+        txn,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        dbname,
+        cmdToRun,
+        Shard::RetryPolicy::kNotIdempotent);
 
     if (!response.isOK()) {
         return Command::appendCommandStatus(*result, response.getStatus());
     }
+    if (!response.getValue().commandStatus.isOK()) {
+        return Command::appendCommandStatus(*result, response.getValue().commandStatus);
+    }
+    if (!response.getValue().writeConcernStatus.isOK()) {
+        return Command::appendCommandStatus(*result, response.getValue().writeConcernStatus);
+    }
 
-    result->appendElements(response.getValue());
-    return getStatusFromCommandResult(response.getValue()).isOK();
+    result->appendElements(response.getValue().response);
+    return true;
 }
 
 bool CatalogManagerReplicaSet::runReadCommandForTest(OperationContext* txn,
@@ -1477,14 +1518,20 @@ Status CatalogManagerReplicaSet::applyChunkOpsDeprecated(OperationContext* txn,
     BSONObj cmd = BSON("applyOps" << updateOps << "preCondition" << preCondition
                                   << kWriteConcernField << kMajorityWriteConcern.toBSON());
 
-    auto response = grid.shardRegistry()->runCommandOnConfigWithRetries(
-        txn, "config", cmd, ShardRegistry::kAllRetriableErrors);
+    auto response = Grid::get(txn)->shardRegistry()->getConfigShard()->runCommand(
+        txn,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        "config",
+        cmd,
+        Shard::RetryPolicy::kIdempotent);
 
     if (!response.isOK()) {
         return response.getStatus();
     }
 
-    Status status = getStatusFromCommandResult(response.getValue());
+    Status status = response.getValue().commandStatus.isOK()
+        ? std::move(response.getValue().writeConcernStatus)
+        : std::move(response.getValue().commandStatus);
 
     if (MONGO_FAIL_POINT(failApplyChunkOps)) {
         status = Status(ErrorCodes::InternalError, "Failpoint 'failApplyChunkOps' generated error");
@@ -1517,7 +1564,7 @@ Status CatalogManagerReplicaSet::applyChunkOpsDeprecated(OperationContext* txn,
                                    << "operation metadata: " << causedBy(chunkStatus)
                                    << ". applyChunkOpsDeprecated failed to get confirmation "
                                    << "of commit. Unable to save chunk ops. Command: " << cmd
-                                   << ". Result: " << response.getValue();
+                                   << ". Result: " << response.getValue().response;
         } else if (!newestChunk.empty()) {
             invariant(newestChunk.size() == 1);
             log() << "chunk operation commit confirmed";
@@ -1526,7 +1573,7 @@ Status CatalogManagerReplicaSet::applyChunkOpsDeprecated(OperationContext* txn,
             errMsg = str::stream() << "chunk operation commit failed: version "
                                    << lastChunkVersion.toString() << " doesn't exist in namespace"
                                    << nss << ". Unable to save chunk ops. Command: " << cmd
-                                   << ". Result: " << response.getValue();
+                                   << ". Result: " << response.getValue().response;
         }
         return Status(status.code(), errMsg);
     }
@@ -1551,14 +1598,13 @@ void CatalogManagerReplicaSet::writeConfigServerDirect(OperationContext* txn,
         return;
     }
 
-    _runBatchWriteCommand(txn, batchRequest, batchResponse, ShardRegistry::kNotMasterErrors);
+    _runBatchWriteCommand(txn, batchRequest, batchResponse, Shard::RetryPolicy::kNotIdempotent);
 }
 
-void CatalogManagerReplicaSet::_runBatchWriteCommand(
-    OperationContext* txn,
-    const BatchedCommandRequest& batchRequest,
-    BatchedCommandResponse* batchResponse,
-    const ShardRegistry::ErrorCodesSet& errorsToCheck) {
+void CatalogManagerReplicaSet::_runBatchWriteCommand(OperationContext* txn,
+                                                     const BatchedCommandRequest& batchRequest,
+                                                     BatchedCommandResponse* batchResponse,
+                                                     Shard::RetryPolicy retryPolicy) {
     const std::string dbname = batchRequest.getNS().db().toString();
     invariant(dbname == "config" || dbname == "admin");
 
@@ -1567,30 +1613,19 @@ void CatalogManagerReplicaSet::_runBatchWriteCommand(
     const BSONObj cmdObj = batchRequest.toBSON();
 
     for (int retry = 1; retry <= kMaxWriteRetry; ++retry) {
-        // runCommandOnConfigWithRetries already does its own retries based on the generic command
-        // errors. If this fails, we know that it has done all the retries that it could do so there
-        // is no need to retry anymore.
-        auto response =
-            grid.shardRegistry()->runCommandOnConfigWithRetries(txn, dbname, cmdObj, errorsToCheck);
-        if (!response.isOK()) {
-            toBatchError(response.getStatus(), batchResponse);
-            return;
-        }
+        auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
+        auto response = configShard->runCommand(
+            txn,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            dbname,
+            cmdObj,
+            Shard::RetryPolicy::kNoRetry);  // We're handling our own retries here.
 
-        string errmsg;
-        if (!batchResponse->parseBSON(response.getValue(), &errmsg)) {
-            toBatchError(
-                Status(ErrorCodes::FailedToParse,
-                       str::stream() << "Failed to parse config server response: " << errmsg),
-                batchResponse);
-            return;
-        }
-
-        // If one of the write operations failed (which is reported in the error details), see if
-        // this is a retriable error as well.
-        Status status = batchResponse->toStatus();
-        if (errorsToCheck.count(status.code()) && retry < kMaxWriteRetry) {
-            LOG(1) << "Command failed with retriable error and will be retried" << causedBy(status);
+        Status status = _processBatchWriteResponse(response, batchResponse);
+        if (retry < kMaxWriteRetry && configShard->isRetriableError(status.code(), retryPolicy)) {
+            batchResponse->clear();
+            LOG(1) << "Batch write command failed with retriable error and will be retried"
+                   << causedBy(status);
             continue;
         }
 
@@ -1618,7 +1653,7 @@ Status CatalogManagerReplicaSet::insertConfigDocument(OperationContext* txn,
 
     for (int retry = 1; retry <= kMaxWriteRetry; retry++) {
         BatchedCommandResponse response;
-        _runBatchWriteCommand(txn, request, &response, ShardRegistry::kNotMasterErrors);
+        _runBatchWriteCommand(txn, request, &response, Shard::RetryPolicy::kNotIdempotent);
 
         Status status = response.toStatus();
 
@@ -1694,7 +1729,7 @@ StatusWith<bool> CatalogManagerReplicaSet::updateConfigDocument(OperationContext
     request.setWriteConcern(kMajorityWriteConcern.toBSON());
 
     BatchedCommandResponse response;
-    _runBatchWriteCommand(txn, request, &response, ShardRegistry::kAllRetriableErrors);
+    _runBatchWriteCommand(txn, request, &response, Shard::RetryPolicy::kIdempotent);
 
     Status status = response.toStatus();
     if (!status.isOK()) {
@@ -1724,7 +1759,7 @@ Status CatalogManagerReplicaSet::removeConfigDocuments(OperationContext* txn,
     request.setWriteConcern(kMajorityWriteConcern.toBSON());
 
     BatchedCommandResponse response;
-    _runBatchWriteCommand(txn, request, &response, ShardRegistry::kAllRetriableErrors);
+    _runBatchWriteCommand(txn, request, &response, Shard::RetryPolicy::kIdempotent);
 
     return response.toStatus();
 }
@@ -1814,13 +1849,31 @@ Status CatalogManagerReplicaSet::_createCappedConfigCollection(OperationContext*
                                                                StringData collName,
                                                                int cappedSize) {
     BSONObj createCmd = BSON("create" << collName << "capped" << true << "size" << cappedSize);
-    auto result = grid.shardRegistry()->runCommandOnConfigWithRetries(
-        txn, "config", createCmd, ShardRegistry::kAllRetriableErrors);
+
+    auto result = Grid::get(txn)->shardRegistry()->getConfigShard()->runCommand(
+        txn,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        "config",
+        createCmd,
+        Shard::RetryPolicy::kIdempotent);
+
     if (!result.isOK()) {
         return result.getStatus();
     }
 
-    return getStatusFromCommandResult(result.getValue());
+    if (!result.getValue().commandStatus.isOK()) {
+        if (result.getValue().commandStatus == ErrorCodes::NamespaceExists) {
+            if (result.getValue().writeConcernStatus.isOK()) {
+                return Status::OK();
+            } else {
+                return result.getValue().writeConcernStatus;
+            }
+        } else {
+            return result.getValue().commandStatus;
+        }
+    }
+
+    return result.getValue().writeConcernStatus;
 }
 
 StatusWith<long long> CatalogManagerReplicaSet::_runCountCommandOnConfig(OperationContext* txn,
