@@ -122,20 +122,6 @@ VersionChoice chooseNewestVersion(ChunkVersion prevLocalVersion,
     return VersionChoice::Remote;
 }
 
-Date_t getDeadlineFromMaxTimeMS(OperationContext* txn) {
-    auto remainingTime = txn->getRemainingMaxTimeMicros();
-    if (remainingTime == 0) {
-        return Date_t::max();
-    }
-
-    if (remainingTime == 1) {
-        // 1 means maxTimeMS has exceeded.
-        return Date_t::now();
-    }
-
-    return Date_t::now() + Microseconds(static_cast<int64_t>(remainingTime));
-}
-
 /**
  * Updates the config server field of the shardIdentity document with the given connection string
  * if setName is equal to the config server replica set name.
@@ -401,7 +387,7 @@ void ShardingState::initializeFromConfigConnString(OperationContext* txn, const 
         }
     }
 
-    uassertStatusOK(_waitForInitialization(getDeadlineFromMaxTimeMS(txn)));
+    uassertStatusOK(_waitForInitialization(txn->getDeadline()));
     uassertStatusOK(reloadShardRegistryUntilSuccess(txn));
     updateConfigServerOpTimeFromMetadata(txn);
 }
@@ -432,8 +418,7 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* txn) {
         return parseStatus.getStatus();
     }
 
-    auto status =
-        initializeFromShardIdentity(parseStatus.getValue(), getDeadlineFromMaxTimeMS(txn));
+    auto status = initializeFromShardIdentity(parseStatus.getValue(), txn->getDeadline());
     if (!status.isOK()) {
         return status;
     }
@@ -636,7 +621,7 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
                                        ChunkVersion* latestShardVersion) {
     invariant(!txn->lockState()->isLocked());
 
-    Status status = _waitForInitialization(getDeadlineFromMaxTimeMS(txn));
+    Status status = _waitForInitialization(txn->getDeadline());
     if (!status.isOK())
         return status;
 

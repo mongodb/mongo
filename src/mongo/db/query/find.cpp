@@ -323,7 +323,12 @@ QueryResult::View getMore(OperationContext* txn,
 
         // If the operation that spawned this cursor had a time limit set, apply leftover
         // time to this getmore.
-        txn->setMaxTimeMicros(cc->getLeftoverMaxTimeMicros());
+        if (cc->getLeftoverMaxTimeMicros() < Microseconds::max()) {
+            uassert(40136,
+                    "Illegal attempt to set operation deadline within DBDirectClient",
+                    !txn->getClient()->isInDirectClient());
+            txn->setDeadlineAfterNowBy(cc->getLeftoverMaxTimeMicros());
+        }
         txn->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
 
         // Ensure that the original query or command object is available in the slow query log,
@@ -547,7 +552,12 @@ std::string runQuery(OperationContext* txn,
     }
 
     // Handle query option $maxTimeMS (not used with commands).
-    txn->setMaxTimeMicros(static_cast<unsigned long long>(pq.getMaxTimeMS()) * 1000);
+    if (pq.getMaxTimeMS() > 0) {
+        uassert(40116,
+                "Illegal attempt to set operation deadline within DBDirectClient",
+                !txn->getClient()->isInDirectClient());
+        txn->setDeadlineAfterNowBy(Milliseconds{pq.getMaxTimeMS()});
+    }
     txn->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
 
     // uassert if we are not on a primary, and not a secondary with SlaveOk query parameter set.

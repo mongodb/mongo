@@ -1095,14 +1095,11 @@ ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext
         // for a new snapshot.
         if (isMajorityReadConcern) {
             // Wait for a snapshot that meets our needs (< targetOpTime).
-            const auto waitTime = txn->isMaxTimeSet()
-                ? Microseconds(static_cast<int64_t>(txn->getRemainingMaxTimeMicros()))
-                : Microseconds{0};
-            const auto waitForever = waitTime == Microseconds{0};
-            LOG(2) << "waitUntilOpTime: waiting for a new snapshot to occur for micros: "
-                   << waitTime;
-            if (!waitForever) {
-                _currentCommittedSnapshotCond.wait_for(lock, waitTime.toSystemDuration());
+            if (txn->hasDeadline()) {
+                LOG(2) << "waitUntilOpTime: waiting for a new snapshot to occur until: "
+                       << txn->getDeadline();
+                _currentCommittedSnapshotCond.wait_until(lock,
+                                                         txn->getDeadline().toSystemTimePoint());
             } else {
                 _currentCommittedSnapshotCond.wait(lock);
             }
@@ -1116,10 +1113,8 @@ ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext
         WaiterInfo waitInfo(&_opTimeWaiterList, txn->getOpID(), &targetOpTime, nullptr, &condVar);
 
         LOG(3) << "Waiting for OpTime: " << waitInfo;
-        if (txn->isMaxTimeSet()) {
-            condVar.wait_for(lock,
-                             Microseconds(static_cast<int64_t>(txn->getRemainingMaxTimeMicros()))
-                                 .toSystemDuration());
+        if (txn->hasDeadline()) {
+            condVar.wait_until(lock, txn->getDeadline().toSystemTimePoint());
         } else {
             condVar.wait(lock);
         }
@@ -1545,12 +1540,7 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitRepl
                 Status(ErrorCodes::ShutdownInProgress, "Replication is being shut down"), elapsed);
         }
 
-        const Microseconds maxTimeMicrosRemaining{
-            static_cast<int64_t>(txn->getRemainingMaxTimeMicros())};
-        Microseconds waitTime = Microseconds::max();
-        if (maxTimeMicrosRemaining != Microseconds::zero()) {
-            waitTime = maxTimeMicrosRemaining;
-        }
+        Microseconds waitTime = txn->getRemainingMaxTimeMicros();
         if (writeConcern.wTimeout != WriteConcernOptions::kNoTimeout) {
             waitTime =
                 std::min<Microseconds>(Milliseconds{writeConcern.wTimeout} - elapsed, waitTime);
@@ -3340,11 +3330,10 @@ void ReplicationCoordinatorImpl::waitUntilSnapshotCommitted(OperationContext* tx
     stdx::unique_lock<stdx::mutex> lock(_mutex);
 
     while (!_currentCommittedSnapshot || _currentCommittedSnapshot->name < untilSnapshot) {
-        Microseconds waitTime(static_cast<int64_t>(txn->getRemainingMaxTimeMicros()));
-        if (waitTime == Microseconds(0)) {
+        if (!txn->hasDeadline()) {
             _currentCommittedSnapshotCond.wait(lock);
         } else {
-            _currentCommittedSnapshotCond.wait_for(lock, waitTime.toSystemDuration());
+            _currentCommittedSnapshotCond.wait_until(lock, txn->getDeadline().toSystemTimePoint());
         }
         txn->checkForInterrupt();
     }

@@ -58,6 +58,7 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
+#include "mongo/util/represent_as.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/version.h"
 
@@ -147,6 +148,25 @@ void warnOnMultiVersion(const vector<ClusterStatistics::ShardStatistics>& cluste
     warning() << sb.str();
 }
 
+void appendOperationDeadlineIfSet(OperationContext* txn, BSONObjBuilder* cmdBuilder) {
+    if (!txn->hasDeadline()) {
+        return;
+    }
+    // Treat a remaining max time less than 1ms as 1ms, since any smaller is treated as infinity
+    // or an error on the receiving node.
+    const auto remainingMicros = std::max(txn->getRemainingMaxTimeMicros(), Microseconds{1000});
+    const auto maxTimeMsArg = representAs<int32_t>(durationCount<Milliseconds>(remainingMicros));
+
+    // We know that remainingMicros > 1000us, so if maxTimeMsArg is not engaged, it is because
+    // remainingMicros was too big to represent as a 32-bit signed integer number of
+    // milliseconds. In that case, we omit a maxTimeMs argument on the command, implying "no max
+    // time".
+    if (!maxTimeMsArg) {
+        return;
+    }
+    cmdBuilder->append(LiteParsedQuery::cmdOptionMaxTimeMS, *maxTimeMsArg);
+}
+
 /**
  * Blocking method, which requests a single chunk migration to run.
  */
@@ -178,9 +198,7 @@ Status executeSingleMigration(OperationContext* txn,
         maxChunkSizeBytes,
         secondaryThrottle,
         waitForDelete);
-    builder.append(LiteParsedQuery::cmdOptionMaxTimeMS,
-                   durationCount<Milliseconds>(
-                       Microseconds(static_cast<int64_t>(txn->getRemainingMaxTimeMicros()))));
+    appendOperationDeadlineIfSet(txn, &builder);
 
     BSONObj cmdObj = builder.obj();
 

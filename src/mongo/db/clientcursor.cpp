@@ -114,7 +114,7 @@ void ClientCursor::init() {
     _isNoTimeout = false;
 
     _idleAgeMillis = 0;
-    _leftoverMaxTimeMicros = 0;
+    _leftoverMaxTimeMicros = Microseconds::max();
     _pos = 0;
 
     if (_queryOptions & QueryOption_NoCursorTimeout) {

@@ -49,14 +49,6 @@ OperationContextReplMock::OperationContextReplMock(Client* client, unsigned int 
 
 OperationContextReplMock::~OperationContextReplMock() = default;
 
-uint64_t OperationContextReplMock::getRemainingMaxTimeMicros() const {
-    return _maxTimeMicrosRemaining;
-}
-
-void OperationContextReplMock::setRemainingMaxTimeMicros(uint64_t micros) {
-    _maxTimeMicrosRemaining = micros;
-}
-
 void OperationContextReplMock::setReplicatedWrites(bool writesAreReplicated) {
     _writesAreReplicated = writesAreReplicated;
 }

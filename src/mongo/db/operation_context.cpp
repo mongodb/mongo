@@ -39,6 +39,7 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
+#include "mongo/util/system_tick_source.h"
 
 namespace mongo {
 
@@ -72,69 +73,80 @@ MONGO_FP_DECLARE(checkForInterruptFail);
 }  // namespace
 
 OperationContext::OperationContext(Client* client, unsigned int opId, Locker* locker)
-    : _client(client), _opId(opId), _locker(locker) {}
+    : _client(client),
+      _opId(opId),
+      _locker(locker),
+      _elapsedTime(client ? client->getServiceContext()->getTickSource()
+                          : SystemTickSource::get()) {}
 
 void OperationContext::markKilled(ErrorCodes::Error killCode) {
     invariant(killCode != ErrorCodes::OK);
     _killCode.compareAndSwap(ErrorCodes::OK, killCode);
 }
 
-void OperationContext::setDeadlineByDate(Date_t when) {
+void OperationContext::setDeadlineAndMaxTime(Date_t when, Microseconds maxTime) {
+    invariant(!getClient()->isInDirectClient());
+    uassert(40120, "Illegal attempt to change operation deadline", !hasDeadline());
     _deadline = when;
+    _maxTime = maxTime;
 }
 
-void OperationContext::setDeadlineRelativeToNow(Milliseconds maxTimeMs) {
-    auto clock = getServiceContext()->getFastClockSource();
-    setDeadlineByDate(clock->now() + clock->getPrecision() + maxTimeMs);
+void OperationContext::setDeadlineByDate(Date_t when) {
+    Microseconds maxTime;
+    if (when == Date_t::max()) {
+        maxTime = Microseconds::max();
+    } else {
+        maxTime = when - getServiceContext()->getFastClockSource()->now();
+        if (maxTime < Microseconds::zero()) {
+            maxTime = Microseconds::zero();
+        }
+    }
+    setDeadlineAndMaxTime(when, maxTime);
+}
+
+void OperationContext::setDeadlineAfterNowBy(Microseconds maxTime) {
+    Date_t when;
+    if (maxTime < Microseconds::zero()) {
+        maxTime = Microseconds::zero();
+    }
+    if (maxTime == Microseconds::max()) {
+        when = Date_t::max();
+    } else {
+        auto clock = getServiceContext()->getFastClockSource();
+        when = clock->now();
+        if (maxTime > Microseconds::zero()) {
+            when += clock->getPrecision() + maxTime;
+        }
+    }
+    setDeadlineAndMaxTime(when, maxTime);
 }
 
 bool OperationContext::hasDeadlineExpired() const {
+    if (!hasDeadline()) {
+        return false;
+    }
     if (MONGO_FAIL_POINT(maxTimeNeverTimeOut)) {
         return false;
     }
-    if (hasDeadline() && MONGO_FAIL_POINT(maxTimeAlwaysTimeOut)) {
+    if (MONGO_FAIL_POINT(maxTimeAlwaysTimeOut)) {
         return true;
+    }
+
+    // TODO: Remove once all OperationContexts are properly connected to Clients and ServiceContexts
+    // in tests.
+    if (MONGO_unlikely(!getClient() || !getServiceContext())) {
+        return false;
     }
 
     const auto now = getServiceContext()->getFastClockSource()->now();
     return now >= getDeadline();
 }
 
-Milliseconds OperationContext::getTimeUntilDeadline() const {
-    const auto now = getServiceContext()->getFastClockSource()->now();
-    return getDeadline() - now;
-}
-
-void OperationContext::setMaxTimeMicros(uint64_t maxTimeMicros) {
-    const auto maxTimeMicrosSigned = static_cast<int64_t>(maxTimeMicros);
-    if (maxTimeMicrosSigned <= 0) {
-        // Do not adjust the deadline if the user specified "0", meaning "forever", or
-        // if they chose a value too large to represent as a 64-bit signed integer.
-        return;
-    }
-    if (maxTimeMicrosSigned == 1) {
-        // This indicates that the time is already expired. Set the deadline to the epoch.
-        setDeadlineByDate(Date_t{});
-        return;
-    }
-    setDeadlineRelativeToNow(Microseconds{maxTimeMicrosSigned});
-}
-
-bool OperationContext::isMaxTimeSet() const {
-    return hasDeadline();
-}
-
-uint64_t OperationContext::getRemainingMaxTimeMicros() const {
+Microseconds OperationContext::getRemainingMaxTimeMicros() const {
     if (!hasDeadline()) {
-        return 0U;
+        return Microseconds::max();
     }
-    const auto microsRemaining = durationCount<Microseconds>(getTimeUntilDeadline());
-    if (microsRemaining <= 0) {
-        // If the operation deadline has passed, say there is 1 microsecond remaining, to
-        // distinguish from 0, which means infinity.
-        return 1U;
-    }
-    return static_cast<uint64_t>(microsRemaining);
+    return _maxTime - getElapsedTime();
 }
 
 void OperationContext::checkForInterrupt() {
@@ -165,14 +177,10 @@ bool opShouldFail(const OperationContext* opCtx, const BSONObj& failPointInfo) {
 }  // namespace
 
 Status OperationContext::checkForInterruptNoAssert() {
-    // TODO: Remove once all OperationContexts are properly connected to Clients and ServiceContexts
-    // in tests.
-    if (MONGO_unlikely(!getClient() || !getServiceContext() ||
-                       !getServiceContext()->getFastClockSource())) {
-        return Status::OK();
-    }
-
-    if (getServiceContext() && getServiceContext()->getKillAllOperations()) {
+    // TODO: Remove the MONGO_likely(getClient()) once all operation contexts are constructed with
+    // clients.
+    if (MONGO_likely(getClient() && getServiceContext()) &&
+        getServiceContext()->getKillAllOperations()) {
         return Status(ErrorCodes::InterruptedAtShutdown, "interrupted at shutdown");
     }
 

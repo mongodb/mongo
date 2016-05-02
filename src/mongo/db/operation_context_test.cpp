@@ -29,11 +29,13 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/tick_source_mock.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -47,24 +49,79 @@ public:
         mockClock = uniqueMockClock.get();
         service = stdx::make_unique<ServiceContextNoop>();
         service->setFastClockSource(std::move(uniqueMockClock));
+        service->setTickSource(stdx::make_unique<TickSourceMock>());
+        client = service->makeClient("OperationDeadlineTest");
     }
 
     ClockSourceMock* mockClock;
     std::unique_ptr<ServiceContext> service;
+    ServiceContext::UniqueClient client;
 };
 
 TEST_F(OperationDeadlineTests, OperationDeadlineExpiration) {
-    auto client = service->makeClient("CurOpTest");
     auto txn = client->makeOperationContext();
-    txn->setMaxTimeMicros(durationCount<Microseconds>(Seconds{1}));
+    txn->setDeadlineAfterNowBy(Seconds{1});
     mockClock->advance(Milliseconds{500});
     ASSERT_OK(txn->checkForInterruptNoAssert());
+
+    // 1ms before relative deadline reports no interrupt
     mockClock->advance(Milliseconds{499});
     ASSERT_OK(txn->checkForInterruptNoAssert());
+
+    // Exactly at deadline reports no interrupt, because setDeadlineAfterNowBy adds one clock
+    // precision unit to the deadline, to ensure that the deadline does not expire in less than the
+    // requested amount of time.
+    mockClock->advance(Milliseconds{1});
+    ASSERT_OK(txn->checkForInterruptNoAssert());
+
+    // Since the mock clock's precision is 1ms, at test start + 1001 ms, we expect
+    // checkForInterruptNoAssert to return ExceededTimeLimit.
     mockClock->advance(Milliseconds{1});
     ASSERT_EQ(ErrorCodes::ExceededTimeLimit, txn->checkForInterruptNoAssert());
+
+    // Also at times greater than start + 1001ms, we expect checkForInterruptNoAssert to keep
+    // returning ExceededTimeLimit.
     mockClock->advance(Milliseconds{1});
     ASSERT_EQ(ErrorCodes::ExceededTimeLimit, txn->checkForInterruptNoAssert());
+}
+
+template <typename D>
+void assertLargeRelativeDeadlineLikeInfinity(Client& client, D maxTime) {
+    auto txn = client.makeOperationContext();
+    txn->setDeadlineAfterNowBy(maxTime);
+    ASSERT_FALSE(txn->hasDeadline()) << "Tried to set maxTime to " << maxTime;
+}
+
+TEST_F(OperationDeadlineTests, VeryLargeRelativeDeadlinesHours) {
+    ASSERT_FALSE(client->makeOperationContext()->hasDeadline());
+    assertLargeRelativeDeadlineLikeInfinity(*client, Hours::max());
+}
+
+TEST_F(OperationDeadlineTests, VeryLargeRelativeDeadlinesMinutes) {
+    assertLargeRelativeDeadlineLikeInfinity(*client, Minutes::max());
+}
+
+TEST_F(OperationDeadlineTests, VeryLargeRelativeDeadlinesSeconds) {
+    assertLargeRelativeDeadlineLikeInfinity(*client, Seconds::max());
+}
+
+TEST_F(OperationDeadlineTests, VeryLargeRelativeDeadlinesMilliseconds) {
+    assertLargeRelativeDeadlineLikeInfinity(*client, Milliseconds::max());
+}
+
+TEST_F(OperationDeadlineTests, VeryLargeRelativeDeadlinesMicroseconds) {
+    assertLargeRelativeDeadlineLikeInfinity(*client, Microseconds::max());
+}
+
+TEST_F(OperationDeadlineTests, VeryLargeRelativeDeadlinesNanoseconds) {
+    // Nanoseconds::max() is less than Microseconds::max(), so it is possible to set
+    // a deadline of that duration.
+    auto txn = client->makeOperationContext();
+    txn->setDeadlineAfterNowBy(Nanoseconds::max());
+    ASSERT_TRUE(txn->hasDeadline());
+    ASSERT_EQ(mockClock->now() + mockClock->getPrecision() +
+                  duration_cast<Milliseconds>(Nanoseconds::max()),
+              txn->getDeadline());
 }
 
 }  // namespace

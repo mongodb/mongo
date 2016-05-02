@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/time_support.h"
+
 
 namespace mongo {
 
@@ -74,6 +76,10 @@ public:
 
     inline long long micros() const {
         return static_cast<long long>((now() - _old) * _microsPerCount);
+    }
+
+    Microseconds elapsed() const {
+        return Microseconds{micros()};
     }
 
     inline void reset() {
