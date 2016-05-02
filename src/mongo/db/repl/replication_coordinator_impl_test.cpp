@@ -2400,6 +2400,10 @@ TEST_F(ReplCoordTest, IsMaster) {
     getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 
+    time_t lastWriteDate = 100;
+    OpTime opTime = OpTime(Timestamp(lastWriteDate, 2), 1);
+    getReplCoord()->setMyLastAppliedOpTime(opTime);
+
     IsMasterResponse response;
     getReplCoord()->fillIsMasterForReplSet(&response);
 
@@ -2434,9 +2438,42 @@ TEST_F(ReplCoordTest, IsMaster) {
     ASSERT_EQUALS(2U, tags.size());
     ASSERT_EQUALS("value1", tags["key1"]);
     ASSERT_EQUALS("value2", tags["key2"]);
+    ASSERT_EQUALS(opTime, response.getLastWriteOpTime());
+    ASSERT_EQUALS(lastWriteDate, response.getLastWriteDate());
 
     IsMasterResponse roundTripped;
     ASSERT_OK(roundTripped.initialize(response.toBSON()));
+}
+
+TEST_F(ReplCoordTest, IsMasterWithCommittedSnapshot) {
+    init("mySet");
+
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "test1:1234"))),
+                       HostAndPort("test1", 1234));
+    OperationContextReplMock txn;
+    runSingleNodeElection(getReplCoord());
+
+    time_t lastWriteDate = 101;
+    OpTime opTime = OpTime(Timestamp(lastWriteDate, 2), 1);
+    time_t majorityWriteDate = 100;
+    OpTime majorityOpTime = OpTime(Timestamp(majorityWriteDate, 1), 1);
+
+    getReplCoord()->setMyLastAppliedOpTime(opTime);
+    getReplCoord()->setMyLastDurableOpTime(opTime);
+    getReplCoord()->onSnapshotCreate(majorityOpTime, SnapshotName(1));
+    ASSERT_EQUALS(majorityOpTime, getReplCoord()->getCurrentCommittedSnapshotOpTime());
+
+    IsMasterResponse response;
+    getReplCoord()->fillIsMasterForReplSet(&response);
+
+    ASSERT_EQUALS(opTime, response.getLastWriteOpTime());
+    ASSERT_EQUALS(lastWriteDate, response.getLastWriteDate());
+    ASSERT_EQUALS(majorityOpTime, response.getLastMajorityWriteOpTime());
+    ASSERT_EQUALS(majorityWriteDate, response.getLastMajorityWriteDate());
 }
 
 TEST_F(ReplCoordTest, LogAMessageWhenShutDownBeforeReplicationStartUpFinished) {

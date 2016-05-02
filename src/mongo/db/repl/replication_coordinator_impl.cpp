@@ -1962,6 +1962,13 @@ void ReplicationCoordinatorImpl::fillIsMasterForReplSet(IsMasterResponse* respon
         _topCoord->fillIsMasterForReplSet(response);
     }
 
+    OpTime lastOpTime = getMyLastAppliedOpTime();
+    response->setLastWrite(lastOpTime, lastOpTime.getTimestamp().getSecs());
+    if (_currentCommittedSnapshot) {
+        OpTime majorityOpTime = _currentCommittedSnapshot->opTime;
+        response->setLastMajorityWrite(majorityOpTime, majorityOpTime.getTimestamp().getSecs());
+    }
+
     if (isWaitingForApplierToDrain()) {
         // Report that we are secondary to ismaster callers until drain completes.
         response->setIsMaster(false);
