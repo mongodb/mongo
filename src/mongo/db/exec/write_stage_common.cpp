@@ -60,6 +60,10 @@ bool ensureStillMatches(const Collection* collection,
             // No longer matches.
             return false;
         }
+
+        // Ensure that the BSONObj underlying the WorkingSetMember is owned because the cursor's
+        // destructor is allowed to free the memory.
+        member->makeObjOwnedIfNeeded();
     }
     return true;
 }
