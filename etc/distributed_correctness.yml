@@ -7,12 +7,12 @@ pre:
 post:
     - command: attach.results
       params:
-        file_location: src/report.json
+        file_location: src/dsi/dsi/report.json
     - command: shell.cleanup
     - command: shell.exec
       # destroy the cluster
       params:
-        working_dir: dsi
+        working_dir: src/dsi/dsi
         script: |
           set -e
           set -v
@@ -26,22 +26,22 @@ functions:
         script: |
           rm -rf ./*
           mkdir src
-    - command: shell.exec
-      # checkout dsi code
+    - command: git.get_project
       params:
-        script: |
-          set -e
-          set -v
-          git clone git@github.com:10gen/dsi.git
-          cd dsi
-          # setup execution environment
-          ./bin/setup-dsi-env.sh
-    - command: shell.exec
+        directory: src
+        revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
+          dsi: ${dsi_rev}
+          workloads: ${workloads_rev}
+    - command: git.apply_patch
       params:
-        working_dir: dsi
-        # configure environment, has private information, no logging
+        directory: src
+    - command: shell.exec
+      # configure environment, has private information, no logging
+      params:
+        working_dir: src/dsi/dsi
         silent: true
         script: |
+          ./bin/setup-dsi-env.sh
           cd ./clusters/${cluster}
           # stage aws credential for terraform
           cp ../../terraform/* .
@@ -54,7 +54,7 @@ functions:
     - command: shell.exec
       # bring up the cluster
       params:
-        working_dir: dsi
+        working_dir: src/dsi/dsi
         silent: true
         script: |
           # to create a mongod EC2 cluster
@@ -70,7 +70,7 @@ functions:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: "dsi/clusters/${cluster}/cluster_config.tgz"
+        local_file: "src/dsi/dsi/clusters/${cluster}/cluster_config.tgz"
         remote_file: dsi/${build_variant}/${revision}/cluster_configs/cluster_config-${build_id}.tgz
         bucket: mciuploads
         permissions: public-read
@@ -84,10 +84,10 @@ functions:
         aws_secret: ${aws_secret}
         remote_file: dsi/${build_variant}/${revision}/cluster_configs/cluster_config-${build_id}.tgz
         bucket: mciuploads
-        local_file: "dsi/clusters/${cluster}/cluster_config.tgz"
+        local_file: "src/dsi/dsi/clusters/${cluster}/cluster_config.tgz"
     - command: shell.exec
       params:
-        working_dir: dsi
+        working_dir: src/dsi/dsi
         silent: true
         script: |
           set -e
@@ -99,7 +99,7 @@ functions:
     - command: shell.exec
       # bring up the mongod
       params:
-        working_dir: dsi
+        working_dir: src/dsi/dsi
         script: |
           set -e
           set -v
@@ -110,7 +110,7 @@ functions:
   "run test":
     - command: shell.exec
       params:
-        working_dir: dsi
+        working_dir: src/dsi/dsi
         script: |
           set -e
           set -v
@@ -121,10 +121,10 @@ functions:
     - command: "json.send"
       params:
          name: "perf"
-         file: "dsi/clusters/perf.json"
+         file: "src/dsi/dsi/clusters/perf.json"
     - command: shell.exec
       params:
-        working_dir: dsi
+        working_dir: src/dsi/dsi
         script: |
           set -e
           set -v
@@ -135,7 +135,7 @@ functions:
     - command: shell.exec
       # destroy the cluster
       params:
-        working_dir: dsi
+        working_dir: src/dsi/dsi
         script: |
           set -e
           set -v
@@ -147,7 +147,7 @@ functions:
   "make test log artifact":
     - command: shell.exec
       params:
-        working_dir: dsi
+        working_dir: src/dsi/dsi
         script: |
           set -e
           set -v
@@ -162,7 +162,7 @@ functions:
     - command: archive.targz_pack
       params:
         target: "reports.tgz"
-        source_dir: "dsi/clusters"
+        source_dir: "src/dsi/dsi/clusters"
         include:
           - "reports/**"
 
@@ -182,23 +182,23 @@ functions:
     - command: json.get_history
       params:
         task: ${task_name}
-        file: "src/history.json"
+        file: "src/dsi/dsi/history.json"
         name: "perf"
     - command: json.get_history
       params:
         tags: true
         task: ${task_name}
-        file: "src/tags.json"
+        file: "src/dsi/dsi/tags.json"
         name: "perf"
     - command: shell.exec
       # post_run_check.py and override.json for DSI tests is part of dsi repo in dsi/bin
       type : test
       params:
-        working_dir: src
+        working_dir: src/dsi/dsi
         script: |
           set -o errexit
           set -v
-          python ../dsi/bin/distributed_correctness_analyze.py
+          python ./bin/distributed_correctness_analyze.py
 
 #######################################
 #               Tasks                 #
@@ -293,6 +293,23 @@ tasks:
     - func: "analyze"
 
 #######################################
+#               Modules               #
+#######################################
+# if a module is added and to be added to the manifest
+# be sure to add the module to git.get_project revisions parameter
+modules:
+- name: dsi
+  repo: git@github.com:10gen/dsi.git
+  prefix: dsi
+  branch: master
+
+- name: workloads
+  repo: git@github.com:10gen/workloads.git
+  prefix: workloads
+  branch: master
+
+
+#######################################
 #            Buildvariants            #
 #######################################
 
@@ -301,6 +318,9 @@ buildvariants:
 - name: linux-standalone
   display_name: Linux Standalone
   batchtime: 1440 # 24 hours
+  modules: &modules
+    - dsi
+    - workloads
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ --release
     setup: standalone
@@ -317,6 +337,7 @@ buildvariants:
 - name: linux-3-node-replSet
   display_name: Linux 3-Node ReplSet
   batchtime: 1440 # 24 hours
+  modules: *modules
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ --release
     setup: replica

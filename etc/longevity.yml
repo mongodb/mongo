@@ -7,12 +7,12 @@ pre:
 post:
     - command: attach.results
       params:
-        file_location: src/report.json
+        file_location: src/dsi/dsi/report.json
     - command: shell.cleanup
     - command: shell.exec
       # destroy the cluster
       params:
-        working_dir: dsi
+        working_dir: src/dsi/dsi
         script: |
           set -e
           set -o verbose
@@ -29,25 +29,26 @@ functions:
         script: |
           rm -rf ./*
           mkdir src
-    - command: shell.exec
-      # checkout and setup DSI environment
+    - command: git.get_project
       params:
-        script: |
-          set -e
-          set -v
-          git clone git@github.com:10gen/dsi.git
-          cd dsi
-          # setup execution environment
-          ./bin/setup-dsi-env.sh
+        directory: src
+        revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
+          dsi: ${dsi_rev}
+          ycsb: ${ycsb_rev}
+    - command: git.apply_patch
+      params:
+        directory: src
     - command: shell.exec
       # configure environment, has private information, no logging
       params:
-        working_dir: dsi
+        working_dir: src/dsi/dsi
         silent: true
         script: |
+          ./bin/setup-dsi-env.sh
           cd ./clusters/${cluster}
           # stage aws credential for terraform
-          ../../bin/make_terraform_env.sh ${terraform_key} ${terraform_secret} https://s3.amazonaws.com/mciuploads/longevity/${build_variant}/${revision}/mongodb-${build_id}.tar.gz
+          cp ../../terraform/* . #I think this should be done in DSI, since it's pulling down terraform. Or we should pull down terraform in this script
+         ../../bin/make_terraform_env.sh ${terraform_key} ${terraform_secret} https://s3.amazonaws.com/mciuploads/longevity/${build_variant}/${revision}/mongodb-${build_id}.tar.gz
           # generate aws private key file
           echo "${ec2_pem}" > ../../keys/aws.pem
           chmod 400 ../../keys/aws.pem
@@ -56,7 +57,7 @@ functions:
     - command: shell.exec
       # bring up the cluster
       params:
-        working_dir: dsi
+        working_dir: src/dsi/dsi
         silent: true
         script: |
           # to create a mongod EC2 cluster
@@ -70,7 +71,7 @@ functions:
     - command: shell.exec
       # bring up the mongod
       params:
-        working_dir: dsi
+        working_dir: src/dsi/dsi
         script: |
           set -e
           set -o verbose
@@ -81,7 +82,7 @@ functions:
   "run test":
     - command: shell.exec
       params:
-        working_dir: dsi
+        working_dir: src/dsi/dsi
         script: |
           set -e
           set -v
@@ -94,13 +95,13 @@ functions:
     - command: "json.send"
       params:
           name: "perf"
-          file: "dsi/clusters/perf.json"
+          file: "src/dsi/dsi/clusters/perf.json"
 
   "destroy cluster":
     - command: shell.exec
       # destroy the cluster
       params:
-        working_dir: dsi
+        working_dir: src/dsi/dsi
         script: |
           set -e
           set -o verbose
@@ -119,7 +120,7 @@ functions:
     - command: shell.exec
       # destroy the cluster
       params:
-        working_dir: dsi
+        working_dir: src/dsi/dsi
         script: |
           set -e
           set -o verbose
@@ -136,7 +137,7 @@ functions:
     - command: archive.targz_pack
       params:
         target: "reports.tgz"
-        source_dir: "dsi/clusters"
+        source_dir: "src/dsi/dsi/clusters"
         include:
           - "reports/**"
 
@@ -155,7 +156,7 @@ functions:
       params:
             aws_key: ${aws_key}
             aws_secret: ${aws_secret}
-            local_file: dsi/clusters/reports/graphs/timeseries-p1.html
+            local_file: /src/dsi/dsi/clusters/reports/graphs/timeseries-p1.html
             remote_file: dsi/${build_variant}/${revision}/${task_id}/${version_id}/logs/timeseries-p1-${test}-${build_id}.html
             bucket: mciuploads
             permissions: public-read
@@ -166,23 +167,23 @@ functions:
     - command: json.get_history
       params:
         task: ${task_name}
-        file: "src/history.json"
+        file: "src/dsi/dsi/history.json"
         name: "perf"
     - command: json.get_history
       params:
         tags: true
         task: ${task_name}
-        file: "src/tags.json"
+        file: "src/dsi/dsi/tags.json"
         name: "perf"
     - command: shell.exec
       # post_run_check.py and longevity_override.json for DSI tests are part of dsi repo
       type : test
       params:
-        working_dir: src
+        working_dir: src/dsi/dsi
         script: |
           set -o errexit
           set -o verbose
-          python -u ../dsi/analysis/post_run_check.py --rev ${revision} -f history.json -t tags.json --refTag 3.2.1-Baseline --overrideFile ../dsi/analysis/master/longevity_override.json --project_id mongo-longevity --task_name ${task_name} --variant ${build_variant}
+          python -u analysis/post_run_check.py --rev ${revision} -f history.json -t tags.json --refTag 3.2.1-Baseline --overrideFile ../dsi/analysis/master/longevity_override.json --project_id mongo-longevity --task_name ${task_name} --variant ${build_variant}
 
 
 tasks:
@@ -260,10 +261,32 @@ tasks:
     - func: "destroy cluster"
     - func: "analyze"
 
+
+#######################################
+#               Modules               #
+#######################################
+# if a module is added and to be added to the manifest
+# be sure to add the module to git.get_project revisions parameter
+modules:
+- name: dsi
+  repo: git@github.com:10gen/dsi.git
+  prefix: dsi
+  branch: master
+
+- name: ycsb
+  repo: git@github.com:mongodb-labs/YCSB.git
+  prefix: YCSB
+  branch: evergreen
+
+
+
 buildvariants:
 - name: linux-wt-shard
   display_name: Linux WT Shard
   batchtime: 40320 # 4 weeks
+  modules: &modules
+    - dsi
+    - ycsb
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ --release
     setup: shard
@@ -282,6 +305,7 @@ buildvariants:
 - name: linux-mmapv1-shard
   display_name: Linux MMAPv1 Shard
   batchtime: 40320 # 4 week
+  modules: *modules
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ --release
     setup: shard
