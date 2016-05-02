@@ -59,7 +59,7 @@ class WiredTigerSizeStorer;
 extern const std::string kWiredTigerEngineName;
 typedef std::list<RecordId> SortedRecordIds;
 
-class WiredTigerRecordStore : public RecordStore {
+class WiredTigerRecordStore final : public RecordStore {
 public:
     /**
      * Parses collections options for wired tiger configuration string for table creation.
