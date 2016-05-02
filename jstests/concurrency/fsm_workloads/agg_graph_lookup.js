@@ -13,22 +13,28 @@ var $config = (function() {
 
     var states = {
         query: function query(db, collName) {
-            var starting = Math.floor(Math.random() * (this.numDocs + 1));
-            var res = db[collName].aggregate({
-                $graphLookup: {
-                    from: collName,
-                    startWith: {$literal: starting},
-                    connectToField: "_id",
-                    connectFromField: "to",
-                    as: "out"
-                }
-            }).toArray();
+            var limitAmount = 20;
+            var startingId = Random.randInt(this.numDocs - limitAmount);
+            var res = db[collName].aggregate([
+                {$match: {_id: {$gt: startingId}}},
+                {
+                  $graphLookup: {
+                      from: collName,
+                      startWith: "$to",
+                      connectToField: "_id",
+                      connectFromField: "to",
+                      maxDepth: 10,
+                      as: "out",
+                  }
+                },
+                {$limit: limitAmount}
+            ]).toArray();
 
-            assertWhenOwnColl.eq(res.length, this.numDocs);
+            assertWhenOwnColl.eq(res.length, limitAmount);
         },
         update: function update(db, collName) {
-            var index = Math.floor(Math.random() * (this.numDocs + 1));
-            var update = Math.floor(Math.random() * (this.numDocs + 1));
+            var index = Random.randInt(this.numDocs + 1);
+            var update = Random.randInt(this.numDocs + 1);
             var res = db[collName].update({_id: index}, {$set: {to: update}});
             assertWhenOwnColl.writeOK(res);
         }
@@ -57,7 +63,7 @@ var $config = (function() {
 
     return {
         threadCount: 10,
-        iterations: 1000,
+        iterations: 100,
         states: states,
         startState: 'query',
         transitions: transitions,
