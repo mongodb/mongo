@@ -161,8 +161,10 @@ functions:
           if [ -f "../terraform.log" ]; then cp ../terraform.log .; fi
           cp ../../perf.json .
           cd ..
+          mkdir -p ./reports/graphs
+          touch ./reports/graphs/timeseries-p1.html
           ../../bin/retrieve-diag-data.sh
-          ../../bin/generate-timeseries-html.sh
+          ../../bin/generate-timeseries-html.sh || true
           rm -rf ../reports
           mv reports ../
     - command: archive.targz_pack
