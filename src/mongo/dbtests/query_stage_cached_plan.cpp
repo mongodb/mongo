@@ -47,11 +47,9 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/util/clock_source_mock.h"
 
 namespace QueryStageCachedPlan {
 
-const std::unique_ptr<ClockSource> clockSource = stdx::make_unique<ClockSourceMock>();
 static const NamespaceString nss("unittests.QueryStageCachedPlan");
 
 class QueryStageCachedPlanBase {
@@ -143,7 +141,7 @@ public:
             &_txn, collection, &_ws, cq.get(), plannerParams, decisionWorks, mockChild.release());
 
         // This should succeed after triggering a replan.
-        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, clockSource.get());
+        PlanYieldPolicy yieldPolicy(nullptr, PlanExecutor::YIELD_MANUAL);
         ASSERT_OK(cachedPlanStage.pickBestPlan(&yieldPolicy));
 
         // Make sure that we get 2 legit results back.
@@ -212,7 +210,7 @@ public:
             &_txn, collection, &_ws, cq.get(), plannerParams, decisionWorks, mockChild.release());
 
         // This should succeed after triggering a replan.
-        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, clockSource.get());
+        PlanYieldPolicy yieldPolicy(nullptr, PlanExecutor::YIELD_MANUAL);
         ASSERT_OK(cachedPlanStage.pickBestPlan(&yieldPolicy));
 
         // Make sure that we get 2 legit results back.

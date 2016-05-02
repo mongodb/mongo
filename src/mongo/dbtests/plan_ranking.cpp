@@ -50,12 +50,9 @@
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/query/stage_builder.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/clock_source_mock.h"
+
 
 namespace mongo {
-
-const std::unique_ptr<ClockSource> clockSource = stdx::make_unique<ClockSourceMock>();
 
 // How we access the external setParameter testing bool.
 extern std::atomic<bool> internalQueryForceIntersectionPlans;  // NOLINT
@@ -132,7 +129,7 @@ public:
             _mps->addPlan(solutions[i], root, ws.get());
         }
         // This is what sets a backup plan, should we test for it.
-        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, clockSource.get());
+        PlanYieldPolicy yieldPolicy(NULL, PlanExecutor::YIELD_MANUAL);
         _mps->pickBestPlan(&yieldPolicy);
         ASSERT(_mps->bestPlanChosen());
 

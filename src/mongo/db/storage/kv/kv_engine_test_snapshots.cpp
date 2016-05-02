@@ -36,9 +36,7 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/snapshot_manager.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
 namespace {
@@ -173,8 +171,7 @@ public:
     }
 
     void setUp() override {
-        service.setFastClockSource(stdx::make_unique<ClockSourceMock>());
-        helper.reset(KVHarnessHelper::create(service.getFastClockSource()));
+        helper.reset(KVHarnessHelper::create());
         engine = helper->getEngine();
         snapshotManager = helper->getEngine()->getSnapshotManager();
 

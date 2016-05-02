@@ -44,7 +44,6 @@
 
 namespace mongo {
 
-class ClockSource;
 class JournalListener;
 class WiredTigerSessionCache;
 class WiredTigerSizeStorer;
@@ -53,7 +52,6 @@ class WiredTigerKVEngine final : public KVEngine {
 public:
     WiredTigerKVEngine(const std::string& canonicalName,
                        const std::string& path,
-                       ClockSource* cs,
                        const std::string& extraOpenOptions,
                        size_t cacheSizeGB,
                        bool durable,

@@ -34,7 +34,6 @@
 
 namespace mongo {
 
-class ClockSource;
 class RecordFetcher;
 
 class PlanYieldPolicy {
@@ -45,12 +44,6 @@ public:
      * locks.
      */
     PlanYieldPolicy(PlanExecutor* exec, PlanExecutor::YieldPolicy policy);
-    /**
-     * Only used in dbtests since we don't have access to a PlanExecutor. Since we don't have
-     * access to the PlanExecutor to grab a ClockSource from, we pass in a ClockSource directly
-     * in the constructor instead.
-     */
-    PlanYieldPolicy(PlanExecutor::YieldPolicy policy, ClockSource* cs);
 
     /**
      * Used by YIELD_AUTO plan executors in order to check whether it is time to yield.

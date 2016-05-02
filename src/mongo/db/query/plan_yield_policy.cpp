@@ -35,27 +35,15 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_yield.h"
-#include "mongo/db/service_context.h"
 #include "mongo/util/scopeguard.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
 
 PlanYieldPolicy::PlanYieldPolicy(PlanExecutor* exec, PlanExecutor::YieldPolicy policy)
     : _policy(policy),
       _forceYield(false),
-      _elapsedTracker(exec->getOpCtx()->getServiceContext()->getFastClockSource(),
-                      internalQueryExecYieldIterations,
-                      Milliseconds(internalQueryExecYieldPeriodMS)),
+      _elapsedTracker(internalQueryExecYieldIterations, internalQueryExecYieldPeriodMS),
       _planYielding(exec) {}
-
-
-PlanYieldPolicy::PlanYieldPolicy(PlanExecutor::YieldPolicy policy, ClockSource* cs)
-    : _policy(policy),
-      _forceYield(false),
-      _elapsedTracker(
-          cs, internalQueryExecYieldIterations, Milliseconds(internalQueryExecYieldPeriodMS)),
-      _planYielding(nullptr) {}
 
 bool PlanYieldPolicy::shouldYield() {
     if (!allowedToYield())
