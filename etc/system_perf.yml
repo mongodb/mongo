@@ -7,7 +7,7 @@ pre:
 post:
     - command: attach.results
       params:
-        file_location: src/report.json
+        file_location: src/dsi/dsi/report.json
     - command: shell.cleanup
     - command: shell.exec
       # destroy the cluster
@@ -178,7 +178,7 @@ functions:
             aws_key: ${aws_key}
             aws_secret: ${aws_secret}
             local_file: reports.tgz
-            remote_file: dsi/${build_variant}/${revision}/${task_id}/${version_id}/logs/${test}-${build_id}.${ext|tgz}
+            remote_file: src/dsi/dsi/${build_variant}/${revision}/${task_id}/${version_id}/logs/${test}-${build_id}.${ext|tgz}
             bucket: mciuploads
             permissions: public-read
             content_type: ${content_type|application/x-gzip}
@@ -187,7 +187,7 @@ functions:
       params:
             aws_key: ${aws_key}
             aws_secret: ${aws_secret}
-            local_file: dsi/clusters/reports/graphs/timeseries-p1.html
+            local_file: src/dsi/dsi/clusters/reports/graphs/timeseries-p1.html
             remote_file: dsi/${build_variant}/${revision}/${task_id}/${version_id}/logs/timeseries-p1-${test}-${build_id}.html
             bucket: mciuploads
             permissions: public-read
@@ -251,7 +251,7 @@ functions:
     - command: "json.send"
       params:
         name: "perf"
-        file: "src/perf.json"
+        file: "src/dsi/dsi/perf.json"
 
 #######################################
 #               Tasks                 #
