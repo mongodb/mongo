@@ -1019,19 +1019,19 @@ public:
             BSONObjSet documentKeySet;
             iam->getKeys(recordBson, &documentKeySet);
 
+            if (descriptor->isPartial()) {
+                const IndexCatalogEntry* ice = _indexCatalog->getEntry(descriptor);
+                if (!ice->getFilterExpression()->matchesBSON(recordBson)) {
+                    continue;
+                }
+            }
+
             if (!descriptor->isMultikey(_txn) && documentKeySet.size() > 1) {
                 string msg = str::stream() << "Index " << descriptor->indexName()
                                            << " is not multi-key but has more than one"
                                            << " key in one or more document(s)";
                 results.errors.push_back(msg);
                 results.valid = false;
-            }
-
-            if (descriptor->isPartial()) {
-                const IndexCatalogEntry* ice = _indexCatalog->getEntry(descriptor);
-                if (!ice->getFilterExpression()->matchesBSON(recordBson)) {
-                    continue;
-                }
             }
 
             for (const auto& key : documentKeySet) {
