@@ -225,6 +225,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context'
     ]
 )
 

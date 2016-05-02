@@ -108,6 +108,7 @@ env.CppUnitTest(
     source='modifier_current_date_test.cpp',
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
         'update',
     ],
 )
@@ -126,6 +127,7 @@ env.CppUnitTest(
     source='modifier_object_replace_test.cpp',
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
         'update',
     ],
 )

@@ -29,8 +29,11 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
 #include "mongo/db/global_timestamp.h"
+#include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/log.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {
@@ -46,7 +49,8 @@ Timestamp getLastSetTimestamp() {
 }
 
 Timestamp getNextGlobalTimestamp() {
-    const unsigned now = Date_t::now().toMillisSinceEpoch() / 1000;
+    const unsigned now = durationCount<Seconds>(
+        getGlobalServiceContext()->getFastClockSource()->now().toDurationSinceEpoch());
 
     // Optimistic approach: just increment the timestamp, assuming the seconds still match.
     auto next = globalTimestamp.addAndFetch(1);
