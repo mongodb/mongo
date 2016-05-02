@@ -1087,10 +1087,26 @@ public:
         _keyCounts[descriptor->indexNamespace()] = numKeys;
 
         if (_level == kValidateFull) {
+            const auto& key = descriptor->keyPattern();
+            BSONObj prevIndexEntryKey;
+            bool isFirstEntry = true;
+
             std::unique_ptr<SortedDataInterface::Cursor> cursor = iam->newCursor(_txn, true);
             // Seeking to BSONObj() is equivalent to seeking to the first entry of an index.
             for (auto indexEntry = cursor->seek(BSONObj(), true); indexEntry;
                  indexEntry = cursor->next()) {
+                // Ensure that the index entries are in increasing or decreasing order.
+                if (!isFirstEntry && (indexEntry->key).woCompare(prevIndexEntryKey, key) < 0) {
+                    if (results.valid) {
+                        results.errors.push_back(
+                            "one or more indexes are not in strictly ascending or descending "
+                            "order");
+                    }
+                    results.valid = false;
+                }
+                isFirstEntry = false;
+                prevIndexEntryKey = indexEntry->key;
+
                 uint32_t keyHash = hashIndexEntry(indexEntry->key, indexEntry->loc);
                 if ((*_ikc)[keyHash] == 0) {
                     _indexKeyCountTableNumEntries++;
