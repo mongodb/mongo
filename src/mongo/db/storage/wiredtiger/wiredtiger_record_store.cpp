@@ -1551,9 +1551,12 @@ Status WiredTigerRecordStore::validate(OperationContext* txn,
 
     long long nrecords = 0;
     long long dataSizeTotal = 0;
+    long long nInvalid = 0;
+
     results->valid = true;
     Cursor cursor(txn, *this, true);
     int interruptInterval = 4096;
+
     while (auto record = cursor.next()) {
         if (!(nrecords % interruptInterval))
             txn->checkForInterrupt();
@@ -1567,8 +1570,13 @@ Status WiredTigerRecordStore::validate(OperationContext* txn,
             // The validatedSize equals dataSize below is not a general requirement, but must be
             // true for WT today because we never pad records.
             if (!status.isOK() || validatedSize != static_cast<size_t>(dataSize)) {
+                if (results->valid) {
+                    // Only log once.
+                    results->errors.push_back("detected one or more invalid documents (see logs)");
+                }
+                nInvalid++;
                 results->valid = false;
-                results->errors.push_back(str::stream() << record->id << " is corrupted");
+                log() << "document at location: " << record->id << " is corrupted";
             }
         }
     }
@@ -1584,6 +1592,10 @@ Status WiredTigerRecordStore::validate(OperationContext* txn,
         _numRecords.store(nrecords);
         _dataSize.store(dataSizeTotal);
         _sizeStorer->storeToCache(_uri, _numRecords.load(), _dataSize.load());
+    }
+
+    if (level == kValidateFull) {
+        output->append("nInvalidDocuments", nInvalid);
     }
 
     output->appendNumber("nrecords", nrecords);
