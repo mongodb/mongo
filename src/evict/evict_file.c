@@ -86,6 +86,8 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 			    __wt_page_can_evict(session, ref, NULL));
 			__wt_ref_out(session, ref);
 			break;
+		case WT_SYNC_CHECKPOINT:
+		case WT_SYNC_WRITE_LEAVES:
 		WT_ILLEGAL_VALUE_ERR(session);
 		}
 	}

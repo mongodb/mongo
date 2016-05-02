@@ -506,8 +506,6 @@ directory_open:
 	 */
 #else
 	file_handle->map = __wt_win_map;
-	file_handle->map_discard = NULL;
-	file_handle->map_preload = NULL;
 	file_handle->unmap = __wt_win_unmap;
 #endif
 	file_handle->read = __win_file_read;
@@ -556,7 +554,6 @@ __wt_os_win(WT_SESSION_IMPL *session)
 	/* Initialize the Windows jump table. */
 	file_system->directory_list = __wt_win_directory_list;
 	file_system->directory_list_free = __wt_win_directory_list_free;
-	file_system->directory_sync = NULL;
 	file_system->exist = __win_fs_exist;
 	file_system->open_file = __win_open_file;
 	file_system->remove = __win_fs_remove;

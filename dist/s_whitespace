@@ -38,7 +38,7 @@ for f in `find bench examples ext src test \
     -name '*.in' -o \
     -name 'Makefile.am' |
     sed -e '/Makefile.in/d' \
-	-e '/support\/power8/d'`; do
+	-e '/checksum\/power8/d'`; do
 	whitespace_and_empty_line $f
 done
 

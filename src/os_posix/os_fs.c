@@ -673,8 +673,6 @@ __wt_os_posix(WT_SESSION_IMPL *session)
 	file_system->directory_list_free = __wt_posix_directory_list_free;
 #ifdef __linux__
 	file_system->directory_sync = __posix_directory_sync;
-#else
-	file_system->directory_sync = NULL;
 #endif
 	file_system->exist = __posix_fs_exist;
 	file_system->open_file = __posix_open_file;

@@ -47,6 +47,7 @@ src/btree/row_key.c
 src/btree/row_modify.c
 src/btree/row_srch.c
 src/cache/cache_las.c
+src/checksum/checksum.c
 src/config/config.c
 src/config/config_api.c
 src/config/config_check.c
@@ -148,7 +149,6 @@ src/session/session_api.c
 src/session/session_compact.c
 src/session/session_dhandle.c
 src/session/session_salvage.c
-src/support/cksum.c
 src/support/cond_auto.c
 src/support/crypto.c
 src/support/err.c
