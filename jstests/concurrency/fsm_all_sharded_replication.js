@@ -18,6 +18,9 @@ var blacklist = [
     'count_limit_skip.js',
     'count_noindex.js',
 
+    // $graphLookup does not support sharded clusters.
+    'agg_graph_lookup.js',
+
     // Disabled due to SERVER-20057, 'Concurrent, sharded mapReduces can fail when temporary
     // namespaces collide across mongos processes'
     'map_reduce_drop.js',
