@@ -38,8 +38,8 @@
         */
         assert.soon(function() {
             primary = replTest.getPrimary();
-            var stats = replTest.nodes.map(m => m.getDB("admin").serverStatus());
             try {
+                var stats = replTest.nodes.map(m => m.getDB("admin").serverStatus());
                 stats.forEach(s => {
                     var executorStats = s.metrics.repl.executor;
                     printjson(s.host);
