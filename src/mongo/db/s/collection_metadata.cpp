@@ -370,6 +370,23 @@ bool CollectionMetadata::getNextChunk(const BSONObj& lookupKey, ChunkType* chunk
     return false;
 }
 
+bool CollectionMetadata::getDifferentChunk(const BSONObj& chunkMinKey,
+                                           ChunkType* differentChunk) const {
+    RangeMap::const_iterator upperChunkIt = _chunksMap.end();
+    RangeMap::const_iterator lowerChunkIt = _chunksMap.begin();
+
+    while (lowerChunkIt != upperChunkIt) {
+        if (lowerChunkIt->first.woCompare(chunkMinKey) != 0) {
+            differentChunk->setMin(lowerChunkIt->first);
+            differentChunk->setMax(lowerChunkIt->second);
+            return true;
+        }
+        ++lowerChunkIt;
+    }
+
+    return false;
+}
+
 BSONObj CollectionMetadata::toBSON() const {
     BSONObjBuilder bb;
     toBSON(bb);

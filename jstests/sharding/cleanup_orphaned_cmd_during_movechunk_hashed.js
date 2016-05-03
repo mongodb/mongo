@@ -67,7 +67,7 @@ load('./jstests/libs/cleanup_orphaned_util.js');
         donor = st.shard1;
     }
 
-    jsTest.log('setting failpoint startedMoveChunk');
+    jsTest.log('setting failpoint startedMoveChunk (donor) and cloned (recipient)');
     pauseMoveChunkAtStep(donor, moveChunkStepNames.startedMoveChunk);
     pauseMigrateAtStep(recip, migrateStepNames.cloned);
 
@@ -102,19 +102,28 @@ load('./jstests/libs/cleanup_orphaned_util.js');
     proceedToMigrateStep(recip, migrateStepNames.steady);
     proceedToMigrateStep(recip, migrateStepNames.done);
 
-    // cleanupOrphaned removes migrated data from donor. The donor would
-    // otherwise clean them up itself, in the post-move delete phase.
     cleanupOrphaned(donor, ns, 2);
-    assert.eq(0, donorColl.count());
+    assert.eq(1, donorColl.count());
     cleanupOrphaned(recip, ns, 2);
     assert.eq(1, recipColl.count());
 
-    // Let migration thread complete.
+    // Let recip side of the migration finish so that the donor proceeds with the commit.
     unpauseMigrateAtStep(recip, migrateStepNames.done);
+    waitForMoveChunkStep(donor, moveChunkStepNames.committed);
+
+    // Donor is paused after the migration chunk commit, but before it finishes the cleanup that
+    // includes running the range deleter. Thus it technically has orphaned data -- commit is
+    // complete, but moved data is still present. cleanupOrphaned can remove the data the donor
+    // would otherwise clean up itself in its post-move delete phase.
+    cleanupOrphaned(donor, ns, 2);
+    assert.eq(0, donorColl.count());
+
+    // Let migration thread complete.
     unpauseMoveChunkAtStep(donor, moveChunkStepNames.committed);
     joinMoveChunk();
 
-    // donor has finished post-move delete.
+    // donor has finished post-move delete, which had nothing to remove with the range deleter
+    // because of the preemptive cleanupOrphaned call.
     assert.eq(0, donorColl.count());
     assert.eq(1, recipColl.count());
     assert.eq(1, coll.count());

@@ -148,7 +148,6 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* txn, MoveChunkR
 
 MigrationSourceManager::~MigrationSourceManager() {
     invariant(!_cloneDriver);
-    invariant(!_uncommittedMetadata);
 }
 
 NamespaceString MigrationSourceManager::getNss() const {
@@ -222,7 +221,6 @@ Status MigrationSourceManager::enterCriticalSection(OperationContext* txn) {
         AutoGetCollection autoColl(txn, _args.getNss(), MODE_IX, MODE_X);
 
         auto css = CollectionShardingState::get(txn, _args.getNss().ns());
-
         if (!css->getMetadata() ||
             !css->getMetadata()->getCollVersion().equals(_committedMetadata->getCollVersion())) {
             return {ErrorCodes::IncompatibleShardingMetadata,
@@ -232,26 +230,12 @@ Status MigrationSourceManager::enterCriticalSection(OperationContext* txn) {
                         << ", actual: " << css->getMetadata()->getCollVersion().toString()};
         }
 
-        ChunkVersion uncommittedCollVersion = _committedMetadata->getCollVersion();
-        uncommittedCollVersion.incMajor();
-
-        // Bump the metadata's version up and "forget" about the chunk being moved. This is not the
-        // commit point, but in practice the state in this shard won't change until the commit it
-        // done.
-        ChunkType chunk;
-        chunk.setMin(_args.getMinKey());
-        chunk.setMax(_args.getMaxKey());
-
-        _uncommittedMetadata = _committedMetadata->cloneMigrate(chunk, uncommittedCollVersion);
-
         // IMPORTANT: After this line, the critical section is in place and needs to be rolled back
         // if anything fails, which would prevent commit to the config servers.
         _critSec = std::make_shared<CriticalSectionState>();
-        css->setMetadata(_uncommittedMetadata);
     }
 
-    log() << "Successfully entered critical section. Uncommited version: "
-          << _uncommittedMetadata->getCollVersion();
+    log() << "Successfully entered critical section.";
 
     _state = kCriticalSection;
     scopedGuard.Dismiss();
@@ -275,6 +259,10 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
         return {commitCloneStatus.code(),
                 str::stream() << "commit clone failed due to " << commitCloneStatus.toString()};
     }
+
+    // Generate the next collection version.
+    ChunkVersion uncommittedCollVersion = _committedMetadata->getCollVersion();
+    uncommittedCollVersion.incMajor();
 
     // applyOps preparation for reflecting the uncommitted metadata on the config server
 
@@ -308,7 +296,7 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
 
         BSONObjBuilder n(op.subobjStart("o"));
         n.append(ChunkType::name(), ChunkType::genID(_args.getNss().ns(), _args.getMinKey()));
-        _uncommittedMetadata->getCollVersion().addToBSON(n, ChunkType::DEPRECATED_lastmod());
+        uncommittedCollVersion.addToBSON(n, ChunkType::DEPRECATED_lastmod());
         n.append(ChunkType::ns(), _args.getNss().ns());
         n.append(ChunkType::min(), _args.getMinKey());
         n.append(ChunkType::max(), _args.getMaxKey());
@@ -327,14 +315,13 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
     // Version at which the next highest lastmod will be set. If the chunk being moved is the last
     // in the shard, nextVersion is that chunk's lastmod otherwise the highest version is from the
     // chunk being bumped on the FROM-shard.
-    ChunkVersion nextVersion = _uncommittedMetadata->getCollVersion();
+    ChunkVersion nextVersion = uncommittedCollVersion;
 
     // If we have chunks left on the FROM shard, update the version of one of them as well. We can
     // figure that out by grabbing the metadata as it has been changed.
-    if (_uncommittedMetadata->getNumChunks()) {
+    if (_committedMetadata->getNumChunks() > 1) {
         ChunkType bumpChunk;
-        invariant(
-            _uncommittedMetadata->getNextChunk(_uncommittedMetadata->getMinKey(), &bumpChunk));
+        invariant(_committedMetadata->getDifferentChunk(_args.getMinKey(), &bumpChunk));
 
         BSONObj bumpMin = bumpChunk.getMin();
         BSONObj bumpMax = bumpChunk.getMax();
@@ -377,12 +364,25 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
     // servers, so crash the server.
     fassertStatusOK(34431, applyOpsStatus);
 
-    // Now that applyOps succeeded, zero out the uncommitted metadata since it is now valid
-    _committedMetadata = std::move(_uncommittedMetadata);
+    // Now that applyOps succeeded and the new collection version is committed, update the
+    // collection metadata to the new collection version and forget the migrated chunk.
+    {
+        ScopedTransaction scopedXact(txn, MODE_IX);
+        AutoGetCollection autoColl(txn, _args.getNss(), MODE_IX, MODE_X);
+
+        ChunkType migratingChunkToForget;
+        migratingChunkToForget.setMin(_args.getMinKey());
+        migratingChunkToForget.setMax(_args.getMaxKey());
+        _committedMetadata =
+            _committedMetadata->cloneMigrate(migratingChunkToForget, uncommittedCollVersion);
+        auto css = CollectionShardingState::get(txn, _args.getNss().ns());
+        css->setMetadata(_committedMetadata);
+    }
 
     MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeLeavingCriticalSection);
 
-    _critSec->exitCriticalSection();
+    scopedGuard.Dismiss();
+    _cleanup(txn);
 
     grid.catalogManager(txn)
         ->logChange(txn,
@@ -390,9 +390,6 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
                     _args.getNss().ns(),
                     BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey() << "from"
                                << _args.getFromShardId() << "to" << _args.getToShardId()));
-
-    scopedGuard.Dismiss();
-    _cleanup(txn);
 
     return Status::OK();
 }
@@ -426,10 +423,8 @@ void MigrationSourceManager::_cleanup(OperationContext* txn) {
         // collection
         css->clearMigrationSourceManager(txn);
 
-        // Restore the uncommitted metadata on the collection
+        // Leave the critical section.
         if (_state == kCriticalSection) {
-            css->setMetadata(_committedMetadata);
-            _uncommittedMetadata.reset();
             _critSec->exitCriticalSection();
             _critSec.reset();
         }

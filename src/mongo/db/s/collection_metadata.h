@@ -145,6 +145,11 @@ public:
     bool getNextChunk(const BSONObj& lookupKey, ChunkType* chunk) const;
 
     /**
+     * Given a chunk identifying key "chunkMinKey", finds a different chunk if one exists.
+     */
+    bool getDifferentChunk(const BSONObj& chunkMinKey, ChunkType* differentChunk) const;
+
+    /**
      * Given a key in the shard key range, get the next range which overlaps or is greater than
      * this key.
      *

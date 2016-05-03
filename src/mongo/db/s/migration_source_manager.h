@@ -209,10 +209,6 @@ private:
     // completed.
     std::unique_ptr<MigrationChunkClonerSource> _cloneDriver;
 
-    // After the critical section has been entered, contains the uncommitted metadata with a single
-    // chunk bumped by one version. Available after the critical section stage has completed.
-    std::shared_ptr<CollectionMetadata> _uncommittedMetadata;
-
     // Whether the source manager is in a critical section. Tracked as a shared pointer so that
     // callers don't have to hold collection lock in order to wait on it. Available after the
     // critical section stage has completed.
