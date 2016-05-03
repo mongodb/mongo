@@ -32,12 +32,16 @@
 
 #include <cstdint>
 
+#include "mongo/util/time_support.h"
+
 namespace mongo {
+
+class ClockSource;
 
 /** Keep track of elapsed time. After a set amount of time, tells you to do something. */
 class ElapsedTracker {
 public:
-    ElapsedTracker(int32_t hitsBetweenMarks, int32_t msBetweenMarks);
+    ElapsedTracker(ClockSource* cs, int32_t hitsBetweenMarks, Milliseconds msBetweenMarks);
 
     /**
      * Call this for every iteration.
@@ -48,12 +52,13 @@ public:
     void resetLastTime();
 
 private:
+    ClockSource* const _clock;
     const int32_t _hitsBetweenMarks;
-    const int32_t _msBetweenMarks;
+    const Milliseconds _msBetweenMarks;
 
     int32_t _pings;
 
-    int64_t _last;
+    Date_t _last;
 };
 
 }  // namespace mongo
