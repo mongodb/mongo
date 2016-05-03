@@ -17,6 +17,8 @@ selector:
     - jstests/sharding/move_chunk_wc.js
     - jstests/sharding/commands_that_write_accept_wc_configRS.js
     - jstests/sharding/commands_that_write_accept_wc_shards.js
+    # NumInitialChunks verification changed. See SERVER-23327.
+    - jstests/sharding/shard_collection_verify_initial_chunks.js
 
 executor:
   js_test:

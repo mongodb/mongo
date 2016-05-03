@@ -406,6 +406,15 @@ public:
                     initSplits.push_back(allSplits[lastIndex]);
                 }
             }
+        } else if (numChunks > 0) {
+            conn.done();
+            return appendCommandStatus(
+                result,
+                {ErrorCodes::InvalidOptions,
+                 str::stream() << (!isHashedShardKey ? "numInitialChunks is not supported "
+                                                       "when the shard key is not hashed."
+                                                     : "numInitialChunks is not supported "
+                                                       "when the collection is not empty.")});
         }
 
         LOG(0) << "CMD: shardcollection: " << cmdObj;
