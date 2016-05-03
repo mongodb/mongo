@@ -72,24 +72,6 @@ struct CandidatePlan {
     CandidatePlan(QuerySolution* s, PlanStage* r, WorkingSet* w)
         : solution(s), root(r), ws(w), failed(false) {}
 
-#if defined(_MSC_VER) && _MSC_VER < 1900  // MVSC++ <= 2013 can't generate default move operations
-    CandidatePlan(CandidatePlan&& other)
-        : solution(std::move(other.solution)),
-          root(std::move(other.root)),
-          ws(std::move(other.ws)),
-          results(std::move(other.results)),
-          failed(std::move(other.failed)) {}
-
-    CandidatePlan& operator=(CandidatePlan&& other) {
-        solution = std::move(other.solution);
-        root = std::move(other.root);
-        ws = std::move(other.ws);
-        results = std::move(other.results);
-        failed = std::move(other.failed);
-        return *this;
-    }
-#endif
-
     std::unique_ptr<QuerySolution> solution;
     PlanStage* root;  // Not owned here.
     WorkingSet* ws;   // Not owned here.

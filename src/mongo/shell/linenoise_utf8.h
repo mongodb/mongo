@@ -31,10 +31,6 @@
 #include <memory>
 #include <string.h>
 
-#if defined(_MSC_VER) && _MSC_VER < 1900
-#include <string>
-#endif
-
 namespace linenoise_utf8 {
 
 typedef unsigned char UChar8;  // UTF-8 octet

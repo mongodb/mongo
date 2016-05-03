@@ -50,16 +50,6 @@ ClusterClientCursorGuard::~ClusterClientCursorGuard() {
     }
 }
 
-#if defined(_MSC_VER) && _MSC_VER < 1900
-ClusterClientCursorGuard::ClusterClientCursorGuard(ClusterClientCursorGuard&& other)
-    : _ccc(std::move(other._ccc)) {}
-
-ClusterClientCursorGuard& ClusterClientCursorGuard::operator=(ClusterClientCursorGuard&& other) {
-    _ccc = std::move(other._ccc);
-    return *this;
-}
-#endif
-
 ClusterClientCursor* ClusterClientCursorGuard::operator->() {
     return _ccc.get();
 }

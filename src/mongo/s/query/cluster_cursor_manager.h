@@ -403,26 +403,8 @@ private:
             invariant(_cursor);
         }
 
-#if defined(_MSC_VER) && _MSC_VER < 1900
-        CursorEntry(CursorEntry&& other)
-            : _cursor(std::move(other._cursor)),
-              _killPending(std::move(other._killPending)),
-              _cursorType(std::move(other._cursorType)),
-              _cursorLifetime(std::move(other._cursorLifetime)),
-              _lastActive(std::move(other._lastActive)) {}
-
-        CursorEntry& operator=(CursorEntry&& other) {
-            _cursor = std::move(other._cursor);
-            _killPending = std::move(other._killPending);
-            _cursorType = std::move(other._cursorType);
-            _cursorLifetime = std::move(other._cursorLifetime);
-            _lastActive = std::move(other._lastActive);
-            return *this;
-        }
-#else
         CursorEntry(CursorEntry&& other) = default;
         CursorEntry& operator=(CursorEntry&& other) = default;
-#endif
 
         bool getKillPending() const {
             return _killPending;
@@ -486,20 +468,8 @@ private:
 
         CursorEntryContainer(uint32_t containerPrefix) : containerPrefix(containerPrefix) {}
 
-#if defined(_MSC_VER) && _MSC_VER < 1900
-        CursorEntryContainer(CursorEntryContainer&& other)
-            : containerPrefix(std::move(other.containerPrefix)),
-              entryMap(std::move(other.entryMap)) {}
-
-        CursorEntryContainer& operator=(CursorEntryContainer&& other) {
-            containerPrefix = std::move(other.containerPrefix);
-            entryMap = std::move(other.entryMap);
-            return *this;
-        }
-#else
         CursorEntryContainer(CursorEntryContainer&& other) = default;
         CursorEntryContainer& operator=(CursorEntryContainer&& other) = default;
-#endif
 
         // Common cursor id prefix for all cursors in this container.
         uint32_t containerPrefix;

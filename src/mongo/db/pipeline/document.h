@@ -79,16 +79,6 @@ public:
      */
     Document(std::initializer_list<std::pair<StringData, ImplicitValue>> initializerList);
 
-#if defined(_MSC_VER) && _MSC_VER < 1900  // MVSC++ <= 2013 can't generate default move operations
-    Document(const Document& other) = default;
-    Document& operator=(const Document& other) = default;
-    Document(Document&& other) : _storage(std::move(other._storage)) {}
-    Document& operator=(Document&& other) {
-        _storage = std::move(other._storage);
-        return *this;
-    }
-#endif
-
     void swap(Document& rhs) {
         _storage.swap(rhs._storage);
     }

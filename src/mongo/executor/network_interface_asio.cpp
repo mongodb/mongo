@@ -62,24 +62,6 @@ const std::size_t kIOServiceWorkers = 1;
 
 NetworkInterfaceASIO::Options::Options() = default;
 
-#if defined(_MSC_VER) && _MSC_VER < 1900
-NetworkInterfaceASIO::Options::Options(Options&& other)
-    : connectionPoolOptions(std::move(other.connectionPoolOptions)),
-      timerFactory(std::move(other.timerFactory)),
-      networkConnectionHook(std::move(other.networkConnectionHook)),
-      streamFactory(std::move(other.streamFactory)),
-      metadataHook(std::move(other.metadataHook)) {}
-
-NetworkInterfaceASIO::Options& NetworkInterfaceASIO::Options::operator=(Options&& other) {
-    connectionPoolOptions = std::move(other.connectionPoolOptions);
-    timerFactory = std::move(other.timerFactory);
-    networkConnectionHook = std::move(other.networkConnectionHook);
-    streamFactory = std::move(other.streamFactory);
-    metadataHook = std::move(other.metadataHook);
-    return *this;
-}
-#endif
-
 NetworkInterfaceASIO::NetworkInterfaceASIO(Options options)
     : _options(std::move(options)),
       _io_service(),

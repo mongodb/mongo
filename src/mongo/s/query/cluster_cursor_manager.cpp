@@ -98,11 +98,6 @@ ClusterCursorManager::PinnedCursor::PinnedCursor(PinnedCursor&& other)
 
 ClusterCursorManager::PinnedCursor& ClusterCursorManager::PinnedCursor::operator=(
     ClusterCursorManager::PinnedCursor&& other) {
-#if defined(_MSC_VER) && _MSC_VER < 1900  // MSVC 2013 STL can emit self-move-assign.
-    if (&other == this)
-        return *this;
-#endif
-
     if (_cursor) {
         // The underlying cursor has not yet been returned.
         returnAndKillCursor();

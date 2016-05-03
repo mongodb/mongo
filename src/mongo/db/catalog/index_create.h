@@ -192,25 +192,6 @@ private:
     class CleanupIndexesVectorOnRollback;
 
     struct IndexToBuild {
-#if defined(_MSC_VER) && _MSC_VER < 1900  // MVSC++ <= 2013 can't generate default move operations
-        IndexToBuild() = default;
-        IndexToBuild(IndexToBuild&& other)
-            : block(std::move(other.block)),
-              real(std::move(other.real)),
-              bulk(std::move(other.bulk)),
-              options(std::move(other.options)),
-              filterExpression(std::move(other.filterExpression)) {}
-
-        IndexToBuild& operator=(IndexToBuild&& other) {
-            block = std::move(other.block);
-            real = std::move(other.real);
-            filterExpression = std::move(other.filterExpression);
-            bulk = std::move(other.bulk);
-            options = std::move(other.options);
-            return *this;
-        }
-#endif
-
         std::unique_ptr<IndexCatalog::IndexBuildBlock> block;
 
         IndexAccessMethod* real = NULL;           // owned elsewhere

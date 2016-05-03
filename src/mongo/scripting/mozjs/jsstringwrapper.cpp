@@ -72,20 +72,6 @@ JSStringWrapper::JSStringWrapper(JSContext* cx, JSString* str) : _isSet(true) {
     out[_length] = '\0';
 }
 
-#if defined(_MSC_VER) && _MSC_VER < 1900
-JSStringWrapper::JSStringWrapper(JSStringWrapper&& other) {
-    *this = std::move(other);
-}
-
-JSStringWrapper& JSStringWrapper::operator=(JSStringWrapper&& other) {
-    _str = std::move(other._str);
-    _length = other._length;
-    std::memcpy(_buf, other._buf, sizeof(_buf));
-    _isSet = other._isSet;
-    return *this;
-}
-#endif
-
 StringData JSStringWrapper::toStringData() const {
     invariant(_isSet);
     return StringData(_str ? _str.get() : _buf, _length);

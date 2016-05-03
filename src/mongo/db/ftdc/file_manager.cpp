@@ -49,11 +49,6 @@
 
 namespace mongo {
 
-// TODO: See time_support.cpp for details on this interposition
-#if defined(_MSC_VER) && _MSC_VER < 1900
-#define snprintf _snprintf
-#endif
-
 FTDCFileManager::FTDCFileManager(const FTDCConfig* config,
                                  const boost::filesystem::path& path,
                                  FTDCCollectorCollection* collection)

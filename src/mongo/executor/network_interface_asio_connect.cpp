@@ -55,21 +55,6 @@ NetworkInterfaceASIO::AsyncConnection::AsyncConnection(std::unique_ptr<AsyncStre
       _clientProtocols(rpc::computeProtocolSet(WireSpec::instance().minWireVersionOutgoing,
                                                WireSpec::instance().maxWireVersionOutgoing)) {}
 
-#if defined(_MSC_VER) && _MSC_VER < 1900
-NetworkInterfaceASIO::AsyncConnection::AsyncConnection(AsyncConnection&& other)
-    : _stream(std::move(other._stream)),
-      _serverProtocols(other._serverProtocols),
-      _clientProtocols(other._clientProtocols) {}
-
-NetworkInterfaceASIO::AsyncConnection& NetworkInterfaceASIO::AsyncConnection::operator=(
-    AsyncConnection&& other) {
-    _stream = std::move(other._stream);
-    _serverProtocols = other._serverProtocols;
-    _clientProtocols = other._clientProtocols;
-    return *this;
-}
-#endif
-
 AsyncStreamInterface& NetworkInterfaceASIO::AsyncConnection::stream() {
     return *_stream;
 }

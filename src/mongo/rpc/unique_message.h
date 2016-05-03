@@ -51,19 +51,8 @@ public:
     UniqueMessage(Message&& message, std::unique_ptr<MessageViewType> view)
         : _message{std::move(message)}, _view{std::move(view)} {}
 
-#if defined(_MSC_VER) && _MSC_VER < 1900
-    UniqueMessage(UniqueMessage&& other)
-        : _message{std::move(other._message)}, _view{std::move(other._view)} {}
-
-    UniqueMessage& operator=(UniqueMessage&& other) {
-        _message = std::move(other._message);
-        _view = std::move(other._view);
-        return *this;
-    }
-#else
     UniqueMessage(UniqueMessage&&) = default;
     UniqueMessage& operator=(UniqueMessage&&) = default;
-#endif
 
     const MessageViewType* operator->() const {
         return _view.get();

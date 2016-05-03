@@ -197,11 +197,6 @@ public:
     }
 
     ValueStorage& operator=(ValueStorage&& rhs) BOOST_NOEXCEPT {
-#if defined(_MSC_VER) && _MSC_VER < 1900  // MSVC 2013 STL can emit self-move-assign.
-        if (&rhs == this)
-            return *this;
-#endif
-
         DEV verifyRefCountingIfShould();
         if (refCounter)
             intrusive_ptr_release(genericRCPtr);

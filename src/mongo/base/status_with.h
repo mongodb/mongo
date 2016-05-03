@@ -82,24 +82,6 @@ public:
      */
     StatusWith(T t) : _status(Status::OK()), _t(std::move(t)) {}
 
-#if defined(_MSC_VER) && _MSC_VER < 1900
-    StatusWith(const StatusWith& s) : _status(s._status), _t(s._t) {}
-
-    StatusWith(StatusWith&& s) : _status(std::move(s._status)), _t(std::move(s._t)) {}
-
-    StatusWith& operator=(const StatusWith& other) {
-        _status = other._status;
-        _t = other._t;
-        return *this;
-    }
-
-    StatusWith& operator=(StatusWith&& other) {
-        _status = std::move(other._status);
-        _t = std::move(other._t);
-        return *this;
-    }
-#endif
-
     const T& getValue() const {
         dassert(isOK());
         return *_t;

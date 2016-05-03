@@ -136,13 +136,8 @@ public:
                    std::vector<BSONObj> batch,
                    boost::optional<long long> numReturnedSoFar = boost::none);
 
-#if defined(_MSC_VER) && _MSC_VER < 1900
-    CursorResponse(CursorResponse&& other);
-    CursorResponse& operator=(CursorResponse&& other);
-#else
     CursorResponse(CursorResponse&& other) = default;
     CursorResponse& operator=(CursorResponse&& other) = default;
-#endif
 
     //
     // Accessors.

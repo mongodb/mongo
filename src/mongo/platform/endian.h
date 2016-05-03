@@ -70,7 +70,7 @@
 #define MONGO_LITTLE_ENDIAN 1234
 #define MONGO_BIG_ENDIAN 4321
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1300)
+#if defined(_MSC_VER)
 #include <cstdlib>
 #define MONGO_UINT16_SWAB(v) _byteswap_ushort(v)
 #define MONGO_UINT32_SWAB(v) _byteswap_ulong(v)

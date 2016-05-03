@@ -107,12 +107,10 @@ const BSONObj AuthorizationManager::versionDocumentQuery = BSON("_id"
 
 const std::string AuthorizationManager::schemaVersionFieldName = "currentVersion";
 
-#ifndef _MSC_EXTENSIONS
 const int AuthorizationManager::schemaVersion24;
 const int AuthorizationManager::schemaVersion26Upgrade;
 const int AuthorizationManager::schemaVersion26Final;
 const int AuthorizationManager::schemaVersion28SCRAM;
-#endif
 
 /**
  * Guard object for synchronizing accesses to data cached in AuthorizationManager instances.

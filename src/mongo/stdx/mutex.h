@@ -49,17 +49,9 @@ using ::std::try_to_lock_t;  // NOLINT
 using ::std::lock_guard;   // NOLINT
 using ::std::unique_lock;  // NOLINT
 
-#if _MSC_VER < 1900
-#define MONGO_STDX_CONSTEXPR const
-#else
-#define MONGO_STDX_CONSTEXPR constexpr
-#endif
-
-MONGO_STDX_CONSTEXPR adopt_lock_t adopt_lock{};
-MONGO_STDX_CONSTEXPR defer_lock_t defer_lock{};
-MONGO_STDX_CONSTEXPR try_to_lock_t try_to_lock{};
-
-#undef MONGO_STDX_CONSTEXPR
+constexpr adopt_lock_t adopt_lock{};
+constexpr defer_lock_t defer_lock{};
+constexpr try_to_lock_t try_to_lock{};
 
 }  // namespace stdx
 }  // namespace mongo

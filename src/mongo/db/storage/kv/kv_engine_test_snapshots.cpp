@@ -58,12 +58,7 @@ public:
         }
 
 
-#if defined(_MSC_VER) && _MSC_VER < 1900  // MSVC 2013 Can't default move constructor.
-        Operation(Operation&& other)
-            : _client(std::move(other._client)), _txn(std::move(other._txn)) {}
-#else
         Operation(Operation&& other) = default;
-#endif
 
         Operation& operator=(Operation&& other) {
             // Need to assign to _txn first if active. Otherwise we'd destroy _client before _txn.

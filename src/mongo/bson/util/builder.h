@@ -326,11 +326,6 @@ public:
     void decouple();  // not allowed. not implemented.
 };
 
-#if defined(_WIN32) && _MSC_VER < 1900
-#pragma push_macro("snprintf")
-#define snprintf _snprintf
-#endif
-
 /** std::stringstream deals with locale so this is a lot faster than std::stringstream for UTF8 */
 template <typename Allocator>
 class StringBuilderImpl {
@@ -443,9 +438,4 @@ private:
 
 typedef StringBuilderImpl<TrivialAllocator> StringBuilder;
 typedef StringBuilderImpl<StackAllocator> StackStringBuilder;
-
-#if defined(_WIN32) && _MSC_VER < 1900
-#undef snprintf
-#pragma pop_macro("snprintf")
-#endif
 }  // namespace mongo

@@ -97,16 +97,6 @@ public:
     /// Deep-convert from BSONElement to Value
     explicit Value(const BSONElement& elem);
 
-#if defined(_MSC_VER) && _MSC_VER < 1900  // MVSC++ <= 2013 can't generate default move operations
-    Value(const Value& other) = default;
-    Value& operator=(const Value& other) = default;
-    Value(Value&& other) : _storage(std::move(other._storage)) {}
-    Value& operator=(Value&& other) {
-        _storage = std::move(other._storage);
-        return *this;
-    }
-#endif
-
     /** Construct a long or integer-valued Value.
      *
      *  Used when preforming arithmetic operations with int where the

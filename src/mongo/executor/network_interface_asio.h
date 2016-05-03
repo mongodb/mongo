@@ -100,15 +100,6 @@ public:
     struct Options {
         Options();
 
-// Explicit move construction and assignment to support MSVC
-#if defined(_MSC_VER) && _MSC_VER < 1900
-        Options(Options&&);
-        Options& operator=(Options&&);
-#else
-        Options(Options&&) = default;
-        Options& operator=(Options&&) = default;
-#endif
-
         std::string instanceName = "NetworkInterfaceASIO";
         ConnectionPool::Options connectionPoolOptions;
         std::unique_ptr<AsyncTimerFactoryInterface> timerFactory;
@@ -168,15 +159,6 @@ private:
         rpc::ProtocolSet serverProtocols() const;
         rpc::ProtocolSet clientProtocols() const;
         void setServerProtocols(rpc::ProtocolSet protocols);
-
-// Explicit move construction and assignment to support MSVC
-#if defined(_MSC_VER) && _MSC_VER < 1900
-        AsyncConnection(AsyncConnection&&);
-        AsyncConnection& operator=(AsyncConnection&&);
-#else
-        AsyncConnection(AsyncConnection&&) = default;
-        AsyncConnection& operator=(AsyncConnection&&) = default;
-#endif
 
     private:
         std::unique_ptr<AsyncStreamInterface> _stream;

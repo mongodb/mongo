@@ -41,10 +41,8 @@
 namespace mongo {
 namespace repl {
 
-#ifndef _MSC_VER
 const size_t ReplicaSetConfig::kMaxMembers;
 const size_t ReplicaSetConfig::kMaxVotingMembers;
-#endif
 
 const std::string ReplicaSetConfig::kConfigServerFieldName = "configsvr";
 const std::string ReplicaSetConfig::kVersionFieldName = "version";

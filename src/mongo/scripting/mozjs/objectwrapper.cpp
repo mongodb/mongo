@@ -43,9 +43,7 @@
 namespace mongo {
 namespace mozjs {
 
-#ifndef _MSC_EXTENSIONS
 const int ObjectWrapper::kMaxWriteFieldDepth;
-#endif  // _MSC_EXTENSIONS
 
 void ObjectWrapper::Key::get(JSContext* cx, JS::HandleObject o, JS::MutableHandleValue value) {
     switch (_type) {

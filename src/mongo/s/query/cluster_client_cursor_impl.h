@@ -59,13 +59,8 @@ public:
      */
     ~ClusterClientCursorGuard();
 
-#if defined(_MSC_VER) && _MSC_VER < 1900
-    ClusterClientCursorGuard(ClusterClientCursorGuard&&);
-    ClusterClientCursorGuard& operator=(ClusterClientCursorGuard&&);
-#else
     ClusterClientCursorGuard(ClusterClientCursorGuard&&) = default;
     ClusterClientCursorGuard& operator=(ClusterClientCursorGuard&&) = default;
-#endif
 
     /**
      * Returns a pointer to the underlying cursor.

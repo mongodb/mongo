@@ -49,11 +49,6 @@ inline Status::Status(Status&& other) BOOST_NOEXCEPT : _error(other._error) {
 }
 
 inline Status& Status::operator=(Status&& other) BOOST_NOEXCEPT {
-#if defined(_MSC_VER) && _MSC_VER < 1900  // MSVC 2013 STL can emit self-move-assign.
-    if (&other == this)
-        return *this;
-#endif
-
     unref(_error);
     _error = other._error;
     other._error = nullptr;
