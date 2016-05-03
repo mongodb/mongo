@@ -73,7 +73,7 @@ struct ProjectionStageParams {
 
     // The collator this operation should use to compare strings. If null, the collation is a simple
     // binary compare.
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
 };
 
 /**

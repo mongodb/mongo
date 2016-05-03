@@ -68,7 +68,7 @@ public:
 
     ProjectionExec(const BSONObj& spec,
                    const MatchExpression* queryExpression,
-                   CollatorInterface* collator,
+                   const CollatorInterface* collator,
                    const ExtensionsCallback& extensionsCallback);
 
     ~ProjectionExec();
@@ -183,7 +183,7 @@ private:
     // The collator this projection should use to compare strings. Needed for projection operators
     // that perform matching (e.g. elemMatch projection). If null, the collation is a simple binary
     // compare.
-    CollatorInterface* _collator = nullptr;
+    const CollatorInterface* _collator = nullptr;
 };
 
 }  // namespace mongo

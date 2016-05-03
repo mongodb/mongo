@@ -449,7 +449,7 @@ public:
         // Rewrite (AND (OR a b) e) => (OR (AND a e) (AND b e))
         {
             BSONObj queryObj = fromjson("{$or:[{a:1}, {b:1}], e:1}");
-            CollatorInterface* collator = nullptr;
+            const CollatorInterface* collator = nullptr;
             StatusWithMatchExpression expr = MatchExpressionParser::parse(
                 queryObj, ExtensionsCallbackDisallowExtensions(), collator);
             ASSERT_OK(expr.getStatus());
@@ -467,7 +467,7 @@ public:
         // Rewrite (AND (OR a b) e f) => (OR (AND a e f) (AND b e f))
         {
             BSONObj queryObj = fromjson("{$or:[{a:1}, {b:1}], e:1, f:1}");
-            CollatorInterface* collator = nullptr;
+            const CollatorInterface* collator = nullptr;
             StatusWithMatchExpression expr = MatchExpressionParser::parse(
                 queryObj, ExtensionsCallbackDisallowExtensions(), collator);
             ASSERT_OK(expr.getStatus());
@@ -485,7 +485,7 @@ public:
         // Rewrite (AND (OR (AND a b) (AND c d) e f) => (OR (AND a b e f) (AND c d e f))
         {
             BSONObj queryObj = fromjson("{$or:[{a:1,b:1}, {c:1,d:1}], e:1,f:1}");
-            CollatorInterface* collator = nullptr;
+            const CollatorInterface* collator = nullptr;
             StatusWithMatchExpression expr = MatchExpressionParser::parse(
                 queryObj, ExtensionsCallbackDisallowExtensions(), collator);
             ASSERT_OK(expr.getStatus());

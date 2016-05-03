@@ -90,7 +90,7 @@ private:
 
     // Null if this merge sort stage orders strings according to simple binary compare. If non-null,
     // represents the collator used to compare strings.
-    CollatorInterface* _collator;
+    const CollatorInterface* _collator;
 
     // Are we deduplicating on RecordId?
     bool _dedup;
@@ -127,7 +127,7 @@ private:
     // The comparison function used in our priority queue.
     class StageWithValueComparison {
     public:
-        StageWithValueComparison(WorkingSet* ws, BSONObj pattern, CollatorInterface* collator)
+        StageWithValueComparison(WorkingSet* ws, BSONObj pattern, const CollatorInterface* collator)
             : _ws(ws), _pattern(pattern), _collator(collator) {}
 
         // Is lhs less than rhs?  Note that priority_queue is a max heap by default so we invert
@@ -137,7 +137,7 @@ private:
     private:
         WorkingSet* _ws;
         BSONObj _pattern;
-        CollatorInterface* _collator;
+        const CollatorInterface* _collator;
     };
 
     // The min heap of the results we're returning.
@@ -160,7 +160,7 @@ public:
 
     // Null if this merge sort stage orders strings according to simple binary compare. If non-null,
     // represents the collator used to compare strings.
-    CollatorInterface* collator;
+    const CollatorInterface* collator;
 
     // Do we deduplicate on RecordId?
     bool dedup;

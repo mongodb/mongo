@@ -60,7 +60,7 @@ typedef BSONObjBuilder bob;
 */
 int compareElementValues(const BSONElement& l,
                          const BSONElement& r,
-                         StringData::ComparatorInterface* comparator = nullptr);
+                         const StringData::ComparatorInterface* comparator = nullptr);
 
 /** BSONElement represents an "element" in a BSONObj.  So for the object { a : 3, b : "abc" },
     'a : 3' is the first element (key+value).
@@ -494,7 +494,7 @@ public:
     */
     int woCompare(const BSONElement& e,
                   bool considerFieldName = true,
-                  StringData::ComparatorInterface* comparator = nullptr) const;
+                  const StringData::ComparatorInterface* comparator = nullptr) const;
 
     /**
      * Functor compatible with std::hash for std::unordered_{map,set}

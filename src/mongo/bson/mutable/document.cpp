@@ -1487,7 +1487,7 @@ SafeNum Element::getValueSafeNum() const {
 
 int Element::compareWithElement(const ConstElement& other,
                                 bool considerFieldName,
-                                StringData::ComparatorInterface* comparator) const {
+                                const StringData::ComparatorInterface* comparator) const {
     verify(ok());
     verify(other.ok());
 
@@ -1570,7 +1570,7 @@ int Element::compareWithElement(const ConstElement& other,
 
 int Element::compareWithBSONElement(const BSONElement& other,
                                     bool considerFieldName,
-                                    StringData::ComparatorInterface* comparator) const {
+                                    const StringData::ComparatorInterface* comparator) const {
     verify(ok());
 
     const Document::Impl& impl = getDocument().getImpl();
@@ -1611,7 +1611,7 @@ int Element::compareWithBSONElement(const BSONElement& other,
 
 int Element::compareWithBSONObj(const BSONObj& other,
                                 bool considerFieldName,
-                                StringData::ComparatorInterface* comparator) const {
+                                const StringData::ComparatorInterface* comparator) const {
     verify(ok());
 
     const Document::Impl& impl = getDocument().getImpl();

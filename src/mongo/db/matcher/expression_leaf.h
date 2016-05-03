@@ -87,7 +87,7 @@ public:
     /**
      * 'collator' must outlive the ComparisonMatchExpression and any clones made of it.
      */
-    ComparisonMatchExpression(MatchType type, CollatorInterface* collator)
+    ComparisonMatchExpression(MatchType type, const CollatorInterface* collator)
         : LeafMatchExpression(type), _collator(collator) {}
 
     Status init(StringData path, const BSONElement& rhs);
@@ -110,13 +110,13 @@ public:
         return _rhs;
     }
 
-    CollatorInterface* getCollator() const {
+    const CollatorInterface* getCollator() const {
         return _collator;
     }
 
 protected:
     BSONElement _rhs;
-    CollatorInterface* _collator;
+    const CollatorInterface* _collator;
 };
 
 //
@@ -125,7 +125,7 @@ protected:
 
 class EqualityMatchExpression : public ComparisonMatchExpression {
 public:
-    EqualityMatchExpression(CollatorInterface* collator)
+    EqualityMatchExpression(const CollatorInterface* collator)
         : ComparisonMatchExpression(EQ, collator) {}
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e =
@@ -140,7 +140,8 @@ public:
 
 class LTEMatchExpression : public ComparisonMatchExpression {
 public:
-    LTEMatchExpression(CollatorInterface* collator) : ComparisonMatchExpression(LTE, collator) {}
+    LTEMatchExpression(const CollatorInterface* collator)
+        : ComparisonMatchExpression(LTE, collator) {}
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e =
             stdx::make_unique<LTEMatchExpression>(_collator);
@@ -154,7 +155,8 @@ public:
 
 class LTMatchExpression : public ComparisonMatchExpression {
 public:
-    LTMatchExpression(CollatorInterface* collator) : ComparisonMatchExpression(LT, collator) {}
+    LTMatchExpression(const CollatorInterface* collator)
+        : ComparisonMatchExpression(LT, collator) {}
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e =
             stdx::make_unique<LTMatchExpression>(_collator);
@@ -168,7 +170,8 @@ public:
 
 class GTMatchExpression : public ComparisonMatchExpression {
 public:
-    GTMatchExpression(CollatorInterface* collator) : ComparisonMatchExpression(GT, collator) {}
+    GTMatchExpression(const CollatorInterface* collator)
+        : ComparisonMatchExpression(GT, collator) {}
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e =
             stdx::make_unique<GTMatchExpression>(_collator);
@@ -182,7 +185,8 @@ public:
 
 class GTEMatchExpression : public ComparisonMatchExpression {
 public:
-    GTEMatchExpression(CollatorInterface* collator) : ComparisonMatchExpression(GTE, collator) {}
+    GTEMatchExpression(const CollatorInterface* collator)
+        : ComparisonMatchExpression(GTE, collator) {}
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e =
             stdx::make_unique<GTEMatchExpression>(_collator);
@@ -314,7 +318,7 @@ class ArrayFilterEntries {
     MONGO_DISALLOW_COPYING(ArrayFilterEntries);
 
 public:
-    ArrayFilterEntries(CollatorInterface* collator);
+    ArrayFilterEntries(const CollatorInterface* collator);
     ~ArrayFilterEntries();
 
     Status addEquality(const BSONElement& e);
@@ -347,7 +351,7 @@ public:
         return _equalities.size() + _regexes.size();
     }
 
-    CollatorInterface* getCollator() const {
+    const CollatorInterface* getCollator() const {
         return _collator;
     }
 
@@ -364,7 +368,7 @@ private:
     bool _hasEmptyArray;
     BSONElementSet _equalities;
     std::vector<RegexMatchExpression*> _regexes;
-    CollatorInterface* _collator;
+    const CollatorInterface* _collator;
 };
 
 /**
@@ -375,7 +379,7 @@ public:
     /**
      * 'collator' must outlive the InMatchExpression and any clones made of it.
      */
-    InMatchExpression(CollatorInterface* collator)
+    InMatchExpression(const CollatorInterface* collator)
         : LeafMatchExpression(MATCH_IN), _arrayEntries(collator) {}
     Status init(StringData path);
 
@@ -399,7 +403,7 @@ public:
         return _arrayEntries;
     }
 
-    CollatorInterface* getCollator() const {
+    const CollatorInterface* getCollator() const {
         return _arrayEntries.getCollator();
     }
 

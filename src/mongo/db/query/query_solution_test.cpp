@@ -251,7 +251,7 @@ TEST(QuerySolutionTest, IntervalListSomePoints) {
 
 std::unique_ptr<ParsedProjection> createParsedProjection(const BSONObj& query,
                                                          const BSONObj& projObj) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression queryMatchExpr =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT(queryMatchExpr.isOK());

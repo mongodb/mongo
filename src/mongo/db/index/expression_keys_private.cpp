@@ -149,7 +149,7 @@ void getS2GeoKeys(const BSONObj& document,
  * Expands array and appends items to 'out'.
  * Used by getOneLiteralKey.
  */
-void getS2LiteralKeysArray(const BSONObj& obj, CollatorInterface* collator, BSONObjSet* out) {
+void getS2LiteralKeysArray(const BSONObj& obj, const CollatorInterface* collator, BSONObjSet* out) {
     BSONObjIterator objIt(obj);
     if (!objIt.more()) {
         // Empty arrays are indexed as undefined.
@@ -171,7 +171,9 @@ void getS2LiteralKeysArray(const BSONObj& obj, CollatorInterface* collator, BSON
  * Otherwise, adds 'elt' as a single element.
  * Used by getLiteralKeys.
  */
-void getS2OneLiteralKey(const BSONElement& elt, CollatorInterface* collator, BSONObjSet* out) {
+void getS2OneLiteralKey(const BSONElement& elt,
+                        const CollatorInterface* collator,
+                        BSONObjSet* out) {
     if (Array == elt.type()) {
         getS2LiteralKeysArray(elt.Obj(), collator, out);
     } else {
@@ -187,7 +189,7 @@ void getS2OneLiteralKey(const BSONElement& elt, CollatorInterface* collator, BSO
  * Used by getS2Keys.
  */
 void getS2LiteralKeys(const BSONElementSet& elements,
-                      CollatorInterface* collator,
+                      const CollatorInterface* collator,
                       BSONObjSet* out) {
     if (0 == elements.size()) {
         // Missing fields are indexed as null.
@@ -324,7 +326,7 @@ void ExpressionKeysPrivate::getHashKeys(const BSONObj& obj,
                                         HashSeed seed,
                                         int hashVersion,
                                         bool isSparse,
-                                        CollatorInterface* collator,
+                                        const CollatorInterface* collator,
                                         BSONObjSet* keys) {
     const char* cstr = hashedField.c_str();
     BSONElement fieldVal = obj.getFieldDottedOrArray(cstr);

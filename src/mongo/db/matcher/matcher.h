@@ -55,7 +55,7 @@ public:
      */
     explicit Matcher(const BSONObj& pattern,
                      const ExtensionsCallback& extensionsCallback,
-                     CollatorInterface* collator);
+                     const CollatorInterface* collator);
 
     bool matches(const BSONObj& doc, MatchDetails* details = NULL) const;
 

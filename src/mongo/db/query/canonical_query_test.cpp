@@ -51,7 +51,7 @@ static const NamespaceString nss("testdb.testcoll");
  * and return the MatchExpression*.
  */
 MatchExpression* parseMatchExpression(const BSONObj& obj) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression status =
         MatchExpressionParser::parse(obj, ExtensionsCallbackNoop(), collator);
     if (!status.isOK()) {

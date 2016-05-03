@@ -50,7 +50,7 @@ using std::unique_ptr;
  * Utility function to create MatchExpression
  */
 unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression status =
         MatchExpressionParser::parse(obj, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(status.isOK());
@@ -78,7 +78,7 @@ void testTransform(const char* specStr,
                    const char* queryStr,
                    const char* objStr,
                    WorkingSetComputedData* data,
-                   CollatorInterface* collator,
+                   const CollatorInterface* collator,
                    bool expectedStatusOK,
                    const char* expectedObjStr) {
     // Create projection exec object.

@@ -45,7 +45,7 @@ class EnsureSortedStage final : public PlanStage {
 public:
     EnsureSortedStage(OperationContext* opCtx,
                       BSONObj pattern,
-                      CollatorInterface* collator,
+                      const CollatorInterface* collator,
                       WorkingSet* ws,
                       PlanStage* child);
 
@@ -76,7 +76,7 @@ private:
 
     // Null if this ensure sorted stage orders strings according to simple binary compare. If
     // non-null, represents the collator used to compare strings.
-    CollatorInterface* _collator;
+    const CollatorInterface* _collator;
 
     // The sort key of the previous result.
     BSONObj _prevSortKey;

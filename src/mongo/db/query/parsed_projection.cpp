@@ -127,7 +127,7 @@ Status ParsedProjection::make(const BSONObj& spec,
                 // only parsing here in order to ensure that the elemMatch projection is valid.
                 //
                 // TODO: Is there a faster way of validating the elemMatchObj?
-                CollatorInterface* collator = nullptr;
+                const CollatorInterface* collator = nullptr;
                 StatusWithMatchExpression statusWithMatcher =
                     MatchExpressionParser::parse(elemMatchObj, extensionsCallback, collator);
                 if (!statusWithMatcher.isOK()) {

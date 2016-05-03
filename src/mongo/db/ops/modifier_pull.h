@@ -80,7 +80,7 @@ private:
 
     // The collator which must be used for matching strings. Null if we should use a simple binary
     // comparison.
-    CollatorInterface* _collator = nullptr;
+    const CollatorInterface* _collator = nullptr;
 
     struct PreparedState;
     std::unique_ptr<PreparedState> _preparedState;

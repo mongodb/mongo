@@ -57,9 +57,9 @@ public:
      */
     CollatorInterfaceMock(MockType mockType);
 
-    int compare(StringData left, StringData right) final;
+    int compare(StringData left, StringData right) const final;
 
-    ComparisonKey getComparisonKey(StringData stringData) final;
+    ComparisonKey getComparisonKey(StringData stringData) const final;
 
 private:
     const MockType _mockType;

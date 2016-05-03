@@ -348,7 +348,7 @@ StatusWithMatchExpression MatchExpressionParser::_parse(const BSONObj& obj, int 
                        mongoutils::str::equals("id", rest) || mongoutils::str::equals("db", rest)) {
                 // DBRef fields.
                 // 'id' is collation-aware. 'ref' and 'db' are compared using binary comparison.
-                CollatorInterface* collator = (str::equals("id", rest) ? _collator : nullptr);
+                const CollatorInterface* collator = (str::equals("id", rest) ? _collator : nullptr);
                 std::unique_ptr<ComparisonMatchExpression> eq =
                     stdx::make_unique<EqualityMatchExpression>(collator);
                 Status s = eq->init(e.fieldName(), e);

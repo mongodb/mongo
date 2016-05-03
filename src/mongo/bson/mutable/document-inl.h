@@ -32,7 +32,7 @@ namespace mutablebson {
 
 inline int Document::compareWith(const Document& other,
                                  bool considerFieldName,
-                                 StringData::ComparatorInterface* comparator) const {
+                                 const StringData::ComparatorInterface* comparator) const {
     // We cheat and use Element::compareWithElement since we know that 'other' is a
     // Document and has a 'hidden' fieldname that is always indentical across all Document
     // instances.
@@ -41,7 +41,7 @@ inline int Document::compareWith(const Document& other,
 
 inline int Document::compareWithBSONObj(const BSONObj& other,
                                         bool considerFieldName,
-                                        StringData::ComparatorInterface* comparator) const {
+                                        const StringData::ComparatorInterface* comparator) const {
     return root().compareWithBSONObj(other, considerFieldName, comparator);
 }
 

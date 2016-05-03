@@ -42,7 +42,7 @@ public:
     /**
      * Compares two StringData objects.
      */
-    virtual int compare(StringData left, StringData right) = 0;
+    virtual int compare(StringData left, StringData right) const = 0;
 };
 
 }  // namespace mongo

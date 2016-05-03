@@ -121,7 +121,7 @@ bool BSONObj::valid() const {
 int BSONObj::woCompare(const BSONObj& r,
                        const Ordering& o,
                        bool considerFieldName,
-                       StringData::ComparatorInterface* comparator) const {
+                       const StringData::ComparatorInterface* comparator) const {
     if (isEmpty())
         return r.isEmpty() ? 0 : -1;
     if (r.isEmpty())
@@ -157,7 +157,7 @@ int BSONObj::woCompare(const BSONObj& r,
 int BSONObj::woCompare(const BSONObj& r,
                        const BSONObj& idxKey,
                        bool considerFieldName,
-                       StringData::ComparatorInterface* comparator) const {
+                       const StringData::ComparatorInterface* comparator) const {
     if (isEmpty())
         return r.isEmpty() ? 0 : -1;
     if (r.isEmpty())

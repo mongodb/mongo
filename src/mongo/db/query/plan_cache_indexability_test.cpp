@@ -36,7 +36,7 @@ namespace mongo {
 namespace {
 
 std::unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression status =
         MatchExpressionParser::parse(obj, ExtensionsCallbackDisallowExtensions(), collator);
     if (!status.isOK()) {

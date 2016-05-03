@@ -122,7 +122,7 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern, const MultikeyPaths& multike
     params.indices.push_back(entry);
 }
 
-void QueryPlannerTest::addIndex(BSONObj keyPattern, CollatorInterface* collator) {
+void QueryPlannerTest::addIndex(BSONObj keyPattern, const CollatorInterface* collator) {
     const bool sparse = false;
     const bool unique = false;
     const bool multikey = false;
@@ -374,7 +374,7 @@ void QueryPlannerTest::assertHasOneSolutionOf(const std::vector<std::string>& so
 }
 
 std::unique_ptr<MatchExpression> QueryPlannerTest::parseMatchExpression(const BSONObj& obj) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression status =
         MatchExpressionParser::parse(obj, ExtensionsCallbackDisallowExtensions(), collator);
     if (!status.isOK()) {

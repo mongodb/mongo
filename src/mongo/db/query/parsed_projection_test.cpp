@@ -47,7 +47,7 @@ using namespace mongo;
 //
 
 unique_ptr<ParsedProjection> createParsedProjection(const BSONObj& query, const BSONObj& projObj) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression statusWithMatcher =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT(statusWithMatcher.isOK());
@@ -76,7 +76,7 @@ unique_ptr<ParsedProjection> createParsedProjection(const char* queryStr, const 
 void assertInvalidProjection(const char* queryStr, const char* projStr) {
     BSONObj query = fromjson(queryStr);
     BSONObj projObj = fromjson(projStr);
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression statusWithMatcher =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT(statusWithMatcher.isOK());

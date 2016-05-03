@@ -68,7 +68,7 @@ TEST(QueryStageEnsureSorted, EnsureSortedEmptyWorkingSet) {
 void testWork(const char* patternStr,
               const char* inputStr,
               const char* expectedStr,
-              CollatorInterface* collator = nullptr) {
+              const CollatorInterface* collator = nullptr) {
     WorkingSet ws;
     auto queuedDataStage = stdx::make_unique<QueuedDataStage>(nullptr, &ws);
     BSONObj inputObj = fromjson(inputStr);
@@ -157,7 +157,7 @@ TEST(QueryStageEnsureSorted, EnsureSortedCompoundKey) {
 }
 
 TEST(QueryStageEnsureSorted, EnsureSortedStringsNullCollator) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     testWork("{a: 1}",
              "{input: [{a: 'abc'}, {a: 'cba'}]}",
              "{output: [{a: 'abc'}, {a: 'cba'}]}",

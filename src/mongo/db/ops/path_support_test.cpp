@@ -521,7 +521,7 @@ TEST_F(ArrayDoc, NonNumericPathInArray) {
 //
 
 static MatchExpression* makeExpr(const BSONObj& exprBSON) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     return MatchExpressionParser::parse(exprBSON, ExtensionsCallbackDisallowExtensions(), collator)
         .getValue()
         .release();

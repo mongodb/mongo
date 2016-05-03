@@ -43,7 +43,7 @@ namespace mongo {
 TEST(MatchExpressionParserGeo, WithinBox) {
     BSONObj query = fromjson("{a:{$within:{$box:[{x: 4, y:4},[6,6]]}}}");
 
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -60,7 +60,7 @@ TEST(MatchExpressionParserGeoNear, ParseNear) {
         "{loc:{$near:{$maxDistance:100, "
         "$geometry:{type:\"Point\", coordinates:[0,0]}}}}");
 
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -78,7 +78,7 @@ TEST(MatchExpressionParserGeoNear, ParseNearExtraField) {
         "{loc:{$near:{$maxDistance:100, "
         "$geometry:{type:\"Point\", coordinates:[0,0]}}, foo: 1}}");
 
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     ASSERT_THROWS(
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator),
         UserException);
@@ -93,7 +93,7 @@ TEST(MatchExpressionParserGeoNear, ParseNearExtraField) {
 TEST(MatchExpressionParserGeoNear, ParseValidNear) {
     BSONObj query = fromjson("{loc: {$near: [0,0], $maxDistance: 100, $minDistance: 50}}");
 
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -109,42 +109,42 @@ TEST(MatchExpressionParserGeoNear, ParseValidNear) {
 TEST(MatchExpressionParserGeoNear, ParseInvalidNear) {
     {
         BSONObj query = fromjson("{loc: {$maxDistance: 100, $near: [0,0]}}");
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         StatusWithMatchExpression result =
             MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
         ASSERT_FALSE(result.isOK());
     }
     {
         BSONObj query = fromjson("{loc: {$minDistance: 100, $near: [0,0]}}");
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         StatusWithMatchExpression result =
             MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
         ASSERT_FALSE(result.isOK());
     }
     {
         BSONObj query = fromjson("{loc: {$near: [0,0], $maxDistance: {}}}");
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         ASSERT_THROWS(
             MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator),
             UserException);
     }
     {
         BSONObj query = fromjson("{loc: {$near: [0,0], $minDistance: {}}}");
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         ASSERT_THROWS(
             MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator),
             UserException);
     }
     {
         BSONObj query = fromjson("{loc: {$near: [0,0], $eq: 40}}");
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         ASSERT_THROWS(
             MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator),
             UserException);
     }
     {
         BSONObj query = fromjson("{loc: {$eq: 40, $near: [0,0]}}");
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         StatusWithMatchExpression result =
             MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
         ASSERT_FALSE(result.isOK());
@@ -152,21 +152,21 @@ TEST(MatchExpressionParserGeoNear, ParseInvalidNear) {
     {
         BSONObj query = fromjson(
             "{loc: {$near: [0,0], $geoWithin: {$geometry: {type: \"Polygon\", coordinates: []}}}}");
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         ASSERT_THROWS(
             MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator),
             UserException);
     }
     {
         BSONObj query = fromjson("{loc: {$near: {$foo: 1}}}");
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         StatusWithMatchExpression result =
             MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
         ASSERT_FALSE(result.isOK());
     }
     {
         BSONObj query = fromjson("{loc: {$minDistance: 10}}");
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         StatusWithMatchExpression result =
             MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
         ASSERT_FALSE(result.isOK());
@@ -176,7 +176,7 @@ TEST(MatchExpressionParserGeoNear, ParseInvalidNear) {
 TEST(MatchExpressionParserGeoNear, ParseValidGeoNear) {
     BSONObj query = fromjson("{loc: {$geoNear: [0,0], $maxDistance: 100, $minDistance: 50}}");
 
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -192,35 +192,35 @@ TEST(MatchExpressionParserGeoNear, ParseValidGeoNear) {
 TEST(MatchExpressionParserGeoNear, ParseInvalidGeoNear) {
     {
         BSONObj query = fromjson("{loc: {$maxDistance: 100, $geoNear: [0,0]}}");
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         StatusWithMatchExpression result =
             MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
         ASSERT_FALSE(result.isOK());
     }
     {
         BSONObj query = fromjson("{loc: {$minDistance: 100, $geoNear: [0,0]}}");
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         StatusWithMatchExpression result =
             MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
         ASSERT_FALSE(result.isOK());
     }
     {
         BSONObj query = fromjson("{loc: {$geoNear: [0,0], $eq: 1}}");
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         ASSERT_THROWS(
             MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator),
             UserException);
     }
     {
         BSONObj query = fromjson("{loc: {$geoNear: [0,0], $maxDistance: {}}}");
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         ASSERT_THROWS(
             MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator),
             UserException);
     }
     {
         BSONObj query = fromjson("{loc: {$geoNear: [0,0], $minDistance: {}}}");
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         ASSERT_THROWS(
             MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator),
             UserException);
@@ -230,7 +230,7 @@ TEST(MatchExpressionParserGeoNear, ParseInvalidGeoNear) {
 TEST(MatchExpressionParserGeoNear, ParseValidNearSphere) {
     BSONObj query = fromjson("{loc: {$nearSphere: [0,0], $maxDistance: 100, $minDistance: 50}}");
 
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -246,35 +246,35 @@ TEST(MatchExpressionParserGeoNear, ParseValidNearSphere) {
 TEST(MatchExpressionParserGeoNear, ParseInvalidNearSphere) {
     {
         BSONObj query = fromjson("{loc: {$maxDistance: 100, $nearSphere: [0,0]}}");
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         StatusWithMatchExpression result =
             MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
         ASSERT_FALSE(result.isOK());
     }
     {
         BSONObj query = fromjson("{loc: {$minDistance: 100, $nearSphere: [0,0]}}");
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         StatusWithMatchExpression result =
             MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
         ASSERT_FALSE(result.isOK());
     }
     {
         BSONObj query = fromjson("{loc: {$nearSphere: [0,0], $maxDistance: {}}}");
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         ASSERT_THROWS(
             MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator),
             UserException);
     }
     {
         BSONObj query = fromjson("{loc: {$nearSphere: [0,0], $minDistance: {}}}");
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         ASSERT_THROWS(
             MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator),
             UserException);
     }
     {
         BSONObj query = fromjson("{loc: {$nearSphere: [0,0], $eq: 1}}");
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         ASSERT_THROWS(
             MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator),
             UserException);

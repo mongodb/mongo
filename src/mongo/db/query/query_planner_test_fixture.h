@@ -63,7 +63,7 @@ protected:
 
     void addIndex(BSONObj keyPattern, const MultikeyPaths& multikeyPaths);
 
-    void addIndex(BSONObj keyPattern, CollatorInterface* collator);
+    void addIndex(BSONObj keyPattern, const CollatorInterface* collator);
 
     //
     // Execute planner.

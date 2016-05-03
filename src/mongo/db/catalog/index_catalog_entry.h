@@ -87,7 +87,7 @@ public:
         return _filterExpression.get();
     }
 
-    CollatorInterface* getCollator() {
+    const CollatorInterface* getCollator() const {
         return _collator.get();
     }
 

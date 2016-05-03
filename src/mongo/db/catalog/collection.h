@@ -436,7 +436,7 @@ public:
      * Get a pointer to the collection's default collator. The pointer must not be used after this
      * Collection is destroyed.
      */
-    CollatorInterface* getDefaultCollator() const;
+    const CollatorInterface* getDefaultCollator() const;
 
 private:
     /**

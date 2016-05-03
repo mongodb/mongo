@@ -769,7 +769,8 @@ Interval IndexBoundsBuilder::makePointInterval(double d) {
 }
 
 // static
-BSONObj IndexBoundsBuilder::objFromElement(const BSONElement& elt, CollatorInterface* collator) {
+BSONObj IndexBoundsBuilder::objFromElement(const BSONElement& elt,
+                                           const CollatorInterface* collator) {
     BSONObjBuilder bob;
     CollationIndexKey::collationAwareIndexKeyAppend(elt, collator, &bob);
     return bob.obj();

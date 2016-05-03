@@ -42,7 +42,7 @@ using std::unique_ptr;
 
 TEST(NotMatchExpression, MatchesScalar) {
     BSONObj baseOperand = BSON("$lt" << 5);
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> lt(new LTMatchExpression(collator));
     ASSERT(lt->init("a", baseOperand["$lt"]).isOK());
     NotMatchExpression notOp;
@@ -53,7 +53,7 @@ TEST(NotMatchExpression, MatchesScalar) {
 
 TEST(NotMatchExpression, MatchesArray) {
     BSONObj baseOperand = BSON("$lt" << 5);
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> lt(new LTMatchExpression(collator));
     ASSERT(lt->init("a", baseOperand["$lt"]).isOK());
     NotMatchExpression notOp;
@@ -66,7 +66,7 @@ TEST(NotMatchExpression, MatchesArray) {
 
 TEST(NotMatchExpression, ElemMatchKey) {
     BSONObj baseOperand = BSON("$lt" << 5);
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> lt(new LTMatchExpression(collator));
     ASSERT(lt->init("a", baseOperand["$lt"]).isOK());
     NotMatchExpression notOp;
@@ -130,7 +130,7 @@ TEST(AndOp, MatchesElementThreeClauses) {
     BSONObj notMatch3 = BSON("a"
                              << "r");
 
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> sub1(new LTMatchExpression(collator));
     ASSERT(sub1->init("a", baseOperand1["$lt"]).isOK());
     unique_ptr<ComparisonMatchExpression> sub2(new GTMatchExpression(collator));
@@ -151,7 +151,7 @@ TEST(AndOp, MatchesElementThreeClauses) {
 
 TEST(AndOp, MatchesSingleClause) {
     BSONObj baseOperand = BSON("$ne" << 5);
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> eq(new EqualityMatchExpression(collator));
     ASSERT(eq->init("a", baseOperand["$ne"]).isOK());
     unique_ptr<NotMatchExpression> ne(new NotMatchExpression());
@@ -171,7 +171,7 @@ TEST(AndOp, MatchesThreeClauses) {
     BSONObj baseOperand2 = BSON("$lt" << 10);
     BSONObj baseOperand3 = BSON("$lt" << 100);
 
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> sub1(new GTMatchExpression(collator));
     ASSERT(sub1->init("a", baseOperand1["$gt"]).isOK());
 
@@ -197,7 +197,7 @@ TEST(AndOp, ElemMatchKey) {
     BSONObj baseOperand1 = BSON("a" << 1);
     BSONObj baseOperand2 = BSON("b" << 2);
 
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> sub1(new EqualityMatchExpression(collator));
     ASSERT(sub1->init("a", baseOperand1["a"]).isOK());
 
@@ -318,7 +318,7 @@ TEST( OrOp, MatchesElementThreeClauses ) {
 */
 TEST(OrOp, MatchesSingleClause) {
     BSONObj baseOperand = BSON("$ne" << 5);
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> eq(new EqualityMatchExpression(collator));
     ASSERT(eq->init("a", baseOperand["$ne"]).isOK());
     unique_ptr<NotMatchExpression> ne(new NotMatchExpression());
@@ -337,7 +337,7 @@ TEST(OrOp, MatchesThreeClauses) {
     BSONObj baseOperand1 = BSON("$gt" << 10);
     BSONObj baseOperand2 = BSON("$lt" << 0);
     BSONObj baseOperand3 = BSON("b" << 100);
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> sub1(new GTMatchExpression(collator));
     ASSERT(sub1->init("a", baseOperand1["$gt"]).isOK());
     unique_ptr<ComparisonMatchExpression> sub2(new LTMatchExpression(collator));
@@ -362,7 +362,7 @@ TEST(OrOp, MatchesThreeClauses) {
 TEST(OrOp, ElemMatchKey) {
     BSONObj baseOperand1 = BSON("a" << 1);
     BSONObj baseOperand2 = BSON("b" << 2);
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> sub1(new EqualityMatchExpression(collator));
     ASSERT(sub1->init("a", baseOperand1["a"]).isOK());
     unique_ptr<ComparisonMatchExpression> sub2(new EqualityMatchExpression(collator));
@@ -482,7 +482,7 @@ TEST( NorOp, MatchesElementThreeClauses ) {
 
 TEST(NorOp, MatchesSingleClause) {
     BSONObj baseOperand = BSON("$ne" << 5);
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> eq(new EqualityMatchExpression(collator));
     ASSERT(eq->init("a", baseOperand["$ne"]).isOK());
     unique_ptr<NotMatchExpression> ne(new NotMatchExpression());
@@ -502,7 +502,7 @@ TEST(NorOp, MatchesThreeClauses) {
     BSONObj baseOperand2 = BSON("$lt" << 0);
     BSONObj baseOperand3 = BSON("b" << 100);
 
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> sub1(new GTMatchExpression(collator));
     ASSERT(sub1->init("a", baseOperand1["$gt"]).isOK());
     unique_ptr<ComparisonMatchExpression> sub2(new LTMatchExpression(collator));
@@ -527,7 +527,7 @@ TEST(NorOp, MatchesThreeClauses) {
 TEST(NorOp, ElemMatchKey) {
     BSONObj baseOperand1 = BSON("a" << 1);
     BSONObj baseOperand2 = BSON("b" << 2);
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> sub1(new EqualityMatchExpression(collator));
     ASSERT(sub1->init("a", baseOperand1["a"]).isOK());
     unique_ptr<ComparisonMatchExpression> sub2(new EqualityMatchExpression(collator));
@@ -552,7 +552,7 @@ TEST(NorOp, ElemMatchKey) {
 TEST(NorOp, Equivalent) {
     BSONObj baseOperand1 = BSON("a" << 1);
     BSONObj baseOperand2 = BSON("b" << 2);
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     EqualityMatchExpression sub1(collator);
     ASSERT(sub1.init("a", baseOperand1["a"]).isOK());
     EqualityMatchExpression sub2(collator);
@@ -568,20 +568,4 @@ TEST(NorOp, Equivalent) {
     ASSERT(e1.equivalent(&e1));
     ASSERT(!e1.equivalent(&e2));
 }
-
-/**
-TEST( NorOp, MatchesIndexKey ) {
-    BSONObj baseOperand = BSON( "a" << 5 );
-    unique_ptr<ComparisonMatchExpression> eq( new ComparisonMatchExpression() );
-    ASSERT( eq->init( "a", baseOperand[ "a" ] ).isOK() );
-    OwnedPointerVector<MatchMatchExpression> subMatchExpressions;
-    subMatchExpressions.mutableVector().push_back( eq.release() );
-    NorOp norOp;
-    ASSERT( norOp.init( &subMatchExpressions ).isOK() );
-    IndexSpec indexSpec( BSON( "a" << 1 ) );
-    BSONObj indexKey = BSON( "" << "7" );
-    ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-            norOp.matchesIndexKey( indexKey, indexSpec ) );
-}
-*/
 }

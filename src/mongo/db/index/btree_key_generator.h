@@ -100,7 +100,7 @@ public:
     BtreeKeyGeneratorV1(std::vector<const char*> fieldNames,
                         std::vector<BSONElement> fixed,
                         bool isSparse,
-                        CollatorInterface* collator);
+                        const CollatorInterface* collator);
 
     virtual ~BtreeKeyGeneratorV1() {}
 
@@ -250,7 +250,7 @@ private:
 
     // Null if this key generator orders strings according to the simple binary compare. If
     // non-null, represents the collator used to generate index keys for indexed strings.
-    CollatorInterface* _collator;
+    const CollatorInterface* _collator;
 };
 
 }  // namespace mongo

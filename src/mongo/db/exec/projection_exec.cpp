@@ -75,7 +75,7 @@ ProjectionExec::ProjectionExec()
 
 ProjectionExec::ProjectionExec(const BSONObj& spec,
                                const MatchExpression* queryExpression,
-                               CollatorInterface* collator,
+                               const CollatorInterface* collator,
                                const ExtensionsCallback& extensionsCallback)
     : _include(true),
       _special(false),

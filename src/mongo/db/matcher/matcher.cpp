@@ -43,7 +43,7 @@ namespace mongo {
 
 Matcher::Matcher(const BSONObj& pattern,
                  const ExtensionsCallback& extensionsCallback,
-                 CollatorInterface* collator)
+                 const CollatorInterface* collator)
     : _pattern(pattern) {
     StatusWithMatchExpression statusWithMatcher =
         MatchExpressionParser::parse(pattern, extensionsCallback, collator);

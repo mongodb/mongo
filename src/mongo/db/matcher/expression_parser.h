@@ -52,13 +52,14 @@ public:
      */
     static StatusWithMatchExpression parse(const BSONObj& obj,
                                            const ExtensionsCallback& extensionsCallback,
-                                           CollatorInterface* collator) {
+                                           const CollatorInterface* collator) {
         // The 0 initializes the match expression tree depth.
         return MatchExpressionParser(&extensionsCallback, collator)._parse(obj, 0);
     }
 
 private:
-    MatchExpressionParser(const ExtensionsCallback* extensionsCallback, CollatorInterface* collator)
+    MatchExpressionParser(const ExtensionsCallback* extensionsCallback,
+                          const CollatorInterface* collator)
         : _extensionsCallback(extensionsCallback), _collator(collator) {}
 
     /**
@@ -155,7 +156,7 @@ private:
 
     // Collator that constructed collation-aware MatchExpressions will use.
     // We do not own this pointer - it has to live as long as the parser is active.
-    CollatorInterface* _collator;
+    const CollatorInterface* _collator;
 };
 
 typedef stdx::function<StatusWithMatchExpression(

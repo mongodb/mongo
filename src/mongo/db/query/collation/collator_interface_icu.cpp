@@ -40,7 +40,7 @@ CollatorInterfaceICU::CollatorInterfaceICU(CollationSpec spec,
                                            std::unique_ptr<icu::Collator> collator)
     : CollatorInterface(std::move(spec)), _collator(std::move(collator)) {}
 
-int CollatorInterfaceICU::compare(StringData left, StringData right) {
+int CollatorInterfaceICU::compare(StringData left, StringData right) const {
     UErrorCode status = U_ZERO_ERROR;
     auto compareResult = _collator->compareUTF8(icu::StringPiece(left.rawData(), left.size()),
                                                 icu::StringPiece(right.rawData(), right.size()),
@@ -63,7 +63,8 @@ int CollatorInterfaceICU::compare(StringData left, StringData right) {
     MONGO_UNREACHABLE;
 }
 
-CollatorInterface::ComparisonKey CollatorInterfaceICU::getComparisonKey(StringData stringData) {
+CollatorInterface::ComparisonKey CollatorInterfaceICU::getComparisonKey(
+    StringData stringData) const {
     // A StringPiece is ICU's StringData. They are logically the same abstraction.
     const icu::StringPiece stringPiece(stringData.rawData(), stringData.size());
 

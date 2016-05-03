@@ -195,7 +195,7 @@ public:
 
         // Make the filter.
         BSONObj filterObj = BSON("foo" << 6);
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
             filterObj, ExtensionsCallbackDisallowExtensions(), collator);
         verify(statusWithMatcher.isOK());

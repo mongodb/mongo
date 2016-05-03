@@ -54,7 +54,7 @@ std::string mockTypeToString(CollatorInterfaceMock::MockType type) {
 CollatorInterfaceMock::CollatorInterfaceMock(MockType mockType)
     : CollatorInterface(CollationSpec(mockTypeToString(mockType))), _mockType(mockType) {}
 
-int CollatorInterfaceMock::compare(StringData left, StringData right) {
+int CollatorInterfaceMock::compare(StringData left, StringData right) const {
     switch (_mockType) {
         case MockType::kReverseString: {
             std::string leftString = left.toString();
@@ -72,7 +72,8 @@ int CollatorInterfaceMock::compare(StringData left, StringData right) {
     MONGO_UNREACHABLE;
 }
 
-CollatorInterface::ComparisonKey CollatorInterfaceMock::getComparisonKey(StringData stringData) {
+CollatorInterface::ComparisonKey CollatorInterfaceMock::getComparisonKey(
+    StringData stringData) const {
     switch (_mockType) {
         case MockType::kReverseString: {
             std::string keyDataString = stringData.toString();

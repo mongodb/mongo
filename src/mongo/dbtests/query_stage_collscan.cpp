@@ -90,7 +90,7 @@ public:
         params.tailable = false;
 
         // Make the filter.
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
             filterObj, ExtensionsCallbackDisallowExtensions(), collator);
         verify(statusWithMatcher.isOK());

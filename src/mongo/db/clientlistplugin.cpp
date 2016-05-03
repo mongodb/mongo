@@ -168,7 +168,7 @@ public:
              BSONObjBuilder& result) {
         unique_ptr<MatchExpression> filter;
         if (cmdObj["filter"].isABSONObj()) {
-            CollatorInterface* collator = nullptr;
+            const CollatorInterface* collator = nullptr;
             StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
                 cmdObj["filter"].Obj(), ExtensionsCallbackDisallowExtensions(), collator);
             if (!statusWithMatcher.isOK()) {

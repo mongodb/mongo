@@ -74,7 +74,7 @@ struct S2IndexingParams {
     double radius;
     // Null if this index orders strings according to the simple binary compare. If non-null,
     // represents the collator used to generate index keys for indexed strings.
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
 
     std::string toString() const;
 

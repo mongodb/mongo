@@ -83,7 +83,7 @@ bool testKeygen(const BSONObj& kp,
                 const BSONObjSet& expectedKeys,
                 const MultikeyPaths& expectedMultikeyPaths,
                 bool sparse = false,
-                CollatorInterface* collator = nullptr) {
+                const CollatorInterface* collator = nullptr) {
     invariant(expectedMultikeyPaths.size() == static_cast<size_t>(kp.nFields()));
 
     //

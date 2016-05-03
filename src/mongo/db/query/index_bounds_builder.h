@@ -131,7 +131,7 @@ public:
      * string, and 'collator' is non-null, the result contains the collator-generated comparison key
      * rather than the original string.
      */
-    static BSONObj objFromElement(const BSONElement& elt, CollatorInterface* collator);
+    static BSONObj objFromElement(const BSONElement& elt, const CollatorInterface* collator);
 
     /**
      * Swap start/end in the provided interval.

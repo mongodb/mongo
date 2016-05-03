@@ -381,7 +381,7 @@ std::vector<BSONElement> BSONElement::Array() const {
 */
 int BSONElement::woCompare(const BSONElement& e,
                            bool considerFieldName,
-                           StringData::ComparatorInterface* comparator) const {
+                           const StringData::ComparatorInterface* comparator) const {
     int lt = (int)canonicalType();
     int rt = (int)e.canonicalType();
     int x = lt - rt;
@@ -853,7 +853,7 @@ std::string escape(const std::string& s, bool escape_slash) {
  */
 int compareElementValues(const BSONElement& l,
                          const BSONElement& r,
-                         StringData::ComparatorInterface* comparator) {
+                         const StringData::ComparatorInterface* comparator) {
     int f;
 
     switch (l.type()) {

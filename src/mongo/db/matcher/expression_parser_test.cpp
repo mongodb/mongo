@@ -42,7 +42,7 @@ namespace mongo {
 
 TEST(MatchExpressionParserTest, SimpleEQ1) {
     BSONObj query = BSON("x" << 2);
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -53,7 +53,7 @@ TEST(MatchExpressionParserTest, SimpleEQ1) {
 
 TEST(MatchExpressionParserTest, Multiple1) {
     BSONObj query = BSON("x" << 5 << "y" << BSON("$gt" << 5 << "$lt" << 8));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -67,7 +67,7 @@ TEST(MatchExpressionParserTest, Multiple1) {
 
 TEST(AtomicMatchExpressionTest, AtomicOperator1) {
     BSONObj query = BSON("x" << 5 << "$atomic" << BSON("$gt" << 5 << "$lt" << 8));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -83,7 +83,7 @@ TEST(AtomicMatchExpressionTest, AtomicOperator1) {
 
 TEST(MatchExpressionParserTest, MinDistanceWithoutNearFailsToParse) {
     BSONObj query = fromjson("{loc: {$minDistance: 10}}");
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_FALSE(result.isOK());

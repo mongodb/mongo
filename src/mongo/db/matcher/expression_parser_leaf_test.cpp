@@ -51,7 +51,7 @@ using std::string;
 TEST(MatchExpressionParserLeafTest, NullCollation) {
     BSONObj query = BSON("x"
                          << "string");
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -75,7 +75,7 @@ TEST(MatchExpressionParserLeafTest, Collation) {
 
 TEST(MatchExpressionParserLeafTest, SimpleEQ2) {
     BSONObj query = BSON("x" << BSON("$eq" << 2));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -87,7 +87,7 @@ TEST(MatchExpressionParserLeafTest, SimpleEQ2) {
 
 TEST(MatchExpressionParserLeafTest, SimpleEQUndefined) {
     BSONObj query = BSON("x" << BSON("$eq" << BSONUndefined));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_FALSE(result.isOK());
@@ -96,7 +96,7 @@ TEST(MatchExpressionParserLeafTest, SimpleEQUndefined) {
 TEST(MatchExpressionParserLeafTest, EQNullCollation) {
     BSONObj query = BSON("x" << BSON("$eq"
                                      << "string"));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -120,7 +120,7 @@ TEST(MatchExpressionParserLeafTest, EQCollation) {
 
 TEST(MatchExpressionParserLeafTest, SimpleGT1) {
     BSONObj query = BSON("x" << BSON("$gt" << 2));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -132,7 +132,7 @@ TEST(MatchExpressionParserLeafTest, SimpleGT1) {
 TEST(MatchExpressionParserLeafTest, GTNullCollation) {
     BSONObj query = BSON("x" << BSON("$gt"
                                      << "abc"));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -156,7 +156,7 @@ TEST(MatchExpressionParserLeafTest, GTCollation) {
 
 TEST(MatchExpressionParserLeafTest, SimpleLT1) {
     BSONObj query = BSON("x" << BSON("$lt" << 2));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -169,7 +169,7 @@ TEST(MatchExpressionParserLeafTest, SimpleLT1) {
 TEST(MatchExpressionParserLeafTest, LTNullCollation) {
     BSONObj query = BSON("x" << BSON("$lt"
                                      << "abc"));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -193,7 +193,7 @@ TEST(MatchExpressionParserLeafTest, LTCollation) {
 
 TEST(MatchExpressionParserLeafTest, SimpleGTE1) {
     BSONObj query = BSON("x" << BSON("$gte" << 2));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -206,7 +206,7 @@ TEST(MatchExpressionParserLeafTest, SimpleGTE1) {
 TEST(MatchExpressionParserLeafTest, GTENullCollation) {
     BSONObj query = BSON("x" << BSON("$gte"
                                      << "abc"));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -230,7 +230,7 @@ TEST(MatchExpressionParserLeafTest, GTECollation) {
 
 TEST(MatchExpressionParserLeafTest, SimpleLTE1) {
     BSONObj query = BSON("x" << BSON("$lte" << 2));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -243,7 +243,7 @@ TEST(MatchExpressionParserLeafTest, SimpleLTE1) {
 TEST(MatchExpressionParserLeafTest, LTENullCollation) {
     BSONObj query = BSON("x" << BSON("$lte"
                                      << "abc"));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -267,7 +267,7 @@ TEST(MatchExpressionParserLeafTest, LTECollation) {
 
 TEST(MatchExpressionParserLeafTest, SimpleNE1) {
     BSONObj query = BSON("x" << BSON("$ne" << 2));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -280,7 +280,7 @@ TEST(MatchExpressionParserLeafTest, SimpleNE1) {
 TEST(MatchExpressionParserLeafTest, NENullCollation) {
     BSONObj query = BSON("x" << BSON("$ne"
                                      << "string"));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -308,7 +308,7 @@ TEST(MatchExpressionParserLeafTest, NECollation) {
 
 TEST(MatchExpressionParserLeafTest, SimpleModBad1) {
     BSONObj query = BSON("x" << BSON("$mod" << BSON_ARRAY(3 << 2)));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -336,7 +336,7 @@ TEST(MatchExpressionParserLeafTest, SimpleModBad1) {
 
 TEST(MatchExpressionParserLeafTest, SimpleMod1) {
     BSONObj query = BSON("x" << BSON("$mod" << BSON_ARRAY(3 << 2)));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -348,7 +348,7 @@ TEST(MatchExpressionParserLeafTest, SimpleMod1) {
 
 TEST(MatchExpressionParserLeafTest, SimpleModNotNumber) {
     BSONObj query = BSON("x" << BSON("$mod" << BSON_ARRAY(2 << "r")));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -363,7 +363,7 @@ TEST(MatchExpressionParserLeafTest, SimpleModNotNumber) {
 TEST(MatchExpressionParserLeafTest, IdCollation) {
     BSONObj query = BSON("$id"
                          << "string");
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -410,7 +410,7 @@ TEST(MatchExpressionParserLeafTest, DbCollation) {
 
 TEST(MatchExpressionParserLeafTest, SimpleIN1) {
     BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(2 << 3)));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -422,7 +422,7 @@ TEST(MatchExpressionParserLeafTest, SimpleIN1) {
 
 TEST(MatchExpressionParserLeafTest, INNullCollation) {
     BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY("string")));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -448,7 +448,7 @@ TEST(MatchExpressionParserLeafTest, INSingleDBRef) {
                                                               << "coll"
                                                               << "$id" << oid << "$db"
                                                               << "db"))));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -512,7 +512,7 @@ TEST(MatchExpressionParserLeafTest, INMultipleDBRef) {
                                                                  << "coll"
                                                                  << "$id" << oid << "$db"
                                                                  << "db"))));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -613,7 +613,7 @@ TEST(MatchExpressionParserLeafTest, INDBRefWithOptionalField1) {
     BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$ref"
                                                               << "coll"
                                                               << "$id" << oid << "foo" << 12345))));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -640,7 +640,7 @@ TEST(MatchExpressionParserLeafTest, INInvalidDBRefs) {
     // missing $id
     BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$ref"
                                                               << "coll"))));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     result = MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
@@ -669,7 +669,7 @@ TEST(MatchExpressionParserLeafTest, INInvalidDBRefs) {
 
 TEST(MatchExpressionParserLeafTest, INExpressionDocument) {
     BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$foo" << 1))));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_FALSE(result.isOK());
@@ -677,7 +677,7 @@ TEST(MatchExpressionParserLeafTest, INExpressionDocument) {
 
 TEST(MatchExpressionParserLeafTest, INNotArray) {
     BSONObj query = BSON("x" << BSON("$in" << 5));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_FALSE(result.isOK());
@@ -685,7 +685,7 @@ TEST(MatchExpressionParserLeafTest, INNotArray) {
 
 TEST(MatchExpressionParserLeafTest, INUndefined) {
     BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(BSONUndefined)));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_FALSE(result.isOK());
@@ -693,7 +693,7 @@ TEST(MatchExpressionParserLeafTest, INUndefined) {
 
 TEST(MatchExpressionParserLeafTest, INNotElemMatch) {
     BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$elemMatch" << 1))));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_FALSE(result.isOK());
@@ -706,7 +706,7 @@ TEST(MatchExpressionParserLeafTest, INRegexTooLong) {
     BSONObjBuilder operand;
     operand.appendArray("$in", inArray.obj());
     BSONObj query = BSON("x" << operand.obj());
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_FALSE(result.isOK());
@@ -715,7 +715,7 @@ TEST(MatchExpressionParserLeafTest, INRegexTooLong) {
 TEST(MatchExpressionParserLeafTest, INRegexTooLong2) {
     string tooLargePattern(50 * 1000, 'z');
     BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$regex" << tooLargePattern))));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_FALSE(result.isOK());
@@ -730,7 +730,7 @@ TEST(MatchExpressionParserLeafTest, INRegexStuff) {
     operand.appendArray("$in", inArray.obj());
 
     BSONObj query = BSON("a" << operand.obj());
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -757,7 +757,7 @@ TEST(MatchExpressionParserLeafTest, INRegexStuff) {
 
 TEST(MatchExpressionParserLeafTest, SimpleNIN1) {
     BSONObj query = BSON("x" << BSON("$nin" << BSON_ARRAY(2 << 3)));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -769,7 +769,7 @@ TEST(MatchExpressionParserLeafTest, SimpleNIN1) {
 
 TEST(MatchExpressionParserLeafTest, NINNotArray) {
     BSONObj query = BSON("x" << BSON("$nin" << 5));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_FALSE(result.isOK());
@@ -777,7 +777,7 @@ TEST(MatchExpressionParserLeafTest, NINNotArray) {
 
 TEST(MatchExpressionParserLeafTest, NINNullCollation) {
     BSONObj query = BSON("x" << BSON("$nin" << BSON_ARRAY("string")));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -805,7 +805,7 @@ TEST(MatchExpressionParserLeafTest, Regex1) {
     BSONObjBuilder b;
     b.appendRegex("x", "abc", "i");
     BSONObj query = b.obj();
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -823,7 +823,7 @@ TEST(MatchExpressionParserLeafTest, Regex2) {
                                      << "abc"
                                      << "$options"
                                      << "i"));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -841,7 +841,7 @@ TEST(MatchExpressionParserLeafTest, Regex3) {
                                      << "i"
                                      << "$regex"
                                      << "abc"));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     log() << "result: " << result.getStatus() << endl;
@@ -861,7 +861,7 @@ TEST(MatchExpressionParserLeafTest, RegexBad) {
                                      << "abc"
                                      << "$optionas"
                                      << "i"));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_FALSE(result.isOK());
@@ -889,7 +889,7 @@ TEST(MatchExpressionParserLeafTest, RegexBad) {
 TEST(MatchExpressionParserLeafTest, RegexEmbeddedNULByte) {
     BSONObj query = BSON("x" << BSON("$regex"
                                      << "^a\\x00b"));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -904,7 +904,7 @@ TEST(MatchExpressionParserLeafTest, ExistsYes1) {
     BSONObjBuilder b;
     b.appendBool("$exists", true);
     BSONObj query = BSON("x" << b.obj());
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -919,7 +919,7 @@ TEST(MatchExpressionParserLeafTest, ExistsNO1) {
     BSONObjBuilder b;
     b.appendBool("$exists", false);
     BSONObj query = BSON("x" << b.obj());
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -932,7 +932,7 @@ TEST(MatchExpressionParserLeafTest, ExistsNO1) {
 
 TEST(MatchExpressionParserLeafTest, Type1) {
     BSONObj query = BSON("x" << BSON("$type" << String));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -944,7 +944,7 @@ TEST(MatchExpressionParserLeafTest, Type1) {
 
 TEST(MatchExpressionParserLeafTest, Type2) {
     BSONObj query = BSON("x" << BSON("$type" << (double)NumberDouble));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -955,7 +955,7 @@ TEST(MatchExpressionParserLeafTest, Type2) {
 
 TEST(MatchExpressionParserLeafTest, TypeDoubleOperator) {
     BSONObj query = BSON("x" << BSON("$type" << 1.5));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -967,7 +967,7 @@ TEST(MatchExpressionParserLeafTest, TypeDoubleOperator) {
 TEST(MatchExpressionParserLeafTest, TypeDecimalOperator) {
     if (Decimal128::enabled) {
         BSONObj query = BSON("x" << BSON("$type" << mongo::NumberDecimal));
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         StatusWithMatchExpression result =
             MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
         ASSERT_TRUE(result.isOK());
@@ -979,7 +979,7 @@ TEST(MatchExpressionParserLeafTest, TypeDecimalOperator) {
 
 TEST(MatchExpressionParserLeafTest, TypeNull) {
     BSONObj query = BSON("x" << BSON("$type" << jstNULL));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
@@ -995,7 +995,7 @@ TEST(MatchExpressionParserLeafTest, TypeBadType) {
     BSONObjBuilder b;
     b.append("$type", (JSTypeMax + 1));
     BSONObj query = BSON("x" << b.obj());
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_NOT_OK(result.getStatus());
@@ -1003,14 +1003,14 @@ TEST(MatchExpressionParserLeafTest, TypeBadType) {
 
 TEST(MatchExpressionParserLeafTest, TypeBad) {
     BSONObj query = BSON("x" << BSON("$type" << BSON("x" << 1)));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_FALSE(result.isOK());
 }
 
 TEST(MatchExpressionParserLeafTest, TypeBadString) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: null}}"),
                                                ExtensionsCallbackDisallowExtensions(),
                                                collator).getStatus());
@@ -1030,7 +1030,7 @@ TEST(MatchExpressionParserLeafTest, TypeBadString) {
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameDouble) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression typeNumberDouble = MatchExpressionParser::parse(
         fromjson("{a: {$type: 'double'}}"), ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_OK(typeNumberDouble.getStatus());
@@ -1043,7 +1043,7 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameDouble) {
 
 TEST(MatchExpressionParserLeafTest, TypeStringNameNumberDecimal) {
     if (Decimal128::enabled) {
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         StatusWithMatchExpression typeNumberDecimal = MatchExpressionParser::parse(
             fromjson("{a: {$type: 'decimal'}}"), ExtensionsCallbackDisallowExtensions(), collator);
         ASSERT_OK(typeNumberDecimal.getStatus());
@@ -1056,7 +1056,7 @@ TEST(MatchExpressionParserLeafTest, TypeStringNameNumberDecimal) {
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameNumberInt) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression typeNumberInt = MatchExpressionParser::parse(
         fromjson("{a: {$type: 'int'}}"), ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_OK(typeNumberInt.getStatus());
@@ -1068,7 +1068,7 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameNumberInt) {
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameNumberLong) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression typeNumberLong = MatchExpressionParser::parse(
         fromjson("{a: {$type: 'long'}}"), ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_OK(typeNumberLong.getStatus());
@@ -1080,7 +1080,7 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameNumberLong) {
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameString) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression typeString = MatchExpressionParser::parse(
         fromjson("{a: {$type: 'string'}}"), ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_OK(typeString.getStatus());
@@ -1091,7 +1091,7 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameString) {
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnamejstOID) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression typejstOID = MatchExpressionParser::parse(
         fromjson("{a: {$type: 'objectId'}}"), ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_OK(typejstOID.getStatus());
@@ -1102,7 +1102,7 @@ TEST(MatchExpressionParserLeafTest, TypeStringnamejstOID) {
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnamejstNULL) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression typejstNULL = MatchExpressionParser::parse(
         fromjson("{a: {$type: 'null'}}"), ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_OK(typejstNULL.getStatus());
@@ -1114,7 +1114,7 @@ TEST(MatchExpressionParserLeafTest, TypeStringnamejstNULL) {
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameBool) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression typeBool = MatchExpressionParser::parse(
         fromjson("{a: {$type: 'bool'}}"), ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_OK(typeBool.getStatus());
@@ -1125,7 +1125,7 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameBool) {
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameObject) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression typeObject = MatchExpressionParser::parse(
         fromjson("{a: {$type: 'object'}}"), ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_OK(typeObject.getStatus());
@@ -1136,7 +1136,7 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameObject) {
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameArray) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression typeArray = MatchExpressionParser::parse(
         fromjson("{a: {$type: 'array'}}"), ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_OK(typeArray.getStatus());
@@ -1147,7 +1147,7 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameArray) {
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameNumber) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression typeNumber = MatchExpressionParser::parse(
         fromjson("{a: {$type: 'number'}}"), ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_OK(typeNumber.getStatus());
@@ -1159,21 +1159,21 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameNumber) {
 }
 
 TEST(MatchExpressionParserLeafTest, InvalidTypeCodeLessThanMinKeyFailsToParse) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression typeNumber = MatchExpressionParser::parse(
         fromjson("{a: {$type: -20}}"), ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_NOT_OK(typeNumber.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, InvalidTypeCodeGreaterThanMaxKeyFailsToParse) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression typeNumber = MatchExpressionParser::parse(
         fromjson("{a: {$type: 400}}"), ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_NOT_OK(typeNumber.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, InvalidTypeCodeUnusedBetweenMinAndMaxFailsToParse) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression typeNumber = MatchExpressionParser::parse(
         fromjson("{a: {$type: 62}}"), ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_NOT_OK(typeNumber.getStatus());
@@ -1187,7 +1187,7 @@ TEST(MatchExpressionParserLeafTest, ValidTypeCodesParseSuccessfully) {
 
     for (auto type : validTypes) {
         BSONObj predicate = BSON("a" << BSON("$type" << type));
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         auto expression = MatchExpressionParser::parse(
             predicate, ExtensionsCallbackDisallowExtensions(), collator);
         ASSERT_OK(expression.getStatus());
@@ -1199,7 +1199,7 @@ TEST(MatchExpressionParserLeafTest, ValidTypeCodesParseSuccessfully) {
 TEST(MatchExpressionParserTest, BitTestMatchExpressionValidMask) {
     const double k2Power53 = scalbn(1, 32);
 
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllSet" << 54)),
                                            ExtensionsCallbackDisallowExtensions(),
                                            collator).getStatus());
@@ -1264,7 +1264,7 @@ TEST(MatchExpressionParserTest, BitTestMatchExpressionValidArray) {
     ASSERT_EQ(BSONType::NumberLong, bsonArrayLongLong[2].type());
     ASSERT_EQ(BSONType::NumberLong, bsonArrayLongLong[3].type());
 
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllSet" << BSON_ARRAY(0))),
                                            ExtensionsCallbackDisallowExtensions(),
                                            collator).getStatus());
@@ -1327,7 +1327,7 @@ TEST(MatchExpressionParserTest, BitTestMatchExpressionValidArray) {
 }
 
 TEST(MatchExpressionParserTest, BitTestMatchExpressionValidBinData) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     ASSERT_OK(
         MatchExpressionParser::parse(
             fromjson("{a: {$bitsAllSet: {$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}}"),
@@ -1356,7 +1356,7 @@ TEST(MatchExpressionParserTest, BitTestMatchExpressionValidBinData) {
 }
 
 TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidMaskType) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: null}}"),
                                                ExtensionsCallbackDisallowExtensions(),
                                                collator).getStatus());
@@ -1425,7 +1425,7 @@ TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidMaskType) {
 TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidMaskValue) {
     const double kLongLongMaxAsDouble = scalbn(1, std::numeric_limits<long long>::digits);
 
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: NaN}}"),
                                                ExtensionsCallbackDisallowExtensions(),
                                                collator).getStatus());
@@ -1500,7 +1500,7 @@ TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidMaskValue) {
 }
 
 TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidArray) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [null]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
                                                collator).getStatus());
@@ -1615,7 +1615,7 @@ TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidArray) {
 }
 
 TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidArrayValue) {
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [-54]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
                                                collator).getStatus());

@@ -37,14 +37,15 @@
 namespace mongo {
 
 // TODO SERVER-23172: Update this to consider strings inside nested objects or arrays.
-bool CollationIndexKey::shouldUseCollationIndexKey(BSONElement elt, CollatorInterface* collator) {
+bool CollationIndexKey::shouldUseCollationIndexKey(BSONElement elt,
+                                                   const CollatorInterface* collator) {
     return collator && elt.type() == BSONType::String;
 }
 
 // TODO SERVER-23172: Update this to convert strings inside nested objects or arrays to their
 // corresponding comparison keys.
 void CollationIndexKey::collationAwareIndexKeyAppend(BSONElement elt,
-                                                     CollatorInterface* collator,
+                                                     const CollatorInterface* collator,
                                                      BSONObjBuilder* out) {
     if (shouldUseCollationIndexKey(elt, collator)) {
         auto comparisonKey = collator->getComparisonKey(elt.valueStringData());

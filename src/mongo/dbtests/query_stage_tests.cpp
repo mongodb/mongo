@@ -80,7 +80,7 @@ public:
     int countResults(const IndexScanParams& params, BSONObj filterObj = BSONObj()) {
         AutoGetCollectionForRead ctx(&_txn, ns());
 
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
             filterObj, ExtensionsCallbackDisallowExtensions(), collator);
         verify(statusWithMatcher.isOK());

@@ -249,7 +249,7 @@ public:
             }
             BSONObj argObj = e.Obj();
             if (filterTag == e.fieldName()) {
-                CollatorInterface* collator = nullptr;
+                const CollatorInterface* collator = nullptr;
                 StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
                     argObj, ExtensionsCallbackReal(txn, &collection->ns()), collator);
                 if (!statusWithMatcher.isOK()) {

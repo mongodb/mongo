@@ -45,7 +45,7 @@ const char* EnsureSortedStage::kStageType = "ENSURE_SORTED";
 
 EnsureSortedStage::EnsureSortedStage(OperationContext* opCtx,
                                      BSONObj pattern,
-                                     CollatorInterface* collator,
+                                     const CollatorInterface* collator,
                                      WorkingSet* ws,
                                      PlanStage* child)
     : PlanStage(kStageType, opCtx), _ws(ws), _collator(collator) {

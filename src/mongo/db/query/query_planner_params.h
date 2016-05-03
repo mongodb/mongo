@@ -121,7 +121,7 @@ struct QueryPlannerParams {
     // The collation which this query must respect. Distinct from the CollatorInterfaces attached to
     // the IndexEntry instances, which give the physical properties of the indices rather than the
     // logical collation which the query must use.
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
 };
 
 }  // namespace mongo

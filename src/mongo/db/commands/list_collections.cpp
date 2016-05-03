@@ -192,7 +192,7 @@ public:
                     result, Status(ErrorCodes::BadValue, "\"filter\" must be an object"));
             }
             // The collator is null because collection objects are compared using binary comparison.
-            CollatorInterface* collator = nullptr;
+            const CollatorInterface* collator = nullptr;
             StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
                 filterElt.Obj(), ExtensionsCallbackDisallowExtensions(), collator);
             if (!statusWithMatcher.isOK()) {

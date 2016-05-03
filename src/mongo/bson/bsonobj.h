@@ -404,7 +404,7 @@ public:
     int woCompare(const BSONObj& r,
                   const Ordering& o,
                   bool considerFieldName = true,
-                  StringData::ComparatorInterface* comparator = nullptr) const;
+                  const StringData::ComparatorInterface* comparator = nullptr) const;
 
     /**wo='well ordered'.  fields must be in same order in each object.
        Ordering is with respect to the signs of the elements
@@ -415,7 +415,7 @@ public:
     int woCompare(const BSONObj& r,
                   const BSONObj& ordering = BSONObj(),
                   bool considerFieldName = true,
-                  StringData::ComparatorInterface* comparator = nullptr) const;
+                  const StringData::ComparatorInterface* comparator = nullptr) const;
 
     bool operator<(const BSONObj& other) const {
         return woCompare(other) < 0;

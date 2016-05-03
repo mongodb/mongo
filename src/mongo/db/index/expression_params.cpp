@@ -124,7 +124,7 @@ void ExpressionParams::parseHaystackParams(const BSONObj& infoObj,
 }
 
 void ExpressionParams::initialize2dsphereParams(const BSONObj& infoObj,
-                                                CollatorInterface* collator,
+                                                const CollatorInterface* collator,
                                                 S2IndexingParams* out) {
     // Set up basic params.
     out->collator = collator;

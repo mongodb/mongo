@@ -55,7 +55,7 @@ void parseHaystackParams(const BSONObj& infoObj,
                          double* bucketSizeOut);
 
 void initialize2dsphereParams(const BSONObj& infoObj,
-                              CollatorInterface* collator,
+                              const CollatorInterface* collator,
                               S2IndexingParams* out);
 
 }  // namespace ExpressionParams

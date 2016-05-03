@@ -44,7 +44,7 @@ TEST(ElemMatchObjectMatchExpression, MatchesElementSingle) {
     BSONObj baseOperand = BSON("b" << 5);
     BSONObj match = BSON("a" << BSON_ARRAY(BSON("b" << 5.0)));
     BSONObj notMatch = BSON("a" << BSON_ARRAY(BSON("b" << 6)));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> eq(new EqualityMatchExpression(collator));
     ASSERT(eq->init("b", baseOperand["b"]).isOK());
     ElemMatchObjectMatchExpression op;
@@ -57,7 +57,7 @@ TEST(ElemMatchObjectMatchExpression, MatchesElementArray) {
     BSONObj baseOperand = BSON("1" << 5);
     BSONObj match = BSON("a" << BSON_ARRAY(BSON_ARRAY('s' << 5.0)));
     BSONObj notMatch = BSON("a" << BSON_ARRAY(BSON_ARRAY(5 << 6)));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> eq(new EqualityMatchExpression(collator));
     ASSERT(eq->init("1", baseOperand["1"]).isOK());
     ElemMatchObjectMatchExpression op;
@@ -74,7 +74,7 @@ TEST(ElemMatchObjectMatchExpression, MatchesElementMultiple) {
     BSONObj notMatch2 = BSON("a" << BSON_ARRAY(BSON("b" << 6 << "c" << 7)));
     BSONObj notMatch3 = BSON("a" << BSON_ARRAY(BSON("b" << BSON_ARRAY(5 << 6))));
     BSONObj match = BSON("a" << BSON_ARRAY(BSON("b" << BSON_ARRAY(5 << 6) << "c" << 7)));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> eq1(new EqualityMatchExpression(collator));
     ASSERT(eq1->init("b", baseOperand1["b"]).isOK());
     unique_ptr<ComparisonMatchExpression> eq2(new EqualityMatchExpression(collator));
@@ -97,7 +97,7 @@ TEST(ElemMatchObjectMatchExpression, MatchesElementMultiple) {
 
 TEST(ElemMatchObjectMatchExpression, MatchesNonArray) {
     BSONObj baseOperand = BSON("b" << 5);
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> eq(new EqualityMatchExpression(collator));
     ASSERT(eq->init("b", baseOperand["b"]).isOK());
     ElemMatchObjectMatchExpression op;
@@ -111,7 +111,7 @@ TEST(ElemMatchObjectMatchExpression, MatchesNonArray) {
 
 TEST(ElemMatchObjectMatchExpression, MatchesArrayObject) {
     BSONObj baseOperand = BSON("b" << 5);
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> eq(new EqualityMatchExpression(collator));
     ASSERT(eq->init("b", baseOperand["b"]).isOK());
     ElemMatchObjectMatchExpression op;
@@ -124,7 +124,7 @@ TEST(ElemMatchObjectMatchExpression, MatchesArrayObject) {
 
 TEST(ElemMatchObjectMatchExpression, MatchesMultipleNamedValues) {
     BSONObj baseOperand = BSON("c" << 5);
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> eq(new EqualityMatchExpression(collator));
     ASSERT(eq->init("c", baseOperand["c"]).isOK());
     ElemMatchObjectMatchExpression op;
@@ -137,7 +137,7 @@ TEST(ElemMatchObjectMatchExpression, MatchesMultipleNamedValues) {
 
 TEST(ElemMatchObjectMatchExpression, ElemMatchKey) {
     BSONObj baseOperand = BSON("c" << 6);
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> eq(new EqualityMatchExpression(collator));
     ASSERT(eq->init("c", baseOperand["c"]).isOK());
     ElemMatchObjectMatchExpression op;
@@ -178,7 +178,7 @@ TEST(ElemMatchValueMatchExpression, MatchesElementSingle) {
     BSONObj baseOperand = BSON("$gt" << 5);
     BSONObj match = BSON("a" << BSON_ARRAY(6));
     BSONObj notMatch = BSON("a" << BSON_ARRAY(4));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> gt(new GTMatchExpression(collator));
     ASSERT(gt->init("", baseOperand["$gt"]).isOK());
     ElemMatchValueMatchExpression op;
@@ -193,7 +193,7 @@ TEST(ElemMatchValueMatchExpression, MatchesElementMultiple) {
     BSONObj notMatch1 = BSON("a" << BSON_ARRAY(0 << 1));
     BSONObj notMatch2 = BSON("a" << BSON_ARRAY(10 << 11));
     BSONObj match = BSON("a" << BSON_ARRAY(0 << 5 << 11));
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> gt(new GTMatchExpression(collator));
     ASSERT(gt->init("", baseOperand1["$gt"]).isOK());
     unique_ptr<ComparisonMatchExpression> lt(new LTMatchExpression(collator));
@@ -211,7 +211,7 @@ TEST(ElemMatchValueMatchExpression, MatchesElementMultiple) {
 
 TEST(ElemMatchValueMatchExpression, MatchesNonArray) {
     BSONObj baseOperand = BSON("$gt" << 5);
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> gt(new GTMatchExpression(collator));
     ASSERT(gt->init("", baseOperand["$gt"]).isOK());
     ElemMatchObjectMatchExpression op;
@@ -224,7 +224,7 @@ TEST(ElemMatchValueMatchExpression, MatchesNonArray) {
 
 TEST(ElemMatchValueMatchExpression, MatchesArrayScalar) {
     BSONObj baseOperand = BSON("$gt" << 5);
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> gt(new GTMatchExpression(collator));
     ASSERT(gt->init("", baseOperand["$gt"]).isOK());
     ElemMatchValueMatchExpression op;
@@ -236,7 +236,7 @@ TEST(ElemMatchValueMatchExpression, MatchesArrayScalar) {
 
 TEST(ElemMatchValueMatchExpression, MatchesMultipleNamedValues) {
     BSONObj baseOperand = BSON("$gt" << 5);
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> gt(new GTMatchExpression(collator));
     ASSERT(gt->init("", baseOperand["$gt"]).isOK());
     ElemMatchValueMatchExpression op;
@@ -249,7 +249,7 @@ TEST(ElemMatchValueMatchExpression, MatchesMultipleNamedValues) {
 
 TEST(ElemMatchValueMatchExpression, ElemMatchKey) {
     BSONObj baseOperand = BSON("$gt" << 6);
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> gt(new GTMatchExpression(collator));
     ASSERT(gt->init("", baseOperand["$gt"]).isOK());
     ElemMatchValueMatchExpression op;
@@ -287,7 +287,7 @@ TEST( ElemMatchValueMatchExpression, MatchesIndexKey ) {
 
 TEST(AndOfElemMatch, MatchesElement) {
     BSONObj baseOperanda1 = BSON("a" << 1);
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> eqa1(new EqualityMatchExpression(collator));
     ASSERT(eqa1->init("a", baseOperanda1["a"]).isOK());
 
@@ -345,7 +345,7 @@ TEST(AndOfElemMatch, MatchesElement) {
 
 TEST(AndOfElemMatch, Matches) {
     BSONObj baseOperandgt1 = BSON("$gt" << 1);
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     unique_ptr<ComparisonMatchExpression> gt1(new GTMatchExpression(collator));
     ASSERT(gt1->init("", baseOperandgt1["$gt"]).isOK());
 

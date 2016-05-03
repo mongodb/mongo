@@ -80,7 +80,7 @@ public:
                             HashSeed seed,
                             int hashVersion,
                             bool isSparse,
-                            CollatorInterface* collator,
+                            const CollatorInterface* collator,
                             BSONObjSet* keys);
 
     /**

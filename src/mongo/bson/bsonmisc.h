@@ -43,7 +43,7 @@ public:
      * string elements.  A custom string comparator may be provided, but it must outlive the
      * constructed BSONElementCmpWithoutField.
      */
-    BSONElementCmpWithoutField(StringData::ComparatorInterface* stringComparator = nullptr)
+    BSONElementCmpWithoutField(const StringData::ComparatorInterface* stringComparator = nullptr)
         : _stringComparator(stringComparator) {}
 
     bool operator()(const BSONElement& l, const BSONElement& r) const {
@@ -51,7 +51,7 @@ public:
     }
 
 private:
-    StringData::ComparatorInterface* _stringComparator;
+    const StringData::ComparatorInterface* _stringComparator;
 };
 
 class BSONObjCmp {
@@ -62,7 +62,7 @@ public:
      * constructed BSONElementCmpWithoutField.
      */
     BSONObjCmp(const BSONObj& order = BSONObj(),
-               StringData::ComparatorInterface* stringComparator = nullptr)
+               const StringData::ComparatorInterface* stringComparator = nullptr)
         : _order(order), _stringComparator(stringComparator) {}
     bool operator()(const BSONObj& l, const BSONObj& r) const {
         return l.woCompare(r, _order, true, _stringComparator) < 0;
@@ -73,7 +73,7 @@ public:
 
 private:
     BSONObj _order;
-    StringData::ComparatorInterface* _stringComparator;
+    const StringData::ComparatorInterface* _stringComparator;
 };
 
 typedef std::set<BSONObj, BSONObjCmp> BSONObjSet;

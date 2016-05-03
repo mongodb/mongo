@@ -974,7 +974,7 @@ Status Collection::setValidationAction(OperationContext* txn, StringData newActi
     return Status::OK();
 }
 
-CollatorInterface* Collection::getDefaultCollator() const {
+const CollatorInterface* Collection::getDefaultCollator() const {
     return _collator.get();
 }
 

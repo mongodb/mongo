@@ -62,7 +62,7 @@ class Basic {
 public:
     void run() {
         BSONObj query = fromjson("{\"a\":\"b\"}");
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         M m(query, ExtensionsCallbackDisallowExtensions(), collator);
         ASSERT(m.matches(fromjson("{\"a\":\"b\"}")));
     }
@@ -73,7 +73,7 @@ class DoubleEqual {
 public:
     void run() {
         BSONObj query = fromjson("{\"a\":5}");
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         M m(query, ExtensionsCallbackDisallowExtensions(), collator);
         ASSERT(m.matches(fromjson("{\"a\":5}")));
     }
@@ -85,7 +85,7 @@ public:
     void run() {
         BSONObjBuilder query;
         query.append("a", 5);
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         M m(query.done(), ExtensionsCallbackDisallowExtensions(), collator);
         ASSERT(m.matches(fromjson("{\"a\":5}")));
     }
@@ -96,7 +96,7 @@ class MixedNumericGt {
 public:
     void run() {
         BSONObj query = fromjson("{\"a\":{\"$gt\":4}}");
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         M m(query, ExtensionsCallbackDisallowExtensions(), collator);
         BSONObjBuilder b;
         b.append("a", 5);
@@ -112,7 +112,7 @@ public:
         ASSERT_EQUALS(4, query["a"].embeddedObject()["$in"].embeddedObject()["0"].number());
         ASSERT_EQUALS(NumberInt, query["a"].embeddedObject()["$in"].embeddedObject()["0"].type());
 
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         M m(query, ExtensionsCallbackDisallowExtensions(), collator);
 
         {
@@ -140,7 +140,7 @@ template <typename M>
 class MixedNumericEmbedded {
 public:
     void run() {
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         M m(BSON("a" << BSON("x" << 1)), ExtensionsCallbackDisallowExtensions(), collator);
         ASSERT(m.matches(BSON("a" << BSON("x" << 1))));
         ASSERT(m.matches(BSON("a" << BSON("x" << 1.0))));
@@ -151,7 +151,7 @@ template <typename M>
 class Size {
 public:
     void run() {
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         M m(fromjson("{a:{$size:4}}"), ExtensionsCallbackDisallowExtensions(), collator);
         ASSERT(m.matches(fromjson("{a:[1,2,3,4]}")));
         ASSERT(!m.matches(fromjson("{a:[1,2,3]}")));
@@ -164,7 +164,7 @@ template <typename M>
 class WithinBox {
 public:
     void run() {
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         M m(fromjson("{loc:{$within:{$box:[{x: 4, y:4},[6,6]]}}}"),
             ExtensionsCallbackDisallowExtensions(),
             collator);
@@ -180,7 +180,7 @@ template <typename M>
 class WithinPolygon {
 public:
     void run() {
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         M m(fromjson("{loc:{$within:{$polygon:[{x:0,y:0},[0,5],[5,5],[5,0]]}}}"),
             ExtensionsCallbackDisallowExtensions(),
             collator);
@@ -196,7 +196,7 @@ template <typename M>
 class WithinCenter {
 public:
     void run() {
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         M m(fromjson("{loc:{$within:{$center:[{x:30,y:30},10]}}}"),
             ExtensionsCallbackDisallowExtensions(),
             collator);
@@ -215,7 +215,7 @@ template <typename M>
 class ElemMatchKey {
 public:
     void run() {
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         M matcher(BSON("a.b" << 1), ExtensionsCallbackDisallowExtensions(), collator);
         MatchDetails details;
         details.requestElemMatchKey();
@@ -236,7 +236,7 @@ public:
         const NamespaceString nss("unittests.matchertests");
         AutoGetCollectionForRead ctx(&txn, nss);
 
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         M m(BSON("$where"
                  << "function(){ return this.a == 1; }"),
             ExtensionsCallbackReal(&txn, &nss),
@@ -250,7 +250,7 @@ template <typename M>
 class TimingBase {
 public:
     long dotime(const BSONObj& patt, const BSONObj& obj) {
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         M m(patt, ExtensionsCallbackDisallowExtensions(), collator);
         Timer t;
         for (int i = 0; i < 900000; i++) {
@@ -281,7 +281,7 @@ template <typename M>
 class NullCollator {
 public:
     void run() {
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         M matcher(BSON("a"
                        << "string"),
                   ExtensionsCallbackDisallowExtensions(),

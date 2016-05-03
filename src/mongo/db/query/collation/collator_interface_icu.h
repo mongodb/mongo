@@ -43,9 +43,9 @@ class CollatorInterfaceICU final : public CollatorInterface {
 public:
     CollatorInterfaceICU(CollationSpec spec, std::unique_ptr<icu::Collator> collator);
 
-    int compare(StringData left, StringData right) final;
+    int compare(StringData left, StringData right) const final;
 
-    ComparisonKey getComparisonKey(StringData stringData) final;
+    ComparisonKey getComparisonKey(StringData stringData) const final;
 
 private:
     // The ICU implementation of the collator to which we delegate interesting work. Const methods

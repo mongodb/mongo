@@ -47,7 +47,7 @@ TEST(MatchExpressionTest, Parse1) {
 
 TEST(LeafMatchExpressionTest, Equal1) {
     BSONObj temp = BSON("x" << 5);
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     EqualityMatchExpression e(collator);
     e.init("x", temp["x"]);
 
@@ -67,7 +67,7 @@ TEST(LeafMatchExpressionTest, Comp1) {
     BSONObj temp = BSON("x" << 5);
 
     {
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         LTEMatchExpression e(collator);
         e.init("x", temp["x"]);
         ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 5 }")));
@@ -77,7 +77,7 @@ TEST(LeafMatchExpressionTest, Comp1) {
     }
 
     {
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         LTMatchExpression e(collator);
         e.init("x", temp["x"]);
         ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 5 }")));
@@ -87,7 +87,7 @@ TEST(LeafMatchExpressionTest, Comp1) {
     }
 
     {
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         GTEMatchExpression e(collator);
         e.init("x", temp["x"]);
         ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 5 }")));
@@ -97,7 +97,7 @@ TEST(LeafMatchExpressionTest, Comp1) {
     }
 
     {
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         GTMatchExpression e(collator);
         e.init("x", temp["x"]);
         ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 5 }")));

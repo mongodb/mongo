@@ -532,7 +532,7 @@ bool TypeMatchExpression::equivalent(const MatchExpression* other) const {
 
 // --------
 
-ArrayFilterEntries::ArrayFilterEntries(CollatorInterface* collator)
+ArrayFilterEntries::ArrayFilterEntries(const CollatorInterface* collator)
     : _hasNull(false), _hasEmptyArray(false), _equalities(collator), _collator(collator) {}
 
 ArrayFilterEntries::~ArrayFilterEntries() {

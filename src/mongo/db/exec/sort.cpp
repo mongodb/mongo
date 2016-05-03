@@ -56,7 +56,7 @@ using stdx::make_unique;
 // static
 const char* SortStage::kStageType = "SORT";
 
-SortStage::WorkingSetComparator::WorkingSetComparator(BSONObj p, CollatorInterface* c)
+SortStage::WorkingSetComparator::WorkingSetComparator(BSONObj p, const CollatorInterface* c)
     : pattern(p), collator(c) {}
 
 bool SortStage::WorkingSetComparator::operator()(const SortableDataItem& lhs,

@@ -154,19 +154,19 @@ public:
  */
 struct ModifierInterface::Options {
     Options() = default;
-    Options(bool repl, bool ofs, CollatorInterface* collator)
+    Options(bool repl, bool ofs, const CollatorInterface* collator)
         : fromReplication(repl), enforceOkForStorage(ofs), collator(collator) {}
 
-    static Options normal(CollatorInterface* collator = nullptr) {
+    static Options normal(const CollatorInterface* collator = nullptr) {
         return Options(false, true, collator);
     }
-    static Options fromRepl(CollatorInterface* collator = nullptr) {
+    static Options fromRepl(const CollatorInterface* collator = nullptr) {
         return Options(true, false, collator);
     }
 
     bool fromReplication = false;
     bool enforceOkForStorage = true;
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
 };
 
 struct ModifierInterface::ExecInfo {

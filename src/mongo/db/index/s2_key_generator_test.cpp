@@ -71,7 +71,7 @@ long long getCellID(int x, int y) {
     BSONObj keyPattern = fromjson("{a: '2dsphere'}");
     BSONObj infoObj = fromjson("{key: {a: '2dsphere'}, '2dsphereIndexVersion': 3}");
     S2IndexingParams params;
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
     BSONObjSet keys;
     ExpressionKeysPrivate::getS2Keys(obj, keyPattern, params, &keys);
@@ -240,7 +240,7 @@ TEST(S2KeyGeneratorTest, NoCollation) {
     BSONObj keyPattern = fromjson("{a: '2dsphere', b: 1}");
     BSONObj infoObj = fromjson("{key: {a: '2dsphere', b: 1}, '2dsphereIndexVersion': 3}");
     S2IndexingParams params;
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
     BSONObjSet actualKeys;
     ExpressionKeysPrivate::getS2Keys(obj, keyPattern, params, &actualKeys);

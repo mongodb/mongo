@@ -57,7 +57,7 @@ public:
 
     // Null if this sort stage orders strings according to simple binary compare. If non-null,
     // represents the collator used to compare strings.
-    CollatorInterface* collator;
+    const CollatorInterface* collator;
 
     // Equal to 0 for no limit.
     size_t limit;
@@ -110,7 +110,7 @@ private:
 
     // Null if this sort stage orders strings according to simple binary compare. If non-null,
     // represents the collator used to compare strings.
-    CollatorInterface* _collator;
+    const CollatorInterface* _collator;
 
     // Equal to 0 for no limit.
     size_t _limit;
@@ -139,13 +139,13 @@ private:
     // Keys are compared using BSONObj::woCompare() with RecordId as a tie-breaker. 'collator' is
     // passed to woCompare() to perform string comparisons.
     struct WorkingSetComparator {
-        explicit WorkingSetComparator(BSONObj p, CollatorInterface* collator);
+        explicit WorkingSetComparator(BSONObj p, const CollatorInterface* collator);
 
         bool operator()(const SortableDataItem& lhs, const SortableDataItem& rhs) const;
 
         BSONObj pattern;
 
-        CollatorInterface* collator;
+        const CollatorInterface* collator;
     };
 
     /**

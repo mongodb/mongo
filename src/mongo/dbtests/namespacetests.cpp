@@ -101,7 +101,7 @@ public:
 
         // Call getKeys on the nullObj.
         BSONObjSet nullFieldKeySet;
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         ExpressionKeysPrivate::getHashKeys(nullObj, "a", 0, 0, false, collator, &nullFieldKeySet);
         BSONElement nullFieldFromKey = nullFieldKeySet.begin()->firstElement();
 
@@ -128,7 +128,7 @@ public:
         BSONObj nullObj = BSON("a" << BSONNULL);
 
         BSONObjSet nullFieldKeySet;
-        CollatorInterface* collator = nullptr;
+        const CollatorInterface* collator = nullptr;
         ExpressionKeysPrivate::getHashKeys(
             nullObj, "a", 0x5eed, 0, false, collator, &nullFieldKeySet);
         BSONElement nullFieldFromKey = nullFieldKeySet.begin()->firstElement();

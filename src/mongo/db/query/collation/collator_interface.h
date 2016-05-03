@@ -95,13 +95,13 @@ public:
      * 0 if 'left' is greater than 'right' w.r.t. the collation, and 0 if 'left' and 'right' are
      * equal w.r.t. the collation.
      */
-    virtual int compare(StringData left, StringData right) = 0;
+    virtual int compare(StringData left, StringData right) const = 0;
 
     /**
      * Returns the comparison key for 'stringData', according to this collation. See ComparisonKey's
      * comments for details.
      */
-    virtual ComparisonKey getComparisonKey(StringData stringData) = 0;
+    virtual ComparisonKey getComparisonKey(StringData stringData) const = 0;
 
     /**
      * Returns whether this collation has the same matching and sorting semantics as 'other'.

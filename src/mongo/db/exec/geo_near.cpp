@@ -744,7 +744,7 @@ GeoNear2DSphereStage::GeoNear2DSphereStage(const GeoNearParams& nearParams,
     _specificStats.indexName = s2Index->indexName();
     _specificStats.indexVersion = s2Index->version();
     // TODO SERVER-23968: change nullptr to the appropriate collator.
-    CollatorInterface* collator = nullptr;
+    const CollatorInterface* collator = nullptr;
     ExpressionParams::initialize2dsphereParams(s2Index->infoObj(), collator, &_indexParams);
 }
 

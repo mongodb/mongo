@@ -64,7 +64,7 @@ public:
                             ModifierInterface::Options::normal()));
     }
 
-    Mod(BSONObj modObj, CollatorInterface* collator) : _modObj(modObj), _mod() {
+    Mod(BSONObj modObj, const CollatorInterface* collator) : _modObj(modObj), _mod() {
         ASSERT_OK(_mod.init(_modObj["$pull"].embeddedObject().firstElement(),
                             ModifierInterface::Options::normal(collator)));
     }
