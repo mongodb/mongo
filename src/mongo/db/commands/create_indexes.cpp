@@ -31,6 +31,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -114,6 +115,26 @@ public:
                     errmsg = "everything in indexes has to be an Object";
                     result.append("cmdObj", cmdObj);
                     return false;
+                }
+
+                // Verify that there are no duplicate keys
+                BSONElement indexKey = e.Obj()["key"];
+                if (indexKey.type() != Object) {
+                    errmsg = "missing 'key' property in index spec";
+                    result.append("cmdObj", cmdObj);
+                    return false;
+                }
+                BSONObjIterator it(indexKey.Obj());
+                std::vector<StringData> keys;
+                while (itr.more()) {
+                    BSONElement e = itr.next();
+                    StringData fieldName(e.fieldName(), e.fieldNameSize());
+                    if (std::find(keys.begin(), keys.end(), fieldName) != keys.end()) {
+                        errmsg = str::stream()
+                            << "duplicate keys detected in index spec: " << indexKey;
+                        return false;
+                    }
+                    keys.push_back(fieldName);
                 }
                 specs.push_back(e.Obj());
             }

@@ -165,6 +165,49 @@ public:
     }
 };
 
+class CreateIndexWithNoKey : Base {
+public:
+    void run() {
+        ASSERT(db.createCollection(ns()));
+
+        BSONObjBuilder indexSpec;
+
+        BSONArrayBuilder indexes;
+        indexes.append(indexSpec.obj());
+
+        BSONObjBuilder cmd;
+        cmd.append("createIndexes", nsColl());
+        cmd.append("indexes", indexes.arr());
+
+        BSONObj result;
+        bool ok = db.runCommand(nsDb(), cmd.obj(), result);
+        log() << result.jsonString();
+        ASSERT(!ok);
+    }
+};
+
+class CreateIndexWithDuplicateKey : Base {
+public:
+    void run() {
+        ASSERT(db.createCollection(ns()));
+
+        BSONObjBuilder indexSpec;
+        indexSpec.append("key", BSON("a" << 1 << "a" << 1 << "b" << 1));
+
+        BSONArrayBuilder indexes;
+        indexes.append(indexSpec.obj());
+
+        BSONObjBuilder cmd;
+        cmd.append("createIndexes", nsColl());
+        cmd.append("indexes", indexes.arr());
+
+        BSONObj result;
+        bool ok = db.runCommand(nsDb(), cmd.obj(), result);
+        log() << result.jsonString();
+        ASSERT(!ok);
+    }
+};
+
 class FindAndModify : Base {
 public:
     void run() {
@@ -271,6 +314,8 @@ public:
         add<SymbolArgument::Touch>();
         add<SymbolArgument::Drop>();
         add<SymbolArgument::GeoSearch>();
+        add<SymbolArgument::CreateIndexWithNoKey>();
+        add<SymbolArgument::CreateIndexWithDuplicateKey>();
     }
 };
 

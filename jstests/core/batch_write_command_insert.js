@@ -310,7 +310,7 @@ result = coll.runCommand(request);
 assert(result.ok, tojson(result));
 assert.eq(0, result.n);
 assert.eq(0, result.writeErrors[0].index);
-assert.eq(coll.getIndexes().length, 1);
+assert.eq(coll.getIndexes().length, 0);
 
 //
 // Invalid index desc
@@ -320,6 +320,7 @@ request = {
     documents: [{ns: coll.toString(), key: {x: 1}}]
 };
 result = coll.runCommand(request);
+print(tojson(result));
 assert(result.ok, tojson(result));
 assert.eq(0, result.n);
 assert.eq(0, result.writeErrors[0].index);
@@ -336,7 +337,7 @@ result = coll.runCommand(request);
 assert(result.ok, tojson(result));
 assert.eq(0, result.n);
 assert.eq(0, result.writeErrors[0].index);
-assert.eq(coll.getIndexes().length, 1);
+assert.eq(coll.getIndexes().length, 0);
 
 //
 // Cannot insert more than one index at a time through the batch writes
