@@ -35,6 +35,7 @@
 #include <utility>
 #include <vector>
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/stdx/condition_variable.h"
@@ -116,6 +117,11 @@ public:
     // the network.
     //
     ////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * RAII-style class for entering and exiting network.
+     */
+    class InNetworkGuard;
 
     /**
      * Causes the currently running (non-executor) thread to assume the mantle of the network
@@ -419,6 +425,17 @@ private:
     RemoteCommandRequest _request;
     TaskExecutor::ResponseStatus _response;
     RemoteCommandCompletionFn _onFinish;
+};
+
+class NetworkInterfaceMock::InNetworkGuard {
+    MONGO_DISALLOW_COPYING(InNetworkGuard);
+
+public:
+    explicit InNetworkGuard(NetworkInterfaceMock* net);
+    ~InNetworkGuard();
+
+private:
+    NetworkInterfaceMock* _net;
 };
 
 }  // namespace executor

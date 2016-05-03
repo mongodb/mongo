@@ -30,6 +30,8 @@
 
 #include "mongo/executor/remote_command_request.h"
 
+#include <ostream>
+
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -85,5 +87,22 @@ std::string RemoteCommandRequest::toString() const {
     return out;
 }
 
+bool RemoteCommandRequest::operator==(const RemoteCommandRequest& rhs) const {
+    if (this == &rhs) {
+        return true;
+    }
+    return target == rhs.target && dbname == rhs.dbname && cmdObj == rhs.cmdObj &&
+        metadata == rhs.metadata && timeout == rhs.timeout;
+}
+
+bool RemoteCommandRequest::operator!=(const RemoteCommandRequest& rhs) const {
+    return !(*this == rhs);
+}
+
 }  // namespace executor
+
+std::ostream& operator<<(std::ostream& os, const executor::RemoteCommandRequest& request) {
+    return os << request.toString();
+}
+
 }  // namespace mongo

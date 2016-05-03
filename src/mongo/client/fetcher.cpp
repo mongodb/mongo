@@ -144,20 +144,20 @@ Fetcher::Fetcher(executor::TaskExecutor* executor,
                  const BSONObj& findCmdObj,
                  const CallbackFn& work,
                  const BSONObj& metadata,
-                 Milliseconds timeout)
+                 Milliseconds timeout,
+                 std::unique_ptr<RemoteCommandRetryScheduler::RetryPolicy> firstCommandRetryPolicy)
     : _executor(executor),
       _source(source),
       _dbname(dbname),
       _cmdObj(findCmdObj.getOwned()),
       _metadata(metadata.getOwned()),
       _work(work),
-      _active(false),
-      _first(true),
-      _remoteCommandCallbackHandle(),
-      _timeout(timeout) {
-    uassert(ErrorCodes::BadValue, "null task executor", executor);
-    uassert(ErrorCodes::BadValue, "database name cannot be empty", !dbname.empty());
-    uassert(ErrorCodes::BadValue, "command object cannot be empty", !findCmdObj.isEmpty());
+      _timeout(timeout),
+      _firstRemoteCommandScheduler(
+          _executor,
+          RemoteCommandRequest(_source, _dbname, _cmdObj, _metadata, _timeout),
+          stdx::bind(&Fetcher::_callback, this, stdx::placeholders::_1, kFirstBatchFieldName),
+          std::move(firstCommandRetryPolicy)) {
     uassert(ErrorCodes::BadValue, "callback function cannot be null", work);
 }
 
@@ -205,11 +205,18 @@ Status Fetcher::schedule() {
     if (_active) {
         return Status(ErrorCodes::IllegalOperation, "fetcher already scheduled");
     }
-    return _schedule_inlock(_cmdObj, kFirstBatchFieldName);
+
+    auto status = _firstRemoteCommandScheduler.startup();
+    if (!status.isOK()) {
+        return status;
+    }
+
+    _active = true;
+    return Status::OK();
 }
 
 void Fetcher::cancel() {
-    executor::TaskExecutor::CallbackHandle remoteCommandCallbackHandle;
+    executor::TaskExecutor::CallbackHandle handle;
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
 
@@ -217,11 +224,16 @@ void Fetcher::cancel() {
             return;
         }
 
-        remoteCommandCallbackHandle = _remoteCommandCallbackHandle;
+        _firstRemoteCommandScheduler.shutdown();
+
+        if (!_getMoreCallbackHandle.isValid()) {
+            return;
+        }
+
+        handle = _getMoreCallbackHandle;
     }
 
-    invariant(remoteCommandCallbackHandle.isValid());
-    _executor->cancel(remoteCommandCallbackHandle);
+    _executor->cancel(handle);
 }
 
 void Fetcher::wait() {
@@ -229,18 +241,19 @@ void Fetcher::wait() {
     _condition.wait(lk, [this]() { return !_active; });
 }
 
-Status Fetcher::_schedule_inlock(const BSONObj& cmdObj, const char* batchFieldName) {
+Status Fetcher::_scheduleGetMore(const BSONObj& cmdObj) {
     StatusWith<executor::TaskExecutor::CallbackHandle> scheduleResult =
         _executor->scheduleRemoteCommand(
             RemoteCommandRequest(_source, _dbname, cmdObj, _metadata, _timeout),
-            stdx::bind(&Fetcher::_callback, this, stdx::placeholders::_1, batchFieldName));
+            stdx::bind(&Fetcher::_callback, this, stdx::placeholders::_1, kNextBatchFieldName));
 
     if (!scheduleResult.isOK()) {
         return scheduleResult.getStatus();
     }
 
-    _active = true;
-    _remoteCommandCallbackHandle = scheduleResult.getValue();
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _getMoreCallbackHandle = scheduleResult.getValue();
+
     return Status::OK();
 }
 
@@ -305,10 +318,7 @@ void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batch
         return;
     }
 
-    {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        status = _schedule_inlock(cmdObj, kNextBatchFieldName);
-    }
+    status = _scheduleGetMore(cmdObj);
     if (!status.isOK()) {
         nextAction = NextAction::kNoAction;
         _work(StatusWith<Fetcher::QueryResponse>(status), nullptr, nullptr);

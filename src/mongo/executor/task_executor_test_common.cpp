@@ -106,14 +106,6 @@ public:
                                                        });                                \
     void CET_##TEST_NAME::_doTest()
 
-bool operator==(const RemoteCommandRequest lhs, const RemoteCommandRequest rhs) {
-    return lhs.target == rhs.target && lhs.dbname == rhs.dbname && lhs.cmdObj == rhs.cmdObj;
-}
-
-bool operator!=(const RemoteCommandRequest lhs, const RemoteCommandRequest rhs) {
-    return !(lhs == rhs);
-}
-
 void setStatus(const TaskExecutor::CallbackArgs& cbData, Status* target) {
     *target = cbData.status;
 }

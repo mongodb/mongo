@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <iosfwd>
 #include <string>
 
 #include "mongo/db/jsobj.h"
@@ -85,6 +86,9 @@ struct RemoteCommandRequest {
 
     std::string toString() const;
 
+    bool operator==(const RemoteCommandRequest& rhs) const;
+    bool operator!=(const RemoteCommandRequest& rhs) const;
+
     // Internal id of this request. Not interpereted and used for tracing purposes only.
     RequestId id;
 
@@ -99,4 +103,7 @@ struct RemoteCommandRequest {
 };
 
 }  // namespace executor
+
+std::ostream& operator<<(std::ostream& os, const executor::RemoteCommandRequest& response);
+
 }  // namespace mongo

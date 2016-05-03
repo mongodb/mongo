@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -35,6 +36,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/executor/task_executor.h"
@@ -116,6 +118,9 @@ public:
      *
      * The callback function 'work' is not allowed to call into the Fetcher instance. This
      * behavior is undefined and may result in a deadlock.
+     *
+     * An optional retry policy may be provided for the first remote command request so that
+     * the remote command scheduler will re-send the command in case of transient network errors.
      */
     Fetcher(executor::TaskExecutor* executor,
             const HostAndPort& source,
@@ -123,7 +128,9 @@ public:
             const BSONObj& cmdObj,
             const CallbackFn& work,
             const BSONObj& metadata = rpc::makeEmptyMetadata(),
-            Milliseconds timeout = RemoteCommandRequest::kNoTimeout);
+            Milliseconds timeout = RemoteCommandRequest::kNoTimeout,
+            std::unique_ptr<RemoteCommandRetryScheduler::RetryPolicy> firstCommandRetryPolicy =
+                RemoteCommandRetryScheduler::makeNoRetryPolicy());
 
     virtual ~Fetcher();
 
@@ -177,9 +184,9 @@ public:
 
 private:
     /**
-     * Schedules remote command to be run by the executor
+     * Schedules getMore command to be run by the executor
      */
-    Status _schedule_inlock(const BSONObj& cmdObj, const char* batchFieldName);
+    Status _scheduleGetMore(const BSONObj& cmdObj);
 
     /**
      * Callback for remote command.
@@ -214,17 +221,20 @@ private:
     mutable stdx::condition_variable _condition;
 
     // _active is true when Fetcher is scheduled to be run by the executor.
-    bool _active;
+    bool _active = false;
 
     // _first is true for first query response and false for subsequent responses.
     // Using boolean instead of a counter to avoid issues with wrap around.
-    bool _first;
+    bool _first = true;
 
-    // Callback handle to the scheduled remote command.
-    executor::TaskExecutor::CallbackHandle _remoteCommandCallbackHandle;
+    // Callback handle to the scheduled getMore command.
+    executor::TaskExecutor::CallbackHandle _getMoreCallbackHandle;
 
     // Socket timeout
     Milliseconds _timeout;
+
+    // First remote command scheduler.
+    RemoteCommandRetryScheduler _firstRemoteCommandScheduler;
 };
 
 }  // namespace mongo

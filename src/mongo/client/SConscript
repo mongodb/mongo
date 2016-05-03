@@ -252,6 +252,7 @@ env.Library(
         'fetcher.cpp',
     ],
     LIBDEPS=[
+        'remote_command_retry_scheduler',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/namespace_string',
@@ -268,5 +269,26 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/commands_test_crutch',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
+    ],
+)
+
+env.Library(
+    target='remote_command_retry_scheduler',
+    source=[
+        'remote_command_retry_scheduler.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.CppUnitTest(
+    target='remote_command_retry_scheduler_test',
+    source='remote_command_retry_scheduler_test.cpp',
+    LIBDEPS=[
+        'remote_command_retry_scheduler',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
+        '$BUILD_DIR/mongo/unittest/task_executor_proxy',
     ],
 )

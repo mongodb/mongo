@@ -559,5 +559,13 @@ void NetworkInterfaceMock::NetworkOperation::finishResponse() {
     _onFinish = RemoteCommandCompletionFn();
 }
 
+NetworkInterfaceMock::InNetworkGuard::InNetworkGuard(NetworkInterfaceMock* net) : _net(net) {
+    _net->enterNetwork();
+}
+
+NetworkInterfaceMock::InNetworkGuard::~InNetworkGuard() {
+    _net->exitNetwork();
+}
+
 }  // namespace executor
 }  // namespace mongo

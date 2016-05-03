@@ -32,10 +32,12 @@
 
 #include "mongo/s/client/shard_remote.h"
 
+#include <algorithm>
 #include <string>
 
 #include "mongo/client/fetcher.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/jsobj.h"
@@ -43,7 +45,6 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/platform/unordered_set.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
@@ -84,31 +85,6 @@ const BSONObj kReplSecondaryOkMetadata{[] {
     o.appendElements(kReplMetadata);
     return o.obj();
 }()};
-
-class ErrorCodesHash {
-public:
-    size_t operator()(ErrorCodes::Error e) const {
-        return std::hash<typename std::underlying_type<ErrorCodes::Error>::type>()(e);
-    }
-};
-
-using ErrorCodesSet = unordered_set<ErrorCodes::Error, ErrorCodesHash>;
-
-const ErrorCodesSet kNotMasterErrors{
-    ErrorCodes::NotMaster, ErrorCodes::NotMasterNoSlaveOk, ErrorCodes::NotMasterOrSecondary};
-
-const ErrorCodesSet kAllRetriableErrors{
-    ErrorCodes::NotMaster,
-    ErrorCodes::NotMasterNoSlaveOk,
-    ErrorCodes::NotMasterOrSecondary,
-    // If write concern failed to be satisfied on the remote server, this most probably means that
-    // some of the secondary nodes were unreachable or otherwise unresponsive, so the call is safe
-    // to be retried if idempotency can be guaranteed.
-    ErrorCodes::WriteConcernFailed,
-    ErrorCodes::HostUnreachable,
-    ErrorCodes::HostNotFound,
-    ErrorCodes::NetworkTimeout,
-    ErrorCodes::InterruptedDueToReplStateChange};
 
 /**
  * Returns a new BSONObj describing the same command and arguments as 'cmdObj', but with a maxTimeMS
@@ -172,12 +148,10 @@ bool ShardRemote::isRetriableError(ErrorCodes::Error code, RetryPolicy options) 
         return false;
     }
 
-    if (options == RetryPolicy::kIdempotent) {
-        return kAllRetriableErrors.count(code);
-    } else {
-        invariant(options == RetryPolicy::kNotIdempotent);
-        return kNotMasterErrors.count(code);
-    }
+    const auto& retriableErrors = options == RetryPolicy::kIdempotent
+        ? RemoteCommandRetryScheduler::kAllRetriableErrors
+        : RemoteCommandRetryScheduler::kNotMasterErrors;
+    return std::find(retriableErrors.begin(), retriableErrors.end(), code) != retriableErrors.end();
 }
 
 const ConnectionString ShardRemote::getConnString() const {

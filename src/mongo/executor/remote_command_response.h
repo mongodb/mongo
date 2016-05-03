@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <iosfwd>
 #include <string>
 #include <memory>
 
@@ -66,6 +67,9 @@ struct RemoteCommandResponse {
 
     std::string toString() const;
 
+    bool operator==(const RemoteCommandResponse& rhs) const;
+    bool operator!=(const RemoteCommandResponse& rhs) const;
+
     std::shared_ptr<const Message> message;  // May be null.
     BSONObj data;                            // Either owned or points into message.
     BSONObj metadata;                        // Either owned or points into message.
@@ -73,4 +77,7 @@ struct RemoteCommandResponse {
 };
 
 }  // namespace executor
+
+std::ostream& operator<<(std::ostream& os, const executor::RemoteCommandResponse& request);
+
 }  // namespace mongo

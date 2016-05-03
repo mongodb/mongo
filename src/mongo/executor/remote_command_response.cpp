@@ -48,5 +48,21 @@ std::string RemoteCommandResponse::toString() const {
                          << " cmd:" << data.toString();
 }
 
+bool RemoteCommandResponse::operator==(const RemoteCommandResponse& rhs) const {
+    if (this == &rhs) {
+        return true;
+    }
+    return data == rhs.data && metadata == rhs.metadata && elapsedMillis == rhs.elapsedMillis;
+}
+
+bool RemoteCommandResponse::operator!=(const RemoteCommandResponse& rhs) const {
+    return !(*this == rhs);
+}
+
 }  // namespace executor
+
+std::ostream& operator<<(std::ostream& os, const executor::RemoteCommandResponse& response) {
+    return os << response.toString();
+}
+
 }  // namespace mongo

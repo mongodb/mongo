@@ -50,10 +50,11 @@ env.CppUnitTest(
     LIBDEPS=[
         'sharding_client',
         'sharding_connection_hook',
-        '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/mongo/client/remote_command_retry_scheduler',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/dbtests/mocklib',
+        '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/mongoscore',
         '$BUILD_DIR/mongo/util/net/network',
     ]
