@@ -37,6 +37,7 @@
 
 namespace mongo {
 
+class ChunkType;
 class ClusterStatistics;
 class MigrationSecondaryThrottleOptions;
 class OperationContext;
@@ -63,9 +64,13 @@ public:
      */
     static Balancer* get(OperationContext* operationContext);
 
-    ClusterStatistics* getClusterStatistics() const {
-        return _clusterStats.get();
-    }
+    /**
+     * Blocking call, which requests the balancer to move a single chunk to a more appropriate
+     * shard, in accordance with the active balancer policy. It is not guaranteed that the chunk
+     * will actually move because it may already be at the best shard. An error will be returned if
+     * the attempt to find a better shard or the actual migration fail for any reason.
+     */
+    Status rebalanceSingleChunk(OperationContext* txn, const ChunkType& chunk);
 
 private:
     // BackgroundJob methods implementation

@@ -197,6 +197,7 @@ MONGO_COMPILER_NORETURN void uasserted(int msgid, const std::string& msg);
 */
 MONGO_COMPILER_NORETURN void msgassertedNoTrace(int msgid, const char* msg);
 MONGO_COMPILER_NORETURN void msgassertedNoTrace(int msgid, const std::string& msg);
+MONGO_COMPILER_NORETURN void msgassertedNoTraceWithStatus(int msgid, const Status& status);
 MONGO_COMPILER_NORETURN void msgasserted(int msgid, const char* msg);
 MONGO_COMPILER_NORETURN void msgasserted(int msgid, const std::string& msg);
 

@@ -28,12 +28,16 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/base/disallow_copying.h"
-#include "mongo/s/balancer_policy.h"
+#include "mongo/s/balancer/balancer_policy.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_version.h"
 
 namespace mongo {
 
+class ChunkType;
 class NamespaceString;
 class OperationContext;
 template <typename T>
@@ -89,6 +93,15 @@ public:
      */
     virtual StatusWith<MigrateInfoVector> selectChunksToMove(OperationContext* txn,
                                                              bool aggressiveBalanceHint) = 0;
+
+    /**
+     * Requests a single chunk to be relocated to a different shard, if possible. If some error
+     * occurs while trying to determine the best location for the chunk, a failed status is
+     * returned. If the chunk is already at the best shard that it can be, returns boost::none.
+     * Otherwise returns migration information for where the chunk should be moved.
+     */
+    virtual StatusWith<boost::optional<MigrateInfo>> selectSpecificChunkToMove(
+        OperationContext* txn, const ChunkType& chunk) = 0;
 
 protected:
     BalancerChunkSelectionPolicy();

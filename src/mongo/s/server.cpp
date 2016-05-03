@@ -58,7 +58,7 @@
 #include "mongo/db/startup_warnings_common.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/platform/process_id.h"
-#include "mongo/s/balance.h"
+#include "mongo/s/balancer/balancer.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_locks.h"

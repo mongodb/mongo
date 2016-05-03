@@ -181,6 +181,42 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
     return candidateChunks;
 }
 
+StatusWith<boost::optional<MigrateInfo>>
+BalancerChunkSelectionPolicyImpl::selectSpecificChunkToMove(OperationContext* txn,
+                                                            const ChunkType& chunk) {
+    const NamespaceString nss(chunk.getNS());
+
+    auto scopedCMStatus = ScopedChunkManager::getExisting(txn, nss);
+    if (!scopedCMStatus.isOK()) {
+        return scopedCMStatus.getStatus();
+    }
+
+    auto scopedCM = std::move(scopedCMStatus.getValue());
+    ChunkManager* const cm = scopedCM.cm();
+
+    auto tagForChunkStatus =
+        Grid::get(txn)->catalogManager(txn)->getTagForChunk(txn, nss.ns(), chunk);
+    if (!tagForChunkStatus.isOK()) {
+        return tagForChunkStatus.getStatus();
+    }
+
+    auto shardStatsStatus = _clusterStats->getStats(txn);
+    if (!shardStatsStatus.isOK()) {
+        return shardStatsStatus.getStatus();
+    }
+
+    auto collInfo = createCollectionDistributionInfo(shardStatsStatus.getValue(), cm);
+    ShardToChunksMap shardToChunksMap = std::move(std::get<0>(collInfo));
+
+    DistributionStatus distStatus(shardStatsStatus.getValue(), shardToChunksMap);
+    const ShardId newShardId(distStatus.getBestReceieverShard(tagForChunkStatus.getValue()));
+    if (newShardId.empty() || newShardId == chunk.getShard()) {
+        return boost::optional<MigrateInfo>();
+    }
+
+    return boost::optional<MigrateInfo>{MigrateInfo(nss.ns(), newShardId, chunk)};
+}
+
 StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::_getSplitCandidatesForCollection(
     OperationContext* txn, const NamespaceString& nss) {
     auto scopedCMStatus = ScopedChunkManager::getExisting(txn, nss);

@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/balance.h"
+#include "mongo/s/balancer/balancer.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/client/read_preference.h"
@@ -163,6 +163,35 @@ Balancer::~Balancer() = default;
 
 Balancer* Balancer::get(OperationContext* operationContext) {
     return &getBalancer(operationContext->getServiceContext());
+}
+
+Status Balancer::rebalanceSingleChunk(OperationContext* txn, const ChunkType& chunk) {
+    auto migrateStatus = _chunkSelectionPolicy->selectSpecificChunkToMove(txn, chunk);
+    if (!migrateStatus.isOK()) {
+        return migrateStatus.getStatus();
+    }
+
+    auto migrateInfo = std::move(migrateStatus.getValue());
+    if (!migrateInfo) {
+        LOG(1) << "Unable to find more appropriate location for chunk " << chunk;
+        return Status::OK();
+    }
+
+    auto balancerConfig = Grid::get(txn)->getBalancerConfiguration();
+    Status refreshStatus = balancerConfig->refreshAndCheck(txn);
+    if (!refreshStatus.isOK()) {
+        return refreshStatus;
+    }
+
+    try {
+        _moveChunks(txn,
+                    {*migrateInfo},
+                    balancerConfig->getSecondaryThrottle(),
+                    balancerConfig->waitForDelete());
+        return Status::OK();
+    } catch (const DBException& e) {
+        return e.toStatus();
+    }
 }
 
 void Balancer::run() {
@@ -439,10 +468,8 @@ int Balancer::_moveChunks(OperationContext* txn,
     int movedCount = 0;
 
     for (const auto& migrateInfo : candidateChunks) {
-        // If the balancer was disabled since we started this round, don't start new chunks
-        // moves.
-        if (!Grid::get(txn)->getBalancerConfiguration()->isBalancerActive() ||
-            MONGO_FAIL_POINT(skipBalanceRound)) {
+        // If the balancer was disabled since we started this round, don't start new chunk moves
+        if (!Grid::get(txn)->getBalancerConfiguration()->isBalancerActive()) {
             LOG(1) << "Stopping balancing round early as balancing was disabled";
             return movedCount;
         }

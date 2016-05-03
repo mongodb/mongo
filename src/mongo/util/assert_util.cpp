@@ -231,6 +231,10 @@ void msgassertedNoTrace(int msgid, const std::string& msg) {
     msgassertedNoTrace(msgid, msg.c_str());
 }
 
+void msgassertedNoTraceWithStatus(int msgid, const Status& status) {
+    msgassertedNoTrace(msgid, status.toString());
+}
+
 std::string causedBy(const char* e) {
     return std::string(" :: caused by :: ") + e;
 }

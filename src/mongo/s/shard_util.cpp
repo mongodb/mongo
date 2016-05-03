@@ -37,7 +37,6 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -48,8 +47,40 @@ namespace mongo {
 namespace shardutil {
 namespace {
 
+const char kMinKey[] = "min";
+const char kMaxKey[] = "max";
 const char kShouldMigrate[] = "shouldMigrate";
+
+/**
+ * Extracts the bounds of a chunk from a BSON object having the following format:
+ *  { min: <min key>, max: <max key> }
+ *
+ * Returns a failed status if the format cannot be matched.
+ */
+StatusWith<std::pair<BSONObj, BSONObj>> extractChunkBounds(const BSONObj& obj) {
+    BSONElement minKey;
+    {
+        Status minKeyStatus = bsonExtractTypedField(obj, kMinKey, Object, &minKey);
+        if (!minKeyStatus.isOK()) {
+            return {minKeyStatus.code(),
+                    str::stream() << "Invalid min key due to " << minKeyStatus.toString()};
+        }
+    }
+
+    BSONElement maxKey;
+    {
+        Status maxKeyStatus = bsonExtractTypedField(obj, kMaxKey, Object, &maxKey);
+        if (!maxKeyStatus.isOK()) {
+            return {maxKeyStatus.code(),
+                    str::stream() << "Invalid max key due to " << maxKeyStatus.toString()};
+        }
+    }
+
+    return std::pair<BSONObj, BSONObj>(
+        std::make_pair(minKey.Obj().getOwned(), maxKey.Obj().getOwned()));
 }
+
+}  // namespace
 
 StatusWith<long long> retrieveTotalShardSize(OperationContext* txn, const ShardId& shardId) {
     auto shard = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
@@ -87,8 +118,8 @@ StatusWith<BSONObj> selectMedianKey(OperationContext* txn,
     BSONObjBuilder cmd;
     cmd.append("splitVector", nss.ns());
     cmd.append("keyPattern", shardKeyPattern.toBSON());
-    cmd.append("min", minKey);
-    cmd.append("max", maxKey);
+    cmd.append(kMinKey, minKey);
+    cmd.append(kMaxKey, maxKey);
     cmd.appendBool("force", true);
 
     auto shard = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
@@ -130,8 +161,8 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* txn,
     BSONObjBuilder cmd;
     cmd.append("splitVector", nss.ns());
     cmd.append("keyPattern", shardKeyPattern.toBSON());
-    cmd.append("min", minKey);
-    cmd.append("max", maxKey);
+    cmd.append(kMinKey, minKey);
+    cmd.append(kMaxKey, maxKey);
     cmd.append("maxChunkSizeBytes", chunkSizeBytes);
     cmd.append("maxSplitPoints", maxPoints);
     cmd.append("maxChunkObjects", maxObjs);
@@ -187,12 +218,13 @@ StatusWith<boost::optional<std::pair<BSONObj, BSONObj>>> splitChunkAtMultiplePoi
 
     BSONObjBuilder cmd;
     cmd.append("splitChunk", nss.ns());
-    cmd.append("configdb", grid.shardRegistry()->getConfigServerConnectionString().toString());
+    cmd.append("configdb",
+               Grid::get(txn)->shardRegistry()->getConfigServerConnectionString().toString());
     cmd.append("from", shardId);
     cmd.append("keyPattern", shardKeyPattern.toBSON());
     collectionVersion.appendForCommands(&cmd);
-    cmd.append("min", minKey);
-    cmd.append("max", maxKey);
+    cmd.append(kMinKey, minKey);
+    cmd.append(kMaxKey, maxKey);
     cmd.append("splitKeys", splitPoints);
 
     BSONObj cmdObj = cmd.obj();
@@ -219,30 +251,21 @@ StatusWith<boost::optional<std::pair<BSONObj, BSONObj>>> splitChunkAtMultiplePoi
     }
 
     if (!status.isOK()) {
-        log() << "splitChunk cmd " << cmdObj << " failed" << causedBy(status);
+        log() << "Split chunk " << cmdObj << " failed" << causedBy(status);
         return {status.code(), str::stream() << "split failed due to " << status.toString()};
     }
 
     BSONElement shouldMigrateElement;
     status = bsonExtractTypedField(cmdResponse, kShouldMigrate, Object, &shouldMigrateElement);
     if (status.isOK()) {
-        BSONObj shouldMigrateBounds = shouldMigrateElement.embeddedObject();
-        BSONElement minKey, maxKey;
-
-        Status minKeyStatus = bsonExtractTypedField(shouldMigrateBounds, "min", Object, &minKey);
-        Status maxKeyStatus = bsonExtractTypedField(shouldMigrateBounds, "max", Object, &maxKey);
-
-        if (minKeyStatus.isOK() && maxKeyStatus.isOK()) {
-            return boost::optional<std::pair<BSONObj, BSONObj>>(
-                std::make_pair(minKey.Obj().getOwned(), maxKey.Obj().getOwned()));
-        } else if (!minKeyStatus.isOK()) {
-            status = minKeyStatus;
-        } else {
-            status = maxKeyStatus;
+        auto chunkBoundsStatus = extractChunkBounds(shouldMigrateElement.embeddedObject());
+        if (!chunkBoundsStatus.isOK()) {
+            return chunkBoundsStatus.getStatus();
         }
-    }
 
-    if (!status.isOK()) {
+        return boost::optional<std::pair<BSONObj, BSONObj>>(
+            std::move(chunkBoundsStatus.getValue()));
+    } else if (status != ErrorCodes::NoSuchKey) {
         warning()
             << "Chunk migration will be skipped because splitChunk returned invalid response: "
             << cmdResponse << ". Extracting " << kShouldMigrate << " field failed"

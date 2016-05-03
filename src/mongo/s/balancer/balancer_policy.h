@@ -129,13 +129,6 @@ public:
         return _shardInfo;
     }
 
-    /**
-     * Note: jumbo and versions are not set.
-     */
-    static void populateShardToChunksMap(const ShardStatisticsVector& allShards,
-                                         const ChunkManager& chunkMgr,
-                                         ShardToChunksMap* shardToChunksMap);
-
 private:
     const ShardStatisticsVector _shardInfo;
     const ShardToChunksMap& _shardChunks;

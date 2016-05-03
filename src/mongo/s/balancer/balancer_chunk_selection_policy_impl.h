@@ -44,6 +44,9 @@ public:
     StatusWith<MigrateInfoVector> selectChunksToMove(OperationContext* txn,
                                                      bool aggressiveBalanceHint) override;
 
+    StatusWith<boost::optional<MigrateInfo>> selectSpecificChunkToMove(
+        OperationContext* txn, const ChunkType& chunk) override;
+
 private:
     /**
      * Synchronous method, which iterates the collection's chunks and uses the tags information to

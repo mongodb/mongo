@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/balancer_policy.h"
+#include "mongo/s/balancer/balancer_policy.h"
 
 #include <algorithm>
 
@@ -224,31 +224,6 @@ void DistributionStatus::dump() const {
         for (map<BSONObj, TagRange>::const_iterator i = _tagRanges.begin(); i != _tagRanges.end();
              ++i)
             log() << i->second.toString();
-    }
-}
-
-void DistributionStatus::populateShardToChunksMap(const ShardStatisticsVector& allShards,
-                                                  const ChunkManager& chunkMgr,
-                                                  ShardToChunksMap* shardToChunksMap) {
-    // Makes sure there is an entry in shardToChunksMap for every shard.
-    for (const auto& stat : allShards) {
-        (*shardToChunksMap)[stat.shardId];
-    }
-
-    const ChunkMap& chunkMap = chunkMgr.getChunkMap();
-    for (ChunkMap::const_iterator it = chunkMap.begin(); it != chunkMap.end(); ++it) {
-        const ChunkPtr chunkPtr = it->second;
-
-        ChunkType chunk;
-        chunk.setNS(chunkMgr.getns());
-        chunk.setMin(chunkPtr->getMin().getOwned());
-        chunk.setMax(chunkPtr->getMax().getOwned());
-        chunk.setJumbo(chunkPtr->isJumbo());  // TODO: is this reliable?
-
-        const string shardName(chunkPtr->getShardId());
-        chunk.setShard(shardName);
-
-        (*shardToChunksMap)[shardName].push_back(chunk);
     }
 }
 
