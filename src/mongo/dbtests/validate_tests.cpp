@@ -464,10 +464,7 @@ public:
             // Explicitly test that multi-key partial indexes containing documents that
             // don't match the filter expression are handled correctly.
             ASSERT_OK(coll->insertDocument(
-                &_txn,
-                BSON("_id" << 3 << "a" << BSON_ARRAY(-1 << -2 << -3)),
-                nullOpDebug,
-                true));
+                &_txn, BSON("_id" << 3 << "a" << BSON_ARRAY(-1 << -2 << -3)), nullOpDebug, true));
             wunit.commit();
         }
 
