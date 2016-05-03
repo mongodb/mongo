@@ -41,12 +41,21 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/service_context_noop.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/executor/task_executor_pool.h"
+#include "mongo/s/balancer/balancer_configuration.h"
+#include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/dist_lock_catalog_mock.h"
 #include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/s/catalog/type_locks.h"
+#include "mongo/s/client/shard_factory.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
@@ -117,8 +126,28 @@ public:
     }
 
 protected:
+    virtual std::unique_ptr<TickSource> makeTickSource() {
+        return stdx::make_unique<SystemTickSource>();
+    }
+
     void setUp() override {
-        getGlobalServiceContext()->setTickSource(stdx::make_unique<SystemTickSource>());
+        getGlobalServiceContext()->setTickSource(makeTickSource());
+
+        // Set up grid just so that the config shard is accessible via the ShardRegistry.
+        auto targeterFactory = stdx::make_unique<RemoteCommandTargeterFactoryMock>();
+        auto shardFactory = stdx::make_unique<ShardFactory>(std::move(targeterFactory));
+        ConnectionString configCS = ConnectionString::forReplicaSet(
+            "configReplSet", std::vector<HostAndPort>{HostAndPort{"config"}});
+        auto shardRegistry = stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS);
+        grid.init(nullptr,
+                  nullptr,
+                  std::move(shardRegistry),
+                  nullptr,
+                  stdx::make_unique<BalancerConfiguration>(
+                      ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes),
+                  nullptr,
+                  nullptr);
+
         _mgr->startUp();
     }
 
@@ -126,6 +155,7 @@ protected:
         // Don't care about what shutDown passes to stopPing here.
         _mockCatalog->expectStopPing([](StringData) {}, Status::OK());
         _mgr->shutDown(txn());
+        grid.clearForUnitTests();
     }
 
     std::unique_ptr<DistLockCatalogMock> _dummyDoNotUse;  // dummy placeholder
@@ -138,16 +168,17 @@ protected:
 class RSDistLockMgrWithMockTickSource : public ReplSetDistLockManagerFixture {
 public:
     /**
+     * Override the way the fixture gets the tick source to install to use a mock tick source.
+     */
+    std::unique_ptr<TickSource> makeTickSource() override {
+        return stdx::make_unique<TickSourceMock>();
+    }
+
+    /**
      * Returns the mock tick source.
      */
     TickSourceMock* getMockTickSource() {
         return dynamic_cast<TickSourceMock*>(getGlobalServiceContext()->getTickSource());
-    }
-
-protected:
-    void setUp() override {
-        getGlobalServiceContext()->setTickSource(stdx::make_unique<TickSourceMock>());
-        _mgr->startUp();
     }
 };
 

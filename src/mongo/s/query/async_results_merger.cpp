@@ -427,40 +427,40 @@ void AsyncResultsMerger::handleBatchResponse(
                                : cbData.response.getStatus());
 
     if (!cursorResponseStatus.isOK()) {
-        // Notify the shard registry of the failure.
-        if (remote.shardId) {
-            auto shard = grid.shardRegistry()->getShardNoReload(*remote.shardId);
-            if (!shard) {
-                remote.status = Status(cursorResponseStatus.getStatus().code(),
-                                       str::stream() << "Could not find shard " << *remote.shardId
-                                                     << " containing host "
-                                                     << remote.getTargetHost().toString());
-            } else {
-                shard->updateReplSetMonitor(remote.getTargetHost(),
-                                            cursorResponseStatus.getStatus());
-            }
-        }
-
-        // If the error is retriable, schedule another request.
-        if (!remote.cursorId && remote.retryCount < kMaxNumFailedHostRetryAttempts &&
-            ShardRegistry::kAllRetriableErrors.count(cursorResponseStatus.getStatus().code())) {
-            LOG(1) << "Initial cursor establishment failed with retriable error and will be retried"
-                   << causedBy(cursorResponseStatus.getStatus());
-
-            ++remote.retryCount;
-
-            // Since we potentially updated the targeter that the last host it chose might be
-            // faulty, the call below may end up getting a different host.
-            remote.status = askForNextBatch_inlock(remoteIndex);
-            if (remote.status.isOK()) {
-                return;
-            }
-
-            // If we end up here, it means we failed to schedule the retry request, which is a more
-            // severe error that should not be retried. Just pass through to the error handling
-            // logic below.
+        auto shard = remote.getShard();
+        if (!shard) {
+            remote.status =
+                Status(cursorResponseStatus.getStatus().code(),
+                       str::stream() << "Could not find shard " << *remote.shardId
+                                     << " containing host " << remote.getTargetHost().toString());
         } else {
-            remote.status = cursorResponseStatus.getStatus();
+            shard->updateReplSetMonitor(remote.getTargetHost(), cursorResponseStatus.getStatus());
+
+            // Retry initial cursor establishment if possible.  Never retry getMores to avoid
+            // accidentally skipping results.
+            if (!remote.cursorId && remote.retryCount < kMaxNumFailedHostRetryAttempts &&
+                shard->isRetriableError(cursorResponseStatus.getStatus().code(),
+                                        Shard::RetryPolicy::kIdempotent)) {
+                invariant(remote.shardId);
+                LOG(1) << "Initial cursor establishment failed with retriable error and will be "
+                          "retried" << causedBy(cursorResponseStatus.getStatus());
+
+                ++remote.retryCount;
+
+                // Since we potentially updated the targeter that the last host it chose might be
+                // faulty, the call below may end up getting a different host.
+                remote.status = askForNextBatch_inlock(remoteIndex);
+                if (remote.status.isOK()) {
+                    return;
+                }
+
+                // If we end up here, it means we failed to schedule the retry request, which is a
+                // more
+                // severe error that should not be retried. Just pass through to the error handling
+                // logic below.
+            } else {
+                remote.status = cursorResponseStatus.getStatus();
+            }
         }
 
         // Unreachable host errors are swallowed if the 'allowPartialResults' option is set. We
@@ -634,7 +634,7 @@ Status AsyncResultsMerger::RemoteCursorData::resolveShardIdToHostAndPort(
     invariant(shardId);
     invariant(!cursorId);
 
-    const auto shard = grid.shardRegistry()->getShardNoReload(*shardId);
+    const auto shard = getShard();
     if (!shard) {
         return Status(ErrorCodes::ShardNotFound,
                       str::stream() << "Could not find shard " << *shardId);
@@ -650,6 +650,15 @@ Status AsyncResultsMerger::RemoteCursorData::resolveShardIdToHostAndPort(
     _shardHostAndPort = std::move(findHostStatus.getValue());
 
     return Status::OK();
+}
+
+std::shared_ptr<Shard> AsyncResultsMerger::RemoteCursorData::getShard() {
+    invariant(shardId || _shardHostAndPort);
+    if (shardId) {
+        return grid.shardRegistry()->getShardNoReload(*shardId);
+    } else {
+        return grid.shardRegistry()->getShardNoReload(_shardHostAndPort->toString());
+    }
 }
 
 //

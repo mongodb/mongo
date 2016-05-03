@@ -275,9 +275,8 @@ function assertErrorCode(coll, pipe, code, errmsg) {
         var error = assert.throws(function() {
             cursor.itcount();
         }, [], "expected error: " + code);
-        if (!error.message.search(code)) {
-            assert(false, "expected error: " + code + " got: " + error);
-        }
+
+        assert.eq(error.code, code);
     } else {
         assert.eq(cursorRes.code, code);
     }
