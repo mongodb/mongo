@@ -163,6 +163,9 @@ UpdateOp parseUpdateCommand(StringData dbName, const BSONObj& cmd) {
                 haveU = true;
                 checkType(Object, field);
                 update.update = field.Obj();
+            } else if (fieldName == "collation") {
+                checkType(Object, field);
+                update.collation = field.Obj();
             } else if (fieldName == "multi") {
                 checkType(Bool, field);
                 update.multi = field.Bool();
@@ -199,6 +202,9 @@ DeleteOp parseDeleteCommand(StringData dbName, const BSONObj& cmd) {
                 haveQ = true;
                 checkType(Object, field);
                 del.query = field.Obj();
+            } else if (fieldName == "collation") {
+                checkType(Object, field);
+                del.collation = field.Obj();
             } else if (fieldName == "limit") {
                 haveLimit = true;
                 uassert(ErrorCodes::TypeMismatch,

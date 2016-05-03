@@ -62,6 +62,7 @@ struct UpdateOp : ParsedWriteOp {
     struct SingleUpdate {
         BSONObj query;
         BSONObj update;
+        BSONObj collation;
         bool multi = false;
         bool upsert = false;
     };
@@ -75,6 +76,7 @@ struct UpdateOp : ParsedWriteOp {
 struct DeleteOp : ParsedWriteOp {
     struct SingleDelete {
         BSONObj query;
+        BSONObj collation;
         bool multi = true;
     };
 

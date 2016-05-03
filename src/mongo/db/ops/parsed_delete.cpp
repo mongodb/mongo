@@ -60,7 +60,10 @@ Status ParsedDelete::parseRequest() {
     // DeleteStage would not return the deleted document.
     invariant(_request->getProj().isEmpty() || _request->shouldReturnDeleted());
 
-    if (CanonicalQuery::isSimpleIdQuery(_request->getQuery())) {
+    // TODO SERVER-23611: Create decision logic for idhack when the query has no collation, but
+    // there may be a collection default collation.
+    if (_request->getCollation().isEmpty() &&
+        CanonicalQuery::isSimpleIdQuery(_request->getQuery())) {
         return Status::OK();
     }
 
@@ -82,6 +85,7 @@ Status ParsedDelete::parseQueryToCQ() {
 
     // The projection needs to be applied after the delete operation, so we specify an empty
     // BSONObj as the projection during canonicalization.
+    // TODO SERVER-23473: Pass the collation to canonicalize().
     const BSONObj emptyObj;
     auto statusWithCQ = CanonicalQuery::canonicalize(_txn,
                                                      _request->getNamespaceString(),

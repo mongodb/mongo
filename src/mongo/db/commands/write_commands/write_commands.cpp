@@ -308,6 +308,7 @@ public:
         UpdateRequest updateRequest(batch.ns);
         updateRequest.setLifecycle(&updateLifecycle);
         updateRequest.setQuery(batch.updates[0].query);
+        updateRequest.setCollation(batch.updates[0].collation);
         updateRequest.setUpdates(batch.updates[0].update);
         updateRequest.setMulti(batch.updates[0].multi);
         updateRequest.setUpsert(batch.updates[0].upsert);
@@ -377,6 +378,7 @@ public:
 
         DeleteRequest deleteRequest(batch.ns);
         deleteRequest.setQuery(batch.deletes[0].query);
+        deleteRequest.setCollation(batch.deletes[0].collation);
         deleteRequest.setMulti(batch.deletes[0].multi);
         deleteRequest.setYieldPolicy(PlanExecutor::YIELD_AUTO);
         deleteRequest.setExplain();

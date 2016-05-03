@@ -84,6 +84,21 @@ TEST(CommandWriteOpsParsers, GarbageFieldsInDeleteDoc) {
     auto cmd = BSON("delete"
                     << "bar"
                     << "deletes" << BSON_ARRAY("q" << BSONObj() << "limit" << 0 << "GARBAGE" << 1));
+}
+
+TEST(CommandWriteOpsParsers, BadCollationFieldInUpdateDoc) {
+    auto cmd =
+        BSON("update"
+             << "bar"
+             << "updates" << BSON_ARRAY("q" << BSONObj() << "u" << BSONObj() << "collation" << 1));
+    ASSERT_THROWS_CODE(parseInsertCommand("foo", cmd), UserException, ErrorCodes::FailedToParse);
+}
+
+TEST(CommandWriteOpsParsers, BadCollationFieldInDeleteDoc) {
+    auto cmd =
+        BSON("delete"
+             << "bar"
+             << "deletes" << BSON_ARRAY("q" << BSONObj() << "limit" << 0 << "collation" << 1));
     ASSERT_THROWS_CODE(parseInsertCommand("foo", cmd), UserException, ErrorCodes::FailedToParse);
 }
 
@@ -123,11 +138,14 @@ TEST(CommandWriteOpsParsers, Update) {
     const auto ns = NamespaceString("test", "foo");
     const BSONObj query = BSON("x" << 1);
     const BSONObj update = BSON("$inc" << BSON("x" << 1));
+    const BSONObj collation = BSON("locale"
+                                   << "en_US");
     for (bool upsert : {false, true}) {
         for (bool multi : {false, true}) {
             auto cmd = BSON("update" << ns.coll() << "updates"
-                                     << BSON_ARRAY(BSON("q" << query << "u" << update << "upsert"
-                                                            << upsert << "multi" << multi)));
+                                     << BSON_ARRAY(BSON("q" << query << "u" << update << "collation"
+                                                            << collation << "upsert" << upsert
+                                                            << "multi" << multi)));
             auto op = parseUpdateCommand(ns.db(), cmd);
             ASSERT_EQ(op.ns.ns(), ns.ns());
             ASSERT(!op.bypassDocumentValidation);
@@ -135,6 +153,7 @@ TEST(CommandWriteOpsParsers, Update) {
             ASSERT_EQ(op.updates.size(), 1u);
             ASSERT_EQ(op.updates[0].query, query);
             ASSERT_EQ(op.updates[0].update, update);
+            ASSERT_EQ(op.updates[0].collation, collation);
             ASSERT_EQ(op.updates[0].upsert, upsert);
             ASSERT_EQ(op.updates[0].multi, multi);
         }
@@ -144,15 +163,19 @@ TEST(CommandWriteOpsParsers, Update) {
 TEST(CommandWriteOpsParsers, Remove) {
     const auto ns = NamespaceString("test", "foo");
     const BSONObj query = BSON("x" << 1);
+    const BSONObj collation = BSON("locale"
+                                   << "en_US");
     for (bool multi : {false, true}) {
         auto cmd = BSON("delete" << ns.coll() << "deletes"
-                                 << BSON_ARRAY(BSON("q" << query << "limit" << (multi ? 0 : 1))));
+                                 << BSON_ARRAY(BSON("q" << query << "collation" << collation
+                                                        << "limit" << (multi ? 0 : 1))));
         auto op = parseDeleteCommand(ns.db(), cmd);
         ASSERT_EQ(op.ns.ns(), ns.ns());
         ASSERT(!op.bypassDocumentValidation);
         ASSERT_EQ(op.continueOnError, false);
         ASSERT_EQ(op.deletes.size(), 1u);
         ASSERT_EQ(op.deletes[0].query, query);
+        ASSERT_EQ(op.deletes[0].collation, collation);
         ASSERT_EQ(op.deletes[0].multi, multi);
     }
 }

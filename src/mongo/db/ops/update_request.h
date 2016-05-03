@@ -93,6 +93,14 @@ public:
         return _sort;
     }
 
+    inline void setCollation(const BSONObj& collation) {
+        _collation = collation;
+    }
+
+    inline const BSONObj& getCollation() const {
+        return _collation;
+    }
+
     inline void setUpdates(const BSONObj& updates) {
         _updates = updates;
     }
@@ -178,7 +186,8 @@ public:
 
     const std::string toString() const {
         return str::stream() << " query: " << _query << " projection: " << _proj
-                             << " sort: " << _sort << " updated: " << _updates << " god: " << _god
+                             << " sort: " << _sort << " collation: " << _collation
+                             << " updated: " << _updates << " god: " << _god
                              << " upsert: " << _upsert << " multi: " << _multi
                              << " fromMigration: " << _fromMigration
                              << " isExplain: " << _isExplain;
@@ -195,6 +204,9 @@ private:
 
     // Contains the sort order information.
     BSONObj _sort;
+
+    // Contains the collation information.
+    BSONObj _collation;
 
     // Contains the modifiers to apply to matched objects, or a replacement document.
     BSONObj _updates;

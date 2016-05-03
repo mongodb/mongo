@@ -65,7 +65,10 @@ Status ParsedUpdate::parseRequest() {
 Status ParsedUpdate::parseQuery() {
     dassert(!_canonicalQuery.get());
 
-    if (!_driver.needMatchDetails() && CanonicalQuery::isSimpleIdQuery(_request->getQuery())) {
+    // TODO SERVER-23611: Create decision logic for idhack when the query has no collation, but
+    // there may be a collection default collation.
+    if (!_driver.needMatchDetails() && _request->getCollation().isEmpty() &&
+        CanonicalQuery::isSimpleIdQuery(_request->getQuery())) {
         return Status::OK();
     }
 
@@ -87,6 +90,7 @@ Status ParsedUpdate::parseQueryToCQ() {
 
     // The projection needs to be applied after the update operation, so we specify an empty
     // BSONObj as the projection during canonicalization.
+    // TODO SERVER-23473: Pass the collation to canonicalize().
     const BSONObj emptyObj;
     auto statusWithCQ = CanonicalQuery::canonicalize(_txn,
                                                      _request->getNamespaceString(),

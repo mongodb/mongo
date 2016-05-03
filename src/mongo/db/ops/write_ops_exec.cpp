@@ -484,6 +484,7 @@ static WriteResult::SingleResult performSingleUpdateOp(OperationContext* txn,
     UpdateRequest request(ns);
     request.setLifecycle(&updateLifecycle);
     request.setQuery(op.query);
+    request.setCollation(op.collation);
     request.setUpdates(op.update);
     request.setMulti(op.multi);
     request.setUpsert(op.upsert);
@@ -595,6 +596,7 @@ static WriteResult::SingleResult performSingleDeleteOp(OperationContext* txn,
 
     DeleteRequest request(ns);
     request.setQuery(op.query);
+    request.setCollation(op.collation);
     request.setMulti(op.multi);
     request.setYieldPolicy(PlanExecutor::YIELD_AUTO);  // ParsedDelete overrides this for $isolated.
 
