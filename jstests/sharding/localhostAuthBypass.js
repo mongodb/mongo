@@ -180,7 +180,7 @@ var start = function() {
         auth: "",
         keyFile: keyfile,
         shards: numShards,
-        chunksize: 1,
+        chunkSize: 1,
         other: {
             nopreallocj: 1,
             useHostname: false  // Must use localhost to take advantage of the localhost auth bypass

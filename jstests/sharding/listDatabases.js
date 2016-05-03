@@ -1,6 +1,6 @@
 // tests that listDatabases doesn't show config db on a shard, even if it is there
 
-var test = new ShardingTest({shards: 1, mongos: 1, other: {chunksize: 1}});
+var test = new ShardingTest({shards: 1, mongos: 1, other: {chunkSize: 1}});
 
 var mongos = test.s0;
 var mongod = test.shard0;

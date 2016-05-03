@@ -5,7 +5,7 @@
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 1, mongos: 1, other: {mongosOptions: {chunkSize: 1}}});
+    var st = new ShardingTest({shards: 1, mongos: 1, other: {chunkSize: 1}});
 
     // The balancer is by default stopped, thus it will NOT interfere unpredictably with the chunk
     // moves/splits depending on the timing.
@@ -48,7 +48,7 @@
         // if resetting the chunk size happens during reloads.  If the size is
         // reset, we'd expect to split less, since the first split would then
         // disable further splits (statistically, since the decision is randomized).
-        // We choose 1.4 since split attempts happen about once every 1/5 chunksize,
+        // We choose 1.4 since split attempts happen about once every 1/5 chunkSize,
         // and we want to be sure we def get a split attempt at a full chunk.
         var insertsForSplit = Math.ceil((chunkSizeBytes * 1.4) / approxSize);
         var totalInserts = insertsForSplit * numChunks;

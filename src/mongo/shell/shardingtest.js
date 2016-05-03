@@ -9,7 +9,7 @@
  *     name {string}: name for this test
  *     verbose {number}: the verbosity for the mongos
  *     keyFile {string}: the location of the keyFile
- *     chunksize {number}:
+ *     chunkSize {number}: the chunk size to use as configuration for the cluster
  *     nopreallocj {boolean|number}:
  *
  *     mongos {number|Object|Array.<Object>}: number of mongos or mongos
@@ -53,7 +53,7 @@
  *     other: {
  *       nopreallocj: same as above
  *       rs: same as above
- *       chunksize: same as above
+ *       chunkSize: same as above
  *
  *       shardOptions {Object}: same as the shards property above.
  *          Can be used to specify options that are common all shards.
@@ -1018,6 +1018,10 @@ var ShardingTest = function(params) {
     otherParams.useBridge = otherParams.useBridge || false;
     otherParams.bridgeOptions = otherParams.bridgeOptions || {};
 
+    if (otherParams.chunkSize && numMongos === 0) {
+        throw Error('Cannot set chunk size without any running mongos instances');
+    }
+
     var keyFile = otherParams.keyFile || otherParams.extraOptions.keyFile;
     var hostName = getHostName();
 
@@ -1221,6 +1225,7 @@ var ShardingTest = function(params) {
 
     rstOptions.nodes = nodeOptions;
 
+    // Start the config server
     this.configRS = new ReplSetTest(rstOptions);
     this.configRS.startSet(startOptions);
 
@@ -1230,7 +1235,8 @@ var ShardingTest = function(params) {
     var initiateTimeout = otherParams.rsOptions && otherParams.rsOptions.initiateTimeout;
     this.configRS.initiate(config, null, initiateTimeout);
 
-    this.configRS.getPrimary();  // Wait for master to be elected before starting mongos
+    // Wait for master to be elected before starting mongos
+    this.configRS.getPrimary();
 
     this._configDB = this.configRS.getURL();
     this._configServers = this.configRS.nodes;
@@ -1247,19 +1253,10 @@ var ShardingTest = function(params) {
     print("ShardingTest " + this._testName + " :\n" +
           tojson({config: this._configDB, shards: this._connections}));
 
-    if (numMongos == 0 && !otherParams.noChunkSize) {
-        if (keyFile) {
-            throw Error("Cannot set chunk size without any mongos when using auth");
-        } else {
-            configConnection.getDB("config").settings.insert(
-                {_id: "chunksize", value: otherParams.chunksize || otherParams.chunkSize || 50});
-        }
-    }
-
     this._mongos = [];
 
     // Start the MongoS servers
-    for (var i = 0; i < ((numMongos == 0 ? -1 : numMongos) || 1); i++) {
+    for (var i = 0; i < numMongos; i++) {
         options = {
             useHostname: otherParams.useHostname,
             pathOpts: Object.merge(pathOpts, {mongos: i}),
@@ -1268,8 +1265,8 @@ var ShardingTest = function(params) {
             keyFile: keyFile,
         };
 
-        if (!otherParams.noChunkSize) {
-            options.chunkSize = otherParams.chunksize || otherParams.chunkSize || 50;
+        if (otherParams.chunkSize) {
+            options.chunkSize = otherParams.chunkSize;
         }
 
         if (otherParams.mongosOptions && otherParams.mongosOptions.binVersion) {

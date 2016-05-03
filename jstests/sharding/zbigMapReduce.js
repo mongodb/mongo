@@ -15,7 +15,6 @@ function setupTest() {
 
     // Reduce chunk size to split
     var config = s.getDB("config");
-    config.settings.save({_id: "chunksize", value: 1});
 
     assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
     s.ensurePrimaryShard('test', 'test-rs0');

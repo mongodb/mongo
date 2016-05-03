@@ -3,14 +3,15 @@
 (function() {
     'use strict';
 
-    var st = new ShardingTest(
-        {name: 'auto_rebalance_rs', mongos: 1, shards: 2, chunksize: 1, rs: {nodes: 3}});
+    var st = new ShardingTest({mongos: 1, shards: 2, chunkSize: 1, rs: {nodes: 3}});
 
     assert.writeOK(st.getDB("config").settings.update(
         {_id: "balancer"}, {$set: {"_secondaryThrottle": false}}, {upsert: true}));
 
-    st.getDB("admin").runCommand({enableSharding: "TestDB_auto_rebalance_rs"});
-    st.getDB("admin").runCommand({shardCollection: "TestDB_auto_rebalance_rs.foo", key: {x: 1}});
+    assert.commandWorked(
+        st.getDB("admin").runCommand({enableSharding: "TestDB_auto_rebalance_rs"}));
+    assert.commandWorked(st.getDB("admin").runCommand(
+        {shardCollection: "TestDB_auto_rebalance_rs.foo", key: {x: 1}}));
 
     var dbTest = st.getDB("TestDB_auto_rebalance_rs");
 
@@ -23,11 +24,11 @@
     assert.writeOK(bulk.execute());
 
     // Wait for the rebalancing to kick in
-    st.startBalancer(60000);
+    st.startBalancer();
 
     assert.soon(function() {
-        var s1Chunks = st.getDB("config").chunks.count({shard: "auto_rebalance_rs-rs0"});
-        var s2Chunks = st.getDB("config").chunks.count({shard: "auto_rebalance_rs-rs1"});
+        var s1Chunks = st.getDB("config").chunks.count({shard: "test-rs0"});
+        var s2Chunks = st.getDB("config").chunks.count({shard: "test-rs1"});
         var total = st.getDB("config").chunks.count({ns: "TestDB_auto_rebalance_rs.foo"});
 
         print("chunks: " + s1Chunks + " " + s2Chunks + " " + total);

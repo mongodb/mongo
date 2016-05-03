@@ -2,13 +2,13 @@
 (function() {
     'use strict';
 
-    var chunkSize = 1;  // In MB
+    var chunkSizeMB = 1;
 
     var st = new ShardingTest(
-        {shards: 1, mongos: 1, other: {chunksize: chunkSize, mongosOptions: {noAutoSplit: ""}}});
+        {shards: 1, mongos: 1, other: {chunkSize: chunkSizeMB, mongosOptions: {noAutoSplit: ""}}});
 
     var data = "x";
-    while (data.length < chunkSize * 1024 * 1024) {
+    while (data.length < chunkSizeMB * 1024 * 1024) {
         data += data;
     }
 

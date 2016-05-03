@@ -49,10 +49,7 @@
         name: "auth",
         mongos: 1,
         shards: 0,
-        other: {
-            extraOptions: {"keyFile": "jstests/libs/key1"},
-            noChunkSize: true,
-        }
+        other: {extraOptions: {"keyFile": "jstests/libs/key1"}, chunkSize: 1},
     });
 
     if (s.getDB('admin').runCommand('buildInfo').bits < 64) {
@@ -67,8 +64,6 @@
     login(adminUser);
 
     // Set the chunk size, disable the secondary throttle (so the test doesn't run so slow)
-    assert.writeOK(
-        s.getDB("config").settings.update({_id: "chunksize"}, {$set: {value: 1}}, {upsert: true}));
     assert.writeOK(s.getDB("config").settings.update(
         {_id: "balancer"},
         {$set: {"_secondaryThrottle": false, "_waitForDelete": true}},
@@ -77,7 +72,7 @@
     printjson(s.getDB("config").settings.find().toArray());
 
     print("Restart mongos with different auth options");
-    s.restartMongos(0, {v: 2, configdb: s._configDB, keyFile: "jstests/libs/key1", chunkSize: 1});
+    s.restartMongos(0);
     login(adminUser);
 
     var d1 = new ReplSetTest({name: "d1", nodes: 3, useHostName: true});

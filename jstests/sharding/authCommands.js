@@ -10,9 +10,9 @@ var doTest = function() {
     var st = new ShardingTest({
         keyFile: 'jstests/libs/key1',
         shards: 2,
-        chunksize: 2,
+        chunkSize: 2,
         rs: rsOpts,
-        other: {nopreallocj: 1, useHostname: false}
+        other: {useHostname: false},
     });
 
     var mongos = st.s;
