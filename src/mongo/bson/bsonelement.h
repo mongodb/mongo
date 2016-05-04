@@ -486,6 +486,20 @@ public:
         return !operator==(r);
     }
 
+    /**
+     * Compares the raw bytes of the two BSONElements, including the field names. This will treat
+     * different types (e.g. integers and doubles) as distinct values, even if they have the same
+     * field name and bit pattern in the value portion of the BSON element.
+     */
+    bool binaryEqual(const BSONElement& rhs) const;
+
+    /**
+     * Compares the raw bytes of the two BSONElements, excluding the field names. This will treat
+     * different types (e.g integers and doubles) as distinct values, even if they have the same bit
+     * pattern in the value portion of the BSON element.
+     */
+    bool binaryEqualValues(const BSONElement& rhs) const;
+
     /** Well ordered comparison.
         @return <0: l<r. 0:l==r. >0:l>r
         order by type, field name, and field value.

@@ -33,6 +33,7 @@
 #include "mongo/db/index/btree_access_method.h"
 
 #include <vector>
+#include <utility>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -50,6 +51,7 @@
 namespace mongo {
 
 using std::endl;
+using std::pair;
 using std::set;
 using std::vector;
 
@@ -192,26 +194,6 @@ Status IndexAccessMethod::remove(OperationContext* txn,
     return Status::OK();
 }
 
-// Return keys in l that are not in r.
-// Lifted basically verbatim from elsewhere.
-static void setDifference(const BSONObjSet& l, const BSONObjSet& r, vector<BSONObj*>* diff) {
-    // l and r must use the same ordering spec.
-    verify(l.key_comp().order() == r.key_comp().order());
-    BSONObjSet::const_iterator i = l.begin();
-    BSONObjSet::const_iterator j = r.begin();
-    while (1) {
-        if (i == l.end())
-            break;
-        while (j != r.end() && j->woCompare(*i) < 0)
-            j++;
-        if (j == r.end() || i->woCompare(*j) != 0) {
-            const BSONObj* jo = &*i;
-            diff->push_back((BSONObj*)jo);
-        }
-        i++;
-    }
-}
-
 Status IndexAccessMethod::initializeAsEmpty(OperationContext* txn) {
     return _newInterface->initAsEmpty(txn);
 }
@@ -267,6 +249,42 @@ long long IndexAccessMethod::getSpaceUsedBytes(OperationContext* txn) const {
     return _newInterface->getSpaceUsedBytes(txn);
 }
 
+pair<vector<BSONObj>, vector<BSONObj>> IndexAccessMethod::setDifference(const BSONObjSet& left,
+                                                                        const BSONObjSet& right) {
+    // Two iterators to traverse the two sets in sorted order.
+    auto leftIt = left.begin();
+    auto rightIt = right.begin();
+    vector<BSONObj> onlyLeft;
+    vector<BSONObj> onlyRight;
+
+    while (leftIt != left.end() && rightIt != right.end()) {
+        const int cmp = leftIt->woCompare(*rightIt);
+        if (cmp == 0) {
+            // 'leftIt' and 'rightIt' compare equal using woCompare(), but may not be identical,
+            // which should result in an index change.
+            if (!leftIt->binaryEqual(*rightIt)) {
+                onlyLeft.push_back(*leftIt);
+                onlyRight.push_back(*rightIt);
+            }
+            ++leftIt;
+            ++rightIt;
+            continue;
+        } else if (cmp > 0) {
+            onlyRight.push_back(*rightIt);
+            ++rightIt;
+        } else {
+            onlyLeft.push_back(*leftIt);
+            ++leftIt;
+        }
+    }
+
+    // Add the rest of 'left' to 'onlyLeft', and the rest of 'right' to 'onlyRight', if any.
+    onlyLeft.insert(onlyLeft.end(), leftIt, left.end());
+    onlyRight.insert(onlyRight.end(), rightIt, right.end());
+
+    return {std::move(onlyLeft), std::move(onlyRight)};
+}
+
 Status IndexAccessMethod::validateUpdate(OperationContext* txn,
                                          const BSONObj& from,
                                          const BSONObj& to,
@@ -281,8 +299,7 @@ Status IndexAccessMethod::validateUpdate(OperationContext* txn,
     ticket->loc = record;
     ticket->dupsAllowed = options.dupsAllowed;
 
-    setDifference(ticket->oldKeys, ticket->newKeys, &ticket->removed);
-    setDifference(ticket->newKeys, ticket->oldKeys, &ticket->added);
+    std::tie(ticket->removed, ticket->added) = setDifference(ticket->oldKeys, ticket->newKeys);
 
     ticket->_isValid = true;
 
@@ -308,12 +325,11 @@ Status IndexAccessMethod::update(OperationContext* txn,
     }
 
     for (size_t i = 0; i < ticket.removed.size(); ++i) {
-        _newInterface->unindex(txn, *ticket.removed[i], ticket.loc, ticket.dupsAllowed);
+        _newInterface->unindex(txn, ticket.removed[i], ticket.loc, ticket.dupsAllowed);
     }
 
     for (size_t i = 0; i < ticket.added.size(); ++i) {
-        Status status =
-            _newInterface->insert(txn, *ticket.added[i], ticket.loc, ticket.dupsAllowed);
+        Status status = _newInterface->insert(txn, ticket.added[i], ticket.loc, ticket.dupsAllowed);
         if (!status.isOK()) {
             if (status.code() == ErrorCodes::KeyTooLong && ignoreKeyTooLong(txn)) {
                 // Ignore.

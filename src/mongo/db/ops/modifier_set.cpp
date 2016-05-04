@@ -152,16 +152,24 @@ Status ModifierSet::prepare(mutablebson::Element root,
     // in-place and no-op logic
     //
 
-    // If the field path is not fully present, then this mod cannot be in place, nor is a
-    // noOp.
+    // If the field path is not fully present, then this mod cannot be in place, nor is it a noOp.
     if (!_preparedState->elemFound.ok() || _preparedState->idxFound < (_fieldRef.numParts() - 1)) {
         return Status::OK();
     }
 
-    // If the value being $set is the same as the one already in the doc, than this is a
-    // noOp.
+    // If the value being $set is the same as the one already in the doc, than this is a noOp. We
+    // use binary equality to compare so that any change to the document is considered, unlike using
+    // a comparison that winds up in woCompare (see SERVER-16801). In the case where elemFound
+    // doesn't have a serialized representation, we just declare the operation to not be a
+    // no-op. This is potentially a missed optimization, but is unlikely to cause much pain since in
+    // the normal update workflow we only admit one modification on any path from a leaf to the
+    // document root. In that domain, hasValue will always be true. We may encounter a
+    // non-serialized elemFound in the case where our base document is the result of calling
+    // populateDocumentWithQueryFields, so this could cause us to do slightly more work than
+    // strictly necessary in the case where an update (w upsert:true) becomes an insert.
     if (_preparedState->elemFound.ok() && _preparedState->idxFound == (_fieldRef.numParts() - 1) &&
-        _preparedState->elemFound.compareWithBSONElement(_val, false /*ignore field*/) == 0) {
+        _preparedState->elemFound.hasValue() &&
+        _preparedState->elemFound.getValue().binaryEqualValues(_val)) {
         execInfo->noOp = _preparedState->noOp = true;
     }
 

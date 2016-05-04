@@ -248,6 +248,17 @@ public:
      */
     virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const = 0;
 
+    /**
+     * Splits the sets 'left' and 'right' into two vectors, the first containing the elements that
+     * only appeared in 'left', and the second containing only elements that appeared in 'right'.
+     *
+     * Note this considers objects which are not identical as distinct objects. For example,
+     * setDifference({BSON("a" << 0.0)}, {BSON("a" << 0LL)}) would result in the pair
+     * ( {BSON("a" << 0.0)}, {BSON("a" << 0LL)} ).
+     */
+    static std::pair<std::vector<BSONObj>, std::vector<BSONObj>> setDifference(
+        const BSONObjSet& left, const BSONObjSet& right);
+
 protected:
     // Determines whether it's OK to ignore ErrorCodes::KeyTooLong for this OperationContext
     bool ignoreKeyTooLong(OperationContext* txn);
@@ -278,9 +289,8 @@ private:
     BSONObjSet oldKeys;
     BSONObjSet newKeys;
 
-    // These point into the sets oldKeys and newKeys.
-    std::vector<BSONObj*> removed;
-    std::vector<BSONObj*> added;
+    std::vector<BSONObj> removed;
+    std::vector<BSONObj> added;
 
     RecordId loc;
     bool dupsAllowed;
