@@ -145,28 +145,28 @@ public:
         return _electionId;
     }
 
-    const OpTime getLastWriteOpTime() const {
+    OpTime getLastWriteOpTime() const {
         if (!_lastWrite) {
             return OpTime();
         }
         return _lastWrite->opTime;
     }
 
-    const time_t getLastWriteDate() const {
+    time_t getLastWriteDate() const {
         if (!_lastWrite) {
             return 0;
         }
         return _lastWrite->value;
     }
 
-    const OpTime getLastMajorityWriteOpTime() const {
+    OpTime getLastMajorityWriteOpTime() const {
         if (!_lastMajorityWrite) {
             return OpTime();
         }
         return _lastMajorityWrite->opTime;
     }
 
-    const time_t getLastMajorityWriteDate() const {
+    time_t getLastMajorityWriteDate() const {
         if (!_lastMajorityWrite) {
             return 0;
         }
