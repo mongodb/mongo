@@ -504,25 +504,31 @@ ops(void *arg)
 		/* Checkpoint the database. */
 		if (tinfo->ops == ckpt_op && g.c_checkpoints) {
 			/*
-			 * LSM and data-sources don't support named checkpoints,
-			 * and we can't drop a named checkpoint while there's a
-			 * cursor open on it, otherwise 20% of the time name the
-			 * checkpoint.
+			 * Checkpoints are single-threaded inside WiredTiger,
+			 * skip our checkpoint if another thread is already
+			 * doing one.
 			 */
-			if (DATASOURCE("helium") || DATASOURCE("kvsbdb") ||
-			    DATASOURCE("lsm") ||
-			    readonly || mmrand(&tinfo->rnd, 1, 5) == 1)
+			ret = pthread_rwlock_trywrlock(&g.checkpoint_lock);
+			if (ret == EBUSY)
+				goto skip_checkpoint;
+			testutil_check(ret);
+
+			/*
+			 * LSM and data-sources don't support named checkpoints
+			 * and we can't drop a named checkpoint while there's a
+			 * backup in progress, otherwise name the checkpoint 5%
+			 * of the time.
+			 */
+			if (mmrand(&tinfo->rnd, 1, 20) != 1 ||
+			    DATASOURCE("helium") ||
+			    DATASOURCE("kvsbdb") || DATASOURCE("lsm") ||
+			    pthread_rwlock_trywrlock(&g.backup_lock) == EBUSY)
 				ckpt_config = NULL;
 			else {
 				(void)snprintf(ckpt_name, sizeof(ckpt_name),
 				    "name=thread-%d", tinfo->id);
 				ckpt_config = ckpt_name;
 			}
-
-			/* Named checkpoints lock out backups */
-			if (ckpt_config != NULL)
-				testutil_check(
-				    pthread_rwlock_wrlock(&g.backup_lock));
 
 			testutil_checkfmt(
 			    session->checkpoint(session, ckpt_config),
@@ -531,6 +537,8 @@ ops(void *arg)
 			if (ckpt_config != NULL)
 				testutil_check(
 				    pthread_rwlock_unlock(&g.backup_lock));
+			testutil_check(
+			    pthread_rwlock_unlock(&g.checkpoint_lock));
 
 			/* Rephrase the checkpoint name for cursor open. */
 			if (ckpt_config == NULL)
@@ -541,7 +549,7 @@ ops(void *arg)
 				    "checkpoint=thread-%d", tinfo->id);
 			ckpt_available = true;
 
-			/* Pick the next checkpoint operation. */
+skip_checkpoint:	/* Pick the next checkpoint operation. */
 			ckpt_op += mmrand(&tinfo->rnd, 5000, 20000);
 		}
 

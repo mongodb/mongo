@@ -121,7 +121,8 @@ typedef struct {
 	int replay;				/* Replaying a run. */
 	int workers_finished;			/* Operations completed */
 
-	pthread_rwlock_t backup_lock;		/* Hot backup running */
+	pthread_rwlock_t backup_lock;		/* Backup running */
+	pthread_rwlock_t checkpoint_lock;	/* Checkpoint running */
 
 	WT_RAND_STATE rnd;			/* Global RNG state */
 

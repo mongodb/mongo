@@ -118,7 +118,12 @@ backup(void *arg)
 			sleep(1);
 		}
 
-		/* Lock out named checkpoints */
+		/*
+		 * We can't drop named checkpoints while there's a backup in
+		 * progress, serialize backups with named checkpoints. Wait
+		 * for the checkpoint to complete, otherwise backups might be
+		 * starved out.
+		 */
 		testutil_check(pthread_rwlock_wrlock(&g.backup_lock));
 		if (g.workers_finished) {
 			testutil_check(pthread_rwlock_unlock(&g.backup_lock));
