@@ -349,15 +349,11 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
             bob.done().getObjectField(repl::ReadConcernArgs::kReadConcernFieldName).getOwned();
     }
 
-    auto lpq = LiteParsedQuery::makeAsFindCmd(nss,
-                                              query,
-                                              BSONObj(),  // projection
-                                              sort,
-                                              BSONObj(),  // hint
-                                              readConcernObj,
-                                              BSONObj(),    // collation
-                                              boost::none,  // skip
-                                              limit);
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    lpq->setFilter(query);
+    lpq->setSort(sort);
+    lpq->setReadConcern(readConcernObj);
+    lpq->setLimit(limit);
 
     BSONObjBuilder findCmdBuilder;
     lpq->asFindCommand(&findCmdBuilder);

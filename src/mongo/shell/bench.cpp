@@ -713,19 +713,13 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                         BSONObj fixedQuery = fixQuery(op.query, bsonTemplateEvaluator);
                         BSONObj result;
                         if (op.useReadCmd) {
-                            unique_ptr<LiteParsedQuery> lpq =
-                                LiteParsedQuery::makeAsFindCmd(NamespaceString(op.ns),
-                                                               fixedQuery,
-                                                               op.projection,  // projection
-                                                               BSONObj(),      // sort
-                                                               BSONObj(),      // hint
-                                                               BSONObj(),      // readConcern
-                                                               BSONObj(),      // collation
-                                                               boost::none,    // skip
-                                                               1LL,            // limit
-                                                               boost::none,    // batchSize
-                                                               boost::none,    // ntoreturn
-                                                               false);         // wantMore
+                            auto lpq = stdx::make_unique<LiteParsedQuery>(NamespaceString(op.ns));
+                            lpq->setFilter(fixedQuery);
+                            lpq->setProj(op.projection);
+                            lpq->setLimit(1LL);
+                            lpq->setWantMore(false);
+                            invariantOK(lpq->validate());
+
                             BenchRunEventTrace _bret(&stats.findOneCounter);
                             runQueryWithReadCommands(conn, std::move(lpq), &result);
                         } else {
@@ -820,18 +814,21 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                             uassert(28824,
                                     "cannot use 'options' in combination with read commands",
                                     !op.options);
-                            unique_ptr<LiteParsedQuery> lpq = LiteParsedQuery::makeAsFindCmd(
-                                NamespaceString(op.ns),
-                                fixedQuery,
-                                op.projection,
-                                BSONObj(),  // sort
-                                BSONObj(),  // hint
-                                BSONObj(),  // readConcern
-                                BSONObj(),  // collation
-                                op.skip ? boost::optional<long long>(op.skip) : boost::none,
-                                op.limit ? boost::optional<long long>(op.limit) : boost::none,
-                                op.batchSize ? boost::optional<long long>(op.batchSize)
-                                             : boost::none);
+
+                            auto lpq = stdx::make_unique<LiteParsedQuery>(NamespaceString(op.ns));
+                            lpq->setFilter(fixedQuery);
+                            lpq->setProj(op.projection);
+                            if (op.skip) {
+                                lpq->setSkip(op.skip);
+                            }
+                            if (op.limit) {
+                                lpq->setLimit(op.limit);
+                            }
+                            if (op.batchSize) {
+                                lpq->setBatchSize(op.batchSize);
+                            }
+                            invariantOK(lpq->validate());
+
                             BenchRunEventTrace _bret(&stats.queryCounter);
                             count = runQueryWithReadCommands(conn, std::move(lpq));
                         } else {

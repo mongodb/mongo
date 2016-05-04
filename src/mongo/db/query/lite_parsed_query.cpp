@@ -142,13 +142,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
                 return status;
             }
 
-            // Sort document normalization.
-            BSONObj sort = el.Obj().getOwned();
-            if (!isValidSortOrder(sort)) {
-                return Status(ErrorCodes::BadValue, "bad sort specification");
-            }
-
-            pq->_sort = sort;
+            pq->_sort = el.Obj().getOwned();
         } else if (str::equals(fieldName, kHintField)) {
             BSONObj hintObj;
             if (Object == el.type()) {
@@ -186,9 +180,6 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
             }
 
             long long skip = el.numberLong();
-            if (skip < 0) {
-                return Status(ErrorCodes::BadValue, "skip value must be non-negative");
-            }
 
             // A skip value of 0 means that there is no skip.
             if (skip) {
@@ -203,9 +194,6 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
             }
 
             long long limit = el.numberLong();
-            if (limit < 0) {
-                return Status(ErrorCodes::BadValue, "limit value must be non-negative");
-            }
 
             // A limit value of 0 means that there is no limit.
             if (limit) {
@@ -219,12 +207,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
                 return Status(ErrorCodes::FailedToParse, ss);
             }
 
-            long long batchSize = el.numberLong();
-            if (batchSize < 0) {
-                return Status(ErrorCodes::BadValue, "batchSize value must be non-negative");
-            }
-
-            pq->_batchSize = batchSize;
+            pq->_batchSize = el.numberLong();
         } else if (str::equals(fieldName, kNToReturnField)) {
             if (!el.isNumber()) {
                 str::stream ss;
@@ -233,12 +216,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
                 return Status(ErrorCodes::FailedToParse, ss);
             }
 
-            long long ntoreturn = el.numberLong();
-            if (ntoreturn < 0) {
-                return Status(ErrorCodes::BadValue, "ntoreturn value must be non-negative");
-            }
-
-            pq->_ntoreturn = ntoreturn;
+            pq->_ntoreturn = el.numberLong();
         } else if (str::equals(fieldName, kSingleBatchField)) {
             Status status = checkFieldType(el, Bool);
             if (!status.isOK()) {
@@ -261,12 +239,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
                 return Status(ErrorCodes::FailedToParse, ss);
             }
 
-            int maxScan = el.numberInt();
-            if (maxScan < 0) {
-                return Status(ErrorCodes::BadValue, "maxScan value must be non-negative");
-            }
-
-            pq->_maxScan = maxScan;
+            pq->_maxScan = el.numberInt();
         } else if (str::equals(fieldName, cmdOptionMaxTimeMS)) {
             StatusWith<int> maxTimeMS = parseMaxTimeMS(el);
             if (!maxTimeMS.isOK()) {
@@ -384,112 +357,12 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
 
     pq->addMetaProjection();
 
-    Status validateStatus = pq->validateFindCmd();
+    Status validateStatus = pq->validate();
     if (!validateStatus.isOK()) {
         return validateStatus;
     }
 
     return std::move(pq);
-}
-
-// static
-StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeAsOpQuery(NamespaceString nss,
-                                                                       int ntoskip,
-                                                                       int ntoreturn,
-                                                                       int queryOptions,
-                                                                       const BSONObj& query,
-                                                                       const BSONObj& proj,
-                                                                       const BSONObj& sort,
-                                                                       const BSONObj& hint,
-                                                                       const BSONObj& minObj,
-                                                                       const BSONObj& maxObj,
-                                                                       bool snapshot,
-                                                                       bool explain) {
-    unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery(std::move(nss)));
-    pq->_sort = sort.getOwned();
-    pq->_hint = hint.getOwned();
-    pq->_min = minObj.getOwned();
-    pq->_max = maxObj.getOwned();
-    pq->_snapshot = snapshot;
-    pq->_explain = explain;
-
-    Status status = pq->init(ntoskip, ntoreturn, queryOptions, query, proj, false);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    return std::move(pq);
-}
-
-// static
-std::unique_ptr<LiteParsedQuery> LiteParsedQuery::makeAsFindCmd(
-    NamespaceString nss,
-    const BSONObj& filter,
-    const BSONObj& projection,
-    const BSONObj& sort,
-    const BSONObj& hint,
-    const BSONObj& readConcern,
-    const BSONObj& collation,
-    boost::optional<long long> skip,
-    boost::optional<long long> limit,
-    boost::optional<long long> batchSize,
-    boost::optional<long long> ntoreturn,
-    bool wantMore,
-    bool isExplain,
-    const std::string& comment,
-    int maxScan,
-    int maxTimeMS,
-    const BSONObj& min,
-    const BSONObj& max,
-    bool returnKey,
-    bool showRecordId,
-    bool isSnapshot,
-    bool hasReadPref,
-    bool isTailable,
-    bool isSlaveOk,
-    bool isOplogReplay,
-    bool isNoCursorTimeout,
-    bool isAwaitData,
-    bool allowPartialResults) {
-    unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery(std::move(nss)));
-    // ntoreturn and batchSize or limit are mutually exclusive.
-    if (batchSize || limit) {
-        invariant(!ntoreturn);
-    }
-
-    pq->_filter = filter;
-    pq->_proj = projection;
-    pq->_sort = sort;
-    pq->_hint = hint;
-    pq->_readConcern = readConcern;
-    pq->_collation = collation;
-
-    pq->_skip = skip;
-    pq->_limit = limit;
-    pq->_batchSize = batchSize;
-    pq->_ntoreturn = ntoreturn;
-    pq->_wantMore = wantMore;
-
-    pq->_explain = isExplain;
-    pq->_comment = comment;
-    pq->_maxScan = maxScan;
-    pq->_maxTimeMS = maxTimeMS;
-
-    pq->_min = min;
-    pq->_max = max;
-
-    pq->_returnKey = returnKey;
-    pq->_showRecordId = showRecordId;
-    pq->_snapshot = isSnapshot;
-    pq->_hasReadPref = hasReadPref;
-    pq->_tailable = isTailable;
-    pq->_slaveOk = isSlaveOk;
-    pq->_oplogReplay = isOplogReplay;
-    pq->_noCursorTimeout = isNoCursorTimeout;
-    pq->_awaitData = isAwaitData;
-    pq->_allowPartialResults = allowPartialResults;
-
-    return pq;
 }
 
 BSONObj LiteParsedQuery::asFindCommand() const {
@@ -641,6 +514,10 @@ Status LiteParsedQuery::validate() const {
         }
     }
 
+    if (!isValidSortOrder(_sort)) {
+        return Status(ErrorCodes::BadValue, "bad sort specification");
+    }
+
     // All fields with a $meta sort must have a corresponding $meta projection.
     BSONObjIterator sortIt(_sort);
     while (sortIt.more()) {
@@ -668,6 +545,42 @@ Status LiteParsedQuery::validate() const {
                       "'limit' or 'batchSize' fields can not be set with 'ntoreturn' field.");
     }
 
+
+    if (_skip && *_skip < 0) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Skip value must be non-negative, but received: " << *_skip);
+    }
+
+    if (_limit && *_limit < 0) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream()
+                          << "Limit value must be non-negative, but received: " << *_limit);
+    }
+
+    if (_batchSize && *_batchSize < 0) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream()
+                          << "BatchSize value must be non-negative, but received: " << *_batchSize);
+    }
+
+    if (_ntoreturn && *_ntoreturn < 0) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream()
+                          << "NToReturn value must be non-negative, but received: " << *_ntoreturn);
+    }
+
+    if (_maxScan < 0) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream()
+                          << "MaxScan value must be non-negative, but received: " << _maxScan);
+    }
+
+    if (_maxTimeMS < 0) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream()
+                          << "MaxTimeMS value must be non-negative, but received: " << _maxTimeMS);
+    }
+
     if (_tailable) {
         // Tailable cursors cannot have any sort other than {$natural: 1}.
         const BSONObj expectedSort = BSON("$natural" << 1);
@@ -681,6 +594,10 @@ Status LiteParsedQuery::validate() const {
             return Status(ErrorCodes::BadValue,
                           "cannot use tailable option with the 'singleBatch' option");
         }
+    }
+
+    if (_awaitData && !_tailable) {
+        return Status(ErrorCodes::BadValue, "Cannot set awaitData without tailable");
     }
 
     return Status::OK();
@@ -797,11 +714,6 @@ Status LiteParsedQuery::init(int ntoskip,
     _proj = proj.getOwned();
 
     if (ntoskip) {
-        if (ntoskip < 0) {
-            str::stream ss;
-            ss << "Skip value must be positive, but received: " << ntoskip << ". ";
-            return Status(ErrorCodes::BadValue, ss);
-        }
         _skip = ntoskip;
     }
 
@@ -841,10 +753,6 @@ Status LiteParsedQuery::init(int ntoskip,
     }
 
     _hasReadPref = queryObj.hasField("$readPreference");
-
-    if (!isValidSortOrder(_sort)) {
-        return Status(ErrorCodes::BadValue, "bad sort specification");
-    }
 
     return validate();
 }
@@ -994,14 +902,6 @@ void LiteParsedQuery::addMetaProjection() {
     if (showRecordId()) {
         addShowRecordIdMetaProj();
     }
-}
-
-Status LiteParsedQuery::validateFindCmd() {
-    if (isAwaitData() && !isTailable()) {
-        return Status(ErrorCodes::BadValue, "Cannot set awaitData without tailable");
-    }
-
-    return validate();
 }
 
 boost::optional<long long> LiteParsedQuery::getEffectiveBatchSize() const {

@@ -104,20 +104,9 @@ void assertNotEquivalent(const char* queryStr,
 
 
 TEST(CanonicalQueryTest, IsValidText) {
-    // Passes in default values for LiteParsedQuery.
     // Filter inside LiteParsedQuery is not used.
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(nss,
-                                                                             0,
-                                                                             0,
-                                                                             0,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             false,     // snapshot
-                                                                             false)));  // explain
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    ASSERT_OK(lpq->validate());
 
     // Valid: regular TEXT.
     ASSERT_OK(isValid("{$text: {$search: 's'}}", *lpq));
@@ -171,41 +160,19 @@ TEST(CanonicalQueryTest, IsValidText) {
 }
 
 TEST(CanonicalQueryTest, IsValidTextTailable) {
-    // Passes in default values for LiteParsedQuery.
     // Filter inside LiteParsedQuery is not used.
-    int options = QueryOption_CursorTailable;
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(nss,
-                                                                             0,
-                                                                             0,
-                                                                             options,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             false,
-                                                                             false)));
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    lpq->setTailable(true);
+    ASSERT_OK(lpq->validate());
 
     // Invalid: TEXT and tailable.
     ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *lpq));
 }
 
 TEST(CanonicalQueryTest, IsValidGeo) {
-    // Passes in default values for LiteParsedQuery.
     // Filter inside LiteParsedQuery is not used.
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(nss,
-                                                                             0,
-                                                                             0,
-                                                                             0,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             false,     // snapshot
-                                                                             false)));  // explain
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    ASSERT_OK(lpq->validate());
 
     // Valid: regular GEO_NEAR.
     ASSERT_OK(isValid("{a: {$near: [0, 0]}}", *lpq));
@@ -269,20 +236,9 @@ TEST(CanonicalQueryTest, IsValidGeo) {
 }
 
 TEST(CanonicalQueryTest, IsValidTextAndGeo) {
-    // Passes in default values for LiteParsedQuery.
     // Filter inside LiteParsedQuery is not used.
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(nss,
-                                                                             0,
-                                                                             0,
-                                                                             0,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             false,     // snapshot
-                                                                             false)));  // explain
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    ASSERT_OK(lpq->validate());
 
     // Invalid: TEXT and GEO_NEAR.
     ASSERT_NOT_OK(isValid("{$text: {$search: 's'}, a: {$near: [0, 0]}}", *lpq));
@@ -301,63 +257,30 @@ TEST(CanonicalQueryTest, IsValidTextAndGeo) {
 }
 
 TEST(CanonicalQueryTest, IsValidTextAndNaturalAscending) {
-    // Passes in default values for LiteParsedQuery except for sort order.
     // Filter inside LiteParsedQuery is not used.
-    BSONObj sort = fromjson("{$natural: 1}");
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(nss,
-                                                                             0,
-                                                                             0,
-                                                                             0,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             sort,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             false,     // snapshot
-                                                                             false)));  // explain
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    lpq->setSort(fromjson("{$natural: 1}"));
+    ASSERT_OK(lpq->validate());
 
     // Invalid: TEXT and {$natural: 1} sort order.
     ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *lpq));
 }
 
 TEST(CanonicalQueryTest, IsValidTextAndNaturalDescending) {
-    // Passes in default values for LiteParsedQuery except for sort order.
     // Filter inside LiteParsedQuery is not used.
-    BSONObj sort = fromjson("{$natural: -1}");
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(nss,
-                                                                             0,
-                                                                             0,
-                                                                             0,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             sort,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             false,     // snapshot
-                                                                             false)));  // explain
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    lpq->setSort(fromjson("{$natural: -1}"));
+    ASSERT_OK(lpq->validate());
 
     // Invalid: TEXT and {$natural: -1} sort order.
     ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *lpq));
 }
 
 TEST(CanonicalQueryTest, IsValidTextAndHint) {
-    // Passes in default values for LiteParsedQuery except for hint.
     // Filter inside LiteParsedQuery is not used.
-    BSONObj hint = fromjson("{a: 1}");
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(nss,
-                                                                             0,
-                                                                             0,
-                                                                             0,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             hint,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             false,     // snapshot
-                                                                             false)));  // explain
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    lpq->setHint(fromjson("{a: 1}"));
+    ASSERT_OK(lpq->validate());
 
     // Invalid: TEXT and {$natural: -1} sort order.
     ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *lpq));
@@ -365,21 +288,10 @@ TEST(CanonicalQueryTest, IsValidTextAndHint) {
 
 // SERVER-14366
 TEST(CanonicalQueryTest, IsValidGeoNearNaturalSort) {
-    // Passes in default values for LiteParsedQuery except for sort order.
     // Filter inside LiteParsedQuery is not used.
-    BSONObj sort = fromjson("{$natural: 1}");
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(nss,
-                                                                             0,
-                                                                             0,
-                                                                             0,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             sort,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             false,     // snapshot
-                                                                             false)));  // explain
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    lpq->setSort(fromjson("{$natural: 1}"));
+    ASSERT_OK(lpq->validate());
 
     // Invalid: GEO_NEAR and {$natural: 1} sort order.
     ASSERT_NOT_OK(isValid("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}", *lpq));
@@ -387,42 +299,20 @@ TEST(CanonicalQueryTest, IsValidGeoNearNaturalSort) {
 
 // SERVER-14366
 TEST(CanonicalQueryTest, IsValidGeoNearNaturalHint) {
-    // Passes in default values for LiteParsedQuery except for the hint.
     // Filter inside LiteParsedQuery is not used.
-    BSONObj hint = fromjson("{$natural: 1}");
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(nss,
-                                                                             0,
-                                                                             0,
-                                                                             0,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             hint,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             false,     // snapshot
-                                                                             false)));  // explain
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    lpq->setHint(fromjson("{$natural: 1}"));
+    ASSERT_OK(lpq->validate());
 
     // Invalid: GEO_NEAR and {$natural: 1} hint.
     ASSERT_NOT_OK(isValid("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}", *lpq));
 }
 
 TEST(CanonicalQueryTest, IsValidTextAndSnapshot) {
-    // Passes in default values for LiteParsedQuery except for snapshot.
     // Filter inside LiteParsedQuery is not used.
-    bool snapshot = true;
-    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(nss,
-                                                                             0,
-                                                                             0,
-                                                                             0,
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             BSONObj(),
-                                                                             snapshot,
-                                                                             false)));  // explain
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    lpq->setSnapshot(true);
+    ASSERT_OK(lpq->validate());
 
     // Invalid: TEXT and snapshot.
     ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *lpq));

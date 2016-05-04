@@ -50,6 +50,15 @@ public:
     static const char kFindCommandName[];
     static const char kShardVersionField[];
 
+    LiteParsedQuery(NamespaceString nss);
+
+    /**
+     * Returns a non-OK status if any property of the LPQ has a bad value (e.g. a negative skip
+     * value) or if there is a bad combination of options (e.g. awaitData is illegal without
+     * tailable).
+     */
+    Status validate() const;
+
     /**
      * Parses a find command object, 'cmdObj'. Caller must indicate whether or not this lite
      * parsed query is an explained query or not via 'isExplain'.
@@ -60,58 +69,6 @@ public:
     static StatusWith<std::unique_ptr<LiteParsedQuery>> makeFromFindCommand(NamespaceString nss,
                                                                             const BSONObj& cmdObj,
                                                                             bool isExplain);
-
-    /**
-     * Constructs a LiteParseQuery object as though it is from a legacy QueryMessage.
-     */
-    static StatusWith<std::unique_ptr<LiteParsedQuery>> makeAsOpQuery(NamespaceString nss,
-                                                                      int ntoskip,
-                                                                      int ntoreturn,
-                                                                      int queryoptions,
-                                                                      const BSONObj& query,
-                                                                      const BSONObj& proj,
-                                                                      const BSONObj& sort,
-                                                                      const BSONObj& hint,
-                                                                      const BSONObj& minObj,
-                                                                      const BSONObj& maxObj,
-                                                                      bool snapshot,
-                                                                      bool explain);
-
-    /**
-     * Constructs a LiteParseQuery object that can be used to serialize to find command
-     * BSON object.
-     *
-     * Input must be fully validated (e.g. if there is a limit value, it must be non-negative).
-     */
-    static std::unique_ptr<LiteParsedQuery> makeAsFindCmd(
-        NamespaceString nss,
-        const BSONObj& filter = BSONObj(),
-        const BSONObj& projection = BSONObj(),
-        const BSONObj& sort = BSONObj(),
-        const BSONObj& hint = BSONObj(),
-        const BSONObj& readConcern = BSONObj(),
-        const BSONObj& collation = BSONObj(),
-        boost::optional<long long> skip = boost::none,
-        boost::optional<long long> limit = boost::none,
-        boost::optional<long long> batchSize = boost::none,
-        boost::optional<long long> ntoreturn = boost::none,
-        bool wantMore = true,
-        bool isExplain = false,
-        const std::string& comment = "",
-        int maxScan = 0,
-        int maxTimeMS = 0,
-        const BSONObj& min = BSONObj(),
-        const BSONObj& max = BSONObj(),
-        bool returnKey = false,
-        bool showRecordId = false,
-        bool isSnapshot = false,
-        bool hasReadPref = false,
-        bool isTailable = false,
-        bool isSlaveOk = false,
-        bool isOplogReplay = false,
-        bool isNoCursorTimeout = false,
-        bool isAwaitData = false,
-        bool allowPartialResults = false);
 
     /**
      * Converts this LPQ into a find command.
@@ -170,6 +127,7 @@ public:
     const NamespaceString& nss() const {
         return _nss;
     }
+
     const std::string& ns() const {
         return _nss.ns();
     }
@@ -177,20 +135,49 @@ public:
     const BSONObj& getFilter() const {
         return _filter;
     }
+
+    void setFilter(BSONObj filter) {
+        _filter = filter.getOwned();
+    }
+
     const BSONObj& getProj() const {
         return _proj;
     }
+
+    void setProj(BSONObj proj) {
+        _proj = proj.getOwned();
+    }
+
     const BSONObj& getSort() const {
         return _sort;
     }
+
+    void setSort(BSONObj sort) {
+        _sort = sort.getOwned();
+    }
+
     const BSONObj& getHint() const {
         return _hint;
     }
+
+    void setHint(BSONObj hint) {
+        _hint = hint.getOwned();
+    }
+
     const BSONObj& getReadConcern() const {
         return _readConcern;
     }
+
+    void setReadConcern(BSONObj readConcern) {
+        _readConcern = readConcern.getOwned();
+    }
+
     const BSONObj& getCollation() const {
         return _collation;
+    }
+
+    void setCollation(BSONObj collation) {
+        _collation = collation.getOwned();
     }
 
     static const long long kDefaultBatchSize;
@@ -198,14 +185,33 @@ public:
     boost::optional<long long> getSkip() const {
         return _skip;
     }
+
+    void setSkip(boost::optional<long long> skip) {
+        _skip = skip;
+    }
+
     boost::optional<long long> getLimit() const {
         return _limit;
     }
+
+    void setLimit(boost::optional<long long> limit) {
+        _limit = limit;
+    }
+
     boost::optional<long long> getBatchSize() const {
         return _batchSize;
     }
+
+    void setBatchSize(boost::optional<long long> batchSize) {
+        _batchSize = batchSize;
+    }
+
     boost::optional<long long> getNToReturn() const {
         return _ntoreturn;
+    }
+
+    void setNToReturn(boost::optional<long long> ntoreturn) {
+        _ntoreturn = ntoreturn;
     }
 
     /**
@@ -218,65 +224,152 @@ public:
         return _wantMore;
     }
 
+    void setWantMore(bool wantMore) {
+        _wantMore = wantMore;
+    }
+
     bool isExplain() const {
         return _explain;
+    }
+
+    void setExplain(bool explain) {
+        _explain = explain;
     }
 
     const std::string& getComment() const {
         return _comment;
     }
 
+    void setComment(const std::string& comment) {
+        _comment = comment;
+    }
+
     int getMaxScan() const {
         return _maxScan;
     }
+
+    void setMaxScan(int maxScan) {
+        _maxScan = maxScan;
+    }
+
     int getMaxTimeMS() const {
         return _maxTimeMS;
+    }
+
+    void setMaxTimeMS(int maxTimeMS) {
+        _maxTimeMS = maxTimeMS;
     }
 
     const BSONObj& getMin() const {
         return _min;
     }
+
+    void setMin(BSONObj min) {
+        _min = min.getOwned();
+    }
+
     const BSONObj& getMax() const {
         return _max;
+    }
+
+    void setMax(BSONObj max) {
+        _max = max.getOwned();
     }
 
     bool returnKey() const {
         return _returnKey;
     }
+
+    void setReturnKey(bool returnKey) {
+        _returnKey = returnKey;
+    }
+
     bool showRecordId() const {
         return _showRecordId;
     }
+
+    void setShowRecordId(bool showRecordId) {
+        _showRecordId = showRecordId;
+    }
+
     bool isSnapshot() const {
         return _snapshot;
     }
+
+    void setSnapshot(bool snapshot) {
+        _snapshot = snapshot;
+    }
+
     bool hasReadPref() const {
         return _hasReadPref;
+    }
+
+    void setHasReadPref(bool hasReadPref) {
+        _hasReadPref = hasReadPref;
     }
 
     bool isTailable() const {
         return _tailable;
     }
+
+    void setTailable(bool tailable) {
+        _tailable = tailable;
+    }
+
     bool isSlaveOk() const {
         return _slaveOk;
     }
+
+    void setSlaveOk(bool slaveOk) {
+        _slaveOk = slaveOk;
+    }
+
     bool isOplogReplay() const {
         return _oplogReplay;
     }
+
+    void setOplogReplay(bool oplogReplay) {
+        _oplogReplay = oplogReplay;
+    }
+
     bool isNoCursorTimeout() const {
         return _noCursorTimeout;
     }
+
+    void setNoCursorTimeout(bool noCursorTimeout) {
+        _noCursorTimeout = noCursorTimeout;
+    }
+
     bool isAwaitData() const {
         return _awaitData;
     }
+
+    void setAwaitData(bool awaitData) {
+        _awaitData = awaitData;
+    }
+
     bool isExhaust() const {
         return _exhaust;
     }
+
+    void setExhaust(bool exhaust) {
+        _exhaust = exhaust;
+    }
+
     bool isAllowPartialResults() const {
         return _allowPartialResults;
     }
 
+    void setAllowPartialResults(bool allowPartialResults) {
+        _allowPartialResults = allowPartialResults;
+    }
+
     boost::optional<long long> getReplicationTerm() const {
         return _replicationTerm;
+    }
+
+    void setReplicationTerm(boost::optional<long long> replicationTerm) {
+        _replicationTerm = replicationTerm;
     }
 
     /**
@@ -296,14 +389,6 @@ public:
         const QueryMessage& qm);
 
 private:
-    LiteParsedQuery(NamespaceString nss);
-
-    /**
-     * Parsing code calls this after construction of the LPQ is complete. There are additional
-     * semantic properties that must be checked even if "lexically" the parse is OK.
-     */
-    Status validate() const;
-
     Status init(int ntoskip,
                 int ntoreturn,
                 int queryOptions,
@@ -334,11 +419,6 @@ private:
      * Add the meta projection to this object if needed.
      */
     void addMetaProjection();
-
-    /**
-     * Returns OK if this is valid in the find command context.
-     */
-    Status validateFindCmd();
 
     const NamespaceString _nss;
 

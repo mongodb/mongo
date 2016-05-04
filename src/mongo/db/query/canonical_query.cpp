@@ -250,27 +250,19 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     const ExtensionsCallback& extensionsCallback) {
     // TODO: we should be passing the filter corresponding to 'root' to the LPQ rather than the base
     // query's filter, baseQuery.getParsed().getFilter().
-    BSONObj emptyObj;
-    auto lpqStatus = LiteParsedQuery::makeAsOpQuery(baseQuery.nss(),
-                                                    0,  // ntoskip
-                                                    0,  // ntoreturn
-                                                    0,  // queryOptions
-                                                    baseQuery.getParsed().getFilter(),
-                                                    baseQuery.getParsed().getProj(),
-                                                    baseQuery.getParsed().getSort(),
-                                                    emptyObj,  // hint
-                                                    emptyObj,  // min
-                                                    emptyObj,  // max
-                                                    false,     // snapshot
-                                                    baseQuery.getParsed().isExplain());
+    auto lpq = stdx::make_unique<LiteParsedQuery>(baseQuery.nss());
+    lpq->setFilter(baseQuery.getParsed().getFilter());
+    lpq->setProj(baseQuery.getParsed().getProj());
+    lpq->setSort(baseQuery.getParsed().getSort());
+    lpq->setExplain(baseQuery.getParsed().isExplain());
+    auto lpqStatus = lpq->validate();
     if (!lpqStatus.isOK()) {
-        return lpqStatus.getStatus();
+        return lpqStatus;
     }
 
     // Make the CQ we'll hopefully return.
     std::unique_ptr<CanonicalQuery> cq(new CanonicalQuery());
-    Status initStatus = cq->init(
-        lpqStatus.getValue().release(), extensionsCallback, root->shallowClone().release());
+    Status initStatus = cq->init(lpq.release(), extensionsCallback, root->shallowClone().release());
 
     if (!initStatus.isOK()) {
         return initStatus;
@@ -293,16 +285,32 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     bool snapshot,
     bool explain,
     const ExtensionsCallback& extensionsCallback) {
-    // Pass empty sort and projection.
-    BSONObj emptyObj;
-
-    auto lpqStatus = LiteParsedQuery::makeAsOpQuery(
-        std::move(nss), skip, limit, 0, query, proj, sort, hint, minObj, maxObj, snapshot, explain);
-    if (!lpqStatus.isOK()) {
-        return lpqStatus.getStatus();
+    auto lpq = stdx::make_unique<LiteParsedQuery>(std::move(nss));
+    lpq->setFilter(query);
+    lpq->setSort(sort);
+    lpq->setProj(proj);
+    if (skip) {
+        lpq->setSkip(skip);
     }
-
-    auto& lpq = lpqStatus.getValue();
+    if (limit) {
+        if (limit < 0) {
+            if (limit == std::numeric_limits<long long>::min()) {
+                return Status(ErrorCodes::BadValue, "negative limit cannot be negated");
+            }
+            limit = -limit;
+            lpq->setWantMore(false);
+        }
+        lpq->setNToReturn(limit);
+    }
+    lpq->setHint(hint);
+    lpq->setMin(minObj);
+    lpq->setMax(maxObj);
+    lpq->setSnapshot(snapshot);
+    lpq->setExplain(explain);
+    auto lpqStatus = lpq->validate();
+    if (!lpqStatus.isOK()) {
+        return lpqStatus;
+    }
 
     // Build a parse tree from the BSONObj in the parsed query.
     // TODO SERVER-23610: pass our CollatorInterface* instead of nullptr.

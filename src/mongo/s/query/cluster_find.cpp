@@ -103,34 +103,13 @@ std::unique_ptr<LiteParsedQuery> transformQueryForShards(const LiteParsedQuery& 
         newProjection = projectionBuilder.obj();
     }
 
-    return LiteParsedQuery::makeAsFindCmd(lpq.nss(),
-                                          lpq.getFilter(),
-                                          newProjection,
-                                          lpq.getSort(),
-                                          lpq.getHint(),
-                                          lpq.getReadConcern(),
-                                          lpq.getCollation(),
-                                          boost::none,  // Don't forward skip.
-                                          newLimit,
-                                          lpq.getBatchSize(),
-                                          newNToReturn,
-                                          lpq.wantMore(),
-                                          lpq.isExplain(),
-                                          lpq.getComment(),
-                                          lpq.getMaxScan(),
-                                          lpq.getMaxTimeMS(),
-                                          lpq.getMin(),
-                                          lpq.getMax(),
-                                          lpq.returnKey(),
-                                          lpq.showRecordId(),
-                                          lpq.isSnapshot(),
-                                          lpq.hasReadPref(),
-                                          lpq.isTailable(),
-                                          lpq.isSlaveOk(),
-                                          lpq.isOplogReplay(),
-                                          lpq.isNoCursorTimeout(),
-                                          lpq.isAwaitData(),
-                                          lpq.isAllowPartialResults());
+    auto newLPQ = stdx::make_unique<LiteParsedQuery>(lpq);
+    newLPQ->setProj(newProjection);
+    newLPQ->setSkip(boost::none);
+    newLPQ->setLimit(newLimit);
+    newLPQ->setNToReturn(newNToReturn);
+    invariantOK(newLPQ->validate());
+    return newLPQ;
 }
 
 StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
