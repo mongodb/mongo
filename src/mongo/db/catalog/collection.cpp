@@ -709,7 +709,11 @@ StatusWith<RecordId> Collection::_updateDocumentWithMove(OperationContext* txn,
 
     invariant(sid == txn->recoveryUnit()->getSnapshotId());
     args->updatedDoc = newDoc;
-    txn->getServiceContext()->getOpObserver()->onUpdate(txn, *args);
+
+    auto opObserver = getGlobalServiceContext()->getOpObserver();
+    if (opObserver) {
+        opObserver->onUpdate(txn, *args);
+    }
 
     moveCounter.increment();
     if (opDebug) {
