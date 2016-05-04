@@ -1,8 +1,5 @@
 /**
  *   Tests for the db object enhancement
- *
- *    This test requires mmapv1.
- *    @tags: [requires_mmapv1]
  */
 
 assert("test" == db, "wrong database currently not test");
@@ -99,16 +96,12 @@ assert.commandFailed(
     'configured a storage engine with invalid options');
 
 // Tests that a non-active storage engine can be configured so long as it is registered.
-if (db.serverBuildInfo().bits === 64) {
-    // wiredTiger is not a registered storage engine on 32-bit systems.
+var alternateStorageEngine =
+    db.serverBuildInfo().storageEngines.find(engine => engine !== storageEngineName);
+if (alternateStorageEngine) {
     var indexOptions = {
-        storageEngine: {}
+        storageEngine: {[alternateStorageEngine]: {}}
     };
-    if (storageEngineName === 'wiredTiger') {
-        indexOptions.storageEngine.mmapv1 = {};
-    } else {
-        indexOptions.storageEngine.wiredTiger = {};
-    }
     assert.commandWorked(db.createCollection('idxOptions', {indexOptionDefaults: indexOptions}),
                          'should have been able to configure a non-active storage engine');
     assert(db.idxOptions.drop());
