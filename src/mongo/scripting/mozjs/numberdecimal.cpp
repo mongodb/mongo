@@ -101,7 +101,7 @@ void NumberDecimalInfo::construct(JSContext* cx, JS::CallArgs args) {
 void NumberDecimalInfo::make(JSContext* cx, JS::MutableHandleValue thisv, Decimal128 decimal) {
     auto scope = getScope(cx);
 
-    scope->getProto<NumberDecimalInfo>().newInstance(thisv);
+    scope->getProto<NumberDecimalInfo>().newObject(thisv);
     JS_SetPrivate(thisv.toObjectOrNull(), new Decimal128(decimal));
 }
 
