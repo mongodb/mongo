@@ -30,10 +30,9 @@
 
 #include "mongo/platform/basic.h"
 
-#include <vector>
-
 #include "mongo/db/concurrency/lock_manager.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/util/assert_util.h"
@@ -661,33 +660,36 @@ void LockManager::downgrade(LockRequest* request, LockMode newMode) {
 }
 
 void LockManager::cleanupUnusedLocks() {
-    size_t deletedLockHeads = 0;
     for (unsigned i = 0; i < _numLockBuckets; i++) {
         LockBucket* bucket = &_lockBuckets[i];
         stdx::lock_guard<SimpleMutex> scopedLock(bucket->mutex);
+        _cleanupUnusedLocksInBucket(bucket);
+    }
+}
 
-        LockBucket::Map::iterator it = bucket->data.begin();
-        while (it != bucket->data.end()) {
-            LockHead* lock = it->second;
-            if (lock->partitioned()) {
-                lock->migratePartitionedLockHeads();
-            }
-            if (lock->grantedModes == 0) {
-                invariant(lock->grantedModes == 0);
-                invariant(lock->grantedList._front == NULL);
-                invariant(lock->grantedList._back == NULL);
-                invariant(lock->conflictModes == 0);
-                invariant(lock->conflictList._front == NULL);
-                invariant(lock->conflictList._back == NULL);
-                invariant(lock->conversionsCount == 0);
-                invariant(lock->compatibleFirstCount == 0);
+void LockManager::_cleanupUnusedLocksInBucket(LockBucket* bucket) {
+    LockBucket::Map::iterator it = bucket->data.begin();
+    size_t deletedLockHeads = 0;
+    while (it != bucket->data.end()) {
+        LockHead* lock = it->second;
+        if (lock->partitioned()) {
+            lock->migratePartitionedLockHeads();
+        }
+        if (lock->grantedModes == 0) {
+            invariant(lock->grantedModes == 0);
+            invariant(lock->grantedList._front == NULL);
+            invariant(lock->grantedList._back == NULL);
+            invariant(lock->conflictModes == 0);
+            invariant(lock->conflictList._front == NULL);
+            invariant(lock->conflictList._back == NULL);
+            invariant(lock->conversionsCount == 0);
+            invariant(lock->compatibleFirstCount == 0);
 
-                bucket->data.erase(it++);
-                deletedLockHeads++;
-                delete lock;
-            } else {
-                it++;
-            }
+            bucket->data.erase(it++);
+            deletedLockHeads++;
+            delete lock;
+        } else {
+            it++;
         }
     }
 }
@@ -820,6 +822,70 @@ void LockManager::dump() const {
     }
 }
 
+void LockManager::_dumpBucketToBSON(const std::map<LockerId, BSONObj>& lockToClientMap,
+                                    const LockBucket* bucket,
+                                    BSONObjBuilder* result) {
+    for (auto& bucketEntry : bucket->data) {
+        const LockHead* lock = bucketEntry.second;
+
+        if (lock->grantedList.empty()) {
+            // If there are no granted requests, this lock is empty, so no need to print it
+            continue;
+        }
+
+        result->append("resourceId", lock->resourceId.toString());
+
+        BSONArrayBuilder grantedLocks;
+        for (const LockRequest* iter = lock->grantedList._front; iter != nullptr;
+             iter = iter->next) {
+            _buildBucketBSON(iter, lockToClientMap, bucket, &grantedLocks);
+        }
+        result->append("granted", grantedLocks.arr());
+
+        BSONArrayBuilder pendingLocks;
+        for (const LockRequest* iter = lock->conflictList._front; iter != nullptr;
+             iter = iter->next) {
+            _buildBucketBSON(iter, lockToClientMap, bucket, &pendingLocks);
+        }
+        result->append("pending", pendingLocks.arr());
+    }
+}
+
+void LockManager::_buildBucketBSON(const LockRequest* iter,
+                                   const std::map<LockerId, BSONObj>& lockToClientMap,
+                                   const LockBucket* bucket,
+                                   BSONArrayBuilder* locks) {
+    BSONObjBuilder info;
+    info.append("mode", modeName(iter->mode));
+    info.append("convertMode", modeName(iter->convertMode));
+    info.append("enqueueAtFront", iter->enqueueAtFront);
+    info.append("compatibleFirst", iter->compatibleFirst);
+
+    LockerId lockerId = iter->locker->getId();
+    std::map<LockerId, BSONObj>::const_iterator it = lockToClientMap.find(lockerId);
+    if (it != lockToClientMap.end()) {
+        info.appendElements(it->second);
+    }
+    locks->append(info.obj());
+}
+
+void LockManager::getLockInfoBSON(const std::map<LockerId, BSONObj>& lockToClientMap,
+                                  BSONObjBuilder* result) {
+    BSONArrayBuilder lockInfo;
+    for (unsigned i = 0; i < _numLockBuckets; i++) {
+        LockBucket* bucket = &_lockBuckets[i];
+        stdx::lock_guard<SimpleMutex> scopedLock(bucket->mutex);
+
+        _cleanupUnusedLocksInBucket(bucket);
+        if (!bucket->data.empty()) {
+            BSONObjBuilder b;
+            _dumpBucketToBSON(lockToClientMap, bucket, &b);
+            lockInfo.append(b.obj());
+        }
+    }
+    result->append("lockInfo", lockInfo.arr());
+}
+
 void LockManager::_dumpBucket(const LockBucket* bucket) const {
     for (LockBucket::Map::const_iterator it = bucket->data.begin(); it != bucket->data.end();
          it++) {
@@ -852,7 +918,6 @@ void LockManager::_dumpBucket(const LockBucket* bucket) const {
         }
 
         sb << "-----------------------------------------------------------\n";
-
         log() << sb.str();
     }
 }

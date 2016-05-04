@@ -30,7 +30,10 @@
 
 #include <cstdint>
 #include <deque>
+#include <map>
+#include <vector>
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/config.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/lock_request_list.h"
@@ -121,6 +124,13 @@ public:
      */
     void dump() const;
 
+    /**
+     * Dumps the contents of all locks into a BSON object
+     * to be used in lockInfo command in the shell.
+     */
+    void getLockInfoBSON(const std::map<LockerId, BSONObj>& lockToClientMap,
+                         BSONObjBuilder* result);
+
 private:
     // The deadlock detector needs to access the buckets and locks directly
     friend class DeadlockDetector;
@@ -166,6 +176,23 @@ private:
     void _dumpBucket(const LockBucket* bucket) const;
 
     /**
+     * Dump the contents of a bucket to the BSON.
+     */
+    void _dumpBucketToBSON(const std::map<LockerId, BSONObj>& lockToClientMap,
+                           const LockBucket* bucket,
+                           BSONObjBuilder* result);
+
+    /**
+     * Build the BSON object containing the lock info for a particular
+     * bucket. The lockToClientMap is used to map the lockerId to
+     * more useful client information.
+     */
+    void _buildBucketBSON(const LockRequest* iter,
+                          const std::map<LockerId, BSONObj>& lockToClientMap,
+                          const LockBucket* bucket,
+                          BSONArrayBuilder* locks);
+
+    /**
      * Should be invoked when the state of a lock changes in a way, which could potentially
      * allow other blocked requests to proceed.
      *
@@ -177,6 +204,12 @@ private:
      *          granted modes, which was conflicting before became zero.
      */
     void _onLockModeChanged(LockHead* lock, bool checkConflictQueue);
+
+    /**
+     * Helper function to delete all locks that have no request on them on a single bucket.
+     * Called by cleanupUnusedLocks()
+     */
+    void _cleanupUnusedLocksInBucket(LockBucket* bucket);
 
     static const unsigned _numLockBuckets;
     LockBucket* _lockBuckets;
