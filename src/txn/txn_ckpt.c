@@ -792,6 +792,9 @@ __checkpoint_lock_tree(WT_SESSION_IMPL *session,
 	hot_backup_locked = false;
 	name_alloc = NULL;
 
+	/* Only referenced in diagnostic builds. */
+	WT_UNUSED(is_checkpoint);
+
 	/*
 	 * Only referenced in diagnostic builds and gcc 5.1 isn't satisfied
 	 * with wrapping the entire assert condition in the unused macro.
