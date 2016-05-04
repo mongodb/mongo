@@ -3660,8 +3660,6 @@ buildvariants:
   - name: replicasets_WT
   - name: replication
   - name: replication_WT
-  - name: sharding
-  - name: sharding_WT
   - name: sharding_csrs_upgrade
   - name: sharding_csrs_upgrade_WT
   - name: slow1
@@ -3753,8 +3751,6 @@ buildvariants:
   - name: replicasets_WT
   - name: replication
   - name: replication_WT
-  - name: sharding
-  - name: sharding_WT
   - name: sharding_csrs_upgrade
   - name: sharding_csrs_upgrade_WT
   - name: slow1
@@ -3805,8 +3801,6 @@ buildvariants:
   - name: replicasets_WT
   - name: replication
   - name: replication_WT
-  - name: sharding
-  - name: sharding_WT
   - name: sharding_csrs_upgrade
   - name: sharding_csrs_upgrade_WT
   - name: tool
@@ -3842,8 +3836,6 @@ buildvariants:
   - name: mmap
   - name: replicasets_auth
   - name: sasl
-  - name: sharding_auth
-  - name: sharding_auth_audit_WT
   - name: sharding_csrs_upgrade_auth_WT
   - name: snmp
   - name: snmp_WT
