@@ -394,6 +394,31 @@ int BSONElement::woCompare(const BSONElement& e, bool considerFieldName) const {
     return x;
 }
 
+bool BSONElement::binaryEqual(const BSONElement& rhs) const {
+    const int elemSize = size();
+
+    if (elemSize != rhs.size()) {
+        return false;
+    }
+
+    return (elemSize == 0) || (memcmp(data, rhs.rawdata(), elemSize) == 0);
+}
+
+bool BSONElement::binaryEqualValues(const BSONElement& rhs) const {
+    // The binaryEqual method above implicitly compares the type, but we need to do so explicitly
+    // here. It doesn't make sense to consider to BSONElement objects as binaryEqual if they have
+    // the same bit pattern but different types (consider an integer and a double).
+    if (type() != rhs.type())
+        return false;
+
+    const int valueSize = valuesize();
+    if (valueSize != rhs.valuesize()) {
+        return false;
+    }
+
+    return (valueSize == 0) || (memcmp(value(), rhs.value(), valueSize) == 0);
+}
+
 BSONObj BSONElement::embeddedObjectUserCheck() const {
     if (MONGO_likely(isABSONObj()))
         return BSONObj(value());
