@@ -962,41 +962,16 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 			if (read_gen_oldest != WT_READGEN_OLDEST)
 				break;
 		}
-
-		/*
-		 * Take all candidates if we only gathered pages with an oldest
-		 * read generation set.
-		 *
-		 * We normally never take more than 50% of the entries; if 50%
-		 * of the entries were at the oldest read generation, take them.
-		 */
-		if (read_gen_oldest == WT_READGEN_OLDEST)
-			cache->evict_candidates = entries;
-		else if (candidates >= entries / 2)
-			cache->evict_candidates = candidates;
-		else {
-			/* Save the calculated oldest generation. */
-			cache->read_gen_oldest = read_gen_oldest;
-
-			/* Find the bottom 25% of read generations. */
-			cutoff =
-			    (3 * read_gen_oldest + __evict_read_gen(
-			    &cache->evict_queue[entries - 1])) / 4;
-
-			/*
-			 * Don't take less than 10% or more than 50% of entries,
-			 * regardless. That said, if there is only one entry,
-			 * which is normal when populating an empty file, don't
-			 * exclude it.
-			 */
-			for (candidates = 1 + entries / 10;
-			    candidates < entries / 2;
-			    candidates++)
-				if (__evict_read_gen(
-				    &cache->evict_queue[candidates]) > cutoff)
-					break;
-			cache->evict_candidates = candidates;
-		}
+		
+		/* Save the calculated oldest generation. */
+		cache->read_gen_oldest = read_gen_oldest;
+		
+		WT_CACHE *cache = S2C(session)->cache;
+		uint64_t bytes_max = S2C(session)->cache_size + 1;
+		uint64_t bytes_inuse = __wt_cache_bytes_inuse(cache);
+		float cache_usage_pct_target = (bytes_inuse / cache->eviction_target * bytes_max);
+		if(cache_usage_pct_target>=1) cache_usage_pct_target = 1.0;
+		cache->evict_candidates = entries * cache_usage_per_target;
 	}
 
 	cache->evict_current = cache->evict_queue;
@@ -1359,11 +1334,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		    page->memory_footprint < btree->splitmempage)
 			continue;
 
-		/* Limit internal pages to 50% unless we get aggressive. */
-		if (WT_PAGE_IS_INTERNAL(page) &&
-		    !FLD_ISSET(cache->state, WT_EVICT_PASS_AGGRESSIVE) &&
-		    internal_pages >= (int)(evict - start) / 2)
-			continue;
+		/* Remove internal page threshold, Sometimes page eviction can't follow up page read into cache */
+		/*    Or we can generate threshold of internal page eviction based on cache eviction pressure (cache usage) */
 
 fast:		/* If the page can't be evicted, give up. */
 		if (!__wt_page_can_evict(session, ref, NULL))
