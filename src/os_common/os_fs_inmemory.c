@@ -262,14 +262,20 @@ __im_fs_size(WT_FILE_SYSTEM *file_system,
 	im_fs = (WT_FILE_SYSTEM_INMEM *)file_system;
 	session = (WT_SESSION_IMPL *)wt_session;
 
+	/*
+	 * Search for the handle, then get its size.  Take care to release the
+	 * global lock before getting the size or we will self-deadlock.
+	 */
 	__wt_spin_lock(session, &im_fs->lock);
+	im_fh = __im_handle_search(file_system, name);
+	__wt_spin_unlock(session, &im_fs->lock);
 
-	ret = ENOENT;
-	if ((im_fh = __im_handle_search(file_system, name)) != NULL)
+	if (im_fh == NULL)
+		ret = ENOENT;
+	else
 		ret = __im_file_size(
 		    (WT_FILE_HANDLE *)im_fh, wt_session, sizep);
 
-	__wt_spin_unlock(session, &im_fs->lock);
 	return (ret);
 }
 
