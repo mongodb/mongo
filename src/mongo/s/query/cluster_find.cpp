@@ -43,6 +43,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/getmore_request.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"

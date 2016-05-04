@@ -46,6 +46,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/type_shard_identity.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"

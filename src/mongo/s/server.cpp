@@ -57,6 +57,7 @@
 #include "mongo/db/service_context_noop.h"
 #include "mongo/db/startup_warnings_common.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/s/balancer/balancer.h"
 #include "mongo/s/catalog/catalog_manager.h"

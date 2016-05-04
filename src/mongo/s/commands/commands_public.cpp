@@ -43,6 +43,7 @@
 #include "mongo/db/commands/rename_collection.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"

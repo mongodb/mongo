@@ -40,6 +40,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/service_context_noop.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager_mock.h"

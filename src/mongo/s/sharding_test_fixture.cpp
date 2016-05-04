@@ -43,6 +43,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"

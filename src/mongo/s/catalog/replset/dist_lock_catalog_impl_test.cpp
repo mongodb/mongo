@@ -42,6 +42,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/network_test_env.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"

@@ -37,31 +37,19 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/client/query_fetcher.h"
-#include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/replica_set_monitor.h"
-#include "mongo/db/client.h"
-#include "mongo/db/query/lite_parsed_query.h"
-#include "mongo/executor/connection_pool_stats.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/config_server_metadata.h"
-#include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/client/shard_factory.h"
-#include "mongo/s/write_ops/wc_error_detail.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -70,90 +58,6 @@ using std::set;
 using std::string;
 using std::unique_ptr;
 using std::vector;
-
-using executor::TaskExecutor;
-using RemoteCommandCallbackArgs = TaskExecutor::RemoteCommandCallbackArgs;
-using repl::OpTime;
-
-namespace {
-
-const char kCmdResponseWriteConcernField[] = "writeConcernError";
-
-const Seconds kConfigCommandTimeout{30};
-const int kOnErrorNumRetries = 3;
-
-BSONObj appendMaxTimeToCmdObj(long long maxTimeMicros, const BSONObj& cmdObj) {
-    Seconds maxTime = kConfigCommandTimeout;
-
-    Microseconds remainingTxnMaxTime(maxTimeMicros);
-    bool hasTxnMaxTime(remainingTxnMaxTime != Microseconds::zero());
-    bool hasUserMaxTime = !cmdObj[LiteParsedQuery::cmdOptionMaxTimeMS].eoo();
-
-    if (hasTxnMaxTime) {
-        maxTime = duration_cast<Seconds>(remainingTxnMaxTime);
-    } else if (hasUserMaxTime) {
-        return cmdObj;
-    }
-
-    BSONObjBuilder updatedCmdBuilder;
-    if (hasTxnMaxTime && hasUserMaxTime) {  // Need to remove user provided maxTimeMS.
-        BSONObjIterator cmdObjIter(cmdObj);
-        const char* maxTimeFieldName = LiteParsedQuery::cmdOptionMaxTimeMS;
-        while (cmdObjIter.more()) {
-            BSONElement e = cmdObjIter.next();
-            if (str::equals(e.fieldName(), maxTimeFieldName)) {
-                continue;
-            }
-            updatedCmdBuilder.append(e);
-        }
-    } else {
-        updatedCmdBuilder.appendElements(cmdObj);
-    }
-
-    updatedCmdBuilder.append(LiteParsedQuery::cmdOptionMaxTimeMS,
-                             durationCount<Milliseconds>(maxTime));
-    return updatedCmdBuilder.obj();
-}
-
-Status checkForWriteConcernError(const BSONObj& obj) {
-    BSONElement wcErrorElem;
-    Status status = bsonExtractTypedField(obj, kCmdResponseWriteConcernField, Object, &wcErrorElem);
-    if (status.isOK()) {
-        BSONObj wcErrObj(wcErrorElem.Obj());
-
-        WCErrorDetail wcError;
-        string wcErrorParseMsg;
-        if (!wcError.parseBSON(wcErrObj, &wcErrorParseMsg)) {
-            return Status(ErrorCodes::UnsupportedFormat,
-                          str::stream() << "Failed to parse write concern section due to "
-                                        << wcErrorParseMsg);
-        } else {
-            return Status(ErrorCodes::WriteConcernFailed, wcError.toString());
-        }
-    } else if (status == ErrorCodes::NoSuchKey) {
-        return Status::OK();
-    }
-
-    return status;
-}
-
-}  // unnamed namespace
-
-const ShardRegistry::ErrorCodesSet ShardRegistry::kNotMasterErrors{
-    ErrorCodes::NotMaster, ErrorCodes::NotMasterNoSlaveOk, ErrorCodes::NotMasterOrSecondary};
-
-const ShardRegistry::ErrorCodesSet ShardRegistry::kAllRetriableErrors{
-    ErrorCodes::NotMaster,
-    ErrorCodes::NotMasterNoSlaveOk,
-    ErrorCodes::NotMasterOrSecondary,
-    // If write concern failed to be satisfied on the remote server, this most probably means that
-    // some of the secondary nodes were unreachable or otherwise unresponsive, so the call is safe
-    // to be retried if idempotency can be guaranteed.
-    ErrorCodes::WriteConcernFailed,
-    ErrorCodes::HostUnreachable,
-    ErrorCodes::HostNotFound,
-    ErrorCodes::NetworkTimeout,
-    ErrorCodes::InterruptedDueToReplStateChange};
 
 ShardRegistry::ShardRegistry(std::unique_ptr<ShardFactory> shardFactory,
                              ConnectionString configServerCS)
@@ -460,161 +364,6 @@ shared_ptr<Shard> ShardRegistry::_findUsingLookUp_inlock(const ShardId& shardId)
     }
 
     return nullptr;
-}
-
-StatusWith<Shard::QueryResponse> ShardRegistry::exhaustiveFindOnConfig(
-    OperationContext* txn,
-    const ReadPreferenceSetting& readPref,
-    const NamespaceString& nss,
-    const BSONObj& query,
-    const BSONObj& sort,
-    boost::optional<long long> limit) {
-    const auto configShard = getConfigShard();
-    return configShard->exhaustiveFindOnConfig(txn, readPref, nss, query, sort, limit);
-}
-
-StatusWith<BSONObj> ShardRegistry::runIdempotentCommandOnShard(
-    OperationContext* txn,
-    const std::shared_ptr<Shard>& shard,
-    const ReadPreferenceSetting& readPref,
-    const std::string& dbName,
-    const BSONObj& cmdObj) {
-    auto response = _runCommandWithRetries(txn,
-                                           Grid::get(txn)->getExecutorPool()->getFixedExecutor(),
-                                           shard,
-                                           readPref,
-                                           dbName,
-                                           cmdObj,
-                                           kAllRetriableErrors);
-    if (!response.isOK()) {
-        return response.getStatus();
-    }
-
-    return response.getValue().response;
-}
-
-StatusWith<BSONObj> ShardRegistry::runIdempotentCommandOnShard(
-    OperationContext* txn,
-    ShardId shardId,
-    const ReadPreferenceSetting& readPref,
-    const std::string& dbName,
-    const BSONObj& cmdObj) {
-    auto shard = getShard(txn, shardId);
-    if (!shard) {
-        return {ErrorCodes::ShardNotFound, str::stream() << "shard " << shardId << " not found"};
-    }
-    return runIdempotentCommandOnShard(txn, shard, readPref, dbName, cmdObj);
-}
-
-StatusWith<BSONObj> ShardRegistry::runIdempotentCommandOnConfig(
-    OperationContext* txn,
-    const ReadPreferenceSetting& readPref,
-    const std::string& dbName,
-    const BSONObj& cmdObj) {
-    auto response = _runCommandWithRetries(txn,
-                                           Grid::get(txn)->getExecutorPool()->getFixedExecutor(),
-                                           getConfigShard(),
-                                           readPref,
-                                           dbName,
-                                           cmdObj,
-                                           kAllRetriableErrors);
-
-    if (!response.isOK()) {
-        return response.getStatus();
-    }
-
-    return response.getValue().response;
-}
-
-StatusWith<BSONObj> ShardRegistry::runCommandOnConfigWithRetries(
-    OperationContext* txn,
-    const std::string& dbname,
-    const BSONObj& cmdObj,
-    const ShardRegistry::ErrorCodesSet& errorsToCheck) {
-    auto response = _runCommandWithRetries(txn,
-                                           Grid::get(txn)->getExecutorPool()->getFixedExecutor(),
-                                           getConfigShard(),
-                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                           dbname,
-                                           cmdObj,
-                                           errorsToCheck);
-    if (!response.isOK()) {
-        return response.getStatus();
-    }
-
-    return response.getValue().response;
-}
-
-StatusWith<Shard::CommandResponse> ShardRegistry::_runCommandWithRetries(
-    OperationContext* txn,
-    TaskExecutor* executor,
-    const std::shared_ptr<Shard>& shard,
-    const ReadPreferenceSetting& readPref,
-    const std::string& dbname,
-    const BSONObj& cmdObj,
-    const ShardRegistry::ErrorCodesSet& errorsToCheck) {
-    const bool isConfigShard = shard->isConfig();
-
-    for (int retry = 1; retry <= kOnErrorNumRetries; ++retry) {
-        const BSONObj cmdWithMaxTimeMS =
-            (isConfigShard ? appendMaxTimeToCmdObj(txn->getRemainingMaxTimeMicros(), cmdObj)
-                           : cmdObj);
-
-        const auto swCmdResponse = shard->runCommand(
-            txn, readPref, dbname, cmdWithMaxTimeMS, Shard::RetryPolicy::kNoRetry);
-
-        // First, check if the request failed to even reach the shard, and if we should retry.
-        Status requestStatus = swCmdResponse.getStatus();
-        if (!requestStatus.isOK()) {
-            if (retry < kOnErrorNumRetries && errorsToCheck.count(requestStatus.code())) {
-                LOG(1) << "Request " << cmdObj << " failed with retriable error and will be retried"
-                       << causedBy(requestStatus);
-                continue;
-            } else {
-                return requestStatus;
-            }
-        }
-
-        // If the request reached the shard, we might return the command response or an error
-        // status.
-        const auto cmdResponse = std::move(swCmdResponse.getValue());
-        Status commandStatus = getStatusFromCommandResult(cmdResponse.response);
-
-        // Next, check if the command failed with a retriable error.
-        if (!commandStatus.isOK() && errorsToCheck.count(commandStatus.code())) {
-            if (retry < kOnErrorNumRetries) {
-                // If the command failed with a retriable error and we can retry, retry.
-                LOG(1) << "Command " << cmdObj << " failed with retriable error and will be retried"
-                       << causedBy(commandStatus);
-                continue;
-            } else {
-                // If the command failed with a retriable error and we can't retry, return the
-                // command error as a status.
-                return commandStatus;
-            }
-        }
-
-        // If the command succeeded, or it failed with a non-retriable error, check if the write
-        // concern failed.
-        Status writeConcernStatus = checkForWriteConcernError(cmdResponse.response);
-        if (!writeConcernStatus.isOK()) {
-            if (errorsToCheck.count(writeConcernStatus.code()) && retry < kOnErrorNumRetries) {
-                // If the write concern failed with a retriable error and we can retry, retry.
-                LOG(1) << "Write concern for " << cmdObj << " failed and will be retried"
-                       << causedBy(writeConcernStatus);
-                continue;
-            } else {
-                // If the write concern failed and we can't retry, return the write concern error
-                // as a status.
-                return writeConcernStatus;
-            }
-        }
-
-        // If the command succeeded, or if it failed with a non-retriable error but the write
-        // concern was ok, return the command response object.
-        return cmdResponse;
-    }
-    MONGO_UNREACHABLE;
 }
 
 }  // namespace mongo

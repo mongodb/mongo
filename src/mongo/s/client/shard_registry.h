@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -36,10 +35,6 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/executor/task_executor_pool.h"
-#include "mongo/platform/unordered_set.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -47,25 +42,12 @@
 namespace mongo {
 
 class BSONObjBuilder;
-class CatalogManager;
 struct HostAndPort;
 class NamespaceString;
 class OperationContext;
 class ShardFactory;
 class Shard;
 class ShardType;
-struct ReadPreferenceSetting;
-
-template <typename T>
-class StatusWith;
-
-namespace executor {
-
-struct ConnectionPoolStats;
-class NetworkInterface;
-class TaskExecutor;
-
-}  // namespace executor
 
 /**
  * Maintains the set of all shards known to the instance and their connections and exposes
@@ -170,99 +152,6 @@ public:
 
     void toBSON(BSONObjBuilder* result);
 
-    /**
-     * Executes 'find' command against a config server matching the given read preference, and
-     * fetches *all* the results that the host will return until there are no more or until an error
-     * is returned.
-     *
-     * Returns either the complete set of results or an error, never partial results.
-     *
-     * Note: should never be used outside of CatalogManagerReplicaSet or DistLockCatalogImpl.
-     */
-    StatusWith<Shard::QueryResponse> exhaustiveFindOnConfig(OperationContext* txn,
-                                                            const ReadPreferenceSetting& readPref,
-                                                            const NamespaceString& nss,
-                                                            const BSONObj& query,
-                                                            const BSONObj& sort,
-                                                            boost::optional<long long> limit);
-
-
-    /**
-     * Runs a command against a host belonging to the specified shard and matching the given
-     * readPref, and returns the result.  It is the responsibility of the caller to check the
-     * returned BSON for command-specific failures. It is also important that the command is safe
-     * to be retried in case we cannot verify whether or not it ran successfully.
-     */
-    StatusWith<BSONObj> runIdempotentCommandOnShard(OperationContext* txn,
-                                                    const std::shared_ptr<Shard>& shard,
-                                                    const ReadPreferenceSetting& readPref,
-                                                    const std::string& dbName,
-                                                    const BSONObj& cmdObj);
-    StatusWith<BSONObj> runIdempotentCommandOnShard(OperationContext* txn,
-                                                    ShardId shardId,
-                                                    const ReadPreferenceSetting& readPref,
-                                                    const std::string& dbName,
-                                                    const BSONObj& cmdObj);
-
-    /**
-     * Runs command against a config server that matches the given read preference,  and returns
-     * the result.  It is the responsibility of the caller to check the returned BSON
-     * for command-specific failures.  It is also important that the command is safe to be retried
-     * in case we cannot verify whether or not it ran successfully.
-     */
-    StatusWith<BSONObj> runIdempotentCommandOnConfig(OperationContext* txn,
-                                                     const ReadPreferenceSetting& readPref,
-                                                     const std::string& dbname,
-                                                     const BSONObj& cmdObj);
-
-    class ErrorCodesHash {
-    public:
-        size_t operator()(ErrorCodes::Error e) const {
-            return std::hash<typename std::underlying_type<ErrorCodes::Error>::type>()(e);
-        }
-    };
-
-    using ErrorCodesSet = unordered_set<ErrorCodes::Error, ErrorCodesHash>;
-
-    /**
-     * Runs a command against the config shard's primary and includes a set of errors on which to
-     * retry. Converts responses, which contain writeConcernError into WriteConcernFailed status.
-     *
-     * Retries if executing the command fails with one of the specified error codes, or if executing
-     * the command succeeds but the server returned one of the codes. If executing the command fails
-     * with a different code we return that code.
-     *
-     * If executing the command succeeds and the command itself succeeds or fails with a code not in
-     * the set, then we return the command response object. Thus the caller is responsible for
-     * checking the command response object for any kind of command-specific failures other than
-     * those specified in errorsToCheck.
-     */
-    StatusWith<BSONObj> runCommandOnConfigWithRetries(OperationContext* txn,
-                                                      const std::string& dbname,
-                                                      const BSONObj& cmdObj,
-                                                      const ErrorCodesSet& errorsToCheck);
-
-    /**
-     * Notifies the specified RemoteCommandTargeter of a particular mode of failure for the
-     * specified host.
-     */
-    static void updateReplSetMonitor(const std::shared_ptr<RemoteCommandTargeter>& targeter,
-                                     const HostAndPort& remoteHost,
-                                     const Status& remoteCommandStatus);
-
-    /**
-     * Set of error codes, which indicate that the remote host is not the current master. Retries on
-     * errors from this set are always safe and should be used by default.
-     */
-    static const ErrorCodesSet kNotMasterErrors;
-
-    /**
-     * Set of error codes which includes NotMaster and all other exceptions on which it is okay to
-     * retry the operation, but the retries may require some additional idempotency guarantees
-     * imposed by the calling code.
-     */
-    static const ErrorCodesSet kAllRetriableErrors;
-
 private:
     using ShardMap = std::unordered_map<ShardId, std::shared_ptr<Shard>>;
 
@@ -280,18 +169,6 @@ private:
 
     std::shared_ptr<Shard> _findUsingLookUp(const ShardId& shardId);
     std::shared_ptr<Shard> _findUsingLookUp_inlock(const ShardId& shardId);
-
-    /**
-     * Runs a command cmdObj, extracts an error code from its result and retries if its in the
-     * errorsToCheck set or reaches the max number of retries.
-     */
-    StatusWith<Shard::CommandResponse> _runCommandWithRetries(OperationContext* txn,
-                                                              executor::TaskExecutor* executor,
-                                                              const std::shared_ptr<Shard>& shard,
-                                                              const ReadPreferenceSetting& readPref,
-                                                              const std::string& dbname,
-                                                              const BSONObj& cmdObj,
-                                                              const ErrorCodesSet& errorsToCheck);
 
     // Factory to create shards.  Never changed after startup so safe
     // to access outside of _mutex.

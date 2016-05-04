@@ -40,6 +40,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 

@@ -36,6 +36,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
