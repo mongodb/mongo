@@ -80,6 +80,22 @@ __im_handle_remove(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __im_handle_size --
+ *	Return the handle's data size.
+ */
+static void
+__im_handle_size(WT_FILE_HANDLE_INMEM *im_fh, wt_off_t *sizep)
+{
+	/*
+	 * XXX
+	 * This function exists as a place for this comment. MongoDB assumes
+	 * any file with content will have a non-zero size. In memory tables
+	 * generally are zero-sized, make MongoDB happy.
+	 */
+	*sizep = im_fh->buf.size == 0 ? 1024 : (wt_off_t)im_fh->buf.size;
+}
+
+/*
  * __im_fs_directory_list --
  *	Return the directory contents.
  */
@@ -262,19 +278,15 @@ __im_fs_size(WT_FILE_SYSTEM *file_system,
 	im_fs = (WT_FILE_SYSTEM_INMEM *)file_system;
 	session = (WT_SESSION_IMPL *)wt_session;
 
-	/*
-	 * Search for the handle, then get its size.  Take care to release the
-	 * global lock before getting the size or we will self-deadlock.
-	 */
 	__wt_spin_lock(session, &im_fs->lock);
-	im_fh = __im_handle_search(file_system, name);
-	__wt_spin_unlock(session, &im_fs->lock);
 
-	if (im_fh == NULL)
+	/* Search for the handle, then get its size. */
+	if ((im_fh = __im_handle_search(file_system, name)) == NULL)
 		ret = ENOENT;
 	else
-		ret = __im_file_size(
-		    (WT_FILE_HANDLE *)im_fh, wt_session, sizep);
+		__im_handle_size(im_fh, sizep);
+
+	__wt_spin_unlock(session, &im_fs->lock);
 
 	return (ret);
 }
@@ -358,12 +370,7 @@ __im_file_size(
 
 	__wt_spin_lock(session, &im_fs->lock);
 
-	/*
-	 * XXX hack - MongoDB assumes that any file with content will have a
-	 * non-zero size. In memory tables generally are zero-sized, make
-	 * MongoDB happy.
-	 */
-	*sizep = im_fh->buf.size == 0 ? 1024 : (wt_off_t)im_fh->buf.size;
+	__im_handle_size(im_fh, sizep);
 
 	__wt_spin_unlock(session, &im_fs->lock);
 
