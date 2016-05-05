@@ -108,94 +108,147 @@ void operator+=(ActionSet& target, const ActionSet& source) {
 
 // This sets up the built-in role ActionSets.  This is what determines what actions each role
 // is authorized to perform
+// Note: we suppress clang-format for this function because we want each enum value on a separate
+// line
+// clang-format off
 MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
     // Read role
-    readRoleActions << ActionType::collStats << ActionType::dbHash << ActionType::dbStats
-                    << ActionType::find << ActionType::killCursors << ActionType::listCollections
-                    << ActionType::listIndexes << ActionType::planCacheRead;
+    readRoleActions
+        << ActionType::collStats
+        << ActionType::dbHash
+        << ActionType::dbStats
+        << ActionType::find
+        << ActionType::killCursors
+        << ActionType::listCollections
+        << ActionType::listIndexes
+        << ActionType::planCacheRead;
 
     // Read-write role
     readWriteRoleActions += readRoleActions;
-    readWriteRoleActions << ActionType::convertToCapped   // db admin gets this also
-                         << ActionType::createCollection  // db admin gets this also
-                         << ActionType::dropCollection << ActionType::dropIndex
-                         << ActionType::emptycapped << ActionType::createIndex << ActionType::insert
-                         << ActionType::remove
-                         << ActionType::renameCollectionSameDB  // db admin gets this also
-                         << ActionType::update;
+    readWriteRoleActions
+        << ActionType::convertToCapped  // db admin gets this also
+        << ActionType::createCollection  // db admin gets this also
+        << ActionType::dropCollection
+        << ActionType::dropIndex
+        << ActionType::emptycapped
+        << ActionType::createIndex
+        << ActionType::insert
+        << ActionType::remove
+        << ActionType::renameCollectionSameDB  // db admin gets this also
+        << ActionType::update;
 
     // User admin role
-    userAdminRoleActions << ActionType::changeCustomData << ActionType::changePassword
-                         << ActionType::createUser << ActionType::createRole << ActionType::dropUser
-                         << ActionType::dropRole << ActionType::grantRole << ActionType::revokeRole
-                         << ActionType::viewUser << ActionType::viewRole;
+    userAdminRoleActions
+        << ActionType::changeCustomData
+        << ActionType::changePassword
+        << ActionType::createUser
+        << ActionType::createRole
+        << ActionType::dropUser
+        << ActionType::dropRole
+        << ActionType::grantRole
+        << ActionType::revokeRole
+        << ActionType::viewUser
+        << ActionType::viewRole;
 
 
     // DB admin role
     dbAdminRoleActions
-        << ActionType::bypassDocumentValidation << ActionType::collMod
-        << ActionType::collStats                               // clusterMonitor gets this also
-        << ActionType::compact << ActionType::convertToCapped  // read_write gets this also
-        << ActionType::createCollection                        // read_write gets this also
-        << ActionType::dbStats                                 // clusterMonitor gets this also
+        << ActionType::bypassDocumentValidation
+        << ActionType::collMod
+        << ActionType::collStats  // clusterMonitor gets this also
+        << ActionType::compact
+        << ActionType::convertToCapped  // read_write gets this also
+        << ActionType::createCollection // read_write gets this also
+        << ActionType::dbStats  // clusterMonitor gets this also
         << ActionType::dropCollection
         << ActionType::dropDatabase  // clusterAdmin gets this also TODO(spencer): should
                                      // readWriteAnyDatabase?
-        << ActionType::dropIndex << ActionType::createIndex << ActionType::enableProfiler
-        << ActionType::listCollections << ActionType::listIndexes
-        << ActionType::planCacheIndexFilter << ActionType::planCacheRead
-        << ActionType::planCacheWrite << ActionType::reIndex
+        << ActionType::dropIndex
+        << ActionType::createIndex
+        << ActionType::enableProfiler
+        << ActionType::listCollections
+        << ActionType::listIndexes
+        << ActionType::planCacheIndexFilter
+        << ActionType::planCacheRead
+        << ActionType::planCacheWrite
+        << ActionType::reIndex
         << ActionType::renameCollectionSameDB  // read_write gets this also
-        << ActionType::repairDatabase << ActionType::storageDetails << ActionType::validate;
+        << ActionType::repairDatabase
+        << ActionType::storageDetails
+        << ActionType::validate;
 
     // clusterMonitor role actions that target the cluster resource
     clusterMonitorRoleClusterActions
-        << ActionType::connPoolStats << ActionType::getCmdLineOpts << ActionType::getLog
-        << ActionType::getParameter << ActionType::getShardMap << ActionType::hostInfo
-        << ActionType::listDatabases << ActionType::listShards  // clusterManager gets this also
-        << ActionType::netstat << ActionType::replSetGetConfig  // clusterManager gets this also
-        << ActionType::replSetGetStatus                         // clusterManager gets this also
-        << ActionType::serverStatus << ActionType::top << ActionType::inprog
+        << ActionType::connPoolStats
+        << ActionType::getCmdLineOpts
+        << ActionType::getLog
+        << ActionType::getParameter
+        << ActionType::getShardMap
+        << ActionType::hostInfo
+        << ActionType::listDatabases
+        << ActionType::listShards  // clusterManager gets this also
+        << ActionType::netstat
+        << ActionType::replSetGetConfig  // clusterManager gets this also
+        << ActionType::replSetGetStatus  // clusterManager gets this also
+        << ActionType::serverStatus 
+        << ActionType::top
+        << ActionType::inprog
         << ActionType::shardingState;
 
     // clusterMonitor role actions that target a database (or collection) resource
-    clusterMonitorRoleDatabaseActions << ActionType::collStats  // dbAdmin gets this also
-                                      << ActionType::dbStats    // dbAdmin gets this also
-                                      << ActionType::getShardVersion << ActionType::indexStats;
+    clusterMonitorRoleDatabaseActions 
+        << ActionType::collStats  // dbAdmin gets this also
+        << ActionType::dbStats  // dbAdmin gets this also
+        << ActionType::getShardVersion
+        << ActionType::indexStats;
 
     // hostManager role actions that target the cluster resource
     hostManagerRoleClusterActions
         << ActionType::applicationMessage  // clusterManager gets this also
-        << ActionType::connPoolSync << ActionType::cpuProfiler << ActionType::logRotate
-        << ActionType::setParameter << ActionType::shutdown << ActionType::touch
-        << ActionType::unlock << ActionType::diagLogging
+        << ActionType::connPoolSync
+        << ActionType::cpuProfiler
+        << ActionType::logRotate
+        << ActionType::setParameter
+        << ActionType::shutdown
+        << ActionType::touch
+        << ActionType::unlock
+        << ActionType::diagLogging
         << ActionType::flushRouterConfig  // clusterManager gets this also
         << ActionType::fsync
-        << ActionType::invalidateUserCache            // userAdminAnyDatabase gets this also
-        << ActionType::killop << ActionType::resync;  // clusterManager gets this also
+        << ActionType::invalidateUserCache // userAdminAnyDatabase gets this also
+        << ActionType::killop
+        << ActionType::resync;  // clusterManager gets this also
 
     // hostManager role actions that target the database resource
-    hostManagerRoleDatabaseActions << ActionType::killCursors << ActionType::repairDatabase;
+    hostManagerRoleDatabaseActions
+        << ActionType::killCursors
+        << ActionType::repairDatabase;
 
 
     // clusterManager role actions that target the cluster resource
     clusterManagerRoleClusterActions
-        << ActionType::appendOplogNote     // backup gets this also
+        << ActionType::appendOplogNote  // backup gets this also
         << ActionType::applicationMessage  // hostManager gets this also
         << ActionType::replSetConfigure
-        << ActionType::replSetGetConfig                          // clusterMonitor gets this also
-        << ActionType::replSetGetStatus                          // clusterMonitor gets this also
-        << ActionType::replSetStateChange << ActionType::resync  // hostManager gets this also
-        << ActionType::addShard << ActionType::removeShard
-        << ActionType::listShards         // clusterMonitor gets this also
+        << ActionType::replSetGetConfig  // clusterMonitor gets this also
+        << ActionType::replSetGetStatus  // clusterMonitor gets this also
+        << ActionType::replSetStateChange
+        << ActionType::resync  // hostManager gets this also
+        << ActionType::addShard 
+        << ActionType::removeShard
+        << ActionType::listShards  // clusterMonitor gets this also
         << ActionType::flushRouterConfig  // hostManager gets this also
         << ActionType::cleanupOrphaned;
 
-    clusterManagerRoleDatabaseActions << ActionType::splitChunk << ActionType::moveChunk
-                                      << ActionType::enableSharding << ActionType::splitVector;
+    clusterManagerRoleDatabaseActions
+        << ActionType::splitChunk
+        << ActionType::moveChunk
+        << ActionType::enableSharding
+        << ActionType::splitVector;
 
     return Status::OK();
 }
+// clang-format on
 
 void addReadOnlyDbPrivileges(PrivilegeVector* privileges, StringData dbName) {
     Privilege::addPrivilegeToPrivilegeVector(
