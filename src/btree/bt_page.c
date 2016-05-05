@@ -10,7 +10,7 @@
 
 static void __inmem_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
 static void __inmem_col_int(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __inmem_col_var(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
+static int  __inmem_col_var(WT_SESSION_IMPL *, WT_PAGE *, uint64_t, size_t *);
 static int  __inmem_row_int(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
 static int  __inmem_row_leaf(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __inmem_row_leaf_entries(
@@ -21,8 +21,8 @@ static int  __inmem_row_leaf_entries(
  *	Create or read a page into the cache.
  */
 int
-__wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type,
-    uint64_t recno, uint32_t alloc_entries, bool alloc_refs, WT_PAGE **pagep)
+__wt_page_alloc(WT_SESSION_IMPL *session,
+    uint8_t type, uint32_t alloc_entries, bool alloc_refs, WT_PAGE **pagep)
 {
 	WT_CACHE *cache;
 	WT_DECL_RET;
@@ -67,13 +67,10 @@ __wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type,
 
 	switch (type) {
 	case WT_PAGE_COL_FIX:
-		page->pg_fix_recno = recno;
 		page->pg_fix_entries = alloc_entries;
 		break;
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_ROW_INT:
-		page->pg_intl_recno = recno;
-
 		/*
 		 * Internal pages have an array of references to objects so they
 		 * can split.  Allocate the array of references and optionally,
@@ -105,7 +102,6 @@ err:			if ((pindex = WT_INTL_INDEX_GET_SAFE(page)) != NULL) {
 		}
 		break;
 	case WT_PAGE_COL_VAR:
-		page->pg_var_recno = recno;
 		page->pg_var_d = (WT_COL *)((uint8_t *)page + sizeof(WT_PAGE));
 		page->pg_var_entries = alloc_entries;
 		break;
@@ -191,8 +187,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref,
 	}
 
 	/* Allocate and initialize a new WT_PAGE. */
-	WT_RET(__wt_page_alloc(
-	    session, dsk->type, dsk->recno, alloc_entries, true, &page));
+	WT_RET(__wt_page_alloc(session, dsk->type, alloc_entries, true, &page));
 	page->dsk = dsk;
 	F_SET_ATOMIC(page, flags);
 
@@ -211,7 +206,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref,
 		__inmem_col_int(session, page);
 		break;
 	case WT_PAGE_COL_VAR:
-		WT_ERR(__inmem_col_var(session, page, &size));
+		WT_ERR(__inmem_col_var(session, page, dsk->recno, &size));
 		break;
 	case WT_PAGE_ROW_INT:
 		WT_ERR(__inmem_row_int(session, page, &size));
@@ -292,7 +287,7 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 		__wt_cell_unpack(cell, unpack);
 		ref->addr = cell;
-		ref->key.recno = unpack->v;
+		ref->ref_recno = unpack->v;
 	}
 }
 
@@ -329,7 +324,8 @@ __inmem_col_var_repeats(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t *np)
  *	column-store trees.
  */
 static int
-__inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
+__inmem_col_var(
+    WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t recno, size_t *sizep)
 {
 	WT_BTREE *btree;
 	WT_COL *cip;
@@ -337,13 +333,12 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	const WT_PAGE_HEADER *dsk;
-	uint64_t recno, rle;
+	uint64_t rle;
 	size_t bytes_allocated;
 	uint32_t i, indx, n, repeat_off;
 
 	btree = S2BT(session);
 	dsk = page->dsk;
-	recno = page->pg_var_recno;
 
 	repeats = NULL;
 	repeat_off = 0;

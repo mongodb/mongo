@@ -13,24 +13,16 @@
  *	Map a segment of the file in, if possible.
  */
 int
-__wt_block_map(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, void *mapp, size_t *maplenp,
-    void **mappingcookie)
+__wt_block_map(WT_SESSION_IMPL *session, WT_BLOCK *block,
+    void *mapped_regionp, size_t *lengthp, void *mapped_cookiep)
 {
 	WT_DECL_RET;
+	WT_FILE_HANDLE *handle;
 
-	*(void **)mapp = NULL;
-	*maplenp = 0;
+	*(void **)mapped_regionp = NULL;
+	*lengthp = 0;
+	*(void **)mapped_cookiep = NULL;
 
-#ifdef WORDS_BIGENDIAN
-	/*
-	 * The underlying objects are little-endian, mapping objects isn't
-	 * currently supported on big-endian systems.
-	 */
-	WT_UNUSED(session);
-	WT_UNUSED(block);
-	WT_UNUSED(mappingcookie);
-#else
 	/* Map support is configurable. */
 	if (!S2C(session)->mmap)
 		return (0);
@@ -51,15 +43,23 @@ __wt_block_map(
 		return (0);
 
 	/*
+	 * There may be no underlying functionality.
+	 */
+	handle = block->fh->handle;
+	if (handle->map == NULL)
+		return (0);
+
+	/*
 	 * Map the file into memory.
 	 * Ignore not-supported errors, we'll read the file through the cache
 	 * if map fails.
 	 */
-	ret = block->fh->fh_map(
-	    session, block->fh, mapp, maplenp, mappingcookie);
-	if (ret == ENOTSUP)
+	ret = handle->map(handle,
+	    (WT_SESSION *)session, mapped_regionp, lengthp, mapped_cookiep);
+	if (ret == ENOTSUP) {
+		*(void **)mapped_regionp = NULL;
 		ret = 0;
-#endif
+	}
 
 	return (ret);
 }
@@ -69,11 +69,13 @@ __wt_block_map(
  *	Unmap any mapped-in segment of the file.
  */
 int
-__wt_block_unmap(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, void *map, size_t maplen,
-    void **mappingcookie)
+__wt_block_unmap(WT_SESSION_IMPL *session,
+    WT_BLOCK *block, void *mapped_region, size_t length, void *mapped_cookie)
 {
+	WT_FILE_HANDLE *handle;
+
 	/* Unmap the file from memory. */
-	return (block->fh->fh_map_unmap(
-	    session, block->fh, map, maplen, mappingcookie));
+	handle = block->fh->handle;
+	return (handle->unmap(handle,
+	    (WT_SESSION *)session, mapped_region, length, mapped_cookie));
 }

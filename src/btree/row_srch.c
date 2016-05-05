@@ -634,6 +634,7 @@ __wt_row_random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	WT_INSERT *ins, **start, **stop;
 	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page;
+	uint64_t samples;
 	uint32_t choice, entries, i;
 	int level;
 
@@ -688,7 +689,7 @@ __wt_row_random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	 * Step down the skip list levels, selecting a random chunk of the name
 	 * space at each level.
 	 */
-	while (level > 0) {
+	for (samples = entries; level > 0; samples += entries) {
 		/*
 		 * There are (entries) or (entries + 1) chunks of the name space
 		 * considered at each level. They are: between start and the 1st
@@ -764,6 +765,16 @@ __wt_row_random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	cbt->ins = ins;
 	cbt->ins_head = ins_head;
 	cbt->compare = 0;
+
+	/*
+	 * Random lookups in newly created collections can be slow if a page
+	 * consists of a large skiplist. Schedule the page for eviction if we
+	 * encounter a large skiplist. This worthwhile because applications
+	 * that take a sample often take many samples, so the overhead of
+	 * traversing the skip list each time accumulates to real time.
+	 */
+	if (samples > 5000)
+		__wt_page_evict_soon(page);
 
 	return (0);
 }

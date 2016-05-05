@@ -24,7 +24,7 @@ __handle_error_default(WT_EVENT_HANDLER *handler,
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	WT_RET(__wt_fprintf(session, WT_STDERR(session), "%s\n", errmsg));
-	WT_RET(__wt_fsync(session, WT_STDERR(session), true));
+	WT_RET(__wt_fflush(session, WT_STDERR(session)));
 	return (0);
 }
 
@@ -42,7 +42,7 @@ __handle_message_default(WT_EVENT_HANDLER *handler,
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	WT_RET(__wt_fprintf(session, WT_STDOUT(session), "%s\n", message));
-	WT_RET(__wt_fsync(session, WT_STDOUT(session), true));
+	WT_RET(__wt_fflush(session, WT_STDOUT(session)));
 	return (0);
 }
 

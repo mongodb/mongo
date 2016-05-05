@@ -8,423 +8,549 @@
 
 #include "wt_internal.h"
 
-static int __im_handle_size(WT_SESSION_IMPL *, WT_FH *, wt_off_t *);
-
 /*
- * In-memory information.
+ * File system interface for in-memory implementation.
  */
 typedef struct {
+	WT_FILE_SYSTEM iface;
+
+	TAILQ_HEAD(__wt_fhhash_inmem,
+	    __wt_file_handle_inmem) fhhash[WT_HASH_ARRAY_SIZE];
+	TAILQ_HEAD(__wt_fh_inmem_qh, __wt_file_handle_inmem) fhqh;
+
 	WT_SPINLOCK lock;
-} WT_IM;
+} WT_FILE_SYSTEM_INMEM;
+
+static int __im_file_size(WT_FILE_HANDLE *, WT_SESSION *, wt_off_t *);
 
 /*
- * __im_directory_list --
- *	Get a list of files from a directory, in-memory version.
+ * __im_handle_search --
+ *	Return a matching handle, if one exists.
  */
-static int
-__im_directory_list(WT_SESSION_IMPL *session, const char *dir,
-    const char *prefix, uint32_t flags, char ***dirlist, u_int *countp)
+static WT_FILE_HANDLE_INMEM *
+__im_handle_search(WT_FILE_SYSTEM *file_system, const char *name)
 {
-	WT_UNUSED(session);
-	WT_UNUSED(dir);
-	WT_UNUSED(prefix);
-	WT_UNUSED(flags);
-	WT_UNUSED(dirlist);
-	WT_UNUSED(countp);
+	WT_FILE_HANDLE_INMEM *im_fh;
+	WT_FILE_SYSTEM_INMEM *im_fs;
+	uint64_t bucket, hash;
 
-	WT_RET_MSG(session, ENOTSUP, "directory-list");
+	im_fs = (WT_FILE_SYSTEM_INMEM *)file_system;
+
+	hash = __wt_hash_city64(name, strlen(name));
+	bucket = hash % WT_HASH_ARRAY_SIZE;
+	TAILQ_FOREACH(im_fh, &im_fs->fhhash[bucket], hashq)
+		if (strcmp(im_fh->iface.name, name) == 0)
+			break;
+
+	return (im_fh);
 }
 
 /*
- * __im_directory_sync --
- *	Flush a directory to ensure file creation is durable.
+ * __im_handle_remove --
+ *	Destroy an in-memory file handle. Should only happen on remove or
+ *	shutdown.
  */
 static int
-__im_directory_sync(WT_SESSION_IMPL *session, const char *path)
+__im_handle_remove(WT_SESSION_IMPL *session,
+    WT_FILE_SYSTEM *file_system, WT_FILE_HANDLE_INMEM *im_fh)
 {
-	WT_UNUSED(session);
-	WT_UNUSED(path);
+	WT_FILE_HANDLE *fhp;
+	WT_FILE_SYSTEM_INMEM *im_fs;
+	uint64_t bucket;
+
+	im_fs = (WT_FILE_SYSTEM_INMEM *)file_system;
+
+	if (im_fh->ref != 0)
+		WT_RET_MSG(session, EBUSY,
+		    "%s: file-remove", im_fh->iface.name);
+
+	bucket = im_fh->name_hash % WT_HASH_ARRAY_SIZE;
+	WT_FILE_HANDLE_REMOVE(im_fs, im_fh, bucket);
+
+	/* Clean up private information. */
+	__wt_buf_free(session, &im_fh->buf);
+
+	/* Clean up public information. */
+	fhp = (WT_FILE_HANDLE *)im_fh;
+	__wt_free(session, fhp->name);
+
+	__wt_free(session, im_fh);
+
 	return (0);
 }
 
 /*
- * __im_file_exist --
+ * __im_handle_size --
+ *	Return the handle's data size.
+ */
+static void
+__im_handle_size(WT_FILE_HANDLE_INMEM *im_fh, wt_off_t *sizep)
+{
+	/*
+	 * XXX
+	 * This function exists as a place for this comment. MongoDB assumes
+	 * any file with content will have a non-zero size. In memory tables
+	 * generally are zero-sized, make MongoDB happy.
+	 */
+	*sizep = im_fh->buf.size == 0 ? 1024 : (wt_off_t)im_fh->buf.size;
+}
+
+/*
+ * __im_fs_directory_list --
+ *	Return the directory contents.
+ */
+static int
+__im_fs_directory_list(WT_FILE_SYSTEM *file_system,
+    WT_SESSION *wt_session, const char *directory,
+    const char *prefix, char ***dirlistp, uint32_t *countp)
+{
+	WT_DECL_RET;
+	WT_FILE_HANDLE_INMEM *im_fh;
+	WT_FILE_SYSTEM_INMEM *im_fs;
+	WT_SESSION_IMPL *session;
+	size_t dirallocsz, len;
+	uint32_t count;
+	char *name, **entries;
+
+	im_fs = (WT_FILE_SYSTEM_INMEM *)file_system;
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	*dirlistp = NULL;
+	*countp = 0;
+
+	dirallocsz = 0;
+	len = strlen(directory);
+	entries = NULL;
+
+	__wt_spin_lock(session, &im_fs->lock);
+
+	count = 0;
+	TAILQ_FOREACH(im_fh, &im_fs->fhqh, q) {
+		name = im_fh->iface.name;
+		if (strncmp(name, directory, len) != 0 ||
+		    (prefix != NULL && !WT_PREFIX_MATCH(name + len, prefix)))
+			continue;
+
+		WT_ERR(__wt_realloc_def(
+		    session, &dirallocsz, count + 1, &entries));
+		WT_ERR(__wt_strdup(session, name, &entries[count]));
+		++count;
+	}
+
+	*dirlistp = entries;
+	*countp = count;
+
+err:	__wt_spin_unlock(session, &im_fs->lock);
+	if (ret == 0)
+		return (0);
+
+	if (entries != NULL) {
+		while (count > 0)
+			__wt_free(session, entries[--count]);
+		__wt_free(session, entries);
+	}
+
+	WT_RET_MSG(session, ret,
+	    "%s: directory-list, prefix \"%s\"",
+	    directory, prefix == NULL ? "" : prefix);
+}
+
+/*
+ * __im_fs_directory_list_free --
+ *	Free memory returned by __im_fs_directory_list.
+ */
+static int
+__im_fs_directory_list_free(WT_FILE_SYSTEM *file_system,
+    WT_SESSION *wt_session, char **dirlist, uint32_t count)
+{
+	WT_SESSION_IMPL *session;
+
+	WT_UNUSED(file_system);
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	if (dirlist != NULL) {
+		while (count > 0)
+			__wt_free(session, dirlist[--count]);
+		__wt_free(session, dirlist);
+	}
+	return (0);
+}
+
+/*
+ * __im_fs_exist --
  *	Return if the file exists.
  */
 static int
-__im_file_exist(WT_SESSION_IMPL *session, const char *name, bool *existp)
+__im_fs_exist(WT_FILE_SYSTEM *file_system,
+    WT_SESSION *wt_session, const char *name, bool *existp)
 {
-	*existp = __wt_handle_search(session, name, false, NULL, NULL);
+	WT_FILE_SYSTEM_INMEM *im_fs;
+	WT_SESSION_IMPL *session;
+
+	im_fs = (WT_FILE_SYSTEM_INMEM *)file_system;
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	__wt_spin_lock(session, &im_fs->lock);
+
+	*existp = __im_handle_search(file_system, name) != NULL;
+
+	__wt_spin_unlock(session, &im_fs->lock);
 	return (0);
 }
 
 /*
- * __im_file_remove --
+ * __im_fs_remove --
  *	POSIX remove.
  */
 static int
-__im_file_remove(WT_SESSION_IMPL *session, const char *name)
+__im_fs_remove(
+    WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char *name)
 {
 	WT_DECL_RET;
-	WT_FH *fh;
+	WT_FILE_HANDLE_INMEM *im_fh;
+	WT_FILE_SYSTEM_INMEM *im_fs;
+	WT_SESSION_IMPL *session;
 
-	if (__wt_handle_search(session, name, true, NULL, &fh)) {
-		WT_ASSERT(session, fh->ref == 1);
+	im_fs = (WT_FILE_SYSTEM_INMEM *)file_system;
+	session = (WT_SESSION_IMPL *)wt_session;
 
-		/* Force a discard of the handle. */
-		F_CLR(fh, WT_FH_IN_MEMORY);
-		ret = __wt_close(session, &fh);
-	}
+	__wt_spin_lock(session, &im_fs->lock);
+
+	ret = ENOENT;
+	if ((im_fh = __im_handle_search(file_system, name)) != NULL)
+		ret = __im_handle_remove(session, file_system, im_fh);
+
+	__wt_spin_unlock(session, &im_fs->lock);
 	return (ret);
 }
 
 /*
- * __im_file_rename --
+ * __im_fs_rename --
  *	POSIX rename.
  */
 static int
-__im_file_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
+__im_fs_rename(WT_FILE_SYSTEM *file_system,
+    WT_SESSION *wt_session, const char *from, const char *to)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_FH *fh;
-	uint64_t bucket, hash;
-	char *to_name;
+	WT_FILE_HANDLE_INMEM *im_fh;
+	WT_FILE_SYSTEM_INMEM *im_fs;
+	WT_SESSION_IMPL *session;
+	uint64_t bucket;
+	char *copy;
 
-	conn = S2C(session);
+	im_fs = (WT_FILE_SYSTEM_INMEM *)file_system;
+	session = (WT_SESSION_IMPL *)wt_session;
 
-	/* We'll need a copy of the target name. */
-	WT_RET(__wt_strdup(session, to, &to_name));
+	__wt_spin_lock(session, &im_fs->lock);
 
-	__wt_spin_lock(session, &conn->fh_lock);
+	ret = ENOENT;
+	if ((im_fh = __im_handle_search(file_system, from)) != NULL) {
+		WT_ERR(__wt_strdup(session, to, &copy));
+		__wt_free(session, im_fh->iface.name);
+		im_fh->iface.name = copy;
 
-	/* Make sure the target name isn't active. */
-	hash = __wt_hash_city64(to, strlen(to));
-	bucket = hash % WT_HASH_ARRAY_SIZE;
-	TAILQ_FOREACH(fh, &conn->fhhash[bucket], hashq)
-		if (strcmp(to, fh->name) == 0)
-			WT_ERR(EPERM);
-
-	/* Find the source name. */
-	hash = __wt_hash_city64(from, strlen(from));
-	bucket = hash % WT_HASH_ARRAY_SIZE;
-	TAILQ_FOREACH(fh, &conn->fhhash[bucket], hashq)
-		if (strcmp(from, fh->name) == 0)
-			break;
-	if (fh == NULL)
-		WT_ERR(ENOENT);
-
-	/* Remove source from the list. */
-	WT_CONN_FILE_REMOVE(conn, fh, bucket);
-
-	/* Swap the names. */
-	__wt_free(session, fh->name);
-	fh->name = to_name;
-	to_name = NULL;
-
-	/* Put source back on the list. */
-	hash = __wt_hash_city64(to, strlen(to));
-	bucket = hash % WT_HASH_ARRAY_SIZE;
-	WT_CONN_FILE_INSERT(conn, fh, bucket);
-
-	if (0) {
-err:		__wt_free(session, to_name);
+		bucket = im_fh->name_hash % WT_HASH_ARRAY_SIZE;
+		WT_FILE_HANDLE_REMOVE(im_fs, im_fh, bucket);
+		im_fh->name_hash = __wt_hash_city64(to, strlen(to));
+		bucket = im_fh->name_hash % WT_HASH_ARRAY_SIZE;
+		WT_FILE_HANDLE_INSERT(im_fs, im_fh, bucket);
 	}
-	__wt_spin_unlock(session, &conn->fh_lock);
 
+err:	__wt_spin_unlock(session, &im_fs->lock);
 	return (ret);
 }
 
 /*
- * __im_file_size --
+ * __im_fs_size --
  *	Get the size of a file in bytes, by file name.
  */
 static int
-__im_file_size(
-    WT_SESSION_IMPL *session, const char *name, bool silent, wt_off_t *sizep)
+__im_fs_size(WT_FILE_SYSTEM *file_system,
+    WT_SESSION *wt_session, const char *name, wt_off_t *sizep)
 {
 	WT_DECL_RET;
-	WT_FH *fh;
-	WT_IM *im;
+	WT_FILE_HANDLE_INMEM *im_fh;
+	WT_FILE_SYSTEM_INMEM *im_fs;
+	WT_SESSION_IMPL *session;
 
-	WT_UNUSED(silent);
+	im_fs = (WT_FILE_SYSTEM_INMEM *)file_system;
+	session = (WT_SESSION_IMPL *)wt_session;
 
-	im = S2C(session)->inmemory;
-	__wt_spin_lock(session, &im->lock);
+	__wt_spin_lock(session, &im_fs->lock);
 
-	if (__wt_handle_search(session, name, true, NULL, &fh)) {
-		WT_ERR(__im_handle_size(session, fh, sizep));
-		WT_ERR(__wt_close(session, &fh));
-	} else
+	/* Search for the handle, then get its size. */
+	if ((im_fh = __im_handle_search(file_system, name)) == NULL)
 		ret = ENOENT;
-
-err:	__wt_spin_unlock(session, &im->lock);
-	return (ret);
-}
-
-/*
- * __im_handle_advise --
- *	POSIX fadvise.
- */
-static int
-__im_handle_advise(WT_SESSION_IMPL *session,
-    WT_FH *fh, wt_off_t offset, wt_off_t len, int advice)
-{
-	WT_UNUSED(session);
-	WT_UNUSED(fh);
-	WT_UNUSED(offset);
-	WT_UNUSED(len);
-	WT_UNUSED(advice);
-	return (ENOTSUP);
-}
-
-/*
- * __im_handle_close --
- *	ANSI C close/fclose.
- */
-static int
-__im_handle_close(WT_SESSION_IMPL *session, WT_FH *fh)
-{
-	__wt_buf_free(session, &fh->buf);
-
-	return (0);
-}
-
-/*
- * __im_handle_getc --
- *	ANSI C fgetc.
- */
-static int
-__im_handle_getc(WT_SESSION_IMPL *session, WT_FH *fh, int *chp)
-{
-	WT_IM *im;
-
-	im = S2C(session)->inmemory;
-	__wt_spin_lock(session, &im->lock);
-
-	if (fh->off >= fh->buf.size)
-		*chp = EOF;
 	else
-		*chp = ((char *)fh->buf.data)[fh->off++];
+		__im_handle_size(im_fh, sizep);
 
-	__wt_spin_unlock(session, &im->lock);
-	return (0);
-}
+	__wt_spin_unlock(session, &im_fs->lock);
 
-/*
- * __im_handle_lock --
- *	Lock/unlock a file.
- */
-static int
-__im_handle_lock(WT_SESSION_IMPL *session, WT_FH *fh, bool lock)
-{
-	WT_UNUSED(session);
-	WT_UNUSED(fh);
-	WT_UNUSED(lock);
-	return (0);
-}
-
-/*
- * __im_handle_printf --
- *	ANSI C vfprintf.
- */
-static int
-__im_handle_printf(
-    WT_SESSION_IMPL *session, WT_FH *fh, const char *fmt, va_list ap)
-{
-	va_list ap_copy;
-	WT_DECL_ITEM(tmp);
-	WT_DECL_RET;
-	WT_IM *im;
-	size_t len;
-
-	im = S2C(session)->inmemory;
-
-	/* Build the string we're writing. */
-	WT_RET(__wt_scr_alloc(session, strlen(fmt) * 2 + 128, &tmp));
-	for (;;) {
-		va_copy(ap_copy, ap);
-		len = (size_t)vsnprintf(tmp->mem, tmp->memsize, fmt, ap_copy);
-		va_end(ap_copy);
-		if (len < tmp->memsize) {
-			tmp->data = tmp->mem;
-			tmp->size = len;
-			break;
-		}
-		WT_ERR(__wt_buf_extend(session, tmp, len + 1));
-	}
-
-	__wt_spin_lock(session, &im->lock);
-
-	/* Grow the handle's buffer as necessary. */
-	WT_ERR(__wt_buf_grow(session, &fh->buf, fh->off + len));
-
-	/* Copy the data into place and update the offset. */
-	memcpy((uint8_t *)fh->buf.mem + fh->off, tmp->data, len);
-	fh->off += len;
-
-err:	__wt_spin_unlock(session, &im->lock);
-
-	__wt_scr_free(session, &tmp);
 	return (ret);
 }
 
 /*
- * __im_handle_read --
+ * __im_file_close --
+ *	ANSI C close.
+ */
+static int
+__im_file_close(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session)
+{
+	WT_FILE_HANDLE_INMEM *im_fh;
+	WT_FILE_SYSTEM_INMEM *im_fs;
+	WT_SESSION_IMPL *session;
+
+	im_fh = (WT_FILE_HANDLE_INMEM *)file_handle;
+	im_fs = (WT_FILE_SYSTEM_INMEM *)file_handle->file_system;
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	__wt_spin_lock(session, &im_fs->lock);
+
+	--im_fh->ref;
+
+	__wt_spin_unlock(session, &im_fs->lock);
+
+	return (0);
+}
+
+/*
+ * __im_file_read --
  *	POSIX pread.
  */
 static int
-__im_handle_read(
-    WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, void *buf)
+__im_file_read(WT_FILE_HANDLE *file_handle,
+    WT_SESSION *wt_session, wt_off_t offset, size_t len, void *buf)
 {
 	WT_DECL_RET;
-	WT_IM *im;
+	WT_FILE_HANDLE_INMEM *im_fh;
+	WT_FILE_SYSTEM_INMEM *im_fs;
+	WT_SESSION_IMPL *session;
 	size_t off;
 
-	im = S2C(session)->inmemory;
-	__wt_spin_lock(session, &im->lock);
+	im_fh = (WT_FILE_HANDLE_INMEM *)file_handle;
+	im_fs = (WT_FILE_SYSTEM_INMEM *)file_handle->file_system;
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	__wt_spin_lock(session, &im_fs->lock);
 
 	off = (size_t)offset;
-	if (off < fh->buf.size) {
-		len = WT_MIN(len, fh->buf.size - off);
-		memcpy(buf, (uint8_t *)fh->buf.mem + off, len);
-		fh->off = off + len;
+	if (off < im_fh->buf.size) {
+		len = WT_MIN(len, im_fh->buf.size - off);
+		memcpy(buf, (uint8_t *)im_fh->buf.mem + off, len);
+		im_fh->off = off + len;
 	} else
 		ret = WT_ERROR;
 
-	__wt_spin_unlock(session, &im->lock);
+	__wt_spin_unlock(session, &im_fs->lock);
 	if (ret == 0)
 		return (0);
 	WT_RET_MSG(session, WT_ERROR,
 	    "%s: handle-read: failed to read %" WT_SIZET_FMT " bytes at "
 	    "offset %" WT_SIZET_FMT,
-	    fh->name, len, off);
+	    file_handle->name, len, off);
 }
 
 /*
- * __im_handle_size --
+ * __im_file_size --
  *	Get the size of a file in bytes, by file handle.
  */
 static int
-__im_handle_size(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
+__im_file_size(
+    WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, wt_off_t *sizep)
 {
-	WT_UNUSED(session);
+	WT_FILE_HANDLE_INMEM *im_fh;
+	WT_FILE_SYSTEM_INMEM *im_fs;
+	WT_SESSION_IMPL *session;
 
-	/*
-	 * XXX hack - MongoDB assumes that any file with content will have a
-	 * non-zero size. In memory tables generally are zero-sized, make
-	 * MongoDB happy.
-	 */
-	*sizep = fh->buf.size == 0 ? 1024 : (wt_off_t)fh->buf.size;
+	im_fh = (WT_FILE_HANDLE_INMEM *)file_handle;
+	im_fs = (WT_FILE_SYSTEM_INMEM *)file_handle->file_system;
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	__wt_spin_lock(session, &im_fs->lock);
+
+	__im_handle_size(im_fh, sizep);
+
+	__wt_spin_unlock(session, &im_fs->lock);
+
 	return (0);
 }
 
 /*
- * __im_handle_sync --
- *	POSIX fflush/fsync.
- */
-static int
-__im_handle_sync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
-{
-	WT_UNUSED(session);
-	WT_UNUSED(fh);
-
-	/*
-	 * Callers attempting asynchronous flush handle ENOTSUP returns, and
-	 * won't make further attempts.
-	 */
-	return (block ? 0 : ENOTSUP);
-}
-
-/*
- * __im_handle_truncate --
+ * __im_file_truncate --
  *	POSIX ftruncate.
  */
 static int
-__im_handle_truncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
+__im_file_truncate(
+    WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, wt_off_t offset)
 {
 	WT_DECL_RET;
-	WT_IM *im;
+	WT_FILE_HANDLE_INMEM *im_fh;
+	WT_FILE_SYSTEM_INMEM *im_fs;
+	WT_SESSION_IMPL *session;
 	size_t off;
 
-	im = S2C(session)->inmemory;
-	__wt_spin_lock(session, &im->lock);
+	im_fh = (WT_FILE_HANDLE_INMEM *)file_handle;
+	im_fs = (WT_FILE_SYSTEM_INMEM *)file_handle->file_system;
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	__wt_spin_lock(session, &im_fs->lock);
 
 	/*
-	 * Grow the buffer as necessary, clear any new space in the file,
-	 * and reset the file's data length.
+	 * Grow the buffer as necessary, clear any new space in the file, and
+	 * reset the file's data length.
 	 */
 	off = (size_t)offset;
-	WT_ERR(__wt_buf_grow(session, &fh->buf, off));
-	if (fh->buf.size < off)
-		memset((uint8_t *)
-		    fh->buf.data + fh->buf.size, 0, off - fh->buf.size);
-	fh->buf.size = off;
+	WT_ERR(__wt_buf_grow(session, &im_fh->buf, off));
+	if (im_fh->buf.size < off)
+		memset((uint8_t *)im_fh->buf.data + im_fh->buf.size,
+		    0, off - im_fh->buf.size);
+	im_fh->buf.size = off;
 
-err:	__wt_spin_unlock(session, &im->lock);
+err:	__wt_spin_unlock(session, &im_fs->lock);
 	return (ret);
 }
 
 /*
- * __im_handle_write --
+ * __im_file_write --
  *	POSIX pwrite.
  */
 static int
-__im_handle_write(WT_SESSION_IMPL *session,
-    WT_FH *fh, wt_off_t offset, size_t len, const void *buf)
+__im_file_write(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session,
+    wt_off_t offset, size_t len, const void *buf)
 {
 	WT_DECL_RET;
-	WT_IM *im;
+	WT_FILE_HANDLE_INMEM *im_fh;
+	WT_FILE_SYSTEM_INMEM *im_fs;
+	WT_SESSION_IMPL *session;
 	size_t off;
 
-	im = S2C(session)->inmemory;
-	__wt_spin_lock(session, &im->lock);
+	im_fh = (WT_FILE_HANDLE_INMEM *)file_handle;
+	im_fs = (WT_FILE_SYSTEM_INMEM *)file_handle->file_system;
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	__wt_spin_lock(session, &im_fs->lock);
 
 	off = (size_t)offset;
-	WT_ERR(__wt_buf_grow(session, &fh->buf, off + len + 1024));
+	WT_ERR(__wt_buf_grow(session, &im_fh->buf, off + len + 1024));
 
-	memcpy((uint8_t *)fh->buf.data + off, buf, len);
-	if (off + len > fh->buf.size)
-		fh->buf.size = off + len;
-	fh->off = off + len;
+	memcpy((uint8_t *)im_fh->buf.data + off, buf, len);
+	if (off + len > im_fh->buf.size)
+		im_fh->buf.size = off + len;
+	im_fh->off = off + len;
 
-err:	__wt_spin_unlock(session, &im->lock);
+err:	__wt_spin_unlock(session, &im_fs->lock);
 	if (ret == 0)
 		return (0);
 	WT_RET_MSG(session, ret,
 	    "%s: handle-write: failed to write %" WT_SIZET_FMT " bytes at "
 	    "offset %" WT_SIZET_FMT,
-	    fh->name, len, off);
+	    file_handle->name, len, off);
 }
 
 /*
- * __im_handle_open --
+ * __im_file_open --
  *	POSIX fopen/open.
  */
 static int
-__im_handle_open(WT_SESSION_IMPL *session,
-    WT_FH *fh, const char *path, uint32_t file_type, uint32_t flags)
+__im_file_open(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
+    const char *name, WT_OPEN_FILE_TYPE file_type, uint32_t flags,
+    WT_FILE_HANDLE **file_handlep)
 {
-	WT_UNUSED(session);
-	WT_UNUSED(path);
+	WT_DECL_RET;
+	WT_FILE_HANDLE *file_handle;
+	WT_FILE_HANDLE_INMEM *im_fh;
+	WT_FILE_SYSTEM_INMEM *im_fs;
+	WT_SESSION_IMPL *session;
+	uint64_t bucket, hash;
+
 	WT_UNUSED(file_type);
 	WT_UNUSED(flags);
 
-	fh->off = 0;
-	F_SET(fh, WT_FH_IN_MEMORY);
+	im_fs = (WT_FILE_SYSTEM_INMEM *)file_system;
+	session = (WT_SESSION_IMPL *)wt_session;
 
-	fh->fh_advise = __im_handle_advise;
-	fh->fh_close = __im_handle_close;
-	fh->fh_getc = __im_handle_getc;
-	fh->fh_lock = __im_handle_lock;
-	fh->fh_printf = __im_handle_printf;
-	fh->fh_read = __im_handle_read;
-	fh->fh_size = __im_handle_size;
-	fh->fh_sync = __im_handle_sync;
-	fh->fh_truncate = __im_handle_truncate;
-	fh->fh_write = __im_handle_write;
+	__wt_spin_lock(session, &im_fs->lock);
 
-	return (0);
+	/*
+	 * First search the file queue, if we find it, assert there's only a
+	 * single reference, in-memory only supports a single handle on any
+	 * file, for now.
+	 */
+	im_fh = __im_handle_search(file_system, name);
+	if (im_fh != NULL) {
+
+		if (im_fh->ref != 0)
+			WT_ERR_MSG(session, EBUSY,
+			    "%s: file-open: already open", name);
+
+		im_fh->ref = 1;
+		im_fh->off = 0;
+
+		*file_handlep = (WT_FILE_HANDLE *)im_fh;
+
+		__wt_spin_unlock(session, &im_fs->lock);
+		return (0);
+	}
+
+	/* The file hasn't been opened before, create a new one. */
+	WT_ERR(__wt_calloc_one(session, &im_fh));
+
+	/* Initialize public information. */
+	file_handle = (WT_FILE_HANDLE *)im_fh;
+	file_handle->file_system = file_system;
+	WT_ERR(__wt_strdup(session, name, &file_handle->name));
+
+	/* Initialize private information. */
+	im_fh->ref = 1;
+	im_fh->off = 0;
+
+	hash = __wt_hash_city64(name, strlen(name));
+	bucket = hash % WT_HASH_ARRAY_SIZE;
+	im_fh->name_hash = hash;
+	WT_FILE_HANDLE_INSERT(im_fs, im_fh, bucket);
+
+	file_handle->close = __im_file_close;
+	file_handle->read = __im_file_read;
+	file_handle->size = __im_file_size;
+	file_handle->truncate = __im_file_truncate;
+	file_handle->write = __im_file_write;
+
+	*file_handlep = file_handle;
+
+	if (0) {
+err:		__wt_free(session, im_fh);
+	}
+
+	__wt_spin_unlock(session, &im_fs->lock);
+	return (ret);
+}
+
+/*
+ * __im_terminate --
+ *	Terminate an in-memory configuration.
+ */
+static int
+__im_terminate(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session)
+{
+	WT_DECL_RET;
+	WT_FILE_HANDLE_INMEM *im_fh;
+	WT_FILE_SYSTEM_INMEM *im_fs;
+	WT_SESSION_IMPL *session;
+
+	WT_UNUSED(file_system);
+
+	session = (WT_SESSION_IMPL *)wt_session;
+	im_fs = (WT_FILE_SYSTEM_INMEM *)file_system;
+
+	while ((im_fh = TAILQ_FIRST(&im_fs->fhqh)) != NULL)
+		WT_TRET(__im_handle_remove(session, file_system, im_fh));
+
+	__wt_spin_destroy(session, &im_fs->lock);
+	__wt_free(session, im_fs);
+
+	return (ret);
 }
 
 /*
@@ -434,49 +560,36 @@ __im_handle_open(WT_SESSION_IMPL *session,
 int
 __wt_os_inmemory(WT_SESSION_IMPL *session)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_IM *im;
+	WT_FILE_SYSTEM *file_system;
+	WT_FILE_SYSTEM_INMEM *im_fs;
+	u_int i;
 
-	conn = S2C(session);
-	im = NULL;
+	WT_RET(__wt_calloc_one(session, &im_fs));
+
+	/* Initialize private information. */
+	TAILQ_INIT(&im_fs->fhqh);
+	for (i = 0; i < WT_HASH_ARRAY_SIZE; i++)
+		TAILQ_INIT(&im_fs->fhhash[i]);
+
+	WT_ERR(__wt_spin_init(session, &im_fs->lock, "in-memory I/O"));
 
 	/* Initialize the in-memory jump table. */
-	conn->file_directory_list = __im_directory_list;
-	conn->file_directory_sync = __im_directory_sync;
-	conn->file_exist = __im_file_exist;
-	conn->file_remove = __im_file_remove;
-	conn->file_rename = __im_file_rename;
-	conn->file_size = __im_file_size;
-	conn->handle_open = __im_handle_open;
+	file_system = (WT_FILE_SYSTEM *)im_fs;
+	file_system->directory_list = __im_fs_directory_list;
+	file_system->directory_list_free = __im_fs_directory_list_free;
+	file_system->exist = __im_fs_exist;
+	file_system->open_file = __im_file_open;
+	file_system->remove = __im_fs_remove;
+	file_system->rename = __im_fs_rename;
+	file_system->size = __im_fs_size;
+	file_system->terminate = __im_terminate;
 
-	/* Allocate an in-memory structure. */
-	WT_RET(__wt_calloc_one(session, &im));
-	WT_ERR(__wt_spin_init(session, &im->lock, "in-memory I/O"));
-	conn->inmemory = im;
+	/* Switch the file system into place. */
+	S2C(session)->file_system = (WT_FILE_SYSTEM *)im_fs;
 
 	return (0);
 
-err:	__wt_free(session, im);
-	return (ret);
-}
-
-/*
- * __wt_os_inmemory_cleanup --
- *	Discard an in-memory configuration.
- */
-int
-__wt_os_inmemory_cleanup(WT_SESSION_IMPL *session)
-{
-	WT_DECL_RET;
-	WT_IM *im;
-
-	if ((im = S2C(session)->inmemory) == NULL)
-		return (0);
-	S2C(session)->inmemory = NULL;
-
-	__wt_spin_destroy(session, &im->lock);
-	__wt_free(session, im);
-
+err:	__wt_free(session, im_fs);
 	return (ret);
 }

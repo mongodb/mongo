@@ -26,9 +26,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "wt_internal.h"			/* For __wt_XXX */
+#include "test_util.i"
 
-#include <assert.h>
+void (*custom_die)(void) = NULL;
 
 static void
 check(const char *fmt, ...)
@@ -40,13 +40,15 @@ check(const char *fmt, ...)
 	len = 0;			/* -Werror=maybe-uninitialized */
 
 	va_start(ap, fmt);
-	assert(__wt_struct_sizev(NULL, &len, fmt, ap) == 0);
+	testutil_check(__wt_struct_sizev(NULL, &len, fmt, ap));
 	va_end(ap);
 
-	assert(len > 0 && len < sizeof(buf));
+	if (len < 1 || len >= sizeof(buf))
+		testutil_die(EINVAL,
+		    "Unexpected length from __wt_struct_sizev");
 
 	va_start(ap, fmt);
-	assert(__wt_struct_packv(NULL, buf, sizeof(buf), fmt, ap) == 0);
+	testutil_check(__wt_struct_packv(NULL, buf, sizeof(buf), fmt, ap));
 	va_end(ap);
 
 	printf("%s ", fmt);

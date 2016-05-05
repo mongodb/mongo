@@ -289,7 +289,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	}
 
 	/* Stop if a running transaction needs the chunk. */
-	__wt_txn_update_oldest(session, true);
+	WT_RET(__wt_txn_update_oldest(session, true));
 	if (chunk->switch_txn == WT_TXN_NONE ||
 	    !__wt_txn_visible_all(session, chunk->switch_txn)) {
 		WT_RET(__wt_verbose(session, WT_VERB_LSM,
@@ -525,7 +525,7 @@ __lsm_drop_file(WT_SESSION_IMPL *session, const char *uri)
 	    ret = __wt_schema_drop(session, uri, drop_cfg));
 
 	if (ret == 0)
-		ret = __wt_remove(session, uri + strlen("file:"));
+		ret = __wt_fs_remove(session, uri + strlen("file:"));
 	WT_RET(__wt_verbose(session, WT_VERB_LSM, "Dropped %s", uri));
 
 	if (ret == EBUSY || ret == ENOENT)

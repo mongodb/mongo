@@ -181,6 +181,7 @@ main(int argc, char *argv[])
 	 */
 	testutil_check(pthread_rwlock_init(&g.append_lock, NULL));
 	testutil_check(pthread_rwlock_init(&g.backup_lock, NULL));
+	testutil_check(pthread_rwlock_init(&g.checkpoint_lock, NULL));
 	testutil_check(pthread_rwlock_init(&g.death_lock, NULL));
 
 	printf("%s: process %" PRIdMAX "\n", g.progname, (intmax_t)getpid());
@@ -198,8 +199,8 @@ main(int argc, char *argv[])
 		if (SINGLETHREADED)
 			bdb_open();		/* Initial file config */
 #endif
-		wts_open(g.home, 1, &g.wts_conn);
-		wts_create();
+		wts_open(g.home, true, &g.wts_conn);
+		wts_init();
 
 		wts_load();			/* Load initial records */
 		wts_verify("post-bulk verify");	/* Verify */
@@ -275,6 +276,8 @@ main(int argc, char *argv[])
 
 	testutil_check(pthread_rwlock_destroy(&g.append_lock));
 	testutil_check(pthread_rwlock_destroy(&g.backup_lock));
+	testutil_check(pthread_rwlock_destroy(&g.checkpoint_lock));
+	testutil_check(pthread_rwlock_destroy(&g.death_lock));
 
 	config_clear();
 
@@ -288,7 +291,7 @@ main(int argc, char *argv[])
 static void
 startup(void)
 {
-	int ret;
+	WT_DECL_RET;
 
 	/* Flush/close any logging information. */
 	fclose_and_clear(&g.logfp);

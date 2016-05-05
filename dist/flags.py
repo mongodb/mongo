@@ -8,13 +8,6 @@ flags = {
 ###################################################
 # Internal routine flag declarations
 ###################################################
-    'file_types' : [
-        'FILE_TYPE_CHECKPOINT',
-        'FILE_TYPE_DATA',
-        'FILE_TYPE_DIRECTORY',
-        'FILE_TYPE_LOG',
-        'FILE_TYPE_REGULAR',
-    ],
     'log_scan' : [
         'LOGSCAN_FIRST',
         'LOGSCAN_FROM_CKP',

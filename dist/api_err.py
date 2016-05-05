@@ -53,9 +53,11 @@ errors = [
         to return an error if recovery is required to use the database.'''),
     Error('WT_CACHE_FULL', -31807,
         'operation would overflow cache', '''
-        This error is generated when wiredtiger_open is configured
-        to run in-memory, and an insert or update operation requires more
-        than the configured cache size to complete.''', undoc=True),
+        This error is only generated when wiredtiger_open is configured
+        to run in-memory, and an insert or update operation requires
+        more than the configured cache size to complete. The operation
+        may be retried; if a transaction is in progress, it should be
+        rolled back and the operation retried in a new transaction.'''),
     Error('WT_PERM_DENIED', -31808,
         'permission denied (internal)', undoc=True),
 ]

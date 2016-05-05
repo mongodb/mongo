@@ -111,10 +111,10 @@ config_event_handler(void)
 	/*! [Configure event_handler] */
 
 	/* Make an invalid API call, to ensure the event handler works. */
+	printf("ex_event_handler: expect an error message to follow\n");
 	(void)conn->open_session(conn, NULL, "isolation=invalid", &session);
 
-	if (ret == 0)
-		ret = conn->close(conn, NULL);
+	ret = conn->close(conn, NULL);
 
 	return (ret);
 }

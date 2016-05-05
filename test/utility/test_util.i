@@ -64,9 +64,11 @@ testutil_die(int e, const char *fmt, ...)
 	if (custom_die != NULL)
 		(*custom_die)();
 
-	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
-	va_end(ap);
+	if (fmt != NULL) {
+		va_start(ap, fmt);
+		vfprintf(stderr, fmt, ap);
+		va_end(ap);
+	}
 	if (e != 0)
 		fprintf(stderr, ": %s", wiredtiger_strerror(e));
 	fprintf(stderr, "\n");
@@ -160,4 +162,59 @@ testutil_make_work_dir(char *dir)
 	if ((ret = system(buf)) != 0)
 		testutil_die(ret, "%s", buf);
 	free(buf);
+}
+
+/*
+ * dcalloc --
+ *	Call calloc, dying on failure.
+ */
+static inline void *
+dcalloc(size_t number, size_t size)
+{
+	void *p;
+
+	if ((p = calloc(number, size)) != NULL)
+		return (p);
+	testutil_die(errno, "calloc: %" WT_SIZET_FMT "B", number * size);
+}
+
+/*
+ * dmalloc --
+ *	Call malloc, dying on failure.
+ */
+static inline void *
+dmalloc(size_t len)
+{
+	void *p;
+
+	if ((p = malloc(len)) != NULL)
+		return (p);
+	testutil_die(errno, "malloc: %" WT_SIZET_FMT "B", len);
+}
+
+/*
+ * drealloc --
+ *	Call realloc, dying on failure.
+ */
+static inline void *
+drealloc(void *p, size_t len)
+{
+	void *t;
+	if ((t = realloc(p, len)) != NULL)
+		return (t);
+	testutil_die(errno, "realloc: %" WT_SIZET_FMT "B", len);
+}
+
+/*
+ * dstrdup --
+ *	Call strdup, dying on failure.
+ */
+static inline void *
+dstrdup(const void *str)
+{
+	char *p;
+
+	if ((p = strdup(str)) != NULL)
+		return (p);
+	testutil_die(errno, "strdup");
 }

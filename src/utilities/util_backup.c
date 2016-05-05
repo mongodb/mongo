@@ -23,7 +23,7 @@ append_target(WT_SESSION *session, const char *target, char **bufp)
 	static char *buf = NULL;
 
 						/* 20 bytes of slop */
-	if (remain < strlen(target) + 20) {
+	if (buf == NULL || remain < strlen(target) + 20) {
 		len += strlen(target) + 512;
 		remain += strlen(target) + 512;
 		if ((buf = realloc(buf, len)) == NULL)

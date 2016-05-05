@@ -25,6 +25,7 @@ EBUSY
 ECMA
 EINVAL
 ENCRYPTOR
+ENOTSUP
 EmpId
 Encryptors
 Facebook
@@ -178,6 +179,8 @@ desc
 destructor
 destructors
 dev
+disjunction
+disjunctions
 distclean
 dl
 dll
@@ -207,6 +210,7 @@ erlang
 errno
 exe
 fadvise
+fallocate
 failchk
 fd's
 fdatasync
@@ -331,6 +335,7 @@ nocase
 nocasecoll
 nodup
 noflush
+nolock
 nolocking
 nommap
 nop

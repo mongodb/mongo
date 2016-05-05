@@ -55,7 +55,7 @@ __rename_file(
 	default:
 		WT_ERR(ret);
 	}
-	WT_ERR(__wt_exist(session, newfile, &exist));
+	WT_ERR(__wt_fs_exist(session, newfile, &exist));
 	if (exist)
 		WT_ERR_MSG(session, EEXIST, "%s", newfile);
 
@@ -64,7 +64,7 @@ __rename_file(
 	WT_ERR(__wt_metadata_insert(session, newuri, oldvalue));
 
 	/* Rename the underlying file. */
-	WT_ERR(__wt_rename(session, filename, newfile));
+	WT_ERR(__wt_fs_rename(session, filename, newfile));
 	if (WT_META_TRACKING(session))
 		WT_ERR(__wt_meta_track_fileop(session, uri, newuri));
 

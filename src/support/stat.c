@@ -60,6 +60,7 @@ static const char * const __stats_dsrc_desc[] = {
 	"cache: page written requiring lookaside records",
 	"cache: pages read into cache",
 	"cache: pages read into cache requiring lookaside entries",
+	"cache: pages requested from the cache",
 	"cache: pages written from cache",
 	"cache: pages written requiring in-memory restoration",
 	"cache: unmodified pages evicted",
@@ -189,6 +190,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
 	stats->cache_write_lookaside = 0;
 	stats->cache_read = 0;
 	stats->cache_read_lookaside = 0;
+	stats->cache_pages_requested = 0;
 	stats->cache_write = 0;
 	stats->cache_write_restore = 0;
 	stats->cache_eviction_clean = 0;
@@ -316,6 +318,7 @@ __wt_stat_dsrc_aggregate_single(
 	to->cache_write_lookaside += from->cache_write_lookaside;
 	to->cache_read += from->cache_read;
 	to->cache_read_lookaside += from->cache_read_lookaside;
+	to->cache_pages_requested += from->cache_pages_requested;
 	to->cache_write += from->cache_write;
 	to->cache_write_restore += from->cache_write_restore;
 	to->cache_eviction_clean += from->cache_eviction_clean;
@@ -455,6 +458,8 @@ __wt_stat_dsrc_aggregate(
 	    WT_STAT_READ(from, cache_write_lookaside);
 	to->cache_read += WT_STAT_READ(from, cache_read);
 	to->cache_read_lookaside += WT_STAT_READ(from, cache_read_lookaside);
+	to->cache_pages_requested +=
+	    WT_STAT_READ(from, cache_pages_requested);
 	to->cache_write += WT_STAT_READ(from, cache_write);
 	to->cache_write_restore += WT_STAT_READ(from, cache_write_restore);
 	to->cache_eviction_clean += WT_STAT_READ(from, cache_eviction_clean);
@@ -543,11 +548,16 @@ static const char * const __stats_connection_desc[] = {
 	"cache: bytes read into cache",
 	"cache: bytes written from cache",
 	"cache: checkpoint blocked page eviction",
+	"cache: eviction calls to get a page",
+	"cache: eviction calls to get a page found queue empty",
+	"cache: eviction calls to get a page found queue empty after locking",
 	"cache: eviction currently operating in aggressive mode",
 	"cache: eviction server candidate queue empty when topping up",
 	"cache: eviction server candidate queue not empty when topping up",
 	"cache: eviction server evicting pages",
 	"cache: eviction server populating queue, but not evicting pages",
+	"cache: eviction server skipped very large page",
+	"cache: eviction server slept, because we did not make progress with eviction",
 	"cache: eviction server unable to reach eviction goal",
 	"cache: eviction worker thread evicting pages",
 	"cache: failed eviction of pages that exceeded the in-memory maximum",
@@ -570,6 +580,7 @@ static const char * const __stats_connection_desc[] = {
 	"cache: pages evicted by application threads",
 	"cache: pages read into cache",
 	"cache: pages read into cache requiring lookaside entries",
+	"cache: pages requested from the cache",
 	"cache: pages selected for eviction unable to be evicted",
 	"cache: pages walked for eviction",
 	"cache: pages written from cache",
@@ -740,11 +751,16 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cache_bytes_read = 0;
 	stats->cache_bytes_write = 0;
 	stats->cache_eviction_checkpoint = 0;
+	stats->cache_eviction_get_ref = 0;
+	stats->cache_eviction_get_ref_empty = 0;
+	stats->cache_eviction_get_ref_empty2 = 0;
 		/* not clearing cache_eviction_aggressive_set */
 	stats->cache_eviction_queue_empty = 0;
 	stats->cache_eviction_queue_not_empty = 0;
 	stats->cache_eviction_server_evicting = 0;
 	stats->cache_eviction_server_not_evicting = 0;
+	stats->cache_eviction_server_toobig = 0;
+	stats->cache_eviction_server_slept = 0;
 	stats->cache_eviction_slow = 0;
 	stats->cache_eviction_worker_evicting = 0;
 	stats->cache_eviction_force_fail = 0;
@@ -767,6 +783,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_app = 0;
 	stats->cache_read = 0;
 	stats->cache_read_lookaside = 0;
+	stats->cache_pages_requested = 0;
 	stats->cache_eviction_fail = 0;
 	stats->cache_eviction_walk = 0;
 	stats->cache_write = 0;
@@ -928,6 +945,12 @@ __wt_stat_connection_aggregate(
 	to->cache_bytes_write += WT_STAT_READ(from, cache_bytes_write);
 	to->cache_eviction_checkpoint +=
 	    WT_STAT_READ(from, cache_eviction_checkpoint);
+	to->cache_eviction_get_ref +=
+	    WT_STAT_READ(from, cache_eviction_get_ref);
+	to->cache_eviction_get_ref_empty +=
+	    WT_STAT_READ(from, cache_eviction_get_ref_empty);
+	to->cache_eviction_get_ref_empty2 +=
+	    WT_STAT_READ(from, cache_eviction_get_ref_empty2);
 	to->cache_eviction_aggressive_set +=
 	    WT_STAT_READ(from, cache_eviction_aggressive_set);
 	to->cache_eviction_queue_empty +=
@@ -938,6 +961,10 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, cache_eviction_server_evicting);
 	to->cache_eviction_server_not_evicting +=
 	    WT_STAT_READ(from, cache_eviction_server_not_evicting);
+	to->cache_eviction_server_toobig +=
+	    WT_STAT_READ(from, cache_eviction_server_toobig);
+	to->cache_eviction_server_slept +=
+	    WT_STAT_READ(from, cache_eviction_server_slept);
 	to->cache_eviction_slow += WT_STAT_READ(from, cache_eviction_slow);
 	to->cache_eviction_worker_evicting +=
 	    WT_STAT_READ(from, cache_eviction_worker_evicting);
@@ -973,6 +1000,8 @@ __wt_stat_connection_aggregate(
 	to->cache_eviction_app += WT_STAT_READ(from, cache_eviction_app);
 	to->cache_read += WT_STAT_READ(from, cache_read);
 	to->cache_read_lookaside += WT_STAT_READ(from, cache_read_lookaside);
+	to->cache_pages_requested +=
+	    WT_STAT_READ(from, cache_pages_requested);
 	to->cache_eviction_fail += WT_STAT_READ(from, cache_eviction_fail);
 	to->cache_eviction_walk += WT_STAT_READ(from, cache_eviction_walk);
 	to->cache_write += WT_STAT_READ(from, cache_write);

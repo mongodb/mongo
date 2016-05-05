@@ -6,14 +6,6 @@
  * See the file LICENSE for redistribution information.
  */
 
-/*
- * Number of directory entries can grow dynamically.
- */
-#define	WT_DIR_ENTRY	32
-
-#define	WT_DIRLIST_EXCLUDE	0x1	/* Exclude files matching prefix */
-#define	WT_DIRLIST_INCLUDE	0x2	/* Include files matching prefix */
-
 #define	WT_SYSCALL_RETRY(call, ret) do {				\
 	int __retry;							\
 	for (__retry = 0; __retry < 10; ++__retry) {			\
@@ -59,81 +51,97 @@
 	     (t1).tv_nsec == (t2).tv_nsec ? 0 : 1 : 1)
 
 /*
- * The underlying OS calls return ENOTSUP if posix_fadvise functionality isn't
- * available, but WiredTiger uses the POSIX flag names in the API. Use distinct
- * values so the underlying code can distinguish.
+ * Macros to ensure a file handle is inserted or removed from both the main and
+ * the hashed queue, used by connection-level and in-memory data structures.
  */
-#ifndef	POSIX_FADV_DONTNEED
-#define	POSIX_FADV_DONTNEED	0x01
-#endif
-#ifndef	POSIX_FADV_WILLNEED
-#define	POSIX_FADV_WILLNEED	0x02
-#endif
+#define	WT_FILE_HANDLE_INSERT(h, fh, bucket) do {			\
+	TAILQ_INSERT_HEAD(&(h)->fhqh, fh, q);				\
+	TAILQ_INSERT_HEAD(&(h)->fhhash[bucket], fh, hashq);		\
+} while (0)
 
-#define	WT_OPEN_CREATE		0x001	/* Create is OK */
-#define	WT_OPEN_EXCLUSIVE	0x002	/* Exclusive open */
-#define	WT_OPEN_FIXED		0x004	/* Path isn't relative to home */
-#define	WT_OPEN_READONLY	0x008	/* Readonly open */
-#define	WT_STREAM_APPEND	0x010	/* Open a stream: append */
-#define	WT_STREAM_LINE_BUFFER	0x020	/* Line buffer the stream */
-#define	WT_STREAM_READ		0x040	/* Open a stream: read */
-#define	WT_STREAM_WRITE		0x080	/* Open a stream: write */
+#define	WT_FILE_HANDLE_REMOVE(h, fh, bucket) do {			\
+	TAILQ_REMOVE(&(h)->fhqh, fh, q);				\
+	TAILQ_REMOVE(&(h)->fhhash[bucket], fh, hashq);			\
+} while (0)
 
 struct __wt_fh {
+	/*
+	 * There is a file name field in both the WT_FH and WT_FILE_HANDLE
+	 * structures, which isn't ideal. There would be compromises to keeping
+	 * a single copy: If it were in WT_FH, file systems could not access
+	 * the name field, if it were just in the WT_FILE_HANDLE internal
+	 * WiredTiger code would need to maintain a string inside a structure
+	 * that is owned by the user (since we care about the content of the
+	 * file name). Keeping two copies seems most reasonable.
+	 */
 	const char *name;			/* File name */
-	uint64_t name_hash;			/* Hash of name */
-	TAILQ_ENTRY(__wt_fh) q;			/* List of open handles */
-	TAILQ_ENTRY(__wt_fh) hashq;		/* Hashed list of handles */
 
-	u_int	ref;				/* Reference count */
+	uint64_t name_hash;			/* hash of name */
+	TAILQ_ENTRY(__wt_fh) q;			/* internal queue */
+	TAILQ_ENTRY(__wt_fh) hashq;		/* internal hash queue */
+	u_int ref;				/* reference count */
+
+	WT_FILE_HANDLE *handle;
+};
+
+#ifdef _WIN32
+struct __wt_file_handle_win {
+	WT_FILE_HANDLE iface;
 
 	/*
-	 * Underlying file system handle support.
+	 * Windows specific file handle fields
 	 */
-#ifdef _WIN32
 	HANDLE filehandle;			/* Windows file handle */
 	HANDLE filehandle_secondary;		/* Windows file handle
 						   for file size changes */
+	bool	 direct_io;			/* O_DIRECT configured */
+};
+
 #else
-	int	 fd;				/* POSIX file handle */
-#endif
-	FILE	*fp;				/* ANSI C stdio handle */
+
+struct __wt_file_handle_posix {
+	WT_FILE_HANDLE iface;
 
 	/*
-	 * Underlying in-memory handle support.
+	 * POSIX specific file handle fields
 	 */
-	size_t	 off;				/* Read/write offset */
-	WT_ITEM  buf;				/* Data */
+	int	 fd;				/* POSIX file handle */
 
 	bool	 direct_io;			/* O_DIRECT configured */
+};
+#endif
 
-	enum {					/* file extend configuration */
-	    WT_FALLOCATE_AVAILABLE,
-	    WT_FALLOCATE_NOT_AVAILABLE,
-	    WT_FALLOCATE_POSIX,
-	    WT_FALLOCATE_STD,
-	    WT_FALLOCATE_SYS } fallocate_available;
-	bool fallocate_requires_locking;
+struct __wt_file_handle_inmem {
+	WT_FILE_HANDLE iface;
 
-#define	WT_FH_FLUSH_ON_CLOSE	0x01		/* Flush when closing */
-#define	WT_FH_IN_MEMORY		0x02		/* In-memory, don't remove */
+	/*
+	 * In memory specific file handle fields
+	 */
+	uint64_t name_hash;			/* hash of name */
+	TAILQ_ENTRY(__wt_file_handle_inmem) q;	/* internal queue, hash queue */
+	TAILQ_ENTRY(__wt_file_handle_inmem) hashq;
+
+	size_t	 off;				/* Read/write offset */
+	WT_ITEM  buf;				/* Data */
+	u_int	 ref;				/* Reference count */
+};
+
+struct __wt_fstream {
+	const char *name;			/* Stream name */
+
+	FILE *fp;				/* stdio FILE stream */
+	WT_FH *fh;				/* WT file handle */
+	wt_off_t off;				/* Read/write offset */
+	wt_off_t size;				/* File size */
+	WT_ITEM  buf;				/* Data */
+
+#define	WT_STREAM_APPEND	0x01		/* Open a stream for append */
+#define	WT_STREAM_READ		0x02		/* Open a stream for read */
+#define	WT_STREAM_WRITE		0x04		/* Open a stream for write */
 	uint32_t flags;
 
-	int (*fh_advise)(WT_SESSION_IMPL *, WT_FH *, wt_off_t, wt_off_t, int);
-	int (*fh_allocate)(WT_SESSION_IMPL *, WT_FH *, wt_off_t, wt_off_t);
-	int (*fh_close)(WT_SESSION_IMPL *, WT_FH *);
-	int (*fh_getc)(WT_SESSION_IMPL *, WT_FH *, int *);
-	int (*fh_lock)(WT_SESSION_IMPL *, WT_FH *, bool);
-	int (*fh_map)(WT_SESSION_IMPL *, WT_FH *, void *, size_t *, void **);
-	int (*fh_map_discard)(WT_SESSION_IMPL *, WT_FH *, void *, size_t);
-	int (*fh_map_preload)(WT_SESSION_IMPL *, WT_FH *, const void *, size_t);
-	int (*fh_map_unmap)(
-	    WT_SESSION_IMPL *, WT_FH *, void *, size_t, void **);
-	int (*fh_printf)(WT_SESSION_IMPL *, WT_FH *, const char *, va_list);
-	int (*fh_read)(WT_SESSION_IMPL *, WT_FH *, wt_off_t, size_t, void *);
-	int (*fh_size)(WT_SESSION_IMPL *, WT_FH *, wt_off_t *);
-	int (*fh_sync)(WT_SESSION_IMPL *, WT_FH *, bool);
-	int (*fh_truncate)(WT_SESSION_IMPL *, WT_FH *, wt_off_t);
-	int (*fh_write)(
-	    WT_SESSION_IMPL *, WT_FH *, wt_off_t, size_t, const void *);
+	int (*close)(WT_SESSION_IMPL *, WT_FSTREAM *);
+	int (*flush)(WT_SESSION_IMPL *, WT_FSTREAM *);
+	int (*getline)(WT_SESSION_IMPL *, WT_FSTREAM *, WT_ITEM *);
+	int (*printf)(WT_SESSION_IMPL *, WT_FSTREAM *, const char *, va_list);
 };

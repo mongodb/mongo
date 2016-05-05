@@ -26,22 +26,10 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sys/wait.h>
-#include <errno.h>
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#ifndef _WIN32
-#include <unistd.h>
-#endif
-
-#include <wiredtiger.h>
-
 #include "test_util.i"
 
 #define	HOME_SIZE	512
-#define	HOME_BASE	"WT_HOME"
+#define	HOME_BASE	"WT_TEST"
 static char home[HOME_SIZE];		/* Base home directory */
 static char hometmp[HOME_SIZE];		/* Each conn home directory */
 static const char *progname;		/* Program name */
@@ -172,17 +160,10 @@ main(int argc, char *argv[])
 	 * Allocate arrays for connection handles, sessions, statistics
 	 * cursors and, if needed, data cursors.
 	 */
-	if ((connections = calloc(
-	    (size_t)dbs, sizeof(WT_CONNECTION *))) == NULL)
-		testutil_die(ENOMEM, "connection array malloc");
-	if ((sessions = calloc(
-	    (size_t)dbs, sizeof(WT_SESSION *))) == NULL)
-		testutil_die(ENOMEM, "session array malloc");
-	if ((cond_reset_orig = calloc((size_t)dbs, sizeof(uint64_t))) == NULL)
-		testutil_die(ENOMEM, "orig stat malloc");
-	if (!idle && ((cursors = calloc(
-	    (size_t)dbs, sizeof(WT_CURSOR *))) == NULL))
-		testutil_die(ENOMEM, "cursor array malloc");
+	connections = dcalloc((size_t)dbs, sizeof(WT_CONNECTION *));
+	sessions = dcalloc((size_t)dbs, sizeof(WT_SESSION *));
+	cond_reset_orig = dcalloc((size_t)dbs, sizeof(uint64_t));
+	cursors = idle ? NULL : dcalloc((size_t)dbs, sizeof(WT_CURSOR *));
 	memset(cmd, 0, sizeof(cmd));
 	/*
 	 * Set up all the directory names.
@@ -257,8 +238,7 @@ main(int argc, char *argv[])
 	free(connections);
 	free(sessions);
 	free(cond_reset_orig);
-	if (!idle)
-		free(cursors);
+	free(cursors);
 
 	return (EXIT_SUCCESS);
 }

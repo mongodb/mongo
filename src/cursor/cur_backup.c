@@ -10,7 +10,6 @@
 
 static int __backup_all(WT_SESSION_IMPL *);
 static int __backup_cleanup_handles(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *);
-static int __backup_file_create(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, bool);
 static int __backup_list_append(
     WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *);
 static int __backup_list_uri_append(WT_SESSION_IMPL *, const char *, bool *);
@@ -178,8 +177,7 @@ __backup_log_append(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, bool active)
 		for (i = 0; i < logcount; i++)
 			WT_ERR(__backup_list_append(session, cb, logfiles[i]));
 	}
-err:	if (logfiles != NULL)
-		__wt_log_files_free(session, logfiles, logcount);
+err:	WT_TRET(__wt_fs_directory_list_free(session, &logfiles, logcount));
 	return (ret);
 }
 
@@ -193,9 +191,13 @@ __backup_start(
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	WT_FSTREAM *srcfs;
+	const char *dest;
 	bool exist, log_only, target_list;
 
 	conn = S2C(session);
+	srcfs = NULL;
+	dest = NULL;
 
 	cb->next = 0;
 	cb->list = NULL;
@@ -224,11 +226,16 @@ __backup_start(
 	conn->hot_backup = true;
 	WT_ERR(__wt_writeunlock(session, conn->hot_backup_lock));
 
-	/* Create the hot backup file. */
-	WT_ERR(__backup_file_create(session, cb, false));
-
-	/* Add log files if logging is enabled. */
-
+	/*
+	 * Create a temporary backup file.  This must be opened before
+	 * generating the list of targets in backup_uri.  This file will
+	 * later be renamed to the correct name depending on whether or not
+	 * we're doing an incremental backup.  We need a temp file so that if
+	 * we fail or crash while filling it, the existence of a partial file
+	 * doesn't confuse restarting in the source database.
+	 */
+	WT_ERR(__wt_fopen(session, WT_BACKUP_TMP,
+	    WT_OPEN_CREATE, WT_STREAM_WRITE, &cb->bfs));
 	/*
 	 * If a list of targets was specified, work our way through them.
 	 * Else, generate a list of all database objects.
@@ -248,20 +255,23 @@ __backup_start(
 	/* Add the hot backup and standard WiredTiger files to the list. */
 	if (log_only) {
 		/*
-		 * Close any hot backup file.
-		 * We're about to open the incremental backup file.
+		 * We also open an incremental backup source file so that we
+		 * can detect a crash with an incremental backup existing in
+		 * the source directory versus an improper destination.
 		 */
-		WT_TRET(__wt_close(session, &cb->bfh));
-		WT_ERR(__backup_file_create(session, cb, log_only));
+		dest = WT_INCREMENTAL_BACKUP;
+		WT_ERR(__wt_fopen(session, WT_INCREMENTAL_SRC,
+		    WT_OPEN_CREATE, WT_STREAM_WRITE, &srcfs));
 		WT_ERR(__backup_list_append(
 		    session, cb, WT_INCREMENTAL_BACKUP));
 	} else {
+		dest = WT_METADATA_BACKUP;
 		WT_ERR(__backup_list_append(session, cb, WT_METADATA_BACKUP));
-		WT_ERR(__wt_exist(session, WT_BASECONFIG, &exist));
+		WT_ERR(__wt_fs_exist(session, WT_BASECONFIG, &exist));
 		if (exist)
 			WT_ERR(__backup_list_append(
 			    session, cb, WT_BASECONFIG));
-		WT_ERR(__wt_exist(session, WT_USERCONFIG, &exist));
+		WT_ERR(__wt_fs_exist(session, WT_USERCONFIG, &exist));
 		if (exist)
 			WT_ERR(__backup_list_append(
 			    session, cb, WT_USERCONFIG));
@@ -269,10 +279,15 @@ __backup_start(
 	}
 
 err:	/* Close the hot backup file. */
-	WT_TRET(__wt_close(session, &cb->bfh));
+	WT_TRET(__wt_fclose(session, &cb->bfs));
+	if (srcfs != NULL)
+		WT_TRET(__wt_fclose(session, &srcfs));
 	if (ret != 0) {
 		WT_TRET(__backup_cleanup_handles(session, cb));
 		WT_TRET(__backup_stop(session));
+	} else {
+		WT_ASSERT(session, dest != NULL);
+		WT_TRET(__wt_fs_rename(session, WT_BACKUP_TMP, dest));
 	}
 
 	return (ret);
@@ -384,13 +399,23 @@ __backup_uri(WT_SESSION_IMPL *session,
 			    uri);
 
 		/*
-		 * Handle log targets.  We do not need to go through the
-		 * schema worker, just call the function to append them.
-		 * Set log_only only if it is our only URI target.
+		 * Handle log targets. We do not need to go through the schema
+		 * worker, just call the function to append them. Set log_only
+		 * only if it is our only URI target.
 		 */
 		if (WT_PREFIX_MATCH(uri, "log:")) {
+			/*
+			 * Log archive cannot mix with incremental backup, don't
+			 * let that happen.
+			 */
+			if (FLD_ISSET(
+			    S2C(session)->log_flags, WT_CONN_LOG_ARCHIVE))
+				WT_ERR_MSG(session, EINVAL,
+				    "incremental backup not possible when "
+				    "automatic log archival configured");
 			*log_only = !target_list;
-			WT_ERR(__backup_list_uri_append(session, uri, NULL));
+			WT_ERR(__backup_log_append(
+			    session, session->bkp_cursor, false));
 		} else {
 			*log_only = false;
 			WT_ERR(__wt_schema_worker(session,
@@ -404,19 +429,6 @@ err:	__wt_scr_free(session, &tmp);
 }
 
 /*
- * __backup_file_create --
- *	Create the meta-data backup file.
- */
-static int
-__backup_file_create(
-    WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, bool incremental)
-{
-	return (__wt_open(session,
-	    incremental ? WT_INCREMENTAL_BACKUP : WT_METADATA_BACKUP,
-	    WT_FILE_TYPE_REGULAR, WT_OPEN_CREATE | WT_STREAM_WRITE, &cb->bfh));
-}
-
-/*
  * __wt_backup_file_remove --
  *	Remove the incremental and meta-data backup files.
  */
@@ -425,7 +437,15 @@ __wt_backup_file_remove(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
 
+	/*
+	 * Note that order matters for removing the incremental files.  We must
+	 * remove the backup file before removing the source file so that we
+	 * always know we were a source directory while there's any chance of
+	 * an incremental backup file existing.
+	 */
+	WT_TRET(__wt_remove_if_exists(session, WT_BACKUP_TMP));
 	WT_TRET(__wt_remove_if_exists(session, WT_INCREMENTAL_BACKUP));
+	WT_TRET(__wt_remove_if_exists(session, WT_INCREMENTAL_SRC));
 	WT_TRET(__wt_remove_if_exists(session, WT_METADATA_BACKUP));
 	return (ret);
 }
@@ -453,11 +473,6 @@ __backup_list_uri_append(
 	 * if there's an entry backed by anything other than a file or lsm
 	 * entry, we're confused.
 	 */
-	if (WT_PREFIX_MATCH(name, "log:")) {
-		WT_RET(__backup_log_append(session, cb, false));
-		return (0);
-	}
-
 	if (!WT_PREFIX_MATCH(name, "file:") &&
 	    !WT_PREFIX_MATCH(name, "colgroup:") &&
 	    !WT_PREFIX_MATCH(name, "index:") &&
@@ -473,7 +488,7 @@ __backup_list_uri_append(
 
 	/* Add the metadata entry to the backup file. */
 	WT_RET(__wt_metadata_search(session, name, &value));
-	ret = __wt_fprintf(session, cb->bfh, "%s\n%s\n", name, value);
+	ret = __wt_fprintf(session, cb->bfs, "%s\n%s\n", name, value);
 	__wt_free(session, value);
 	WT_RET(ret);
 

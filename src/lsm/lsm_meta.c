@@ -331,7 +331,7 @@ __lsm_meta_read_v1(
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf,
 	    "key_format=u,value_format=u,memory_page_max=%" PRIu64,
-	    2 * lsm_tree->chunk_max));
+	    2 * lsm_tree->chunk_size));
 	file_cfg[2] = buf->data;
 	WT_ERR(__wt_config_collapse(session, file_cfg, &fileconf));
 	lsm_tree->file_config = fileconf;

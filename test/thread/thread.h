@@ -26,19 +26,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sys/types.h>
-#include <sys/time.h>
-
-#include <errno.h>
-#include <inttypes.h>
-#include <pthread.h>
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-
 #include "test_util.i"
+
+#include <signal.h>
 
 #define	FNAME		"file:wt.%03d"		/* File name */
 #define	FNAME_STAT	"__stats"		/* File name for statistics */

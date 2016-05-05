@@ -15,7 +15,7 @@ static int __verify_filefrag_add(
 	WT_SESSION_IMPL *, WT_BLOCK *, const char *, wt_off_t, wt_off_t, bool);
 static int __verify_filefrag_chk(WT_SESSION_IMPL *, WT_BLOCK *);
 static int __verify_last_avail(WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *);
-static int __verify_last_truncate(WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *);
+static int __verify_set_file_size(WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *);
 
 /* The bit list ignores the first block: convert to/from a frag/offset. */
 #define	WT_wt_off_TO_FRAG(block, off)					\
@@ -49,8 +49,8 @@ __wt_block_verify_start(WT_SESSION_IMPL *session,
 			return (0);
 	}
 
-	/* Truncate the file to the size of the last checkpoint. */
-	WT_RET(__verify_last_truncate(session, block, ckpt));
+	/* Set the size of the file to the size of the last checkpoint. */
+	WT_RET(__verify_set_file_size(session, block, ckpt));
 
 	/*
 	 * We're done if the file has no data pages (this happens if we verify
@@ -144,11 +144,11 @@ err:	__wt_block_ckpt_destroy(session, ci);
 }
 
 /*
- * __verify_last_truncate --
- *	Truncate the file to the last checkpoint's size.
+ * __verify_set_file_size --
+ *	Set the file size to the last checkpoint's size.
  */
 static int
-__verify_last_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt)
+__verify_set_file_size(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt)
 {
 	WT_BLOCK_CKPT *ci, _ci;
 	WT_DECL_RET;
@@ -156,7 +156,13 @@ __verify_last_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt)
 	ci = &_ci;
 	WT_RET(__wt_block_ckpt_init(session, ci, ckpt->name));
 	WT_ERR(__wt_block_buffer_to_ckpt(session, block, ckpt->raw.data, ci));
-	WT_ERR_BUSY_OK(__wt_block_truncate(session, block, ci->file_size));
+
+	/*
+	 * Verify is read-only. Set the block's file size information as if we
+	 * truncated the file during checkpoint load, so references to blocks
+	 * after last checkpoint's file size fail.
+	 */
+	block->size = block->extend_size = ci->file_size;
 
 err:	__wt_block_ckpt_destroy(session, ci);
 	return (ret);

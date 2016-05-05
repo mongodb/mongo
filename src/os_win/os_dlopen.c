@@ -20,6 +20,7 @@ __wt_dlopen(WT_SESSION_IMPL *session, const char *path, WT_DLH **dlhp)
 
 	WT_RET(__wt_calloc_one(session, &dlh));
 	WT_ERR(__wt_strdup(session, path, &dlh->name));
+	WT_ERR(__wt_strdup(session, path == NULL ? "local" : path, &dlh->name));
 
 	/* NULL means load from the current binary */
 	if (path == NULL) {

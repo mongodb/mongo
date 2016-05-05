@@ -19,44 +19,32 @@ __wt_bm_preload(
 	WT_BLOCK *block;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
+	WT_FILE_HANDLE *handle;
 	wt_off_t offset;
 	uint32_t cksum, size;
 	bool mapped;
 
 	WT_UNUSED(addr_size);
+
 	block = bm->block;
 
 	WT_STAT_FAST_CONN_INCR(session, block_preload);
 
-	/* Preload the block. */
-	if (block->preload_available) {
-		/* Crack the cookie. */
-		WT_RET(__wt_block_buffer_to_addr(
-		    block, addr, &offset, &size, &cksum));
+	/* Crack the cookie. */
+	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
 
-		mapped = bm->map != NULL &&
-		    offset + size <= (wt_off_t)bm->maplen;
-		if (mapped)
-			ret = block->fh->fh_map_preload(session,
-			    block->fh, (uint8_t *)bm->map + offset, size);
-		else
-			ret = block->fh->fh_advise(session,
-			    block->fh, (wt_off_t)offset,
-			    (wt_off_t)size, POSIX_FADV_WILLNEED);
-		if (ret == 0)
-			return (0);
+	handle = block->fh->handle;
+	mapped = bm->map != NULL && offset + size <= (wt_off_t)bm->maplen;
+	if (mapped && handle->map_preload != NULL)
+		ret = handle->map_preload(handle, (WT_SESSION *)session,
+		    (uint8_t *)bm->map + offset, size, bm->mapped_cookie);
+	if (!mapped && handle->fadvise != NULL)
+		ret = handle->fadvise(handle, (WT_SESSION *)session,
+		    (wt_off_t)offset, (wt_off_t)size, WT_FILE_HANDLE_WILLNEED);
+	if (ret != EBUSY && ret != ENOTSUP)
+		return (ret);
 
-		/* Ignore ENOTSUP, but don't try again. */
-		if (ret != ENOTSUP)
-			return (ret);
-		block->preload_available = false;
-	}
-
-	/*
-	 * If preload isn't supported, do it the slow way; don't call the
-	 * underlying read routine directly, we don't know for certain if
-	 * this is a mapped range.
-	 */
+	/* If preload isn't supported, do it the slow way. */
 	WT_RET(__wt_scr_alloc(session, 0, &tmp));
 	ret = __wt_bm_read(bm, session, tmp, addr, addr_size);
 	__wt_scr_free(session, &tmp);
@@ -74,6 +62,7 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 {
 	WT_BLOCK *block;
 	WT_DECL_RET;
+	WT_FILE_HANDLE *handle;
 	wt_off_t offset;
 	uint32_t cksum, size;
 	bool mapped;
@@ -87,23 +76,17 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 	/*
 	 * Map the block if it's possible.
 	 */
+	handle = block->fh->handle;
 	mapped = bm->map != NULL && offset + size <= (wt_off_t)bm->maplen;
-	if (mapped) {
+	if (mapped && handle->map_preload != NULL) {
 		buf->data = (uint8_t *)bm->map + offset;
 		buf->size = size;
-		if (block->preload_available) {
-			ret = block->fh->fh_map_preload(
-			    session, block->fh, buf->data, buf->size);
-
-			/* Ignore ENOTSUP, but don't try again. */
-			if (ret != ENOTSUP)
-				return (ret);
-			block->preload_available = false;
-		}
+		ret = handle->map_preload(handle, (WT_SESSION *)session,
+		    buf->data, buf->size,bm->mapped_cookie);
 
 		WT_STAT_FAST_CONN_INCR(session, block_map_read);
 		WT_STAT_FAST_CONN_INCRV(session, block_byte_map_read, size);
-		return (0);
+		return (ret);
 	}
 
 #ifdef HAVE_DIAGNOSTIC

@@ -33,13 +33,12 @@ wts_load(void)
 {
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
+	WT_DECL_RET;
 	WT_ITEM key, value;
 	WT_SESSION *session;
-	uint8_t *keybuf, *valbuf;
 	bool is_bulk;
 
 	conn = g.wts_conn;
-	keybuf = valbuf = NULL;
 
 	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
@@ -63,8 +62,8 @@ wts_load(void)
 	    is_bulk ? "bulk,append" : NULL, &cursor));
 
 	/* Set up the key/value buffers. */
-	key_gen_setup(&keybuf);
-	val_gen_setup(NULL, &valbuf);
+	key_gen_setup(&key);
+	val_gen_setup(NULL, &value);
 
 	for (;;) {
 		if (++g.key_cnt > g.c_rows) {
@@ -73,13 +72,11 @@ wts_load(void)
 		}
 
 		/* Report on progress every 100 inserts. */
-		if (g.key_cnt % 100 == 0)
+		if (g.key_cnt % 1000 == 0)
 			track("bulk load", g.key_cnt, NULL);
 
-		key_gen(keybuf, &key.size, (uint64_t)g.key_cnt);
-		key.data = keybuf;
-		val_gen(NULL, valbuf, &value.size, (uint64_t)g.key_cnt);
-		value.data = valbuf;
+		key_gen(&key, g.key_cnt);
+		val_gen(NULL, &value, g.key_cnt);
 
 		switch (g.type) {
 		case FIX:
@@ -88,7 +85,7 @@ wts_load(void)
 			cursor->set_value(cursor, *(uint8_t *)value.data);
 			if (g.logging == LOG_OPS)
 				(void)g.wt_api->msg_printf(g.wt_api, session,
-				    "%-10s %" PRIu32 " {0x%02" PRIx8 "}",
+				    "%-10s %" PRIu64 " {0x%02" PRIx8 "}",
 				    "bulk V",
 				    g.key_cnt, ((uint8_t *)value.data)[0]);
 			break;
@@ -98,7 +95,7 @@ wts_load(void)
 			cursor->set_value(cursor, &value);
 			if (g.logging == LOG_OPS)
 				(void)g.wt_api->msg_printf(g.wt_api, session,
-				    "%-10s %" PRIu32 " {%.*s}", "bulk V",
+				    "%-10s %" PRIu64 " {%.*s}", "bulk V",
 				    g.key_cnt,
 				    (int)value.size, (char *)value.data);
 			break;
@@ -106,18 +103,40 @@ wts_load(void)
 			cursor->set_key(cursor, &key);
 			if (g.logging == LOG_OPS)
 				(void)g.wt_api->msg_printf(g.wt_api, session,
-				    "%-10s %" PRIu32 " {%.*s}", "bulk K",
+				    "%-10s %" PRIu64 " {%.*s}", "bulk K",
 				    g.key_cnt, (int)key.size, (char *)key.data);
 			cursor->set_value(cursor, &value);
 			if (g.logging == LOG_OPS)
 				(void)g.wt_api->msg_printf(g.wt_api, session,
-				    "%-10s %" PRIu32 " {%.*s}", "bulk V",
+				    "%-10s %" PRIu64 " {%.*s}", "bulk V",
 				    g.key_cnt,
 				    (int)value.size, (char *)value.data);
 			break;
 		}
 
-		testutil_check(cursor->insert(cursor));
+		/*
+		 * We don't want to size the cache to ensure the initial data
+		 * set can load in the in-memory case, guaranteeing the load
+		 * succeeds probably means future updates are also guaranteed
+		 * to succeed, which isn't what we want. If we run out of space
+		 * in the initial load, reset the row counter and continue.
+		 *
+		 * Decrease inserts, they can't be successful if we're at the
+		 * cache limit, and increase the delete percentage to get some
+		 * extra space once the run starts.
+		 */
+		if ((ret = cursor->insert(cursor)) != 0) {
+			if (ret != WT_CACHE_FULL)
+				testutil_die(ret, "cursor.insert");
+			g.rows = --g.key_cnt;
+			g.c_rows = (uint32_t)g.key_cnt;
+
+			if (g.c_insert_pct > 5)
+				g.c_insert_pct = 5;
+			if (g.c_delete_pct < 20)
+				g.c_delete_pct += 20;
+			break;
+		}
 
 #ifdef HAVE_BERKELEY_DB
 		if (SINGLETHREADED)
@@ -133,6 +152,6 @@ wts_load(void)
 
 	testutil_check(session->close(session, NULL));
 
-	free(keybuf);
-	free(valbuf);
+	free(key.mem);
+	free(value.mem);
 }

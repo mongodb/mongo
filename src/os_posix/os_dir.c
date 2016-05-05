@@ -15,30 +15,33 @@
  *	Get a list of files from a directory, POSIX version.
  */
 int
-__wt_posix_directory_list(WT_SESSION_IMPL *session, const char *dir,
-    const char *prefix, uint32_t flags, char ***dirlist, u_int *countp)
+__wt_posix_directory_list(WT_FILE_SYSTEM *file_system,
+    WT_SESSION *wt_session, const char *directory,
+    const char *prefix, char ***dirlistp, uint32_t *countp)
 {
 	struct dirent *dp;
 	DIR *dirp;
 	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 	size_t dirallocsz;
-	u_int count, dirsz;
-	bool match;
-	char **entries, *path;
+	uint32_t count;
+	char **entries;
 
-	*dirlist = NULL;
+	WT_UNUSED(file_system);
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	*dirlistp = NULL;
 	*countp = 0;
-
-	WT_RET(__wt_filename(session, dir, &path));
 
 	dirp = NULL;
 	dirallocsz = 0;
-	dirsz = 0;
 	entries = NULL;
 
-	WT_SYSCALL_RETRY(((dirp = opendir(path)) == NULL ? 1 : 0), ret);
+	WT_SYSCALL_RETRY(((dirp = opendir(directory)) == NULL ? 1 : 0), ret);
 	if (ret != 0)
-		WT_ERR_MSG(session, ret, "%s: directory-list: opendir", path);
+		WT_RET_MSG(session, ret,
+		    "%s: directory-list: opendir", directory);
 
 	for (count = 0; (dp = readdir(dirp)) != NULL;) {
 		/*
@@ -49,44 +52,50 @@ __wt_posix_directory_list(WT_SESSION_IMPL *session, const char *dir,
 			continue;
 
 		/* The list of files is optionally filtered by a prefix. */
-		match = false;
-		if (prefix != NULL &&
-		    ((LF_ISSET(WT_DIRLIST_INCLUDE) &&
-		    WT_PREFIX_MATCH(dp->d_name, prefix)) ||
-		    (LF_ISSET(WT_DIRLIST_EXCLUDE) &&
-		    !WT_PREFIX_MATCH(dp->d_name, prefix))))
-			match = true;
-		if (prefix == NULL || match) {
-			/*
-			 * We have a file name we want to return.
-			 */
-			count++;
-			if (count > dirsz) {
-				dirsz += WT_DIR_ENTRY;
-				WT_ERR(__wt_realloc_def(
-				    session, &dirallocsz, dirsz, &entries));
-			}
-			WT_ERR(__wt_strdup(
-			    session, dp->d_name, &entries[count-1]));
-		}
+		if (prefix != NULL && !WT_PREFIX_MATCH(dp->d_name, prefix))
+			continue;
+
+		WT_ERR(__wt_realloc_def(
+		    session, &dirallocsz, count + 1, &entries));
+		WT_ERR(__wt_strdup(session, dp->d_name, &entries[count]));
+		++count;
 	}
-	if (count > 0)
-		*dirlist = entries;
+
+	*dirlistp = entries;
 	*countp = count;
 
 err:	if (dirp != NULL)
 		(void)closedir(dirp);
-	__wt_free(session, path);
 
 	if (ret == 0)
 		return (0);
 
-	if (*dirlist != NULL) {
-		for (count = dirsz; count > 0; count--)
-			__wt_free(session, entries[count]);
-		__wt_free(session, entries);
-	}
+	WT_TRET(__wt_posix_directory_list_free(
+	    file_system, wt_session, entries, count));
+
 	WT_RET_MSG(session, ret,
 	    "%s: directory-list, prefix \"%s\"",
-	    dir, prefix == NULL ? "" : prefix);
+	    directory, prefix == NULL ? "" : prefix);
+}
+
+/*
+ * __wt_posix_directory_list_free --
+ *	Free memory returned by __wt_posix_directory_list.
+ */
+int
+__wt_posix_directory_list_free(WT_FILE_SYSTEM *file_system,
+    WT_SESSION *wt_session, char **dirlist, uint32_t count)
+{
+	WT_SESSION_IMPL *session;
+
+	WT_UNUSED(file_system);
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	if (dirlist != NULL) {
+		while (count > 0)
+			__wt_free(session, dirlist[--count]);
+		__wt_free(session, dirlist);
+	}
+	return (0);
 }

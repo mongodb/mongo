@@ -26,7 +26,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	WT_RET(__wt_evict_file_exclusive_on(session));
 
 	/* Make sure the oldest transaction ID is up-to-date. */
-	__wt_txn_update_oldest(session, true);
+	WT_RET(__wt_txn_update_oldest(session, true));
 
 	/* Walk the tree, discarding pages. */
 	next_ref = NULL;
@@ -86,6 +86,8 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 			    __wt_page_can_evict(session, ref, NULL));
 			__wt_ref_out(session, ref);
 			break;
+		case WT_SYNC_CHECKPOINT:
+		case WT_SYNC_WRITE_LEAVES:
 		WT_ILLEGAL_VALUE_ERR(session);
 		}
 	}

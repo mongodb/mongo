@@ -294,6 +294,10 @@ static CONFIG c[] = {
 	  "maximum time to run in minutes (default 20 minutes)",
 	  C_IGNORE, 0, UINT_MAX, UINT_MAX, &g.c_timer, NULL },
 
+	{ "transaction-frequency",
+	  "percent operations done inside an explicit transaction",
+	  0x0, 1, 100, 100, &g.c_txn_freq, NULL },
+
 	{ "value_max",
 	  "maximum size of values",
 	  0x0, 32, 4096, MEGABYTE(10), &g.c_value_max, NULL },

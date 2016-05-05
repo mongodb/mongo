@@ -103,7 +103,6 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 	bool hard_limit, have_primary, ovfl;
 
 	lsm_tree = clsm->lsm_tree;
-	ovfl = false;
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
 
 	if (clsm->nchunks == 0) {
@@ -210,7 +209,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm, bool reset, bool update)
 				goto open;
 
 			if (txn->isolation == WT_ISO_SNAPSHOT)
-				__wt_txn_cursor_op(session);
+				WT_RET(__wt_txn_cursor_op(session));
 
 			/*
 			 * Figure out how many updates are required for
@@ -1155,7 +1154,6 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 	closest = NULL;
 	clsm = (WT_CURSOR_LSM *)cursor;
 	exact = 0;
-	deleted = false;
 
 	CURSOR_API_CALL(cursor, session, search_near, NULL);
 	WT_CURSOR_NEEDKEY(cursor);

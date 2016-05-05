@@ -26,9 +26,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "wt_internal.h"			/* For __wt_XXX */
+#include "test_util.i"
 
-#include <assert.h>
+void (*custom_die)(void) = NULL;
 
 int
 main(void)
@@ -47,9 +47,10 @@ main(void)
 
 #if 1
 			p = buf;
-			assert(__wt_vpack_uint(&p, sizeof(buf), r) == 0);
+			testutil_check(__wt_vpack_uint(&p, sizeof(buf), r));
 			cp = buf;
-			assert(__wt_vunpack_uint(&cp, sizeof(buf), &r2) == 0);
+			testutil_check(
+			    __wt_vunpack_uint(&cp, sizeof(buf), &r2));
 #else
 			/*
 			 * Note: use memmove for comparison because GCC does

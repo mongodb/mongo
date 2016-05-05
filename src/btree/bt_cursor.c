@@ -164,12 +164,12 @@ __cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 		 * column-store pages don't have slots, but map one-to-one to
 		 * keys, check for retrieval past the end of the page.
 		 */
-		if (cbt->recno >= page->pg_fix_recno + page->pg_fix_entries)
+		if (cbt->recno >= cbt->ref->ref_recno + page->pg_fix_entries)
 			return (false);
 
 		/*
-		 * Updates aren't stored on the page, an update would have
-		 * appeared as an "insert" object; no further checks to do.
+		 * An update would have appeared as an "insert" object; no
+		 * further checks to do.
 		 */
 		break;
 	case BTREE_COL_VAR:
@@ -179,19 +179,18 @@ __cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 		WT_ASSERT(session, cbt->slot < page->pg_var_entries);
 
 		/*
-		 * Column-store updates aren't stored on the page, instead they
-		 * are stored as "insert" objects. If search returned an insert
-		 * object we can't return, the returned on-page object must be
-		 * checked for a match.
+		 * Column-store updates are stored as "insert" objects. If
+		 * search returned an insert object we can't return, the
+		 * returned on-page object must be checked for a match.
 		 */
 		if (cbt->ins != NULL && !F_ISSET(cbt, WT_CBT_VAR_ONPAGE_MATCH))
 			return (false);
 
 		/*
-		 * Updates aren't stored on the page, an update would have
-		 * appeared as an "insert" object; however, variable-length
-		 * column store deletes are written into the backing store,
-		 * check the cell for a record already deleted when read.
+		 * Although updates would have appeared as an "insert" objects,
+		 * variable-length column store deletes are written into the
+		 * backing store; check the cell for a record already deleted
+		 * when read.
 		 */
 		cip = &page->pg_var_d[cbt->slot];
 		if ((cell = WT_COL_PTR(page, cip)) == NULL ||
@@ -211,9 +210,11 @@ __cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 		if (cbt->ins != NULL)
 			return (false);
 
-		/* Updates are stored on the page, check for a delete. */
-		if (page->pg_row_upd != NULL && (upd = __wt_txn_read(
-		    session, page->pg_row_upd[cbt->slot])) != NULL) {
+		/* Check for an update. */
+		if (page->modify != NULL &&
+		    page->modify->mod_row_update != NULL &&
+		    (upd = __wt_txn_read(session,
+		    page->modify->mod_row_update[cbt->slot])) != NULL) {
 			if (WT_UPDATE_DELETED_ISSET(upd))
 				return (false);
 			if (updp != NULL)
@@ -325,7 +326,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	valid = false;
 	if (F_ISSET(cbt, WT_CBT_ACTIVE) &&
 	    cbt->ref->page->read_gen != WT_READGEN_OLDEST) {
-		__wt_txn_cursor_op(session);
+		WT_ERR(__wt_txn_cursor_op(session));
 
 		WT_ERR(btree->type == BTREE_ROW ?
 		    __cursor_row_search(session, cbt, cbt->ref, false) :
@@ -405,7 +406,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 	if (btree->type == BTREE_ROW &&
 	    F_ISSET(cbt, WT_CBT_ACTIVE) &&
 	    cbt->ref->page->read_gen != WT_READGEN_OLDEST) {
-		__wt_txn_cursor_op(session);
+		WT_ERR(__wt_txn_cursor_op(session));
 
 		WT_ERR(__cursor_row_search(session, cbt, cbt->ref, true));
 
@@ -596,9 +597,12 @@ __curfile_update_check(WT_CURSOR_BTREE *cbt)
 		return (0);
 	if (cbt->ins != NULL)
 		return (__wt_txn_update_check(session, cbt->ins->upd));
-	if (btree->type == BTREE_ROW && cbt->ref->page->pg_row_upd != NULL)
-		return (__wt_txn_update_check(
-		    session, cbt->ref->page->pg_row_upd[cbt->slot]));
+
+	if (btree->type == BTREE_ROW &&
+	    cbt->ref->page->modify != NULL &&
+	    cbt->ref->page->modify->mod_row_update != NULL)
+		return (__wt_txn_update_check(session,
+		    cbt->ref->page->modify->mod_row_update[cbt->slot]));
 	return (0);
 }
 

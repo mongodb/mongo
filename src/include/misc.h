@@ -96,8 +96,9 @@
  * the caller remember to put the & operator on the pointer.
  */
 #define	__wt_free(session, p) do {					\
-	if ((p) != NULL)						\
-		__wt_free_int(session, (void *)&(p));			\
+	void *__p = &(p);						\
+	if (*(void **)__p != NULL)					\
+		__wt_free_int(session, __p);				\
 } while (0)
 #ifdef HAVE_DIAGNOSTIC
 #define	__wt_overwrite_and_free(session, p) do {			\

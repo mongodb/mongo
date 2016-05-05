@@ -106,10 +106,12 @@ cursor_scope_ops(WT_CURSOR *cursor)
 			 * memory, but as it does not position the cursor, it
 			 * doesn't reference memory owned by the cursor, either.
 			 */
+			printf("ex_scope: "
+			    "expect two WiredTiger error messages:\n");
 			if ((ret = cursor->get_key(cursor, &key)) == 0 ||
 			    (ret = cursor->get_value(cursor, &value)) == 0) {
 				fprintf(stderr,
-				    "%s: error in s get_key/value: %s\n",
+				    "%s: error in get_key/value: %s\n",
 				     op->op, session->strerror(session, ret));
 				return (ret);
 			}
@@ -122,6 +124,8 @@ cursor_scope_ops(WT_CURSOR *cursor)
 			 * reference key memory owned by the cursor, but has no
 			 * value.
 			 */
+			printf("ex_scope: "
+			    "expect one WiredTiger error message:\n");
 			if ((ret = cursor->get_key(cursor, &key)) != 0 ||
 			    (ret = cursor->get_value(cursor, &value)) == 0) {
 				fprintf(stderr,

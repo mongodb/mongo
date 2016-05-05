@@ -126,10 +126,10 @@ static WT_EVENT_HANDLER event_handler = {
  *	Open a connection to a WiredTiger database.
  */
 void
-wts_open(const char *home, int set_api, WT_CONNECTION **connp)
+wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
 {
 	WT_CONNECTION *conn;
-	int ret;
+	WT_DECL_RET;
 	char *config, *end, *p, helium_config[1024];
 
 	*connp = NULL;
@@ -138,10 +138,11 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	end = config + sizeof(g.wiredtiger_open_config);
 
 	p += snprintf(p, REMAIN(p, end),
-	    "create,checkpoint_sync=false,cache_size=%" PRIu32 "MB",
-	    g.c_cache);
-
-	p += snprintf(p, REMAIN(p, end), ",error_prefix=\"%s\"", g.progname);
+	    "create=true,"
+	    "cache_size=%" PRIu32 "MB,"
+	    "checkpoint_sync=false,"
+	    "error_prefix=\"%s\"",
+	    g.c_cache, g.progname);
 
 	/* In-memory configuration. */
 	if (g.c_in_memory != 0)
@@ -273,8 +274,13 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 void
 wts_reopen(void)
 {
+	WT_CONNECTION *conn;
+
 	testutil_checkfmt(wiredtiger_open(g.home, &event_handler,
-	    g.wiredtiger_open_config, &g.wts_conn), "%s", g.home);
+	    g.wiredtiger_open_config, &conn), "%s", g.home);
+
+	g.wt_api = conn->get_extension_api(conn);
+	g.wts_conn = conn;
 }
 
 /*
@@ -282,7 +288,7 @@ wts_reopen(void)
  *	Create the underlying store.
  */
 void
-wts_create(void)
+wts_init(void)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
@@ -497,8 +503,8 @@ void
 wts_verify(const char *tag)
 {
 	WT_CONNECTION *conn;
+	WT_DECL_RET;
 	WT_SESSION *session;
-	int ret;
 
 	if (g.c_verify == 0)
 		return;
@@ -531,12 +537,12 @@ wts_stats(void)
 {
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
+	WT_DECL_RET;
 	WT_SESSION *session;
 	FILE *fp;
 	char *stat_name;
 	const char *pval, *desc;
 	uint64_t v;
-	int ret;
 
 	/* Ignore statistics if they're not configured. */
 	if (g.c_statistics == 0)

@@ -15,4 +15,4 @@ TESTS = $(noinst_PROGRAMS)
 LOG_COMPILER = $(TEST_WRAPPER)
 
 clean-local:
-	rm -rf WT_TEST* *.core __*
+	rm -rf WT_TEST.* *.core

@@ -326,7 +326,7 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
 	__wt_page_evict_soon(page);
 
 	/* Bump the oldest ID, we're about to do some visibility checks. */
-	__wt_txn_update_oldest(session, false);
+	WT_RET(__wt_txn_update_oldest(session, false));
 
 	/* If eviction cannot succeed, don't try. */
 	return (__wt_page_can_evict(session, ref, NULL));
@@ -377,9 +377,7 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref)
 	if (addr == NULL) {
 		WT_ASSERT(session, previous_state == WT_REF_DELETED);
 
-		WT_ERR(__wt_btree_new_leaf_page(session,
-		    btree->type == BTREE_ROW ? WT_RECNO_OOB : ref->key.recno,
-		    &page));
+		WT_ERR(__wt_btree_new_leaf_page(session, &page));
 		ref->page = page;
 		goto done;
 	}
@@ -463,6 +461,8 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 
 	btree = S2BT(session);
 
+	WT_STAT_FAST_CONN_INCR(session, cache_pages_requested);
+	WT_STAT_FAST_DATA_INCR(session, cache_pages_requested);
 	for (evict_soon = stalled = false,
 	    force_attempts = 0, sleep_cnt = wait_cnt = 0;;) {
 		switch (ref->state) {

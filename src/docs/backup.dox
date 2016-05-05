@@ -42,6 +42,12 @@ Copying the database files for a backup does not require any special
 alignment or block size (specifically, Linux or Windows filesystems that
 do not support read/write isolation can be safely read for backups).
 
+The database file may grow in size during the copy, and the file copy
+should not consider that an error. Blocks appended to the file after the
+copy starts can be safely ignored, that is, it is correct for the copy
+to determine an initial size of the file and then copy that many bytes,
+ignoring any bytes appended after the backup cursor was opened.
+
 The cursor must not be closed until all of the files have been copied,
 however, there is no requirement the files be copied in any order or in
 any relationship to the WT_CURSOR::next calls, only that all files have
@@ -98,29 +104,35 @@ and removing log files from the original database home:
 
 1. Perform a full backup of the database (as described above).
 
-2. Perform a full database checkpoint.
+2. Open a cursor on the \c "backup:" data source, configured with the
+   \c "target=(\"log:\\")" target specified, which begins the process
+   of an incremental backup.
 
-3. Open a cursor on the \c "backup:" data source, with the
-   \c "target=(\"log:\\")" target specified, which begins the
-   process of an incremental backup.
-
-4. Copy each log file returned by the WT_CURSOR::next method to the backup
+3. Copy each log file returned by the WT_CURSOR::next method to the backup
    directory.  It is not an error to copy a log file which has been copied
    before, but care should be taken to ensure each log file is completely copied
-   as the most recent log file may change in size while being copied.
+   as the most recent log file may grow in size while being copied.
 
-5. If all log files have been successfully copied, archive the log
+4. If all log files have been successfully copied, archive the log
    files by calling the WT_SESSION::truncate method with the URI
-   <code>log:</code> and specifying the backup cursor as the
-   start cursor to that method.
+   <code>log:</code> and specifying the backup cursor as the start
+   cursor to that method. (Note there is no requirement backups be
+   coordinated with database checkpoints, however, an incremental backup
+   will repeatedly copy the same files, and will not make additional log
+   files available for archival, unless there was a checkpoint after the
+   previous incremental backup.)
 
-6. Close the backup cursor.
+5. Close the backup cursor.
 
-Steps 2-6 can be repeated any number of times before step 1 is
-repeated.  These steps can be repeated as long as the backup database
-directory has not been opened, recovery run and become live.  Once
-the database becomes live, you must repeat all steps 1-6 to another,
-different backup database directory.
+Steps 2-5 can be repeated any number of times before step 1 is repeated.
+Full and incremental backups may be repeated as long as the backup
+database directory has not been opened and recovery run.  Once recovery
+has run in a backup directory, you can no longer back up to that
+database directory.
+
+An example of opening the backup data source for an incremental backup:
+
+@snippet ex_all.c incremental backup
 
 @section backup_o_direct Backup and O_DIRECT
 

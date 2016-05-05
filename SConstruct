@@ -214,6 +214,7 @@ if (VERSION_MAJOR == None or
 wiredtiger_includes = """
         #include <sys/types.h>
         #include <stdarg.h>
+        #include <stdbool.h>
         #include <stdint.h>
         #include <stdio.h>
     """
@@ -345,12 +346,12 @@ examples = [
     "ex_all",
     "ex_async",
     "ex_call_center",
-    "ex_config",
     "ex_config_parse",
     "ex_cursor",
     "ex_data_source",
     "ex_encrypt",
     "ex_extending",
+    "ex_file_system",
     "ex_hello",
     "ex_log",
     "ex_pack",
@@ -468,7 +469,7 @@ Default(t)
 
 #Build the Examples
 for ex in examples:
-    if(ex in ['ex_all', 'ex_async', 'ex_thread', 'ex_encrypt']):
+    if(ex in ['ex_all', 'ex_async', 'ex_encrypt', 'ex_file_system' , 'ex_thread']):
         exp = env.Program(ex, "examples/c/" + ex + ".c", LIBS=[wtlib, shim] + wtlibs)
         Default(exp)
         env.Alias("check", env.SmokeTest(exp))
