@@ -34,6 +34,7 @@
 
 #include <memory.h>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -106,7 +107,9 @@ public:
         return _oplogReadTill;
     }
 
-    static WiredTigerRecoveryUnit* get(OperationContext* txn);
+    static WiredTigerRecoveryUnit* get(OperationContext* txn) {
+        return checked_cast<WiredTigerRecoveryUnit*>(txn->recoveryUnit());
+    }
 
     static void appendGlobalStats(BSONObjBuilder& b);
 
