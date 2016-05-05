@@ -76,9 +76,13 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver',
-        '$BUILD_DIR/mongo/db/serveronly',
         'shard_interface'
     ],
+    LIBDEPS_TAGS=[
+        # Depends on DBDirectClient
+        'incomplete',
+    ],
+
 )
 
 env.CppUnitTest(

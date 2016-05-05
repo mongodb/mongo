@@ -56,7 +56,7 @@ class DBClientBase;
  */
 class ConnectionString {
 public:
-    enum ConnectionType { INVALID, MASTER, SET, CUSTOM };
+    enum ConnectionType { INVALID, MASTER, SET, CUSTOM, LOCAL };
 
     ConnectionString() = default;
 
@@ -64,6 +64,11 @@ public:
      * Constructs a connection string representing a replica set.
      */
     static ConnectionString forReplicaSet(StringData setName, std::vector<HostAndPort> servers);
+
+    /**
+     * Constructs a local connection string.
+     */
+    static ConnectionString forLocal();
 
     /**
      * Creates a MASTER connection string with the specified server.
@@ -154,6 +159,11 @@ private:
      * Creates a SET connection string with the specified set name and servers.
      */
     ConnectionString(StringData setName, std::vector<HostAndPort> servers);
+
+    /**
+     * Creates a connection string with the specified type. Used for creating LOCAL strings.
+     */
+    explicit ConnectionString(ConnectionType connType);
 
 
     void _fillServers(std::string s);

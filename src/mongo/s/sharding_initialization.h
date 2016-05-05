@@ -29,22 +29,23 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 
 namespace mongo {
 
 class ConnectionString;
 class OperationContext;
+class ShardFactory;
 class Status;
 
 /**
  * Takes in the connection string for reaching the config servers and initializes the global
  * CatalogManager, ShardingRegistry, and grid objects.
  */
-Status initializeGlobalShardingStateForMongos(const ConnectionString& configCS,
-                                              uint64_t maxChunkSizeBytes);
-
-Status initializeGlobalShardingStateForMongod(const ConnectionString& configCS);
-
+Status initializeGlobalShardingState(const ConnectionString& configCS,
+                                     uint64_t maxChunkSizeBytes,
+                                     std::unique_ptr<ShardFactory> shardFactory,
+                                     bool isMongos);
 /**
  * Tries to contact the config server and reload the shard registry until it succeeds or
  * is interrupted.

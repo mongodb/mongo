@@ -210,7 +210,7 @@ env.Library(
         '$BUILD_DIR/mongo/client/connection_string',
         '$BUILD_DIR/mongo/rpc/metadata',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
-        '$BUILD_DIR/mongo/db/service_context', 
+        '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/stats/timer_stats',
     ]
 )
@@ -264,6 +264,7 @@ env.Library(
         "d_state.cpp",
     ],
     LIBDEPS=[
+        "coreshard",
         "$BUILD_DIR/mongo/db/commands/core",
         "$BUILD_DIR/mongo/db/concurrency/lock_manager",
         "$BUILD_DIR/mongo/db/query/query",
@@ -271,7 +272,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/s/metadata",
         "$BUILD_DIR/mongo/db/s/sharding",
         "$BUILD_DIR/mongo/executor/network_interface_factory",
-        "coreshard",
+        "$BUILD_DIR/mongo/s/client/shard_local",
     ],
     LIBDEPS_TAGS=[
         # Depends on symbols from files in serverOnlyFiles

@@ -26,6 +26,9 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/client/shard_factory.h"
@@ -33,38 +36,27 @@
 #include "mongo/base/status_with.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/s/client/shard_remote.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
-ShardFactory::ShardFactory(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory)
-    : _targeterFactory(std::move(targeterFactory)){};
+ShardFactory::ShardFactory(BuildersMap&& builders,
+                           std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory)
+    : _builders(builders), _targeterFactory(std::move(targeterFactory)) {}
 
 std::unique_ptr<Shard> ShardFactory::createUniqueShard(const ShardId& shardId,
-                                                       const ConnectionString& connStr,
-                                                       bool isLocal) {
-    if (isLocal) {
-        // TODO: Replace with the following line once ShardLocal is implemented.
-        // return stdx::make_unique<ShardLocal>(shardId);
-        MONGO_UNREACHABLE;
-    } else {
-        return stdx::make_unique<ShardRemote>(shardId, connStr, _targeterFactory->create(connStr));
-    }
+                                                       const ConnectionString& connStr) {
+    auto builderIt = _builders.find(connStr.type());
+    invariant(builderIt != _builders.end());
+    return builderIt->second(shardId, connStr);
 }
 
 std::shared_ptr<Shard> ShardFactory::createShard(const ShardId& shardId,
-                                                 const ConnectionString& connStr,
-                                                 bool isLocal) {
-    if (isLocal) {
-        // TODO: Replace with the following line once ShardLocal is implemented.
-        // return stdx::make_shared<ShardLocal>(shardId);
-        MONGO_UNREACHABLE;
-    } else {
-        return std::make_shared<ShardRemote>(shardId, connStr, _targeterFactory->create(connStr));
-    }
+                                                 const ConnectionString& connStr) {
+    auto builderIt = _builders.find(connStr.type());
+    invariant(builderIt != _builders.end());
+    return std::shared_ptr<Shard>(builderIt->second(shardId, connStr));
 }
-
 }  // namespace mongo

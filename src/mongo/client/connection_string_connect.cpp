@@ -88,8 +88,9 @@ DBClientBase* ConnectionString::connect(std::string& errmsg, double socketTimeou
             return replacementConn;
         }
 
+        case LOCAL:
         case INVALID:
-            uasserted(13421, "trying to connect to invalid ConnectionString");
+            MONGO_UNREACHABLE;
     }
 
     MONGO_UNREACHABLE;

@@ -132,8 +132,11 @@ std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(std::unique_ptr<NetworkIn
     return executorPool;
 }
 
+}  // namespace
+
 Status initializeGlobalShardingState(const ConnectionString& configCS,
                                      uint64_t maxChunkSizeBytes,
+                                     std::unique_ptr<ShardFactory> shardFactory,
                                      bool isMongos) {
     if (configCS.type() == ConnectionString::INVALID) {
         return {ErrorCodes::BadValue, "Unrecognized connection string."};
@@ -154,8 +157,6 @@ Status initializeGlobalShardingState(const ConnectionString& configCS,
     auto executorPool = makeTaskExecutorPool(std::move(network), isMongos);
     executorPool->startup();
 
-    auto shardFactory(
-        stdx::make_unique<ShardFactory>(stdx::make_unique<RemoteCommandTargeterFactoryImpl>()));
     auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS));
 
     auto catalogManager = makeCatalogManager(getGlobalServiceContext(),
@@ -178,18 +179,6 @@ Status initializeGlobalShardingState(const ConnectionString& configCS,
     }
 
     return Status::OK();
-}
-
-}  // namespace
-
-Status initializeGlobalShardingStateForMongos(const ConnectionString& configCS,
-                                              uint64_t maxChunkSizeBytes) {
-    return initializeGlobalShardingState(configCS, maxChunkSizeBytes, true);
-}
-
-Status initializeGlobalShardingStateForMongod(const ConnectionString& configCS) {
-    return initializeGlobalShardingState(
-        configCS, ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes, false);
 }
 
 Status reloadShardRegistryUntilSuccess(OperationContext* txn) {

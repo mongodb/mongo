@@ -35,6 +35,8 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/client/remote_command_targeter_factory_impl.h"
+#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
@@ -50,8 +52,12 @@
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/client/shard_factory.h"
+#include "mongo/s/client/shard_remote.h"
+#include "mongo/s/client/shard_local.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_initialization.h"
@@ -143,7 +149,44 @@ ShardingState::ShardingState()
     : _initializationState(static_cast<uint32_t>(InitializationState::kNew)),
       _initializationStatus(Status(ErrorCodes::InternalError, "Uninitialized value")),
       _configServerTickets(kMaxConfigServerRefreshThreads),
-      _globalInit(initializeGlobalShardingStateForMongod) {}
+      _globalInit() {
+    _globalInit = [](const ConnectionString& configCS) {
+
+        auto targeterFactory = stdx::make_unique<RemoteCommandTargeterFactoryImpl>();
+        auto targeterFactoryPtr = targeterFactory.get();
+
+        ShardFactory::BuilderCallable setBuilder =
+            [targeterFactoryPtr](const ShardId& shardId, const ConnectionString& connStr) {
+                return stdx::make_unique<ShardRemote>(
+                    shardId, connStr, targeterFactoryPtr->create(connStr));
+            };
+
+        ShardFactory::BuilderCallable masterBuilder =
+            [targeterFactoryPtr](const ShardId& shardId, const ConnectionString& connStr) {
+                return stdx::make_unique<ShardRemote>(
+                    shardId, connStr, targeterFactoryPtr->create(connStr));
+            };
+
+        ShardFactory::BuilderCallable localBuilder =
+            [](const ShardId& shardId, const ConnectionString& connStr) {
+                return stdx::make_unique<ShardLocal>(shardId);
+            };
+
+        ShardFactory::BuildersMap buildersMap{
+            {ConnectionString::SET, std::move(setBuilder)},
+            {ConnectionString::MASTER, std::move(masterBuilder)},
+            {ConnectionString::LOCAL, std::move(localBuilder)},
+        };
+
+        auto shardFactory =
+            stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
+
+        return initializeGlobalShardingState(configCS,
+                                             ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
+                                             std::move(shardFactory),
+                                             false);
+    };
+}
 
 ShardingState::~ShardingState() = default;
 

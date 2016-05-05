@@ -153,20 +153,13 @@ bool setShardVersion(OperationContext* txn,
  */
 DBClientBase* getVersionable(DBClientBase* conn) {
     switch (conn->type()) {
+        case ConnectionString::LOCAL:
         case ConnectionString::INVALID:
-            massert(15904,
-                    str::stream() << "cannot set version on invalid connection "
-                                  << conn->toString(),
-                    false);
-            return nullptr;
+        case ConnectionString::CUSTOM:
+            MONGO_UNREACHABLE;
+
         case ConnectionString::MASTER:
             return conn;
-        case ConnectionString::CUSTOM:
-            massert(16334,
-                    str::stream() << "cannot set version or shard on custom connection "
-                                  << conn->toString(),
-                    false);
-            return nullptr;
         case ConnectionString::SET:
             DBClientReplicaSet* set = (DBClientReplicaSet*)conn;
             return &(set->masterConn());

@@ -52,6 +52,7 @@
 #include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/client/shard_remote.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/write_ops/batched_update_request.h"
@@ -131,8 +132,30 @@ private:
         executorPool->startup();
 
         ConnectionString configCS(HostAndPort("dummy:1234"));
-        auto shardFactory(
-            stdx::make_unique<ShardFactory>(stdx::make_unique<RemoteCommandTargeterFactoryMock>()));
+
+        auto targeterFactory = stdx::make_unique<RemoteCommandTargeterFactoryMock>();
+        auto targeterFactoryPtr = targeterFactory.get();
+
+        ShardFactory::BuilderCallable setBuilder =
+            [targeterFactoryPtr](const ShardId& shardId, const ConnectionString& connStr) {
+                return stdx::make_unique<ShardRemote>(
+                    shardId, connStr, targeterFactoryPtr->create(connStr));
+            };
+
+        ShardFactory::BuilderCallable masterBuilder =
+            [targeterFactoryPtr](const ShardId& shardId, const ConnectionString& connStr) {
+                return stdx::make_unique<ShardRemote>(
+                    shardId, connStr, targeterFactoryPtr->create(connStr));
+            };
+
+        ShardFactory::BuildersMap buildersMap{
+            {ConnectionString::SET, std::move(setBuilder)},
+            {ConnectionString::MASTER, std::move(masterBuilder)},
+        };
+
+        auto shardFactory =
+            stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
+
         auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS));
 
         _distLockCatalog = stdx::make_unique<DistLockCatalogImpl>(shardRegistry.get());

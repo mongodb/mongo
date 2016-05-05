@@ -30,42 +30,53 @@
 
 #include <memory>
 #include <string>
+#include <map>
+#include <functional>
 
 #include "mongo/base/disallow_copying.h"
+
+#include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_factory.h"
+#include "mongo/s/client/shard.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
-class ConnectionString;
-class Shard;
-
 /**
- * A factory for creating ShardRemote or ShardLocal instances.
+ * An object factory for creating Shard instances via calling registered builders.
  */
 class ShardFactory {
     MONGO_DISALLOW_COPYING(ShardFactory);
 
 public:
-    ShardFactory(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory);
+    using BuilderCallable =
+        stdx::function<std::unique_ptr<Shard>(const ShardId&, const ConnectionString&)>;
+    using BuildersMap = std::map<ConnectionString::ConnectionType, BuilderCallable>;
+
+    ShardFactory(BuildersMap&&, std::unique_ptr<RemoteCommandTargeterFactory>);
     ~ShardFactory() = default;
 
     /**
      * Deprecated. Creates a unique_ptr with a new instance of a Shard with the provided shardId
      * and connection string. This method is currently only used for addShard.
      */
-    std::unique_ptr<Shard> createUniqueShard(const std::string& shardId,
-                                             const ConnectionString& connStr,
-                                             bool isLocal);
+    std::unique_ptr<Shard> createUniqueShard(const ShardId& shardId,
+                                             const ConnectionString& connStr);
 
     /**
      * Creates a shared_ptr with a new instance of a Shard with the provided shardId
      * and connection string.
      */
-    std::shared_ptr<Shard> createShard(const std::string& shardId,
-                                       const ConnectionString& connStr,
-                                       bool isLocal);
+    std::shared_ptr<Shard> createShard(const ShardId& shardId, const ConnectionString& connStr);
 
 private:
+    // Map from ConnectionType to a function that can be used to build a Shard object for that
+    // ConnectionType. This map must be set up at the initialization of the ShardFactory instance.
+    BuildersMap _builders;
+
+    // Even though ShardFactory doesn't use _targeterFactory directly, the functions contained in
+    // _builders may, so ShardFactory must own _targeterFactory so that their lifetimes are tied
+    // together
     std::unique_ptr<RemoteCommandTargeterFactory> _targeterFactory;
 };
 

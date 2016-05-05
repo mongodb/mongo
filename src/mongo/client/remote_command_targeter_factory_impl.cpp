@@ -53,11 +53,11 @@ std::unique_ptr<RemoteCommandTargeter> RemoteCommandTargeterFactoryImpl::create(
         case ConnectionString::SET:
             return stdx::make_unique<RemoteCommandTargeterRS>(connStr.getSetName(),
                                                               connStr.getServers());
+        // These connections should never be seen
         case ConnectionString::INVALID:
-            // These connections should never be seen
-            break;
+        case ConnectionString::LOCAL:
+            MONGO_UNREACHABLE;
     }
-
     MONGO_UNREACHABLE;
 }
 

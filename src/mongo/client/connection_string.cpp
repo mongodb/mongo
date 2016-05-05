@@ -70,9 +70,17 @@ ConnectionString::ConnectionString(const std::string& s, ConnectionType connType
     _finishInit();
 }
 
+ConnectionString::ConnectionString(ConnectionType connType) : _type(connType), _string("<local>") {
+    invariant(_type == LOCAL);
+}
+
 ConnectionString ConnectionString::forReplicaSet(StringData setName,
                                                  std::vector<HostAndPort> servers) {
     return ConnectionString(setName, std::move(servers));
+}
+
+ConnectionString ConnectionString::forLocal() {
+    return ConnectionString(LOCAL);
 }
 
 // TODO: rewrite parsing  make it more reliable
@@ -161,6 +169,8 @@ bool ConnectionString::sameLogicalEndpoint(const ConnectionString& other) const 
             return _setName == other._setName;
         case CUSTOM:
             return _string == other._string;
+        case LOCAL:
+            return true;
     }
 
     MONGO_UNREACHABLE;
@@ -207,6 +217,8 @@ std::string ConnectionString::typeToString(ConnectionType type) {
             return "set";
         case CUSTOM:
             return "custom";
+        case LOCAL:
+            return "local";
     }
 
     MONGO_UNREACHABLE;

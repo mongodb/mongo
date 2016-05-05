@@ -42,6 +42,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
+#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/service_context_noop.h"
@@ -54,6 +55,7 @@
 #include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/client/shard_remote.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/stdx/condition_variable.h"
@@ -134,10 +136,32 @@ protected:
         getGlobalServiceContext()->setTickSource(makeTickSource());
 
         // Set up grid just so that the config shard is accessible via the ShardRegistry.
-        auto targeterFactory = stdx::make_unique<RemoteCommandTargeterFactoryMock>();
-        auto shardFactory = stdx::make_unique<ShardFactory>(std::move(targeterFactory));
         ConnectionString configCS = ConnectionString::forReplicaSet(
             "configReplSet", std::vector<HostAndPort>{HostAndPort{"config"}});
+
+        auto targeterFactory = stdx::make_unique<RemoteCommandTargeterFactoryMock>();
+        auto targeterFactoryPtr = targeterFactory.get();
+
+        ShardFactory::BuilderCallable setBuilder =
+            [targeterFactoryPtr](const ShardId& shardId, const ConnectionString& connStr) {
+                return stdx::make_unique<ShardRemote>(
+                    shardId, connStr, targeterFactoryPtr->create(connStr));
+            };
+
+        ShardFactory::BuilderCallable masterBuilder =
+            [targeterFactoryPtr](const ShardId& shardId, const ConnectionString& connStr) {
+                return stdx::make_unique<ShardRemote>(
+                    shardId, connStr, targeterFactoryPtr->create(connStr));
+            };
+
+        ShardFactory::BuildersMap buildersMap{
+            {ConnectionString::SET, std::move(setBuilder)},
+            {ConnectionString::MASTER, std::move(masterBuilder)},
+        };
+
+        auto shardFactory =
+            stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
+
         auto shardRegistry = stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS);
         grid.init(nullptr,
                   nullptr,

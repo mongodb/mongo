@@ -39,6 +39,7 @@
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
+#include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/config.h"
 #include "mongo/db/audit.h"
@@ -67,6 +68,8 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard_connection.h"
+#include "mongo/s/client/shard_remote.h"
+#include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/sharding_connection_hook_for_mongos.h"
 #include "mongo/s/cluster_write.h"
@@ -272,8 +275,34 @@ static void reloadSettings(OperationContext* txn) {
 }
 
 static Status initializeSharding(OperationContext* txn) {
-    Status status = initializeGlobalShardingStateForMongos(mongosGlobalParams.configdbs,
-                                                           mongosGlobalParams.maxChunkSizeBytes);
+    auto targeterFactory = stdx::make_unique<RemoteCommandTargeterFactoryImpl>();
+    auto targeterFactoryPtr = targeterFactory.get();
+
+    ShardFactory::BuilderCallable setBuilder =
+        [targeterFactoryPtr](const ShardId& shardId, const ConnectionString& connStr) {
+            return stdx::make_unique<ShardRemote>(
+                shardId, connStr, targeterFactoryPtr->create(connStr));
+        };
+
+    ShardFactory::BuilderCallable masterBuilder =
+        [targeterFactoryPtr](const ShardId& shardId, const ConnectionString& connStr) {
+            return stdx::make_unique<ShardRemote>(
+                shardId, connStr, targeterFactoryPtr->create(connStr));
+        };
+
+    ShardFactory::BuildersMap buildersMap{
+        {ConnectionString::SET, std::move(setBuilder)},
+        {ConnectionString::MASTER, std::move(masterBuilder)},
+    };
+
+    auto shardFactory =
+        stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
+
+    Status status = initializeGlobalShardingState(mongosGlobalParams.configdbs,
+                                                  mongosGlobalParams.maxChunkSizeBytes,
+                                                  std::move(shardFactory),
+                                                  true);
+
     if (!status.isOK()) {
         return status;
     }

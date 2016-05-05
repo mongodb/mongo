@@ -209,7 +209,7 @@ shared_ptr<Shard> ShardRegistry::getConfigShard() {
 }
 
 unique_ptr<Shard> ShardRegistry::createConnection(const ConnectionString& connStr) const {
-    return _shardFactory->createUniqueShard("<unnamed>", connStr, false);
+    return _shardFactory->createUniqueShard("<unnamed>", connStr);
 }
 
 shared_ptr<Shard> ShardRegistry::lookupRSName(const string& name) const {
@@ -326,7 +326,7 @@ void ShardRegistry::_addShard_inlock(const ShardId& shardId, const ConnectionStr
 
     // TODO: the third argument should pass the bool that will instruct factory to create either
     // local or remote shard.
-    auto shard = _shardFactory->createShard(shardId, connString, false);
+    auto shard = _shardFactory->createShard(shardId, connString);
 
     _lookup[shard->getId()] = shard;
 
