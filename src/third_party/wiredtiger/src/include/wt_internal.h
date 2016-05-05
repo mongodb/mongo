@@ -169,6 +169,8 @@ struct __wt_dsrc_stats;
     typedef struct __wt_dsrc_stats WT_DSRC_STATS;
 struct __wt_evict_entry;
     typedef struct __wt_evict_entry WT_EVICT_ENTRY;
+struct __wt_evict_queue;
+    typedef struct __wt_evict_queue WT_EVICT_QUEUE;
 struct __wt_evict_worker;
     typedef struct __wt_evict_worker WT_EVICT_WORKER;
 struct __wt_ext;
@@ -179,6 +181,14 @@ struct __wt_fair_lock;
     typedef struct __wt_fair_lock WT_FAIR_LOCK;
 struct __wt_fh;
     typedef struct __wt_fh WT_FH;
+struct __wt_file_handle_inmem;
+    typedef struct __wt_file_handle_inmem WT_FILE_HANDLE_INMEM;
+struct __wt_file_handle_posix;
+    typedef struct __wt_file_handle_posix WT_FILE_HANDLE_POSIX;
+struct __wt_file_handle_win;
+    typedef struct __wt_file_handle_win WT_FILE_HANDLE_WIN;
+struct __wt_fstream;
+    typedef struct __wt_fstream WT_FSTREAM;
 struct __wt_hazard;
     typedef struct __wt_hazard WT_HAZARD;
 struct __wt_ikey;
@@ -351,21 +361,23 @@ union __wt_rand_state;
 
 #include "intpack.i"			/* required by cell.i, packing.i */
 
-#include "buf.i"
+#include "buf.i"                        /* required by cell.i */
 #include "cache.i"			/* required by txn.i */
 #include "cell.i"			/* required by btree.i */
-#include "log.i"
-#include "misc.i"
 #include "mutex.i"			/* required by btree.i */
-#include "packing.i"
 #include "txn.i"			/* required by btree.i */
 
+#include "bitstring.i"
 #include "btree.i"			/* required by cursor.i */
 #include "btree_cmp.i"
-#include "cursor.i"
-
-#include "bitstring.i"
 #include "column.i"
+#include "cursor.i"
+#include "log.i"
+#include "misc.i"
+#include "os_fhandle.i"
+#include "os_fs.i"
+#include "os_fstream.i"
+#include "packing.i"
 #include "serial.i"
 
 #if defined(__cplusplus)

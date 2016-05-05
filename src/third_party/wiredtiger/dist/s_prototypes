@@ -55,7 +55,7 @@ l=`echo ../src\/os*/*.c`
 
 for i in $l; do
 	proto $i
-done | tee xxx | env LC_ALL=C sort -u
+done | env LC_ALL=C sort -u
 ) > $t
 
 f=../src/include/extern.h

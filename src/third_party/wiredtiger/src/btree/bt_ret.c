@@ -46,7 +46,7 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 		}
 
 		/* Take the value from the original page. */
-		v = __bit_getv_recno(page, cbt->iface.recno, btree->bitcnt);
+		v = __bit_getv_recno(cbt->ref, cursor->recno, btree->bitcnt);
 		return (__wt_buf_set(session, &cursor->value, &v, 1));
 	case WT_PAGE_COL_VAR:
 		/*

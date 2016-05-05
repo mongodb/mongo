@@ -58,7 +58,6 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	created = updating = false;
 	pool_name = NULL;
 	cp = NULL;
-	size = 0;
 
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
 		updating = true;

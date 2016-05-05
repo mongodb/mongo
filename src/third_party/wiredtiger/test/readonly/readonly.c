@@ -26,19 +26,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sys/wait.h>
-#include <errno.h>
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#ifndef _WIN32
-#include <unistd.h>
-#endif
-
-#include <wiredtiger.h>
-
 #include "test_util.i"
+
+#include <sys/wait.h>
 
 #define	HOME_SIZE	512
 static char home[HOME_SIZE];		/* Program working dir lock file */

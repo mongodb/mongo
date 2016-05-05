@@ -26,14 +26,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <errno.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#ifndef _WIN32
-#include <unistd.h>
-#endif
-
 #include "test_util.i"
 
 static char home[512];				/* Program working dir */
@@ -205,8 +197,7 @@ main(int argc, char *argv[])
 
 	/* Allocate a buffer to use. */
 	len = small ? ((size_t)SMALL_MAX) : ((size_t)4 * GIGABYTE);
-	if ((big = malloc(len)) == NULL)
-		testutil_die(errno, "");
+	big = dmalloc(len);
 	memset(big, 'a', len);
 
 	/* Make sure the configurations all work. */

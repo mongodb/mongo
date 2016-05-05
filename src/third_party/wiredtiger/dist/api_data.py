@@ -722,8 +722,8 @@ wiredtiger_open = wiredtiger_open_common + [
         \c create option''',
         type='boolean'),
     Config('in_memory', 'false', r'''
-        keep data in-memory only, minimize disk I/O''',
-        type='boolean', undoc=True),
+        keep data in-memory only. See @ref in_memory for more information''',
+        type='boolean'),
     Config('use_environment', 'true', r'''
         use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME environment
         variables if the process is not running with special privileges.
@@ -818,6 +818,13 @@ methods = {
     Config('bloom_hash_count', '8', r'''
         the number of hash values per item for the bloom filter''',
         min='2', max='100'),
+    Config('operation', '"and"', r'''
+        the operation applied between this and other joined cursors.
+        When "operation=and" is specified, all the conditions implied by
+        joins must be satisfied for an entry to be returned by the join cursor;
+        when "operation=or" is specified, only one must be satisfied.
+        All cursors joined to a join cursor must have matching operations''',
+        choices=['and', 'or']),
     Config('strategy', '', r'''
         when set to bloom, a bloom filter is created and populated for
         this index. This has an up front cost but may reduce the number
@@ -1073,11 +1080,17 @@ methods = {
         type='boolean'),
 ]),
 'WT_CONNECTION.reconfigure' : Method(connection_runtime_config),
+'WT_CONNECTION.set_file_system' : Method([]),
 
 'WT_CONNECTION.load_extension' : Method([
     Config('config', '', r'''
         configuration string passed to the entry point of the
         extension as its WT_CONFIG_ARG argument'''),
+    Config('early_load', 'false', r'''
+        whether this extension should be loaded at the beginning of
+        ::wiredtiger_open. Only applicable to extensions loaded via the
+        wiredtiger_open configurations string''',
+        type='boolean'),
     Config('entry', 'wiredtiger_extension_init', r'''
         the entry point of the extension, called to initialize the
         extension when it is loaded.  The signature of the function

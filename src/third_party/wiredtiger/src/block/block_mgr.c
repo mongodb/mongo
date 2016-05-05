@@ -103,7 +103,7 @@ __bm_checkpoint_load(WT_BM *bm, WT_SESSION_IMPL *session,
 		 * of being read into cache buffers.
 		 */
 		WT_RET(__wt_block_map(session,
-		    bm->block, &bm->map, &bm->maplen, &bm->mappingcookie));
+		    bm->block, &bm->map, &bm->maplen, &bm->mapped_cookie));
 
 		/*
 		 * If this handle is for a checkpoint, that is, read-only, there
@@ -149,7 +149,7 @@ __bm_checkpoint_unload(WT_BM *bm, WT_SESSION_IMPL *session)
 	/* Unmap any mapped segment. */
 	if (bm->map != NULL)
 		WT_TRET(__wt_block_unmap(session,
-		    bm->block, bm->map, bm->maplen, &bm->mappingcookie));
+		    bm->block, bm->map, bm->maplen, &bm->mapped_cookie));
 
 	/* Unload the checkpoint. */
 	WT_TRET(__wt_block_checkpoint_unload(session, bm->block, !bm->is_live));
@@ -302,6 +302,20 @@ __bm_is_mapped(WT_BM *bm, WT_SESSION_IMPL *session)
 }
 
 /*
+ * __bm_map_discard --
+ *	Discard a mapped segment.
+ */
+static int
+__bm_map_discard(WT_BM *bm, WT_SESSION_IMPL *session, void *map, size_t len)
+{
+	WT_FILE_HANDLE *handle;
+
+	handle = bm->block->fh->handle;
+	return (handle->map_discard(
+	    handle, (WT_SESSION *)session, map, len, bm->mapped_cookie));
+}
+
+/*
  * __bm_salvage_end --
  *	End a block manager salvage.
  */
@@ -413,19 +427,7 @@ __bm_stat(WT_BM *bm, WT_SESSION_IMPL *session, WT_DSRC_STATS *stats)
 static int
 __bm_sync(WT_BM *bm, WT_SESSION_IMPL *session, bool block)
 {
-	WT_DECL_RET;
-
-	if (!block && !bm->block->nowait_sync_available)
-		return (0);
-
-	if ((ret = __wt_fsync(session, bm->block->fh, block)) == 0)
-		return (0);
-
-	/* Ignore ENOTSUP, but don't try again. */
-	if (ret != ENOTSUP)
-		return (ret);
-	bm->block->nowait_sync_available = false;
-	return (0);
+	return (__wt_fsync(session, bm->block->fh, block));
 }
 
 /*
@@ -544,6 +546,7 @@ __bm_method_set(WT_BM *bm, bool readonly)
 	bm->compact_start = __bm_compact_start;
 	bm->free = __bm_free;
 	bm->is_mapped = __bm_is_mapped;
+	bm->map_discard = __bm_map_discard;
 	bm->preload = __wt_bm_preload;
 	bm->read = __wt_bm_read;
 	bm->salvage_end = __bm_salvage_end;

@@ -7,6 +7,7 @@ AC_DEFUN([AM_TYPES], [
 #include <sys/types.h>
 #include <inttypes.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>"
 	AC_SUBST(wiredtiger_includes_decl)

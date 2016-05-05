@@ -140,12 +140,10 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * will unnecessarily allocate buffer space.
 	 */
 	if (!checkpoint && !F_ISSET(S2C(session), WT_CONN_IN_MEMORY)) {
-		/*
-		 * The truncate might fail if there's a file mapping (if there's
-		 * an open checkpoint on the file), that's OK.
-		 */
 		WT_ERR(__wt_verbose(session, WT_VERB_CHECKPOINT,
 		    "truncate file to %" PRIuMAX, (uintmax_t)ci->file_size));
+
+		/* The truncate might fail, and that's OK. */
 		WT_ERR_BUSY_OK(
 		    __wt_block_truncate(session, block, ci->file_size));
 	}
@@ -190,10 +188,7 @@ __wt_block_checkpoint_unload(
 	 * checkpoints.
 	 */
 	if (!checkpoint) {
-		/*
-		 * The truncate might fail if there's a file mapping (if there's
-		 * an open checkpoint on the file), that's OK.
-		 */
+		/* The truncate might fail, and that's OK. */
 		WT_TRET_BUSY_OK(
 		    __wt_block_truncate(session, block, block->size));
 

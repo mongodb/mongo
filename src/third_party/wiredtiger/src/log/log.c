@@ -8,6 +8,8 @@
 
 #include "wt_internal.h"
 
+static int __log_openfile(
+	WT_SESSION_IMPL *, bool, WT_FH **, const char *, uint32_t);
 static int __log_write_internal(
 	WT_SESSION_IMPL *, WT_ITEM *, WT_LSN *, uint32_t);
 
@@ -93,8 +95,9 @@ __wt_log_background(WT_SESSION_IMPL *session, WT_LSN *lsn)
 int
 __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 {
-	WT_LOG *log;
 	WT_DECL_RET;
+	WT_FH *log_fh;
+	WT_LOG *log;
 
 	log = S2C(session)->log;
 
@@ -121,7 +124,7 @@ __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 		    "log_force_sync: sync directory %s to LSN %" PRIu32
 		    "/%" PRIu32,
 		    log->log_dir_fh->name, min_lsn->l.file, min_lsn->l.offset));
-		WT_ERR(__wt_directory_sync_fh(session, log->log_dir_fh));
+		WT_ERR(__wt_fsync(session, log->log_dir_fh, true));
 		log->sync_dir_lsn = *min_lsn;
 		WT_STAT_FAST_CONN_INCR(session, log_sync_dir);
 	}
@@ -129,12 +132,21 @@ __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 	 * Sync the log file if needed.
 	 */
 	if (__wt_log_cmp(&log->sync_lsn, min_lsn) < 0) {
+		/*
+		 * Get our own file handle to the log file.  It is possible
+		 * for the file handle in the log structure to change out
+		 * from under us and either be NULL or point to a different
+		 * file than we want.
+		 */
+		WT_ERR(__log_openfile(session,
+		    false, &log_fh, WT_LOG_FILENAME, min_lsn->l.file));
 		WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 		    "log_force_sync: sync %s to LSN %" PRIu32 "/%" PRIu32,
-		    log->log_fh->name, min_lsn->l.file, min_lsn->l.offset));
-		WT_ERR(__wt_fsync(session, log->log_fh, true));
+		    log_fh->name, min_lsn->l.file, min_lsn->l.offset));
+		WT_ERR(__wt_fsync(session, log_fh, true));
 		log->sync_lsn = *min_lsn;
 		WT_STAT_FAST_CONN_INCR(session, log_sync);
+		WT_ERR(__wt_close(session, &log_fh));
 		WT_ERR(__wt_cond_signal(session, log->log_sync_cond));
 	}
 err:
@@ -246,8 +258,8 @@ __log_get_files(WT_SESSION_IMPL *session,
 	log_path = conn->log_path;
 	if (log_path == NULL)
 		log_path = "";
-	return (__wt_dirlist(session, log_path, file_prefix,
-	    WT_DIRLIST_INCLUDE, filesp, countp));
+	return (__wt_fs_directory_list(
+	    session, log_path, file_prefix, filesp, countp));
 }
 
 /*
@@ -264,6 +276,9 @@ __wt_log_get_all_files(WT_SESSION_IMPL *session,
 	char **files;
 	uint32_t id, max;
 	u_int count, i;
+
+	*filesp = NULL;
+	*countp = 0;
 
 	id = 0;
 	log = S2C(session)->log;
@@ -295,23 +310,9 @@ __wt_log_get_all_files(WT_SESSION_IMPL *session,
 	*countp = count;
 
 	if (0) {
-err:		__wt_log_files_free(session, files, count);
+err:		WT_TRET(__wt_fs_directory_list_free(session, &files, count));
 	}
 	return (ret);
-}
-
-/*
- * __wt_log_files_free --
- *	Free memory associated with a log file list.
- */
-void
-__wt_log_files_free(WT_SESSION_IMPL *session, char **files, u_int count)
-{
-	u_int i;
-
-	for (i = 0; i < count; i++)
-		__wt_free(session, files[i]);
-	__wt_free(session, files);
 }
 
 /*
@@ -431,21 +432,27 @@ __log_prealloc(WT_SESSION_IMPL *session, WT_FH *fh)
 
 	conn = S2C(session);
 	log = conn->log;
-	ret = 0;
+
 	/*
 	 * If the user configured zero filling, pre-allocate the log file
 	 * manually.  Otherwise use either fallocate or ftruncate to create
 	 * and zero the log file based on what is available.
 	 */
 	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ZERO_FILL))
-		ret = __log_zero(session, fh,
-		    WT_LOG_FIRST_RECORD, conn->log_file_max);
-	else if (fh->fallocate_available == WT_FALLOCATE_NOT_AVAILABLE ||
-	    (ret = __wt_fallocate(session, fh,
-	    WT_LOG_FIRST_RECORD, conn->log_file_max)) == ENOTSUP)
-		ret = __wt_ftruncate(session, fh,
-		    WT_LOG_FIRST_RECORD + conn->log_file_max);
-	return (ret);
+		return (__log_zero(session, fh,
+		    WT_LOG_FIRST_RECORD, conn->log_file_max));
+
+	/*
+	 * We have exclusive access to the log file and there are no other
+	 * writes happening concurrently, so there are no locking issues.
+	 */
+	if ((ret = __wt_fallocate(
+	    session, fh, WT_LOG_FIRST_RECORD, conn->log_file_max)) == 0)
+		return (0);
+	WT_RET_ERROR_OK(ret, ENOTSUP);
+
+	return (__wt_ftruncate(
+	    session, fh, WT_LOG_FIRST_RECORD + conn->log_file_max));
 }
 
 /*
@@ -657,14 +664,17 @@ static int
 __log_openfile(WT_SESSION_IMPL *session,
     bool ok_create, WT_FH **fhp, const char *file_prefix, uint32_t id)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_LOG_DESC *desc;
 	WT_LOG_RECORD *logrec;
 	uint32_t allocsize;
+	u_int flags;
 
-	log = S2C(session)->log;
+	conn = S2C(session);
+	log = conn->log;
 	if (log == NULL)
 		allocsize = WT_LOG_ALIGN;
 	else
@@ -673,8 +683,14 @@ __log_openfile(WT_SESSION_IMPL *session,
 	WT_ERR(__log_filename(session, id, file_prefix, buf));
 	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 	    "opening log %s", (const char *)buf->data));
-	WT_ERR(__wt_open(session, buf->data,
-	    WT_FILE_TYPE_LOG, ok_create ? WT_OPEN_CREATE : 0, fhp));
+	flags = 0;
+	if (ok_create)
+		LF_SET(WT_OPEN_CREATE);
+	if (FLD_ISSET(conn->direct_io, WT_DIRECT_IO_LOG))
+		LF_SET(WT_OPEN_DIRECTIO);
+	WT_ERR(__wt_open(
+	    session, buf->data, WT_OPEN_FILE_TYPE_LOG, flags, fhp));
+
 	/*
 	 * If we are not creating the log file but opening it for reading,
 	 * check that the magic number and versions are correct.
@@ -745,12 +761,11 @@ __log_alloc_prealloc(WT_SESSION_IMPL *session, uint32_t to_num)
 	 * All file setup, writing the header and pre-allocation was done
 	 * before.  We only need to rename it.
 	 */
-	WT_ERR(__wt_rename(session, from_path->data, to_path->data));
+	WT_ERR(__wt_fs_rename(session, from_path->data, to_path->data));
 
 err:	__wt_scr_free(session, &from_path);
 	__wt_scr_free(session, &to_path);
-	if (logfiles != NULL)
-		__wt_log_files_free(session, logfiles, logcount);
+	WT_TRET(__wt_fs_directory_list_free(session, &logfiles, logcount));
 	return (ret);
 }
 
@@ -972,8 +987,7 @@ __log_truncate(WT_SESSION_IMPL *session,
 		}
 	}
 err:	WT_TRET(__wt_close(session, &log_fh));
-	if (logfiles != NULL)
-		__wt_log_files_free(session, logfiles, logcount);
+	WT_TRET(__wt_fs_directory_list_free(session, &logfiles, logcount));
 	return (ret);
 }
 
@@ -1025,7 +1039,7 @@ __wt_log_allocfile(
 	/*
 	 * Rename it into place and make it available.
 	 */
-	WT_ERR(__wt_rename(session, from_path->data, to_path->data));
+	WT_ERR(__wt_fs_rename(session, from_path->data, to_path->data));
 
 err:	__wt_scr_free(session, &from_path);
 	__wt_scr_free(session, &to_path);
@@ -1048,7 +1062,7 @@ __wt_log_remove(WT_SESSION_IMPL *session,
 	WT_ERR(__log_filename(session, lognum, file_prefix, path));
 	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 	    "log_remove: remove log %s", (char *)path->data));
-	WT_ERR(__wt_remove(session, path->data));
+	WT_ERR(__wt_fs_remove(session, path->data));
 err:	__wt_scr_free(session, &path);
 	return (ret);
 }
@@ -1084,7 +1098,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 		WT_RET(__wt_verbose(session, WT_VERB_LOG,
 		    "log_open: open fh to directory %s", conn->log_path));
 		WT_RET(__wt_open(session, conn->log_path,
-		    WT_FILE_TYPE_DIRECTORY, 0, &log->log_dir_fh));
+		    WT_OPEN_FILE_TYPE_DIRECTORY, 0, &log->log_dir_fh));
 	}
 
 	if (!F_ISSET(conn, WT_CONN_READONLY)) {
@@ -1101,9 +1115,8 @@ __wt_log_open(WT_SESSION_IMPL *session)
 			WT_ERR(__wt_log_remove(
 			    session, WT_LOG_TMPNAME, lognum));
 		}
-		__wt_log_files_free(session, logfiles, logcount);
-		logfiles = NULL;
-		logcount = 0;
+		WT_ERR(
+		    __wt_fs_directory_list_free(session, &logfiles, logcount));
 		WT_ERR(__log_get_files(session,
 		    WT_LOG_PREPNAME, &logfiles, &logcount));
 		for (i = 0; i < logcount; i++) {
@@ -1112,8 +1125,8 @@ __wt_log_open(WT_SESSION_IMPL *session)
 			WT_ERR(__wt_log_remove(
 			    session, WT_LOG_PREPNAME, lognum));
 		}
-		__wt_log_files_free(session, logfiles, logcount);
-		logfiles = NULL;
+		WT_ERR(
+		    __wt_fs_directory_list_free(session, &logfiles, logcount));
 	}
 
 	/*
@@ -1151,8 +1164,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 		FLD_SET(conn->log_flags, WT_CONN_LOG_EXISTED);
 	}
 
-err:	if (logfiles != NULL)
-		__wt_log_files_free(session, logfiles, logcount);
+err:	WT_TRET(__wt_fs_directory_list_free(session, &logfiles, logcount));
 	return (ret);
 }
 
@@ -1188,8 +1200,7 @@ __wt_log_close(WT_SESSION_IMPL *session)
 		WT_RET(__wt_verbose(session, WT_VERB_LOG,
 		    "closing log directory %s", log->log_dir_fh->name));
 		if (!F_ISSET(conn, WT_CONN_READONLY))
-			WT_RET(
-			    __wt_directory_sync_fh(session, log->log_dir_fh));
+			WT_RET(__wt_fsync(session, log->log_dir_fh, true));
 		WT_RET(__wt_close(session, &log->log_dir_fh));
 		log->log_dir_fh = NULL;
 	}
@@ -1396,8 +1407,7 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 			    "/%" PRIu32,
 			    log->log_dir_fh->name,
 			    sync_lsn.l.file, sync_lsn.l.offset));
-			WT_ERR(__wt_directory_sync_fh(
-			    session, log->log_dir_fh));
+			WT_ERR(__wt_fsync(session, log->log_dir_fh, true));
 			log->sync_dir_lsn = sync_lsn;
 			WT_STAT_FAST_CONN_INCR(session, log_sync_dir);
 		}
@@ -1538,8 +1548,8 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		}
 		WT_SET_LSN(&start_lsn, firstlog, 0);
 		WT_SET_LSN(&end_lsn, lastlog, 0);
-		__wt_log_files_free(session, logfiles, logcount);
-		logfiles = NULL;
+		WT_ERR(
+		    __wt_fs_directory_list_free(session, &logfiles, logcount));
 	}
 	WT_ERR(__log_openfile(
 	    session, false, &log_fh, WT_LOG_FILENAME, start_lsn.l.file));
@@ -1735,8 +1745,7 @@ advance:
 
 err:	WT_STAT_FAST_CONN_INCR(session, log_scans);
 
-	if (logfiles != NULL)
-		__wt_log_files_free(session, logfiles, logcount);
+	WT_TRET(__wt_fs_directory_list_free(session, &logfiles, logcount));
 
 	__wt_scr_free(session, &buf);
 	__wt_scr_free(session, &decryptitem);

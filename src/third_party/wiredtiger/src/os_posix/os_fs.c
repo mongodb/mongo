@@ -13,29 +13,10 @@
  *	Underlying support function to flush a file handle.
  */
 static int
-__posix_sync(WT_SESSION_IMPL *session,
-    int fd, const char *name, const char *func, bool block)
+__posix_sync(
+    WT_SESSION_IMPL *session, int fd, const char *name, const char *func)
 {
 	WT_DECL_RET;
-
-	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
-
-#ifdef	HAVE_SYNC_FILE_RANGE
-	if (!block) {
-		WT_SYSCALL_RETRY(sync_file_range(fd,
-		    (off64_t)0, (off64_t)0, SYNC_FILE_RANGE_WRITE), ret);
-		if (ret == 0)
-			return (0);
-		WT_RET_MSG(session, ret, "%s: %s: sync_file_range", name, func);
-	}
-#else
-	/*
-	 * Callers attempting asynchronous flush handle ENOTSUP returns, and
-	 * won't make further attempts.
-	 */
-	if (!block)
-		return (ENOTSUP);
-#endif
 
 #if defined(F_FULLFSYNC)
 	/*
@@ -73,45 +54,29 @@ __posix_sync(WT_SESSION_IMPL *session,
 #endif
 }
 
+#ifdef __linux__
 /*
  * __posix_directory_sync --
  *	Flush a directory to ensure file creation is durable.
  */
 static int
-__posix_directory_sync(WT_SESSION_IMPL *session, const char *path)
+__posix_directory_sync(
+    WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char *path)
 {
-#ifdef __linux__
 	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 	int fd, tret;
-	const char *dir;
-	char *copy;
 
-	tret = 0;
-	/*
-	 * POSIX 1003.1 does not require that fsync of a file handle ensures the
-	 * entry in the directory containing the file has also reached disk (and
-	 * there are historic Linux filesystems requiring this), do an explicit
-	 * fsync on a file descriptor for the directory to be sure.
-	 */
-	copy = NULL;
-	if (path == NULL || (dir = strrchr(path, '/')) == NULL)
-		path = S2C(session)->home;
-	else {
-		/*
-		 * Copy the directory name, leaving the trailing slash in place,
-		 * so a path of "/foo" doesn't result in an empty string.
-		 */
-		WT_RET(__wt_strndup(
-		    session, path, (size_t)(dir - path) + 1, &copy));
-		path = copy;
-	}
+	WT_UNUSED(file_system);
+
+	session = (WT_SESSION_IMPL *)wt_session;
 
 	WT_SYSCALL_RETRY((
 	    (fd = open(path, O_RDONLY, 0444)) == -1 ? 1 : 0), ret);
 	if (ret != 0)
-		WT_ERR_MSG(session, ret, "%s: directory-sync: open", path);
+		WT_RET_MSG(session, ret, "%s: directory-sync: open", path);
 
-	ret = __posix_sync(session, fd, path, "directory-sync", true);
+	ret = __posix_sync(session, fd, path, "directory-sync");
 
 	WT_SYSCALL_RETRY(close(fd), tret);
 	if (tret != 0) {
@@ -119,232 +84,182 @@ __posix_directory_sync(WT_SESSION_IMPL *session, const char *path)
 		if (ret == 0)
 			ret = tret;
 	}
-err:	__wt_free(session, copy);
 	return (ret);
-#else
-	WT_UNUSED(session);
-	WT_UNUSED(path);
-	return (0);
-#endif
 }
+#endif
 
 /*
- * __posix_file_exist --
+ * __posix_fs_exist --
  *	Return if the file exists.
  */
 static int
-__posix_file_exist(WT_SESSION_IMPL *session, const char *name, bool *existp)
+__posix_fs_exist(WT_FILE_SYSTEM *file_system,
+    WT_SESSION *wt_session, const char *name, bool *existp)
 {
 	struct stat sb;
 	WT_DECL_RET;
-	char *path;
+	WT_SESSION_IMPL *session;
 
-	WT_RET(__wt_filename(session, name, &path));
-	name = path;
+	WT_UNUSED(file_system);
+
+	session = (WT_SESSION_IMPL *)wt_session;
 
 	WT_SYSCALL_RETRY(stat(name, &sb), ret);
-	if (ret == 0)
+	if (ret == 0) {
 		*existp = true;
-	else if (ret == ENOENT) {
+		return (0);
+	}
+	if (ret == ENOENT) {
 		*existp = false;
-		ret = 0;
-	} else
-		__wt_err(session, ret, "%s: file-exist: stat", name);
-
-	__wt_free(session, path);
-	return (ret);
+		return (0);
+	}
+	WT_RET_MSG(session, ret, "%s: file-exist: stat", name);
 }
 
 /*
- * __posix_file_remove --
+ * __posix_fs_remove --
  *	Remove a file.
  */
 static int
-__posix_file_remove(WT_SESSION_IMPL *session, const char *name)
+__posix_fs_remove(
+    WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char *name)
 {
 	WT_DECL_RET;
-	char *path;
+	WT_SESSION_IMPL *session;
 
-#ifdef HAVE_DIAGNOSTIC
-	if (__wt_handle_search(session, name, false, NULL, NULL))
-		WT_RET_MSG(session, EINVAL,
-		    "%s: file-remove: file has open handles", name);
-#endif
+	WT_UNUSED(file_system);
 
-	WT_RET(__wt_filename(session, name, &path));
-	name = path;
+	session = (WT_SESSION_IMPL *)wt_session;
 
 	WT_SYSCALL_RETRY(remove(name), ret);
-	if (ret != 0)
-		__wt_err(session, ret, "%s: file-remove: remove", name);
-
-	__wt_free(session, path);
-	return (ret);
+	if (ret == 0)
+		return (0);
+	WT_RET_MSG(session, ret, "%s: file-remove: remove", name);
 }
 
 /*
- * __posix_file_rename --
+ * __posix_fs_rename --
  *	Rename a file.
  */
 static int
-__posix_file_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
+__posix_fs_rename(WT_FILE_SYSTEM *file_system,
+    WT_SESSION *wt_session, const char *from, const char *to)
 {
 	WT_DECL_RET;
-	char *from_path, *to_path;
+	WT_SESSION_IMPL *session;
 
-#ifdef HAVE_DIAGNOSTIC
-	if (__wt_handle_search(session, from, false, NULL, NULL))
-		WT_RET_MSG(session, EINVAL,
-		    "%s: file-rename: file has open handles", from);
-	if (__wt_handle_search(session, to, false, NULL, NULL))
-		WT_RET_MSG(session, EINVAL,
-		    "%s: file-rename: file has open handles", to);
-#endif
+	WT_UNUSED(file_system);
 
-	from_path = to_path = NULL;
-	WT_ERR(__wt_filename(session, from, &from_path));
-	from = from_path;
-	WT_ERR(__wt_filename(session, to, &to_path));
-	to = to_path;
+	session = (WT_SESSION_IMPL *)wt_session;
 
 	WT_SYSCALL_RETRY(rename(from, to), ret);
-	if (ret != 0)
-		__wt_err(session, ret,
-		    "%s to %s: file-rename: rename", from, to);
-
-err:	__wt_free(session, from_path);
-	__wt_free(session, to_path);
-	return (ret);
+	if (ret == 0)
+		return (0);
+	WT_RET_MSG(session, ret, "%s to %s: file-rename: rename", from, to);
 }
 
 /*
- * __posix_file_size --
+ * __posix_fs_size --
  *	Get the size of a file in bytes, by file name.
  */
 static int
-__posix_file_size(
-    WT_SESSION_IMPL *session, const char *name, bool silent, wt_off_t *sizep)
+__posix_fs_size(WT_FILE_SYSTEM *file_system,
+    WT_SESSION *wt_session, const char *name, wt_off_t *sizep)
 {
 	struct stat sb;
 	WT_DECL_RET;
-	char *path;
+	WT_SESSION_IMPL *session;
 
-	WT_RET(__wt_filename(session, name, &path));
-	name = path;
+	WT_UNUSED(file_system);
 
-	/*
-	 * Optionally don't log errors on ENOENT; some callers of this function
-	 * expect failure in that case and don't want an error message logged.
-	 */
+	session = (WT_SESSION_IMPL *)wt_session;
+
 	WT_SYSCALL_RETRY(stat(name, &sb), ret);
-	if (ret == 0)
+	if (ret == 0) {
 		*sizep = sb.st_size;
-	else if (ret != ENOENT || !silent)
-		__wt_err(session, ret, "%s: file-size: stat", name);
-
-	__wt_free(session, path);
-
-	return (ret);
+		return (0);
+	}
+	WT_RET_MSG(session, ret, "%s: file-size: stat", name);
 }
 
+#if defined(HAVE_POSIX_FADVISE)
 /*
- * __posix_handle_advise --
+ * __posix_file_advise --
  *	POSIX fadvise.
  */
 static int
-__posix_handle_advise(WT_SESSION_IMPL *session,
-    WT_FH *fh, wt_off_t offset, wt_off_t len, int advice)
+__posix_file_advise(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session,
+    wt_off_t offset, wt_off_t len, int advice)
 {
-#if defined(HAVE_POSIX_FADVISE)
 	WT_DECL_RET;
+	WT_FILE_HANDLE_POSIX *pfh;
+	WT_SESSION_IMPL *session;
 
-	/*
-	 * Refuse pre-load when direct I/O is configured for the file, the
-	 * kernel cache isn't interesting.
-	 */
-	if (advice == POSIX_MADV_WILLNEED && fh->direct_io)
-		return (ENOTSUP);
+	session = (WT_SESSION_IMPL *)wt_session;
+	pfh = (WT_FILE_HANDLE_POSIX *)file_handle;
 
-	WT_SYSCALL_RETRY(posix_fadvise(fh->fd, offset, len, advice), ret);
+	WT_SYSCALL_RETRY(posix_fadvise(pfh->fd, offset, len, advice), ret);
 	if (ret == 0)
 		return (0);
 
 	/*
 	 * Treat EINVAL as not-supported, some systems don't support some flags.
-	 * Quietly fail, callers expect not-supported failures.
+	 * Quietly fail, callers expect not-supported failures, and reset the
+	 * handle method to prevent future calls.
 	 */
-	if (ret == EINVAL)
+	if (ret == EINVAL) {
+		file_handle->fadvise = NULL;
 		return (ENOTSUP);
+	}
 
-	WT_RET_MSG(session, ret, "%s: handle-advise: posix_fadvise", fh->name);
-#else
-	WT_UNUSED(session);
-	WT_UNUSED(fh);
-	WT_UNUSED(offset);
-	WT_UNUSED(len);
-	WT_UNUSED(advice);
+	WT_RET_MSG(session, ret,
+	    "%s: handle-advise: posix_fadvise", file_handle->name);
 
-	/* Quietly fail, callers expect not-supported failures. */
-	return (ENOTSUP);
-#endif
 }
+#endif
 
 /*
- * __posix_handle_close --
- *	ANSI C close/fclose.
+ * __posix_file_close --
+ *	ANSI C close.
  */
 static int
-__posix_handle_close(WT_SESSION_IMPL *session, WT_FH *fh)
+__posix_file_close(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session)
 {
 	WT_DECL_RET;
+	WT_FILE_HANDLE_POSIX *pfh;
+	WT_SESSION_IMPL *session;
 
-	if (fh->fp == NULL) {
-		WT_SYSCALL_RETRY(close(fh->fd), ret);
-		if (ret == 0)
-			return (0);
-		WT_RET_MSG(session, ret, "%s: handle-close: close", fh->name);
+	session = (WT_SESSION_IMPL *)wt_session;
+	pfh = (WT_FILE_HANDLE_POSIX *)file_handle;
+
+	/* Close the file handle. */
+	if (pfh->fd != -1) {
+		WT_SYSCALL_RETRY(close(pfh->fd), ret);
+		if (ret != 0)
+			__wt_err(session, ret,
+			    "%s: handle-close: close", file_handle->name);
 	}
 
-	/* If the stream was opened for writing, flush the file. */
-	if (F_ISSET(fh, WT_FH_FLUSH_ON_CLOSE) && fflush(fh->fp) != 0) {
-		ret = __wt_errno();
-		__wt_err(session, ret, "%s: handle-close: fflush", fh->name);
-	}
-
-	/* Close the file. */
-	if (fclose(fh->fp) != 0) {
-		ret = __wt_errno();
-		__wt_err(session, ret, "%s: handle-close: fclose", fh->name);
-	}
+	__wt_free(session, file_handle->name);
+	__wt_free(session, pfh);
 	return (ret);
 }
 
 /*
- * __posix_handle_getc --
- *	ANSI C fgetc.
- */
-static int
-__posix_handle_getc(WT_SESSION_IMPL *session, WT_FH *fh, int *chp)
-{
-	if (fh->fp == NULL)
-		WT_RET_MSG(session,
-		    ENOTSUP, "%s: handle-getc: no stream configured", fh->name);
-
-	*chp = fgetc(fh->fp);
-	if (*chp != EOF || !ferror(fh->fp))
-		return (0);
-	WT_RET_MSG(session, __wt_errno(), "%s: handle-getc: fgetc", fh->name);
-}
-
-/*
- * __posix_handle_lock --
+ * __posix_file_lock --
  *	Lock/unlock a file.
  */
 static int
-__posix_handle_lock(WT_SESSION_IMPL *session, WT_FH *fh, bool lock)
+__posix_file_lock(
+    WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, bool lock)
 {
 	struct flock fl;
 	WT_DECL_RET;
+	WT_FILE_HANDLE_POSIX *pfh;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+	pfh = (WT_FILE_HANDLE_POSIX *)file_handle;
 
 	/*
 	 * WiredTiger requires this function be able to acquire locks past
@@ -360,44 +275,32 @@ __posix_handle_lock(WT_SESSION_IMPL *session, WT_FH *fh, bool lock)
 	fl.l_type = lock ? F_WRLCK : F_UNLCK;
 	fl.l_whence = SEEK_SET;
 
-	WT_SYSCALL_RETRY(fcntl(fh->fd, F_SETLK, &fl), ret);
+	WT_SYSCALL_RETRY(fcntl(pfh->fd, F_SETLK, &fl), ret);
 	if (ret == 0)
 		return (0);
-	WT_RET_MSG(session, ret, "%s: handle-lock: fcntl", fh->name);
+	WT_RET_MSG(session, ret, "%s: handle-lock: fcntl", file_handle->name);
 }
 
 /*
- * __posix_handle_printf --
- *	ANSI C vfprintf.
- */
-static int
-__posix_handle_printf(
-    WT_SESSION_IMPL *session, WT_FH *fh, const char *fmt, va_list ap)
-{
-	if (fh->fp == NULL)
-		WT_RET_MSG(session, ENOTSUP,
-		    "%s: vfprintf: no stream configured", fh->name);
-
-	if (vfprintf(fh->fp, fmt, ap) >= 0)
-		return (0);
-	WT_RET_MSG(session, EIO, "%s: handle-printf: vfprintf", fh->name);
-}
-
-/*
- * __posix_handle_read --
+ * __posix_file_read --
  *	POSIX pread.
  */
 static int
-__posix_handle_read(
-    WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, void *buf)
+__posix_file_read(WT_FILE_HANDLE *file_handle,
+    WT_SESSION *wt_session, wt_off_t offset, size_t len, void *buf)
 {
+	WT_FILE_HANDLE_POSIX *pfh;
+	WT_SESSION_IMPL *session;
 	size_t chunk;
 	ssize_t nr;
 	uint8_t *addr;
 
+	session = (WT_SESSION_IMPL *)wt_session;
+	pfh = (WT_FILE_HANDLE_POSIX *)file_handle;
+
 	/* Assert direct I/O is aligned and a multiple of the alignment. */
 	WT_ASSERT(session,
-	    !fh->direct_io ||
+	    !pfh->direct_io ||
 	    S2C(session)->buffer_alignment == 0 ||
 	    (!((uintptr_t)buf &
 	    (uintptr_t)(S2C(session)->buffer_alignment - 1)) &&
@@ -407,79 +310,122 @@ __posix_handle_read(
 	/* Break reads larger than 1GB into 1GB chunks. */
 	for (addr = buf; len > 0; addr += nr, len -= (size_t)nr, offset += nr) {
 		chunk = WT_MIN(len, WT_GIGABYTE);
-		if ((nr = pread(fh->fd, addr, chunk, offset)) <= 0)
+		if ((nr = pread(pfh->fd, addr, chunk, offset)) <= 0)
 			WT_RET_MSG(session, nr == 0 ? WT_ERROR : __wt_errno(),
 			    "%s: handle-read: pread: failed to read %"
 			    WT_SIZET_FMT " bytes at offset %" PRIuMAX,
-			    fh->name, chunk, (uintmax_t)offset);
+			    file_handle->name, chunk, (uintmax_t)offset);
 	}
 	return (0);
 }
 
 /*
- * __posix_handle_size --
+ * __posix_file_size --
  *	Get the size of a file in bytes, by file handle.
  */
 static int
-__posix_handle_size(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
+__posix_file_size(
+    WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, wt_off_t *sizep)
 {
 	struct stat sb;
 	WT_DECL_RET;
+	WT_FILE_HANDLE_POSIX *pfh;
+	WT_SESSION_IMPL *session;
 
-	WT_SYSCALL_RETRY(fstat(fh->fd, &sb), ret);
+	session = (WT_SESSION_IMPL *)wt_session;
+	pfh = (WT_FILE_HANDLE_POSIX *)file_handle;
+
+	WT_SYSCALL_RETRY(fstat(pfh->fd, &sb), ret);
 	if (ret == 0) {
 		*sizep = sb.st_size;
 		return (0);
 	}
-	WT_RET_MSG(session, ret, "%s: handle-size: fstat", fh->name);
+	WT_RET_MSG(session, ret, "%s: handle-size: fstat", file_handle->name);
 }
 
 /*
- * __posix_handle_sync --
- *	POSIX fflush/fsync.
+ * __posix_file_sync --
+ *	POSIX fsync.
  */
 static int
-__posix_handle_sync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
+__posix_file_sync(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session)
 {
-	if (fh->fp == NULL)
-		return (__posix_sync(
-		    session, fh->fd, fh->name, "handle-sync", block));
+	WT_FILE_HANDLE_POSIX *pfh;
+	WT_SESSION_IMPL *session;
 
-	if (fflush(fh->fp) == 0)
-		return (0);
-	WT_RET_MSG(session, __wt_errno(), "%s: handle-sync: fflush", fh->name);
+	session = (WT_SESSION_IMPL *)wt_session;
+	pfh = (WT_FILE_HANDLE_POSIX *)file_handle;
+
+	return (
+	    __posix_sync(session, pfh->fd, file_handle->name, "handle-sync"));
 }
 
+#ifdef HAVE_SYNC_FILE_RANGE
 /*
- * __posix_handle_truncate --
+ * __posix_file_sync_nowait --
+ *	POSIX fsync.
+ */
+static int
+__posix_file_sync_nowait(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session)
+{
+	WT_DECL_RET;
+	WT_FILE_HANDLE_POSIX *pfh;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+	pfh = (WT_FILE_HANDLE_POSIX *)file_handle;
+
+	WT_SYSCALL_RETRY(sync_file_range(pfh->fd,
+	    (off64_t)0, (off64_t)0, SYNC_FILE_RANGE_WRITE), ret);
+	if (ret == 0)
+		return (0);
+	WT_RET_MSG(session, ret,
+	    "%s: handle-sync-nowait: sync_file_range", file_handle->name);
+}
+#endif
+
+/*
+ * __posix_file_truncate --
  *	POSIX ftruncate.
  */
 static int
-__posix_handle_truncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
+__posix_file_truncate(
+    WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, wt_off_t len)
 {
 	WT_DECL_RET;
+	WT_FILE_HANDLE_POSIX *pfh;
+	WT_SESSION_IMPL *session;
 
-	WT_SYSCALL_RETRY(ftruncate(fh->fd, len), ret);
+	session = (WT_SESSION_IMPL *)wt_session;
+	pfh = (WT_FILE_HANDLE_POSIX *)file_handle;
+
+	WT_SYSCALL_RETRY(ftruncate(pfh->fd, len), ret);
 	if (ret == 0)
 		return (0);
-	WT_RET_MSG(session, ret, "%s: handle-truncate: ftruncate", fh->name);
+	WT_RET_MSG(session, ret,
+	    "%s: handle-truncate: ftruncate", file_handle->name);
 }
 
 /*
- * __posix_handle_write --
+ * __posix_file_write --
  *	POSIX pwrite.
  */
 static int
-__posix_handle_write(WT_SESSION_IMPL *session,
-    WT_FH *fh, wt_off_t offset, size_t len, const void *buf)
+__posix_file_write(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session,
+    wt_off_t offset, size_t len, const void *buf)
 {
+	WT_FILE_HANDLE_POSIX *pfh;
+	WT_SESSION_IMPL *session;
 	size_t chunk;
 	ssize_t nw;
 	const uint8_t *addr;
 
+	session = (WT_SESSION_IMPL *)wt_session;
+	pfh = (WT_FILE_HANDLE_POSIX *)file_handle;
+
 	/* Assert direct I/O is aligned and a multiple of the alignment. */
 	WT_ASSERT(session,
-	    !fh->direct_io ||
+	    !pfh->direct_io ||
 	    S2C(session)->buffer_alignment == 0 ||
 	    (!((uintptr_t)buf &
 	    (uintptr_t)(S2C(session)->buffer_alignment - 1)) &&
@@ -489,21 +435,21 @@ __posix_handle_write(WT_SESSION_IMPL *session,
 	/* Break writes larger than 1GB into 1GB chunks. */
 	for (addr = buf; len > 0; addr += nw, len -= (size_t)nw, offset += nw) {
 		chunk = WT_MIN(len, WT_GIGABYTE);
-		if ((nw = pwrite(fh->fd, addr, chunk, offset)) < 0)
+		if ((nw = pwrite(pfh->fd, addr, chunk, offset)) < 0)
 			WT_RET_MSG(session, __wt_errno(),
 			    "%s: handle-write: pwrite: failed to write %"
 			    WT_SIZET_FMT " bytes at offset %" PRIuMAX,
-			    fh->name, chunk, (uintmax_t)offset);
+			    file_handle->name, chunk, (uintmax_t)offset);
 	}
 	return (0);
 }
 
 /*
- * __posix_handle_open_cloexec --
+ * __posix_open_file_cloexec --
  *	Prevent child access to file handles.
  */
 static inline int
-__posix_handle_open_cloexec(WT_SESSION_IMPL *session, int fd, const char *name)
+__posix_open_file_cloexec(WT_SESSION_IMPL *session, int fd, const char *name)
 {
 #if defined(HAVE_FCNTL) && defined(FD_CLOEXEC) && !defined(O_CLOEXEC)
 	int f;
@@ -528,28 +474,35 @@ __posix_handle_open_cloexec(WT_SESSION_IMPL *session, int fd, const char *name)
 }
 
 /*
- * __posix_handle_open --
+ * __posix_open_file --
  *	Open a file handle.
  */
 static int
-__posix_handle_open(WT_SESSION_IMPL *session,
-    WT_FH *fh, const char *name, uint32_t file_type, uint32_t flags)
+__posix_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
+    const char *name, WT_OPEN_FILE_TYPE file_type, uint32_t flags,
+    WT_FILE_HANDLE **file_handlep)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	WT_FILE_HANDLE *file_handle;
+	WT_FILE_HANDLE_POSIX *pfh;
+	WT_SESSION_IMPL *session;
 	mode_t mode;
-	int f, fd, tret;
-	bool direct_io;
-	const char *stream_mode;
+	int f;
 
+	WT_UNUSED(file_system);
+
+	*file_handlep = NULL;
+
+	session = (WT_SESSION_IMPL *)wt_session;
 	conn = S2C(session);
-	direct_io = false;
+
+	WT_RET(__wt_calloc_one(session, &pfh));
 
 	/* Set up error handling. */
-	fh->fd = fd = -1;
-	fh->fp = NULL;
+	pfh->fd = -1;
 
-	if (file_type == WT_FILE_TYPE_DIRECTORY) {
+	if (file_type == WT_OPEN_FILE_TYPE_DIRECTORY) {
 		f = O_RDONLY;
 #ifdef O_CLOEXEC
 		/*
@@ -560,10 +513,10 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 		f |= O_CLOEXEC;
 #endif
 		WT_SYSCALL_RETRY((
-		    (fd = open(name, f, 0444)) == -1 ? 1 : 0), ret);
+		    (pfh->fd = open(name, f, 0444)) == -1 ? 1 : 0), ret);
 		if (ret != 0)
 			WT_ERR_MSG(session, ret, "%s: handle-open: open", name);
-		WT_ERR(__posix_handle_open_cloexec(session, fd, name));
+		WT_ERR(__posix_open_file_cloexec(session, pfh->fd, name));
 		goto directory_open;
 	}
 
@@ -589,28 +542,20 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 	f |= O_CLOEXEC;
 #endif
 #ifdef O_DIRECT
-	/*
-	 * Direct I/O: file-type is a flag from the set of possible flags stored
-	 * in the connection handle during configuration, check for a match.
-	 * Also, "direct_io=checkpoint" configures direct I/O for readonly data
-	 * files.
-	 */
-	if (FLD_ISSET(conn->direct_io, file_type) ||
-	    (LF_ISSET(WT_OPEN_READONLY) &&
-	    file_type == WT_FILE_TYPE_DATA &&
-	    FLD_ISSET(conn->direct_io, WT_FILE_TYPE_CHECKPOINT))) {
+	/* Direct I/O. */
+	if (LF_ISSET(WT_OPEN_DIRECTIO)) {
 		f |= O_DIRECT;
-		direct_io = true;
-	}
+		pfh->direct_io = true;
+	} else
+		pfh->direct_io = false;
 #endif
-	fh->direct_io = direct_io;
 #ifdef O_NOATIME
 	/* Avoid updating metadata for read-only workloads. */
-	if (file_type == WT_FILE_TYPE_DATA)
+	if (file_type == WT_OPEN_FILE_TYPE_DATA)
 		f |= O_NOATIME;
 #endif
 
-	if (file_type == WT_FILE_TYPE_LOG &&
+	if (file_type == WT_OPEN_FILE_TYPE_LOG &&
 	    FLD_ISSET(conn->txn_logsync, WT_LOG_DSYNC)) {
 #ifdef O_DSYNC
 		f |= O_DSYNC;
@@ -622,82 +567,91 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 #endif
 	}
 
-	WT_SYSCALL_RETRY(((fd = open(name, f, mode)) == -1 ? 1 : 0), ret);
+	WT_SYSCALL_RETRY(((pfh->fd = open(name, f, mode)) == -1 ? 1 : 0), ret);
 	if (ret != 0)
 		WT_ERR_MSG(session, ret,
-		    direct_io ?
+		    pfh->direct_io ?
 		    "%s: handle-open: open: failed with direct I/O configured, "
 		    "some filesystem types do not support direct I/O" :
 		    "%s: handle-open: open", name);
-	WT_ERR(__posix_handle_open_cloexec(session, fd, name));
+	WT_ERR(__posix_open_file_cloexec(session, pfh->fd, name));
 
-	/* Disable read-ahead on trees: it slows down random read workloads. */
 #if defined(HAVE_POSIX_FADVISE)
-	if (file_type == WT_FILE_TYPE_DATA) {
+	/*
+	 * Disable read-ahead on trees: it slows down random read workloads.
+	 * Ignore fadvise when doing direct I/O, the kernel cache isn't
+	 * interesting.
+	 */
+	if (!pfh->direct_io && file_type == WT_OPEN_FILE_TYPE_DATA) {
 		WT_SYSCALL_RETRY(
-		    posix_fadvise(fd, 0, 0, POSIX_FADV_RANDOM), ret);
+		    posix_fadvise(pfh->fd, 0, 0, POSIX_FADV_RANDOM), ret);
 		if (ret != 0)
 			WT_ERR_MSG(session, ret,
 			    "%s: handle-open: posix_fadvise", name);
 	}
 #endif
 
-	/* Optionally configure a stdio stream API. */
-	switch (LF_MASK(WT_STREAM_APPEND | WT_STREAM_READ | WT_STREAM_WRITE)) {
-	case WT_STREAM_APPEND:
-		stream_mode = "a";
-		F_SET(fh, WT_FH_FLUSH_ON_CLOSE);
-		break;
-	case WT_STREAM_READ:
-		stream_mode = "r";
-		break;
-	case WT_STREAM_WRITE:
-		stream_mode = "w";
-		F_SET(fh, WT_FH_FLUSH_ON_CLOSE);
-		break;
-	case 0:
-	default:
-		stream_mode = NULL;
-		break;
-	}
-	if (stream_mode != NULL) {
-		if ((fh->fp = fdopen(fd, stream_mode)) == NULL)
-			WT_ERR_MSG(session, __wt_errno(),
-			    "%s: handle-open: fdopen", name);
-		if (LF_ISSET(WT_STREAM_LINE_BUFFER))
-			__wt_stream_set_line_buffer(fh->fp);
-	}
-
 directory_open:
-	fh->fd = fd;
+	/* Initialize public information. */
+	file_handle = (WT_FILE_HANDLE *)pfh;
+	WT_ERR(__wt_strdup(session, name, &file_handle->name));
 
-	/* Configure fallocate calls. */
-	__wt_posix_handle_allocate_configure(session, fh);
+	file_handle->close = __posix_file_close;
+#if defined(HAVE_POSIX_FADVISE)
+	/*
+	 * Ignore fadvise when doing direct I/O, the kernel cache isn't
+	 * interesting.
+	 */
+	if (!pfh->direct_io)
+		file_handle->fadvise = __posix_file_advise;
+#endif
+	file_handle->fallocate = __wt_posix_file_fallocate;
+	file_handle->lock = __posix_file_lock;
+#ifdef WORDS_BIGENDIAN
+	/*
+	 * The underlying objects are little-endian, mapping objects isn't
+	 * currently supported on big-endian systems.
+	 */
+#else
+	file_handle->map = __wt_posix_map;
+#ifdef HAVE_POSIX_MADVISE
+	file_handle->map_discard = __wt_posix_map_discard;
+	file_handle->map_preload = __wt_posix_map_preload;
+#endif
+	file_handle->unmap = __wt_posix_unmap;
+#endif
+	file_handle->read = __posix_file_read;
+	file_handle->size = __posix_file_size;
+	file_handle->sync = __posix_file_sync;
+#ifdef HAVE_SYNC_FILE_RANGE
+	file_handle->sync_nowait = __posix_file_sync_nowait;
+#endif
+	file_handle->truncate = __posix_file_truncate;
+	file_handle->write = __posix_file_write;
 
-	fh->fh_advise = __posix_handle_advise;
-	fh->fh_allocate = __wt_posix_handle_allocate;
-	fh->fh_close = __posix_handle_close;
-	fh->fh_getc = __posix_handle_getc;
-	fh->fh_lock = __posix_handle_lock;
-	fh->fh_map = __wt_posix_map;
-	fh->fh_map_discard = __wt_posix_map_discard;
-	fh->fh_map_preload = __wt_posix_map_preload;
-	fh->fh_map_unmap = __wt_posix_map_unmap;
-	fh->fh_printf = __posix_handle_printf;
-	fh->fh_read = __posix_handle_read;
-	fh->fh_size = __posix_handle_size;
-	fh->fh_sync = __posix_handle_sync;
-	fh->fh_truncate = __posix_handle_truncate;
-	fh->fh_write = __posix_handle_write;
+	*file_handlep = file_handle;
 
 	return (0);
 
-err:	if (fd != -1) {
-		WT_SYSCALL_RETRY(close(fd), tret);
-		if (tret != 0)
-			__wt_err(session, tret, "%s: handle-open: close", name);
-	}
+err:	WT_TRET(__posix_file_close((WT_FILE_HANDLE *)pfh, wt_session));
 	return (ret);
+}
+
+/*
+ * __posix_terminate --
+ *	Terminate a POSIX configuration.
+ */
+static int
+__posix_terminate(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session)
+{
+	WT_SESSION_IMPL *session;
+
+	WT_UNUSED(file_system);
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	__wt_free(session, file_system);
+	return (0);
 }
 
 /*
@@ -708,29 +662,27 @@ int
 __wt_os_posix(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_FILE_SYSTEM *file_system;
 
 	conn = S2C(session);
 
+	WT_RET(__wt_calloc_one(session, &file_system));
+
 	/* Initialize the POSIX jump table. */
-	conn->file_directory_list = __wt_posix_directory_list;
-	conn->file_directory_sync = __posix_directory_sync;
-	conn->file_exist = __posix_file_exist;
-	conn->file_remove = __posix_file_remove;
-	conn->file_rename = __posix_file_rename;
-	conn->file_size = __posix_file_size;
-	conn->handle_open = __posix_handle_open;
+	file_system->directory_list = __wt_posix_directory_list;
+	file_system->directory_list_free = __wt_posix_directory_list_free;
+#ifdef __linux__
+	file_system->directory_sync = __posix_directory_sync;
+#endif
+	file_system->exist = __posix_fs_exist;
+	file_system->open_file = __posix_open_file;
+	file_system->remove = __posix_fs_remove;
+	file_system->rename = __posix_fs_rename;
+	file_system->size = __posix_fs_size;
+	file_system->terminate = __posix_terminate;
 
-	return (0);
-}
-
-/*
- * __wt_os_posix_cleanup --
- *	Discard a POSIX configuration.
- */
-int
-__wt_os_posix_cleanup(WT_SESSION_IMPL *session)
-{
-	WT_UNUSED(session);
+	/* Switch it into place. */
+	conn->file_system = file_system;
 
 	return (0);
 }

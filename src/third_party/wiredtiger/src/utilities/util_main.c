@@ -36,7 +36,6 @@ main(int argc, char *argv[])
 
 	conn = NULL;
 	p = NULL;
-	secretkey = NULL;
 
 	/* Get the program name. */
 	if ((progname = strrchr(argv[0], '/')) == NULL)

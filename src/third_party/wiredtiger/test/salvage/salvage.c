@@ -159,7 +159,7 @@ int
 usage(void)
 {
 	(void)fprintf(stderr,
-	    "usage: %s [-v] [-r run] [-t fix|rle|var|row]\n", progname);
+	    "usage: %s [-v] [-r run] [-t fix|var|row]\n", progname);
 	return (EXIT_FAILURE);
 }
 
@@ -170,7 +170,7 @@ run(int r)
 
 	printf("\t%s: run %d\n", __wt_page_type_string(page_type), r);
 
-	CHECK(system("rm -f WiredTiger* __slvg.* __schema.*") == 0);
+	CHECK(system("rm -f WiredTiger* __slvg.*") == 0);
 	CHECK((res_fp = fopen(RSLT, "w")) != NULL);
 
 	/*

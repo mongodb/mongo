@@ -37,10 +37,12 @@ import fnmatch, os, shutil, time
 from suite_subprocess import suite_subprocess
 from wtscenario import multiply_scenarios, number_scenarios, prune_scenarios
 from helper import copy_wiredtiger_home
-import wttest
+import wiredtiger, wttest
 
 class test_backup05(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:test_backup05'
+    emptyuri = 'table:test_empty05'
+    newuri = 'table:test_new05'
     create_params = 'key_format=i,value_format=i'
     freq = 5
 
@@ -51,11 +53,34 @@ class test_backup05(wttest.WiredTigerTestCase, suite_subprocess):
 
         # With the connection still open, copy files to new directory.
         # Half the time use an unaligned copy.
-        aligned = (i % (self.freq * 2) != 0) or os.name == "nt"
+        even = i % (self.freq * 2) == 0
+        aligned = even or os.name == "nt"
         copy_wiredtiger_home(olddir, newdir, aligned)
+
+        # Half the time try to rename a table and the other half try
+        # to remove a table.  They should fail.
+        if not even:
+            self.assertRaises(wiredtiger.WiredTigerError,
+                lambda: self.session.rename(
+                self.emptyuri, self.newuri, None))
+        else:
+            self.assertRaises(wiredtiger.WiredTigerError,
+                lambda: self.session.drop(self.emptyuri, None))
 
         # Now simulate fsyncUnlock by closing the backup cursor.
         cbkup.close()
+
+        # Once the backup cursor is closed we should be able to perform
+        # schema operations.  Test that and then reset the files to their
+        # expected initial names.
+        if not even:
+            self.session.rename(self.emptyuri, self.newuri, None)
+            self.session.drop(self.newuri, None)
+            self.session.create(self.emptyuri, self.create_params)
+        else:
+            self.session.drop(self.emptyuri, None)
+            self.session.create(self.emptyuri, self.create_params)
+
 
         # Open the new directory and verify
         conn = self.setUpConnectionOpen(newdir)
@@ -77,6 +102,10 @@ class test_backup05(wttest.WiredTigerTestCase, suite_subprocess):
         #
         # If the metadata isn't flushed, eventually the metadata we copy will
         # be sufficiently out-of-sync with the data file that it won't verify.
+
+        self.session.create(self.emptyuri, self.create_params)
+        self.reopen_conn()
+
         self.session.create(self.uri, self.create_params)
         for i in range(100):
             c = self.session.open_cursor(self.uri)
@@ -88,7 +117,7 @@ class test_backup05(wttest.WiredTigerTestCase, suite_subprocess):
                 self.session.verify(self.uri)
 
     def test_backup(self):
-        with self.expectedStdoutPattern('Recreating metadata'):
+        with self.expectedStdoutPattern('recreating metadata'):
             self.backup()
 
 if __name__ == '__main__':

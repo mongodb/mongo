@@ -47,8 +47,8 @@ win_filelist()
 	(
 	sed \
 	    -e '/\/os_posix\//d' \
-	    -e '/src\/support\/power8\/crc32.S/d' \
-	    -e '/src\/support\/power8\/crc32_wrapper.c/d'
+	    -e '/src\/checksum\/power8\/crc32.S/d' \
+	    -e '/src\/checksum\/power8\/crc32_wrapper.c/d'
 
 	echo 'src/os_win/os_dir.c'
 	echo 'src/os_win/os_dlopen.c'

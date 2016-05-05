@@ -47,6 +47,9 @@ src/btree/row_key.c
 src/btree/row_modify.c
 src/btree/row_srch.c
 src/cache/cache_las.c
+src/checksum/checksum.c
+src/checksum/power8/crc32.S
+src/checksum/power8/crc32_wrapper.c
 src/config/config.c
 src/config/config_api.c
 src/config/config_check.c
@@ -106,10 +109,9 @@ src/os_common/os_abort.c
 src/os_common/os_alloc.c
 src/os_common/os_fhandle.c
 src/os_common/os_fs_inmemory.c
-src/os_common/os_fs_stdio.c
-src/os_common/os_getline.c
+src/os_common/os_fstream.c
+src/os_common/os_fstream_stdio.c
 src/os_common/os_getopt.c
-src/os_common/os_init.c
 src/os_common/os_strtouq.c
 src/os_posix/os_dir.c
 src/os_posix/os_dlopen.c
@@ -148,7 +150,6 @@ src/session/session_api.c
 src/session/session_compact.c
 src/session/session_dhandle.c
 src/session/session_salvage.c
-src/support/cksum.c
 src/support/cond_auto.c
 src/support/crypto.c
 src/support/err.c
@@ -160,8 +161,6 @@ src/support/hex.c
 src/support/huffman.c
 src/support/mtx_rw.c
 src/support/pow.c
-src/support/power8/crc32.S
-src/support/power8/crc32_wrapper.c
 src/support/rand.c
 src/support/scratch.c
 src/support/stat.c

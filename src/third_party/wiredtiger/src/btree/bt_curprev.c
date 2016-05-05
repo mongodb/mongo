@@ -128,12 +128,10 @@ static inline int
 __cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, bool newpage)
 {
 	WT_ITEM *val;
-	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
-	page = cbt->ref->page;
 	val = &cbt->iface.value;
 
 	if (newpage) {
@@ -176,8 +174,8 @@ __cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, bool newpage)
 		 * to a record number matching the first record on the page.
 		 */
 		if (cbt->ins == NULL &&
-		    (cbt->recno == page->pg_fix_recno ||
-		    __col_fix_last_recno(page) != 0))
+		    (cbt->recno == cbt->ref->ref_recno ||
+		    __col_fix_last_recno(cbt->ref) != 0))
 			return (WT_NOTFOUND);
 	}
 
@@ -234,7 +232,7 @@ __cursor_fix_prev(WT_CURSOR_BTREE *cbt, bool newpage)
 
 	/* Initialize for each new page. */
 	if (newpage) {
-		cbt->last_standard_recno = __col_fix_last_recno(page);
+		cbt->last_standard_recno = __col_fix_last_recno(cbt->ref);
 		if (cbt->last_standard_recno == 0)
 			return (WT_NOTFOUND);
 		__cursor_set_recno(cbt, cbt->last_standard_recno);
@@ -242,7 +240,7 @@ __cursor_fix_prev(WT_CURSOR_BTREE *cbt, bool newpage)
 	}
 
 	/* Move to the previous entry and return the item. */
-	if (cbt->recno == page->pg_fix_recno)
+	if (cbt->recno == cbt->ref->ref_recno)
 		return (WT_NOTFOUND);
 	__cursor_set_recno(cbt, cbt->recno - 1);
 
@@ -255,7 +253,7 @@ new_page:
 		cbt->ins = NULL;
 	upd = cbt->ins == NULL ? NULL : __wt_txn_read(session, cbt->ins->upd);
 	if (upd == NULL) {
-		cbt->v = __bit_getv_recno(page, cbt->recno, btree->bitcnt);
+		cbt->v = __bit_getv_recno(cbt->ref, cbt->recno, btree->bitcnt);
 		val->data = &cbt->v;
 	} else
 		val->data = WT_UPDATE_DATA(upd);
@@ -327,7 +325,7 @@ __cursor_var_prev(WT_CURSOR_BTREE *cbt, bool newpage)
 
 	/* Initialize for each new page. */
 	if (newpage) {
-		cbt->last_standard_recno = __col_var_last_recno(page);
+		cbt->last_standard_recno = __col_var_last_recno(cbt->ref);
 		if (cbt->last_standard_recno == 0)
 			return (WT_NOTFOUND);
 		__cursor_set_recno(cbt, cbt->last_standard_recno);
@@ -338,12 +336,12 @@ __cursor_var_prev(WT_CURSOR_BTREE *cbt, bool newpage)
 	for (;;) {
 		__cursor_set_recno(cbt, cbt->recno - 1);
 
-new_page:	if (cbt->recno < page->pg_var_recno)
+new_page:	if (cbt->recno < cbt->ref->ref_recno)
 			return (WT_NOTFOUND);
 
 		/* Find the matching WT_COL slot. */
 		if ((cip =
-		    __col_var_search(page, cbt->recno, &rle_start)) == NULL)
+		    __col_var_search(cbt->ref, cbt->recno, &rle_start)) == NULL)
 			return (WT_NOTFOUND);
 		cbt->slot = WT_COL_SLOT(page, cip);
 

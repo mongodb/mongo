@@ -59,10 +59,8 @@ fop_start(u_int nthreads)
 	tids = NULL; /* Silence GCC 4.1 warning. */
 
 	/* Create statistics and thread structures. */
-	if ((run_stats = calloc(
-	    (size_t)(nthreads), sizeof(*run_stats))) == NULL ||
-	    (tids = calloc((size_t)(nthreads), sizeof(*tids))) == NULL)
-		testutil_die(errno, "calloc");
+	run_stats = dcalloc((size_t)(nthreads), sizeof(*run_stats));
+	tids = dcalloc((size_t)(nthreads), sizeof(*tids));
 
 	(void)gettimeofday(&start, NULL);
 

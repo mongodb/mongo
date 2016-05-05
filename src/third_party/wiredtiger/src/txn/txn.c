@@ -108,17 +108,17 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
  * __wt_txn_get_snapshot --
  *	Allocate a snapshot.
  */
-void
+int
 __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *s, *txn_state;
 	uint64_t current_id, id;
 	uint64_t prev_oldest_id, snap_min;
 	uint32_t i, n, session_cnt;
-	int32_t count;
 
 	conn = S2C(session);
 	txn = &session->txn;
@@ -126,15 +126,13 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	txn_state = WT_SESSION_TXN_STATE(session);
 
 	/*
-	 * We're going to scan.  Increment the count of scanners to prevent the
-	 * oldest ID from moving forwards.  Spin if the count is negative,
-	 * which indicates that some thread is moving the oldest ID forwards.
+	 * Spin waiting for the lock: the sleeps in our blocking readlock
+	 * implementation are too slow for scanning the transaction table.
 	 */
-	do {
-		if ((count = txn_global->scan_count) < 0)
-			WT_PAUSE();
-	} while (count < 0 ||
-	    !__wt_atomic_casiv32(&txn_global->scan_count, count, count + 1));
+	while ((ret =
+	    __wt_try_readlock(session, txn_global->scan_rwlock)) == EBUSY)
+		WT_PAUSE();
+	WT_RET(ret);
 
 	current_id = snap_min = txn_global->current;
 	prev_oldest_id = txn_global->oldest_id;
@@ -145,11 +143,9 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 		__txn_sort_snapshot(session, 0, current_id);
 
 		/* Check that the oldest ID has not moved in the meantime. */
-		if (prev_oldest_id == txn_global->oldest_id) {
-			WT_ASSERT(session, txn_global->scan_count > 0);
-			(void)__wt_atomic_subiv32(&txn_global->scan_count, 1);
-			return;
-		}
+		WT_ASSERT(session, prev_oldest_id == txn_global->oldest_id);
+		WT_RET(__wt_readunlock(session, txn_global->scan_rwlock));
+		return (0);
 	}
 
 	/* Walk the array of concurrent transactions. */
@@ -182,67 +178,35 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	WT_ASSERT(session, prev_oldest_id == txn_global->oldest_id);
 	txn_state->snap_min = snap_min;
 
-	WT_ASSERT(session, txn_global->scan_count > 0);
-	(void)__wt_atomic_subiv32(&txn_global->scan_count, 1);
+	WT_RET(__wt_readunlock(session, txn_global->scan_rwlock));
 
 	__txn_sort_snapshot(session, n, current_id);
+	return (0);
 }
 
 /*
- * __wt_txn_update_oldest --
- *	Sweep the running transactions to update the oldest ID required.
- * !!!
- * If a data-source is calling the WT_EXTENSION_API.transaction_oldest
- * method (for the oldest transaction ID not yet visible to a running
- * transaction), and then comparing that oldest ID against committed
- * transactions to see if updates for a committed transaction are still
- * visible to running transactions, the oldest transaction ID may be
- * the same as the last committed transaction ID, if the transaction
- * state wasn't refreshed after the last transaction committed.  Push
- * past the last committed transaction.
-*/
-void
-__wt_txn_update_oldest(WT_SESSION_IMPL *session, bool force)
+ * __txn_oldest_scan --
+ *	Sweep the running transactions to calculate the oldest ID required.
+ */
+static void
+__txn_oldest_scan(WT_SESSION_IMPL *session,
+    uint64_t *oldest_idp, uint64_t *last_runningp,
+    WT_SESSION_IMPL **oldest_sessionp)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *oldest_session;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *s;
-	uint64_t current_id, id, last_running, oldest_id, prev_oldest_id;
+	uint64_t id, last_running, oldest_id, prev_oldest_id;
 	uint32_t i, session_cnt;
-	int32_t count;
-	bool last_running_moved;
 
 	conn = S2C(session);
 	txn_global = &conn->txn_global;
-
-retry:
-	current_id = last_running = txn_global->current;
 	oldest_session = NULL;
+
+	/* The oldest ID cannot change while we are holding the scan lock. */
 	prev_oldest_id = txn_global->oldest_id;
-
-	/*
-	 * For pure read-only workloads, or if the update isn't forced and the
-	 * oldest ID isn't too far behind, avoid scanning.
-	 */
-	if (prev_oldest_id == current_id ||
-	    (!force && WT_TXNID_LT(current_id, prev_oldest_id + 100)))
-		return;
-
-	/*
-	 * We're going to scan.  Increment the count of scanners to prevent the
-	 * oldest ID from moving forwards.  Spin if the count is negative,
-	 * which indicates that some thread is moving the oldest ID forwards.
-	 */
-	do {
-		if ((count = txn_global->scan_count) < 0)
-			WT_PAUSE();
-	} while (count < 0 ||
-	    !__wt_atomic_casiv32(&txn_global->scan_count, count, count + 1));
-
-	/* The oldest ID cannot change until the scan count goes to zero. */
-	prev_oldest_id = txn_global->oldest_id;
-	current_id = oldest_id = last_running = txn_global->current;
+	oldest_id = last_running = txn_global->current;
 
 	/* Walk the array of concurrent transactions. */
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
@@ -264,7 +228,7 @@ retry:
 		 * !!!
 		 * Note: Don't ignore snap_min values older than the previous
 		 * oldest ID.  Read-uncommitted operations publish snap_min
-		 * values without incrementing scan_count to protect the global
+		 * values without acquiring the scan lock to protect the global
 		 * table.  See the comment in __wt_txn_cursor_op for
 		 * more details.
 		 */
@@ -283,76 +247,118 @@ retry:
 	    WT_TXNID_LT(id, oldest_id))
 		oldest_id = id;
 
-	/* Update the last running ID. */
-	last_running_moved =
-	    WT_TXNID_LT(txn_global->last_running, last_running);
+	*oldest_idp = oldest_id;
+	*oldest_sessionp = oldest_session;
+	*last_runningp = last_running;
+}
 
-	/* Update the oldest ID. */
-	if (WT_TXNID_LT(prev_oldest_id, oldest_id) || last_running_moved) {
-		/*
-		 * We know we want to update.  Check if we're racing.
-		 */
-		if (__wt_atomic_casiv32(&txn_global->scan_count, 1, -1)) {
-			WT_ORDERED_READ(session_cnt, conn->session_cnt);
-			for (i = 0, s = txn_global->states;
-			    i < session_cnt; i++, s++) {
-				if ((id = s->id) != WT_TXN_NONE &&
-				WT_TXNID_LT(id, last_running))
-					last_running = id;
-				if ((id = s->snap_min) != WT_TXN_NONE &&
-				WT_TXNID_LT(id, oldest_id))
-					oldest_id = id;
-			}
+/*
+ * __wt_txn_update_oldest --
+ *	Sweep the running transactions to update the oldest ID required.
+ */
+int
+__wt_txn_update_oldest(WT_SESSION_IMPL *session, bool force)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *oldest_session;
+	WT_TXN_GLOBAL *txn_global;
+	uint64_t current_id, last_running, oldest_id;
+	uint64_t prev_last_running, prev_oldest_id;
 
-			if (WT_TXNID_LT(last_running, oldest_id))
-				oldest_id = last_running;
+	conn = S2C(session);
+	txn_global = &conn->txn_global;
+
+	current_id = last_running = txn_global->current;
+	prev_last_running = txn_global->last_running;
+	prev_oldest_id = txn_global->oldest_id;
+
+	/*
+	 * For pure read-only workloads, or if the update isn't forced and the
+	 * oldest ID isn't too far behind, avoid scanning.
+	 */
+	if (prev_oldest_id == current_id ||
+	    (!force && WT_TXNID_LT(current_id, prev_oldest_id + 100)))
+		return (0);
+
+	/* First do a read-only scan. */
+	if (force)
+		WT_RET(__wt_readlock(session, txn_global->scan_rwlock));
+	else if ((ret =
+	    __wt_try_readlock(session, txn_global->scan_rwlock)) != 0)
+		return (ret == EBUSY ? 0 : ret);
+	__txn_oldest_scan(session, &oldest_id, &last_running, &oldest_session);
+	WT_RET(__wt_readunlock(session, txn_global->scan_rwlock));
+
+	/*
+	 * If the state hasn't changed (or hasn't moved far enough for
+	 * non-forced updates), give up.
+	 */
+	if ((oldest_id == prev_oldest_id ||
+	    (!force && WT_TXNID_LT(oldest_id, prev_oldest_id + 100))) &&
+	    ((last_running == prev_last_running) ||
+	    (!force && WT_TXNID_LT(last_running, prev_last_running + 100))))
+		return (0);
+
+	/* It looks like an update is necessary, wait for exclusive access. */
+	if (force)
+		WT_RET(__wt_writelock(session, txn_global->scan_rwlock));
+	else if ((ret =
+	    __wt_try_writelock(session, txn_global->scan_rwlock)) != 0)
+		return (ret == EBUSY ? 0 : ret);
+
+	/*
+	 * If the oldest ID has been updated while we waited, don't bother
+	 * scanning.
+	 */
+	if (WT_TXNID_LE(oldest_id, txn_global->oldest_id) &&
+	    WT_TXNID_LE(last_running, txn_global->last_running))
+		goto done;
+
+	/*
+	 * Re-scan now that we have exclusive access.  This is necessary because
+	 * threads get transaction snapshots with read locks, and we have to be
+	 * sure that there isn't a thread that has got a snapshot locally but
+	 * not yet published its snap_min.
+	 */
+	__txn_oldest_scan(session, &oldest_id, &last_running, &oldest_session);
 
 #ifdef HAVE_DIAGNOSTIC
-			/*
-			 * Make sure the ID doesn't move past any named
-			 * snapshots.
-			 *
-			 * Don't include the read/assignment in the assert
-			 * statement.  Coverity complains if there are
-			 * assignments only done in diagnostic builds, and
-			 * when the read is from a volatile.
-			 */
-			id = txn_global->nsnap_oldest_id;
-			WT_ASSERT(session,
-			    id == WT_TXN_NONE || !WT_TXNID_LT(id, oldest_id));
+	{
+	/*
+	 * Make sure the ID doesn't move past any named snapshots.
+	 *
+	 * Don't include the read/assignment in the assert statement.  Coverity
+	 * complains if there are assignments only done in diagnostic builds,
+	 * and when the read is from a volatile.
+	 */
+	uint64_t id = txn_global->nsnap_oldest_id;
+	WT_ASSERT(session,
+	    id == WT_TXN_NONE || !WT_TXNID_LT(id, oldest_id));
+	}
 #endif
-			if (WT_TXNID_LT(txn_global->last_running, last_running))
-				txn_global->last_running = last_running;
-			if (WT_TXNID_LT(txn_global->oldest_id, oldest_id))
-				txn_global->oldest_id = oldest_id;
-			WT_ASSERT(session, txn_global->scan_count == -1);
-			txn_global->scan_count = 0;
-		} else {
-			/*
-			 * We wanted to update the oldest ID but we're racing
-			 * another thread.  Retry if this is a forced update.
-			 */
-			WT_ASSERT(session, txn_global->scan_count > 0);
-			(void)__wt_atomic_subiv32(&txn_global->scan_count, 1);
-			if (force) {
-				__wt_yield();
-				goto retry;
-			}
-		}
-	} else {
+	/* Update the oldest ID. */
+	if (WT_TXNID_LT(txn_global->oldest_id, oldest_id))
+		txn_global->oldest_id = oldest_id;
+	if (WT_TXNID_LT(txn_global->last_running, last_running)) {
+		txn_global->last_running = last_running;
+
+		/* Output a verbose message about long-running transactions,
+		 * but only when some progress is being made. */
 		if (WT_VERBOSE_ISSET(session, WT_VERB_TRANSACTION) &&
 		    current_id - oldest_id > 10000 && oldest_session != NULL) {
-			(void)__wt_verbose(session, WT_VERB_TRANSACTION,
+			WT_TRET(__wt_verbose(session, WT_VERB_TRANSACTION,
 			    "old snapshot %" PRIu64
 			    " pinned in session %" PRIu32 " [%s]"
 			    " with snap_min %" PRIu64 "\n",
 			    oldest_id, oldest_session->id,
 			    oldest_session->lastop,
-			    oldest_session->txn.snap_min);
+			    oldest_session->txn.snap_min));
 		}
-		WT_ASSERT(session, txn_global->scan_count > 0);
-		(void)__wt_atomic_subiv32(&txn_global->scan_count, 1);
 	}
+
+done:	WT_TRET(__wt_writeunlock(session, txn_global->scan_rwlock));
+	return (ret);
 }
 
 /*
@@ -513,7 +519,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 		 */
 		if (F_ISSET(txn, WT_TXN_SYNC_SET))
 			WT_RET_MSG(session, EINVAL,
-			    "Sync already set during begin_transaction.");
+			    "Sync already set during begin_transaction");
 		if (WT_STRING_MATCH("background", cval.str, cval.len))
 			txn->txn_logsync = WT_LOG_BACKGROUND;
 		else if (WT_STRING_MATCH("off", cval.str, cval.len))
@@ -736,6 +742,8 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_spin_init(session,
 	    &txn_global->id_lock, "transaction id lock"));
 	WT_RET(__wt_rwlock_alloc(session,
+	    &txn_global->scan_rwlock, "transaction scan lock"));
+	WT_RET(__wt_rwlock_alloc(session,
 	    &txn_global->nsnap_rwlock, "named snapshot lock"));
 	txn_global->nsnap_oldest_id = WT_TXN_NONE;
 	TAILQ_INIT(&txn_global->nsnaph);
@@ -768,6 +776,7 @@ __wt_txn_global_destroy(WT_SESSION_IMPL *session)
 		return (0);
 
 	__wt_spin_destroy(session, &txn_global->id_lock);
+	WT_TRET(__wt_rwlock_destroy(session, &txn_global->scan_rwlock));
 	WT_TRET(__wt_rwlock_destroy(session, &txn_global->nsnap_rwlock));
 	__wt_free(session, txn_global->states);
 
