@@ -45,6 +45,6 @@ public:
 
     virtual KVEngine* restartEngine() = 0;
 
-    static KVHarnessHelper* create(ClockSource* cs);
+    static KVHarnessHelper* create();
 };
 }

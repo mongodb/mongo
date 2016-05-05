@@ -51,7 +51,7 @@ private:
     std::unique_ptr<EphemeralForTestEngine> _engine;
 };
 
-KVHarnessHelper* KVHarnessHelper::create(ClockSource* cs) {
+KVHarnessHelper* KVHarnessHelper::create() {
     return new EphemeralForTestKVHarnessHelper();
 }
 }

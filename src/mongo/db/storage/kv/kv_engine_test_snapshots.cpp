@@ -168,8 +168,7 @@ public:
     }
 
     void setUp() override {
-        service.setFastClockSource(stdx::make_unique<ClockSourceMock>());
-        helper.reset(KVHarnessHelper::create(service.getFastClockSource()));
+        helper.reset(KVHarnessHelper::create());
         engine = helper->getEngine();
         snapshotManager = helper->getEngine()->getSnapshotManager();
 

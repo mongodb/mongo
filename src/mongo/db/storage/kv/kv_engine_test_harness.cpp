@@ -54,7 +54,7 @@ const std::unique_ptr<ClockSource> clock = stdx::make_unique<ClockSourceMock>();
 }
 
 TEST(KVEngineTestHarness, SimpleRS1) {
-    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(clock.get()));
+    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
     KVEngine* engine = helper->getEngine();
     ASSERT(engine);
 
@@ -92,7 +92,7 @@ TEST(KVEngineTestHarness, SimpleRS1) {
 }
 
 TEST(KVEngineTestHarness, Restart1) {
-    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(clock.get()));
+    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
     KVEngine* engine = helper->getEngine();
     ASSERT(engine);
 
@@ -136,7 +136,7 @@ TEST(KVEngineTestHarness, Restart1) {
 
 
 TEST(KVEngineTestHarness, SimpleSorted1) {
-    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(clock.get()));
+    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
     KVEngine* engine = helper->getEngine();
     ASSERT(engine);
 
@@ -164,7 +164,7 @@ TEST(KVEngineTestHarness, SimpleSorted1) {
 }
 
 TEST(KVCatalogTest, Coll1) {
-    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(clock.get()));
+    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
     KVEngine* engine = helper->getEngine();
 
     unique_ptr<RecordStore> rs;
@@ -208,7 +208,7 @@ TEST(KVCatalogTest, Coll1) {
 
 
 TEST(KVCatalogTest, Idx1) {
-    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(clock.get()));
+    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
     KVEngine* engine = helper->getEngine();
 
     unique_ptr<RecordStore> rs;
@@ -281,7 +281,7 @@ TEST(KVCatalogTest, Idx1) {
 }
 
 TEST(KVCatalogTest, DirectoryPerDb1) {
-    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(clock.get()));
+    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
     KVEngine* engine = helper->getEngine();
 
     unique_ptr<RecordStore> rs;
@@ -323,7 +323,7 @@ TEST(KVCatalogTest, DirectoryPerDb1) {
 }
 
 TEST(KVCatalogTest, Split1) {
-    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(clock.get()));
+    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
     KVEngine* engine = helper->getEngine();
 
     unique_ptr<RecordStore> rs;
@@ -365,7 +365,7 @@ TEST(KVCatalogTest, Split1) {
 }
 
 TEST(KVCatalogTest, DirectoryPerAndSplit1) {
-    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(clock.get()));
+    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
     KVEngine* engine = helper->getEngine();
 
     unique_ptr<RecordStore> rs;
