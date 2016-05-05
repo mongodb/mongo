@@ -692,7 +692,7 @@ main(void)
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	const char *key, *open_config, *uri;
-	u_int i;
+	int i;
 	int ret = 0;
 	char kbuf[64];
 
@@ -743,7 +743,7 @@ main(void)
 		return (EXIT_FAILURE);
 	}
 	for (i = 0; i < 1000; ++i) {
-		(void)snprintf(kbuf, sizeof(kbuf), "%010u KEY -----", i);
+		(void)snprintf(kbuf, sizeof(kbuf), "%010d KEY -----", i);
 		cursor->set_key(cursor, kbuf);
 		cursor->set_value(cursor, "--- VALUE ---");
 		if ((ret = cursor->insert(cursor)) != 0) {
@@ -769,7 +769,7 @@ main(void)
 			    kbuf, wiredtiger_strerror(ret));
 			return (EXIT_FAILURE);
 		}
-		(void)snprintf(kbuf, sizeof(kbuf), "%010u KEY -----", i);
+		(void)snprintf(kbuf, sizeof(kbuf), "%010d KEY -----", i);
 		if ((ret = cursor->get_key(cursor, &key)) != 0) {
 			fprintf(stderr, "WT_CURSOR.get_key: %s\n",
 			    wiredtiger_strerror(ret));
