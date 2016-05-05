@@ -37,49 +37,54 @@
 
 namespace mongo {
 namespace {
+// This is the value of the next timestamp to handed out.
 AtomicUInt64 globalTimestamp(0);
 }  // namespace
 
 void setGlobalTimestamp(const Timestamp& newTime) {
-    globalTimestamp.store(newTime.asULL());
+    globalTimestamp.store(newTime.asULL() + 1);
 }
 
 Timestamp getLastSetTimestamp() {
-    return Timestamp(globalTimestamp.load());
+    return Timestamp(globalTimestamp.load() - 1);
 }
 
-Timestamp getNextGlobalTimestamp() {
+Timestamp getNextGlobalTimestamp(unsigned count) {
     const unsigned now = durationCount<Seconds>(
         getGlobalServiceContext()->getFastClockSource()->now().toDurationSinceEpoch());
+    invariant(now != 0);  // This is a sentinel value for null Timestamps.
+    invariant(count != 0);
 
     // Optimistic approach: just increment the timestamp, assuming the seconds still match.
-    auto next = globalTimestamp.addAndFetch(1);
-    unsigned globalSecs = Timestamp(next).getSecs();
+    auto first = globalTimestamp.fetchAndAdd(count);
+    auto currentTimestamp = first + count;  // What we just set it to.
+    unsigned globalSecs = Timestamp(currentTimestamp).getSecs();
 
     // Fail if time is not moving forward for 2**31 calls to getNextGlobalTimestamp.
-    if (globalSecs > now && Timestamp(next).getInc() >= 1U << 31) {
-        mongo::warning() << "clock skew detected, prev: " << Timestamp(next).getSecs()
-                         << " now: " << now << std::endl;
+    if (MONGO_unlikely(globalSecs > now) && Timestamp(currentTimestamp).getInc() >= 1U << 31) {
+        mongo::severe() << "clock skew detected, prev: " << globalSecs << " now: " << now;
         fassertFailed(17449);
     }
 
-    //  While the seconds need to be updated, try to do it.
-    while (globalSecs < now) {
-        const auto expected = next;
-        const auto desired = Timestamp(now, 1).asULL();
+    // If the seconds need to be updated, try to do it. This can happen at most once per second.
+    if (MONGO_unlikely(globalSecs < now)) {
+        // First fix the seconds portion.
+        while (globalSecs < now) {
+            const auto desired = Timestamp(now, 1).asULL();
 
-        // If the compareAndSwap was not successful, assume someone else updated the seconds.
-        auto actual = globalTimestamp.compareAndSwap(expected, desired);
-        if (actual == expected) {
-            next = desired;
-        } else {
-            next = globalTimestamp.addAndFetch(1);
+            auto actual = globalTimestamp.compareAndSwap(currentTimestamp, desired);
+            if (actual == currentTimestamp)
+                break;  // We successfully set the secs, so we're done here.
+
+            // We raced with someone else. Try again, unless they fixed the secs field for us.
+            currentTimestamp = actual;
+            globalSecs = Timestamp(currentTimestamp).getSecs();
         }
 
-        // Either way, the seconds should no longer be less than now, but repeat if we raced.
-        globalSecs = Timestamp(next).getSecs();
+        // Now reserve our timestamps with the new value of secs.
+        first = globalTimestamp.fetchAndAdd(count);
     }
 
-    return Timestamp(next);
+    return Timestamp(first);
 }
 }  // namespace mongo
