@@ -48,7 +48,7 @@
         });
 
     // write that should reach all nodes
-    var timeout = 15 * 1000;
+    var timeout = 60 * 1000;
     var options = {
         writeConcern: {w: numNodes, wtimeout: timeout}
     };
