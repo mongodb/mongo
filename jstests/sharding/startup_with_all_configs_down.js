@@ -56,7 +56,9 @@
     var error = assert.throws(function() {
         st.s.getDB('test').foo.find().itcount();
     });
-    assert.eq(ErrorCodes.ExceededTimeLimit, error.code);
+
+    assert(ErrorCodes.ReplicaSetNotFound == error.code ||
+           ErrorCodes.ExceededTimeLimit == error.code || ErrorCodes.HostUnreachable == error.code);
 
     jsTestLog("Restarting the config servers");
     for (var i = 0; i < st._configServers.length; i++) {

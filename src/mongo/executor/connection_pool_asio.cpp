@@ -185,7 +185,13 @@ void ASIOConnection::cancelTimeout() {
 
 void ASIOConnection::setup(Milliseconds timeout, SetupCallback cb) {
     _impl->strand().dispatch([this, timeout, cb] {
-        _setupCallback = std::move(cb);
+        _setupCallback = [this, cb](ConnectionInterface* ptr, Status status) {
+            cancelTimeout();
+            cb(ptr, status);
+        };
+
+        // Actually timeout setup
+        setTimeout(timeout, [this] { _impl->connection().stream().cancel(); });
 
         _global->_impl->_connect(_impl.get());
     });
@@ -202,7 +208,7 @@ void ASIOConnection::refresh(Milliseconds timeout, RefreshCallback cb) {
         _refreshCallback = std::move(cb);
 
         // Actually timeout refreshes
-        setTimeout(timeout, [this]() { _impl->connection().stream().cancel(); });
+        setTimeout(timeout, [this] { _impl->connection().stream().cancel(); });
 
         // Our pings are isMaster's
         auto beginStatus = op->beginCommand(makeIsMasterRequest(this),
