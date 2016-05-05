@@ -32,6 +32,7 @@
 
 #include <inttypes.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <wiredtiger.h>
@@ -51,12 +52,12 @@ main(void)
 	    NULL, config_string, strlen(config_string), &parser)) != 0) {
 		fprintf(stderr, "Error creating configuration parser: %s\n",
 		    wiredtiger_strerror(ret));
-		return (ret);
+		return (EXIT_FAILURE);
 	}
 	if ((ret = parser->close(parser)) != 0) {
 		fprintf(stderr, "Error closing configuration parser: %s\n",
 		    wiredtiger_strerror(ret));
-		return (ret);
+		return (EXIT_FAILURE);
 	}
 	/*! [Create a configuration parser] */
 
@@ -64,7 +65,7 @@ main(void)
 	    NULL, config_string, strlen(config_string), &parser)) != 0) {
 		fprintf(stderr, "Error creating configuration parser: %s\n",
 		    wiredtiger_strerror(ret));
-		return (ret);
+		return (EXIT_FAILURE);
 	}
 
 	{
@@ -76,7 +77,7 @@ main(void)
 	if ((ret = parser->get(parser, "page_size", &v)) != 0) {
 		fprintf(stderr,
 		    "page_size configuration: %s", wiredtiger_strerror(ret));
-		return (ret);
+		return (EXIT_FAILURE);
 	}
 	my_page_size = v.val;
 	/*! [get] */
@@ -91,7 +92,7 @@ main(void)
 	    NULL, config_string, strlen(config_string), &parser)) != 0) {
 		fprintf(stderr, "Error creating configuration parser: %s\n",
 		    wiredtiger_strerror(ret));
-		return (ret);
+		return (EXIT_FAILURE);
 	}
 	/*! [next] */
 	/*
@@ -112,7 +113,7 @@ main(void)
 	    NULL, config_string, strlen(config_string), &parser)) != 0) {
 		fprintf(stderr, "Error creating configuration parser: %s\n",
 		    wiredtiger_strerror(ret));
-		return (ret);
+		return (EXIT_FAILURE);
 	}
 
 	/*! [nested get] */
@@ -125,7 +126,7 @@ main(void)
 	if ((ret = parser->get(parser, "log.file_max", &v)) != 0) {
 		fprintf(stderr,
 		    "log.file_max configuration: %s", wiredtiger_strerror(ret));
-		return (ret);
+		return (EXIT_FAILURE);
 	}
 	printf("log file max: %" PRId64 "\n", v.val);
 	/*! [nested get] */
@@ -135,7 +136,7 @@ main(void)
 	    NULL, config_string, strlen(config_string), &parser)) != 0) {
 		fprintf(stderr, "Error creating configuration parser: %s\n",
 		    wiredtiger_strerror(ret));
-		return (ret);
+		return (EXIT_FAILURE);
 	}
 	/*! [nested traverse] */
 	{
@@ -150,11 +151,10 @@ main(void)
 				    "Error creating nested configuration "
 				    "parser: %s\n",
 				    wiredtiger_strerror(ret));
-				ret = parser->close(parser);
-				return (ret);
+				break;
 			}
-			while ((ret = sub_parser->next(
-			    sub_parser, &k, &v)) == 0)
+			while ((ret =
+			    sub_parser->next(sub_parser, &k, &v)) == 0)
 				printf("\t%.*s\n", (int)k.len, k.str);
 			ret = sub_parser->close(sub_parser);
 		}
@@ -163,5 +163,5 @@ main(void)
 	ret = parser->close(parser);
 	}
 
-	return (ret);
+	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
