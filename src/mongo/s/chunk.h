@@ -30,6 +30,7 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
 
@@ -127,9 +128,9 @@ public:
      *
      * @throws UserException
      */
-    StatusWith<boost::optional<std::pair<BSONObj, BSONObj>>> split(OperationContext* txn,
-                                                                   SplitPointMode mode,
-                                                                   size_t* resultingSplits) const;
+    StatusWith<boost::optional<ChunkRange>> split(OperationContext* txn,
+                                                  SplitPointMode mode,
+                                                  size_t* resultingSplits) const;
 
     /**
      * marks this chunk as a jumbo chunk

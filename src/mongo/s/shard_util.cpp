@@ -51,35 +51,6 @@ const char kMinKey[] = "min";
 const char kMaxKey[] = "max";
 const char kShouldMigrate[] = "shouldMigrate";
 
-/**
- * Extracts the bounds of a chunk from a BSON object having the following format:
- *  { min: <min key>, max: <max key> }
- *
- * Returns a failed status if the format cannot be matched.
- */
-StatusWith<std::pair<BSONObj, BSONObj>> extractChunkBounds(const BSONObj& obj) {
-    BSONElement minKey;
-    {
-        Status minKeyStatus = bsonExtractTypedField(obj, kMinKey, Object, &minKey);
-        if (!minKeyStatus.isOK()) {
-            return {minKeyStatus.code(),
-                    str::stream() << "Invalid min key due to " << minKeyStatus.toString()};
-        }
-    }
-
-    BSONElement maxKey;
-    {
-        Status maxKeyStatus = bsonExtractTypedField(obj, kMaxKey, Object, &maxKey);
-        if (!maxKeyStatus.isOK()) {
-            return {maxKeyStatus.code(),
-                    str::stream() << "Invalid max key due to " << maxKeyStatus.toString()};
-        }
-    }
-
-    return std::pair<BSONObj, BSONObj>(
-        std::make_pair(minKey.Obj().getOwned(), maxKey.Obj().getOwned()));
-}
-
 }  // namespace
 
 StatusWith<long long> retrieveTotalShardSize(OperationContext* txn, const ShardId& shardId) {
@@ -196,7 +167,7 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* txn,
     return std::move(splitPoints);
 }
 
-StatusWith<boost::optional<std::pair<BSONObj, BSONObj>>> splitChunkAtMultiplePoints(
+StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     OperationContext* txn,
     const ShardId& shardId,
     const NamespaceString& nss,
@@ -258,13 +229,12 @@ StatusWith<boost::optional<std::pair<BSONObj, BSONObj>>> splitChunkAtMultiplePoi
     BSONElement shouldMigrateElement;
     status = bsonExtractTypedField(cmdResponse, kShouldMigrate, Object, &shouldMigrateElement);
     if (status.isOK()) {
-        auto chunkBoundsStatus = extractChunkBounds(shouldMigrateElement.embeddedObject());
-        if (!chunkBoundsStatus.isOK()) {
-            return chunkBoundsStatus.getStatus();
+        auto chunkRangeStatus = ChunkRange::fromBSON(shouldMigrateElement.embeddedObject());
+        if (!chunkRangeStatus.isOK()) {
+            return chunkRangeStatus.getStatus();
         }
 
-        return boost::optional<std::pair<BSONObj, BSONObj>>(
-            std::move(chunkBoundsStatus.getValue()));
+        return boost::optional<ChunkRange>(std::move(chunkRangeStatus.getValue()));
     } else if (status != ErrorCodes::NoSuchKey) {
         warning()
             << "Chunk migration will be skipped because splitChunk returned invalid response: "
@@ -272,7 +242,7 @@ StatusWith<boost::optional<std::pair<BSONObj, BSONObj>>> splitChunkAtMultiplePoi
             << causedBy(status);
     }
 
-    return boost::optional<std::pair<BSONObj, BSONObj>>();
+    return boost::optional<ChunkRange>();
 }
 
 }  // namespace shardutil

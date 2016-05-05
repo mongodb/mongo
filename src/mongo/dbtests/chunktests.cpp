@@ -65,7 +65,7 @@ public:
             _chunkMap[mySplitPoints[i]] = chunk;
         }
 
-        _chunkRanges.reloadAll(_chunkMap);
+        _chunkRangeMap = std::move(_constructRanges(_chunkMap));
     }
 };
 

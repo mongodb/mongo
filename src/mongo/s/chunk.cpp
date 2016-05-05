@@ -39,7 +39,6 @@
 #include "mongo/s/balancer/balancer.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_manager.h"
-#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
@@ -218,8 +217,9 @@ std::vector<BSONObj> Chunk::_determineSplitPoints(OperationContext* txn, bool at
     return splitPoints;
 }
 
-StatusWith<boost::optional<std::pair<BSONObj, BSONObj>>> Chunk::split(
-    OperationContext* txn, SplitPointMode mode, size_t* resultingSplits) const {
+StatusWith<boost::optional<ChunkRange>> Chunk::split(OperationContext* txn,
+                                                     SplitPointMode mode,
+                                                     size_t* resultingSplits) const {
     size_t dummy;
     if (resultingSplits == NULL) {
         resultingSplits = &dummy;
@@ -368,8 +368,8 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {
             ChunkType chunkToMove;
             chunkToMove.setNS(_manager->getns());
             chunkToMove.setShard(getShardId());
-            chunkToMove.setMin(suggestedMigrateChunk->first);
-            chunkToMove.setMax(suggestedMigrateChunk->second);
+            chunkToMove.setMin(suggestedMigrateChunk->getMin());
+            chunkToMove.setMax(suggestedMigrateChunk->getMax());
 
             msgassertedNoTraceWithStatus(
                 10412, Balancer::get(txn)->rebalanceSingleChunk(txn, chunkToMove));

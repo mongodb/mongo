@@ -32,6 +32,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
 
@@ -103,7 +104,7 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* txn,
  * minKey/maxKey Bounds of the chunk to be split.
  * splitPoints The set of points at which the chunk should be split.
  */
-StatusWith<boost::optional<std::pair<BSONObj, BSONObj>>> splitChunkAtMultiplePoints(
+StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     OperationContext* txn,
     const ShardId& shardId,
     const NamespaceString& nss,

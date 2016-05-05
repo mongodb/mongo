@@ -52,6 +52,51 @@ const BSONField<bool> ChunkType::jumbo("jumbo");
 const BSONField<Date_t> ChunkType::DEPRECATED_lastmod("lastmod");
 const BSONField<OID> ChunkType::DEPRECATED_epoch("lastmodEpoch");
 
+namespace {
+
+const char kMinKey[] = "min";
+const char kMaxKey[] = "max";
+
+}  // namespace
+
+ChunkRange::ChunkRange(BSONObj minKey, BSONObj maxKey)
+    : _minKey(std::move(minKey)), _maxKey(std::move(maxKey)) {}
+
+StatusWith<ChunkRange> ChunkRange::fromBSON(const BSONObj& obj) {
+    BSONElement minKey;
+    {
+        Status minKeyStatus = bsonExtractTypedField(obj, kMinKey, Object, &minKey);
+        if (!minKeyStatus.isOK()) {
+            return {minKeyStatus.code(),
+                    str::stream() << "Invalid min key due to " << minKeyStatus.reason()};
+        }
+    }
+
+    BSONElement maxKey;
+    {
+        Status maxKeyStatus = bsonExtractTypedField(obj, kMaxKey, Object, &maxKey);
+        if (!maxKeyStatus.isOK()) {
+            return {maxKeyStatus.code(),
+                    str::stream() << "Invalid max key due to " << maxKeyStatus.reason()};
+        }
+    }
+
+    return ChunkRange(minKey.Obj().getOwned(), maxKey.Obj().getOwned());
+}
+
+bool ChunkRange::containsKey(const BSONObj& key) const {
+    return _minKey.woCompare(key) <= 0 && key.woCompare(_maxKey) < 0;
+}
+
+void ChunkRange::append(BSONObjBuilder* builder) const {
+    builder->append(kMinKey, _minKey);
+    builder->append(kMaxKey, _maxKey);
+}
+
+std::string ChunkRange::toString() const {
+    return str::stream() << "[" << _minKey << ", " << _maxKey << ")";
+}
+
 StatusWith<ChunkType> ChunkType::fromBSON(const BSONObj& source) {
     ChunkType chunk;
 
@@ -72,19 +117,13 @@ StatusWith<ChunkType> ChunkType::fromBSON(const BSONObj& source) {
     }
 
     {
-        BSONElement chunkMinElement;
-        Status status = bsonExtractTypedField(source, min.name(), Object, &chunkMinElement);
-        if (!status.isOK())
-            return status;
-        chunk._min = chunkMinElement.Obj().getOwned();
-    }
+        auto chunkRangeStatus = ChunkRange::fromBSON(source);
+        if (!chunkRangeStatus.isOK())
+            return chunkRangeStatus.getStatus();
 
-    {
-        BSONElement chunkMaxElement;
-        Status status = bsonExtractTypedField(source, max.name(), Object, &chunkMaxElement);
-        if (!status.isOK())
-            return status;
-        chunk._max = chunkMaxElement.Obj().getOwned();
+        const auto chunkRange = std::move(chunkRangeStatus.getValue());
+        chunk._min = chunkRange.getMin().getOwned();
+        chunk._max = chunkRange.getMax().getOwned();
     }
 
     {

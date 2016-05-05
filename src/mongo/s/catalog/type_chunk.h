@@ -31,15 +31,53 @@
 #include <boost/optional.hpp>
 #include <string>
 
-#include "mongo/db/jsobj.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/s/chunk_version.h"
 
 namespace mongo {
 
-class BSONObj;
+class BSONObjBuilder;
 class Status;
 template <typename T>
 class StatusWith;
+
+/**
+ * Contains the minimum representation of a chunk - its bounds in the format [min, max) along with
+ * utilities for parsing and persistence.
+ */
+class ChunkRange {
+public:
+    ChunkRange(BSONObj minKey, BSONObj maxKey);
+
+    /**
+     * Parses a chunk range using the format { min: <min bound>, max: <max bound> }.
+     */
+    static StatusWith<ChunkRange> fromBSON(const BSONObj& obj);
+
+    const BSONObj& getMin() const {
+        return _minKey;
+    }
+
+    const BSONObj& getMax() const {
+        return _maxKey;
+    }
+
+    /**
+     * Checks whether the specified key is within the bounds of this chunk range.
+     */
+    bool containsKey(const BSONObj& key) const;
+
+    /**
+     * Writes the contents of this chunk range as { min: <min bound>, max: <max bound> }.
+     */
+    void append(BSONObjBuilder* builder) const;
+
+    std::string toString() const;
+
+private:
+    BSONObj _minKey;
+    BSONObj _maxKey;
+};
 
 /**
  * This class represents the layout and contents of documents contained in the
