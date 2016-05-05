@@ -1392,7 +1392,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, uint32_t queue_index, u_int *slotp)
 		/* Limit internal pages to 50% unless we get aggressive. */
 		if (WT_PAGE_IS_INTERNAL(page) &&
 		    !FLD_ISSET(cache->state, WT_EVICT_PASS_AGGRESSIVE) &&
-		    internal_pages >= (int)(evict - start) / 2)
+		    internal_pages >= (int)(end - start) / 2)
 			continue;
 
 fast:		/* If the page can't be evicted, give up. */
