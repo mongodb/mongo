@@ -208,8 +208,12 @@ StatusWith<std::unique_ptr<PlanExecutor>> attemptToGetExecutor(
     const size_t plannerOpts) {
     const ExtensionsCallbackReal extensionsCallback(pExpCtx->opCtx, &pExpCtx->ns);
 
-    auto cq = CanonicalQuery::canonicalize(
-        txn, pExpCtx->ns, queryObj, sortObj, projectionObj, extensionsCallback);
+    auto lpq = stdx::make_unique<LiteParsedQuery>(pExpCtx->ns);
+    lpq->setFilter(queryObj);
+    lpq->setSort(sortObj);
+    lpq->setProj(projectionObj);
+
+    auto cq = CanonicalQuery::canonicalize(txn, std::move(lpq), extensionsCallback);
 
     if (!cq.isOK()) {
         // Return an error instead of uasserting, since there are cases where the combination of

@@ -118,13 +118,13 @@ void addQueryShapeToPlanCache(OperationContext* txn,
                               const char* queryStr,
                               const char* sortStr,
                               const char* projectionStr) {
-    BSONObj queryObj = fromjson(queryStr);
-    BSONObj sortObj = fromjson(sortStr);
-    BSONObj projectionObj = fromjson(projectionStr);
-
     // Create canonical query.
-    auto statusWithCQ = CanonicalQuery::canonicalize(
-        txn, nss, queryObj, sortObj, projectionObj, ExtensionsCallbackDisallowExtensions());
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    lpq->setFilter(fromjson(queryStr));
+    lpq->setSort(fromjson(sortStr));
+    lpq->setProj(fromjson(projectionStr));
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(txn, std::move(lpq), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -146,13 +146,13 @@ bool planCacheContains(const PlanCache& planCache,
     QueryTestServiceContext serviceContext;
     auto txn = serviceContext.makeOperationContext();
 
-    BSONObj queryObj = fromjson(queryStr);
-    BSONObj sortObj = fromjson(sortStr);
-    BSONObj projectionObj = fromjson(projectionStr);
-
     // Create canonical query.
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    lpq->setFilter(fromjson(queryStr));
+    lpq->setSort(fromjson(sortStr));
+    lpq->setProj(fromjson(projectionStr));
     auto statusWithInputQuery = CanonicalQuery::canonicalize(
-        txn.get(), nss, queryObj, sortObj, projectionObj, ExtensionsCallbackDisallowExtensions());
+        txn.get(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithInputQuery.getStatus());
     unique_ptr<CanonicalQuery> inputQuery = std::move(statusWithInputQuery.getValue());
 
@@ -167,13 +167,12 @@ bool planCacheContains(const PlanCache& planCache,
         // Canonicalizing query shape in cache entry to get cache key.
         // Alternatively, we could add key to PlanCacheEntry but that would be used in one place
         // only.
-        auto statusWithCurrentQuery =
-            CanonicalQuery::canonicalize(txn.get(),
-                                         nss,
-                                         entry->query,
-                                         entry->sort,
-                                         entry->projection,
-                                         ExtensionsCallbackDisallowExtensions());
+        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+        lpq->setFilter(entry->query);
+        lpq->setSort(entry->sort);
+        lpq->setProj(entry->projection);
+        auto statusWithCurrentQuery = CanonicalQuery::canonicalize(
+            txn.get(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCurrentQuery.getStatus());
         unique_ptr<CanonicalQuery> currentQuery = std::move(statusWithCurrentQuery.getValue());
 

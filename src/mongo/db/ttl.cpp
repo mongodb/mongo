@@ -288,8 +288,10 @@ private:
         const char* keyFieldName = key.firstElement().fieldName();
         BSONObj query =
             BSON(keyFieldName << BSON("$gte" << kDawnOfTime << "$lte" << expirationTime));
-        auto canonicalQuery =
-            CanonicalQuery::canonicalize(txn, nss, query, ExtensionsCallbackDisallowExtensions());
+        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+        lpq->setFilter(query);
+        auto canonicalQuery = CanonicalQuery::canonicalize(
+            txn, std::move(lpq), ExtensionsCallbackDisallowExtensions());
         invariantOK(canonicalQuery.getStatus());
 
         DeleteStageParams params;

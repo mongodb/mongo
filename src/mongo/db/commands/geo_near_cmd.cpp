@@ -207,9 +207,12 @@ public:
         BSONObj projObj = BSON("$pt" << BSON("$meta" << LiteParsedQuery::metaGeoNearPoint) << "$dis"
                                      << BSON("$meta" << LiteParsedQuery::metaGeoNearDistance));
 
+        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+        lpq->setFilter(rewritten);
+        lpq->setProj(projObj);
+        lpq->setLimit(numWanted);
         const ExtensionsCallbackReal extensionsCallback(txn, &nss);
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn, nss, rewritten, BSONObj(), projObj, 0, numWanted, BSONObj(), extensionsCallback);
+        auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(lpq), extensionsCallback);
         if (!statusWithCQ.isOK()) {
             errmsg = "Can't parse filter / create query";
             return false;

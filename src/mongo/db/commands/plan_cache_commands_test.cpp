@@ -130,8 +130,10 @@ TEST(PlanCacheCommandsTest, planCacheListQueryShapesOneKey) {
     auto txn = serviceContext.makeOperationContext();
 
     // Create a canonical query
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    lpq->setFilter(fromjson("{a: 1}"));
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        txn.get(), nss, fromjson("{a: 1}"), ExtensionsCallbackDisallowExtensions());
+        txn.get(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -159,8 +161,10 @@ TEST(PlanCacheCommandsTest, planCacheClearAllShapes) {
     auto txn = serviceContext.makeOperationContext();
 
     // Create a canonical query
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    lpq->setFilter(fromjson("{a: 1}"));
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        txn.get(), nss, fromjson("{a: 1}"), ExtensionsCallbackDisallowExtensions());
+        txn.get(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -278,12 +282,16 @@ TEST(PlanCacheCommandsTest, planCacheClearOneKey) {
     auto txn = serviceContext.makeOperationContext();
 
     // Create 2 canonical queries.
+    auto lpqA = stdx::make_unique<LiteParsedQuery>(nss);
+    lpqA->setFilter(fromjson("{a: 1}"));
     auto statusWithCQA = CanonicalQuery::canonicalize(
-        txn.get(), nss, fromjson("{a: 1}"), ExtensionsCallbackDisallowExtensions());
+        txn.get(), std::move(lpqA), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQA.getStatus());
+    auto lpqB = stdx::make_unique<LiteParsedQuery>(nss);
+    lpqB->setFilter(fromjson("{b: 1}"));
     unique_ptr<CanonicalQuery> cqA = std::move(statusWithCQA.getValue());
     auto statusWithCQB = CanonicalQuery::canonicalize(
-        txn.get(), nss, fromjson("{b: 1}"), ExtensionsCallbackDisallowExtensions());
+        txn.get(), std::move(lpqB), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQB.getStatus());
     unique_ptr<CanonicalQuery> cqB = std::move(statusWithCQB.getValue());
 
@@ -404,8 +412,10 @@ TEST(PlanCacheCommandsTest, planCacheListPlansOnlyOneSolutionTrue) {
     auto txn = serviceContext.makeOperationContext();
 
     // Create a canonical query
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    lpq->setFilter(fromjson("{a: 1}"));
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        txn.get(), nss, fromjson("{a: 1}"), ExtensionsCallbackDisallowExtensions());
+        txn.get(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -427,8 +437,10 @@ TEST(PlanCacheCommandsTest, planCacheListPlansOnlyOneSolutionFalse) {
     auto txn = serviceContext.makeOperationContext();
 
     // Create a canonical query
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    lpq->setFilter(fromjson("{a: 1}"));
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        txn.get(), nss, fromjson("{a: 1}"), ExtensionsCallbackDisallowExtensions());
+        txn.get(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 

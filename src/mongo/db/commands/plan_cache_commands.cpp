@@ -209,10 +209,12 @@ StatusWith<unique_ptr<CanonicalQuery>> PlanCacheCommand::canonicalize(OperationC
 
     // Create canonical query
     const NamespaceString nss(ns);
+    auto lpq = stdx::make_unique<LiteParsedQuery>(std::move(nss));
+    lpq->setFilter(queryObj);
+    lpq->setSort(sortObj);
+    lpq->setProj(projObj);
     const ExtensionsCallbackReal extensionsCallback(txn, &nss);
-
-    auto statusWithCQ = CanonicalQuery::canonicalize(
-        txn, std::move(nss), queryObj, sortObj, projObj, extensionsCallback);
+    auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(lpq), extensionsCallback);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }

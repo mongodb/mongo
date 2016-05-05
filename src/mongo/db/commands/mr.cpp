@@ -1060,8 +1060,10 @@ void State::finalReduce(OperationContext* txn, CurOp* curOp, ProgressMeterHolder
     const NamespaceString nss(_config.incLong);
     const ExtensionsCallbackReal extensionsCallback(_txn, &nss);
 
-    auto statusWithCQ =
-        CanonicalQuery::canonicalize(txn, nss, BSONObj(), sortKey, BSONObj(), extensionsCallback);
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    lpq->setSort(sortKey);
+
+    auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(lpq), extensionsCallback);
     verify(statusWithCQ.isOK());
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -1422,10 +1424,14 @@ public:
                 unique_ptr<ScopedTransaction> scopedXact(new ScopedTransaction(txn, MODE_IS));
                 unique_ptr<AutoGetDb> scopedAutoDb(new AutoGetDb(txn, nss.db(), MODE_S));
 
+                auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+                lpq->setFilter(config.filter);
+                lpq->setSort(config.sort);
+
                 const ExtensionsCallbackReal extensionsCallback(txn, &nss);
 
-                auto statusWithCQ = CanonicalQuery::canonicalize(
-                    txn, nss, config.filter, config.sort, BSONObj(), extensionsCallback);
+                auto statusWithCQ =
+                    CanonicalQuery::canonicalize(txn, std::move(lpq), extensionsCallback);
                 if (!statusWithCQ.isOK()) {
                     uasserted(17238, "Can't canonicalize query " + config.filter.toString());
                     return 0;

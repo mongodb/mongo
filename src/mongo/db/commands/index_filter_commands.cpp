@@ -322,9 +322,12 @@ Status ClearFilters::clear(OperationContext* txn,
         invariant(entry);
 
         // Create canonical query.
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn, nss, entry->query, entry->sort, entry->projection, extensionsCallback);
-        invariant(statusWithCQ.isOK());
+        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+        lpq->setFilter(entry->query);
+        lpq->setSort(entry->sort);
+        lpq->setProj(entry->projection);
+        auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(lpq), extensionsCallback);
+        invariantOK(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
         // Remove plan cache entry.

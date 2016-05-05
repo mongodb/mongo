@@ -240,8 +240,10 @@ void SortKeyGenerator::getBoundsForSort(OperationContext* txn,
                          BSONObj());
     params.indices.push_back(sortOrder);
 
-    auto statusWithQueryForSort = CanonicalQuery::canonicalize(
-        txn, NamespaceString("fake.ns"), queryObj, ExtensionsCallbackNoop());
+    auto lpq = stdx::make_unique<LiteParsedQuery>(NamespaceString("fake.ns"));
+    lpq->setFilter(queryObj);
+    auto statusWithQueryForSort =
+        CanonicalQuery::canonicalize(txn, std::move(lpq), ExtensionsCallbackNoop());
     verify(statusWithQueryForSort.isOK());
     std::unique_ptr<CanonicalQuery> queryForSort = std::move(statusWithQueryForSort.getValue());
 

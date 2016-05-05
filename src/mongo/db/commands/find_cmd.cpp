@@ -147,7 +147,7 @@ public:
 
         ExtensionsCallbackReal extensionsCallback(txn, &nss);
         auto statusWithCQ =
-            CanonicalQuery::canonicalize(txn, lpqStatus.getValue().release(), extensionsCallback);
+            CanonicalQuery::canonicalize(txn, std::move(lpqStatus.getValue()), extensionsCallback);
         if (!statusWithCQ.isOK()) {
             return statusWithCQ.getStatus();
         }
@@ -232,7 +232,7 @@ public:
 
         // Finish the parsing step by using the LiteParsedQuery to create a CanonicalQuery.
         ExtensionsCallbackReal extensionsCallback(txn, &nss);
-        auto statusWithCQ = CanonicalQuery::canonicalize(txn, lpq.release(), extensionsCallback);
+        auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(lpq), extensionsCallback);
         if (!statusWithCQ.isOK()) {
             return appendCommandStatus(result, statusWithCQ.getStatus());
         }

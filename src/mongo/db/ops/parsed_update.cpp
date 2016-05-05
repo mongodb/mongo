@@ -80,31 +80,25 @@ Status ParsedUpdate::parseQueryToCQ() {
 
     const ExtensionsCallbackReal extensionsCallback(_txn, &_request->getNamespaceString());
 
+    // The projection needs to be applied after the update operation, so we do not specify a
+    // projection during canonicalization.
+    auto lpq = stdx::make_unique<LiteParsedQuery>(_request->getNamespaceString());
+    lpq->setFilter(_request->getQuery());
+    lpq->setSort(_request->getSort());
+    lpq->setExplain(_request->isExplain());
+
     // Limit should only used for the findAndModify command when a sort is specified. If a sort
     // is requested, we want to use a top-k sort for efficiency reasons, so should pass the
     // limit through. Generally, a update stage expects to be able to skip documents that were
     // deleted/modified under it, but a limit could inhibit that and give an EOF when the update
     // has not actually updated a document. This behavior is fine for findAndModify, but should
     // not apply to update in general.
-    long long limit = (!_request->isMulti() && !_request->getSort().isEmpty()) ? -1 : 0;
-
-    // The projection needs to be applied after the update operation, so we specify an empty
-    // BSONObj as the projection during canonicalization.
     // TODO SERVER-23473: Pass the collation to canonicalize().
-    const BSONObj emptyObj;
-    auto statusWithCQ = CanonicalQuery::canonicalize(_txn,
-                                                     _request->getNamespaceString(),
-                                                     _request->getQuery(),
-                                                     _request->getSort(),
-                                                     emptyObj,  // projection
-                                                     0,         // skip
-                                                     limit,
-                                                     emptyObj,  // hint
-                                                     emptyObj,  // min
-                                                     emptyObj,  // max
-                                                     false,     // snapshot
-                                                     _request->isExplain(),
-                                                     extensionsCallback);
+    if (!_request->isMulti() && !_request->getSort().isEmpty()) {
+        lpq->setLimit(1);
+    }
+
+    auto statusWithCQ = CanonicalQuery::canonicalize(_txn, std::move(lpq), extensionsCallback);
     if (statusWithCQ.isOK()) {
         _canonicalQuery = std::move(statusWithCQ.getValue());
     }

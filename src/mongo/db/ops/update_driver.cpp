@@ -171,11 +171,12 @@ Status UpdateDriver::populateDocumentWithQueryFields(OperationContext* txn,
                                                      const BSONObj& query,
                                                      const vector<FieldRef*>* immutablePaths,
                                                      mutablebson::Document& doc) const {
-    // We canonicalize the query to collapse $and/$or, and the first arg (ns) is not needed.  Also,
+    // We canonicalize the query to collapse $and/$or, and the namespace is not needed.  Also,
     // because this is for the upsert case, where we insert a new document if one was not found, the
     // $where/$text clauses do not make sense, hence empty ExtensionsCallback.
-    auto statusWithCQ =
-        CanonicalQuery::canonicalize(txn, NamespaceString(""), query, ExtensionsCallbackNoop());
+    auto lpq = stdx::make_unique<LiteParsedQuery>(NamespaceString(""));
+    lpq->setFilter(query);
+    auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(lpq), ExtensionsCallbackNoop());
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }

@@ -328,7 +328,7 @@ TEST(CanonicalQueryTest, IsValidSortKeyMetaProjection) {
         auto lpq = assertGet(LiteParsedQuery::makeFromFindCommand(
             nss, fromjson("{find: 'testcoll', projection: {foo: {$meta: 'sortKey'}}}"), isExplain));
         auto cq = CanonicalQuery::canonicalize(
-            txn.get(), lpq.release(), ExtensionsCallbackDisallowExtensions());
+            txn.get(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
         ASSERT_NOT_OK(cq.getStatus());
     }
 
@@ -340,7 +340,7 @@ TEST(CanonicalQueryTest, IsValidSortKeyMetaProjection) {
             fromjson("{find: 'testcoll', projection: {foo: {$meta: 'sortKey'}}, sort: {bar: 1}}"),
             isExplain));
         auto cq = CanonicalQuery::canonicalize(
-            txn.get(), lpq.release(), ExtensionsCallbackDisallowExtensions());
+            txn.get(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(cq.getStatus());
     }
 }
@@ -435,9 +435,10 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr) {
     QueryTestServiceContext serviceContext;
     auto txn = serviceContext.makeOperationContext();
 
-    BSONObj queryObj = fromjson(queryStr);
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    lpq->setFilter(fromjson(queryStr));
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        txn.get(), nss, queryObj, ExtensionsCallbackDisallowExtensions());
+        txn.get(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -448,11 +449,12 @@ std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     QueryTestServiceContext serviceContext;
     auto txn = serviceContext.makeOperationContext();
 
-    BSONObj queryObj = fromjson(queryStr);
-    BSONObj sortObj = fromjson(sortStr);
-    BSONObj projObj = fromjson(projStr);
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    lpq->setFilter(fromjson(queryStr));
+    lpq->setSort(fromjson(sortStr));
+    lpq->setProj(fromjson(projStr));
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        txn.get(), nss, queryObj, sortObj, projObj, ExtensionsCallbackDisallowExtensions());
+        txn.get(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -561,7 +563,7 @@ TEST(CanonicalQueryTest, CanonicalizeFromBaseQuery) {
         "{find:'bogusns', filter:{$or:[{a:1,b:1},{a:1,c:1}]}, projection:{a:1}, sort:{b:1}}";
     auto lpq = assertGet(LiteParsedQuery::makeFromFindCommand(nss, fromjson(cmdStr), isExplain));
     auto baseCq = assertGet(CanonicalQuery::canonicalize(
-        txn.get(), lpq.release(), ExtensionsCallbackDisallowExtensions()));
+        txn.get(), std::move(lpq), ExtensionsCallbackDisallowExtensions()));
 
     MatchExpression* firstClauseExpr = baseCq->root()->getChild(0);
     auto childCq = assertGet(CanonicalQuery::canonicalize(

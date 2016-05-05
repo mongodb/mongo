@@ -56,11 +56,12 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     QueryTestServiceContext serviceContext;
     auto txn = serviceContext.makeOperationContext();
 
-    BSONObj queryObj = fromjson(queryStr);
-    BSONObj sortObj = fromjson(sortStr);
-    BSONObj projObj = fromjson(projStr);
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    lpq->setFilter(fromjson(queryStr));
+    lpq->setSort(fromjson(sortStr));
+    lpq->setProj(fromjson(projStr));
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        txn.get(), nss, queryObj, sortObj, projObj, ExtensionsCallbackDisallowExtensions());
+        txn.get(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }

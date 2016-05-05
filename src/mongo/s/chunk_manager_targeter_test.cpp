@@ -61,8 +61,10 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr) {
 
     BSONObj queryObj = fromjson(queryStr);
     const NamespaceString nss("test.foo");
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    lpq->setFilter(queryObj);
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(txn.get(), nss, queryObj, ExtensionsCallbackNoop());
+        CanonicalQuery::canonicalize(txn.get(), std::move(lpq), ExtensionsCallbackNoop());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }

@@ -96,16 +96,12 @@ protected:
 
         OldClientWriteContext ctx(&_opCtx, nss.ns());
 
-        auto cq =
-            uassertStatusOK(CanonicalQuery::canonicalize(&_opCtx,
-                                                         nss,
-                                                         /*query=*/BSONObj(),
-                                                         /*sort=*/BSONObj(),
-                                                         /*proj=*/BSONObj(),
-                                                         /*skip=*/0,
-                                                         /*limit=*/0,
-                                                         hint.value_or(BSONObj()),
-                                                         ExtensionsCallbackDisallowExtensions()));
+        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+        if (hint) {
+            lpq->setHint(*hint);
+        }
+        auto cq = uassertStatusOK(CanonicalQuery::canonicalize(
+            &_opCtx, std::move(lpq), ExtensionsCallbackDisallowExtensions()));
 
         _exec = uassertStatusOK(
             getExecutor(&_opCtx, ctx.getCollection(), std::move(cq), PlanExecutor::YIELD_MANUAL));

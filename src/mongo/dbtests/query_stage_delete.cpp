@@ -104,8 +104,10 @@ public:
     }
 
     unique_ptr<CanonicalQuery> canonicalize(const BSONObj& query) {
-        auto statusWithCQ =
-            CanonicalQuery::canonicalize(&_txn, nss, query, ExtensionsCallbackDisallowExtensions());
+        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+        lpq->setFilter(query);
+        auto statusWithCQ = CanonicalQuery::canonicalize(
+            &_txn, std::move(lpq), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         return std::move(statusWithCQ.getValue());
     }

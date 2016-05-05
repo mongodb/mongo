@@ -145,7 +145,7 @@ public:
         }
 
         auto cq =
-            CanonicalQuery::canonicalize(txn, lpq.getValue().release(), ExtensionsCallbackNoop());
+            CanonicalQuery::canonicalize(txn, std::move(lpq.getValue()), ExtensionsCallbackNoop());
         if (!cq.isOK()) {
             return appendCommandStatus(result, cq.getStatus());
         }

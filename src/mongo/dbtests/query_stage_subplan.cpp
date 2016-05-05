@@ -83,7 +83,7 @@ protected:
             unittest::assertGet(LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain));
 
         auto cq = unittest::assertGet(
-            CanonicalQuery::canonicalize(txn(), lpq.release(), ExtensionsCallbackNoop()));
+            CanonicalQuery::canonicalize(txn(), std::move(lpq), ExtensionsCallbackNoop()));
         return cq;
     }
 
@@ -114,8 +114,10 @@ public:
             "{$or: [{a: {$geoWithin: {$centerSphere: [[0,0],10]}}},"
             "{a: {$geoWithin: {$centerSphere: [[1,1],10]}}}]}");
 
-        auto statusWithCQ =
-            CanonicalQuery::canonicalize(txn(), nss, query, ExtensionsCallbackDisallowExtensions());
+        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+        lpq->setFilter(query);
+        auto statusWithCQ = CanonicalQuery::canonicalize(
+            txn(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -158,8 +160,10 @@ public:
 
         Collection* collection = ctx.getCollection();
 
-        auto statusWithCQ =
-            CanonicalQuery::canonicalize(txn(), nss, query, ExtensionsCallbackDisallowExtensions());
+        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+        lpq->setFilter(query);
+        auto statusWithCQ = CanonicalQuery::canonicalize(
+            txn(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -214,8 +218,10 @@ public:
 
         Collection* collection = ctx.getCollection();
 
-        auto statusWithCQ =
-            CanonicalQuery::canonicalize(txn(), nss, query, ExtensionsCallbackDisallowExtensions());
+        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+        lpq->setFilter(query);
+        auto statusWithCQ = CanonicalQuery::canonicalize(
+            txn(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -271,8 +277,10 @@ public:
 
         Collection* collection = ctx.getCollection();
 
-        auto statusWithCQ =
-            CanonicalQuery::canonicalize(txn(), nss, query, ExtensionsCallbackDisallowExtensions());
+        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+        lpq->setFilter(query);
+        auto statusWithCQ = CanonicalQuery::canonicalize(
+            txn(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -525,8 +533,10 @@ public:
         insert(BSON("_id" << 3 << "a" << 1 << "c" << 3));
         insert(BSON("_id" << 4 << "a" << 1 << "c" << 4));
 
+        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+        lpq->setFilter(query);
         auto cq = unittest::assertGet(CanonicalQuery::canonicalize(
-            txn(), nss, query, ExtensionsCallbackDisallowExtensions()));
+            txn(), std::move(lpq), ExtensionsCallbackDisallowExtensions()));
 
         Collection* collection = ctx.getCollection();
 
@@ -582,11 +592,11 @@ public:
         insert(BSON("_id" << 3 << "a" << 3));
         insert(BSON("_id" << 4));
 
-        BSONObj query = fromjson("{$or: [{a: 1}, {a: {$ne:1}}]}");
-        BSONObj sort = BSON("d" << 1);
-        BSONObj projection;
+        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+        lpq->setFilter(fromjson("{$or: [{a: 1}, {a: {$ne:1}}]}"));
+        lpq->setSort(BSON("d" << 1));
         auto cq = unittest::assertGet(CanonicalQuery::canonicalize(
-            txn(), nss, query, sort, projection, ExtensionsCallbackDisallowExtensions()));
+            txn(), std::move(lpq), ExtensionsCallbackDisallowExtensions()));
 
         Collection* collection = ctx.getCollection();
 

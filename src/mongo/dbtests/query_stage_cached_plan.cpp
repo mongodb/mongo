@@ -122,8 +122,10 @@ public:
         ASSERT(collection);
 
         // Query can be answered by either index on "a" or index on "b".
+        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+        lpq->setFilter(fromjson("{a: {$gte: 8}, b: 1}"));
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn(), nss, fromjson("{a: {$gte: 8}, b: 1}"), ExtensionsCallbackDisallowExtensions());
+            txn(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -187,8 +189,10 @@ public:
         ASSERT(collection);
 
         // Query can be answered by either index on "a" or index on "b".
+        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+        lpq->setFilter(fromjson("{a: {$gte: 8}, b: 1}"));
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn(), nss, fromjson("{a: {$gte: 8}, b: 1}"), ExtensionsCallbackDisallowExtensions());
+            txn(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 

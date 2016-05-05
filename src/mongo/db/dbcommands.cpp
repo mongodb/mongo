@@ -630,13 +630,12 @@ public:
         BSONObj sort = BSON("files_id" << 1 << "n" << 1);
 
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            auto statusWithCQ =
-                CanonicalQuery::canonicalize(txn,
-                                             NamespaceString(ns),
-                                             query,
-                                             sort,
-                                             BSONObj(),
-                                             ExtensionsCallbackDisallowExtensions());
+            auto lpq = stdx::make_unique<LiteParsedQuery>(NamespaceString(ns));
+            lpq->setFilter(query);
+            lpq->setSort(sort);
+
+            auto statusWithCQ = CanonicalQuery::canonicalize(
+                txn, std::move(lpq), ExtensionsCallbackDisallowExtensions());
             if (!statusWithCQ.isOK()) {
                 uasserted(17240, "Can't canonicalize query " + query.toString());
                 return 0;
