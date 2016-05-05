@@ -89,6 +89,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/db/restapi.h"
+#include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/s/type_shard_identity.h"
@@ -740,13 +741,16 @@ static void _initAndListen(int listenPort) {
 
     if (!storageGlobalParams.readOnly) {
         startFTDC();
+        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+            uassertStatusOK(ShardingState::get(startupOpCtx.get())
+                                ->initializeFromShardIdentity(startupOpCtx.get()));
 
-        uassertStatusOK(ShardingState::get(startupOpCtx.get())
-                            ->initializeFromShardIdentity(startupOpCtx.get()));
-
-        // Note: For replica sets, ShardingStateRecovery happens on transition to primary.
-        if (!repl::getGlobalReplicationCoordinator()->isReplEnabled()) {
-            uassertStatusOK(ShardingStateRecovery::recover(startupOpCtx.get()));
+            // Note: For replica sets, ShardingStateRecovery happens on transition to primary.
+            if (!repl::getGlobalReplicationCoordinator()->isReplEnabled()) {
+                uassertStatusOK(ShardingStateRecovery::recover(startupOpCtx.get()));
+            }
+        } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            uassertStatusOK(initializeGlobalShardingStateForMongod(ConnectionString::forLocal()));
         }
 
         logStartup(startupOpCtx.get());

@@ -55,6 +55,7 @@ env.Library(
         'move_timing_helper.cpp',
         'operation_sharding_state.cpp',
         'sharded_connection_info.cpp',
+        'sharding_initialization_mongod.cpp',
         'sharding_state.cpp',
         'sharding_state_recovery.cpp',
     ],
