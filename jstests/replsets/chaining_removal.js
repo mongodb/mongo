@@ -28,7 +28,7 @@
     }, "node 4 failed to start chaining: "+ tojson(res));
 
     // write that should reach all nodes
-    var timeout = 15 * 1000;
+    var timeout = 60 * 1000;
     var options = {writeConcern: {w: numNodes, wtimeout: timeout}};
     assert.writeOK(primary.getDB(name).foo.insert({x: 1}, options));
 
