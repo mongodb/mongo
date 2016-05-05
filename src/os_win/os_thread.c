@@ -21,7 +21,7 @@ __wt_thread_create(WT_SESSION_IMPL *session,
 	if (*tidret != 0)
 		return (0);
 
-	WT_RET_MSG(session, __wt_errno, "thread create: _beginthreadex");
+	WT_RET_MSG(session, __wt_errno(), "thread create: _beginthreadex");
 }
 
 /*
