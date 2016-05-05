@@ -85,20 +85,8 @@ public:
                      const std::string& contextName,
                      LabeledLevel labeledLevel);
 
-    /**
-     * Move constructor.
-     *
-     * TODO: Replace with = default implementation when minimum MSVC version is bumped to
-     * MSVC2015.
-     */
-    LogstreamBuilder(LogstreamBuilder&& other);
-
-    /**
-     * Move assignment operator.
-     *
-     * TODO: Replace with =default implementation when minimum MSVC version is bumped to VS2015.
-     */
-    LogstreamBuilder& operator=(LogstreamBuilder&& other);
+    LogstreamBuilder(LogstreamBuilder&& other) = default;
+    LogstreamBuilder& operator=(LogstreamBuilder&& other) = default;
 
     /**
      * Destroys a LogstreamBuilder().  If anything was written to it via stream() or operator<<,

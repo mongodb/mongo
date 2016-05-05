@@ -95,29 +95,6 @@ LogstreamBuilder::LogstreamBuilder(logger::MessageLogDomain* domain,
     setBaseMessage(labeledLevel.getLabel());
 }
 
-LogstreamBuilder::LogstreamBuilder(LogstreamBuilder&& other)
-    : _domain(std::move(other._domain)),
-      _contextName(std::move(other._contextName)),
-      _severity(std::move(other._severity)),
-      _component(std::move(other._component)),
-      _baseMessage(std::move(other._baseMessage)),
-      _os(std::move(other._os)),
-      _tee(std::move(other._tee)),
-      _isTruncatable(other._isTruncatable) {}
-
-LogstreamBuilder& LogstreamBuilder::operator=(LogstreamBuilder&& other) {
-    _domain = std::move(other._domain);
-    _contextName = std::move(other._contextName);
-    _severity = std::move(other._severity);
-    _component = std::move(other._component);
-    _baseMessage = std::move(other._baseMessage);
-    _os = std::move(other._os);
-    _tee = std::move(other._tee);
-    _isTruncatable = std::move(other._isTruncatable);
-    return *this;
-}
-
-
 LogstreamBuilder::~LogstreamBuilder() {
     if (_os) {
         if (!_baseMessage.empty())
