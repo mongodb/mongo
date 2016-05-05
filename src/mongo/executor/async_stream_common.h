@@ -76,7 +76,6 @@ void readStream(ASIOStream* stream,
 
 template <typename ASIOStream>
 void cancelStream(ASIOStream* stream, bool connected) {
-    invariant(connected);
     stream->cancel();
 }
 
