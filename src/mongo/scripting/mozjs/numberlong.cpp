@@ -78,7 +78,7 @@ long long NumberLongInfo::ToNumberLong(JSContext* cx, JS::HandleObject thisv) {
 void NumberLongInfo::Functions::valueOf::call(JSContext* cx, JS::CallArgs args) {
     long long out = NumberLongInfo::ToNumberLong(cx, args.thisv());
 
-    args.rval().setDouble(out);
+    ValueReader(cx, args.rval()).fromDouble(out);
 }
 
 void NumberLongInfo::Functions::toNumber::call(JSContext* cx, JS::CallArgs args) {
@@ -116,7 +116,7 @@ void NumberLongInfo::Functions::compare::call(JSContext* cx, JS::CallArgs args) 
         comparison = 1;
     }
 
-    args.rval().setDouble(comparison);
+    ValueReader(cx, args.rval()).fromDouble(comparison);
 }
 
 void NumberLongInfo::construct(JSContext* cx, JS::CallArgs args) {

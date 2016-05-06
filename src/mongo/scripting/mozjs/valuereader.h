@@ -49,6 +49,7 @@ public:
 
     void fromBSONElement(const BSONElement& elem, const BSONObj& parent, bool readOnly);
     void fromBSON(const BSONObj& obj, const BSONObj* parent, bool readOnly);
+    void fromDouble(double d);
     void fromStringData(StringData sd);
     void fromDecimal128(Decimal128 decimal);
 
