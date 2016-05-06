@@ -48,6 +48,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -139,14 +140,20 @@ void Command::execCommandClientBasic(OperationContext* txn,
         return;
     }
 
-    if (supportsWriteConcern) {
-        txn->setWriteConcern(wcResult.getValue());
-    }
 
     std::string errmsg;
     bool ok = false;
     try {
-        ok = c->run(txn, dbname, cmdObj, queryOptions, errmsg, result);
+        if (!supportsWriteConcern) {
+            ok = c->run(txn, dbname, cmdObj, queryOptions, errmsg, result);
+        } else {
+            // Change the write concern while running the command.
+            const auto oldWC = txn->getWriteConcern();
+            ON_BLOCK_EXIT([&] { txn->setWriteConcern(oldWC); });
+            txn->setWriteConcern(wcResult.getValue());
+
+            ok = c->run(txn, dbname, cmdObj, queryOptions, errmsg, result);
+        }
     } catch (const DBException& e) {
         result.resetToEmpty();
         const int code = e.getCode();

@@ -54,7 +54,6 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -203,11 +202,6 @@ public:
         intrusive_ptr<Pipeline> pPipeline = Pipeline::parseCommand(errmsg, cmdObj, pCtx);
         if (!pPipeline.get())
             return false;
-
-        // Save and reset the write concern so that it doesn't get changed accidentally by
-        // DBDirectClient.
-        auto oldWC = txn->getWriteConcern();
-        ON_BLOCK_EXIT([txn, oldWC] { txn->setWriteConcern(oldWC); });
 
         // This is outside of the if block to keep the object alive until the pipeline is finished.
         BSONObj parsed;

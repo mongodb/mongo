@@ -616,7 +616,7 @@ long long State::postProcessCollectionNonAtomic(OperationContext* txn,
         ScopedTransaction transaction(txn, MODE_X);
         Lock::GlobalWrite lock(txn->lockState());  // TODO(erh): why global???
         // replace: just rename from temp to final collection name, dropping previous collection
-        _db.dropCollection(_config.outputOptions.finalNamespace, txn->getWriteConcern());
+        _db.dropCollection(_config.outputOptions.finalNamespace);
         BSONObj info;
 
         if (!_db.runCommand("admin",
@@ -627,7 +627,7 @@ long long State::postProcessCollectionNonAtomic(OperationContext* txn,
             uasserted(10076, str::stream() << "rename failed: " << info);
         }
 
-        _db.dropCollection(_config.tempNamespace, txn->getWriteConcern());
+        _db.dropCollection(_config.tempNamespace);
     } else if (_config.outputOptions.outType == Config::MERGE) {
         // merge: upsert new docs into old collection
         {
@@ -646,7 +646,7 @@ long long State::postProcessCollectionNonAtomic(OperationContext* txn,
             Helpers::upsert(_txn, _config.outputOptions.finalNamespace, o);
             pm.hit();
         }
-        _db.dropCollection(_config.tempNamespace, txn->getWriteConcern());
+        _db.dropCollection(_config.tempNamespace);
         pm.finished();
     } else if (_config.outputOptions.outType == Config::REDUCE) {
         // reduce: apply reduce op on new result and existing one
@@ -1325,11 +1325,6 @@ public:
              BSONObjBuilder& result) {
         Timer t;
 
-        // Save and reset the write concern so that it doesn't get changed accidentally by
-        // DBDirectClient.
-        auto oldWC = txn->getWriteConcern();
-        ON_BLOCK_EXIT([txn, oldWC] { txn->setWriteConcern(oldWC); });
-
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmd))
             maybeDisableValidation.emplace(txn);
@@ -1654,11 +1649,6 @@ public:
                        str::stream() << "Can not execute mapReduce with output database "
                                      << dbname));
         }
-
-        // Save and reset the write concern so that it doesn't get changed accidentally by
-        // DBDirectClient.
-        auto oldWC = txn->getWriteConcern();
-        ON_BLOCK_EXIT([txn, oldWC] { txn->setWriteConcern(oldWC); });
 
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmdObj))

@@ -262,14 +262,13 @@ public:
             }
         }
 
-        txn->setWriteConcern(writeConcern);
         {
             stdx::lock_guard<Client> lk(*txn->getClient());
             txn->setMessage_inlock("waiting for write concern");
         }
 
         WriteConcernResult wcResult;
-        status = waitForWriteConcern(txn, lastOpTime, txn->getWriteConcern(), &wcResult);
+        status = waitForWriteConcern(txn, lastOpTime, writeConcern, &wcResult);
         wcResult.appendTo(writeConcern, &result);
 
         // For backward compatibility with 2.4, wtimeout returns ok : 1.0

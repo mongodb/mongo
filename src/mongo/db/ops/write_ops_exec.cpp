@@ -276,11 +276,6 @@ static WriteResult performCreateIndexes(OperationContext* txn, const InsertOp& w
     // seem worth it since users that want faster index builds should just use the createIndexes
     // command rather than a legacy emulation.
     LastOpFixer lastOpFixer(txn, wholeOp.ns);
-
-    // Creating an index can change the writeConcern. Make sure we set it back to what it was.
-    const auto oldWC = txn->getWriteConcern();
-    ON_BLOCK_EXIT([&] { txn->setWriteConcern(oldWC); });
-
     WriteResult out;
     for (auto&& spec : wholeOp.documents) {
         try {

@@ -73,7 +73,6 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/sequence_util.h"
 #include "mongo/util/time_support.h"
 
@@ -265,11 +264,6 @@ Status queryAuthzDocument(OperationContext* txn,
 Status insertAuthzDocument(OperationContext* txn,
                            const NamespaceString& collectionName,
                            const BSONObj& document) {
-    // Save and reset the write concern so that it doesn't get changed accidentally by
-    // DBDirectClient.
-    auto oldWC = txn->getWriteConcern();
-    ON_BLOCK_EXIT([txn, oldWC] { txn->setWriteConcern(oldWC); });
-
     try {
         DBDirectClient client(txn);
 
@@ -304,11 +298,6 @@ Status updateAuthzDocuments(OperationContext* txn,
                             bool upsert,
                             bool multi,
                             long long* nMatched) {
-    // Save and reset the write concern so that it doesn't get changed accidentally by
-    // DBDirectClient.
-    auto oldWC = txn->getWriteConcern();
-    ON_BLOCK_EXIT([txn, oldWC] { txn->setWriteConcern(oldWC); });
-
     try {
         DBDirectClient client(txn);
 
@@ -379,11 +368,6 @@ Status removeAuthzDocuments(OperationContext* txn,
                             const NamespaceString& collectionName,
                             const BSONObj& query,
                             long long* numRemoved) {
-    // Save and reset the write concern so that it doesn't get changed accidentally by
-    // DBDirectClient.
-    auto oldWC = txn->getWriteConcern();
-    ON_BLOCK_EXIT([txn, oldWC] { txn->setWriteConcern(oldWC); });
-
     try {
         DBDirectClient client(txn);
 
