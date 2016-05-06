@@ -1,6 +1,7 @@
 /**
  * Tests that the config server connection string in the shard identity document of both the
  * primary and secondary will get updated whenever the config server membership changes.
+ * @tags: [requires_persistence]
  */
 (function() {
     "use strict";
