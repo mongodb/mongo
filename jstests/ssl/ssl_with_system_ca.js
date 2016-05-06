@@ -1,3 +1,7 @@
+// On OSX this test assumes that jstests/libs/trusted-ca.pem has been added as a trusted
+// certificate to the login keychain of the evergreen user. See,
+// https://github.com/10gen/buildslave-cookbooks/commit/af7cabe5b6e0885902ebd4902f7f974b64cc8961
+// for details.
 ((function() {
     'use strict';
     const HOST_TYPE = getBuildInfo().buildEnvironment.target_os;
@@ -5,11 +9,6 @@
     if (HOST_TYPE == "windows") {
         runProgram(
             "certutil.exe", "-addstore", "-user", "-f", "CA", "jstests\\libs\\trusted-ca.pem");
-    } else if (HOST_TYPE == "osx") {
-        runProgram(
-            "/bin/sh",
-            "-c",
-            "/usr/bin/security add-trusted-cert -k ~/Library/Keychains/login.keychain jstests/libs/trusted-ca.pem");
     }
 
     var testWithCerts = function(serverPem) {
