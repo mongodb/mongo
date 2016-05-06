@@ -92,14 +92,14 @@ public:
                 continue;
             }
 
-            auto result =
+            auto response =
                 uassertStatusOK(s->runCommand(txn,
                                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                               "admin",
                                               BSON("fsync" << 1),
                                               Shard::RetryPolicy::kIdempotent));
-            uassertStatusOK(result.commandStatus);
-            BSONObj x = std::move(result.response);
+            uassertStatusOK(response.commandStatus);
+            BSONObj x = std::move(response.response);
 
             sub.append(s->getId(), x);
 

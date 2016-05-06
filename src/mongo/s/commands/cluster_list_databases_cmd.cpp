@@ -100,14 +100,14 @@ public:
                 continue;
             }
 
-            auto result = uassertStatusOK(
+            auto response = uassertStatusOK(
                 s->runCommand(txn,
                               ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
                               "admin",
                               BSON("listDatabases" << 1),
                               Shard::RetryPolicy::kIdempotent));
-            uassertStatusOK(result.commandStatus);
-            BSONObj x = std::move(result.response);
+            uassertStatusOK(response.commandStatus);
+            BSONObj x = std::move(response.response);
 
             BSONObjIterator j(x["databases"].Obj());
             while (j.more()) {
