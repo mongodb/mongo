@@ -71,7 +71,7 @@ int64_t NumberLongInfo::ToNumberLong(JSContext* cx, JS::HandleObject thisv) {
 
 void NumberLongInfo::Functions::valueOf::call(JSContext* cx, JS::CallArgs args) {
     int64_t out = NumberLongInfo::ToNumberLong(cx, args.thisv());
-    args.rval().setDouble(out);
+    ValueReader(cx, args.rval()).fromDouble(out);
 }
 
 void NumberLongInfo::Functions::toNumber::call(JSContext* cx, JS::CallArgs args) {
@@ -110,12 +110,12 @@ void NumberLongInfo::Functions::compare::call(JSContext* cx, JS::CallArgs args) 
         comparison = 1;
     }
 
-    args.rval().setDouble(comparison);
+    ValueReader(cx, args.rval()).fromDouble(comparison);
 }
 
 void NumberLongInfo::Functions::floatApprox::call(JSContext* cx, JS::CallArgs args) {
     int64_t numLong = NumberLongInfo::ToNumberLong(cx, args.thisv());
-    args.rval().setDouble(numLong);
+    ValueReader(cx, args.rval()).fromDouble(numLong);
 }
 
 void NumberLongInfo::Functions::top::call(JSContext* cx, JS::CallArgs args) {
@@ -124,7 +124,7 @@ void NumberLongInfo::Functions::top::call(JSContext* cx, JS::CallArgs args) {
     // values above 2^53 are not accurately represented in JS
     if (numLong == INT64_MIN || std::abs(numLong) >= 9007199254740992LL) {
         auto val64 = static_cast<unsigned long long>(numLong);
-        args.rval().setDouble(val64 >> 32);
+        ValueReader(cx, args.rval()).fromDouble(val64 >> 32);
     } else {
         args.rval().setUndefined();
     }
@@ -136,7 +136,7 @@ void NumberLongInfo::Functions::bottom::call(JSContext* cx, JS::CallArgs args) {
     // values above 2^53 are not accurately represented in JS
     if (numLong == INT64_MIN || std::abs(numLong) >= 9007199254740992LL) {
         auto val64 = static_cast<unsigned long long>(numLong);
-        args.rval().setDouble(val64 & 0x00000000FFFFFFFF);
+        ValueReader(cx, args.rval()).fromDouble(val64 & 0x00000000FFFFFFFF);
     } else {
         args.rval().setUndefined();
     }

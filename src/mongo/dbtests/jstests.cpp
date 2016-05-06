@@ -2244,6 +2244,27 @@ public:
         ASSERT_EQUALS(17, ret.number());
     }
 };
+
+/**
+ * This tests a bug discovered in SERVER-24054, where certain interesting nan patterns crash
+ * spidermonkey by looking like non-double type puns.  This verifies that we put that particular
+ * interesting nan in and that we still get a nan out.
+ */
+class NovelNaN {
+public:
+    void run() {
+        uint8_t bits[] = {
+            16, 0, 0, 0, 0x01, 'a', '\0', 0x61, 0x79, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0,
+        };
+        unique_ptr<Scope> s(globalScriptEngine->newScope());
+
+        s->setObject("val", BSONObj(reinterpret_cast<char*>(bits)).getOwned());
+
+        s->invoke("val[\"a\"];", 0, 0);
+        ASSERT_TRUE(std::isnan(s->getNumber("__returnValue")));
+    }
+};
+
 class NoReturnSpecified {
 public:
     void run() {
@@ -2400,6 +2421,8 @@ public:
 
         add<ScopeOut>();
         add<InvalidStoredJS>();
+
+        add<NovelNaN>();
 
         add<NoReturnSpecified>();
 

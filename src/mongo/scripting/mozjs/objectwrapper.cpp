@@ -324,7 +324,7 @@ void ObjectWrapper::getValue(Key key, JS::MutableHandleValue value) {
 
 void ObjectWrapper::setNumber(Key key, double val) {
     JS::RootedValue jsValue(_context);
-    jsValue.setDouble(val);
+    ValueReader(_context, &jsValue).fromDouble(val);
 
     setValue(key, jsValue);
 }
