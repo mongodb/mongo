@@ -400,7 +400,17 @@ void ReplicationCoordinatorExternalStateImpl::clearShardingState() {
 }
 
 void ReplicationCoordinatorExternalStateImpl::recoverShardingState(OperationContext* txn) {
-    uassertStatusOK(ShardingStateRecovery::recover(txn));
+    auto status = ShardingStateRecovery::recover(txn);
+
+    if (status == ErrorCodes::ShutdownInProgress) {
+        // Note: callers of this method don't expect exceptions, so throw only unexpected fatal
+        // errors.
+        return;
+    }
+
+    if (!status.isOK()) {
+        fassertFailedWithStatus(40107, status);
+    }
 
     // There is a slight chance that some stale metadata might have been loaded before the latest
     // optime has been recovered, so throw out everything that we have up to now
