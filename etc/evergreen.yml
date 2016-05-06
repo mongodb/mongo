@@ -409,20 +409,20 @@ functions:
 
         if [ "Windows_NT" = "$OS" ]; then
           # Get the list of Windows tasks (tasklist list format):
-          # - The second column (and beyond) has task name after the : (cut -f2- -d ':')
-          # - Remove leading whitespace with sed
+          # - Transpose the Image Name and PID
+          # - The first column has the process ID
+          # - The second column (and beyond) has task name
           # - Grep for the task names of interest while ignoring any names that are in the exclude list
-          # - Provide the unique process names (eliminate duplicates)
 
-          processes=$(tasklist /fo:list | grep 'Image Name:' | cut -f2- -d ':' | sed -e 's/^[ \t]*//' | grep -i -E "$process_kill_list" | grep -i -v -E "$process_exclude_list" | /usr/bin/sort -u)
-          # Kill the Windows process with the matching image name (/im) with force (/f)
-          kill_process () { echo "Killing process $1"; taskkill /im "$1" /f; }
+          processes=$(tasklist /fo:csv | awk -F'","' '{x=$1; gsub("\"","",x); print $2, x}' | grep -i -E "$process_kill_list" | grep -i -v -E "$process_exclude_list")
+
+          # Kill the Windows process by process ID with force (/f)
+          kill_process () { pid=$(echo $1 | cut -f1 -d ' '); echo "Killing process $1"; taskkill /pid "$pid" /f; }
         else
           # Get the list of Unix tasks (pgrep full & long):
           # - Grep for the task names of interest while ignoring any names that are in the exclude list
-          # - Remove leading whitespace with sed
-          # - The second column (and beyond) has task name (cut -f2- -d " ")
-          # - Provide the unique process names to eliminate duplicates (sort -u)
+          # - The first column has the process ID
+          # - The second column (and beyond) has task name
 
           # There are 2 "styles" of pgrep, figure out which one works
           pgrep_list_full=$(pgrep -f --list-full ".*" 2>&1 > /dev/null)
@@ -444,9 +444,11 @@ functions:
             fi
           fi
 
-          processes=$(echo "$pgrep_list" | $grep -i -v -E "$process_exclude_list" | sed -e 's/^[ \t]*//' | cut -f2- -d ' ' | sort -u)
-          # Kill the matching Unix process with the matching image name with signal KILL (9)
-          kill_process () { echo "Killing process $1"; pkill -9 -f "^$1\$"; }
+          # Since a process name might have a CR or LF in it, we need to delete any lines from
+          # pgrep which do not start with space(s) and 1 digit and trim any leading spaces.
+          processes=$(echo "$pgrep_list" | $grep -i -v -E "$process_exclude_list" | sed -e '/^ *[0-9]/!d; s/^ *//; s/[[:cntrl:]]//g;')
+          # Kill the Unix process ID with signal KILL (9)
+          kill_process () { pid=$(echo $1 | cut -f1 -d ' '); echo "Killing process $1"; kill -9 $pid; }
         fi
         # Since a full process name can have spaces, the IFS (internal field separator)
         # should not include a space, just a LF & CR
