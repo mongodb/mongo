@@ -31,7 +31,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-#ifdef _WIN32
+#if (defined(_WIN32) && _MSC_VER < 1900)
 /* snprintf is not supported on <= VS2013 */
 #define	snprintf _snprintf
 #endif
