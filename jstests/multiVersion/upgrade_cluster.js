@@ -21,7 +21,9 @@ load('./jstests/multiVersion/libs/multi_cluster.js');
             shardOptions: {binVersion: "last-stable"},
 
             rsOptions: {binVersion: "last-stable"},
-            rs: isRSCluster
+            rs: isRSCluster,
+            // TODO: SERVER-24163 remove after v3.4
+            waitForCSRSSecondaries: false
         };
 
         var testCRUD = function(mongos) {

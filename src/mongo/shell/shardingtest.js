@@ -75,7 +75,9 @@
  *         specify options that are common all replica members.
  *       useHostname {boolean}: if true, use hostname of machine,
  *         otherwise use localhost
- *       numReplicas {number}
+ *       numReplicas {number},
+ *       waitForCSRSSecondaries {boolean}: if false, will not wait for the read committed view
+ *         of the secondaries to catch up with the primary. Defaults to true.
  *     }
  *   }
  *
@@ -960,6 +962,9 @@ var ShardingTest = function(params) {
     var verboseLevel = otherParams.hasOwnProperty('verbose') ? otherParams.verbose : 1;
     var numMongos = otherParams.hasOwnProperty('mongos') ? otherParams.mongos : 1;
     var numConfigs = otherParams.hasOwnProperty('config') ? otherParams.config : 3;
+    var waitForCSRSSecondaries = otherParams.hasOwnProperty('waitForCSRSSecondaries')
+        ? otherParams.waitForCSRSSecondaries
+        : true;
 
     // Allow specifying mixed-type options like this:
     // { mongos : [ { noprealloc : "" } ],
@@ -1379,6 +1384,15 @@ var ShardingTest = function(params) {
         print("Failed to add shards, stopping cluster.");
         this.stop();
         throw e;
+    }
+
+    if (waitForCSRSSecondaries) {
+        // Ensure that all CSRS nodes are up to date. This is strictly needed for tests that use
+        // multiple mongoses. In those cases, the first mongos initializes the contents of the
+        // 'config' database, but without waiting for those writes to replicate to all the
+        // config servers then the secondary mongoses risk reading from a stale config server
+        // and seeing an empty config database.
+        this.configRS.awaitLastOpCommitted();
     }
 
     if (jsTestOptions().keyFile) {

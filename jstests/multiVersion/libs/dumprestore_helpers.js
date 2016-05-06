@@ -54,7 +54,9 @@ function multiVersionDumpRestoreTest(configObj) {
             name: testBaseName + "_sharded_source",
             mongos: [{binVersion: configObj.serverSourceVersion}],
             shards: [{binVersion: configObj.serverSourceVersion}],
-            config: [{binVersion: configObj.serverSourceVersion}]
+            config: [{binVersion: configObj.serverSourceVersion}],
+            // TODO: SERVER-24163 remove after v3.4
+            waitForCSRSSecondaries: false
         };
         var shardingTest = new ShardingTest(shardingTestConfig);
         var serverSource = shardingTest.s;
@@ -116,7 +118,9 @@ function multiVersionDumpRestoreTest(configObj) {
             name: testBaseName + "_sharded_dest",
             mongos: [{binVersion: configObj.serverDestVersion}],
             shards: [{binVersion: configObj.serverDestVersion}],
-            config: [{binVersion: configObj.serverDestVersion}]
+            config: [{binVersion: configObj.serverDestVersion}],
+            // TODO: SERVER-24163 remove after v3.4
+            waitForCSRSSecondaries: false
         };
         var shardingTest = new ShardingTest(shardingTestConfig);
         serverDest = shardingTest.s;

@@ -23,7 +23,9 @@ load('./jstests/multiVersion/libs/verify_versions.js');
             other: {
                 mongosOptions: {binVersion: version},
                 configOptions: {binVersion: version},
-                shardOptions: {binVersion: version}
+                shardOptions: {binVersion: version},
+                // TODO: SERVER-24163 remove after v3.4
+                waitForCSRSSecondaries: false
             }
         });
 
@@ -52,8 +54,9 @@ load('./jstests/multiVersion/libs/verify_versions.js');
         other: {
             mongosOptions: {binVersion: versionsToCheckMongos},
             configOptions: {binVersion: versionsToCheck},
-            shardOptions: {binVersion: versionsToCheck}
-
+            shardOptions: {binVersion: versionsToCheck},
+            // TODO: SERVER-24163 remove after v3.4
+            waitForCSRSSecondaries: false
         }
     });
 
@@ -95,7 +98,9 @@ load('./jstests/multiVersion/libs/verify_versions.js');
 
             mongosOptions: {binVersion: versionsToCheckMongos},
             configOptions: {binVersion: versionsToCheck},
-            rsOptions: {binVersion: versionsToCheck, protocolVersion: 0}
+            rsOptions: {binVersion: versionsToCheck, protocolVersion: 0},
+            // TODO: SERVER-24163 remove after v3.4
+            waitForCSRSSecondaries: false
         }
     });
 
