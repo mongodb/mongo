@@ -71,6 +71,14 @@ public:
                                             std::string reason,
                                             int location = 0)
         : _status(code, std::move(reason), location) {}
+    MONGO_COMPILER_COLD_FUNCTION StatusWith(ErrorCodes::Error code,
+                                            const char* reason,
+                                            int location = 0)
+        : _status(code, reason, location) {}
+    MONGO_COMPILER_COLD_FUNCTION StatusWith(ErrorCodes::Error code,
+                                            const mongoutils::str::stream& reason,
+                                            int location = 0)
+        : _status(code, reason, location) {}
 
     /**
      * for the error case

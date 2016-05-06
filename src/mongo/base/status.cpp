@@ -26,6 +26,7 @@
  */
 
 #include "mongo/base/status.h"
+#include "mongo/util/mongoutils/str.h"
 
 #include <ostream>
 #include <sstream>
@@ -44,6 +45,12 @@ Status::Status(ErrorCodes::Error code, std::string reason, int location)
     : _error(ErrorInfo::create(code, std::move(reason), location)) {
     ref(_error);
 }
+
+Status::Status(ErrorCodes::Error code, const char* reason, int location)
+    : Status(code, std::string(reason), location) {}
+
+Status::Status(ErrorCodes::Error code, const mongoutils::str::stream& reason, int location)
+    : Status(code, std::string(reason), location) {}
 
 bool Status::compare(const Status& other) const {
     return code() == other.code() && location() == other.location();
