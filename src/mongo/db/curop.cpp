@@ -233,10 +233,6 @@ MONGO_FP_DECLARE(maxTimeAlwaysTimeOut);
 // This fail point cannot be used with the maxTimeAlwaysTimeOut fail point.
 MONGO_FP_DECLARE(maxTimeNeverTimeOut);
 
-
-BSONObj CachedBSONObjBase::_tooBig = fromjson("{\"$msg\":\"query not recording (too large)\"}");
-
-
 CurOp* CurOp::get(const OperationContext* opCtx) {
     return get(*opCtx);
 }
@@ -308,6 +304,39 @@ void CurOp::raiseDbProfileLevel(int dbProfileLevel) {
     _dbprofile = std::max(dbProfileLevel, _dbprofile);
 }
 
+namespace {
+/**
+ * Appends {name: obj} to the provided builder.  If obj is greater than maxSize, appends a
+ * string summary of obj instead of the object itself.
+ */
+void appendAsObjOrString(StringData name,
+                         const BSONObj& obj,
+                         size_t maxSize,
+                         BSONObjBuilder* builder) {
+    if (static_cast<size_t>(obj.objsize()) <= maxSize) {
+        builder->append(name, obj);
+    } else {
+        // Generate an abbreviated serialization for the object, by passing false as the
+        // "full" argument to obj.toString().
+        const bool isArray = false;
+        const bool full = false;
+        std::string objToString = obj.toString(isArray, full);
+        if (objToString.size() <= maxSize) {
+            builder->append(name, objToString);
+        } else {
+            // objToString is still too long, so we append to the builder a truncated form
+            // of objToString concatenated with "...".  Instead of creating a new string
+            // temporary, mutate objToString to do this (we know that we can mutate
+            // characters in objToString up to and including objToString[maxSize]).
+            objToString[maxSize - 3] = '.';
+            objToString[maxSize - 2] = '.';
+            objToString[maxSize - 1] = '.';
+            builder->append(name, StringData(objToString).substr(0, maxSize));
+        }
+    }
+}
+}  // namespace
+
 void CurOp::reportState(BSONObjBuilder* builder) {
     if (_start) {
         builder->append("secs_running", elapsedSeconds());
@@ -317,8 +346,13 @@ void CurOp::reportState(BSONObjBuilder* builder) {
     builder->append("op", logicalOpToString(_logicalOp));
     builder->append("ns", _ns);
 
+    // When currentOp is run, it returns a single response object containing all current
+    // operations. This request will fail if the response exceeds the 16MB document limit. We limit
+    // query object size here to reduce the risk of exceeding.
+    const size_t maxQuerySize = 512;
+
     if (_networkOp == dbInsert) {
-        _query.append(*builder, "insert");
+        appendAsObjOrString("insert", _query, maxQuerySize, builder);
     } else if (!_command && _networkOp == dbQuery) {
         // This is a legacy OP_QUERY. We upconvert the "query" field of the currentOp output to look
         // similar to a find command.
@@ -328,10 +362,12 @@ void CurOp::reportState(BSONObjBuilder* builder) {
         const int ntoreturn = 0;
         const int ntoskip = 0;
 
-        builder->append(
-            "query", upconvertQueryEntry(_query.get(), NamespaceString(_ns), ntoreturn, ntoskip));
+        appendAsObjOrString("query",
+                            upconvertQueryEntry(_query, NamespaceString(_ns), ntoreturn, ntoskip),
+                            maxQuerySize,
+                            builder);
     } else {
-        _query.append(*builder, "query");
+        appendAsObjOrString("query", _query, maxQuerySize, builder);
     }
 
     if (!_planSummary.empty()) {
@@ -568,39 +604,6 @@ string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockSt
     return s.str();
 }
 
-namespace {
-/**
- * Appends {name: obj} to the provided builder.  If obj is greater than maxSize, appends a
- * string summary of obj instead of the object itself.
- */
-void appendAsObjOrString(StringData name,
-                         const BSONObj& obj,
-                         size_t maxSize,
-                         BSONObjBuilder* builder) {
-    if (static_cast<size_t>(obj.objsize()) <= maxSize) {
-        builder->append(name, obj);
-    } else {
-        // Generate an abbreviated serialization for the object, by passing false as the
-        // "full" argument to obj.toString().
-        const bool isArray = false;
-        const bool full = false;
-        std::string objToString = obj.toString(isArray, full);
-        if (objToString.size() <= maxSize) {
-            builder->append(name, objToString);
-        } else {
-            // objToString is still too long, so we append to the builder a truncated form
-            // of objToString concatenated with "...".  Instead of creating a new string
-            // temporary, mutate objToString to do this (we know that we can mutate
-            // characters in objToString up to and including objToString[maxSize]).
-            objToString[maxSize - 3] = '.';
-            objToString[maxSize - 2] = '.';
-            objToString[maxSize - 1] = '.';
-            builder->append(name, StringData(objToString).substr(0, maxSize));
-        }
-    }
-}
-}  // namespace
-
 #define OPDEBUG_APPEND_NUMBER(x) \
     if (x != -1)                 \
     b.appendNumber(#x, (x))
@@ -689,8 +692,8 @@ void OpDebug::append(const CurOp& curop,
         b.append("planSummary", curop.getPlanSummary());
     }
 
-    if (execStats.have()) {
-        execStats.append(b, "execStats");
+    if (!execStats.isEmpty()) {
+        b.append("execStats", execStats);
     }
 }
 

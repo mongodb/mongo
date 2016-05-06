@@ -1545,7 +1545,7 @@ public:
                 if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
                     BSONObjBuilder execStatsBob;
                     Explain::getWinningPlanStats(exec.get(), &execStatsBob);
-                    curOp->debug().execStats.set(execStatsBob.obj());
+                    curOp->debug().execStats = execStatsBob.obj();
                 }
             }
             pm.finished();

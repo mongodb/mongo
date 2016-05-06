@@ -171,7 +171,7 @@ public:
         if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
             BSONObjBuilder execStatsBob;
             Explain::getWinningPlanStats(exec.get(), &execStatsBob);
-            curOp->debug().execStats.set(execStatsBob.obj());
+            curOp->debug().execStats = execStatsBob.obj();
         }
 
         // Plan is done executing. We just need to pull the count out of the root stage.

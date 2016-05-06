@@ -49,82 +49,6 @@ class CurOp;
 class OperationContext;
 struct PlanSummaryStats;
 
-/**
- * stores a copy of a bson obj in a fixed size buffer
- * if its too big for the buffer, says "too big"
- * useful for keeping a copy around indefinitely without wasting a lot of space or doing malloc
- */
-class CachedBSONObjBase {
-public:
-    static BSONObj _tooBig;  // { $msg : "query not recording (too large)" }
-};
-
-template <size_t BUFFER_SIZE>
-class CachedBSONObj : public CachedBSONObjBase {
-public:
-    enum { TOO_BIG_SENTINEL = 1 };
-
-    CachedBSONObj() {
-        reset();
-    }
-
-    void reset(int sz = 0) {
-        _lock.lock();
-        _reset(sz);
-        _lock.unlock();
-    }
-
-    void set(const BSONObj& o) {
-        scoped_spinlock lk(_lock);
-        size_t sz = o.objsize();
-        if (sz > sizeof(_buf)) {
-            _reset(TOO_BIG_SENTINEL);
-        } else {
-            memcpy(_buf, o.objdata(), sz);
-        }
-    }
-
-    int size() const {
-        return ConstDataView(_buf).read<LittleEndian<int>>();
-    }
-    bool have() const {
-        return size() > 0;
-    }
-    bool tooBig() const {
-        return size() == TOO_BIG_SENTINEL;
-    }
-
-    BSONObj get() const {
-        scoped_spinlock lk(_lock);
-        return _get();
-    }
-
-    void append(BSONObjBuilder& b, StringData name) const {
-        scoped_spinlock lk(_lock);
-        BSONObj temp = _get();
-        b.append(name, temp);
-    }
-
-private:
-    /** you have to be locked when you call this */
-    BSONObj _get() const {
-        int sz = size();
-        if (sz == 0)
-            return BSONObj();
-        if (sz == TOO_BIG_SENTINEL)
-            return _tooBig;
-        return BSONObj(_buf).copy();
-    }
-
-    /** you have to be locked when you call this */
-    void _reset(int sz) {
-        DataView(_buf).write<LittleEndian<int>>(sz);
-    }
-
-    mutable SpinLock _lock;
-    char _buf[BUFFER_SIZE];
-};
-
 /* lifespan is different than CurOp because of recursives with DBDirectClient */
 class OpDebug {
 public:
@@ -195,9 +119,7 @@ public:
     long long keysDeleted{0};   // Number of index keys removed.
     long long writeConflicts{0};
 
-    // New Query Framework debugging/profiling info
-    // TODO: should this really be an opaque BSONObj?  Not sure.
-    CachedBSONObj<4096> execStats;
+    BSONObj execStats;  // Owned here.
 
     // error handling
     ExceptionInfo exceptionInfo;
@@ -243,13 +165,15 @@ public:
     ~CurOp();
 
     bool haveQuery() const {
-        return _query.have();
+        return !_query.isEmpty();
     }
+
+    /**
+     * The BSONObj returned may not be owned by CurOp. Callers should call getOwned() if they plan
+     * to reference beyond the lifetime of this CurOp instance.
+     */
     BSONObj query() const {
-        return _query.get();
-    }
-    void appendQuery(BSONObjBuilder& b, StringData name) const {
-        _query.append(b, name);
+        return _query;
     }
 
     void enter_inlock(const char* ns, int dbProfileLevel);
@@ -394,8 +318,12 @@ public:
         return elapsedMillis() / 1000;
     }
 
+    /**
+     * 'query' must be either an owned BSONObj or guaranteed to outlive the OperationContext it is
+     * associated with.
+     */
     void setQuery_inlock(const BSONObj& query) {
-        _query.set(query);
+        _query = query;
     }
 
     Command* getCommand() const {
@@ -502,7 +430,7 @@ private:
     bool _isCommand{false};
     int _dbprofile{0};  // 0=off, 1=slow, 2=all
     std::string _ns;
-    CachedBSONObj<512> _query;  // CachedBSONObj is thread safe
+    BSONObj _query;
     OpDebug _debug;
     std::string _message;
     ProgressMeter _progressMeter;

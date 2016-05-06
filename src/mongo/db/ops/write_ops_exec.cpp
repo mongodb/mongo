@@ -527,7 +527,7 @@ static WriteResult::SingleResult performSingleUpdateOp(OperationContext* txn,
     if (curOp.shouldDBProfile(curOp.elapsedMillis())) {
         BSONObjBuilder execStatsBob;
         Explain::getWinningPlanStats(exec.get(), &execStatsBob);
-        curOp.debug().execStats.set(execStatsBob.obj());
+        curOp.debug().execStats = execStatsBob.obj();
     }
 
     const UpdateStats* updateStats = UpdateStage::getUpdateStats(exec.get());
@@ -630,7 +630,7 @@ static WriteResult::SingleResult performSingleDeleteOp(OperationContext* txn,
     if (curOp.shouldDBProfile(curOp.elapsedMillis())) {
         BSONObjBuilder execStatsBob;
         Explain::getWinningPlanStats(exec.get(), &execStatsBob);
-        curOp.debug().execStats.set(execStatsBob.obj());
+        curOp.debug().execStats = execStatsBob.obj();
     }
 
     LastError::get(txn->getClient()).recordDelete(n);

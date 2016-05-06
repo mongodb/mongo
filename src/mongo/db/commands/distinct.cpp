@@ -266,7 +266,7 @@ public:
         if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
             BSONObjBuilder execStatsBob;
             Explain::getWinningPlanStats(executor.getValue().get(), &execStatsBob);
-            curOp->debug().execStats.set(execStatsBob.obj());
+            curOp->debug().execStats = execStatsBob.obj();
         }
 
         verify(start == bb.buf());

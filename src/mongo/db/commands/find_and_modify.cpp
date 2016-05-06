@@ -421,7 +421,7 @@ public:
                 if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
                     BSONObjBuilder execStatsBob;
                     Explain::getWinningPlanStats(exec.get(), &execStatsBob);
-                    opDebug->execStats.set(execStatsBob.obj());
+                    curOp->debug().execStats = execStatsBob.obj();
                 }
 
                 boost::optional<BSONObj> value = advanceStatus.getValue();
@@ -516,7 +516,7 @@ public:
                 if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
                     BSONObjBuilder execStatsBob;
                     Explain::getWinningPlanStats(exec.get(), &execStatsBob);
-                    opDebug->execStats.set(execStatsBob.obj());
+                    curOp->debug().execStats = execStatsBob.obj();
                 }
 
                 boost::optional<BSONObj> value = advanceStatus.getValue();

@@ -162,7 +162,7 @@ void endQueryOp(OperationContext* txn,
     if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
         BSONObjBuilder statsBob;
         Explain::getWinningPlanStats(&exec, &statsBob);
-        curOp->debug().execStats.set(statsBob.obj());
+        curOp->debug().execStats = statsBob.obj();
     }
 }
 
@@ -416,7 +416,7 @@ QueryResult::View getMore(OperationContext* txn,
         if (curOp.shouldDBProfile(curOp.elapsedMillis())) {
             BSONObjBuilder execStatsBob;
             Explain::getWinningPlanStats(exec, &execStatsBob);
-            curOp.debug().execStats.set(execStatsBob.obj());
+            curOp.debug().execStats = execStatsBob.obj();
         }
 
         // We have to do this before re-acquiring locks in the agg case because

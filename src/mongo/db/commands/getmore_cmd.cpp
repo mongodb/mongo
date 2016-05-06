@@ -387,7 +387,7 @@ public:
         if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
             BSONObjBuilder execStatsBob;
             Explain::getWinningPlanStats(exec, &execStatsBob);
-            curOp->debug().execStats.set(execStatsBob.obj());
+            curOp->debug().execStats = execStatsBob.obj();
         }
 
         if (shouldSaveCursorGetMore(state, exec, isCursorTailable(cursor))) {

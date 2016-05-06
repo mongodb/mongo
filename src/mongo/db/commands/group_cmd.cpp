@@ -198,7 +198,7 @@ private:
         if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
             BSONObjBuilder execStatsBob;
             Explain::getWinningPlanStats(planExecutor.get(), &execStatsBob);
-            curOp->debug().execStats.set(execStatsBob.obj());
+            curOp->debug().execStats = execStatsBob.obj();
         }
 
         invariant(STAGE_GROUP == planExecutor->getRootStage()->stageType());
