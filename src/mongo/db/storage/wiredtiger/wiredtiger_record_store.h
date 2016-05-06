@@ -127,9 +127,10 @@ public:
                                               int len,
                                               bool enforceQuota);
 
-    virtual StatusWith<RecordId> insertRecord(OperationContext* txn,
-                                              const DocWriter* doc,
-                                              bool enforceQuota);
+    virtual Status insertRecordsWithDocWriter(OperationContext* txn,
+                                              const DocWriter* const* docs,
+                                              size_t nDocs,
+                                              RecordId* idsOut);
 
     virtual Status updateRecord(OperationContext* txn,
                                 const RecordId& oldLocation,
@@ -256,6 +257,8 @@ private:
 
     void _dealtWithCappedId(SortedRecordIds::iterator it);
     void _addUncommitedRecordId_inlock(OperationContext* txn, const RecordId& id);
+
+    Status _insertRecords(OperationContext* txn, Record* records, size_t nRecords);
 
     RecordId _nextId();
     void _setId(RecordId id);

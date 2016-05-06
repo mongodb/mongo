@@ -255,7 +255,7 @@ vector<std::unique_ptr<RecordCursor>> SimpleRecordStoreV1::getManyCursors(
     return cursors;
 }
 
-class CompactDocWriter : public DocWriter {
+class CompactDocWriter final : public DocWriter {
 public:
     /**
      * param allocationSize - allocation size WITH header
@@ -368,7 +368,7 @@ void SimpleRecordStoreV1::_compactExtent(OperationContext* txn,
                 // start of the compact, this insert will allocate a record in a new extent.
                 // See the comment in compact() for more details.
                 CompactDocWriter writer(recOld, rawDataSize, allocationSize);
-                StatusWith<RecordId> status = insertRecord(txn, &writer, false);
+                StatusWith<RecordId> status = insertRecordWithDocWriter(txn, &writer);
                 uassertStatusOK(status.getStatus());
                 const MmapV1RecordHeader* newRec =
                     recordFor(DiskLoc::fromRecordId(status.getValue()));

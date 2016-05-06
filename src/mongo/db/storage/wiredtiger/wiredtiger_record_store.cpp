@@ -1261,11 +1261,17 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* txn) {
 Status WiredTigerRecordStore::insertRecords(OperationContext* txn,
                                             std::vector<Record>* records,
                                             bool enforceQuota) {
+    return _insertRecords(txn, records->data(), records->size());
+}
+
+Status WiredTigerRecordStore::_insertRecords(OperationContext* txn,
+                                             Record* records,
+                                             size_t nRecords) {
     // We are kind of cheating on capped collections since we write all of them at once ....
     // Simplest way out would be to just block vector writes for everything except oplog ?
-    int totalLength = 0;
-    for (auto& record : *records)
-        totalLength += record.data.size();
+    int64_t totalLength = 0;
+    for (size_t i = 0; i < nRecords; i++)
+        totalLength += records[i].data.size();
 
     // caller will retry one element at a time
     if (_isCapped && totalLength > _cappedMaxSize)
@@ -1277,8 +1283,9 @@ Status WiredTigerRecordStore::insertRecords(OperationContext* txn,
     invariant(c);
 
     RecordId highestId = RecordId();
-    dassert(!records->empty());
-    for (auto& record : *records) {
+    dassert(nRecords != 0);
+    for (size_t i = 0; i < nRecords; i++) {
+        auto& record = records[i];
         if (_useOplogHack) {
             StatusWith<RecordId> status =
                 oploghack::extractKey(record.data.data(), record.data.size());
@@ -1302,7 +1309,8 @@ Status WiredTigerRecordStore::insertRecords(OperationContext* txn,
             _oplog_highestSeen = highestId;
     }
 
-    for (auto& record : *records) {
+    for (size_t i = 0; i < nRecords; i++) {
+        auto& record = records[i];
         c->set_key(c, _makeKey(record.id));
         WiredTigerItem value(record.data.data(), record.data.size());
         c->set_value(c, value.Get());
@@ -1311,12 +1319,11 @@ Status WiredTigerRecordStore::insertRecords(OperationContext* txn,
             return wtRCToStatus(ret, "WiredTigerRecordStore::insertRecord");
     }
 
-    _changeNumRecords(txn, records->size());
+    _changeNumRecords(txn, nRecords);
     _increaseDataSize(txn, totalLength);
 
     if (_oplogStones) {
-        _oplogStones->updateCurrentStoneAfterInsertOnCommit(
-            txn, totalLength, highestId, records->size());
+        _oplogStones->updateCurrentStoneAfterInsertOnCommit(txn, totalLength, highestId, nRecords);
     } else {
         cappedDeleteAsNeeded(txn, highestId);
     }
@@ -1328,13 +1335,11 @@ StatusWith<RecordId> WiredTigerRecordStore::insertRecord(OperationContext* txn,
                                                          const char* data,
                                                          int len,
                                                          bool enforceQuota) {
-    std::vector<Record> records;
     Record record = {RecordId(), RecordData(data, len)};
-    records.push_back(record);
-    Status status = insertRecords(txn, &records, enforceQuota);
+    Status status = _insertRecords(txn, &record, 1);
     if (!status.isOK())
         return StatusWith<RecordId>(status);
-    return StatusWith<RecordId>(records[0].id);
+    return StatusWith<RecordId>(record.id);
 }
 
 void WiredTigerRecordStore::_dealtWithCappedId(SortedRecordIds::iterator it) {
@@ -1356,15 +1361,43 @@ RecordId WiredTigerRecordStore::lowestCappedHiddenRecord() const {
     return _uncommittedRecordIds.empty() ? RecordId() : _uncommittedRecordIds.front();
 }
 
-StatusWith<RecordId> WiredTigerRecordStore::insertRecord(OperationContext* txn,
-                                                         const DocWriter* doc,
-                                                         bool enforceQuota) {
-    const int len = doc->documentSize();
+Status WiredTigerRecordStore::insertRecordsWithDocWriter(OperationContext* txn,
+                                                         const DocWriter* const* docs,
+                                                         size_t nDocs,
+                                                         RecordId* idsOut) {
+    std::unique_ptr<Record[]> records(new Record[nDocs]);
 
-    std::unique_ptr<char[]> buf(new char[len]);
-    doc->writeDocument(buf.get());
+    // First get all the sizes so we can allocate a single buffer for all documents. Eventually it
+    // would be nice if we could either hand off the buffers to WT without copying or write them
+    // in-place as we do with MMAPv1, but for now this is the best we can do.
+    size_t totalSize = 0;
+    for (size_t i = 0; i < nDocs; i++) {
+        const size_t docSize = docs[i]->documentSize();
+        records[i].data = RecordData(nullptr, docSize);  // We fill in the real ptr in next loop.
+        totalSize += docSize;
+    }
 
-    return insertRecord(txn, buf.get(), len, enforceQuota);
+    std::unique_ptr<char[]> buffer(new char[totalSize]);
+    char* pos = buffer.get();
+    for (size_t i = 0; i < nDocs; i++) {
+        docs[i]->writeDocument(pos);
+        const size_t size = records[i].data.size();
+        records[i].data = RecordData(pos, size);
+        pos += size;
+    }
+    invariant(pos == (buffer.get() + totalSize));
+
+    Status s = _insertRecords(txn, records.get(), nDocs);
+    if (!s.isOK())
+        return s;
+
+    if (idsOut) {
+        for (size_t i = 0; i < nDocs; i++) {
+            idsOut[i] = records[i].id;
+        }
+    }
+
+    return s;
 }
 
 Status WiredTigerRecordStore::updateRecord(OperationContext* txn,

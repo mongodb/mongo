@@ -293,7 +293,9 @@ public:
      * Callers must ensure no document validation is performed for this collection when calling
      * this method.
      */
-    Status insertDocument(OperationContext* txn, const DocWriter* doc, bool enforceQuota);
+    Status insertDocumentsForOplog(OperationContext* txn,
+                                   const DocWriter* const* docs,
+                                   size_t nDocs);
 
     Status insertDocument(OperationContext* txn,
                           const BSONObj& doc,

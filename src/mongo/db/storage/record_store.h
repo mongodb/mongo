@@ -45,7 +45,6 @@ class CappedCallback;
 class Collection;
 struct CompactOptions;
 struct CompactStats;
-class DocWriter;
 class MAdvise;
 class NamespaceDetails;
 class OperationContext;
@@ -62,12 +61,15 @@ class ValidateAdaptor;
  */
 class DocWriter {
 public:
-    virtual ~DocWriter() {}
     virtual void writeDocument(char* buf) const = 0;
     virtual size_t documentSize() const = 0;
     virtual bool addPadding() const {
         return true;
     }
+
+protected:
+    // Can't delete through base pointer.
+    ~DocWriter() = default;
 };
 
 /**
@@ -370,10 +372,6 @@ public:
                                               int len,
                                               bool enforceQuota) = 0;
 
-    virtual StatusWith<RecordId> insertRecord(OperationContext* txn,
-                                              const DocWriter* doc,
-                                              bool enforceQuota) = 0;
-
     virtual Status insertRecords(OperationContext* txn,
                                  std::vector<Record>* records,
                                  bool enforceQuota) {
@@ -386,6 +384,31 @@ public:
             record.id = res.getValue();
         }
         return Status::OK();
+    }
+
+    /**
+     * Inserts nDocs documents into this RecordStore using the DocWriter interface.
+     *
+     * This allows the storage engine to reserve space for a record and have it built in-place
+     * rather than building the record then copying it into its destination.
+     *
+     * On success, if idsOut is non-null the RecordIds of the inserted records will be written into
+     * it. It must have space for nDocs RecordIds.
+     */
+    virtual Status insertRecordsWithDocWriter(OperationContext* txn,
+                                              const DocWriter* const* docs,
+                                              size_t nDocs,
+                                              RecordId* idsOut = nullptr) = 0;
+
+    /**
+     * A thin wrapper around insertRecordsWithDocWriter() to simplify handling of single DocWriters.
+     */
+    StatusWith<RecordId> insertRecordWithDocWriter(OperationContext* txn, const DocWriter* doc) {
+        RecordId out;
+        Status status = insertRecordsWithDocWriter(txn, &doc, 1, &out);
+        if (!status.isOK())
+            return status;
+        return out;
     }
 
     /**

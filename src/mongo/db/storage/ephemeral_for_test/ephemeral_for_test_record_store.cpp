@@ -398,36 +398,42 @@ StatusWith<RecordId> EphemeralForTestRecordStore::insertRecord(OperationContext*
     return StatusWith<RecordId>(loc);
 }
 
-StatusWith<RecordId> EphemeralForTestRecordStore::insertRecord(OperationContext* txn,
-                                                               const DocWriter* doc,
-                                                               bool enforceQuota) {
-    const int len = doc->documentSize();
-    if (_isCapped && len > _cappedMaxSize) {
-        // We use dataSize for capped rollover and we don't want to delete everything if we know
-        // this won't fit.
-        return StatusWith<RecordId>(ErrorCodes::BadValue, "object to insert exceeds cappedMaxSize");
+Status EphemeralForTestRecordStore::insertRecordsWithDocWriter(OperationContext* txn,
+                                                               const DocWriter* const* docs,
+                                                               size_t nDocs,
+                                                               RecordId* idsOut) {
+    for (size_t i = 0; i < nDocs; i++) {
+        const int len = docs[i]->documentSize();
+        if (_isCapped && len > _cappedMaxSize) {
+            // We use dataSize for capped rollover and we don't want to delete everything if we know
+            // this won't fit.
+            return Status(ErrorCodes::BadValue, "object to insert exceeds cappedMaxSize");
+        }
+
+        EphemeralForTestRecord rec(len);
+        docs[i]->writeDocument(rec.data.get());
+
+        RecordId loc;
+        if (_data->isOplog) {
+            StatusWith<RecordId> status = extractAndCheckLocForOplog(rec.data.get(), len);
+            if (!status.isOK())
+                return status.getStatus();
+            loc = status.getValue();
+        } else {
+            loc = allocateLoc();
+        }
+
+        txn->recoveryUnit()->registerChange(new InsertChange(_data, loc));
+        _data->dataSize += len;
+        _data->records[loc] = rec;
+
+        cappedDeleteAsNeeded(txn);
+
+        if (idsOut)
+            idsOut[i] = loc;
     }
 
-    EphemeralForTestRecord rec(len);
-    doc->writeDocument(rec.data.get());
-
-    RecordId loc;
-    if (_data->isOplog) {
-        StatusWith<RecordId> status = extractAndCheckLocForOplog(rec.data.get(), len);
-        if (!status.isOK())
-            return status;
-        loc = status.getValue();
-    } else {
-        loc = allocateLoc();
-    }
-
-    txn->recoveryUnit()->registerChange(new InsertChange(_data, loc));
-    _data->dataSize += len;
-    _data->records[loc] = rec;
-
-    cappedDeleteAsNeeded(txn);
-
-    return StatusWith<RecordId>(loc);
+    return Status::OK();
 }
 
 Status EphemeralForTestRecordStore::updateRecord(OperationContext* txn,

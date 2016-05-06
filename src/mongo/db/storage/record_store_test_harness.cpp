@@ -97,7 +97,7 @@ TEST(RecordStoreTestHarness, Simple1) {
 }
 
 namespace {
-class DummyDocWriter : public DocWriter {
+class DummyDocWriter final : public DocWriter {
 public:
     virtual ~DummyDocWriter() {}
     virtual void writeDocument(char* buf) const {
@@ -125,7 +125,7 @@ TEST(RecordStoreTestHarness, Simple1InsertDocWroter) {
         {
             WriteUnitOfWork uow(opCtx.get());
             DummyDocWriter dw;
-            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), &dw, false);
+            StatusWith<RecordId> res = rs->insertRecordWithDocWriter(opCtx.get(), &dw);
             ASSERT_OK(res.getStatus());
             loc1 = res.getValue();
             uow.commit();

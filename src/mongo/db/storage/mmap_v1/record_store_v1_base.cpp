@@ -294,35 +294,43 @@ DiskLoc RecordStoreV1Base::getPrevRecordInExtent(OperationContext* txn, const Di
     return result;
 }
 
-StatusWith<RecordId> RecordStoreV1Base::insertRecord(OperationContext* txn,
-                                                     const DocWriter* doc,
-                                                     bool enforceQuota) {
-    int docSize = doc->documentSize();
-    if (docSize < 4) {
-        return StatusWith<RecordId>(ErrorCodes::InvalidLength, "record has to be >= 4 bytes");
+Status RecordStoreV1Base::insertRecordsWithDocWriter(OperationContext* txn,
+                                                     const DocWriter* const* docs,
+                                                     size_t nDocs,
+                                                     RecordId* idsOut) {
+    for (size_t i = 0; i < nDocs; i++) {
+        int docSize = docs[i]->documentSize();
+        if (docSize < 4) {
+            return Status(ErrorCodes::InvalidLength, "record has to be >= 4 bytes");
+        }
+        const int lenWHdr = docSize + MmapV1RecordHeader::HeaderSize;
+        if (lenWHdr > MaxAllowedAllocation) {
+            return Status(ErrorCodes::InvalidLength, "record has to be <= 16.5MB");
+        }
+        const int lenToAlloc = (docs[i]->addPadding() && shouldPadInserts())
+            ? quantizeAllocationSpace(lenWHdr)
+            : lenWHdr;
+
+        StatusWith<DiskLoc> loc = allocRecord(txn, lenToAlloc, /*enforceQuota=*/false);
+        if (!loc.isOK())
+            return loc.getStatus();
+
+        MmapV1RecordHeader* r = recordFor(loc.getValue());
+        fassert(17319, r->lengthWithHeaders() >= lenWHdr);
+
+        r = reinterpret_cast<MmapV1RecordHeader*>(txn->recoveryUnit()->writingPtr(r, lenWHdr));
+        docs[i]->writeDocument(r->data());
+
+        _addRecordToRecListInExtent(txn, r, loc.getValue());
+
+        _details->incrementStats(txn, r->netLength(), 1);
+
+        if (idsOut)
+            idsOut[i] = loc.getValue().toRecordId();
     }
-    const int lenWHdr = docSize + MmapV1RecordHeader::HeaderSize;
-    if (lenWHdr > MaxAllowedAllocation) {
-        return StatusWith<RecordId>(ErrorCodes::InvalidLength, "record has to be <= 16.5MB");
-    }
-    const int lenToAlloc =
-        (doc->addPadding() && shouldPadInserts()) ? quantizeAllocationSpace(lenWHdr) : lenWHdr;
 
-    StatusWith<DiskLoc> loc = allocRecord(txn, lenToAlloc, enforceQuota);
-    if (!loc.isOK())
-        return StatusWith<RecordId>(loc.getStatus());
 
-    MmapV1RecordHeader* r = recordFor(loc.getValue());
-    fassert(17319, r->lengthWithHeaders() >= lenWHdr);
-
-    r = reinterpret_cast<MmapV1RecordHeader*>(txn->recoveryUnit()->writingPtr(r, lenWHdr));
-    doc->writeDocument(r->data());
-
-    _addRecordToRecListInExtent(txn, r, loc.getValue());
-
-    _details->incrementStats(txn, r->netLength(), 1);
-
-    return StatusWith<RecordId>(loc.getValue().toRecordId());
+    return Status::OK();
 }
 
 

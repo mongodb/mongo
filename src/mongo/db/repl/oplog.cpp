@@ -375,8 +375,7 @@ void _logOpsInner(OperationContext* txn,
 
     // we jump through a bunch of hoops here to avoid copying the obj buffer twice --
     // instead we do a single copy to the destination in the record store.
-    for (size_t i = 0; i < nWriters; i++)
-        checkOplogInsert(oplogCollection->insertDocument(txn, writers[i], false));
+    checkOplogInsert(oplogCollection->insertDocumentsForOplog(txn, writers, nWriters));
 
     // Set replCoord last optime only after we're sure the WUOW didn't abort and roll back.
     if (updateReplOpTime) {

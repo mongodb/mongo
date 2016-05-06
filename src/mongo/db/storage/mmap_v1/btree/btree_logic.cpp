@@ -1822,7 +1822,7 @@ void BtreeLogic<BtreeLayout>::split(OperationContext* txn,
     }
 }
 
-class DummyDocWriter : public DocWriter {
+class DummyDocWriter final : public DocWriter {
 public:
     DummyDocWriter(size_t sz) : _sz(sz) {}
     virtual void writeDocument(char* buf) const { /* no-op */
@@ -1848,7 +1848,7 @@ Status BtreeLogic<BtreeLayout>::initAsEmpty(OperationContext* txn) {
 template <class BtreeLayout>
 DiskLoc BtreeLogic<BtreeLayout>::_addBucket(OperationContext* txn) {
     DummyDocWriter docWriter(BtreeLayout::BucketSize);
-    StatusWith<RecordId> loc = _recordStore->insertRecord(txn, &docWriter, false);
+    StatusWith<RecordId> loc = _recordStore->insertRecordWithDocWriter(txn, &docWriter);
     // XXX: remove this(?) or turn into massert or sanely bubble it back up.
     uassertStatusOK(loc.getStatus());
 

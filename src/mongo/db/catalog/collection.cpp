@@ -324,24 +324,25 @@ StatusWithMatchExpression Collection::parseValidator(const BSONObj& validator) c
     return statusWithMatcher;
 }
 
-Status Collection::insertDocument(OperationContext* txn, const DocWriter* doc, bool enforceQuota) {
-    invariant(!_validator || documentValidationDisabled(txn));
+Status Collection::insertDocumentsForOplog(OperationContext* txn,
+                                           const DocWriter* const* docs,
+                                           size_t nDocs) {
     dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
-    invariant(!_indexCatalog.haveAnyIndexes());  // eventually can implement, just not done
 
-    if (_mustTakeCappedLockOnInsert)
-        synchronizeOnCappedInFlightResource(txn->lockState(), _ns);
+    // Since this is only for the OpLog, we can assume these for simplicity.
+    // This also means that we do not need to forward this object to the OpObserver, which is good
+    // because it would defeat the purpose of using DocWriter.
+    invariant(!_validator);
+    invariant(!_indexCatalog.haveAnyIndexes());
+    invariant(!_mustTakeCappedLockOnInsert);
 
-    StatusWith<RecordId> loc = _recordStore->insertRecord(txn, doc, _enforceQuota(enforceQuota));
-    if (!loc.isOK())
-        return loc.getStatus();
-
-    // we cannot call into the OpObserver here because the document being written is not present
-    // fortunately, this is currently only used for adding entries to the oplog.
+    Status status = _recordStore->insertRecordsWithDocWriter(txn, docs, nDocs);
+    if (!status.isOK())
+        return status;
 
     txn->recoveryUnit()->onCommit([this]() { notifyCappedWaitersIfNeeded(); });
 
-    return loc.getStatus();
+    return status;
 }
 
 
@@ -439,7 +440,8 @@ Status Collection::_insertDocuments(OperationContext* txn,
                                     OpDebug* opDebug) {
     dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
 
-    if (isCapped() && _indexCatalog.haveAnyIndexes() && std::distance(begin, end) > 1) {
+    const size_t count = std::distance(begin, end);
+    if (isCapped() && _indexCatalog.haveAnyIndexes() && count > 1) {
         // We require that inserts to indexed capped collections be done one-at-a-time to avoid the
         // possibility that a later document causes an earlier document to be deleted before it can
         // be indexed.
@@ -456,6 +458,7 @@ Status Collection::_insertDocuments(OperationContext* txn,
     }
 
     std::vector<Record> records;
+    records.reserve(count);
     for (auto it = begin; it != end; it++) {
         Record record = {RecordId(), RecordData(it->objdata(), it->objsize())};
         records.push_back(record);
@@ -465,6 +468,7 @@ Status Collection::_insertDocuments(OperationContext* txn,
         return status;
 
     std::vector<BsonRecord> bsonRecords;
+    bsonRecords.reserve(count);
     int recordIndex = 0;
     for (auto it = begin; it != end; it++) {
         RecordId loc = records[recordIndex++].id;

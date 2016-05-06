@@ -35,7 +35,7 @@
 namespace mongo {
 namespace {
 
-class StringDocWriter : public DocWriter {
+class StringDocWriter final : public DocWriter {
 public:
     StringDocWriter(const std::string& data, bool padding) : _data(data), _padding(padding) {}
 

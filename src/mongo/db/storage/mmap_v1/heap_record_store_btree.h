@@ -60,9 +60,10 @@ public:
                                               int len,
                                               bool enforceQuota);
 
-    virtual StatusWith<RecordId> insertRecord(OperationContext* txn,
-                                              const DocWriter* doc,
-                                              bool enforceQuota);
+    virtual Status insertRecordsWithDocWriter(OperationContext* txn,
+                                              const DocWriter* const* docs,
+                                              size_t nDocs,
+                                              RecordId* idsOut);
 
     virtual long long numRecords(OperationContext* txn) const {
         return _records.size();
