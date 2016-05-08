@@ -38,6 +38,15 @@ namespace mongo {
 
 using std::string;
 
+namespace {
+
+bool indexTypeSupportsPathLevelMultikeyTracking(StringData accessMethod) {
+    // TODO SERVER-23906: Enable path-level multikey tracking for new 2dsphere indexes.
+    return accessMethod == IndexNames::BTREE;
+}
+
+}  // namespace
+
 class KVCollectionCatalogEntry::AddIndexChange : public RecoveryUnit::Change {
 public:
     AddIndexChange(OperationContext* opCtx, KVCollectionCatalogEntry* cce, StringData ident)
@@ -84,14 +93,53 @@ KVCollectionCatalogEntry::~KVCollectionCatalogEntry() {}
 
 bool KVCollectionCatalogEntry::setIndexIsMultikey(OperationContext* txn,
                                                   StringData indexName,
-                                                  bool multikey) {
+                                                  const MultikeyPaths& multikeyPaths) {
     MetaData md = _getMetaData(txn);
 
     int offset = md.findIndexOffset(indexName);
     invariant(offset >= 0);
-    if (md.indexes[offset].multikey == multikey)
-        return false;
-    md.indexes[offset].multikey = multikey;
+
+    const bool tracksPathLevelMultikeyInfo = !md.indexes[offset].multikeyPaths.empty();
+    if (!tracksPathLevelMultikeyInfo) {
+        invariant(multikeyPaths.empty());
+
+        if (md.indexes[offset].multikey) {
+            // The index is already set as multikey and we aren't tracking path-level multikey
+            // information for it. We return false to indicate that the index metadata is unchanged.
+            return false;
+        }
+    }
+
+    md.indexes[offset].multikey = true;
+
+    if (tracksPathLevelMultikeyInfo && !multikeyPaths.empty()) {
+        invariant(multikeyPaths.size() == md.indexes[offset].multikeyPaths.size());
+
+        bool newPathIsMultikey = false;
+        bool somePathIsMultikey = false;
+
+        // Store new path components that cause this index to be multikey in catalog's index
+        // metadata.
+        for (size_t i = 0; i < multikeyPaths.size(); ++i) {
+            std::set<size_t>& indexMultikeyComponents = md.indexes[offset].multikeyPaths[i];
+            for (const auto multikeyComponent : multikeyPaths[i]) {
+                auto result = indexMultikeyComponents.insert(multikeyComponent);
+                newPathIsMultikey = newPathIsMultikey || result.second;
+                somePathIsMultikey = true;
+            }
+        }
+
+        // If all of the sets in the multikey paths vector were empty, then no component of any
+        // indexed field caused the index to be multikey. setIndexIsMultikey() therefore shouldn't
+        // have been called.
+        invariant(somePathIsMultikey);
+
+        if (!newPathIsMultikey) {
+            // We return false to indicate that the index metadata is unchanged.
+            return false;
+        }
+    }
+
     _catalog->putMetaData(txn, ns().toString(), md);
     return true;
 }
@@ -125,7 +173,11 @@ Status KVCollectionCatalogEntry::removeIndex(OperationContext* txn, StringData i
 Status KVCollectionCatalogEntry::prepareForIndexBuild(OperationContext* txn,
                                                       const IndexDescriptor* spec) {
     MetaData md = _getMetaData(txn);
-    md.indexes.push_back(IndexMetaData(spec->infoObj(), false, RecordId(), false));
+    IndexMetaData imd(spec->infoObj(), false, RecordId(), false);
+    if (indexTypeSupportsPathLevelMultikeyTracking(spec->getAccessMethodName())) {
+        imd.multikeyPaths = MultikeyPaths{static_cast<size_t>(spec->keyPattern().nFields())};
+    }
+    md.indexes.push_back(imd);
     _catalog->putMetaData(txn, ns().toString(), md);
 
     string ident = _catalog->getIndexIdent(txn, ns().ns(), spec->indexName());

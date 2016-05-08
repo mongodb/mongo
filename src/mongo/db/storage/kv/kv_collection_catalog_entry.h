@@ -52,7 +52,7 @@ public:
 
     bool setIndexIsMultikey(OperationContext* txn,
                             StringData indexName,
-                            bool multikey = true) final;
+                            const MultikeyPaths& multikeyPaths) final;
 
     void setIndexHead(OperationContext* txn, StringData indexName, const RecordId& newHead) final;
 

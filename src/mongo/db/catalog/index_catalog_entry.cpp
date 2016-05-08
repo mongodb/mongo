@@ -220,7 +220,8 @@ void IndexCatalogEntry::setMultikey(OperationContext* txn) {
 
         WriteUnitOfWork wuow(txn);
 
-        if (_collection->setIndexIsMultikey(txn, _descriptor->indexName())) {
+        // TODO SERVER-22726: Propagate multikey paths computed during index key generation.
+        if (_collection->setIndexIsMultikey(txn, _descriptor->indexName(), MultikeyPaths{})) {
             if (_infoCache) {
                 LOG(1) << _ns << ": clearing plan cache - index " << _descriptor->keyPattern()
                        << " set to multi key.";
@@ -245,7 +246,7 @@ RecordId IndexCatalogEntry::_catalogHead(OperationContext* txn) const {
 }
 
 bool IndexCatalogEntry::_catalogIsMultikey(OperationContext* txn) const {
-    return _collection->isIndexMultikey(txn, _descriptor->indexName());
+    return _collection->isIndexMultikey(txn, _descriptor->indexName(), nullptr);
 }
 
 // ------------------

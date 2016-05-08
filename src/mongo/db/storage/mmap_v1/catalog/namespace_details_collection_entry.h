@@ -67,13 +67,15 @@ public:
 
     BSONObj getIndexSpec(OperationContext* txn, StringData idxName) const final;
 
-    bool isIndexMultikey(OperationContext* txn, StringData indexName) const final;
+    bool isIndexMultikey(OperationContext* txn,
+                         StringData indexName,
+                         MultikeyPaths* multikeyPaths) const final;
     bool isIndexMultikey(int idxNo) const;
 
     bool setIndexIsMultikey(OperationContext* txn, int idxNo, bool multikey = true);
     bool setIndexIsMultikey(OperationContext* txn,
                             StringData indexName,
-                            bool multikey = true) final;
+                            const MultikeyPaths& multikeyPaths) final;
 
     RecordId getIndexHead(OperationContext* txn, StringData indexName) const final;
 
