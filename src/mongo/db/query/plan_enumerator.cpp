@@ -91,10 +91,9 @@ using PossibleFirstAssignment = std::vector<MatchExpression*>;
 void getPossibleFirstAssignments(const IndexEntry& thisIndex,
                                  const vector<MatchExpression*>& predsOverLeadingField,
                                  std::vector<PossibleFirstAssignment>* possibleFirstAssignments) {
-    invariant(thisIndex.multikey && thisIndex.multikeyPaths);
-    const auto& multikeyPaths = *thisIndex.multikeyPaths;
+    invariant(thisIndex.multikey && !thisIndex.multikeyPaths.empty());
 
-    if (multikeyPaths[0].empty()) {
+    if (thisIndex.multikeyPaths[0].empty()) {
         // No prefix of the leading index field causes the index to be multikey. In other words, the
         // index isn't multikey as a result of the leading index field. We can then safely assign
         // all predicates on it to the index and the access planner will intersect the bounds.
@@ -140,7 +139,8 @@ void getPossibleFirstAssignments(const IndexEntry& thisIndex,
 
         // Since the multikey path components are 0-indexed, 'elemMatchRootLength' actually
         // corresponds to the path component immediately following the root of the $elemMatch.
-        if (multikeyPaths[0].lower_bound(elemMatchRootLength) == multikeyPaths[0].end()) {
+        if (thisIndex.multikeyPaths[0].lower_bound(elemMatchRootLength) ==
+            thisIndex.multikeyPaths[0].end()) {
             // The root of the $elemMatch is the longest prefix of the leading index field that
             // causes the index to be multikey, so we can assign all of the leaf expressions in the
             // $elemMatch to the index.
@@ -615,7 +615,7 @@ bool PlanEnumerator::enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
 
         const vector<MatchExpression*>& predsOverLeadingField = it->second;
 
-        if (thisIndex.multikey && thisIndex.multikeyPaths) {
+        if (thisIndex.multikey && !thisIndex.multikeyPaths.empty()) {
             // 2dsphere indexes are the only special index type that should ever have path-level
             // multikey information.
             invariant(INDEX_2DSPHERE == thisIndex.type);
@@ -794,7 +794,7 @@ void PlanEnumerator::enumerateOneIndex(const IndexToPredMap& idxToFirst,
     for (IndexToPredMap::const_iterator it = idxToFirst.begin(); it != idxToFirst.end(); ++it) {
         const IndexEntry& thisIndex = (*_indices)[it->first];
 
-        if (thisIndex.multikey && thisIndex.multikeyPaths) {
+        if (thisIndex.multikey && !thisIndex.multikeyPaths.empty()) {
             // We have path-level information about what causes 'thisIndex' to be multikey and can
             // use this information to get tighter bounds by assigning additional predicates to the
             // index.
@@ -1292,8 +1292,7 @@ void PlanEnumerator::assignMultikeySafePredicates(const std::vector<MatchExpress
     invariant(indexAssignment->preds.size() == indexAssignment->positions.size());
 
     const IndexEntry& thisIndex = (*_indices)[indexAssignment->index];
-    invariant(thisIndex.multikeyPaths);
-    const auto& multikeyPaths = *thisIndex.multikeyPaths;
+    invariant(!thisIndex.multikeyPaths.empty());
 
     // 'used' is a map from each prefix of a queried path that causes 'thisIndex' to be multikey to
     // the 'elemMatchExpr' of the associated leaf expression's RelevantTag. We use it to ensure that
@@ -1311,7 +1310,8 @@ void PlanEnumerator::assignMultikeySafePredicates(const std::vector<MatchExpress
 
         // 'assignedPred' has already been assigned to 'thisIndex', so canAssignPredToIndex() ought
         // to return true.
-        const bool shouldHaveAssigned = canAssignPredToIndex(rt, multikeyPaths[posInIdx], &used);
+        const bool shouldHaveAssigned =
+            canAssignPredToIndex(rt, thisIndex.multikeyPaths[posInIdx], &used);
         if (!shouldHaveAssigned) {
             // However, there are cases with multikey 2dsphere indexes where the mandatory predicate
             // is still safe to compound with, even though a prefix of it that causes the index to
@@ -1335,7 +1335,7 @@ void PlanEnumerator::assignMultikeySafePredicates(const std::vector<MatchExpress
                 continue;
             }
 
-            if (multikeyPaths[posInIdx].empty()) {
+            if (thisIndex.multikeyPaths[posInIdx].empty()) {
                 // We can always intersect or compound the bounds when no prefix of the queried path
                 // causes the index to be multikey.
                 indexAssignment->preds.push_back(couldAssignPred);
@@ -1345,7 +1345,8 @@ void PlanEnumerator::assignMultikeySafePredicates(const std::vector<MatchExpress
 
             // See if any of the predicates that are already assigned to 'thisIndex' prevent us from
             // assigning 'couldAssignPred' as well.
-            const bool shouldAssign = canAssignPredToIndex(rt, multikeyPaths[posInIdx], &used);
+            const bool shouldAssign =
+                canAssignPredToIndex(rt, thisIndex.multikeyPaths[posInIdx], &used);
 
             if (shouldAssign) {
                 indexAssignment->preds.push_back(couldAssignPred);

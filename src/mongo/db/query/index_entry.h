@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
 #include <string>
 
 #include "mongo/db/index/multikey_paths.h"
@@ -106,7 +105,11 @@ struct IndexEntry {
 
     bool multikey;
 
-    boost::optional<MultikeyPaths> multikeyPaths;
+    // If non-empty, 'multikeyPaths' is a vector with size equal to the number of elements in the
+    // index key pattern. Each element in the vector is an ordered set of positions (starting at 0)
+    // into the corresponding indexed field that represent what prefixes of the indexed field cause
+    // the index to be multikey.
+    MultikeyPaths multikeyPaths;
 
     bool sparse;
 
