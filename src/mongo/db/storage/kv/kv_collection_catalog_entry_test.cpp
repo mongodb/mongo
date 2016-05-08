@@ -239,6 +239,16 @@ TEST_F(KVCollectionCatalogEntryTest, CanSetMultipleFieldsAndComponentsAsMultikey
 }
 
 DEATH_TEST_F(KVCollectionCatalogEntryTest,
+             CannotOmitPathLevelMultikeyInfoWithBtreeIndex,
+             "Invariant failure !multikeyPaths.empty()") {
+    std::string indexName = createIndex(BSON("a" << 1 << "b" << 1));
+    CollectionCatalogEntry* collEntry = getCollectionCatalogEntry();
+
+    auto opCtx = newOperationContext();
+    collEntry->setIndexIsMultikey(opCtx.get(), indexName, MultikeyPaths{});
+}
+
+DEATH_TEST_F(KVCollectionCatalogEntryTest,
              AtLeastOnePathComponentMustCauseIndexToBeMultikey,
              "Invariant failure somePathIsMultikey") {
     std::string indexName = createIndex(BSON("a" << 1 << "b" << 1));

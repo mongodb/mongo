@@ -312,6 +312,7 @@ void BtreeKeyGeneratorV1::getKeysImpl(std::vector<const char*> fieldNames,
     }
 
     if (multikeyPaths) {
+        invariant(multikeyPaths->empty());
         multikeyPaths->resize(fieldNames.size());
     }
     getKeysImplWithArray(fieldNames, fixed, obj, keys, 0, _emptyPositionalInfo, multikeyPaths);

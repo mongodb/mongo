@@ -45,8 +45,13 @@ public:
     }
 
 private:
-    // Implemented:
-    virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const;
+    /**
+     * Fills 'keys' with the keys that should be generated for 'obj' on this index.
+     *
+     * This function ignores the 'multikeyPaths' pointer because text indexes don't support tracking
+     * path-level multikey information.
+     */
+    void getKeys(const BSONObj& obj, BSONObjSet* keys, MultikeyPaths* multikeyPaths) const final;
 
     fts::FTSSpec _ftsSpec;
 };

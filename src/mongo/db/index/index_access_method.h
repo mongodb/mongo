@@ -216,7 +216,14 @@ public:
         std::unique_ptr<Sorter> _sorter;
         const IndexAccessMethod* _real;
         int64_t _keysInserted = 0;
-        bool _isMultiKey = false;
+
+        // Set to true if at least one document causes IndexAccessMethod::getKeys() to return a
+        // BSONObjSet with size strictly greater than one.
+        bool _everGeneratedMultipleKeys = false;
+
+        // Holds the path components that cause this index to be multikey. The '_indexMultikeyPaths'
+        // vector remains empty if this index doesn't support path-level multikey tracking.
+        MultikeyPaths _indexMultikeyPaths;
     };
 
     /**
@@ -245,8 +252,16 @@ public:
 
     /**
      * Fills 'keys' with the keys that should be generated for 'obj' on this index.
+     *
+     * If the 'multikeyPaths' pointer is non-null, then it must point to an empty vector. If this
+     * index type supports tracking path-level multikey information, then this function resizes
+     * 'multikeyPaths' to have the same number of elements as the index key pattern and fills each
+     * element with the prefixes of the indexed field that would cause this index to be multikey as
+     * a result of inserting 'keys'.
      */
-    virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const = 0;
+    virtual void getKeys(const BSONObj& obj,
+                         BSONObjSet* keys,
+                         MultikeyPaths* multikeyPaths) const = 0;
 
     /**
      * Splits the sets 'left' and 'right' into two vectors, the first containing the elements that
@@ -294,6 +309,11 @@ private:
 
     RecordId loc;
     bool dupsAllowed;
+
+    // Holds the path components that would cause this index to be multikey as a result of inserting
+    // 'newKeys'. The 'newMultikeyPaths' vector remains empty if this index doesn't support
+    // path-level multikey tracking.
+    MultikeyPaths newMultikeyPaths;
 };
 
 /**

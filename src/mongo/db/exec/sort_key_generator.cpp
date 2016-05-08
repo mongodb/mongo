@@ -229,8 +229,15 @@ void SortKeyGenerator::getBoundsForSort(OperationContext* txn,
     params.options = QueryPlannerParams::NO_TABLE_SCAN;
 
     // We're creating a "virtual index" with key pattern equal to the sort order.
-    IndexEntry sortOrder(
-        sortObj, IndexNames::BTREE, true, false, false, "doesnt_matter", NULL, BSONObj());
+    IndexEntry sortOrder(sortObj,
+                         IndexNames::BTREE,
+                         true,
+                         MultikeyPaths{},
+                         false,
+                         false,
+                         "doesnt_matter",
+                         NULL,
+                         BSONObj());
     params.indices.push_back(sortOrder);
 
     auto statusWithQueryForSort = CanonicalQuery::canonicalize(

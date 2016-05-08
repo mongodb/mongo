@@ -49,7 +49,16 @@ public:
     static BSONObj fixSpec(const BSONObj& specObj);
 
 private:
-    virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const;
+    /**
+     * Fills 'keys' with the keys that should be generated for 'obj' on this index.
+     *
+     * This function ignores the 'multikeyPaths' pointer because text indexes don't support tracking
+     * path-level multikey information.
+     *
+     * TODO SERVER-23114: Return prefixes of the indexed fields that cause the index to be multikey
+     * as a result of inserting 'keys'.
+     */
+    void getKeys(const BSONObj& obj, BSONObjSet* keys, MultikeyPaths* multikeyPaths) const final;
 
     S2IndexingParams _params;
 

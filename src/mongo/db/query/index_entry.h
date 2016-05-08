@@ -50,6 +50,7 @@ struct IndexEntry {
     IndexEntry(const BSONObj& kp,
                const std::string& accessMethod,
                bool mk,
+               const MultikeyPaths& mkp,
                bool sp,
                bool unq,
                const std::string& n,
@@ -57,6 +58,7 @@ struct IndexEntry {
                const BSONObj& io)
         : keyPattern(kp),
           multikey(mk),
+          multikeyPaths(mkp),
           sparse(sp),
           unique(unq),
           name(n),

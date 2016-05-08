@@ -54,7 +54,13 @@ private:
     // This really gets the 'locs' from the provided obj.
     void getKeys(const BSONObj& obj, std::vector<BSONObj>& locs) const;
 
-    virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const;
+    /**
+     * Fills 'keys' with the keys that should be generated for 'obj' on this index.
+     *
+     * This function ignores the 'multikeyPaths' pointer because 2d indexes don't support tracking
+     * path-level multikey information.
+     */
+    void getKeys(const BSONObj& obj, BSONObjSet* keys, MultikeyPaths* multikeyPaths) const final;
 
     TwoDIndexingParams _params;
 };

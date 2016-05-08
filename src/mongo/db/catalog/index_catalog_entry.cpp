@@ -34,6 +34,8 @@
 
 #include "mongo/db/catalog/index_catalog_entry.h"
 
+#include <algorithm>
+
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/head_manager.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -99,7 +101,12 @@ void IndexCatalogEntry::init(OperationContext* txn, IndexAccessMethod* accessMet
 
     _isReady = _catalogIsReady(txn);
     _head = _catalogHead(txn);
-    _isMultikey = _catalogIsMultikey(txn);
+
+    {
+        stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
+        _isMultikey.store(_catalogIsMultikey(txn, &_indexMultikeyPaths));
+        _indexTracksPathLevelMultikeyInfo = !_indexMultikeyPaths.empty();
+    }
 
     if (BSONElement filterElement = _descriptor->getInfoElement("partialFilterExpression")) {
         invariant(filterElement.isABSONObj());
@@ -135,7 +142,12 @@ bool IndexCatalogEntry::isReady(OperationContext* txn) const {
 }
 
 bool IndexCatalogEntry::isMultikey() const {
-    return _isMultikey;
+    return _isMultikey.load();
+}
+
+MultikeyPaths IndexCatalogEntry::getMultikeyPaths(OperationContext* txn) const {
+    stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
+    return _indexMultikeyPaths;
 }
 
 // ---
@@ -167,7 +179,7 @@ void IndexCatalogEntry::setHead(OperationContext* txn, RecordId newHead) {
 
 /**
  * RAII class, which associates a new RecoveryUnit with an OperationContext for the purposes
- * of simulating a sub-transaction. Takes ownership of the new recovery unit and frees it at
+ * of simulating a side-transaction. Takes ownership of the new recovery unit and frees it at
  * destruction time.
  */
 class RecoveryUnitSwap {
@@ -196,43 +208,86 @@ private:
     const std::unique_ptr<RecoveryUnit> _newRecoveryUnit;
 };
 
-void IndexCatalogEntry::setMultikey(OperationContext* txn) {
-    if (isMultikey()) {
+void IndexCatalogEntry::setMultikey(OperationContext* txn, const MultikeyPaths& multikeyPaths) {
+    if (!_indexTracksPathLevelMultikeyInfo && isMultikey()) {
+        // If the index is already set as multikey and we don't have any path-level information to
+        // update, then there's nothing more for us to do.
         return;
     }
 
-    // Only one thread should set the multi-key value per collection, because the metadata for
-    // a collection is one large document.
-    Lock::ResourceLock collMDLock(txn->lockState(), ResourceId(RESOURCE_METADATA, _ns), MODE_X);
+    if (_indexTracksPathLevelMultikeyInfo) {
+        stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
+        invariant(multikeyPaths.size() == _indexMultikeyPaths.size());
 
-    // Check again in case we blocked on the MD lock and another thread beat us to setting the
-    // multiKey metadata for this index.
-    if (isMultikey()) {
-        return;
-    }
-
-    // This effectively emulates a sub-transaction off the main transaction, which invoked
-    // setMultikey. The reason we need is to avoid artificial WriteConflicts, which happen
-    // with snapshot isolation.
-    {
-        StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
-        RecoveryUnitSwap ruSwap(txn, storageEngine->newRecoveryUnit());
-
-        WriteUnitOfWork wuow(txn);
-
-        // TODO SERVER-22726: Propagate multikey paths computed during index key generation.
-        if (_collection->setIndexIsMultikey(txn, _descriptor->indexName(), MultikeyPaths{})) {
-            if (_infoCache) {
-                LOG(1) << _ns << ": clearing plan cache - index " << _descriptor->keyPattern()
-                       << " set to multi key.";
-                _infoCache->clearQueryCache();
+        bool newPathIsMultikey = false;
+        for (size_t i = 0; i < multikeyPaths.size(); ++i) {
+            if (!std::includes(_indexMultikeyPaths[i].begin(),
+                               _indexMultikeyPaths[i].end(),
+                               multikeyPaths[i].begin(),
+                               multikeyPaths[i].end())) {
+                // If 'multikeyPaths' contains a new path component that causes this index to be
+                // multikey, then we must update the index metadata in the CollectionCatalogEntry.
+                newPathIsMultikey = true;
+                break;
             }
         }
 
-        wuow.commit();
+        if (!newPathIsMultikey) {
+            // Otherwise, if all the path components in 'multikeyPaths' are already tracked in
+            // '_indexMultikeyPaths', then there's nothing more for us to do.
+            return;
+        }
     }
 
-    _isMultikey = true;
+    {
+        // Only one thread should set the multi-key value per collection, because the metadata for a
+        // collection is one large document.
+        Lock::ResourceLock collMDLock(txn->lockState(), ResourceId(RESOURCE_METADATA, _ns), MODE_X);
+
+        if (!_indexTracksPathLevelMultikeyInfo && isMultikey()) {
+            // It's possible that we raced with another thread when acquiring the MD lock. If the
+            // index is already set as multikey and we don't have any path-level information to
+            // update, then there's nothing more for us to do.
+            return;
+        }
+
+        // This effectively emulates a side-transaction off the main transaction, which invoked
+        // setMultikey. The reason we need is to avoid artificial WriteConflicts, which happen with
+        // snapshot isolation.
+        {
+            StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
+            RecoveryUnitSwap ruSwap(txn, storageEngine->newRecoveryUnit());
+
+            WriteUnitOfWork wuow(txn);
+
+            // It's possible that the index type (e.g. ascending/descending index) supports tracking
+            // path-level multikey information, but this particular index doesn't.
+            // CollectionCatalogEntry::setIndexIsMultikey() requires that we discard the path-level
+            // multikey information in order to avoid unintentionally setting path-level multikey
+            // information on an index created before 3.4.
+            if (_collection->setIndexIsMultikey(
+                    txn,
+                    _descriptor->indexName(),
+                    _indexTracksPathLevelMultikeyInfo ? multikeyPaths : MultikeyPaths{})) {
+                if (_infoCache) {
+                    LOG(1) << _ns << ": clearing plan cache - index " << _descriptor->keyPattern()
+                           << " set to multi key.";
+                    _infoCache->clearQueryCache();
+                }
+            }
+
+            wuow.commit();
+        }
+    }
+
+    _isMultikey.store(true);
+
+    if (_indexTracksPathLevelMultikeyInfo) {
+        stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
+        for (size_t i = 0; i < multikeyPaths.size(); ++i) {
+            _indexMultikeyPaths[i].insert(multikeyPaths[i].begin(), multikeyPaths[i].end());
+        }
+    }
 }
 
 // ----
@@ -245,8 +300,9 @@ RecordId IndexCatalogEntry::_catalogHead(OperationContext* txn) const {
     return _collection->getIndexHead(txn, _descriptor->indexName());
 }
 
-bool IndexCatalogEntry::_catalogIsMultikey(OperationContext* txn) const {
-    return _collection->isIndexMultikey(txn, _descriptor->indexName(), nullptr);
+bool IndexCatalogEntry::_catalogIsMultikey(OperationContext* txn,
+                                           MultikeyPaths* multikeyPaths) const {
+    return _collection->isIndexMultikey(txn, _descriptor->indexName(), multikeyPaths);
 }
 
 // ------------------

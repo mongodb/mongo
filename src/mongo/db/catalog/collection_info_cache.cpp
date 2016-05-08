@@ -156,6 +156,7 @@ void CollectionInfoCache::updatePlanCacheIndexEntries(OperationContext* txn) {
         indexEntries.emplace_back(desc->keyPattern(),
                                   desc->getAccessMethodName(),
                                   desc->isMultikey(txn),
+                                  ice->getMultikeyPaths(txn),
                                   desc->isSparse(),
                                   desc->unique(),
                                   desc->indexName(),

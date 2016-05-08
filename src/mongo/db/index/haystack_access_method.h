@@ -69,7 +69,13 @@ protected:
                        unsigned limit);
 
 private:
-    virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const;
+    /**
+     * Fills 'keys' with the keys that should be generated for 'obj' on this index.
+     *
+     * This function ignores the 'multikeyPaths' pointer because geoHaystack indexes don't support
+     * tracking path-level multikey information.
+     */
+    void getKeys(const BSONObj& obj, BSONObjSet* keys, MultikeyPaths* multikeyPaths) const final;
 
     std::string _geoField;
     std::vector<std::string> _otherFields;

@@ -100,7 +100,10 @@ bool KVCollectionCatalogEntry::setIndexIsMultikey(OperationContext* txn,
     invariant(offset >= 0);
 
     const bool tracksPathLevelMultikeyInfo = !md.indexes[offset].multikeyPaths.empty();
-    if (!tracksPathLevelMultikeyInfo) {
+    if (tracksPathLevelMultikeyInfo) {
+        invariant(!multikeyPaths.empty());
+        invariant(multikeyPaths.size() == md.indexes[offset].multikeyPaths.size());
+    } else {
         invariant(multikeyPaths.empty());
 
         if (md.indexes[offset].multikey) {
@@ -112,9 +115,7 @@ bool KVCollectionCatalogEntry::setIndexIsMultikey(OperationContext* txn,
 
     md.indexes[offset].multikey = true;
 
-    if (tracksPathLevelMultikeyInfo && !multikeyPaths.empty()) {
-        invariant(multikeyPaths.size() == md.indexes[offset].multikeyPaths.size());
-
+    if (tracksPathLevelMultikeyInfo) {
         bool newPathIsMultikey = false;
         bool somePathIsMultikey = false;
 

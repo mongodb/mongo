@@ -73,6 +73,7 @@ dbtest = env.Program(
         'mmaptests.cpp',
         'mock_dbclient_conn_test.cpp',
         'mock_replica_set_test.cpp',
+        'multikey_paths_test.cpp',
         'namespacetests.cpp',
         'oplogstarttests.cpp',
         'pdfiletests.cpp',

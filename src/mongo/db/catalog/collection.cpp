@@ -1021,7 +1021,10 @@ public:
 
             const IndexAccessMethod* iam = _indexCatalog->getIndex(descriptor);
             BSONObjSet documentKeySet;
-            iam->getKeys(recordBson, &documentKeySet);
+            // There's no need to compute the prefixes of the indexed fields that cause the
+            // index to be multikey when validating the index keys.
+            MultikeyPaths* multikeyPaths = nullptr;
+            iam->getKeys(recordBson, &documentKeySet, multikeyPaths);
 
             if (descriptor->isPartial()) {
                 const IndexCatalogEntry* ice = _indexCatalog->getEntry(descriptor);

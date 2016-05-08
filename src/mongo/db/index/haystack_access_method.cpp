@@ -59,7 +59,9 @@ HaystackAccessMethod::HaystackAccessMethod(IndexCatalogEntry* btreeState,
     uassert(16774, "no non-geo fields specified", _otherFields.size());
 }
 
-void HaystackAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) const {
+void HaystackAccessMethod::getKeys(const BSONObj& obj,
+                                   BSONObjSet* keys,
+                                   MultikeyPaths* multikeyPaths) const {
     ExpressionKeysPrivate::getHaystackKeys(obj, _geoField, _otherFields, _bucketSize, keys);
 }
 
