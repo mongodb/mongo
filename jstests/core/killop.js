@@ -6,10 +6,11 @@
  * some other reason.
  *
  * NOTES:
- * The long operations are count({$where: function () { while (1) ; } }).  These operations do not
- * terminate until the server determines that they've spent too much time in JS execution, typically
- * after 30 seconds of wall clock time have passed.  For these operations to take a long time, the
- * counted collection must not be empty; hence an initial write to the collection is required.
+ * The long operations are count({ $where: function() { while (1) { sleep(500); } } }).  These
+ * operations do not terminate until the server determines that they've spent too much time in JS
+ * execution, typically after 30 seconds of wall clock time have passed.  For these operations to
+ * take a long time, the counted collection must not be empty; hence an initial write to the
+ * collection is required.
  */
 (function() {
     'use strict';
@@ -37,11 +38,12 @@
         return ids;
     }
 
+    var countWithWhereOp =
+        'db.jstests_killop.count({ $where: function() { while (1) { sleep(500); } } });';
+
     jsTestLog("Starting long-running $where operation");
-    var s1 = startParallelShell(
-        "db.jstests_killop.count( { $where: function() { while( 1 ) { ; } } } )");
-    var s2 = startParallelShell(
-        "db.jstests_killop.count( { $where: function() { while( 1 ) { ; } } } )");
+    var s1 = startParallelShell(countWithWhereOp);
+    var s2 = startParallelShell(countWithWhereOp);
 
     jsTestLog("Finding ops in currentOp() output");
     var o = [];
