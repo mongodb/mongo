@@ -74,7 +74,7 @@ using repl::ReadConcernArgs;
 namespace {
 
 const HostAndPort dummyHost("dummy", 123);
-static const stdx::chrono::seconds kFutureTimeout{5};
+static const Seconds kFutureTimeout{5};
 
 /**
  * Sets up the mocked out objects for testing the replica-set backed catalog manager.

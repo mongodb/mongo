@@ -126,7 +126,7 @@ ShardingNetworkConnectionHook::makeRequest(const HostAndPort& remoteHost) {
     executor::RemoteCommandRequest request;
     request.dbname = "admin";
     request.target = remoteHost;
-    request.timeout = stdx::chrono::seconds{30};
+    request.timeout = Seconds{30};
     request.cmdObj = ssv.toBSON();
 
     return {request};

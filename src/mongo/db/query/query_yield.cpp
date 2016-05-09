@@ -78,7 +78,7 @@ void QueryYield::yieldAllLocks(OperationContext* txn,
         const BSONObj& data = customWait.getData();
         BSONElement customWaitNS = data["namespace"];
         if (!customWaitNS || planExecNS == customWaitNS.str()) {
-            sleepFor(stdx::chrono::milliseconds(data["waitForMillis"].numberInt()));
+            sleepFor(Milliseconds(data["waitForMillis"].numberInt()));
         }
     }
 

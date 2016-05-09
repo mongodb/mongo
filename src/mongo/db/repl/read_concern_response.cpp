@@ -42,16 +42,14 @@ namespace repl {
 const string ReadConcernResponse::kWaitedMSFieldName("waitedMS");
 
 ReadConcernResponse::ReadConcernResponse(Status status)
-    : ReadConcernResponse(status, stdx::chrono::milliseconds(0), false) {}
+    : ReadConcernResponse(status, Milliseconds(0), false) {}
 
 ReadConcernResponse::ReadConcernResponse() : ReadConcernResponse(Status::OK()) {}
 
-ReadConcernResponse::ReadConcernResponse(Status status, stdx::chrono::milliseconds duration)
+ReadConcernResponse::ReadConcernResponse(Status status, Milliseconds duration)
     : ReadConcernResponse(status, duration, true) {}
 
-ReadConcernResponse::ReadConcernResponse(Status status,
-                                         stdx::chrono::milliseconds duration,
-                                         bool waited)
+ReadConcernResponse::ReadConcernResponse(Status status, Milliseconds duration, bool waited)
     : _waited(waited), _duration(duration), _status(status) {}
 
 void ReadConcernResponse::appendInfo(BSONObjBuilder* builder) {
@@ -66,7 +64,7 @@ bool ReadConcernResponse::didWait() const {
     return _waited;
 }
 
-stdx::chrono::milliseconds ReadConcernResponse::getDuration() const {
+Milliseconds ReadConcernResponse::getDuration() const {
     return _duration;
 }
 

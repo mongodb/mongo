@@ -200,7 +200,7 @@ Status BackgroundJob::cancel() {
 
 bool BackgroundJob::wait(unsigned msTimeOut) {
     verify(!_selfDelete);  // you cannot call wait on a self-deleting job
-    const auto deadline = stdx::chrono::system_clock::now() + stdx::chrono::milliseconds(msTimeOut);
+    const auto deadline = stdx::chrono::system_clock::now() + Milliseconds(msTimeOut);
     stdx::unique_lock<stdx::mutex> l(_status->mutex);
     while (_status->state != Done) {
         if (msTimeOut) {
@@ -304,7 +304,7 @@ Status PeriodicTaskRunner::stop(int gracePeriodMillis) {
 
 void PeriodicTaskRunner::run() {
     // Use a shorter cycle time in debug mode to help catch race conditions.
-    const stdx::chrono::seconds waitTime(kDebugBuild ? 5 : 60);
+    const Seconds waitTime(kDebugBuild ? 5 : 60);
 
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     while (!_shutdownRequested) {

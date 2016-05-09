@@ -67,7 +67,7 @@ public:
     ~ShardingTestFixture();
 
 protected:
-    static const stdx::chrono::seconds kFutureTimeout;
+    static const Seconds kFutureTimeout;
 
     template <typename Lambda>
     executor::NetworkTestEnv::FutureHandle<typename std::result_of<Lambda()>::type> launchAsync(

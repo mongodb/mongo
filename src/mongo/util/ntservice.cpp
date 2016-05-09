@@ -544,7 +544,7 @@ static void serviceStop() {
     // so it doesn't even need a name.
     stdx::thread(std::move(exitCleanlyTask)).detach();
 
-    const auto timeout = stdx::chrono::milliseconds(kStopWaitHintMillis / 2);
+    const auto timeout = Milliseconds(kStopWaitHintMillis / 2);
 
     // We periodically check if we are done exiting by polling at half of each wait interval
     while (exitedCleanly.wait_for(timeout) != stdx::future_status::ready) {

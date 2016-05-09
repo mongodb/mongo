@@ -35,18 +35,17 @@
 #include <algorithm>
 
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/time_support.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-
-using stdx::chrono::milliseconds;
 
 namespace {
 
 void NoLockFuncSet(StringData name,
                    StringData whyMessage,
-                   milliseconds waitFor,
-                   milliseconds lockTryInterval) {
+                   Milliseconds waitFor,
+                   Milliseconds lockTryInterval) {
     FAIL(str::stream() << "Lock not expected to be called. "
                        << "Name: " << name << ", whyMessage: " << whyMessage
                        << ", waitFor: " << waitFor << ", lockTryInterval: " << lockTryInterval);
@@ -71,8 +70,8 @@ StatusWith<DistLockManager::ScopedDistLock> DistLockManagerMock::lock(
     OperationContext* txn,
     StringData name,
     StringData whyMessage,
-    milliseconds waitFor,
-    milliseconds lockTryInterval) {
+    Milliseconds waitFor,
+    Milliseconds lockTryInterval) {
     return lockWithSessionID(
         txn, name, whyMessage, DistLockHandle::gen(), waitFor, lockTryInterval);
 }
@@ -82,8 +81,8 @@ StatusWith<DistLockManager::ScopedDistLock> DistLockManagerMock::lockWithSession
     StringData name,
     StringData whyMessage,
     const OID lockSessionID,
-    milliseconds waitFor,
-    milliseconds lockTryInterval) {
+    Milliseconds waitFor,
+    Milliseconds lockTryInterval) {
     _lockChecker(name, whyMessage, waitFor, lockTryInterval);
     _lockChecker = NoLockFuncSet;
 

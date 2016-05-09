@@ -28,6 +28,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/concurrency/threadlocal.h"
+#include "mongo/util/time_support.h"
 
 class nspr::Thread {
     mongo::stdx::thread thread_;
@@ -275,7 +276,7 @@ PRStatus PR_WaitCondVar(PRCondVar* cvar, uint32_t timeout) {
             mongo::stdx::unique_lock<mongo::stdx::mutex> lk(cvar->lock()->mutex(),
                                                             mongo::stdx::adopt_lock_t());
 
-            cvar->cond().wait_for(lk, mongo::stdx::chrono::microseconds(timeout));
+            cvar->cond().wait_for(lk, mongo::Microseconds(timeout));
             lk.release();
 
             return PR_SUCCESS;

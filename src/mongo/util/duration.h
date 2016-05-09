@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <iosfwd>
 #include <limits>
@@ -213,6 +214,10 @@ public:
         static_assert(!isLowerPrecisionThan<Duration<FromPeriod>>(),
                       "Use duration_cast to convert from higher precision Duration types to lower "
                       "precision ones");
+    }
+
+    constexpr operator stdx::chrono::duration<int64_t, period>() const {
+        return stdx::chrono::duration<int64_t, period>{_count};
     }
 
     /**

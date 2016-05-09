@@ -141,7 +141,7 @@ TEST_F(CollectionIndexUsageTrackerTest, DateTimeAfterDeregister) {
     ASSERT(statsMap.find("foo") == statsMap.end());
 
     // Increment clock source so that a new index registration has different start time.
-    getClockSource()->advance(stdx::chrono::milliseconds(1));
+    getClockSource()->advance(Milliseconds(1));
 
     getTracker()->registerIndex("foo", BSON("foo" << 1));
     statsMap = getTracker()->getUsageStats();

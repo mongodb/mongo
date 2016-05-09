@@ -62,7 +62,7 @@ using std::string;
 using std::vector;
 using unittest::assertGet;
 
-static const stdx::chrono::seconds kFutureTimeout{5};
+static const Seconds kFutureTimeout{5};
 
 const BSONObj kReplSecondaryOkMetadata{[] {
     BSONObjBuilder o;

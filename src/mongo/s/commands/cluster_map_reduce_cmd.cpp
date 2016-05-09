@@ -67,7 +67,7 @@ namespace {
 
 AtomicUInt32 JOB_NUMBER;
 
-const stdx::chrono::milliseconds kNoDistLockTimeout(-1);
+const Milliseconds kNoDistLockTimeout(-1);
 
 /**
  * Generates a unique name for the temporary M/R output collection.

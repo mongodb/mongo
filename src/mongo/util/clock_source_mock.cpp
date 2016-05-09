@@ -41,7 +41,7 @@ Date_t ClockSourceMock::now() {
     return _now;
 }
 
-void ClockSourceMock::advance(stdx::chrono::milliseconds ms) {
+void ClockSourceMock::advance(Milliseconds ms) {
     _now += ms;
 }
 

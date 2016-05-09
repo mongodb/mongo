@@ -54,7 +54,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/stdx/chrono.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -69,7 +68,6 @@ using executor::TaskExecutor;
 using std::set;
 using std::string;
 using std::vector;
-using stdx::chrono::milliseconds;
 using unittest::assertGet;
 
 using InsertRetryTest = CatalogManagerReplSetTestFixture;

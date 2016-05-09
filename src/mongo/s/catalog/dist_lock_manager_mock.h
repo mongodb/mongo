@@ -47,27 +47,26 @@ public:
 
     virtual std::string getProcessID() override;
 
-    virtual StatusWith<DistLockManager::ScopedDistLock> lock(
-        OperationContext* txn,
-        StringData name,
-        StringData whyMessage,
-        stdx::chrono::milliseconds waitFor,
-        stdx::chrono::milliseconds lockTryInterval) override;
+    virtual StatusWith<DistLockManager::ScopedDistLock> lock(OperationContext* txn,
+                                                             StringData name,
+                                                             StringData whyMessage,
+                                                             Milliseconds waitFor,
+                                                             Milliseconds lockTryInterval) override;
 
     virtual StatusWith<DistLockManager::ScopedDistLock> lockWithSessionID(
         OperationContext* txn,
         StringData name,
         StringData whyMessage,
         const OID lockSessionID,
-        stdx::chrono::milliseconds waitFor,
-        stdx::chrono::milliseconds lockTryInterval) override;
+        Milliseconds waitFor,
+        Milliseconds lockTryInterval) override;
 
     virtual void unlockAll(OperationContext* txn, const std::string& processID) override;
 
     using LockFunc = stdx::function<void(StringData name,
                                          StringData whyMessage,
-                                         stdx::chrono::milliseconds waitFor,
-                                         stdx::chrono::milliseconds lockTryInterval)>;
+                                         Milliseconds waitFor,
+                                         Milliseconds lockTryInterval)>;
 
     void expectLock(LockFunc checkerFunc, Status lockStatus);
 

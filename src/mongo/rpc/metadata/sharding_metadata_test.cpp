@@ -46,7 +46,7 @@ ShardingMetadata checkParse(const BSONObj& metadata) {
 }
 
 const auto kElectionId = OID{"541b1a00e8a23afa832b218e"};
-const auto kLastOpTime = repl::OpTime(Timestamp(stdx::chrono::seconds{1337}, 800u), 4);
+const auto kLastOpTime = repl::OpTime(Timestamp(Seconds{1337}, 800u), 4);
 
 TEST(ShardingMetadata, ReadFromMetadata) {
     {

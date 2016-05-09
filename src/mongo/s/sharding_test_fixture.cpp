@@ -83,7 +83,7 @@ ShardingTestFixture::ShardingTestFixture() = default;
 
 ShardingTestFixture::~ShardingTestFixture() = default;
 
-const stdx::chrono::seconds ShardingTestFixture::kFutureTimeout{5};
+const Seconds ShardingTestFixture::kFutureTimeout{5};
 
 void ShardingTestFixture::setUp() {
     _service = stdx::make_unique<ServiceContextNoop>();

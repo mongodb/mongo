@@ -44,7 +44,7 @@ namespace {
 // Period of time after which mortal cursors are killed for inactivity. Configurable with server
 // parameter "cursorTimeoutMillis".
 std::atomic<long long> cursorTimeoutMillis(  // NOLINT
-    durationCount<stdx::chrono::milliseconds>(stdx::chrono::minutes(10)));
+    durationCount<Milliseconds>(Minutes(10)));
 
 ExportedServerParameter<long long, ServerParameterType::kStartupAndRuntime>
     cursorTimeoutMillisConfig(ServerParameterSet::getGlobal(),
@@ -65,10 +65,9 @@ void ClusterCursorCleanupJob::run() {
     invariant(manager);
 
     while (!inShutdown()) {
-        manager->killMortalCursorsInactiveSince(Date_t::now() -
-                                                stdx::chrono::milliseconds(cursorTimeoutMillis));
+        manager->killMortalCursorsInactiveSince(Date_t::now() - Milliseconds(cursorTimeoutMillis));
         manager->reapZombieCursors();
-        sleepFor(stdx::chrono::seconds(4));
+        sleepFor(Seconds(4));
     }
 }
 

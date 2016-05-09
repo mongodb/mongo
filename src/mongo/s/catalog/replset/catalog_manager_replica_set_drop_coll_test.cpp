@@ -44,7 +44,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/write_ops/batched_update_request.h"
-#include "mongo/stdx/chrono.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {
@@ -53,7 +53,6 @@ using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 using std::string;
 using std::vector;
-using stdx::chrono::milliseconds;
 using unittest::assertGet;
 
 class DropColl2ShardTest : public CatalogManagerReplSetTestFixture {
@@ -65,7 +64,7 @@ public:
         configTargeter()->setFindHostReturnValue(_configHost);
 
         distLock()->expectLock(
-            [this](StringData name, StringData whyMessage, milliseconds, milliseconds) {
+            [this](StringData name, StringData whyMessage, Milliseconds, Milliseconds) {
                 ASSERT_EQUALS(_dropNS.ns(), name);
                 ASSERT_EQUALS("drop", whyMessage);
             },
@@ -263,7 +262,7 @@ TEST_F(DropColl2ShardTest, ConfigTargeterError) {
 }
 
 TEST_F(DropColl2ShardTest, DistLockBusy) {
-    distLock()->expectLock([](StringData, StringData, milliseconds, milliseconds) {},
+    distLock()->expectLock([](StringData, StringData, Milliseconds, Milliseconds) {},
                            {ErrorCodes::LockBusy, "test lock taken"});
 
     auto future = launchAsync([this] {

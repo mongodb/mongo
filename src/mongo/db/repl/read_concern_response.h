@@ -31,7 +31,7 @@
 #include <string>
 
 #include "mongo/base/status.h"
-#include "mongo/stdx/chrono.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -56,7 +56,7 @@ public:
     /**
      * Constructs a response with wait set to true along with the given parameters.
      */
-    ReadConcernResponse(Status status, stdx::chrono::milliseconds duration);
+    ReadConcernResponse(Status status, Milliseconds duration);
 
     /**
      * Appends to the builder the timeout and duration info if didWait() is true.
@@ -70,7 +70,7 @@ public:
      * Returns the duration waited for the ReadConcern to be satisfied.
      * Returns 0 if didWait is false.
      */
-    stdx::chrono::milliseconds getDuration() const;
+    Milliseconds getDuration() const;
 
     /**
      * Returns more details about an error if it occurred.
@@ -78,10 +78,10 @@ public:
     Status getStatus() const;
 
 private:
-    ReadConcernResponse(Status status, stdx::chrono::milliseconds duration, bool waited);
+    ReadConcernResponse(Status status, Milliseconds duration, bool waited);
 
     bool _waited;
-    stdx::chrono::milliseconds _duration = stdx::chrono::milliseconds(0);
+    Milliseconds _duration = Milliseconds(0);
     Status _status;
 };
 

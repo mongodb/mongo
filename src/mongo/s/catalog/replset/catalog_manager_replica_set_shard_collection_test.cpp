@@ -56,9 +56,9 @@
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/stdx/chrono.h"
 #include "mongo/stdx/future.h"
 #include "mongo/util/log.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {
@@ -70,7 +70,6 @@ using executor::TaskExecutor;
 using std::set;
 using std::string;
 using std::vector;
-using stdx::chrono::milliseconds;
 using unittest::assertGet;
 
 const BSONObj kReplMetadata();
@@ -225,8 +224,8 @@ TEST_F(ShardCollectionTest, distLockFails) {
     distLock()->expectLock(
         [](StringData name,
            StringData whyMessage,
-           milliseconds waitFor,
-           milliseconds lockTryInterval) {
+           Milliseconds waitFor,
+           Milliseconds lockTryInterval) {
             ASSERT_EQUALS("test.foo", name);
             ASSERT_EQUALS("shardCollection", whyMessage);
         },
@@ -258,8 +257,8 @@ TEST_F(ShardCollectionTest, anotherMongosSharding) {
     distLock()->expectLock(
         [&](StringData name,
             StringData whyMessage,
-            milliseconds waitFor,
-            milliseconds lockTryInterval) {
+            Milliseconds waitFor,
+            Milliseconds lockTryInterval) {
             ASSERT_EQUALS(ns, name);
             ASSERT_EQUALS("shardCollection", whyMessage);
         },
@@ -317,8 +316,8 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
     distLock()->expectLock(
         [&](StringData name,
             StringData whyMessage,
-            milliseconds waitFor,
-            milliseconds lockTryInterval) {
+            Milliseconds waitFor,
+            Milliseconds lockTryInterval) {
             ASSERT_EQUALS(ns, name);
             ASSERT_EQUALS("shardCollection", whyMessage);
         },
@@ -487,8 +486,8 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     distLock()->expectLock(
         [&](StringData name,
             StringData whyMessage,
-            milliseconds waitFor,
-            milliseconds lockTryInterval) {
+            Milliseconds waitFor,
+            Milliseconds lockTryInterval) {
             ASSERT_EQUALS(ns, name);
             ASSERT_EQUALS("shardCollection", whyMessage);
         },
@@ -642,8 +641,8 @@ TEST_F(ShardCollectionTest, withInitialData) {
     distLock()->expectLock(
         [&](StringData name,
             StringData whyMessage,
-            milliseconds waitFor,
-            milliseconds lockTryInterval) {
+            Milliseconds waitFor,
+            Milliseconds lockTryInterval) {
             ASSERT_EQUALS(ns, name);
             ASSERT_EQUALS("shardCollection", whyMessage);
         },

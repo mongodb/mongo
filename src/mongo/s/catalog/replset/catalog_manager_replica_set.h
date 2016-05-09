@@ -88,11 +88,10 @@ public:
                      const std::string& ns,
                      const BSONObj& detail) override;
 
-    StatusWith<DistLockManager::ScopedDistLock> distLock(
-        OperationContext* txn,
-        StringData name,
-        StringData whyMessage,
-        stdx::chrono::milliseconds waitFor) override;
+    StatusWith<DistLockManager::ScopedDistLock> distLock(OperationContext* txn,
+                                                         StringData name,
+                                                         StringData whyMessage,
+                                                         Milliseconds waitFor) override;
 
     Status shardCollection(OperationContext* txn,
                            const std::string& ns,

@@ -55,7 +55,7 @@ using executor::TaskExecutor;
 using stdx::async;
 using unittest::assertGet;
 
-const stdx::chrono::seconds kFutureTimeout{5};
+const Seconds kFutureTimeout{5};
 const HostAndPort configHost{"TestHost1"};
 
 class InfoLoggingTest : public CatalogManagerReplSetTestFixture {

@@ -446,7 +446,7 @@ public:
         OperationContext* txn,
         StringData name,
         StringData whyMessage,
-        stdx::chrono::milliseconds waitFor = DistLockManager::kSingleLockAttemptTimeout) = 0;
+        Milliseconds waitFor = DistLockManager::kSingleLockAttemptTimeout) = 0;
 
 protected:
     CatalogManager() = default;

@@ -61,8 +61,7 @@ TEST(ReadAfterResponse, WithStatus) {
 }
 
 TEST(ReadAfterResponse, WaitedWithDuration) {
-    ReadConcernResponse response(Status(ErrorCodes::InternalError, "test"),
-                                 stdx::chrono::milliseconds(7));
+    ReadConcernResponse response(Status(ErrorCodes::InternalError, "test"), Milliseconds(7));
 
     ASSERT_TRUE(response.didWait());
     ASSERT_EQUALS(Milliseconds(7), response.getDuration());

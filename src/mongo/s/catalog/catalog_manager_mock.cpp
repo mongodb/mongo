@@ -144,11 +144,10 @@ StatusWith<repl::OpTimeWith<std::vector<ShardType>>> CatalogManagerMock::getAllS
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-StatusWith<DistLockManager::ScopedDistLock> CatalogManagerMock::distLock(
-    OperationContext* txn,
-    StringData name,
-    StringData whyMessage,
-    stdx::chrono::milliseconds waitFor) {
+StatusWith<DistLockManager::ScopedDistLock> CatalogManagerMock::distLock(OperationContext* txn,
+                                                                         StringData name,
+                                                                         StringData whyMessage,
+                                                                         Milliseconds waitFor) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 

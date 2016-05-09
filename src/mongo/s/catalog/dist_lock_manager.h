@@ -62,15 +62,15 @@ class StatusWith;
 class DistLockManager {
 public:
     // Default timeout which will be used if one is not passed to the lock method.
-    static const stdx::chrono::seconds kDefaultLockTimeout;
+    static const Seconds kDefaultLockTimeout;
 
     // Timeout value, which specifies that if the lock is not available immediately, no attempt
     // should be made to wait for it to become free.
-    static const stdx::chrono::milliseconds kSingleLockAttemptTimeout;
+    static const Milliseconds kSingleLockAttemptTimeout;
 
     // If timeout is passed to the lock call, what is the default frequency with which the lock will
     // be checked for availability.
-    static const stdx::chrono::milliseconds kDefaultLockRetryInterval;
+    static const Milliseconds kDefaultLockRetryInterval;
 
     /**
      * RAII type for distributed lock. Not meant to be shared across multiple threads.
@@ -134,8 +134,8 @@ public:
         OperationContext* txn,
         StringData name,
         StringData whyMessage,
-        stdx::chrono::milliseconds waitFor = kDefaultLockTimeout,
-        stdx::chrono::milliseconds lockTryInterval = kDefaultLockRetryInterval) = 0;
+        Milliseconds waitFor = kDefaultLockTimeout,
+        Milliseconds lockTryInterval = kDefaultLockRetryInterval) = 0;
 
     /**
      * Same behavior as lock(...) above, except takes a specific lock session ID "lockSessionID"
@@ -150,8 +150,8 @@ public:
         StringData name,
         StringData whyMessage,
         const OID lockSessionID,
-        stdx::chrono::milliseconds waitFor = kDefaultLockTimeout,
-        stdx::chrono::milliseconds lockTryInterval = kDefaultLockRetryInterval) = 0;
+        Milliseconds waitFor = kDefaultLockTimeout,
+        Milliseconds lockTryInterval = kDefaultLockRetryInterval) = 0;
 
     /**
      * Makes a best-effort attempt to unlock all locks owned by the given processID.

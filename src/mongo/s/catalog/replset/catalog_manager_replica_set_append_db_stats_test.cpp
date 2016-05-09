@@ -39,6 +39,7 @@
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
 #include "mongo/stdx/future.h"
 #include "mongo/util/log.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {
@@ -46,7 +47,6 @@ namespace {
 using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
-using stdx::chrono::milliseconds;
 
 using CatalogManagerReplSetAppendDbStatsTest = CatalogManagerReplSetTestFixture;
 

@@ -55,9 +55,9 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/batched_insert_request.h"
 #include "mongo/s/write_ops/batched_update_request.h"
-#include "mongo/stdx/chrono.h"
 #include "mongo/stdx/future.h"
 #include "mongo/util/log.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {
@@ -70,7 +70,6 @@ using rpc::ReplSetMetadata;
 using repl::OpTime;
 using std::string;
 using std::vector;
-using stdx::chrono::milliseconds;
 using unittest::assertGet;
 
 using CatalogManagerReplSetTest = CatalogManagerReplSetTestFixture;
@@ -706,8 +705,8 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandRewriteWriteConce
     distLock()->expectLock(
         [](StringData name,
            StringData whyMessage,
-           milliseconds waitFor,
-           milliseconds lockTryInterval) {
+           Milliseconds waitFor,
+           Milliseconds lockTryInterval) {
             ASSERT_EQUALS("authorizationData", name);
             ASSERT_EQUALS("dropUser", whyMessage);
         },
@@ -1540,8 +1539,8 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseSuccess) {
 
     distLock()->expectLock([dbname](StringData name,
                                     StringData whyMessage,
-                                    stdx::chrono::milliseconds waitFor,
-                                    stdx::chrono::milliseconds lockTryInterval) {},
+                                    Milliseconds waitFor,
+                                    Milliseconds lockTryInterval) {},
                            Status::OK());
 
 
@@ -1639,8 +1638,8 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseDistLockHeld) {
     distLock()->expectLock(
         [dbname](StringData name,
                  StringData whyMessage,
-                 milliseconds waitFor,
-                 milliseconds lockTryInterval) {
+                 Milliseconds waitFor,
+                 Milliseconds lockTryInterval) {
             ASSERT_EQUALS(dbname, name);
             ASSERT_EQUALS("createDatabase", whyMessage);
         },
@@ -1658,8 +1657,8 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseDBExists) {
 
     distLock()->expectLock([dbname](StringData name,
                                     StringData whyMessage,
-                                    stdx::chrono::milliseconds waitFor,
-                                    stdx::chrono::milliseconds lockTryInterval) {},
+                                    Milliseconds waitFor,
+                                    Milliseconds lockTryInterval) {},
                            Status::OK());
 
 
@@ -1697,8 +1696,8 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseDBExistsDifferentCase) {
 
     distLock()->expectLock([dbname](StringData name,
                                     StringData whyMessage,
-                                    stdx::chrono::milliseconds waitFor,
-                                    stdx::chrono::milliseconds lockTryInterval) {},
+                                    Milliseconds waitFor,
+                                    Milliseconds lockTryInterval) {},
                            Status::OK());
 
 
@@ -1735,8 +1734,8 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseNoShards) {
 
     distLock()->expectLock([dbname](StringData name,
                                     StringData whyMessage,
-                                    stdx::chrono::milliseconds waitFor,
-                                    stdx::chrono::milliseconds lockTryInterval) {},
+                                    Milliseconds waitFor,
+                                    Milliseconds lockTryInterval) {},
                            Status::OK());
 
 
@@ -1827,8 +1826,8 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseDuplicateKeyOnInsert) {
 
     distLock()->expectLock([dbname](StringData name,
                                     StringData whyMessage,
-                                    stdx::chrono::milliseconds waitFor,
-                                    stdx::chrono::milliseconds lockTryInterval) {},
+                                    Milliseconds waitFor,
+                                    Milliseconds lockTryInterval) {},
                            Status::OK());
 
 
@@ -1934,15 +1933,10 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingNoDBExists) {
         shardRegistry()->getShard(operationContext(), "shard0")->getTargeter());
     shardTargeter->setFindHostReturnValue(HostAndPort("shard0:12"));
 
-    distLock()->expectLock(
-        [](StringData name,
-           StringData whyMessage,
-           stdx::chrono::milliseconds,
-           stdx::chrono::milliseconds) {
-            ASSERT_EQ("test", name);
-            ASSERT_FALSE(whyMessage.empty());
-        },
-        Status::OK());
+    distLock()->expectLock([](StringData name, StringData whyMessage, Milliseconds, Milliseconds) {
+        ASSERT_EQ("test", name);
+        ASSERT_FALSE(whyMessage.empty());
+    }, Status::OK());
 
     auto future = launchAsync([this] {
         auto status = catalogManager()->enableSharding(operationContext(), "test");
@@ -2022,9 +2016,8 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingNoDBExists) {
 TEST_F(CatalogManagerReplSetTest, EnableShardingLockBusy) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
-    distLock()->expectLock(
-        [](StringData, StringData, stdx::chrono::milliseconds, stdx::chrono::milliseconds) {},
-        {ErrorCodes::LockBusy, "lock taken"});
+    distLock()->expectLock([](StringData, StringData, Milliseconds, Milliseconds) {},
+                           {ErrorCodes::LockBusy, "lock taken"});
 
     auto status = catalogManager()->enableSharding(operationContext(), "test");
     ASSERT_EQ(ErrorCodes::LockBusy, status.code());
@@ -2040,9 +2033,7 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingDBExistsWithDifferentCase) {
 
     setupShards(vector<ShardType>{shard});
 
-    distLock()->expectLock(
-        [](StringData, StringData, stdx::chrono::milliseconds, stdx::chrono::milliseconds) {},
-        Status::OK());
+    distLock()->expectLock([](StringData, StringData, Milliseconds, Milliseconds) {}, Status::OK());
 
     auto future = launchAsync([this] {
         auto status = catalogManager()->enableSharding(operationContext(), "test");
@@ -2069,9 +2060,7 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingDBExists) {
 
     setupShards(vector<ShardType>{shard});
 
-    distLock()->expectLock(
-        [](StringData, StringData, stdx::chrono::milliseconds, stdx::chrono::milliseconds) {},
-        Status::OK());
+    distLock()->expectLock([](StringData, StringData, Milliseconds, Milliseconds) {}, Status::OK());
 
     auto future = launchAsync([this] {
         auto status = catalogManager()->enableSharding(operationContext(), "test");
@@ -2127,9 +2116,7 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingFailsWhenTheDatabaseIsAlreadySha
 
     setupShards(vector<ShardType>{shard});
 
-    distLock()->expectLock(
-        [](StringData, StringData, stdx::chrono::milliseconds, stdx::chrono::milliseconds) {},
-        Status::OK());
+    distLock()->expectLock([](StringData, StringData, Milliseconds, Milliseconds) {}, Status::OK());
 
     auto future = launchAsync([this] {
         auto status = catalogManager()->enableSharding(operationContext(), "test");
@@ -2155,9 +2142,7 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingDBExistsInvalidFormat) {
 
     setupShards(vector<ShardType>{shard});
 
-    distLock()->expectLock(
-        [](StringData, StringData, stdx::chrono::milliseconds, stdx::chrono::milliseconds) {},
-        Status::OK());
+    distLock()->expectLock([](StringData, StringData, Milliseconds, Milliseconds) {}, Status::OK());
 
     auto future = launchAsync([this] {
         auto status = catalogManager()->enableSharding(operationContext(), "test");
@@ -2177,9 +2162,7 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingDBExistsInvalidFormat) {
 TEST_F(CatalogManagerReplSetTest, EnableShardingNoDBExistsNoShards) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
-    distLock()->expectLock(
-        [](StringData, StringData, stdx::chrono::milliseconds, stdx::chrono::milliseconds) {},
-        Status::OK());
+    distLock()->expectLock([](StringData, StringData, Milliseconds, Milliseconds) {}, Status::OK());
 
     auto future = launchAsync([this] {
         auto status = catalogManager()->enableSharding(operationContext(), "test");

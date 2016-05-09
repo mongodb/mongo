@@ -245,7 +245,7 @@ TEST_F(ClusterCursorManagerTest, CheckOutCursorUpdateActiveTime) {
                                      ClusterCursorManager::CursorType::NamespaceNotSharded,
                                      ClusterCursorManager::CursorLifetime::Mortal));
     Date_t cursorRegistrationTime = getClockSource()->now();
-    getClockSource()->advance(stdx::chrono::milliseconds(1));
+    getClockSource()->advance(Milliseconds(1));
     auto checkedOutCursor = getManager()->checkOutCursor(nss, cursorId);
     ASSERT_OK(checkedOutCursor.getStatus());
     checkedOutCursor.getValue().returnCursor(ClusterCursorManager::CursorState::NotExhausted);
@@ -340,7 +340,7 @@ TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceBasic) {
 // Test that killing all mortal expired cursors does not kill a cursor that is unexpired.
 TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceSkipUnexpired) {
     Date_t timeBeforeCursorCreation = getClockSource()->now();
-    getClockSource()->advance(stdx::chrono::milliseconds(1));
+    getClockSource()->advance(Milliseconds(1));
     getManager()->registerCursor(allocateMockCursor(),
                                  nss,
                                  ClusterCursorManager::CursorType::NamespaceNotSharded,
@@ -377,7 +377,7 @@ TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceMultipleCursors) 
                                      nss,
                                      ClusterCursorManager::CursorType::NamespaceNotSharded,
                                      ClusterCursorManager::CursorLifetime::Mortal);
-        getClockSource()->advance(stdx::chrono::milliseconds(1));
+        getClockSource()->advance(Milliseconds(1));
     }
     getManager()->killMortalCursorsInactiveSince(cutoff);
     for (size_t i = 0; i < numCursors; ++i) {

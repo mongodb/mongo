@@ -156,11 +156,10 @@ public:
 
     DistLockManager* getDistLockManager() override;
 
-    StatusWith<DistLockManager::ScopedDistLock> distLock(
-        OperationContext* txn,
-        StringData name,
-        StringData whyMessage,
-        stdx::chrono::milliseconds waitFor) override;
+    StatusWith<DistLockManager::ScopedDistLock> distLock(OperationContext* txn,
+                                                         StringData name,
+                                                         StringData whyMessage,
+                                                         Milliseconds waitFor) override;
 
     Status initConfigVersion(OperationContext* txn) override;
 
