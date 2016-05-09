@@ -126,8 +126,8 @@ public:
                 }
                 BSONObjIterator it(indexKey.Obj());
                 std::vector<StringData> keys;
-                while (itr.more()) {
-                    BSONElement e = itr.next();
+                while (it.more()) {
+                    BSONElement e = it.next();
                     StringData fieldName(e.fieldName(), e.fieldNameSize());
                     if (std::find(keys.begin(), keys.end(), fieldName) != keys.end()) {
                         errmsg = str::stream()
