@@ -77,6 +77,13 @@ public:
     static StatusWith<ChunkVersion> parseFromBSONForSetShardVersion(const BSONObj& obj);
 
     /**
+     * Interprets the specified BSON content as the format for chunk persistence, which is in the
+     * form:
+     *  { ..., lastmod: [ <combined major/minor> ], lastmodEpoch: [ <OID epoch> ], ... }
+     */
+    static StatusWith<ChunkVersion> parseFromBSONForChunk(const BSONObj& obj);
+
+    /**
      * Indicates a dropped collection. All components are zeroes (OID is zero time, zero
      * machineId/inc).
      */
@@ -255,12 +262,6 @@ public:
     // { version : <TS>, versionEpoch : <OID> } object format
     //
 
-    static bool canParseBSON(const BSONObj& obj, const std::string& prefix = "") {
-        bool canParse;
-        fromBSON(obj, prefix, &canParse);
-        return canParse;
-    }
-
     static ChunkVersion fromBSON(const BSONObj& obj, const std::string& prefix = "") {
         bool canParse;
         return fromBSON(obj, prefix, &canParse);
@@ -346,9 +347,15 @@ public:
     void appendForSetShardVersion(BSONObjBuilder* builder) const;
 
     /**
-     * Appends the contents to the specified builder in the format expected by the write commands.
+     * Appends the contents to the specified builder in the format expected by the sharded commands.
      */
     void appendForCommands(BSONObjBuilder* builder) const;
+
+    /**
+     * Appends the contents to the specified builder in the format expected by the chunk
+     * serialization/deserialization code.
+     */
+    void appendForChunk(BSONObjBuilder* builder) const;
 
     std::string toString() const {
         StringBuilder sb;

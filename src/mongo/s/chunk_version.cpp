@@ -40,6 +40,7 @@ namespace mongo {
 namespace {
 
 const char kVersion[] = "version";
+const char kLastmod[] = "lastmod";
 
 }  // namespace
 
@@ -97,12 +98,25 @@ StatusWith<ChunkVersion> ChunkVersion::parseFromBSONForSetShardVersion(const BSO
     return chunkVersion;
 }
 
+StatusWith<ChunkVersion> ChunkVersion::parseFromBSONForChunk(const BSONObj& obj) {
+    bool canParse;
+    const ChunkVersion chunkVersion = ChunkVersion::fromBSON(obj, kLastmod, &canParse);
+    if (!canParse)
+        return {ErrorCodes::BadValue, "Unable to parse shard version"};
+
+    return chunkVersion;
+}
+
 void ChunkVersion::appendForSetShardVersion(BSONObjBuilder* builder) const {
     addToBSON(*builder, kVersion);
 }
 
 void ChunkVersion::appendForCommands(BSONObjBuilder* builder) const {
     builder->appendArray(kShardVersionField, toBSON());
+}
+
+void ChunkVersion::appendForChunk(BSONObjBuilder* builder) const {
+    addToBSON(*builder, kLastmod);
 }
 
 BSONObj ChunkVersion::toBSON() const {

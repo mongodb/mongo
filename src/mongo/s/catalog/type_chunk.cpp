@@ -154,12 +154,13 @@ StatusWith<ChunkType> ChunkType::fromBSON(const BSONObj& source) {
         }
     }
 
-    // The format of chunk version encoding is { lastmod: <Major|Minor>, lastmodEpoch: OID }
-    if (!ChunkVersion::canParseBSON(source, DEPRECATED_lastmod())) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Unable to parse chunk version from " << source);
+    {
+        auto versionStatus = ChunkVersion::parseFromBSONForChunk(source);
+        if (!versionStatus.isOK()) {
+            return versionStatus.getStatus();
+        }
+        chunk._version = std::move(versionStatus.getValue());
     }
-    chunk._version = ChunkVersion::fromBSON(source, DEPRECATED_lastmod());
 
     return chunk;
 }
@@ -243,8 +244,7 @@ BSONObj ChunkType::toBSON() const {
     if (_shard)
         builder.append(shard.name(), getShard());
     if (_version) {
-        // For now, write both the deprecated *and* the new fields
-        _version->addToBSON(builder, DEPRECATED_lastmod());
+        _version->appendForChunk(&builder);
     }
     if (_jumbo)
         builder.append(jumbo.name(), getJumbo());

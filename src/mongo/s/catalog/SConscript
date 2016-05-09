@@ -9,53 +9,12 @@ env.SConscript(
 )
 
 env.Library(
-    target='catalog_types',
-    source=[
-        'mongo_version_range.cpp',
-        'type_changelog.cpp',
-        'type_chunk.cpp',
-        'type_collection.cpp',
-        'type_config_version.cpp',
-        'type_database.cpp',
-        'type_lockpings.cpp',
-        'type_locks.cpp',
-        'type_mongos.cpp',
-        'type_shard.cpp',
-        'type_tags.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/db/common',
-    ]
-)
-
-env.Library(
     target='catalog_manager_mock',
     source=[
         'catalog_manager_mock.cpp',
     ],
     LIBDEPS=[
         'dist_lock_manager_mock',
-    ]
-)
-
-env.CppUnitTest(
-    target='catalog_types_test',
-    source=[
-        'type_changelog_test.cpp',
-        'type_chunk_test.cpp',
-        'type_collection_test.cpp',
-        'type_config_version_test.cpp',
-        'type_database_test.cpp',
-        'type_lockpings_test.cpp',
-        'type_locks_test.cpp',
-        'type_mongos_test.cpp',
-        'type_shard_test.cpp',
-        'type_tags_test.cpp',
-    ],
-    LIBDEPS=[
-        'catalog_types'
     ]
 )
 
@@ -96,8 +55,8 @@ env.Library(
         'dist_lock_catalog_mock.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/s/common',
         '$BUILD_DIR/mongo/unittest/unittest',
-        'catalog_types',
         'dist_lock_catalog_interface',
     ]
 )

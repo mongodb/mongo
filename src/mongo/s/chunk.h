@@ -223,6 +223,4 @@ private:
     static int mkDataWritten();
 };
 
-typedef std::shared_ptr<const Chunk> ChunkPtr;
-
 }  // namespace mongo
