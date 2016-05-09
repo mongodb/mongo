@@ -20,7 +20,9 @@
             {"_id": 0, "host": nodes[0]},
             {"_id": 1, "host": nodes[1]},
             {"_id": 2, "host": nodes[2], "arbiterOnly": true}
-        ]
+        ],
+        // No primary catch-up so we focus on the drain mode.
+        "settings": {"catchUpTimeoutMillis": 0},
     });
 
     var primary = replSet.getPrimary();

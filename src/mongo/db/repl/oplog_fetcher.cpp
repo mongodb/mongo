@@ -37,6 +37,7 @@
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 
@@ -46,6 +47,8 @@ namespace repl {
 Seconds OplogFetcher::kDefaultProtocolZeroAwaitDataTimeout(2);
 
 namespace {
+
+MONGO_FP_DECLARE(stopOplogFetcher);
 
 /**
  * Calculates await data timeout based on the current replica set configuration.
@@ -299,6 +302,11 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
     if (!result.isOK()) {
         LOG(2) << "Error returned from oplog query: " << result.getStatus();
         _onShutdown(result.getStatus());
+        return;
+    }
+
+    // Stop fetching and return immediately on fail point.
+    if (MONGO_FAIL_POINT(stopOplogFetcher)) {
         return;
     }
 

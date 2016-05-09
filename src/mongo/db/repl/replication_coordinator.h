@@ -399,6 +399,12 @@ public:
     virtual bool isWaitingForApplierToDrain() = 0;
 
     /**
+     * A new primary tries to have its oplog catch up after winning an election.
+     * Return true if the coordinator is waiting for catch-up to finish.
+     */
+    virtual bool isCatchingUp() = 0;
+
+    /**
      * Signals that a previously requested pause and drain of the applier buffer
      * has completed.
      *

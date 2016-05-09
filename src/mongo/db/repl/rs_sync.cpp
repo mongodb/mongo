@@ -135,7 +135,8 @@ void RSDataSync::_run() {
         }
 
         try {
-            if (memberState.primary() && !_replCoord->isWaitingForApplierToDrain()) {
+            if (memberState.primary() && !_replCoord->isWaitingForApplierToDrain() &&
+                !_replCoord->isCatchingUp()) {
                 sleepsecs(1);
                 continue;
             }

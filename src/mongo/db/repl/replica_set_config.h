@@ -63,6 +63,7 @@ public:
     static const Milliseconds kDefaultElectionTimeoutPeriod;
     static const Milliseconds kDefaultHeartbeatInterval;
     static const Seconds kDefaultHeartbeatTimeoutPeriod;
+    static const Milliseconds kDefaultCatchUpTimeoutPeriod;
     static const bool kDefaultChainingAllowed;
 
     /**
@@ -215,6 +216,13 @@ public:
      */
     Milliseconds getHeartbeatTimeoutPeriodMillis() const {
         return _heartbeatTimeoutPeriod;
+    }
+
+    /**
+     * Gets the timeout to wait for a primary to catch up its oplog.
+     */
+    Milliseconds getCatchUpTimeoutPeriod() const {
+        return _catchUpTimeoutPeriod;
     }
 
     /**
@@ -374,6 +382,7 @@ private:
     Milliseconds _electionTimeoutPeriod = kDefaultElectionTimeoutPeriod;
     Milliseconds _heartbeatInterval = kDefaultHeartbeatInterval;
     Seconds _heartbeatTimeoutPeriod = kDefaultHeartbeatTimeoutPeriod;
+    Milliseconds _catchUpTimeoutPeriod = kDefaultCatchUpTimeoutPeriod;
     bool _chainingAllowed = kDefaultChainingAllowed;
     bool _writeConcernMajorityJournalDefault = false;
     int _majorityVoteCount = 0;

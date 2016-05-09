@@ -258,6 +258,11 @@ protected:
      */
     void disableSnapshots();
 
+    /**
+     * Timeout all freshness scan request for primary catch-up.
+     */
+    void simulateCatchUpTimeout();
+
 private:
     std::unique_ptr<ReplicationCoordinatorImpl> _repl;
     // Owned by ReplicationCoordinatorImpl

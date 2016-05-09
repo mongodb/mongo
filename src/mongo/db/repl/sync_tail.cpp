@@ -1290,7 +1290,8 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
     Lock::ParallelBatchWriterMode pbwm(txn->lockState());
 
     auto replCoord = ReplicationCoordinator::get(txn);
-    if (replCoord->getMemberState().primary() && !replCoord->isWaitingForApplierToDrain()) {
+    if (replCoord->getMemberState().primary() && !replCoord->isWaitingForApplierToDrain() &&
+        !replCoord->isCatchingUp()) {
         severe() << "attempting to replicate ops while primary";
         return {ErrorCodes::CannotApplyOplogWhilePrimary,
                 "attempting to replicate ops while primary"};

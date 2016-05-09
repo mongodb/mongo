@@ -105,6 +105,7 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
 
     ASSERT(getReplCoord()->getMemberState().primary())
         << getReplCoord()->getMemberState().toString();
+    simulateCatchUpTimeout();
     ASSERT(getReplCoord()->isWaitingForApplierToDrain());
 
     const auto txnPtr = makeOperationContext();
@@ -167,6 +168,8 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
     getReplCoord()->waitForElectionFinish_forTest();
     ASSERT(getReplCoord()->getMemberState().primary())
         << getReplCoord()->getMemberState().toString();
+    // Wait for catchup check to finish.
+    simulateCatchUpTimeout();
     ASSERT(getReplCoord()->isWaitingForApplierToDrain());
 
     const auto txnPtr = makeOperationContext();
@@ -902,6 +905,244 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringVotePhase)
     getNet()->runReadyNetworkOperations();
     getNet()->exitNetwork();
     ASSERT(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+}
+
+class PrimaryCatchUpTest : public ReplCoordTest {
+protected:
+    using NetworkOpIter = NetworkInterfaceMock::NetworkOperationIterator;
+    using FreshnessScanFn = stdx::function<void(const NetworkOpIter)>;
+
+    void simulateSuccessfulV1Voting() {
+        ReplicationCoordinatorImpl* replCoord = getReplCoord();
+        NetworkInterfaceMock* net = getNet();
+
+        auto electionTimeoutWhen = replCoord->getElectionTimeout_forTest();
+        ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
+        log() << "Election timeout scheduled at " << electionTimeoutWhen << " (simulator time)";
+
+        ReplicaSetConfig rsConfig = replCoord->getReplicaSetConfig_forTest();
+        ASSERT(replCoord->getMemberState().secondary()) << replCoord->getMemberState().toString();
+        bool hasReadyRequests = true;
+        // Process requests until we're primary and consume the heartbeats for the notification
+        // of election win. Exit immediately on catch up.
+        while (!replCoord->isCatchingUp() &&
+               (!replCoord->getMemberState().primary() || hasReadyRequests)) {
+            log() << "Waiting on network in state " << replCoord->getMemberState();
+            getNet()->enterNetwork();
+            if (net->now() < electionTimeoutWhen) {
+                net->runUntil(electionTimeoutWhen);
+            }
+            const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
+            const RemoteCommandRequest& request = noi->getRequest();
+            log() << request.target.toString() << " processing " << request.cmdObj;
+            ReplSetHeartbeatArgsV1 hbArgs;
+            Status status = hbArgs.initialize(request.cmdObj);
+            if (hbArgs.initialize(request.cmdObj).isOK()) {
+                ReplSetHeartbeatResponse hbResp;
+                hbResp.setSetName(rsConfig.getReplSetName());
+                hbResp.setState(MemberState::RS_SECONDARY);
+                hbResp.setConfigVersion(rsConfig.getConfigVersion());
+                net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON(true)));
+            } else if (request.cmdObj.firstElement().fieldNameStringData() ==
+                       "replSetRequestVotes") {
+                net->scheduleResponse(noi,
+                                      net->now(),
+                                      makeResponseStatus(BSON("ok" << 1 << "reason"
+                                                                   << ""
+                                                                   << "term"
+                                                                   << request.cmdObj["term"].Long()
+                                                                   << "voteGranted"
+                                                                   << true)));
+            } else {
+                error() << "Black holing unexpected request to " << request.target << ": "
+                        << request.cmdObj;
+                net->blackHole(noi);
+            }
+            net->runReadyNetworkOperations();
+            hasReadyRequests = net->hasReadyRequests();
+            getNet()->exitNetwork();
+        }
+    }
+
+    ReplicaSetConfig setUp3NodeReplSetAndRunForElection(OpTime opTime) {
+        BSONObj configObj = BSON("_id"
+                                 << "mySet"
+                                 << "version"
+                                 << 1
+                                 << "members"
+                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                          << "node1:12345")
+                                               << BSON("_id" << 2 << "host"
+                                                             << "node2:12345")
+                                               << BSON("_id" << 3 << "host"
+                                                             << "node3:12345"))
+                                 << "protocolVersion"
+                                 << 1
+                                 << "settings"
+                                 << BSON("catchUpTimeoutMillis" << 5000));
+        assertStartSuccess(configObj, HostAndPort("node1", 12345));
+        ReplicaSetConfig config = assertMakeRSConfig(configObj);
+
+        getReplCoord()->setMyLastAppliedOpTime(opTime);
+        getReplCoord()->setMyLastDurableOpTime(opTime);
+        ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+        simulateSuccessfulV1Voting();
+        IsMasterResponse imResponse;
+        getReplCoord()->fillIsMasterForReplSet(&imResponse);
+        ASSERT_FALSE(imResponse.isMaster()) << imResponse.toBSON().toString();
+        ASSERT_TRUE(imResponse.isSecondary()) << imResponse.toBSON().toString();
+
+        return config;
+    }
+
+    ResponseStatus makeFreshnessScanResponse(OpTime opTime) {
+        // OpTime part of replSetGetStatus.
+        return makeResponseStatus(BSON("optimes" << BSON("appliedOpTime" << opTime.toBSON())));
+    }
+
+    void processFreshnessScanRequests(FreshnessScanFn onFreshnessScanRequest) {
+        NetworkInterfaceMock* net = getNet();
+        net->enterNetwork();
+        while (net->hasReadyRequests()) {
+            const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
+            const RemoteCommandRequest& request = noi->getRequest();
+            if (request.cmdObj.firstElement().fieldNameStringData() == "replSetGetStatus") {
+                log() << request.target.toString() << " processing " << request.cmdObj;
+                onFreshnessScanRequest(noi);
+            } else {
+                log() << "Black holing unexpected request to " << request.target << ": "
+                      << request.cmdObj;
+                net->blackHole(noi);
+            }
+            net->runReadyNetworkOperations();
+        }
+        net->exitNetwork();
+    }
+};
+
+TEST_F(PrimaryCatchUpTest, PrimaryDoNotNeedToCatchUp) {
+    startCapturingLogMessages();
+    OpTime time1(Timestamp(100, 1), 0);
+    ReplicaSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
+
+    processFreshnessScanRequests([this](const NetworkOpIter noi) {
+        getNet()->scheduleResponse(noi, getNet()->now(), makeFreshnessScanResponse(OpTime()));
+    });
+    ASSERT(getReplCoord()->isWaitingForApplierToDrain());
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countLogLinesContaining("My optime is most up-to-date, skipping catch-up"));
+    auto txn = makeOperationContext();
+    getReplCoord()->signalDrainComplete(txn.get());
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase("test"));
+}
+
+TEST_F(PrimaryCatchUpTest, PrimaryFreshnessScanTimeout) {
+    startCapturingLogMessages();
+
+    OpTime time1(Timestamp(100, 1), 0);
+    ReplicaSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
+
+    processFreshnessScanRequests([this](const NetworkOpIter noi) {
+        auto request = noi->getRequest();
+        log() << "Black holing request to " << request.target << ": " << request.cmdObj;
+        getNet()->blackHole(noi);
+    });
+
+    auto net = getNet();
+    net->enterNetwork();
+    net->runUntil(net->now() + config.getCatchUpTimeoutPeriod());
+    net->exitNetwork();
+    ASSERT(getReplCoord()->isWaitingForApplierToDrain());
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countLogLinesContaining("Could not access any nodes within timeout"));
+    auto txn = makeOperationContext();
+    getReplCoord()->signalDrainComplete(txn.get());
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase("test"));
+}
+
+TEST_F(PrimaryCatchUpTest, PrimaryCatchUpSucceeds) {
+    startCapturingLogMessages();
+
+    OpTime time1(Timestamp(100, 1), 0);
+    OpTime time2(Timestamp(100, 2), 0);
+    ReplicaSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
+
+    processFreshnessScanRequests([this, time2](const NetworkOpIter noi) {
+        auto net = getNet();
+        // The old primary accepted one more op and all nodes caught up after voting for me.
+        net->scheduleResponse(noi, net->now(), makeFreshnessScanResponse(time2));
+    });
+
+    NetworkInterfaceMock* net = getNet();
+    ASSERT(getReplCoord()->isCatchingUp());
+    // Simulate the work done by bgsync and applier threads.
+    // setMyLastAppliedOpTime() will signal the optime waiter.
+    getReplCoord()->setMyLastAppliedOpTime(time2);
+    net->enterNetwork();
+    net->runReadyNetworkOperations();
+    net->exitNetwork();
+    ASSERT(getReplCoord()->isWaitingForApplierToDrain());
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countLogLinesContaining("Finished catch-up oplog after becoming primary."));
+    auto txn = makeOperationContext();
+    getReplCoord()->signalDrainComplete(txn.get());
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase("test"));
+}
+
+TEST_F(PrimaryCatchUpTest, PrimaryCatchUpTimeout) {
+    startCapturingLogMessages();
+
+    OpTime time1(Timestamp(100, 1), 0);
+    OpTime time2(Timestamp(100, 2), 0);
+    ReplicaSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
+
+    // The new primary learns of the latest OpTime.
+    processFreshnessScanRequests([this, time2](const NetworkOpIter noi) {
+        auto net = getNet();
+        net->scheduleResponse(noi, net->now(), makeFreshnessScanResponse(time2));
+    });
+
+    NetworkInterfaceMock* net = getNet();
+    ASSERT(getReplCoord()->isCatchingUp());
+    net->enterNetwork();
+    net->runUntil(net->now() + config.getCatchUpTimeoutPeriod());
+    net->exitNetwork();
+    ASSERT(getReplCoord()->isWaitingForApplierToDrain());
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countLogLinesContaining("Cannot catch up oplog after becoming primary"));
+    auto txn = makeOperationContext();
+    getReplCoord()->signalDrainComplete(txn.get());
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase("test"));
+}
+
+TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringFreshnessScan) {
+    startCapturingLogMessages();
+
+    OpTime time1(Timestamp(100, 1), 0);
+    OpTime time2(Timestamp(100, 2), 0);
+    ReplicaSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
+
+    processFreshnessScanRequests([this, time2](const NetworkOpIter noi) {
+        auto request = noi->getRequest();
+        log() << "Black holing request to " << request.target << ": " << request.cmdObj;
+        getNet()->blackHole(noi);
+    });
+    ASSERT(getReplCoord()->isCatchingUp());
+
+    TopologyCoordinator::UpdateTermResult updateTermResult;
+    auto evh = getReplCoord()->updateTerm_forTest(2, &updateTermResult);
+    ASSERT_TRUE(evh.isValid());
+    getReplExec()->waitForEvent(evh);
+    ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
+    auto net = getNet();
+    net->enterNetwork();
+    net->runUntil(net->now() + config.getCatchUpTimeoutPeriod());
+    net->exitNetwork();
+    ASSERT_FALSE(getReplCoord()->isWaitingForApplierToDrain());
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countLogLinesContaining("Stopped transition to primary"));
+    ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase("test"));
 }
 
 }  // namespace

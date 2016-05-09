@@ -80,6 +80,8 @@ void FreshnessScanner::Algorithm::processResponse(const RemoteCommandRequest& re
         OpTime lastOpTime;
         Status status = bsonExtractOpTimeField(opTimesObj, "appliedOpTime", &lastOpTime);
         if (!status.isOK()) {
+            LOG(2) << "FreshnessScanner: failed to parse opTime in " << opTimesObj << " from "
+                   << request.target << causedBy(status);
             return;
         }
 
@@ -92,6 +94,8 @@ void FreshnessScanner::Algorithm::processResponse(const RemoteCommandRequest& re
         auto iter =
             std::upper_bound(_freshnessInfos.begin(), _freshnessInfos.end(), freshnessInfo, cmp);
         _freshnessInfos.insert(iter, freshnessInfo);
+        LOG(2) << "FreshnessScanner: processed response " << opTimesObj << " from "
+               << request.target;
     }
 }
 

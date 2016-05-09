@@ -130,6 +130,8 @@ public:
 
     virtual bool isWaitingForApplierToDrain();
 
+    virtual bool isCatchingUp();
+
     virtual void signalDrainComplete(OperationContext*);
 
     virtual Status waitForDrainFinish(Milliseconds timeout) override;

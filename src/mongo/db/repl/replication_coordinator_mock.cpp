@@ -209,6 +209,10 @@ bool ReplicationCoordinatorMock::isWaitingForApplierToDrain() {
     return false;
 }
 
+bool ReplicationCoordinatorMock::isCatchingUp() {
+    return false;
+}
+
 void ReplicationCoordinatorMock::signalDrainComplete(OperationContext*) {}
 
 Status ReplicationCoordinatorMock::waitForDrainFinish(Milliseconds timeout) {

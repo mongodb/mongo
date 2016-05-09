@@ -50,6 +50,8 @@ const std::string ReplicaSetConfig::kMajorityWriteConcernModeName = "$majority";
 const Milliseconds ReplicaSetConfig::kDefaultHeartbeatInterval(2000);
 const Seconds ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod(10);
 const Milliseconds ReplicaSetConfig::kDefaultElectionTimeoutPeriod(10000);
+// TODO(siyuan): Change the default catch up timeout to 5000 milliseconds;
+const Milliseconds ReplicaSetConfig::kDefaultCatchUpTimeoutPeriod(0);
 const bool ReplicaSetConfig::kDefaultChainingAllowed(true);
 
 namespace {
@@ -76,6 +78,7 @@ const std::string kGetLastErrorDefaultsFieldName = "getLastErrorDefaults";
 const std::string kGetLastErrorModesFieldName = "getLastErrorModes";
 const std::string kHeartbeatIntervalFieldName = "heartbeatIntervalMillis";
 const std::string kHeartbeatTimeoutFieldName = "heartbeatTimeoutSecs";
+const std::string kCatchUpTimeoutFieldName = "catchUpTimeoutMillis";
 const std::string kReplicaSetIdFieldName = "replicaSetId";
 
 }  // namespace
@@ -263,6 +266,23 @@ Status ReplicaSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
         return heartbeatTimeoutStatus;
     }
     _heartbeatTimeoutPeriod = Seconds(heartbeatTimeoutSecs);
+
+    //
+    // Parse catchUpTimeoutMillis
+    //
+    auto notLessThanZero = stdx::bind(std::greater_equal<long long>(), stdx::placeholders::_1, 0);
+    long long catchUpTimeoutMillis;
+    Status catchUpTimeoutStatus = bsonExtractIntegerFieldWithDefaultIf(
+        settings,
+        kCatchUpTimeoutFieldName,
+        durationCount<Milliseconds>(kDefaultCatchUpTimeoutPeriod),
+        notLessThanZero,
+        "catch-up timeout must be greater than or equal to 0",
+        &catchUpTimeoutMillis);
+    if (!catchUpTimeoutStatus.isOK()) {
+        return catchUpTimeoutStatus;
+    }
+    _catchUpTimeoutPeriod = Milliseconds(catchUpTimeoutMillis);
 
     //
     // Parse chainingAllowed
@@ -763,6 +783,8 @@ BSONObj ReplicaSetConfig::toBSON() const {
                                   durationCount<Seconds>(_heartbeatTimeoutPeriod));
     settingsBuilder.appendIntOrLL(kElectionTimeoutFieldName,
                                   durationCount<Milliseconds>(_electionTimeoutPeriod));
+    settingsBuilder.appendIntOrLL(kCatchUpTimeoutFieldName,
+                                  durationCount<Milliseconds>(_catchUpTimeoutPeriod));
 
 
     BSONObjBuilder gleModes(settingsBuilder.subobjStart(kGetLastErrorModesFieldName));

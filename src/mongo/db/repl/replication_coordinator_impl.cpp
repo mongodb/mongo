@@ -45,6 +45,7 @@
 #include "mongo/db/repl/data_replicator_external_state_impl.h"
 #include "mongo/db/repl/elect_cmd_runner.h"
 #include "mongo/db/repl/freshness_checker.h"
+#include "mongo/db/repl/freshness_scanner.h"
 #include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/last_vote.h"
@@ -146,37 +147,25 @@ std::string ReplicationCoordinatorImpl::SlaveInfo::toString() const {
     return toBSON().toString();
 }
 
-
 struct ReplicationCoordinatorImpl::WaiterInfo {
-    /**
-     * Constructor takes the list of waiters and enqueues itself on the list, removing itself
-     * in the destructor.
-     */
-    WaiterInfo(std::vector<WaiterInfo*>* _list,
-               unsigned int _opID,
-               const OpTime* _opTime,
+
+    using FinishFunc = stdx::function<void()>;
+
+    WaiterInfo(unsigned int _opID,
+               const OpTime _opTime,
                const WriteConcernOptions* _writeConcern,
                stdx::condition_variable* _condVar)
-        : list(_list),
-          master(true),
-          opID(_opID),
-          opTime(_opTime),
-          writeConcern(_writeConcern),
-          condVar(_condVar) {
-        list->push_back(this);
-    }
+        : opID(_opID), opTime(_opTime), writeConcern(_writeConcern), condVar(_condVar) {}
 
-    ~WaiterInfo() {
-        list->erase(std::remove(list->begin(), list->end(), this), list->end());
-    }
+    // When waiter is signaled, finishCallback will be called while holding replCoord _mutex
+    // since WaiterLists are protected by _mutex.
+    WaiterInfo(const OpTime _opTime, FinishFunc _finishCallback)
+        : opTime(_opTime), finishCallback(_finishCallback) {}
 
     BSONObj toBSON() const {
         BSONObjBuilder bob;
         bob.append("opId", opID);
-        if (opTime) {
-            bob.append("opTime", opTime->toBSON());
-        }
-        bob.append("master", master);
+        bob.append("opTime", opTime.toBSON());
         if (writeConcern) {
             bob.append("writeConcern", writeConcern->toBSON());
         }
@@ -187,13 +176,89 @@ struct ReplicationCoordinatorImpl::WaiterInfo {
         return toBSON().toString();
     };
 
-    std::vector<WaiterInfo*>* list;
-    bool master;  // Set to false to indicate that stepDown was called while waiting
-    const unsigned int opID;
-    const OpTime* opTime;
-    const WriteConcernOptions* writeConcern;
-    stdx::condition_variable* condVar;
+    // It is invalid to call notify() unless holding ReplicationCoordinatorImpl::_mutex.
+    void notify() {
+        if (condVar) {
+            condVar->notify_all();
+        }
+        if (finishCallback) {
+            finishCallback();
+        }
+    }
+
+    const unsigned int opID = 0;
+    const OpTime opTime;
+    const WriteConcernOptions* writeConcern = nullptr;
+    stdx::condition_variable* condVar = nullptr;
+    // The callback that will be called when this waiter is notified.
+    FinishFunc finishCallback = nullptr;
 };
+
+struct ReplicationCoordinatorImpl::WaiterInfoGuard {
+    /**
+     * Constructor takes the list of waiters and enqueues itself on the list, removing itself
+     * in the destructor.
+     *
+     * Usually waiters will be signaled and removed when their criteria are satisfied, but
+     * wait_until() with timeout may signal waiters earlier and this guard will remove the waiter
+     * properly.
+     *
+     * _list is guarded by ReplicationCoordinatorImpl::_mutex, thus it is illegal to construct one
+     * of these without holding _mutex
+     */
+    WaiterInfoGuard(WaiterList* list,
+                    unsigned int opID,
+                    const OpTime opTime,
+                    const WriteConcernOptions* writeConcern,
+                    stdx::condition_variable* condVar)
+        : waiter(opID, opTime, writeConcern, condVar), _list(list) {
+        list->add_inlock(&waiter);
+    }
+
+    ~WaiterInfoGuard() {
+        _list->remove_inlock(&waiter);
+    }
+
+    WaiterInfo waiter;
+
+private:
+    WaiterList* _list;
+};
+
+void ReplicationCoordinatorImpl::WaiterList::add_inlock(WaiterType waiter) {
+    _list.push_back(waiter);
+}
+
+void ReplicationCoordinatorImpl::WaiterList::signalAndRemoveIf_inlock(
+    stdx::function<bool(WaiterType)> func) {
+    std::vector<WaiterType>::iterator it = _list.end();
+    while (true) {
+        it = std::find_if(_list.begin(), _list.end(), func);
+        if (it == _list.end()) {
+            break;
+        }
+        (*it)->notify();
+        std::swap(*it, _list.back());
+        _list.pop_back();
+    }
+}
+
+void ReplicationCoordinatorImpl::WaiterList::signalAndRemoveAll_inlock() {
+    for (auto& waiter : _list) {
+        waiter->notify();
+    }
+    _list.clear();
+}
+
+bool ReplicationCoordinatorImpl::WaiterList::remove_inlock(WaiterType waiter) {
+    auto it = std::find(_list.begin(), _list.end(), waiter);
+    if (it != _list.end()) {
+        std::swap(*it, _list.back());
+        _list.pop_back();
+        return true;
+    }
+    return false;
+}
 
 namespace {
 ReplicationCoordinator::Mode getReplicationModeFromSettings(const ReplSettings& settings) {
@@ -594,12 +659,8 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* txn) {
             return;
         }
         fassert(18823, _rsConfigState != kConfigStartingUp);
-        for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
-             it != _replicationWaiterList.end();
-             ++it) {
-            WaiterInfo* waiter = *it;
-            waiter->condVar->notify_all();
-        }
+        _replicationWaiterList.signalAndRemoveAll_inlock();
+        _opTimeWaiterList.signalAndRemoveAll_inlock();
     }
 
     // joining the replication executor is blocking so it must be run outside of the mutex
@@ -736,6 +797,12 @@ bool ReplicationCoordinatorImpl::isWaitingForApplierToDrain() {
     return _isWaitingForDrainToComplete;
 }
 
+bool ReplicationCoordinatorImpl::isCatchingUp() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _isCatchingUp;
+}
+
+
 void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
     // This logic is a little complicated in order to avoid acquiring the global exclusive lock
     // unnecessarily.  This is important because the applier may call signalDrainComplete()
@@ -806,7 +873,7 @@ Status ReplicationCoordinatorImpl::waitForDrainFinish(Milliseconds timeout) {
     }
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    auto pred = [this]() { return !_isWaitingForDrainToComplete; };
+    auto pred = [this]() { return !_isCatchingUp && !_isWaitingForDrainToComplete; };
     if (!_drainFinishedCond.wait_for(lk, timeout.toSystemDuration(), pred)) {
         return Status(ErrorCodes::ExceededTimeLimit,
                       "Timed out waiting to finish draining applier buffer");
@@ -1028,11 +1095,8 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTime_inlock(const OpTime& op
     invariant(isRollbackAllowed || mySlaveInfo->lastAppliedOpTime <= opTime);
     _updateSlaveInfoAppliedOpTime_inlock(mySlaveInfo, opTime);
 
-    for (auto& opTimeWaiter : _opTimeWaiterList) {
-        if (*(opTimeWaiter->opTime) <= opTime) {
-            opTimeWaiter->condVar->notify_all();
-        }
-    }
+    _opTimeWaiterList.signalAndRemoveIf_inlock(
+        [opTime](WaiterInfo* waiter) { return waiter->opTime <= opTime; });
 }
 
 void ReplicationCoordinatorImpl::_setMyLastDurableOpTime_inlock(const OpTime& opTime,
@@ -1138,9 +1202,10 @@ Status ReplicationCoordinatorImpl::waitUntilOpTimeForRead(OperationContext* txn,
 
         // We just need to wait for the opTime to catch up to what we need (not majority RC).
         stdx::condition_variable condVar;
-        WaiterInfo waitInfo(&_opTimeWaiterList, txn->getOpID(), &targetOpTime, nullptr, &condVar);
+        WaiterInfoGuard waitInfo(
+            &_opTimeWaiterList, txn->getOpID(), targetOpTime, nullptr, &condVar);
 
-        LOG(3) << "Waiting for OpTime: " << waitInfo;
+        LOG(3) << "Waiting for OpTime: " << waitInfo.waiter;
         if (txn->hasDeadline()) {
             condVar.wait_until(lock, txn->getDeadline().toSystemTimePoint());
         } else {
@@ -1334,22 +1399,9 @@ void ReplicationCoordinatorImpl::interrupt(unsigned opId) {
         // Wake ops waiting for a new committed snapshot.
         _currentCommittedSnapshotCond.notify_all();
 
-        for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
-             it != _replicationWaiterList.end();
-             ++it) {
-            WaiterInfo* info = *it;
-            if (info->opID == opId) {
-                info->condVar->notify_all();
-                return;
-            }
-        }
-
-        for (auto& opTimeWaiter : _opTimeWaiterList) {
-            if (opTimeWaiter->opID == opId) {
-                opTimeWaiter->condVar->notify_all();
-                return;
-            }
-        }
+        auto hasSameOpID = [opId](WaiterInfo* waiter) { return waiter->opID == opId; };
+        _replicationWaiterList.signalAndRemoveIf_inlock(hasSameOpID);
+        _opTimeWaiterList.signalAndRemoveIf_inlock(hasSameOpID);
     }
 
     {
@@ -1364,16 +1416,8 @@ void ReplicationCoordinatorImpl::interruptAll() {
         // Wake ops waiting for a new committed snapshot.
         _currentCommittedSnapshotCond.notify_all();
 
-        for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
-             it != _replicationWaiterList.end();
-             ++it) {
-            WaiterInfo* info = *it;
-            info->condVar->notify_all();
-        }
-
-        for (auto& opTimeWaiter : _opTimeWaiterList) {
-            opTimeWaiter->condVar->notify_all();
-        }
+        _replicationWaiterList.signalAndRemoveAll_inlock();
+        _opTimeWaiterList.signalAndRemoveAll_inlock();
     }
 
     {
@@ -1543,7 +1587,8 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitRepl
 
     // Must hold _mutex before constructing waitInfo as it will modify _replicationWaiterList
     stdx::condition_variable condVar;
-    WaiterInfo waitInfo(&_replicationWaiterList, txn->getOpID(), &opTime, &writeConcern, &condVar);
+    WaiterInfoGuard waitInfo(
+        &_replicationWaiterList, txn->getOpID(), opTime, &writeConcern, &condVar);
     while (!_doneWaitingForReplication_inlock(opTime, minSnapshot, writeConcern)) {
         const Milliseconds elapsed{timer->millis()};
 
@@ -1552,7 +1597,7 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitRepl
             return StatusAndDuration(interruptedStatus, elapsed);
         }
 
-        if (!waitInfo.master) {
+        if (replMode == modeReplSet && !_getMemberState_inlock().primary()) {
             return StatusAndDuration(Status(ErrorCodes::NotMaster,
                                             "Not master anymore while waiting for replication"
                                             " - this most likely means that a step down"
@@ -2001,7 +2046,7 @@ void ReplicationCoordinatorImpl::fillIsMasterForReplSet(IsMasterResponse* respon
         response->setLastMajorityWrite(majorityOpTime, majorityOpTime.getTimestamp().getSecs());
     }
 
-    if (isWaitingForApplierToDrain()) {
+    if (isWaitingForApplierToDrain() || isCatchingUp()) {
         // Report that we are secondary to ismaster callers until drain completes.
         response->setIsMaster(false);
         response->setIsSecondary(true);
@@ -2475,13 +2520,9 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock() {
     PostMemberStateUpdateAction result;
     if (_memberState.primary() || newState.removed() || newState.rollback()) {
         // Wake up any threads blocked in awaitReplication, close connections, etc.
-        for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
-             it != _replicationWaiterList.end();
-             ++it) {
-            WaiterInfo* info = *it;
-            info->master = false;
-            info->condVar->notify_all();
-        }
+        _replicationWaiterList.signalAndRemoveAll_inlock();
+        // Wake up the optime waiter that is waiting for primary catch-up to finish.
+        _opTimeWaiterList.signalAndRemoveAll_inlock();
         _canAcceptNonLocalWrites = false;
         result = kActionCloseAllConnections;
     } else {
@@ -2580,15 +2621,20 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
                 _electionId = OID::gen();
             }
             _topCoord->processWinElection(_electionId, getNextGlobalTimestamp());
-            _isWaitingForDrainToComplete = true;
+            _isCatchingUp = true;
             const PostMemberStateUpdateAction nextAction =
                 _updateMemberStateFromTopologyCoordinator_inlock();
             invariant(nextAction != kActionWinElection);
             lk.unlock();
-            _externalState->signalApplierToCancelFetcher();
             _performPostMemberStateUpdateAction(nextAction);
             // Notify all secondaries of the election win.
             _scheduleElectionWinNotification();
+            lk.lock();
+            if (isV1ElectionProtocol()) {
+                _scanOpTimeForCatchUp_inlock();
+            } else {
+                _finishCatchUpOplog_inlock(true);
+            }
             break;
         }
         case kActionStartSingleNodeElection:
@@ -2599,6 +2645,99 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
         default:
             severe() << "Unknown post member state update action " << static_cast<int>(action);
             fassertFailed(26010);
+    }
+}
+
+void ReplicationCoordinatorImpl::_scanOpTimeForCatchUp_inlock() {
+    auto scanner = std::make_shared<FreshnessScanner>();
+    auto scanStartTime = _replExecutor.now();
+    auto evhStatus =
+        scanner->start(&_replExecutor, _rsConfig, _selfIndex, _rsConfig.getCatchUpTimeoutPeriod());
+    if (evhStatus == ErrorCodes::ShutdownInProgress) {
+        _finishCatchUpOplog_inlock(true);
+        return;
+    }
+    fassertStatusOK(40254, evhStatus.getStatus());
+    long long term = _cachedTerm;
+    _replExecutor.onEvent(
+        evhStatus.getValue(), [this, scanner, scanStartTime, term](const CallbackArgs& cbData) {
+            LockGuard lk(_mutex);
+            if (cbData.status == ErrorCodes::CallbackCanceled) {
+                _finishCatchUpOplog_inlock(true);
+                return;
+            }
+            auto totalTimeout = _rsConfig.getCatchUpTimeoutPeriod();
+            auto catchUpTimeout = totalTimeout - (_replExecutor.now() - scanStartTime);
+            _catchUpOplogToLatest_inlock(*scanner, catchUpTimeout, term);
+        });
+}
+
+void ReplicationCoordinatorImpl::_catchUpOplogToLatest_inlock(const FreshnessScanner& scanner,
+                                                              Milliseconds timeout,
+                                                              long long originalTerm) {
+    // On stepping down, the node doesn't update its term immediately due to SERVER-21425.
+    // Term is also checked in case the catchup timeout is so long that the node becomes primary
+    // again.
+    if (!_memberState.primary() || originalTerm != _cachedTerm) {
+        log() << "Stopped transition to primary of term " << originalTerm
+              << " because I've already stepped down.";
+        _finishCatchUpOplog_inlock(false);
+        return;
+    }
+
+    auto result = scanner.getResult();
+
+    // Cannot access any nodes within timeout.
+    if (result.size() == 0) {
+        log() << "Could not access any nodes within timeout when checking for "
+              << "additional ops to apply before finishing transition to primary. "
+              << "Will move forward with becoming primary anyway.";
+        _finishCatchUpOplog_inlock(true);
+        return;
+    }
+
+    // I'm most up-to-date as far as I know.
+    auto freshnessInfo = result.front();
+    if (freshnessInfo.opTime <= _getMyLastAppliedOpTime_inlock()) {
+        log() << "My optime is most up-to-date, skipping catch-up "
+              << "and completing transition to primary.";
+        _finishCatchUpOplog_inlock(true);
+        return;
+    }
+
+    // Wait for the replication level to reach the latest opTime within timeout.
+    auto latestOpTime = freshnessInfo.opTime;
+    auto finishCB = [this, latestOpTime]() {
+        if (latestOpTime > _getMyLastAppliedOpTime_inlock()) {
+            log() << "Cannot catch up oplog after becoming primary.";
+        } else {
+            log() << "Finished catch-up oplog after becoming primary.";
+        }
+
+        _finishCatchUpOplog_inlock(true);
+    };
+    auto waiterInfo = std::make_shared<WaiterInfo>(freshnessInfo.opTime, finishCB);
+
+    _opTimeWaiterList.add_inlock(waiterInfo.get());
+    auto timeoutCB = [this, waiterInfo, finishCB](const CallbackArgs& cbData) {
+        LockGuard lk(_mutex);
+        if (_opTimeWaiterList.remove_inlock(waiterInfo.get())) {
+            finishCB();
+        }
+    };
+    // Schedule the timeout callback. It may signal after we have already caught up.
+    _replExecutor.scheduleWorkAt(_replExecutor.now() + timeout, timeoutCB);
+}
+
+void ReplicationCoordinatorImpl::_finishCatchUpOplog_inlock(bool startToDrain) {
+    _isCatchingUp = false;
+    // If the node steps down during the catch-up, we don't go into drain mode.
+    if (startToDrain) {
+        _isWaitingForDrainToComplete = true;
+        // Signal applier in executor to avoid the deadlock with bgsync's mutex that is required to
+        // cancel fetcher.
+        _replExecutor.scheduleWork(
+            _wrapAsCallbackFn([this]() { _externalState->signalApplierToCancelFetcher(); }));
     }
 }
 
@@ -2687,15 +2826,10 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(const ReplicaSetConfig& n
 }
 
 void ReplicationCoordinatorImpl::_wakeReadyWaiters_inlock() {
-    for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
-         it != _replicationWaiterList.end();
-         ++it) {
-        WaiterInfo* info = *it;
-        if (_doneWaitingForReplication_inlock(
-                *info->opTime, SnapshotName::min(), *info->writeConcern)) {
-            info->condVar->notify_all();
-        }
-    }
+    _replicationWaiterList.signalAndRemoveIf_inlock([this](WaiterInfo* waiter) {
+        return _doneWaitingForReplication_inlock(
+            waiter->opTime, SnapshotName::min(), *waiter->writeConcern);
+    });
 }
 
 Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(
