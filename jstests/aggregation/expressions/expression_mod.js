@@ -13,9 +13,9 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and testExp
     // Confirm different input numeric types are evaluated correctly.
     //
 
-    // Aggregate checking various combinations of number types
-    // The $match portion ensures they are of the correct type as the shell turns
-    // the ints back to doubles at the end so we can not check types with asserts
+    // Aggregate checking various combinations of number types.
+    // The $match portion ensures they are of the correct type as the shell turns the ints back to
+    // doubles at the end so we can not check types with assert.
     coll.save({});
     var result =
         coll.aggregate(
@@ -59,7 +59,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and testExp
               }
             });
 
-    // Correct answers (it is mainly the types that are important here)
+    // Correct answers (it is mainly the types that are important here).
     var expectedResult = [{
         dub_dub: 0.5,
         dub_int: 0.5,
@@ -91,5 +91,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and testExp
     testExpression(coll, {$mod: [10, NaN]}, NaN);
     testExpression(coll, {$mod: [10, Infinity]}, 10);
     testExpression(coll, {$mod: [10, -Infinity]}, 10);
+    testExpression(coll, {$mod: [Infinity, 10]}, NaN);
+    testExpression(coll, {$mod: [-Infinity, 10]}, NaN);
     testExpression(coll, {$mod: [NaN, 10]}, NaN);
 })();
