@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/write_ops/wc_error_detail.h"
+#include "mongo/rpc/write_concern_error_detail.h"
 
 #include "mongo/db/field_parser.h"
 #include "mongo/util/mongoutils/str.h"
@@ -45,11 +45,11 @@ const BSONField<string> errMessage("errmsg");
 
 }  // namespace
 
-WCErrorDetail::WCErrorDetail() {
+WriteConcernErrorDetail::WriteConcernErrorDetail() {
     clear();
 }
 
-bool WCErrorDetail::isValid(string* errMsg) const {
+bool WriteConcernErrorDetail::isValid(string* errMsg) const {
     string dummy;
     if (errMsg == NULL) {
         errMsg = &dummy;
@@ -64,7 +64,7 @@ bool WCErrorDetail::isValid(string* errMsg) const {
     return true;
 }
 
-BSONObj WCErrorDetail::toBSON() const {
+BSONObj WriteConcernErrorDetail::toBSON() const {
     BSONObjBuilder builder;
 
     if (_isErrCodeSet)
@@ -79,7 +79,7 @@ BSONObj WCErrorDetail::toBSON() const {
     return builder.obj();
 }
 
-bool WCErrorDetail::parseBSON(const BSONObj& source, string* errMsg) {
+bool WriteConcernErrorDetail::parseBSON(const BSONObj& source, string* errMsg) {
     clear();
 
     string dummy;
@@ -109,7 +109,7 @@ bool WCErrorDetail::parseBSON(const BSONObj& source, string* errMsg) {
     return true;
 }
 
-void WCErrorDetail::clear() {
+void WriteConcernErrorDetail::clear() {
     _errCode = ErrorCodes::OK;
     _isErrCodeSet = false;
 
@@ -120,7 +120,7 @@ void WCErrorDetail::clear() {
     _isErrMessageSet = false;
 }
 
-void WCErrorDetail::cloneTo(WCErrorDetail* other) const {
+void WriteConcernErrorDetail::cloneTo(WriteConcernErrorDetail* other) const {
     other->clear();
 
     other->_errCode = _errCode;
@@ -133,13 +133,13 @@ void WCErrorDetail::cloneTo(WCErrorDetail* other) const {
     other->_isErrMessageSet = _isErrMessageSet;
 }
 
-string WCErrorDetail::toString() const {
+string WriteConcernErrorDetail::toString() const {
     return str::stream() << (_isErrCodeSet ? ErrorCodes::errorString(_errCode) : "<no code>")
                          << ": " << (_isErrMessageSet ? _errMessage : "")
                          << ". Error details: " << (_isErrInfoSet ? _errInfo.toString() : "<none>");
 }
 
-Status WCErrorDetail::toStatus() const {
+Status WriteConcernErrorDetail::toStatus() const {
     str::stream ss;
     if (_isErrMessageSet) {
         ss << _errMessage << ". ";
@@ -151,40 +151,40 @@ Status WCErrorDetail::toStatus() const {
     return Status((_isErrCodeSet ? _errCode : ErrorCodes::UnknownError), ss);
 }
 
-void WCErrorDetail::setErrCode(ErrorCodes::Error code) {
+void WriteConcernErrorDetail::setErrCode(ErrorCodes::Error code) {
     _errCode = code;
     _isErrCodeSet = true;
 }
 
-ErrorCodes::Error WCErrorDetail::getErrCode() const {
+ErrorCodes::Error WriteConcernErrorDetail::getErrCode() const {
     dassert(_isErrCodeSet);
     return _errCode;
 }
 
-void WCErrorDetail::setErrInfo(const BSONObj& errInfo) {
+void WriteConcernErrorDetail::setErrInfo(const BSONObj& errInfo) {
     _errInfo = errInfo.getOwned();
     _isErrInfoSet = true;
 }
 
-bool WCErrorDetail::isErrInfoSet() const {
+bool WriteConcernErrorDetail::isErrInfoSet() const {
     return _isErrInfoSet;
 }
 
-const BSONObj& WCErrorDetail::getErrInfo() const {
+const BSONObj& WriteConcernErrorDetail::getErrInfo() const {
     dassert(_isErrInfoSet);
     return _errInfo;
 }
 
-void WCErrorDetail::setErrMessage(StringData errMessage) {
+void WriteConcernErrorDetail::setErrMessage(StringData errMessage) {
     _errMessage = errMessage.toString();
     _isErrMessageSet = true;
 }
 
-bool WCErrorDetail::isErrMessageSet() const {
+bool WriteConcernErrorDetail::isErrMessageSet() const {
     return _isErrMessageSet;
 }
 
-const string& WCErrorDetail::getErrMessage() const {
+const string& WriteConcernErrorDetail::getErrMessage() const {
     dassert(_isErrMessageSet);
     return _errMessage;
 }

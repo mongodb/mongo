@@ -50,7 +50,6 @@
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/set_shard_version_request.h"
-#include "mongo/s/write_ops/wc_error_detail.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

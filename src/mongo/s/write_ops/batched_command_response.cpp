@@ -51,7 +51,8 @@ const BSONField<std::vector<BatchedUpsertDetail*>> BatchedCommandResponse::upser
     "upserted");
 const BSONField<OID> BatchedCommandResponse::electionId("electionId");
 const BSONField<std::vector<WriteErrorDetail*>> BatchedCommandResponse::writeErrors("writeErrors");
-const BSONField<WCErrorDetail*> BatchedCommandResponse::writeConcernError("writeConcernError");
+const BSONField<WriteConcernErrorDetail*> BatchedCommandResponse::writeConcernError(
+    "writeConcernError");
 
 BatchedCommandResponse::BatchedCommandResponse() {
     clear();
@@ -222,7 +223,7 @@ bool BatchedCommandResponse::parseBSON(const BSONObj& source, string* errMsg) {
         return false;
     _writeErrorDetails.reset(tempErrDetails);
 
-    WCErrorDetail* wcError = NULL;
+    WriteConcernErrorDetail* wcError = NULL;
     fieldState = FieldParser::extract(source, writeConcernError, &wcError, errMsg);
     if (fieldState == FieldParser::FIELD_INVALID)
         return false;
@@ -327,7 +328,7 @@ void BatchedCommandResponse::cloneTo(BatchedCommandResponse* other) const {
     }
 
     if (_wcErrDetails.get()) {
-        other->_wcErrDetails.reset(new WCErrorDetail());
+        other->_wcErrDetails.reset(new WriteConcernErrorDetail());
         _wcErrDetails->cloneTo(other->_wcErrDetails.get());
     }
 }
@@ -558,7 +559,7 @@ const WriteErrorDetail* BatchedCommandResponse::getErrDetailsAt(size_t pos) cons
     return _writeErrorDetails->at(pos);
 }
 
-void BatchedCommandResponse::setWriteConcernError(WCErrorDetail* error) {
+void BatchedCommandResponse::setWriteConcernError(WriteConcernErrorDetail* error) {
     _wcErrDetails.reset(error);
 }
 
@@ -570,7 +571,7 @@ bool BatchedCommandResponse::isWriteConcernErrorSet() const {
     return _wcErrDetails.get();
 }
 
-const WCErrorDetail* BatchedCommandResponse::getWriteConcernError() const {
+const WriteConcernErrorDetail* BatchedCommandResponse::getWriteConcernError() const {
     return _wcErrDetails.get();
 }
 
@@ -586,7 +587,7 @@ Status BatchedCommandResponse::toStatus() const {
     }
 
     if (isWriteConcernErrorSet()) {
-        const WCErrorDetail* errDetail = getWriteConcernError();
+        const WriteConcernErrorDetail* errDetail = getWriteConcernError();
 
         return Status(ErrorCodes::fromInt(errDetail->getErrCode()), errDetail->getErrMessage());
     }

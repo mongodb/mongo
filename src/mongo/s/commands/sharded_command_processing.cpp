@@ -30,14 +30,14 @@
 
 #include "mongo/s/commands/sharded_command_processing.h"
 
-#include "mongo/s/write_ops/wc_error_detail.h"
+#include "mongo/rpc/write_concern_error_detail.h"
 
 namespace mongo {
 
 void appendWriteConcernErrorToCmdResponse(const std::string& shardID,
                                           const BSONElement& wcErrorElem,
                                           BSONObjBuilder& responseBuilder) {
-    WCErrorDetail wcError;
+    WriteConcernErrorDetail wcError;
     std::string errMsg;
     auto wcErrorObj = wcErrorElem.Obj();
     if (!wcError.parseBSON(wcErrorObj, &errMsg)) {

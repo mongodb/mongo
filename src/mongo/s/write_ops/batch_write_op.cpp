@@ -745,7 +745,7 @@ void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
     bool reportWCError = errOps.empty() ||
         (!_clientRequest->getOrdered() && errOps.size() < _clientRequest->sizeWriteOps());
     if (!_wcErrors.empty() && reportWCError) {
-        WCErrorDetail* error = new WCErrorDetail;
+        WriteConcernErrorDetail* error = new WriteConcernErrorDetail;
 
         // Generate the multi-error message below
         stringstream msg;

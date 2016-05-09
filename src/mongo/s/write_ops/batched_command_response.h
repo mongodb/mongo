@@ -34,10 +34,10 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/bson_serializable.h"
 #include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/s/write_ops/batched_upsert_detail.h"
-#include "mongo/s/write_ops/wc_error_detail.h"
 
 namespace mongo {
 
@@ -61,7 +61,7 @@ public:
     static const BSONField<std::vector<BatchedUpsertDetail*>> upsertDetails;
     static const BSONField<OID> electionId;
     static const BSONField<std::vector<WriteErrorDetail*>> writeErrors;
-    static const BSONField<WCErrorDetail*> writeConcernError;
+    static const BSONField<WriteConcernErrorDetail*> writeConcernError;
 
     //
     // construction / destruction
@@ -136,10 +136,10 @@ public:
     const std::vector<WriteErrorDetail*>& getErrDetails() const;
     const WriteErrorDetail* getErrDetailsAt(std::size_t pos) const;
 
-    void setWriteConcernError(WCErrorDetail* error);
+    void setWriteConcernError(WriteConcernErrorDetail* error);
     void unsetWriteConcernError();
     bool isWriteConcernErrorSet() const;
-    const WCErrorDetail* getWriteConcernError() const;
+    const WriteConcernErrorDetail* getWriteConcernError() const;
 
     /**
      * Converts the specified command response into a status, based on its contents.
@@ -196,7 +196,7 @@ private:
     std::unique_ptr<std::vector<WriteErrorDetail*>> _writeErrorDetails;
 
     // (O)  errors that occurred while trying to satisfy the write concern.
-    std::unique_ptr<WCErrorDetail> _wcErrDetails;
+    std::unique_ptr<WriteConcernErrorDetail> _wcErrDetails;
 };
 
 }  // namespace mongo

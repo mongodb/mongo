@@ -52,7 +52,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/sharding_raii.h"
-#include "mongo/s/write_ops/wc_error_detail.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/util/log.h"
 

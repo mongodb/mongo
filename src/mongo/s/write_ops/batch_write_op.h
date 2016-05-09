@@ -35,10 +35,10 @@
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/base/status.h"
 #include "mongo/platform/unordered_map.h"
+#include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/ns_targeter.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/s/write_ops/wc_error_detail.h"
 #include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/s/write_ops/write_op.h"
 
@@ -257,12 +257,13 @@ struct ShardError {
  * Certain types of errors are not stored in WriteOps or must be returned to a caller.
  */
 struct ShardWCError {
-    ShardWCError(const ShardEndpoint& endpoint, const WCErrorDetail& error) : endpoint(endpoint) {
+    ShardWCError(const ShardEndpoint& endpoint, const WriteConcernErrorDetail& error)
+        : endpoint(endpoint) {
         error.cloneTo(&this->error);
     }
 
     const ShardEndpoint endpoint;
-    WCErrorDetail error;
+    WriteConcernErrorDetail error;
 };
 
 /**

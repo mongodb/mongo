@@ -123,7 +123,7 @@ void addError(int code, const string& message, int index, BatchedCommandResponse
 }
 
 void addWCError(BatchedCommandResponse* response) {
-    unique_ptr<WCErrorDetail> error(new WCErrorDetail);
+    unique_ptr<WriteConcernErrorDetail> error(new WriteConcernErrorDetail);
     error->setErrCode(ErrorCodes::WriteConcernFailed);
     error->setErrMessage("mock wc error");
 

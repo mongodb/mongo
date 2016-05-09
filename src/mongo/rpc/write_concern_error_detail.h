@@ -40,14 +40,14 @@ namespace mongo {
  * This class represents the layout and content of the error that occurs while trying
  * to satisfy the write concern after executing runCommand.
  */
-class WCErrorDetail {
-    MONGO_DISALLOW_COPYING(WCErrorDetail);
+class WriteConcernErrorDetail {
+    MONGO_DISALLOW_COPYING(WriteConcernErrorDetail);
 
 public:
-    WCErrorDetail();
+    WriteConcernErrorDetail();
 
     /** Copies all the fields present in 'this' to 'other'. */
-    void cloneTo(WCErrorDetail* other) const;
+    void cloneTo(WriteConcernErrorDetail* other) const;
 
     //
     // bson serializable interface implementation

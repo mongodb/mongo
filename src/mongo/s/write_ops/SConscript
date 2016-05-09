@@ -13,14 +13,13 @@ env.Library(
         'batched_update_request.cpp',
         'batched_update_document.cpp',
         'batched_upsert_detail.cpp',
-        'wc_error_detail.cpp',
         'write_error_detail.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/repl/optime',
-        '$BUILD_DIR/mongo/s/chunk_version',
+        '$BUILD_DIR/mongo/s/common',
     ],
 )
 

@@ -8,10 +8,12 @@ env.Library(
     ],
     source=[
         'get_status_from_command_result.cpp',
+        'write_concern_error_detail.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/util/foundation'
     ],
 )

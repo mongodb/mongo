@@ -48,8 +48,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/rpc/metadata.h"
+#include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/stale_exception.h"
-#include "mongo/s/write_ops/wc_error_detail.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -190,7 +190,7 @@ void Command::appendCommandWCStatus(BSONObjBuilder& result,
                                     const Status& awaitReplicationStatus,
                                     const WriteConcernResult& wcResult) {
     if (!awaitReplicationStatus.isOK() && !result.hasField("writeConcernError")) {
-        WCErrorDetail wcError;
+        WriteConcernErrorDetail wcError;
         wcError.setErrCode(awaitReplicationStatus.code());
         wcError.setErrMessage(awaitReplicationStatus.reason());
         if (wcResult.wTimedOut) {

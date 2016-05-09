@@ -42,7 +42,6 @@
 #include "mongo/s/commands/sharded_command_processing.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_raii.h"
-#include "mongo/s/write_ops/wc_error_detail.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

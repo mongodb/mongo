@@ -268,7 +268,7 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterWriteConcernFailureMatch) {
         response.setOk(true);
         response.setN(1);
 
-        auto wcError = stdx::make_unique<WCErrorDetail>();
+        auto wcError = stdx::make_unique<WriteConcernErrorDetail>();
 
         WriteConcernResult wcRes;
         wcRes.err = "timeout";
@@ -372,7 +372,7 @@ TEST_F(UpdateRetryTest, WriteConcernFailure) {
         response.setOk(true);
         response.setNModified(1);
 
-        auto wcError = stdx::make_unique<WCErrorDetail>();
+        auto wcError = stdx::make_unique<WriteConcernErrorDetail>();
 
         WriteConcernResult wcRes;
         wcRes.err = "timeout";

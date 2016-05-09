@@ -33,7 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/s/write_ops/wc_error_detail.h"
+#include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -91,7 +91,7 @@ Status getWriteConcernStatusFromCommandResult(const BSONObj& obj) {
 
     BSONObj wcErrObj(wcErrorElem.Obj());
 
-    WCErrorDetail wcError;
+    WriteConcernErrorDetail wcError;
     std::string wcErrorParseMsg;
     if (!wcError.parseBSON(wcErrObj, &wcErrorParseMsg)) {
         return Status(ErrorCodes::UnsupportedFormat,

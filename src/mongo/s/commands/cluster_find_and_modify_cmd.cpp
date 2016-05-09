@@ -48,7 +48,6 @@
 #include "mongo/s/sharding_raii.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/commands/strategy.h"
-#include "mongo/s/write_ops/wc_error_detail.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {

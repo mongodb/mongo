@@ -41,12 +41,12 @@
 #include "mongo/config.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/sharded_command_processing.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/write_ops/wc_error_detail.h"
 
 namespace mongo {
 
@@ -935,7 +935,7 @@ public:
                 // If the status is a write concern error, append a writeConcernError instead of
                 // and error message.
                 if (ErrorCodes::isWriteConcernError(status.code())) {
-                    WCErrorDetail wcError;
+                    WriteConcernErrorDetail wcError;
                     wcError.setErrMessage(status.reason());
                     wcError.setErrCode(status.code());
                     result.append("writeConcernError", wcError.toBSON());
