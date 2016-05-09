@@ -69,12 +69,12 @@ load('./jstests/libs/chunk_manipulation_util.js');
     //      coll1:     [10, 20)
     //      coll2:     [10, 20)
 
-    assert.commandWorked(
-        admin.runCommand({moveChunk: ns1, find: {a: 10}, to: st.shard2.shardName}));
-    assert.commandWorked(
-        admin.runCommand({moveChunk: ns2, find: {a: 10}, to: st.shard2.shardName}));
-    assert.commandWorked(
-        admin.runCommand({moveChunk: ns1, find: {a: 20}, to: st.shard1.shardName}));
+    assert.commandWorked(admin.runCommand(
+        {moveChunk: ns1, find: {a: 10}, to: st.shard2.shardName, _waitForDelete: true}));
+    assert.commandWorked(admin.runCommand(
+        {moveChunk: ns2, find: {a: 10}, to: st.shard2.shardName, _waitForDelete: true}));
+    assert.commandWorked(admin.runCommand(
+        {moveChunk: ns1, find: {a: 20}, to: st.shard1.shardName, _waitForDelete: true}));
     assert.eq(1, shard0Coll1.count());
     assert.eq(1, shard0Coll2.count());
     assert.eq(1, shard1Coll1.count());
@@ -119,13 +119,14 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert.eq(2, shard1Coll1.count());
 
     // Reset setup
-    assert.commandWorked(admin.runCommand({moveChunk: ns1, find: {a: 0}, to: st.shard0.shardName}));
-    assert.commandWorked(
-        admin.runCommand({moveChunk: ns1, find: {a: 20}, to: st.shard0.shardName}));
-    assert.commandWorked(
-        admin.runCommand({moveChunk: ns1, find: {a: 10}, to: st.shard0.shardName}));
-    assert.commandWorked(
-        admin.runCommand({moveChunk: ns2, find: {a: 10}, to: st.shard0.shardName}));
+    assert.commandWorked(admin.runCommand(
+        {moveChunk: ns1, find: {a: 0}, to: st.shard0.shardName, _waitForDelete: true}));
+    assert.commandWorked(admin.runCommand(
+        {moveChunk: ns1, find: {a: 20}, to: st.shard0.shardName, _waitForDelete: true}));
+    assert.commandWorked(admin.runCommand(
+        {moveChunk: ns1, find: {a: 10}, to: st.shard0.shardName, _waitForDelete: true}));
+    assert.commandWorked(admin.runCommand(
+        {moveChunk: ns2, find: {a: 10}, to: st.shard0.shardName, _waitForDelete: true}));
     assert.eq(3, shard0Coll1.count());
     assert.eq(2, shard0Coll2.count());
     assert.eq(0, shard1Coll1.count());
@@ -168,7 +169,8 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert.eq(1, shard1Coll1.count());
 
     // Reset setup
-    assert.commandWorked(admin.runCommand({moveChunk: ns1, find: {a: 0}, to: st.shard0.shardName}));
+    assert.commandWorked(admin.runCommand(
+        {moveChunk: ns1, find: {a: 0}, to: st.shard0.shardName, _waitForDelete: true}));
     assert.eq(3, shard0Coll1.count());
     assert.eq(2, shard0Coll2.count());
     assert.eq(0, shard1Coll1.count());
@@ -235,7 +237,8 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert.eq(1, shard2Coll2.count(), "shard2 failed to complete migration");
 
     // Reset setup
-    assert.commandWorked(admin.runCommand({moveChunk: ns2, find: {a: 0}, to: st.shard0.shardName}));
+    assert.commandWorked(admin.runCommand(
+        {moveChunk: ns2, find: {a: 0}, to: st.shard0.shardName, _waitForDelete: true}));
     assert.eq(3, shard0Coll1.count());
     assert.eq(2, shard0Coll2.count());
     assert.eq(0, shard1Coll1.count());
