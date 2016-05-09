@@ -30,7 +30,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/owned_pointer_vector.h"
-#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/client.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/commands.h"
@@ -44,6 +43,7 @@
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/commands/cluster_explain.h"
+#include "mongo/s/dbclient_shard_resolver.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batch_upconvert.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -259,6 +259,7 @@ private:
                 return status;
         }
 
+        DBClientShardResolver resolver;
         DBClientMultiCommand dispatcher;
 
         // Assemble requests
@@ -266,18 +267,11 @@ private:
              ++it) {
             const ShardEndpoint* endpoint = *it;
 
-            const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
-            auto shard = grid.shardRegistry()->getShard(txn, endpoint->shardName);
-            if (!shard) {
-                return Status(ErrorCodes::ShardNotFound,
-                              "Could not find shard with id " + endpoint->shardName);
-            }
-            auto swHostAndPort = shard->getTargeter()->findHost(readPref);
-            if (!swHostAndPort.isOK()) {
-                return swHostAndPort.getStatus();
-            }
+            ConnectionString host;
+            Status status = resolver.chooseWriteHost(txn, endpoint->shardName, &host);
+            if (!status.isOK())
+                return status;
 
-            ConnectionString host(swHostAndPort.getValue());
             dispatcher.addCommand(host, dbName, command);
         }
 

@@ -34,10 +34,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/s/client/dbclient_multi_command.h"
-#include "mongo/client/remote_command_targeter.h"
-#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_last_error_info.h"
-#include "mongo/s/grid.h"
+#include "mongo/s/dbclient_shard_resolver.h"
 #include "mongo/s/write_ops/batch_downconvert.h"
 
 namespace mongo {
@@ -110,18 +108,11 @@ public:
             const ConnectionString& shardEndpoint = it->first;
             const HostOpTime& hot = it->second;
 
-            const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
-            auto shard = grid.shardRegistry()->getShard(txn, shardEndpoint.toString());
-            if (!shard) {
-                result.append("errmsg", "Could not find shard with id " + shardEndpoint.toString());
-                return false;
-            }
-            auto swHostAndPort = shard->getTargeter()->findHost(readPref);
-            if (!swHostAndPort.isOK()) {
+            ConnectionString resolvedHost;
+            status = DBClientShardResolver::findMaster(shardEndpoint, &resolvedHost);
+            if (!status.isOK()) {
                 break;
             }
-
-            ConnectionString resolvedHost(swHostAndPort.getValue());
 
             resolvedHostOpTimes[resolvedHost] = hot;
         }

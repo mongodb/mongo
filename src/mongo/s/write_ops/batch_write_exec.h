@@ -36,6 +36,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/s/ns_targeter.h"
+#include "mongo/s/shard_resolver.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 
@@ -64,7 +65,7 @@ class BatchWriteExec {
     MONGO_DISALLOW_COPYING(BatchWriteExec);
 
 public:
-    BatchWriteExec(NSTargeter* targeter, MultiCommandDispatch* dispatcher);
+    BatchWriteExec(NSTargeter* targeter, ShardResolver* resolver, MultiCommandDispatch* dispatcher);
 
     /**
      * Executes a client batch write request by sending child batches to several shard
@@ -80,6 +81,9 @@ public:
 private:
     // Not owned here
     NSTargeter* _targeter;
+
+    // Not owned here
+    ShardResolver* _resolver;
 
     // Not owned here
     MultiCommandDispatch* _dispatcher;

@@ -34,8 +34,6 @@ env.Library(
     LIBDEPS=[
         'batch_write_types',
         '$BUILD_DIR/mongo/client/connection_string',
-        '$BUILD_DIR/mongo/s/client/sharding_client',
-        '$BUILD_DIR/mongo/s/coreshard',
     ],
 )
 
@@ -77,7 +75,6 @@ env.CppUnitTest(
         'cluster_write_op',
         '$BUILD_DIR/mongo/db/range_arithmetic',
         '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/s/sharding_test_fixture',
     ]
 )
 
@@ -90,7 +87,5 @@ env.CppUnitTest(
     LIBDEPS=[
         'cluster_write_op',
         'cluster_write_op_conversion',
-        '$BUILD_DIR/mongo/s/sharding_test_fixture',
-        '$BUILD_DIR/mongo/s/mongoscore',
-    ],
+    ]
 )

@@ -126,6 +126,7 @@ env.Library(
     source=[
         'chunk_manager_targeter.cpp',
         'cluster_write.cpp',
+        'dbclient_shard_resolver.cpp',
     ],
     LIBDEPS=[
         'client/sharding_client',
