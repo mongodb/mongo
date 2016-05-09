@@ -76,6 +76,16 @@ TEST(CollatorInterfaceMockSelfTest, PointersToMocksOfDifferentTypesDoNotMatch) {
     ASSERT(!CollatorInterface::collatorsMatch(&reverseMock, &alwaysEqualMock));
 }
 
+TEST(CollatorInterfaceMockSelfTest, ClonedMockMatchesOriginal) {
+    CollatorInterfaceMock reverseMock(CollatorInterfaceMock::MockType::kReverseString);
+    auto reverseClone = reverseMock.clone();
+    ASSERT(CollatorInterface::collatorsMatch(reverseClone.get(), &reverseMock));
+
+    CollatorInterfaceMock alwaysEqualMock(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    auto alwaysEqualClone = alwaysEqualMock.clone();
+    ASSERT(CollatorInterface::collatorsMatch(alwaysEqualClone.get(), &alwaysEqualMock));
+}
+
 TEST(CollatorInterfaceMockSelfTest, ReverseMockComparesInReverse) {
     CollatorInterfaceMock reverseMock(CollatorInterfaceMock::MockType::kReverseString);
     ASSERT_EQ(reverseMock.compare("abc", "abc"), 0);

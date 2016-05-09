@@ -33,6 +33,7 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/query/parsed_projection.h"
 
@@ -111,6 +112,9 @@ public:
     const ParsedProjection* getProj() const {
         return _proj.get();
     }
+    const CollatorInterface* getCollator() const {
+        return _collator.get();
+    }
 
     // Debugging
     std::string toString() const;
@@ -168,12 +172,10 @@ private:
     // You must go through canonicalize to create a CanonicalQuery.
     CanonicalQuery() {}
 
-    /**
-     * Takes ownership of 'root' and 'lpq'.
-     */
     Status init(std::unique_ptr<LiteParsedQuery> lpq,
                 const ExtensionsCallback& extensionsCallback,
-                MatchExpression* root);
+                MatchExpression* root,
+                std::unique_ptr<CollatorInterface> collator);
 
     std::unique_ptr<LiteParsedQuery> _pq;
 
@@ -181,6 +183,8 @@ private:
     std::unique_ptr<MatchExpression> _root;
 
     std::unique_ptr<ParsedProjection> _proj;
+
+    std::unique_ptr<CollatorInterface> _collator;
 
     bool _hasNoopExtensions = false;
 

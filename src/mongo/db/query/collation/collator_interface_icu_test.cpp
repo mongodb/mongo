@@ -98,6 +98,20 @@ void assertNotEqualEnUS(StringData left, StringData right) {
     assertEnUSComparison(right, left, ExpectedComparison::NOT_EQUAL);
 }
 
+TEST(CollatorInterfaceICUTest, ClonedCollatorMatchesOriginal) {
+    CollationSpec collationSpec;
+    collationSpec.localeID = "en_US";
+
+    UErrorCode status = U_ZERO_ERROR;
+    std::unique_ptr<icu::Collator> coll(
+        icu::Collator::createInstance(icu::Locale("en", "US"), status));
+    ASSERT(U_SUCCESS(status));
+
+    CollatorInterfaceICU icuCollator(collationSpec, std::move(coll));
+    auto clone = icuCollator.clone();
+    ASSERT_TRUE(*clone == icuCollator);
+}
+
 TEST(CollatorInterfaceICUTest, ASCIIComparisonWorksForUSEnglishCollation) {
     CollationSpec collationSpec;
     collationSpec.localeID = "en_US";

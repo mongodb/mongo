@@ -34,6 +34,8 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/util/log.h"
 
@@ -118,10 +120,19 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
         return lpqStatus;
     }
 
+    std::unique_ptr<CollatorInterface> collator;
+    if (!lpq->getCollation().isEmpty()) {
+        auto statusWithCollator = CollatorFactoryInterface::get(txn->getServiceContext())
+                                      ->makeFromBSON(lpq->getCollation());
+        if (!statusWithCollator.isOK()) {
+            return statusWithCollator.getStatus();
+        }
+        collator = std::move(statusWithCollator.getValue());
+    }
+
     // Make MatchExpression.
-    // TODO SERVER-23610: pass our CollatorInterface* instead of nullptr.
     StatusWithMatchExpression statusWithMatcher =
-        MatchExpressionParser::parse(lpq->getFilter(), extensionsCallback, nullptr);
+        MatchExpressionParser::parse(lpq->getFilter(), extensionsCallback, collator.get());
     if (!statusWithMatcher.isOK()) {
         return statusWithMatcher.getStatus();
     }
@@ -130,7 +141,8 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     // Make the CQ we'll hopefully return.
     std::unique_ptr<CanonicalQuery> cq(new CanonicalQuery());
 
-    Status initStatus = cq->init(std::move(lpq), extensionsCallback, me.release());
+    Status initStatus =
+        cq->init(std::move(lpq), extensionsCallback, me.release(), std::move(collator));
 
     if (!initStatus.isOK()) {
         return initStatus;
@@ -150,16 +162,22 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     lpq->setFilter(baseQuery.getParsed().getFilter());
     lpq->setProj(baseQuery.getParsed().getProj());
     lpq->setSort(baseQuery.getParsed().getSort());
+    lpq->setCollation(baseQuery.getParsed().getCollation());
     lpq->setExplain(baseQuery.getParsed().isExplain());
     auto lpqStatus = lpq->validate();
     if (!lpqStatus.isOK()) {
         return lpqStatus;
     }
 
+    std::unique_ptr<CollatorInterface> collator;
+    if (baseQuery.getCollator()) {
+        collator = baseQuery.getCollator()->clone();
+    }
+
     // Make the CQ we'll hopefully return.
     std::unique_ptr<CanonicalQuery> cq(new CanonicalQuery());
-    Status initStatus =
-        cq->init(std::move(lpq), extensionsCallback, root->shallowClone().release());
+    Status initStatus = cq->init(
+        std::move(lpq), extensionsCallback, root->shallowClone().release(), std::move(collator));
 
     if (!initStatus.isOK()) {
         return initStatus;
@@ -169,8 +187,10 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 
 Status CanonicalQuery::init(std::unique_ptr<LiteParsedQuery> lpq,
                             const ExtensionsCallback& extensionsCallback,
-                            MatchExpression* root) {
-    _pq.reset(lpq.release());
+                            MatchExpression* root,
+                            std::unique_ptr<CollatorInterface> collator) {
+    _pq = std::move(lpq);
+    _collator = std::move(collator);
 
     _hasNoopExtensions = extensionsCallback.hasNoopExtensions();
     _isIsolated = LiteParsedQuery::isQueryIsolated(_pq->getFilter());

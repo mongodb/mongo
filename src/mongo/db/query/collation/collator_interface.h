@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
@@ -89,6 +90,8 @@ public:
     CollatorInterface(CollationSpec spec) : _spec(std::move(spec)) {}
 
     virtual ~CollatorInterface() {}
+
+    virtual std::unique_ptr<CollatorInterface> clone() const = 0;
 
     /**
      * Returns a number < 0 if 'left' is less than 'right' with respect to the collation, a number >

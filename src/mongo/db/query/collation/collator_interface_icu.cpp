@@ -32,6 +32,7 @@
 
 #include <unicode/sortkey.h>
 
+#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -39,6 +40,12 @@ namespace mongo {
 CollatorInterfaceICU::CollatorInterfaceICU(CollationSpec spec,
                                            std::unique_ptr<icu::Collator> collator)
     : CollatorInterface(std::move(spec)), _collator(std::move(collator)) {}
+
+std::unique_ptr<CollatorInterface> CollatorInterfaceICU::clone() const {
+    auto clone = stdx::make_unique<CollatorInterfaceICU>(
+        getSpec(), std::unique_ptr<icu::Collator>(_collator->clone()));
+    return {std::move(clone)};
+}
 
 int CollatorInterfaceICU::compare(StringData left, StringData right) const {
     UErrorCode status = U_ZERO_ERROR;

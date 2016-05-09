@@ -578,5 +578,61 @@ TEST(CanonicalQueryTest, CanonicalizeFromBaseQuery) {
     ASSERT_TRUE(childCq->getParsed().isExplain());
 }
 
+TEST(CanonicalQueryTest, CanonicalQueryFromLPQWithNoCollation) {
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
+
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    auto cq = assertGet(CanonicalQuery::canonicalize(
+        txn.get(), std::move(lpq), ExtensionsCallbackDisallowExtensions()));
+    ASSERT_TRUE(cq->getCollator() == nullptr);
+}
+
+TEST(CanonicalQueryTest, CanonicalQueryFromLPQWithCollation) {
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
+
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    lpq->setCollation(BSON("locale"
+                           << "reverse"));
+    auto cq = assertGet(CanonicalQuery::canonicalize(
+        txn.get(), std::move(lpq), ExtensionsCallbackDisallowExtensions()));
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    ASSERT_TRUE(CollatorInterface::collatorsMatch(cq->getCollator(), &collator));
+}
+
+TEST(CanonicalQueryTest, CanonicalQueryFromBaseQueryWithNoCollation) {
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
+
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    lpq->setFilter(fromjson("{$or:[{a:1,b:1},{a:1,c:1}]}"));
+    auto baseCq = assertGet(CanonicalQuery::canonicalize(
+        txn.get(), std::move(lpq), ExtensionsCallbackDisallowExtensions()));
+    MatchExpression* firstClauseExpr = baseCq->root()->getChild(0);
+    auto childCq = assertGet(CanonicalQuery::canonicalize(
+        txn.get(), *baseCq, firstClauseExpr, ExtensionsCallbackDisallowExtensions()));
+    ASSERT_TRUE(baseCq->getCollator() == nullptr);
+    ASSERT_TRUE(childCq->getCollator() == nullptr);
+}
+
+TEST(CanonicalQueryTest, CanonicalQueryFromBaseQueryWithCollation) {
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
+
+    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+    lpq->setFilter(fromjson("{$or:[{a:1,b:1},{a:1,c:1}]}"));
+    lpq->setCollation(BSON("locale"
+                           << "reverse"));
+    auto baseCq = assertGet(CanonicalQuery::canonicalize(
+        txn.get(), std::move(lpq), ExtensionsCallbackDisallowExtensions()));
+    MatchExpression* firstClauseExpr = baseCq->root()->getChild(0);
+    auto childCq = assertGet(CanonicalQuery::canonicalize(
+        txn.get(), *baseCq, firstClauseExpr, ExtensionsCallbackDisallowExtensions()));
+    ASSERT(baseCq->getCollator());
+    ASSERT(childCq->getCollator());
+    ASSERT_TRUE(*(childCq->getCollator()) == *(baseCq->getCollator()));
+}
+
 }  // namespace
 }  // namespace mongo

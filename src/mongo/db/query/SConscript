@@ -35,7 +35,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/matcher/expressions",
         "$BUILD_DIR/mongo/db/server_parameters",
         "collation/collation_serializer",
-        "collation/collator_interface",
+        "collation/collator_factory_interface",
         "command_request_response",
         "index_bounds",
     ],
@@ -44,7 +44,6 @@ env.Library(
 env.Library(
     target='query',
     source=[
-        "collation/collator_factory_mock_decoration.cpp",
         "explain.cpp",
         "get_executor.cpp",
         "find.cpp",
@@ -55,7 +54,6 @@ env.Library(
         "stage_builder.cpp",
     ],
     LIBDEPS=[
-        "collation/collator_factory_mock",
         "internal_plans",
         "query_common",
         "query_planner",
@@ -75,12 +73,14 @@ env.Library(
 env.Library(
     target="query_common",
     source=[
+        "collation/collator_factory_mock_decoration.cpp",
         "find_common.cpp",
         "explain_common.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/util/fail_point",
+        "collation/collator_factory_mock",
         "lite_parsed_query",
     ],
 )
@@ -117,7 +117,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/mongohasher",
         "$BUILD_DIR/mongo/db/server_parameters",
         "collation/collation_index_key",
-        "collation/collator_interface",
     ],
 )
 

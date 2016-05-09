@@ -57,6 +57,8 @@ public:
      */
     CollatorInterfaceMock(MockType mockType);
 
+    std::unique_ptr<CollatorInterface> clone() const final;
+
     int compare(StringData left, StringData right) const final;
 
     ComparisonKey getComparisonKey(StringData stringData) const final;

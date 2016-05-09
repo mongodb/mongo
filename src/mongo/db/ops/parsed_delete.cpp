@@ -80,6 +80,7 @@ Status ParsedDelete::parseQueryToCQ() {
     auto lpq = stdx::make_unique<LiteParsedQuery>(_request->getNamespaceString());
     lpq->setFilter(_request->getQuery());
     lpq->setSort(_request->getSort());
+    lpq->setCollation(_request->getCollation());
     lpq->setExplain(_request->isExplain());
 
     // Limit should only used for the findAndModify command when a sort is specified. If a sort
@@ -88,7 +89,6 @@ Status ParsedDelete::parseQueryToCQ() {
     // deleted out from under it, but a limit could inhibit that and give an EOF when the delete
     // has not actually deleted a document. This behavior is fine for findAndModify, but should
     // not apply to deletes in general.
-    // TODO SERVER-23473: Pass the collation to canonicalize().
     if (!_request->isMulti() && !_request->getSort().isEmpty()) {
         lpq->setLimit(1);
     }
