@@ -464,6 +464,7 @@ env.Library(
         'service_context_noop.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/util/clock_sources',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         '$BUILD_DIR/mongo/util/decorable',
         '$BUILD_DIR/mongo/util/net/hostandport',

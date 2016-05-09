@@ -343,7 +343,7 @@ public:
     void setPreciseClockSource(std::unique_ptr<ClockSource> newSource);
 
 protected:
-    ServiceContext() = default;
+    ServiceContext();
 
     /**
      * Mutex used to synchronize access to mutable state of this ServiceContext instance,

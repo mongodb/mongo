@@ -36,6 +36,8 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/system_clock_source.h"
+#include "mongo/util/system_tick_source.h"
 
 namespace mongo {
 
@@ -111,6 +113,11 @@ Status validateStorageOptions(
     }
     return Status::OK();
 }
+
+ServiceContext::ServiceContext()
+    : _tickSource(stdx::make_unique<SystemTickSource>()),
+      _fastClockSource(stdx::make_unique<SystemClockSource>()),
+      _preciseClockSource(stdx::make_unique<SystemClockSource>()) {}
 
 ServiceContext::~ServiceContext() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
