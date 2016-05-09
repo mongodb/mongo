@@ -547,7 +547,7 @@ static void serviceStop() {
     const auto timeout = Milliseconds(kStopWaitHintMillis / 2);
 
     // We periodically check if we are done exiting by polling at half of each wait interval
-    while (exitedCleanly.wait_for(timeout) != stdx::future_status::ready) {
+    while (exitedCleanly.wait_for(timeout.toSystemDuration()) != stdx::future_status::ready) {
         reportStatus(SERVICE_STOP_PENDING, kStopWaitHintMillis);
         log() << "Service Stop is waiting for storage engine to finish shutdown";
     }

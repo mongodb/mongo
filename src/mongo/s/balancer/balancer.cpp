@@ -179,7 +179,8 @@ Status executeSingleMigration(OperationContext* txn,
         secondaryThrottle,
         waitForDelete);
     builder.append(LiteParsedQuery::cmdOptionMaxTimeMS,
-                   durationCount<Milliseconds>(Microseconds(txn->getRemainingMaxTimeMicros())));
+                   durationCount<Milliseconds>(
+                       Microseconds(static_cast<int64_t>(txn->getRemainingMaxTimeMicros()))));
 
     BSONObj cmdObj = builder.obj();
 

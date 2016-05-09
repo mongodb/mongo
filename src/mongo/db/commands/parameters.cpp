@@ -42,6 +42,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/logger/logger.h"
 #include "mongo/logger/parse_log_component_settings.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_manager.h"

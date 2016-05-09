@@ -32,6 +32,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/string_map.h"
 

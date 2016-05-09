@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"

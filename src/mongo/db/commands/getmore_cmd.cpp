@@ -357,7 +357,7 @@ public:
                 ctx.reset();
 
                 // Block waiting for data.
-                Microseconds timeout(curOp->getRemainingMaxTimeMicros());
+                Microseconds timeout(static_cast<int64_t>(curOp->getRemainingMaxTimeMicros()));
                 notifier->wait(notifierVersion, timeout);
                 notifier.reset();
 

@@ -53,8 +53,10 @@ Milliseconds calculateAwaitDataTimeout(const ReplicaSetConfig& config) {
     // Under protocol version 1, make the awaitData timeout (maxTimeMS) dependent on the election
     // timeout. This enables the sync source to communicate liveness of the primary to secondaries.
     // Under protocol version 0, use a default timeout of 2 seconds for awaitData.
-    return config.getProtocolVersion() == 1LL ? config.getElectionTimeoutPeriod() / 2
-                                              : OplogFetcher::kDefaultProtocolZeroAwaitDataTimeout;
+    if (config.getProtocolVersion() == 1LL) {
+        return config.getElectionTimeoutPeriod() / 2;
+    }
+    return OplogFetcher::kDefaultProtocolZeroAwaitDataTimeout;
 }
 
 /**

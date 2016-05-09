@@ -164,7 +164,7 @@ void ReplSetDistLockManager::doTask() {
         }
 
         stdx::unique_lock<stdx::mutex> lk(_mutex);
-        _shutDownCV.wait_for(lk, _pingInterval);
+        _shutDownCV.wait_for(lk, _pingInterval.toSystemDuration());
     }
 }
 

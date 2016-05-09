@@ -37,6 +37,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/map_util.h"

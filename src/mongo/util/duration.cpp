@@ -34,7 +34,6 @@
 #include "mongo/bson/util/builder.h"
 
 namespace mongo {
-namespace x {
 namespace {
 template <typename Stream>
 Stream& streamPut(Stream& os, Nanoseconds ns) {
@@ -142,5 +141,4 @@ template StringBuilderImpl<TrivialAllocator>& operator<<(StringBuilderImpl<Trivi
                                                          Minutes);
 template StringBuilderImpl<TrivialAllocator>& operator<<(StringBuilderImpl<TrivialAllocator>&,
                                                          Hours);
-}  // namespace x
 }  // namespace mongo

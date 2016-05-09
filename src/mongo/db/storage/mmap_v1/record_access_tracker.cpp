@@ -231,7 +231,7 @@ bool RecordAccessTracker::Rolling::access(size_t region,
     if (rarelyCount++ % (2048 / BigHashSize) == 0) {
         Date_t now = cs->now();
 
-        if (now - _lastRotate > Seconds(RotateTimeSecs)) {
+        if (now - _lastRotate > Seconds(static_cast<int64_t>(RotateTimeSecs))) {
             _rotate(cs);
         }
     }

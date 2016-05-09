@@ -59,7 +59,7 @@ void ASIOTimer::setTimeout(Milliseconds timeout, TimeoutCallback cb) {
         _cb = std::move(cb);
 
         cancelTimeout();
-        _impl.expires_after(std::min(kMaxTimerDuration, timeout));
+        _impl.expires_after(std::min(kMaxTimerDuration, timeout).toSystemDuration());
 
         decltype(_callbackSharedState->id) id;
         decltype(_callbackSharedState) sharedState;

@@ -31,6 +31,7 @@
 #include <cstddef>
 #include <cstring>
 #include <limits>
+#include <memory>
 
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/util/allocator.h"

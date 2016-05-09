@@ -38,6 +38,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/platform/process_id.h"
+#include "mongo/platform/unordered_map.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {

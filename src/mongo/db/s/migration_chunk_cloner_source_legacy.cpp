@@ -231,10 +231,10 @@ Status MigrationChunkClonerSourceLegacy::awaitUntilCriticalSectionIsAppropriate(
     invariant(!txn->lockState()->isLocked());
     auto scopedGuard = MakeGuard([&] { cancelClone(txn); });
 
-    const Milliseconds startTime(curTimeMillis64());
+    const auto startTime = Date_t::now();
 
     int iteration = 0;
-    while ((Milliseconds(curTimeMillis64()) - startTime) < maxTimeToWait) {
+    while ((Date_t::now() - startTime) < maxTimeToWait) {
         // Exponential sleep backoff, up to 1024ms. Don't sleep much on the first few iterations,
         // since we want empty chunk migrations to be fast.
         sleepmillis(1 << std::min(iteration, 10));
@@ -400,7 +400,7 @@ Status MigrationChunkClonerSourceLegacy::nextCloneBatch(OperationContext* txn,
 
     ElapsedTracker tracker(txn->getServiceContext()->getFastClockSource(),
                            internalQueryExecYieldIterations,
-                           Milliseconds(internalQueryExecYieldPeriodMS));
+                           Milliseconds(internalQueryExecYieldPeriodMS.load()));
 
     stdx::lock_guard<stdx::mutex> sl(_mutex);
 

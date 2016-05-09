@@ -299,7 +299,7 @@ void startFTDC() {
 
 
     FTDCConfig config;
-    config.period = Milliseconds(localPeriodMillis);
+    config.period = Milliseconds(localPeriodMillis.load());
     config.enabled = localEnabledFlag;
     config.maxFileSizeBytes = localMaxFileSizeMB * 1024 * 1024;
     config.maxDirectorySizeBytes = localMaxDirectorySizeMB * 1024 * 1024;

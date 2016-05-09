@@ -27,11 +27,14 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/util/text.h"
 
 #include <boost/integer_traits.hpp>
 #include <errno.h>
 #include <iostream>
+#include <memory>
 #include <sstream>
 
 #ifdef _WIN32

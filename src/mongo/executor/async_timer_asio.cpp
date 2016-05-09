@@ -34,7 +34,7 @@ namespace mongo {
 namespace executor {
 
 AsyncTimerASIO::AsyncTimerASIO(asio::io_service::strand* strand, Milliseconds expiration)
-    : _strand(strand), _timer(_strand->get_io_service(), expiration) {}
+    : _strand(strand), _timer(_strand->get_io_service(), expiration.toSystemDuration()) {}
 
 void AsyncTimerASIO::cancel() {
     _timer.cancel();

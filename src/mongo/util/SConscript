@@ -494,7 +494,7 @@ env.CppUnitTest(
     target='duration_test',
 source=[
     'duration_test.cpp',
-    'duration.cpp',
 ],
 LIBDEPS=[
+    '$BUILD_DIR/mongo/base',
 ])

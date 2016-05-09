@@ -38,6 +38,7 @@
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -97,6 +98,11 @@ public:
             ASSERT(status == stdx::future_status::ready);
 
             return _future.get();
+        }
+
+        template <class Period>
+        T timed_get(const Duration<Period>& timeout_duration) {
+            return timed_get(timeout_duration.toSystemDuration());
         }
 
     private:

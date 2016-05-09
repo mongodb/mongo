@@ -687,7 +687,7 @@ static void durThread(ClockSource* cs, int64_t serverStartMs) {
         }
 
         // +1 so it never goes down to zero
-        const unsigned oneThird = (ms / 3) + 1;
+        const int64_t oneThird = (ms / 3) + 1;
 
         // Reset the stats based on the reset interval
         if (stats.curr()->getCurrentDurationMillis() > DurStatsResetIntervalMillis) {
@@ -699,7 +699,7 @@ static void durThread(ClockSource* cs, int64_t serverStartMs) {
 
             for (unsigned i = 0; i <= 2; i++) {
                 if (stdx::cv_status::no_timeout ==
-                    flushRequested.wait_for(lock, Milliseconds(oneThird))) {
+                    flushRequested.wait_for(lock, Milliseconds(oneThird).toSystemDuration())) {
                     // Someone forced a flush
                     break;
                 }

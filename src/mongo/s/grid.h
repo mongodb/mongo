@@ -31,6 +31,7 @@
 #include <memory>
 
 #include "mongo/db/repl/optime.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 

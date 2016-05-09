@@ -25,11 +25,11 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/stdx/chrono.h"
 #include "mongo/util/duration.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-namespace x {
 namespace {
 
 // The DurationTestSameType Compare* tests server to check the implementation of the comparison
@@ -114,30 +114,35 @@ TEST(DurationComparisonDifferentTypes, CompareAtLimits) {
     ASSERT_LT(Seconds::min(), Milliseconds::min());
 
     ASSERT_LT(Milliseconds::min(),
-              durationCast<Milliseconds>(durationCast<Seconds>(Milliseconds::min())));
+              duration_cast<Milliseconds>(duration_cast<Seconds>(Milliseconds::min())));
     ASSERT_GT(Milliseconds::max(),
-              durationCast<Milliseconds>(durationCast<Seconds>(Milliseconds::max())));
+              duration_cast<Milliseconds>(duration_cast<Seconds>(Milliseconds::max())));
 }
 
 TEST(DurationCast, NonTruncatingDurationCasts) {
-    ASSERT_EQ(1, durationCast<Seconds>(Milliseconds{1000}).count());
-    ASSERT_EQ(1000, durationCast<Milliseconds>(Seconds{1}).count());
+    ASSERT_EQ(1, duration_cast<Seconds>(Milliseconds{1000}).count());
+    ASSERT_EQ(1000, duration_cast<Milliseconds>(Seconds{1}).count());
     ASSERT_EQ(1000, Milliseconds{Seconds{1}}.count());
-    ASSERT_EQ(1053, durationCast<Milliseconds>(Milliseconds{1053}).count());
+    ASSERT_EQ(1053, duration_cast<Milliseconds>(Milliseconds{1053}).count());
 }
 
 TEST(DurationCast, TruncatingDurationCasts) {
-    ASSERT_EQ(1, durationCast<Seconds>(Milliseconds{1600}).count());
-    ASSERT_EQ(0, durationCast<Seconds>(Milliseconds{999}).count());
-    ASSERT_EQ(-1, durationCast<Seconds>(Milliseconds{-1600}).count());
-    ASSERT_EQ(0, durationCast<Seconds>(Milliseconds{-999}).count());
+    ASSERT_EQ(1, duration_cast<Seconds>(Milliseconds{1600}).count());
+    ASSERT_EQ(0, duration_cast<Seconds>(Milliseconds{999}).count());
+    ASSERT_EQ(-1, duration_cast<Seconds>(Milliseconds{-1600}).count());
+    ASSERT_EQ(0, duration_cast<Seconds>(Milliseconds{-999}).count());
 }
 
 TEST(DurationCast, OverflowingCastsThrow) {
     ASSERT_THROWS_CODE(
-        durationCast<Milliseconds>(Seconds::max()), UserException, ErrorCodes::DurationOverflow);
+        duration_cast<Milliseconds>(Seconds::max()), UserException, ErrorCodes::DurationOverflow);
     ASSERT_THROWS_CODE(
-        durationCast<Milliseconds>(Seconds::min()), UserException, ErrorCodes::DurationOverflow);
+        duration_cast<Milliseconds>(Seconds::min()), UserException, ErrorCodes::DurationOverflow);
+}
+
+TEST(DurationCast, ImplicitConversionToStdxDuration) {
+    auto standardMillis = Milliseconds{10}.toSystemDuration();
+    ASSERT_EQUALS(Milliseconds{10}, duration_cast<Milliseconds>(standardMillis));
 }
 
 TEST(DurationAssignment, DurationAssignment) {
@@ -215,5 +220,4 @@ TEST(DurationArithmetic, DivideOverflowThrows) {
 }
 
 }  // namespace
-}  // namespace x
 }  // namespace mongo

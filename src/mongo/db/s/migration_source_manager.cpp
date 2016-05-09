@@ -453,11 +453,12 @@ MigrationSourceManager::CriticalSectionState::CriticalSectionState() = default;
 
 bool MigrationSourceManager::CriticalSectionState::waitUntilOutOfCriticalSection(
     Microseconds waitTimeout) {
-    const auto waitDeadline = stdx::chrono::system_clock::now() + waitTimeout;
+    const auto waitDeadline = Date_t::now() + waitTimeout;
 
     stdx::unique_lock<stdx::mutex> sl(_criticalSectionMutex);
     while (_inCriticalSection) {
-        if (stdx::cv_status::timeout == _criticalSectionCV.wait_until(sl, waitDeadline)) {
+        if (stdx::cv_status::timeout ==
+            _criticalSectionCV.wait_until(sl, waitDeadline.toSystemTimePoint())) {
             return false;
         }
     }

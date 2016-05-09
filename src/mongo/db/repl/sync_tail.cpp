@@ -601,7 +601,7 @@ public:
         if (_ops.empty()) {
             // We intentionally don't care about whether this returns due to signaling or timeout
             // since we do the same thing either way: return whatever is in _ops.
-            (void)_cv.wait_for(lk, maxWaitTime);
+            (void)_cv.wait_for(lk, maxWaitTime.toSystemDuration());
         }
 
         OpQueue ops = std::move(_ops);

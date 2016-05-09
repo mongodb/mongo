@@ -326,10 +326,11 @@ bool MigrationDestinationManager::startCommit(const MigrationSessionId& sessionI
 
     _state = COMMIT_START;
 
-    const auto deadline = stdx::chrono::system_clock::now() + Seconds(30);
+    const auto deadline = Date_t::now() + Seconds(30);
 
     while (_sessionId) {
-        if (stdx::cv_status::timeout == _isActiveCV.wait_until(lock, deadline)) {
+        if (stdx::cv_status::timeout ==
+            _isActiveCV.wait_until(lock, deadline.toSystemTimePoint())) {
             _state = FAIL;
             log() << "startCommit never finished!" << migrateLog;
             return false;

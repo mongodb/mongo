@@ -34,8 +34,7 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/util/md5.hpp"
 

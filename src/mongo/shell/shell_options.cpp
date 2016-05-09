@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault;
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/shell/shell_options.h"
@@ -42,6 +44,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/shell/shell_utils.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_options.h"

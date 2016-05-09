@@ -30,6 +30,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {

@@ -40,6 +40,7 @@
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/db/server_options.h"
+#include "mongo/logger/logger.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"

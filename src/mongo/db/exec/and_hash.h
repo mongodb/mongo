@@ -34,6 +34,7 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/record_id.h"
+#include "mongo/platform/unordered_map.h"
 #include "mongo/platform/unordered_set.h"
 
 namespace mongo {

@@ -44,6 +44,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/random.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/net/hostandport.h"
 

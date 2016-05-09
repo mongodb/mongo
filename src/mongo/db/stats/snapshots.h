@@ -33,7 +33,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/stats/top.h"
-#include "mongo/platform/basic.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/background.h"
 
 /**

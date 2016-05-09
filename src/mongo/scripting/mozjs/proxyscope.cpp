@@ -35,6 +35,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/util/destructor_guard.h"
 #include "mongo/util/quick_exit.h"
 
 namespace mongo {

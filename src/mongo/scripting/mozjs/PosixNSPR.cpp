@@ -276,7 +276,7 @@ PRStatus PR_WaitCondVar(PRCondVar* cvar, uint32_t timeout) {
             mongo::stdx::unique_lock<mongo::stdx::mutex> lk(cvar->lock()->mutex(),
                                                             mongo::stdx::adopt_lock_t());
 
-            cvar->cond().wait_for(lk, mongo::Microseconds(timeout));
+            cvar->cond().wait_for(lk, mongo::Microseconds(timeout).toSystemDuration());
             lk.release();
 
             return PR_SUCCESS;

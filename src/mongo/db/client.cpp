@@ -50,8 +50,6 @@
 
 namespace mongo {
 
-using logger::LogComponent;
-
 TSP_DECLARE(ServiceContext::UniqueClient, currentClient)
 TSP_DEFINE(ServiceContext::UniqueClient, currentClient)
 

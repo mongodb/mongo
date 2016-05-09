@@ -85,7 +85,7 @@ struct FTDCConfig {
 
     static const bool kEnabledDefault = true;
 
-    static const std::uint64_t kPeriodMillisDefault;
+    static const std::int64_t kPeriodMillisDefault;
     static const std::uint64_t kMaxDirectorySizeBytesDefault = 100 * 1024 * 1024;
     static const std::uint64_t kMaxFileSizeBytesDefault = 10 * 1024 * 1024;
 

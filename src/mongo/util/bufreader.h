@@ -33,6 +33,7 @@
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_type_terminated.h"
+#include "mongo/base/disallow_copying.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/platform/strnlen.h"
 #include "mongo/util/assert_util.h"

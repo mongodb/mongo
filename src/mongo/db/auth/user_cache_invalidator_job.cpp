@@ -141,11 +141,12 @@ void UserCacheInvalidator::run() {
 
     while (true) {
         stdx::unique_lock<stdx::mutex> lock(invalidationIntervalMutex);
-        Date_t sleepUntil = lastInvalidationTime + Seconds(userCacheInvalidationIntervalSecs);
+        Date_t sleepUntil =
+            lastInvalidationTime + Seconds(userCacheInvalidationIntervalSecs.load());
         Date_t now = Date_t::now();
         while (now < sleepUntil) {
-            invalidationIntervalChangedCondition.wait_for(lock, sleepUntil - now);
-            sleepUntil = lastInvalidationTime + Seconds(userCacheInvalidationIntervalSecs);
+            invalidationIntervalChangedCondition.wait_until(lock, sleepUntil.toSystemTimePoint());
+            sleepUntil = lastInvalidationTime + Seconds(userCacheInvalidationIntervalSecs.load());
             now = Date_t::now();
         }
         lastInvalidationTime = now;

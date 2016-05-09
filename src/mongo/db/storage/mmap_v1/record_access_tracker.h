@@ -28,8 +28,10 @@
 
 #pragma once
 
+#include <memory>
 
 #include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

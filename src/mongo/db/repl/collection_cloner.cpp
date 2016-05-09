@@ -33,6 +33,7 @@
 #include "mongo/db/repl/collection_cloner.h"
 
 #include "mongo/util/assert_util.h"
+#include "mongo/util/destructor_guard.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 

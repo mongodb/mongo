@@ -825,8 +825,8 @@ TEST(SystemTime, ConvertDateToSystemTime) {
     const Date_t aDate = unittest::assertGet(dateFromISOString(isoTimeString));
     const auto aTimePoint = aDate.toSystemTimePoint();
     const auto actual = aTimePoint - stdx::chrono::system_clock::from_time_t(0);
-    ASSERT(aDate.toDurationSinceEpoch() == actual) << "Expected " << aDate << "; but found "
-                                                   << Date_t::fromDurationSinceEpoch(actual);
+    ASSERT(aDate.toDurationSinceEpoch().toSystemDuration() == actual)
+        << "Expected " << aDate << "; but found " << Date_t::fromDurationSinceEpoch(actual);
     ASSERT_EQUALS(aDate, Date_t(aTimePoint));
 }
 

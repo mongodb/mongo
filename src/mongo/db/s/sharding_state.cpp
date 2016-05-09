@@ -133,7 +133,7 @@ Date_t getDeadlineFromMaxTimeMS(OperationContext* txn) {
         return Date_t::now();
     }
 
-    return Date_t::now() + Microseconds(remainingTime);
+    return Date_t::now() + Microseconds(static_cast<int64_t>(remainingTime));
 }
 
 /**

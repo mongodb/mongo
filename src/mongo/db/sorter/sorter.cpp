@@ -61,6 +61,7 @@
 #include "mongo/s/mongos_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
+#include "mongo/util/destructor_guard.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/print.h"
 #include "mongo/util/unowned_ptr.h"

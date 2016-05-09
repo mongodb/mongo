@@ -28,7 +28,10 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
+#include <iosfwd>
+#include <string>
+#include <vector>
+
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

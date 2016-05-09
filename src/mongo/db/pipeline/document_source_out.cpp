@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/util/destructor_guard.h"
 
 namespace mongo {
 

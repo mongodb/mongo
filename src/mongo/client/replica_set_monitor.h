@@ -28,6 +28,7 @@
 #pragma once
 
 #include <atomic>
+#include <memory>
 #include <set>
 #include <string>
 
@@ -35,6 +36,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

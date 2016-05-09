@@ -46,15 +46,16 @@ PlanYieldPolicy::PlanYieldPolicy(PlanExecutor* exec, PlanExecutor::YieldPolicy p
       _forceYield(false),
       _elapsedTracker(exec->getOpCtx()->getServiceContext()->getFastClockSource(),
                       internalQueryExecYieldIterations,
-                      Milliseconds(internalQueryExecYieldPeriodMS)),
+                      Milliseconds(internalQueryExecYieldPeriodMS.load())),
       _planYielding(exec) {}
 
 
 PlanYieldPolicy::PlanYieldPolicy(PlanExecutor::YieldPolicy policy, ClockSource* cs)
     : _policy(policy),
       _forceYield(false),
-      _elapsedTracker(
-          cs, internalQueryExecYieldIterations, Milliseconds(internalQueryExecYieldPeriodMS)),
+      _elapsedTracker(cs,
+                      internalQueryExecYieldIterations,
+                      Milliseconds(internalQueryExecYieldPeriodMS.load())),
       _planYielding(nullptr) {}
 
 bool PlanYieldPolicy::shouldYield() {

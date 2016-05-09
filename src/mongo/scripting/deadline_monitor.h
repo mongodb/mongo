@@ -32,6 +32,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/time_support.h"
@@ -91,7 +92,7 @@ public:
      * @param   task        the task to kill()
      * @param   timeoutMs   number of milliseconds before the deadline expires
      */
-    void startDeadline(_Task* const task, uint64_t timeoutMs) {
+    void startDeadline(_Task* const task, int64_t timeoutMs) {
         const auto deadline = Date_t::now() + Milliseconds(timeoutMs);
         stdx::lock_guard<stdx::mutex> lk(_deadlineMutex);
 

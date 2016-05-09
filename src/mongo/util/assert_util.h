@@ -31,10 +31,8 @@
 #include <string>
 
 #include "mongo/base/status.h"  // NOTE: This is safe as utils depend on base
+#include "mongo/base/status_with.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/logger/log_severity.h"
-#include "mongo/logger/logger.h"
-#include "mongo/logger/logstream_builder.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/debug_util.h"
 
@@ -378,23 +376,6 @@ Status exceptionToStatus();
         msgasserted(14043, ss.str());                               \
     } catch (...) {                                                 \
         msgasserted(14044, std::string("unknown exception") + msg); \
-    }
-
-#define DESTRUCTOR_GUARD MONGO_DESTRUCTOR_GUARD
-#define MONGO_DESTRUCTOR_GUARD(expression)                                                     \
-    try {                                                                                      \
-        expression;                                                                            \
-    } catch (const std::exception& e) {                                                        \
-        ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(),                  \
-                                          ::mongo::getThreadName(),                            \
-                                          ::mongo::logger::LogSeverity::Log())                 \
-            << "caught exception (" << e.what() << ") in destructor (" << __FUNCTION__ << ")"  \
-            << std::endl;                                                                      \
-    } catch (...) {                                                                            \
-        ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(),                  \
-                                          ::mongo::getThreadName(),                            \
-                                          ::mongo::logger::LogSeverity::Log())                 \
-            << "caught unknown exception in destructor (" << __FUNCTION__ << ")" << std::endl; \
     }
 
 /**

@@ -35,6 +35,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/process_id.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {

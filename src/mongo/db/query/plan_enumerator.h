@@ -36,6 +36,7 @@
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/query_knobs.h"
+#include "mongo/platform/unordered_map.h"
 
 namespace mongo {
 

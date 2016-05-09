@@ -27,13 +27,13 @@
 
 #pragma once
 
-#include <chrono>
 #include <cstdint>
 #include <iosfwd>
 #include <limits>
 #include <ratio>
 
 #include "mongo/platform/overflow_arithmetic.h"
+#include "mongo/stdx/chrono.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -42,8 +42,6 @@ namespace mongo {
 
 template <typename Allocator>
 class StringBuilderImpl;
-
-namespace x {
 
 template <typename Period>
 class Duration;
@@ -103,7 +101,7 @@ using HigherPrecisionDuration =
  * so attempting to cast that value to Milliseconds will throw an exception.
  */
 template <typename ToDuration, typename FromPeriod>
-ToDuration durationCast(const Duration<FromPeriod>& from) {
+ToDuration duration_cast(const Duration<FromPeriod>& from) {
     using FromOverTo = std::ratio_divide<FromPeriod, typename ToDuration::period>;
     if (ToDuration::template isHigherPrecisionThan<Duration<FromPeriod>>()) {
         typename ToDuration::rep toCount;
@@ -113,6 +111,29 @@ ToDuration durationCast(const Duration<FromPeriod>& from) {
         return ToDuration{toCount};
     }
     return ToDuration{from.count() / FromOverTo::den};
+}
+
+template <typename ToDuration, typename FromRep, typename FromPeriod>
+inline ToDuration duration_cast(const stdx::chrono::duration<FromRep, FromPeriod>& d) {
+    return duration_cast<ToDuration>(Duration<FromPeriod>{d.count()});
+}
+
+/**
+ * Convenience method for reading the count of a duration with specified units.
+ *
+ * Use when logging or comparing to integers, to ensure that you're using
+ * the units you intend.
+ *
+ * E.g., log() << durationCount<Seconds>(some duration) << " seconds";
+ */
+template <typename DOut, typename DIn>
+inline long long durationCount(DIn d) {
+    return duration_cast<DOut>(d).count();
+}
+
+template <typename DOut, typename RepIn, typename PeriodIn>
+inline long long durationCount(const stdx::chrono::duration<RepIn, PeriodIn>& d) {
+    return durationCount<DOut>(Duration<PeriodIn>{d.count()});
 }
 
 /**
@@ -197,12 +218,14 @@ public:
     template <typename Rep2>
     constexpr explicit Duration(const Rep2& r)
         : _count(r) {
-        static_assert(std::is_integral<Rep2>::value && std::is_signed<Rep2>::value,
-                      "Durations must be constructed from values of signed integral type");
+        static_assert(std::is_integral<Rep2>::value &&
+                          (std::is_signed<Rep2>::value || sizeof(Rep2) < sizeof(rep)),
+                      "Durations must be constructed from values of integral type that are "
+                      "representable as 64-bit signed integers");
     }
 
     /**
-     * Constructs a higher-precision duration from a lower-precision one, as by durationCast.
+     * Constructs a higher-precision duration from a lower-precision one, as by duration_cast.
      *
      * Throws a UserException if "from" is out of the range of this duration type.
      *
@@ -210,18 +233,23 @@ public:
      * this constructor.
      */
     template <typename FromPeriod>
-    /*implicit*/ Duration(const Duration<FromPeriod>& from) : Duration(durationCast<Duration>(from)) {
+    /*implicit*/ Duration(const Duration<FromPeriod>& from)
+        : Duration(duration_cast<Duration>(from)) {
         static_assert(!isLowerPrecisionThan<Duration<FromPeriod>>(),
                       "Use duration_cast to convert from higher precision Duration types to lower "
                       "precision ones");
     }
 
-    constexpr operator stdx::chrono::duration<int64_t, period>() const {
-        return stdx::chrono::duration<int64_t, period>{_count};
+    stdx::chrono::system_clock::duration toSystemDuration() const {
+        using SystemDuration = stdx::chrono::system_clock::duration;
+        return SystemDuration{duration_cast<Duration<SystemDuration::period>>(*this).count()};
     }
 
     /**
      * Returns the number of periods represented by this duration.
+     *
+     * It is better to use durationCount<DesiredDurationType>(value), since it makes the unit of the
+     * count clear at the call site.
      */
     constexpr rep count() const {
         return _count;
@@ -411,5 +439,4 @@ Duration<Period> operator/(Duration<Period> d, const Rep2& scale) {
     return d;
 }
 
-}  // namespace x
 }  // namespace mongo

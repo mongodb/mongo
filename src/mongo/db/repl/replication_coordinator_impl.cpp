@@ -604,7 +604,7 @@ Status ReplicationCoordinatorImpl::waitForMemberState(MemberState expectedState,
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     auto pred = [this, expectedState]() { return _memberState == expectedState; };
-    if (!_memberStateChange.wait_for(lk, timeout, pred)) {
+    if (!_memberStateChange.wait_for(lk, timeout.toSystemDuration(), pred)) {
         return Status(ErrorCodes::ExceededTimeLimit,
                       str::stream() << "Timed out waiting for state to become "
                                     << expectedState.toString() << ". Current state is "
@@ -779,7 +779,7 @@ Status ReplicationCoordinatorImpl::waitForDrainFinish(Milliseconds timeout) {
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     auto pred = [this]() { return !_isWaitingForDrainToComplete; };
-    if (!_drainFinishedCond.wait_for(lk, timeout, pred)) {
+    if (!_drainFinishedCond.wait_for(lk, timeout.toSystemDuration(), pred)) {
         return Status(ErrorCodes::ExceededTimeLimit,
                       "Timed out waiting to finish draining applier buffer");
     }
@@ -1096,13 +1096,13 @@ ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext
         if (isMajorityReadConcern) {
             // Wait for a snapshot that meets our needs (< targetOpTime).
             const auto waitTime = CurOp::get(txn)->isMaxTimeSet()
-                ? Microseconds(txn->getRemainingMaxTimeMicros())
+                ? Microseconds(static_cast<int64_t>(txn->getRemainingMaxTimeMicros()))
                 : Microseconds{0};
             const auto waitForever = waitTime == Microseconds{0};
             LOG(2) << "waitUntilOpTime: waiting for a new snapshot to occur for micros: "
                    << waitTime;
             if (!waitForever) {
-                _currentCommittedSnapshotCond.wait_for(lock, waitTime);
+                _currentCommittedSnapshotCond.wait_for(lock, waitTime.toSystemDuration());
             } else {
                 _currentCommittedSnapshotCond.wait(lock);
             }
@@ -1117,7 +1117,9 @@ ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext
 
         LOG(3) << "Waiting for OpTime: " << waitInfo;
         if (CurOp::get(txn)->isMaxTimeSet()) {
-            condVar.wait_for(lock, Microseconds(txn->getRemainingMaxTimeMicros()));
+            condVar.wait_for(lock,
+                             Microseconds(static_cast<int64_t>(txn->getRemainingMaxTimeMicros()))
+                                 .toSystemDuration());
         } else {
             condVar.wait(lock);
         }
@@ -1543,7 +1545,8 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitRepl
                 Status(ErrorCodes::ShutdownInProgress, "Replication is being shut down"), elapsed);
         }
 
-        const Microseconds maxTimeMicrosRemaining{txn->getRemainingMaxTimeMicros()};
+        const Microseconds maxTimeMicrosRemaining{
+            static_cast<int64_t>(txn->getRemainingMaxTimeMicros())};
         Microseconds waitTime = Microseconds::max();
         if (maxTimeMicrosRemaining != Microseconds::zero()) {
             waitTime = maxTimeMicrosRemaining;
@@ -1557,7 +1560,7 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitRepl
         if (waitForever) {
             condVar.wait(*lock);
         } else {
-            condVar.wait_for(*lock, waitTime);
+            condVar.wait_for(*lock, waitTime.toSystemDuration());
         }
     }
 
@@ -2937,7 +2940,8 @@ bool ReplicationCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& curre
 
 SyncSourceResolverResponse ReplicationCoordinatorImpl::selectSyncSource(
     OperationContext* txn, const OpTime& lastOpTimeFetched) {
-    const Timestamp sentinelTimestamp(duration_cast<Seconds>(Milliseconds(curTimeMillis64())), 0);
+    const Timestamp sentinelTimestamp(duration_cast<Seconds>(Date_t::now().toDurationSinceEpoch()),
+                                      0);
     const OpTime sentinel(sentinelTimestamp, std::numeric_limits<long long>::max());
     OpTime earliestOpTimeSeen = sentinel;
     SyncSourceResolverResponse resp;
@@ -3336,11 +3340,11 @@ void ReplicationCoordinatorImpl::waitUntilSnapshotCommitted(OperationContext* tx
     stdx::unique_lock<stdx::mutex> lock(_mutex);
 
     while (!_currentCommittedSnapshot || _currentCommittedSnapshot->name < untilSnapshot) {
-        Microseconds waitTime(txn->getRemainingMaxTimeMicros());
+        Microseconds waitTime(static_cast<int64_t>(txn->getRemainingMaxTimeMicros()));
         if (waitTime == Microseconds(0)) {
             _currentCommittedSnapshotCond.wait(lock);
         } else {
-            _currentCommittedSnapshotCond.wait_for(lock, waitTime);
+            _currentCommittedSnapshotCond.wait_for(lock, waitTime.toSystemDuration());
         }
         txn->checkForInterrupt();
     }

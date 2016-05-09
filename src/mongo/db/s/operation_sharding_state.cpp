@@ -101,11 +101,12 @@ bool OperationShardingState::waitForMigrationCriticalSection(OperationContext* t
     invariant(!txn->lockState()->isLocked());
 
     if (_migrationCriticalSection) {
-        const Microseconds operationRemainingTime(Microseconds(txn->getRemainingMaxTimeMicros()));
+        const Microseconds operationRemainingTime(
+            Microseconds(static_cast<int64_t>(txn->getRemainingMaxTimeMicros())));
         _migrationCriticalSection->waitUntilOutOfCriticalSection(
             durationCount<Microseconds>(operationRemainingTime)
                 ? operationRemainingTime
-                : kMaxWaitForMigrationCriticalSection);
+                : Microseconds{kMaxWaitForMigrationCriticalSection});
         _migrationCriticalSection = nullptr;
         return true;
     }

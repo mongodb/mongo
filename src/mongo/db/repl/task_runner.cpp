@@ -42,6 +42,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/destructor_guard.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
 

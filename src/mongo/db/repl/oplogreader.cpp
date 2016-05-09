@@ -138,7 +138,8 @@ HostAndPort OplogReader::getHost() const {
 void OplogReader::connectToSyncSource(OperationContext* txn,
                                       const OpTime& lastOpTimeFetched,
                                       ReplicationCoordinator* replCoord) {
-    const Timestamp sentinelTimestamp(duration_cast<Seconds>(Milliseconds(curTimeMillis64())), 0);
+    const Timestamp sentinelTimestamp(duration_cast<Seconds>(Date_t::now().toDurationSinceEpoch()),
+                                      0);
     const OpTime sentinel(sentinelTimestamp, std::numeric_limits<long long>::max());
     OpTime oldestOpTimeSeen = sentinel;
 

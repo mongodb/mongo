@@ -857,9 +857,9 @@ std::pair<ReplSetHeartbeatArgs, Milliseconds> TopologyCoordinatorImpl::prepareHe
         hbArgs.setConfigVersion(-2);
     }
 
-    const Milliseconds timeoutPeriod(_rsConfig.isInitialized()
-                                         ? _rsConfig.getHeartbeatTimeoutPeriodMillis()
-                                         : ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod);
+    const Milliseconds timeoutPeriod(
+        _rsConfig.isInitialized() ? _rsConfig.getHeartbeatTimeoutPeriodMillis()
+                                  : Milliseconds{ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod});
     const Milliseconds timeout = timeoutPeriod - alreadyElapsed;
     return std::make_pair(hbArgs, timeout);
 }
@@ -893,9 +893,9 @@ std::pair<ReplSetHeartbeatArgsV1, Milliseconds> TopologyCoordinatorImpl::prepare
         hbArgs.setTerm(OpTime::kInitialTerm);
     }
 
-    const Milliseconds timeoutPeriod(_rsConfig.isInitialized()
-                                         ? _rsConfig.getHeartbeatTimeoutPeriodMillis()
-                                         : ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod);
+    const Milliseconds timeoutPeriod(
+        _rsConfig.isInitialized() ? _rsConfig.getHeartbeatTimeoutPeriodMillis()
+                                  : Milliseconds{ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod});
     const Milliseconds timeout(timeoutPeriod - alreadyElapsed);
     return std::make_pair(hbArgs, timeout);
 }

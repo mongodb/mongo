@@ -53,6 +53,7 @@
 #include "mongo/platform/strnlen.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/checksum.h"
+#include "mongo/util/destructor_guard.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"

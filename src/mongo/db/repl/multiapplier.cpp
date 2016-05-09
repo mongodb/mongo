@@ -37,6 +37,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/util/destructor_guard.h"
 
 namespace mongo {
 namespace repl {

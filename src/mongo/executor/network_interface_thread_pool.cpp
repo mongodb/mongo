@@ -33,6 +33,7 @@
 #include "mongo/executor/network_interface_thread_pool.h"
 
 #include "mongo/executor/network_interface.h"
+#include "mongo/util/destructor_guard.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 

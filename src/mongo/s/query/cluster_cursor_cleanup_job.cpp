@@ -65,7 +65,8 @@ void ClusterCursorCleanupJob::run() {
     invariant(manager);
 
     while (!inShutdown()) {
-        manager->killMortalCursorsInactiveSince(Date_t::now() - Milliseconds(cursorTimeoutMillis));
+        manager->killMortalCursorsInactiveSince(Date_t::now() -
+                                                Milliseconds(cursorTimeoutMillis.load()));
         manager->reapZombieCursors();
         sleepFor(Seconds(4));
     }

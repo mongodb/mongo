@@ -189,7 +189,7 @@ void NetworkInterfaceASIO::waitForWorkUntil(Date_t when) {
         if (waitTime <= Milliseconds(0)) {
             break;
         }
-        _isExecutorRunnableCondition.wait_for(lk, waitTime);
+        _isExecutorRunnableCondition.wait_for(lk, waitTime.toSystemDuration());
     }
     _isExecutorRunnable = false;
 }

@@ -152,7 +152,7 @@ void CappedInsertNotifier::_wait(stdx::unique_lock<stdx::mutex>& lk,
     while (!_dead && prevVersion == _version) {
         if (timeout == Microseconds::max()) {
             _notifier.wait(lk);
-        } else if (stdx::cv_status::timeout == _notifier.wait_for(lk, timeout)) {
+        } else if (stdx::cv_status::timeout == _notifier.wait_for(lk, timeout.toSystemDuration())) {
             return;
         }
     }

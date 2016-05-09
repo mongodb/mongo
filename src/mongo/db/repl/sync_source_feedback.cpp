@@ -191,7 +191,8 @@ void SyncSourceFeedback::run() {
             // this class.
             stdx::unique_lock<stdx::mutex> lock(_mtx);
             while (!_positionChanged && !_shutdownSignaled) {
-                if (_cond.wait_for(lock, keepAliveInterval) == stdx::cv_status::timeout) {
+                if (_cond.wait_for(lock, keepAliveInterval.toSystemDuration()) ==
+                    stdx::cv_status::timeout) {
                     MemberState state = ReplicationCoordinator::get(txn.get())->getMemberState();
                     if (!(state.primary() || state.startup())) {
                         break;

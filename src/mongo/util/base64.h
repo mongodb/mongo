@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <memory>
+#include <iosfwd>
+#include <string>
 
 #include "mongo/util/assert_util.h"
 

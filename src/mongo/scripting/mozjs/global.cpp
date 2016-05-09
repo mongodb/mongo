@@ -33,6 +33,7 @@
 #include <js/Conversions.h>
 
 #include "mongo/base/init.h"
+#include "mongo/logger/logger.h"
 #include "mongo/logger/logstream_builder.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/jsstringwrapper.h"

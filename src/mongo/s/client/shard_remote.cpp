@@ -66,7 +66,7 @@ namespace {
 const Status kInternalErrorStatus{ErrorCodes::InternalError,
                                   "Invalid to check for write concern error if command failed"};
 
-const Seconds kConfigCommandTimeout{30};
+const Milliseconds kConfigCommandTimeout = Seconds{30};
 
 const BSONObj kNoMetadata(rpc::makeEmptyMetadata());
 
@@ -332,10 +332,10 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     BSONObjBuilder findCmdBuilder;
     lpq->asFindCommand(&findCmdBuilder);
 
-    Seconds maxTime = kConfigCommandTimeout;
-    Microseconds remainingTxnMaxTime(txn->getRemainingMaxTimeMicros());
+    Milliseconds maxTime = kConfigCommandTimeout;
+    Microseconds remainingTxnMaxTime(static_cast<int64_t>(txn->getRemainingMaxTimeMicros()));
     if (remainingTxnMaxTime != Microseconds::zero()) {
-        maxTime = duration_cast<Seconds>(remainingTxnMaxTime);
+        maxTime = duration_cast<Milliseconds>(remainingTxnMaxTime);
     }
 
     findCmdBuilder.append(LiteParsedQuery::cmdOptionMaxTimeMS,
