@@ -216,7 +216,7 @@ Status ForwardingCatalogManager::ScopedDistLock::checkStatus() {
 }
 
 Status ForwardingCatalogManager::scheduleReplaceCatalogManagerIfNeeded(
-    ConfigServerMode desiredMode, StringData replSetName, const HostAndPort& knownServer) {
+    ConfigServerMode desiredMode, const ConnectionString& csrsConnStr) {
     stdx::lock_guard<stdx::mutex> lk(_observerMutex);
     const auto currentMode = _actual->getMode();
     if (currentMode == desiredMode) {
@@ -231,13 +231,14 @@ Status ForwardingCatalogManager::scheduleReplaceCatalogManagerIfNeeded(
     }
     invariant(desiredMode == ConfigServerMode::CSRS);
     if (_nextConfigChangeComplete.isValid()) {
-        if (_nextConfigConnectionString.getSetName() != replSetName) {
+        if (_nextConfigConnectionString.getSetName() != csrsConnStr.getSetName()) {
             severe() << "Conflicting new config server replica set names: "
-                     << _nextConfigConnectionString.getSetName() << " vs " << replSetName;
+                     << _nextConfigConnectionString.getSetName() << " vs "
+                     << csrsConnStr.getSetName();
             fassertFailed(28788);
         }
     } else {
-        _nextConfigConnectionString = ConnectionString::forReplicaSet(replSetName, {knownServer});
+        _nextConfigConnectionString = csrsConnStr;
         _nextConfigChangeComplete =
             fassertStatusOK(28789, _shardRegistry->getExecutor()->makeEvent());
         fassertStatusOK(

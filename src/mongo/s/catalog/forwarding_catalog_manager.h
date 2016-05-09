@@ -84,8 +84,7 @@ public:
      * Currently only supports going to CSRS mode from SCCC mode.
      */
     Status scheduleReplaceCatalogManagerIfNeeded(ConfigServerMode desiredMode,
-                                                 StringData replSetName,
-                                                 const HostAndPort& knownServer);
+                                                 const ConnectionString& csrsConnString);
 
     /**
      * Blocking method, which will waits for a previously scheduled catalog manager change to

@@ -68,6 +68,10 @@ var CSRSUpgradeCoordinator = function() {
         return st._mongos[n];
     };
 
+    this.getShard = function(n) {
+        return st['shard' + n];
+    };
+
     this.getShardName = function(n) {
         return shardConfigs[n]._id;
     };

@@ -162,13 +162,23 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
                 str::stream() << "Unrecognized configsvr version number: " << configServerModeNumber
                               << ". Expected either 0 or 1",
                 configServerModeNumber == 0 || configServerModeNumber == 1);
+        auto configServerMode = configServerModeNumber == 0
+            ? CatalogManager::ConfigServerMode::SCCC
+            : CatalogManager::ConfigServerMode::CSRS;
 
-        BSONElement setName = isMasterResponse["setName"];
+        // We still want to call scheduleReplaceCatalogManagerIfNeeded when configServerMode
+        // is SCCC to catch illegal downgrade attempts and return a useful error message.
+        // To enable that we use the default (invalid) ConnectionString when configServerMode
+        // is SCCC.
+        ConnectionString configConnString;
+        if (configServerMode == CatalogManager::ConfigServerMode::CSRS) {
+            configConnString = ConnectionString::forReplicaSet(
+                isMasterResponse["setName"].valueStringData(),
+                {static_cast<DBClientConnection*>(conn)->getServerHostAndPort()});
+        }
+
         status = grid.forwardingCatalogManager()->scheduleReplaceCatalogManagerIfNeeded(
-            configServerModeNumber == 0 ? CatalogManager::ConfigServerMode::SCCC
-                                        : CatalogManager::ConfigServerMode::CSRS,
-            setName.type() == String ? setName.valueStringData() : StringData(),
-            static_cast<DBClientConnection*>(conn)->getServerHostAndPort());
+            configServerMode, configConnString);
         uassertStatusOK(status);
     }
 }

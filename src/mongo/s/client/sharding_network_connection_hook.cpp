@@ -73,11 +73,20 @@ Status ShardingNetworkConnectionHook::validateHostImpl(
             const BSONElement setName = isMasterReply.data["setName"];
             auto configServerMode =
                 (configServerModeNumber == 0 ? ConfigServerMode::SCCC : ConfigServerMode::CSRS);
+
+            // We still want to call scheduleReplaceCatalogManagerIfNeeded when configServerMode
+            // is SCCC to catch illegal downgrade attempts and return a useful error message.
+            // To enable that we use the default (invalid) ConnectionString when configServerMode
+            // is SCCC.
+            ConnectionString configConnString;
+            if (configServerMode == ConfigServerMode::CSRS) {
+                configConnString =
+                    ConnectionString::forReplicaSet(setName.valueStringData(), {remoteHost});
+            }
+
             auto catalogSwapStatus =
                 grid.forwardingCatalogManager()->scheduleReplaceCatalogManagerIfNeeded(
-                    configServerMode,
-                    (setName.type() == String ? setName.valueStringData() : StringData()),
-                    remoteHost);
+                    configServerMode, configConnString);
             if (configServerMode == ConfigServerMode::CSRS && catalogSwapStatus.isOK() && forSCC) {
                 // Even though scheduleReplaceCatalogManagerIfNeeded didn't indicate that a catalog
                 // manager swap is needed, if this connection is part of a SyncClusterConnection,

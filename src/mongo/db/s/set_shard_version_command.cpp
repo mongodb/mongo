@@ -370,7 +370,8 @@ private:
                       << givenConnStr
                       << " for the config server connection string, but has stored: "
                       << storedConnStr;
-                storedConnStr = givenConnStr;
+                grid.forwardingCatalogManager()->scheduleReplaceCatalogManagerIfNeeded(
+                    CatalogManager::ConfigServerMode::CSRS, givenConnStr);
 
                 return true;
             }
