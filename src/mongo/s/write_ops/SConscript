@@ -88,9 +88,10 @@ env.CppUnitTest(
         'batch_downconvert_test.cpp',
     ],
     LIBDEPS=[
-        'cluster_write_op',
-        'cluster_write_op_conversion',
-        '$BUILD_DIR/mongo/s/sharding_test_fixture',
-        '$BUILD_DIR/mongo/s/mongoscore',
-    ],
+       'cluster_write_op',
+       'cluster_write_op_conversion',
+       '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+       '$BUILD_DIR/mongo/db/service_context_noop_init',
+       '$BUILD_DIR/mongo/s/mongoscore',
+   ],
 )
