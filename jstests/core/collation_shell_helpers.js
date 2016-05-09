@@ -54,26 +54,22 @@
     assert.writeOK(coll.insert({_id: 1, str: "foo"}));
     assert.writeOK(coll.insert({_id: 2, str: "bar"}));
 
-    // Aggregation. TODO SERVER-23473: This should work once we've added a collation parameter to
-    // the aggregate command.
-    assert.throws(function() {
-        coll.aggregate([],
-                       {
-                           collation : {
-                           locale:
-                               "fr"
-                           }
-                       }).itcount();
-    });
-    assert.throws(function() {
-        coll.explain().aggregate([],
-                                 {
-                                     collation : {
-                                     locale:
-                                         "fr"
-                                     }
-                                 });
-    });
+    // Aggregation.
+    assert.eq(2,
+              coll.aggregate([],
+                             {
+                                 collation : {
+                                 locale:
+                                     "fr"
+                                 }
+                             }).itcount());
+    assert.commandWorked(coll.explain().aggregate([],
+                                                  {
+                                                      collation : {
+                                                      locale:
+                                                          "fr"
+                                                      }
+                                                  }));
 
     // Count command.
     assert.eq(2, coll.find().collation({locale: "fr"}).count());

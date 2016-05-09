@@ -48,6 +48,7 @@
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/collation/collation_serializer.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/service_context.h"
@@ -206,12 +207,15 @@ StatusWith<std::unique_ptr<PlanExecutor>> attemptToGetExecutor(
     BSONObj projectionObj,
     BSONObj sortObj,
     const size_t plannerOpts) {
-    const ExtensionsCallbackReal extensionsCallback(pExpCtx->opCtx, &pExpCtx->ns);
-
     auto lpq = stdx::make_unique<LiteParsedQuery>(pExpCtx->ns);
     lpq->setFilter(queryObj);
-    lpq->setSort(sortObj);
     lpq->setProj(projectionObj);
+    lpq->setSort(sortObj);
+    if (pExpCtx->collator) {
+        lpq->setCollation(CollationSerializer::specToBSON(pExpCtx->collator->getSpec()));
+    }
+
+    const ExtensionsCallbackReal extensionsCallback(pExpCtx->opCtx, &pExpCtx->ns);
 
     auto cq = CanonicalQuery::canonicalize(txn, std::move(lpq), extensionsCallback);
 

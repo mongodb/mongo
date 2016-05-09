@@ -38,11 +38,14 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/collation/collation_serializer.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -56,6 +59,7 @@ using std::vector;
 
 const char Pipeline::commandName[] = "aggregate";
 const char Pipeline::pipelineName[] = "pipeline";
+const char Pipeline::collationName[] = "collation";
 const char Pipeline::explainName[] = "explain";
 const char Pipeline::fromRouterName[] = "fromRouter";
 const char Pipeline::serverPipelineName[] = "serverPipeline";
@@ -98,6 +102,19 @@ intrusive_ptr<Pipeline> Pipeline::parseCommand(string& errmsg,
 
         // ignore writeConcern since it's handled externally
         if (str::equals(pFieldName, "writeConcern")) {
+            continue;
+        }
+
+        if (str::equals(pFieldName, collationName)) {
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << collationName << " must be an object, not a "
+                                  << typeName(cmdElement.type()),
+                    cmdElement.type() == BSONType::Object);
+            auto statusWithCollator =
+                CollatorFactoryInterface::get(pCtx->opCtx->getServiceContext())
+                    ->makeFromBSON(cmdElement.Obj());
+            uassertStatusOK(statusWithCollator.getStatus());
+            pCtx->collator = std::move(statusWithCollator.getValue());
             continue;
         }
 
@@ -435,6 +452,11 @@ Document Pipeline::serialize() const {
 
     if (pCtx->bypassDocumentValidation) {
         serialized.setField(bypassDocumentValidationCommandOption(), Value(true));
+    }
+
+    if (pCtx->collator.get()) {
+        serialized.setField(collationName,
+                            Value(CollationSerializer::specToBSON(pCtx->collator->getSpec())));
     }
 
     return serialized.freeze();
