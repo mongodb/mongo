@@ -32,6 +32,7 @@
 
 #include "mongo/client/connection_string.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
 
@@ -67,8 +68,7 @@ public:
                                 const ConnectionString& configServerConnectionString,
                                 const std::string& fromShardId,
                                 const std::string& toShardId,
-                                const BSONObj& chunkMinKey,
-                                const BSONObj& chunkMaxKey,
+                                const ChunkRange& range,
                                 int64_t maxChunkSizeBytes,
                                 const MigrationSecondaryThrottleOptions& secondaryThrottle,
                                 bool waitForDelete);
@@ -90,11 +90,11 @@ public:
     }
 
     const BSONObj& getMinKey() const {
-        return _minKey;
+        return _range.getMin();
     }
 
     const BSONObj& getMaxKey() const {
-        return _maxKey;
+        return _range.getMax();
     }
 
     int64_t getMaxChunkSizeBytes() const {
@@ -110,7 +110,9 @@ public:
     }
 
 private:
-    MoveChunkRequest(NamespaceString nss, MigrationSecondaryThrottleOptions secondaryThrottle);
+    MoveChunkRequest(NamespaceString nss,
+                     ChunkRange range,
+                     MigrationSecondaryThrottleOptions secondaryThrottle);
 
     // The collection for which this request applies
     NamespaceString _nss;
@@ -126,9 +128,8 @@ private:
     // The recipient shard id
     std::string _toShardId;
 
-    // Exact min and max key of the chunk being moved
-    BSONObj _minKey;
-    BSONObj _maxKey;
+    // Range of chunk chunk being moved
+    ChunkRange _range;
 
     // This value is used by the migration source to determine the data size threshold above which a
     // chunk would be considered jumbo and migrations will not proceed.

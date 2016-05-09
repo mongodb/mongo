@@ -47,8 +47,7 @@ TEST(MoveChunkRequest, CreateAsCommandComplete) {
         assertGet(ConnectionString::parse("TestConfigRS/CS1:12345,CS2:12345,CS3:12345")),
         "shard0001",
         "shard0002",
-        BSON("Key" << -100),
-        BSON("Key" << 100),
+        ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
         1024,
         MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
         true);

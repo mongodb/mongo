@@ -40,16 +40,17 @@ const char kMoveChunk[] = "moveChunk";
 const char kConfigServerConnectionString[] = "configdb";
 const char kFromShardId[] = "fromShard";
 const char kToShardId[] = "toShard";
-const char kChunkMinKey[] = "min";
-const char kChunkMaxKey[] = "max";
 const char kMaxChunkSizeBytes[] = "maxChunkSizeBytes";
 const char kWaitForDelete[] = "waitForDelete";
 
 }  // namespace
 
 MoveChunkRequest::MoveChunkRequest(NamespaceString nss,
+                                   ChunkRange range,
                                    MigrationSecondaryThrottleOptions secondaryThrottle)
-    : _nss(std::move(nss)), _secondaryThrottle(std::move(secondaryThrottle)) {}
+    : _nss(std::move(nss)),
+      _range(std::move(range)),
+      _secondaryThrottle(std::move(secondaryThrottle)) {}
 
 StatusWith<MoveChunkRequest> MoveChunkRequest::createFromCommand(NamespaceString nss,
                                                                  const BSONObj& obj) {
@@ -58,7 +59,14 @@ StatusWith<MoveChunkRequest> MoveChunkRequest::createFromCommand(NamespaceString
         return secondaryThrottleStatus.getStatus();
     }
 
-    MoveChunkRequest request(std::move(nss), std::move(secondaryThrottleStatus.getValue()));
+    auto rangeStatus = ChunkRange::fromBSON(obj);
+    if (!rangeStatus.isOK()) {
+        return rangeStatus.getStatus();
+    }
+
+    MoveChunkRequest request(std::move(nss),
+                             std::move(rangeStatus.getValue()),
+                             std::move(secondaryThrottleStatus.getValue()));
 
     {
         std::string configServerConnectionString;
@@ -91,34 +99,6 @@ StatusWith<MoveChunkRequest> MoveChunkRequest::createFromCommand(NamespaceString
     }
 
     {
-        BSONElement elem;
-        Status status = bsonExtractTypedField(obj, kChunkMinKey, BSONType::Object, &elem);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        request._minKey = elem.Obj().getOwned();
-
-        if (request._minKey.isEmpty()) {
-            return Status(ErrorCodes::UnsupportedFormat, "The chunk min key cannot be empty");
-        }
-    }
-
-    {
-        BSONElement elem;
-        Status status = bsonExtractTypedField(obj, kChunkMaxKey, BSONType::Object, &elem);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        request._maxKey = elem.Obj().getOwned();
-
-        if (request._maxKey.isEmpty()) {
-            return Status(ErrorCodes::UnsupportedFormat, "The chunk max key cannot be empty");
-        }
-    }
-
-    {
         Status status =
             bsonExtractBooleanFieldWithDefault(obj, kWaitForDelete, false, &request._waitForDelete);
         if (!status.isOK()) {
@@ -145,8 +125,7 @@ void MoveChunkRequest::appendAsCommand(BSONObjBuilder* builder,
                                        const ConnectionString& configServerConnectionString,
                                        const std::string& fromShardId,
                                        const std::string& toShardId,
-                                       const BSONObj& chunkMinKey,
-                                       const BSONObj& chunkMaxKey,
+                                       const ChunkRange& range,
                                        int64_t maxChunkSizeBytes,
                                        const MigrationSecondaryThrottleOptions& secondaryThrottle,
                                        bool waitForDelete) {
@@ -158,8 +137,7 @@ void MoveChunkRequest::appendAsCommand(BSONObjBuilder* builder,
     builder->append(kConfigServerConnectionString, configServerConnectionString.toString());
     builder->append(kFromShardId, fromShardId);
     builder->append(kToShardId, toShardId);
-    builder->append(kChunkMinKey, chunkMinKey);
-    builder->append(kChunkMaxKey, chunkMaxKey);
+    range.append(builder);
     builder->append(kMaxChunkSizeBytes, static_cast<long long>(maxChunkSizeBytes));
     secondaryThrottle.append(builder);
     builder->append(kWaitForDelete, waitForDelete);

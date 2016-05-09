@@ -70,6 +70,10 @@ StatusWith<ChunkRange> ChunkRange::fromBSON(const BSONObj& obj) {
             return {minKeyStatus.code(),
                     str::stream() << "Invalid min key due to " << minKeyStatus.reason()};
         }
+
+        if (minKey.Obj().isEmpty()) {
+            return {ErrorCodes::BadValue, "The min key cannot be empty"};
+        }
     }
 
     BSONElement maxKey;
@@ -78,6 +82,10 @@ StatusWith<ChunkRange> ChunkRange::fromBSON(const BSONObj& obj) {
         if (!maxKeyStatus.isOK()) {
             return {maxKeyStatus.code(),
                     str::stream() << "Invalid max key due to " << maxKeyStatus.reason()};
+        }
+
+        if (maxKey.Obj().isEmpty()) {
+            return {ErrorCodes::BadValue, "The max key cannot be empty"};
         }
     }
 
