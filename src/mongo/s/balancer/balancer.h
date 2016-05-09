@@ -28,12 +28,9 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
 #include "mongo/s/balancer/balancer_chunk_selection_policy.h"
-#include "mongo/util/background.h"
-#include "mongo/util/timer.h"
+#include "mongo/s/sharding_uptime_reporter.h"
+#include "mongo/stdx/thread.h"
 
 namespace mongo {
 
@@ -54,7 +51,7 @@ class StatusWith;
  * there is an imbalance by checking the difference in chunks between the most and least
  * loaded shards. It would issue a request for a chunk migration per round, if it found so.
  */
-class Balancer : public BackgroundJob {
+class Balancer {
 public:
     Balancer();
     ~Balancer();
@@ -63,6 +60,12 @@ public:
      * Retrieves the per-service instance of the Balancer.
      */
     static Balancer* get(OperationContext* operationContext);
+
+    /**
+     * Starts the main balancer loop and returns immediately without waiting for initialization.
+     * This method may only be called once for the lifetime of the balancer.
+     */
+    void start(OperationContext* txn);
 
     /**
      * Blocking call, which requests the balancer to move a single chunk to a more appropriate
@@ -88,9 +91,10 @@ public:
                            bool waitForDelete);
 
 private:
-    std::string name() const final;
-
-    void run() final;
+    /**
+     * The main balancer loop, which runs in a separate thread.
+     */
+    void _mainThread();
 
     /**
      * Checks that the balancer can connect to all servers it needs to do its job.
@@ -100,11 +104,6 @@ private:
      * This method throws on a network exception
      */
     bool _init(OperationContext* txn);
-
-    /**
-     * Marks this balancer as being live on the config server(s).
-     */
-    void _ping(OperationContext* txn, bool waiting);
 
     /**
      * Returns true if all the servers listed in configdb as being shards are reachable and are
@@ -131,13 +130,13 @@ private:
                     const MigrationSecondaryThrottleOptions& secondaryThrottle,
                     bool waitForDelete);
 
-    // hostname:port of my mongos
-    std::string _myid;
+    // The uptime reporter associated with this instance
+    const ShardingUptimeReporter _stardingUptimeReporter;
 
-    // Time the Balancer started running
-    Timer _timer;
+    // The main balancer thread
+    stdx::thread _thread;
 
-    // number of moved chunks in last round
+    // Number of moved chunks in last round
     int _balancedLastTime;
 
     // Balancer policy

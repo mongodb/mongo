@@ -32,6 +32,8 @@
 
 #include "mongo/s/balancer/balancer.h"
 
+#include <string>
+
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
@@ -40,17 +42,12 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/lite_parsed_query.h"
-#include "mongo/db/server_options.h"
-#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/balancer/balancer_chunk_selection_policy_impl.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/balancer/cluster_statistics_impl.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_mongos.h"
-#include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -67,10 +64,7 @@
 namespace mongo {
 
 using std::map;
-using std::set;
-using std::shared_ptr;
 using std::string;
-using std::unique_ptr;
 using std::vector;
 
 namespace {
@@ -122,7 +116,7 @@ private:
     int _chunksMoved{0};
 
     // Set only on failure
-    boost::optional<std::string> _errMsg;
+    boost::optional<string> _errMsg;
 };
 
 /**
@@ -170,7 +164,7 @@ Status executeSingleMigration(OperationContext* txn,
 
     ChunkManager* const cm = scopedCMStatus.getValue().cm();
 
-    shared_ptr<Chunk> c = cm->findIntersectingChunk(txn, migrateInfo.minKey);
+    auto c = cm->findIntersectingChunk(txn, migrateInfo.minKey);
 
     BSONObjBuilder builder;
     MoveChunkRequest::appendAsCommand(
@@ -245,6 +239,11 @@ Balancer* Balancer::get(OperationContext* operationContext) {
     return &getBalancer(operationContext->getServiceContext());
 }
 
+void Balancer::start(OperationContext* txn) {
+    invariant(!_thread.joinable());
+    _thread = stdx::thread([this] { _mainThread(); });
+}
+
 Status Balancer::rebalanceSingleChunk(OperationContext* txn, const ChunkType& chunk) {
     auto migrateStatus = _chunkSelectionPolicy->selectSpecificChunkToMove(txn, chunk);
     if (!migrateStatus.isOK()) {
@@ -289,11 +288,7 @@ Status Balancer::moveSingleChunk(OperationContext* txn,
                                   waitForDelete);
 }
 
-std::string Balancer::name() const {
-    return "Balancer";
-}
-
-void Balancer::run() {
+void Balancer::_mainThread() {
     Client::initThread("Balancer");
 
     // This is the body of a BackgroundJob so if we throw here we're basically ending the balancer
@@ -313,12 +308,15 @@ void Balancer::run() {
 
     while (!inShutdown()) {
         auto txn = cc().makeOperationContext();
+        auto shardingContext = Grid::get(txn.get());
+        auto balancerConfig = shardingContext->getBalancerConfiguration();
 
         BalanceRoundDetails roundDetails;
 
         try {
-            // ping has to be first so we keep things in the config server in sync
-            _ping(txn.get(), false);
+            // Reporting the balancer as active must be first call so the balancer control scripts
+            // know that there is an active balancer
+            _stardingUptimeReporter.reportStatus(txn.get(), true);
 
             MONGO_FAIL_POINT_BLOCK(balancerRoundIntervalSetting, scopedBalancerRoundInterval) {
                 const BSONObj& data = scopedBalancerRoundInterval.getData();
@@ -326,9 +324,8 @@ void Balancer::run() {
             }
 
             // Use fresh shard state and balancer settings
-            Grid::get(txn.get())->shardRegistry()->reload(txn.get());
+            shardingContext->shardRegistry()->reload(txn.get());
 
-            auto balancerConfig = Grid::get(txn.get())->getBalancerConfiguration();
             Status refreshStatus = balancerConfig->refreshAndCheck(txn.get());
             if (!refreshStatus.isOK()) {
                 warning() << "Skipping balancing round" << causedBy(refreshStatus);
@@ -340,8 +337,8 @@ void Balancer::run() {
             if (!balancerConfig->isBalancerActive() || MONGO_FAIL_POINT(skipBalanceRound)) {
                 LOG(1) << "skipping balancing round because balancing is disabled";
 
-                // Ping again so scripts can determine if we're active without waiting
-                _ping(txn.get(), true);
+                // Tell scripts that the balancer is not active anymore
+                _stardingUptimeReporter.reportStatus(txn.get(), false);
 
                 sleepFor(balanceRoundInterval);
                 continue;
@@ -350,7 +347,7 @@ void Balancer::run() {
             uassert(13258, "oids broken after resetting!", _checkOIDs(txn.get()));
 
             {
-                auto scopedDistLock = grid.catalogManager(txn.get())
+                auto scopedDistLock = shardingContext->catalogManager(txn.get())
                                           ->distLock(txn.get(),
                                                      "balancer",
                                                      "doing balance round",
@@ -359,8 +356,8 @@ void Balancer::run() {
                 if (!scopedDistLock.isOK()) {
                     LOG(1) << "skipping balancing round" << causedBy(scopedDistLock.getStatus());
 
-                    // Ping again so scripts can determine if we're active without waiting
-                    _ping(txn.get(), true);
+                    // Tell scripts that the balancer is not active anymore
+                    _stardingUptimeReporter.reportStatus(txn.get(), false);
 
                     sleepFor(balanceRoundInterval);  // no need to wake up soon
                     continue;
@@ -396,15 +393,15 @@ void Balancer::run() {
                     roundDetails.setSucceeded(static_cast<int>(candidateChunks.size()),
                                               _balancedLastTime);
 
-                    grid.catalogManager(txn.get())
+                    shardingContext->catalogManager(txn.get())
                         ->logAction(txn.get(), "balancer.round", "", roundDetails.toBSON());
                 }
 
                 LOG(1) << "*** End of balancing round";
             }
 
-            // Ping again so scripts can determine if we're active without waiting
-            _ping(txn.get(), true);
+            // Tell scripts that the balancer is not active anymore
+            _stardingUptimeReporter.reportStatus(txn.get(), false);
 
             sleepFor(_balancedLastTime ? kShortBalanceRoundInterval : balanceRoundInterval);
         } catch (const std::exception& e) {
@@ -416,7 +413,7 @@ void Balancer::run() {
             // This round failed, tell the world!
             roundDetails.setFailed(e.what());
 
-            grid.catalogManager(txn.get())
+            shardingContext->catalogManager(txn.get())
                 ->logAction(txn.get(), "balancer.round", "", roundDetails.toBSON());
 
             // Sleep a fair amount before retrying because of the error
@@ -430,21 +427,20 @@ bool Balancer::_init(OperationContext* txn) {
 
     try {
         // Contact the config server and refresh shard information. Checks that each shard is indeed
-        // a different process (no hostname mixup)
-        // these checks are redundant in that they're redone at every new round but we want to do
-        // them initially here so to catch any problem soon
-        grid.shardRegistry()->reload(txn);
+        // a different process (no hostname mixup).
+        //
+        // These checks are redundant in that they're redone at every new round but we want to do
+        // them initially here so to catch any problem soon.
+        Grid::get(txn)->shardRegistry()->reload(txn);
+
         if (!_checkOIDs(txn)) {
             return false;
         }
 
         log() << "config servers and shards contacted successfully";
+        _stardingUptimeReporter.reportStatus(txn, false);
 
-        StringBuilder buf;
-        buf << getHostNameCached() << ":" << serverGlobalParams.port;
-        _myid = buf.str();
-
-        log() << "balancer id: " << _myid << " started";
+        log() << "balancer id: " << _stardingUptimeReporter.getInstanceId() << " started";
 
         return true;
     } catch (const std::exception& e) {
@@ -454,30 +450,17 @@ bool Balancer::_init(OperationContext* txn) {
     }
 }
 
-void Balancer::_ping(OperationContext* txn, bool waiting) {
-    MongosType mType;
-    mType.setName(_myid);
-    mType.setPing(jsTime());
-    mType.setUptime(_timer.seconds());
-    mType.setWaiting(waiting);
-    mType.setMongoVersion(versionString);
-
-    grid.catalogManager(txn)->updateConfigDocument(txn,
-                                                   MongosType::ConfigNS,
-                                                   BSON(MongosType::name(_myid)),
-                                                   BSON("$set" << mType.toBSON()),
-                                                   true);
-}
-
 bool Balancer::_checkOIDs(OperationContext* txn) {
+    auto shardingContext = Grid::get(txn);
+
     vector<ShardId> all;
-    grid.shardRegistry()->getAllShardIds(&all);
+    shardingContext->shardRegistry()->getAllShardIds(&all);
 
     // map of OID machine ID => shardId
     map<int, string> oids;
 
     for (const ShardId& shardId : all) {
-        const auto s = grid.shardRegistry()->getShard(txn, shardId);
+        const auto s = shardingContext->shardRegistry()->getShard(txn, shardId);
         if (!s) {
             continue;
         }
@@ -507,7 +490,7 @@ bool Balancer::_checkOIDs(OperationContext* txn) {
                                   Shard::RetryPolicy::kIdempotent));
                 uassertStatusOK(result.commandStatus);
 
-                const auto otherShard = grid.shardRegistry()->getShard(txn, oids[x]);
+                const auto otherShard = shardingContext->shardRegistry()->getShard(txn, oids[x]);
                 if (otherShard) {
                     result = uassertStatusOK(
                         otherShard->runCommand(txn,
@@ -602,7 +585,7 @@ int Balancer::_moveChunks(OperationContext* txn,
                 auto scopedCM = uassertStatusOK(ScopedChunkManager::getExisting(txn, nss));
                 ChunkManager* const cm = scopedCM.cm();
 
-                shared_ptr<Chunk> c = cm->findIntersectingChunk(txn, migrateInfo.minKey);
+                auto c = cm->findIntersectingChunk(txn, migrateInfo.minKey);
 
                 auto splitStatus = c->split(txn, Chunk::normal, nullptr);
                 if (!splitStatus.isOK()) {

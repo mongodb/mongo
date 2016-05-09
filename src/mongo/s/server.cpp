@@ -392,7 +392,7 @@ static ExitCode runMongosServer() {
         return EXIT_SHARDING_ERROR;
     }
 
-    Balancer::get(opCtx.get())->go();
+    Balancer::get(opCtx.get())->start(opCtx.get());
     clusterCursorCleanupJob.go();
 
     UserCacheInvalidator cacheInvalidatorThread(getGlobalAuthorizationManager());
