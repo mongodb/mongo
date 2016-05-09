@@ -16,8 +16,6 @@
     assert.eq(1, s1.getDB('test').existing.count({_id: 1}));
     assert.eq(1, s2.getDB('test').existing.count({_id: 1}));
 
-    // Balancer is by default stopped, thus it will not interfere with manual chunk moves.
-
     s2.adminCommand({shardcollection: "test.existing", key: {_id: 1}});
     assert.commandWorked(s2.adminCommand({split: "test.existing", middle: {_id: 5}}));
 
@@ -28,8 +26,6 @@
     });
 
     assert.eq(1, res.ok, tojson(res));
-
-    s1.startBalancer();
 
     printjson(s2.adminCommand({"getShardVersion": "test.existing"}));
     printjson(new Mongo(s1.getPrimaryShard("test").name)
@@ -59,8 +55,6 @@
     assert.eq(1, s1.getDB('test').existing3.count({_id: 1}));
     assert.eq(1, s2.getDB('test').existing3.count({_id: 1}));
 
-    s1.stopBalancer();
-
     s2.adminCommand({shardcollection: "test.existing3", key: {_id: 1}});
     assert.commandWorked(s2.adminCommand({split: "test.existing3", middle: {_id: 5}}));
 
@@ -70,8 +64,6 @@
         to: s1.getOther(s1.getPrimaryShard("test")).name
     });
     assert.eq(1, res.ok, tojson(res));
-
-    s1.startBalancer();
 
     s1.stop();
 
