@@ -180,6 +180,8 @@ __wt_fopen(WT_SESSION_IMPL *session,
 	WT_FH *fh;
 	WT_FSTREAM *fs;
 
+	*fsp = NULL;
+
 	fs = NULL;
 
 	WT_RET(__wt_open(
@@ -208,6 +210,6 @@ __wt_fopen(WT_SESSION_IMPL *session,
 	return (0);
 
 err:	WT_TRET(__wt_close(session, &fh));
-	__wt_free(session, *fsp);
+	__wt_free(session, fs);
 	return (ret);
 }

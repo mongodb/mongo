@@ -38,6 +38,8 @@ __wt_config_collapse(
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 
+	*config_ret = NULL;
+
 	WT_RET(__wt_scr_alloc(session, 0, &tmp));
 
 	WT_ERR(__wt_config_init(session, &cparser, cfg[0]));
@@ -59,6 +61,8 @@ __wt_config_collapse(
 		WT_ERR(__wt_buf_catfmt(session, tmp, "%.*s=%.*s,",
 		    (int)k.len, k.str, (int)v.len, v.str));
 	}
+
+	/* We loop until error, and the expected error is WT_NOTFOUND. */
 	if (ret != WT_NOTFOUND)
 		goto err;
 
