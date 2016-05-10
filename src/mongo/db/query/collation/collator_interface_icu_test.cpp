@@ -564,4 +564,32 @@ TEST(CollatorInterfaceICUTest, DifferentEmbeddedInvalidSequencesAndDifferentFina
     assertLessThanEnUS(valid2, invalid2);
 }
 
+TEST(CollatorInterfaceICUTest, ComparisonKeysForEnUsCollatorCorrect) {
+    CollationSpec collationSpec;
+    collationSpec.localeID = "en_US";
+    UErrorCode status = U_ZERO_ERROR;
+    std::unique_ptr<icu::Collator> coll(
+        icu::Collator::createInstance(icu::Locale("en", "US"), status));
+    ASSERT(U_SUCCESS(status));
+    CollatorInterfaceICU icuCollator(collationSpec, std::move(coll));
+
+    ASSERT_EQ(icuCollator.getComparisonKey("abc").getKeyData(), "\x29\x2B\x2D\x01\x07\x01\x07");
+    ASSERT_EQ(icuCollator.getComparisonKey("c\xC3\xB4t\xC3\xA9").getKeyData(),
+              "\x2D\x45\x4F\x31\x01\x44\x8E\x44\x88\x01\x0A");
+}
+
+TEST(CollatorInterfaceICUTest, ComparisonKeysForFrCaCollatorCorrect) {
+    CollationSpec collationSpec;
+    collationSpec.localeID = "fr_CA";
+    UErrorCode status = U_ZERO_ERROR;
+    std::unique_ptr<icu::Collator> coll(
+        icu::Collator::createInstance(icu::Locale("fr", "CA"), status));
+    ASSERT(U_SUCCESS(status));
+    CollatorInterfaceICU icuCollator(collationSpec, std::move(coll));
+
+    ASSERT_EQ(icuCollator.getComparisonKey("abc").getKeyData(), "\x29\x2B\x2D\x01\x07\x01\x07");
+    ASSERT_EQ(icuCollator.getComparisonKey("c\xC3\xB4t\xC3\xA9").getKeyData(),
+              "\x2D\x45\x4F\x31\x01\x88\x44\x8E\x06\x01\x0A");
+}
+
 }  // namespace
