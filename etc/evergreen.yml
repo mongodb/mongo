@@ -38,6 +38,26 @@ variables:
       run_multiple_jobs: false
       max_jobs: 0  # If set in combination with run_multiple_jobs, will cap the number of jobs used.
 
+- &jepsen_config_vars
+  jepsen_protocol_version: --protocol-version 1
+  jepsen_read_concern: ""
+  jepsen_read_with_find_and_modify: ""
+  jepsen_storage_engine: ""
+  jepsen_time_limit: --time-limit 300
+  jepsen_write_concern: ""
+
+# Template for running Jepsen tests
+- &run_jepsen_template
+  name: run_jepsen_template
+  depends_on:
+  - name: compile
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+
 - &run_jstestfuzz_tests
   func: "run tests"
   # Terminate the function when there has been no output to stdout for 30 minutes. E.g. when something is stuck in an infinite loop.
@@ -321,6 +341,59 @@ functions:
         fi
 
         ${path_prefix} ${san_symbolizer} ${san_options} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json
+
+  "do jepsen setup" :
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          git clone git@github.com:10gen/jepsen.git
+          cd jepsen/jepsen
+          git checkout mongodb-master
+          lein install
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          # On each LXC host do the following:
+          #   Copy the mongodb tarball to /root
+          numVms=5
+          for i in $(seq 1 $numVms)
+          do
+            hostn=n$i
+            sudo cp -f mongo-binaries.tgz /var/lib/lxc/$hostn/rootfs/root/
+          done
+
+  "run jepsen test" :
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src/jepsen/mongodb
+        script: |
+          set -o verbose
+          set -o errexit
+          # Increase JVM heap space to 75% of total memory
+          heap_space=$(grep MemTotal: /proc/meminfo | awk '{printf "%0dm",$2*0.75/1024}')
+          sed -i -e "/:aot/i\  :jvm-opts [\"-Xmx$heap_space\"]" project.clj
+          lein run --tarball "file:///root/mongo-binaries.tgz" ${jepsen_protocol_version} ${jepsen_read_concern} ${jepsen_read_with_find_and_modify} ${jepsen_storage_engine} ${jepsen_time_limit} ${jepsen_write_concern}
+    - command: archive.targz_pack
+      params:
+        target: "src/jepsen-results.tgz"
+        source_dir: "src/jepsen/mongodb/store"
+        include:
+          - "./**"
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/jepsen-results.tgz
+        remote_file: mongodb-mongo-master/${build_variant}/${revision}/jepsen/jepsen-results-${task_id}-${execution}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: Jepsen Test Results - ${execution}
 
   "run jstestfuzz":
     - command: shell.exec
@@ -682,6 +755,18 @@ tasks:
           set -o errexit
           set -o verbose
           ${scons|scons} ${compile_flags|} lint
+
+## jepsen WT ##
+- <<: *run_jepsen_template
+  name: jepsen_findAndModify_WT
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+      jepsen_read_with_find_and_modify: --read-with-find-and-modify
+      jepsen_storage_engine: --storage-engine wiredTiger
 
 ## jstestfuzz mmapv1 ##
 - <<: *jstestfuzz_template
@@ -2811,6 +2896,9 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
+  - name: jepsen_findAndModify_WT
+    distros:
+    - ubuntu1404-jepsen
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
@@ -4765,6 +4853,9 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
+  - name: jepsen_findAndModify_WT
+    distros:
+    - ubuntu1404-jepsen
   - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
