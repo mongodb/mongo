@@ -543,8 +543,11 @@ Status EphemeralForTestRecordStore::validate(OperationContext* txn,
             size_t dataSize;
             const Status status = adaptor->validate(it->first, rec.toRecordData(), &dataSize);
             if (!status.isOK()) {
+                if (results->valid) {
+                    // Only log once.
+                    results->errors.push_back("detected one or more invalid documents (see logs)");
+                }
                 results->valid = false;
-                results->errors.push_back("invalid object detected (see logs)");
                 log() << "Invalid object detected in " << _ns << ": " << status.reason();
             }
         }

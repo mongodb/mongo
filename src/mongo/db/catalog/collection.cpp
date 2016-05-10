@@ -1039,7 +1039,7 @@ public:
             if (!descriptor->isMultikey(_txn) && documentKeySet.size() > 1) {
                 string msg = str::stream() << "Index " << descriptor->indexName()
                                            << " is not multi-key but has more than one"
-                                           << " key in one or more document(s)";
+                                           << " key in document " << recordId;
                 results.errors.push_back(msg);
                 results.valid = false;
             }

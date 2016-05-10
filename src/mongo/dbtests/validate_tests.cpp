@@ -561,6 +561,108 @@ public:
     }
 };
 
+class ValidateIndexEntry : public ValidateBase {
+public:
+    ValidateIndexEntry() : ValidateBase(true) {}
+
+    void run() {
+        // Create a new collection, insert three records and check it's valid.
+        Database* db = _ctx.db();
+        OpDebug* const nullOpDebug = nullptr;
+        Collection* coll;
+        RecordId id1;
+        {
+            WriteUnitOfWork wunit(&_txn);
+            ASSERT_OK(db->dropCollection(&_txn, _ns));
+            coll = db->createCollection(&_txn, _ns);
+
+            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 1 << "a" << 1), nullOpDebug, true));
+            id1 = coll->getCursor(&_txn)->next()->id;
+            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 2 << "a" << 2), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 3 << "b" << 1), nullOpDebug, true));
+            wunit.commit();
+        }
+
+        const std::string indexName = "bad_index";
+        auto status = dbtests::createIndexFromSpec(
+            &_txn,
+            coll->ns().ns(),
+            BSON("name" << indexName << "ns" << coll->ns().ns() << "key" << BSON("a" << 1)
+                        << "background" << false));
+
+        ASSERT_OK(status);
+        ASSERT_TRUE(checkValid());
+
+        // Replace a correct index entry with a bad one and check it's invalid.
+        IndexCatalog* indexCatalog = coll->getIndexCatalog();
+        IndexDescriptor* descriptor = indexCatalog->findIndexByName(&_txn, indexName);
+        IndexAccessMethod* iam = indexCatalog->getIndex(descriptor);
+
+        {
+            WriteUnitOfWork wunit(&_txn);
+            int64_t numDeleted;
+            int64_t numInserted;
+            const BSONObj actualKey = BSON("a" << 1);
+            const BSONObj badKey = BSON("a" << -1);
+            InsertDeleteOptions options;
+            options.dupsAllowed = true;
+            options.logIfError = true;
+            auto removeStatus = iam->remove(&_txn, actualKey, id1, options, &numDeleted);
+            auto insertStatus = iam->insert(&_txn, badKey, id1, options, &numInserted);
+
+            ASSERT_EQUALS(numDeleted, 1);
+            ASSERT_EQUALS(numInserted, 1);
+            ASSERT_OK(removeStatus);
+            ASSERT_OK(insertStatus);
+            wunit.commit();
+        }
+
+        ASSERT_FALSE(checkValid());
+    }
+};
+
+class ValidateIndexOrdering : public ValidateBase {
+public:
+    ValidateIndexOrdering() : ValidateBase(true) {}
+
+    void run() {
+        // Create a new collection, insert three records and check it's valid.
+        Database* db = _ctx.db();
+        OpDebug* const nullOpDebug = nullptr;
+        Collection* coll;
+        RecordId id1;
+        {
+            WriteUnitOfWork wunit(&_txn);
+            ASSERT_OK(db->dropCollection(&_txn, _ns));
+            coll = db->createCollection(&_txn, _ns);
+
+            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 1 << "a" << 1), nullOpDebug, true));
+            id1 = coll->getCursor(&_txn)->next()->id;
+            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 2 << "a" << 2), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(&_txn, BSON("_id" << 3 << "b" << 1), nullOpDebug, true));
+            wunit.commit();
+        }
+
+        const std::string indexName = "bad_index";
+        auto status = dbtests::createIndexFromSpec(
+            &_txn,
+            coll->ns().ns(),
+            BSON("name" << indexName << "ns" << coll->ns().ns() << "key" << BSON("a" << 1)
+                        << "background" << false));
+
+        ASSERT_OK(status);
+        ASSERT_TRUE(checkValid());
+
+        // Change the IndexDescriptor's keyPattern to descending so the index ordering
+        // appears wrong.
+        IndexCatalog* indexCatalog = coll->getIndexCatalog();
+        IndexDescriptor* descriptor = indexCatalog->findIndexByName(&_txn, indexName);
+        descriptor->setKeyPatternForTest(BSON("a" << -1));
+
+        ASSERT_FALSE(checkValid());
+    }
+};
+
 class ValidateTests : public Suite {
 public:
     ValidateTests() : Suite("validate_tests") {}
@@ -579,6 +681,10 @@ public:
         add<ValidateSparseIndex>();
         add<ValidateCompoundIndex>();
         add<ValidatePartialIndex>();
+
+        // Tests for index validation.
+        add<ValidateIndexEntry>();
+        add<ValidateIndexOrdering>();
     }
 } validateTests;
 }  // namespace ValidateTests
