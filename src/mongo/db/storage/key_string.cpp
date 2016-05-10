@@ -247,8 +247,11 @@ string readInvertedCString(BufReader* reader) {
 
 string readInvertedCStringWithNuls(BufReader* reader) {
     std::string out;
+    bool firstPass = true;
     do {
-        if (!out.empty()) {
+        if (firstPass) {
+            firstPass = false;
+        } else {
             // If this isn't our first pass through the loop it means we hit an NUL byte
             // encoded as "\xFF\00" in our inverted string.
             reader->skip(1);

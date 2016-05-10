@@ -378,6 +378,7 @@ const std::vector<BSONObj>& getInterestingElements() {
     // These are used to test strings that include NUL bytes.
     const StringData ball("ball", StringData::LiteralTag());
     const StringData ball00n("ball\0\0n", StringData::LiteralTag());
+    const StringData zeroBall("\0ball", StringData::LiteralTag());
 
     elements.push_back(BSON("" << 1));
     elements.push_back(BSON("" << 1.0));
@@ -403,8 +404,10 @@ const std::vector<BSONObj>& getInterestingElements() {
                             << "aaa"));
     elements.push_back(BSON(""
                             << "AAA"));
+    elements.push_back(BSON("" << zeroBall));
     elements.push_back(BSON("" << ball));
     elements.push_back(BSON("" << ball00n));
+    elements.push_back(BSON("" << BSONSymbol(zeroBall)));
     elements.push_back(BSON("" << BSONSymbol(ball)));
     elements.push_back(BSON("" << BSONSymbol(ball00n)));
     elements.push_back(BSON("" << BSON("a" << 5)));
@@ -416,6 +419,7 @@ const std::vector<BSONObj>& getInterestingElements() {
     elements.push_back(BSON("" << OID("abcdefabcdefabcdefabcdef")));
     elements.push_back(BSON("" << Date_t(123)));
     elements.push_back(BSON("" << BSONCode("abc_code")));
+    elements.push_back(BSON("" << BSONCode(zeroBall)));
     elements.push_back(BSON("" << BSONCode(ball)));
     elements.push_back(BSON("" << BSONCode(ball00n)));
     elements.push_back(BSON("" << BSONCodeWScope("def_code1",
@@ -427,6 +431,7 @@ const std::vector<BSONObj>& getInterestingElements() {
     elements.push_back(BSON("" << BSONCodeWScope("def_code2",
                                                  BSON("x_scope"
                                                       << "b"))));
+    elements.push_back(BSON("" << BSONCodeWScope(zeroBall, BSON("a" << 1))));
     elements.push_back(BSON("" << BSONCodeWScope(ball, BSON("a" << 1))));
     elements.push_back(BSON("" << BSONCodeWScope(ball00n, BSON("a" << 1))));
     elements.push_back(BSON("" << true));
