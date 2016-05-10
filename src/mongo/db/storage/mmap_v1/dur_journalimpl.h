@@ -39,6 +39,9 @@
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
+
+class ClockSource;
+
 namespace dur {
 
 /** the writeahead journal for durability */
@@ -49,7 +52,7 @@ public:
     Journal();
 
     /** call during startup by journalMakeDir() */
-    void init();
+    void init(ClockSource* cs, int64_t serverStartMs);
 
     /** check if time to rotate files.  assure a file is open.
         done separately from the journal() call as we can do this part
@@ -118,6 +121,9 @@ private:
     // data <= this time is fsynced in the datafiles (unless hard drive controller is caching)
     AtomicUInt64 _lastFlushTime;
     AtomicWord<bool> _writeToLSNNeeded;
+
+    ClockSource* _clock;
+    int64_t _serverStartMs;
 };
 }
 }

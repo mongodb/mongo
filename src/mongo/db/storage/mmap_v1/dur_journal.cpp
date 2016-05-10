@@ -52,6 +52,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/checksum.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/file.h"
 #include "mongo/util/hex.h"
@@ -193,11 +194,7 @@ Journal j;
 
 const unsigned long long LsnShutdownSentinel = ~((unsigned long long)0);
 
-Journal::Journal() {
-    _written = 0;
-    _nextFileNumber = 0;
-    _curLogFile = 0;
-    _curFileId = 0;
+Journal::Journal() : _written(0), _nextFileNumber(0), _curLogFile(0), _curFileId(0) {
     _lastSeqNumberWrittenToSharedView.store(0);
     _preFlushTime.store(0);
     _lastFlushTime.store(0);
@@ -498,8 +495,8 @@ boost::filesystem::path findPrealloced() {
 }
 
 /** assure journal/ dir exists. throws. call during startup. */
-void journalMakeDir() {
-    j.init();
+void journalMakeDir(ClockSource* cs, int64_t serverStartMs) {
+    j.init(cs, serverStartMs);
 
     boost::filesystem::path p = getJournalDir();
     j.dir = p.string();
@@ -552,8 +549,10 @@ void Journal::_open() {
     }
 }
 
-void Journal::init() {
+void Journal::init(ClockSource* cs, int64_t serverStartMs) {
     verify(_curLogFile == 0);
+    _clock = cs;
+    _serverStartMs = serverStartMs;
 }
 
 void Journal::open() {
@@ -661,8 +660,9 @@ stdx::mutex lastGeneratedSeqNumberMutex;
 uint64_t lastGeneratedSeqNumber = 0;
 }
 
-uint64_t generateNextSeqNumber() {
-    const uint64_t now = Listener::getElapsedTimeMillis();
+uint64_t generateNextSeqNumber(ClockSource* cs, int64_t serverStartMs) {
+    const uint64_t now = cs->now().toMillisSinceEpoch() - serverStartMs;
+
     stdx::lock_guard<stdx::mutex> lock(lastGeneratedSeqNumberMutex);
     if (now > lastGeneratedSeqNumber) {
         lastGeneratedSeqNumber = now;
@@ -693,7 +693,7 @@ void Journal::closeCurrentJournalFile() {
 
     JFile jf;
     jf.filename = _curLogFile->_name;
-    jf.lastEventTimeMs = generateNextSeqNumber();
+    jf.lastEventTimeMs = generateNextSeqNumber(_clock, _serverStartMs);
     _oldJournalFiles.push_back(jf);
 
     delete _curLogFile;  // close

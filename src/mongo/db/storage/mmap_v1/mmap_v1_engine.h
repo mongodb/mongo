@@ -113,6 +113,9 @@ private:
     RecordAccessTracker _recordAccessTracker;
 
     std::unique_ptr<ExtentManager::Factory> _extentManagerFactory;
+
+    ClockSource* _clock;
+    int64_t _startMs;
 };
 
 void _deleteDataFiles(const std::string& database);

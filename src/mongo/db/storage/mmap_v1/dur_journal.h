@@ -35,6 +35,7 @@
 namespace mongo {
 
 class AlignedBuilder;
+class ClockSource;
 class JSectHeader;
 
 namespace dur {
@@ -51,13 +52,13 @@ extern bool okToCleanUp;
 void journalCleanup(bool log = false);
 
 /** assure journal/ dir exists. throws */
-void journalMakeDir();
+void journalMakeDir(ClockSource* cs, int64_t serverStartMs);
 
 /**
  * Generates the next sequence number for use in the journal, guaranteed to be greater than all
  * prior sequence numbers.
  */
-uint64_t generateNextSeqNumber();
+uint64_t generateNextSeqNumber(ClockSource* cs, int64_t serverStartMs);
 
 /**
  * Informs the journaling system that all writes on or before the passed in sequence number have
