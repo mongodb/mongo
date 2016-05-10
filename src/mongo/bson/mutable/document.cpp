@@ -408,7 +408,7 @@ namespace {
 #endif
 
 // The designated field name for the root element.
-const char kRootFieldName[] = "";
+constexpr auto kRootFieldName = ""_sd;
 
 // How many reps do we cache before we spill to heap. Use a power of two. For debug
 // builds we make this very small so it is less likely to mask vector invalidation
@@ -2590,7 +2590,7 @@ Element Document::makeElementWithNewFieldName(StringData fieldName, ConstElement
 }
 
 Element Document::makeRootElement() {
-    return makeElementObject(StringData(kRootFieldName, StringData::LiteralTag()));
+    return makeElementObject(kRootFieldName);
 }
 
 Element Document::makeRootElement(const BSONObj& value) {

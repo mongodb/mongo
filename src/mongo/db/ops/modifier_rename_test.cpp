@@ -40,19 +40,11 @@
 #include "mongo/db/ops/log_builder.h"
 #include "mongo/unittest/unittest.h"
 
-namespace {
+namespace mongo {
 
-using mongo::BSONObj;
-using mongo::fromjson;
-using mongo::LogBuilder;
-using mongo::ModifierInterface;
-using mongo::NumberInt;
-using mongo::ModifierRename;
-using mongo::Status;
-using mongo::StringData;
-using mongo::mutablebson::ConstElement;
-using mongo::mutablebson::Document;
-using mongo::mutablebson::Element;
+using mutablebson::ConstElement;
+using mutablebson::Document;
+using mutablebson::Element;
 
 /** Helper to build and manipulate the mod. */
 class Mod {
@@ -111,25 +103,25 @@ TEST(InvalidInit, FromDbTests) {
 TEST(InvalidInit, ToFieldCannotContainEmbeddedNullByte) {
     ModifierRename mod;
     {
-        StringData embeddedNull("a\0b", StringData::LiteralTag());
+        const auto embeddedNull = "a\0b"_sd;
         ASSERT_NOT_OK(mod.init(BSON("a" << embeddedNull).firstElement(),
                                ModifierInterface::Options::normal()));
     }
 
     {
-        StringData singleNullByte("\0", StringData::LiteralTag());
+        const auto singleNullByte = "\0"_sd;
         ASSERT_NOT_OK(mod.init(BSON("a" << singleNullByte).firstElement(),
                                ModifierInterface::Options::normal()));
     }
 
     {
-        StringData leadingNullByte("\0bbbb", StringData::LiteralTag());
+        const auto leadingNullByte = "\0bbbb"_sd;
         ASSERT_NOT_OK(mod.init(BSON("a" << leadingNullByte).firstElement(),
                                ModifierInterface::Options::normal()));
     }
 
     {
-        StringData trailingNullByte("bbbb\0", StringData::LiteralTag());
+        const auto trailingNullByte = "bbbb\0"_sd;
         ASSERT_NOT_OK(mod.init(BSON("a" << trailingNullByte).firstElement(),
                                ModifierInterface::Options::normal()));
     }
@@ -468,4 +460,4 @@ TEST(LegacyData, CanRenameFromInvalidFieldName) {
     ASSERT_EQUALS(logDoc, logObj);
 }
 
-}  // namespace
+}  // namespace mongo

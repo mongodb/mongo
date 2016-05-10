@@ -4405,13 +4405,11 @@ TEST(ExpressionStrLenBytes, ComputesLengthOfEmptyString) {
 }
 
 TEST(ExpressionStrLenBytes, ComputesLengthOfStringWithNull) {
-    assertExpectedResults("$strLenBytes",
-                          {{{Value(StringData("ab\0c", StringData::LiteralTag()))}, Value(4)}});
+    assertExpectedResults("$strLenBytes", {{{Value("ab\0c"_sd)}, Value(4)}});
 }
 
 TEST(ExpressionStrLenCP, ComputesLengthOfStringWithNullAtEnd) {
-    assertExpectedResults("$strLenBytes",
-                          {{{Value(StringData("abc\0", StringData::LiteralTag()))}, Value(4)}});
+    assertExpectedResults("$strLenBytes", {{{Value("abc\0"_sd)}, Value(4)}});
 }
 
 }  // namespace StrLenBytes
@@ -4427,18 +4425,15 @@ TEST(ExpressionStrLenCP, ComputesLengthOfEmptyString) {
 }
 
 TEST(ExpressionStrLenCP, ComputesLengthOfStringWithNull) {
-    assertExpectedResults("$strLenCP",
-                          {{{Value(StringData("ab\0c", StringData::LiteralTag()))}, Value(4)}});
+    assertExpectedResults("$strLenCP", {{{Value("ab\0c"_sd)}, Value(4)}});
 }
 
 TEST(ExpressionStrLenCP, ComputesLengthOfStringWithNullAtEnd) {
-    assertExpectedResults("$strLenCP",
-                          {{{Value(StringData("abc\0", StringData::LiteralTag()))}, Value(4)}});
+    assertExpectedResults("$strLenCP", {{{Value("abc\0"_sd)}, Value(4)}});
 }
 
 TEST(ExpressionStrLenCP, ComputesLengthOfStringWithAccent) {
-    assertExpectedResults("$strLenCP",
-                          {{{Value(StringData("a\0bâ", StringData::LiteralTag()))}, Value(4)}});
+    assertExpectedResults("$strLenCP", {{{Value("a\0bâ"_sd)}, Value(4)}});
 }
 
 TEST(ExpressionStrLenCP, ComputesLengthOfStringWithSpecialCharacters) {
@@ -4562,7 +4557,7 @@ TEST(ExpressionSubstrCPTest, DoesThrowWithBadContinuationByte) {
     VariablesIdGenerator idGenerator;
     VariablesParseState vps(&idGenerator);
 
-    StringData continuationByte("\x80\x00", StringData::LiteralTag());
+    const auto continuationByte = "\x80\x00"_sd;
     const auto expr = Expression::parseExpression(
         BSON("$substrCP" << BSON_ARRAY(continuationByte << 0 << 1)).firstElement(), vps);
     ASSERT_THROWS({ expr->evaluate(Document()); }, UserException);
@@ -4572,7 +4567,7 @@ TEST(ExpressionSubstrCPTest, DoesThrowWithInvalidLeadingByte) {
     VariablesIdGenerator idGenerator;
     VariablesParseState vps(&idGenerator);
 
-    StringData leadingByte("\xFF\x00", StringData::LiteralTag());
+    const auto leadingByte = "\xFF\x00"_sd;
     const auto expr = Expression::parseExpression(
         BSON("$substrCP" << BSON_ARRAY(leadingByte << 0 << 1)).firstElement(), vps);
     ASSERT_THROWS({ expr->evaluate(Document()); }, UserException);

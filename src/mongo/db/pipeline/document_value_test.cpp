@@ -359,8 +359,8 @@ public:
         // EOO not valid in middle of BSONObj
         append("double", 1.0);
         append("c-string", "string\0after NUL");  // after NULL is ignored
-        append("c++", StringData("string\0after NUL", StringData::LiteralTag()).toString());
-        append("StringData", StringData("string\0after NUL", StringData::LiteralTag()));
+        append("c++", "string\0after NUL"_sd);
+        append("StringData", "string\0after NUL"_sd);
         append("emptyObj", BSONObj());
         append("filledObj", BSON("a" << 1));
         append("emptyArray", BSON("" << BSONArray()).firstElement());
@@ -379,9 +379,9 @@ public:
         append("regexEmpty", BSONRegEx("", ""));
         append("dbref", BSONDBRef("foo", OID()));
         append("code", BSONCode("function() {}"));
-        append("codeNul", BSONCode(StringData("var nul = '\0'", StringData::LiteralTag())));
+        append("codeNul", BSONCode("var nul = '\0'"_sd));
         append("symbol", BSONSymbol("foo"));
-        append("symbolNul", BSONSymbol(StringData("f\0o", StringData::LiteralTag())));
+        append("symbolNul", BSONSymbol("f\0o"_sd));
         append("codeWScope", BSONCodeWScope("asdf", BSONObj()));
         append("codeWScopeWScope", BSONCodeWScope("asdf", BSON("one" << 1)));
         append("int", 1);

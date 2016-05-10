@@ -283,7 +283,7 @@ Status RoleGraph::handleLogOp(OperationContext* txn,
                               const NamespaceString& ns,
                               const BSONObj& o,
                               const BSONObj* o2) {
-    if (op == StringData("db", StringData::LiteralTag()))
+    if (op == "db"_sd)
         return Status::OK();
     if (op[0] == '\0' || op[1] != '\0') {
         return Status(ErrorCodes::BadValue,

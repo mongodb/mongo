@@ -967,7 +967,7 @@ TEST(MatchExpressionParserLeafTest, RegexEmbeddedNULByte) {
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_TRUE(result.isOK());
 
-    StringData value("a\0b", StringData::LiteralTag());
+    const auto value = "a\0b"_sd;
     ASSERT(result.getValue()->matchesBSON(BSON("x" << value)));
     ASSERT(!result.getValue()->matchesBSON(BSON("x"
                                                 << "a")));

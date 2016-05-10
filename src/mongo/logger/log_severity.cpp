@@ -35,28 +35,28 @@ namespace mongo {
 namespace logger {
 
 namespace {
-const char unknownSeverityString[] = "UNKNOWN";
-const char severeSeverityString[] = "SEVERE";
-const char errorSeverityString[] = "ERROR";
-const char warningSeverityString[] = "warning";
-const char infoSeverityString[] = "info";
-const char debugSeverityString[] = "debug";
+constexpr auto unknownSeverityString = "UNKNOWN"_sd;
+constexpr auto severeSeverityString = "SEVERE"_sd;
+constexpr auto errorSeverityString = "ERROR"_sd;
+constexpr auto warningSeverityString = "warning"_sd;
+constexpr auto infoSeverityString = "info"_sd;
+constexpr auto debugSeverityString = "debug"_sd;
 }  // namespace
 
 StringData LogSeverity::toStringData() const {
     if (_severity > 0)
-        return StringData(debugSeverityString, StringData::LiteralTag());
+        return debugSeverityString;
     if (*this == LogSeverity::Severe())
-        return StringData(severeSeverityString, StringData::LiteralTag());
+        return severeSeverityString;
     if (*this == LogSeverity::Error())
-        return StringData(errorSeverityString, StringData::LiteralTag());
+        return errorSeverityString;
     if (*this == LogSeverity::Warning())
-        return StringData(warningSeverityString, StringData::LiteralTag());
+        return warningSeverityString;
     if (*this == LogSeverity::Info())
-        return StringData(infoSeverityString, StringData::LiteralTag());
+        return infoSeverityString;
     if (*this == LogSeverity::Log())
-        return StringData(infoSeverityString, StringData::LiteralTag());
-    return StringData(unknownSeverityString, StringData::LiteralTag());
+        return infoSeverityString;
+    return unknownSeverityString;
 }
 
 char LogSeverity::toChar() const {

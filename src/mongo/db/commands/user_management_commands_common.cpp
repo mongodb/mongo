@@ -54,7 +54,7 @@ namespace auth {
 
 void redactPasswordData(mutablebson::Element parent) {
     namespace mmb = mutablebson;
-    const StringData pwdFieldName("pwd", StringData::LiteralTag());
+    const auto pwdFieldName = "pwd"_sd;
     for (mmb::Element pwdElement = mmb::findFirstChildNamed(parent, pwdFieldName); pwdElement.ok();
          pwdElement = mmb::findElementNamed(pwdElement.rightSibling(), pwdFieldName)) {
         pwdElement.setValueString("xxx");

@@ -87,11 +87,11 @@ TEST(CollationIndexKeyTest, CollationAwareAppendCorrectlySerializesEmptyComparis
 TEST(CollationIndexKeyTest, CollationAwareAppendCorrectlySerializesWithEmbeddedNullByte) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     BSONObjBuilder builder;
-    builder.append("foo", StringData("a\0b", StringData::LiteralTag()));
+    builder.append("foo", "a\0b"_sd);
     BSONObj dataObj = builder.obj();
 
     BSONObjBuilder expectedBuilder;
-    expectedBuilder.append("", StringData("b\0a", StringData::LiteralTag()));
+    expectedBuilder.append("", "b\0a"_sd);
     BSONObj expectedObj = expectedBuilder.obj();
 
     BSONObjBuilder out;

@@ -490,9 +490,9 @@ const std::vector<BSONObj>& getInterestingElements(KeyString::Version version) {
     elements.clear();
 
     // These are used to test strings that include NUL bytes.
-    const StringData ball("ball", StringData::LiteralTag());
-    const StringData ball00n("ball\0\0n", StringData::LiteralTag());
-    const StringData zeroBall("\0ball", StringData::LiteralTag());
+    const auto ball = "ball"_sd;
+    const auto ball00n = "ball\0\0n"_sd;
+    const auto zeroBall = "\0ball"_sd;
 
     elements.push_back(BSON("" << 1));
     elements.push_back(BSON("" << 1.0));

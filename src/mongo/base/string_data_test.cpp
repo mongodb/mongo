@@ -33,9 +33,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
-namespace {
+namespace mongo {
 
-using mongo::StringData;
 using std::string;
 
 TEST(Construction, Empty) {
@@ -65,10 +64,22 @@ TEST(Construction, FromNullCString) {
     ASSERT_TRUE(strData.rawData() == NULL);
 }
 
-TEST(Construction, FromLiteral) {
-    StringData strData("ccc", StringData::LiteralTag());
-    ASSERT_EQUALS(strData.size(), 3U);
-    ASSERT_EQUALS(strData.toString(), string("ccc"));
+TEST(Construction, FromUserDefinedLiteral) {
+    const auto strData = "cc\0c"_sd;
+    ASSERT_EQUALS(strData.size(), 4U);
+    ASSERT_EQUALS(strData.toString(), string("cc\0c", 4));
+}
+
+TEST(Construction, FromUserDefinedRawLiteral) {
+    const auto strData = R"("")"_sd;
+    ASSERT_EQUALS(strData.size(), 2U);
+    ASSERT_EQUALS(strData.toString(), string("\"\"", 2));
+}
+
+TEST(Construction, FromEmptyUserDefinedLiteral) {
+    const auto strData = ""_sd;
+    ASSERT_EQUALS(strData.size(), 0U);
+    ASSERT_EQUALS(strData.toString(), string(""));
 }
 
 TEST(Comparison, BothEmpty) {
@@ -266,8 +277,7 @@ TEST(EndsWith, Simple) {
 
 TEST(ConstIterator, StdCopy) {
     std::vector<char> chars;
-    const char rawData[] = "This is some raw data.";
-    StringData data(rawData, StringData::LiteralTag());
+    auto data = "This is some raw data."_sd;
 
     chars.resize(data.size());
     std::copy(data.begin(), data.end(), chars.begin());
@@ -279,8 +289,7 @@ TEST(ConstIterator, StdCopy) {
 
 TEST(ConstIterator, StdReverseCopy) {
     std::vector<char> chars;
-    const char rawData[] = "This is some raw data.";
-    StringData data(rawData, StringData::LiteralTag());
+    auto data = "This is some raw data."_sd;
 
     chars.resize(data.size());
     std::reverse_copy(data.begin(), data.end(), chars.begin());
@@ -294,8 +303,7 @@ TEST(ConstIterator, StdReverseCopy) {
 
 TEST(ConstIterator, StdReplaceCopy) {
     std::vector<char> chars;
-    const char rawData[] = "This is some raw data.";
-    StringData data(rawData, StringData::LiteralTag());
+    auto data = "This is some raw data."_sd;
 
     chars.resize(data.size());
     std::replace_copy(data.begin(), data.end(), chars.begin(), ' ', '_');
@@ -307,4 +315,4 @@ TEST(ConstIterator, StdReplaceCopy) {
     }
 }
 
-}  // unnamed namespace
+}  // namespace mongo

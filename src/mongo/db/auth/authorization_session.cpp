@@ -246,7 +246,7 @@ Status AuthorizationSession::checkAuthForGetMore(const NamespaceString& ns,
 
 Status AuthorizationSession::checkAuthForInsert(const NamespaceString& ns,
                                                 const BSONObj& document) {
-    if (ns.coll() == StringData("system.indexes", StringData::LiteralTag())) {
+    if (ns.coll() == "system.indexes"_sd) {
         BSONElement nsElement = document["ns"];
         if (nsElement.type() != String) {
             return Status(ErrorCodes::Unauthorized,

@@ -319,8 +319,7 @@ void processNoteSegment(const dl_phdr_info& info, const ElfW(Phdr) & phdr, BSONO
         if (noteHeader.n_type != NT_GNU_BUILD_ID)
             continue;
         const char* const noteNameBegin = notesCurr + sizeof(noteHeader);
-        if (StringData(noteNameBegin, noteHeader.n_namesz - 1) !=
-            StringData(ELF_NOTE_GNU, StringData::LiteralTag())) {
+        if (StringData(noteNameBegin, noteHeader.n_namesz - 1) != ELF_NOTE_GNU) {
             continue;
         }
         const char* const noteDescBegin =

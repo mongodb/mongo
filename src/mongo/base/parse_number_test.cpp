@@ -249,9 +249,7 @@ TEST(Double, TestParsingGarbage) {
     ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString<double>("1e6 ", &d));
     ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString<double>(" 1e6", &d));
     ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString<double>("0xabcab.defPa", &d));
-    ASSERT_EQUALS(
-        ErrorCodes::FailedToParse,
-        parseNumberFromString<double>(StringData("1.0\0garbage", StringData::LiteralTag()), &d));
+    ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString<double>("1.0\0garbage"_sd, &d));
 }
 
 TEST(Double, TestParsingOverflow) {

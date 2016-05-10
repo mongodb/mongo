@@ -42,14 +42,6 @@ namespace {
 // Lazily evaluated in LogComponent::getDottedName().
 std::string _dottedNames[LogComponent::kNumLogComponents + 1];
 
-/**
- * Returns StringData created from a string literal
- */
-template <size_t N>
-StringData createStringData(const char (&val)[N]) {
-    return StringData(val, StringData::LiteralTag());
-}
-
 //
 // Fully initialize _dottedNames before we enter multithreaded execution.
 //
@@ -94,41 +86,41 @@ LogComponent LogComponent::parent() const {
 StringData LogComponent::toStringData() const {
     switch (_value) {
         case kDefault:
-            return createStringData("default");
+            return "default"_sd;
         case kAccessControl:
-            return createStringData("accessControl");
+            return "accessControl"_sd;
         case kCommand:
-            return createStringData("command");
+            return "command"_sd;
         case kControl:
-            return createStringData("control");
+            return "control"_sd;
         case kExecutor:
-            return createStringData("executor");
+            return "executor"_sd;
         case kGeo:
-            return createStringData("geo");
+            return "geo"_sd;
         case kIndex:
-            return createStringData("index");
+            return "index"_sd;
         case kNetwork:
-            return createStringData("network");
+            return "network"_sd;
         case kQuery:
-            return createStringData("query");
+            return "query"_sd;
         case kReplication:
-            return createStringData("replication");
+            return "replication"_sd;
         case kSharding:
-            return createStringData("sharding");
+            return "sharding"_sd;
         case kStorage:
-            return createStringData("storage");
+            return "storage"_sd;
         case kJournal:
-            return createStringData("journal");
+            return "journal"_sd;
         case kWrite:
-            return createStringData("write");
+            return "write"_sd;
         case kFTDC:
-            return createStringData("ftdc");
+            return "ftdc"_sd;
         case kASIO:
-            return createStringData("asio");
+            return "asio"_sd;
         case kBridge:
-            return createStringData("bridge");
+            return "bridge"_sd;
         case kNumLogComponents:
-            return createStringData("total");
+            return "total"_sd;
             // No default. Compiler should complain if there's a log component that's not handled.
     }
     invariant(false);
@@ -164,41 +156,41 @@ std::string LogComponent::getDottedName() const {
 StringData LogComponent::getNameForLog() const {
     switch (_value) {
         case kDefault:
-            return createStringData("-       ");
+            return "-       "_sd;
         case kAccessControl:
-            return createStringData("ACCESS  ");
+            return "ACCESS  "_sd;
         case kCommand:
-            return createStringData("COMMAND ");
+            return "COMMAND "_sd;
         case kControl:
-            return createStringData("CONTROL ");
+            return "CONTROL "_sd;
         case kExecutor:
-            return createStringData("EXECUTOR");
+            return "EXECUTOR"_sd;
         case kGeo:
-            return createStringData("GEO     ");
+            return "GEO     "_sd;
         case kIndex:
-            return createStringData("INDEX   ");
+            return "INDEX   "_sd;
         case kNetwork:
-            return createStringData("NETWORK ");
+            return "NETWORK "_sd;
         case kQuery:
-            return createStringData("QUERY   ");
+            return "QUERY   "_sd;
         case kReplication:
-            return createStringData("REPL    ");
+            return "REPL    "_sd;
         case kSharding:
-            return createStringData("SHARDING");
+            return "SHARDING"_sd;
         case kStorage:
-            return createStringData("STORAGE ");
+            return "STORAGE "_sd;
         case kJournal:
-            return createStringData("JOURNAL ");
+            return "JOURNAL "_sd;
         case kWrite:
-            return createStringData("WRITE   ");
+            return "WRITE   "_sd;
         case kFTDC:
-            return createStringData("FTDC    ");
+            return "FTDC    "_sd;
         case kASIO:
-            return createStringData("ASIO    ");
+            return "ASIO    "_sd;
         case kBridge:
-            return createStringData("BRIDGE  ");
+            return "BRIDGE  "_sd;
         case kNumLogComponents:
-            return createStringData("TOTAL   ");
+            return "TOTAL   "_sd;
             // No default. Compiler should complain if there's a log component that's not handled.
     }
     invariant(false);
