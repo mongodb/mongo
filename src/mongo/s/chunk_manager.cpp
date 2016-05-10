@@ -196,7 +196,7 @@ void ChunkManager::loadExistingRanges(OperationContext* txn, const ChunkManager*
                 _chunkMap.swap(chunkMap);
                 _shardIds.swap(shardIds);
                 _shardVersions.swap(shardVersions);
-                _chunkRangeMap = std::move(_constructRanges(_chunkMap));
+                _chunkRangeMap = _constructRanges(_chunkMap);
                 return;
             }
         }
