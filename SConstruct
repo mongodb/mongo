@@ -2166,6 +2166,17 @@ def doConfigure(myenv):
     if myenv.ToolchainIs('gcc', 'clang'):
         AddToLINKFLAGSIfSupported(myenv, '-fuse-ld=gold')
 
+        # Disallow an executable stack. Also, issue a warning if any files are found that would
+        # cause the stack to become executable if the noexecstack flag was not in play, so that we
+        # can find them and fix them. We do this here after we check for ld.gold because the
+        # --warn-execstack is currently only offered with gold.
+        #
+        # TODO: Add -Wl,--fatal-warnings once WT-2629 is fixed. We probably can do that
+        # unconditionally above, and not need to do it as an AddToLINKFLAGSIfSupported step, since
+        # both gold and binutils ld both support it.
+        AddToLINKFLAGSIfSupported(myenv, "-Wl,-z,noexecstack")
+        AddToLINKFLAGSIfSupported(myenv, "-Wl,--warn-execstack")
+
     # Apply any link time optimization settings as selected by the 'lto' option.
     if has_option('lto'):
         if myenv.ToolchainIs('msvc'):
