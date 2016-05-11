@@ -28,6 +28,7 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/basic.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -576,6 +577,83 @@ Decimal128 Decimal128::divide(const Decimal128& other,
     return result;
 }
 
+Decimal128 Decimal128::exponential(RoundingMode roundMode) const {
+    std::uint32_t throwAwayFlag = 0;
+    return exponential(&throwAwayFlag);
+}
+
+Decimal128 Decimal128::exponential(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
+    BID_UINT128 current = decimal128ToLibraryType(_value);
+    current = bid128_exp(current, roundMode, signalingFlags);
+    return Decimal128{libraryTypeToValue(current)};
+}
+
+Decimal128 Decimal128::logarithm(RoundingMode roundMode) const {
+    std::uint32_t throwAwayFlag = 0;
+    return logarithm(&throwAwayFlag);
+}
+
+Decimal128 Decimal128::logarithm(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
+    BID_UINT128 current = decimal128ToLibraryType(_value);
+    current = bid128_log(current, roundMode, signalingFlags);
+    return Decimal128{libraryTypeToValue(current)};
+}
+
+Decimal128 Decimal128::logarithm(const Decimal128& other, RoundingMode roundMode) const {
+    std::uint32_t throwAwayFlag = 0;
+    if (other.isEqual(Decimal128(2))) {
+        BID_UINT128 current = decimal128ToLibraryType(_value);
+        current = bid128_log2(current, roundMode, &throwAwayFlag);
+        return Decimal128{libraryTypeToValue(current)};
+    }
+    if (other.isEqual(Decimal128(10))) {
+        BID_UINT128 current = decimal128ToLibraryType(_value);
+        current = bid128_log10(current, roundMode, &throwAwayFlag);
+        return Decimal128{libraryTypeToValue(current)};
+    }
+    return logarithm(other, &throwAwayFlag);
+}
+
+Decimal128 Decimal128::logarithm(const Decimal128& other,
+                                 std::uint32_t* signalingFlags,
+                                 RoundingMode roundMode) const {
+    return logarithm(signalingFlags, roundMode).divide(other);
+}
+
+Decimal128 Decimal128::modulo(const Decimal128& other) const {
+    std::uint32_t throwAwayFlag = 0;
+    return modulo(other, &throwAwayFlag);
+}
+
+Decimal128 Decimal128::modulo(const Decimal128& other, std::uint32_t* signalingFlags) const {
+    BID_UINT128 current = decimal128ToLibraryType(_value);
+    BID_UINT128 divisor = decimal128ToLibraryType(other.getValue());
+    current = bid128_fmod(current, divisor, signalingFlags);
+    return Decimal128{libraryTypeToValue(current)};
+}
+
+Decimal128 Decimal128::power(const Decimal128& other, RoundingMode roundMode) const {
+    std::uint32_t throwAwayFlag = 0;
+    return power(other, &throwAwayFlag, roundMode);
+}
+
+Decimal128 Decimal128::power(const Decimal128& other,
+                             std::uint32_t* signalingFlags,
+                             RoundingMode roundMode) const {
+    BID_UINT128 base = decimal128ToLibraryType(_value);
+    BID_UINT128 exp = decimal128ToLibraryType(other.getValue());
+
+
+    BID_UINT128 result;
+    if (this->isEqual(Decimal128(10)))
+        result = bid128_exp10(exp, roundMode, signalingFlags);
+    else if (this->isEqual(Decimal128(2)))
+        result = bid128_exp2(exp, roundMode, signalingFlags);
+    else
+        result = bid128_pow(base, exp, roundMode, signalingFlags);
+    return Decimal128{libraryTypeToValue(result)}.add(kLargestNegativeExponentZero);
+}
+
 Decimal128 Decimal128::quantize(const Decimal128& other, RoundingMode roundMode) const {
     std::uint32_t throwAwayFlag = 0;
     return quantize(other, &throwAwayFlag, roundMode);
@@ -590,6 +668,17 @@ Decimal128 Decimal128::quantize(const Decimal128& reference,
     Decimal128::Value value = libraryTypeToValue(quantizedResult);
     Decimal128 result(value);
     return result;
+}
+
+Decimal128 Decimal128::squareRoot(RoundingMode roundMode) const {
+    std::uint32_t throwAwayFlag = 0;
+    return exponential(&throwAwayFlag);
+}
+
+Decimal128 Decimal128::squareRoot(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
+    BID_UINT128 current = decimal128ToLibraryType(_value);
+    current = bid128_sqrt(current, roundMode, signalingFlags);
+    return Decimal128{libraryTypeToValue(current)};
 }
 
 bool Decimal128::isEqual(const Decimal128& other) const {
