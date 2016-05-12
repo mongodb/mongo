@@ -3006,6 +3006,10 @@ should_dagger = ( is_running_os('osx') or is_running_os('linux')  ) and "dagger"
 if should_dagger:
     env.Tool("dagger")
 
+incremental_link = Tool('incremental_link')
+if incremental_link.exists(env):
+    incremental_link(env)
+
 def checkErrorCodes():
     import buildscripts.errorcodes as x
     if x.checkErrorCodes() == False:
