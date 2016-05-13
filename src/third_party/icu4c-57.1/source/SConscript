@@ -8,7 +8,6 @@ env.Append(
     CPPDEFINES=[
         'UCONFIG_ONLY_COLLATION=1',
         'U_CHARSET_IS_UTF8=1',
-        'U_I18N_IMPLEMENTATION=1',
         'U_STATIC_IMPLEMENTATION=1',
     ],
 )
@@ -22,7 +21,9 @@ def removeIfPresent(lst, item):
 for to_remove in ['-Werror', '-Wall', '-W']:
     removeIfPresent(env['CCFLAGS'], to_remove)
 
-env.Library(
+i18nEnv = env.Clone()
+i18nEnv.Append(CPPDEFINES=['U_I18N_IMPLEMENTATION=1'])
+i18nEnv.Library(
     target='icu_i18n',
     source=[
         'i18n/affixpatternparser.cpp',
@@ -230,11 +231,7 @@ env.Library(
 )
 
 commonEnv = env.Clone()
-
-# TODO possibly remove "-Iicu/blah/source" flag.
-# TODO figure out why "-Iicu/blah/source/common" is being added twice.
 commonEnv.Append(CPPDEFINES=['U_COMMON_IMPLEMENTATION=1'])
-
 commonEnv.Library(
     target='icu_common',
     source=[
