@@ -323,7 +323,10 @@ void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
         const set<string>& uris = i->second;
 
         BSONObj currentOpRes;
-        conn->runPseudoCommand("admin", "currentOp", "$cmd.sys.inprog", {}, currentOpRes);
+        if (!conn->runPseudoCommand("admin", "currentOp", "$cmd.sys.inprog", {}, currentOpRes) or !currentOpRes.valid() or !currentOpRes.hasField("inprog")) {
+          // can auth fail.
+          continue;
+        }
         auto inprog = currentOpRes["inprog"].embeddedObject();
         BSONForEach(op, inprog) {
             if (uris.count(op["client"].String())) {
