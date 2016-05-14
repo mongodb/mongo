@@ -547,7 +547,8 @@ public:
         verify(empty());
         size_t dataLen = len + sizeof(MsgData::Value) - 4;
         MsgData::View d = reinterpret_cast<char*>(mongoMalloc(dataLen));
-        memcpy(d.data(), msgdata, len);
+        if (len)
+            memcpy(d.data(), msgdata, len);
         d.setLen(dataLen);
         d.setOperation(operation);
         _setData(d.view2ptr(), true);

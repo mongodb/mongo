@@ -218,7 +218,8 @@ public:
     }
 
     void appendBuf(const void* src, size_t len) {
-        memcpy(grow((int)len), src, len);
+        if (len)
+            memcpy(grow((int)len), src, len);
     }
 
     template <class T>
