@@ -173,28 +173,10 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
             return;
         }
         case mongo::NumberLong: {
-            unsigned long long nativeUnsignedLong = elem.numberLong();
-            // values above 2^53 are not accurately represented in JS
-            if (static_cast<long long>(nativeUnsignedLong) ==
-                    static_cast<long long>(
-                        static_cast<double>(static_cast<long long>(nativeUnsignedLong))) &&
-                nativeUnsignedLong < 9007199254740992ULL) {
-                JS::AutoValueArray<1> args(_context);
-                ValueReader(_context, args[0])
-                    .fromDouble(static_cast<double>(static_cast<long long>(nativeUnsignedLong)));
-
-                scope->getProto<NumberLongInfo>().newInstance(args, _value);
-            } else {
-                JS::AutoValueArray<3> args(_context);
-                ValueReader(_context, args[0])
-                    .fromDouble(static_cast<double>(static_cast<long long>(nativeUnsignedLong)));
-                ValueReader(_context, args[1]).fromDouble(nativeUnsignedLong >> 32);
-                ValueReader(_context, args[2])
-                    .fromDouble(
-                        static_cast<unsigned long>(nativeUnsignedLong & 0x00000000ffffffff));
-                scope->getProto<NumberLongInfo>().newInstance(args, _value);
-            }
-
+            JS::RootedObject thisv(_context);
+            scope->getProto<NumberLongInfo>().newObject(&thisv);
+            JS_SetPrivate(thisv, new int64_t(elem.numberLong()));
+            _value.setObjectOrNull(thisv);
             return;
         }
         case mongo::NumberDecimal: {
