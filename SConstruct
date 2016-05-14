@@ -2148,8 +2148,20 @@ def doConfigure(myenv):
             myenv['ENV']['TSAN_OPTIONS'] = tsan_options
 
         if using_ubsan:
-            # By default, undefined behavior sanitizer doesn't stop on the first error. Make it so.
-            AddToCCFLAGSIfSupported(myenv, "-fno-sanitize-recover")
+            # By default, undefined behavior sanitizer doesn't stop on
+            # the first error. Make it so. Newer versions of clang
+            # have renamed the flag.
+            if not AddToCCFLAGSIfSupported(myenv, "-fno-sanitize-recover"):
+                AddToCCFLAGSIfSupported(myenv, "-fno-sanitize-recover=undefined")
+
+            # Ideally, we would apply this only in the WiredTiger
+            # directory until WT-2631 is resolved, but we can't rely
+            # on the flag being supported until clang-3.6, which isn't
+            # our minimum, and we don't have access to
+            # AddToCCFFLAGSIfSupported in the scope of the WT
+            # Sconscript.
+            #
+            AddToCCFLAGSIfSupported(myenv, "-fno-sanitize=nonnull-attribute")
 
     if myenv.ToolchainIs('msvc') and optBuild:
         # http://blogs.msdn.com/b/vcblog/archive/2013/09/11/introducing-gw-compiler-switch.aspx

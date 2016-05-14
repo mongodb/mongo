@@ -80,22 +80,22 @@ int identityCompare(T a, T b) {
     return (a < b) ? -1 : 1;
 }
 
-int signedCompare(int64_t a, int64_t b) {
+inline int signedCompare(int64_t a, int64_t b) {
     return identityCompare(a, b);
 }
 
-int signedCompare(double a, double b) {
+inline int signedCompare(double a, double b) {
     return identityCompare(a, b);
 }
 
-int signedCompare(uint64_t a, uint64_t b) {
+inline int signedCompare(uint64_t a, uint64_t b) {
     return identityCompare(a, b);
 }
 
 /**
  * Compare unsigned and signed integers.
  */
-int signedCompare(int64_t a, uint64_t b) {
+inline int signedCompare(int64_t a, uint64_t b) {
     if (a < 0) {
         return -1;
     }
@@ -104,14 +104,14 @@ int signedCompare(int64_t a, uint64_t b) {
     return signedCompare(aUnsigned, b);
 }
 
-int signedCompare(uint64_t a, int64_t b) {
+inline int signedCompare(uint64_t a, int64_t b) {
     return -signedCompare(b, a);
 }
 
 /**
  * Compare doubles and signed integers.
  */
-int signedCompare(double a, int64_t b) {
+inline int signedCompare(double a, int64_t b) {
     // Casting int64_ts to doubles will round them
     // and give the wrong result, so convert doubles to
     // int64_ts if we can, then do the comparison.
@@ -125,14 +125,14 @@ int signedCompare(double a, int64_t b) {
     return signedCompare(aAsInt64, b);
 }
 
-int signedCompare(int64_t a, double b) {
+inline int signedCompare(int64_t a, double b) {
     return -signedCompare(b, a);
 }
 
 /**
  * Compare doubles and unsigned integers.
  */
-int signedCompare(double a, uint64_t b) {
+inline int signedCompare(double a, uint64_t b) {
     if (a < 0) {
         return -1;
     }
@@ -148,7 +148,7 @@ int signedCompare(double a, uint64_t b) {
     return signedCompare(aAsUInt64, b);
 }
 
-int signedCompare(uint64_t a, double b) {
+inline int signedCompare(uint64_t a, double b) {
     return -signedCompare(b, a);
 }
 
