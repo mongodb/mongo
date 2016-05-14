@@ -92,14 +92,22 @@ BSONObj S2AccessMethod::fixSpec(const BSONObj& specObj) {
         return bob.obj();
     }
 
-    const int indexVersion = indexVersionElt.numberInt();
+    uassert(40108,
+            str::stream() << "Invalid type or value for geo index version { "
+                          << kIndexVersionFieldName << " : " << indexVersionElt
+                          << " }, only versions: [" << S2_INDEX_VERSION_1 << ","
+                          << S2_INDEX_VERSION_2 << "," << S2_INDEX_VERSION_3 << "] are supported",
+            indexVersionElt.isNumber() && ((indexVersionElt.type() != mongo::NumberDouble) ||
+                                           std::isnormal(indexVersionElt.numberDouble())));
+
+    const auto indexVersion = indexVersionElt.numberLong();
+
     uassert(17394,
             str::stream() << "unsupported geo index version { " << kIndexVersionFieldName << " : "
-                          << indexVersionElt << " }, only support versions: [" << S2_INDEX_VERSION_1
-                          << "," << S2_INDEX_VERSION_2 << "," << S2_INDEX_VERSION_3 << "]",
-            indexVersionElt.isNumber() &&
-                (indexVersion == S2_INDEX_VERSION_3 || indexVersion == S2_INDEX_VERSION_2 ||
-                 indexVersion == S2_INDEX_VERSION_1));
+                          << indexVersionElt << " }, only versions: [" << S2_INDEX_VERSION_1 << ","
+                          << S2_INDEX_VERSION_2 << "," << S2_INDEX_VERSION_3 << "] are supported",
+            (indexVersion == S2_INDEX_VERSION_3 || indexVersion == S2_INDEX_VERSION_2 ||
+             indexVersion == S2_INDEX_VERSION_1));
     return specObj;
 }
 
