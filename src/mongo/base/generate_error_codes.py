@@ -300,6 +300,7 @@ class cpp_generator(base_generator):
  */
 #pragma once
 #include <string>
+#include <cstdint>
 #include "mongo/base/string_data.h"
 namespace mongo {
     /**
@@ -310,7 +311,9 @@ namespace mongo {
      */
     class ErrorCodes {
     public:
-        enum Error {
+        // Explicitly 32-bits wide so that non-symbolic values,
+        // like uassert codes, are valid.
+        enum Error : std::int32_t {
             %(error_code_enum_declarations)s,
             MaxError
         };
