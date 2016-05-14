@@ -110,13 +110,12 @@ public:
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
-            MemberState expectedState(stateVal);
-            if (expectedState.toString().empty()) {
-                return appendCommandStatus(
-                    result,
-                    Status(ErrorCodes::BadValue,
-                           str::stream() << "Unrecognized numerical state: " << stateVal));
+
+            const auto swMemberState = MemberState::create(stateVal);
+            if (!swMemberState.isOK()) {
+                return appendCommandStatus(result, swMemberState.getStatus());
             }
+            const auto expectedState = swMemberState.getValue();
 
             long long timeoutMillis;
             status = bsonExtractIntegerField(cmdObj, "timeoutMillis", &timeoutMillis);

@@ -31,6 +31,11 @@
 #pragma once
 
 #include <string>
+#include <type_traits>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace repl {
@@ -60,6 +65,18 @@ struct MemberState {
         RS_REMOVED = 10, /* node removed from replica set */
         RS_MAX = 10
     } s;
+
+    template <typename T>
+    static StatusWith<MemberState> create(T t) {
+        static_assert(std::is_integral<T>::value, "T must be an integral type");
+        using UnderlyingType = std::underlying_type<MS>::type;
+        if (std::is_signed<T>::value && (t < 0))
+            return {ErrorCodes::BadValue, str::stream() << "MemberState cannot be negative"};
+        auto asUnderlying = static_cast<UnderlyingType>(t);
+        if (asUnderlying > RS_MAX)
+            return {ErrorCodes::BadValue, str::stream() << "Unrecognized numerical state"};
+        return {static_cast<MemberState>(asUnderlying)};
+    }
 
     MemberState(MS ms = RS_UNKNOWN) : s(ms) {}
     explicit MemberState(int ms) : s((MS)ms) {}
