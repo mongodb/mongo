@@ -383,8 +383,11 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	mod->last_oldest_id = oldest_id;
 
 	/* Initialize the reconciliation structure for each new run. */
-	WT_RET(__rec_write_init(
-	    session, ref, flags, salvage, &session->reconcile));
+	if ((ret = __rec_write_init(
+	    session, ref, flags, salvage, &session->reconcile)) != 0) {
+		WT_TRET(__wt_fair_unlock(session, &page->page_lock));
+		return (ret);
+	}
 	r = session->reconcile;
 
 	/* Reconcile the page. */
@@ -4269,13 +4272,13 @@ __rec_col_var(WT_SESSION_IMPL *session,
 	last = r->last;
 	vpack = &_vpack;
 
+	WT_RET(__rec_split_init(
+	    session, r, page, pageref->ref_recno, btree->maxleafpage));
+
 	WT_RET(__wt_scr_alloc(session, 0, &orig));
 	data = NULL;
 	size = 0;
 	upd = NULL;
-
-	WT_RET(__rec_split_init(
-	    session, r, page, pageref->ref_recno, btree->maxleafpage));
 
 	/*
 	 * The salvage code may be calling us to reconcile a page where there
@@ -5019,8 +5022,8 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 	 * Temporary buffers in which to instantiate any uninstantiated keys
 	 * or value items we need.
 	 */
-	WT_RET(__wt_scr_alloc(session, 0, &tmpkey));
-	WT_RET(__wt_scr_alloc(session, 0, &tmpval));
+	WT_ERR(__wt_scr_alloc(session, 0, &tmpkey));
+	WT_ERR(__wt_scr_alloc(session, 0, &tmpval));
 
 	/* For each entry in the page... */
 	WT_ROW_FOREACH(page, rip, i) {
@@ -5180,7 +5183,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 					 * can't remove them from the in-memory
 					 * tree; if an overflow key was deleted
 					 * without being instantiated (for
-					 * example, cursor-based truncation, do
+					 * example, cursor-based truncation), do
 					 * it now.
 					 */
 					if (ikey == NULL)
