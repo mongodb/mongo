@@ -44,6 +44,7 @@ const std::string MemberConfig::kIdFieldName = "_id";
 const std::string MemberConfig::kVotesFieldName = "votes";
 const std::string MemberConfig::kPriorityFieldName = "priority";
 const std::string MemberConfig::kHostFieldName = "host";
+const std::string MemberConfig::kHostInternalFieldName = "hostinternal";
 const std::string MemberConfig::kHiddenFieldName = "hidden";
 const std::string MemberConfig::kSlaveDelayFieldName = "slaveDelay";
 const std::string MemberConfig::kArbiterOnlyFieldName = "arbiterOnly";
@@ -62,7 +63,8 @@ const std::string kLegalMemberConfigFieldNames[] = {MemberConfig::kIdFieldName,
                                                     MemberConfig::kSlaveDelayFieldName,
                                                     MemberConfig::kArbiterOnlyFieldName,
                                                     MemberConfig::kBuildIndexesFieldName,
-                                                    MemberConfig::kTagsFieldName};
+                                                    MemberConfig::kTagsFieldName,
+                                                    MemberConfig::kHostInternalFieldName};
 
 const int kVotesFieldDefault = 1;
 const double kPriorityFieldDefault = 1.0;
@@ -102,6 +104,8 @@ Status MemberConfig::initialize(const BSONObj& mcfg, ReplicaSetTagConfig* tagCon
     status = bsonExtractStringField(mcfg, kHostFieldName, &hostAndPortString);
     if (!status.isOK())
         return status;
+
+
     boost::trim(hostAndPortString);
     status = _host.initialize(hostAndPortString);
     if (!status.isOK())
@@ -109,6 +113,25 @@ Status MemberConfig::initialize(const BSONObj& mcfg, ReplicaSetTagConfig* tagCon
     if (!_host.hasPort()) {
         // make port explicit even if default.
         _host = HostAndPort(_host.host(), _host.port());
+    }
+    // Checking for optional internal replication host name
+    std::string hostInternalAndPortString;
+    status = bsonExtractStringField(mcfg, kHostInternalFieldName, &hostInternalAndPortString);
+
+    // if it does not exist let's use hostAndPortString
+    if ( status == ErrorCodes::NoSuchKey ){
+        hostInternalAndPortString = hostAndPortString;
+    } else if ( !status.isOK() ){
+        return status;
+    } else {
+      boost::trim(hostInternalAndPortString);
+    }
+    status = _hostInternal.initialize(hostInternalAndPortString);
+    if (!status.isOK())
+        return status;
+    if (!_hostInternal.hasPort()) {
+        // make port explicit even if default.
+        _hostInternal = HostAndPort(_hostInternal.host(), _hostInternal.port());
     }
 
     //
@@ -287,6 +310,7 @@ BSONObj MemberConfig::toBSON(const ReplicaSetTagConfig& tagConfig) const {
     BSONObjBuilder configBuilder;
     configBuilder.append("_id", _id);
     configBuilder.append("host", _host.toString());
+    configBuilder.append("hostinternal", _hostInternal.toString());
     configBuilder.append("arbiterOnly", _arbiterOnly);
     configBuilder.append("buildIndexes", _buildIndexes);
     configBuilder.append("hidden", _hidden);

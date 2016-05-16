@@ -33,6 +33,7 @@
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -898,6 +899,7 @@ bool operator==(const MemberConfig& a, const MemberConfig& b) {
         }
     }
     return a.getId() == b.getId() && a.getHostAndPort() == b.getHostAndPort() &&
+        a.getHostInternalAndPort() == b.getHostInternalAndPort() &&
         a.getPriority() == b.getPriority() && a.getSlaveDelay() == b.getSlaveDelay() &&
         a.isVoter() == b.isVoter() && a.isArbiter() == b.isArbiter() &&
         a.isHidden() == b.isHidden() && a.shouldBuildIndexes() == b.shouldBuildIndexes() &&
@@ -1404,6 +1406,44 @@ TEST(ReplicaSetConfig, ReplSetId) {
     ASSERT_STRING_CONTAINS(status.reason(),
                            "\"replicaSetId\" had the wrong type. Expected objectId, found int");
 }
+
+TEST(ReplicaSetConfig,  ReplSetHostInternal){
+  // Configuration initialized having hostinternal set
+  ReplicaSetConfig configLocal;
+  auto status = configLocal.initializeForInitiate(BSON("_id"
+                                                << "rs0"
+                                                << "version" << 1
+                                                << "members" << BSON_ARRAY(
+                                                                  BSON("_id" << 0
+                                                                      << "host" << "localhost:12345"
+                                                                      << "hostinternal" << "127.0.0.1:12345"))
+                                                ));
+  ASSERT_EQUALS(Status::OK(), status);
+  //check that it's valid
+  ASSERT_OK(configLocal.validate());
+  ASSERT_TRUE(configLocal.hasReplicaSetId());
+  // check if we can find hostinternal on configuration
+  auto hap = HostAndPort("127.0.0.1", 12345);
+
+  ASSERT_EQUALS( 0, configLocal.findMemberIndexByHostAndPort(hap));
+}
+
+TEST(ReplicaSetConfig, ReplSetOnlyHostInternal){
+  // Configuration initialized having only hostinternal should fail
+  ReplicaSetConfig configLocal;
+  auto status = configLocal.initializeForInitiate(BSON("_id"
+                                                << "rs0"
+                                                << "version" << 1
+                                                << "members" << BSON_ARRAY(
+                                                                  BSON("_id" << 0
+                                                                      << "hostinternal" << "127.0.0.1:12345"))
+                                                ));
+  ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
+  //check that it's not valid
+  ASSERT_NOT_OK(configLocal.validate());
+  ASSERT_FALSE(configLocal.hasReplicaSetId());
+}
+
 
 }  // namespace
 }  // namespace repl

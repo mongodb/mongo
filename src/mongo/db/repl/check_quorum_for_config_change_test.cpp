@@ -162,6 +162,20 @@ TEST_F(CheckQuorumForInitiate, ValidSingleNodeSet) {
     ASSERT_OK(waitForQuorumCheck());
 }
 
+TEST_F(CheckQuorumForInitiate, ValidSingleNodeInternalHostSet) {
+    ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
+                                                      << "rs0"
+                                                      << "version" << 1 << "members"
+                                                      << BSON_ARRAY(BSON("_id" << 1
+                                                                        << "host"
+                                                                        << "h1"
+                                                                        << "hostinternal"
+                                                                        << "p1"
+                                                                      ))));
+    startQuorumCheck(config, 0);
+    ASSERT_OK(waitForQuorumCheck());
+}
+
 TEST_F(CheckQuorumForInitiate, QuorumCheckCanceledByShutdown) {
     _executor->shutdown();
     ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
@@ -219,7 +233,7 @@ const BSONObj makeHeartbeatRequest(const ReplicaSetConfig& rsConfig, int myConfi
     hbArgs.setProtocolVersion(1);
     hbArgs.setConfigVersion(rsConfig.getConfigVersion());
     hbArgs.setCheckEmpty(rsConfig.getConfigVersion() == 1);
-    hbArgs.setSenderHost(myConfig.getHostAndPort());
+    hbArgs.setSenderHost(myConfig.getHostInternalAndPort());
     hbArgs.setSenderId(myConfig.getId());
     return hbArgs.toBSON();
 }

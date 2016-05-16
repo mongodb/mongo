@@ -132,8 +132,8 @@ vector<string> MockReplicaSet::getSecondaries() const {
     for (ReplicaSetConfig::MemberIterator member = _replConfig.membersBegin();
          member != _replConfig.membersEnd();
          ++member) {
-        if (member->getHostAndPort() != HostAndPort(_primaryHost)) {
-            secondaries.push_back(member->getHostAndPort().toString());
+        if (member->getHostInternalAndPort() != HostAndPort(_primaryHost)) {
+            secondaries.push_back(member->getHostInternalAndPort().toString());
         }
     }
 

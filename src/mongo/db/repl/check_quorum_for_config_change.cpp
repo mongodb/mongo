@@ -59,7 +59,7 @@ QuorumChecker::QuorumChecker(const ReplicaSetConfig* rsConfig, int myIndex)
     const MemberConfig& myConfig = _rsConfig->getMemberAt(_myIndex);
 
     if (myConfig.isVoter()) {
-        _voters.push_back(myConfig.getHostAndPort());
+        _voters.push_back(myConfig.getHostInternalAndPort());
     }
     if (myConfig.isElectable()) {
         _numElectable = 1;
@@ -86,7 +86,7 @@ std::vector<RemoteCommandRequest> QuorumChecker::getRequests() const {
     hbArgs.setProtocolVersion(1);
     hbArgs.setConfigVersion(_rsConfig->getConfigVersion());
     hbArgs.setCheckEmpty(isInitialConfig);
-    hbArgs.setSenderHost(myConfig.getHostAndPort());
+    hbArgs.setSenderHost(myConfig.getHostInternalAndPort());
     hbArgs.setSenderId(myConfig.getId());
     const BSONObj hbRequest = hbArgs.toBSON();
 
@@ -99,7 +99,7 @@ std::vector<RemoteCommandRequest> QuorumChecker::getRequests() const {
             // No need to check self for liveness or unreadiness.
             continue;
         }
-        requests.push_back(RemoteCommandRequest(_rsConfig->getMemberAt(i).getHostAndPort(),
+        requests.push_back(RemoteCommandRequest(_rsConfig->getMemberAt(i).getHostInternalAndPort(),
                                                 "admin",
                                                 hbRequest,
                                                 BSON(rpc::kReplSetMetadataFieldName << 1),
@@ -241,7 +241,7 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
 
     for (int i = 0; i < _rsConfig->getNumMembers(); ++i) {
         const MemberConfig& memberConfig = _rsConfig->getMemberAt(i);
-        if (memberConfig.getHostAndPort() != request.target) {
+        if (memberConfig.getHostInternalAndPort() != request.target) {
             continue;
         }
         if (memberConfig.isElectable()) {

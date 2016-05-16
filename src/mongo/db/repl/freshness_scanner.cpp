@@ -44,14 +44,14 @@ namespace mongo {
 namespace repl {
 
 using executor::RemoteCommandRequest;
-
+// what this do?
 FreshnessScanner::Algorithm::Algorithm(const ReplicaSetConfig& rsConfig,
                                        int myIndex,
                                        Milliseconds timeout)
     : _rsConfig(rsConfig), _myIndex(myIndex), _timeout(timeout) {
     for (int index = 0; index < _rsConfig.getNumMembers(); index++) {
         if (index != _myIndex) {
-            _targets.push_back(_rsConfig.getMemberAt(index).getHostAndPort());
+            _targets.push_back(_rsConfig.getMemberAt(index).getHostInternalAndPort());
         }
     }
     _totalRequests = _targets.size();
