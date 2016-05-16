@@ -1219,6 +1219,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	 */
 	if (page->read_gen != WT_READGEN_OLDEST ||
 	    LF_ISSET(WT_READ_NO_EVICT) ||
+	    F_ISSET(session, WT_SESSION_NO_CACHE_CHECK) ||
 	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
 	    !__wt_page_can_evict(session, page, true, NULL))
 		return (__wt_hazard_clear(session, page));
