@@ -167,8 +167,6 @@ public:
         BSONObj rewritten = queryBob.obj();
 
         // Extract the collation, if it exists.
-        // TODO SERVER-23473: Pass this collation spec object down so that it can be converted into
-        // a CollatorInterface.
         BSONObj collation;
         {
             BSONElement collationElt;
@@ -211,6 +209,7 @@ public:
         lpq->setFilter(rewritten);
         lpq->setProj(projObj);
         lpq->setLimit(numWanted);
+        lpq->setCollation(collation);
         const ExtensionsCallbackReal extensionsCallback(txn, &nss);
         auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(lpq), extensionsCallback);
         if (!statusWithCQ.isOK()) {
