@@ -38,6 +38,8 @@
 namespace mongo {
 namespace transport {
 
+class TicketImpl;
+
 /**
  * The TransportLayer moves Messages between transport::Endpoints and the database.
  * This class owns an Acceptor that generates new endpoints from which it can
@@ -55,7 +57,7 @@ class TransportLayer {
     MONGO_DISALLOW_COPYING(TransportLayer);
 
 public:
-    virtual ~TransportLayer() = default;
+    virtual ~TransportLayer();
 
     /**
      * Source (receive) a new Message for this Session.
@@ -145,7 +147,12 @@ public:
     virtual void shutdown() = 0;
 
 protected:
-    TransportLayer() = default;
+    TransportLayer();
+
+    /**
+     * Return the implementation of this Ticket.
+     */
+    TicketImpl* getTicketImpl(const Ticket& ticket);
 };
 
 }  // namespace transport

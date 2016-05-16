@@ -26,43 +26,62 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
 #include "mongo/transport/session.h"
-#include "mongo/util/time_support.h"
+
+#include "mongo/platform/atomic_word.h"
+#include "mongo/transport/transport_layer.h"
 
 namespace mongo {
 namespace transport {
 
-/**
- * Interface representing implementations of Ticket.
- *
- * Ticket implementations are specific to a TransportLayer implementation.
- */
-class TicketImpl {
-    MONGO_DISALLOW_COPYING(TicketImpl);
+namespace {
 
-public:
-    using SessionId = Session::SessionId;
+AtomicUInt64 sessionIdCounter(0);
 
-    virtual ~TicketImpl() = default;
+}  // namespace
 
-    TicketImpl(TicketImpl&&) = default;
-    TicketImpl& operator=(TicketImpl&&) = default;
+Session::Session(HostAndPort remote, HostAndPort local, TransportLayer* tl)
+    : _id(sessionIdCounter.addAndFetch(1)), _remote(remote), _local(local), _tl(tl) {}
 
-    /**
-     * Return this ticket's session id.
-     */
-    virtual SessionId sessionId() const = 0;
+Session::~Session() {
+    if (_tl != nullptr) {
+        invariant(_tl);
+        _tl->end(*this);
+    }
+}
 
-    /**
-     * Return this ticket's expiration date.
-     */
-    virtual Date_t expiration() const = 0;
+Session::Session(Session&& other)
+    : _id(other._id),
+      _remote(std::move(other._remote)),
+      _local(std::move(other._local)),
+      _tl(other._tl) {
+    // We do not want to call tl->end() on moved-from Sessions.
+    other._tl = nullptr;
+}
 
-protected:
-    TicketImpl() = default;
-};
+Session& Session::operator=(Session&& other) {
+    _id = other._id;
+    _remote = std::move(other._remote);
+    _local = std::move(other._local);
+    _tl = other._tl;
+    _tl = nullptr;
+
+    return *this;
+}
+
+Session::SessionId Session::id() const {
+    return _id;
+}
+
+const HostAndPort& Session::remote() const {
+    return _remote;
+}
+
+const HostAndPort& Session::local() const {
+    return _local;
+}
 
 }  // namespace transport
 }  // namespace mongo

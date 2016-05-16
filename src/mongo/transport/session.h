@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -40,6 +41,8 @@ class TransportLayer;
  * (on the transport side) and Messages with Client objects (on the database side).
  */
 class Session {
+    MONGO_DISALLOW_COPYING(Session);
+
 public:
     /**
      * Type to indicate the internal id for this session.
@@ -55,6 +58,12 @@ public:
      * Destroys a session, calling end() for this session in its TransportLayer.
      */
     ~Session();
+
+    /**
+     * Move constructor and assignment operator.
+     */
+    Session(Session&& other);
+    Session& operator=(Session&& other);
 
     /**
      * Return the id for this session.

@@ -26,43 +26,19 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/transport/session.h"
-#include "mongo/util/time_support.h"
+#include "mongo/transport/transport_layer.h"
 
 namespace mongo {
 namespace transport {
 
-/**
- * Interface representing implementations of Ticket.
- *
- * Ticket implementations are specific to a TransportLayer implementation.
- */
-class TicketImpl {
-    MONGO_DISALLOW_COPYING(TicketImpl);
+TransportLayer::TransportLayer() = default;
+TransportLayer::~TransportLayer() = default;
 
-public:
-    using SessionId = Session::SessionId;
-
-    virtual ~TicketImpl() = default;
-
-    TicketImpl(TicketImpl&&) = default;
-    TicketImpl& operator=(TicketImpl&&) = default;
-
-    /**
-     * Return this ticket's session id.
-     */
-    virtual SessionId sessionId() const = 0;
-
-    /**
-     * Return this ticket's expiration date.
-     */
-    virtual Date_t expiration() const = 0;
-
-protected:
-    TicketImpl() = default;
-};
+TicketImpl* TransportLayer::getTicketImpl(const Ticket& ticket) {
+    return ticket.impl();
+}
 
 }  // namespace transport
 }  // namespace mongo

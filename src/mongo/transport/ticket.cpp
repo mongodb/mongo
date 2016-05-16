@@ -26,43 +26,35 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/transport/session.h"
-#include "mongo/util/time_support.h"
+#include "mongo/transport/ticket.h"
+#include "mongo/transport/ticket_impl.h"
 
 namespace mongo {
 namespace transport {
 
-/**
- * Interface representing implementations of Ticket.
- *
- * Ticket implementations are specific to a TransportLayer implementation.
- */
-class TicketImpl {
-    MONGO_DISALLOW_COPYING(TicketImpl);
+const Date_t Ticket::kNoExpirationDate{Date_t::max()};
 
-public:
-    using SessionId = Session::SessionId;
+Ticket::Ticket(std::unique_ptr<TicketImpl> ticket) : _ticket(std::move(ticket)) {}
 
-    virtual ~TicketImpl() = default;
+Ticket::~Ticket() = default;
 
-    TicketImpl(TicketImpl&&) = default;
-    TicketImpl& operator=(TicketImpl&&) = default;
+Ticket::Ticket(Ticket&&) = default;
+Ticket& Ticket::operator=(Ticket&&) = default;
 
-    /**
-     * Return this ticket's session id.
-     */
-    virtual SessionId sessionId() const = 0;
+Session::SessionId Ticket::sessionId() const {
+    return _ticket->sessionId();
+}
 
-    /**
-     * Return this ticket's expiration date.
-     */
-    virtual Date_t expiration() const = 0;
+Date_t Ticket::expiration() const {
+    return _ticket->expiration();
+}
 
-protected:
-    TicketImpl() = default;
-};
+// TODO should this actually be const?
+TicketImpl* Ticket::impl() const {
+    return _ticket.get();
+}
 
 }  // namespace transport
 }  // namespace mongo

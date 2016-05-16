@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/time_support.h"
 
@@ -45,6 +46,8 @@ class Ticket {
     MONGO_DISALLOW_COPYING(Ticket);
 
 public:
+    friend class TransportLayer;
+
     using SessionId = Session::SessionId;
 
     /**
@@ -53,6 +56,13 @@ public:
     static const Date_t kNoExpirationDate;
 
     Ticket(std::unique_ptr<TicketImpl> ticket);
+    ~Ticket();
+
+    /**
+     * Move constructor and assignment operator.
+     */
+    Ticket(Ticket&&);
+    Ticket& operator=(Ticket&&);
 
     /**
      * Return this ticket's session id.
@@ -63,6 +73,12 @@ public:
      * Return this ticket's expiration date.
      */
     Date_t expiration() const;
+
+protected:
+    /**
+     * Return a non-owning pointer to the underlying TicketImpl type
+     */
+    TicketImpl* impl() const;
 
 private:
     std::unique_ptr<TicketImpl> _ticket;
