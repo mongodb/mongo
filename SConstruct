@@ -1494,6 +1494,15 @@ if env.TargetOSIs('posix'):
     else:
         env.Append( CCFLAGS=["-O0"] )
 
+    # Promote linker warnings into errors. We can't yet do this on OS X because its linker considers
+    # noall_load obsolete and warns about it.
+    if not env.TargetOSIs('osx'):
+        env.Append(
+            LINKFLAGS=[
+                "-Wl,--fatal-warnings",
+            ],
+        )
+
 mmapv1 = False
 if get_option('mmapv1') == 'auto':
     # The mmapv1 storage engine is only supported on x86
