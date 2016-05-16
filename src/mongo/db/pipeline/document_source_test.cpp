@@ -1347,13 +1347,15 @@ TEST_F(SampleFromRandomCursorBasics, MimicNonOptimized) {
         ASSERT_TRUE((*doc).hasRandMetaField());
         secondTotal += (*doc).getRandMetaField();
     }
-    // The average random meta value of the first document should be about 0.75.
-    ASSERT_GTE(firstTotal / nTrials, 0.74);
-    ASSERT_LTE(firstTotal / nTrials, 0.76);
+    // The average random meta value of the first document should be about 0.75. We assume that
+    // 10000 trials is sufficient for us to apply the Central Limit Theorem. Using an error
+    // tolerance of 0.02 gives us a spurious failure rate approximately equal to 10^-24.
+    ASSERT_GTE(firstTotal / nTrials, 0.73);
+    ASSERT_LTE(firstTotal / nTrials, 0.77);
 
     // The average random meta value of the second document should be about 0.5.
-    ASSERT_GTE(secondTotal / nTrials, 0.49);
-    ASSERT_LTE(secondTotal / nTrials, 0.51);
+    ASSERT_GTE(secondTotal / nTrials, 0.48);
+    ASSERT_LTE(secondTotal / nTrials, 0.52);
 }
 }  // namespace DocumentSourceSampleFromRandomCursor
 
