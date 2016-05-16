@@ -53,7 +53,8 @@ class OpTime;
  */
 class SyncTail {
 public:
-    using MultiSyncApplyFunc = stdx::function<void(const std::vector<OplogEntry>& ops)>;
+    using MultiSyncApplyFunc =
+        stdx::function<void(const std::vector<OplogEntry>& ops, SyncTail* st)>;
 
     /**
      * Type of function to increment "repl.apply.ops" server status metric.
@@ -193,8 +194,8 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
                               MultiApplier::ApplyOperationFn applyOperation);
 
 // These free functions are used by the thread pool workers to write ops to the db.
-void multiSyncApply(const std::vector<OplogEntry>& ops);
-void multiInitialSyncApply(const std::vector<OplogEntry>& ops);
+void multiSyncApply(const std::vector<OplogEntry>& ops, SyncTail* st);
+void multiInitialSyncApply(const std::vector<OplogEntry>& ops, SyncTail* st);
 
 }  // namespace repl
 }  // namespace mongo

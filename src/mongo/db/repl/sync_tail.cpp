@@ -445,7 +445,7 @@ void prefetchOps(const MultiApplier::Operations& ops, OldThreadPool* prefetcherP
 // Doles out all the work to the writer pool threads and waits for them to complete
 void applyOps(const std::vector<MultiApplier::Operations>& writerVectors,
               OldThreadPool* writerPool,
-              SyncTail::MultiSyncApplyFunc func) {
+              MultiApplier::ApplyOperationFn func) {
     TimerHolder timer(&applyBatchStats);
     for (auto&& ops : writerVectors) {
         if (!ops.empty()) {
@@ -527,8 +527,11 @@ void fillWriterVectors(OperationContext* txn,
 // writes the oplog entries to the local oplog.
 OpTime SyncTail::multiApply(OperationContext* txn, const OpQueue& ops) {
     auto convertToVector = ops.getDeque();
-    auto status = repl::multiApply(
-        txn, MultiApplier::Operations(convertToVector.begin(), convertToVector.end()), _applyFunc);
+    auto applyOperation = [this](const MultiApplier::Operations& ops) { _applyFunc(ops, this); };
+    auto status =
+        repl::multiApply(txn,
+                         MultiApplier::Operations(convertToVector.begin(), convertToVector.end()),
+                         applyOperation);
     if (!status.isOK()) {
         if (status == ErrorCodes::InterruptedAtShutdown) {
             return OpTime();
@@ -972,7 +975,7 @@ static void initializeWriterThread() {
 }
 
 // This free function is used by the writer threads to apply each op
-void multiSyncApply(const std::vector<OplogEntry>& ops) {
+void multiSyncApply(const std::vector<OplogEntry>& ops, SyncTail*) {
     std::vector<OplogEntry> oplogEntries(ops.begin(), ops.end());
     std::vector<OplogEntry*> oplogEntryPointers(oplogEntries.size());
     for (size_t i = 0; i < oplogEntries.size(); i++) {
@@ -1090,7 +1093,7 @@ void multiSyncApply(const std::vector<OplogEntry>& ops) {
 }
 
 // This free function is used by the initial sync writer threads to apply each op
-void multiInitialSyncApply(const std::vector<OplogEntry>& ops) {
+void multiInitialSyncApply(const std::vector<OplogEntry>& ops, SyncTail* st) {
     initializeWriterThread();
 
     const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
@@ -1107,17 +1110,14 @@ void multiInitialSyncApply(const std::vector<OplogEntry>& ops) {
         try {
             const Status s = SyncTail::syncApply(&txn, it->raw, convertUpdatesToUpserts);
             if (!s.isOK()) {
-                /* TODO (dannenberg) fix this part. SERVER-23308
                 if (st->shouldRetry(&txn, it->raw)) {
                     const Status s2 = SyncTail::syncApply(&txn, it->raw, convertUpdatesToUpserts);
                     if (!s2.isOK()) {
-                        */
-                severe() << "Error applying operation (" << it->raw.toString() << "): " << s;
-                fassertFailedNoTrace(15915);
-                /*
-            }
-        }
-*/
+                        severe() << "Error applying operation (" << it->raw.toString()
+                                 << "): " << s2;
+                        fassertFailedNoTrace(15915);
+                    }
+                }
 
                 // If shouldRetry() returns false, fall through.
                 // This can happen if the document that was moved and missed by Cloner
