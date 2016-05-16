@@ -989,16 +989,42 @@ def CheckForOS(context, which_os):
     context.Result(ret)
     return ret
 
+def CheckForCXXLink(context):
+    test_body = """
+    #include <iostream>
+    #include <cstdlib>
+
+    int main() {
+        std::cout << "Hello, World" << std::endl;
+        return EXIT_SUCCESS;
+    }
+    """
+    context.Message('Checking that the C++ compiler can link a C++ program... ')
+    ret = context.TryLink(textwrap.dedent(test_body), ".cpp")
+    context.Result(ret)
+    return ret
+
 detectConf = Configure(detectEnv, help=False, custom_tests = {
     'CheckForToolchain' : CheckForToolchain,
     'CheckForProcessor': CheckForProcessor,
     'CheckForOS': CheckForOS,
+    'CheckForCXXLink': CheckForCXXLink,
 })
 
-if not detectConf.CheckCXX():
-    env.FatalError("C++ compiler {0} doesn't work", detectEnv['CXX'])
 if not detectConf.CheckCC():
-    env.FatalError("C compiler {0} doesn't work", detectEnv['CC'])
+    env.ConfError(
+        "C compiler {0} doesn't work",
+        detectEnv['CC'])
+
+if not detectConf.CheckCXX():
+    env.ConfError(
+        "C++ compiler {0} doesn't work",
+        detectEnv['CXX'])
+
+if not detectConf.CheckForCXXLink():
+    env.ConfError(
+        "C++ compiler {0} can't link C++ programs",
+        detectEnv['CXX'])
 
 toolchain_search_sequence = [ "GCC", "clang" ]
 if is_running_os('windows'):
@@ -1009,10 +1035,10 @@ for candidate_toolchain in toolchain_search_sequence:
         break
 
 if not detected_toolchain:
-    env.FatalError("Couldn't identity the C++ compiler")
+    env.ConfError("Couldn't identify the C++ compiler")
 
 if not detectConf.CheckForToolchain(detected_toolchain, "C", "CC", ".c"):
-    env.FatalError("C compiler does not match identified C++ compiler")
+    env.ConfError("C compiler does not match identified C++ compiler")
 
 # Now that we've detected the toolchain, we add methods to the env
 # to get the canonical name of the toolchain and to test whether
@@ -1035,13 +1061,13 @@ if env['TARGET_ARCH']:
 else:
     detected_processor = detectConf.CheckForProcessor(None)
     if not detected_processor:
-        Exit(1)
+        env.ConfError("Failed to detect a supported target architecture")
     env['TARGET_ARCH'] = detected_processor
 
 if env['TARGET_OS'] not in os_macros:
     print "No special config for [{0}] which probably means it won't work".format(env['TARGET_OS'])
 elif not detectConf.CheckForOS(env['TARGET_OS']):
-    env.FatalError("TARGET_OS ({0}) is not supported by compiler", env['TARGET_OS'])
+    env.ConfError("TARGET_OS ({0}) is not supported by compiler", env['TARGET_OS'])
 
 detectConf.Finish()
 
@@ -1093,14 +1119,12 @@ link_model = get_option('link-model')
 if link_model == "auto":
     link_model = "object" if (env.TargetOSIs('windows') or has_option("release")) else "static"
 elif has_option("release") and link_model != "object":
-    print("The link model for release builds is required to be 'object'")
-    Exit(1)
+    env.FatalError("The link model for release builds is required to be 'object'")
 
 # The only link model currently supported on Windows is 'object', since there is no equivalent
 # to --whole-archive.
 if env.TargetOSIs('windows') and link_model != 'object':
-    print("Windows builds must use the 'object' link model");
-    Exit(1);
+    env.FatalError("Windows builds must use the 'object' link model");
 
 # The 'object' mode for libdeps is enabled by setting _LIBDEPS to $_LIBDEPS_OBJS. The other two
 # modes operate in library mode, enabled by setting _LIBDEPS to $_LIBDEPS_LIBS.
@@ -1814,7 +1838,7 @@ def doConfigure(myenv):
     usingLibStdCxx = False
     if has_option('libc++'):
         if not myenv.ToolchainIs('clang'):
-            myenv.ConfError('libc++ is currently only supported for clang')
+            myenv.FatalError('libc++ is currently only supported for clang')
         if env.TargetOSIs('osx') and has_option('osx-version-min') and versiontuple(min_version) < versiontuple('10.7'):
             print("Warning: You passed option 'libc++'. You probably want to also pass 'osx-version-min=10.7' or higher for libc++ support.")
         if AddToCXXFLAGSIfSupported(myenv, '-stdlib=libc++'):
@@ -1969,12 +1993,12 @@ def doConfigure(myenv):
         # dependencies, then turn on the debugging features in libstdc++.
         # TODO: Need a new check here.
         if not debugBuild:
-            myenv.ConfError("--use-glibcxx-debug requires --dbg=on")
+            myenv.FatalError("--use-glibcxx-debug requires --dbg=on")
         if not usingLibStdCxx:
-            myenv.ConfError("--use-glibcxx-debug is only compatible with the GNU implementation "
+            myenv.FatalError("--use-glibcxx-debug is only compatible with the GNU implementation "
                 "of the C++ standard libary")
         if using_system_version_of_cxx_libraries():
-            myenv.ConfError("--use-glibcxx-debug not compatible with system versions of "
+            myenv.FatalError("--use-glibcxx-debug not compatible with system versions of "
                 "C++ libraries.")
         myenv.Append(CPPDEFINES=["_GLIBCXX_DEBUG"]);
 
@@ -2127,7 +2151,7 @@ def doConfigure(myenv):
             myenv['ENV']['LSAN_SYMBOLIZER_PATH'] = llvm_symbolizer
             tsan_options = "external_symbolizer_path=\"%s\" " % llvm_symbolizer
         elif using_lsan:
-            myenv.ConfError("Using the leak sanitizer requires a valid symbolizer")
+            myenv.FatalError("Using the leak sanitizer requires a valid symbolizer")
 
         if using_tsan:
             tsan_options += "suppressions=\"%s\" " % myenv.File("#etc/tsan.suppressions").abspath
@@ -2226,8 +2250,7 @@ def doConfigure(myenv):
             myenv.SetConfigHeaderDefine(macro_name)
     conf.Finish()
     if not haveTriviallyConstructibleThreadLocals:
-        print "Compiler must support a thread local storage class for trivially constructible types"
-        Exit(1)
+        env.ConfError("Compiler must support a thread local storage class for trivially constructible types")
 
     # not all C++11-enabled gcc versions have type properties
     def CheckCXX11IsTriviallyCopyable(context):
@@ -2566,7 +2589,7 @@ def doConfigure(myenv):
     elif myenv['MONGO_ALLOCATOR'] == 'system':
         pass
     else:
-        myenv.ConfError("Invalid --allocator parameter: $MONGO_ALLOCATOR")
+        myenv.FatalError("Invalid --allocator parameter: $MONGO_ALLOCATOR")
 
     def CheckStdAtomic(context, base_type, extra_message):
         test_body = """
