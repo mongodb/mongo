@@ -126,10 +126,7 @@ public:
      */
     std::string toString() const;
 
-    const std::string& getName() const {
-        return _name.get();
-    }
-    void setName(const std::string& name);
+    std::string getName() const;
 
     const std::string& getNS() const {
         return _ns.get();
@@ -167,8 +164,6 @@ public:
 private:
     // Convention: (M)andatory, (O)ptional, (S)pecial rule.
 
-    // (M)  chunk's id
-    boost::optional<std::string> _name;
     // (M)  collection this chunk is in
     boost::optional<std::string> _ns;
     // (M)  first key of the range, inclusive

@@ -449,7 +449,6 @@ TEST_F(CatalogManagerReplSetTest, GetChunksForNSWithSortAndLimit) {
     OID oid = OID::gen();
 
     ChunkType chunkA;
-    chunkA.setName("chunk0000");
     chunkA.setNS("TestDB.TestColl");
     chunkA.setMin(BSON("a" << 1));
     chunkA.setMax(BSON("a" << 100));
@@ -457,7 +456,6 @@ TEST_F(CatalogManagerReplSetTest, GetChunksForNSWithSortAndLimit) {
     chunkA.setShard("shard0000");
 
     ChunkType chunkB;
-    chunkB.setName("chunk0001");
     chunkB.setNS("TestDB.TestColl");
     chunkB.setMin(BSON("a" << 100));
     chunkB.setMax(BSON("a" << 200));
@@ -579,7 +577,6 @@ TEST_F(CatalogManagerReplSetTest, GetChunksForNSInvalidChunk) {
 
     onFindCommand([&chunksQuery](const RemoteCommandRequest& request) {
         ChunkType chunkA;
-        chunkA.setName("chunk0000");
         chunkA.setNS("TestDB.TestColl");
         chunkA.setMin(BSON("a" << 1));
         chunkA.setMax(BSON("a" << 100));
@@ -587,7 +584,6 @@ TEST_F(CatalogManagerReplSetTest, GetChunksForNSInvalidChunk) {
         chunkA.setShard("shard0000");
 
         ChunkType chunkB;
-        chunkB.setName("chunk0001");
         chunkB.setNS("TestDB.TestColl");
         chunkB.setMin(BSON("a" << 100));
         chunkB.setMax(BSON("a" << 200));
@@ -1176,7 +1172,6 @@ TEST_F(CatalogManagerReplSetTest, GetTagForChunkOneTagFound) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     ChunkType chunk;
-    chunk.setName("chunk0000");
     chunk.setNS("test.coll");
     chunk.setMin(BSON("a" << 1));
     chunk.setMax(BSON("a" << 100));
@@ -1221,7 +1216,6 @@ TEST_F(CatalogManagerReplSetTest, GetTagForChunkNoTagFound) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     ChunkType chunk;
-    chunk.setName("chunk0000");
     chunk.setNS("test.coll");
     chunk.setMin(BSON("a" << 1));
     chunk.setMax(BSON("a" << 100));
@@ -1260,7 +1254,6 @@ TEST_F(CatalogManagerReplSetTest, GetTagForChunkInvalidTagDoc) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     ChunkType chunk;
-    chunk.setName("chunk0000");
     chunk.setNS("test.coll");
     chunk.setMin(BSON("a" << 1));
     chunk.setMax(BSON("a" << 100));
@@ -1438,7 +1431,6 @@ TEST_F(CatalogManagerReplSetTest, ApplyChunkOpsDeprecatedSuccessfulWithCheck) {
     onFindCommand([this](const RemoteCommandRequest& request) {
         OID oid = OID::gen();
         ChunkType chunk;
-        chunk.setName("chunk0000");
         chunk.setNS("TestDB.TestColl");
         chunk.setMin(BSON("a" << 1));
         chunk.setMax(BSON("a" << 100));

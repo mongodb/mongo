@@ -109,14 +109,6 @@ StatusWith<ChunkType> ChunkType::fromBSON(const BSONObj& source) {
     ChunkType chunk;
 
     {
-        std::string chunkName;
-        Status status = bsonExtractStringField(source, name.name(), &chunkName);
-        if (!status.isOK())
-            return status;
-        chunk._name = chunkName;
-    }
-
-    {
         std::string chunkNS;
         Status status = bsonExtractStringField(source, ns.name(), &chunkNS);
         if (!status.isOK())
@@ -179,11 +171,6 @@ std::string ChunkType::genID(StringData ns, const BSONObj& o) {
 }
 
 Status ChunkType::validate() const {
-    if (!_name.is_initialized() || _name->empty()) {
-        return Status(ErrorCodes::NoSuchKey,
-                      str::stream() << "missing " << name.name() << " field");
-    }
-
     if (!_ns.is_initialized() || _ns->empty()) {
         return Status(ErrorCodes::NoSuchKey, str::stream() << "missing " << ns.name() << " field");
     }
@@ -233,7 +220,7 @@ Status ChunkType::validate() const {
 
 BSONObj ChunkType::toBSON() const {
     BSONObjBuilder builder;
-    if (_name)
+    if (_ns && _min)
         builder.append(name.name(), getName());
     if (_ns)
         builder.append(ns.name(), getNS());
@@ -243,9 +230,8 @@ BSONObj ChunkType::toBSON() const {
         builder.append(max.name(), getMax());
     if (_shard)
         builder.append(shard.name(), getShard());
-    if (_version) {
+    if (_version)
         _version->appendForChunk(&builder);
-    }
     if (_jumbo)
         builder.append(jumbo.name(), getJumbo());
 
@@ -256,9 +242,10 @@ std::string ChunkType::toString() const {
     return toBSON().toString();
 }
 
-void ChunkType::setName(const std::string& name) {
-    invariant(!name.empty());
-    _name = name;
+std::string ChunkType::getName() const {
+    invariant(_ns);
+    invariant(_min);
+    return genID(*_ns, *_min);
 }
 
 void ChunkType::setNS(const std::string& ns) {

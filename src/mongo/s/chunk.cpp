@@ -44,6 +44,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"
+#include "mongo/s/sharding_raii.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -299,7 +300,7 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {
 
     try {
         _dataWritten += dataWritten;
-        uint64_t splitThreshold = getManager()->getCurrentDesiredChunkSize();
+        uint64_t splitThreshold = _manager->getCurrentDesiredChunkSize();
         if (_minIsInf() || _maxIsInf()) {
             splitThreshold = static_cast<uint64_t>((double)splitThreshold * 0.9);
         }
@@ -308,12 +309,12 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {
             return false;
         }
 
-        if (!getManager()->_splitHeuristics._splitTickets.tryAcquire()) {
-            LOG(1) << "won't auto split because not enough tickets: " << getManager()->getns();
+        if (!_manager->_splitHeuristics._splitTickets.tryAcquire()) {
+            LOG(1) << "won't auto split because not enough tickets: " << _manager->getns();
             return false;
         }
 
-        TicketHolderReleaser releaser(&(getManager()->_splitHeuristics._splitTickets));
+        TicketHolderReleaser releaser(&(_manager->_splitHeuristics._splitTickets));
 
         LOG(1) << "about to initiate autosplit: " << *this << " dataWritten: " << _dataWritten
                << " splitThreshold: " << splitThreshold;
@@ -335,13 +336,15 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {
             _dataWritten = 0;
         }
 
-        Status refreshStatus = Grid::get(txn)->getBalancerConfiguration()->refreshAndCheck(txn);
+        const auto balancerConfig = Grid::get(txn)->getBalancerConfiguration();
+
+        Status refreshStatus = balancerConfig->refreshAndCheck(txn);
         if (!refreshStatus.isOK()) {
             warning() << "Unable to refresh balancer settings" << causedBy(refreshStatus);
             return false;
         }
 
-        bool shouldBalance = Grid::get(txn)->getBalancerConfiguration()->isBalancerActive();
+        bool shouldBalance = balancerConfig->isBalancerActive();
         if (shouldBalance) {
             auto collStatus = grid.catalogManager(txn)->getCollection(txn, _manager->getns());
             if (!collStatus.isOK()) {
@@ -365,14 +368,26 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {
         // spot from staying on a single shard. This is based on the assumption that succeeding
         // inserts will fall on the top chunk.
         if (suggestedMigrateChunk && shouldBalance) {
-            ChunkType chunkToMove;
-            chunkToMove.setNS(_manager->getns());
-            chunkToMove.setShard(getShardId());
-            chunkToMove.setMin(suggestedMigrateChunk->getMin());
-            chunkToMove.setMax(suggestedMigrateChunk->getMax());
+            const NamespaceString nss(_manager->getns());
 
-            msgassertedNoTraceWithStatus(
-                10412, Balancer::get(txn)->rebalanceSingleChunk(txn, chunkToMove));
+            // We need to use the latest chunk manager (after the split) in order to have the most
+            // up-to-date view of the chunk we are about to move
+            auto scopedCM = uassertStatusOK(ScopedChunkManager::getExisting(txn, nss));
+            auto suggestedChunk =
+                scopedCM.cm()->findIntersectingChunk(txn, suggestedMigrateChunk->getMin());
+
+            ChunkType chunkToMove;
+            chunkToMove.setNS(nss.ns());
+            chunkToMove.setShard(suggestedChunk->getShardId());
+            chunkToMove.setMin(suggestedChunk->getMin());
+            chunkToMove.setMax(suggestedChunk->getMax());
+            chunkToMove.setVersion(suggestedChunk->getLastmod());
+
+            Status rebalanceStatus = Balancer::get(txn)->rebalanceSingleChunk(txn, chunkToMove);
+            if (!rebalanceStatus.isOK()) {
+                msgassertedNoTraceWithStatus(10412, rebalanceStatus);
+            }
+
             _manager->reload(txn);
         }
 

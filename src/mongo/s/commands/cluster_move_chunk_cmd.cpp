@@ -222,7 +222,6 @@ public:
         {
             ChunkType chunkType;
             chunkType.setNS(nss.ns());
-            chunkType.setName(ChunkType::genID(nss.ns(), chunk->getMin()));
             chunkType.setMin(chunk->getMin());
             chunkType.setMax(chunk->getMax());
             chunkType.setShard(chunk->getShardId());

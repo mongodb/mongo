@@ -131,7 +131,6 @@ Status runApplyOpsCmd(OperationContext* txn,
 
     // Fill in details not tracked by metadata
     ChunkType mergedChunk(firstChunk);
-    mergedChunk.setName(ChunkType::genID(firstChunk.getNS(), firstChunk.getMin()));
     mergedChunk.setMax(chunksToMerge.back().getMax());
     mergedChunk.setVersion(newMergedVersion);
 
@@ -140,7 +139,6 @@ Status runApplyOpsCmd(OperationContext* txn,
     // Don't remove chunk we're expanding
     for (size_t i = 1; i < chunksToMerge.size(); ++i) {
         ChunkType chunkToMerge(chunksToMerge[i]);
-        chunkToMerge.setName(ChunkType::genID(chunkToMerge.getNS(), chunkToMerge.getMin()));
         updatesB.append(buildOpRemoveChunk(chunkToMerge));
     }
 

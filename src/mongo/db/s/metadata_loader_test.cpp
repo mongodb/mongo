@@ -103,7 +103,6 @@ protected:
         for (const auto chunkVal : chunks.vector()) {
             ChunkType chunk(*chunkVal);
 
-            chunk.setName(OID::gen().toString());
             if (!chunk.isVersionSet()) {
                 chunk.setVersion(version);
                 version.incMajor();
@@ -280,7 +279,6 @@ TEST_F(MetadataLoaderFixture, CheckNumChunk) {
     chunkType.setMin(BSON("a" << MINKEY));
     chunkType.setMax(BSON("a" << MAXKEY));
     chunkType.setVersion(ChunkVersion(1, 0, epoch));
-    chunkType.setName(OID::gen().toString());
     ASSERT(chunkType.validate().isOK());
 
     auto future = launchAsync([this] {

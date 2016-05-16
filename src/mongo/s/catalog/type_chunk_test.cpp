@@ -53,14 +53,6 @@ TEST(ChunkType, MissingRequiredFields) {
     StatusWith<ChunkType> chunkRes = ChunkType::fromBSON(objModNS);
     ASSERT_FALSE(chunkRes.isOK());
 
-    BSONObj objModName =
-        BSON(ChunkType::ns("test.mycol") << ChunkType::min(BSON("a" << 10 << "b" << 10))
-                                         << ChunkType::max(BSON("a" << 20)) << "lastmod"
-                                         << Timestamp(chunkVersion.toLong()) << "lastmodEpoch"
-                                         << chunkVersion.epoch() << ChunkType::shard("shard0001"));
-    chunkRes = ChunkType::fromBSON(objModName);
-    ASSERT_FALSE(chunkRes.isOK());
-
     BSONObj objModKeys =
         BSON(ChunkType::name("test.mycol-a_MinKey")
              << ChunkType::ns("test.mycol") << "lastmod" << Timestamp(chunkVersion.toLong())
@@ -124,7 +116,6 @@ TEST(ChunkType, CorrectContents) {
     ASSERT_OK(chunkRes.getStatus());
     ChunkType chunk = chunkRes.getValue();
 
-    ASSERT_EQUALS(chunk.getName(), "test.mycol-a_MinKey");
     ASSERT_EQUALS(chunk.getNS(), "test.mycol");
     ASSERT_EQUALS(chunk.getMin(), BSON("a" << 10));
     ASSERT_EQUALS(chunk.getMax(), BSON("a" << 20));
@@ -144,7 +135,6 @@ TEST(ChunkType, Pre22Format) {
                                  << "shard0001")));
 
     ASSERT_OK(chunk.validate());
-    ASSERT_EQUALS(chunk.getName(), "test.mycol-a_MinKey");
     ASSERT_EQUALS(chunk.getNS(), "test.mycol");
     ASSERT_EQUALS(chunk.getMin(), BSON("a" << 10));
     ASSERT_EQUALS(chunk.getMax(), BSON("a" << 20));

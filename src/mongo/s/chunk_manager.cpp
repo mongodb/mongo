@@ -421,7 +421,6 @@ Status ChunkManager::createFirstChunks(OperationContext* txn,
             i < splitPoints.size() ? splitPoints[i] : _keyPattern.getKeyPattern().globalMax();
 
         ChunkType chunk;
-        chunk.setName(ChunkType::genID(_ns, min));
         chunk.setNS(_ns);
         chunk.setMin(min);
         chunk.setMax(max);

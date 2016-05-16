@@ -306,7 +306,6 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
     ShardKeyPattern keyPattern(BSON("_id" << 1));
 
     ChunkType expectedChunk;
-    expectedChunk.setName(ChunkType::genID(ns, keyPattern.getKeyPattern().globalMin()));
     expectedChunk.setNS(ns);
     expectedChunk.setMin(keyPattern.getKeyPattern().globalMin());
     expectedChunk.setMax(keyPattern.getKeyPattern().globalMax());
@@ -441,7 +440,6 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     expectedChunk0.setShard(shard0.getName());
     expectedChunk0.setMin(keyPattern.getKeyPattern().globalMin());
     expectedChunk0.setMax(splitPoint0);
-    expectedChunk0.setName(ChunkType::genID(ns, expectedChunk0.getMin()));
     expectedChunk0.setVersion(expectedVersion);
     expectedVersion.incMinor();
 
@@ -450,7 +448,6 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     expectedChunk1.setShard(shard1.getName());
     expectedChunk1.setMin(splitPoint0);
     expectedChunk1.setMax(splitPoint1);
-    expectedChunk1.setName(ChunkType::genID(ns, expectedChunk1.getMin()));
     expectedChunk1.setVersion(expectedVersion);
     expectedVersion.incMinor();
 
@@ -459,7 +456,6 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     expectedChunk2.setShard(shard2.getName());
     expectedChunk2.setMin(splitPoint1);
     expectedChunk2.setMax(splitPoint2);
-    expectedChunk2.setName(ChunkType::genID(ns, expectedChunk2.getMin()));
     expectedChunk2.setVersion(expectedVersion);
     expectedVersion.incMinor();
 
@@ -468,7 +464,6 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     expectedChunk3.setShard(shard0.getName());
     expectedChunk3.setMin(splitPoint2);
     expectedChunk3.setMax(splitPoint3);
-    expectedChunk3.setName(ChunkType::genID(ns, expectedChunk3.getMin()));
     expectedChunk3.setVersion(expectedVersion);
     expectedVersion.incMinor();
 
@@ -477,7 +472,6 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     expectedChunk4.setShard(shard1.getName());
     expectedChunk4.setMin(splitPoint3);
     expectedChunk4.setMax(keyPattern.getKeyPattern().globalMax());
-    expectedChunk4.setName(ChunkType::genID(ns, expectedChunk4.getMin()));
     expectedChunk4.setVersion(expectedVersion);
 
     vector<ChunkType> expectedChunks{
@@ -596,7 +590,6 @@ TEST_F(ShardCollectionTest, withInitialData) {
     expectedChunk0.setShard(shard.getName());
     expectedChunk0.setMin(keyPattern.getKeyPattern().globalMin());
     expectedChunk0.setMax(splitPoint0);
-    expectedChunk0.setName(ChunkType::genID(ns, expectedChunk0.getMin()));
     expectedChunk0.setVersion(expectedVersion);
     expectedVersion.incMinor();
 
@@ -605,7 +598,6 @@ TEST_F(ShardCollectionTest, withInitialData) {
     expectedChunk1.setShard(shard.getName());
     expectedChunk1.setMin(splitPoint0);
     expectedChunk1.setMax(splitPoint1);
-    expectedChunk1.setName(ChunkType::genID(ns, expectedChunk1.getMin()));
     expectedChunk1.setVersion(expectedVersion);
     expectedVersion.incMinor();
 
@@ -614,7 +606,6 @@ TEST_F(ShardCollectionTest, withInitialData) {
     expectedChunk2.setShard(shard.getName());
     expectedChunk2.setMin(splitPoint1);
     expectedChunk2.setMax(splitPoint2);
-    expectedChunk2.setName(ChunkType::genID(ns, expectedChunk2.getMin()));
     expectedChunk2.setVersion(expectedVersion);
     expectedVersion.incMinor();
 
@@ -623,7 +614,6 @@ TEST_F(ShardCollectionTest, withInitialData) {
     expectedChunk3.setShard(shard.getName());
     expectedChunk3.setMin(splitPoint2);
     expectedChunk3.setMax(splitPoint3);
-    expectedChunk3.setName(ChunkType::genID(ns, expectedChunk3.getMin()));
     expectedChunk3.setVersion(expectedVersion);
     expectedVersion.incMinor();
 
@@ -632,7 +622,6 @@ TEST_F(ShardCollectionTest, withInitialData) {
     expectedChunk4.setShard(shard.getName());
     expectedChunk4.setMin(splitPoint3);
     expectedChunk4.setMax(keyPattern.getKeyPattern().globalMax());
-    expectedChunk4.setName(ChunkType::genID(ns, expectedChunk4.getMin()));
     expectedChunk4.setVersion(expectedVersion);
 
     vector<ChunkType> expectedChunks{
