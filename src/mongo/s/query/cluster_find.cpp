@@ -44,6 +44,7 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/executor/task_executor_pool.h"
+#include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
@@ -76,11 +77,19 @@ static const int kPerDocumentOverheadBytesUpperBound = 10;
  * Given the LiteParsedQuery 'lpq' being executed by mongos, returns a copy of the query which is
  * suitable for forwarding to the targeted hosts.
  */
-std::unique_ptr<LiteParsedQuery> transformQueryForShards(const LiteParsedQuery& lpq) {
+StatusWith<std::unique_ptr<LiteParsedQuery>> transformQueryForShards(const LiteParsedQuery& lpq) {
     // If there is a limit, we forward the sum of the limit and the skip.
     boost::optional<long long> newLimit;
     if (lpq.getLimit()) {
-        newLimit = *lpq.getLimit() + lpq.getSkip().value_or(0);
+        long long newLimitValue;
+        if (mongoSignedAddOverflow64(*lpq.getLimit(), lpq.getSkip().value_or(0), &newLimitValue)) {
+            return Status(
+                ErrorCodes::Overflow,
+                str::stream()
+                    << "sum of limit and skip cannot be represented as a 64-bit integer, limit: "
+                    << *lpq.getLimit() << ", skip: " << lpq.getSkip().value_or(0));
+        }
+        newLimit = newLimitValue;
     }
 
     // Similarly, if nToReturn is set, we forward the sum of nToReturn and the skip.
@@ -88,9 +97,27 @@ std::unique_ptr<LiteParsedQuery> transformQueryForShards(const LiteParsedQuery& 
     if (lpq.getNToReturn()) {
         // !wantMore and ntoreturn mean the same as !wantMore and limit, so perform the conversion.
         if (!lpq.wantMore()) {
-            newLimit = *lpq.getNToReturn() + lpq.getSkip().value_or(0);
+            long long newLimitValue;
+            if (mongoSignedAddOverflow64(
+                    *lpq.getNToReturn(), lpq.getSkip().value_or(0), &newLimitValue)) {
+                return Status(ErrorCodes::Overflow,
+                              str::stream()
+                                  << "sum of ntoreturn and skip cannot be represented as a 64-bit "
+                                     "integer, ntoreturn: " << *lpq.getNToReturn()
+                                  << ", skip: " << lpq.getSkip().value_or(0));
+            }
+            newLimit = newLimitValue;
         } else {
-            newNToReturn = *lpq.getNToReturn() + lpq.getSkip().value_or(0);
+            long long newNToReturnValue;
+            if (mongoSignedAddOverflow64(
+                    *lpq.getNToReturn(), lpq.getSkip().value_or(0), &newNToReturnValue)) {
+                return Status(ErrorCodes::Overflow,
+                              str::stream()
+                                  << "sum of ntoreturn and skip cannot be represented as a 64-bit "
+                                     "integer, ntoreturn: " << *lpq.getNToReturn()
+                                  << ", skip: " << lpq.getSkip().value_or(0));
+            }
+            newNToReturn = newNToReturnValue;
         }
     }
 
@@ -109,7 +136,7 @@ std::unique_ptr<LiteParsedQuery> transformQueryForShards(const LiteParsedQuery& 
     newLPQ->setLimit(newLimit);
     newLPQ->setNToReturn(newNToReturn);
     invariantOK(newLPQ->validate());
-    return newLPQ;
+    return std::move(newLPQ);
 }
 
 StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
@@ -166,6 +193,9 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
     invariant(params.sort.isEmpty() || !params.isTailable);
 
     const auto lpqToForward = transformQueryForShards(query.getParsed());
+    if (!lpqToForward.isOK()) {
+        return lpqToForward.getStatus();
+    }
 
     // Use read pref to target a particular host from each shard. Also construct the find command
     // that we will forward to each shard.
@@ -174,7 +204,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
 
         // Build the find command, and attach shard version if necessary.
         BSONObjBuilder cmdBuilder;
-        lpqToForward->asFindCommand(&cmdBuilder);
+        lpqToForward.getValue()->asFindCommand(&cmdBuilder);
 
         if (chunkManager) {
             ChunkVersion version(chunkManager->getVersion(shard->getId()));
