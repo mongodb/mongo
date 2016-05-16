@@ -75,8 +75,9 @@ functions:
         script: |
           set -e
           set -o verbose
+          source ./venv/bin/activate
           cd ./clusters/${cluster}
-          ../../bin/configure-mongodb-cluster.sh ${setup} ${storageEngine}
+          ../../bin/mongodb_setup.py ${setup} ${storageEngine}
           echo "${cluster} MongoDB Cluster STARTED."
 
   "run test":
@@ -127,6 +128,7 @@ functions:
           cd ./clusters/${cluster}/reports
           # move additional file here
           cp ../ips.sh .
+          cp ../ips.py .
           cp ../../perf_all.json .
           cd ..
           ../../bin/retrieve-diag-data.sh

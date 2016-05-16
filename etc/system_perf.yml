@@ -68,7 +68,7 @@ functions:
           # create all resources and instances
           ../../bin/setup-cluster.sh ${cluster}
           echo "EC2 Cluster CREATED."
-          tar -czvf cluster_config.tgz ips.sh terraform.tfstate cluster.tf terraform.tfvars variables.tf
+          tar -czvf cluster_config.tgz ips.sh ips.py terraform.tfstate cluster.tf terraform.tfvars variables.tf
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -106,8 +106,9 @@ functions:
         script: |
           set -e
           set -o verbose
+          source ./venv/bin/activate
           cd ./clusters/${cluster}
-          ../../bin/configure-mongodb-cluster.sh ${setup} ${storageEngine}
+          ../../bin/mongodb_setup.py ${setup} ${storageEngine}
           echo "${cluster} MongoDB Cluster STARTED."
   "run test":
     - command: shell.exec
@@ -158,6 +159,7 @@ functions:
           cd ./clusters/${cluster}/reports
           # move additional file here
           cp ../ips.sh .
+          cp ../ips.py .
           if [ -f "../terraform.log" ]; then cp ../terraform.log .; fi
           cp ../../perf.json .
           cd ..
