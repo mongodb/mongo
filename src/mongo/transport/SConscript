@@ -11,3 +11,29 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/util/foundation',
     ],
 )
+
+env.Library(
+    target='service_entry_point_test_suite',
+    source=[
+        'service_entry_point_test_suite.cpp',
+        ## move these somewhere better:
+        'session.cpp',
+        'ticket.cpp',
+        'transport_layer.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/foundation',
+        '$BUILD_DIR/mongo/util/net/network',
+    ],
+)
+
+env.CppUnitTest(
+    target='service_entry_point_mock_test',
+    source=[
+        'service_entry_point_mock.cpp', ## move?
+        'service_entry_point_mock_test.cpp',
+    ],
+    LIBDEPS=[
+        'service_entry_point_test_suite',
+    ],
+)
