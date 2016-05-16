@@ -46,10 +46,6 @@ namespace rpc {
 
 namespace {
 
-// Symbolic constant for the "$secondaryOk" metadata field. This field should be of boolean or
-// numeric type, and is treated as a boolean.
-const char kSecondaryOkFieldName[] = "$secondaryOk";
-
 // Symbolic constant for the "$readPreference" metadata field. The field should be of Object type
 // when present.
 const char kReadPreferenceFieldName[] = "$readPreference";
@@ -140,6 +136,10 @@ Status extractUnwrappedReadPreference(const BSONObj& unwrappedCommand,
 }
 
 }  // namespace
+
+// Symbolic constant for the "$secondaryOk" metadata field. This field should be of boolean or
+// numeric type, and is treated as a boolean.
+const char ServerSelectionMetadata::kSecondaryOkFieldName[] = "$secondaryOk";
 
 const OperationContext::Decoration<ServerSelectionMetadata> ServerSelectionMetadata::get =
     OperationContext::declareDecoration<ServerSelectionMetadata>();

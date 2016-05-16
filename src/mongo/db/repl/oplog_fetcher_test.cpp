@@ -36,6 +36,7 @@
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
@@ -355,7 +356,7 @@ TEST_F(OplogFetcherTest, MetadataObjectContainsReplSetMetadataFieldUnderProtocol
                                     enqueueDocumentsFn,
                                     [](Status, OpTimeWithHash) {})
                            .getMetadataObject_forTest();
-    ASSERT_EQUALS(1, metadataObj.nFields());
+    ASSERT_EQUALS(2, metadataObj.nFields());
     ASSERT_EQUALS(1, metadataObj[rpc::kReplSetMetadataFieldName].numberInt());
 }
 
@@ -369,7 +370,9 @@ TEST_F(OplogFetcherTest, MetadataObjectIsEmptyUnderProtocolVersion0) {
                                     enqueueDocumentsFn,
                                     [](Status, OpTimeWithHash) {})
                            .getMetadataObject_forTest();
-    ASSERT_EQUALS(BSONObj(), metadataObj);
+    ASSERT_EQUALS(BSON(rpc::ServerSelectionMetadata::fieldName()
+                       << BSON(rpc::ServerSelectionMetadata::kSecondaryOkFieldName << 1)),
+                  metadataObj);
 }
 
 TEST_F(OplogFetcherTest, RemoteCommandTimeoutShouldEqualElectionTimeout) {

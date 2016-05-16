@@ -51,6 +51,7 @@ class ServerSelectionMetadata {
     MONGO_DISALLOW_COPYING(ServerSelectionMetadata);
 
 public:
+    static const char kSecondaryOkFieldName[];
     static const OperationContext::Decoration<ServerSelectionMetadata> get;
 
     ServerSelectionMetadata() = default;
