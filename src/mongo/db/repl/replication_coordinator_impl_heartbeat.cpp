@@ -266,7 +266,7 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponseAction(
         case HeartbeatResponseAction::StepDownRemotePrimary: {
             invariant(action.getPrimaryConfigIndex() != _selfIndex);
             _requestRemotePrimaryStepdown(
-                _rsConfig.getMemberAt(action.getPrimaryConfigIndex()).getHostAndPort());
+                _rsConfig.getMemberAt(action.getPrimaryConfigIndex()).getHostInternalAndPort());
             break;
         }
         case HeartbeatResponseAction::PriorityTakeover: {
@@ -640,7 +640,7 @@ void ReplicationCoordinatorImpl::_startHeartbeats_inlock() {
         if (i == _selfIndex) {
             continue;
         }
-        _scheduleHeartbeatToTarget(_rsConfig.getMemberAt(i).getHostAndPort(), i, now);
+        _scheduleHeartbeatToTarget(_rsConfig.getMemberAt(i).getHostInternalAndPort(), i, now);
     }
     if (isV1ElectionProtocol()) {
         for (auto&& slaveInfo : _slaveInfo) {

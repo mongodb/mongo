@@ -189,7 +189,7 @@ TEST_F(ElectCmdRunnerTest, TwoNodes) {
                                                             << "h1"))));
 
     std::vector<HostAndPort> hosts;
-    hosts.push_back(config.getMemberAt(1).getHostAndPort());
+    hosts.push_back(config.getMemberAt(1).getHostInternalAndPort());
 
     const BSONObj electRequest = makeElectRequest(config, 0);
 
@@ -227,7 +227,7 @@ TEST_F(ElectCmdRunnerTest, ShuttingDown) {
                                                                                   << "h1"))));
 
     std::vector<HostAndPort> hosts;
-    hosts.push_back(config.getMemberAt(1).getHostAndPort());
+    hosts.push_back(config.getMemberAt(1).getHostInternalAndPort());
 
     ElectCmdRunner electCmdRunner;
     StatusWith<ReplicationExecutor::EventHandle> evh(ErrorCodes::InternalError, "Not set");
@@ -260,7 +260,7 @@ public:
         for (ReplicaSetConfig::MemberIterator mem = ++config.membersBegin();
              mem != config.membersEnd();
              ++mem) {
-            hosts.push_back(mem->getHostAndPort());
+            hosts.push_back(mem->getHostInternalAndPort());
         }
 
         _checker.reset(new ElectCmdRunner::Algorithm(config, selfConfigIndex, hosts, OID()));

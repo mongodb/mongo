@@ -426,7 +426,8 @@ Status ReplicaSetConfig::validate() const {
         Status status = memberI.validate();
         if (!status.isOK())
             return status;
-        if (memberI.getHostAndPort().isLocalHost()) {
+        if (memberI.getHostInternalAndPort().isLocalHost() ||
+            memberI.getHostAndPort().isLocalHost()) {
             ++localhostCount;
         }
         if (memberI.isVoter()) {
@@ -461,7 +462,8 @@ Status ReplicaSetConfig::validate() const {
                                             << " == "
                                             << memberI.getId());
             }
-            if (memberI.getHostAndPort() == memberJ.getHostAndPort()) {
+
+            if (memberI.getHostAndPort() == memberJ.getHostAndPort() ) {
                 return Status(ErrorCodes::BadValue,
                               str::stream() << "Found two member configurations with same "
                                             << MemberConfig::kHostFieldName
@@ -479,6 +481,17 @@ Status ReplicaSetConfig::validate() const {
                                             << MemberConfig::kHostFieldName
                                             << " == "
                                             << memberI.getHostAndPort().toString());
+            }
+            // validating that the internal host is not duplicated in the configuration
+            if (!memberI.getHostInternalAndPort().empty() && memberI.getHostInternalAndPort() == memberJ.getHostInternalAndPort() ) {
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "Found two member configurations with same "
+                                            << MemberConfig::kHostInternalFieldName << " field, "
+                                            << kMembersFieldName << "." << i << "."
+                                            << MemberConfig::kHostInternalFieldName
+                                            << " == " << kMembersFieldName << "." << j << "."
+                                            << MemberConfig::kHostInternalFieldName
+                                            << " == " << memberI.getHostInternalAndPort().toString());
             }
         }
     }
@@ -634,7 +647,7 @@ const int ReplicaSetConfig::findMemberIndexByHostAndPort(const HostAndPort& hap)
     int x = 0;
     for (std::vector<MemberConfig>::const_iterator it = _members.begin(); it != _members.end();
          ++it) {
-        if (it->getHostAndPort() == hap) {
+        if (it->getHostInternalAndPort() == hap || it->getHostAndPort() == hap) {
             return x;
         }
         ++x;

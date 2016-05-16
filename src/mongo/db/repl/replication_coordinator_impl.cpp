@@ -1095,7 +1095,7 @@ void ReplicationCoordinatorImpl::_updateSlaveInfoFromConfig_inlock() {
     for (int i = 0; i < _rsConfig.getNumMembers(); ++i) {
         const MemberConfig& memberConfig = _rsConfig.getMemberAt(i);
         int memberId = memberConfig.getId();
-        const HostAndPort& memberHostAndPort = memberConfig.getHostAndPort();
+        const HostAndPort& memberHostAndPort = memberConfig.getHostInternalAndPort();
 
         SlaveInfo slaveInfo;
 
@@ -2861,7 +2861,7 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(const ReplicaSetConfig& n
     log() << "New replica set config in use: " << _rsConfig.toBSON() << rsLog;
     _selfIndex = myIndex;
     if (_selfIndex >= 0) {
-        log() << "This node is " << _rsConfig.getMemberAt(_selfIndex).getHostAndPort()
+        log() << "This node is " << _rsConfig.getMemberAt(_selfIndex).getHostInternalAndPort()
               << " in the config";
     } else {
         log() << "This node is not a member of the config";
@@ -3024,7 +3024,7 @@ std::vector<HostAndPort> ReplicationCoordinatorImpl::getOtherNodesInReplSet() co
         if (i == _selfIndex)
             continue;
 
-        nodes.push_back(_rsConfig.getMemberAt(i).getHostAndPort());
+        nodes.push_back(_rsConfig.getMemberAt(i).getHostInternalAndPort());
     }
     return nodes;
 }
