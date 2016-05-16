@@ -1988,7 +1988,13 @@ tasks:
           mv distsrc.${ext|tgz} mongodb-src-${src_suffix}.${ext|tar.gz} || true
           /usr/bin/find build/ -type f | grep msi$ | xargs -I original_filename cp original_filename mongodb-win32-${push_arch}-${suffix}.msi || true
 
-          notary-client.py --key-name "server-3.4" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --skip-missing mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} mongodb-win32-${push_arch}-${suffix}.msi mongodb-src-${src_suffix}.${ext|tar.gz}
+          # Extract shell and banner files out of scons-made archive for separate shell archive
+          ${platform_decompress|tar zxvf} mongodb-binaries.${ext|tgz} mongodb-\*/bin/mongo${exe} mongodb-\*/[A-Z]\*
+
+          # Create new shell archive (make_archive.py uses filename to determine what format archive to create)
+          ${python|python} buildscripts/make_archive.py -o mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz} $(ls -d mongodb-*/bin/mongo${exe} mongodb-*/[A-Z]*)
+
+          notary-client.py --key-name "server-3.4" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --skip-missing mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} mongodb-win32-${push_arch}-${suffix}.msi mongodb-src-${src_suffix}.${ext|tar.gz}
 
           if [ "${has_packages|}" = "true" ] ; then
             for rpm in $(find repo/ -name \*.rpm) ; do
@@ -2017,6 +2023,16 @@ tasks:
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}
+    # Put the shell tarball/zipfile
+    - command: s3.put
+      params:
+        aws_secret: ${aws_secret}
+        local_file: src/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+        aws_key: ${aws_key}
+        bucket: build-push-testing
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        remote_file: ${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}
     # Put the source tarball
     - command: s3.put
       params:
@@ -2051,6 +2067,17 @@ tasks:
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig
+    # Put the shell tarball signature
+    - command: s3.put
+      params:
+        aws_secret: ${aws_secret}
+        local_file: src/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+        aws_key: ${aws_key}
+        bucket: build-push-testing
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        remote_file: ${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig
+
 
     # Put the source tarball signature
     - command: s3.put
@@ -2098,6 +2125,16 @@ tasks:
         bucket: build-push-testing
         content_type: text/plain
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1
+    # Put the shell tarball sha1
+    - command: s3.put
+      params:
+        aws_secret: ${aws_secret}
+        local_file: src/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+        aws_key: ${aws_key}
+        permissions: public-read
+        bucket: build-push-testing
+        content_type: text/plain
+        remote_file: ${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1
 
     # Put the source tarball sha1
     - command: s3.put
@@ -2145,6 +2182,16 @@ tasks:
         bucket: build-push-testing
         content_type: text/plain
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256
+    # Put the shell tarball sha256
+    - command: s3.put
+      params:
+        aws_secret: ${aws_secret}
+        local_file: src/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+        permissions: public-read
+        aws_key: ${aws_key}
+        bucket: build-push-testing
+        content_type: text/plain
+        remote_file: ${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256
 
     # Put the source tarball sha256
     - command: s3.put
@@ -2192,6 +2239,16 @@ tasks:
         permissions: public-read
         content_type: text/plain
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5
+    # Put the shell tarball md5
+    - command: s3.put
+      params:
+        aws_secret: ${aws_secret}
+        local_file: src/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+        aws_key: ${aws_key}
+        bucket: build-push-testing
+        permissions: public-read
+        content_type: text/plain
+        remote_file: ${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5
 
     # Put the source tarball md5
     - command: s3.put
@@ -2256,6 +2313,10 @@ tasks:
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}', 'bucket': '${push_bucket}'}}
 
+            #Shell
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}', 'bucket': '${push_bucket}'}}
+
             #Source tarball
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}', 'bucket': 'build-push-testing'},
                'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}', 'bucket': '${push_bucket}'},
@@ -2277,6 +2338,10 @@ tasks:
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig', 'bucket': '${push_bucket}'}}
 
+            #Shell Signature
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig', 'bucket': '${push_bucket}'}}
+
             #Debug Symbols Signature
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.sig', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sig', 'bucket': '${push_bucket}'},
@@ -2292,6 +2357,10 @@ tasks:
             #SHA1 for binaries
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1', 'bucket': '${push_bucket}'}}
+
+            #SHA1 for shell
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1', 'bucket': '${push_bucket}'}}
 
             #SHA1 for source tarball
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha1', 'bucket': 'build-push-testing'},
@@ -2314,6 +2383,10 @@ tasks:
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256', 'bucket': '${push_bucket}'}}
 
+            #SHA256 for shell
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256', 'bucket': '${push_bucket}'}}
+
             #SHA256 for source tarball
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha256', 'bucket': 'build-push-testing'},
                'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha256', 'bucket': '${push_bucket}'},
@@ -2334,6 +2407,10 @@ tasks:
             #MD5 for binaries
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5', 'bucket': '${push_bucket}'}}
+
+            #MD5 for shell
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5', 'bucket': '${push_bucket}'}}
 
             #MD5 for source tarball
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.md5', 'bucket': 'build-push-testing'},
@@ -3176,6 +3253,7 @@ buildvariants:
   - windows-64-vs2015-test
   batchtime: 1440 # 1 day
   expansions:
+    platform_decompress: unzip
     exe: ".exe"
     push_path: win32
     push_bucket: downloads.mongodb.org
@@ -3276,6 +3354,7 @@ buildvariants:
   - windows-64-vs2015-test
   batchtime: 1440 # 1 day
   expansions:
+    platform_decompress: unzip
     exe: ".exe"
     push_path: win32
     push_bucket: downloads.mongodb.org
@@ -3380,6 +3459,7 @@ buildvariants:
   run_on:
   - windows-64-vs2015-test
   expansions:
+    platform_decompress: unzip
     exe: ".exe"
     push_path: win32
     push_bucket: downloads.mongodb.org
@@ -3474,6 +3554,7 @@ buildvariants:
   run_on:
   - windows-64-vs2015-test
   expansions:
+    platform_decompress: unzip
     tooltags: "-tags 'ssl sasl'"
     exe: ".exe"
     gorootvars: 'PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"'
@@ -3531,6 +3612,7 @@ buildvariants:
   - windows-64-vs2015-test
   batchtime: 1440 # 1 day
   expansions:
+    platform_decompress: unzip
     tooltags: "-tags 'ssl sasl'"
     exe: ".exe"
     gorootvars: 'PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"'
@@ -3581,6 +3663,7 @@ buildvariants:
   - windows-64-vs2015-test
   batchtime: 1440 # 1 day
   expansions:
+    platform_decompress: unzip
     exe: ".exe"
     gorootvars: 'PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"'
     tooltags: "-tags ssl"
