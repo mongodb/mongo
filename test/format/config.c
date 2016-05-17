@@ -234,16 +234,11 @@ config_compression(void)
 		switch (mmrand(NULL, 1, 20)) {
 		case 1: case 2: case 3: case 4:		/* 20% no compression */
 			break;
-		case 5: case 6:				/* 10% bzip */
-			cstr = "compression=bzip";
-			break;
-		case 7:					/* 5% bzip-raw */
-			cstr = "compression=bzip-raw";
-			break;
 		case 8: case 9: case 10: case 11:	/* 20% lz4 */
 			cstr = "compression=lz4";
 			break;
-		case 12: case 13: case 14: case 15:	/* 20% snappy */
+		case 5: case 6: case 7:
+		case 12: case 13: case 14: case 15:	/* 35% snappy */
 			cstr = "compression=snappy";
 			break;
 		case 16: case 17: case 18: case 19:	/* 20% zlib */
