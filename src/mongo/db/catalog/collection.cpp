@@ -198,6 +198,8 @@ Collection::Collection(OperationContext* txn,
       _needCappedLock(supportsDocLocking() && _recordStore->isCapped() && _ns.db() != "local"),
       _infoCache(this),
       _indexCatalog(this),
+      _collator(
+          uassertStatusOK(parseCollation(txn, _details->getCollectionOptions(txn).collation))),
       _validatorDoc(_details->getCollectionOptions(txn).validator.getOwned()),
       _validator(uassertStatusOK(parseValidator(_validatorDoc))),
       _validationAction(uassertStatusOK(
@@ -206,9 +208,7 @@ Collection::Collection(OperationContext* txn,
           _parseValidationLevel(_details->getCollectionOptions(txn).validationLevel))),
       _cursorManager(fullNS),
       _cappedNotifier(_recordStore->isCapped() ? new CappedInsertNotifier() : nullptr),
-      _mustTakeCappedLockOnInsert(isCapped() && !_ns.isSystemDotProfile() && !_ns.isOplog()),
-      _collator(
-          uassertStatusOK(parseCollation(txn, _details->getCollectionOptions(txn).collation))) {
+      _mustTakeCappedLockOnInsert(isCapped() && !_ns.isSystemDotProfile() && !_ns.isOplog()) {
     _magic = 1357924;
     _indexCatalog.init(txn);
     if (isCapped())
@@ -315,9 +315,8 @@ StatusWithMatchExpression Collection::parseValidator(const BSONObj& validator) c
             return status;
     }
 
-    // TODO SERVER-23687: Pass the appropriate CollatorInterface* instead of nullptr.
-    auto statusWithMatcher =
-        MatchExpressionParser::parse(validator, ExtensionsCallbackDisallowExtensions(), nullptr);
+    auto statusWithMatcher = MatchExpressionParser::parse(
+        validator, ExtensionsCallbackDisallowExtensions(), _collator.get());
     if (!statusWithMatcher.isOK())
         return statusWithMatcher.getStatus();
 

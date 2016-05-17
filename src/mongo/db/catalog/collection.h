@@ -493,6 +493,12 @@ private:
     CollectionInfoCache _infoCache;
     IndexCatalog _indexCatalog;
 
+    // The default collation which is applied to operations and indices which have no collation of
+    // their own. The collection's validator will respect this collation.
+    //
+    // If null, the default collation is simple binary compare.
+    std::unique_ptr<CollatorInterface> _collator;
+
     // Empty means no filter.
     BSONObj _validatorDoc;
     // Points into _validatorDoc. Null means no filter.
@@ -518,10 +524,6 @@ private:
 
     // The earliest snapshot that is allowed to use this collection.
     boost::optional<SnapshotName> _minVisibleSnapshot;
-
-    // The default collation which is applied to operations and indices which have no collation of
-    // their own. If null, the default collation is simple binary compare.
-    std::unique_ptr<CollatorInterface> _collator;
 
     friend class Database;
     friend class IndexCatalog;
