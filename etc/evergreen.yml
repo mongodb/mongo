@@ -368,7 +368,6 @@ functions:
 
   "run jepsen test" :
     - command: shell.exec
-      type: test
       params:
         working_dir: src/jepsen/mongodb
         script: |
@@ -377,7 +376,16 @@ functions:
           # Increase JVM heap space to 75% of total free memory
           heap_space=$(awk '/MemFree:/{printf "%0dm\n",$2*0.75/1024}' /proc/meminfo)
           sed -i -e "s/\"-Xmx.*\"/\"-Xmx$heap_space\"/" project.clj
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src/jepsen/mongodb
+        script: |
+          set -o verbose
           lein run --tarball "file:///root/mongo-binaries.tgz" ${jepsen_protocol_version} ${jepsen_read_concern} ${jepsen_read_with_find_and_modify} ${jepsen_storage_engine} ${jepsen_time_limit} ${jepsen_write_concern}
+          status=$?
+          # Create status file, so we can signal an error, after the archive/put steps have run.
+          echo $status > ../../jepsen-status-${task_id}-${execution}.txt
     - command: archive.targz_pack
       params:
         target: "src/jepsen-results.tgz"
@@ -394,6 +402,12 @@ functions:
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
         display_name: Jepsen Test Results - ${execution}
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src
+        script: |
+          exit $(cat jepsen-status-${task_id}-${execution}.txt)
 
   "run jstestfuzz":
     - command: shell.exec
