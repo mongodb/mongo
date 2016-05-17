@@ -58,6 +58,7 @@ DistinctScan::DistinctScan(OperationContext* txn,
     _specificStats.indexName = _params.descriptor->indexName();
     _specificStats.indexVersion = _params.descriptor->version();
     _specificStats.isMultiKey = _params.descriptor->isMultikey(getOpCtx());
+    _specificStats.multiKeyPaths = _params.descriptor->getMultikeyPaths(getOpCtx());
     _specificStats.isUnique = _params.descriptor->unique();
     _specificStats.isSparse = _params.descriptor->isSparse();
     _specificStats.isPartial = _params.descriptor->isPartial();

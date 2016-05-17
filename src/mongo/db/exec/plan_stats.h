@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/util/time_support.h"
@@ -247,7 +248,12 @@ struct CountScanStats : public SpecificStats {
 
     int indexVersion;
 
+    // Set to true if the index used for the count scan is multikey.
     bool isMultiKey;
+
+    // Represents which prefixes of the indexed field(s) cause the index to be multikey.
+    MultikeyPaths multiKeyPaths;
+
     bool isPartial;
     bool isSparse;
     bool isUnique;
@@ -286,7 +292,13 @@ struct DistinctScanStats : public SpecificStats {
     // Properties of the index used for the distinct scan.
     std::string indexName;
     int indexVersion = 0;
+
+    // Set to true if the index used for the distinct scan is multikey.
     bool isMultiKey = false;
+
+    // Represents which prefixes of the indexed field(s) cause the index to be multikey.
+    MultikeyPaths multiKeyPaths;
+
     bool isPartial = false;
     bool isSparse = false;
     bool isUnique = false;
@@ -400,6 +412,10 @@ struct IndexScanStats : public SpecificStats {
     // index properties
     // Whether this index is over a field that contain array values.
     bool isMultiKey;
+
+    // Represents which prefixes of the indexed field(s) cause the index to be multikey.
+    MultikeyPaths multiKeyPaths;
+
     bool isPartial;
     bool isSparse;
     bool isUnique;

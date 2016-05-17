@@ -52,6 +52,7 @@ CountScan::CountScan(OperationContext* txn, const CountScanParams& params, Worki
     _specificStats.keyPattern = _params.descriptor->keyPattern();
     _specificStats.indexName = _params.descriptor->indexName();
     _specificStats.isMultiKey = _params.descriptor->isMultikey(txn);
+    _specificStats.multiKeyPaths = _params.descriptor->getMultikeyPaths(txn);
     _specificStats.isUnique = _params.descriptor->unique();
     _specificStats.isSparse = _params.descriptor->isSparse();
     _specificStats.isPartial = _params.descriptor->isPartial();

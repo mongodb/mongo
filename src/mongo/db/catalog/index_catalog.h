@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -210,7 +211,21 @@ public:
 
     // ---- modify single index
 
-    bool isMultikey(OperationContext* txn, const IndexDescriptor* idex);
+    /**
+     * Returns true if the index 'idx' is multikey, and returns false otherwise.
+     */
+    bool isMultikey(OperationContext* txn, const IndexDescriptor* idx);
+
+    /**
+     * Returns the path components that cause the index 'idx' to be multikey if the index supports
+     * path-level multikey tracking, and returns an empty vector if path-level multikey tracking
+     * isn't supported.
+     *
+     * If the index supports path-level multikey tracking but isn't multikey, then this function
+     * returns a vector with size equal to the number of elements in the index key pattern where
+     * each element in the vector is an empty set.
+     */
+    MultikeyPaths getMultikeyPaths(OperationContext* txn, const IndexDescriptor* idx);
 
     // --- these probably become private?
 

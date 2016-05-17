@@ -907,6 +907,11 @@ bool IndexCatalog::isMultikey(OperationContext* txn, const IndexDescriptor* idx)
     return entry->isMultikey();
 }
 
+MultikeyPaths IndexCatalog::getMultikeyPaths(OperationContext* txn, const IndexDescriptor* idx) {
+    IndexCatalogEntry* entry = _entries.find(idx);
+    invariant(entry);
+    return entry->getMultikeyPaths(txn);
+}
 
 // ---------------------------
 

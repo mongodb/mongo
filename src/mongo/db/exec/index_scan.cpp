@@ -77,6 +77,7 @@ IndexScan::IndexScan(OperationContext* txn,
     _specificStats.keyPattern = _keyPattern;
     _specificStats.indexName = _params.descriptor->indexName();
     _specificStats.isMultiKey = _params.descriptor->isMultikey(getOpCtx());
+    _specificStats.multiKeyPaths = _params.descriptor->getMultikeyPaths(getOpCtx());
     _specificStats.isUnique = _params.descriptor->unique();
     _specificStats.isSparse = _params.descriptor->isSparse();
     _specificStats.isPartial = _params.descriptor->isPartial();

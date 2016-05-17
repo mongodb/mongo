@@ -32,6 +32,7 @@
 
 #include <string>
 
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/catalog/collection.h"
 
@@ -153,9 +154,14 @@ public:
     }
 
     // Is this index multikey?
-    bool isMultikey(OperationContext* txn) const {
+    bool isMultikey(OperationContext* opCtx) const {
         _checkOk();
-        return _collection->getIndexCatalog()->isMultikey(txn, this);
+        return _collection->getIndexCatalog()->isMultikey(opCtx, this);
+    }
+
+    MultikeyPaths getMultikeyPaths(OperationContext* opCtx) const {
+        _checkOk();
+        return _collection->getIndexCatalog()->getMultikeyPaths(opCtx, this);
     }
 
     bool isIdIndex() const {

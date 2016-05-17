@@ -195,6 +195,40 @@ void addStageSummaryStr(const PlanStage* stage, mongoutils::str::stream& ss) {
     }
 }
 
+/**
+ * Adds the path-level multikey information to the explain output in a field called "multiKeyPaths".
+ * The value associated with the "multiKeyPaths" field is an object with keys equal to those in the
+ * index key pattern and values equal to an array of strings corresponding to paths that cause the
+ * index to be multikey.
+ *
+ * For example, with the index {'a.b': 1, 'a.c': 1} where the paths "a" and "a.b" cause the
+ * index to be multikey, we'd have {'multiKeyPaths': {'a.b': ['a', 'a.b'], 'a.c': ['a']}}.
+ *
+ * This function should only be called if the associated index supports path-level multikey
+ * tracking.
+ */
+void appendMultikeyPaths(const BSONObj& keyPattern,
+                         const MultikeyPaths& multikeyPaths,
+                         BSONObjBuilder* bob) {
+    BSONObjBuilder subMultikeyPaths(bob->subobjStart("multiKeyPaths"));
+
+    size_t i = 0;
+    for (const auto keyElem : keyPattern) {
+        const FieldRef path{keyElem.fieldNameStringData()};
+
+        BSONArrayBuilder arrMultikeyComponents(
+            subMultikeyPaths.subarrayStart(keyElem.fieldNameStringData()));
+        for (const auto multikeyComponent : multikeyPaths[i]) {
+            arrMultikeyComponents.append(path.dottedSubstring(0, multikeyComponent + 1));
+        }
+        arrMultikeyComponents.doneFast();
+
+        ++i;
+    }
+
+    subMultikeyPaths.doneFast();
+}
+
 }  // namespace
 
 namespace mongo {
@@ -285,6 +319,9 @@ void Explain::statsToBSON(const PlanStageStats& stats,
         bob->append("keyPattern", spec->keyPattern);
         bob->append("indexName", spec->indexName);
         bob->appendBool("isMultiKey", spec->isMultiKey);
+        if (!spec->multiKeyPaths.empty()) {
+            appendMultikeyPaths(spec->keyPattern, spec->multiKeyPaths, bob);
+        }
         bob->appendBool("isUnique", spec->isUnique);
         bob->appendBool("isSparse", spec->isSparse);
         bob->appendBool("isPartial", spec->isPartial);
@@ -302,6 +339,9 @@ void Explain::statsToBSON(const PlanStageStats& stats,
         bob->append("keyPattern", spec->keyPattern);
         bob->append("indexName", spec->indexName);
         bob->appendBool("isMultiKey", spec->isMultiKey);
+        if (!spec->multiKeyPaths.empty()) {
+            appendMultikeyPaths(spec->keyPattern, spec->multiKeyPaths, bob);
+        }
         bob->appendBool("isUnique", spec->isUnique);
         bob->appendBool("isSparse", spec->isSparse);
         bob->appendBool("isPartial", spec->isPartial);
@@ -367,6 +407,9 @@ void Explain::statsToBSON(const PlanStageStats& stats,
         bob->append("keyPattern", spec->keyPattern);
         bob->append("indexName", spec->indexName);
         bob->appendBool("isMultiKey", spec->isMultiKey);
+        if (!spec->multiKeyPaths.empty()) {
+            appendMultikeyPaths(spec->keyPattern, spec->multiKeyPaths, bob);
+        }
         bob->appendBool("isUnique", spec->isUnique);
         bob->appendBool("isSparse", spec->isSparse);
         bob->appendBool("isPartial", spec->isPartial);
