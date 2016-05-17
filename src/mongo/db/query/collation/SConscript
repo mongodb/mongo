@@ -2,7 +2,7 @@
 
 Import("endian")
 Import("env")
-Import("icuEnabled")
+Import("use_system_version_of_library")
 
 env = env.Clone()
 
@@ -131,7 +131,7 @@ env.CppUnitTest(
     ],
 )
 
-if icuEnabled:
+if not use_system_version_of_library("icu"):
     generateICUInit = env.Command(
         target="icu_init.cpp",
         source=[
@@ -145,37 +145,37 @@ if icuEnabled:
 
     env.Alias("generated-sources", generateICUInit)
 
-    env.Library(
-        target="collator_icu",
-        source=[
-            "collator_factory_icu.cpp",
-            "collator_interface_icu.cpp",
-            "icu_init.cpp",
-        ],
-        LIBDEPS=[
-            "$BUILD_DIR/mongo/base",
-            "$BUILD_DIR/mongo/bson/util/bson_extract",
-            "$BUILD_DIR/third_party/shim_icu",
-            "collator_interface",
-        ],
-    )
+env.Library(
+    target="collator_icu",
+    source=[
+        "collator_factory_icu.cpp",
+        "collator_interface_icu.cpp",
+        "icu_init.cpp" if not use_system_version_of_library("icu") else "icu_init_stub.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/bson/util/bson_extract",
+        "$BUILD_DIR/third_party/shim_icu",
+        "collator_factory_interface",
+    ],
+)
 
-    env.CppUnitTest(
-        target="collator_interface_icu_test",
-        source=[
-            "collator_interface_icu_test.cpp",
-        ],
-        LIBDEPS=[
-            "collator_icu",
-        ],
-    )
+env.CppUnitTest(
+    target="collator_interface_icu_test",
+    source=[
+        "collator_interface_icu_test.cpp",
+    ],
+    LIBDEPS=[
+        "collator_icu",
+    ],
+)
 
-    env.CppUnitTest(
-        target="collator_factory_icu_test",
-        source=[
-            "collator_factory_icu_test.cpp",
-        ],
-        LIBDEPS=[
-            "collator_icu",
-        ],
-    )
+env.CppUnitTest(
+    target="collator_factory_icu_test",
+    source=[
+        "collator_factory_icu_test.cpp",
+    ],
+    LIBDEPS=[
+        "collator_icu",
+    ],
+)

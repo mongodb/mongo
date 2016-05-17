@@ -29,7 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/init.h"
-#include "mongo/db/query/collation/collator_factory_mock.h"
+#include "mongo/db/query/collation/collator_factory_icu.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
 
@@ -37,11 +37,11 @@ namespace mongo {
 
 namespace {
 
-// TODO SERVER-22371: We should decorate with a CollatorFactoryICU instead.
 MONGO_INITIALIZER_WITH_PREREQUISITES(CreateCollatorFactory,
-                                     ("SetGlobalEnvironment"))(InitializerContext* context) {
+                                     ("SetGlobalEnvironment",
+                                      "LoadICUData"))(InitializerContext* context) {
     CollatorFactoryInterface::set(getGlobalServiceContext(),
-                                  stdx::make_unique<CollatorFactoryMock>());
+                                  stdx::make_unique<CollatorFactoryICU>());
     return Status::OK();
 }
 

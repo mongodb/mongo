@@ -73,14 +73,14 @@ env.Library(
 env.Library(
     target="query_common",
     source=[
-        "collation/collator_factory_mock_decoration.cpp",
+        "collation/collator_factory_icu_decoration.cpp",
         "find_common.cpp",
         "explain_common.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/util/fail_point",
-        "collation/collator_factory_mock",
+        "collation/collator_icu",
         "lite_parsed_query",
     ],
 )

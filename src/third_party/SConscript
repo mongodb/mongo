@@ -2,7 +2,6 @@
 
 Import("env use_system_version_of_library usemozjs get_option")
 Import("wiredtiger")
-Import("icuEnabled")
 
 boostSuffix = "-1.60.0"
 snappySuffix = '-1.1.3'
@@ -81,7 +80,7 @@ if not use_system_version_of_library('intel_decimal128'):
     thirdPartyIncludePathList.append(
         ('intel_decimal128', '#/src/third_party/IntelRDFPMathLib20U1/LIBRARY'))
 
-if icuEnabled and not use_system_version_of_library('icu'):
+if not use_system_version_of_library('icu'):
     thirdPartyIncludePathList.append(
         ('icu', '#/src/third_party/icu4c' + icuSuffix + '/source/common'))
     thirdPartyIncludePathList.append(
@@ -366,21 +365,24 @@ intelDecimal128Env.Library(
 	'shim_intel_decimal128.cpp'
     ])
 
-if icuEnabled:
-    if use_system_version_of_library('icu'):
-        # TODO
-        icuEnv = env.Clone()
-    else:
-        icuEnv = env.Clone()
-        icuEnv.InjectThirdPartyIncludePaths(libraries=['icu'])
-        icuEnv.SConscript('icu4c' + icuSuffix + '/source/SConscript', exports={ 'env' : icuEnv })
-        icuEnv = icuEnv.Clone(
-            LIBDEPS=[
-                'icu4c' + icuSuffix + '/source/icu_i18n',
-            ])
-
-    icuEnv.Library(
-        target='shim_icu',
-        source=[
-            'shim_icu.cpp',
+if use_system_version_of_library("icu"):
+    icuEnv = env.Clone(
+        SYSLIBDEPS=[
+            env['LIBDEPS_ICUDATA_SYSLIBDEP'],
+            env['LIBDEPS_ICUI18N_SYSLIBDEP'],
+            env['LIBDEPS_ICUUC_SYSLIBDEP'],
         ])
+else:
+    icuEnv = env.Clone()
+    icuEnv.InjectThirdPartyIncludePaths(libraries=['icu'])
+    icuEnv.SConscript('icu4c' + icuSuffix + '/source/SConscript', exports={ 'env' : icuEnv })
+    icuEnv = icuEnv.Clone(
+        LIBDEPS=[
+            'icu4c' + icuSuffix + '/source/icu_i18n',
+        ])
+
+icuEnv.Library(
+    target='shim_icu',
+    source=[
+        'shim_icu.cpp',
+    ])

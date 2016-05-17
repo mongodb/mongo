@@ -30,7 +30,9 @@
 
 #include "mongo/db/query/collation/collator_factory_icu.h"
 
+#include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {

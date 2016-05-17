@@ -362,15 +362,6 @@ add_option('use-system-asio',
     nargs=0,
 )
 
-add_option('icu',
-    choices=['on', 'off'],
-    const='on',
-    default='off',
-    help='Enable ICU',
-    nargs='?',
-    type='choice',
-)
-
 add_option('use-system-icu',
     help="use system version of ICU",
     nargs=0,
@@ -1503,11 +1494,6 @@ if get_option('wiredtiger') == 'on':
         wiredtiger = True
         env.SetConfigHeaderDefine("MONGO_CONFIG_WIREDTIGER_ENABLED")
 
-icuEnabled = False
-if get_option('icu') == 'on':
-    icuEnabled = True
-    env.SetConfigHeaderDefine("MONGO_CONFIG_ICU_ENABLED")
-
 if env['TARGET_ARCH'] == 'i386':
     # If we are using GCC or clang to target 32 bit, set the ISA minimum to 'nocona',
     # and the tuning to 'generic'. The choice of 'nocona' is selected because it
@@ -2479,6 +2465,17 @@ def doConfigure(myenv):
     if use_system_version_of_library("intel_decimal128"):
         conf.FindSysLibDep("intel_decimal128", ["bid"])
 
+    if use_system_version_of_library("icu"):
+        conf.FindSysLibDep("icudata", ["icudata"])
+        # We can't use FindSysLibDep() for icui18n and icuuc below, since SConf.CheckLib() (which
+        # FindSysLibDep() relies on) doesn't expose an 'extra_libs' parameter to indicate that the
+        # library being tested has additional dependencies (icuuc depends on icudata, and icui18n
+        # depends on both). As a workaround, we skip the configure check for these two libraries and
+        # manually assign the library name. We hope that if the user has icudata installed on their
+        # system, then they also have icu18n and icuuc installed.
+        conf.env['LIBDEPS_ICUI18N_SYSLIBDEP'] = 'icui18n'
+        conf.env['LIBDEPS_ICUUC_SYSLIBDEP'] = 'icuuc'
+
     if wiredtiger and use_system_version_of_library("wiredtiger"):
         if not conf.CheckCXXHeader( "wiredtiger.h" ):
             myenv.ConfError("Cannot find wiredtiger headers")
@@ -2717,7 +2714,6 @@ Export("debugBuild optBuild")
 Export("wiredtiger")
 Export("mmapv1")
 Export("endian")
-Export("icuEnabled")
 
 def injectMongoIncludePaths(thisEnv):
     thisEnv.AppendUnique(CPPPATH=['$BUILD_DIR'])
