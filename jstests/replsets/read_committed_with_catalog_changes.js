@@ -208,13 +208,13 @@ load("jstests/replsets/rslib.js");       // For startSetIfSupportsReadMajority.
     // they may be passed in to a ScopedThread.
     function assertReadsBlock(coll) {
         var res =
-            coll.runCommand('find', {"readConcern": {"level": "majority"}, "maxTimeMS": 1000});
+            coll.runCommand('find', {"readConcern": {"level": "majority"}, "maxTimeMS": 5000});
         assert.commandFailedWithCode(res,
                                      ErrorCodes.ExceededTimeLimit,
                                      "Expected read of " + coll.getFullName() + " to block");
     }
 
-    function assertReadsSucceed(coll, timeoutMs = 1000) {
+    function assertReadsSucceed(coll, timeoutMs = 10000) {
         var res = coll.runCommand('find',
                                   {"readConcern": {"level": "majority"}, "maxTimeMS": timeoutMs});
         assert.commandWorked(res, 'reading from ' + coll.getFullName());
