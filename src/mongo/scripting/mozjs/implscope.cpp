@@ -367,13 +367,13 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
     execSetup(JSFiles::assert);
     execSetup(JSFiles::types);
 
-    // install process-specific utilities in the global scope (dependancy: types.js, assert.js)
-    if (_engine->getScopeInitCallback())
-        _engine->getScopeInitCallback()(*this);
-
     // install global utility functions
     installGlobalUtils(*this);
     _mongoHelpersProto.install(_global);
+
+    // install process-specific utilities in the global scope (dependancy: types.js, assert.js)
+    if (_engine->getScopeInitCallback())
+        _engine->getScopeInitCallback()(*this);
 }
 
 MozJSImplScope::~MozJSImplScope() {
