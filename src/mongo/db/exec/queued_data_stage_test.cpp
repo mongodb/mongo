@@ -32,8 +32,12 @@
 
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/operation_context_noop.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_noop.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 
 using namespace mongo;
 
@@ -42,12 +46,38 @@ namespace {
 using std::unique_ptr;
 using stdx::make_unique;
 
+class QueuedDataStageTest : public unittest::Test {
+public:
+    QueuedDataStageTest() {
+        _service = stdx::make_unique<ServiceContextNoop>();
+        _client = _service.get()->makeClient("test");
+        _opCtxNoop.reset(new OperationContextNoop(_client.get(), 0));
+        _opCtx = _opCtxNoop.get();
+    }
+
+protected:
+    OperationContext* getOpCtx() {
+        return _opCtx;
+    }
+
+private:
+    OperationContext* _opCtx;
+    std::unique_ptr<OperationContextNoop> _opCtxNoop;
+
+    std::unique_ptr<ServiceContextNoop> _service;
+
+    // UniqueClient is declared after ServiceContextNoop because
+    // members of a class are destroyed in reverse order of declaration and
+    // UniqueClient must be destroyed before the ServiceContextNoop is destroyed.
+    ServiceContext::UniqueClient _client;
+};
+
 //
 // Basic test that we get out valid stats objects.
 //
-TEST(QueuedDataStageTest, getValidStats) {
+TEST_F(QueuedDataStageTest, getValidStats) {
     WorkingSet ws;
-    auto mock = make_unique<QueuedDataStage>(nullptr, &ws);
+    auto mock = make_unique<QueuedDataStage>(getOpCtx(), &ws);
     const CommonStats* commonStats = mock->getCommonStats();
     ASSERT_EQUALS(commonStats->works, static_cast<size_t>(0));
     const SpecificStats* specificStats = mock->getSpecificStats();
@@ -59,10 +89,10 @@ TEST(QueuedDataStageTest, getValidStats) {
 //
 // Test that our stats are updated as we perform operations.
 //
-TEST(QueuedDataStageTest, validateStats) {
+TEST_F(QueuedDataStageTest, validateStats) {
     WorkingSet ws;
     WorkingSetID wsID;
-    auto mock = make_unique<QueuedDataStage>(nullptr, &ws);
+    auto mock = make_unique<QueuedDataStage>(getOpCtx(), &ws);
 
     // make sure that we're at all zero
     const CommonStats* stats = mock->getCommonStats();
