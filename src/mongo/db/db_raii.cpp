@@ -134,8 +134,10 @@ void AutoGetCollectionForRead::_ensureMajorityCommittedSnapshotIsValid(const Nam
 
         uassertStatusOK(_txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
 
-        stdx::lock_guard<Client> lk(*_txn->getClient());
-        CurOp::get(_txn)->yielded();
+        {
+            stdx::lock_guard<Client> lk(*_txn->getClient());
+            CurOp::get(_txn)->yielded();
+        }
 
         // Relock.
         _autoColl.emplace(_txn, nss, MODE_IS);
