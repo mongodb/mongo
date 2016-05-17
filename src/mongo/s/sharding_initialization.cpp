@@ -51,13 +51,12 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/sharding_network_connection_hook.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/sharding_egress_metadata_hook.h"
-#include "mongo/s/sharding_egress_metadata_hook_for_mongos.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/dist_lock_catalog_impl.h"
 #include "mongo/s/catalog/replset/replset_dist_lock_manager.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/sharding_egress_metadata_hook.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -101,16 +100,11 @@ std::unique_ptr<CatalogManager> makeCatalogManager(ServiceContext* service,
             executor::makeNetworkInterface("NetworkInterfaceASIO-AddShard-TaskExecutor")));
 }
 
-std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(std::unique_ptr<NetworkInterface> fixedNet,
-                                                       bool isMongos) {
+std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(
+    std::unique_ptr<NetworkInterface> fixedNet,
+    std::unique_ptr<rpc::EgressMetadataHook> metadataHook) {
     std::vector<std::unique_ptr<executor::TaskExecutor>> executors;
     for (size_t i = 0; i < TaskExecutorPool::getSuggestedPoolSize(); ++i) {
-        std::unique_ptr<rpc::EgressMetadataHook> metadataHook;
-        if (isMongos) {
-            metadataHook = stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>();
-        } else {
-            metadataHook = stdx::make_unique<rpc::ShardingEgressMetadataHook>();
-        };
         auto net = executor::makeNetworkInterface(
             "NetworkInterfaceASIO-TaskExecutorPool-" + std::to_string(i),
             stdx::make_unique<ShardingNetworkConnectionHook>(),
@@ -137,24 +131,17 @@ std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(std::unique_ptr<NetworkIn
 Status initializeGlobalShardingState(const ConnectionString& configCS,
                                      uint64_t maxChunkSizeBytes,
                                      std::unique_ptr<ShardFactory> shardFactory,
-                                     bool isMongos) {
+                                     rpc::ShardingEgressMetadataHookBuilder hookBuilder) {
     if (configCS.type() == ConnectionString::INVALID) {
         return {ErrorCodes::BadValue, "Unrecognized connection string."};
-    }
-
-    std::unique_ptr<rpc::EgressMetadataHook> metadataHook;
-    if (isMongos) {
-        metadataHook = stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>();
-    } else {
-        metadataHook = stdx::make_unique<rpc::ShardingEgressMetadataHook>();
     }
 
     auto network =
         executor::makeNetworkInterface("NetworkInterfaceASIO-ShardRegistry",
                                        stdx::make_unique<ShardingNetworkConnectionHook>(),
-                                       std::move(metadataHook));
+                                       hookBuilder());
     auto networkPtr = network.get();
-    auto executorPool = makeTaskExecutorPool(std::move(network), isMongos);
+    auto executorPool = makeTaskExecutorPool(std::move(network), hookBuilder());
     executorPool->startup();
 
     auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS));

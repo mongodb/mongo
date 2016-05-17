@@ -26,18 +26,23 @@
  *    it in the license file.
  */
 
+#pragma once
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/s/sharding_connection_hook_for_mongod.h"
-
-#include "mongo/s/sharding_egress_metadata_hook_for_mongod.h"
-#include "mongo/stdx/memory.h"
+#include "mongo/s/sharding_egress_metadata_hook.h"
 
 namespace mongo {
 
-ShardingConnectionHookForMongod::ShardingConnectionHookForMongod(bool shardedConnections)
-    : ShardingConnectionHook(shardedConnections,
-                             stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>()){};
+namespace rpc {
 
+class ShardingEgressMetadataHookForMongod final : public ShardingEgressMetadataHook {
+public:
+    ShardingEgressMetadataHookForMongod() = default;
+
+private:
+    void _saveGLEStats(const BSONObj& metadata, StringData hostString) override;
+    repl::OpTime _getConfigServerOpTime() override;
+    Status _advanceConfigOptimeFromShard(ShardId shardId, const BSONObj& metadataObj) override;
+};
+
+}  // namespace rpc
 }  // namespace mongo

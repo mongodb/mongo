@@ -57,7 +57,7 @@ Status ShardingEgressMetadataHook::writeRequestMetadata(bool shardedConnection,
         if (!shardedConnection) {
             return Status::OK();
         }
-        rpc::ConfigServerMetadata(grid.configOpTime()).writeToMetadata(metadataBob);
+        rpc::ConfigServerMetadata(_getConfigServerOpTime()).writeToMetadata(metadataBob);
         return Status::OK();
     } catch (...) {
         return exceptionToStatus();
@@ -68,7 +68,7 @@ Status ShardingEgressMetadataHook::writeRequestMetadata(const HostAndPort& targe
                                                         BSONObjBuilder* metadataBob) {
     try {
         audit::writeImpersonatedUsersToMetadata(metadataBob);
-        rpc::ConfigServerMetadata(grid.configOpTime()).writeToMetadata(metadataBob);
+        rpc::ConfigServerMetadata(_getConfigServerOpTime()).writeToMetadata(metadataBob);
         return Status::OK();
     } catch (...) {
         return exceptionToStatus();
@@ -134,8 +134,6 @@ Status ShardingEgressMetadataHook::_advanceConfigOptimeFromShard(ShardId shardId
         return exceptionToStatus();
     }
 }
-
-void ShardingEgressMetadataHook::_saveGLEStats(const BSONObj& metadata, StringData hostString) {}
 
 }  // namespace rpc
 }  // namespace mongo

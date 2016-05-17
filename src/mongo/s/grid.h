@@ -122,8 +122,18 @@ public:
         return _balancerConfig.get();
     }
 
+    /**
+     * Returns the the last optime that a shard or config server has reported as the current
+     * committed optime on the config server.
+     * NOTE: This is not valid to call on a config server instance.
+     */
     repl::OpTime configOpTime() const;
 
+    /**
+     * Called whenever a mongos or shard gets a response from a config server or shard and updates
+     * what we've seen as the last config server optime.
+     * NOTE: This is not valid to call on a config server instance.
+     */
     void advanceConfigOpTime(repl::OpTime opTime);
 
     /**
@@ -156,6 +166,7 @@ private:
     mutable stdx::mutex _mutex;
 
     // Last known highest opTime from the config server that should be used when doing reads.
+    // This value is updated any time a shard or mongos talks to a config server or a shard.
     repl::OpTime _configOpTime;
 
     // Deprecated. This is only used on mongos, and once addShard is solely handled by the configs,

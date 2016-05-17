@@ -78,6 +78,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/mongos_options.h"
 #include "mongo/s/query/cluster_cursor_cleanup_job.h"
+#include "mongo/s/sharding_egress_metadata_hook_for_mongos.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/s/version_mongos.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
@@ -298,10 +299,11 @@ static Status initializeSharding(OperationContext* txn) {
     auto shardFactory =
         stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
-    Status status = initializeGlobalShardingState(mongosGlobalParams.configdbs,
-                                                  mongosGlobalParams.maxChunkSizeBytes,
-                                                  std::move(shardFactory),
-                                                  true);
+    Status status = initializeGlobalShardingState(
+        mongosGlobalParams.configdbs,
+        mongosGlobalParams.maxChunkSizeBytes,
+        std::move(shardFactory),
+        []() { return stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>(); });
 
     if (!status.isOK()) {
         return status;

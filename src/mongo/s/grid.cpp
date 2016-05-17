@@ -32,6 +32,7 @@
 
 #include "mongo/s/grid.h"
 
+#include "mongo/db/server_options.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/balancer/balancer_configuration.h"
@@ -89,11 +90,15 @@ void Grid::setAllowLocalHost(bool allow) {
 }
 
 repl::OpTime Grid::configOpTime() const {
+    invariant(serverGlobalParams.clusterRole != ClusterRole::ConfigServer);
+
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _configOpTime;
 }
 
 void Grid::advanceConfigOpTime(repl::OpTime opTime) {
+    invariant(serverGlobalParams.clusterRole != ClusterRole::ConfigServer);
+
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_configOpTime < opTime) {
         _configOpTime = opTime;

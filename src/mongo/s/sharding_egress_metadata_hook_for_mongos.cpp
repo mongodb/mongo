@@ -30,10 +30,12 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/s/sharding_egress_metadata_hook_for_mongos.h"
+
 #include "mongo/db/client.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/s/cluster_last_error_info.h"
-#include "mongo/s/sharding_egress_metadata_hook_for_mongos.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -74,6 +76,10 @@ void ShardingEgressMetadataHookForMongos::_saveGLEStats(const BSONObj& metadata,
         .addHostOpTime(
             shardConn.getValue(),
             HostOpTime(shardingMetadata.getLastOpTime(), shardingMetadata.getLastElectionId()));
+}
+
+repl::OpTime ShardingEgressMetadataHookForMongos::_getConfigServerOpTime() {
+    return grid.configOpTime();
 }
 
 }  // namespace rpc

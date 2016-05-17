@@ -244,7 +244,6 @@ void ShardRegistryData::addConfigShard(std::shared_ptr<Shard> shard) {
     _addShard_inlock(shard);
 }
 
-
 shared_ptr<Shard> ShardRegistryData::findByRSName(const string& name) const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     auto i = _rsLookup.find(name);

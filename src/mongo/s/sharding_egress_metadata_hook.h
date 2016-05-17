@@ -31,6 +31,7 @@
 #include <memory>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/s/client/shard.h"
 
@@ -42,6 +43,8 @@ namespace rpc {
 
 class ShardingEgressMetadataHook : public rpc::EgressMetadataHook {
 public:
+    virtual ~ShardingEgressMetadataHook() = default;
+
     Status readReplyMetadata(const HostAndPort& replySource, const BSONObj& metadataObj) override;
     Status writeRequestMetadata(const HostAndPort& target, BSONObjBuilder* metadataBob) override;
 
@@ -55,10 +58,28 @@ public:
                                 const StringData target,
                                 BSONObjBuilder* metadataBob);
 
-private:
-    virtual void _saveGLEStats(const BSONObj& metadata, StringData hostString);
+protected:
+    /**
+     * On mongod this is a no-op.
+     * On mongos it looks for $gleStats in a command's reply metadata, and fills in the
+     * ClusterLastErrorInfo for this thread's associated Client with the data, if found.
+     * This data will be used by subsequent GLE calls, to ensure we look for the correct write on
+     * the correct PRIMARY.
+     */
+    virtual void _saveGLEStats(const BSONObj& metadata, StringData hostString) = 0;
 
-    Status _advanceConfigOptimeFromShard(ShardId shardId, const BSONObj& metadataObj);
+    /**
+     * Called by writeRequestMetadata() to find the config server optime that should be sent as part
+     * of the ConfigServerMetadata.
+     */
+    virtual repl::OpTime _getConfigServerOpTime() = 0;
+
+    /**
+     * On config servers this is a no-op.
+     * On shards and mongoses this advances the Grid's stored config server optime based on the
+     * metadata in the response object from running a command.
+     */
+    virtual Status _advanceConfigOptimeFromShard(ShardId shardId, const BSONObj& metadataObj);
 };
 
 }  // namespace rpc

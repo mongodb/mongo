@@ -26,18 +26,42 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/s/sharding_connection_hook_for_mongod.h"
-
 #include "mongo/s/sharding_egress_metadata_hook_for_mongod.h"
-#include "mongo/stdx/memory.h"
+
+#include "mongo/base/status.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/server_options.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/sharding_egress_metadata_hook_for_mongos.h"
 
 namespace mongo {
 
-ShardingConnectionHookForMongod::ShardingConnectionHookForMongod(bool shardedConnections)
-    : ShardingConnectionHook(shardedConnections,
-                             stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>()){};
+namespace rpc {
 
+void ShardingEgressMetadataHookForMongod::_saveGLEStats(const BSONObj& metadata,
+                                                        StringData hostString) {}
+
+repl::OpTime ShardingEgressMetadataHookForMongod::_getConfigServerOpTime() {
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        return repl::getGlobalReplicationCoordinator()->getCurrentCommittedSnapshotOpTime();
+    } else {
+        // TODO uncomment as part of SERVER-22663
+        // invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+        return grid.configOpTime();
+    }
+}
+
+Status ShardingEgressMetadataHookForMongod::_advanceConfigOptimeFromShard(
+    ShardId shardId, const BSONObj& metadataObj) {
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        return Status::OK();
+    }
+    return ShardingEgressMetadataHook::_advanceConfigOptimeFromShard(shardId, metadataObj);
+}
+
+}  // namespace rpc
 }  // namespace mongo

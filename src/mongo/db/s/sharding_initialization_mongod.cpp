@@ -39,6 +39,7 @@
 #include "mongo/s/client/shard_remote.h"
 #include "mongo/s/client/shard_local.h"
 #include "mongo/s/client/shard_factory.h"
+#include "mongo/s/sharding_egress_metadata_hook_for_mongod.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/stdx/memory.h"
 
@@ -75,6 +76,9 @@ Status initializeGlobalShardingStateForMongod(const ConnectionString& configCS) 
         stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
     return initializeGlobalShardingState(
-        configCS, ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes, std::move(shardFactory), false);
+        configCS,
+        ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
+        std::move(shardFactory),
+        []() { return stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>(); });
 }
 }

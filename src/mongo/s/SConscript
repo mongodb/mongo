@@ -17,7 +17,6 @@ env.Library(
     target='sharding_initialization',
     source=[
         'sharding_initialization.cpp',
-        'sharding_egress_metadata_hook_for_mongos.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/executor/network_interface_factory',
@@ -226,6 +225,7 @@ env.Library(
         'mongos_options.cpp',
         's_only.cpp',
         's_sharding_server_status.cpp',
+        'sharding_egress_metadata_hook_for_mongos.cpp',
         'version_mongos.cpp',
     ],
     LIBDEPS=[
@@ -260,7 +260,8 @@ env.Library(
     target='serveronly',
     source=[
         'd_sharding_server_status.cpp',
-        "d_state.cpp",
+        'd_state.cpp',
+        'sharding_egress_metadata_hook_for_mongod.cpp',
     ],
     LIBDEPS=[
         "coreshard",
