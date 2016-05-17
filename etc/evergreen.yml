@@ -4726,6 +4726,7 @@ buildvariants:
   # - name: jsCore_auth
   # - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_decimal_WT
   # - name: jsCore_minimum_batch_size_WT
   # - name: jsCore_op_query
   - name: jsCore_op_query_WT
