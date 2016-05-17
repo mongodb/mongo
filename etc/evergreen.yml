@@ -374,9 +374,9 @@ functions:
         script: |
           set -o verbose
           set -o errexit
-          # Increase JVM heap space to 75% of total memory
-          heap_space=$(grep MemTotal: /proc/meminfo | awk '{printf "%0dm",$2*0.75/1024}')
-          sed -i -e "/:aot/i\  :jvm-opts [\"-Xmx$heap_space\"]" project.clj
+          # Increase JVM heap space to 75% of total free memory
+          heap_space=$(awk '/MemFree:/{printf "%0dm\n",$2*0.75/1024}' /proc/meminfo)
+          sed -i -e "s/\"-Xmx.*\"/\"-Xmx$heap_space\"/" project.clj
           lein run --tarball "file:///root/mongo-binaries.tgz" ${jepsen_protocol_version} ${jepsen_read_concern} ${jepsen_read_with_find_and_modify} ${jepsen_storage_engine} ${jepsen_time_limit} ${jepsen_write_concern}
     - command: archive.targz_pack
       params:
