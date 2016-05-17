@@ -31,6 +31,8 @@
 
 #ifdef _WIN32
 #include "mongo/platform/windows_basic.h"
+#else
+#include <pthread.h>
 #endif
 
 #include "mongo/util/assert_util.h"
