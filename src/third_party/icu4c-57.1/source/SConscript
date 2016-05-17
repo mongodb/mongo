@@ -12,6 +12,20 @@ env.Append(
     ],
 )
 
+if env.TargetOSIs('solaris'):
+    # On Solaris, compile of certain files fails if the below define is not enabled.  Specifically,
+    # files that include "source/common/uposixdefs.h" will have _XOPEN_SOURCE=600 and
+    # _XOPEN_SOURCE_EXTENDED=1 defined by default; if the file also includes <sys/feature_tests.h>,
+    # then the application is assumed to conform to the XPG4v2 specification, which generates an
+    # error because XPG4v2 programs are incompatible with C99. If we keep _XOPEN_SOURCE=600 but
+    # force _XOPEN_SOURCE_EXTENDED=0, then <sys/feature_tests.h> chooses XPG6, which resolves the
+    # error (since XPG6 is compatible with C99).
+    env.Append(
+        CPPDEFINES=[
+            ('_XOPEN_SOURCE_EXTENDED', 0),
+        ],
+    )
+
 def removeIfPresent(lst, item):
     try:
         lst.remove(item)
