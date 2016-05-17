@@ -229,4 +229,38 @@
 
     delete TestData.cursorId;
 
+    //
+    // Confirm 512 byte size limit for currentOp query field.
+    //
+    coll.drop();
+    assert.writeOK(coll.insert({a: 1}));
+
+    // When the currentOp command serializes the query object as a string, individual string values
+    // inside it are truncated at 150 characters. To test "total length" truncation we need to pass
+    // multiple values, each smaller than 150 bytes.
+    TestData.queryFilter = {
+        "1": "1".repeat(100),
+        "2": "2".repeat(100),
+        "3": "3".repeat(100),
+        "4": "4".repeat(100),
+        "5": "5".repeat(100),
+        "6": "6".repeat(100),
+    };
+    var truncatedQueryString = "{ find: \"currentop_query\", filter: { " +
+        "1: \"1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111\", " +
+        "2: \"2222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222\", " +
+        "3: \"3333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333\", " +
+        "4: \"4444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\", " +
+        "5: \"5555555555555555555555555555555555555555...";
+
+    confirmCurrentOpContents({
+        test: function() {
+            assert.commandWorked(
+                db.runCommand({find: "currentop_query", filter: TestData.queryFilter}));
+        },
+        planSummary: "COLLSCAN",
+        currentOpFilter: {"query": truncatedQueryString}
+    });
+
+    delete TestData.queryFilter;
 })();
