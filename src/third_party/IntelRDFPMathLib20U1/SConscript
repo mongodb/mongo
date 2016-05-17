@@ -310,8 +310,7 @@ elif processor == 'x86_64' or processor == 'ppc64le':
     cpp_defines['EFI2'] = '1'
 # Using 64 bit big endian
 elif processor == 's390x':
-    cpp_defines['efi2'] = '1'
-    cpp_defines['EFI2'] = '1'
+    cpp_defines['s390x'] = '1'
     cpp_defines['BID_BIG_ENDIAN'] = '1'
 else:
     assert False, "Unsupported architecture: " + processor

@@ -449,7 +449,7 @@ BID_UINT32 a32, b32, c32, q32, r32;
 BID_UINT64 a64, b64, c64, q64, r64;
 BID_UINT128 a, b, c, q, r;
 
-char AI8;
+signed char AI8;
 unsigned char AUI8;
 short AI16, BI16;
 unsigned short AUI16, BUI16;
@@ -466,7 +466,7 @@ unsigned short u1_16, u2_16;
 short i1_16, i2_16;
 
 unsigned char u1_8, u2_8;
-char i1_8, i2_8;
+signed char i1_8, i2_8;
 
 unsigned int expected_status;
 
