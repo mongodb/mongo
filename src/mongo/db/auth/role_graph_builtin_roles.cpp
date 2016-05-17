@@ -187,6 +187,7 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::hostInfo
         << ActionType::listDatabases
         << ActionType::listShards  // clusterManager gets this also
+        << ActionType::lockInfo
         << ActionType::netstat
         << ActionType::replSetGetConfig  // clusterManager gets this also
         << ActionType::replSetGetStatus  // clusterManager gets this also

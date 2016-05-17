@@ -789,6 +789,20 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: 'lockInfo',
+          command: {lockInfo: 1},
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: roles_monitoring,
+                privileges: [{resource: {cluster: true}, actions: ['lockInfo']}]
+              },
+              {runOnDb: firstDbName, roles: {}, expectFail: true},
+              {runOnDb: secondDbName, roles: {}, expectFail: true}
+          ]
+        },
+        {
           testname: "dataSize_1",
           command: {dataSize: firstDbName + ".x"},
           testcases: [{
