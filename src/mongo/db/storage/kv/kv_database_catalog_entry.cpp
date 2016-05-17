@@ -161,9 +161,10 @@ void KVDatabaseCatalogEntry::appendExtraStats(OperationContext* opCtx,
                                               BSONObjBuilder* out,
                                               double scale) const {}
 
-bool KVDatabaseCatalogEntry::currentFilesCompatible(OperationContext* opCtx) const {
-    // todo
-    return true;
+Status KVDatabaseCatalogEntry::currentFilesCompatible(OperationContext* opCtx) const {
+    // TODO SERVER-23116: Delegate to the KVCatalog::FeatureTracker as to whether the data files are
+    // compatible or not.
+    return Status::OK();
 }
 
 void KVDatabaseCatalogEntry::getCollectionNamespaces(std::list<std::string>* out) const {

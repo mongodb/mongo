@@ -72,10 +72,18 @@ public:
     virtual void markIndexSafe24AndUp(OperationContext* opCtx) = 0;
 
     /**
-     * @return true if current files on disk are compatibile with the current version.
-     *              if we return false, then an upgrade will be required
+     * Returns whethers the data files are compatible with the current code:
+     *
+     *   - Status::OK() if the data files are compatible with the current code.
+     *
+     *   - ErrorCodes::CanRepairToDowngrade if the data files are incompatible with the current
+     *     code, but a --repair would make them compatible. For example, when rebuilding all indexes
+     *     in the data files would resolve the incompatibility.
+     *
+     *   - ErrorCodes::MustUpgrade if the data files are incompatible with the current code and a
+     *     newer version is required to start up.
      */
-    virtual bool currentFilesCompatible(OperationContext* opCtx) const = 0;
+    virtual Status currentFilesCompatible(OperationContext* opCtx) const = 0;
 
     // ----
 

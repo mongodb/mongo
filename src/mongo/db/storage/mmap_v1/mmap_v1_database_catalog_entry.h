@@ -82,7 +82,7 @@ public:
     virtual bool isOlderThan24(OperationContext* opCtx) const;
     virtual void markIndexSafe24AndUp(OperationContext* opCtx);
 
-    virtual bool currentFilesCompatible(OperationContext* opCtx) const;
+    virtual Status currentFilesCompatible(OperationContext* opCtx) const;
 
     virtual void appendExtraStats(OperationContext* opCtx, BSONObjBuilder* out, double scale) const;
 

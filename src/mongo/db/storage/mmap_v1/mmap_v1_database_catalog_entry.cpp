@@ -420,8 +420,7 @@ bool MMAPV1DatabaseCatalogEntry::isOlderThan24(OperationContext* opCtx) const {
         return false;
 
     const DataFileVersion version = _extentManager->getFileFormat(opCtx);
-
-    invariant(version.isCompatibleWithCurrentCode());
+    fassert(40109, version.isCompatibleWithCurrentCode());
 
     return !version.is24IndexClean();
 }
@@ -431,8 +430,7 @@ void MMAPV1DatabaseCatalogEntry::markIndexSafe24AndUp(OperationContext* opCtx) {
         return;
 
     DataFileVersion version = _extentManager->getFileFormat(opCtx);
-
-    invariant(version.isCompatibleWithCurrentCode());
+    fassert(40110, version.isCompatibleWithCurrentCode());
 
     if (version.is24IndexClean())
         return;  // nothing to do
@@ -441,9 +439,9 @@ void MMAPV1DatabaseCatalogEntry::markIndexSafe24AndUp(OperationContext* opCtx) {
     _extentManager->setFileFormat(opCtx, version);
 }
 
-bool MMAPV1DatabaseCatalogEntry::currentFilesCompatible(OperationContext* opCtx) const {
+Status MMAPV1DatabaseCatalogEntry::currentFilesCompatible(OperationContext* opCtx) const {
     if (_extentManager->numFiles() == 0)
-        return true;
+        return Status::OK();
 
     return _extentManager->getOpenFile(0)->getHeader()->version.isCompatibleWithCurrentCode();
 }
@@ -492,7 +490,7 @@ void MMAPV1DatabaseCatalogEntry::_init(OperationContext* txn) {
     }
 
     DataFileVersion version = _extentManager->getFileFormat(txn);
-    if (version.isCompatibleWithCurrentCode() && !version.mayHave28Freelist()) {
+    if (version.isCompatibleWithCurrentCode().isOK() && !version.mayHave30Freelist()) {
         if (storageGlobalParams.readOnly) {
             severe() << "Legacy storage format detected, but server was started with the "
                         "--queryableBackupMode command line parameter.";
@@ -500,7 +498,7 @@ void MMAPV1DatabaseCatalogEntry::_init(OperationContext* txn) {
         }
 
         // Any DB that can be opened and written to gets this flag set.
-        version.setMayHave28Freelist();
+        version.setMayHave30Freelist();
         _extentManager->setFileFormat(txn, version);
     }
 

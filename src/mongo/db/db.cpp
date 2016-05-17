@@ -426,10 +426,20 @@ static void repairDatabasesAndCheckVersion(OperationContext* txn) {
 
         // First thing after opening the database is to check for file compatibility,
         // otherwise we might crash if this is a deprecated format.
-        if (!db->getDatabaseCatalogEntry()->currentFilesCompatible(txn)) {
-            log() << "****";
-            log() << "cannot do this upgrade without an upgrade in the middle";
-            log() << "please do a --repair with 2.6 and then start this version";
+        auto status = db->getDatabaseCatalogEntry()->currentFilesCompatible(txn);
+        if (!status.isOK()) {
+            if (status.code() == ErrorCodes::CanRepairToDowngrade) {
+                // Convert CanRepairToDowngrade statuses to MustUpgrade statuses to avoid logging a
+                // potentially confusing and inaccurate message.
+                //
+                // TODO SERVER-24097: Log a message informing the user that they can start the
+                // current version of mongod with --repair and then proceed with normal startup.
+                status = {ErrorCodes::MustUpgrade, status.reason()};
+            }
+            severe() << "Unable to start mongod due to an incompatibility with the data files and"
+                        " this version of mongod: " << status;
+            severe() << "Please consult our documentation when trying to downgrade to a previous"
+                        " major release";
             quickExit(EXIT_NEED_UPGRADE);
             return;
         }

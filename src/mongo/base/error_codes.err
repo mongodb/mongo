@@ -155,6 +155,8 @@ error_code("ChunkTooBig", 153)
 error_code("InconsistentShardIdentity", 154)
 error_code("CannotApplyOplogWhilePrimary", 155)
 error_code("NeedsDocumentMove", 156)
+error_code("CanRepairToDowngrade", 157)
+error_code("MustUpgrade", 158)
 
 # Non-sequential error codes (for compatibility only)
 error_code("SocketException", 9001)
