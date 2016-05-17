@@ -350,7 +350,7 @@ void KVCatalog::init(OperationContext* opCtx) {
 
             // Initialize the feature tracker and skip over the version document because it doesn't
             // correspond to a namespace entry.
-            _featureTracker = std::move(FeatureTracker::get(opCtx, this, record->id));
+            _featureTracker = FeatureTracker::get(opCtx, this, record->id);
             continue;
         }
 
@@ -363,7 +363,7 @@ void KVCatalog::init(OperationContext* opCtx) {
     if (!_featureTracker) {
         // If there wasn't a feature document, then just an initialize a feature tracker that
         // doesn't manage a feature document yet.
-        _featureTracker = std::move(KVCatalog::FeatureTracker::create(opCtx, this));
+        _featureTracker = KVCatalog::FeatureTracker::create(opCtx, this);
     }
 
     // In the unlikely event that we have used this _rand before generate a new one.
