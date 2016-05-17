@@ -6,9 +6,9 @@ env = env.Clone()
 
 env.Append(
     CPPDEFINES=[
-        'UCONFIG_ONLY_COLLATION=1',
-        'U_CHARSET_IS_UTF8=1',
-        'U_STATIC_IMPLEMENTATION=1',
+        ('UCONFIG_ONLY_COLLATION', 1),
+        ('U_CHARSET_IS_UTF8', 1),
+        ('U_STATIC_IMPLEMENTATION', 1),
     ],
 )
 
@@ -22,7 +22,11 @@ for to_remove in ['-Werror', '-Wall', '-W']:
     removeIfPresent(env['CCFLAGS'], to_remove)
 
 i18nEnv = env.Clone()
-i18nEnv.Append(CPPDEFINES=['U_I18N_IMPLEMENTATION=1'])
+i18nEnv.Append(
+    CPPDEFINES=[
+        ('U_I18N_IMPLEMENTATION', 1),
+    ],
+)
 i18nEnv.Library(
     target='icu_i18n',
     source=[
@@ -231,7 +235,11 @@ i18nEnv.Library(
 )
 
 commonEnv = env.Clone()
-commonEnv.Append(CPPDEFINES=['U_COMMON_IMPLEMENTATION=1'])
+commonEnv.Append(
+    CPPDEFINES=[
+        ('U_COMMON_IMPLEMENTATION', 1),
+    ],
+)
 commonEnv.Library(
     target='icu_common',
     source=[
