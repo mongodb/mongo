@@ -1360,7 +1360,7 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
 	WT_SESSION_IMPL *s;
-	uint32_t i, hazard_size, session_cnt;
+	uint32_t i, j, hazard_size, max, session_cnt;
 
 	conn = S2C(session);
 
@@ -1372,15 +1372,28 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * come or go, we'll check the slots for all of the sessions that could
 	 * have been active when we started our check.
 	 */
+	WT_STAT_FAST_CONN_INCR(session, cache_hazard_checks);
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
-	for (s = conn->sessions, i = 0; i < session_cnt; ++s, ++i) {
+	for (s = conn->sessions, i = 0, j = 0, max = 0;
+	    i < session_cnt; ++s, ++i) {
 		if (!s->active)
 			continue;
 		WT_ORDERED_READ(hazard_size, s->hazard_size);
-		for (hp = s->hazard; hp < s->hazard + hazard_size; ++hp)
-			if (hp->page == page)
+		if (s->hazard_size > max) {
+			max = s->hazard_size;
+			WT_STAT_FAST_CONN_SET(session,
+			    cache_hazard_max, max);
+		}
+		for (hp = s->hazard; hp < s->hazard + hazard_size; ++hp) {
+			++j;
+			if (hp->page == page) {
+				WT_STAT_FAST_CONN_INCRV(session,
+				    cache_hazard_walks, j);
 				return (hp);
+			}
+		}
 	}
+	WT_STAT_FAST_CONN_INCRV(session, cache_hazard_walks, j);
 	return (NULL);
 }
 

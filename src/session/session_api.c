@@ -1675,7 +1675,7 @@ __open_session(WT_CONNECTION_IMPL *conn,
 	 * __wt_hazard_close ensures the array is cleared - so it is safe to
 	 * reset the starting size on each open.
 	 */
-	session_ret->hazard_size = WT_HAZARD_INCR;
+	session_ret->hazard_size = 0;
 
 	/*
 	 * Configuration: currently, the configuration for open_session is the

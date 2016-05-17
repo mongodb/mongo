@@ -198,7 +198,7 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_session_impl {
 	((s)->hazard == NULL)
 
 	/* The number of hazard pointers grows dynamically. */
-#define	WT_HAZARD_INCR		10
+#define	WT_HAZARD_INCR		1
 	uint32_t   hazard_size;		/* Allocated slots in hazard array. */
 	uint32_t   nhazard;		/* Count of active hazard pointers */
 	WT_HAZARD *hazard;		/* Hazard pointer array */

@@ -1631,6 +1631,8 @@ execute_workload(CONFIG *cfg)
 {
 	CONFIG_THREAD *threads;
 	WORKLOAD *workp;
+	WT_CONNECTION *conn;
+	WT_SESSION **sessions;
 	pthread_t idle_table_cycle_thread;
 	uint64_t last_ckpts, last_inserts, last_reads, last_truncates;
 	uint64_t last_updates;
@@ -1646,6 +1648,8 @@ execute_workload(CONFIG *cfg)
 	last_ckpts = last_inserts = last_reads = last_truncates = 0;
 	last_updates = 0;
 	ret = 0;
+
+	sessions = NULL;
 
 	/* Start cycling idle tables. */
 	if ((ret = start_idle_table_cycle(cfg, &idle_table_cycle_thread)) != 0)
@@ -1664,6 +1668,18 @@ execute_workload(CONFIG *cfg)
 	} else
 		pfunc = worker;
 
+	if (cfg->session_count_idle != 0) {
+		sessions = dcalloc((size_t)cfg->session_count_idle,
+		    sizeof(WT_SESSION *));
+		conn = cfg->conn;
+		for (i = 0; i < cfg->session_count_idle; ++i)
+			if ((ret = conn->open_session(
+			    conn, NULL, cfg->sess_config, &sessions[i])) != 0) {
+				lprintf(cfg, ret, 0,
+				    "execute_workload: idle open_session");
+				goto err;
+			}
+	}
 	/* Start each workload. */
 	for (threads = cfg->workers, i = 0,
 	    workp = cfg->workload; i < cfg->workload_cnt; ++i, ++workp) {
@@ -1758,6 +1774,7 @@ err:	cfg->stop = 1;
 	if (ret == 0 && cfg->drop_tables && (ret = drop_all_tables(cfg)) != 0)
 		lprintf(cfg, ret, 0, "Drop tables failed.");
 
+	free(sessions);
 	/* Report if any worker threads didn't finish. */
 	if (cfg->error != 0) {
 		lprintf(cfg, WT_ERROR, 0,
@@ -2170,15 +2187,15 @@ int
 main(int argc, char *argv[])
 {
 	CONFIG *cfg, _cfg;
-	size_t req_len;
+	size_t req_len, sreq_len;
 	int ch, monitor_set, ret;
 	const char *opts = "C:H:h:m:O:o:T:";
 	const char *config_opts;
-	char *cc_buf, *tc_buf, *user_cconfig, *user_tconfig;
+	char *cc_buf, *sess_cfg, *tc_buf, *user_cconfig, *user_tconfig;
 
 	monitor_set = ret = 0;
 	config_opts = NULL;
-	cc_buf = tc_buf = user_cconfig = user_tconfig = NULL;
+	cc_buf = sess_cfg = tc_buf = user_cconfig = user_tconfig = NULL;
 
 	/* Setup the default configuration values. */
 	cfg = &_cfg;
@@ -2317,7 +2334,8 @@ main(int argc, char *argv[])
 
 	/* Concatenate non-default configuration strings. */
 	if (cfg->verbose > 1 || user_cconfig != NULL ||
-	    cfg->compress_ext != NULL || cfg->async_config != NULL) {
+	    cfg->session_count_idle > 0 || cfg->compress_ext != NULL ||
+	    cfg->async_config != NULL) {
 		req_len = strlen(cfg->conn_config) + strlen(debug_cconfig) + 3;
 		if (user_cconfig != NULL)
 			req_len += strlen(user_cconfig);
@@ -2325,16 +2343,26 @@ main(int argc, char *argv[])
 			req_len += strlen(cfg->async_config);
 		if (cfg->compress_ext != NULL)
 			req_len += strlen(cfg->compress_ext);
+		if (cfg->session_count_idle > 0) {
+			sreq_len = strlen(",session_max=") + 6;
+			req_len += sreq_len;
+			sess_cfg = dcalloc(sreq_len, 1);
+			snprintf(sess_cfg, sreq_len,
+			    ",session_max=%" PRIu32,
+			    cfg->session_count_idle + cfg->workers_cnt +
+			    cfg->populate_threads + 10);
+		}
 		cc_buf = dcalloc(req_len, 1);
 		/*
 		 * This is getting hard to parse.
 		 */
-		snprintf(cc_buf, req_len, "%s%s%s%s%s%s%s",
+		snprintf(cc_buf, req_len, "%s%s%s%s%s%s%s%s",
 		    cfg->conn_config,
 		    cfg->async_config ? cfg->async_config : "",
 		    cfg->compress_ext ? cfg->compress_ext : "",
 		    cfg->verbose > 1 ? ",": "",
 		    cfg->verbose > 1 ? debug_cconfig : "",
+		    sess_cfg ? sess_cfg : "",
 		    user_cconfig ? ",": "",
 		    user_cconfig ? user_cconfig : "");
 		if ((ret = config_opt_str(cfg, "conn_config", cc_buf)) != 0)
@@ -2410,6 +2438,7 @@ einval:		ret = EINVAL;
 
 err:	config_free(cfg);
 	free(cc_buf);
+	free(sess_cfg);
 	free(tc_buf);
 	free(user_cconfig);
 	free(user_tconfig);
