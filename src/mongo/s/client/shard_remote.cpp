@@ -316,7 +316,8 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     BSONObj readConcernObj;
     {
         const repl::ReadConcernArgs readConcern{grid.configOpTime(),
-                                                repl::ReadConcernLevel::kMajorityReadConcern};
+            (serverGlobalParams.allowInconsistentConfigReads) ? repl::ReadConcernLevel::kLocalReadConcern : repl::ReadConcernLevel::kMajorityReadConcern};
+
         BSONObjBuilder bob;
         readConcern.appendInfo(&bob);
         readConcernObj =

@@ -76,7 +76,7 @@ const double socketTimeoutSecs = 5;
 // Intentionally chosen to compare worse than all known latencies.
 const int64_t unknownLatency = numeric_limits<int64_t>::max();
 
-const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOnly, TagSet());
+const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryPreferred, TagSet());
 const Milliseconds kFindHostMaxBackOffTime(500);
 
 // TODO: Move to ReplicaSetMonitorManager
