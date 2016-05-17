@@ -33,6 +33,7 @@
 #include "mongo/db/storage/kv/kv_database_catalog_entry.h"
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
 #include "mongo/db/storage/kv/kv_collection_catalog_entry.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
@@ -162,9 +163,8 @@ void KVDatabaseCatalogEntry::appendExtraStats(OperationContext* opCtx,
                                               double scale) const {}
 
 Status KVDatabaseCatalogEntry::currentFilesCompatible(OperationContext* opCtx) const {
-    // TODO SERVER-23116: Delegate to the KVCatalog::FeatureTracker as to whether the data files are
-    // compatible or not.
-    return Status::OK();
+    // Delegate to the FeatureTracker as to whether the data files are compatible or not.
+    return _engine->getCatalog()->getFeatureTracker()->isCompatibleWithCurrentCode(opCtx);
 }
 
 void KVDatabaseCatalogEntry::getCollectionNamespaces(std::list<std::string>* out) const {
