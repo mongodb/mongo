@@ -231,6 +231,11 @@ public:
     }
 
     /**
+     * Returns whether all members of this replica set have hostname localhost.
+     */
+    bool isLocalHostAllowed() const;
+
+    /**
      * Returns whether or not majority write concerns should implicitly journal, if j has not been
      * explicitly set.
      */

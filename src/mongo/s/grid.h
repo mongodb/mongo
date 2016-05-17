@@ -77,11 +77,15 @@ public:
               executor::NetworkInterface* network);
 
     /**
+     * Deprecated. This is only used on mongos, and once addShard is solely handled by the configs,
+     * it can be deleted.
      * @return true if shards and config servers are allowed to use 'localhost' in address
      */
     bool allowLocalHost() const;
 
     /**
+     * Deprecated. This is only used on mongos, and once addShard is solely handled by the configs,
+     * it can be deleted.
      * @param whether to allow shards and config servers to use 'localhost' in address
      */
     void setAllowLocalHost(bool allow);
@@ -154,7 +158,9 @@ private:
     // Last known highest opTime from the config server that should be used when doing reads.
     repl::OpTime _configOpTime;
 
-    // can 'localhost' be used in shard addresses?
+    // Deprecated. This is only used on mongos, and once addShard is solely handled by the configs,
+    // it can be deleted.
+    // Can 'localhost' be used in shard addresses?
     bool _allowLocalShard;
 };
 

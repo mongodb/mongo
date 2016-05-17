@@ -602,6 +602,12 @@ Milliseconds ReplicaSetConfig::getHeartbeatInterval() const {
     return _heartbeatInterval;
 }
 
+bool ReplicaSetConfig::isLocalHostAllowed() const {
+    // It is sufficient to check any one member's hostname, since in ReplicaSetConfig::validate,
+    // it's ensured that either all members have hostname localhost or none do.
+    return _members.begin()->getHostAndPort().isLocalHost();
+}
+
 ReplicaSetTag ReplicaSetConfig::findTag(StringData key, StringData value) const {
     return _tagConfig.findTag(key, value);
 }
