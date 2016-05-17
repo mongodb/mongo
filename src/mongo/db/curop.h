@@ -81,7 +81,6 @@ public:
     // Similarly, the return value will be dbGetMore for both OP_GET_MORE and getMore command.
     LogicalOp logicalOp{LogicalOp::opInvalid};  // only set this through setNetworkOp_inlock()
     bool iscommand{false};
-    BSONObj query{};
     BSONObj updateobj{};
 
     // detailed options

@@ -194,7 +194,6 @@ void generateLegacyQueryErrorResponse(const AssertionException* exception,
  */
 void beginCommandOp(OperationContext* txn, const NamespaceString& nss, const BSONObj& queryObj) {
     auto curop = CurOp::get(txn);
-    curop->debug().query = queryObj;
     stdx::lock_guard<Client> lk(*txn->getClient());
     curop->setQuery_inlock(queryObj);
     curop->setNS_inlock(nss.ns());
@@ -221,7 +220,9 @@ void receivedCommand(OperationContext* txn,
         rpc::LegacyRequest request{&message};
         // Auth checking for Commands happens later.
         int nToReturn = queryMessage.ntoreturn;
-        beginCommandOp(txn, nss, queryMessage.query);
+
+        beginCommandOp(txn, nss, request.getCommandArgs());
+
         {
             stdx::lock_guard<Client> lk(*txn->getClient());
             op->markCommand_inlock();
@@ -235,8 +236,6 @@ void receivedCommand(OperationContext* txn,
         runCommands(txn, request, &builder);
 
         op->debug().iscommand = true;
-        // TODO: Does this get overwritten/do we really need to set this twice?
-        op->debug().query = request.getCommandArgs();
     } catch (const DBException& exception) {
         Command::generateErrorResponse(txn, &builder, exception);
     }
@@ -274,7 +273,6 @@ void receivedRpc(OperationContext* txn, Client& client, DbResponse& dbResponse, 
         runCommands(txn, request, &replyBuilder);
 
         curOp->debug().iscommand = true;
-        curOp->debug().query = request.getCommandArgs();
 
     } catch (const DBException& exception) {
         Command::generateErrorResponse(txn, &replyBuilder, exception);

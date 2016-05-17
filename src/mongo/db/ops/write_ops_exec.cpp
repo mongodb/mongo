@@ -470,8 +470,6 @@ static WriteResult::SingleResult performSingleUpdateOp(OperationContext* txn,
         curOp.setLogicalOp_inlock(LogicalOp::opUpdate);
         curOp.setQuery_inlock(op.query);
         curOp.ensureStarted();
-
-        curOp.debug().query = op.query;
     }
 
     UpdateLifecycleImpl updateLifecycle(ns);
@@ -581,10 +579,9 @@ static WriteResult::SingleResult performSingleDeleteOp(OperationContext* txn,
         curOp.setLogicalOp_inlock(LogicalOp::opDelete);
         curOp.setQuery_inlock(op.query);
         curOp.ensureStarted();
-
-        curOp.debug().query = op.query;
-        curOp.debug().ndeleted = 0;
     }
+
+    curOp.debug().ndeleted = 0;
 
     txn->checkForInterrupt();
 

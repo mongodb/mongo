@@ -514,6 +514,8 @@ string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockSt
 
     s << curop.getNS();
 
+    auto query = curop.query();
+
     if (!query.isEmpty()) {
         if (iscommand) {
             s << " command: ";
@@ -524,7 +526,7 @@ string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockSt
                 curCommand->redactForLogging(&cmdToLog);
                 s << curCommand->getName() << " ";
                 s << cmdToLog.toString();
-            } else {  // Should not happen but we need to handle curCommand == NULL gracefully
+            } else {  // Should not happen but we need to handle curCommand == NULL gracefully.
                 s << query.toString();
             }
         } else {
@@ -622,16 +624,16 @@ void OpDebug::append(const CurOp& curop,
     b.append("ns", nss.ns());
 
     if (!iscommand && networkOp == dbQuery) {
-        appendAsObjOrString(
-            "query", upconvertQueryEntry(query, nss, ntoreturn, ntoskip), maxElementSize, &b);
+        appendAsObjOrString("query",
+                            upconvertQueryEntry(curop.query(), nss, ntoreturn, ntoskip),
+                            maxElementSize,
+                            &b);
     } else if (!iscommand && networkOp == dbGetMore) {
         appendAsObjOrString(
             "query", upconvertGetMoreEntry(nss, cursorid, ntoreturn), maxElementSize, &b);
-    } else if (!query.isEmpty()) {
+    } else if (curop.haveQuery()) {
         const char* fieldName = (logicalOp == LogicalOp::opCommand) ? "command" : "query";
-        appendAsObjOrString(fieldName, query, maxElementSize, &b);
-    } else if (!iscommand && curop.haveQuery()) {
-        appendAsObjOrString("query", curop.query(), maxElementSize, &b);
+        appendAsObjOrString(fieldName, curop.query(), maxElementSize, &b);
     }
 
     if (!updateobj.isEmpty()) {

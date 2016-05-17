@@ -130,7 +130,6 @@ void beginQueryOp(OperationContext* txn,
                   long long ntoreturn,
                   long long ntoskip) {
     auto curOp = CurOp::get(txn);
-    curOp->debug().query = queryObj;
     curOp->debug().ntoreturn = ntoreturn;
     curOp->debug().ntoskip = ntoskip;
     stdx::lock_guard<Client> lk(*txn->getClient());
@@ -329,7 +328,6 @@ QueryResult::View getMore(OperationContext* txn,
 
         // Ensure that the original query or command object is available in the slow query log,
         // profiler, and currentOp.
-        curOp.debug().query = cc->getQuery();
         {
             stdx::lock_guard<Client> lk(*txn->getClient());
             curOp.setQuery_inlock(cc->getQuery());
@@ -533,9 +531,6 @@ std::string runQuery(OperationContext* txn,
         // Add the resulting object to the return buffer.
         BSONObj explainObj = explainBob.obj();
         bb.appendBuf((void*)explainObj.objdata(), explainObj.objsize());
-
-        // TODO: Does this get overwritten/do we really need to set this twice?
-        curOp.debug().query = q.query;
 
         // Set query result fields.
         QueryResult::View qr = bb.buf();
