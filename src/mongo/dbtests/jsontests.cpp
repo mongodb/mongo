@@ -2717,12 +2717,8 @@ public:
         add<JsonStringTests::NumberLongStrict>();
         add<JsonStringTests::NumberLongStrictLarge>();
         add<JsonStringTests::NumberLongStrictNegative>();
-
-        if (Decimal128::enabled) {
-            add<JsonStringTests::NumberDecimal>();
-            add<JsonStringTests::NumberDecimalStrict>();
-        }
-
+        add<JsonStringTests::NumberDecimal>();
+        add<JsonStringTests::NumberDecimalStrict>();
         add<JsonStringTests::NumberDoubleNaN>();
         add<JsonStringTests::NumberDoubleInfinity>();
         add<JsonStringTests::NumberDoubleNegativeInfinity>();

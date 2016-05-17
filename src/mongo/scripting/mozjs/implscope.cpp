@@ -772,9 +772,7 @@ void MozJSImplScope::installBSONTypes() {
     _nativeFunctionProto.install(_global);
     _numberIntProto.install(_global);
     _numberLongProto.install(_global);
-    if (Decimal128::enabled) {
-        _numberDecimalProto.install(_global);
-    }
+    _numberDecimalProto.install(_global);
     _objectProto.install(_global);
     _oidProto.install(_global);
     _regExpProto.install(_global);

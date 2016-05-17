@@ -51,20 +51,14 @@ TEST(Basics, Initialization) {
     const SafeNum numDouble(0.0);
     ASSERT_EQUALS(numDouble.type(), mongo::NumberDouble);
 
-    if (mongo::Decimal128::enabled) {
-        const SafeNum numDecimal(Decimal128("1.0"));
-        ASSERT_EQUALS(numDecimal.type(), mongo::NumberDecimal);
-    }
+    const SafeNum numDecimal(Decimal128("1.0"));
+    ASSERT_EQUALS(numDecimal.type(), mongo::NumberDecimal);
 }
 
 TEST(Basics, BSONElementInitialization) {
     mongo::BSONObj o;
-    if (mongo::Decimal128::enabled) {
-        o = BSON("numberInt" << 1 << "numberLong" << 1LL << "numberDouble" << 0.1 << "NumberDecimal"
-                             << Decimal128("1"));
-    } else {
-        o = BSON("numberInt" << 1 << "numberLong" << 1LL << "numberDouble" << 0.1);
-    }
+    o = BSON("numberInt" << 1 << "numberLong" << 1LL << "numberDouble" << 0.1 << "NumberDecimal"
+                         << Decimal128("1"));
 
     const SafeNum numInt(o.getField("numberInt"));
     ASSERT_EQUALS(numInt.type(), mongo::NumberInt);
@@ -75,10 +69,8 @@ TEST(Basics, BSONElementInitialization) {
     const SafeNum numDouble(o.getField("numberDouble"));
     ASSERT_EQUALS(numDouble.type(), mongo::NumberDouble);
 
-    if (mongo::Decimal128::enabled) {
-        const SafeNum numDecimal(o.getField("NumberDecimal"));
-        ASSERT_EQUALS(numDecimal.type(), mongo::NumberDecimal);
-    }
+    const SafeNum numDecimal(o.getField("NumberDecimal"));
+    ASSERT_EQUALS(numDecimal.type(), mongo::NumberDecimal);
 }
 
 TEST(Comparison, EOO) {
@@ -104,11 +96,9 @@ TEST(Comparison, StrictTypeComparison) {
     ASSERT_FALSE(oneDouble.isIdentical(one));
     ASSERT_TRUE(oneDouble.isIdentical(oneDouble));
 
-    if (mongo::Decimal128::enabled) {
-        const SafeNum oneDecimal(Decimal128(1));
-        ASSERT_FALSE(oneDecimal.isIdentical(one));
-        ASSERT_TRUE(oneDecimal.isIdentical(oneDecimal));
-    }
+    const SafeNum oneDecimal(Decimal128(1));
+    ASSERT_FALSE(oneDecimal.isIdentical(one));
+    ASSERT_TRUE(oneDecimal.isIdentical(oneDecimal));
 }
 
 TEST(Comparison, EquivalenceComparisonNormal) {
@@ -119,10 +109,8 @@ TEST(Comparison, EquivalenceComparisonNormal) {
     ASSERT_EQUALS(oneLong, oneDouble);
     ASSERT_EQUALS(oneDouble, one);
 
-    if (mongo::Decimal128::enabled) {
-        const SafeNum oneDecimal(Decimal128(1));
-        ASSERT_EQUALS(oneDecimal, one);
-    }
+    const SafeNum oneDecimal(Decimal128(1));
+    ASSERT_EQUALS(oneDecimal, one);
 }
 
 TEST(Comparison, MaxIntInDouble) {
@@ -163,18 +151,16 @@ TEST(Addition, UpConvertion) {
     ASSERT_EQUALS(stillInt64.type(), mongo::NumberLong);
     ASSERT_EQUALS(stillDouble.type(), mongo::NumberDouble);
 
-    if (mongo::Decimal128::enabled) {
-        const SafeNum zeroDecimal(Decimal128(0));
-        ASSERT_EQUALS((zeroInt64 + zeroDecimal).type(), mongo::NumberDecimal);
-        ASSERT_EQUALS((zeroInt32 + zeroDecimal).type(), mongo::NumberDecimal);
-        ASSERT_EQUALS((zeroDouble + zeroDecimal).type(), mongo::NumberDecimal);
-        ASSERT_EQUALS((zeroDecimal + zeroInt32).type(), mongo::NumberDecimal);
-        ASSERT_EQUALS((zeroDecimal + zeroInt64).type(), mongo::NumberDecimal);
-        ASSERT_EQUALS((zeroDecimal + zeroDouble).type(), mongo::NumberDecimal);
+    const SafeNum zeroDecimal(Decimal128(0));
+    ASSERT_EQUALS((zeroInt64 + zeroDecimal).type(), mongo::NumberDecimal);
+    ASSERT_EQUALS((zeroInt32 + zeroDecimal).type(), mongo::NumberDecimal);
+    ASSERT_EQUALS((zeroDouble + zeroDecimal).type(), mongo::NumberDecimal);
+    ASSERT_EQUALS((zeroDecimal + zeroInt32).type(), mongo::NumberDecimal);
+    ASSERT_EQUALS((zeroDecimal + zeroInt64).type(), mongo::NumberDecimal);
+    ASSERT_EQUALS((zeroDecimal + zeroDouble).type(), mongo::NumberDecimal);
 
-        const SafeNum stillDecimal(zeroDecimal + zeroDecimal);
-        ASSERT_EQUALS(stillDecimal.type(), mongo::NumberDecimal);
-    }
+    const SafeNum stillDecimal(zeroDecimal + zeroDecimal);
+    ASSERT_EQUALS(stillDecimal.type(), mongo::NumberDecimal);
 }
 
 TEST(Addition, Overflow32to64) {
@@ -259,15 +245,13 @@ TEST(BitAnd, FloatingPointIsIgnored) {
     ASSERT_FALSE((val_double & val_ll).isValid());
     ASSERT_FALSE((val_double & val_double).isValid());
 
-    if (mongo::Decimal128::enabled) {
-        const SafeNum val_decimal(Decimal128(1));
-        ASSERT_FALSE((val_int & val_decimal).isValid());
-        ASSERT_FALSE((val_double & val_decimal).isValid());
-        ASSERT_FALSE((val_ll & val_decimal).isValid());
-        ASSERT_FALSE((val_decimal & val_int).isValid());
-        ASSERT_FALSE((val_decimal & val_ll).isValid());
-        ASSERT_FALSE((val_decimal & val_double).isValid());
-    }
+    const SafeNum val_decimal(Decimal128(1));
+    ASSERT_FALSE((val_int & val_decimal).isValid());
+    ASSERT_FALSE((val_double & val_decimal).isValid());
+    ASSERT_FALSE((val_ll & val_decimal).isValid());
+    ASSERT_FALSE((val_decimal & val_int).isValid());
+    ASSERT_FALSE((val_decimal & val_ll).isValid());
+    ASSERT_FALSE((val_decimal & val_double).isValid());
 }
 
 TEST(BitAnd, 32and32) {
@@ -313,15 +297,13 @@ TEST(BitOr, FloatingPointIsIgnored) {
     ASSERT_FALSE((val_double | val_ll).isValid());
     ASSERT_FALSE((val_double | val_double).isValid());
 
-    if (mongo::Decimal128::enabled) {
-        const SafeNum val_decimal(Decimal128(1));
-        ASSERT_FALSE((val_decimal | val_int).isValid());
-        ASSERT_FALSE((val_decimal | val_double).isValid());
-        ASSERT_FALSE((val_decimal | val_ll).isValid());
-        ASSERT_FALSE((val_int | val_decimal).isValid());
-        ASSERT_FALSE((val_ll | val_decimal).isValid());
-        ASSERT_FALSE((val_double | val_decimal).isValid());
-    }
+    const SafeNum val_decimal(Decimal128(1));
+    ASSERT_FALSE((val_decimal | val_int).isValid());
+    ASSERT_FALSE((val_decimal | val_double).isValid());
+    ASSERT_FALSE((val_decimal | val_ll).isValid());
+    ASSERT_FALSE((val_int | val_decimal).isValid());
+    ASSERT_FALSE((val_ll | val_decimal).isValid());
+    ASSERT_FALSE((val_double | val_decimal).isValid());
 }
 
 TEST(BitOr, 32and32) {
@@ -366,15 +348,13 @@ TEST(BitXor, FloatingPointIsIgnored) {
     ASSERT_FALSE((val_double ^ val_ll).isValid());
     ASSERT_FALSE((val_double ^ val_double).isValid());
 
-    if (mongo::Decimal128::enabled) {
-        const SafeNum val_decimal(Decimal128(1));
-        ASSERT_FALSE((val_decimal ^ val_int).isValid());
-        ASSERT_FALSE((val_decimal ^ val_ll).isValid());
-        ASSERT_FALSE((val_decimal ^ val_double).isValid());
-        ASSERT_FALSE((val_int ^ val_decimal).isValid());
-        ASSERT_FALSE((val_ll ^ val_decimal).isValid());
-        ASSERT_FALSE((val_double ^ val_decimal).isValid());
-    }
+    const SafeNum val_decimal(Decimal128(1));
+    ASSERT_FALSE((val_decimal ^ val_int).isValid());
+    ASSERT_FALSE((val_decimal ^ val_ll).isValid());
+    ASSERT_FALSE((val_decimal ^ val_double).isValid());
+    ASSERT_FALSE((val_int ^ val_decimal).isValid());
+    ASSERT_FALSE((val_ll ^ val_decimal).isValid());
+    ASSERT_FALSE((val_double ^ val_decimal).isValid());
 }
 
 TEST(BitXor, 32and32) {
@@ -463,17 +443,15 @@ TEST(Multiplication, UpConvertion) {
     ASSERT_EQUALS(stillInt64.type(), mongo::NumberLong);
     ASSERT_EQUALS(stillDouble.type(), mongo::NumberDouble);
 
-    if (mongo::Decimal128::enabled) {
-        const SafeNum zeroDecimal(Decimal128(0));
-        ASSERT_EQUALS((zeroDecimal * zeroInt32).type(), mongo::NumberDecimal);
-        ASSERT_EQUALS((zeroInt32 * zeroDecimal).type(), mongo::NumberDecimal);
-        ASSERT_EQUALS((zeroDecimal * zeroInt64).type(), mongo::NumberDecimal);
-        ASSERT_EQUALS((zeroInt64 * zeroDecimal).type(), mongo::NumberDecimal);
-        ASSERT_EQUALS((zeroDecimal * zeroDouble).type(), mongo::NumberDecimal);
-        ASSERT_EQUALS((zeroDouble * zeroDecimal).type(), mongo::NumberDecimal);
-        const SafeNum stillDecimal(zeroDecimal * zeroDecimal);
-        ASSERT_EQUALS(stillDecimal.type(), mongo::NumberDecimal);
-    }
+    const SafeNum zeroDecimal(Decimal128(0));
+    ASSERT_EQUALS((zeroDecimal * zeroInt32).type(), mongo::NumberDecimal);
+    ASSERT_EQUALS((zeroInt32 * zeroDecimal).type(), mongo::NumberDecimal);
+    ASSERT_EQUALS((zeroDecimal * zeroInt64).type(), mongo::NumberDecimal);
+    ASSERT_EQUALS((zeroInt64 * zeroDecimal).type(), mongo::NumberDecimal);
+    ASSERT_EQUALS((zeroDecimal * zeroDouble).type(), mongo::NumberDecimal);
+    ASSERT_EQUALS((zeroDouble * zeroDecimal).type(), mongo::NumberDecimal);
+    const SafeNum stillDecimal(zeroDecimal * zeroDecimal);
+    ASSERT_EQUALS(stillDecimal.type(), mongo::NumberDecimal);
 }
 
 TEST(Multiplication, Overflow32to64) {

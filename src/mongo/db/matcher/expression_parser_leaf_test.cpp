@@ -965,16 +965,14 @@ TEST(MatchExpressionParserLeafTest, TypeDoubleOperator) {
 }
 
 TEST(MatchExpressionParserLeafTest, TypeDecimalOperator) {
-    if (Decimal128::enabled) {
-        BSONObj query = BSON("x" << BSON("$type" << mongo::NumberDecimal));
-        const CollatorInterface* collator = nullptr;
-        StatusWithMatchExpression result =
-            MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
-        ASSERT_TRUE(result.isOK());
+    BSONObj query = BSON("x" << BSON("$type" << mongo::NumberDecimal));
+    const CollatorInterface* collator = nullptr;
+    StatusWithMatchExpression result =
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
+    ASSERT_TRUE(result.isOK());
 
-        ASSERT_FALSE(result.getValue()->matchesBSON(BSON("x" << 5.3)));
-        ASSERT_TRUE(result.getValue()->matchesBSON(BSON("x" << mongo::Decimal128("1"))));
-    }
+    ASSERT_FALSE(result.getValue()->matchesBSON(BSON("x" << 5.3)));
+    ASSERT_TRUE(result.getValue()->matchesBSON(BSON("x" << mongo::Decimal128("1"))));
 }
 
 TEST(MatchExpressionParserLeafTest, TypeNull) {
@@ -1042,17 +1040,15 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameDouble) {
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringNameNumberDecimal) {
-    if (Decimal128::enabled) {
-        const CollatorInterface* collator = nullptr;
-        StatusWithMatchExpression typeNumberDecimal = MatchExpressionParser::parse(
-            fromjson("{a: {$type: 'decimal'}}"), ExtensionsCallbackDisallowExtensions(), collator);
-        ASSERT_OK(typeNumberDecimal.getStatus());
-        TypeMatchExpression* tmeNumberDecimal =
-            static_cast<TypeMatchExpression*>(typeNumberDecimal.getValue().get());
-        ASSERT(tmeNumberDecimal->getType() == NumberDecimal);
-        ASSERT_TRUE(tmeNumberDecimal->matchesBSON(BSON("a" << mongo::Decimal128("1"))));
-        ASSERT_FALSE(tmeNumberDecimal->matchesBSON(fromjson("{a: true}")));
-    }
+    const CollatorInterface* collator = nullptr;
+    StatusWithMatchExpression typeNumberDecimal = MatchExpressionParser::parse(
+        fromjson("{a: {$type: 'decimal'}}"), ExtensionsCallbackDisallowExtensions(), collator);
+    ASSERT_OK(typeNumberDecimal.getStatus());
+    TypeMatchExpression* tmeNumberDecimal =
+        static_cast<TypeMatchExpression*>(typeNumberDecimal.getValue().get());
+    ASSERT(tmeNumberDecimal->getType() == NumberDecimal);
+    ASSERT_TRUE(tmeNumberDecimal->matchesBSON(BSON("a" << mongo::Decimal128("1"))));
+    ASSERT_FALSE(tmeNumberDecimal->matchesBSON(fromjson("{a: true}")));
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameNumberInt) {

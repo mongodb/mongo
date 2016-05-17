@@ -129,12 +129,10 @@ TEST(Init, FailToInitWithInvalidValue) {
     ASSERT_NOT_OK(mod.init(modObj["$bit"].embeddedObject().firstElement(),
                            ModifierInterface::Options::normal()));
 
-    if (mongo::Decimal128::enabled) {
-        // The argument to the sub-operator must be integral
-        modObj = fromjson("{ $bit : { a : { or : NumberDecimal(\"1.0\") } } }");
-        ASSERT_NOT_OK(mod.init(modObj["$bit"].embeddedObject().firstElement(),
-                               ModifierInterface::Options::normal()));
-    }
+    // The argument to the sub-operator must be integral
+    modObj = fromjson("{ $bit : { a : { or : NumberDecimal(\"1.0\") } } }");
+    ASSERT_NOT_OK(mod.init(modObj["$bit"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
 }
 
 TEST(Init, ParsesAndInt) {

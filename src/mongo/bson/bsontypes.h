@@ -112,7 +112,7 @@ enum BSONType {
     /** 128 bit decimal */
     NumberDecimal = 19,
     /** max type that is not MaxKey */
-    JSTypeMax = Decimal128::enabled ? 19 : 18,
+    JSTypeMax = 19,
     /** larger than all other types */
     MaxKey = 127
 };

@@ -2398,11 +2398,9 @@ public:
         add<NumberLong>();
         add<NumberLong2>();
 
-        if (Decimal128::enabled) {
-            add<NumberDecimal>();
-            add<NumberDecimalGetFromScope>();
-            add<NumberDecimalBigObject>();
-        }
+        add<NumberDecimal>();
+        add<NumberDecimalGetFromScope>();
+        add<NumberDecimalBigObject>();
 
         add<MaxTimestamp>();
         add<RenameTest>();
@@ -2476,19 +2474,17 @@ public:
         add<RoundTripTests::NumberInt>();
         add<RoundTripTests::Number>();
 
-        if (Decimal128::enabled) {
-            add<RoundTripTests::NumberDecimal>();
-            add<RoundTripTests::NumberDecimalNegative>();
-            add<RoundTripTests::NumberDecimalMax>();
-            add<RoundTripTests::NumberDecimalMin>();
-            add<RoundTripTests::NumberDecimalPositiveZero>();
-            add<RoundTripTests::NumberDecimalNegativeZero>();
-            add<RoundTripTests::NumberDecimalPositiveNaN>();
-            add<RoundTripTests::NumberDecimalNegativeNaN>();
-            add<RoundTripTests::NumberDecimalPositiveInfinity>();
-            add<RoundTripTests::NumberDecimalNegativeInfinity>();
-            add<RoundTripTests::NumberDecimalPrecision>();
-        }
+        add<RoundTripTests::NumberDecimal>();
+        add<RoundTripTests::NumberDecimalNegative>();
+        add<RoundTripTests::NumberDecimalMax>();
+        add<RoundTripTests::NumberDecimalMin>();
+        add<RoundTripTests::NumberDecimalPositiveZero>();
+        add<RoundTripTests::NumberDecimalNegativeZero>();
+        add<RoundTripTests::NumberDecimalPositiveNaN>();
+        add<RoundTripTests::NumberDecimalNegativeNaN>();
+        add<RoundTripTests::NumberDecimalPositiveInfinity>();
+        add<RoundTripTests::NumberDecimalNegativeInfinity>();
+        add<RoundTripTests::NumberDecimalPrecision>();
 
         add<RoundTripTests::UUID>();
         add<RoundTripTests::HexData>();

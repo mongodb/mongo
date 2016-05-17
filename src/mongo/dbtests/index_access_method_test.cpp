@@ -106,19 +106,17 @@ TEST(IndexAccessMethodSetDifference, ZerosOfDifferentTypesAreNotEquivalent) {
     assertDistinct(doubleObj, intObj);
     assertDistinct(doubleObj, longObj);
 
-    if (mongo::Decimal128::enabled) {
-        const BSONObj decimalObj = fromjson("{'': NumberDecimal('0')}");
+    const BSONObj decimalObj = fromjson("{'': NumberDecimal('0')}");
 
-        ASSERT_EQ(0, doubleObj.woCompare(decimalObj));
+    ASSERT_EQ(0, doubleObj.woCompare(decimalObj));
 
-        assertDistinct(intObj, decimalObj);
-        assertDistinct(longObj, decimalObj);
-        assertDistinct(doubleObj, decimalObj);
+    assertDistinct(intObj, decimalObj);
+    assertDistinct(longObj, decimalObj);
+    assertDistinct(doubleObj, decimalObj);
 
-        assertDistinct(decimalObj, intObj);
-        assertDistinct(decimalObj, longObj);
-        assertDistinct(decimalObj, doubleObj);
-    }
+    assertDistinct(decimalObj, intObj);
+    assertDistinct(decimalObj, longObj);
+    assertDistinct(decimalObj, doubleObj);
 }
 
 TEST(IndexAccessMethodSetDifference, ShouldDetectOneDifferenceAmongManySimilarities) {

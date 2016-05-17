@@ -48,16 +48,6 @@ namespace mongo {
  */
 class Decimal128 {
 public:
-/**
- * This boolean is used as a master switch to enable and disable decimal support.
- * TODO(SERVER-23553): Remove once s390 decimal support is working
- */
-#if defined(__s390x__)
-    static const bool enabled = false;
-#else
-    static const bool enabled = true;
-#endif
-
     /**
      * Static constants to get Decimal128 representations of specific numbers
      * kLargestPositive -> 9999999999999999999999999999999999E6111
