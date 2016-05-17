@@ -1485,7 +1485,7 @@ bool CatalogManagerReplicaSet::runUserManagementWriteCommand(OperationContext* t
 
     auto response = Grid::get(txn)->shardRegistry()->getConfigShard()->runCommand(
         txn,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
         dbname,
         cmdToRun,
         Shard::RetryPolicy::kNotIdempotent);

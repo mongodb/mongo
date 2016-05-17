@@ -246,6 +246,13 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
                                "syslog facility used for mongodb syslog message");
 
 #endif  // _WIN32
+
+    options->addOptionChaining("allowInconsistentConfigReads",
+                               "allowInconsistentConfigReads",
+                               moe::Switch,
+                               "allow to read config data from config replica set nodes other than Primary");
+
+
     options->addOptionChaining("systemLog.logAppend",
                                "logappend",
                                moe::Switch,
@@ -934,6 +941,10 @@ Status storeServerOptions(const moe::Environment& params, const std::vector<std:
 
     if (params.count("systemLog.logAppend") && params["systemLog.logAppend"].as<bool>() == true) {
         serverGlobalParams.logAppend = true;
+    }
+
+    if (params.count("allowInconsistentConfigReads") && params["allowInconsistentConfigReads"].as<bool>() == true) {
+        serverGlobalParams.allowInconsistentConfigReads = true;
     }
 
     if (params.count("systemLog.logRotate")) {

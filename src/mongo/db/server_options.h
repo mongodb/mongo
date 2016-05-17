@@ -80,6 +80,7 @@ struct ServerGlobalParams {
 
     std::string logpath;            // Path to log file, if logging to a file; otherwise, empty.
     bool logAppend = false;         // True if logging to a file in append mode.
+    bool allowInconsistentConfigReads = false;  // True if it is allowed to read config data from config replica set nodes other than Primary
     bool logRenameOnRotate = true;  // True if logging should rename log files on rotate
     bool logWithSyslog = false;     // True if logging to syslog; must not be set if logpath is set.
     int syslogFacility;             // Facility used when appending messages to the syslog.
