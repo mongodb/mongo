@@ -30,6 +30,9 @@
 
 #pragma once
 
+#include <vector>
+#include <string>
+
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/base/disallow_copying.h"
 
@@ -57,6 +60,7 @@ public:
             const std::string& masterHost,
             const CloneOptions& opts,
             std::set<std::string>* clonedColls,
+            std::vector<BSONObj> collectionsToClone,
             std::string& errmsg,
             int* errCode = 0);
 
@@ -68,6 +72,18 @@ public:
                         bool mayBeInterrupted,
                         bool copyIndexes = true,
                         bool logForRepl = true);
+
+    // Filters a database's collection list and removes collections that should not be cloned.
+    // CloneOptions should be populated with a fromDB and a list of collections to ignore, which
+    // will be filtered out.
+    StatusWith<std::vector<BSONObj>> filterCollectionsForClone(
+        const CloneOptions& opts, const std::list<BSONObj>& initialCollections);
+
+    // Executes 'createCollection' for each collection specified in 'collections', in 'dbName'.
+    Status createCollectionsForDb(OperationContext* txn,
+                                  const std::vector<BSONObj>& collections,
+                                  const std::string& dbName);
+
 
 private:
     void copy(OperationContext* txn,
@@ -103,6 +119,8 @@ private:
  *  snapshot    - use $snapshot mode for copying collections.  note this should not be used
  *                when it isn't required, as it will be slower.  for example,
  *                repairDatabase need not use it.
+ *  createCollections - When 'true', will fetch a list of collections from the remote and create
+ *                them.  When 'false', assumes collections have already been created ahead of time.
  */
 struct CloneOptions {
     CloneOptions() {
@@ -115,6 +133,7 @@ struct CloneOptions {
 
         syncData = true;
         syncIndexes = true;
+        createCollections = true;
     }
 
     std::string fromDB;
@@ -129,6 +148,7 @@ struct CloneOptions {
 
     bool syncData;
     bool syncIndexes;
+    bool createCollections;
 };
 
 }  // namespace mongo

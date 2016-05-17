@@ -440,7 +440,14 @@ void ReplSource::resync(OperationContext* txn, const std::string& dbName) {
         cloneOptions.mayBeInterrupted = false;
 
         Cloner cloner;
-        bool ok = cloner.go(txn, db, hostName.c_str(), cloneOptions, NULL, errmsg, &errCode);
+        bool ok = cloner.go(txn,
+                            db,
+                            hostName.c_str(),
+                            cloneOptions,
+                            NULL,
+                            std::vector<BSONObj>(),
+                            errmsg,
+                            &errCode);
 
         if (!ok) {
             if (errCode == DatabaseDifferCaseCode) {

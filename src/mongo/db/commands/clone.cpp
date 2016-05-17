@@ -123,7 +123,8 @@ public:
         Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
 
         Cloner cloner;
-        bool rval = cloner.go(txn, dbname, from, opts, &clonedColls, errmsg);
+        bool rval =
+            cloner.go(txn, dbname, from, opts, &clonedColls, std::vector<BSONObj>(), errmsg);
 
         BSONArrayBuilder barr;
         barr.append(clonedColls);

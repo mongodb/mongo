@@ -163,44 +163,44 @@ void checkAdminDatabasePostClone(OperationContext* txn, Database* adminDb) {
 bool _initialSyncClone(OperationContext* txn,
                        Cloner& cloner,
                        const std::string& host,
-                       const list<string>& dbs,
+                       const std::string& db,
+                       std::vector<BSONObj>& collections,
                        bool dataPass) {
-    for (list<string>::const_iterator i = dbs.begin(); i != dbs.end(); i++) {
-        const string db = *i;
-        if (db == "local")
-            continue;
+    if (db == "local")
+        return true;
 
-        if (dataPass)
-            log() << "initial sync cloning db: " << db;
-        else
-            log() << "initial sync cloning indexes for : " << db;
+    if (dataPass)
+        log() << "initial sync cloning db: " << db;
+    else
+        log() << "initial sync cloning indexes for : " << db;
 
-        string err;
-        int errCode;
-        CloneOptions options;
-        options.fromDB = db;
-        options.logForRepl = false;
-        options.slaveOk = true;
-        options.useReplAuth = true;
-        options.snapshot = false;
-        options.mayYield = true;
-        options.mayBeInterrupted = false;
-        options.syncData = dataPass;
-        options.syncIndexes = !dataPass;
+    std::string err;
+    int errCode;
+    CloneOptions options;
+    options.fromDB = db;
+    options.logForRepl = false;
+    options.slaveOk = true;
+    options.useReplAuth = true;
+    options.snapshot = false;
+    options.mayYield = true;
+    options.mayBeInterrupted = false;
+    options.syncData = dataPass;
+    options.syncIndexes = !dataPass;
+    options.createCollections = false;
 
-        // Make database stable
-        ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock dbWrite(txn->lockState(), db, MODE_X);
+    // Make database stable
+    ScopedTransaction transaction(txn, MODE_IX);
+    Lock::DBLock dbWrite(txn->lockState(), db, MODE_X);
 
-        if (!cloner.go(txn, db, host, options, NULL, err, &errCode)) {
-            log() << "initial sync: error while " << (dataPass ? "cloning " : "indexing ") << db
-                  << ".  " << (err.empty() ? "" : err + ".  ");
-            return false;
-        }
+    bool status = cloner.go(txn, db, host, options, nullptr, collections, err, &errCode);
+    if (!status) {
+        log() << "initial sync: error while " << (dataPass ? "cloning " : "indexing ") << db
+              << ".  " << (err.empty() ? "" : err + ".  ");
+        return false;
+    }
 
-        if (db == "admin") {
-            checkAdminDatabasePostClone(txn, dbHolder().get(txn, db));
-        }
+    if (dataPass && (db == "admin")) {
+        checkAdminDatabasePostClone(txn, dbHolder().get(txn, db));
     }
 
     return true;
@@ -406,11 +406,42 @@ Status _initialSync() {
         if (admin != dbs.end()) {
             dbs.splice(dbs.begin(), dbs, admin);
         }
+        // Ignore local db
+        dbs.erase(std::remove(dbs.begin(), dbs.end(), "local"), dbs.end());
     }
 
     Cloner cloner;
-    if (!_initialSyncClone(&txn, cloner, r.conn()->getServerAddress(), dbs, true)) {
-        return Status(ErrorCodes::InitialSyncFailure, "initial sync failed data cloning");
+    std::map<std::string, std::vector<BSONObj>> collectionsPerDb;
+    for (auto&& db : dbs) {
+        CloneOptions options;
+        options.fromDB = db;
+        log() << "fetching and creating collections for " << db;
+        std::list<BSONObj> initialCollections =
+            r.conn()->getCollectionInfos(options.fromDB);  // may uassert
+        auto fetchStatus = cloner.filterCollectionsForClone(options, initialCollections);
+        if (!fetchStatus.isOK()) {
+            return fetchStatus.getStatus();
+        }
+        auto collections = fetchStatus.getValue();
+
+        ScopedTransaction transaction(&txn, MODE_IX);
+        Lock::DBLock dbWrite(txn.lockState(), db, MODE_X);
+
+        auto createStatus = cloner.createCollectionsForDb(&txn, collections, db);
+        if (!createStatus.isOK()) {
+            return createStatus;
+        }
+        collectionsPerDb.emplace(db, std::move(collections));
+    }
+    for (auto&& dbCollsPair : collectionsPerDb) {
+        if (!_initialSyncClone(&txn,
+                               cloner,
+                               r.conn()->getServerAddress(),
+                               dbCollsPair.first,
+                               dbCollsPair.second,
+                               true)) {
+            return Status(ErrorCodes::InitialSyncFailure, "initial sync failed data cloning");
+        }
     }
 
     log() << "initial sync data copy, starting syncup";
@@ -441,10 +472,18 @@ Status _initialSync() {
 
     msg = "initial sync building indexes";
     log() << msg;
-    if (!_initialSyncClone(&txn, cloner, r.conn()->getServerAddress(), dbs, false)) {
-        return Status(ErrorCodes::InitialSyncFailure,
-                      str::stream() << "initial sync failed: " << msg);
+    for (auto&& dbCollsPair : collectionsPerDb) {
+        if (!_initialSyncClone(&txn,
+                               cloner,
+                               r.conn()->getServerAddress(),
+                               dbCollsPair.first,
+                               dbCollsPair.second,
+                               false)) {
+            return Status(ErrorCodes::InitialSyncFailure,
+                          str::stream() << "initial sync failed: " << msg);
+        }
     }
+
 
     msg = "oplog sync 3 of 3";
     log() << msg;

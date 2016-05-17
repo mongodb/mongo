@@ -221,12 +221,13 @@ public:
             // SERVER-4328 todo lock just the two db's not everything for the fromself case
             ScopedTransaction transaction(txn, MODE_X);
             Lock::GlobalWrite lk(txn->lockState());
-            return cloner.go(txn, todb, fromhost, cloneOptions, NULL, errmsg);
+            return cloner.go(
+                txn, todb, fromhost, cloneOptions, NULL, std::vector<BSONObj>(), errmsg);
         }
 
         ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock lk(txn->lockState(), todb, MODE_X);
-        return cloner.go(txn, todb, fromhost, cloneOptions, NULL, errmsg);
+        return cloner.go(txn, todb, fromhost, cloneOptions, NULL, std::vector<BSONObj>(), errmsg);
     }
 
 } cmdCopyDB;
