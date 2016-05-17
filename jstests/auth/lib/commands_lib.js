@@ -2377,6 +2377,21 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "replSetStepUp",
+          command: {replSetStepUp: "x"},
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: roles_clusterManager,
+                privileges: [{resource: {cluster: true}, actions: ["replSetStateChange"]}],
+                expectFail: true
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
           testname: "replSetSyncFrom",
           command: {replSetSyncFrom: "x"},
           skipSharded: true,

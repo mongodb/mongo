@@ -785,6 +785,8 @@ public:
     virtual ReplSettings::IndexPrefetchConfig getIndexPrefetchConfig() const = 0;
     virtual void setIndexPrefetchConfig(const ReplSettings::IndexPrefetchConfig cfg) = 0;
 
+    virtual Status stepUpIfEligible() = 0;
+
 protected:
     ReplicationCoordinator();
 };

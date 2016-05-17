@@ -449,5 +449,9 @@ ReplSettings::IndexPrefetchConfig ReplicationCoordinatorMock::getIndexPrefetchCo
 void ReplicationCoordinatorMock::setIndexPrefetchConfig(
     const ReplSettings::IndexPrefetchConfig cfg) {}
 
+Status ReplicationCoordinatorMock::stepUpIfEligible() {
+    return Status::OK();
+}
+
 }  // namespace repl
 }  // namespace mongo
