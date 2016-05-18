@@ -1485,7 +1485,10 @@ public:
                                                    Pipeline::SourceContainer* container) final;
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
     void dispose() final;
-    BSONObjSet getOutputSorts() final;
+
+    BSONObjSet getOutputSorts() final {
+        return DocumentSource::truncateSortSet(pSource->getOutputSorts(), {_as.getPath(false)});
+    }
 
     bool needsPrimaryShard() const final {
         return true;
