@@ -351,13 +351,12 @@ TEST_F(ReplCoordTest,
     BSONObjBuilder result;
     ReplSetReconfigArgs args;
     args.force = false;
-    args.newConfigObj = BSON("_id"
-                             << "mySet"
+    args.newConfigObj = BSON("_id" << "mySet"
                              << "version" << 3 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")));
+                             << BSON_ARRAY(BSON("_id" << 1 <<
+                                                "host" << "node1:12345") <<
+                                           BSON("_id" << 2 <<
+                                                "host" << "node2:12345")));
 
     ASSERT_EQUALS(ErrorCodes::ConfigurationInProgress,
                   getReplCoord()->processReplSetReconfig(&txn, args, &result));
@@ -601,6 +600,44 @@ TEST_F(ReplCoordTest, NodeAcceptsConfigFromAReconfigWithForceTrueWhileNotPrimary
 
     // ensure forced reconfig results in a random larger version
     ASSERT_GREATER_THAN(result.obj()["config"].Obj()["version"].numberInt(), 3);
+}
+
+TEST_F(ReplCoordTest, NodeReturnsConfigurationInProgressWhenReceivingAReconfigWhileInitiatingWithHostInternal) {
+    // start up, initiate, then before that initiate concludes, reconfig
+    OperationContextNoop txn;
+    init();
+    start(HostAndPort("node1", 12345));
+    ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(100, 0), 0));
+    getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(100, 0), 0));
+
+    // initiate
+    Status status(ErrorCodes::InternalError, "Not Set");
+    stdx::thread initateThread(stdx::bind(doReplSetInitiate, getReplCoord(), &status));
+    getNet()->enterNetwork();
+    getNet()->blackHole(getNet()->getNextReadyRequest());
+    getNet()->exitNetwork();
+
+    // reconfig
+    BSONObjBuilder result;
+    ReplSetReconfigArgs args;
+    args.force = false;
+    args.newConfigObj = BSON("_id"
+                             << "mySet"
+                             << "version" << 3 << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 <<
+                                                "host" << "node1:12345" <<
+                                                "hostinternal" << "nodeinternal1:12345")
+                                           << BSON("_id" << 2 <<
+                                                   "host" << "node2:12345" <<
+                                                   "hostinternal" << "nodeinternal2:12345")));
+
+    ASSERT_EQUALS(ErrorCodes::ConfigurationInProgress,
+                  getReplCoord()->processReplSetReconfig(&txn, args, &result));
+    ASSERT_TRUE(result.obj().isEmpty());
+
+    shutdown();
+    initateThread.join();
 }
 
 }  // anonymous namespace
