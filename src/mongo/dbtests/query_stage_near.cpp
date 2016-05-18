@@ -34,7 +34,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/owned_pointer_vector.h"
-#include "mongo/db/client.h"
 #include "mongo/db/exec/near.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -48,12 +47,6 @@ using std::shared_ptr;
 using std::unique_ptr;
 using std::vector;
 using stdx::make_unique;
-
-class QueryStageNearTest : public unittest::Test {
-protected:
-    const ServiceContext::UniqueOperationContext _uniqOpCtx = cc().makeOperationContext();
-    OperationContext* const _opCtx = _uniqOpCtx.get();
-};
 
 /**
  * Stage which implements a basic distance search, and interprets the "distance" field of
@@ -70,9 +63,8 @@ public:
         double max;
     };
 
-    MockNearStage(OperationContext* opCtx, WorkingSet* workingSet)
-        : NearStage(opCtx, "MOCK_DISTANCE_SEARCH_STAGE", STAGE_UNKNOWN, workingSet, NULL),
-          _pos(0) {}
+    MockNearStage(WorkingSet* workingSet)
+        : NearStage(NULL, "MOCK_DISTANCE_SEARCH_STAGE", STAGE_UNKNOWN, workingSet, NULL), _pos(0) {}
 
     void addInterval(vector<BSONObj> data, double min, double max) {
         _intervals.mutableVector().push_back(new MockInterval(data, min, max));
@@ -147,11 +139,11 @@ static void assertAscendingAndValid(const vector<BSONObj>& results) {
     }
 }
 
-TEST_F(QueryStageNearTest, Basic) {
+TEST(query_stage_near, Basic) {
     vector<BSONObj> mockData;
     WorkingSet workingSet;
 
-    MockNearStage nearStage(_opCtx, &workingSet);
+    MockNearStage nearStage(&workingSet);
 
     // First set of results
     mockData.clear();
@@ -182,11 +174,11 @@ TEST_F(QueryStageNearTest, Basic) {
     assertAscendingAndValid(results);
 }
 
-TEST_F(QueryStageNearTest, EmptyResults) {
+TEST(query_stage_near, EmptyResults) {
     vector<BSONObj> mockData;
     WorkingSet workingSet;
 
-    MockNearStage nearStage(_opCtx, &workingSet);
+    MockNearStage nearStage(&workingSet);
 
     // Empty set of results
     mockData.clear();

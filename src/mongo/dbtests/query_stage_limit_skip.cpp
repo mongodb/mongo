@@ -34,7 +34,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/dbclientcursor.h"
-#include "mongo/db/client.h"
 #include "mongo/db/exec/limit.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/queued_data_stage.h"
@@ -56,8 +55,8 @@ using stdx::make_unique;
 static const int N = 50;
 
 /* Populate a QueuedDataStage and return it.  Caller owns it. */
-QueuedDataStage* getMS(OperationContext* opCtx, WorkingSet* ws) {
-    auto ms = make_unique<QueuedDataStage>(opCtx, ws);
+QueuedDataStage* getMS(WorkingSet* ws) {
+    auto ms = make_unique<QueuedDataStage>(nullptr, ws);
 
     // Put N ADVANCED results into the mock stage, and some other stalling results (YIELD/TIME).
     for (int i = 0; i < N; ++i) {
@@ -97,18 +96,13 @@ public:
         for (int i = 0; i < 2 * N; ++i) {
             WorkingSet ws;
 
-            unique_ptr<PlanStage> skip = make_unique<SkipStage>(_opCtx, i, &ws, getMS(_opCtx, &ws));
+            unique_ptr<PlanStage> skip = make_unique<SkipStage>(nullptr, i, &ws, getMS(&ws));
             ASSERT_EQUALS(max(0, N - i), countResults(skip.get()));
 
-            unique_ptr<PlanStage> limit =
-                make_unique<LimitStage>(_opCtx, i, &ws, getMS(_opCtx, &ws));
+            unique_ptr<PlanStage> limit = make_unique<LimitStage>(nullptr, i, &ws, getMS(&ws));
             ASSERT_EQUALS(min(N, i), countResults(limit.get()));
         }
     }
-
-protected:
-    const ServiceContext::UniqueOperationContext _uniqOpCtx = cc().makeOperationContext();
-    OperationContext* const _opCtx = _uniqOpCtx.get();
 };
 
 class All : public Suite {

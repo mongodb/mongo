@@ -114,8 +114,6 @@ public:
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
     OperationContext& _txn = *_txnPtr;
-    ClockSource* const _clock = _txn.getServiceContext()->getFastClockSource();
-
     DBDirectClient _client;
 };
 
@@ -182,7 +180,7 @@ public:
         mps->addPlan(createQuerySolution(), secondRoot.release(), sharedWs.get());
 
         // Plan 0 aka the first plan aka the index scan should be the best.
-        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, _clock);
+        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, clockSource.get());
         mps->pickBestPlan(&yieldPolicy);
         ASSERT(mps->bestPlanChosen());
         ASSERT_EQUALS(0, mps->bestPlanIdx());
@@ -266,7 +264,7 @@ public:
         }
 
         // This sets a backup plan.
-        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, _clock);
+        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, clockSource.get());
         mps->pickBestPlan(&yieldPolicy);
         ASSERT(mps->bestPlanChosen());
         ASSERT(mps->hasBackupPlan());

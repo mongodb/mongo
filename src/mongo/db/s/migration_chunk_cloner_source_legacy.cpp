@@ -88,8 +88,8 @@ BSONObj createRecvChunkCommitRequest(const NamespaceString& nss,
  */
 class DeleteNotificationStage final : public PlanStage {
 public:
-    DeleteNotificationStage(MigrationChunkClonerSourceLegacy* cloner, OperationContext* txn)
-        : PlanStage("SHARDING_NOTIFY_DELETE", txn), _cloner(cloner) {}
+    DeleteNotificationStage(MigrationChunkClonerSourceLegacy* cloner)
+        : PlanStage("SHARDING_NOTIFY_DELETE", nullptr), _cloner(cloner) {}
 
     void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) override {
         if (type == INVALIDATION_DELETION) {
@@ -527,7 +527,7 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* txn
         auto statusWithPlanExecutor =
             PlanExecutor::make(txn,
                                stdx::make_unique<WorkingSet>(),
-                               stdx::make_unique<DeleteNotificationStage>(this, txn),
+                               stdx::make_unique<DeleteNotificationStage>(this),
                                collection,
                                PlanExecutor::YIELD_MANUAL);
         invariant(statusWithPlanExecutor.isOK());

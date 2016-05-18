@@ -29,15 +29,16 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/scoped_timer.h"
-#include "mongo/util/clock_source.h"
+
+#include "mongo/util/net/listen.h"
 
 namespace mongo {
 
-ScopedTimer::ScopedTimer(ClockSource* cs, long long* counter)
-    : _clock(cs), _counter(counter), _start(cs->now()) {}
+ScopedTimer::ScopedTimer(long long* counter)
+    : _counter(counter), _start(Listener::getElapsedTimeMillis()) {}
 
 ScopedTimer::~ScopedTimer() {
-    long long elapsed = durationCount<Milliseconds>(_clock->now() - _start);
+    long long elapsed = Listener::getElapsedTimeMillis() - _start;
     *_counter += elapsed;
 }
 
