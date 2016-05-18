@@ -4504,6 +4504,29 @@ TEST_F(ReplCoordTest, PopulateUnsetWriteConcernOptionsSyncModeReturnsInputIfWMod
            getReplCoord()->populateUnsetWriteConcernOptionsSyncMode(wc).syncMode);
 }
 
+TEST_F(ReplCoordTest, PopulateUnsetWriteConcernOptionsSyncModeReturnsInputIfWModeIsNotMajorityUsingHostInternal) {
+    init("mySet");
+
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 <<
+                                               "host" << "test1:1234" <<
+                                               "hostinternal" << "testinternal1:1234"))
+                            << "writeConcernMajorityJournalDefault" << false),
+                       HostAndPort("testinternal1", 1234));
+
+    WriteConcernOptions wc;
+    wc.syncMode = WriteConcernOptions::SyncMode::UNSET;
+    wc.wMode = "not the value of kMajority";
+    ASSERT(WriteConcernOptions::SyncMode::NONE ==
+           getReplCoord()->populateUnsetWriteConcernOptionsSyncMode(wc).syncMode);
+
+    wc.wMode = "like literally anythingelse";
+    ASSERT(WriteConcernOptions::SyncMode::NONE ==
+           getReplCoord()->populateUnsetWriteConcernOptionsSyncMode(wc).syncMode);
+}
+
 namespace {
 void selectSyncSource(ReplicationCoordinatorImpl* replCoord, SyncSourceResolverResponse* resp) {
     OperationContextNoop txn;
