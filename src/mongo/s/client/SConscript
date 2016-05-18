@@ -60,6 +60,18 @@ env.CppUnitTest(
     ]
 )
 
+env.CppUnitTest(
+    target='shard_registry_test',
+    source=[
+        'shard_registry_data_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/mongo/s/mongoscore',
+        '$BUILD_DIR/mongo/s/sharding_test_fixture',
+    ]
+)
+
 env.Library(
     target='shard_interface',
     source=[

@@ -51,7 +51,7 @@ const Status kInternalErrorStatus{ErrorCodes::InternalError,
 }  // namespace
 
 const ConnectionString ShardLocal::getConnString() const {
-    MONGO_UNREACHABLE;
+    return ConnectionString::forLocal();
 }
 
 std::shared_ptr<RemoteCommandTargeter> ShardLocal::getTargeter() const {
@@ -59,7 +59,7 @@ std::shared_ptr<RemoteCommandTargeter> ShardLocal::getTargeter() const {
 };
 
 const ConnectionString ShardLocal::originalConnString() const {
-    MONGO_UNREACHABLE;
+    return ConnectionString::forLocal();
 }
 
 void ShardLocal::updateReplSetMonitor(const HostAndPort& remoteHost,

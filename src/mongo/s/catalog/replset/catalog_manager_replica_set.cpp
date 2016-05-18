@@ -63,6 +63,7 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/config.h"
@@ -955,7 +956,9 @@ StatusWith<ShardDrainingStatus> CatalogManagerReplicaSet::removeShard(OperationC
         return status;
     }
 
-    grid.shardRegistry()->remove(name);
+    shardConnectionPool.removeHost(name);
+    ReplicaSetMonitor::remove(name);
+
     grid.shardRegistry()->reload(txn);
 
     // Record finish in changelog
