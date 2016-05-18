@@ -32,8 +32,8 @@ assert.commandFailed(res, "Setting the invalidation interval to an disallowed va
 res = st.s1.getDB('admin').runCommand({getParameter: 1, userCacheInvalidationIntervalSecs: 1});
 
 assert.eq(5, res.userCacheInvalidationIntervalSecs);
-st.s1.getDB('test').foo.insert({a: 1});  // initial data
-st.s1.getDB('test').bar.insert({a: 1});  // initial data
+assert.writeOK(st.s1.getDB('test').foo.insert({a: 1}));  // initial data
+assert.writeOK(st.s1.getDB('test').bar.insert({a: 1}));  // initial data
 st.s1.getDB('admin').createUser({user: 'admin', pwd: 'pwd', roles: ['userAdminAnyDatabase']});
 st.s1.getDB('admin').logout();
 
