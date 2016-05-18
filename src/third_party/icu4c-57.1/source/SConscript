@@ -4,11 +4,16 @@ Import('env')
 
 env = env.Clone()
 
+# The below list of defines are used to configure ICU. They must be duplicated exactly in every
+# library that injects the third-party ICU headers. If this list is changed here, it must be changed
+# in other such libraries as well.
 env.Append(
     CPPDEFINES=[
         ('UCONFIG_ONLY_COLLATION', 1),
         ('U_CHARSET_IS_UTF8', 1),
+        ('U_DISABLE_RENAMING', 1),
         ('U_STATIC_IMPLEMENTATION', 1),
+        ('U_USING_ICU_NAMESPACE', 0),
     ],
 )
 

@@ -30,6 +30,7 @@
 
 #include "mongo/db/query/collation/collator_interface_icu.h"
 
+#include <unicode/coll.h>
 #include <unicode/sortkey.h>
 
 #include "mongo/stdx/memory.h"

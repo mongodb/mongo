@@ -30,7 +30,9 @@
 
 #include "mongo/db/query/collation/collator_factory_icu.h"
 
+#include <unicode/coll.h>
 #include <unicode/errorcode.h>
+#include <unicode/ucol.h>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/bson_extract.h"
