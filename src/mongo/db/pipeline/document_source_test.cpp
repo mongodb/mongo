@@ -3352,11 +3352,11 @@ TEST(ObjectForMatch, ShouldExtractEntireArrayFromPrefixOfDottedField) {
 namespace DocumentSourceLookUp {
 using mongo::DocumentSourceLookUp;
 
-class OutputSortTruncatesOnEquality : public Mock::Base {
+class OutputSort : public Mock::Base {
 public:
     void run() {
         intrusive_ptr<DocumentSourceMock> source = DocumentSourceMock::create();
-        source->sorts = {BSON("a" << 1 << "d.e" << 1 << "c" << 1)};
+        source->sorts = {BSON("a" << 1 << "d.e" << 1)};
         intrusive_ptr<DocumentSource> lookup =
             DocumentSourceLookUp::createFromBson(BSON("$lookup" << BSON("from"
                                                                         << "a"
@@ -3372,30 +3372,7 @@ public:
         BSONObjSet outputSort = lookup->getOutputSorts();
 
         ASSERT_EQUALS(outputSort.count(BSON("a" << 1)), 1U);
-        ASSERT_EQUALS(outputSort.size(), 1U);
-    }
-};
-
-class OutputSortTruncatesOnPrefix : public Mock::Base {
-public:
-    void run() {
-        intrusive_ptr<DocumentSourceMock> source = DocumentSourceMock::create();
-        source->sorts = {BSON("a" << 1 << "d.e" << 1 << "c" << 1)};
-        intrusive_ptr<DocumentSource> lookup =
-            DocumentSourceLookUp::createFromBson(BSON("$lookup" << BSON("from"
-                                                                        << "a"
-                                                                        << "localField"
-                                                                        << "b"
-                                                                        << "foreignField"
-                                                                        << "c"
-                                                                        << "as"
-                                                                        << "d")).firstElement(),
-                                                 ctx());
-        lookup->setSource(source.get());
-
-        BSONObjSet outputSort = lookup->getOutputSorts();
-
-        ASSERT_EQUALS(outputSort.count(BSON("a" << 1)), 1U);
+        ASSERT_EQUALS(outputSort.count(BSON("d.e" << 1)), 0U);
         ASSERT_EQUALS(outputSort.size(), 1U);
     }
 };
@@ -3519,8 +3496,7 @@ public:
         add<DocumentSourceGeoNear::LimitCoalesce>();
         add<DocumentSourceGeoNear::OutputSort>();
 
-        add<DocumentSourceLookUp::OutputSortTruncatesOnEquality>();
-        add<DocumentSourceLookUp::OutputSortTruncatesOnPrefix>();
+        add<DocumentSourceLookUp::OutputSort>();
 
         add<DocumentSourceMatch::RedactSafePortion>();
         add<DocumentSourceMatch::Coalesce>();
