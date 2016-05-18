@@ -250,11 +250,17 @@ Decimal128::Decimal128(double doubleValue,
 
 Decimal128::Decimal128(std::string stringValue, RoundingMode roundMode) {
     std::uint32_t throwAwayFlag = 0;
+    *this = Decimal128(stringValue, &throwAwayFlag, roundMode);
+}
+
+Decimal128::Decimal128(std::string stringValue,
+                       std::uint32_t* signalingFlags,
+                       RoundingMode roundMode) {
     std::unique_ptr<char[]> charInput(new char[stringValue.size() + 1]);
     std::copy(stringValue.begin(), stringValue.end(), charInput.get());
     charInput[stringValue.size()] = '\0';
     BID_UINT128 dec128;
-    dec128 = bid128_from_string(charInput.get(), roundMode, &throwAwayFlag);
+    dec128 = bid128_from_string(charInput.get(), roundMode, signalingFlags);
     _value = libraryTypeToValue(dec128);
 }
 

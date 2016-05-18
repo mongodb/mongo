@@ -67,26 +67,4 @@
     // Not representable as double
     assert.eq(col.find({"a": 36028797018963967}).count(), 0, "E2");
     assert.eq(col.find({"a": NumberLong("36028797018963967")}).count(), 1, "E3");
-
-    // Doubles not representable as decimal
-    col.drop();
-    var exactDouble = 1427247692705959881058285969449495136382746624;
-    var exactDoubleString = "1427247692705959881058285969449495136382746624";
-
-    assert.writeOK(col.insert([{"a": exactDouble}  // Exact double (46 digits)
-    ],
-                              "4 insertion failed"));
-
-    assert.eq(col.find({"a": NumberDecimal(exactDoubleString)}).count(), 0, "F1");
-    assert.eq(col.find({"a": {$gt: NumberDecimal(exactDoubleString)}}).count(), 1, "E2");
-
-    var exactDoubleTiny = 1 / 1606938044258990275541962092341162602522202993782792835301376;
-    var exactDoubleTinyString =
-        "0.00000000000000000000000000000000000000000000000000000000000062230152778611417071440640537801242405902521687211671331011166147896988340353834411839448231257136169569665895551224821247160434722900390625";
-
-    col.drop();
-    assert.writeOK(col.insert([{"a": exactDoubleTiny}], "5 insertion failed"));
-
-    assert.eq(col.find({"a": NumberDecimal(exactDoubleTinyString)}).count(), 0, "F1");
-    assert.eq(col.find({"a": {$gt: NumberDecimal(exactDoubleTinyString)}}).count(), 1, "F2");
 }());

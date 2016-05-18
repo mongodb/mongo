@@ -14,7 +14,7 @@
         {'decimal': NumberDecimal('1.0')},
         {'decimal': NumberDecimal('1.00')},
         {'decimal': NumberDecimal('2.00')},
-        {'decimal': NumberDecimal('1234567890123456789012.12345678901234')},
+        {'decimal': NumberDecimal('12345678901234.56789012345678901234')},
         {'decimal': NumberDecimal('NaN')},
         {'decimal': NumberDecimal('-NaN')},
         {'decimal': NumberDecimal('Infinity')},
