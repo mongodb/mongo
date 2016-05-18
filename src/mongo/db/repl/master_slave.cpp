@@ -218,8 +218,6 @@ void ReplSource::save(OperationContext* txn) {
     LOG(1) << "Saving repl source: " << o << endl;
 
     {
-        OpDebug debug;
-
         OldClientContext ctx(txn, "local.sources", false);
 
         const NamespaceString requestNs("local.sources");
@@ -229,7 +227,7 @@ void ReplSource::save(OperationContext* txn) {
         request.setUpdates(o);
         request.setUpsert();
 
-        UpdateResult res = update(txn, ctx.db(), request, &debug);
+        UpdateResult res = update(txn, ctx.db(), request);
 
         verify(!res.modifiers);
         verify(res.numMatched == 1 || !res.upserted.isEmpty());

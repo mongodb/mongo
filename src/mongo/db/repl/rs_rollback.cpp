@@ -742,7 +742,6 @@ void syncFixUp(OperationContext* txn,
                     }
                 } else {
                     // TODO faster...
-                    OpDebug debug;
                     updates++;
 
                     const NamespaceString requestNs(doc.ns);
@@ -755,7 +754,7 @@ void syncFixUp(OperationContext* txn,
                     UpdateLifecycleImpl updateLifecycle(requestNs);
                     request.setLifecycle(&updateLifecycle);
 
-                    update(txn, ctx.db(), request, &debug);
+                    update(txn, ctx.db(), request);
                 }
             } catch (const DBException& e) {
                 log() << "exception in rollback ns:" << doc.ns << ' ' << pattern.toString() << ' '

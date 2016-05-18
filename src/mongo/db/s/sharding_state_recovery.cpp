@@ -192,7 +192,6 @@ Status modifyRecoveryDocument(OperationContext* txn,
 
         LOG(1) << "Changing sharding recovery document " << updateObj;
 
-        OpDebug opDebug;
         UpdateRequest updateReq(NamespaceString::kConfigCollectionNamespace);
         updateReq.setQuery(RecoveryDocument::getQuery());
         updateReq.setUpdates(updateObj);
@@ -200,7 +199,7 @@ Status modifyRecoveryDocument(OperationContext* txn,
         UpdateLifecycleImpl updateLifecycle(NamespaceString::kConfigCollectionNamespace);
         updateReq.setLifecycle(&updateLifecycle);
 
-        UpdateResult result = update(txn, autoGetOrCreateDb->getDb(), updateReq, &opDebug);
+        UpdateResult result = update(txn, autoGetOrCreateDb->getDb(), updateReq);
         invariant(result.numDocsModified == 1 || !result.upserted.isEmpty());
         invariant(result.numMatched <= 1);
 

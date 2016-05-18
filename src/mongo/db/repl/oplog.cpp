@@ -862,7 +862,6 @@ Status applyOperation_inlock(OperationContext* txn,
                 // Do update on DuplicateKey errors.
                 // This will only be on the _id field in replication,
                 // since we disable non-_id unique constraint violations.
-                OpDebug debug;
                 BSONObjBuilder b;
                 b.append(o.getField("_id"));
 
@@ -875,7 +874,7 @@ Status applyOperation_inlock(OperationContext* txn,
                 UpdateLifecycleImpl updateLifecycle(requestNs);
                 request.setLifecycle(&updateLifecycle);
 
-                UpdateResult res = update(txn, db, request, &debug);
+                UpdateResult res = update(txn, db, request);
                 if (res.numMatched == 0 && res.upserted.isEmpty()) {
                     error() << "No document was updated even though we got a DuplicateKey "
                                "error when inserting";
@@ -889,7 +888,6 @@ Status applyOperation_inlock(OperationContext* txn,
     } else if (*opType == 'u') {
         opCounters->gotUpdate();
 
-        OpDebug debug;
         BSONObj updateCriteria = o2;
         const bool upsert = valueB || convertUpdateToUpsert;
 
@@ -906,7 +904,7 @@ Status applyOperation_inlock(OperationContext* txn,
         UpdateLifecycleImpl updateLifecycle(requestNs);
         request.setLifecycle(&updateLifecycle);
 
-        UpdateResult ur = update(txn, db, request, &debug);
+        UpdateResult ur = update(txn, db, request);
 
         if (ur.numMatched == 0 && ur.upserted.isEmpty()) {
             if (ur.modifiers) {

@@ -800,7 +800,9 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* txn,
     }
 
     // TODO: This seems a bit circuitious.
-    opDebug->updateobj = request->getUpdates();
+    if (opDebug) {
+        opDebug->updateobj = request->getUpdates();
+    }
 
     // If this is a user-issued update, then we want to return an error: you cannot perform
     // writes on a secondary. If this is an update to a secondary from the replication system,

@@ -1031,6 +1031,7 @@ const UpdateStats* UpdateStage::getUpdateStats(const PlanExecutor* exec) {
 }
 
 void UpdateStage::recordUpdateStatsInOpDebug(const UpdateStats* updateStats, OpDebug* opDebug) {
+    invariant(opDebug);
     opDebug->nMatched = updateStats->nMatched;
     opDebug->nModified = updateStats->nModified;
     opDebug->upsert = updateStats->inserted;

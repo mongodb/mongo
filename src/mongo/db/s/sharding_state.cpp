@@ -974,12 +974,10 @@ Status ShardingState::updateShardIdentityConfigString(OperationContext* txn,
     UpdateLifecycleImpl updateLifecycle(NamespaceString::kConfigCollectionNamespace);
     updateReq.setLifecycle(&updateLifecycle);
 
-    OpDebug opDebug;
-
     try {
         AutoGetOrCreateDb autoDb(txn, NamespaceString::kConfigCollectionNamespace.db(), MODE_X);
 
-        auto result = update(txn, autoDb.getDb(), updateReq, &opDebug);
+        auto result = update(txn, autoDb.getDb(), updateReq);
         if (result.numMatched == 0) {
             warning() << "failed to update config string of shard identity document because "
                       << "it does not exist. This shard could have been removed from the cluster";

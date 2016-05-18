@@ -243,7 +243,6 @@ void Helpers::upsert(OperationContext* txn, const string& ns, const BSONObj& o, 
     verify(e.type());
     BSONObj id = e.wrap();
 
-    OpDebug debug;
     OldClientContext context(txn, ns);
 
     const NamespaceString requestNs(ns);
@@ -256,11 +255,10 @@ void Helpers::upsert(OperationContext* txn, const string& ns, const BSONObj& o, 
     UpdateLifecycleImpl updateLifecycle(requestNs);
     request.setLifecycle(&updateLifecycle);
 
-    update(txn, context.db(), request, &debug);
+    update(txn, context.db(), request);
 }
 
 void Helpers::putSingleton(OperationContext* txn, const char* ns, BSONObj obj) {
-    OpDebug debug;
     OldClientContext context(txn, ns);
 
     const NamespaceString requestNs(ns);
@@ -271,7 +269,7 @@ void Helpers::putSingleton(OperationContext* txn, const char* ns, BSONObj obj) {
     UpdateLifecycleImpl updateLifecycle(requestNs);
     request.setLifecycle(&updateLifecycle);
 
-    update(txn, context.db(), request, &debug);
+    update(txn, context.db(), request);
 
     CurOp::get(txn)->done();
 }
