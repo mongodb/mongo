@@ -68,6 +68,9 @@ using std::string;
 // Failpoint which fails initial sync and leaves on oplog entry in the buffer.
 MONGO_FP_DECLARE(failInitSyncWithBufferedEntriesLeft);
 
+// Failpoint which causes the initial sync function to hang before copying databases.
+MONGO_FP_DECLARE(initialSyncHangBeforeCopyingDatabases);
+
 /**
  * Truncates the oplog (removes any documents) and resets internal variables that were
  * originally initialized or affected by using values from the oplog at startup time.  These
@@ -354,6 +357,14 @@ Status _initialSync() {
 
     log() << "initial sync drop all databases";
     dropAllDatabasesExceptLocal(&txn);
+
+    if (MONGO_FAIL_POINT(initialSyncHangBeforeCopyingDatabases)) {
+        log() << "initial sync - initialSyncHangBeforeCopyingDatabases fail point enabled. "
+                 "Blocking until fail point is disabled.";
+        while (MONGO_FAIL_POINT(initialSyncHangBeforeCopyingDatabases)) {
+            mongo::sleepsecs(1);
+        }
+    }
 
     log() << "initial sync clone all databases";
 

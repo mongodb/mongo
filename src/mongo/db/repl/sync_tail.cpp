@@ -114,6 +114,10 @@ static ServerStatusMetricField<Counter64> displayOpsApplied("repl.apply.ops", &o
 
 MONGO_FP_DECLARE(rsSyncApplyStop);
 
+// Failpoint which causes the initial sync function to hang before calling shouldRetry on a failed
+// operation.
+MONGO_FP_DECLARE(initialSyncHangBeforeGettingMissingDocument);
+
 // Number and time of each ApplyOps worker pool round
 static TimerStats applyBatchStats;
 static ServerStatusMetricField<TimerStats> displayOpBatchesApplied("repl.apply.batches",
@@ -870,6 +874,14 @@ BSONObj SyncTail::getMissingDoc(OperationContext* txn, Database* db, const BSONO
     if (collection && collection->isCapped()) {
         log() << "missing doc, but this is okay for a capped collection (" << ns << ")";
         return BSONObj();
+    }
+
+    if (MONGO_FAIL_POINT(initialSyncHangBeforeGettingMissingDocument)) {
+        log() << "initial sync - initialSyncHangBeforeGettingMissingDocument fail point enabled. "
+                 "Blocking until fail point is disabled.";
+        while (MONGO_FAIL_POINT(initialSyncHangBeforeGettingMissingDocument)) {
+            mongo::sleepsecs(1);
+        }
     }
 
     const int retryMax = 3;
