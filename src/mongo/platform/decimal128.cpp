@@ -371,6 +371,17 @@ double Decimal128::toDouble(std::uint32_t* signalingFlags, RoundingMode roundMod
 }
 
 std::string Decimal128::toString() const {
+    // If the decimal is a variant of NaN (i.e. sNaN, -NaN, +NaN, etc...) or a variant of
+    // Inf (i.e. +Inf, Inf, -Inf), return either NaN, Infinity, or -Infinity
+    if (!isFinite()) {
+        if (this->isEqual(kPositiveInfinity)) {
+            return "Infinity";
+        } else if (this->isEqual(kNegativeInfinity)) {
+            return "-Infinity";
+        }
+        invariant(isNaN());
+        return "NaN";
+    }
     BID_UINT128 dec128 = decimal128ToLibraryType(_value);
     char decimalCharRepresentation[1 /* mantissa sign */ + 34 /* mantissa */ +
                                    1 /* scientific E */ + 1 /* exponent sign */ + 4 /* exponent */ +
@@ -389,16 +400,7 @@ std::string Decimal128::toString() const {
 
     std::string dec128String(decimalCharRepresentation);
 
-    // If the string is NaN or Infinity, return either NaN, +Inf, or -Inf
     std::string::size_type ePos = dec128String.find("E");
-    if (ePos == std::string::npos) {
-        if (dec128String == "-NaN" || dec128String == "+NaN")
-            return "NaN";
-        if (dec128String[0] == '+')
-            return "Inf";
-        invariant(dec128String == "-Inf");
-        return dec128String;
-    }
 
     // Calculate the precision and exponent of the number and output it in a readable manner
     int precision = 0;
@@ -481,6 +483,10 @@ bool Decimal128::isNaN() const {
 
 bool Decimal128::isInfinite() const {
     return bid128_isInf(decimal128ToLibraryType(_value));
+}
+
+bool Decimal128::isFinite() const {
+    return bid128_isFinite(decimal128ToLibraryType(_value));
 }
 
 bool Decimal128::isNegative() const {

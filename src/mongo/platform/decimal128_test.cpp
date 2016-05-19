@@ -661,13 +661,6 @@ TEST(Decimal128Test, TestDecimal128ToStringNeg) {
     ASSERT_EQUALS(result, "-2.087015E-278");
 }
 
-TEST(Decimal128Test, TestDecimal128ToStringPosNaN) {
-    std::string s = "+NaN";
-    Decimal128 d(s);
-    std::string result = d.toString();
-    ASSERT_EQUALS(result, "NaN");
-}
-
 TEST(Decimal128Test, TestDecimal128ToStringInRangeZero1) {
     std::string s = "0";
     Decimal128 d(s);
@@ -823,25 +816,38 @@ TEST(Decimal128Test, TestDecimal128ToStringOutRangePos3) {
     ASSERT_EQUALS(result, "1.234567890123456789012345678901234E+33");
 }
 
-TEST(Decimal128Test, TestDecimal128ToStringNegNaN) {
-    std::string s = "-NaN";
+TEST(Decimal128Test, TestDecimal128ToStringInvalidToNaN) {
+    std::string s = "Some garbage string";
     Decimal128 d(s);
-    std::string result = d.toString();
-    ASSERT_EQUALS(result, "NaN");
+    ASSERT_EQUALS(d.toString(), "NaN");
+}
+
+TEST(Decimal128Test, TestDecimal128ToStringNaN) {
+    std::string s[3] = {"-NaN", "+NaN", "NaN"};
+    for (auto& item : s) {
+        Decimal128 d(item);
+        ASSERT_EQUALS(d.toString(), "NaN");
+    }
+
+    // Testing a NaN with a payload
+    Decimal128 payloadNaN(Decimal128::Value({/*payload*/ 0x1, 0x7cull << 56}));
+    ASSERT_EQUALS(payloadNaN.toString(), "NaN");
 }
 
 TEST(Decimal128Test, TestDecimal128ToStringPosInf) {
-    std::string s = "+Infinity";
-    Decimal128 d(s);
-    std::string result = d.toString();
-    ASSERT_EQUALS(result, "Inf");
+    std::string s[3] = {"Inf", "Infinity", "+Inf"};
+    for (auto& item : s) {
+        Decimal128 d(item);
+        ASSERT_EQUALS(d.toString(), "Infinity");
+    }
 }
 
 TEST(Decimal128Test, TestDecimal128ToStringNegInf) {
-    std::string s = "-Infinity";
-    Decimal128 d(s);
-    std::string result = d.toString();
-    ASSERT_EQUALS(result, "-Inf");
+    std::string s[2] = {"-Infinity", "-Inf"};
+    for (auto& item : s) {
+        Decimal128 d(item);
+        ASSERT_EQUALS(d.toString(), "-Infinity");
+    }
 }
 
 // Tests for Decimal128 operations that use a signaling flag

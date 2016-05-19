@@ -304,6 +304,11 @@ public:
     bool isNegative() const;
 
     /**
+     * Return true if and only if a Decimal128 is Zero, Normal, or Subnormal (not Inf or NaN)
+     */
+    bool isFinite() const;
+
+    /**
      * This set of mathematical operation functions implement the corresponding
      * IEEE 754-2008 operations on self and other.
      * The operations are commutative, so a.add(b) is equivalent to b.add(a).
