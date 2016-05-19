@@ -1463,15 +1463,10 @@ if env.TargetOSIs('posix'):
 
     # SERVER-9761: Ensure early detection of missing symbols in dependent libraries at program
     # startup.
-    #
-    # TODO: Is it necessary to add to both linkflags and shlinkflags, or are LINKFLAGS
-    # propagated to SHLINKFLAGS?
     if env.TargetOSIs('osx'):
         env.Append( LINKFLAGS=["-Wl,-bind_at_load"] )
-        env.Append( SHLINKFLAGS=["-Wl,-bind_at_load"] )
     else:
         env.Append( LINKFLAGS=["-Wl,-z,now"] )
-        env.Append( SHLINKFLAGS=["-Wl,-z,now"] )
         env.Append( LINKFLAGS=["-rdynamic"] )
 
     env.Append( LIBS=[] )
@@ -2198,6 +2193,9 @@ def doConfigure(myenv):
         # both gold and binutils ld both support it.
         AddToLINKFLAGSIfSupported(myenv, "-Wl,-z,noexecstack")
         AddToLINKFLAGSIfSupported(myenv, "-Wl,--warn-execstack")
+
+        # If possible with the current linker, mark relocations as read-only.
+        AddToLINKFLAGSIfSupported(myenv, "-Wl,-z,relro")
 
     # Apply any link time optimization settings as selected by the 'lto' option.
     if has_option('lto'):
