@@ -47,6 +47,53 @@ static void config_opt_usage(void);
 	(strncmp(str, bytes, len) == 0 && (str)[(len)] == '\0')
 
 /*
+ * config_unescape --
+ *	Modify a string in place, replacing any backslash escape sequences.
+ *	The modified string is always shorter.
+ */
+static int
+config_unescape(char *orig)
+{
+	char ch, *dst, *s;
+
+	for (dst = s = orig; *s != '\0';) {
+		if ((ch = *s++) == '\\') {
+			ch = *s++;
+			switch (ch) {
+			case 'b':
+				*dst++ = '\b';
+				break;
+			case 'f':
+				*dst++ = '\f';
+				break;
+			case 'n':
+				*dst++ = '\n';
+				break;
+			case 'r':
+				*dst++ = '\r';
+				break;
+			case 't':
+				*dst++ = '\t';
+				break;
+			case '\\':
+			case '/':
+			case '\"':	/* Backslash needed for spell check. */
+				*dst++ = ch;
+				break;
+			default:
+				/* Note: Unicode (\u) not implemented. */
+				fprintf(stderr,
+				    "invalid escape in string: %s\n", orig);
+				return (EINVAL);
+			}
+		} else
+			*dst++ = ch;
+	}
+	*dst = '\0';
+	return (0);
+}
+
+/*
  * config_assign --
  *	Assign the src config to the dest, any storage allocated in dest is
  * freed as a result.
@@ -363,7 +410,8 @@ static int
 config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 {
 	CONFIG_OPT *popt;
-	char *newstr, **strp;
+	char *begin, *newstr, **strp;
+	int ret;
 	size_t i, newlen, nopt;
 	void *valueloc;
 
@@ -438,16 +486,19 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		}
 		strp = (char **)valueloc;
 		newlen = v->len + 1;
-		if (*strp == NULL) {
-			newstr = dstrdup(v->str);
-		} else {
+		if (*strp == NULL)
+			begin = newstr = dstrdup(v->str);
+		else {
 			newlen += (strlen(*strp) + 1);
 			newstr = dcalloc(newlen, sizeof(char));
 			snprintf(newstr, newlen,
 			    "%s,%*s", *strp, (int)v->len, v->str);
 			/* Free the old value now we've copied it. */
 			free(*strp);
+			begin = &newstr[newlen - 1 - v->len];
 		}
+		if ((ret = config_unescape(begin)) != 0)
+			return (ret);
 		*strp = newstr;
 		break;
 	case STRING_TYPE:
@@ -531,7 +582,7 @@ config_opt_file(CONFIG *cfg, const char *filename)
 	 * WiredTiger configuration string compatible string, and using
 	 * the WiredTiger configuration parser to parse it at once.
 	 */
-#define	WTPERF_CONFIG_DELIMS	"\n\\"
+#define	WTPERF_CONFIG_DELIMS	"\n"
 	for (line = strtok(file_buf, WTPERF_CONFIG_DELIMS);
 	    line != NULL;
 	    line = strtok(NULL, WTPERF_CONFIG_DELIMS)) {
