@@ -55,7 +55,8 @@ struct IndexEntry {
                bool unq,
                const std::string& n,
                const MatchExpression* fe,
-               const BSONObj& io)
+               const BSONObj& io,
+               const CollatorInterface* ci)
         : keyPattern(kp),
           multikey(mk),
           multikeyPaths(mkp),
@@ -63,7 +64,8 @@ struct IndexEntry {
           unique(unq),
           name(n),
           filterExpr(fe),
-          infoObj(io) {
+          infoObj(io),
+          collator(ci) {
         type = IndexNames::nameToType(accessMethod);
     }
 

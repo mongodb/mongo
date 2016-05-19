@@ -237,7 +237,8 @@ void SortKeyGenerator::getBoundsForSort(OperationContext* txn,
                          false,
                          "doesnt_matter",
                          NULL,
-                         BSONObj());
+                         BSONObj(),
+                         NULL);
     params.indices.push_back(sortOrder);
 
     auto lpq = stdx::make_unique<LiteParsedQuery>(NamespaceString("fake.ns"));

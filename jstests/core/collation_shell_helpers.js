@@ -72,8 +72,12 @@
                                                   }));
 
     // Count command.
-    assert.eq(2, coll.find().collation({locale: "fr"}).count());
-    assert.eq(2, coll.count({}, {collation: {locale: "fr"}}));
+    assert.eq(0, coll.find({str: "FOO"}).count());
+    assert.eq(0, coll.find({str: "FOO"}).collation({locale: "en_US"}).count());
+    assert.eq(1, coll.find({str: "FOO"}).collation({locale: "en_US", strength: 2}).count());
+    assert.eq(0, coll.count({str: "FOO"}));
+    assert.eq(0, coll.count({str: "FOO"}, {collation: {locale: "en_US"}}));
+    assert.eq(1, coll.count({str: "FOO"}, {collation: {locale: "en_US", strength: 2}}));
     assert.commandWorked(coll.explain().find().collation({locale: "fr"}).count());
 
     // Distinct.
@@ -82,9 +86,22 @@
 
     // Find command.
     if (db.getMongo().useReadCommands()) {
-        assert.eq(2, coll.find().collation({locale: "fr"}).itcount());
-        assert.neq(null,
-                   coll.findOne({str: "foo"}, undefined, undefined, undefined, {locale: "fr"}));
+        // Without an index.
+        assert.eq(0, coll.find({str: "FOO"}).itcount());
+        assert.eq(0, coll.find({str: "FOO"}).collation({locale: "en_US"}).itcount());
+        assert.eq(1, coll.find({str: "FOO"}).collation({locale: "en_US", strength: 2}).itcount());
+
+        // With an index.
+        assert.commandWorked(
+            coll.ensureIndex({str: 1}, {collation: {locale: "en_US", strength: 2}}));
+        assert.eq(0, coll.find({str: "FOO"}).hint({str: 1}).itcount());
+        assert.eq(0, coll.find({str: "FOO"}).collation({locale: "en_US"}).hint({str: 1}).itcount());
+        assert.eq(1,
+                  coll.find({str: "FOO"})
+                      .collation({locale: "en_US", strength: 2})
+                      .hint({str: 1})
+                      .itcount());
+        assert.commandWorked(coll.dropIndexes());
     } else {
         assert.throws(function() {
             coll.find().collation({locale: "fr"}).itcount();

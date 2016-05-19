@@ -140,13 +140,14 @@ IndexCatalogEntry* IndexCatalog::_setupInMemoryStructures(OperationContext* txn,
         fassertFailedNoTrace(28782);
     }
 
-    unique_ptr<IndexCatalogEntry> entry(new IndexCatalogEntry(_collection->ns().ns(),
-                                                              _collection->getCatalogEntry(),
-                                                              descriptorCleanup.release(),
-                                                              _collection->infoCache()));
-
-    entry->init(txn,
-                _collection->_dbce->getIndex(txn, _collection->getCatalogEntry(), entry.get()));
+    auto entry = stdx::make_unique<IndexCatalogEntry>(txn,
+                                                      _collection->ns().ns(),
+                                                      _collection->getCatalogEntry(),
+                                                      descriptorCleanup.release(),
+                                                      _collection->infoCache());
+    std::unique_ptr<IndexAccessMethod> accessMethod(
+        _collection->_dbce->getIndex(txn, _collection->getCatalogEntry(), entry.get()));
+    entry->init(std::move(accessMethod));
 
     IndexCatalogEntry* save = entry.get();
     _entries.add(entry.release());
