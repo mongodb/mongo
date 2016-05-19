@@ -143,6 +143,8 @@ static bool handleCursorCommand(OperationContext* txn,
         // will be restored in getMore().
         exec->saveState();
         exec->detachFromOperationContext();
+    } else {
+        CurOp::get(txn)->debug().cursorExhausted = true;
     }
 
     const long long cursorId = cursor ? cursor->cursorid() : 0LL;
@@ -219,6 +221,7 @@ public:
 
         unique_ptr<ClientCursorPin> pin;  // either this OR the exec will be non-null
         unique_ptr<PlanExecutor> exec;
+        auto curOp = CurOp::get(txn);
         {
             // This will throw if the sharding version for this connection is out of date. The
             // lock must be held continuously from now until we have we created both the output
@@ -236,32 +239,6 @@ public:
                 PipelineD::prepareCursorSource(txn, collection, nss, pPipeline, pCtx);
             pPipeline->stitch();
 
-            if (collection && input) {
-                // Record the indexes used by the input executor. Retrieval of summary stats for a
-                // PlanExecutor is normally done post execution. DocumentSourceCursor however will
-                // destroy the input PlanExecutor once the result set has been exhausted. For
-                // that reason we need to collect the indexes used prior to plan execution.
-                PlanSummaryStats stats;
-                Explain::getSummaryStats(*input, &stats);
-                collection->infoCache()->notifyOfQuery(txn, stats.indexesUsed);
-
-                auto curOp = CurOp::get(txn);
-                {
-                    stdx::lock_guard<Client>(*txn->getClient());
-                    curOp->setPlanSummary_inlock(Explain::getPlanSummary(input.get()));
-                }
-
-                // TODO SERVER-23265: Confirm whether this is the correct place to gather all
-                // metrics. There is no harm adding here for the time being.
-                curOp->debug().setPlanSummaryMetrics(stats);
-
-                if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
-                    BSONObjBuilder execStatsBob;
-                    Explain::getWinningPlanStats(input.get(), &execStatsBob);
-                    curOp->debug().execStats = execStatsBob.obj();
-                }
-            }
-
             // Create the PlanExecutor which returns results from the pipeline. The WorkingSet
             // ('ws') and the PipelineProxyStage ('proxy') will be owned by the created
             // PlanExecutor.
@@ -275,6 +252,18 @@ public:
                       txn, std::move(ws), std::move(proxy), collection, PlanExecutor::YIELD_MANUAL);
             invariant(statusWithPlanExecutor.isOK());
             exec = std::move(statusWithPlanExecutor.getValue());
+
+            {
+                auto planSummary = Explain::getPlanSummary(exec.get());
+                stdx::lock_guard<Client>(*txn->getClient());
+                curOp->setPlanSummary_inlock(std::move(planSummary));
+            }
+
+            if (collection) {
+                PlanSummaryStats stats;
+                Explain::getSummaryStats(*exec, &stats);
+                collection->infoCache()->notifyOfQuery(txn, stats.indexesUsed);
+            }
 
             if (!collection && input) {
                 // If we don't have a collection, we won't be able to register any executors, so
@@ -323,6 +312,13 @@ public:
                                                  result);
             } else {
                 pPipeline->run(result);
+            }
+
+            if (!pPipeline->isExplain()) {
+                PlanSummaryStats stats;
+                Explain::getSummaryStats(pin ? *pin->c()->getExecutor() : *exec.get(), &stats);
+                curOp->debug().setPlanSummaryMetrics(stats);
+                curOp->debug().nreturned = stats.nReturned;
             }
 
             // Clean up our ClientCursorPin, if needed.  We must reacquire the collection lock

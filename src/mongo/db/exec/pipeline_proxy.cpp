@@ -33,6 +33,7 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -138,4 +139,13 @@ shared_ptr<PlanExecutor> PipelineProxyStage::getChildExecutor() {
     return _childExec.lock();
 }
 
+std::string PipelineProxyStage::getPlanSummaryStr() const {
+    return PipelineD::getPlanSummaryStr(_pipeline);
+}
+
+void PipelineProxyStage::getPlanSummaryStats(PlanSummaryStats* statsOut) const {
+    invariant(statsOut);
+    PipelineD::getPlanSummaryStats(_pipeline, statsOut);
+    statsOut->nReturned = getCommonStats()->advanced;
+}
 }  // namespace mongo

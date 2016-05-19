@@ -1,5 +1,4 @@
 // Confirms that profiled aggregation execution contains all expected metrics with proper values.
-// TODO SERVER-23265: Fix keysExamined, docsExamined & hasSortStage.
 
 (function() {
     "use strict";
@@ -28,19 +27,17 @@
 
     assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
     assert.eq(profileObj.op, "command", tojson(profileObj));
-
-    // TODO SERVER-23265: keysExamined and docsExamined should be non-zero.
-    assert.eq(profileObj.keysExamined, 0, tojson(profileObj));
-    assert.eq(profileObj.docsExamined, 0, tojson(profileObj));
-
+    assert.eq(profileObj.nreturned, 8, tojson(profileObj));
+    assert.eq(profileObj.keysExamined, 8, tojson(profileObj));
+    assert.eq(profileObj.docsExamined, 8, tojson(profileObj));
     assert.eq(profileObj.planSummary, "IXSCAN { a: 1.0 }", tojson(profileObj));
-    assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
     assert.eq(profileObj.protocol, getProfilerProtocolStringForCommand(conn), tojson(profileObj));
     assert.eq(profileObj.command.aggregate, coll.getName(), tojson(profileObj));
     assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("locks"), tojson(profileObj));
+    assert(!profileObj.hasOwnProperty("hasSortStage"), tojson(profileObj));
 
     //
     // Confirm hasSortStage with in-memory sort.
@@ -53,9 +50,7 @@
     assert.eq(8, coll.aggregate([{$match: {a: {$gte: 2}}}, {$sort: {a: 1}}]).itcount());
     profileObj = getLatestProfilerEntry(testDB);
 
-    // TODO SERVER-23265: hasSortStage should be present with a value of true.
-    // assert.eq(profileObj.hasSortStage, true, tojson(profileObj));
-    assert(!profileObj.hasOwnProperty("hasSortStage"), tojson(profileObj));
+    assert.eq(profileObj.hasSortStage, true, tojson(profileObj));
 
     //
     // Confirm "fromMultiPlanner" metric.

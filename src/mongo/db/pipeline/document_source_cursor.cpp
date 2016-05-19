@@ -38,6 +38,7 @@
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -91,28 +92,32 @@ void DocumentSourceCursor::loadBatch() {
     int memUsageBytes = 0;
     BSONObj obj;
     PlanExecutor::ExecState state;
-    while ((state = _exec->getNext(&obj, NULL)) == PlanExecutor::ADVANCED) {
-        if (_shouldProduceEmptyDocs) {
-            _currentBatch.push_back(Document());
-        } else if (_dependencies) {
-            _currentBatch.push_back(_dependencies->extractFields(obj));
-        } else {
-            _currentBatch.push_back(Document::fromBsonWithMetaData(obj));
-        }
+    {
+        ON_BLOCK_EXIT([this] { recordPlanSummaryStats(); });
 
-        if (_limit) {
-            if (++_docsAddedToBatches == _limit->getLimit()) {
-                break;
+        while ((state = _exec->getNext(&obj, NULL)) == PlanExecutor::ADVANCED) {
+            if (_shouldProduceEmptyDocs) {
+                _currentBatch.push_back(Document());
+            } else if (_dependencies) {
+                _currentBatch.push_back(_dependencies->extractFields(obj));
+            } else {
+                _currentBatch.push_back(Document::fromBsonWithMetaData(obj));
             }
-            verify(_docsAddedToBatches < _limit->getLimit());
-        }
 
-        memUsageBytes += _currentBatch.back().getApproximateSize();
+            if (_limit) {
+                if (++_docsAddedToBatches == _limit->getLimit()) {
+                    break;
+                }
+                verify(_docsAddedToBatches < _limit->getLimit());
+            }
 
-        if (memUsageBytes > FindCommon::kMaxBytesToReturnToClientAtOnce) {
-            // End this batch and prepare PlanExecutor for yielding.
-            _exec->saveState();
-            return;
+            memUsageBytes += _currentBatch.back().getApproximateSize();
+
+            if (memUsageBytes > FindCommon::kMaxBytesToReturnToClientAtOnce) {
+                // End this batch and prepare PlanExecutor for yielding.
+                _exec->saveState();
+                return;
+            }
         }
     }
 
@@ -159,6 +164,23 @@ Pipeline::SourceContainer::iterator DocumentSourceCursor::optimizeAt(
 }
 
 
+void DocumentSourceCursor::recordPlanSummaryStr() {
+    invariant(_exec);
+    _planSummary = Explain::getPlanSummary(_exec.get());
+}
+
+void DocumentSourceCursor::recordPlanSummaryStats() {
+    invariant(_exec);
+    // Aggregation handles in-memory sort outside of the query sub-system. Given that we need to
+    // preserve the existing value of hasSortStage rather than overwrite with the underlying
+    // PlanExecutor's value.
+    auto hasSortStage = _planSummaryStats.hasSortStage;
+
+    Explain::getSummaryStats(*_exec, &_planSummaryStats);
+
+    _planSummaryStats.hasSortStage = hasSortStage;
+}
+
 Value DocumentSourceCursor::serialize(bool explain) const {
     // we never parse a documentSourceCursor, so we only serialize for explain
     if (!explain)
@@ -204,7 +226,12 @@ DocumentSourceCursor::DocumentSourceCursor(const string& ns,
       _docsAddedToBatches(0),
       _ns(ns),
       _exec(exec),
-      _outputSorts(exec->getOutputSorts()) {}
+      _outputSorts(exec->getOutputSorts()) {
+    recordPlanSummaryStr();
+
+    // We record execution metrics here to allow for capture of indexes used prior to execution.
+    recordPlanSummaryStats();
+}
 
 intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
     const string& ns,
@@ -217,5 +244,13 @@ void DocumentSourceCursor::setProjection(const BSONObj& projection,
                                          const boost::optional<ParsedDeps>& deps) {
     _projection = projection;
     _dependencies = deps;
+}
+
+const std::string& DocumentSourceCursor::getPlanSummaryStr() const {
+    return _planSummary;
+}
+
+const PlanSummaryStats& DocumentSourceCursor::getPlanSummaryStats() const {
+    return _planSummaryStats;
 }
 }

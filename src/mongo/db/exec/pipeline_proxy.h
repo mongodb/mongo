@@ -35,6 +35,7 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/record_id.h"
 
 namespace mongo {
@@ -70,11 +71,13 @@ public:
     // Returns empty PlanStageStats object
     std::unique_ptr<PlanStageStats> getStats() final;
 
-
     // Not used.
     SpecificStats* getSpecificStats() const final {
         return NULL;
     }
+
+    std::string getPlanSummaryStr() const;
+    void getPlanSummaryStats(PlanSummaryStats* statsOut) const;
 
     // Not used.
     StageType stageType() const final {

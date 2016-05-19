@@ -50,6 +50,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/collation/collation_serializer.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
@@ -485,6 +486,35 @@ shared_ptr<PlanExecutor> PipelineD::addCursorSource(const intrusive_ptr<Pipeline
     exec->saveState();
 
     return exec;
+}
+
+std::string PipelineD::getPlanSummaryStr(const boost::intrusive_ptr<Pipeline>& pPipeline) {
+    if (auto docSourceCursor =
+            dynamic_cast<DocumentSourceCursor*>(pPipeline->sources.front().get())) {
+        return docSourceCursor->getPlanSummaryStr();
+    }
+
+    return "";
+}
+
+void PipelineD::getPlanSummaryStats(const boost::intrusive_ptr<Pipeline>& pPipeline,
+                                    PlanSummaryStats* statsOut) {
+    invariant(statsOut);
+
+    if (auto docSourceCursor =
+            dynamic_cast<DocumentSourceCursor*>(pPipeline->sources.front().get())) {
+        *statsOut = docSourceCursor->getPlanSummaryStats();
+    }
+
+    bool hasSortStage{false};
+    for (auto&& source : pPipeline->sources) {
+        if (dynamic_cast<DocumentSourceSort*>(source.get())) {
+            hasSortStage = true;
+            break;
+        }
+    }
+
+    statsOut->hasSortStage = hasSortStage;
 }
 
 }  // namespace mongo

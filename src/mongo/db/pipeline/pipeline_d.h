@@ -42,6 +42,7 @@ struct ExpressionContext;
 class OperationContext;
 class Pipeline;
 class PlanExecutor;
+struct PlanSummaryStats;
 class BSONObj;
 struct DepsTracker;
 
@@ -83,6 +84,11 @@ public:
         const NamespaceString& nss,
         const boost::intrusive_ptr<Pipeline>& pPipeline,
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+    static std::string getPlanSummaryStr(const boost::intrusive_ptr<Pipeline>& pPipeline);
+
+    static void getPlanSummaryStats(const boost::intrusive_ptr<Pipeline>& pPipeline,
+                                    PlanSummaryStats* statsOut);
 
 private:
     PipelineD();  // does not exist:  prevent instantiation

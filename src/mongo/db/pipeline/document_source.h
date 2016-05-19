@@ -51,6 +51,7 @@
 #include "mongo/db/pipeline/lookup_set_cache.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/intrusive_counter.h"
@@ -431,12 +432,20 @@ public:
         _shouldProduceEmptyDocs = true;
     }
 
+    const std::string& getPlanSummaryStr() const;
+
+    const PlanSummaryStats& getPlanSummaryStats() const;
+
 private:
     DocumentSourceCursor(const std::string& ns,
                          const std::shared_ptr<PlanExecutor>& exec,
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     void loadBatch();
+
+    void recordPlanSummaryStr();
+
+    void recordPlanSummaryStats();
 
     std::deque<Document> _currentBatch;
 
@@ -452,6 +461,8 @@ private:
     const std::string _ns;
     std::shared_ptr<PlanExecutor> _exec;  // PipelineProxyStage holds a weak_ptr to this.
     BSONObjSet _outputSorts;
+    std::string _planSummary;
+    PlanSummaryStats _planSummaryStats;
 };
 
 

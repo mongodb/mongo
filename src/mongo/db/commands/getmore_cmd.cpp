@@ -397,7 +397,11 @@ public:
         postExecutionStats.totalDocsExamined -= preExecutionStats.totalDocsExamined;
         curOp->debug().setPlanSummaryMetrics(postExecutionStats);
 
-        if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
+        // We do not report 'execStats' for aggregation, both in the original request and
+        // subsequent getMore. The reason for this is that aggregation's source PlanExecutor
+        // could be destroyed before we know whether we need execStats and we do not want to
+        // generate for all operations due to cost.
+        if (!cursor->isAggCursor() && curOp->shouldDBProfile(curOp->elapsedMillis())) {
             BSONObjBuilder execStatsBob;
             Explain::getWinningPlanStats(exec, &execStatsBob);
             curOp->debug().execStats = execStatsBob.obj();

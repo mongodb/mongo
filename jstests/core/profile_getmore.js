@@ -93,31 +93,30 @@
     // Confirm getMore on aggregation.
     //
     coll.drop();
-    for (i = 0; i < 10; ++i) {
+    for (i = 0; i < 20; ++i) {
         assert.writeOK(coll.insert({a: i}));
     }
     assert.commandWorked(coll.createIndex({a: 1}));
 
-    var cursor = coll.aggregate([{$match: {a: {$gt: 0}}}], {cursor: {batchSize: 2}});
-    cursor.next();  // Perform initial query and consume first of 2 docs returned.
+    var cursor = coll.aggregate([{$match: {a: {$gte: 0}}}], {cursor: {batchSize: 0}});
+    var cursorId = getLatestProfilerEntry(testDB).cursorid;
+    assert.neq(0, cursorId);
 
-    var cursorId = getLatestProfilerEntry(testDB).cursorid;  // Save cursorid from find.
+    cursor.next();  // Consume the result set.
 
-    cursor.next();  // Consume second of 2 docs from initial query.
-    cursor.next();  // getMore performed, leaving open cursor.
-
-    var profileObj = getLatestProfilerEntry(testDB);
+    profileObj = getLatestProfilerEntry(testDB);
 
     assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
     assert.eq(profileObj.op, "getmore", tojson(profileObj));
     if (!isLegacyReadMode) {
-        assert.eq(
-            profileObj.originatingCommand.pipeline[0], {$match: {a: {$gt: 0}}}, tojson(profileObj));
+        assert.eq(profileObj.originatingCommand.pipeline[0],
+                  {$match: {a: {$gte: 0}}},
+                  tojson(profileObj));
     }
     assert.eq(profileObj.cursorid, cursorId, tojson(profileObj));
-
-    // TODO SERVER-23265 - The following values are incorrect. Fix to report correct values.
-    assert.eq(profileObj.keysExamined, 0, tojson(profileObj));
-    assert.eq(profileObj.docsExamined, 0, tojson(profileObj));
-    assert.eq(profileObj.nreturned, 7, tojson(profileObj));
+    assert.eq(profileObj.nreturned, 20, tojson(profileObj));
+    assert.eq(profileObj.planSummary, "IXSCAN { a: 1.0 }", tojson(profileObj));
+    assert.eq(profileObj.cursorExhausted, true, tojson(profileObj));
+    assert.eq(profileObj.keysExamined, 20, tojson(profileObj));
+    assert.eq(profileObj.docsExamined, 20, tojson(profileObj));
 })();
