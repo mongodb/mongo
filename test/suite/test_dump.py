@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os
+import os, shutil
 import wiredtiger, wttest
 from helper import \
     complex_populate, complex_populate_check, \
@@ -42,6 +42,7 @@ class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
     dir='dump.dir'            # Backup directory name
 
     name = 'test_dump'
+    name2 = 'test_dumpb'
     nentries = 2500
 
     dumpfmt = [
@@ -109,6 +110,7 @@ class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Create the object.
         uri = self.uri + self.name
+        uri2 = self.uri + self.name2
         self.populate(self, uri,
             self.config + ',key_format=' + self.keyfmt, self.nentries)
 
@@ -130,19 +132,15 @@ class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertEqual(not s1.symmetric_difference(s2), True)
 
         # Check the object's contents
-        conn = self.wiredtiger_open(self.dir)
-        session = conn.open_session()
+        self.reopen_conn(self.dir)
         self.populate_check(self, uri, self.nentries)
-        conn.close()
 
-        # Re-load the object again.
+        # Re-load the object again in the original directory.
+        self.reopen_conn('.')
         self.runWt(['-h', self.dir, 'load', '-f', 'dump.out'])
 
         # Check the contents, they shouldn't have changed.
-        conn = self.wiredtiger_open(self.dir)
-        session = conn.open_session()
         self.populate_check(self, uri, self.nentries)
-        conn.close()
 
         # Re-load the object again, but confirm -n (no overwrite) fails.
         self.runWt(['-h', self.dir,
@@ -157,6 +155,15 @@ class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
                        outfilename='dumpidx.out')
             self.check_non_empty_file('dumpidx.out')
             self.compare_dump_values('dump.out', 'dumpidx.out')
+
+        # Re-load the object into a different table uri
+        shutil.rmtree(self.dir)
+        os.mkdir(self.dir)
+        self.runWt(['-h', self.dir, 'load', '-r', self.name2, '-f', 'dump.out'])
+
+        # Check the contents in the new table.
+        self.reopen_conn(self.dir)
+        self.populate_check(self, uri2, self.nentries)
 
 if __name__ == '__main__':
     wttest.run()
