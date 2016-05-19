@@ -423,7 +423,7 @@ bool Cloner::copyCollection(OperationContext* txn,
         }
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             WriteUnitOfWork wunit(txn);
-            Status status = userCreateNS(txn, db, ns, options, logForRepl, 0);
+            Status status = userCreateNS(txn, db, ns, options, logForRepl, false);
             if (!status.isOK()) {
                 errmsg = status.toString();
                 // aborts write unit of work
@@ -527,7 +527,7 @@ Status Cloner::createCollectionsForDb(OperationContext* txn,
             WriteUnitOfWork wunit(txn);
 
             // we defer building id index for performance - building it in batch is much faster
-            Status createStatus = userCreateNS(txn, db, nss.ns(), options, false);
+            Status createStatus = userCreateNS(txn, db, nss.ns(), options, false, false);
             if (!createStatus.isOK()) {
                 return createStatus;
             }

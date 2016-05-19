@@ -82,7 +82,10 @@ print("=================== failpoint enabled ==============");
 printjson(assert.commandWorked(secondary.getDB("admin").adminCommand( 
                                   { configureFailPoint: 'failInitSyncWithBufferedEntriesLeft', 
                                     mode: {times: 1}} )));
-printjson(assert.commandWorked(secondary.getDB("admin").adminCommand( { resync:true } )));
+assert.soon(function() {
+    res = secondary.getDB("admin").adminCommand( { resync:true } );
+    return (res.ok === 1);
+    });
 
 // NOTE: This is here to prevent false negatives, but it is racy and dependent on magic numbers.
 // Removed the assertion because it was too flaky.  Printing a warning instead (dan)
