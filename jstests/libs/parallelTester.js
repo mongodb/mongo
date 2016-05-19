@@ -166,7 +166,6 @@ if (typeof _threadInject != "undefined") {
             "notablescan.js",
             "drop2.js",
             "dropdb_race.js",
-            "fsync2.js",  // May be placed in serialTestsArr once SERVER-4243 is fixed.
             "bench_test1.js",
             "padding.js",
             "queryoptimizera.js",
