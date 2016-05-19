@@ -30,6 +30,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
+#include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/service_context_noop.h"
@@ -80,6 +81,10 @@ void initGrid(OperationContext* txn, const ConnectionString& configConnString) {
 
     auto targeterFactory = stdx::make_unique<RemoteCommandTargeterFactoryMock>();
     auto targeterFactoryPtr = targeterFactory.get();
+
+    auto configTargeter(stdx::make_unique<RemoteCommandTargeterMock>());
+    configTargeter->setConnectionStringReturnValue(configConnString);
+    targeterFactory->addTargeterToReturn(configConnString, std::move(configTargeter));
 
     ShardFactory::BuilderCallable setBuilder =
         [targeterFactoryPtr](const ShardId& shardId, const ConnectionString& connStr) {

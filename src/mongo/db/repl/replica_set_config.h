@@ -33,6 +33,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/db/repl/member_config.h"
 #include "mongo/db/repl/replica_set_tag.h"
 #include "mongo/db/write_concern_options.h"
@@ -118,6 +119,13 @@ public:
      */
     const std::string& getReplSetName() const {
         return _replSetName;
+    }
+
+    /**
+     * Gets the connection string that can be used to talk to this replica set.
+     */
+    ConnectionString getConnectionString() const {
+        return _connectionString;
     }
 
     /**
@@ -345,6 +353,11 @@ private:
     void _addInternalWriteConcernModes();
 
     /**
+     * Populate _connectionString based on the contents of _members and _replSetName.
+     */
+    void _initializeConnectionString();
+
+    /**
      * Sets replica set ID to 'defaultReplicaSetId' if forInitiate is false and 'cfg' does not
      * contain an ID.
      */
@@ -371,6 +384,7 @@ private:
     long long _protocolVersion = 0;
     bool _configServer = false;
     OID _replicaSetId;
+    ConnectionString _connectionString;
 };
 
 

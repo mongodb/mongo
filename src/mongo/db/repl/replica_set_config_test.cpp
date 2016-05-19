@@ -79,6 +79,9 @@ TEST(ReplicaSetConfig, ParseMinimalConfigAndCheckDefaults) {
     ASSERT_FALSE(config.getWriteConcernMajorityShouldJournal());
     ASSERT_FALSE(config.isConfigServer());
     ASSERT_EQUALS(0, config.getProtocolVersion());
+    ASSERT_EQUALS(
+        ConnectionString::forReplicaSet("rs0", {HostAndPort{"localhost:12345"}}).toString(),
+        config.getConnectionString().toString());
 }
 
 TEST(ReplicaSetConfig, ParseLargeConfigAndCheckAccessors) {
@@ -111,6 +114,32 @@ TEST(ReplicaSetConfig, ParseLargeConfigAndCheckAccessors) {
     ASSERT_EQUALS(Seconds(120), config.getHeartbeatTimeoutPeriod());
     ASSERT_EQUALS(Milliseconds(10), config.getElectionTimeoutPeriod());
     ASSERT_EQUALS(1, config.getProtocolVersion());
+    ASSERT_EQUALS(
+        ConnectionString::forReplicaSet("rs0", {HostAndPort{"localhost:12345"}}).toString(),
+        config.getConnectionString().toString());
+}
+
+TEST(ReplicaSetConfig, GetConnectionStringFiltersHiddenNodes) {
+    ReplicaSetConfig config;
+    ASSERT_OK(
+        config.initialize(BSON("_id"
+                               << "rs0"
+                               << "version" << 1 << "members"
+                               << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                        << "localhost:11111")
+                                             << BSON("_id" << 1 << "host"
+                                                           << "localhost:22222"
+                                                           << "arbiterOnly" << true)
+                                             << BSON("_id" << 2 << "host"
+                                                           << "localhost:33333"
+                                                           << "hidden" << true << "priority" << 0)
+                                             << BSON("_id" << 3 << "host"
+                                                           << "localhost:44444")))));
+    ASSERT_OK(config.validate());
+    ASSERT_EQUALS(
+        ConnectionString::forReplicaSet(
+            "rs0", {HostAndPort{"localhost:11111"}, HostAndPort{"localhost:44444"}}).toString(),
+        config.getConnectionString().toString());
 }
 
 TEST(ReplicaSetConfig, MajorityCalculationThreeVotersNoArbiters) {

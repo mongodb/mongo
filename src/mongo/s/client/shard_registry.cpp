@@ -68,7 +68,7 @@ ShardRegistry::ShardRegistry(std::unique_ptr<ShardFactory> shardFactory,
 }
 
 ConnectionString ShardRegistry::getConfigServerConnectionString() const {
-    return getConfigShard()->originalConnString();
+    return getConfigShard()->getConnString();
 }
 
 void ShardRegistry::rebuildConfigShard() {

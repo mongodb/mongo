@@ -468,8 +468,8 @@ Status ShardingState::initializeFromShardIdentity(const ShardIdentityType& shard
         auto prevConfigsvrConnStr = grid.shardRegistry()->getConfigServerConnectionString();
         if (prevConfigsvrConnStr.type() != ConnectionString::SET) {
             return {ErrorCodes::UnsupportedFormat,
-                    str::stream() << "config server connection string was previosly initialized as "
-                                     "something that is not a replica sets: "
+                    str::stream() << "config server connection string was previously initialized as"
+                                     " something that is not a replica set: "
                                   << prevConfigsvrConnStr.toString()};
         }
 
