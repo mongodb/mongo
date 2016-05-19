@@ -73,8 +73,8 @@ private:
             {ConnectionString::MASTER, std::move(masterBuilder)},
         };
 
-        _shardFactory = std::move(
-            stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory)));
+        _shardFactory =
+            stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
     }
 
     void tearDown() override {}
