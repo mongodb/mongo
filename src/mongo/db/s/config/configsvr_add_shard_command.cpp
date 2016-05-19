@@ -30,7 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -41,6 +40,7 @@
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/add_shard_request_type.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -48,131 +48,8 @@ namespace mongo {
 namespace {
 
 using std::string;
-using str::stream;
-
-namespace {
-
-const char kShardName[] = "name";
-const char kMaxSizeMB[] = "maxSize";
 
 const long long kMaxSizeMBDefault = 0;
-
-}  // namespace
-
-class AddShardRequest {
-public:
-    /**
-     * Parses the provided BSON content as the internal _configsvrAddShard command, and if it is
-     * correct, constructs an AddShardRequest object from it.
-     */
-    static StatusWith<AddShardRequest> parseFromConfigCommand(const BSONObj& obj) {
-        // required fields
-
-        auto swConnString = ConnectionString::parse(obj.firstElement().valuestrsafe());
-        if (!swConnString.isOK()) {
-            return swConnString.getStatus();
-        }
-        ConnectionString connString = std::move(swConnString.getValue());
-
-        AddShardRequest request(std::move(connString));
-
-        // optional fields
-
-        {
-            string name;
-            Status status = bsonExtractStringField(obj, kShardName, &name);
-            if (status.isOK()) {
-                request._name = std::move(name);
-            } else if (status != ErrorCodes::NoSuchKey) {
-                return status;
-            }
-        }
-        {
-            long long maxSizeMB;
-            Status status = bsonExtractIntegerField(obj, kMaxSizeMB, &maxSizeMB);
-            if (status.isOK()) {
-                request._maxSizeMB = std::move(maxSizeMB);
-            } else if (status != ErrorCodes::NoSuchKey) {
-                return status;
-            }
-        }
-
-        return request;
-    }
-
-    Status validate(bool allowLocalHost) {
-        // Check that if one of the new shard's hosts is localhost, we are allowed to use localhost
-        // as a hostname. (Using localhost requires that every server in the cluster uses
-        // localhost).
-        std::vector<HostAndPort> serverAddrs = _connString.getServers();
-        for (size_t i = 0; i < serverAddrs.size(); i++) {
-            if (serverAddrs[i].isLocalHost() != allowLocalHost) {
-                string errmsg = str::stream()
-                    << "Can't use localhost as a shard since all shards need to"
-                    << " communicate. Either use all shards and configdbs in localhost"
-                    << " or all in actual IPs. host: " << serverAddrs[i].toString()
-                    << " isLocalHost:" << serverAddrs[i].isLocalHost();
-
-                log() << "addshard request " << toString()
-                      << " failed: attempt to mix localhosts and IPs";
-                return Status(ErrorCodes::InvalidOptions, errmsg);
-            }
-
-            // If the server has no port, assign it the default port.
-            if (!serverAddrs[i].hasPort()) {
-                serverAddrs[i] =
-                    HostAndPort(serverAddrs[i].host(), ServerGlobalParams::ShardServerPort);
-            }
-        }
-        return Status::OK();
-    }
-
-    string toString() const {
-        stream ss;
-        ss << "AddShardRequest shard: " << _connString.toString();
-        if (hasName())
-            ss << ", name: " << *_name;
-        if (hasMaxSize())
-            ss << ", maxSize: " << *_maxSizeMB;
-        return ss;
-    }
-
-    const ConnectionString& getConnString() const {
-        return _connString;
-    }
-
-    bool hasName() const {
-        return _name.is_initialized();
-    }
-
-    const string& getName() const {
-        invariant(_name.is_initialized());
-        return *_name;
-    }
-
-    bool hasMaxSize() const {
-        return _maxSizeMB.is_initialized();
-    }
-
-    long long getMaxSize() const {
-        invariant(_maxSizeMB.is_initialized());
-        return *_maxSizeMB;
-    }
-
-private:
-    explicit AddShardRequest(ConnectionString connString) : _connString(std::move(connString)) {}
-
-    // If the shard to be added is standalone, then the hostname and port of the mongod instance to
-    // be added. If the shard to be added is a replica set, the name of the replica set and the
-    // hostname and port of at least one member of the replica set.
-    ConnectionString _connString;
-
-    // A name for the shard. If not specified, a unique name is automatically generated.
-    boost::optional<string> _name;
-
-    // The maximum size in megabytes of the shard. If set to 0, the size is not limited.
-    boost::optional<long long> _maxSizeMB;
-};
 
 /**
  * Internal sharding command run on config servers to add a shard to the cluster.

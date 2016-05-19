@@ -166,6 +166,29 @@ env.CppUnitTest(
     ]
 )
 
+env.Library(
+    target='request_types',
+    source=[
+        'request_types/add_shard_request_type.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/client/connection_string',
+        '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/mongo/db/service_context',
+    ],
+)
+
+env.CppUnitTest('request_types_test',
+    source=[
+        'request_types/add_shard_request_test.cpp',
+    ],
+    LIBDEPS=[
+        'request_types',
+    ],
+)
+
 # This library contains sharding functionality used by both mongod and mongos. Certain tests,
 # which exercise this functionality also link against it.
 env.Library(
@@ -195,6 +218,7 @@ env.Library(
         'catalog/replset/catalog_manager_replica_set',
         'client/sharding_client',
         'common',
+        'request_types',
     ],
     LIBDEPS_TAGS=[
         'incomplete',

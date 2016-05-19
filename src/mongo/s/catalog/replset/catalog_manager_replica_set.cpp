@@ -525,10 +525,12 @@ StatusWith<string> CatalogManagerReplicaSet::addShard(OperationContext* txn,
 
     logChange(txn, "addShard", "", shardDetails.obj());
 
-    // Make sure the new shard is visible from this point on. Do the reload twice in case there was
-    // a concurrent reload, which started before we added the shard.
-    if (!Grid::get(txn)->shardRegistry()->reload(txn)) {
-        Grid::get(txn)->shardRegistry()->reload(txn);
+    // Ensure the added shard is visible to this process.
+    auto shardRegistry = Grid::get(txn)->shardRegistry();
+    if (!shardRegistry->getShard(txn, shardType.getName())) {
+        return {ErrorCodes::OperationFailed,
+                "Could not find shard metadata for shard after adding it. This most likely "
+                "indicates that the shard was removed immediately after it was added."};
     }
 
     return shardType.getName();
