@@ -121,6 +121,14 @@ public:
 
         vector<string> cached;
 
+        const std::initializer_list<StringData> replicatedSystemCollections{"system.backup_users",
+                                                                            "system.js",
+                                                                            "system.new_users",
+                                                                            "system.roles",
+                                                                            "system.users",
+                                                                            "system.version"};
+
+
         BSONObjBuilder bb(result.subobjStart("collections"));
         for (list<string>::iterator i = colls.begin(); i != colls.end(); i++) {
             string fullCollectionName = *i;
@@ -130,7 +138,10 @@ public:
             }
             string shortCollectionName = fullCollectionName.substr(dbname.size() + 1);
 
-            if (shortCollectionName.find("system.") == 0)
+            if (shortCollectionName.find("system.") == 0 &&
+                std::find(replicatedSystemCollections.begin(),
+                          replicatedSystemCollections.end(),
+                          shortCollectionName) == replicatedSystemCollections.end())
                 continue;
 
             if (desiredCollections.size() > 0 && desiredCollections.count(shortCollectionName) == 0)
