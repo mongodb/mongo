@@ -1106,6 +1106,20 @@ void signalOplogWaiters() {
     }
 }
 
+void checkForCappedOplog(OperationContext* txn) {
+    invariant(!_oplogCollectionName.empty());
+    const NamespaceString oplogNss(_oplogCollectionName);
+    ScopedTransaction transaction(txn, MODE_IX);
+    AutoGetDb autoDb(txn, oplogNss.db(), MODE_IX);
+    Lock::CollectionLock oplogCollectionLock(txn->lockState(), oplogNss.ns(), MODE_X);
+    Collection* oplogCollection = autoDb.getDb()->getCollection(oplogNss);
+    if (oplogCollection && !oplogCollection->isCapped()) {
+        severe() << "The oplog collection " << _oplogCollectionName
+                 << " is not capped; a capped oplog is a requirement for replication to function.";
+        fassertFailedNoTrace(40115);
+    }
+}
+
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(replSnapshotThreadThrottleMicros, int, 1000);
 
 SnapshotThread::SnapshotThread(SnapshotManager* manager)

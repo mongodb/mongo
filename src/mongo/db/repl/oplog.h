@@ -167,5 +167,10 @@ void setOplogCollectionName();
  */
 void signalOplogWaiters();
 
+/**
+ * Check that the oplog is capped, and abort the process if it is not.
+ */
+void checkForCappedOplog(OperationContext* txn);
+
 }  // namespace repl
 }  // namespace mongo

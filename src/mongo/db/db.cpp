@@ -492,6 +492,9 @@ static void repairDatabasesAndCheckVersion(OperationContext* txn) {
         if (replSettings.usingReplSets()) {
             // We only care about the _id index if we are in a replset
             checkForIdIndexes(txn, db);
+            // Ensure oplog is capped (mmap does not guarantee order of inserts on noncapped
+            // collections)
+            repl::checkForCappedOplog(txn);
         }
 
         if (shouldDoCleanupForSERVER23299) {
