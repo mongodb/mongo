@@ -36,7 +36,7 @@ functions:
         revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
           dsi: ${dsi_rev}
           workloads: ${workloads_rev}
-          ycsb: ${ycsb_rev}
+          YCSB: ${YCSB_rev}
     - command: git.apply_patch
       params:
         directory: src
@@ -475,7 +475,7 @@ modules:
   prefix: workloads
   branch: master
 
-- name: ycsb
+- name: YCSB
   repo: git@github.com:mongodb-labs/YCSB.git
   prefix: YCSB
   branch: evergreen
@@ -493,7 +493,7 @@ buildvariants:
   modules: &modules
     - dsi
     - workloads
-    - ycsb
+    - YCSB
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ --release
     setup: single-replica
