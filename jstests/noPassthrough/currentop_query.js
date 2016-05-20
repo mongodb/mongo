@@ -222,7 +222,10 @@
                 db.runCommand({getMore: TestData.cursorId, collection: "currentop_query"}));
         },
         planSummary: "COLLSCAN",
-        currentOpFilter: {"query.getMore": TestData.cursorId}
+        currentOpFilter: {
+            "query.getMore": TestData.cursorId,
+            "originatingCommand.filter.$comment": "currentop_query"
+        }
     });
 
     delete TestData.cursorId;

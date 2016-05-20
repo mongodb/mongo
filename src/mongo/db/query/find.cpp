@@ -333,13 +333,6 @@ QueryResult::View getMore(OperationContext* txn,
         }
         txn->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
 
-        // Ensure that the original query or command object is available in the slow query log,
-        // profiler, and currentOp.
-        {
-            stdx::lock_guard<Client> lk(*txn->getClient());
-            curOp.setQuery_inlock(cc->getQuery());
-        }
-
         cc->updateSlaveLocation(txn);
 
         if (cc->isAggCursor()) {
@@ -372,9 +365,14 @@ QueryResult::View getMore(OperationContext* txn,
         exec->reattachToOperationContext(txn);
         exec->restoreState();
 
+        auto planSummary = Explain::getPlanSummary(exec);
         {
             stdx::lock_guard<Client>(*txn->getClient());
-            CurOp::get(txn)->setPlanSummary_inlock(Explain::getPlanSummary(exec));
+            curOp.setPlanSummary_inlock(planSummary);
+
+            // Ensure that the original query or command object is available in the slow query log,
+            // profiler and currentOp.
+            curOp.setQuery_inlock(cc->getQuery());
         }
 
         PlanExecutor::ExecState state;

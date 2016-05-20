@@ -321,7 +321,7 @@ public:
                                  nss.ns(),
                                  txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
                                  originalQR.getOptions(),
-                                 originalQR.getFilter());
+                                 cmdObj.getOwned());
             cursorId = cursor->cursorid();
 
             invariant(!exec);

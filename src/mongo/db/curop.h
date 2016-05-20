@@ -173,6 +173,14 @@ public:
         return _query;
     }
 
+    /**
+     * Returns an owned BSONObj representing the original command. Used only by the getMore
+     * command.
+     */
+    BSONObj originatingCommand() const {
+        return _originatingCommand;
+    }
+
     void enter_inlock(const char* ns, int dbProfileLevel);
 
     /**
@@ -293,6 +301,13 @@ public:
         _query = query;
     }
 
+    /**
+     * Sets the original command object. Used only by the getMore command.
+     */
+    void setOriginatingCommand_inlock(const BSONObj& commandObj) {
+        _originatingCommand = commandObj.getOwned();
+    }
+
     Command* getCommand() const {
         return _command;
     }
@@ -398,6 +413,7 @@ private:
     int _dbprofile{0};  // 0=off, 1=slow, 2=all
     std::string _ns;
     BSONObj _query;
+    BSONObj _originatingCommand;  // Used by getMore to display original command.
     OpDebug _debug;
     std::string _message;
     ProgressMeter _progressMeter;

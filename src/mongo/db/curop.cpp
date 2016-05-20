@@ -346,6 +346,10 @@ void CurOp::reportState(BSONObjBuilder* builder) {
         appendAsObjOrString("query", _query, maxQuerySize, builder);
     }
 
+    if (!_originatingCommand.isEmpty()) {
+        appendAsObjOrString("originatingCommand", _originatingCommand, maxQuerySize, builder);
+    }
+
     if (!_planSummary.empty()) {
         builder->append("planSummary", _planSummary);
     }
@@ -413,6 +417,11 @@ string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockSt
             s << " query: ";
             s << query.toString();
         }
+    }
+
+    auto originatingCommand = curop.originatingCommand();
+    if (!originatingCommand.isEmpty()) {
+        s << " originatingCommand: " << originatingCommand;
     }
 
     if (!curop.getPlanSummary().empty()) {
@@ -514,6 +523,11 @@ void OpDebug::append(const CurOp& curop,
     } else if (curop.haveQuery()) {
         const char* fieldName = (logicalOp == LogicalOp::opCommand) ? "command" : "query";
         appendAsObjOrString(fieldName, curop.query(), maxElementSize, &b);
+    }
+
+    auto originatingCommand = curop.originatingCommand();
+    if (!originatingCommand.isEmpty()) {
+        appendAsObjOrString("originatingCommand", originatingCommand, maxElementSize, &b);
     }
 
     if (!updateobj.isEmpty()) {

@@ -307,9 +307,17 @@ public:
         exec->reattachToOperationContext(txn);
         exec->restoreState();
 
+        auto planSummary = Explain::getPlanSummary(exec);
         {
             stdx::lock_guard<Client>(*txn->getClient());
-            curOp->setPlanSummary_inlock(Explain::getPlanSummary(exec));
+            curOp->setPlanSummary_inlock(planSummary);
+
+            // Ensure that the original query or command object is available in the slow query log,
+            // profiler and currentOp.
+            auto originatingCommand = cursor->getQuery();
+            if (!originatingCommand.isEmpty()) {
+                curOp->setOriginatingCommand_inlock(originatingCommand);
+            }
         }
 
         uint64_t notifierVersion = 0;
