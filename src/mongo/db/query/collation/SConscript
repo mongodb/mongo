@@ -124,16 +124,6 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target="collator_interface_icu_test",
-    source=[
-        "collator_interface_icu_test.cpp",
-    ],
-    LIBDEPS=[
-        "collator_icu",
-    ],
-)
-
-env.CppUnitTest(
     target="collator_factory_icu_test",
     source=[
         "collator_factory_icu_test.cpp",
@@ -143,6 +133,8 @@ env.CppUnitTest(
     ],
 )
 
+# The collator_icu library and the collator_interface_icu_test unit tests need an environment which
+# has access to the third-party ICU headers.
 icuEnv = env.Clone()
 
 if not use_system_version_of_library("icu"):
@@ -186,5 +178,15 @@ icuEnv.Library(
         "$BUILD_DIR/mongo/bson/util/bson_extract",
         "$BUILD_DIR/third_party/shim_icu",
         "collator_factory_interface",
+    ],
+)
+
+icuEnv.CppUnitTest(
+    target="collator_interface_icu_test",
+    source=[
+        "collator_interface_icu_test.cpp",
+    ],
+    LIBDEPS=[
+        "collator_icu",
     ],
 )
