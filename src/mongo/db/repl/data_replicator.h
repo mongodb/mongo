@@ -136,8 +136,6 @@ struct DataReplicatorOptions {
     std::string scopeNS;
     BSONObj filterCriteria;
 
-    MultiApplier::ApplyOperationFn applierFn;
-    MultiApplier::MultiApplyFn multiApplyFn;
     RollbackFn rollbackFn;
     Reporter::PrepareReplSetUpdatePositionCommandFn prepareReplSetUpdatePositionCommandFn;
     GetMyLastOptimeFn getMyLastOptime;

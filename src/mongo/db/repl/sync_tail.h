@@ -180,7 +180,7 @@ private:
 };
 
 /**
- * Applies the opeartions described in the oplog entries contained in "ops" using the
+ * Applies the operations described in the oplog entries contained in "ops" using the
  * "applyOperation" function.
  *
  * Returns ErrorCode::InterruptedAtShutdown if the node enters shutdown while applying ops,

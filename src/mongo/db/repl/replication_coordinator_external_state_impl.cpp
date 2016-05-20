@@ -57,6 +57,7 @@
 #include "mongo/db/repl/rs_initialsync.h"
 #include "mongo/db/repl/snapshot_thread.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/s/sharding_state.h"
@@ -107,7 +108,7 @@ void ReplicationCoordinatorExternalStateImpl::startInitialSync(OnInitialSyncFini
         invariant(!(bgsync == nullptr && !inShutdownStrict()));  // bgsync can be null @shutdown.
         invariant(!_producerThread);  // The producer thread should not be init'd before this.
         _producerThread.reset(
-            new stdx::thread(stdx::bind(&BackgroundSync::producerThread, bgsync)));
+            new stdx::thread(stdx::bind(&BackgroundSync::producerThread, bgsync, this)));
         // Do initial sync.
         syncDoInitialSync();
         finished();
@@ -119,7 +120,7 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication() {
         log() << "Starting replication fetcher thread";
         BackgroundSync* bgsync = BackgroundSync::get();
         _producerThread.reset(
-            new stdx::thread(stdx::bind(&BackgroundSync::producerThread, bgsync)));
+            new stdx::thread(stdx::bind(&BackgroundSync::producerThread, bgsync, this)));
     }
     log() << "Starting replication applier threads";
     invariant(!_applierThread);
@@ -500,6 +501,30 @@ bool ReplicationCoordinatorExternalStateImpl::isReadCommittedSupportedByStorageE
     invariant(storageEngine);
     return storageEngine->getSnapshotManager();
 }
+
+StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::multiApply(
+    OperationContext* txn,
+    const MultiApplier::Operations& ops,
+    MultiApplier::ApplyOperationFn applyOperation) {
+    return repl::multiApply(txn, ops, applyOperation);
+}
+
+void ReplicationCoordinatorExternalStateImpl::multiSyncApply(const MultiApplier::Operations& ops) {
+    // SyncTail* argument is not used by repl::multiSyncApply().
+    repl::multiSyncApply(ops, nullptr);
+}
+
+void ReplicationCoordinatorExternalStateImpl::multiInitialSyncApply(
+    const MultiApplier::Operations& ops, const HostAndPort& source) {
+    // repl::multiInitialSyncApply uses SyncTail::shouldRetry() (and implicitly getMissingDoc())
+    // to fetch missing documents during initial sync. Therefore, it is fine to construct SyncTail
+    // with invalid BackgroundSync and MultiSyncApplyFunc arguments because we will not be accessing
+    // any SyncTail functionality that require these constructor parameters.
+    SyncTail syncTail(nullptr, SyncTail::MultiSyncApplyFunc());
+    syncTail.setHostname(source.toString());
+    repl::multiInitialSyncApply(ops, &syncTail);
+}
+
 
 JournalListener::Token ReplicationCoordinatorExternalStateImpl::getToken() {
     return repl::getGlobalReplicationCoordinator()->getMyLastAppliedOpTime();

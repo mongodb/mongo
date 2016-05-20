@@ -203,10 +203,6 @@ ReplicationCoordinator::Mode getReplicationModeFromSettings(const ReplSettings& 
 
 DataReplicatorOptions createDataReplicatorOptions(ReplicationCoordinator* replCoord) {
     DataReplicatorOptions options;
-    options.applierFn = [](const MultiApplier::Operations&) {};
-    options.multiApplyFn =
-        [](OperationContext*, const MultiApplier::Operations&, MultiApplier::ApplyOperationFn)
-            -> OpTime { return OpTime(); };
     options.rollbackFn =
         [](OperationContext*, const OpTime&, const HostAndPort&) -> Status { return Status::OK(); };
     options.prepareReplSetUpdatePositionCommandFn =
@@ -256,7 +252,7 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
       _canAcceptNonLocalWrites(!(settings.usingReplSets() || settings.isSlave())),
       _canServeNonLocalReads(0U),
       _dr(createDataReplicatorOptions(this),
-          stdx::make_unique<DataReplicatorExternalStateImpl>(this),
+          stdx::make_unique<DataReplicatorExternalStateImpl>(this, externalState),
           &_replExecutor),
       _isDurableStorageEngine(isDurableStorageEngineFn ? *isDurableStorageEngineFn : []() -> bool {
           return getGlobalServiceContext()->getGlobalStorageEngine()->isDurable();

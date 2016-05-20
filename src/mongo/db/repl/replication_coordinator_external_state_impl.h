@@ -87,6 +87,12 @@ public:
     virtual void notifyOplogMetadataWaiters();
     virtual double getElectionTimeoutOffsetLimitFraction() const;
     virtual bool isReadCommittedSupportedByStorageEngine(OperationContext* txn) const;
+    virtual StatusWith<OpTime> multiApply(OperationContext* txn,
+                                          const MultiApplier::Operations& ops,
+                                          MultiApplier::ApplyOperationFn applyOperation) override;
+    virtual void multiSyncApply(const MultiApplier::Operations& ops) override;
+    virtual void multiInitialSyncApply(const MultiApplier::Operations& ops,
+                                       const HostAndPort& source) override;
 
     std::string getNextOpContextThreadName();
 

@@ -33,14 +33,17 @@
 #include "mongo/db/repl/data_replicator_external_state_impl.h"
 
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
 
 DataReplicatorExternalStateImpl::DataReplicatorExternalStateImpl(
-    ReplicationCoordinator* replicationCoordinator)
-    : _replicationCoordinator(replicationCoordinator) {}
+    ReplicationCoordinator* replicationCoordinator,
+    ReplicationCoordinatorExternalState* replicationCoordinatorExternalState)
+    : _replicationCoordinator(replicationCoordinator),
+      _replicationCoordinatorExternalState(replicationCoordinatorExternalState) {}
 
 OpTimeWithTerm DataReplicatorExternalStateImpl::getCurrentTermAndLastCommittedOpTime() {
     if (!_replicationCoordinator->isV1ElectionProtocol()) {
@@ -70,8 +73,29 @@ bool DataReplicatorExternalStateImpl::shouldStopFetching(const HostAndPort& sour
     return false;
 }
 
+StatusWith<OpTime> DataReplicatorExternalStateImpl::_multiApply(
+    OperationContext* txn,
+    const MultiApplier::Operations& ops,
+    MultiApplier::ApplyOperationFn applyOperation) {
+    return _replicationCoordinatorExternalState->multiApply(txn, ops, applyOperation);
+}
+
+void DataReplicatorExternalStateImpl::_multiSyncApply(const MultiApplier::Operations& ops) {
+    _replicationCoordinatorExternalState->multiSyncApply(ops);
+}
+
+void DataReplicatorExternalStateImpl::_multiInitialSyncApply(const MultiApplier::Operations& ops,
+                                                             const HostAndPort& source) {
+    _replicationCoordinatorExternalState->multiInitialSyncApply(ops, source);
+}
+
 ReplicationCoordinator* DataReplicatorExternalStateImpl::getReplicationCoordinator() const {
     return _replicationCoordinator;
+}
+
+ReplicationCoordinatorExternalState*
+DataReplicatorExternalStateImpl::getReplicationCoordinatorExternalState() const {
+    return _replicationCoordinatorExternalState;
 }
 
 }  // namespace repl

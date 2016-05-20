@@ -34,6 +34,7 @@ namespace mongo {
 namespace repl {
 
 class ReplicationCoordinator;
+class ReplicationCoordinatorExternalState;
 
 /**
  * Data replicator external state implementation using a replication coordinator.
@@ -41,7 +42,9 @@ class ReplicationCoordinator;
 
 class DataReplicatorExternalStateImpl : public DataReplicatorExternalState {
 public:
-    DataReplicatorExternalStateImpl(ReplicationCoordinator* replicationCoordinator);
+    DataReplicatorExternalStateImpl(
+        ReplicationCoordinator* replicationCoordinator,
+        ReplicationCoordinatorExternalState* replicationCoordinatorExternalState);
 
     OpTimeWithTerm getCurrentTermAndLastCommittedOpTime() override;
 
@@ -51,12 +54,26 @@ public:
                             const OpTime& sourceOpTime,
                             bool sourceHasSyncSource) override;
 
+private:
+    StatusWith<OpTime> _multiApply(OperationContext* txn,
+                                   const MultiApplier::Operations& ops,
+                                   MultiApplier::ApplyOperationFn applyOperation) override;
+
+    void _multiSyncApply(const MultiApplier::Operations& ops) override;
+
+    void _multiInitialSyncApply(const MultiApplier::Operations& ops,
+                                const HostAndPort& source) override;
+
 protected:
     ReplicationCoordinator* getReplicationCoordinator() const;
+    ReplicationCoordinatorExternalState* getReplicationCoordinatorExternalState() const;
 
 private:
     // Not owned by us.
     ReplicationCoordinator* _replicationCoordinator;
+
+    // Not owned by us.
+    ReplicationCoordinatorExternalState* _replicationCoordinatorExternalState;
 };
 
 

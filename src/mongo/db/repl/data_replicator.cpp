@@ -428,7 +428,6 @@ DataReplicator::DataReplicator(
       _applierActive(false),
       _applierPaused(false),
       _oplogBuffer(kOplogBufferSize, &getSize) {
-    uassert(ErrorCodes::BadValue, "invalid applier function", _opts.applierFn);
     uassert(ErrorCodes::BadValue, "invalid rollback function", _opts.rollbackFn);
     uassert(ErrorCodes::BadValue,
             "invalid replSetUpdatePosition command object creation function",
@@ -1147,7 +1146,6 @@ Status DataReplicator::_scheduleApplyBatch_inlock() {
                 return status.getStatus();
             }
         }
-        invariant(_opts.applierFn);
         invariant(!(_applier && _applier->isActive()));
         return _scheduleApplyBatch_inlock(ops);
     }
@@ -1155,6 +1153,27 @@ Status DataReplicator::_scheduleApplyBatch_inlock() {
 }
 
 Status DataReplicator::_scheduleApplyBatch_inlock(const Operations& ops) {
+    MultiApplier::ApplyOperationFn applierFn;
+    if (_state == DataReplicatorState::Steady) {
+        applierFn = stdx::bind(&DataReplicatorExternalState::_multiSyncApply,
+                               _dataReplicatorExternalState.get(),
+                               stdx::placeholders::_1);
+    } else {
+        invariant(_state == DataReplicatorState::InitialSync);
+        // "_syncSource" has to be copied to stdx::bind result.
+        HostAndPort source = _syncSource;
+        applierFn = stdx::bind(&DataReplicatorExternalState::_multiInitialSyncApply,
+                               _dataReplicatorExternalState.get(),
+                               stdx::placeholders::_1,
+                               source);
+    }
+
+    auto multiApplyFn = stdx::bind(&DataReplicatorExternalState::_multiApply,
+                                   _dataReplicatorExternalState.get(),
+                                   stdx::placeholders::_1,
+                                   stdx::placeholders::_2,
+                                   stdx::placeholders::_3);
+
     auto lambda = [this](const TimestampStatus& ts, const Operations& theOps) {
         CBHStatus status = _exec->scheduleWork(stdx::bind(&DataReplicator::_onApplyBatchFinish,
                                                           this,
@@ -1172,7 +1191,7 @@ Status DataReplicator::_scheduleApplyBatch_inlock(const Operations& ops) {
         _exec->wait(status.getValue());
     };
 
-    _applier.reset(new MultiApplier(_exec, ops, _opts.applierFn, _opts.multiApplyFn, lambda));
+    _applier.reset(new MultiApplier(_exec, ops, applierFn, multiApplyFn, lambda));
     return _applier->start();
 }
 

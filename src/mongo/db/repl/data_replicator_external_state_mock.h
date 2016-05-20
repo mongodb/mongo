@@ -41,6 +41,8 @@ class ReplicationCoordinator;
 
 class DataReplicatorExternalStateMock : public DataReplicatorExternalState {
 public:
+    DataReplicatorExternalStateMock();
+
     OpTimeWithTerm getCurrentTermAndLastCommittedOpTime() override;
 
     void processMetadata(const rpc::ReplSetMetadata& metadata) override;
@@ -63,6 +65,19 @@ public:
 
     // Returned by shouldStopFetching.
     bool shouldStopFetchingResult = false;
+
+    // Override to change multiApply behavior.
+    MultiApplier::MultiApplyFn multiApplyFn;
+
+private:
+    StatusWith<OpTime> _multiApply(OperationContext* txn,
+                                   const MultiApplier::Operations& ops,
+                                   MultiApplier::ApplyOperationFn applyOperation) override;
+
+    void _multiSyncApply(const MultiApplier::Operations& ops) override;
+
+    void _multiInitialSyncApply(const MultiApplier::Operations& ops,
+                                const HostAndPort& source) override;
 };
 
 

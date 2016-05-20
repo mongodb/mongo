@@ -33,6 +33,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/time_support.h"
@@ -268,6 +269,26 @@ public:
      * Returns true if the current storage engine supports read committed.
      */
     virtual bool isReadCommittedSupportedByStorageEngine(OperationContext* txn) const = 0;
+
+    /**
+     * Applies the operations described in the oplog entries contained in "ops" using the
+     * "applyOperation" function.
+     */
+    virtual StatusWith<OpTime> multiApply(OperationContext* txn,
+                                          const MultiApplier::Operations& ops,
+                                          MultiApplier::ApplyOperationFn applyOperation) = 0;
+
+    /**
+     * Used by multiApply() to writes operations to database during steady state replication.
+     */
+    virtual void multiSyncApply(const MultiApplier::Operations& ops) = 0;
+
+    /**
+     * Used by multiApply() to writes operations to database during initial sync.
+     * Fetches missing documents from "source".
+     */
+    virtual void multiInitialSyncApply(const MultiApplier::Operations& ops,
+                                       const HostAndPort& source) = 0;
 };
 
 }  // namespace repl

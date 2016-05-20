@@ -33,6 +33,11 @@
 namespace mongo {
 namespace repl {
 
+DataReplicatorExternalStateMock::DataReplicatorExternalStateMock()
+    : multiApplyFn([](OperationContext*,
+                      const MultiApplier::Operations& ops,
+                      MultiApplier::ApplyOperationFn) { return ops.back().getOpTime(); }) {}
+
 OpTimeWithTerm DataReplicatorExternalStateMock::getCurrentTermAndLastCommittedOpTime() {
     return {currentTerm, lastCommittedOpTime};
 }
@@ -49,6 +54,18 @@ bool DataReplicatorExternalStateMock::shouldStopFetching(const HostAndPort& sour
     syncSourceHasSyncSource = sourceHasSyncSource;
     return shouldStopFetchingResult;
 }
+
+StatusWith<OpTime> DataReplicatorExternalStateMock::_multiApply(
+    OperationContext* txn,
+    const MultiApplier::Operations& ops,
+    MultiApplier::ApplyOperationFn applyOperation) {
+    return multiApplyFn(txn, ops, applyOperation);
+}
+
+void DataReplicatorExternalStateMock::_multiSyncApply(const MultiApplier::Operations& ops) {}
+
+void DataReplicatorExternalStateMock::_multiInitialSyncApply(const MultiApplier::Operations& ops,
+                                                             const HostAndPort& source) {}
 
 }  // namespace repl
 }  // namespace mongo

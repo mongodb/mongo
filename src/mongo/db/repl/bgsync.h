@@ -52,6 +52,7 @@ namespace repl {
 
 class Member;
 class ReplicationCoordinator;
+class ReplicationCoordinatorExternalState;
 
 // This interface exists to facilitate easier testing;
 // the test infrastructure implements these functions with stubs.
@@ -102,8 +103,13 @@ public:
 
     virtual ~BackgroundSync() {}
 
-    // starts the producer thread
-    void producerThread();
+    /**
+     * Starts the producer thread which runs until shutdown. Upon resolving the current sync source
+     * the producer thread uses the OplogFetcher (which requires the replication coordinator
+     * external state at construction) to fetch oplog entries from the source's oplog via a long
+     * running find query.
+     */
+    void producerThread(ReplicationCoordinatorExternalState* replicationCoordinatorExternalState);
     // starts the sync target notifying thread
     void notifierThread();
 
@@ -151,8 +157,9 @@ private:
     BackgroundSync operator=(const BackgroundSync& s);
 
     // Production thread
-    void _producerThread();
-    void _produce(OperationContext* txn);
+    void _producerThread(ReplicationCoordinatorExternalState* replicationCoordinatorExternalState);
+    void _produce(OperationContext* txn,
+                  ReplicationCoordinatorExternalState* replicationCoordinatorExternalState);
 
     /**
      * Signals to the applier that we have no new data,
@@ -210,10 +217,6 @@ private:
 
     // A pointer to the replication coordinator running the show.
     ReplicationCoordinator* _replCoord;
-
-    // Data replicator external state required by the oplog fetcher.
-    // Owned by us.
-    std::unique_ptr<DataReplicatorExternalState> _dataReplicatorExternalState;
 
     // Used to determine sync source.
     // TODO(dannenberg) move into DataReplicator.

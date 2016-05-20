@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -37,6 +38,8 @@
 
 namespace mongo {
 namespace repl {
+
+class DataReplicator;
 
 /**
  * Holds current term and last committed optime necessary to populate find/getMore command requests.
@@ -76,6 +79,37 @@ public:
     virtual bool shouldStopFetching(const HostAndPort& source,
                                     const OpTime& sourceOpTime,
                                     bool sourceHasSyncSource) = 0;
+
+private:
+    /**
+     * Applies the operations described in the oplog entries contained in "ops" using the
+     * "applyOperation" function.
+     *
+     * Used exclusively by the DataReplicator to construct a MultiApplier.
+     */
+    virtual StatusWith<OpTime> _multiApply(OperationContext* txn,
+                                           const MultiApplier::Operations& ops,
+                                           MultiApplier::ApplyOperationFn applyOperation) = 0;
+
+    /**
+     * Used by _multiApply() to write operations to database during steady state replication.
+     *
+     * Used exclusively by the DataReplicator to construct a MultiApplier.
+     */
+    virtual void _multiSyncApply(const MultiApplier::Operations& ops) = 0;
+
+    /**
+     * Used by _multiApply() to write operations to database during initial sync.
+     * Fetches missing documents from "source".
+     *
+     * Used exclusively by the DataReplicator to construct a MultiApplier.
+     */
+    virtual void _multiInitialSyncApply(const MultiApplier::Operations& ops,
+                                        const HostAndPort& source) = 0;
+
+    // Provides DataReplicator with access to _multiApply, _multiSyncApply and
+    // _multiInitialSyncApply.
+    friend class DataReplicator;
 };
 
 }  // namespace repl

@@ -80,8 +80,10 @@ const Milliseconds kOplogSocketTimeout(30000);
  */
 class DataReplicatorExternalStateBackgroundSync : public DataReplicatorExternalStateImpl {
 public:
-    DataReplicatorExternalStateBackgroundSync(ReplicationCoordinator* replicationCoordinator,
-                                              BackgroundSync* bgsync);
+    DataReplicatorExternalStateBackgroundSync(
+        ReplicationCoordinator* replicationCoordinator,
+        ReplicationCoordinatorExternalState* replicationCoordinatorExternalState,
+        BackgroundSync* bgsync);
     bool shouldStopFetching(const HostAndPort& source,
                             const OpTime& sourceOpTime,
                             bool sourceHasSyncSource) override;
@@ -91,8 +93,11 @@ private:
 };
 
 DataReplicatorExternalStateBackgroundSync::DataReplicatorExternalStateBackgroundSync(
-    ReplicationCoordinator* replicationCoordinator, BackgroundSync* bgsync)
-    : DataReplicatorExternalStateImpl(replicationCoordinator), _bgsync(bgsync) {}
+    ReplicationCoordinator* replicationCoordinator,
+    ReplicationCoordinatorExternalState* replicationCoordinatorExternalState,
+    BackgroundSync* bgsync)
+    : DataReplicatorExternalStateImpl(replicationCoordinator, replicationCoordinatorExternalState),
+      _bgsync(bgsync) {}
 
 bool DataReplicatorExternalStateBackgroundSync::shouldStopFetching(const HostAndPort& source,
                                                                    const OpTime& sourceOpTime,
@@ -157,8 +162,6 @@ BackgroundSync::BackgroundSync()
       _threadPoolTaskExecutor(makeThreadPool(),
                               executor::makeNetworkInterface("NetworkInterfaceASIO-BGSync")),
       _replCoord(getGlobalReplicationCoordinator()),
-      _dataReplicatorExternalState(
-          stdx::make_unique<DataReplicatorExternalStateBackgroundSync>(_replCoord, this)),
       _syncSourceResolver(_replCoord),
       _lastOpTimeFetched(Timestamp(std::numeric_limits<int>::max(), 0),
                          std::numeric_limits<long long>::max()) {}
@@ -184,7 +187,8 @@ void BackgroundSync::shutdown() {
     }
 }
 
-void BackgroundSync::producerThread() {
+void BackgroundSync::producerThread(
+    ReplicationCoordinatorExternalState* replicationCoordinatorExternalState) {
     Client::initThread("rsBackgroundSync");
     AuthorizationSession::get(cc())->grantInternalAuthorization();
 
@@ -196,7 +200,7 @@ void BackgroundSync::producerThread() {
 
     while (!inShutdown()) {
         try {
-            _producerThread();
+            _producerThread(replicationCoordinatorExternalState);
         } catch (const DBException& e) {
             std::string msg(str::stream() << "sync producer problem: " << e.toString());
             error() << msg;
@@ -222,7 +226,8 @@ void BackgroundSync::_signalNoNewDataForApplier() {
     }
 }
 
-void BackgroundSync::_producerThread() {
+void BackgroundSync::_producerThread(
+    ReplicationCoordinatorExternalState* replicationCoordinatorExternalState) {
     const MemberState state = _replCoord->getMemberState();
     // Stop when the state changes to primary.
     if (_replCoord->isWaitingForApplierToDrain() || state.primary()) {
@@ -256,10 +261,12 @@ void BackgroundSync::_producerThread() {
         start(&txn);
     }
 
-    _produce(&txn);
+    _produce(&txn, replicationCoordinatorExternalState);
 }
 
-void BackgroundSync::_produce(OperationContext* txn) {
+void BackgroundSync::_produce(
+    OperationContext* txn,
+    ReplicationCoordinatorExternalState* replicationCoordinatorExternalState) {
     // this oplog reader does not do a handshake because we don't want the server it's syncing
     // from to track how far it has synced
     {
@@ -339,6 +346,8 @@ void BackgroundSync::_produce(OperationContext* txn) {
 
     // "lastFetched" not used. Already set in _enqueueDocuments.
     Status fetcherReturnStatus = Status::OK();
+    DataReplicatorExternalStateBackgroundSync dataReplicatorExternalState(
+        _replCoord, replicationCoordinatorExternalState, this);
     OplogFetcher* oplogFetcher;
     try {
         auto config = _replCoord->getConfig();
@@ -354,7 +363,7 @@ void BackgroundSync::_produce(OperationContext* txn) {
                                             source,
                                             NamespaceString(rsOplogName),
                                             config,
-                                            _dataReplicatorExternalState.get(),
+                                            &dataReplicatorExternalState,
                                             stdx::bind(&BackgroundSync::_enqueueDocuments,
                                                        this,
                                                        stdx::placeholders::_1,

@@ -106,11 +106,6 @@ public:
      * clear/reset state
      */
     void reset() {
-        _applierFn = [](const MultiApplier::Operations&) {};
-        _multiApplyFn = [](OperationContext*,
-                           const MultiApplier::Operations& ops,
-                           MultiApplier::ApplyOperationFn)
-                            -> StatusWith<OpTime> { return ops.back().getOpTime(); };
         _rollbackFn = [](OperationContext*, const OpTime&, const HostAndPort&)
                           -> Status { return Status::OK(); };
         _setMyLastOptime = [this](const OpTime& opTime) { _myLastOpTime = opTime; };
@@ -181,6 +176,10 @@ public:
         return *_dr;
     }
 
+    DataReplicatorExternalStateMock* getExternalState() {
+        return _externalState;
+    }
+
 protected:
     void setUp() override {
         ReplicationExecutorTest::setUp();
@@ -194,11 +193,6 @@ protected:
 
         DataReplicatorOptions options;
         options.initialSyncRetryWait = Milliseconds(0);
-        options.applierFn = [this](const MultiApplier::Operations& ops) { return _applierFn(ops); };
-        options.multiApplyFn =
-            [this](OperationContext* txn,
-                   const MultiApplier::Operations& ops,
-                   MultiApplier::ApplyOperationFn func) { return _multiApplyFn(txn, ops, func); };
         options.rollbackFn = [this](OperationContext* txn,
                                     const OpTime& lastOpTimeWritten,
                                     const HostAndPort& syncSource) -> Status {
@@ -231,6 +225,7 @@ protected:
         auto dataReplicatorExternalState = stdx::make_unique<DataReplicatorExternalStateMock>();
         dataReplicatorExternalState->currentTerm = 1LL;
         dataReplicatorExternalState->lastCommittedOpTime = _myLastOpTime;
+        _externalState = dataReplicatorExternalState.get();
 
         try {
             _dr.reset(new DataReplicator(
@@ -246,8 +241,6 @@ protected:
         // Executor may still invoke callback before shutting down.
     }
 
-    MultiApplier::ApplyOperationFn _applierFn;
-    MultiApplier::MultiApplyFn _multiApplyFn;
     DataReplicatorOptions::RollbackFn _rollbackFn;
     DataReplicatorOptions::SetMyLastOptimeFn _setMyLastOptime;
     OpTime _myLastOpTime;
@@ -255,6 +248,7 @@ protected:
     std::unique_ptr<SyncSourceSelector> _syncSourceSelector;
 
 private:
+    DataReplicatorExternalStateMock* _externalState;
     std::unique_ptr<DataReplicator> _dr;
 };
 
@@ -521,7 +515,7 @@ TEST_F(InitialSyncTest, Complete) {
 TEST_F(InitialSyncTest, MissingDocOnMultiApplyCompletes) {
     DataReplicatorOptions opts;
     int applyCounter{0};
-    _multiApplyFn =
+    getExternalState()->multiApplyFn =
         [&](OperationContext*, const MultiApplier::Operations& ops, MultiApplier::ApplyOperationFn)
             -> StatusWith<OpTime> {
                 if (++applyCounter == 1) {
@@ -944,7 +938,7 @@ TEST_F(SteadyStateTest, PauseDataReplicator) {
     unittest::Barrier barrier(2U);
     Timestamp lastTimestampApplied;
     BSONObj operationApplied;
-    _multiApplyFn =
+    getExternalState()->multiApplyFn =
         [&](OperationContext*, const MultiApplier::Operations& ops, MultiApplier::ApplyOperationFn)
             -> StatusWith<OpTime> {
                 stdx::lock_guard<stdx::mutex> lock(mutex);
@@ -1036,7 +1030,7 @@ TEST_F(SteadyStateTest, ApplyOneOperation) {
     unittest::Barrier barrier(2U);
     Timestamp lastTimestampApplied;
     BSONObj operationApplied;
-    _multiApplyFn =
+    getExternalState()->multiApplyFn =
         [&](OperationContext*, const MultiApplier::Operations& ops, MultiApplier::ApplyOperationFn)
             -> StatusWith<OpTime> {
                 stdx::lock_guard<stdx::mutex> lock(mutex);
