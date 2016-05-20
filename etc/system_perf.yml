@@ -530,6 +530,7 @@ buildvariants:
 - name: linux-standalone-c3-4xlarge
   display_name: Linux Standalone (c3.4xlarge trial)
   batchtime: 480 # 8 hours
+  disabled: true
   modules: *modules
   expansions:
     setup: standalone
@@ -547,6 +548,7 @@ buildvariants:
   display_name: Linux Standalone (c3.2xlarge trial)
   batchtime: 480 # 8 hours
   modules: *modules
+  disabled: true
   expansions:
     setup: standalone
     cluster: single-c3-2xlarge
@@ -614,6 +616,7 @@ buildvariants:
   display_name: Windows Standalone (trial)
   batchtime: 480 # 8 hours
   modules: *modules
+  disabled: true
   expansions:
     setup: standalone-win
     cluster: windows-single
@@ -637,6 +640,7 @@ buildvariants:
   display_name: Windows 1-node ReplSet (trial)
   batchtime: 480 # 8 hours
   modules: *modules
+  disabled: true
   expansions:
     setup: replica-win
     cluster: windows-single
