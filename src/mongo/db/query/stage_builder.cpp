@@ -119,7 +119,6 @@ PlanStage* buildStages(OperationContext* txn,
         SortStageParams params;
         params.collection = collection;
         params.pattern = sn->pattern;
-        params.collator = cq.getCollator();
         params.limit = sn->limit;
         return new SortStage(txn, params, ws, childStage);
     } else if (STAGE_SORT_KEY_GENERATOR == root->getType()) {
@@ -129,7 +128,7 @@ PlanStage* buildStages(OperationContext* txn,
             return NULL;
         }
         return new SortKeyGeneratorStage(
-            txn, childStage, ws, keyGenNode->sortSpec, keyGenNode->queryObj);
+            txn, childStage, ws, keyGenNode->sortSpec, keyGenNode->queryObj, cq.getCollator());
     } else if (STAGE_PROJECTION == root->getType()) {
         const ProjectionNode* pn = static_cast<const ProjectionNode*>(root);
         PlanStage* childStage = buildStages(txn, collection, cq, qsol, pn->children[0], ws);
@@ -335,7 +334,7 @@ PlanStage* buildStages(OperationContext* txn,
         if (NULL == childStage) {
             return NULL;
         }
-        return new EnsureSortedStage(txn, esn->pattern, cq.getCollator(), ws, childStage);
+        return new EnsureSortedStage(txn, esn->pattern, ws, childStage);
     } else {
         mongoutils::str::stream ss;
         root->appendToString(&ss, 0);

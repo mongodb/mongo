@@ -280,7 +280,8 @@ Status prepareExecution(OperationContext* opCtx,
                                                      *rootOut,
                                                      ws,
                                                      canonicalQuery->getParsed().getSort(),
-                                                     canonicalQuery->getParsed().getFilter());
+                                                     canonicalQuery->getParsed().getFilter(),
+                                                     canonicalQuery->getCollator());
             }
 
             // Stuff the right data into the params depending on what proj impl we use.

@@ -38,6 +38,7 @@
 
 namespace mongo {
 
+class CollatorInterface;
 class Collection;
 class WorkingSetMember;
 
@@ -56,7 +57,10 @@ public:
      * 'txn' must point to a valid OperationContext, but 'txn' does not need to outlive the
      * constructed SortKeyGenerator.
      */
-    SortKeyGenerator(OperationContext* txn, const BSONObj& sortSpec, const BSONObj& queryObj);
+    SortKeyGenerator(OperationContext* txn,
+                     const BSONObj& sortSpec,
+                     const BSONObj& queryObj,
+                     const CollatorInterface* collator);
 
     /**
      * Returns the key used to sort 'member'. If the member is in LOC_AND_IDX state, it must not
@@ -80,6 +84,8 @@ private:
      * Populates _hasBounds and _bounds.
      */
     void getBoundsForSort(OperationContext* txn, const BSONObj& queryObj, const BSONObj& sortObj);
+
+    const CollatorInterface* _collator;
 
     // The raw object in .sort()
     BSONObj _rawSortSpec;
@@ -113,7 +119,8 @@ public:
                           PlanStage* child,
                           WorkingSet* ws,
                           const BSONObj& sortSpecObj,
-                          const BSONObj& queryObj);
+                          const BSONObj& queryObj,
+                          const CollatorInterface* collator);
 
     bool isEOF() final;
 
@@ -137,6 +144,8 @@ private:
 
     // The raw query as expressed by the user.
     const BSONObj _query;
+
+    const CollatorInterface* _collator;
 
     std::unique_ptr<SortKeyGenerator> _sortKeyGen;
 };

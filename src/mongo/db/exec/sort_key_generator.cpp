@@ -40,6 +40,8 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/query/collation/collation_serializer.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -52,7 +54,9 @@ namespace mongo {
 
 SortKeyGenerator::SortKeyGenerator(OperationContext* txn,
                                    const BSONObj& sortSpec,
-                                   const BSONObj& queryObj) {
+                                   const BSONObj& queryObj,
+                                   const CollatorInterface* collator)
+    : _collator(collator) {
     _hasBounds = false;
     _sortHasMeta = false;
     _rawSortSpec = sortSpec;
@@ -98,8 +102,7 @@ SortKeyGenerator::SortKeyGenerator(OperationContext* txn,
         fixed.push_back(BSONElement());
     }
 
-    // TODO SERVER-23095: change nullptr to the appropriate CollationInterface*.
-    _keyGen.reset(new BtreeKeyGeneratorV1(fieldNames, fixed, false /* not sparse */, nullptr));
+    _keyGen.reset(new BtreeKeyGeneratorV1(fieldNames, fixed, false /* not sparse */, _collator));
 
     // The bounds checker only works on the Btree part of the sort key.
     getBoundsForSort(txn, queryObj, _btreeObj);
@@ -228,7 +231,8 @@ void SortKeyGenerator::getBoundsForSort(OperationContext* txn,
     QueryPlannerParams params;
     params.options = QueryPlannerParams::NO_TABLE_SCAN;
 
-    // We're creating a "virtual index" with key pattern equal to the sort order.
+    // We're creating a "virtual index" with key pattern equal to the sort order. The "virtual
+    // index" has the collation which the query is using.
     IndexEntry sortOrder(sortObj,
                          IndexNames::BTREE,
                          true,
@@ -238,11 +242,15 @@ void SortKeyGenerator::getBoundsForSort(OperationContext* txn,
                          "doesnt_matter",
                          NULL,
                          BSONObj(),
-                         NULL);
+                         _collator);
     params.indices.push_back(sortOrder);
 
     auto lpq = stdx::make_unique<LiteParsedQuery>(NamespaceString("fake.ns"));
     lpq->setFilter(queryObj);
+    if (_collator) {
+        lpq->setCollation(CollationSerializer::specToBSON(_collator->getSpec()));
+    }
+
     auto statusWithQueryForSort =
         CanonicalQuery::canonicalize(txn, std::move(lpq), ExtensionsCallbackNoop());
     verify(statusWithQueryForSort.isOK());
@@ -290,8 +298,13 @@ SortKeyGeneratorStage::SortKeyGeneratorStage(OperationContext* opCtx,
                                              PlanStage* child,
                                              WorkingSet* ws,
                                              const BSONObj& sortSpecObj,
-                                             const BSONObj& queryObj)
-    : PlanStage(kStageType, opCtx), _ws(ws), _sortSpec(sortSpecObj), _query(queryObj) {
+                                             const BSONObj& queryObj,
+                                             const CollatorInterface* collator)
+    : PlanStage(kStageType, opCtx),
+      _ws(ws),
+      _sortSpec(sortSpecObj),
+      _query(queryObj),
+      _collator(collator) {
     _children.emplace_back(child);
 }
 
@@ -301,7 +314,7 @@ bool SortKeyGeneratorStage::isEOF() {
 
 PlanStage::StageState SortKeyGeneratorStage::doWork(WorkingSetID* out) {
     if (!_sortKeyGen) {
-        _sortKeyGen = stdx::make_unique<SortKeyGenerator>(getOpCtx(), _sortSpec, _query);
+        _sortKeyGen = stdx::make_unique<SortKeyGenerator>(getOpCtx(), _sortSpec, _query, _collator);
         return PlanStage::NEED_TIME;
     }
 

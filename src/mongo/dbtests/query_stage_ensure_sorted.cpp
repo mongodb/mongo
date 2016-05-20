@@ -28,12 +28,12 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/client.h"
 #include "mongo/db/exec/ensure_sorted.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/sort_key_generator.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/query_test_service_context.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
@@ -56,8 +56,10 @@ public:
                   const char* inputStr,
                   const char* expectedStr,
                   CollatorInterface* collator = nullptr) {
+        auto txn = _serviceContext.makeOperationContext();
+
         WorkingSet ws;
-        auto queuedDataStage = stdx::make_unique<QueuedDataStage>(_opCtx, &ws);
+        auto queuedDataStage = stdx::make_unique<QueuedDataStage>(txn.get(), &ws);
         BSONObj inputObj = fromjson(inputStr);
         BSONElement inputElt = inputObj["input"];
         ASSERT(inputElt.isABSONObj());
@@ -77,8 +79,8 @@ public:
         // Initialization.
         BSONObj pattern = fromjson(patternStr);
         auto sortKeyGen = stdx::make_unique<SortKeyGeneratorStage>(
-            _opCtx, queuedDataStage.release(), &ws, pattern, BSONObj());
-        EnsureSortedStage ess(_opCtx, pattern, collator, &ws, sortKeyGen.release());
+            txn.get(), queuedDataStage.release(), &ws, pattern, BSONObj(), collator);
+        EnsureSortedStage ess(txn.get(), pattern, &ws, sortKeyGen.release());
         WorkingSetID id = WorkingSet::INVALID_ID;
         PlanStage::StageState state = PlanStage::NEED_TIME;
 
@@ -106,16 +108,17 @@ public:
     }
 
 protected:
-    const ServiceContext::UniqueOperationContext _uniqOpCtx = cc().makeOperationContext();
-    OperationContext* const _opCtx = _uniqOpCtx.get();
+    QueryTestServiceContext _serviceContext;
 };
 
 TEST_F(QueryStageEnsureSortedTest, EnsureSortedEmptyWorkingSet) {
+    auto txn = _serviceContext.makeOperationContext();
+
     WorkingSet ws;
-    auto queuedDataStage = stdx::make_unique<QueuedDataStage>(_opCtx, &ws);
+    auto queuedDataStage = stdx::make_unique<QueuedDataStage>(txn.get(), &ws);
     auto sortKeyGen = stdx::make_unique<SortKeyGeneratorStage>(
-        _opCtx, queuedDataStage.release(), &ws, BSONObj(), BSONObj());
-    EnsureSortedStage ess(_opCtx, BSONObj(), nullptr, &ws, sortKeyGen.release());
+        txn.get(), queuedDataStage.release(), &ws, BSONObj(), BSONObj(), nullptr);
+    EnsureSortedStage ess(txn.get(), BSONObj(), &ws, sortKeyGen.release());
 
     WorkingSetID id = WorkingSet::INVALID_ID;
     PlanStage::StageState state = PlanStage::NEED_TIME;

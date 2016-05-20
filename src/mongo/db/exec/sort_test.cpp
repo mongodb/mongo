@@ -35,6 +35,7 @@
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/query/collation/collator_factory_mock.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_noop.h"
@@ -54,6 +55,7 @@ public:
         _client = _service.get()->makeClient("test");
         _opCtxNoop.reset(new OperationContextNoop(_client.get(), 0));
         _opCtx = _opCtxNoop.get();
+        CollatorFactoryInterface::set(_service.get(), stdx::make_unique<CollatorFactoryMock>());
     }
 
     OperationContext* getOpCtx() {
@@ -101,11 +103,14 @@ public:
         // Setting limit to 0 means no limit
         SortStageParams params;
         params.pattern = fromjson(patternStr);
-        params.collator = collator;
         params.limit = limit;
 
-        auto sortKeyGen = stdx::make_unique<SortKeyGeneratorStage>(
-            getOpCtx(), queuedDataStage.release(), &ws, params.pattern, fromjson(queryStr));
+        auto sortKeyGen = stdx::make_unique<SortKeyGeneratorStage>(getOpCtx(),
+                                                                   queuedDataStage.release(),
+                                                                   &ws,
+                                                                   params.pattern,
+                                                                   fromjson(queryStr),
+                                                                   collator);
 
         SortStage sort(getOpCtx(), params, &ws, sortKeyGen.release());
 
@@ -170,7 +175,7 @@ TEST_F(SortStageTest, SortEmptyWorkingSet) {
     // QueuedDataStage will be owned by SortStage.
     auto queuedDataStage = stdx::make_unique<QueuedDataStage>(getOpCtx(), &ws);
     auto sortKeyGen = stdx::make_unique<SortKeyGeneratorStage>(
-        getOpCtx(), queuedDataStage.release(), &ws, BSONObj(), BSONObj());
+        getOpCtx(), queuedDataStage.release(), &ws, BSONObj(), BSONObj(), nullptr);
     SortStageParams params;
     SortStage sort(getOpCtx(), params, &ws, sortKeyGen.release());
 

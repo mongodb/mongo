@@ -675,6 +675,8 @@ bool AsyncResultsMerger::MergingComparator::operator()(const size_t& lhs, const 
     BSONObj leftDocKey = leftDoc[ClusterClientCursorParams::kSortKeyField].Obj();
     BSONObj rightDocKey = rightDoc[ClusterClientCursorParams::kSortKeyField].Obj();
 
+    // This does not need to sort with a collator, since mongod has already mapped strings to their
+    // ICU comparison keys as part of the $sortKey meta projection.
     return leftDocKey.woCompare(rightDocKey, _sort, false /*considerFieldName*/) > 0;
 }
 
