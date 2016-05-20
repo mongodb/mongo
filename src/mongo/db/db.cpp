@@ -322,6 +322,9 @@ static unsigned long long checkIfReplMissingFromCommandLine(OperationContext* tx
  * these versions.
  */
 static bool isSubjectToSERVER23299(OperationContext* txn) {
+    if (storageGlobalParams.readOnly) {
+        return false;
+    }
     dbHolder().openDb(txn, startupLogCollectionName.db());
     AutoGetCollectionForRead autoColl(txn, startupLogCollectionName);
     // No startup log or an empty one means either that the user was not running an affected
