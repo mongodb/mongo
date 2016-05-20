@@ -3,6 +3,7 @@ src:src/third_party/IntelRDFPMathLib20U1/*
 src:src/third_party/asio-asio-*/*
 src:src/third_party/boost-*/*
 src:src/third_party/gperftools-*/*
+src:src/third_party/icu-*/*
 src:src/third_party/libstemmer_c/*
 src:src/third_party/mozjs-*/*
 src:src/third_party/murmurhash3/*
