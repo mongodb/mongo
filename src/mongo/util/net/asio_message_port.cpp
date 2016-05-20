@@ -308,7 +308,7 @@ bool ASIOMessagingPort::recv(Message& m) {
         }
 
         if (_awaitingHandshake) {
-            static_assert(strlen(kGET) <= kHeaderLen,
+            static_assert(sizeof(kGET) - 1 <= kHeaderLen,
                           "HTTP GET string must be smaller than the message header.");
             if (memcmp(md.view2ptr(), kGET, strlen(kGET)) == 0) {
                 std::string httpMsg =
