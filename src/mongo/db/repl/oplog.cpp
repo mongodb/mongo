@@ -455,11 +455,8 @@ void logOp(OperationContext* txn,
 }
 
 OpTime writeOpsToOplog(OperationContext* txn, const std::vector<BSONObj>& ops) {
-    ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-
     OpTime lastOptime;
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        lastOptime = replCoord->getMyLastAppliedOpTime();
         invariant(!ops.empty());
         ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock lk(txn->lockState(), "local", MODE_X);
