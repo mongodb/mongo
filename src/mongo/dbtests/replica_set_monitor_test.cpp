@@ -118,12 +118,12 @@ repl::ReplicaSetConfig _getConfigWithMemberRemoved(const repl::ReplicaSetConfig&
     for (repl::ReplicaSetConfig::MemberIterator member = oldConfig.membersBegin();
          member != oldConfig.membersEnd();
          ++member) {
-        if (member->getHostInternalAndPort() == toRemove) {
+        if (member->getInternalHostAndPort() == toRemove) {
             continue;
         }
 
         membersBuilder.append(
-            BSON("_id" << member->getId() << "host" << member->getHostInternalAndPort().toString()));
+            BSON("_id" << member->getId() << "host" << member->getInternalHostAndPort().toString()));
     }
 
     membersBuilder.done();
@@ -171,11 +171,10 @@ TEST(ReplicaSetMonitorTest, PrimaryRemovedFromSetStress) {
         replSet.setPrimary(hostToRemove);
         // Make sure the monitor sees the new primary
         replMonitor->startOrContinueRefresh().refreshAll();
-        // FIND_THIS
         repl::ReplicaSetConfig newConfig =
             _getConfigWithMemberRemoved(origConfig, HostAndPort(hostToRemove));
         replSet.setConfig(newConfig);
-        replSet.setPrimary(newConfig.getMemberAt(0).getHostInternalAndPort().toString());
+        replSet.setPrimary(newConfig.getMemberAt(0).getInternalHostAndPort().toString());
         // Force refresh -> should not crash
         replMonitor->startOrContinueRefresh().refreshAll();
     }

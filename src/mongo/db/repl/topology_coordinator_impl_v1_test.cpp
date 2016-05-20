@@ -119,7 +119,7 @@ protected:
     }
 
     HostAndPort getCurrentPrimaryHost() {
-        return _currentConfig.getMemberAt(getTopoCoord().getCurrentPrimaryIndex()).getHostInternalAndPort();
+        return _currentConfig.getMemberAt(getTopoCoord().getCurrentPrimaryIndex()).getInternalHostAndPort();
     }
 
     // Update config and set selfIndex

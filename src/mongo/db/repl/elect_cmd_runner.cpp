@@ -66,7 +66,7 @@ std::vector<RemoteCommandRequest> ElectCmdRunner::Algorithm::getRequests() const
     BSONObjBuilder electCmdBuilder;
     electCmdBuilder.append("replSetElect", 1);
     electCmdBuilder.append("set", _rsConfig.getReplSetName());
-    electCmdBuilder.append("who", selfConfig.getHostInternalAndPort().toString());
+    electCmdBuilder.append("who", selfConfig.getInternalHostAndPort().toString());
     electCmdBuilder.append("whoid", selfConfig.getId());
     electCmdBuilder.appendIntOrLL("cfgver", _rsConfig.getConfigVersion());
     electCmdBuilder.append("round", _round);
@@ -75,7 +75,7 @@ std::vector<RemoteCommandRequest> ElectCmdRunner::Algorithm::getRequests() const
     // Schedule a RemoteCommandRequest for each non-DOWN node
     for (std::vector<HostAndPort>::const_iterator it = _targets.begin(); it != _targets.end();
          ++it) {
-        invariant(*it != selfConfig.getHostInternalAndPort());
+        invariant(*it != selfConfig.getInternalHostAndPort());
         requests.push_back(RemoteCommandRequest(
             *it,
             "admin",

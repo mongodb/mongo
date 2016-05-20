@@ -44,7 +44,7 @@ const std::string MemberConfig::kIdFieldName = "_id";
 const std::string MemberConfig::kVotesFieldName = "votes";
 const std::string MemberConfig::kPriorityFieldName = "priority";
 const std::string MemberConfig::kHostFieldName = "host";
-const std::string MemberConfig::kHostInternalFieldName = "hostinternal";
+const std::string MemberConfig::kHostInternalFieldName = "hostInternal";
 const std::string MemberConfig::kHiddenFieldName = "hidden";
 const std::string MemberConfig::kSlaveDelayFieldName = "slaveDelay";
 const std::string MemberConfig::kArbiterOnlyFieldName = "arbiterOnly";
@@ -310,7 +310,7 @@ BSONObj MemberConfig::toBSON(const ReplicaSetTagConfig& tagConfig) const {
     BSONObjBuilder configBuilder;
     configBuilder.append("_id", _id);
     configBuilder.append("host", _host.toString());
-    configBuilder.append("hostinternal", _hostInternal.toString());
+    configBuilder.append("hostInternal", _hostInternal.toString());
     configBuilder.append("arbiterOnly", _arbiterOnly);
     configBuilder.append("buildIndexes", _buildIndexes);
     configBuilder.append("hidden", _hidden);

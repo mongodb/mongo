@@ -51,7 +51,7 @@ FreshnessScanner::Algorithm::Algorithm(const ReplicaSetConfig& rsConfig,
     : _rsConfig(rsConfig), _myIndex(myIndex), _timeout(timeout) {
     for (int index = 0; index < _rsConfig.getNumMembers(); index++) {
         if (index != _myIndex) {
-            _targets.push_back(_rsConfig.getMemberAt(index).getHostInternalAndPort());
+            _targets.push_back(_rsConfig.getMemberAt(index).getInternalHostAndPort());
         }
     }
     _totalRequests = _targets.size();

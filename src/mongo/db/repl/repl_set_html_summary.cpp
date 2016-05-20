@@ -162,9 +162,9 @@ const std::string ReplSetHtmlSummary::toHtmlString() const {
             memberTable << td(_selfOptime.toString());
         } else {
             std::stringstream link;
-            link << "http://" << memberConfig.getHostInternalAndPort().host() << ':'
-                 << (memberConfig.getHostInternalAndPort().port() + 1000) << "/_replSet";
-            memberTable << td(a(link.str(), "", memberConfig.getHostInternalAndPort().toString()));
+            link << "http://" << memberConfig.getInternalHostAndPort().host() << ':'
+                 << (memberConfig.getInternalHostAndPort().port() + 1000) << "/_replSet";
+            memberTable << td(a(link.str(), "", memberConfig.getInternalHostAndPort().toString()));
             memberTable << td(memberConfig.getId());
             memberTable << td(red(str::stream() << memberHB.getHealth(), !up));
             const unsigned int uptime = timeDifference(_now, memberHB.getUpSince());

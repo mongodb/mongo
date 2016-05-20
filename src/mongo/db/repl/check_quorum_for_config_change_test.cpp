@@ -169,7 +169,7 @@ TEST_F(CheckQuorumForInitiate, ValidSingleNodeInternalHostSet) {
                                                       << BSON_ARRAY(BSON("_id" << 1
                                                                         << "host"
                                                                         << "h1"
-                                                                        << "hostinternal"
+                                                                        << "hostInternal"
                                                                         << "p1"
                                                                       ))));
     startQuorumCheck(config, 0);
@@ -233,7 +233,7 @@ const BSONObj makeHeartbeatRequest(const ReplicaSetConfig& rsConfig, int myConfi
     hbArgs.setProtocolVersion(1);
     hbArgs.setConfigVersion(rsConfig.getConfigVersion());
     hbArgs.setCheckEmpty(rsConfig.getConfigVersion() == 1);
-    hbArgs.setSenderHost(myConfig.getHostInternalAndPort());
+    hbArgs.setSenderHost(myConfig.getInternalHostAndPort());
     hbArgs.setSenderId(myConfig.getId());
     return hbArgs.toBSON();
 }

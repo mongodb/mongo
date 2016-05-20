@@ -394,7 +394,7 @@ Status ReplicaSetConfig::validate() const {
         Status status = memberI.validate();
         if (!status.isOK())
             return status;
-        if (memberI.getHostInternalAndPort().isLocalHost() ||
+        if (memberI.getInternalHostAndPort().isLocalHost() ||
             memberI.getHostAndPort().isLocalHost()) {
             ++localhostCount;
         }
@@ -432,7 +432,7 @@ Status ReplicaSetConfig::validate() const {
                                             << " == " << memberI.getHostAndPort().toString());
             }
             // validating that the internal host is not duplicated in the configuration
-            if (!memberI.getHostInternalAndPort().empty() && memberI.getHostInternalAndPort() == memberJ.getHostInternalAndPort() ) {
+            if (!memberI.getInternalHostAndPort().empty() && memberI.getInternalHostAndPort() == memberJ.getInternalHostAndPort() ) {
                 return Status(ErrorCodes::BadValue,
                               str::stream() << "Found two member configurations with same "
                                             << MemberConfig::kHostInternalFieldName << " field, "
@@ -440,7 +440,7 @@ Status ReplicaSetConfig::validate() const {
                                             << MemberConfig::kHostInternalFieldName
                                             << " == " << kMembersFieldName << "." << j << "."
                                             << MemberConfig::kHostInternalFieldName
-                                            << " == " << memberI.getHostInternalAndPort().toString());
+                                            << " == " << memberI.getInternalHostAndPort().toString());
             }
         }
     }
@@ -587,7 +587,7 @@ const int ReplicaSetConfig::findMemberIndexByHostAndPort(const HostAndPort& hap)
     int x = 0;
     for (std::vector<MemberConfig>::const_iterator it = _members.begin(); it != _members.end();
          ++it) {
-        if (it->getHostInternalAndPort() == hap || it->getHostAndPort() == hap) {
+        if (it->getInternalHostAndPort() == hap || it->getHostAndPort() == hap) {
             return x;
         }
         ++x;

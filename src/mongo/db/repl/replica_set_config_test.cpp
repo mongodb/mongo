@@ -899,7 +899,7 @@ bool operator==(const MemberConfig& a, const MemberConfig& b) {
         }
     }
     return a.getId() == b.getId() && a.getHostAndPort() == b.getHostAndPort() &&
-        a.getHostInternalAndPort() == b.getHostInternalAndPort() &&
+        a.getInternalHostAndPort() == b.getInternalHostAndPort() &&
         a.getPriority() == b.getPriority() && a.getSlaveDelay() == b.getSlaveDelay() &&
         a.isVoter() == b.isVoter() && a.isArbiter() == b.isArbiter() &&
         a.isHidden() == b.isHidden() && a.shouldBuildIndexes() == b.shouldBuildIndexes() &&
@@ -1416,7 +1416,7 @@ TEST(ReplicaSetConfig,  ReplSetHostInternal){
                                                 << "members" << BSON_ARRAY(
                                                                   BSON("_id" << 0
                                                                       << "host" << "localhost:12345"
-                                                                      << "hostinternal" << "127.0.0.1:12345"))
+                                                                      << "hostInternal" << "127.0.0.1:12345"))
                                                 ));
   ASSERT_EQUALS(Status::OK(), status);
   //check that it's valid
@@ -1436,7 +1436,7 @@ TEST(ReplicaSetConfig, ReplSetOnlyHostInternal){
                                                 << "version" << 1
                                                 << "members" << BSON_ARRAY(
                                                                   BSON("_id" << 0
-                                                                      << "hostinternal" << "127.0.0.1:12345"))
+                                                                      << "hostInternal" << "127.0.0.1:12345"))
                                                 ));
   ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
   //check that it's not valid

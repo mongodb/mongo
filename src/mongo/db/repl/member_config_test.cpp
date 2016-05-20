@@ -46,7 +46,7 @@ TEST(MemberConfig, ParseMinimalMemberConfigAndCheckDefaults) {
                             &tagConfig));
     ASSERT_EQUALS(0, mc.getId());
     ASSERT_EQUALS(HostAndPort("localhost", 12345), mc.getHostAndPort());
-    ASSERT_EQUALS(HostAndPort("localhost", 12345), mc.getHostInternalAndPort());
+    ASSERT_EQUALS(HostAndPort("localhost", 12345), mc.getInternalHostAndPort());
     ASSERT_EQUALS(1.0, mc.getPriority());
     ASSERT_EQUALS(Seconds(0), mc.getSlaveDelay());
     ASSERT_TRUE(mc.isVoter());
@@ -80,8 +80,16 @@ TEST(MemberConfig, ParseFailWithJustHostInternal) {
     ReplicaSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_EQUALS(ErrorCodes::NoSuchKey,
-              mc.initialize(BSON("hostinternal" << "localhost:12345"),
+              mc.initialize(BSON("_id" << 0 << "hostInternal" << "localhost:12345"),
                             &tagConfig  ));
+}
+
+TEST(MemberConfig, ParseSuccessIfOnlyHostIsSetAndgetInternalHostAndPortIsRequested) {
+    ReplicaSetTagConfig tagConfig;
+    MemberConfig mc;
+    ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host" << "localhost:12345"),
+              &tagConfig  ));
+    ASSERT_EQUALS(HostAndPort("localhost", 12345), mc.getInternalHostAndPort());
 }
 
 TEST(MemberConfig, ParseFailsWithBadIdField) {

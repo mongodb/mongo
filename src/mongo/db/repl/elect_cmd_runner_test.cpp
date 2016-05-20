@@ -99,7 +99,7 @@ ReplicaSetConfig assertMakeRSConfig(const BSONObj& configBson) {
 const BSONObj makeElectRequest(const ReplicaSetConfig& rsConfig, int selfIndex) {
     const MemberConfig& myConfig = rsConfig.getMemberAt(selfIndex);
     return BSON("replSetElect" << 1 << "set" << rsConfig.getReplSetName() << "who"
-                               << myConfig.getHostInternalAndPort().toString() << "whoid"
+                               << myConfig.getInternalHostAndPort().toString() << "whoid"
                                << myConfig.getId() << "cfgver" << rsConfig.getConfigVersion()
                                << "round" << 380865962699346850ll);
 }
@@ -181,7 +181,7 @@ TEST_F(ElectCmdRunnerTest, TwoNodes) {
                                                             << "h1"))));
 
     std::vector<HostAndPort> hosts;
-    hosts.push_back(config.getMemberAt(1).getHostInternalAndPort());
+    hosts.push_back(config.getMemberAt(1).getInternalHostAndPort());
 
     const BSONObj electRequest = makeElectRequest(config, 0);
 
@@ -217,7 +217,7 @@ TEST_F(ElectCmdRunnerTest, ShuttingDown) {
                                                                                   << "h1"))));
 
     std::vector<HostAndPort> hosts;
-    hosts.push_back(config.getMemberAt(1).getHostInternalAndPort());
+    hosts.push_back(config.getMemberAt(1).getInternalHostAndPort());
 
     ElectCmdRunner electCmdRunner;
     StatusWith<ReplicationExecutor::EventHandle> evh(ErrorCodes::InternalError, "Not set");
@@ -250,7 +250,7 @@ public:
         for (ReplicaSetConfig::MemberIterator mem = ++config.membersBegin();
              mem != config.membersEnd();
              ++mem) {
-            hosts.push_back(mem->getHostInternalAndPort());
+            hosts.push_back(mem->getInternalHostAndPort());
         }
 
         _checker.reset(new ElectCmdRunner::Algorithm(config, selfConfigIndex, hosts, OID()));
