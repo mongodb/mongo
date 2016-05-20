@@ -75,22 +75,22 @@ public:
         return getFullName();
     }
 
+    bool operator==(const UserName& rhs) const {
+        return _splitPoint == rhs._splitPoint && getFullName() == rhs.getFullName();
+    }
+
+    bool operator!=(const UserName& rhs) const {
+        return _splitPoint != rhs._splitPoint || getFullName() != rhs.getFullName();
+    }
+
+    bool operator<(const UserName& rhs) const {
+        return getUser() < rhs.getUser() || (getUser() == rhs.getUser() && getDB() < rhs.getDB());
+    }
+
 private:
     std::string _fullName;  // The full name, stored as a string.  "user@db".
     size_t _splitPoint;     // The index of the "@" separating the user and db name parts.
 };
-
-static inline bool operator==(const UserName& lhs, const UserName& rhs) {
-    return lhs.getFullName() == rhs.getFullName();
-}
-
-static inline bool operator!=(const UserName& lhs, const UserName& rhs) {
-    return lhs.getFullName() != rhs.getFullName();
-}
-
-static inline bool operator<(const UserName& lhs, const UserName& rhs) {
-    return lhs.getFullName() < rhs.getFullName();
-}
 
 std::ostream& operator<<(std::ostream& os, const UserName& name);
 
