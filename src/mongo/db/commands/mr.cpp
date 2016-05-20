@@ -1366,6 +1366,16 @@ public:
             }
         }
 
+        // Ensure that the RangePreserver is freed under the lock. This is necessary since the
+        // RangePreserver's destructor unpins a ClientCursor, and access to the CursorManager must
+        // be done under the lock.
+        ON_BLOCK_EXIT([txn, &config, &rangePreserver] {
+            if (rangePreserver) {
+                AutoGetCollectionForRead ctx(txn, config.ns);
+                rangePreserver.reset();
+            }
+        });
+
         bool shouldHaveData = false;
 
         BSONObjBuilder countsBuilder;
