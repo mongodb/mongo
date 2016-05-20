@@ -3465,7 +3465,7 @@ buildvariants:
   display_name: Windows Vista
   modules: ~
   run_on:
-  - windows-64-vs2015-test
+  - windows-64-vs2015-small
   batchtime: 1440 # 1 day
   expansions:
     platform_decompress: unzip
@@ -3482,7 +3482,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - windows-64-vs2015-compile
+    - windows-64-vs2015-large
   - name: aggregation
   - name: aggregation_WT
   - name: auth
@@ -3566,7 +3566,7 @@ buildvariants:
   display_name: Windows 2008R2
   modules: ~
   run_on:
-  - windows-64-vs2015-test
+  - windows-64-vs2015-small
   batchtime: 1440 # 1 day
   expansions:
     platform_decompress: unzip
@@ -3584,7 +3584,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - windows-64-vs2015-compile
+    - windows-64-vs2015-large
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_read_concern_majority_passthrough_WT
@@ -3672,7 +3672,7 @@ buildvariants:
   display_name: "* Windows 2008R2 DEBUG"
   modules: ~
   run_on:
-  - windows-64-vs2015-test
+  - windows-64-vs2015-small
   expansions:
     platform_decompress: unzip
     exe: ".exe"
@@ -3687,7 +3687,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - windows-64-vs2015-compile
+    - windows-64-vs2015-large
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_read_concern_majority_passthrough_WT
@@ -3708,7 +3708,11 @@ buildvariants:
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
+    distros:
+    - windows-64-vs2015-large
   - name: jsCore_small_oplog_rs_WT
+    distros:
+    - windows-64-vs2015-large
   - name: mmap
   - name: mongosTest
   - name: noPassthrough
@@ -3725,39 +3729,49 @@ buildvariants:
     # Some concurrency workloads require a lot of memory, so we use machines
     # with more RAM for these suites.
     distros:
-    - windows-64-vs2015-compile
+    - windows-64-vs2015-large
   - name: concurrency_WT
     distros:
-    - windows-64-vs2015-compile
+    - windows-64-vs2015-large
   - name: concurrency_replication
     distros:
-    - windows-64-vs2015-compile
+    - windows-64-vs2015-large
   - name: concurrency_replication_WT
     distros:
-    - windows-64-vs2015-compile
+    - windows-64-vs2015-large
   - name: concurrency_sharded
     distros:
-    - windows-64-vs2015-compile
+    - windows-64-vs2015-large
   - name: concurrency_sharded_WT
     distros:
-    - windows-64-vs2015-compile
+    - windows-64-vs2015-large
   - name: concurrency_simultaneous
     distros:
-    - windows-64-vs2015-compile
+    - windows-64-vs2015-large
   - name: concurrency_simultaneous_WT
     distros:
-    - windows-64-vs2015-compile
+    - windows-64-vs2015-large
   - name: read_concern_majority_passthrough_WT
+    distros:
+    - windows-64-vs2015-large
   - name: read_only
   - name: read_only_WT
   - name: read_only_sharded
   - name: read_only_sharded_WT
   - name: replicasets
+    distros:
+    - windows-64-vs2015-large
   - name: replicasets_WT
+    distros:
+    - windows-64-vs2015-large
   - name: replication
   - name: replication_WT
   - name: sharding
+    distros:
+    - windows-64-vs2015-large
   - name: sharding_WT
+    distros:
+    - windows-64-vs2015-large
   - name: tool
   - name: tool_WT
   - name: unittests
@@ -3767,7 +3781,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - windows-64-vs2015-test
+  - windows-64-vs2015-small
   expansions:
     platform_decompress: unzip
     tooltags: "-tags 'ssl sasl'"
@@ -3785,7 +3799,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - windows-64-vs2015-compile
+    - windows-64-vs2015-large
   - name: audit
   - name: audit_WT
   - name: auth_audit
@@ -3824,7 +3838,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - windows-64-vs2015-test
+  - windows-64-vs2015-small
   batchtime: 1440 # 1 day
   expansions:
     platform_decompress: unzip
@@ -3844,14 +3858,14 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - windows-64-vs2015-compile
+    - windows-64-vs2015-large
   - name: audit
   - name: audit_WT
   - name: auth_audit
   - name: dbtest
   - name: concurrency
     distros:
-    - windows-64-vs2015-compile  # Some workloads require a lot of memory, use a bigger machine for this suite.
+    - windows-64-vs2015-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
   - name: concurrency_replication
   - name: concurrency_sharded
   - name: concurrency_simultaneous
@@ -3875,7 +3889,7 @@ buildvariants:
   display_name: SSL Windows 2008R2
   modules: ~
   run_on:
-  - windows-64-vs2015-test
+  - windows-64-vs2015-small
   batchtime: 1440 # 1 day
   expansions:
     platform_decompress: unzip
@@ -3894,7 +3908,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - windows-64-vs2015-compile
+    - windows-64-vs2015-large
   - name: aggregation
   - name: aggregation_WT
   - name: auth
@@ -4298,7 +4312,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - rhel62-test
+  - rhel62-small
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
@@ -4316,7 +4330,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel62-build
+    - rhel62-large
   - name: lint
   - name: aggregation
   - name: aggregation_WT
@@ -4372,7 +4386,11 @@ buildvariants:
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
+    distros:
+    - rhel62-large
   - name: jsCore_small_oplog_rs_WT
+    distros:
+    - rhel62-large
   - name: jstestfuzz
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
@@ -4391,15 +4409,27 @@ buildvariants:
   - name: parallel_compatibility
   - name: parallel_compatibility_WT
   - name: read_concern_majority_passthrough_WT
+    distros:
+    - rhel62-large
   - name: read_only
   - name: read_only_WT
   - name: read_only_sharded
   - name: read_only_sharded_WT
   - name: replicasets
+    distros:
+    - rhel62-large
   - name: replicasets_WT
+    distros:
+    - rhel62-large
   - name: replicasets_WT_ese
+    distros:
+    - rhel62-large
   - name: replicasets_auth
+    distros:
+    - rhel62-large
   - name: replicasets_legacy
+    distros:
+    - rhel62-large
   - name: replication
   - name: replication_WT
   - name: replication_auth
@@ -4409,10 +4439,20 @@ buildvariants:
   - name: sharded_collections_jscore_passthrough
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding
+    distros:
+    - rhel62-large
   - name: sharding_WT
+    distros:
+    - rhel62-large
   - name: sharding_WT_ese
+    distros:
+    - rhel62-large
   - name: sharding_auth
+    distros:
+    - rhel62-large
   - name: sharding_auth_audit_WT
+    distros:
+    - rhel62-large
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
@@ -4421,8 +4461,14 @@ buildvariants:
   - name: sharding_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
   - name: sharding_last_stable_mongos
+    distros:
+    - rhel62-large
   - name: sharding_op_query_WT
+    distros:
+    - rhel62-large
   - name: sharding_csrs_continuous_config_stepdown_WT
+    distros:
+    - rhel62-large
   - name: slow1
   - name: slow1_WT
   - name: serial_run
@@ -4615,7 +4661,7 @@ buildvariants:
   display_name: SSL RHEL 6.2
   modules: ~
   run_on:
-  - rhel62-test
+  - rhel62-small
   batchtime: 1440 # 1 day
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
@@ -4633,7 +4679,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel62-build
+    - rhel62-large
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
@@ -5993,7 +6039,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - rhel62-test
+  - rhel62-small
   batchtime: 1440 # 1 day
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
@@ -6009,7 +6055,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel62-build
+    - rhel62-large
   - name: aggregation_WT
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough_WT
@@ -6019,7 +6065,7 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: concurrency
     distros:
-    - rhel62-build  # Some workloads require a lot of memory, use a bigger machine for this suite.
+    - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
   - name: concurrency_replication
   - name: concurrency_sharded
   - name: concurrency_simultaneous
@@ -6095,7 +6141,7 @@ buildvariants:
   # Disabled due to SERVER-21965
   # - name: concurrency
   #   distros:
-  #   - rhel62-build  # Some workloads require a lot of memory, use a bigger machine for this suite.
+  #   - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
   # - name: concurrency_replication
   # - name: concurrency_sharded
   # - name: concurrency_simultaneous
@@ -6776,7 +6822,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - rhel62-test
+  - rhel62-small
   batchtime: 1440 # 1 day
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
@@ -6787,7 +6833,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel62-build
+    - rhel62-large
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_WT_ese
