@@ -83,8 +83,7 @@ public:
         _blacklistedSource = host;
     }
     bool shouldChangeSyncSource(const HostAndPort& currentSource,
-                                const OpTime& sourcesOpTime,
-                                bool syncSourceHasSyncSource) override {
+                                const rpc::ReplSetMetadata& metadata) override {
         return false;
     }
     SyncSourceResolverResponse selectSyncSource(OperationContext* txn,
@@ -125,10 +124,8 @@ public:
         _syncSourceSelector->blacklistSyncSource(host, until);
     }
     bool shouldChangeSyncSource(const HostAndPort& currentSource,
-                                const OpTime& sourcesOpTime,
-                                bool syncSourceHasSyncSource) override {
-        return _syncSourceSelector->shouldChangeSyncSource(
-            currentSource, sourcesOpTime, syncSourceHasSyncSource);
+                                const rpc::ReplSetMetadata& metadata) override {
+        return _syncSourceSelector->shouldChangeSyncSource(currentSource, metadata);
     }
     SyncSourceResolverResponse selectSyncSource(OperationContext* txn,
                                                 const OpTime& lastOpTimeFetched) override {
@@ -697,8 +694,7 @@ public:
         _blacklistedSource = host;
     }
     bool shouldChangeSyncSource(const HostAndPort& currentSource,
-                                const OpTime& sourcesOpTime,
-                                bool syncSourceHasSyncSource) override {
+                                const rpc::ReplSetMetadata& metadata) override {
         return false;
     }
     SyncSourceResolverResponse selectSyncSource(OperationContext* txn,
@@ -829,8 +825,7 @@ public:
     }
     void blacklistSyncSource(const HostAndPort& host, Date_t until) override {}
     bool shouldChangeSyncSource(const HostAndPort& currentSource,
-                                const OpTime& sourcesOpTime,
-                                bool syncSourceHasSyncSource) override {
+                                const rpc::ReplSetMetadata& metadata) override {
         return false;
     }
     SyncSourceResolverResponse selectSyncSource(OperationContext* txn,

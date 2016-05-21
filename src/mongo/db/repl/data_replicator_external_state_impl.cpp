@@ -60,14 +60,12 @@ void DataReplicatorExternalStateImpl::processMetadata(const rpc::ReplSetMetadata
 }
 
 bool DataReplicatorExternalStateImpl::shouldStopFetching(const HostAndPort& source,
-                                                         const OpTime& sourceOpTime,
-                                                         bool sourceHasSyncSource) {
+                                                         const rpc::ReplSetMetadata& metadata) {
     // Re-evaluate quality of sync target.
-    if (_replicationCoordinator->shouldChangeSyncSource(
-            source, sourceOpTime, sourceHasSyncSource)) {
+    if (_replicationCoordinator->shouldChangeSyncSource(source, metadata)) {
         LOG(1) << "Canceling oplog query because we have to choose a sync source. Current source: "
-               << source << ", OpTime " << sourceOpTime
-               << ", hasSyncSource:" << sourceHasSyncSource;
+               << source << ", OpTime " << metadata.getLastOpVisible()
+               << ", its sync source index:" << metadata.getSyncSourceIndex();
         return true;
     }
     return false;

@@ -281,8 +281,7 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
     }
 
     const auto& queryResponse = result.getValue();
-    OpTime sourcesLastOpTime;
-    bool syncSourceHasSyncSource = false;
+    rpc::ReplSetMetadata metadata;
 
     // Forward metadata (containing liveness information) to data replicator external state.
     bool receivedMetadata =
@@ -296,10 +295,8 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
             _onShutdown(metadataResult.getStatus());
             return;
         }
-        auto metadata = metadataResult.getValue();
+        metadata = metadataResult.getValue();
         _dataReplicatorExternalState->processMetadata(metadata);
-        sourcesLastOpTime = metadata.getLastOpVisible();
-        syncSourceHasSyncSource = metadata.getSyncSourceIndex() != -1;
     }
 
     const auto& documents = queryResponse.documents;
@@ -349,13 +346,14 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
         _lastFetched = opTimeWithHash;
     }
 
-    if (_dataReplicatorExternalState->shouldStopFetching(
-            _fetcher.getSource(), sourcesLastOpTime, syncSourceHasSyncSource)) {
+    if (_dataReplicatorExternalState->shouldStopFetching(_fetcher.getSource(), metadata)) {
         _onShutdown(Status(ErrorCodes::InvalidSyncSource,
-                           str::stream() << "sync source " << _fetcher.getSource().toString()
-                                         << " (last optime: " << sourcesLastOpTime.toString()
-                                         << "; has sync source: " << syncSourceHasSyncSource
-                                         << ") is no longer valid"),
+                           str::stream()
+                               << "sync source " << _fetcher.getSource().toString()
+                               << " (last optime: " << metadata.getLastOpVisible().toString()
+                               << "; sync source index: " << metadata.getSyncSourceIndex()
+                               << "; primary index: " << metadata.getPrimaryIndex()
+                               << ") is no longer valid"),
                     opTimeWithHash);
         return;
     }

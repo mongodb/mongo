@@ -77,8 +77,7 @@ public:
      * metadata).
      */
     virtual bool shouldStopFetching(const HostAndPort& source,
-                                    const OpTime& sourceOpTime,
-                                    bool sourceHasSyncSource) = 0;
+                                    const rpc::ReplSetMetadata& metadata) = 0;
 
 private:
     /**

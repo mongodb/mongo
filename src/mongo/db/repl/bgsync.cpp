@@ -85,8 +85,7 @@ public:
         ReplicationCoordinatorExternalState* replicationCoordinatorExternalState,
         BackgroundSync* bgsync);
     bool shouldStopFetching(const HostAndPort& source,
-                            const OpTime& sourceOpTime,
-                            bool sourceHasSyncSource) override;
+                            const rpc::ReplSetMetadata& metadata) override;
 
 private:
     BackgroundSync* _bgsync;
@@ -99,15 +98,13 @@ DataReplicatorExternalStateBackgroundSync::DataReplicatorExternalStateBackground
     : DataReplicatorExternalStateImpl(replicationCoordinator, replicationCoordinatorExternalState),
       _bgsync(bgsync) {}
 
-bool DataReplicatorExternalStateBackgroundSync::shouldStopFetching(const HostAndPort& source,
-                                                                   const OpTime& sourceOpTime,
-                                                                   bool sourceHasSyncSource) {
+bool DataReplicatorExternalStateBackgroundSync::shouldStopFetching(
+    const HostAndPort& source, const rpc::ReplSetMetadata& metadata) {
     if (_bgsync->shouldStopFetching()) {
         return true;
     }
 
-    return DataReplicatorExternalStateImpl::shouldStopFetching(
-        source, sourceOpTime, sourceHasSyncSource);
+    return DataReplicatorExternalStateImpl::shouldStopFetching(source, metadata);
 }
 
 /**

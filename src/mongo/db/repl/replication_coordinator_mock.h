@@ -208,8 +208,7 @@ public:
     virtual void resetLastOpTimesFromOplog(OperationContext* txn);
 
     virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
-                                        const OpTime& syncSourceLastOpTime,
-                                        bool syncSourceHasSyncSource);
+                                        const rpc::ReplSetMetadata& metadata);
 
     virtual OpTime getLastCommittedOpTime() const;
 
