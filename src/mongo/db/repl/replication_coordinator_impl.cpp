@@ -329,7 +329,7 @@ Date_t ReplicationCoordinatorImpl::getPriorityTakeover_forTest() const {
     return _priorityTakeoverWhen;
 }
 
-OpTime ReplicationCoordinatorImpl::getCurrentCommittedSnapshotOpTime() {
+OpTime ReplicationCoordinatorImpl::getCurrentCommittedSnapshotOpTime() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_currentCommittedSnapshot) {
         return _currentCommittedSnapshot->opTime;
@@ -1846,32 +1846,35 @@ int ReplicationCoordinatorImpl::_getMyId_inlock() const {
 }
 
 bool ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    invariant(_rsConfig.isInitialized());
-    // Do not send updates if we have been removed from the config.
-    if (_selfIndex == -1) {
-        return false;
-    }
-    cmdBuilder->append("replSetUpdatePosition", 1);
-    // Create an array containing objects each live member connected to us and for ourself.
-    BSONArrayBuilder arrayBuilder(cmdBuilder->subarrayStart("optimes"));
-    for (SlaveInfoVector::iterator itr = _slaveInfo.begin(); itr != _slaveInfo.end(); ++itr) {
-        if (itr->lastAppliedOpTime.isNull()) {
-            // Don't include info on members we haven't heard from yet.
-            continue;
+    {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        invariant(_rsConfig.isInitialized());
+        // Do not send updates if we have been removed from the config.
+        if (_selfIndex == -1) {
+            return false;
         }
-        // Don't include members we think are down.
-        if (!itr->self && itr->down) {
-            continue;
+        cmdBuilder->append("replSetUpdatePosition", 1);
+        // Create an array containing objects each live member connected to us and for ourself.
+        BSONArrayBuilder arrayBuilder(cmdBuilder->subarrayStart("optimes"));
+        for (SlaveInfoVector::iterator itr = _slaveInfo.begin(); itr != _slaveInfo.end(); ++itr) {
+            if (itr->lastAppliedOpTime.isNull()) {
+                // Don't include info on members we haven't heard from yet.
+                continue;
+            }
+            // Don't include members we think are down.
+            if (!itr->self && itr->down) {
+                continue;
+            }
+
+            BSONObjBuilder entry(arrayBuilder.subobjStart());
+            itr->lastDurableOpTime.append(&entry, "durableOpTime");
+            itr->lastAppliedOpTime.append(&entry, "appliedOpTime");
+            entry.append("memberId", itr->memberId);
+            entry.append("cfgver", _rsConfig.getConfigVersion());
         }
-
-        BSONObjBuilder entry(arrayBuilder.subobjStart());
-        itr->lastDurableOpTime.append(&entry, "durableOpTime");
-        itr->lastAppliedOpTime.append(&entry, "appliedOpTime");
-        entry.append("memberId", itr->memberId);
-        entry.append("cfgver", _rsConfig.getConfigVersion());
     }
-
+    // Add metadata to command. Old style parsing logic will reject the metadata.
+    prepareReplMetadata(OpTime(), cmdBuilder);
     return true;
 }
 
@@ -3267,37 +3270,35 @@ void ReplicationCoordinatorImpl::_processReplSetDeclareElectionWinner_finish(
     *result = _topCoord->processReplSetDeclareElectionWinner(args, responseTerm);
 }
 
-void ReplicationCoordinatorImpl::prepareReplResponseMetadata(const rpc::RequestInterface& request,
-                                                             const OpTime& lastOpTimeFromClient,
-                                                             BSONObjBuilder* builder) {
-    if (request.getMetadata().hasField(rpc::kReplSetMetadataFieldName)) {
-        rpc::ReplSetMetadata metadata;
 
-        CBHStatus cbh = _replExecutor.scheduleWork(
-            stdx::bind(&ReplicationCoordinatorImpl::_prepareReplResponseMetadata_finish,
-                       this,
-                       stdx::placeholders::_1,
-                       lastOpTimeFromClient,
-                       &metadata));
+void ReplicationCoordinatorImpl::prepareReplMetadata(const OpTime& lastOpTimeFromClient,
+                                                     BSONObjBuilder* builder) const {
+    rpc::ReplSetMetadata metadata;
 
-        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-            return;
-        }
+    CBHStatus cbh = _replExecutor.scheduleWork(
+        stdx::bind(&ReplicationCoordinatorImpl::_prepareReplResponseMetadata_finish,
+                   this,
+                   stdx::placeholders::_1,
+                   lastOpTimeFromClient,
+                   &metadata));
 
-        fassert(28709, cbh.getStatus());
-        _replExecutor.wait(cbh.getValue());
-
-        metadata.writeToMetadata(builder);
+    if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+        return;
     }
+
+    fassert(28709, cbh.getStatus());
+    _replExecutor.wait(cbh.getValue());
+
+    metadata.writeToMetadata(builder);
 }
 
 void ReplicationCoordinatorImpl::_prepareReplResponseMetadata_finish(
     const ReplicationExecutor::CallbackArgs& cbData,
     const OpTime& lastOpTimeFromClient,
-    rpc::ReplSetMetadata* metadata) {
+    rpc::ReplSetMetadata* metadata) const {
     OpTime lastReadableOpTime = getCurrentCommittedSnapshotOpTime();
     OpTime lastVisibleOpTime = std::max(lastOpTimeFromClient, lastReadableOpTime);
-    _topCoord->prepareReplResponseMetadata(metadata, lastVisibleOpTime, _lastCommittedOpTime);
+    _topCoord->prepareReplMetadata(metadata, lastVisibleOpTime, _lastCommittedOpTime);
 }
 
 bool ReplicationCoordinatorImpl::isV1ElectionProtocol() {

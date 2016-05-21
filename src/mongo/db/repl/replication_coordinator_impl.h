@@ -290,9 +290,8 @@ public:
     virtual Status processReplSetDeclareElectionWinner(const ReplSetDeclareElectionWinnerArgs& args,
                                                        long long* responseTerm) override;
 
-    void prepareReplResponseMetadata(const rpc::RequestInterface&,
-                                     const OpTime& lastOpTimeFromClient,
-                                     BSONObjBuilder* builder) override;
+    virtual void prepareReplMetadata(const OpTime& lastOpTimeFromClient,
+                                     BSONObjBuilder* builder) const override;
 
     virtual Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
                                       ReplSetHeartbeatResponse* response) override;
@@ -317,7 +316,7 @@ public:
 
     virtual void onSnapshotCreate(OpTime timeOfSnapshot, SnapshotName name) override;
 
-    virtual OpTime getCurrentCommittedSnapshotOpTime() override;
+    virtual OpTime getCurrentCommittedSnapshotOpTime() const override;
 
     virtual void waitUntilSnapshotCommitted(OperationContext* txn,
                                             const SnapshotName& untilSnapshot) override;
@@ -663,11 +662,11 @@ private:
                                             Status* result);
 
     /**
-     * Bottom half of prepareReplResponseMetadata.
+     * Bottom half of prepareReplMetadata.
      */
     void _prepareReplResponseMetadata_finish(const ReplicationExecutor::CallbackArgs& cbData,
                                              const OpTime& lastOpTimeFromClient,
-                                             rpc::ReplSetMetadata* metadata);
+                                             rpc::ReplSetMetadata* metadata) const;
     /**
      * Scheduled to cause the ReplicationCoordinator to reconsider any state that might
      * need to change as a result of time passing - for instance becoming PRIMARY when a single
