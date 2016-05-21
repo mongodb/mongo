@@ -338,7 +338,7 @@ Date_t ReplicationCoordinatorImpl::getPriorityTakeover_forTest() const {
     return _priorityTakeoverWhen;
 }
 
-OpTime ReplicationCoordinatorImpl::getCurrentCommittedSnapshotOpTime() {
+OpTime ReplicationCoordinatorImpl::getCurrentCommittedSnapshotOpTime() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_currentCommittedSnapshot) {
         return _currentCommittedSnapshot->opTime;
@@ -1889,49 +1889,55 @@ int ReplicationCoordinatorImpl::_getMyId_inlock() const {
 
 StatusWith<BSONObj> ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand(
     ReplicationCoordinator::ReplSetUpdatePositionCommandStyle commandStyle) const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    invariant(_rsConfig.isInitialized());
-    // Do not send updates if we have been removed from the config.
-    if (_selfIndex == -1) {
-        return Status(ErrorCodes::NodeNotFound,
-                      "This node is not in the current replset configuration.");
-    }
     BSONObjBuilder cmdBuilder;
-    cmdBuilder.append(UpdatePositionArgs::kCommandFieldName, 1);
-    // Create an array containing objects each live member connected to us and for ourself.
-    BSONArrayBuilder arrayBuilder(cmdBuilder.subarrayStart("optimes"));
-    for (const auto& slaveInfo : _slaveInfo) {
-        if (slaveInfo.lastAppliedOpTime.isNull()) {
-            // Don't include info on members we haven't heard from yet.
-            continue;
+    {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        invariant(_rsConfig.isInitialized());
+        // Do not send updates if we have been removed from the config.
+        if (_selfIndex == -1) {
+            return Status(ErrorCodes::NodeNotFound,
+                          "This node is not in the current replset configuration.");
         }
-        // Don't include members we think are down.
-        if (!slaveInfo.self && slaveInfo.down) {
-            continue;
-        }
+        cmdBuilder.append(UpdatePositionArgs::kCommandFieldName, 1);
+        // Create an array containing objects each live member connected to us and for ourself.
+        BSONArrayBuilder arrayBuilder(cmdBuilder.subarrayStart("optimes"));
+        for (const auto& slaveInfo : _slaveInfo) {
+            if (slaveInfo.lastAppliedOpTime.isNull()) {
+                // Don't include info on members we haven't heard from yet.
+                continue;
+            }
+            // Don't include members we think are down.
+            if (!slaveInfo.self && slaveInfo.down) {
+                continue;
+            }
 
-        BSONObjBuilder entry(arrayBuilder.subobjStart());
-        switch (commandStyle) {
-            case ReplSetUpdatePositionCommandStyle::kNewStyle:
-                slaveInfo.lastDurableOpTime.append(&entry,
-                                                   UpdatePositionArgs::kDurableOpTimeFieldName);
-                slaveInfo.lastAppliedOpTime.append(&entry,
-                                                   UpdatePositionArgs::kAppliedOpTimeFieldName);
-                break;
-            case ReplSetUpdatePositionCommandStyle::kOldStyle:
-                entry.append("_id", slaveInfo.rid);
-                if (isV1ElectionProtocol()) {
-                    slaveInfo.lastDurableOpTime.append(&entry, "optime");
-                } else {
-                    entry.append("optime", slaveInfo.lastDurableOpTime.getTimestamp());
-                }
-                break;
+            BSONObjBuilder entry(arrayBuilder.subobjStart());
+            switch (commandStyle) {
+                case ReplSetUpdatePositionCommandStyle::kNewStyle:
+                    slaveInfo.lastDurableOpTime.append(&entry,
+                                                       UpdatePositionArgs::kDurableOpTimeFieldName);
+                    slaveInfo.lastAppliedOpTime.append(&entry,
+                                                       UpdatePositionArgs::kAppliedOpTimeFieldName);
+                    break;
+                case ReplSetUpdatePositionCommandStyle::kOldStyle:
+                    entry.append("_id", slaveInfo.rid);
+                    if (isV1ElectionProtocol()) {
+                        slaveInfo.lastDurableOpTime.append(&entry, "optime");
+                    } else {
+                        entry.append("optime", slaveInfo.lastDurableOpTime.getTimestamp());
+                    }
+                    break;
+            }
+            entry.append(UpdatePositionArgs::kMemberIdFieldName, slaveInfo.memberId);
+            entry.append(UpdatePositionArgs::kConfigVersionFieldName, _rsConfig.getConfigVersion());
         }
-        entry.append(UpdatePositionArgs::kMemberIdFieldName, slaveInfo.memberId);
-        entry.append(UpdatePositionArgs::kConfigVersionFieldName, _rsConfig.getConfigVersion());
+        arrayBuilder.done();
     }
-    arrayBuilder.done();
 
+    // Add metadata to command. Old style parsing logic will reject the metadata.
+    if (commandStyle == ReplSetUpdatePositionCommandStyle::kNewStyle) {
+        prepareReplMetadata(OpTime(), &cmdBuilder);
+    }
     return cmdBuilder.obj();
 }
 
@@ -3121,18 +3127,15 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
     return Status::OK();
 }
 
-void ReplicationCoordinatorImpl::prepareReplResponseMetadata(const rpc::RequestInterface& request,
-                                                             const OpTime& lastOpTimeFromClient,
-                                                             BSONObjBuilder* builder) {
-    if (request.getMetadata().hasField(rpc::kReplSetMetadataFieldName)) {
-        rpc::ReplSetMetadata metadata;
-        LockGuard topoLock(_topoMutex);
+void ReplicationCoordinatorImpl::prepareReplMetadata(const OpTime& lastOpTimeFromClient,
+                                                     BSONObjBuilder* builder) const {
+    rpc::ReplSetMetadata metadata;
+    LockGuard topoLock(_topoMutex);
 
-        OpTime lastReadableOpTime = getCurrentCommittedSnapshotOpTime();
-        OpTime lastVisibleOpTime = std::max(lastOpTimeFromClient, lastReadableOpTime);
-        _topCoord->prepareReplResponseMetadata(&metadata, lastVisibleOpTime, _lastCommittedOpTime);
-        metadata.writeToMetadata(builder);
-    }
+    OpTime lastReadableOpTime = getCurrentCommittedSnapshotOpTime();
+    OpTime lastVisibleOpTime = std::max(lastOpTimeFromClient, lastReadableOpTime);
+    _topCoord->prepareReplMetadata(&metadata, lastVisibleOpTime, _lastCommittedOpTime);
+    metadata.writeToMetadata(builder);
 }
 
 bool ReplicationCoordinatorImpl::isV1ElectionProtocol() const {

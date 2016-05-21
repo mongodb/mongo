@@ -155,8 +155,8 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
             replMetadata = responseStatus;
         }
         if (replMetadata.isOK()) {
-            // Asynchronous stepdown could happen, but it will be queued in executor after
-            // this function, so we cannot and don't need to wait for it to finish.
+            // Asynchronous stepdown could happen, but it will wait for _topoMutex and execute
+            // after this function, so we cannot and don't need to wait for it to finish.
             _processReplSetMetadata_incallback(replMetadata.getValue());
         }
     }

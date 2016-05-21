@@ -1911,7 +1911,7 @@ TEST_F(ReplCoordTest, NodeIncludesOtherMembersProgressInUpdatePositionCommand) {
     BSONObj cmd = unittest::assertGet(getReplCoord()->prepareReplSetUpdatePositionCommand(
         ReplicationCoordinator::ReplSetUpdatePositionCommandStyle::kNewStyle));
 
-    ASSERT_EQUALS(2, cmd.nFields());
+    ASSERT_EQUALS(3, cmd.nFields());
     ASSERT_EQUALS(UpdatePositionArgs::kCommandFieldName, cmd.firstElement().fieldNameStringData());
 
     std::set<long long> memberIds;
@@ -4481,6 +4481,40 @@ TEST_F(ReplCoordTest, OnlyForwardSyncProgressForOtherNodesWhenTheNodesAreBelieve
         ASSERT_EQUALS(optime, entryOpTime);
     }
     ASSERT_EQUALS(1U, memberIds4.size());
+}
+
+TEST_F(ReplCoordTest, NewStyleUpdatePositionCmdHasMetadata) {
+    assertStartSuccess(
+        BSON("_id"
+             << "mySet"
+             << "version"
+             << 1
+             << "members"
+             << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                      << "test1:1234")
+                           << BSON("_id" << 1 << "host"
+                                         << "test2:1234")
+                           << BSON("_id" << 2 << "host"
+                                         << "test3:1234"))
+             << "protocolVersion"
+             << 1
+             << "settings"
+             << BSON("electionTimeoutMillis" << 2000 << "heartbeatIntervalMillis" << 40000)),
+        HostAndPort("test1", 1234));
+    OpTime optime(Timestamp(100, 2), 0);
+    getReplCoord()->setMyLastAppliedOpTime(optime);
+    getReplCoord()->setMyLastDurableOpTime(optime);
+
+    // Set last committed optime via metadata.
+    rpc::ReplSetMetadata syncSourceMetadata(optime.getTerm(), optime, optime, 1, OID(), -1, 1);
+    getReplCoord()->processReplSetMetadata(syncSourceMetadata);
+    getReplCoord()->onSnapshotCreate(optime, SnapshotName(1));
+
+    BSONObj cmd = unittest::assertGet(getReplCoord()->prepareReplSetUpdatePositionCommand(
+        ReplicationCoordinator::ReplSetUpdatePositionCommandStyle::kNewStyle));
+    auto metadata = unittest::assertGet(rpc::ReplSetMetadata::readFromMetadata(cmd));
+    ASSERT_EQUALS(metadata.getTerm(), getReplCoord()->getTerm());
+    ASSERT_EQUALS(metadata.getLastOpVisible(), optime);
 }
 
 TEST_F(ReplCoordTest, StepDownWhenHandleLivenessTimeoutMarksAMajorityOfVotingNodesDown) {

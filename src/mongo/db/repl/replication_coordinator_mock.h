@@ -216,9 +216,8 @@ public:
                                               const ReplSetRequestVotesArgs& args,
                                               ReplSetRequestVotesResponse* response);
 
-    void prepareReplResponseMetadata(const rpc::RequestInterface& request,
-                                     const OpTime& lastOpTimeFromClient,
-                                     BSONObjBuilder* builder) override;
+    void prepareReplMetadata(const OpTime& lastOpTimeFromClient,
+                             BSONObjBuilder* builder) const override;
 
     virtual Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
                                       ReplSetHeartbeatResponse* response);
@@ -241,7 +240,7 @@ public:
 
     virtual void dropAllSnapshots() override;
 
-    virtual OpTime getCurrentCommittedSnapshotOpTime() override;
+    virtual OpTime getCurrentCommittedSnapshotOpTime() const override;
 
     virtual void waitUntilSnapshotCommitted(OperationContext* txn,
                                             const SnapshotName& untilSnapshot) override;

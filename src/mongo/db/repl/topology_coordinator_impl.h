@@ -217,9 +217,9 @@ public:
     virtual bool stepDown(Date_t until, bool force, const OpTime& lastOpApplied);
     virtual bool stepDownIfPending();
     virtual Date_t getStepDownTime() const;
-    virtual void prepareReplResponseMetadata(rpc::ReplSetMetadata* metadata,
-                                             const OpTime& lastVisibleOpTime,
-                                             const OpTime& lastCommitttedOpTime) const;
+    virtual void prepareReplMetadata(rpc::ReplSetMetadata* metadata,
+                                     const OpTime& lastVisibleOpTime,
+                                     const OpTime& lastCommitttedOpTime) const;
     virtual void processReplSetRequestVotes(const ReplSetRequestVotesArgs& args,
                                             ReplSetRequestVotesResponse* response,
                                             const OpTime& lastAppliedOpTime);

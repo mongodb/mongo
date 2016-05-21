@@ -377,9 +377,8 @@ Status ReplicationCoordinatorMock::processReplSetRequestVotes(
     return Status::OK();
 }
 
-void ReplicationCoordinatorMock::prepareReplResponseMetadata(const rpc::RequestInterface& request,
-                                                             const OpTime& lastOpTimeFromClient,
-                                                             BSONObjBuilder* builder) {}
+void ReplicationCoordinatorMock::prepareReplMetadata(const OpTime& lastOpTimeFromClient,
+                                                     BSONObjBuilder* builder) const {}
 
 Status ReplicationCoordinatorMock::processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
                                                       ReplSetHeartbeatResponse* response) {
@@ -414,7 +413,7 @@ void ReplicationCoordinatorMock::onSnapshotCreate(OpTime timeOfSnapshot, Snapsho
 
 void ReplicationCoordinatorMock::dropAllSnapshots() {}
 
-OpTime ReplicationCoordinatorMock::getCurrentCommittedSnapshotOpTime() {
+OpTime ReplicationCoordinatorMock::getCurrentCommittedSnapshotOpTime() const {
     return OpTime();
 }
 

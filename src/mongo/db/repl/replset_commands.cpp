@@ -658,7 +658,9 @@ public:
                      int,
                      string& errmsg,
                      BSONObjBuilder& result) {
-        Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
+        auto replCoord = repl::ReplicationCoordinator::get(txn->getClient()->getServiceContext());
+
+        Status status = replCoord->checkReplEnabledForCommand(&result);
         if (!status.isOK())
             return appendCommandStatus(result, status);
 
@@ -666,6 +668,14 @@ public:
         // enable mixed-version operation, since we no longer use the handshakes
         if (cmdObj.hasField("handshake"))
             return true;
+
+        auto metadataResult = rpc::ReplSetMetadata::readFromMetadata(cmdObj);
+        if (metadataResult.isOK()) {
+            // New style update position command has metadata, which may inform the
+            // upstream of a higher term.
+            auto metadata = metadataResult.getValue();
+            replCoord->processReplSetMetadata(metadata);
+        }
 
         // In the case of an update from a member with an invalid replica set config,
         // we return our current config version.
@@ -676,8 +686,7 @@ public:
         status = args.initialize(cmdObj);
         if (status.isOK()) {
             // v3.2.4+ style replSetUpdatePosition command.
-            status = getGlobalReplicationCoordinator()->processReplSetUpdatePosition(
-                args, &configVersion);
+            status = replCoord->processReplSetUpdatePosition(args, &configVersion);
 
             if (status == ErrorCodes::InvalidReplicaSetConfig) {
                 result.append("configVersion", configVersion);
@@ -690,8 +699,7 @@ public:
             if (!status.isOK())
                 return appendCommandStatus(result, status);
 
-            status = getGlobalReplicationCoordinator()->processReplSetUpdatePosition(
-                oldArgs, &configVersion);
+            status = replCoord->processReplSetUpdatePosition(oldArgs, &configVersion);
 
             if (status == ErrorCodes::InvalidReplicaSetConfig) {
                 result.append("configVersion", configVersion);
