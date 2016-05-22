@@ -28,8 +28,8 @@
 
 #pragma once
 
-#include <mongo/base/status.h>
-#include <mongo/bson/mutable/document.h>
+#include "mongo/base/status.h"
+#include "mongo/bson/mutable/document.h"
 
 namespace mongo {
 
