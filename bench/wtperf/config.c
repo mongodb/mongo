@@ -616,7 +616,7 @@ config_opt_file(CONFIG *cfg, const char *filename)
 				continue;
 
 			/*
-			 * An empty line terminating an option we're buliding;
+			 * An empty line terminating an option we're building;
 			 * clean things up so we can proceed.
 			 */
 			linelen = 0;
