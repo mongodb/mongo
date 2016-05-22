@@ -22,13 +22,6 @@ def build_cpp_integration_test(env, target, source, **kwargs):
     libdeps = kwargs.get('LIBDEPS', [])
     libdeps.append( '$BUILD_DIR/mongo/unittest/integration_test_main' )
 
-    includeCrutch = True
-    if "NO_CRUTCH" in kwargs:
-        includeCrutch = not kwargs["NO_CRUTCH"]
-
-    if includeCrutch:
-        libdeps.append( '$BUILD_DIR/mongo/unittest/unittest_crutch' )
-
     kwargs['LIBDEPS'] = libdeps
 
     result = env.Program(target, source, **kwargs)

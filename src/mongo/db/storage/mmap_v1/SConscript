@@ -181,7 +181,6 @@ if mmapv1:
             '$BUILD_DIR/mongo/db/serveronly',
             '$BUILD_DIR/mongo/util/ntservice_mock',
             ],
-        NO_CRUTCH=True,
         )
 
     env.CppUnitTest(target = 'record_access_tracker_test',

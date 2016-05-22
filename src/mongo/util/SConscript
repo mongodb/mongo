@@ -346,7 +346,6 @@ if env.TargetOSIs('windows'):
             'shell32',
             env['LIBS']
         ],
-        NO_CRUTCH=True,
     )
 
 env.Library(

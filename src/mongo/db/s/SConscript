@@ -166,7 +166,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/util/net/message_port_mock',
         '$BUILD_DIR/mongo/util/ntservice_mock',
     ],
-    NO_CRUTCH = True,
 )
 
 env.CppUnitTest(
@@ -185,6 +184,5 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/util/net/message_port_mock',
         '$BUILD_DIR/mongo/util/ntservice_mock',
     ],
-    NO_CRUTCH = True,
 )
 

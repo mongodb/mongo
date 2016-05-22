@@ -85,7 +85,6 @@ env.CppUnitTest(
         'storage_interface_impl',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
     ],
-    NO_CRUTCH = True,
 )
 
 env.Library(
@@ -250,7 +249,6 @@ env.CppUnitTest(
         'rs_rollback',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
     ],
-    NO_CRUTCH = True,
 )
 
 env.Library(
@@ -317,7 +315,6 @@ env.CppUnitTest(
         'sync_tail',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
     ],
-    NO_CRUTCH = True,
 )
 
 env.Library('topology_coordinator',
@@ -651,7 +648,7 @@ env.CppUnitTest('isself_test',
                     '$BUILD_DIR/mongo/db/serveronly',
                     "$BUILD_DIR/mongo/util/ntservice_mock",
                 ],
-                NO_CRUTCH = True)
+                )
 
 env.Library(
     target='replset_commands',

@@ -249,7 +249,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/util/ntservice_mock',
     ],
-    NO_CRUTCH=True,
 )
 
 env.Library(

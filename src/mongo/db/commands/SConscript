@@ -102,7 +102,6 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/serveronly",
         "$BUILD_DIR/mongo/util/ntservice_mock",
     ],
-    NO_CRUTCH = True,
 )
 
 env.CppUnitTest(
@@ -114,7 +113,6 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/serveronly",
         "$BUILD_DIR/mongo/util/ntservice_mock",
     ],
-    NO_CRUTCH = True,
 )
 
 env.CppUnitTest(
@@ -127,5 +125,4 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/serveronly",
         "$BUILD_DIR/mongo/util/ntservice_mock",
     ],
-    NO_CRUTCH = True,
 )

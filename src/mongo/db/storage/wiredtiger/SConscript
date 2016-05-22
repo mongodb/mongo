@@ -106,7 +106,6 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/serveronly',
             '$BUILD_DIR/mongo/util/ntservice_mock',
             ],
-        NO_CRUTCH=True,
         )
 
     # All of these tests fail to compile under undefined behavior
