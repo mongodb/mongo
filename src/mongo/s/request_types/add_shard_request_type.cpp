@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/request_types/add_shard_request_type.h"
 
 #include "mongo/bson/util/bson_extract.h"
