@@ -11,6 +11,8 @@
  *    sure that some chunks are moved.
  */
 (function() {
+    'use strict';
+
     /**
      * Simple representation for wall clock time. Hour and minutes should be integers.
      */
@@ -82,17 +84,8 @@
 
     var st = new ShardingTest({shards: 2});
     var configDB = st.s.getDB('config');
-    assert.commandWorked(configDB.adminCommand({
-        configureFailPoint: 'balancerRoundIntervalSetting',
-        mode: 'alwaysOn',
-        data: {sleepSecs: 1}
-    }));
-
-    configDB.adminCommand({enableSharding: 'test'});
-    configDB.adminCommand({shardCollection: 'test.user', key: {_id: 1}});
-
-    // Disable balancer so it will not interfere with the chunk distribution setup.
-    st.stopBalancer();
+    assert.commandWorked(configDB.adminCommand({enableSharding: 'test'}));
+    assert.commandWorked(configDB.adminCommand({shardCollection: 'test.user', key: {_id: 1}}));
 
     for (var x = 0; x < 150; x += 10) {
         configDB.adminCommand({split: 'test.user', middle: {_id: x}});
@@ -102,24 +95,24 @@
 
     var startDate = new Date();
     var hourMinStart = new HourAndMinute(startDate.getHours(), startDate.getMinutes());
-    configDB.settings.update({_id: 'balancer'},
-                             {
-                               $set: {
-                                   activeWindow: {
-                                       start: hourMinStart.addHour(-2).toString(),
-                                       stop: hourMinStart.addHour(-1).toString()
-                                   },
-                                   stopped: false
-                               }
-                             },
-                             true);
+    assert.writeOK(configDB.settings.update({_id: 'balancer'},
+                                            {
+                                              $set: {
+                                                  activeWindow: {
+                                                      start: hourMinStart.addHour(-2).toString(),
+                                                      stop: hourMinStart.addHour(-1).toString()
+                                                  },
+                                                  stopped: false,
+                                              }
+                                            },
+                                            true));
 
     waitForAtLeastOneBalanceRound(st.s.host, 60 * 1000);
 
     var shard0ChunksAfter = configDB.chunks.find({ns: 'test.user', shard: 'shard0000'}).count();
     assert.eq(shard0Chunks, shard0ChunksAfter);
 
-    configDB.settings.update(
+    assert.writeOK(configDB.settings.update(
         {_id: 'balancer'},
         {
           $set: {
@@ -127,7 +120,7 @@
                   {start: hourMinStart.toString(), stop: hourMinStart.addHour(2).toString()}
           }
         },
-        true);
+        true));
 
     waitForAtLeastOneBalanceRound(st.s.host, 60 * 1000);
 

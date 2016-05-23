@@ -242,7 +242,6 @@ Status executeSingleMigration(OperationContext* txn,
 }
 
 MONGO_FP_DECLARE(skipBalanceRound);
-MONGO_FP_DECLARE(balancerRoundIntervalSetting);
 
 }  // namespace
 
@@ -336,11 +335,6 @@ void Balancer::_mainThread() {
             // Reporting the balancer as active must be first call so the balancer control scripts
             // know that there is an active balancer
             _stardingUptimeReporter.reportStatus(txn.get(), true);
-
-            MONGO_FAIL_POINT_BLOCK(balancerRoundIntervalSetting, scopedBalancerRoundInterval) {
-                const BSONObj& data = scopedBalancerRoundInterval.getData();
-                balanceRoundInterval = Seconds(data["sleepSecs"].numberInt());
-            }
 
             // Use fresh shard state and balancer settings
             shardingContext->shardRegistry()->reload(txn.get());
