@@ -301,9 +301,7 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
                  moe::Switch,
                  "For rolling access control upgrade. Attempt to authenticate over outgoing "
                  "connections and proceed regardless of success. Accept incoming connections "
-                 "with or without authentication.")
-        .setSources(moe::SourceAllLegacy)
-        .incompatibleWith("noauth");
+                 "with or without authentication.").incompatibleWith("noauth");
 
     options->addOptionChaining(
                  "security.clusterAuthMode",
