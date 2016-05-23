@@ -118,15 +118,25 @@ void ConnectionString::_fillServers(std::string s) {
 void ConnectionString::_finishInit() {
     switch (_type) {
         case MASTER:
-            verify(_setName.empty());
-            verify(_servers.size() == 1);
+            uassert(ErrorCodes::FailedToParse,
+                    "Cannot specify a replica set name for a ConnectionString of type MASTER",
+                    _setName.empty());
+            uassert(ErrorCodes::FailedToParse,
+                    "ConnectionStrings of type MASTER must contain exactly one server",
+                    _servers.size() == 1);
             break;
         case SET:
-            verify(!_setName.empty());
-            verify(_servers.size() >= 1);  // 1 is ok since we can derive
+            uassert(ErrorCodes::FailedToParse,
+                    "Must specify set name for replica set ConnectionStrings",
+                    !_setName.empty());
+            uassert(ErrorCodes::FailedToParse,
+                    "Replica set ConnectionStrings must have at least one server specified",
+                    _servers.size() >= 1);
             break;
         default:
-            verify(_servers.size() > 0);
+            uassert(ErrorCodes::FailedToParse,
+                    "ConnectionStrings must specify at least one server",
+                    _servers.size() > 0);
     }
 
     // Needed here as well b/c the parsing logic isn't used in all constructors
