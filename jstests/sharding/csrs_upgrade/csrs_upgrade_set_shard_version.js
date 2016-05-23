@@ -55,14 +55,11 @@ load("jstests/libs/csrs_upgrade_util.js");
     coordinator.shutdownOneSCCCNode();
     coordinator.allowAllCSRSNodesToVote();
     coordinator.switchToCSRSMode();
-
-    assertIsSCCCConnectionString(
-        coordinator.getShard(0).adminCommand('serverStatus').sharding.configsvrConnectionString);
-    assertIsSCCCConnectionString(
-        coordinator.getShard(1).adminCommand('serverStatus').sharding.configsvrConnectionString);
-
     assert.commandWorked(coordinator.getMongos(0).adminCommand('flushRouterConfig'));
 
+    // Can't assert that the shard *hasn't* switched to CSRS mode yet as the dist lock pinger could
+    // trigger the swap even with no other operations happening.  Instead just verify that after a
+    // query the shards have definitely switched to CSRS mode.
     assert.eq(40,
               coordinator.getMongos(0)
                   .getCollection(coordinator.getShardedCollectionName())
