@@ -26,7 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "test_util.i"
+#include "test_util.h"
 
 static char home[512];				/* Program working dir */
 static const char *progname;			/* Program name */

@@ -880,6 +880,7 @@ os
 osfhandle
 ovfl
 ownp
+pR
 packv
 pagesize
 parens
@@ -925,6 +926,7 @@ pushms
 putK
 putV
 pv
+pvA
 pwrite
 py
 qdown

@@ -26,22 +26,14 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include "test_util.h"
+
 #include <sys/wait.h>
-#include <errno.h>
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#ifndef _WIN32
-#include <unistd.h>
-#else
+
+#ifdef _WIN32
 /* snprintf is not supported on <= VS2013 */
 #define	snprintf _snprintf
 #endif
-
-#include <wiredtiger.h>
-
-#include "test_util.i"
 
 static char home[512];			/* Program working dir */
 static const char *progname;		/* Program name */

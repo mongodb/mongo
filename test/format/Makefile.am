@@ -1,21 +1,24 @@
-AM_CPPFLAGS = -I$(top_builddir) \
-    -I$(top_srcdir)/src/include -I$(top_srcdir)/test/utility
+AM_CPPFLAGS = -I$(top_builddir)
+AM_CPPFLAGS +=-I$(top_srcdir)/src/include
+AM_CPPFLAGS +=-I$(top_srcdir)/test/utility
 if HAVE_BERKELEY_DB
-AM_CPPFLAGS += -DHAVE_BERKELEY_DB \
-	-DBERKELEY_DB_PATH=\"$(BERKELEY_DB_PATH)\" -I$(BERKELEY_DB_PATH)/include
+AM_CPPFLAGS +=-DHAVE_BERKELEY_DB
+AM_CPPFLAGS +=-DBERKELEY_DB_PATH=\"$(BERKELEY_DB_PATH)\"
+AM_CPPFLAGS +=-I$(BERKELEY_DB_PATH)/include
 endif
 
 noinst_PROGRAMS = t
 noinst_SCRIPTS = s_dumpcmp
 t_SOURCES =\
-	config.h format.h backup.c bulk.c compact.c config.c lrt.c ops.c \
-	rebalance.c salvage.c t.c util.c wts.c
+	backup.c bulk.c compact.c config.c lrt.c ops.c rebalance.c \
+	salvage.c t.c util.c wts.c
 
 if HAVE_BERKELEY_DB
 t_SOURCES += bdb.c
 endif
 
-t_LDADD = $(top_builddir)/libwiredtiger.la
+t_LDADD = $(top_builddir)/test/utility/libtest_util.la
+t_LDADD +=$(top_builddir)/libwiredtiger.la
 if HAVE_BERKELEY_DB
 t_LDADD += -L$(BERKELEY_DB_PATH)/lib -ldb
 endif

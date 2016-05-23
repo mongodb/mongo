@@ -26,7 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "test_util.i"
+#include "test_util.h"
 
 void (*custom_die)(void) = NULL;
 
@@ -42,6 +42,7 @@ test_value(int64_t val)
 	uint64_t uinput, uoutput;
 	size_t used_len;
 
+	soutput = 0;	/* -Werror=maybe-uninitialized */
 	sinput = val;
 	soutput = 0;	/* Make GCC happy. */
 	p = buf;

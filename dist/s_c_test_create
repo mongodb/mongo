@@ -1,0 +1,105 @@
+#! /bin/sh
+
+#
+# Usage: s_c_test_create test_name
+#
+# Create a new test case in the C test suite.
+# This will create the infrastructure for a new C test case.  The given
+# test name is a new directory in the C suite directory and the Makefile
+# components and C program template are created.
+#
+# Any 'make check' variations of this test should be added to the smoke.sh
+# script in the main C suite directory.
+#
+tmp=__a
+trap 'rm -f $tmp; exit 0' 0 1 2 3 13 15
+
+if [ "x$1" = "x" ]; then
+	echo "Usage: $0 test_name"
+	exit 1
+fi
+CSUITE_DIRECTORY=../test/csuite
+MAKEFILE_NAME=$CSUITE_DIRECTORY/Makefile.am
+
+TEST_NAME=$1
+
+exists=`grep $TEST_NAME $MAKEFILE_NAME`
+
+if [ "x$exists" != "x" ]; then
+	echo "Test with requested name already exists. Try another name."
+	exit 1
+fi
+
+# Create a subdirectory and stub for the new test
+mkdir $CSUITE_DIRECTORY/$TEST_NAME
+
+(cat <<EOF
+/*-
+ * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2008-2014 WiredTiger, Inc.
+ *
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+#include "test_util.h"
+
+/*
+ * JIRA ticket reference: 
+ * Test case description: 
+ * Failure mode: 
+ */
+
+void (*custom_die)(void) = NULL;
+
+int
+main(int argc, char *argv[])
+{
+	TEST_OPTS *opts, _opts;
+
+	opts = &_opts;
+	memset(opts, 0, sizeof(*opts));
+	testutil_check(testutil_parse_opts(argc, argv, opts));
+	testutil_make_work_dir(opts->home);
+
+	/*
+	 * Insert test implementation here.
+	 */
+
+	testutil_cleanup(opts);
+
+	return (0);
+}
+EOF
+) > $CSUITE_DIRECTORY/$TEST_NAME/main.c
+
+
+# Now update the C test suite makefile to include the new test case
+
+NEW_MAKE_SECT="test_${TEST_NAME}_SOURCES = ${TEST_NAME}\/main.c\\nnoinst_PROGRAMS = test_${TEST_NAME}\\n\\n"
+
+cat $CSUITE_DIRECTORY/Makefile.am | awk \
+    "/^# Script add new line here/ && !modif { printf(\"$NEW_MAKE_SECT\"); modif=1 } {print}" > $tmp
+
+mv $tmp $CSUITE_DIRECTORY/Makefile.am
+
+exit 0
