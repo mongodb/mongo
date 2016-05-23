@@ -86,6 +86,13 @@
 
     // Find command.
     if (db.getMongo().useReadCommands()) {
+        // On _id field.
+        assert.writeOK(coll.insert({_id: "foo"}));
+        assert.eq(0, coll.find({_id: "FOO"}).itcount());
+        assert.eq(0, coll.find({_id: "FOO"}).collation({locale: "en_US"}).itcount());
+        assert.eq(1, coll.find({_id: "FOO"}).collation({locale: "en_US", strength: 2}).itcount());
+        assert.writeOK(coll.remove({_id: "foo"}));
+
         // Without an index.
         assert.eq(0, coll.find({str: "FOO"}).itcount());
         assert.eq(0, coll.find({str: "FOO"}).collation({locale: "en_US"}).itcount());
