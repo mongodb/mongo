@@ -40,7 +40,7 @@
 namespace mongo {
 
 // static
-BSONObj IndexLegacy::adjustIndexSpecObject(const BSONObj& obj) {
+StatusWith<BSONObj> IndexLegacy::adjustIndexSpecObject(const BSONObj& obj) {
     std::string pluginName = IndexNames::findPluginName(obj.getObjectField("key"));
 
     if (IndexNames::TEXT == pluginName) {

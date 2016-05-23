@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/s2_common.h"
@@ -44,9 +45,11 @@ public:
      * Takes an index spec object for this index and returns a copy tweaked to conform to the
      * expected format.  When an index build is initiated, this function is called on the spec
      * object the user provides, and the return value of this function is the final spec object
-     * that gets saved in the index catalog.  Throws a UserException if 'specObj' is invalid.
+     * that gets saved in the index catalog.
+     *
+     * Returns a non-OK status if 'specObj' is invalid.
      */
-    static BSONObj fixSpec(const BSONObj& specObj);
+    static StatusWith<BSONObj> fixSpec(const BSONObj& specObj);
 
 private:
     /**

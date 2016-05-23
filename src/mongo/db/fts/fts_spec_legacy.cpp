@@ -191,7 +191,7 @@ void FTSSpec::_scoreDocumentV1(const BSONObj& obj, TermFrequencyMap* term_freqs)
     }
 }
 
-BSONObj FTSSpec::_fixSpecV1(const BSONObj& spec) {
+StatusWith<BSONObj> FTSSpec::_fixSpecV1(const BSONObj& spec) {
     map<string, int> m;
 
     BSONObj keyPattern;
@@ -238,10 +238,11 @@ BSONObj FTSSpec::_fixSpecV1(const BSONObj& spec) {
     {
         BSONObjBuilder b;
         for (map<string, int>::iterator i = m.begin(); i != m.end(); ++i) {
-            uassert(17365,
-                    str::stream() << "text index weight must be in the exclusive interval (0,"
-                                  << MAX_WORD_WEIGHT << ") but found: " << i->second,
-                    i->second > 0 && i->second < MAX_WORD_WEIGHT);
+            if (i->second <= 0 || i->second >= MAX_WORD_WEIGHT) {
+                return {ErrorCodes::CannotCreateIndex,
+                        str::stream() << "text index weight must be in the exclusive interval (0,"
+                                      << MAX_WORD_WEIGHT << ") but found: " << i->second};
+            }
             b.append(i->first, i->second);
         }
         weights = b.obj();
@@ -277,9 +278,10 @@ BSONObj FTSSpec::_fixSpecV1(const BSONObj& spec) {
             version = e.numberInt();
         } else if (str::equals(e.fieldName(), "textIndexVersion")) {
             textIndexVersion = e.numberInt();
-            uassert(17366,
-                    str::stream() << "bad textIndexVersion: " << textIndexVersion,
-                    textIndexVersion == 1);
+            if (textIndexVersion != 1) {
+                return {ErrorCodes::CannotCreateIndex,
+                        str::stream() << "bad textIndexVersion: " << textIndexVersion};
+            }
         } else {
             b.append(e);
         }

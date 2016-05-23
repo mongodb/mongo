@@ -34,6 +34,7 @@
 #include <vector>
 #include <string>
 
+#include "mongo/base/status_with.h"
 #include "mongo/db/fts/fts_language.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/db/fts/stemmer.h"
@@ -113,7 +114,7 @@ public:
     const Weights& weights() const {
         return _weights;
     }
-    static BSONObj fixSpec(const BSONObj& spec);
+    static StatusWith<BSONObj> fixSpec(const BSONObj& spec);
 
     /**
      * Returns text index version.
@@ -164,7 +165,7 @@ private:
 
     const FTSLanguage& _getLanguageToUseV1(const BSONObj& userDoc) const;
 
-    static BSONObj _fixSpecV1(const BSONObj& spec);
+    static StatusWith<BSONObj> _fixSpecV1(const BSONObj& spec);
 
     //
     // Instance variables.

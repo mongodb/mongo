@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
@@ -54,7 +55,7 @@ public:
      * GEO_2DSPHERE provide additional validation on the index spec, and tweak the index spec
      * object to conform to their expected format.
      */
-    static BSONObj adjustIndexSpecObject(const BSONObj& obj);
+    static StatusWith<BSONObj> adjustIndexSpecObject(const BSONObj& obj);
 
     /**
      * Returns the BSONObj that is inserted into an index when the object is missing the keys

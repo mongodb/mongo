@@ -80,7 +80,7 @@ S2AccessMethod::S2AccessMethod(IndexCatalogEntry* btreeState, SortedDataInterfac
 }
 
 // static
-BSONObj S2AccessMethod::fixSpec(const BSONObj& specObj) {
+StatusWith<BSONObj> S2AccessMethod::fixSpec(const BSONObj& specObj) {
     // If the spec object has the field "2dsphereIndexVersion", validate it.  If it doesn't, add
     // {2dsphereIndexVersion: 3}, which is the default for newly-built indexes.
 
@@ -92,22 +92,33 @@ BSONObj S2AccessMethod::fixSpec(const BSONObj& specObj) {
         return bob.obj();
     }
 
-    uassert(40108,
-            str::stream() << "Invalid type or value for geo index version { "
-                          << kIndexVersionFieldName << " : " << indexVersionElt
-                          << " }, only versions: [" << S2_INDEX_VERSION_1 << ","
-                          << S2_INDEX_VERSION_2 << "," << S2_INDEX_VERSION_3 << "] are supported",
-            indexVersionElt.isNumber() && ((indexVersionElt.type() != mongo::NumberDouble) ||
-                                           std::isnormal(indexVersionElt.numberDouble())));
+    if (!indexVersionElt.isNumber()) {
+        return {ErrorCodes::CannotCreateIndex,
+                str::stream() << "Invalid type for geo index version { " << kIndexVersionFieldName
+                              << " : " << indexVersionElt << " }, only versions: ["
+                              << S2_INDEX_VERSION_1 << "," << S2_INDEX_VERSION_2 << ","
+                              << S2_INDEX_VERSION_3 << "] are supported"};
+    }
+
+    if (indexVersionElt.type() == BSONType::NumberDouble &&
+        !std::isnormal(indexVersionElt.numberDouble())) {
+        return {ErrorCodes::CannotCreateIndex,
+                str::stream() << "Invalid value for geo index version { " << kIndexVersionFieldName
+                              << " : " << indexVersionElt << " }, only versions: ["
+                              << S2_INDEX_VERSION_1 << "," << S2_INDEX_VERSION_2 << ","
+                              << S2_INDEX_VERSION_3 << "] are supported"};
+    }
 
     const auto indexVersion = indexVersionElt.numberLong();
+    if (indexVersion != S2_INDEX_VERSION_1 && indexVersion != S2_INDEX_VERSION_2 &&
+        indexVersion != S2_INDEX_VERSION_3) {
+        return {ErrorCodes::CannotCreateIndex,
+                str::stream() << "unsupported geo index version { " << kIndexVersionFieldName
+                              << " : " << indexVersionElt << " }, only versions: ["
+                              << S2_INDEX_VERSION_1 << "," << S2_INDEX_VERSION_2 << ","
+                              << S2_INDEX_VERSION_3 << "] are supported"};
+    }
 
-    uassert(17394,
-            str::stream() << "unsupported geo index version { " << kIndexVersionFieldName << " : "
-                          << indexVersionElt << " }, only versions: [" << S2_INDEX_VERSION_1 << ","
-                          << S2_INDEX_VERSION_2 << "," << S2_INDEX_VERSION_3 << "] are supported",
-            (indexVersion == S2_INDEX_VERSION_3 || indexVersion == S2_INDEX_VERSION_2 ||
-             indexVersion == S2_INDEX_VERSION_1));
     return specObj;
 }
 

@@ -276,18 +276,21 @@ StatusWith<BSONObj> IndexCatalog::prepareSpecForCreate(OperationContext* txn,
     if (!status.isOK())
         return StatusWith<BSONObj>(status);
 
-    BSONObj fixed = _fixIndexSpec(original);
+    auto fixed = _fixIndexSpec(original);
+    if (!fixed.isOK()) {
+        return fixed;
+    }
 
     // we double check with new index spec
-    status = _isSpecOk(txn, fixed);
+    status = _isSpecOk(txn, fixed.getValue());
     if (!status.isOK())
         return StatusWith<BSONObj>(status);
 
-    status = _doesSpecConflictWithExisting(txn, fixed);
+    status = _doesSpecConflictWithExisting(txn, fixed.getValue());
     if (!status.isOK())
         return StatusWith<BSONObj>(status);
 
-    return StatusWith<BSONObj>(fixed);
+    return fixed;
 }
 
 Status IndexCatalog::createIndexOnEmptyCollection(OperationContext* txn, BSONObj spec) {
@@ -1257,8 +1260,12 @@ BSONObj IndexCatalog::fixIndexKey(const BSONObj& key) {
     return key;
 }
 
-BSONObj IndexCatalog::_fixIndexSpec(const BSONObj& spec) {
-    BSONObj o = IndexLegacy::adjustIndexSpecObject(spec);
+StatusWith<BSONObj> IndexCatalog::_fixIndexSpec(const BSONObj& spec) {
+    auto statusWithSpec = IndexLegacy::adjustIndexSpecObject(spec);
+    if (!statusWithSpec.isOK()) {
+        return statusWithSpec;
+    }
+    BSONObj o = statusWithSpec.getValue();
 
     BSONObjBuilder b;
 

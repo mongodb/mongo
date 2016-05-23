@@ -38,6 +38,7 @@ namespace mongo {
 
 using std::set;
 using std::string;
+using unittest::assertGet;
 
 namespace fts {
 
@@ -49,10 +50,10 @@ void assertFixSuccess(const std::string& s) {
 
     try {
         // fixSpec() should not throw on a valid spec.
-        BSONObj fixed = FTSSpec::fixSpec(user);
+        BSONObj fixed = assertGet(FTSSpec::fixSpec(user));
 
         // fixSpec() on an already-fixed spec shouldn't change it.
-        BSONObj fixed2 = FTSSpec::fixSpec(fixed);
+        BSONObj fixed2 = assertGet(FTSSpec::fixSpec(fixed));
         ASSERT_EQUALS(fixed, fixed2);
     } catch (UserException&) {
         ASSERT(false);
@@ -64,14 +65,7 @@ void assertFixSuccess(const std::string& s) {
  */
 void assertFixFailure(const std::string& s) {
     BSONObj user = fromjson(s);
-
-    try {
-        // fixSpec() on an invalid spec should uassert.
-        BSONObj fixed = FTSSpec::fixSpec(user);
-    } catch (UserException&) {
-        return;
-    }
-    ASSERT(false);
+    ASSERT_NOT_OK(FTSSpec::fixSpec(user));
 }
 
 TEST(FTSSpec, FixNormalKey1) {
@@ -192,7 +186,7 @@ TEST(FTSSpec, ScoreSingleField1) {
                                       << "text"
                                       << "text") << "weights" << BSON("title" << 10));
 
-    FTSSpec spec(FTSSpec::fixSpec(user));
+    FTSSpec spec(assertGet(FTSSpec::fixSpec(user)));
 
     TermFrequencyMap m;
     spec.scoreDocument(BSON("title"
@@ -210,7 +204,7 @@ TEST(FTSSpec, ScoreMultipleField1) {
                                       << "text"
                                       << "text") << "weights" << BSON("title" << 10));
 
-    FTSSpec spec(FTSSpec::fixSpec(user));
+    FTSSpec spec(assertGet(FTSSpec::fixSpec(user)));
 
     TermFrequencyMap m;
     spec.scoreDocument(BSON("title"
@@ -236,7 +230,7 @@ TEST(FTSSpec, ScoreMultipleField2) {
                                       << "a.b"
                                       << "text"));
 
-    FTSSpec spec(FTSSpec::fixSpec(user));
+    FTSSpec spec(assertGet(FTSSpec::fixSpec(user)));
 
     TermFrequencyMap m;
     spec.scoreDocument(BSON("a" << BSON("b"
@@ -251,7 +245,7 @@ TEST(FTSSpec, ScoreRepeatWord) {
                                       << "text"
                                       << "text") << "weights" << BSON("title" << 10));
 
-    FTSSpec spec(FTSSpec::fixSpec(user));
+    FTSSpec spec(assertGet(FTSSpec::fixSpec(user)));
 
     TermFrequencyMap m;
     spec.scoreDocument(BSON("title"
@@ -266,7 +260,7 @@ TEST(FTSSpec, ScoreRepeatWord) {
 TEST(FTSSpec, Extra1) {
     BSONObj user = BSON("key" << BSON("data"
                                       << "text"));
-    FTSSpec spec(FTSSpec::fixSpec(user));
+    FTSSpec spec(assertGet(FTSSpec::fixSpec(user)));
     ASSERT_EQUALS(0U, spec.numExtraBefore());
     ASSERT_EQUALS(0U, spec.numExtraAfter());
 }
@@ -275,20 +269,20 @@ TEST(FTSSpec, Extra2) {
     BSONObj user = BSON("key" << BSON("data"
                                       << "text"
                                       << "x" << 1));
-    BSONObj fixed = FTSSpec::fixSpec(user);
+    BSONObj fixed = assertGet(FTSSpec::fixSpec(user));
     FTSSpec spec(fixed);
     ASSERT_EQUALS(0U, spec.numExtraBefore());
     ASSERT_EQUALS(1U, spec.numExtraAfter());
     ASSERT_EQUALS(StringData("x"), spec.extraAfter(0));
 
-    BSONObj fixed2 = FTSSpec::fixSpec(fixed);
+    BSONObj fixed2 = assertGet(FTSSpec::fixSpec(fixed));
     ASSERT_EQUALS(fixed, fixed2);
 }
 
 TEST(FTSSpec, Extra3) {
     BSONObj user = BSON("key" << BSON("x" << 1 << "data"
                                           << "text"));
-    BSONObj fixed = FTSSpec::fixSpec(user);
+    BSONObj fixed = assertGet(FTSSpec::fixSpec(user));
 
     ASSERT_EQUALS(BSON("x" << 1 << "_fts"
                            << "text"
@@ -296,7 +290,7 @@ TEST(FTSSpec, Extra3) {
                   fixed["key"].Obj());
     ASSERT_EQUALS(BSON("data" << 1), fixed["weights"].Obj());
 
-    BSONObj fixed2 = FTSSpec::fixSpec(fixed);
+    BSONObj fixed2 = assertGet(FTSSpec::fixSpec(fixed));
     ASSERT_EQUALS(fixed, fixed2);
 
     FTSSpec spec(fixed);
@@ -323,7 +317,7 @@ TEST(FTSSpec, Extra3) {
 TEST(FTSSpec, NestedArraysPos1) {
     BSONObj user = BSON("key" << BSON("a.b"
                                       << "text"));
-    FTSSpec spec(FTSSpec::fixSpec(user));
+    FTSSpec spec(assertGet(FTSSpec::fixSpec(user)));
 
     // The following document matches {"a.b": {$type: 2}}, so "term" should be indexed.
     BSONObj obj = fromjson("{a: [{b: ['term']}]}");  // indirectly nested arrays
@@ -335,7 +329,7 @@ TEST(FTSSpec, NestedArraysPos1) {
 TEST(FTSSpec, NestedArraysPos2) {
     BSONObj user = BSON("key" << BSON("$**"
                                       << "text"));
-    FTSSpec spec(FTSSpec::fixSpec(user));
+    FTSSpec spec(assertGet(FTSSpec::fixSpec(user)));
 
     // The wildcard spec implies a full recursive traversal, so "term" should be indexed.
     BSONObj obj = fromjson("{a: {b: [['term']]}}");  // directly nested arrays
@@ -347,7 +341,7 @@ TEST(FTSSpec, NestedArraysPos2) {
 TEST(FTSSpec, NestedArraysNeg1) {
     BSONObj user = BSON("key" << BSON("a.b"
                                       << "text"));
-    FTSSpec spec(FTSSpec::fixSpec(user));
+    FTSSpec spec(assertGet(FTSSpec::fixSpec(user)));
 
     // The following document does not match {"a.b": {$type: 2}}, so "term" should not be
     // indexed.
@@ -361,7 +355,7 @@ TEST(FTSSpec, NestedArraysNeg1) {
 TEST(FTSSpec, NestedLanguages_PerArrayItemStemming) {
     BSONObj indexSpec = BSON("key" << BSON("a.b.c"
                                            << "text"));
-    FTSSpec spec(FTSSpec::fixSpec(indexSpec));
+    FTSSpec spec(assertGet(FTSSpec::fixSpec(indexSpec)));
     TermFrequencyMap tfm;
 
     BSONObj obj = fromjson(
@@ -390,7 +384,7 @@ TEST(FTSSpec, NestedLanguages_PerArrayItemStemming) {
 TEST(FTSSpec, NestedLanguages_PerSubdocStemming) {
     BSONObj indexSpec = BSON("key" << BSON("a.b.c"
                                            << "text"));
-    FTSSpec spec(FTSSpec::fixSpec(indexSpec));
+    FTSSpec spec(assertGet(FTSSpec::fixSpec(indexSpec)));
     TermFrequencyMap tfm;
 
     BSONObj obj = fromjson(
@@ -421,7 +415,7 @@ TEST(FTSSpec, NestedLanguages_PerSubdocStemming) {
 TEST(FTSSpec, NestedLanguages_NestedArrays) {
     BSONObj indexSpec = BSON("key" << BSON("a.b.c"
                                            << "text"));
-    FTSSpec spec(FTSSpec::fixSpec(indexSpec));
+    FTSSpec spec(assertGet(FTSSpec::fixSpec(indexSpec)));
     TermFrequencyMap tfm;
 
     BSONObj obj = fromjson(
@@ -452,7 +446,7 @@ TEST(FTSSpec, NestedLanguages_NestedArrays) {
 TEST(FTSSpec, NestedLanguages_PathPruning) {
     BSONObj indexSpec = BSON("key" << BSON("a.b.c"
                                            << "text"));
-    FTSSpec spec(FTSSpec::fixSpec(indexSpec));
+    FTSSpec spec(assertGet(FTSSpec::fixSpec(indexSpec)));
     TermFrequencyMap tfm;
 
     BSONObj obj = fromjson(
@@ -485,7 +479,7 @@ TEST(FTSSpec, NestedLanguages_PathPruning) {
 TEST(FTSSpec, NestedLanguages_Wildcard) {
     BSONObj indexSpec = BSON("key" << BSON("$**"
                                            << "text"));
-    FTSSpec spec(FTSSpec::fixSpec(indexSpec));
+    FTSSpec spec(assertGet(FTSSpec::fixSpec(indexSpec)));
     TermFrequencyMap tfm;
 
     BSONObj obj = fromjson(
@@ -519,7 +513,7 @@ TEST(FTSSpec, NestedLanguages_Wildcard) {
 TEST(FTSSpec, NestedLanguages_WildcardOverride) {
     BSONObj indexSpec = BSON("key" << BSON("$**"
                                            << "text") << "weights" << BSON("d.e.f" << 20));
-    FTSSpec spec(FTSSpec::fixSpec(indexSpec));
+    FTSSpec spec(assertGet(FTSSpec::fixSpec(indexSpec)));
     TermFrequencyMap tfm;
 
     BSONObj obj = fromjson(
@@ -556,7 +550,7 @@ TEST(FTSSpec, TextIndexLegacyNestedArrays) {
     // textIndexVersion=1 FTSSpec objects do not index nested arrays.
     {
         BSONObj indexSpec = fromjson("{key: {'a.b': 'text'}, textIndexVersion: 1}");
-        FTSSpec spec(FTSSpec::fixSpec(indexSpec));
+        FTSSpec spec(assertGet(FTSSpec::fixSpec(indexSpec)));
         TermFrequencyMap tfm;
         spec.scoreDocument(obj, &tfm);
         ASSERT_EQUALS(tfm.size(), 0U);
@@ -565,7 +559,7 @@ TEST(FTSSpec, TextIndexLegacyNestedArrays) {
     // textIndexVersion=2 FTSSpec objects do index nested arrays.
     {
         BSONObj indexSpec = fromjson("{key: {'a.b': 'text'}, textIndexVersion: 2}");
-        FTSSpec spec(FTSSpec::fixSpec(indexSpec));
+        FTSSpec spec(assertGet(FTSSpec::fixSpec(indexSpec)));
         TermFrequencyMap tfm;
         spec.scoreDocument(obj, &tfm);
         ASSERT_EQUALS(tfm.size(), 1U);
@@ -580,7 +574,7 @@ TEST(FTSSpec, TextIndexLegacyLanguageRecognition) {
     // for purposes of stopword processing.
     {
         BSONObj indexSpec = fromjson("{key: {'a': 'text'}, textIndexVersion: 1}");
-        FTSSpec spec(FTSSpec::fixSpec(indexSpec));
+        FTSSpec spec(assertGet(FTSSpec::fixSpec(indexSpec)));
         TermFrequencyMap tfm;
         spec.scoreDocument(obj, &tfm);
         ASSERT_EQUALS(tfm.size(), 1U);  // "the" not recognized as stopword
@@ -589,7 +583,7 @@ TEST(FTSSpec, TextIndexLegacyLanguageRecognition) {
     // textIndexVersion=2 FTSSpec objects recognize two-letter codes.
     {
         BSONObj indexSpec = fromjson("{key: {'a': 'text'}, textIndexVersion: 2}");
-        FTSSpec spec(FTSSpec::fixSpec(indexSpec));
+        FTSSpec spec(assertGet(FTSSpec::fixSpec(indexSpec)));
         TermFrequencyMap tfm;
         spec.scoreDocument(obj, &tfm);
         ASSERT_EQUALS(tfm.size(), 0U);  // "the" recognized as stopword
