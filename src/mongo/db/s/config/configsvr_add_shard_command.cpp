@@ -215,8 +215,10 @@ public:
              std::string& errmsg,
              BSONObjBuilder& result) override {
         if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            string errmsg = "_configsvrAddShard can only be run on config servers";
-            return appendCommandStatus(result, Status(ErrorCodes::IllegalOperation, errmsg));
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::IllegalOperation,
+                       "_configsvrAddShard can only be run on config servers"));
         }
 
         auto swParsedRequest = AddShardRequest::parseFromConfigCommand(cmdObj);
