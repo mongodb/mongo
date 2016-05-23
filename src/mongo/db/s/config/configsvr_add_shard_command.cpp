@@ -154,7 +154,7 @@ public:
         return _maxSizeMB.is_initialized();
     }
 
-    const long long getMaxSize() const {
+    long long getMaxSize() const {
         invariant(_maxSizeMB.is_initialized());
         return *_maxSizeMB;
     }
