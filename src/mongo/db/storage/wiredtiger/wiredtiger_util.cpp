@@ -230,7 +230,7 @@ Status WiredTigerUtil::checkApplicationMetadataFormatVersion(OperationContext* o
     if (version < minimumVersion || version > maximumVersion) {
         return Status(ErrorCodes::UnsupportedFormat,
                       str::stream() << "Application metadata for " << uri
-                                    << " has unsupported format version " << version);
+                                    << " has unsupported format version: " << version << ".");
     }
 
     LOG(2) << "WiredTigerUtil::checkApplicationMetadataFormatVersion "
