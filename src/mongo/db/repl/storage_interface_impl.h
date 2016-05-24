@@ -66,6 +66,10 @@ public:
 
     void setMinValid(OperationContext* ctx, const BatchBoundaries& boundaries) override;
 
+    StatusWith<OpTime> writeOpsToOplog(OperationContext* txn,
+                                       const NamespaceString& nss,
+                                       const MultiApplier::Operations& operations) override;
+
 private:
     NamespaceString _minValidNss;
 };

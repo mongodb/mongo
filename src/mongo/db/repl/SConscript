@@ -56,6 +56,7 @@ env.Library(
         'storage_interface.cpp',
     ],
     LIBDEPS=[
+        'oplog_entry',
         'optime',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/decorable',
@@ -79,6 +80,7 @@ env.CppUnitTest(
         'storage_interface_impl_test.cpp',
     ],
     LIBDEPS=[
+        'oplog_interface_local',
         'replmocks',
         'storage_interface_impl',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',

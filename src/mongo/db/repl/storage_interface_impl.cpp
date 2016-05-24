@@ -32,10 +32,14 @@
 
 #include "mongo/db/repl/storage_interface_impl.h"
 
+#include <algorithm>
+
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
@@ -185,6 +189,39 @@ void StorageInterfaceImpl::setMinValid(OperationContext* txn, const BatchBoundar
     LOG(3) << "setting minvalid: " << boundaries.start.toString() << "("
            << boundaries.start.toBSON() << ") -> " << boundaries.end.toString() << "("
            << boundaries.end.toBSON() << ")";
+}
+
+StatusWith<OpTime> StorageInterfaceImpl::writeOpsToOplog(
+    OperationContext* txn, const NamespaceString& nss, const MultiApplier::Operations& operations) {
+    if (operations.empty()) {
+        return {ErrorCodes::EmptyArrayOperation,
+                "unable to write operations to oplog - no operations provided"};
+    }
+
+    std::vector<BSONObj> ops(operations.size());
+    auto toBSON = [](const OplogEntry& entry) { return entry.raw; };
+    std::transform(operations.begin(), operations.end(), ops.begin(), toBSON);
+
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        AutoGetCollection collectionWriteGuard(txn, nss, MODE_X);
+        auto collection = collectionWriteGuard.getCollection();
+        if (!collection) {
+            return {ErrorCodes::NamespaceNotFound,
+                    str::stream() << "unable to write operations to oplog at " << nss.ns()
+                                  << ": collection not found. Did you drop it?"};
+        }
+
+        WriteUnitOfWork wunit(txn);
+        OpDebug* const nullOpDebug = nullptr;
+        auto status = collection->insertDocuments(txn, ops.begin(), ops.end(), nullOpDebug, false);
+        if (!status.isOK()) {
+            return status;
+        }
+        wunit.commit();
+    }
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "writeOpsToOplog", nss.ns());
+
+    return operations.back().getOpTime();
 }
 
 }  // namespace repl

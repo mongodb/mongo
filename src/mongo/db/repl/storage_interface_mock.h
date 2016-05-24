@@ -52,6 +52,11 @@ public:
                      const DurableRequirement durReq) override;
     void setMinValid(OperationContext* txn, const BatchBoundaries& boundaries) override;
 
+
+    StatusWith<OpTime> writeOpsToOplog(OperationContext* txn,
+                                       const NamespaceString& nss,
+                                       const MultiApplier::Operations& operations) override;
+
 private:
     mutable stdx::mutex _initialSyncFlagMutex;
     bool _initialSyncFlag = false;

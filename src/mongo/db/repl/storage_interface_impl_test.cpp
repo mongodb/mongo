@@ -30,13 +30,17 @@
 
 #include <memory>
 
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
@@ -67,6 +71,49 @@ BSONObj getMinValidDocument(OperationContext* txn, const NamespaceString& minVal
     return BSONObj();
 }
 
+/**
+ * Creates collection options suitable for oplog.
+ */
+CollectionOptions createOplogCollectionOptions() {
+    CollectionOptions options;
+    options.capped = true;
+    options.cappedSize = 64 * 1024 * 1024LL;
+    options.autoIndexId = CollectionOptions::NO;
+    return options;
+}
+
+/**
+ * Create test collection.
+ * Returns collection.
+ */
+void createCollection(OperationContext* txn,
+                      const NamespaceString& nss,
+                      const CollectionOptions& options) {
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        ScopedTransaction transaction(txn, MODE_IX);
+        Lock::DBLock dblk(txn->lockState(), nss.db(), MODE_X);
+        OldClientContext ctx(txn, nss.ns());
+        auto db = ctx.db();
+        ASSERT_TRUE(db);
+        mongo::WriteUnitOfWork wuow(txn);
+        auto coll = db->createCollection(txn, nss.ns(), options);
+        ASSERT_TRUE(coll);
+        wuow.commit();
+    }
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createCollection", nss.ns());
+}
+
+/**
+ * Creates an oplog entry with given optime.
+ */
+OplogEntry makeOplogEntry(OpTime opTime) {
+    BSONObjBuilder bob;
+    bob.appendElements(opTime.toBSON());
+    bob.append("h", 1LL);
+    bob.append("op", "c");
+    bob.append("ns", "test.t");
+    return OplogEntry(bob.obj());
+}
 
 class StorageInterfaceImplTest : public ServiceContextMongoDTest {
 protected:
@@ -195,6 +242,65 @@ TEST_F(StorageInterfaceImplTest, SnapshotNotSupported) {
     auto txn = getClient()->makeOperationContext();
     Status status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
     ASSERT_EQUALS(status, ErrorCodes::CommandNotSupported);
+}
+
+TEST_F(StorageInterfaceImplTest,
+       WriteOpsToOplogReturnsEmptyArrayOperationWhenNoOperationsAreGiven) {
+    NamespaceString nss("local." + _agent.getTestName());
+    StorageInterfaceImpl storageInterface(nss);
+    auto txn = getClient()->makeOperationContext();
+    ASSERT_EQUALS(ErrorCodes::EmptyArrayOperation,
+                  storageInterface.writeOpsToOplog(txn.get(), nss, {}));
+}
+
+TEST_F(StorageInterfaceImplTest,
+       WriteOpsToOplogReturnsInternalErrorWhenSavingOperationToNonOplogCollection) {
+    // Create fake non-oplog collection to ensure saving oplog entries (without _id field) will
+    // fail.
+    auto txn = getClient()->makeOperationContext();
+    NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    createCollection(txn.get(), nss, CollectionOptions());
+
+    // Non-oplog collection will enforce mandatory _id field requirement on insertion.
+    StorageInterfaceImpl storageInterface(nss);
+    auto op = makeOplogEntry({Timestamp(Seconds(1), 0), 1LL});
+    auto status = storageInterface.writeOpsToOplog(txn.get(), nss, {op}).getStatus();
+    ASSERT_EQUALS(ErrorCodes::InternalError, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "Collection::insertDocument got document without _id");
+}
+
+TEST_F(StorageInterfaceImplTest, WriteOpsToOplogSavesOperationsReturnsOpTimeOfLastOperation) {
+    // Create fake oplog collection to hold operations.
+    auto txn = getClient()->makeOperationContext();
+    NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    createCollection(txn.get(), nss, createOplogCollectionOptions());
+
+    // Insert operations using storage interface. Ensure optime return is consistent with last
+    // operation inserted.
+    StorageInterfaceImpl storageInterface(nss);
+    auto op1 = makeOplogEntry({Timestamp(Seconds(1), 0), 1LL});
+    auto op2 = makeOplogEntry({Timestamp(Seconds(1), 0), 1LL});
+    ASSERT_EQUALS(
+        op2.getOpTime(),
+        unittest::assertGet(storageInterface.writeOpsToOplog(txn.get(), nss, {op1, op2})));
+
+    // Check contents of oplog. OplogInterface iterates over oplog collection in reverse.
+    repl::OplogInterfaceLocal oplog(txn.get(), nss.ns());
+    auto iter = oplog.makeIterator();
+    ASSERT_EQUALS(op2.raw, unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(op1.raw, unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+}
+
+TEST_F(StorageInterfaceImplTest,
+       WriteOpsToOplogReturnsNamespaceNotFoundIfOplogCollectionDoesNotExist) {
+    auto op = makeOplogEntry({Timestamp(Seconds(1), 0), 1LL});
+    NamespaceString nss("local.nosuchcollection");
+    StorageInterfaceImpl storageInterface(nss);
+    auto txn = getClient()->makeOperationContext();
+    auto status = storageInterface.writeOpsToOplog(txn.get(), nss, {op}).getStatus();
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "collection not found");
 }
 
 }  // namespace

@@ -419,7 +419,10 @@ Status _initialSync(BackgroundSync* bgsync) {
     log() << "initial sync data copy, starting syncup";
 
     // prime oplog, but don't need to actually apply the op as the cloned data already reflects it.
-    OpTime lastOptime = writeOpsToOplog(&txn, {lastOp});
+    OplogEntry lastOplogEntry(lastOp);
+    OpTime lastOptime = fassertStatusOK(40142,
+                                        StorageInterface::get(&txn)->writeOpsToOplog(
+                                            &txn, NamespaceString(rsOplogName), {lastOplogEntry}));
     ReplClientInfo::forClient(txn.getClient()).setLastOp(lastOptime);
     replCoord->setMyLastAppliedOpTime(lastOptime);
     setNewTimestamp(lastOptime.getTimestamp());

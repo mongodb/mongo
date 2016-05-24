@@ -65,5 +65,11 @@ void StorageInterfaceMock::setMinValid(OperationContext* txn, const BatchBoundar
     _minValidBoundaries = boundaries;
 }
 
+StatusWith<OpTime> StorageInterfaceMock::writeOpsToOplog(
+    OperationContext* txn, const NamespaceString& nss, const MultiApplier::Operations& operations) {
+    invariant(!operations.empty());
+    return operations.back().getOpTime();
+}
+
 }  // namespace repl
 }  // namespace mongo

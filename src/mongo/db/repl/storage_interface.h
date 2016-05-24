@@ -33,6 +33,8 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
 
@@ -140,6 +142,16 @@ public:
      * or transition from a non-visible state to primary/secondary.
      */
     virtual void setMinValid(OperationContext* txn, const BatchBoundaries& boundaries) = 0;
+
+    /**
+     * Writes operations into the replica set oplog at "nss".
+     * Used internally by replication secondaries.
+     *
+     * Returns the optime for the last operation inserted on success.
+     */
+    virtual StatusWith<OpTime> writeOpsToOplog(OperationContext* txn,
+                                               const NamespaceString& nss,
+                                               const MultiApplier::Operations& operations) = 0;
 };
 
 }  // namespace repl

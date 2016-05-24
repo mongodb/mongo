@@ -28,27 +28,21 @@
 
 #pragma once
 
-#include <cstddef>
-#include <deque>
 #include <string>
+#include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/stdx/functional.h"
-#include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
-class BSONObj;
 class Collection;
-struct CollectionOptions;
 class Database;
 class NamespaceString;
 class OperationContext;
-class Timestamp;
-class RecordId;
 
 namespace repl {
 class ReplSettings;
@@ -64,12 +58,6 @@ void truncateOplogTo(OperationContext* txn, Timestamp truncateTimestamp);
  * This will be either local.oplog.rs (replica sets) or local.oplog.$main (master/slave)
  */
 void createOplog(OperationContext* txn);
-
-// This function writes ops into the replica-set oplog;
-// used internally by replication secondaries after they have applied ops.  Updates the global
-// optime.
-// Returns the optime for the last op inserted.
-OpTime writeOpsToOplog(OperationContext* txn, const std::vector<BSONObj>& ops);
 
 extern std::string rsOplogName;
 extern std::string masterSlaveOplogName;

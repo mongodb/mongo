@@ -438,40 +438,6 @@ void logOps(OperationContext* txn,
     _logOpsInner(txn, nss, basePtrs.get(), count, oplog, replMode, slots[count - 1].opTime);
 }
 
-
-OpTime writeOpsToOplog(OperationContext* txn, const std::vector<BSONObj>& ops) {
-    OpTime lastOptime;
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        invariant(!ops.empty());
-        ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock lk(txn->lockState(), "local", MODE_X);
-
-        if (_localOplogCollection == 0) {
-            OldClientContext ctx(txn, rsOplogName);
-
-            _localDB = ctx.db();
-            verify(_localDB);
-            _localOplogCollection = _localDB->getCollection(rsOplogName);
-            massert(13389,
-                    "local.oplog.rs missing. did you drop it? if so restart server",
-                    _localOplogCollection);
-        }
-
-        OldClientContext ctx(txn, rsOplogName, _localDB);
-        WriteUnitOfWork wunit(txn);
-
-        OpDebug* const nullOpDebug = nullptr;
-        checkOplogInsert(_localOplogCollection->insertDocuments(
-            txn, ops.begin(), ops.end(), nullOpDebug, false));
-        lastOptime =
-            fassertStatusOK(ErrorCodes::InvalidBSON, OpTime::parseFromOplogEntry(ops.back()));
-        wunit.commit();
-    }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "writeOps", _localOplogCollection->ns().ns());
-
-    return lastOptime;
-}
-
 namespace {
 long long getNewOplogSizeBytes(OperationContext* txn, const ReplSettings& replSettings) {
     if (replSettings.getOplogSizeBytes() != 0) {

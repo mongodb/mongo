@@ -52,6 +52,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_timestamp.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/prefetch.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/repl/bgsync.h"
@@ -1186,12 +1187,9 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
     OpTime lastOpTime;
     {
         ON_BLOCK_EXIT([&] { workerPool->join(); });
-        std::vector<BSONObj> raws;
-        raws.reserve(ops.size());
-        for (auto&& op : ops) {
-            raws.emplace_back(op.raw);
-        }
-        lastOpTime = writeOpsToOplog(txn, raws);
+        lastOpTime = fassertStatusOK(
+            40141,
+            StorageInterface::get(txn)->writeOpsToOplog(txn, NamespaceString(rsOplogName), ops));
     }
 
     if (inShutdownStrict()) {

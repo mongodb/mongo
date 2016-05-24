@@ -299,6 +299,12 @@ protected:
 
     public:
         RegistrationAgent(const std::string& suiteName, const std::string& testName);
+        std::string getSuiteName() const;
+        std::string getTestName() const;
+
+    private:
+        const std::string _suiteName;
+        const std::string _testName;
     };
 
     /**
