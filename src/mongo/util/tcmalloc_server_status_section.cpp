@@ -165,7 +165,6 @@ public:
             char buffer[4096];
             MallocExtension::instance()->GetStats(buffer, sizeof buffer);
             builder.append("formattedString", buffer);
-
         }
 
         return builder.obj();
