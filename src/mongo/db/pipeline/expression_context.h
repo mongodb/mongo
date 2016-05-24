@@ -32,7 +32,6 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
@@ -61,7 +60,6 @@ public:
     std::string tempDir;  // Defaults to empty to prevent external sorting in mongos.
 
     OperationContext* opCtx;
-    std::unique_ptr<CollatorInterface> collator;
     static const int kInterruptCheckPeriod = 128;
     int interruptCounter = kInterruptCheckPeriod;  // when 0, check interruptStatus
 };

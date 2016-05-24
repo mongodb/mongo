@@ -68,7 +68,7 @@ ShardRegistry::ShardRegistry(std::unique_ptr<ShardFactory> shardFactory,
 }
 
 ConnectionString ShardRegistry::getConfigServerConnectionString() const {
-    return getConfigShard()->getConnString();
+    return getConfigShard()->originalConnString();
 }
 
 void ShardRegistry::rebuildConfigShard() {
@@ -77,24 +77,20 @@ void ShardRegistry::rebuildConfigShard() {
 }
 
 shared_ptr<Shard> ShardRegistry::getShard(OperationContext* txn, const ShardId& shardId) {
-    // If we know about the shard, return it.
     auto shard = _data.findByShardId(shardId);
     if (shard) {
         return shard;
     }
 
-    // If we can't find the shard, attempt to reload the ShardRegistry.
+    // If we can't find the shard, we might just need to reload the cache
     bool didReload = reload(txn);
+
     shard = _data.findByShardId(shardId);
 
-    // If we found the shard, return it. If we did not find the shard but performed the reload
-    // ourselves, return, because it means the shard does not exist.
     if (shard || didReload) {
         return shard;
     }
 
-    // If we did not perform the reload ourselves (because there was a concurrent reload), force a
-    // reload again to ensure that we have seen data at least as up to date as our first reload.
     reload(txn);
     return _data.findByShardId(shardId);
 }

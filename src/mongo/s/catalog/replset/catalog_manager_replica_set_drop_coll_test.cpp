@@ -62,7 +62,6 @@ public:
 
         getMessagingPort()->setRemote(_clientHost);
         configTargeter()->setFindHostReturnValue(_configHost);
-        configTargeter()->setConnectionStringReturnValue(_configCS);
 
         distLock()->expectLock(
             [this](StringData name, StringData whyMessage, Milliseconds, Milliseconds) {
@@ -164,8 +163,6 @@ public:
 
 private:
     const HostAndPort _configHost{"TestHost1"};
-    const ConnectionString _configCS{
-        ConnectionString::forReplicaSet("configReplSet", {_configHost})};
     const HostAndPort _clientHost{"client:123"};
     const NamespaceString _dropNS{"test.user"};
 
