@@ -87,7 +87,6 @@ public:
     void setUp() override {
         CatalogManagerReplSetTestFixture::setUp();
         configTargeter()->setFindHostReturnValue(configHost);
-        configTargeter()->setConnectionStringReturnValue(configCS);
         getMessagingPort()->setRemote(clientHost);
     }
 
@@ -218,7 +217,6 @@ public:
 
 protected:
     const HostAndPort configHost{"configHost1"};
-    const ConnectionString configCS{ConnectionString::forReplicaSet("configReplSet", {configHost})};
     const HostAndPort clientHost{"clientHost1"};
 };
 

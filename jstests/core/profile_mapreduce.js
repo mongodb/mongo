@@ -72,7 +72,18 @@
     coll.mapReduce(mapFunction, reduceFunction, {query: {a: {$gte: 0}}, out: outputCollectionName});
 
     profileObj = getLatestProfilerEntry(testDB);
-    assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
+
+    // The following assertion confirms incorrect behavior. The "ns" field should be set to
+    // the source collection namespace. Instead it is being set to the output collection's
+    // namespace. This test will fail and should be replaced once this behavior is fixed under
+    // SERVER-23621
+
+    // Test that confirms current incorrect behavior.
+    var outputCollectionNamespace = testDB.getName() + "." + outputCollectionName;
+    assert.eq(profileObj.ns, outputCollectionNamespace, tojson(profileObj));
+
+    // Test that confirms correct behavior, which is currently broken.
+    // assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
 
     //
     // Confirm "fromMultiPlanner" metric.

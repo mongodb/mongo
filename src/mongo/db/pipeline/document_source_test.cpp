@@ -41,7 +41,6 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/clock_source_mock.h"
-#include "mongo/util/tick_source_mock.h"
 #include "mongo/unittest/temp_dir.h"
 
 namespace mongo {
@@ -52,7 +51,6 @@ bool isMongos() {
 std::unique_ptr<ServiceContextNoop> makeTestServiceContext() {
     auto service = stdx::make_unique<ServiceContextNoop>();
     service->setFastClockSource(stdx::make_unique<ClockSourceMock>());
-    service->setTickSource(stdx::make_unique<TickSourceMock>());
     return service;
 }
 }

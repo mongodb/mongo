@@ -589,8 +589,7 @@ IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key,
                           false /* unique */,
                           "shardkey",
                           NULL /* filterExpr */,
-                          BSONObj(),
-                          NULL /* collator */);
+                          BSONObj());
     plannerParams.indices.push_back(indexEntry);
 
     OwnedPointerVector<QuerySolution> solutions;

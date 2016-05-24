@@ -51,7 +51,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -92,26 +91,26 @@ const BSONObj kReplSecondaryOkMetadata{[] {
  * set on it that is the minimum of the maxTimeMS in 'cmdObj' (if present), 'maxTimeMicros', and
  * 30 seconds.
  */
-BSONObj appendMaxTimeToCmdObj(OperationContext* txn, const BSONObj& cmdObj) {
-    Milliseconds maxTime = kConfigCommandTimeout;
+BSONObj appendMaxTimeToCmdObj(long long maxTimeMicros, const BSONObj& cmdObj) {
+    Milliseconds maxTime = duration_cast<Milliseconds>(kConfigCommandTimeout);
 
-    bool hasTxnMaxTime = txn->hasDeadline();
+    Milliseconds remainingTxnMaxTime = duration_cast<Milliseconds>(Microseconds(maxTimeMicros));
+    bool hasTxnMaxTime(remainingTxnMaxTime != Microseconds::zero());
     bool hasUserMaxTime = !cmdObj[LiteParsedQuery::cmdOptionMaxTimeMS].eoo();
 
     if (hasTxnMaxTime) {
-        maxTime = std::min(maxTime, duration_cast<Milliseconds>(txn->getRemainingMaxTimeMicros()));
-        if (maxTime <= Milliseconds::zero()) {
-            // If there is less than 1ms remaining before the maxTime timeout expires, set the max
-            // time to 1ms, since setting maxTimeMs to 1ms in a command means "no max time".
-
-            maxTime = Milliseconds{1};
+        if (remainingTxnMaxTime < maxTime) {
+            maxTime = remainingTxnMaxTime;
         }
     }
 
     if (hasUserMaxTime) {
         Milliseconds userMaxTime(cmdObj[LiteParsedQuery::cmdOptionMaxTimeMS].numberLong());
-        if (userMaxTime <= maxTime) {
+        if (userMaxTime == maxTime) {
             return cmdObj;
+        }
+        if (userMaxTime < maxTime) {
+            maxTime = userMaxTime;
         }
     }
 
@@ -200,7 +199,8 @@ StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* tx
                                                             const ReadPreferenceSetting& readPref,
                                                             const string& dbName,
                                                             const BSONObj& cmdObj) {
-    const BSONObj cmdWithMaxTimeMS = (isConfig() ? appendMaxTimeToCmdObj(txn, cmdObj) : cmdObj);
+    const BSONObj cmdWithMaxTimeMS =
+        (isConfig() ? appendMaxTimeToCmdObj(txn->getRemainingMaxTimeMicros(), cmdObj) : cmdObj);
 
     const auto host =
         _targeter->findHost(readPref, RemoteCommandTargeter::selectFindHostMaxWaitTime(txn));
@@ -332,12 +332,10 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     BSONObjBuilder findCmdBuilder;
     lpq->asFindCommand(&findCmdBuilder);
 
-    Microseconds maxTime = std::min(duration_cast<Microseconds>(kConfigCommandTimeout),
-                                    txn->getRemainingMaxTimeMicros());
-    if (maxTime < Milliseconds{1}) {
-        // If there is less than 1ms remaining before the maxTime timeout expires, set the max time
-        // to 1ms, since setting maxTimeMs to 1ms in a find command means "no max time".
-        maxTime = Milliseconds{1};
+    Milliseconds maxTime = kConfigCommandTimeout;
+    Microseconds remainingTxnMaxTime(static_cast<int64_t>(txn->getRemainingMaxTimeMicros()));
+    if (remainingTxnMaxTime != Microseconds::zero()) {
+        maxTime = duration_cast<Milliseconds>(remainingTxnMaxTime);
     }
 
     findCmdBuilder.append(LiteParsedQuery::cmdOptionMaxTimeMS,
@@ -349,7 +347,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
                     findCmdBuilder.done(),
                     fetcherCallback,
                     _getMetadataForCommand(readPref),
-                    duration_cast<Milliseconds>(maxTime));
+                    maxTime);
     Status scheduleStatus = fetcher.schedule();
     if (!scheduleStatus.isOK()) {
         return scheduleStatus;

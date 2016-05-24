@@ -212,7 +212,6 @@ env.Library(
         "query_planner_test_lib.cpp",
     ],
     LIBDEPS=[
-        "collation/collator_factory_mock",
         "query_planner",
     ],
 )

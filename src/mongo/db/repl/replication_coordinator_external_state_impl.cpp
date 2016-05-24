@@ -72,7 +72,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
-#include "mongo/util/net/listen.h"
+#include "mongo/util/net/message_port.h"
 
 namespace mongo {
 namespace repl {
@@ -387,7 +387,7 @@ HostAndPort ReplicationCoordinatorExternalStateImpl::getClientHostAndPort(
 }
 
 void ReplicationCoordinatorExternalStateImpl::closeConnections() {
-    Listener::closeMessagingPorts(executor::NetworkInterface::kMessagingPortKeepOpen);
+    MessagingPort::closeAllSockets(executor::NetworkInterface::kMessagingPortKeepOpen);
 }
 
 void ReplicationCoordinatorExternalStateImpl::killAllUserOperations(OperationContext* txn) {

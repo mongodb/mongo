@@ -72,8 +72,7 @@ private:
     IndexCatalogEntry* _catalogEntry;
 };
 
-IndexCatalogEntry::IndexCatalogEntry(OperationContext* txn,
-                                     StringData ns,
+IndexCatalogEntry::IndexCatalogEntry(StringData ns,
                                      CollectionCatalogEntry* collection,
                                      IndexDescriptor* descriptor,
                                      CollectionInfoCache* infoCache)
@@ -81,10 +80,24 @@ IndexCatalogEntry::IndexCatalogEntry(OperationContext* txn,
       _collection(collection),
       _descriptor(descriptor),
       _infoCache(infoCache),
+      _accessMethod(NULL),
       _headManager(new HeadManagerImpl(this)),
       _ordering(Ordering::make(descriptor->keyPattern())),
       _isReady(false) {
     _descriptor->_cachedEntry = this;
+}
+
+IndexCatalogEntry::~IndexCatalogEntry() {
+    _descriptor->_cachedEntry = NULL;  // defensive
+
+    delete _headManager;
+    delete _accessMethod;
+    delete _descriptor;
+}
+
+void IndexCatalogEntry::init(OperationContext* txn, IndexAccessMethod* accessMethod) {
+    verify(_accessMethod == NULL);
+    _accessMethod = accessMethod;
 
     _isReady = _catalogIsReady(txn);
     _head = _catalogHead(txn);
@@ -116,18 +129,6 @@ IndexCatalogEntry::IndexCatalogEntry(OperationContext* txn,
         invariantOK(statusWithCollator.getStatus());
         _collator = std::move(statusWithCollator.getValue());
     }
-}
-
-IndexCatalogEntry::~IndexCatalogEntry() {
-    _descriptor->_cachedEntry = NULL;  // defensive
-
-    delete _headManager;
-    delete _descriptor;
-}
-
-void IndexCatalogEntry::init(std::unique_ptr<IndexAccessMethod> accessMethod) {
-    invariant(!_accessMethod);
-    _accessMethod = std::move(accessMethod);
 }
 
 const RecordId& IndexCatalogEntry::head(OperationContext* txn) const {

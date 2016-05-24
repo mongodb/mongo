@@ -34,18 +34,14 @@
 
 #include "mongo/util/net/listen.h"
 
-#include "mongo/base/owned_pointer_vector.h"
-#include "mongo/base/status.h"
+
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
-#include "mongo/stdx/memory.h"
+#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/asio_message_port.h"
 #include "mongo/util/net/message_port.h"
-#include "mongo/util/net/message_port_startup_param.h"
 #include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/scopeguard.h"
 
 #ifndef _WIN32
@@ -96,7 +92,7 @@ vector<SockAddr> ipToAddrs(const char* ips, int port, bool useUnixSockets) {
             out.push_back(SockAddr("::", port));  // IPv6 all
 #ifndef _WIN32
         if (useUnixSockets)
-            out.push_back(SockAddr(makeUnixSockPath(port), port));  // Unix socket
+            out.push_back(SockAddr(makeUnixSockPath(port).c_str(), port));  // Unix socket
 #endif
         return out;
     }
@@ -118,7 +114,7 @@ vector<SockAddr> ipToAddrs(const char* ips, int port, bool useUnixSockets) {
 #ifndef _WIN32
         if (sa.isValid() && useUnixSockets &&
             (sa.getAddr() == "127.0.0.1" || sa.getAddr() == "0.0.0.0"))  // only IPv4
-            out.push_back(SockAddr(makeUnixSockPath(port), port));
+            out.push_back(SockAddr(makeUnixSockPath(port).c_str(), port));
 #endif
     }
     return out;
@@ -354,7 +350,7 @@ void Listener::initAndListen() {
                 pnewSock->secureAccepted(_ssl);
             }
 #endif
-            _accepted(pnewSock, myConnectionNumber);
+            accepted(pnewSock, myConnectionNumber);
         }
     }
 }
@@ -570,7 +566,7 @@ void Listener::initAndListen() {
             pnewSock->secureAccepted(_ssl);
         }
 #endif
-        _accepted(pnewSock, myConnectionNumber);
+        accepted(pnewSock, myConnectionNumber);
     }
 }
 #endif
@@ -587,15 +583,14 @@ void Listener::waitUntilListening() const {
     }
 }
 
-void Listener::_accepted(const std::shared_ptr<Socket>& psocket, long long connectionId) {
-    std::unique_ptr<AbstractMessagingPort> port;
-    if (isMessagePortImplASIO()) {
-        port = stdx::make_unique<ASIOMessagingPort>(psocket->stealSD(), psocket->remoteAddr());
-    } else {
-        port = stdx::make_unique<MessagingPort>(psocket);
-    }
+void Listener::accepted(std::shared_ptr<Socket> psocket, long long connectionId) {
+    MessagingPort* port = new MessagingPort(psocket);
     port->setConnectionId(connectionId);
-    accepted(port.release());
+    acceptedMP(port);
+}
+
+void Listener::acceptedMP(MessagingPort* mp) {
+    verify(!"You must overwrite one of the accepted methods");
 }
 
 // ----- ListeningSockets -------
@@ -642,10 +637,6 @@ void Listener::checkTicketNumbers() {
     globalTicketHolder.resize(want);
 }
 
-void Listener::closeMessagingPorts(AbstractMessagingPort::Tag skipMask) {
-    ASIOMessagingPort::closeSockets(skipMask);
-    MessagingPort::closeSockets(skipMask);
-}
 
 TicketHolder Listener::globalTicketHolder(DEFAULT_MAX_CONN);
 AtomicInt64 Listener::globalConnectionNumber;

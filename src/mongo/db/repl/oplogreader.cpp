@@ -98,8 +98,7 @@ bool OplogReader::connect(const HostAndPort& host) {
             error() << errmsg << endl;
             return false;
         }
-        _conn->port().setTag(_conn->port().getTag() |
-                             executor::NetworkInterface::kMessagingPortKeepOpen);
+        _conn->port().tag |= executor::NetworkInterface::kMessagingPortKeepOpen;
         _host = host;
     }
     return true;

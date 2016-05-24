@@ -30,7 +30,6 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
-#include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/service_context_noop.h"
@@ -53,7 +52,6 @@
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
-#include "mongo/util/tick_source_mock.h"
 
 
 namespace mongo {
@@ -81,10 +79,6 @@ void initGrid(OperationContext* txn, const ConnectionString& configConnString) {
 
     auto targeterFactory = stdx::make_unique<RemoteCommandTargeterFactoryMock>();
     auto targeterFactoryPtr = targeterFactory.get();
-
-    auto configTargeter(stdx::make_unique<RemoteCommandTargeterMock>());
-    configTargeter->setConnectionStringReturnValue(configConnString);
-    targeterFactory->addTargeterToReturn(configConnString, std::move(configTargeter));
 
     ShardFactory::BuilderCallable setBuilder =
         [targeterFactoryPtr](const ShardId& shardId, const ConnectionString& connStr) {
@@ -123,7 +117,6 @@ public:
     void setUp() override {
         _service.setFastClockSource(stdx::make_unique<ClockSourceMock>());
         _service.setPreciseClockSource(stdx::make_unique<ClockSourceMock>());
-        _service.setTickSource(stdx::make_unique<TickSourceMock>());
 
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
         _client = _service.makeClient("ShardingStateTest");

@@ -53,7 +53,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/abstract_message_port.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/exit.h"
@@ -87,7 +86,7 @@ boost::optional<HostAndPort> extractHostInfo(const rpc::RequestInterface& reques
 
 class Forwarder {
 public:
-    Forwarder(AbstractMessagingPort* mp,
+    Forwarder(MessagingPort* mp,
               stdx::mutex* settingsMutex,
               HostSettingsMap* settings,
               int64_t seed)
@@ -115,7 +114,7 @@ public:
                     warning() << "Unable to establish connection to "
                               << mongoBridgeGlobalParams.destUri << " after " << elapsed
                               << " seconds: " << status;
-                    log() << "end connection " << _mp->remote().toString();
+                    log() << "end connection " << _mp->psock->remoteString();
                     _mp->shutdown();
                     return;
                 }
@@ -133,7 +132,7 @@ public:
             try {
                 request.reset();
                 if (!_mp->recv(request)) {
-                    log() << "end connection " << _mp->remote().toString();
+                    log() << "end connection " << _mp->psock->remoteString();
                     _mp->shutdown();
                     break;
                 }
@@ -184,7 +183,7 @@ public:
                     // Close the connection to 'dest'.
                     case HostSettings::State::kHangUp:
                         log() << "Rejecting connection from " << host->toString()
-                              << ", end connection " << _mp->remote().toString();
+                              << ", end connection " << _mp->psock->remoteString();
                         _mp->shutdown();
                         return;
                     // Forward the message to 'dest' with probability '1 - hostSettings.loss'.
@@ -215,7 +214,7 @@ public:
                     // If there's nothing to respond back to '_mp' with, then close the connection.
                     if (response.empty()) {
                         log() << "Received an empty response, end connection "
-                              << _mp->remote().toString();
+                              << _mp->psock->remoteString();
                         _mp->shutdown();
                         break;
                     }
@@ -229,7 +228,7 @@ public:
                     // connections from 'host', then do so now.
                     if (hostSettings.state == HostSettings::State::kHangUp) {
                         log() << "Closing connection from " << host->toString()
-                              << ", end connection " << _mp->remote().toString();
+                              << ", end connection " << _mp->psock->remoteString();
                         _mp->shutdown();
                         break;
                     }
@@ -260,7 +259,7 @@ public:
                 }
             } catch (const DBException& ex) {
                 error() << "Caught DBException in Forwarder: " << ex << ", end connection "
-                        << _mp->remote().toString();
+                        << _mp->psock->remoteString();
                 _mp->shutdown();
                 break;
             } catch (...) {
@@ -304,7 +303,7 @@ private:
         return {};
     }
 
-    AbstractMessagingPort* _mp;
+    MessagingPort* _mp;
 
     stdx::mutex* _settingsMutex;
     HostSettingsMap* _settings;
@@ -320,7 +319,7 @@ public:
         log() << "Setting random seed: " << mongoBridgeGlobalParams.seed;
     }
 
-    void accepted(AbstractMessagingPort* mp) override final {
+    void acceptedMP(MessagingPort* mp) final {
         {
             stdx::lock_guard<stdx::mutex> lk(_portsMutex);
             if (_inShutdown.load()) {
@@ -344,7 +343,7 @@ public:
 
 private:
     stdx::mutex _portsMutex;
-    std::set<AbstractMessagingPort*> _ports;
+    std::set<MessagingPort*> _ports;
     AtomicWord<bool> _inShutdown{false};
 
     stdx::mutex _settingsMutex;

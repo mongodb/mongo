@@ -65,7 +65,6 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/clock_source_mock.h"
-#include "mongo/util/tick_source_mock.h"
 
 namespace mongo {
 
@@ -90,7 +89,6 @@ void ShardingTestFixture::setUp() {
     _service = stdx::make_unique<ServiceContextNoop>();
     _service->setFastClockSource(stdx::make_unique<ClockSourceMock>());
     _service->setPreciseClockSource(stdx::make_unique<ClockSourceMock>());
-    _service->setTickSource(stdx::make_unique<TickSourceMock>());
     _messagePort = stdx::make_unique<MessagingPortMock>();
     _client = _service->makeClient("ShardingTestFixture", _messagePort.get());
     _opCtx = _client->makeOperationContext();

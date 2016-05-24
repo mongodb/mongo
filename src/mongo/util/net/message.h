@@ -51,6 +51,7 @@ namespace mongo {
 const size_t MaxMessageSizeBytes = 48 * 1000 * 1000;
 
 class Message;
+class MessagingPort;
 
 enum NetworkOp : int32_t {
     opInvalid = 0,
@@ -402,8 +403,6 @@ class Message {
     MONGO_DISALLOW_COPYING(Message);
 
 public:
-    using MsgVec = std::vector<std::pair<char*, int>>;
-
     // we assume here that a vector with initial size 0 does no allocation (0 is the default, but
     // wanted to make it explicit).
     Message() = default;
@@ -563,9 +562,7 @@ public:
         return _buf;
     }
 
-    const MsgVec& dataBuffers() const {
-        return _data;
-    }
+    void send(MessagingPort& p, const char* context);
 
     std::string toString() const;
 
@@ -578,6 +575,7 @@ private:
     char* _buf{nullptr};
     // byte buffer(s) - the first must contain at least a full MsgData unless using _buf for storage
     // instead
+    typedef std::vector<std::pair<char*, int>> MsgVec;
     MsgVec _data{};
     bool _freeIt{false};
 };

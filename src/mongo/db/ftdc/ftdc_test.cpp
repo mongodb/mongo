@@ -44,7 +44,6 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
-#include "mongo/util/tick_source_mock.h"
 
 namespace mongo {
 
@@ -115,7 +114,6 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(FTDCTestInit,
 
     getGlobalServiceContext()->setFastClockSource(stdx::make_unique<ClockSourceMock>());
     getGlobalServiceContext()->setPreciseClockSource(stdx::make_unique<ClockSourceMock>());
-    getGlobalServiceContext()->setTickSource(stdx::make_unique<TickSourceMock>());
 
     Client::initThreadIfNotAlready("UnitTest");
 
