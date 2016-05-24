@@ -94,6 +94,7 @@ variables:
   - enterprise-suse12-64
   - enterprise-ubuntu1204-64
   - enterprise-ubuntu1404-64
+  - enterprise-ubuntu1604-64
   - enterprise-debian71-64
   - enterprise-debian81-64
   - linux-64
@@ -105,6 +106,7 @@ variables:
   - suse12
   - ubuntu1204
   - ubuntu1404
+  - ubuntu1604
   - ubuntu1404-rocksdb
   - ubuntu1410-fast-clang
   - debian71
@@ -125,6 +127,7 @@ variables:
   - enterprise-suse12-64
   - enterprise-ubuntu1204-64
   - enterprise-ubuntu1404-64
+  - enterprise-ubuntu1604-64
   - enterprise-debian71-64
   - enterprise-debian81-64
   - rhel55
@@ -134,6 +137,7 @@ variables:
   - suse12
   - ubuntu1204
   - ubuntu1404
+  - ubuntu1604
   - amazon
   - debian71
   - debian81
@@ -1981,6 +1985,7 @@ tasks:
         script: |
           set -o errexit
           set -o verbose
+
           mv mongo-binaries.tgz mongodb-binaries.${ext|tgz}
           mv mongo-debugsymbols.tgz debugsymbols-*.${ext|tgz} || true
           cp mongodb-*.${ext|tgz} mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}
@@ -3052,6 +3057,117 @@ buildvariants:
   - name: push
     distros:
     - rhel55-test
+
+
+- name: ubuntu1604
+  display_name: SSL Ubuntu 16.04
+  modules: ~
+  run_on:
+  - ubuntu1604-test
+  batchtime: 1440 # 1 day
+  expansions:
+    tooltags: "-tags ssl"
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: x86_64-ubuntu1604
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: ubuntu1604
+  tasks:
+  - name: compile
+    distros:
+    - ubuntu1604-build
+  - name: aggregation
+  - name: aggregation_WT
+  - name: aggregation_auth
+  - name: auth
+  - name: auth_WT
+  - name: dbtest
+  - name: dbtest_WT
+  - name: disk
+  - name: durability
+  - name: dur_jscore_passthrough
+  - name: failpoints
+  - name: failpoints_auth
+  - name: gle_auth
+  - name: gle_auth_WT
+  - name: gle_auth_write_cmd
+  - name: gle_auth_write_cmd_WT
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
+  - name: jsCore
+  - name: jsCore_WT
+  - name: jsCore_auth
+  - name: jsCore_compatibility
+  - name: jsCore_compatibility_WT
+  - name: jsCore_decimal
+  - name: jsCore_decimal_WT
+  - name: jsCore_small_oplog
+  - name: jsCore_small_oplog_WT
+  - name: jsCore_small_oplog_rs
+  - name: jsCore_small_oplog_rs_WT
+  - name: jstestfuzz
+  - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
+  - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
+  - name: jstestfuzz_sharded_WT
+  - name: mmap
+  - name: mongosTest
+  - name: multiversion
+  - name: noPassthrough
+  - name: noPassthrough_WT
+  - name: noPassthroughWithMongod
+  - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
+  - name: parallel
+  - name: parallel_WT
+  - name: parallel_compatibility
+  - name: parallel_compatibility_WT
+  - name: concurrency
+  - name: concurrency_WT
+  - name: concurrency_replication
+  - name: concurrency_replication_WT
+  - name: concurrency_sharded
+  - name: concurrency_sharded_WT
+  - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_WT
+  - name: replicasets
+  - name: replicasets_WT
+  - name: replicasets_auth
+  - name: replication
+  - name: replication_WT
+  - name: replication_auth
+  - name: sharding
+  - name: sharding_WT
+  - name: sharding_auth
+  - name: sharding_last_stable_mongos
+  - name: slow1
+  - name: slow1_WT
+  - name: serial_run
+  - name: serial_run_WT
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
+  - name: ssl
+  - name: sslSpecial
+  - name: tool
+  - name: tool_WT
+  - name: unittests
+  - name: push
+    distros:
+    - rhel55-test
+
 
 - name: enterprise-linux-64-amazon-ami
   display_name: "* Enterprise Amazon Linux"
@@ -4975,6 +5091,58 @@ buildvariants:
     distros:
     - rhel55-test
 
+- name: enterprise-ubuntu1604-64
+  display_name: Enterprise Ubuntu 16.04
+  modules:
+  - enterprise
+  run_on:
+  - ubuntu1604-test
+  batchtime: 1440 # 1 day
+  expansions:
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    tooltags: "-tags 'ssl sasl'"
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-ubuntu1604
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    has_packages: true
+    packager_script: packager-enterprise.py
+    packager_arch: x86_64
+    packager_distro: ubuntu1604
+  tasks:
+  - name: compile
+    distros:
+    - ubuntu1604-build
+  - name: audit
+  - name: audit_WT
+  - name: dbtest
+  - name: dbtest_WT
+  - name: ese_WT
+  - name: jsCore
+  - name: jsCore_auth
+  - name: jstestfuzz
+  - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
+  - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
+  - name: jstestfuzz_sharded_WT
+  - name: mmap
+  - name: replicasets_auth
+  - name: sasl
+  - name: sharding_auth
+  - name: snmp
+  - name: snmp_WT
+  - name: ssl
+  - name: sslSpecial
+  - name: unittests
+  - name: push
+    distros:
+    - rhel55-test
+
+
+
 ###########################################
 #          SUSE buildvariants             #
 ###########################################
@@ -6468,19 +6636,19 @@ buildvariants:
     distros:
     - rhel55-test
 
-- name: enterprise-ubuntu-dynamic-1404-64-bit
-  display_name: "* Shared Library Enterprise Ubuntu 1404"
+- name: enterprise-ubuntu-dynamic-1604-64-bit
+  display_name: "* Shared Library Enterprise Ubuntu 16.04"
   modules:
   - enterprise
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1404 -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ --link-model=dynamic
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ --link-model=dynamic
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
   tasks:
   - name: compile
     distros:
-    - ubuntu1404-build
+    - ubuntu1604-build
 
 - name: enterprise-debug-rhel-62-cxx14
   display_name: ~ Enterprise RHEL 6.2 C++14 DEBUG
