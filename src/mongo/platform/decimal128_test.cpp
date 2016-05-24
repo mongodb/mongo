@@ -119,7 +119,7 @@ TEST(Decimal128Test, TestDoubleConstructorQuant1) {
 TEST(Decimal128Test, TestDoubleConstructorQuant2) {
     double dbl = 0.1 / 10000;
     Decimal128 d(dbl);
-    ASSERT_EQUALS(d.toString(), "1.00000000000000E-5");
+    ASSERT_EQUALS(d.toString(), "0.0000100000000000000");
 }
 
 TEST(Decimal128Test, TestDoubleConstructorQuant3) {
@@ -774,32 +774,11 @@ TEST(Decimal128Test, TestDecimal128ToStringInRangeNeg4Minus) {
     ASSERT_EQUALS(result, "-0.005");
 }
 
-TEST(Decimal128Test, TestDecimal128ToStringOutRangeNeg1) {
-    std::string s = ".0005";
-    Decimal128 d(s);
-    std::string result = d.toString();
-    ASSERT_EQUALS(result, "5E-4");
-}
-
-TEST(Decimal128Test, TestDecimal128ToStringOutRangeNeg2) {
-    std::string s = ".000005123123123123";
-    Decimal128 d(s);
-    std::string result = d.toString();
-    ASSERT_EQUALS(result, "5.123123123123E-6");
-}
-
 TEST(Decimal128Test, TestDecimal128ToStringOutRangeNeg3) {
     std::string s = ".012587E-200";
     Decimal128 d(s);
     std::string result = d.toString();
     ASSERT_EQUALS(result, "1.2587E-202");
-}
-
-TEST(Decimal128Test, TestDecimal128ToStringOutRangePos1) {
-    std::string s = "1234567890123";
-    Decimal128 d(s);
-    std::string result = d.toString();
-    ASSERT_EQUALS(result, "1.234567890123E+12");
 }
 
 TEST(Decimal128Test, TestDecimal128ToStringOutRangePos2) {
@@ -809,11 +788,43 @@ TEST(Decimal128Test, TestDecimal128ToStringOutRangePos2) {
     ASSERT_EQUALS(result, "1.020101E+18");
 }
 
-TEST(Decimal128Test, TestDecimal128ToStringOutRangePos3) {
-    std::string s = "1234567890123456789012345678901234";
-    Decimal128 d(s);
-    std::string result = d.toString();
-    ASSERT_EQUALS(result, "1.234567890123456789012345678901234E+33");
+TEST(Decimal128Test, TestDecimal128ToStringFinite) {
+    // General test cases taken from http://speleotrove.com/decimal/daconvs.html#reftostr
+    std::string s[15] = {"123",
+                         "-123",
+                         "123E1",
+                         "123E3",
+                         "123E-1",
+                         "123E-5",
+                         "123E-10",
+                         "-123E-12",
+                         "0E0",
+                         "0E-2",
+                         "0E2",
+                         "-0",
+                         "5E-6",
+                         "50E-7",
+                         "5E-7"};
+    std::string expected[15] = {"123",
+                                "-123",
+                                "1.23E+3",
+                                "1.23E+5",
+                                "12.3",
+                                "0.00123",
+                                "1.23E-8",
+                                "-1.23E-10",
+                                "0",
+                                "0.00",
+                                "0E+2",
+                                "-0",
+                                "0.000005",
+                                "0.0000050",
+                                "5E-7"};
+    for (int i = 0; i < 15; i++) {
+        Decimal128 d(s[i]);
+        std::string result = d.toString();
+        ASSERT_EQUALS(result, expected[i]);
+    }
 }
 
 TEST(Decimal128Test, TestDecimal128ToStringInvalidToNaN) {
