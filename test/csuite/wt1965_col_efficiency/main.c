@@ -55,11 +55,12 @@ static void
 	TEST_OPTS *opts;
 	WT_CURSOR *cursor, *idx_cursor;
 	WT_SESSION *session;
-	uint64_t *obj_data, thr_idx, ts = g_ts;
-	int i, o, r;
+	uint64_t i, ins_rotor, ins_thr_idx, thr_idx, ts;
+	uint64_t *obj_data;
 
 	opts = (TEST_OPTS *)arg;
 	thr_idx = __wt_atomic_fetch_addv64(&opts->next_threadid, 1);
+	ts = g_ts;
 	obj_data = calloc(
 	    (NR_OBJECTS/NR_THREADS + 1) * NR_FIELDS, sizeof(*obj_data));
 
@@ -71,14 +72,14 @@ static void
 	testutil_check(session->open_cursor(
 	    session, "table:index", NULL, NULL, &idx_cursor));
 
-	for (r = 1; r < 10; ++r) {
-		for (o = thr_idx, i = 0;
-		    o < NR_OBJECTS; o += NR_THREADS, i += NR_FIELDS) {
+	for (ins_rotor = 1; ins_rotor < 10; ++ins_rotor) {
+		for (ins_thr_idx = thr_idx, i = 0; ins_thr_idx < NR_OBJECTS;
+		    ins_thr_idx += NR_THREADS, i += NR_FIELDS) {
 
 			testutil_check(
 			    session->begin_transaction(session, "sync=false"));
 
-			cursor->set_key(cursor, ((uint64_t)o) << 40 | r);
+			cursor->set_key(cursor, ins_thr_idx << 40 | ins_rotor);
 			cursor->set_value(cursor, ts,
 			    obj_data[i+0], obj_data[i+1], obj_data[i+2],
 			    obj_data[i+3], obj_data[i+4], obj_data[i+5],
@@ -86,16 +87,17 @@ static void
 			testutil_check(cursor->insert(cursor));
 
 			idx_cursor->set_key(
-			    idx_cursor, ((uint64_t)o) << 40 | ts);
-			idx_cursor->set_value(idx_cursor, r);
+			    idx_cursor, ins_thr_idx << 40 | ts);
+			idx_cursor->set_value(idx_cursor, ins_rotor);
 			testutil_check(idx_cursor->insert(idx_cursor));
 
 			testutil_check(
 			    session->commit_transaction(session, NULL));
 
 			/* change object fields */
-			++obj_data[i + ((o + r) % NR_FIELDS)];
-			++obj_data[i + ((o + r + 1) % NR_FIELDS)];
+			++obj_data[i + ((ins_thr_idx + ins_rotor) % NR_FIELDS)];
+			++obj_data[i +
+			    ((ins_thr_idx + ins_rotor + 1) % NR_FIELDS)];
 
 			++g_ts;
 			/* 5K updates/sec */
