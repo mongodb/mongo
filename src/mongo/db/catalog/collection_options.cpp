@@ -215,6 +215,10 @@ Status CollectionOptions::parse(const BSONObj& options) {
                 return Status(ErrorCodes::BadValue, "'collation' has to be a document.");
             }
 
+            if (e.Obj().isEmpty()) {
+                return Status(ErrorCodes::BadValue, "'collation' cannot be an empty document.");
+            }
+
             collation = e.Obj().getOwned();
         }
     }

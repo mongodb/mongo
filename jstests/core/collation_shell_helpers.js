@@ -8,17 +8,8 @@
 (function() {
     'use strict';
 
-    //
-    // TODO SERVER-23849: test using db.createCollection() to make a collection with a default
-    // collation.
-    //
-
     var coll = db.collation_shell_helpers;
     coll.drop();
-
-    //
-    // Creating an index with a collation.
-    //
 
     var assertIndexHasCollation = function(keyPattern, collation) {
         var foundIndex = false;
@@ -34,13 +25,139 @@
         assert(foundIndex, "index with key pattern " + tojson(keyPattern) + " not found");
     };
 
+    //
+    // Test using db.createCollection() to make a collection with a default collation.
+    //
+
+    // Attempting to create a collection with an invalid collation should fail.
+    assert.commandFailed(
+        db.createCollection("collation_shell_helpers", {collation: "not an object"}));
+    assert.commandFailed(db.createCollection("collation_shell_helpers", {collation: {}}));
+    assert.commandFailed(db.createCollection("collation_shell_helpers", {collation: {blah: 1}}));
+    assert.commandFailed(
+        db.createCollection("collation_shell_helpers", {collation: {locale: "en", blah: 1}}));
+    assert.commandFailed(
+        db.createCollection("collation_shell_helpers", {collation: {locale: "xx"}}));
+    assert.commandFailed(
+        db.createCollection("collation_shell_helpers", {collation: {locale: "en", strength: 99}}));
+
+    // Ensure that we populate all collation-related fields when we create a collection with a valid
+    // collation.
+    assert.commandWorked(
+        db.createCollection("collation_shell_helpers", {collation: {locale: "fr_CA"}}));
+    var collectionInfos = db.getCollectionInfos({name: "collation_shell_helpers"});
+    assert.eq(collectionInfos.length, 1);
+    assert.eq(collectionInfos[0].options.collation,
+              {
+                locale: "fr_CA",
+                caseLevel: false,
+                caseFirst: "off",
+                strength: 3,
+                numericOrdering: false,
+                alternate: "non-ignorable",
+                maxVariable: "punct",
+                normalization: false,
+                backwards: true
+              });
+
+    // Ensure that an index with no collation inherits the collection-default collation.
+    assert.commandWorked(coll.ensureIndex({a: 1}));
+    assertIndexHasCollation({a: 1},
+                            {
+                              locale: "fr_CA",
+                              caseLevel: false,
+                              caseFirst: "off",
+                              strength: 3,
+                              numericOrdering: false,
+                              alternate: "non-ignorable",
+                              maxVariable: "punct",
+                              normalization: false,
+                              backwards: true
+                            });
+
+    // Ensure that an index which specifies an overriding collation does not use the collection
+    // default.
+    assert.commandWorked(coll.ensureIndex({b: 1}, {collation: {locale: "en_US"}}));
+    assertIndexHasCollation({b: 1},
+                            {
+                              locale: "en_US",
+                              caseLevel: false,
+                              caseFirst: "off",
+                              strength: 3,
+                              numericOrdering: false,
+                              alternate: "non-ignorable",
+                              maxVariable: "punct",
+                              normalization: false,
+                              backwards: false
+                            });
+
+    coll.drop();
+
+    //
+    // Creating an index with a collation.
+    //
+
+    // Attempting to build an index with an invalid collation should fail.
+    assert.commandFailed(coll.ensureIndex({a: 1}, {collation: "not an object"}));
+    assert.commandFailed(coll.ensureIndex({a: 1}, {collation: {}}));
+    assert.commandFailed(coll.ensureIndex({a: 1}, {collation: {blah: 1}}));
+    assert.commandFailed(coll.ensureIndex({a: 1}, {collation: {locale: "en", blah: 1}}));
+    assert.commandFailed(coll.ensureIndex({a: 1}, {collation: {locale: "xx"}}));
+    assert.commandFailed(coll.ensureIndex({a: 1}, {collation: {locale: "en", strength: 99}}));
+
     assert.commandWorked(coll.ensureIndex({a: 1}, {collation: {locale: "en_US"}}));
-    assertIndexHasCollation({a: 1}, {locale: "en_US"});
+    assertIndexHasCollation({a: 1},
+                            {
+                              locale: "en_US",
+                              caseLevel: false,
+                              caseFirst: "off",
+                              strength: 3,
+                              numericOrdering: false,
+                              alternate: "non-ignorable",
+                              maxVariable: "punct",
+                              normalization: false,
+                              backwards: false
+                            });
+
     assert.commandWorked(coll.createIndex({b: 1}, {collation: {locale: "en_US"}}));
-    assertIndexHasCollation({b: 1}, {locale: "en_US"});
-    assert.commandWorked(coll.createIndexes([{c: 1}, {d: 1}], {collation: {locale: "fr"}}));
-    assertIndexHasCollation({c: 1}, {locale: "fr"});
-    assertIndexHasCollation({d: 1}, {locale: "fr"});
+    assertIndexHasCollation({b: 1},
+                            {
+                              locale: "en_US",
+                              caseLevel: false,
+                              caseFirst: "off",
+                              strength: 3,
+                              numericOrdering: false,
+                              alternate: "non-ignorable",
+                              maxVariable: "punct",
+                              normalization: false,
+                              backwards: false
+                            });
+
+    assert.commandWorked(coll.createIndexes([{c: 1}, {d: 1}], {collation: {locale: "fr_CA"}}));
+    assertIndexHasCollation({c: 1},
+                            {
+                              locale: "fr_CA",
+                              caseLevel: false,
+                              caseFirst: "off",
+                              strength: 3,
+                              numericOrdering: false,
+                              alternate: "non-ignorable",
+                              maxVariable: "punct",
+                              normalization: false,
+                              backwards: true
+                            });
+    assertIndexHasCollation({d: 1},
+                            {
+                              locale: "fr_CA",
+                              caseLevel: false,
+                              caseFirst: "off",
+                              strength: 3,
+                              numericOrdering: false,
+                              alternate: "non-ignorable",
+                              maxVariable: "punct",
+                              normalization: false,
+                              backwards: true
+                            });
 
     // TODO SERVER-23791: Test that queries with matching collations can use these indices, and that
     // the indices contain collator-generated comparison keys rather than the verbatim indexed

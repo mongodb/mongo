@@ -193,6 +193,11 @@ TEST(CollectionOptions, FailToParseCollationThatIsNotAnObject) {
     ASSERT_NOT_OK(options.parse(fromjson("{collation: 'notAnObject'}")));
 }
 
+TEST(CollectionOptions, FailToParseCollationThatIsAnEmptyObject) {
+    CollectionOptions options;
+    ASSERT_NOT_OK(options.parse(fromjson("{collation: {}}")));
+}
+
 TEST(CollectionOptions, CollationFieldParsesCorrectly) {
     CollectionOptions options;
     ASSERT_OK(options.parse(fromjson("{collation: {locale: 'en'}}")));

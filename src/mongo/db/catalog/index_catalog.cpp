@@ -57,6 +57,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/ops/delete.h"
+#include "mongo/db/query/collation/collation_serializer.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -276,7 +277,7 @@ StatusWith<BSONObj> IndexCatalog::prepareSpecForCreate(OperationContext* txn,
     if (!status.isOK())
         return StatusWith<BSONObj>(status);
 
-    auto fixed = _fixIndexSpec(original);
+    auto fixed = _fixIndexSpec(txn, _collection, original);
     if (!fixed.isOK()) {
         return fixed;
     }
@@ -1260,7 +1261,9 @@ BSONObj IndexCatalog::fixIndexKey(const BSONObj& key) {
     return key;
 }
 
-StatusWith<BSONObj> IndexCatalog::_fixIndexSpec(const BSONObj& spec) {
+StatusWith<BSONObj> IndexCatalog::_fixIndexSpec(OperationContext* txn,
+                                                Collection* collection,
+                                                const BSONObj& spec) {
     auto statusWithSpec = IndexLegacy::adjustIndexSpecObject(spec);
     if (!statusWithSpec.isOK()) {
         return statusWithSpec;
@@ -1289,6 +1292,24 @@ StatusWith<BSONObj> IndexCatalog::_fixIndexSpec(const BSONObj& spec) {
     }
     b.append("name", name);
 
+    if (auto collationElt = spec["collation"]) {
+        // This should already have been verified by _isSpecOk().
+        invariant(collationElt.type() == BSONType::Object);
+
+        auto collator = CollatorFactoryInterface::get(txn->getServiceContext())
+                            ->makeFromBSON(collationElt.Obj());
+        if (!collator.isOK()) {
+            return collator.getStatus();
+        }
+
+        b.append("collation", CollationSerializer::specToBSON(collator.getValue()->getSpec()));
+    } else if (collection->getDefaultCollator()) {
+        // The user did not specify an explicit collation for this index and the collection has a
+        // default collator. In this case, the index inherits the collection default.
+        b.append("collation",
+                 CollationSerializer::specToBSON(collection->getDefaultCollator()->getSpec()));
+    }
+
     {
         BSONObjIterator i(o);
         while (i.more()) {
@@ -1299,7 +1320,7 @@ StatusWith<BSONObj> IndexCatalog::_fixIndexSpec(const BSONObj& spec) {
                 // skip
             } else if (s == "dropDups") {
                 // dropDups is silently ignored and removed from the spec as of SERVER-14710.
-            } else if (s == "v" || s == "unique" || s == "key" || s == "name") {
+            } else if (s == "v" || s == "unique" || s == "key" || s == "name" || s == "collation") {
                 // covered above
             } else {
                 b.append(e);
