@@ -662,7 +662,7 @@ private:
 
             // For pausing replication in tests
             while (MONGO_FAIL_POINT(rsSyncApplyStop) && !_inShutdown.load()) {
-                sleepmillis(0);
+                sleepmillis(10);
             }
 
             stdx::unique_lock<stdx::mutex> lk(_mutex);
