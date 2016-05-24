@@ -98,6 +98,15 @@ public:
     }
 
     virtual BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const {
+        long long verbosity = 1;
+        if (configElement) {
+            // Relies on the fact that safeNumberLong turns non-numbers into 0.
+            long long configValue = configElement.safeNumberLong();
+            if (configValue) {
+                verbosity = configValue;
+            }
+        }
+
         BSONObjBuilder builder;
 
         // For a list of properties see the "Generic Tcmalloc Status" section of
@@ -124,7 +133,9 @@ public:
             // Not including tcmalloc.slack_bytes since it is deprecated.
 
             // Calculate total free bytes, *excluding the page heap*
-            size_t central, transfer, thread;
+            size_t central;
+            size_t transfer;
+            size_t thread;
             if (MallocExtension::instance()->GetNumericProperty("tcmalloc.central_cache_free_bytes",
                                                                 &central) &&
                 MallocExtension::instance()->GetNumericProperty(
@@ -143,11 +154,18 @@ public:
                 sub, "aggressive_memory_decommit", "tcmalloc.aggressive_memory_decommit");
 
 #if MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS
-            // Size class information
-            BSONArrayBuilder arr;
-            MallocExtension::instance()->SizeClasses(&arr, appendSizeClassInfo);
-            sub.append("size_classes", arr.arr());
+            if (verbosity >= 2) {
+                // Size class information
+                BSONArrayBuilder arr;
+                MallocExtension::instance()->SizeClasses(&arr, appendSizeClassInfo);
+                sub.append("size_classes", arr.arr());
+            }
 #endif
+
+            char buffer[4096];
+            MallocExtension::instance()->GetStats(buffer, sizeof buffer);
+            builder.append("formattedString", buffer);
+
         }
 
         return builder.obj();
