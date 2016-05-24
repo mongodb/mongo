@@ -422,6 +422,50 @@ var ReplSetTest = function(opts) {
     };
 
     /**
+     * Blocks until all nodes agree on who the primary is.
+     */
+    this.awaitNodesAgreeOnPrimary = function(timeout) {
+        timeout = timeout || 60000;
+
+        assert.soon(function() {
+            try {
+                var primary = -1;
+
+                for (var i = 0; i < self.nodes.length; i++) {
+                    var replSetGetStatus =
+                        self.nodes[i].getDB("admin").runCommand({replSetGetStatus: 1});
+                    var nodesPrimary = -1;
+                    for (var j = 0; j < replSetGetStatus.members.length; j++) {
+                        if (replSetGetStatus.members[j].state === ReplSetTest.State.PRIMARY) {
+                            // Node sees two primaries.
+                            if (nodesPrimary !== -1) {
+                                return false;
+                            }
+                            nodesPrimary = j;
+                        }
+                    }
+                    // Node doesn't see a primary.
+                    if (nodesPrimary < 0) {
+                        return false;
+                    }
+
+                    if (primary < 0) {
+                        // If we haven't seen a primary yet, set it to this.
+                        primary = nodesPrimary;
+                    } else if (primary !== nodesPrimary) {
+                        return false;
+                    }
+                }
+
+                return true;
+            } catch (e) {
+                print("caught exception " + e);
+                return false;
+            }
+        }, "Awaiting nodes to agree on primary", timeout);
+    };
+
+    /**
      * Blocking call, which will wait for a primary to be elected for some pre-defined timeout and
      * if primary is available will return a connection to it. Otherwise throws an exception.
      */
