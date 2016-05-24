@@ -148,14 +148,14 @@ demo_file_system_create(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
 	file_system = (WT_FILE_SYSTEM *)demo_fs;
 
 	/* Initialize the in-memory jump table. */
-	file_system->directory_list = demo_fs_directory_list;
-	file_system->directory_list_free = demo_fs_directory_list_free;
-	file_system->directory_sync = demo_fs_directory_sync;
-	file_system->exist = demo_fs_exist;
-	file_system->open_file = demo_fs_open;
-	file_system->remove = demo_fs_remove;
-	file_system->rename = demo_fs_rename;
-	file_system->size = demo_fs_size;
+	file_system->fs_directory_list = demo_fs_directory_list;
+	file_system->fs_directory_list_free = demo_fs_directory_list_free;
+	file_system->fs_directory_sync = demo_fs_directory_sync;
+	file_system->fs_exist = demo_fs_exist;
+	file_system->fs_open_file = demo_fs_open;
+	file_system->fs_remove = demo_fs_remove;
+	file_system->fs_rename = demo_fs_rename;
+	file_system->fs_size = demo_fs_size;
 	file_system->terminate = demo_fs_terminate;
 
 	if ((ret = conn->set_file_system(conn, file_system, NULL)) != 0) {
@@ -236,20 +236,20 @@ demo_fs_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
 	 * the functionality.
 	 */
 	file_handle->close = demo_file_close;
-	file_handle->fadvise = NULL;
-	file_handle->fallocate = NULL;
-	file_handle->fallocate_nolock = NULL;
-	file_handle->lock = demo_file_lock;
-	file_handle->map = NULL;
-	file_handle->map_discard = NULL;
-	file_handle->map_preload = NULL;
-	file_handle->unmap = NULL;
-	file_handle->read = demo_file_read;
-	file_handle->size = demo_file_size;
-	file_handle->sync = demo_file_sync;
-	file_handle->sync_nowait = demo_file_sync_nowait;
-	file_handle->truncate = demo_file_truncate;
-	file_handle->write = demo_file_write;
+	file_handle->fh_advise = NULL;
+	file_handle->fh_allocate = NULL;
+	file_handle->fh_allocate_nolock = NULL;
+	file_handle->fh_lock = demo_file_lock;
+	file_handle->fh_map = NULL;
+	file_handle->fh_map_discard = NULL;
+	file_handle->fh_map_preload = NULL;
+	file_handle->fh_unmap = NULL;
+	file_handle->fh_read = demo_file_read;
+	file_handle->fh_size = demo_file_size;
+	file_handle->fh_sync = demo_file_sync;
+	file_handle->fh_sync_nowait = demo_file_sync_nowait;
+	file_handle->fh_truncate = demo_file_truncate;
+	file_handle->fh_write = demo_file_write;
 
 	TAILQ_INSERT_HEAD(&demo_fs->fileq, demo_fh, q);
 	++demo_fs->opened_unique_file_count;

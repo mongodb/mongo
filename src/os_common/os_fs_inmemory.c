@@ -512,10 +512,10 @@ __im_file_open(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
 	WT_FILE_HANDLE_INSERT(im_fs, im_fh, bucket);
 
 	file_handle->close = __im_file_close;
-	file_handle->read = __im_file_read;
-	file_handle->size = __im_file_size;
-	file_handle->truncate = __im_file_truncate;
-	file_handle->write = __im_file_write;
+	file_handle->fh_read = __im_file_read;
+	file_handle->fh_size = __im_file_size;
+	file_handle->fh_truncate = __im_file_truncate;
+	file_handle->fh_write = __im_file_write;
 
 	*file_handlep = file_handle;
 
@@ -576,13 +576,13 @@ __wt_os_inmemory(WT_SESSION_IMPL *session)
 
 	/* Initialize the in-memory jump table. */
 	file_system = (WT_FILE_SYSTEM *)im_fs;
-	file_system->directory_list = __im_fs_directory_list;
-	file_system->directory_list_free = __im_fs_directory_list_free;
-	file_system->exist = __im_fs_exist;
-	file_system->open_file = __im_file_open;
-	file_system->remove = __im_fs_remove;
-	file_system->rename = __im_fs_rename;
-	file_system->size = __im_fs_size;
+	file_system->fs_directory_list = __im_fs_directory_list;
+	file_system->fs_directory_list_free = __im_fs_directory_list_free;
+	file_system->fs_exist = __im_fs_exist;
+	file_system->fs_open_file = __im_file_open;
+	file_system->fs_remove = __im_fs_remove;
+	file_system->fs_rename = __im_fs_rename;
+	file_system->fs_size = __im_fs_size;
 	file_system->terminate = __im_terminate;
 
 	/* Switch the file system into place. */

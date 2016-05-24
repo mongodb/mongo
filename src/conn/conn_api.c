@@ -1919,16 +1919,16 @@ __conn_chk_file_system(WT_SESSION_IMPL *session, bool readonly)
 		WT_RET_MSG(session, EINVAL,				\
 		    "a WT_FILE_SYSTEM.%s method must be configured", #name)
 
-	WT_CONN_SET_FILE_SYSTEM_REQ(directory_list);
-	WT_CONN_SET_FILE_SYSTEM_REQ(directory_list_free);
+	WT_CONN_SET_FILE_SYSTEM_REQ(fs_directory_list);
+	WT_CONN_SET_FILE_SYSTEM_REQ(fs_directory_list_free);
 	/* not required: directory_sync */
-	WT_CONN_SET_FILE_SYSTEM_REQ(exist);
-	WT_CONN_SET_FILE_SYSTEM_REQ(open_file);
+	WT_CONN_SET_FILE_SYSTEM_REQ(fs_exist);
+	WT_CONN_SET_FILE_SYSTEM_REQ(fs_open_file);
 	if (!readonly) {
-		WT_CONN_SET_FILE_SYSTEM_REQ(remove);
-		WT_CONN_SET_FILE_SYSTEM_REQ(rename);
+		WT_CONN_SET_FILE_SYSTEM_REQ(fs_remove);
+		WT_CONN_SET_FILE_SYSTEM_REQ(fs_rename);
 	}
-	WT_CONN_SET_FILE_SYSTEM_REQ(size);
+	WT_CONN_SET_FILE_SYSTEM_REQ(fs_size);
 
 	return (0);
 }

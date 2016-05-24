@@ -3756,9 +3756,9 @@ struct __wt_file_system {
 	 *    directory.
 	 * @param[out] countp the method the number of entries returned
 	 */
-	int (*directory_list)(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
-	    const char *directory, const char *prefix, char ***dirlist,
-	    uint32_t *countp);
+	int (*fs_directory_list)(WT_FILE_SYSTEM *file_system,
+	    WT_SESSION *session, const char *directory, const char *prefix,
+	    char ***dirlist, uint32_t *countp);
 
 	/*!
 	 * Free memory allocated by WT_FILE_SYSTEM::directory_list.
@@ -3770,7 +3770,7 @@ struct __wt_file_system {
 	 * @param dirlist array returned by WT_FILE_SYSTEM::directory_list
 	 * @param count count returned by WT_FILE_SYSTEM::directory_list
 	 */
-	int (*directory_list_free)(WT_FILE_SYSTEM *file_system,
+	int (*fs_directory_list_free)(WT_FILE_SYSTEM *file_system,
 	    WT_SESSION *session, char **dirlist, uint32_t count);
 
 	/*!
@@ -3787,7 +3787,7 @@ struct __wt_file_system {
 	 * @param session the current WiredTiger session
 	 * @param directory the name of the directory
 	 */
-	int (*directory_sync)(WT_FILE_SYSTEM *file_system,
+	int (*fs_directory_sync)(WT_FILE_SYSTEM *file_system,
 	    WT_SESSION *session, const char *directory);
 
 	/*!
@@ -3800,7 +3800,7 @@ struct __wt_file_system {
 	 * @param name the name of the file
 	 * @param[out] existp If the named file system object exists
 	 */
-	int (*exist)(WT_FILE_SYSTEM *file_system,
+	int (*fs_exist)(WT_FILE_SYSTEM *file_system,
 	    WT_SESSION *session, const char *name, bool *existp);
 
 	/*!
@@ -3824,7 +3824,7 @@ struct __wt_file_system {
 	 *    with the WT_FILE_HANDLE:: structure should declare and allocate
 	 *    their own structure as a superset of a WT_FILE_HANDLE:: structure.
 	 */
-	int (*open_file)(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
+	int (*fs_open_file)(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
 	    const char *name, WT_OPEN_FILE_TYPE file_type, uint32_t flags,
 	    WT_FILE_HANDLE **file_handlep);
 
@@ -3840,7 +3840,7 @@ struct __wt_file_system {
 	 * @param session the current WiredTiger session
 	 * @param name the name of the file system object
 	 */
-	int (*remove)(
+	int (*fs_remove)(
 	    WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name);
 
 	/*!
@@ -3856,7 +3856,7 @@ struct __wt_file_system {
 	 * @param from the original name of the object
 	 * @param to the new name for the object
 	 */
-	int (*rename)(WT_FILE_SYSTEM *file_system,
+	int (*fs_rename)(WT_FILE_SYSTEM *file_system,
 	    WT_SESSION *session, const char *from, const char *to);
 
 	/*!
@@ -3869,7 +3869,7 @@ struct __wt_file_system {
 	 * @param name the name of the file system object
 	 * @param[out] sizep the size of the file system entry
 	 */
-	int (*size)(WT_FILE_SYSTEM *file_system,
+	int (*fs_size)(WT_FILE_SYSTEM *file_system,
 	    WT_SESSION *session, const char *name, wt_off_t *sizep);
 
 	/*!
@@ -3938,7 +3938,7 @@ struct __wt_file_handle {
 	 * @param advice one of ::WT_FILE_HANDLE_WILLNEED or
 	 *    ::WT_FILE_HANDLE_DONTNEED.
 	 */
-	int (*fadvise)(WT_FILE_HANDLE *file_handle,
+	int (*fh_advise)(WT_FILE_HANDLE *file_handle,
 	    WT_SESSION *session, wt_off_t offset, wt_off_t len, int advice);
 
 	/*!
@@ -3960,7 +3960,7 @@ struct __wt_file_handle {
 	 * @param offset the file offset
 	 * @param len the size of the advisory
 	 */
-	int (*fallocate)(WT_FILE_HANDLE *file_handle,
+	int (*fh_allocate)(WT_FILE_HANDLE *file_handle,
 	    WT_SESSION *session, wt_off_t, wt_off_t);
 
 	/*!
@@ -3982,7 +3982,7 @@ struct __wt_file_handle {
 	 * @param offset the file offset
 	 * @param len the size of the advisory
 	 */
-	int (*fallocate_nolock)(WT_FILE_HANDLE *file_handle,
+	int (*fh_allocate_nolock)(WT_FILE_HANDLE *file_handle,
 	    WT_SESSION *session, wt_off_t, wt_off_t);
 
 	/*!
@@ -3995,7 +3995,7 @@ struct __wt_file_handle {
 	 * @param session the current WiredTiger session
 	 * @param lock whether to lock or unlock
 	 */
-	int (*lock)(
+	int (*fh_lock)(
 	    WT_FILE_HANDLE *file_handle, WT_SESSION *session, bool lock);
 
 	/*!
@@ -4016,7 +4016,7 @@ struct __wt_file_handle {
 	 *    which can be optionally stored a pointer to an opaque cookie
 	 *    which is subsequently passed to WT_FILE_HANDLE::unmap.
 	 */
-	int (*map)(WT_FILE_HANDLE *file_handle, WT_SESSION *session,
+	int (*fh_map)(WT_FILE_HANDLE *file_handle, WT_SESSION *session,
 	    void *mapped_regionp, size_t *lengthp, void *mapped_cookiep);
 
 	/*!
@@ -4035,7 +4035,7 @@ struct __wt_file_handle {
 	 * @param length the length of the mapped region to discard
 	 * @param mapped_cookie any cookie set by the WT_FILE_HANDLE::map method
 	 */
-	int (*map_discard)(WT_FILE_HANDLE *file_handle,
+	int (*fh_map_discard)(WT_FILE_HANDLE *file_handle,
 	    WT_SESSION *session, void *map, size_t length, void *mapped_cookie);
 
 	/*!
@@ -4054,7 +4054,7 @@ struct __wt_file_handle {
 	 * @param length the size of the mapped region to preload
 	 * @param mapped_cookie any cookie set by the WT_FILE_HANDLE::map method
 	 */
-	int (*map_preload)(WT_FILE_HANDLE *file_handle, WT_SESSION *session,
+	int (*fh_map_preload)(WT_FILE_HANDLE *file_handle, WT_SESSION *session,
 	    const void *map, size_t length, void *mapped_cookie);
 
 	/*!
@@ -4072,7 +4072,7 @@ struct __wt_file_handle {
 	 * @param length the length of the mapped region
 	 * @param mapped_cookie any cookie set by the WT_FILE_HANDLE::map method
 	 */
-	int (*unmap)(WT_FILE_HANDLE *file_handle, WT_SESSION *session,
+	int (*fh_unmap)(WT_FILE_HANDLE *file_handle, WT_SESSION *session,
 	    void *mapped_region, size_t length, void *mapped_cookie);
 
 	/*!
@@ -4086,7 +4086,7 @@ struct __wt_file_handle {
 	 * @param len the amount to read
 	 * @param[out] buf buffer to hold the content read from file
 	 */
-	int (*read)(WT_FILE_HANDLE *file_handle,
+	int (*fh_read)(WT_FILE_HANDLE *file_handle,
 	    WT_SESSION *session, wt_off_t offset, size_t len, void *buf);
 
 	/*!
@@ -4098,7 +4098,7 @@ struct __wt_file_handle {
 	 * @param session the current WiredTiger session
 	 * @param sizep the size of the file
 	 */
-	int (*size)(
+	int (*fh_size)(
 	    WT_FILE_HANDLE *file_handle, WT_SESSION *session, wt_off_t *sizep);
 
 	/*!
@@ -4113,7 +4113,7 @@ struct __wt_file_handle {
 	 * @param file_handle the WT_FILE_HANDLE
 	 * @param session the current WiredTiger session
 	 */
-	int (*sync)(WT_FILE_HANDLE *file_handle, WT_SESSION *session);
+	int (*fh_sync)(WT_FILE_HANDLE *file_handle, WT_SESSION *session);
 
 	/*!
 	 * Schedule the outstanding file writes required for durability and
@@ -4127,7 +4127,7 @@ struct __wt_file_handle {
 	 * @param file_handle the WT_FILE_HANDLE
 	 * @param session the current WiredTiger session
 	 */
-	int (*sync_nowait)(WT_FILE_HANDLE *file_handle, WT_SESSION *session);
+	int (*fh_sync_nowait)(WT_FILE_HANDLE *file_handle, WT_SESSION *session);
 
 	/*!
 	 * Lengthen or shorten a file to the specified length, based on the
@@ -4142,7 +4142,7 @@ struct __wt_file_handle {
 	 * @param session the current WiredTiger session
 	 * @param length desired file size after truncate
 	 */
-	int (*truncate)(
+	int (*fh_truncate)(
 	    WT_FILE_HANDLE *file_handle, WT_SESSION *session, wt_off_t length);
 
 	/*!
@@ -4159,7 +4159,7 @@ struct __wt_file_handle {
 	 * @param length amount of data to write
 	 * @param buf content to be written to the file
 	 */
-	int (*write)(WT_FILE_HANDLE *file_handle, WT_SESSION *session,
+	int (*fh_write)(WT_FILE_HANDLE *file_handle, WT_SESSION *session,
 	    wt_off_t offset, size_t length, const void *buf);
 };
 #endif /* !defined(SWIG) */

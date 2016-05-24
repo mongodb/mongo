@@ -141,7 +141,8 @@ struct __wt_fstream {
 	uint32_t flags;
 
 	int (*close)(WT_SESSION_IMPL *, WT_FSTREAM *);
-	int (*flush)(WT_SESSION_IMPL *, WT_FSTREAM *);
-	int (*getline)(WT_SESSION_IMPL *, WT_FSTREAM *, WT_ITEM *);
-	int (*printf)(WT_SESSION_IMPL *, WT_FSTREAM *, const char *, va_list);
+	int (*fstr_flush)(WT_SESSION_IMPL *, WT_FSTREAM *);
+	int (*fstr_getline)(WT_SESSION_IMPL *, WT_FSTREAM *, WT_ITEM *);
+	int (*fstr_printf)(
+	    WT_SESSION_IMPL *, WT_FSTREAM *, const char *, va_list);
 };

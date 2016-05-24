@@ -730,7 +730,7 @@ extern int __wt_dlsym(WT_SESSION_IMPL *session, WT_DLH *dlh, const char *name, b
 extern int __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp);
 extern int __wt_errno(void);
 extern int __wt_filename(WT_SESSION_IMPL *session, const char *name, char **path);
-extern int __wt_fopen(WT_SESSION_IMPL *session, const char *name, uint32_t open_flags, uint32_t flags, WT_FSTREAM **fsp);
+extern int __wt_fopen(WT_SESSION_IMPL *session, const char *name, uint32_t open_flags, uint32_t flags, WT_FSTREAM **fstrp);
 extern int __wt_get_vm_pagesize(void);
 extern int __wt_getenv(WT_SESSION_IMPL *session, const char *variable, const char **envp);
 extern int __wt_getlasterror(void);

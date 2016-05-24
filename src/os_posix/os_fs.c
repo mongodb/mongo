@@ -228,7 +228,7 @@ __posix_file_advise(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session,
 	 * handle method to prevent future calls.
 	 */
 	if (ret == EINVAL) {
-		file_handle->fadvise = NULL;
+		file_handle->fh_advise = NULL;
 		return (ENOTSUP);
 	}
 
@@ -623,31 +623,31 @@ directory_open:
 	 * interesting.
 	 */
 	if (!pfh->direct_io)
-		file_handle->fadvise = __posix_file_advise;
+		file_handle->fh_advise = __posix_file_advise;
 #endif
-	file_handle->fallocate = __wt_posix_file_fallocate;
-	file_handle->lock = __posix_file_lock;
+	file_handle->fh_allocate = __wt_posix_file_fallocate;
+	file_handle->fh_lock = __posix_file_lock;
 #ifdef WORDS_BIGENDIAN
 	/*
 	 * The underlying objects are little-endian, mapping objects isn't
 	 * currently supported on big-endian systems.
 	 */
 #else
-	file_handle->map = __wt_posix_map;
+	file_handle->fh_map = __wt_posix_map;
 #ifdef HAVE_POSIX_MADVISE
-	file_handle->map_discard = __wt_posix_map_discard;
-	file_handle->map_preload = __wt_posix_map_preload;
+	file_handle->fh_map_discard = __wt_posix_map_discard;
+	file_handle->fh_map_preload = __wt_posix_map_preload;
 #endif
-	file_handle->unmap = __wt_posix_unmap;
+	file_handle->fh_unmap = __wt_posix_unmap;
 #endif
-	file_handle->read = __posix_file_read;
-	file_handle->size = __posix_file_size;
-	file_handle->sync = __posix_file_sync;
+	file_handle->fh_read = __posix_file_read;
+	file_handle->fh_size = __posix_file_size;
+	file_handle->fh_sync = __posix_file_sync;
 #ifdef HAVE_SYNC_FILE_RANGE
-	file_handle->sync_nowait = __posix_file_sync_nowait;
+	file_handle->fh_sync_nowait = __posix_file_sync_nowait;
 #endif
-	file_handle->truncate = __posix_file_truncate;
-	file_handle->write = __posix_file_write;
+	file_handle->fh_truncate = __posix_file_truncate;
+	file_handle->fh_write = __posix_file_write;
 
 	*file_handlep = file_handle;
 
@@ -689,16 +689,16 @@ __wt_os_posix(WT_SESSION_IMPL *session)
 	WT_RET(__wt_calloc_one(session, &file_system));
 
 	/* Initialize the POSIX jump table. */
-	file_system->directory_list = __wt_posix_directory_list;
-	file_system->directory_list_free = __wt_posix_directory_list_free;
+	file_system->fs_directory_list = __wt_posix_directory_list;
+	file_system->fs_directory_list_free = __wt_posix_directory_list_free;
 #ifdef __linux__
-	file_system->directory_sync = __posix_directory_sync;
+	file_system->fs_directory_sync = __posix_directory_sync;
 #endif
-	file_system->exist = __posix_fs_exist;
-	file_system->open_file = __posix_open_file;
-	file_system->remove = __posix_fs_remove;
-	file_system->rename = __posix_fs_rename;
-	file_system->size = __posix_fs_size;
+	file_system->fs_exist = __posix_fs_exist;
+	file_system->fs_open_file = __posix_open_file;
+	file_system->fs_remove = __posix_fs_remove;
+	file_system->fs_rename = __posix_fs_rename;
+	file_system->fs_size = __posix_fs_size;
 	file_system->terminate = __posix_terminate;
 
 	/* Switch it into place. */

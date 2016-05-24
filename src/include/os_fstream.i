@@ -11,9 +11,9 @@
  *	Get a line from a stream.
  */
 static inline int
-__wt_getline(WT_SESSION_IMPL *session, WT_FSTREAM *fs, WT_ITEM *buf)
+__wt_getline(WT_SESSION_IMPL *session, WT_FSTREAM *fstr, WT_ITEM *buf)
 {
-	return (fs->getline(session, fs, buf));
+	return (fstr->fstr_getline(session, fstr, buf));
 }
 
 /*
@@ -21,14 +21,14 @@ __wt_getline(WT_SESSION_IMPL *session, WT_FSTREAM *fs, WT_ITEM *buf)
  *	Close a stream.
  */
 static inline int
-__wt_fclose(WT_SESSION_IMPL *session, WT_FSTREAM **fsp)
+__wt_fclose(WT_SESSION_IMPL *session, WT_FSTREAM **fstrp)
 {
-	WT_FSTREAM *fs;
+	WT_FSTREAM *fstr;
 
-	if ((fs = *fsp) == NULL)
+	if ((fstr = *fstrp) == NULL)
 		return (0);
-	*fsp = NULL;
-	return (fs->close(session, fs));
+	*fstrp = NULL;
+	return (fstr->close(session, fstr));
 }
 
 /*
@@ -36,9 +36,9 @@ __wt_fclose(WT_SESSION_IMPL *session, WT_FSTREAM **fsp)
  *	Flush a stream.
  */
 static inline int
-__wt_fflush(WT_SESSION_IMPL *session, WT_FSTREAM *fs)
+__wt_fflush(WT_SESSION_IMPL *session, WT_FSTREAM *fstr)
 {
-	return (fs->flush(session, fs));
+	return (fstr->fstr_flush(session, fstr));
 }
 
 /*
@@ -47,12 +47,12 @@ __wt_fflush(WT_SESSION_IMPL *session, WT_FSTREAM *fs)
  */
 static inline int
 __wt_vfprintf(
-    WT_SESSION_IMPL *session, WT_FSTREAM *fs, const char *fmt, va_list ap)
+    WT_SESSION_IMPL *session, WT_FSTREAM *fstr, const char *fmt, va_list ap)
 {
 	WT_RET(__wt_verbose(
-	    session, WT_VERB_HANDLEOPS, "%s: handle-printf", fs->name));
+	    session, WT_VERB_HANDLEOPS, "%s: handle-printf", fstr->name));
 
-	return (fs->printf(session, fs, fmt, ap));
+	return (fstr->fstr_printf(session, fstr, fmt, ap));
 }
 
 /*
@@ -60,14 +60,14 @@ __wt_vfprintf(
  *	ANSI C fprintf.
  */
 static inline int
-__wt_fprintf(WT_SESSION_IMPL *session, WT_FSTREAM *fs, const char *fmt, ...)
+__wt_fprintf(WT_SESSION_IMPL *session, WT_FSTREAM *fstr, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
 {
 	WT_DECL_RET;
 	va_list ap;
 
 	va_start(ap, fmt);
-	ret = __wt_vfprintf(session, fs, fmt, ap);
+	ret = __wt_vfprintf(session, fstr, fmt, ap);
 	va_end(ap);
 
 	return (ret);
@@ -79,18 +79,18 @@ __wt_fprintf(WT_SESSION_IMPL *session, WT_FSTREAM *fs, const char *fmt, ...)
  */
 static inline int
 __wt_sync_and_rename(WT_SESSION_IMPL *session,
-    WT_FSTREAM **fsp, const char *from, const char *to)
+    WT_FSTREAM **fstrp, const char *from, const char *to)
 {
 	WT_DECL_RET;
-	WT_FSTREAM *fs;
+	WT_FSTREAM *fstr;
 
-	fs = *fsp;
-	*fsp = NULL;
+	fstr = *fstrp;
+	*fstrp = NULL;
 
 	/* Flush to disk and close the handle. */
-	WT_TRET(__wt_fflush(session, fs));
-	WT_TRET(__wt_fsync(session, fs->fh, true));
-	WT_TRET(__wt_fclose(session, &fs));
+	WT_TRET(__wt_fflush(session, fstr));
+	WT_TRET(__wt_fsync(session, fstr->fh, true));
+	WT_TRET(__wt_fclose(session, &fstr));
 	WT_RET(ret);
 
 	return (__wt_rename_and_sync_directory(session, from, to));

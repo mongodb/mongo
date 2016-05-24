@@ -125,28 +125,28 @@ __wt_posix_file_fallocate(WT_FILE_HANDLE *file_handle,
 	 * avoid locking on Linux if at all possible.
 	 */
 	if (__posix_std_fallocate(file_handle, wt_session, offset, len) == 0) {
-		file_handle->fallocate_nolock = __posix_std_fallocate;
-		WT_PUBLISH(file_handle->fallocate, NULL);
+		file_handle->fh_allocate_nolock = __posix_std_fallocate;
+		WT_PUBLISH(file_handle->fh_allocate, NULL);
 		return (0);
 	}
 	if (__posix_sys_fallocate(file_handle, wt_session, offset, len) == 0) {
-		file_handle->fallocate_nolock = __posix_sys_fallocate;
-		WT_PUBLISH(file_handle->fallocate, NULL);
+		file_handle->fh_allocate_nolock = __posix_sys_fallocate;
+		WT_PUBLISH(file_handle->fh_allocate, NULL);
 		return (0);
 	}
 	if (__posix_posix_fallocate(
 	    file_handle, wt_session, offset, len) == 0) {
 #if defined(__linux__)
-		file_handle->fallocate = __posix_posix_fallocate;
+		file_handle->fh_allocate = __posix_posix_fallocate;
 		WT_WRITE_BARRIER();
 #else
-		file_handle->fallocate_nolock = __posix_posix_fallocate;
-		WT_PUBLISH(file_handle->fallocate, NULL);
+		file_handle->fh_allocate_nolock = __posix_posix_fallocate;
+		WT_PUBLISH(file_handle->fh_allocate, NULL);
 #endif
 		return (0);
 	}
 
-	file_handle->fallocate = NULL;
+	file_handle->fh_allocate = NULL;
 	WT_WRITE_BARRIER();
 	return (ENOTSUP);
 }

@@ -311,7 +311,7 @@ __bm_map_discard(WT_BM *bm, WT_SESSION_IMPL *session, void *map, size_t len)
 	WT_FILE_HANDLE *handle;
 
 	handle = bm->block->fh->handle;
-	return (handle->map_discard(
+	return (handle->fh_map_discard(
 	    handle, (WT_SESSION *)session, map, len, bm->mapped_cookie));
 }
 
