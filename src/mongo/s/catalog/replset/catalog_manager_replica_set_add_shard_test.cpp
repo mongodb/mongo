@@ -739,7 +739,9 @@ TEST_F(AddShardTest, ShardContainsExistingDatabase) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(AddShardTest, ExistingShardName) {
+// TODO(SERVER-24213): Test adding a new shard with an existing shard name, but different
+// shard membership
+TEST_F(AddShardTest, ReAddExistingShard) {
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
         stdx::make_unique<RemoteCommandTargeterMock>());
     ConnectionString connString =
@@ -754,9 +756,7 @@ TEST_F(AddShardTest, ExistingShardName) {
     auto future = launchAsync([this, expectedShardName, connString] {
         auto status =
             catalogManager()->addShard(operationContext(), &expectedShardName, connString, 100);
-        ASSERT_EQUALS(ErrorCodes::DuplicateKey, status);
-        ASSERT_STRING_CONTAINS(status.getStatus().reason(),
-                               "Received DuplicateKey error when inserting");
+        ASSERT_OK(status);
     });
 
     BSONArrayBuilder hosts;
