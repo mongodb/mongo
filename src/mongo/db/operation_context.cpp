@@ -35,6 +35,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/random.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/fail_point_service.h"
@@ -72,10 +73,9 @@ MONGO_FP_DECLARE(checkForInterruptFail);
 
 }  // namespace
 
-OperationContext::OperationContext(Client* client, unsigned int opId, Locker* locker)
+OperationContext::OperationContext(Client* client, unsigned int opId)
     : _client(client),
       _opId(opId),
-      _locker(locker),
       _elapsedTime(client ? client->getServiceContext()->getTickSource()
                           : SystemTickSource::get()) {}
 
@@ -214,6 +214,17 @@ OperationContext::RecoveryUnitState OperationContext::setRecoveryUnit(RecoveryUn
     RecoveryUnitState oldState = _ruState;
     _ruState = state;
     return oldState;
+}
+
+std::unique_ptr<Locker> OperationContext::releaseLockState() {
+    dassert(_locker);
+    return std::move(_locker);
+}
+
+void OperationContext::setLockState(std::unique_ptr<Locker> locker) {
+    dassert(!_locker);
+    dassert(locker);
+    _locker = std::move(locker);
 }
 
 }  // namespace mongo

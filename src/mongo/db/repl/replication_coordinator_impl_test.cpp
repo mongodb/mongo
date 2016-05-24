@@ -847,7 +847,7 @@ TEST_F(ReplCoordTest,
        NodeReturnsUnknownReplWriteConcernWhenAwaitReplicationReceivesAnInvalidWriteConcernMode) {
     auto service = stdx::make_unique<ServiceContextNoop>();
     auto client = service->makeClient("test");
-    OperationContextNoop txn(client.get(), 100);
+    auto txn = client->makeOperationContext();
 
     assertStartSuccess(BSON("_id"
                             << "mySet"
@@ -879,7 +879,7 @@ TEST_F(ReplCoordTest,
     invalidWriteConcern.wMode = "fakemode";
 
     ReplicationCoordinator::StatusAndDuration statusAndDur =
-        getReplCoord()->awaitReplication(&txn, time1, invalidWriteConcern);
+        getReplCoord()->awaitReplication(txn.get(), time1, invalidWriteConcern);
     ASSERT_EQUALS(ErrorCodes::UnknownReplWriteConcern, statusAndDur.status);
 }
 
@@ -888,7 +888,7 @@ TEST_F(
     NodeReturnsWriteConcernFailedUntilASufficientSetOfNodesHaveTheWriteAndTheWriteIsInACommittedSnapshot) {
     auto service = stdx::make_unique<ServiceContextNoop>();
     auto client = service->makeClient("test");
-    OperationContextNoop txn(client.get(), 100);
+    auto txn = client->makeOperationContext();
 
     assertStartSuccess(
         BSON("_id"
@@ -963,11 +963,11 @@ TEST_F(
     getReplCoord()->setMyLastAppliedOpTime(time1);
     getReplCoord()->setMyLastDurableOpTime(time1);
     ReplicationCoordinator::StatusAndDuration statusAndDur =
-        getReplCoord()->awaitReplication(&txn, time1, majorityWriteConcern);
+        getReplCoord()->awaitReplication(txn.get(), time1, majorityWriteConcern);
     ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
-    statusAndDur = getReplCoord()->awaitReplication(&txn, time1, multiDCWriteConcern);
+    statusAndDur = getReplCoord()->awaitReplication(txn.get(), time1, multiDCWriteConcern);
     ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
-    statusAndDur = getReplCoord()->awaitReplication(&txn, time1, multiRackWriteConcern);
+    statusAndDur = getReplCoord()->awaitReplication(txn.get(), time1, multiRackWriteConcern);
     ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
 
     // Majority satisfied but not either custom mode
@@ -977,46 +977,52 @@ TEST_F(
     getReplCoord()->setLastDurableOptime_forTest(2, 2, time1);
     getReplCoord()->onSnapshotCreate(time1, SnapshotName(1));
 
-    statusAndDur = getReplCoord()->awaitReplication(&txn, time1, majorityWriteConcern);
+    statusAndDur = getReplCoord()->awaitReplication(txn.get(), time1, majorityWriteConcern);
     ASSERT_OK(statusAndDur.status);
-    statusAndDur = getReplCoord()->awaitReplication(&txn, time1, multiDCWriteConcern);
+    statusAndDur = getReplCoord()->awaitReplication(txn.get(), time1, multiDCWriteConcern);
     ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
-    statusAndDur = getReplCoord()->awaitReplication(&txn, time1, multiRackWriteConcern);
+    statusAndDur = getReplCoord()->awaitReplication(txn.get(), time1, multiRackWriteConcern);
     ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
 
     // All modes satisfied
     getReplCoord()->setLastAppliedOptime_forTest(2, 3, time1);
     getReplCoord()->setLastDurableOptime_forTest(2, 3, time1);
 
-    statusAndDur = getReplCoord()->awaitReplication(&txn, time1, majorityWriteConcern);
+    statusAndDur = getReplCoord()->awaitReplication(txn.get(), time1, majorityWriteConcern);
     ASSERT_OK(statusAndDur.status);
-    statusAndDur = getReplCoord()->awaitReplication(&txn, time1, multiDCWriteConcern);
+    statusAndDur = getReplCoord()->awaitReplication(txn.get(), time1, multiDCWriteConcern);
     ASSERT_OK(statusAndDur.status);
-    statusAndDur = getReplCoord()->awaitReplication(&txn, time1, multiRackWriteConcern);
+    statusAndDur = getReplCoord()->awaitReplication(txn.get(), time1, multiRackWriteConcern);
     ASSERT_OK(statusAndDur.status);
 
     // Majority also waits for the committed snapshot to be newer than all snapshots reserved by
     // this operation. Custom modes not affected by this.
-    while (getReplCoord()->reserveSnapshotName(&txn) <= SnapshotName(1)) {
+    while (getReplCoord()->reserveSnapshotName(txn.get()) <= SnapshotName(1)) {
         // These unittests "cheat" and use SnapshotName(1) without advancing the counter. Reserve
         // another name if we didn't get a high enough one.
     }
 
-    statusAndDur = getReplCoord()->awaitReplicationOfLastOpForClient(&txn, majorityWriteConcern);
+    statusAndDur =
+        getReplCoord()->awaitReplicationOfLastOpForClient(txn.get(), majorityWriteConcern);
     ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
-    statusAndDur = getReplCoord()->awaitReplicationOfLastOpForClient(&txn, multiDCWriteConcern);
+    statusAndDur =
+        getReplCoord()->awaitReplicationOfLastOpForClient(txn.get(), multiDCWriteConcern);
     ASSERT_OK(statusAndDur.status);
-    statusAndDur = getReplCoord()->awaitReplicationOfLastOpForClient(&txn, multiRackWriteConcern);
+    statusAndDur =
+        getReplCoord()->awaitReplicationOfLastOpForClient(txn.get(), multiRackWriteConcern);
     ASSERT_OK(statusAndDur.status);
 
     // All modes satisfied
     getReplCoord()->onSnapshotCreate(time1, getReplCoord()->reserveSnapshotName(nullptr));
 
-    statusAndDur = getReplCoord()->awaitReplicationOfLastOpForClient(&txn, majorityWriteConcern);
+    statusAndDur =
+        getReplCoord()->awaitReplicationOfLastOpForClient(txn.get(), majorityWriteConcern);
     ASSERT_OK(statusAndDur.status);
-    statusAndDur = getReplCoord()->awaitReplicationOfLastOpForClient(&txn, multiDCWriteConcern);
+    statusAndDur =
+        getReplCoord()->awaitReplicationOfLastOpForClient(txn.get(), multiDCWriteConcern);
     ASSERT_OK(statusAndDur.status);
-    statusAndDur = getReplCoord()->awaitReplicationOfLastOpForClient(&txn, multiRackWriteConcern);
+    statusAndDur =
+        getReplCoord()->awaitReplicationOfLastOpForClient(txn.get(), multiRackWriteConcern);
     ASSERT_OK(statusAndDur.status);
 
     // multiDC satisfied but not majority or multiRack
@@ -1025,11 +1031,11 @@ TEST_F(
     getReplCoord()->setLastAppliedOptime_forTest(2, 3, time2);
     getReplCoord()->setLastDurableOptime_forTest(2, 3, time2);
 
-    statusAndDur = getReplCoord()->awaitReplication(&txn, time2, majorityWriteConcern);
+    statusAndDur = getReplCoord()->awaitReplication(txn.get(), time2, majorityWriteConcern);
     ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
-    statusAndDur = getReplCoord()->awaitReplication(&txn, time2, multiDCWriteConcern);
+    statusAndDur = getReplCoord()->awaitReplication(txn.get(), time2, multiDCWriteConcern);
     ASSERT_OK(statusAndDur.status);
-    statusAndDur = getReplCoord()->awaitReplication(&txn, time2, multiRackWriteConcern);
+    statusAndDur = getReplCoord()->awaitReplication(txn.get(), time2, multiRackWriteConcern);
     ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
 }
 

@@ -49,12 +49,12 @@ TEST(RecordStoreTestHarness, ValidateEmpty) {
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             ValidateAdaptorSpy adaptor;
             ValidateResults results;
@@ -72,12 +72,12 @@ TEST(RecordStoreTestHarness, ValidateEmptyAndScanData) {
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             ValidateAdaptorSpy adaptor;
             ValidateResults results;
@@ -95,12 +95,12 @@ TEST(RecordStoreTestHarness, FullValidateEmptyAndScanData) {
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             ValidateAdaptorSpy adaptor;
             ValidateResults results;
@@ -116,7 +116,7 @@ TEST(RecordStoreTestHarness, FullValidateEmptyAndScanData) {
 // returns an OK status.
 TEST_F(ValidateTest, ValidateNonEmpty) {
     {
-        unique_ptr<OperationContext> opCtx(newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(newOperationContext());
         {
             ValidateAdaptorSpy adaptor;
             ValidateResults results;
@@ -133,7 +133,7 @@ TEST_F(ValidateTest, ValidateNonEmpty) {
 // returns an OK status.
 TEST_F(ValidateTest, ValidateAndScanDataNonEmpty) {
     {
-        unique_ptr<OperationContext> opCtx(newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(newOperationContext());
         {
             ValidateAdaptorSpy adaptor;
             ValidateResults results;
@@ -150,7 +150,7 @@ TEST_F(ValidateTest, ValidateAndScanDataNonEmpty) {
 // returns an OK status.
 TEST_F(ValidateTest, FullValidateNonEmptyAndScanData) {
     {
-        unique_ptr<OperationContext> opCtx(newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(newOperationContext());
         {
             ValidateAdaptorSpy adaptor(getInsertedRecords());
             ValidateResults results;

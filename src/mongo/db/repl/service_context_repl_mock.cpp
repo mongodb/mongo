@@ -35,13 +35,16 @@
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 namespace repl {
 
 std::unique_ptr<OperationContext> ServiceContextReplMock::_newOpCtx(Client* client, unsigned opId) {
-    return std::unique_ptr<OperationContext>(
-        new OperationContextNoop(client, opId, new MMAPV1LockerImpl()));
+    auto opCtx = stdx::make_unique<OperationContextNoop>(client, opId);
+    opCtx->releaseLockState();
+    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    return opCtx;
 }
 
 }  // namespace repl

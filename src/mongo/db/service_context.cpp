@@ -208,27 +208,20 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
         }
         throw;
     }
-    // // TODO(schwerin): When callers no longer construct their own OperationContexts directly,
-    // // but only through the ServiceContext, uncomment the following.  Until then, it must
-    // // be done in the operation context destructors, which introduces a potential race.
-    // {
-    //     stdx::lock_guard<Client> lk(*client);
-    //     client->setOperationContext(opCtx.get());
-    // }
+    {
+        stdx::lock_guard<Client> lk(*client);
+        client->setOperationContext(opCtx.get());
+    }
     return UniqueOperationContext(opCtx.release());
 };
 
 void ServiceContext::OperationContextDeleter::operator()(OperationContext* opCtx) const {
     auto client = opCtx->getClient();
-    invariant(client);
     auto service = client->getServiceContext();
-    // // TODO(schwerin): When callers no longer construct their own OperationContexts directly,
-    // // but only through the ServiceContext, uncomment the following.  Until then, it must
-    // // be done in the operation context destructors, which introduces a potential race.
-    // {
-    //     stdx::lock_guard<Client> lk(*client);
-    //     client->resetOperationContext();
-    // }
+    {
+        stdx::lock_guard<Client> lk(*client);
+        client->resetOperationContext();
+    }
     try {
         for (const auto& observer : service->_clientObservers) {
             observer->onDestroyOperationContext(opCtx);

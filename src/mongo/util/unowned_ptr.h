@@ -63,8 +63,8 @@ struct unowned_ptr {
     template <typename U, typename = IfConvertibleFrom<U>>
     unowned_ptr(const unowned_ptr<U>& p) : _p(p) {}
 
-    template <typename U, typename = IfConvertibleFrom<U>>
-    unowned_ptr(const std::unique_ptr<U>& p) : _p(p.get()) {}
+    template <typename U, typename Deleter, typename = IfConvertibleFrom<U>>
+    unowned_ptr(const std::unique_ptr<U, Deleter>& p) : _p(p.get()) {}
 
     template <typename U, typename = IfConvertibleFrom<U>>
     unowned_ptr(const std::shared_ptr<U>& p) : _p(p.get()) {}

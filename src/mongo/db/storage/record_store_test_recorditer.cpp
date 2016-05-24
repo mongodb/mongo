@@ -54,7 +54,7 @@ TEST(RecordStoreTestHarness, IterateOverMultipleRecords) {
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
@@ -62,7 +62,7 @@ TEST(RecordStoreTestHarness, IterateOverMultipleRecords) {
     RecordId locs[nToInsert];
     std::string datas[nToInsert];
     for (int i = 0; i < nToInsert; i++) {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             stringstream ss;
             ss << "record " << i;
@@ -79,13 +79,13 @@ TEST(RecordStoreTestHarness, IterateOverMultipleRecords) {
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
     }
 
     std::sort(locs, locs + nToInsert);  // inserted records may not be in RecordId order
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         auto cursor = rs->getCursor(opCtx.get());
         for (int i = 0; i < nToInsert; i++) {
             const auto record = cursor->next();
@@ -105,7 +105,7 @@ TEST(RecordStoreTestHarness, IterateOverMultipleRecordsReversed) {
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
@@ -113,7 +113,7 @@ TEST(RecordStoreTestHarness, IterateOverMultipleRecordsReversed) {
     RecordId locs[nToInsert];
     std::string datas[nToInsert];
     for (int i = 0; i < nToInsert; i++) {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             stringstream ss;
             ss << "record " << i;
@@ -130,13 +130,13 @@ TEST(RecordStoreTestHarness, IterateOverMultipleRecordsReversed) {
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
     }
 
     std::sort(locs, locs + nToInsert);  // inserted records may not be in RecordId order
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
         auto cursor = rs->getCursor(opCtx.get(), false);
         for (int i = nToInsert - 1; i >= 0; i--) {
@@ -156,7 +156,7 @@ TEST(RecordStoreTestHarness, IterateStartFromMiddle) {
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
@@ -164,7 +164,7 @@ TEST(RecordStoreTestHarness, IterateStartFromMiddle) {
     RecordId locs[nToInsert];
     std::string datas[nToInsert];
     for (int i = 0; i < nToInsert; i++) {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             stringstream ss;
             ss << "record " << i;
@@ -181,13 +181,13 @@ TEST(RecordStoreTestHarness, IterateStartFromMiddle) {
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
     }
 
     std::sort(locs, locs + nToInsert);  // inserted records may not be in RecordId order
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
         int start = nToInsert / 2;
         auto cursor = rs->getCursor(opCtx.get());
@@ -208,7 +208,7 @@ TEST(RecordStoreTestHarness, IterateStartFromMiddleReversed) {
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
@@ -216,7 +216,7 @@ TEST(RecordStoreTestHarness, IterateStartFromMiddleReversed) {
     RecordId locs[nToInsert];
     std::string datas[nToInsert];
     for (int i = 0; i < nToInsert; i++) {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             stringstream ss;
             ss << "record " << i;
@@ -233,13 +233,13 @@ TEST(RecordStoreTestHarness, IterateStartFromMiddleReversed) {
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
     }
 
     std::sort(locs, locs + nToInsert);  // inserted records may not be in RecordId order
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
         int start = nToInsert / 2;
         auto cursor = rs->getCursor(opCtx.get(), false);
@@ -261,7 +261,7 @@ TEST(RecordStoreTestHarness, RecordIteratorEOF) {
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
@@ -269,7 +269,7 @@ TEST(RecordStoreTestHarness, RecordIteratorEOF) {
     RecordId locs[nToInsert];
     std::string datas[nToInsert];
     for (int i = 0; i < nToInsert; i++) {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             StringBuilder sb;
             sb << "record " << i;
@@ -286,12 +286,12 @@ TEST(RecordStoreTestHarness, RecordIteratorEOF) {
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
         // Get a forward iterator starting at the beginning of the record store.
         auto cursor = rs->getCursor(opCtx.get());
@@ -332,7 +332,7 @@ TEST(RecordStoreTestHarness, RecordIteratorSaveRestore) {
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
@@ -340,7 +340,7 @@ TEST(RecordStoreTestHarness, RecordIteratorSaveRestore) {
     RecordId locs[nToInsert];
     std::string datas[nToInsert];
     for (int i = 0; i < nToInsert; i++) {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             StringBuilder sb;
             sb << "record " << i;
@@ -357,12 +357,12 @@ TEST(RecordStoreTestHarness, RecordIteratorSaveRestore) {
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
         // Get a forward iterator starting at the beginning of the record store.
         auto cursor = rs->getCursor(opCtx.get());
@@ -393,7 +393,7 @@ TEST(RecordStoreTestHarness, SeekAfterEofAndContinue) {
     unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
-    unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+    ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
     const int nToInsert = 2;
     RecordId locs[nToInsert];

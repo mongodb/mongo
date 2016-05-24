@@ -52,12 +52,14 @@ public:
     virtual std::unique_ptr<RecordStore> newCappedRecordStore(
         int64_t cappedSizeBytes = kDefaultCapedSizeBytes, int64_t cappedMaxDocs = -1) = 0;
 
-    virtual std::unique_ptr<OperationContext> newOperationContext(Client* client) {
-        return stdx::make_unique<OperationContextNoop>(client, 1, newRecoveryUnit());
+    virtual ServiceContext::UniqueOperationContext newOperationContext(Client* client) {
+        auto opCtx = client->makeOperationContext();
+        opCtx->setRecoveryUnit(newRecoveryUnit(), OperationContext::kNotInUnitOfWork);
+        return opCtx;
     }
 
-    std::unique_ptr<OperationContext> newOperationContext() {
-        return newOperationContext(nullptr);
+    ServiceContext::UniqueOperationContext newOperationContext() {
+        return newOperationContext(_client.get());
     }
 
     /**

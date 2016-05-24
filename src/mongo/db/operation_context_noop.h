@@ -27,48 +27,37 @@
  */
 #pragma once
 
-
-#include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker_noop.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/util/progress_meter.h"
 
 namespace mongo {
 
+class Client;
+
 class OperationContextNoop : public OperationContext {
 public:
-    OperationContextNoop() : OperationContextNoop(new RecoveryUnitNoop()) {}
-
-    OperationContextNoop(RecoveryUnit* ru) : OperationContextNoop(nullptr, 0, ru) {}
-
-    OperationContextNoop(Client* client, unsigned int opId)
-        : OperationContextNoop(client, opId, new RecoveryUnitNoop()) {}
-
-    OperationContextNoop(Client* client, unsigned int opId, RecoveryUnit* ru)
-        : OperationContextNoop(client, opId, new LockerNoop(), ru) {}
-
-    OperationContextNoop(Client* client, unsigned int opId, Locker* locker)
-        : OperationContextNoop(client, opId, locker, new RecoveryUnitNoop()) {}
-
-    OperationContextNoop(Client* client, unsigned int opId, Locker* locker, RecoveryUnit* ru)
-        : OperationContext(client, opId, locker) {
+    /**
+     * These constructors are for use in legacy tests that do not need operation contexts that are
+     * properly connected to clients.
+     */
+    OperationContextNoop() : OperationContextNoop(nullptr, 0) {}
+    OperationContextNoop(RecoveryUnit* ru) : OperationContextNoop(nullptr, 0) {
         setRecoveryUnit(ru, kNotInUnitOfWork);
-        _locker.reset(lockState());
-
-        if (client) {
-            stdx::lock_guard<Client> lk(*client);
-            client->setOperationContext(this);
-        }
     }
 
-    virtual ~OperationContextNoop() {
-        auto client = getClient();
-        if (client) {
-            stdx::lock_guard<Client> lk(*client);
-            client->resetOperationContext();
-        }
+
+    /**
+     * This constructor is for use by ServiceContexts, and should not be called directly.
+     */
+    OperationContextNoop(Client* client, unsigned int opId) : OperationContext(client, opId) {
+        setRecoveryUnit(new RecoveryUnitNoop(), kNotInUnitOfWork);
+        setLockState(stdx::make_unique<LockerNoop>());
     }
+
+    virtual ~OperationContextNoop() = default;
 
     virtual ProgressMeter* setMessage_inlock(const char* msg,
                                              const std::string& name,
@@ -78,7 +67,6 @@ public:
     }
 
 private:
-    std::unique_ptr<Locker> _locker;
     ProgressMeter _pm;
 };
 

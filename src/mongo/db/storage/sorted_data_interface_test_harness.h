@@ -92,12 +92,14 @@ public:
     virtual std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique) = 0;
     virtual std::unique_ptr<RecoveryUnit> newRecoveryUnit() = 0;
 
-    std::unique_ptr<OperationContext> newOperationContext(Client* client) {
-        return stdx::make_unique<OperationContextNoop>(client, 1, newRecoveryUnit().release());
+    ServiceContext::UniqueOperationContext newOperationContext(Client* client) {
+        auto opCtx = client->makeOperationContext();
+        opCtx->setRecoveryUnit(newRecoveryUnit().release(), OperationContext::kNotInUnitOfWork);
+        return opCtx;
     }
 
-    std::unique_ptr<OperationContext> newOperationContext() {
-        return newOperationContext(nullptr);
+    ServiceContext::UniqueOperationContext newOperationContext() {
+        return newOperationContext(_client.get());
     }
 
     /**
@@ -135,7 +137,8 @@ void insertToIndex(unowned_ptr<OperationContext> txn,
 inline void insertToIndex(unowned_ptr<HarnessHelper> harness,
                           unowned_ptr<SortedDataInterface> index,
                           std::initializer_list<IndexKeyEntry> toInsert) {
-    insertToIndex(harness->newOperationContext(), index, toInsert);
+    auto client = harness->serviceContext()->makeClient("insertToIndex");
+    insertToIndex(harness->newOperationContext(client.get()), index, toInsert);
 }
 
 /**
@@ -151,7 +154,8 @@ void removeFromIndex(unowned_ptr<OperationContext> txn,
 inline void removeFromIndex(unowned_ptr<HarnessHelper> harness,
                             unowned_ptr<SortedDataInterface> index,
                             std::initializer_list<IndexKeyEntry> toRemove) {
-    removeFromIndex(harness->newOperationContext(), index, toRemove);
+    auto client = harness->serviceContext()->makeClient("removeFromIndex");
+    removeFromIndex(harness->newOperationContext(client.get()), index, toRemove);
 }
 
 std::unique_ptr<HarnessHelper> newHarnessHelper();

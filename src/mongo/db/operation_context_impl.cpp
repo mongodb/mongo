@@ -35,8 +35,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/stdx/memory.h"
@@ -52,11 +50,11 @@ std::unique_ptr<Locker> newLocker() {
 
 class ClientOperationInfo {
 public:
-    Locker* getLocker() {
+    std::unique_ptr<Locker>& locker() {
         if (!_locker) {
             _locker = newLocker();
         }
-        return _locker.get();
+        return _locker;
     }
 
 private:
@@ -70,19 +68,15 @@ const auto clientOperationInfoDecoration = Client::declareDecoration<ClientOpera
 using std::string;
 
 OperationContextImpl::OperationContextImpl(Client* client, unsigned opId)
-    : OperationContext(client, opId, clientOperationInfoDecoration(client).getLocker()) {
+    : OperationContext(client, opId) {
+    setLockState(std::move(clientOperationInfoDecoration(client).locker()));
     StorageEngine* storageEngine = getServiceContext()->getGlobalStorageEngine();
     setRecoveryUnit(storageEngine->newRecoveryUnit(), kNotInUnitOfWork);
-
-    stdx::lock_guard<Client> lk(*client);
-    client->setOperationContext(this);
 }
 
 OperationContextImpl::~OperationContextImpl() {
     lockState()->assertEmptyAndReset();
-    auto client = getClient();
-    stdx::lock_guard<Client> lk(*client);
-    client->resetOperationContext();
+    clientOperationInfoDecoration(getClient()).locker() = releaseLockState();
 }
 
 ProgressMeter* OperationContextImpl::setMessage_inlock(const char* msg,
