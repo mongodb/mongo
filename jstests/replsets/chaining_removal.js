@@ -20,6 +20,7 @@
         ],
     });
     replTest.waitForState(nodes[0], ReplSetTest.State.PRIMARY, 60 * 1000);
+    replTest.awaitNodesAgreeOnPrimary();
     var primary = replTest.getPrimary();
     replTest.awaitReplication();
 
