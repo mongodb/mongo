@@ -16,11 +16,7 @@ Import("use_system_version_of_library")
 
 # Boost we need everywhere. 's2' is spammed in all over the place by
 # db/geo unfortunately. pcre is also used many places.
-env.InjectThirdPartyIncludePaths(libraries=[
-    'boost',
-    'pcre',
-    's2',
-])
+env.InjectThirdPartyIncludePaths(libraries=['boost', 's2', 'pcre'])
 env.InjectMongoIncludePaths()
 
 env.SConscript(

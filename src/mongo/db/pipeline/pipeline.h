@@ -212,7 +212,6 @@ private:
     friend class Optimizations::Sharded;
 
     static const char pipelineName[];
-    static const char collationName[];
     static const char explainName[];
     static const char fromRouterName[];
     static const char serverPipelineName[];

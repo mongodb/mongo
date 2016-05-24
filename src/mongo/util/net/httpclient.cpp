@@ -35,6 +35,7 @@
 #include "mongo/config.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/message.h"
+#include "mongo/util/net/message_port.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/ssl_manager.h"

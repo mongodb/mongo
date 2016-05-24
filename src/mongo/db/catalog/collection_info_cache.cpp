@@ -161,8 +161,7 @@ void CollectionInfoCache::updatePlanCacheIndexEntries(OperationContext* txn) {
                                   desc->unique(),
                                   desc->indexName(),
                                   ice->getFilterExpression(),
-                                  desc->infoObj(),
-                                  ice->getCollator());
+                                  desc->infoObj());
     }
 
     _planCache->notifyOfIndexEntries(indexEntries);

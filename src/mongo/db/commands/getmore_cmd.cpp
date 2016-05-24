@@ -277,7 +277,7 @@ public:
         // Reset timeout timer on the cursor since the cursor is still in use.
         cursor->setIdleTime(0);
 
-        const bool hasOwnMaxTime = txn->hasDeadline();
+        const bool hasOwnMaxTime = curOp->isMaxTimeSet();
 
         if (!hasOwnMaxTime) {
             // There is no time limit set directly on this getMore command. If the cursor is
@@ -285,15 +285,10 @@ public:
             // any leftover time from the maxTimeMS of the operation that spawned this cursor,
             // applying it to this getMore.
             if (isCursorAwaitData(cursor)) {
-                uassert(40117,
-                        "Illegal attempt to set operation deadline within DBDirectClient",
-                        !txn->getClient()->isInDirectClient());
-                txn->setDeadlineAfterNowBy(Seconds{1});
-            } else if (cursor->getLeftoverMaxTimeMicros() < Microseconds::max()) {
-                uassert(40118,
-                        "Illegal attempt to set operation deadline within DBDirectClient",
-                        !txn->getClient()->isInDirectClient());
-                txn->setDeadlineAfterNowBy(cursor->getLeftoverMaxTimeMicros());
+                Seconds awaitDataTimeout(1);
+                curOp->setMaxTimeMicros(durationCount<Microseconds>(awaitDataTimeout));
+            } else {
+                curOp->setMaxTimeMicros(cursor->getLeftoverMaxTimeMicros());
             }
         }
         txn->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
@@ -362,7 +357,7 @@ public:
                 ctx.reset();
 
                 // Block waiting for data.
-                const auto timeout = txn->getRemainingMaxTimeMicros();
+                Microseconds timeout(static_cast<int64_t>(curOp->getRemainingMaxTimeMicros()));
                 notifier->wait(notifierVersion, timeout);
                 notifier.reset();
 
@@ -405,7 +400,7 @@ public:
             // from a previous find, then don't roll remaining micros over to the next
             // getMore.
             if (!hasOwnMaxTime) {
-                cursor->setLeftoverMaxTimeMicros(txn->getRemainingMaxTimeMicros());
+                cursor->setLeftoverMaxTimeMicros(curOp->getRemainingMaxTimeMicros());
             }
 
             cursor->incPos(numResults);

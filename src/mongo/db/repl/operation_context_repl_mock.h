@@ -49,6 +49,16 @@ public:
     OperationContextReplMock(Client* client, unsigned int opNum);
     virtual ~OperationContextReplMock();
 
+    virtual void checkForInterrupt() override;
+
+    virtual Status checkForInterruptNoAssert() override;
+
+    void setCheckForInterruptStatus(Status status);
+
+    virtual uint64_t getRemainingMaxTimeMicros() const override;
+
+    void setRemainingMaxTimeMicros(uint64_t micros);
+
     void setReplicatedWrites(bool writesAreReplicated = true) override;
 
     bool writesAreReplicated() const override;

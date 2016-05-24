@@ -51,13 +51,7 @@ const Status kInternalErrorStatus{ErrorCodes::InternalError,
 }  // namespace
 
 const ConnectionString ShardLocal::getConnString() const {
-    auto replCoord = repl::getGlobalReplicationCoordinator();
-
-    // Currently ShardLocal only works for config servers, which must be replica sets.  If we
-    // ever start using ShardLocal on shards we'll need to consider how to handle shards that are
-    // not replica sets.
-    invariant(replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet);
-    return replCoord->getConfig().getConnectionString();
+    return ConnectionString::forLocal();
 }
 
 std::shared_ptr<RemoteCommandTargeter> ShardLocal::getTargeter() const {
@@ -65,9 +59,6 @@ std::shared_ptr<RemoteCommandTargeter> ShardLocal::getTargeter() const {
 };
 
 const ConnectionString ShardLocal::originalConnString() const {
-    // Return the local connection string here as this method is only used for updating the
-    // ShardRegistry and we don't need a mapping from hosts in the replica set config to the shard
-    // for local shards.
     return ConnectionString::forLocal();
 }
 

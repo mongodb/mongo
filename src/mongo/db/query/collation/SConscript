@@ -6,6 +6,14 @@ Import("use_system_version_of_library")
 
 env = env.Clone()
 
+env.InjectThirdPartyIncludePaths("icu")
+
+env.Append(
+    CPPDEFINES=[
+        'U_USING_ICU_NAMESPACE=0',
+    ],
+)
+
 env.Library(
     target="collator_interface",
     source=[
@@ -123,22 +131,8 @@ env.CppUnitTest(
     ],
 )
 
-env.CppUnitTest(
-    target="collator_factory_icu_test",
-    source=[
-        "collator_factory_icu_test.cpp",
-    ],
-    LIBDEPS=[
-        "collator_icu",
-    ],
-)
-
-# The collator_icu library and the collator_interface_icu_test unit tests need an environment which
-# has access to the third-party ICU headers.
-icuEnv = env.Clone()
-
 if not use_system_version_of_library("icu"):
-    generateICUInit = icuEnv.Command(
+    generateICUInit = env.Command(
         target="icu_init.cpp",
         source=[
             "generate_icu_init_cpp.py",
@@ -149,24 +143,9 @@ if not use_system_version_of_library("icu"):
         action="$PYTHON ${SOURCES[0]} -o $TARGET -i ${SOURCES[1]}",
     )
 
-    icuEnv.Alias("generated-sources", generateICUInit)
+    env.Alias("generated-sources", generateICUInit)
 
-    icuEnv.InjectThirdPartyIncludePaths("icu")
-
-    # Since we are injecting the third-party ICU headers, we must also copy the same defines that we
-    # use to configure ICU when building ICU sources. See comment in
-    # src/third_party/icu4c-57.1/source/SConscript.
-    icuEnv.Append(
-        CPPDEFINES=[
-            ("UCONFIG_ONLY_COLLATION", 1),
-            ("U_CHARSET_IS_UTF8", 1),
-            ("U_DISABLE_RENAMING", 1),
-            ("U_STATIC_IMPLEMENTATION", 1),
-            ("U_USING_ICU_NAMESPACE", 0),
-        ],
-    )
-
-icuEnv.Library(
+env.Library(
     target="collator_icu",
     source=[
         "collator_factory_icu.cpp",
@@ -181,10 +160,20 @@ icuEnv.Library(
     ],
 )
 
-icuEnv.CppUnitTest(
+env.CppUnitTest(
     target="collator_interface_icu_test",
     source=[
         "collator_interface_icu_test.cpp",
+    ],
+    LIBDEPS=[
+        "collator_icu",
+    ],
+)
+
+env.CppUnitTest(
+    target="collator_factory_icu_test",
+    source=[
+        "collator_factory_icu_test.cpp",
     ],
     LIBDEPS=[
         "collator_icu",

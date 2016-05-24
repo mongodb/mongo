@@ -1352,12 +1352,7 @@ void Command::execCommand(OperationContext* txn,
                 "no such command option $maxTimeMs; use maxTimeMS instead",
                 extractedFields[kQueryOptionMaxTimeMSField].eoo());
 
-        if (maxTimeMS > 0) {
-            uassert(40119,
-                    "Illegal attempt to set operation deadline within DBDirectClient",
-                    !txn->getClient()->isInDirectClient());
-            txn->setDeadlineAfterNowBy(Milliseconds{maxTimeMS});
-        }
+        CurOp::get(txn)->setMaxTimeMicros(static_cast<unsigned long long>(maxTimeMS) * 1000);
 
         // Operations are only versioned against the primary. We also make sure not to redo shard
         // version handling if this command was issued via the direct client.

@@ -31,10 +31,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 
 #include <memory>
-
-namespace icu {
-class Collator;
-}  // namespace icu
+#include <unicode/coll.h>
 
 namespace mongo {
 

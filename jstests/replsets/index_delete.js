@@ -1,27 +1,37 @@
 /**
+ * TODO: SERVER-13204
+ * This  tests inserts a huge number of documents, initiates a background index build
+ * and tries to perform another task in parallel while the background index task is
+ * active. The problem is that this is timing dependent and the current test setup
+ * tries to achieve this by inserting insane amount of documents.
+ */
+
+/**
  * Starts a replica set with arbiter, build an index
  * drop index once secondary starts building index,
  * index should not exist on secondary afterwards
  */
 
-function indexBuildInProgress(checkDB) {
-    var inprog = checkDB.currentOp().inprog;
-    var indexOps = inprog.filter(function(op) {
-        if (op.msg && op.msg.includes('Index Build')) {
-            if (op.progress && (op.progress.done / op.progress.total) > 0.20) {
-                printjson(op);
+var checkOp = function(checkDB) {
+    var curOp = checkDB.currentOp(true);
+    for (var i = 0; i < curOp.inprog.length; i++) {
+        try {
+            if (curOp.inprog[i].query.background) {
+                // should throw something when string contains > 90%
+                printjson(curOp.inprog[i].msg);
                 return true;
             }
+        } catch (e) {
+            // catchem if you can
         }
-    });
-    return indexOps.length > 0;
-}
-
+    }
+    return false;
+};
 // Set up replica set
 var replTest = new ReplSetTest({name: 'fgIndex', nodes: 3});
 var nodes = replTest.nodeList();
 
-// We need an arbiter to ensure that the primary doesn't step down when we restart the secondary.
+// We need an arbiter to ensure that the primary doesn't step down when we restart the secondary
 replTest.startSet();
 replTest.initiate({
     "_id": "fgIndex",
@@ -37,12 +47,9 @@ var second = replTest.getSecondary();
 var masterDB = master.getDB('fgIndexSec');
 var secondDB = second.getDB('fgIndexSec');
 
-var size = 100;
+var size = 50000;
 
-// Make sure that the index build does not terminate on the secondary.
-assert.commandWorked(
-    secondDB.adminCommand({configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'alwaysOn'}));
-
+jsTest.log("creating test data " + size + " documents");
 var bulk = masterDB.jstests_fgsec.initializeUnorderedBulkOp();
 for (var i = 0; i < size; ++i) {
     bulk.insert({i: i});
@@ -53,28 +60,22 @@ jsTest.log("Creating index");
 masterDB.jstests_fgsec.ensureIndex({i: 1});
 assert.eq(2, masterDB.jstests_fgsec.getIndexes().length);
 
-try {
-    assert.soon(function() {
-        if (indexBuildInProgress(secondDB)) {
-            return true;
-        } else {
-            return false;
-        }
-    }, "index not started on secondary", 30000, 50);
-} finally {
-    // Turn off failpoint and let the index build resumes.
-    assert.commandWorked(
-        secondDB.adminCommand({configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'off'}));
-}
+// Wait for the secondary to get the index entry
+assert.soon(function() {
+    return 2 == secondDB.jstests_fgsec.getIndexes().length;
+}, "index not created on secondary", 1000 * 60 * 10, 50);
 
 jsTest.log("Index created on secondary");
 masterDB.runCommand({dropIndexes: "jstests_fgsec", index: "i_1"});
-
 jsTest.log("Waiting on replication");
 replTest.awaitReplication();
-
+assert.soon(function() {
+    return !checkOp(secondDB);
+}, "index not cancelled on secondary", 30000, 50);
 masterDB.jstests_fgsec.getIndexes().forEach(printjson);
 secondDB.jstests_fgsec.getIndexes().forEach(printjson);
 assert.soon(function() {
     return 1 == secondDB.jstests_fgsec.getIndexes().length;
 }, "Index not dropped on secondary", 30000, 50);
+
+jsTest.log("index-restart-secondary.js complete");

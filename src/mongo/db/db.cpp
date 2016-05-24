@@ -120,7 +120,6 @@
 #include "mongo/util/fast_clock_source_factory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/hostname_canonicalization_worker.h"
-#include "mongo/util/net/listen.h"
 #include "mongo/util/net/message_server.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/ntservice.h"
@@ -322,9 +321,6 @@ static unsigned long long checkIfReplMissingFromCommandLine(OperationContext* tx
  * these versions.
  */
 static bool isSubjectToSERVER23299(OperationContext* txn) {
-    if (storageGlobalParams.readOnly) {
-        return false;
-    }
     dbHolder().openDb(txn, startupLogCollectionName.db());
     AutoGetCollectionForRead autoColl(txn, startupLogCollectionName);
     // No startup log or an empty one means either that the user was not running an affected

@@ -56,8 +56,7 @@ class IndexCatalogEntry {
     MONGO_DISALLOW_COPYING(IndexCatalogEntry);
 
 public:
-    IndexCatalogEntry(OperationContext* txn,
-                      StringData ns,
+    IndexCatalogEntry(StringData ns,
                       CollectionCatalogEntry* collection,  // not owned
                       IndexDescriptor* descriptor,         // ownership passes to me
                       CollectionInfoCache* infoCache);     // not owned, optional
@@ -68,7 +67,7 @@ public:
         return _ns;
     }
 
-    void init(std::unique_ptr<IndexAccessMethod> accessMethod);
+    void init(OperationContext* txn, IndexAccessMethod* accessMethod);
 
     IndexDescriptor* descriptor() {
         return _descriptor;
@@ -78,10 +77,10 @@ public:
     }
 
     IndexAccessMethod* accessMethod() {
-        return _accessMethod.get();
+        return _accessMethod;
     }
     const IndexAccessMethod* accessMethod() const {
-        return _accessMethod.get();
+        return _accessMethod;
     }
 
     const Ordering& ordering() const {
@@ -177,7 +176,7 @@ private:
 
     CollectionInfoCache* _infoCache;  // not owned here
 
-    std::unique_ptr<IndexAccessMethod> _accessMethod;
+    IndexAccessMethod* _accessMethod;  // owned here
 
     // Owned here.
     HeadManager* _headManager;

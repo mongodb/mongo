@@ -32,7 +32,6 @@
 
 #include <iomanip>
 #include <iostream>
-#include <unicode/coll.h>
 
 #include "mongo/unittest/unittest.h"
 

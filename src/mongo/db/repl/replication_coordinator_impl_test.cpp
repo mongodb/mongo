@@ -79,6 +79,8 @@ using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 
 typedef ReplicationCoordinator::ReplSetReconfigArgs ReplSetReconfigArgs;
+Status kInterruptedStatus(ErrorCodes::Interrupted, "operation was interrupted");
+
 // Helper class to wrap Timestamp as an OpTime with term 0.
 struct OpTimeWithTermZero {
     OpTimeWithTermZero(unsigned int sec, unsigned int i) : timestamp(sec, i) {}
@@ -1359,7 +1361,7 @@ TEST_F(ReplCoordTest,
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 1, time1));
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 2, time1));
 
-    txn.markKilled(ErrorCodes::Interrupted);
+    txn.setCheckForInterruptStatus(kInterruptedStatus);
     getReplCoord()->interrupt(opID);
     ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
     ASSERT_EQUALS(ErrorCodes::Interrupted, statusAndDur.status);
@@ -1829,7 +1831,7 @@ TEST_F(StepDownTest, NodeReturnsInterruptedWhenInterruptedDuringStepDown) {
     ASSERT_TRUE(eventHandle);
     ASSERT_TRUE(txn.lockState()->isReadLocked());
 
-    txn.markKilled(ErrorCodes::Interrupted);
+    txn.setCheckForInterruptStatus(kInterruptedStatus);
     getReplCoord()->interrupt(opID);
 
     getReplExec()->waitForEvent(eventHandle);
@@ -3189,7 +3191,7 @@ TEST_F(ReplCoordTest, NodeReturnsInterruptedWhenWaitingUntilAnOpTimeIsInterrupte
     getReplCoord()->setMyLastAppliedOpTime(OpTimeWithTermZero(10, 0));
     getReplCoord()->setMyLastDurableOpTime(OpTimeWithTermZero(10, 0));
 
-    txn.markKilled(ErrorCodes::Interrupted);
+    txn.setCheckForInterruptStatus(Status(ErrorCodes::Interrupted, "test"));
 
     auto result = getReplCoord()->waitUntilOpTime(
         &txn, ReadConcernArgs(OpTimeWithTermZero(50, 0), ReadConcernLevel::kLocalReadConcern));
@@ -3311,7 +3313,7 @@ TEST_F(ReplCoordTest, ReadAfterCommittedInterrupted) {
     getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(10, 0), 0));
     getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(10, 0), 0));
 
-    txn.markKilled(ErrorCodes::Interrupted);
+    txn.setCheckForInterruptStatus(Status(ErrorCodes::Interrupted, "test"));
 
     auto result = getReplCoord()->waitUntilOpTime(
         &txn, ReadConcernArgs(OpTime(Timestamp(50, 0), 0), ReadConcernLevel::kMajorityReadConcern));

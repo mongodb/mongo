@@ -135,23 +135,10 @@ public:
         return _idleAgeMillis;
     }
 
-    /**
-     * Returns the amount of time execution time available to this cursor. Only valid at the
-     * beginning of a getMore request, and only really for use by the maxTime tracking code.
-     *
-     * Microseconds::max() == infinity, values less than 1 mean no time left.
-     */
-    Microseconds getLeftoverMaxTimeMicros() const {
+    uint64_t getLeftoverMaxTimeMicros() const {
         return _leftoverMaxTimeMicros;
     }
-
-    /**
-     * Sets the amount of execution time available to this cursor. This is only called when an
-     * operation that uses a cursor is finishing, to update its remaining time.
-     *
-     * Microseconds::max() == infinity, values less than 1 mean no time left.
-     */
-    void setLeftoverMaxTimeMicros(Microseconds leftoverMaxTimeMicros) {
+    void setLeftoverMaxTimeMicros(uint64_t leftoverMaxTimeMicros) {
         _leftoverMaxTimeMicros = leftoverMaxTimeMicros;
     }
 
@@ -261,8 +248,8 @@ private:
     // How long has the cursor been idle?
     int _idleAgeMillis;
 
-    // Unused maxTime budget for this cursor.
-    Microseconds _leftoverMaxTimeMicros = Microseconds::max();
+    // TODO: Document.
+    uint64_t _leftoverMaxTimeMicros;
 
     //
     // The underlying execution machinery.
