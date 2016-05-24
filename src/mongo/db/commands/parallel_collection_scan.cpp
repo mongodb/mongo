@@ -149,7 +149,7 @@ public:
                                      exec.release(),
                                      ns.ns(),
                                      txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot());
-                cc->setLeftoverMaxTimeMicros(CurOp::get(txn)->getRemainingMaxTimeMicros());
+                cc->setLeftoverMaxTimeMicros(txn->getRemainingMaxTimeMicros());
 
                 BSONObjBuilder threadResult;
                 appendCursorResponseObject(cc->cursorid(), ns.ns(), BSONArray(), &threadResult);

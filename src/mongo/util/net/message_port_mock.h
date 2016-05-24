@@ -30,27 +30,67 @@
 
 #include <vector>
 
-#include "mongo/config.h"
 #include "mongo/util/net/abstract_message_port.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/sockaddr.h"
 
 namespace mongo {
 
-class MessagingPortMock : public AbstractMessagingPort {
+class MessagingPortMock final : public AbstractMessagingPort {
     MONGO_DISALLOW_COPYING(MessagingPortMock);
 
 public:
     MessagingPortMock();
-    virtual ~MessagingPortMock();
+    ~MessagingPortMock();
 
-    virtual void reply(Message& received, Message& response, int32_t responseToMsgId);
-    virtual void reply(Message& received, Message& response);
+    void setTimeout(Milliseconds millis) override;
 
-    virtual HostAndPort remote() const;
-    virtual unsigned remotePort() const;
-    virtual SockAddr remoteAddr() const;
-    virtual SockAddr localAddr() const;
+    void shutdown() override;
+
+    bool call(Message& toSend, Message& response) override;
+
+    bool recv(Message& m) override;
+
+    void reply(Message& received, Message& response, int32_t responseToMsgId) override;
+    void reply(Message& received, Message& response) override;
+
+    void say(Message& toSend, int responseTo = 0) override;
+
+    bool connect(SockAddr& farEnd) override;
+
+    void send(const char* data, int len, const char* context) override;
+    void send(const std::vector<std::pair<char*, int>>& data, const char* context) override;
+
+    HostAndPort remote() const override;
+    unsigned remotePort() const override;
+    SockAddr remoteAddr() const override;
+    SockAddr localAddr() const override;
+
+    bool isStillConnected() const override;
+
+    void setLogLevel(logger::LogSeverity logLevel) override;
+
+    void clearCounters() override;
+
+    long long getBytesIn() const override;
+
+    long long getBytesOut() const override;
+
+    uint64_t getSockCreationMicroSec() const override;
+
+    void setX509SubjectName(const std::string& x509SubjectName) override;
+
+    std::string getX509SubjectName() const override;
+
+    void setConnectionId(const long long connectionId) override;
+
+    long long connectionId() const override;
+
+    void setTag(const AbstractMessagingPort::Tag tag) override;
+
+    AbstractMessagingPort::Tag getTag() const override;
+
+    bool secure(SSLManagerInterface* ssl, const std::string& remoteHost) override;
 
     void setRemote(const HostAndPort& remote);
 

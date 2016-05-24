@@ -84,16 +84,14 @@ public:
 
     /**
      * Returns the current connection string for the shard.
-     *
-     * This is only valid to call on ShardRemote instances.
      */
     virtual const ConnectionString getConnString() const = 0;
 
     /**
-     * Returns the connection string that was used when the shard was added. The current connection
-     * string may be different for shards that are replica sets.
-     *
-     * This is only valid to call on ShardRemote instances.
+     * Returns the connection string that was used to create the Shard from the ShardFactory.  The
+     * current connection string may be different.
+     * NOTE: Chances are this isn't the method you want.  When in doubt, prefer to use
+     * getConnString() instead.
      */
     virtual const ConnectionString originalConnString() const = 0;
 

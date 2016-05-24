@@ -142,7 +142,8 @@ void fillOutPlannerParams(OperationContext* txn,
                                                     desc->unique(),
                                                     desc->indexName(),
                                                     ice->getFilterExpression(),
-                                                    desc->infoObj()));
+                                                    desc->infoObj(),
+                                                    ice->getCollator()));
     }
 
     // If query supports index filters, filter params.indices by indices in query settings.
@@ -1162,6 +1163,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* txn,
 
     auto lpq = stdx::make_unique<LiteParsedQuery>(request.getNs());
     lpq->setFilter(request.getQuery());
+    lpq->setCollation(request.getCollation());
     lpq->setHint(request.getHint());
     lpq->setExplain(explain);
 
@@ -1324,7 +1326,8 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
                                                        desc->unique(),
                                                        desc->indexName(),
                                                        ice->getFilterExpression(),
-                                                       desc->infoObj()));
+                                                       desc->infoObj(),
+                                                       ice->getCollator()));
         }
     }
 

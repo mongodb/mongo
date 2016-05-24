@@ -162,15 +162,15 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='curop_test',
+    target='operation_context_test',
     source=[
-        'curop_test.cpp',
+        'operation_context_test.cpp',
     ],
     LIBDEPS=[
-        'commands_test_crutch',
-        'curop',
+        'service_context',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
     ],
 )
 
@@ -468,6 +468,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/clock_sources',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         '$BUILD_DIR/mongo/util/decorable',
+        '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/net/hostandport',
     ],
 )

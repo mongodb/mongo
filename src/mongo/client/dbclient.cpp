@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <algorithm>
 #include <utility>
 
 #include "mongo/base/status.h"
@@ -63,10 +64,15 @@
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/asio_message_port.h"
+#include "mongo/util/net/message_port.h"
+#include "mongo/util/net/message_port_startup_param.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/password_digest.h"
+#include "mongo/util/represent_as.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -948,6 +954,10 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress) {
     return Status::OK();
 }
 
+namespace {
+const auto kMaxMillisCount = Milliseconds::max().count();
+}  // namespace
+
 Status DBClientConnection::connectSocketOnly(const HostAndPort& serverAddress) {
     _serverAddress = serverAddress;
     _failed = true;
@@ -961,7 +971,14 @@ Status DBClientConnection::connectSocketOnly(const HostAndPort& serverAddress) {
                                     << serverAddress.host() << ", address is invalid");
     }
 
-    _port.reset(new MessagingPort(_so_timeout, _logLevel));
+    if (isMessagePortImplASIO()) {
+        // `_so_timeout` is in seconds.
+        auto ms = representAs<int64_t>(std::floor(_so_timeout * 1000)).value_or(kMaxMillisCount);
+        _port.reset(new ASIOMessagingPort(
+            ms > kMaxMillisCount ? Milliseconds::max() : Milliseconds(ms), _logLevel));
+    } else {
+        _port.reset(new MessagingPort(_so_timeout, _logLevel));
+    }
 
     if (serverAddress.host().empty()) {
         return Status(ErrorCodes::InvalidOptions,
@@ -1058,7 +1075,9 @@ void DBClientConnection::_checkConnection() {
 void DBClientConnection::setSoTimeout(double timeout) {
     _so_timeout = timeout;
     if (_port) {
-        _port->setSocketTimeout(timeout);
+        // `timeout` is in seconds.
+        auto ms = representAs<int64_t>(std::floor(timeout * 1000)).value_or(kMaxMillisCount);
+        _port->setTimeout(ms > kMaxMillisCount ? Milliseconds::max() : Milliseconds(ms));
     }
 }
 

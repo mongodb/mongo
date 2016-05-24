@@ -32,8 +32,8 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/net/abstract_message_port.h"
 #include "mongo/util/net/hostandport.h"
-#include "mongo/util/net/message_port.h"
 
 namespace mongo {
 

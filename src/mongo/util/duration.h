@@ -215,11 +215,13 @@ public:
     /**
      * Constructs a duration representing "r" periods.
      */
-    template <typename Rep2>
+    template <
+        typename Rep2,
+        stdx::enable_if_t<std::is_convertible<Rep2, rep>::value && std::is_integral<Rep2>::value,
+                          int> = 0>
     constexpr explicit Duration(const Rep2& r)
         : _count(r) {
-        static_assert(std::is_integral<Rep2>::value &&
-                          (std::is_signed<Rep2>::value || sizeof(Rep2) < sizeof(rep)),
+        static_assert(std::is_signed<Rep2>::value || sizeof(Rep2) < sizeof(rep),
                       "Durations must be constructed from values of integral type that are "
                       "representable as 64-bit signed integers");
     }

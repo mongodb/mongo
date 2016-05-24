@@ -50,11 +50,6 @@ public:
 
     virtual std::string getNS() const override;
 
-    virtual uint64_t getRemainingMaxTimeMicros() const override;
-
-    virtual void checkForInterrupt() override;
-    virtual Status checkForInterruptNoAssert() override;
-
     virtual bool isPrimaryFor(StringData ns) override;
 
     virtual void setReplicatedWrites(bool writesAreReplicated = true) override;

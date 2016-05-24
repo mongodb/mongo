@@ -525,10 +525,12 @@ StatusWith<string> CatalogManagerReplicaSet::addShard(OperationContext* txn,
 
     logChange(txn, "addShard", "", shardDetails.obj());
 
-    // Make sure the new shard is visible from this point on. Do the reload twice in case there was
-    // a concurrent reload, which started before we added the shard.
-    if (!Grid::get(txn)->shardRegistry()->reload(txn)) {
-        Grid::get(txn)->shardRegistry()->reload(txn);
+    // Ensure the added shard is visible to this process.
+    auto shardRegistry = Grid::get(txn)->shardRegistry();
+    if (!shardRegistry->getShard(txn, shardType.getName())) {
+        return {ErrorCodes::OperationFailed,
+                "Could not find shard metadata for shard after adding it. This most likely "
+                "indicates that the shard was removed immediately after it was added."};
     }
 
     return shardType.getName();
@@ -1562,6 +1564,9 @@ Status CatalogManagerReplicaSet::applyChunkOpsDeprecated(OperationContext* txn,
         ? std::move(response.getValue().writeConcernStatus)
         : std::move(response.getValue().commandStatus);
 
+    // TODO (Dianna) This fail point needs to be reexamined when CommitChunkMigration is in:
+    // migrations will no longer be able to exercise it, so split or merge will need to do so.
+    // SERVER-22659.
     if (MONGO_FAIL_POINT(failApplyChunkOps)) {
         status = Status(ErrorCodes::InternalError, "Failpoint 'failApplyChunkOps' generated error");
     }

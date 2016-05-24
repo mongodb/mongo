@@ -36,8 +36,6 @@
 
 namespace mongo {
 
-class CollatorInterface;
-
 struct QueryPlannerParams {
     QueryPlannerParams()
         : options(DEFAULT),
@@ -117,11 +115,6 @@ struct QueryPlannerParams {
     // plans via the MultiPlanStage, and the set of possible plans is very large for certain
     // index+query combinations.
     size_t maxIndexedSolutions;
-
-    // The collation which this query must respect. Distinct from the CollatorInterfaces attached to
-    // the IndexEntry instances, which give the physical properties of the indices rather than the
-    // logical collation which the query must use.
-    const CollatorInterface* collator = nullptr;
 };
 
 }  // namespace mongo

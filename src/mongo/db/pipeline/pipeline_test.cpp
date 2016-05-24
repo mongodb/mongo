@@ -28,11 +28,13 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/operation_context_noop.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/query_test_service_context.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace mongo {
@@ -1081,6 +1083,34 @@ TEST(PipelineInitialSource, MatchInitialQuery) {
     string errmsg;
     intrusive_ptr<Pipeline> pipe = Pipeline::parseCommand(errmsg, inputBson, ctx);
     ASSERT_EQ(pipe->getInitialQuery(), BSON("a" << 4));
+}
+
+TEST(PipelineInitialSource, CollationNotAnObjectFailsToParse) {
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
+
+    const BSONObj inputBson = fromjson("{pipeline: [{$match: {a: 'abc'}}], collation: 1}");
+
+    intrusive_ptr<ExpressionContext> ctx =
+        new ExpressionContext(txn.get(), NamespaceString("a.collection"));
+    string errmsg;
+    ASSERT_THROWS(Pipeline::parseCommand(errmsg, inputBson, ctx), UserException);
+}
+
+TEST(PipelineInitialSource, ParseCollation) {
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
+
+    const BSONObj inputBson =
+        fromjson("{pipeline: [{$match: {a: 'abc'}}], collation: {locale: 'reverse'}}");
+
+    intrusive_ptr<ExpressionContext> ctx =
+        new ExpressionContext(txn.get(), NamespaceString("a.collection"));
+    string errmsg;
+    intrusive_ptr<Pipeline> pipe = Pipeline::parseCommand(errmsg, inputBson, ctx);
+    ASSERT(ctx->collator.get());
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    ASSERT_TRUE(CollatorInterface::collatorsMatch(ctx->collator.get(), &collator));
 }
 }
 

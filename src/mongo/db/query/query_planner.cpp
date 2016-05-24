@@ -659,7 +659,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
     }
 
     // Figure out how useful each index is to each predicate.
-    QueryPlannerIXSelect::rateIndices(query.root(), "", relevantIndices, params.collator);
+    QueryPlannerIXSelect::rateIndices(query.root(), "", relevantIndices, query.getCollator());
     QueryPlannerIXSelect::stripInvalidAssignments(query.root(), relevantIndices);
 
     // Unless we have GEO_NEAR, TEXT, or a projection, we may be able to apply an optimization

@@ -129,16 +129,10 @@ env.Library(
 )
 
 env.Library(
-    target='tick_source_mock',
-    source=[
-        'tick_source_mock.cpp',
-    ],
-)
-
-env.Library(
     target='clock_source_mock',
     source=[
         'clock_source_mock.cpp',
+        'tick_source_mock.cpp',
     ],
 )
 
@@ -492,9 +486,9 @@ env.CppUnitTest(
 
 env.CppUnitTest(
     target='duration_test',
-source=[
-    'duration_test.cpp',
-],
-LIBDEPS=[
-    '$BUILD_DIR/mongo/base',
-])
+    source=[
+        'duration_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ])

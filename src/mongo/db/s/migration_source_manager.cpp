@@ -62,6 +62,7 @@ const Hours kMaxWaitToEnterCriticalSectionTimeout(6);
 
 }  // namespace
 
+MONGO_FP_DECLARE(failCommitMigrationCommand);
 MONGO_FP_DECLARE(failMigrationCommit);
 MONGO_FP_DECLARE(hangBeforeCommitMigration);
 MONGO_FP_DECLARE(hangBeforeLeavingCriticalSection);
@@ -360,9 +361,81 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
     Status applyOpsStatus = grid.catalogManager(txn)->applyChunkOpsDeprecated(
         txn, updates.arr(), preCond.arr(), _args.getNss().ns(), nextVersion);
 
-    // We cannot meaningfully recover from failure to reflect the uncommitted metadata on the config
-    // servers, so crash the server.
-    fassertStatusOK(34431, applyOpsStatus);
+    if (MONGO_FAIL_POINT(failCommitMigrationCommand)) {
+        applyOpsStatus = Status(ErrorCodes::InternalError,
+                                "Failpoint 'failCommitMigrationCommand' generated error");
+    }
+
+    if (!applyOpsStatus.isOK()) {
+        // This could be an unrelated error (e.g. network error). Check whether the metadata update
+        // succeeded by refreshing the collection metadata and checking that the original chunks no
+        // longer exist.
+
+        warning() << "Migration metadata commit may have failed: refreshing metadata to check"
+                  << causedBy(applyOpsStatus);
+
+        // Need to get the latest optime in case the refresh request goes to a secondary --
+        // otherwise the read won't wait for the write that applyChunkOpsDeprecated may have done.
+        Status status = grid.catalogManager(txn)->logChange(
+            txn,
+            "moveChunk.validating",
+            _args.getNss().ns(),
+            BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey() << "from"
+                       << _args.getFromShardId() << "to" << _args.getToShardId()));
+        if (!status.isOK()) {
+            fassertStatusOK(40137,
+                            {status.code(),
+                             str::stream()
+                                 << "applyOps failed to commit chunk [" << _args.getMinKey() << ","
+                                 << _args.getMaxKey() << ") due to " << causedBy(applyOpsStatus)
+                                 << ", and updating the optime with a write before refreshing the "
+                                 << "metadata also failed: " << causedBy(status)});
+        }
+
+        ShardingState* const shardingState = ShardingState::get(txn);
+        ChunkVersion shardVersion;
+        Status refreshStatus =
+            shardingState->refreshMetadataNow(txn, _args.getNss().ns(), &shardVersion);
+        fassertStatusOK(34431,
+                        {refreshStatus.code(),
+                         str::stream() << "applyOps failed to commit chunk [" << _args.getMinKey()
+                                       << "," << _args.getMaxKey() << ") due to "
+                                       << causedBy(applyOpsStatus)
+                                       << ", and refreshing collection metadata failed: "
+                                       << causedBy(refreshStatus)});
+
+        {
+            ScopedTransaction scopedXact(txn, MODE_IS);
+            AutoGetCollection autoColl(txn, _args.getNss(), MODE_IS);
+
+            auto css = CollectionShardingState::get(txn, _args.getNss());
+            std::shared_ptr<CollectionMetadata> refreshedMetadata = css->getMetadata();
+
+            if (refreshedMetadata->keyBelongsToMe(_args.getMinKey())) {
+                invariant(refreshedMetadata->getCollVersion() ==
+                          _committedMetadata->getCollVersion());
+
+                // After refresh, the collection metadata indicates that the donor shard still owns
+                // the chunk, so no migration changes were written to the config server metadata.
+                return {applyOpsStatus.code(),
+                        str::stream() << "Migration was not committed, applyOps failed: "
+                                      << causedBy(applyOpsStatus)};
+            }
+
+            ChunkVersion refreshedCollectionVersion = refreshedMetadata->getCollVersion();
+            if (!refreshedCollectionVersion.equals(nextVersion)) {
+                // The refreshed collection metadata's collection version does not match the control
+                // chunk's updated collection version, which should now be the highest. The control
+                // chunk was not committed, but the migrated chunk was. This state is not
+                // recoverable.
+                fassertStatusOK(40138,
+                                {applyOpsStatus.code(),
+                                 str::stream() << "Migration was partially committed, state is "
+                                               << "unrecoverable. applyOps error: "
+                                               << causedBy(applyOpsStatus)});
+            }
+        }
+    }
 
     // Now that applyOps succeeded and the new collection version is committed, update the
     // collection metadata to the new collection version and forget the migrated chunk.

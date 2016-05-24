@@ -38,9 +38,11 @@
     assert.commandWorked(st.shard0.getDB("admin").runCommand(
         {configureFailPoint: 'failMigrationCommit', mode: 'off'}));
 
-    // failApplyChunkOps
+    // failApplyChunkOps and failCommitMigrationCommand
     assert.commandWorked(st.shard0.getDB("admin").runCommand(
         {configureFailPoint: 'failApplyChunkOps', mode: 'alwaysOn'}));
+    assert.commandWorked(st.shard0.getDB("admin").runCommand(
+        {configureFailPoint: 'failCommitMigrationCommand', mode: 'alwaysOn'}));
 
     version = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()});
 
@@ -53,6 +55,8 @@
 
     assert.commandWorked(st.shard0.getDB("admin")
                              .runCommand({configureFailPoint: 'failApplyChunkOps', mode: 'off'}));
+    assert.commandWorked(st.shard0.getDB("admin").runCommand(
+        {configureFailPoint: 'failCommitMigrationCommand', mode: 'off'}));
 
     st.stop();
 

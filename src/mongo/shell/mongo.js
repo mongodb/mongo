@@ -217,24 +217,39 @@ connect = function(url, user, pass) {
         }
     }
 
-    chatty("connecting to: " + url);
     var db;
     if (url.startsWith("mongodb://")) {
+        chatty("connecting to: " + url);
         db = new Mongo(url);
         if (db.defaultDB.length == 0) {
             throw Error("Missing database name in connection string \"" + url + "\"");
         }
         db = db.getDB(db.defaultDB);
-    } else if (slash == -1)
+    } else if (slash == -1) {
+        chatty("connecting to: 127.0.0.1:27017/" + url);
         db = new Mongo().getDB(url);
-    else
-        db = new Mongo(url.substring(0, slash)).getDB(url.substring(slash + 1));
+    } else {
+        var hostPart = url.substring(0, slash);
+        var dbPart = url.substring(slash + 1);
+        chatty("connecting to: " + hostPart + "/" + dbPart);
+        db = new Mongo(hostPart).getDB(dbPart);
+    }
 
     if (user && pass) {
         if (!db.auth(user, pass)) {
             throw Error("couldn't login");
         }
     }
+
+    // Check server version
+    var serverVersion = db.version();
+    chatty("MongoDB server version: " + serverVersion);
+
+    var shellVersion = version();
+    if (serverVersion.slice(0, 3) != shellVersion.slice(0, 3)) {
+        chatty("WARNING: shell and server versions do not match");
+    }
+
     return db;
 };
 

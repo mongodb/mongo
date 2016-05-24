@@ -106,7 +106,7 @@ load("jstests/replsets/rslib.js");
         } catch (e) {
             return false;
         }
-    });
+    }, "didn't see a new master", 60000);
 
     // These 97 documents will be rolled back eventually.
     for (var i = 4; i <= 100; i++) {

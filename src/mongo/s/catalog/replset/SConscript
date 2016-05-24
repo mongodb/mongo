@@ -55,7 +55,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/mongoscore',
         '$BUILD_DIR/mongo/s/sharding_test_fixture',
-        '$BUILD_DIR/mongo/util/tick_source_mock',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
     ]
 )
 

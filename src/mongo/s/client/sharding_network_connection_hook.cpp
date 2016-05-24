@@ -103,12 +103,6 @@ Status ShardingNetworkConnectionHook::validateHostImpl(
 
 StatusWith<boost::optional<executor::RemoteCommandRequest>>
 ShardingNetworkConnectionHook::makeRequest(const HostAndPort& remoteHost) {
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        // TODO: SERVER-23973 Temporary crutch until we decide where to get the config server
-        // connection string.
-        return {boost::none};
-    }
-
     auto shard = grid.shardRegistry()->getShardForHostNoReload(remoteHost);
     if (!shard) {
         return {ErrorCodes::ShardNotFound,

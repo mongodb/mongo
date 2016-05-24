@@ -62,6 +62,7 @@ using std::string;
 using std::endl;
 
 MONGO_FP_DECLARE(crashAfterStartingIndexBuild);
+MONGO_FP_DECLARE(hangAfterStartingIndexBuild);
 
 /**
  * On rollback sets MultiIndexBlock::_needToCleanup to true.
@@ -310,6 +311,13 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(std::set<RecordId>* dupsO
             "Unable to complete index build due to collection scan failure: " +
                 WorkingSetCommon::toStatusString(objToIndex.value()),
             state == PlanExecutor::IS_EOF);
+
+    // Need the index build to hang before the progress meter is marked as finished so we can
+    // reliably check that the index build has actually started in js tests.
+    while (MONGO_FAIL_POINT(hangAfterStartingIndexBuild)) {
+        log() << "Hanging index build due to 'hangAfterStartingIndexBuild' failpoint";
+        sleepmillis(1000);
+    }
 
     progress->finished();
 

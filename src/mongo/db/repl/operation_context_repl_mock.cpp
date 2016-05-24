@@ -49,30 +49,6 @@ OperationContextReplMock::OperationContextReplMock(Client* client, unsigned int 
 
 OperationContextReplMock::~OperationContextReplMock() = default;
 
-void OperationContextReplMock::checkForInterrupt() {
-    uassertStatusOK(checkForInterruptNoAssert());
-}
-
-Status OperationContextReplMock::checkForInterruptNoAssert() {
-    if (!_checkForInterruptStatus.isOK()) {
-        return _checkForInterruptStatus;
-    }
-
-    return Status::OK();
-}
-
-void OperationContextReplMock::setCheckForInterruptStatus(Status status) {
-    _checkForInterruptStatus = std::move(status);
-}
-
-uint64_t OperationContextReplMock::getRemainingMaxTimeMicros() const {
-    return _maxTimeMicrosRemaining;
-}
-
-void OperationContextReplMock::setRemainingMaxTimeMicros(uint64_t micros) {
-    _maxTimeMicrosRemaining = micros;
-}
-
 void OperationContextReplMock::setReplicatedWrites(bool writesAreReplicated) {
     _writesAreReplicated = writesAreReplicated;
 }

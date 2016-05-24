@@ -67,6 +67,7 @@ struct SockAddr {
     SockAddr(
         const char* ip,
         int port); /* EndPoint (remote) side, or if you want to specify which interface locally */
+    SockAddr(const std::string& ip, int port) : SockAddr(ip.c_str(), port) {}
 
     template <typename T>
     T& as() {

@@ -37,6 +37,8 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -113,12 +115,12 @@ public:
     /**
      * Raises a UserAssertion if this operation is in a killed state.
      */
-    virtual void checkForInterrupt() = 0;
+    void checkForInterrupt();
 
     /**
      * Returns Status::OK() unless this operation is in a killed state.
      */
-    virtual Status checkForInterruptNoAssert() = 0;
+    Status checkForInterruptNoAssert();
 
     /**
      * Delegates to CurOp, but is included here to break dependencies.
@@ -151,8 +153,6 @@ public:
     Client* getClient() const {
         return _client;
     }
-
-    virtual uint64_t getRemainingMaxTimeMicros() const = 0;
 
     /**
      * Returns the operation ID associated with this operation.
@@ -218,12 +218,80 @@ public:
         return getKillStatus() != ErrorCodes::OK;
     }
 
+    /**
+     * Returns the amount of time since the operation was constructed. Uses the system's most
+     * precise tick source, and may not be cheap to call in a tight loop.
+     */
+    Microseconds getElapsedTime() const {
+        return _elapsedTime.elapsed();
+    }
+
+    /**
+     * Sets the deadline for this operation to the given point in time.
+     *
+     * To remove a deadline, pass in Date_t::max().
+     */
+    void setDeadlineByDate(Date_t when);
+
+    /**
+     * Sets the deadline for this operation to the maxTime plus the current time reported
+     * by the ServiceContext's fast clock source.
+     */
+    void setDeadlineAfterNowBy(Microseconds maxTime);
+    template <typename D>
+    void setDeadlineAfterNowBy(D maxTime) {
+        if (maxTime <= D::zero()) {
+            maxTime = D::zero();
+        }
+        if (maxTime <= Microseconds::max()) {
+            setDeadlineAfterNowBy(duration_cast<Microseconds>(maxTime));
+        } else {
+            setDeadlineByDate(Date_t::max());
+        }
+    }
+
+    /**
+     * Returns true if this operation has a deadline.
+     */
+    bool hasDeadline() const {
+        return getDeadline() < Date_t::max();
+    }
+
+    /**
+     * Returns the deadline for this operation, or Date_t::max() if there is no deadline.
+     */
+    Date_t getDeadline() const {
+        return _deadline;
+    }
+
+    //
+    // Legacy "max time" methods for controlling operation deadlines.
+    //
+
+    /**
+     * Returns the number of microseconds remaining for this operation's time limit, or the
+     * special value Microseconds::max() if the operation has no time limit.
+     */
+    Microseconds getRemainingMaxTimeMicros() const;
+
 protected:
     OperationContext(Client* client, unsigned int opId, Locker* locker);
 
     RecoveryUnitState _ruState = kNotInUnitOfWork;
 
 private:
+    /**
+     * Returns true if this operation has a deadline and it has passed according to the fast clock
+     * on ServiceContext.
+     */
+    bool hasDeadlineExpired() const;
+
+    /**
+     * Sets the deadline and maxTime as described. It is up to the caller to ensure that
+     * these correctly correspond.
+     */
+    void setDeadlineAndMaxTime(Date_t when, Microseconds maxTime);
+
     friend class WriteUnitOfWork;
     Client* const _client;
     const unsigned int _opId;
@@ -237,6 +305,19 @@ private:
     AtomicWord<ErrorCodes::Error> _killCode{ErrorCodes::OK};
 
     WriteConcernOptions _writeConcern;
+
+    Date_t _deadline =
+        Date_t::max();  // The timepoint at which this operation exceeds its time limit.
+
+    // Max operation time requested by the user or by the cursor in the case of a getMore with no
+    // user-specified maxTime. This is tracked with microsecond granularity for the purpose of
+    // assigning unused execution time back to a cursor at the end of an operation, only. The
+    // _deadline and the service context's fast clock are the only values consulted for determining
+    // if the operation's timelimit has been exceeded.
+    Microseconds _maxTime = Microseconds::max();
+
+    // Timer counting the elapsed time since the construction of this OperationContext.
+    Timer _elapsedTime;
 };
 
 class WriteUnitOfWork {

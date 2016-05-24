@@ -32,11 +32,14 @@
 
 #include <vector>
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/commands.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/add_shard_request_type.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -44,6 +47,9 @@ namespace mongo {
 using std::string;
 
 namespace {
+
+const ReadPreferenceSetting kPrimaryOnlyReadPreference{ReadPreference::PrimaryOnly};
+const char kShardAdded[] = "shardAdded";
 
 class AddShardCmd : public Command {
 public:
@@ -80,56 +86,31 @@ public:
                      int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
-        // Parse the new shard's replica set component hosts
-        ConnectionString servers =
-            uassertStatusOK(ConnectionString::parse(cmdObj.firstElement().valuestrsafe()));
+        auto parsedRequest = uassertStatusOK(AddShardRequest::parseFromMongosCommand(cmdObj));
 
-        // using localhost in server names implies every other process must use localhost addresses
-        // too
-        std::vector<HostAndPort> serverAddrs = servers.getServers();
-        for (size_t i = 0; i < serverAddrs.size(); i++) {
-            if (serverAddrs[i].isLocalHost() != grid.allowLocalHost()) {
-                errmsg = str::stream()
-                    << "Can't use localhost as a shard since all shards need to"
-                    << " communicate. Either use all shards and configdbs in localhost"
-                    << " or all in actual IPs. host: " << serverAddrs[i].toString()
-                    << " isLocalHost:" << serverAddrs[i].isLocalHost();
+        auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
+        auto cmdResponseStatus =
+            uassertStatusOK(configShard->runCommand(txn,
+                                                    kPrimaryOnlyReadPreference,
+                                                    "admin",
+                                                    parsedRequest.toCommandForConfig(),
+                                                    Shard::RetryPolicy::kNotIdempotent));
+        uassertStatusOK(cmdResponseStatus.commandStatus);
 
-                log() << "addshard request " << cmdObj
-                      << " failed: attempt to mix localhosts and IPs";
-                return false;
-            }
+        string shardAdded;
+        uassertStatusOK(
+            bsonExtractStringField(cmdResponseStatus.response, kShardAdded, &shardAdded));
+        result << "shardAdded" << shardAdded;
 
-            // it's fine if mongods of a set all use default port
-            if (!serverAddrs[i].hasPort()) {
-                serverAddrs[i] =
-                    HostAndPort(serverAddrs[i].host(), ServerGlobalParams::ShardServerPort);
-            }
+        // Ensure the added shard is visible to this process.
+        auto shardRegistry = Grid::get(txn)->shardRegistry();
+        if (!shardRegistry->getShard(txn, shardAdded)) {
+            return appendCommandStatus(result,
+                                       {ErrorCodes::OperationFailed,
+                                        "Could not find shard metadata for shard after adding it. "
+                                        "This most likely indicates that the shard was removed "
+                                        "immediately after it was added."});
         }
-
-        // name is optional; addShard will provide one if needed
-        string name = "";
-        if (cmdObj["name"].type() == String) {
-            name = cmdObj["name"].valuestrsafe();
-        }
-
-        // maxSize is the space usage cap in a shard in MBs
-        long long maxSize = 0;
-        if (cmdObj[ShardType::maxSizeMB()].isNumber()) {
-            maxSize = cmdObj[ShardType::maxSizeMB()].numberLong();
-        }
-
-        audit::logAddShard(ClientBasic::getCurrent(), name, servers.toString(), maxSize);
-
-        StatusWith<string> addShardResult = grid.catalogManager(txn)->addShard(
-            txn, (name.empty() ? nullptr : &name), servers, maxSize);
-        if (!addShardResult.isOK()) {
-            log() << "addShard request '" << cmdObj << "'"
-                  << " failed: " << addShardResult.getStatus().reason();
-            return appendCommandStatus(result, addShardResult.getStatus());
-        }
-
-        result << "shardAdded" << addShardResult.getValue();
 
         return true;
     }

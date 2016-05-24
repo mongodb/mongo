@@ -67,13 +67,13 @@ private:
         unsigned originalTag = 0;
         AbstractMessagingPort* mp = txn->getClient()->port();
         if (mp) {
-            originalTag = mp->tag;
-            mp->tag |= executor::NetworkInterface::kMessagingPortKeepOpen;
+            originalTag = mp->getTag();
+            mp->setTag(originalTag | executor::NetworkInterface::kMessagingPortKeepOpen);
         }
         // Untag the connection on exit.
         ON_BLOCK_EXIT([mp, originalTag]() {
             if (mp) {
-                mp->tag = originalTag;
+                mp->setTag(originalTag);
             }
         });
 

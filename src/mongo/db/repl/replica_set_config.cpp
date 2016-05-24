@@ -209,6 +209,7 @@ Status ReplicaSetConfig::_initialize(const BSONObj& cfg,
 
     _calculateMajorities();
     _addInternalWriteConcernModes();
+    _initializeConnectionString();
     _isInitialized = true;
     return Status::OK();
 }
@@ -514,6 +515,11 @@ Status ReplicaSetConfig::validate() const {
                       "their config");
     }
 
+    if (!_connectionString.isValid()) {
+        return Status(ErrorCodes::BadValue,
+                      "ReplicaSetConfig represented an invalid replica set ConnectionString");
+    }
+
     return Status::OK();
 }
 
@@ -664,6 +670,22 @@ void ReplicaSetConfig::_addInternalWriteConcernModes() {
         // NoSuchKey means we have no $electable-tagged nodes in this config;
         // other errors are unexpected
         fassert(28694, status);
+    }
+}
+
+void ReplicaSetConfig::_initializeConnectionString() {
+    std::vector<HostAndPort> visibleMembers;
+    for (const auto& member : _members) {
+        if (!member.isHidden() && !member.isArbiter()) {
+            visibleMembers.push_back(member.getHostAndPort());
+        }
+    }
+
+    try {
+        _connectionString = ConnectionString::forReplicaSet(_replSetName, visibleMembers);
+    } catch (const DBException& e) {
+        // Failure to construct the ConnectionString means either an invalid replica set name
+        // or members array, which should be caught in validate()
     }
 }
 
