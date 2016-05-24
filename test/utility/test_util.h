@@ -75,13 +75,23 @@ typedef struct {
 } TEST_OPTS;
 
 /*
+ * testutil_assert --
+ *	Complain and quit if something isn't true.
+ */
+#define	testutil_assert(a) do {						\
+	if (!(a))							\
+		testutil_die(0, "%s/%d: %s", __func__, __LINE__, #a);	\
+} while (0)
+
+/*
  * testutil_check --
  *	Complain and quit if a function call fails.
  */
 #define	testutil_check(call) do {					\
 	int __r;							\
 	if ((__r = (call)) != 0)					\
-		testutil_die(__r, "%s/%d: %s", __func__, __LINE__, #call);\
+		testutil_die(						\
+		    __r, "%s/%d: %s", __func__, __LINE__, #call);	\
 } while (0)
 
 /*

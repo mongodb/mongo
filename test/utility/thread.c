@@ -39,8 +39,8 @@ thread_append(void *arg)
 {
 	TEST_OPTS *opts;
 	WT_CONNECTION *conn;
-	WT_SESSION *session;
 	WT_CURSOR *cursor;
+	WT_SESSION *session;
 	uint64_t id, recno;
 	char buf[64];
 
@@ -81,8 +81,8 @@ thread_insert_append(void *arg)
 {
 	TEST_OPTS *opts;
 	WT_CONNECTION *conn;
-	WT_SESSION *session;
 	WT_CURSOR *cursor;
+	WT_SESSION *session;
 	uint64_t i;
 	char kbuf[64];
 
@@ -99,7 +99,7 @@ thread_insert_append(void *arg)
 		cursor->set_value(cursor, "========== VALUE =======");
 		testutil_check(cursor->insert(cursor));
 		if (i % 100000 == 0) {
-			printf("insert: %d\r", (int)i);
+			printf("insert: %" PRIu64 "\r", i);
 			fflush(stdout);
 		}
 	}
@@ -117,8 +117,8 @@ void *
 thread_prev(void *arg)
 {
 	TEST_OPTS *opts;
-	WT_SESSION *session;
 	WT_CURSOR *cursor;
+	WT_SESSION *session;
 	int ret;
 
 	opts = (TEST_OPTS *)arg;

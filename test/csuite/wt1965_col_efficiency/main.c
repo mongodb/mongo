@@ -37,13 +37,12 @@
 
 void (*custom_die)(void) = NULL;
 
-#define	BUF_SIZE 256
 /* If changing field count also need to change set_value and get_value calls */
 #define	NR_FIELDS 8
 #define	NR_OBJECTS 100
 #define	NR_THREADS 4
 
-static uint64_t g_ts;
+static uint64_t g_ts = 0;
 
 /*
  * Each thread inserts a set of keys into the record store database. The keys
@@ -61,7 +60,7 @@ static void
 	opts = (TEST_OPTS *)arg;
 	thr_idx = __wt_atomic_fetch_addv64(&opts->next_threadid, 1);
 	ts = g_ts;
-	obj_data = calloc(
+	obj_data = dcalloc(
 	    (NR_OBJECTS/NR_THREADS + 1) * NR_FIELDS, sizeof(*obj_data));
 
 	testutil_check(opts->conn->open_session(
@@ -101,7 +100,7 @@ static void
 
 			++g_ts;
 			/* 5K updates/sec */
-			usleep(1000000ULL * NR_THREADS / 5000);
+			(void)usleep(1000000ULL * NR_THREADS / 5000);
 		}
 	}
 
@@ -153,7 +152,7 @@ main(int argc, char *argv[])
 		    &thr[t], NULL, thread_func, (void *)opts));
 
 	for (t = 0; t < NR_THREADS; ++t)
-		pthread_join(thr[t], NULL);
+		(void)pthread_join(thr[t], NULL);
 
 	testutil_check(opts->conn->open_session(
 	    opts->conn, NULL, NULL, &session));
@@ -179,6 +178,7 @@ main(int argc, char *argv[])
 			printf("\t%" PRIu64, f[i]);
 		printf("\n");
 	}
+	testutil_assert(ret == WT_NOTFOUND);
 
 	testutil_cleanup(opts);
 

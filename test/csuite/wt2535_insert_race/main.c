@@ -48,8 +48,8 @@ main(int argc, char *argv[])
 	WT_SESSION *session;
 	clock_t ce, cs;
 	pthread_t id[100];
-	int i;
 	uint64_t current_value;
+	int i;
 
 	opts = &_opts;
 	memset(opts, 0, sizeof(*opts));
@@ -88,12 +88,12 @@ main(int argc, char *argv[])
 	    session->open_cursor(session, opts->uri, NULL, NULL, &c));
 	c->set_key(c, 1);
 	testutil_check(c->search(c));
-	c->get_value(c, &current_value);
+	testutil_check(c->get_value(c, &current_value));
 	if (current_value != opts->nthreads * opts->nrecords) {
 		fprintf(stderr,
 		    "ERROR: didn't get expected number of changes\n");
-		fprintf(stderr, "got: %d, expected: %d\n",
-		    (int)current_value, (int)(opts->nthreads * opts->nrecords));
+		fprintf(stderr, "got: %" PRIu64 ", expected: %" PRIu64 "\n",
+		    current_value, opts->nthreads * opts->nrecords);
 		return (EXIT_FAILURE);
 	}
 	testutil_check(session->close(session, NULL));
@@ -114,10 +114,10 @@ thread_insert_race(void *arg)
 {
 	TEST_OPTS *opts;
 	WT_CONNECTION *conn;
-	WT_SESSION *session;
 	WT_CURSOR *cursor;
-	int ret;
+	WT_SESSION *session;
 	uint64_t i, value;
+	int ret;
 
 	opts = (TEST_OPTS *)arg;
 	conn = opts->conn;
@@ -131,8 +131,8 @@ thread_insert_race(void *arg)
 		testutil_check(
 		    session->begin_transaction(session, "isolation=snapshot"));
 		cursor->set_key(cursor, 1);
-		cursor->search(cursor);
-		cursor->get_value(cursor, &value);
+		testutil_check(cursor->search(cursor));
+		testutil_check(cursor->get_value(cursor, &value));
 		cursor->set_key(cursor, 1);
 		cursor->set_value(cursor, value + 1);
 		if ((ret = cursor->update(cursor)) != 0) {
@@ -146,7 +146,7 @@ thread_insert_race(void *arg)
 		}
 		testutil_check(session->commit_transaction(session, NULL));
 		if (i % 10000 == 0) {
-			printf("insert: %d\r", (int)i);
+			printf("insert: %" PRIu64 "\r", i);
 			fflush(stdout);
 		}
 	}
