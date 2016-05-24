@@ -52,6 +52,6 @@
     assert.eq(2, res.applied);
     assert(res.code);
     assert(res.errmsg);
-    assert.eq([true, false], res.results);
+    assert.eq([false, false], res.results);
     assert.eq(0, res.ok);
 })();

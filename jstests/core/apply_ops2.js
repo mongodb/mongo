@@ -33,7 +33,8 @@ res = db.runCommand({
     alwaysUpsert: false
 });
 
-assert.eq(true, res.results[0], "upsert = false, existing doc update failed");
+// Because the CRUD apply-ops are atomic, all results are false, even the first one.
+assert.eq(false, res.results[0], "upsert = false, existing doc update failed");
 assert.eq(false, res.results[1], "upsert = false, nonexisting doc upserted");
 assert.eq(2, t.find().count(), "2 docs expected after upsert failure");
 

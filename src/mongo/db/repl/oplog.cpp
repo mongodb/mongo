@@ -687,6 +687,7 @@ Status applyOperation_inlock(OperationContext* txn,
     }
     Collection* collection = db->getCollection(ns);
     IndexCatalog* indexCatalog = collection == nullptr ? nullptr : collection->getIndexCatalog();
+    const bool haveWrappingWriteUnitOfWork = txn->lockState()->inAWriteUnitOfWork();
 
     // operation type -- see logOp() comments for types
     const char* opType = fieldOp.valuestrsafe();
@@ -782,12 +783,17 @@ Status applyOperation_inlock(OperationContext* txn,
                     str::stream() << "Failed to apply insert due to missing _id: " << op.toString(),
                     o.hasField("_id"));
 
-            // 1. Try insert first
+            // 1. Try insert first, if we have no wrappingWriteUnitOfWork
             // 2. If okay, commit
-            // 3. If not, do update (and commit)
+            // 3. If not, do upsert (and commit)
             // 4. If both !Ok, return status
             Status status{ErrorCodes::NotYetInitialized, ""};
-            {
+
+            // We cannot rely on a DuplicateKey error if we'repart of a larger transaction, because
+            // that would require the transaction to abort. So instead, use upsert in that case.
+            bool needToDoUpsert = haveWrappingWriteUnitOfWork;
+
+            if (!needToDoUpsert) {
                 WriteUnitOfWork wuow(txn);
                 try {
                     OpDebug* const nullOpDebug = nullptr;
@@ -797,14 +803,14 @@ Status applyOperation_inlock(OperationContext* txn,
                 }
                 if (status.isOK()) {
                     wuow.commit();
-                }
-            }
-            // Now see if we need to do an update, based on duplicate _id index key
-            if (!status.isOK()) {
-                if (status.code() != ErrorCodes::DuplicateKey) {
+                } else if (status == ErrorCodes::DuplicateKey) {
+                    needToDoUpsert = true;
+                } else {
                     return status;
                 }
-
+            }
+            // Now see if we need to do an upsert.
+            if (needToDoUpsert) {
                 // Do update on DuplicateKey errors.
                 // This will only be on the _id field in replication,
                 // since we disable non-_id unique constraint violations.
@@ -827,6 +833,7 @@ Status applyOperation_inlock(OperationContext* txn,
                     fassertFailedNoTrace(28750);
                 }
             }
+
             if (incrementOpsAppliedStats) {
                 incrementOpsAppliedStats();
             }
@@ -917,8 +924,11 @@ Status applyOperation_inlock(OperationContext* txn,
             14825, str::stream() << "error in applyOperation : unknown opType " << *opType);
     }
 
-    // AuthorizationManager's logOp method registers a RecoveryUnit::Change
-    // and to do so we need to have begun a UnitOfWork
+    // AuthorizationManager's logOp method registers a RecoveryUnit::Change and to do so we need
+    // to a new WriteUnitOfWork, if we dont have a wrapping unit of work already. If we already
+    // have a wrapping WUOW, the extra nexting is harmless. The logOp really should have been
+    // done in the WUOW that did the write, but this won't happen because applyOps turns off
+    // observers.
     WriteUnitOfWork wuow(txn);
     getGlobalAuthorizationManager()->logOp(
         txn, opType, ns.toString().c_str(), o, fieldO2.isABSONObj() ? &o2 : NULL);
@@ -949,6 +959,9 @@ Status applyCommand_inlock(OperationContext* txn, const BSONObj& op) {
     BSONObj o = fieldO.embeddedObject();
 
     const char* ns = fieldNs.valuestrsafe();
+    if (!NamespaceString(ns).isValid()) {
+        return {ErrorCodes::InvalidNamespace, "invalid ns: " + std::string(ns)};
+    }
 
     // Applying commands in repl is done under Global W-lock, so it is safe to not
     // perform the current DB checks after reacquiring the lock.
