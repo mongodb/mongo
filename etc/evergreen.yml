@@ -1297,6 +1297,15 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: external_auth_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=external_auth --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: sharding_gle_auth_basics_passthrough
   depends_on:
   - name: gle_auth_basics_passthrough
@@ -4602,6 +4611,7 @@ buildvariants:
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
+  - name: external_auth_WT
   - name: mmap
   - name: replicasets_auth
   - name: sasl
