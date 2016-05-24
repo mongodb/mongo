@@ -1124,6 +1124,7 @@ StatusWith<boost::optional<std::string>> SSLManager::parseAndValidatePeerCertifi
 
     // TODO: check optional cipher restriction, using cert.
     std::string peerSubjectName = getCertificateSubjectName(peerCert);
+    LOG(2) << "Accepted TLS connection from peer: " << peerSubjectName;
 
     // If this is an SSL client context (on a MongoDB server or client)
     // perform hostname validation of the remote server
