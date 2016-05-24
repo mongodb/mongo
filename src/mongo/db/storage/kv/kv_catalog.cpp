@@ -610,6 +610,11 @@ std::vector<std::string> KVCatalog::getAllIdents(OperationContext* opCtx) const 
     auto cursor = _rs->getCursor(opCtx);
     while (auto record = cursor->next()) {
         BSONObj obj = record->data.releaseToBson();
+        if (FeatureTracker::isFeatureDocument(obj)) {
+            // Skip over the version document because it doesn't correspond to a namespace entry and
+            // therefore doesn't refer to any idents.
+            continue;
+        }
         v.push_back(obj["ident"].String());
 
         BSONElement e = obj["idxIdent"];
