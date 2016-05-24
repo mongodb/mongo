@@ -1523,11 +1523,11 @@ err:	WT_TRET(__wt_writeunlock(session, txn_global->nsnap_rwlock));
 }
 
 /*
- * __session_strerror --
+ * __wt_session_strerror --
  *	WT_SESSION->strerror method.
  */
-static const char *
-__session_strerror(WT_SESSION *wt_session, int error)
+const char *
+__wt_session_strerror(WT_SESSION *wt_session, int error)
 {
 	WT_SESSION_IMPL *session;
 
@@ -1550,7 +1550,7 @@ __open_session(WT_CONNECTION_IMPL *conn,
 		NULL,
 		__session_close,
 		__session_reconfigure,
-		__session_strerror,
+		__wt_session_strerror,
 		__session_open_cursor,
 		__session_create,
 		__wt_session_compact,
@@ -1577,7 +1577,7 @@ __open_session(WT_CONNECTION_IMPL *conn,
 		NULL,
 		__session_close,
 		__session_reconfigure,
-		__session_strerror,
+		__wt_session_strerror,
 		__session_open_cursor,
 		__session_create_readonly,
 		__wt_session_compact_readonly,

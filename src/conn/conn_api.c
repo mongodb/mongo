@@ -2012,6 +2012,14 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_os_stdio(session));
 	__wt_event_handler_set(session, event_handler);
 
+	/*
+	 * Set the default session's strerror method. If one of the extensions
+	 * being loaded reports an error via the WT_EXTENSION_API strerror
+	 * method, but doesn't supply that method a WT_SESSION handle, we'll
+	 * use the WT_CONNECTION_IMPL's default session and its strerror method.
+	 */
+	conn->default_session->iface.strerror = __wt_session_strerror;
+
 	/* Basic initialization of the connection structure. */
 	WT_ERR(__wt_connection_init(conn));
 

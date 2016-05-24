@@ -570,6 +570,7 @@ extern int __wt_open_cursor(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR
 extern int __wt_session_create( WT_SESSION_IMPL *session, const char *uri, const char *config);
 extern int __wt_session_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[]);
 extern int __wt_session_range_truncate(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *start, WT_CURSOR *stop);
+extern const char *__wt_session_strerror(WT_SESSION *wt_session, int error);
 extern int __wt_open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const char *config, bool open_metadata, WT_SESSION_IMPL **sessionp);
 extern int __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name, bool open_metadata, uint32_t session_flags, WT_SESSION_IMPL **sessionp);
 extern int __wt_session_compact( WT_SESSION *wt_session, const char *uri, const char *config);
