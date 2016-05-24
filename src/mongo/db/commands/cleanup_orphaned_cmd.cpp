@@ -268,6 +268,12 @@ public:
             return false;
         }
 
+        if (shardingState->migrationSourceManager()->isActive()) {
+            errmsg = str::stream() << "Unable to cleanup orphaned documents because there is an "
+                                   << "active migration";
+            return false;
+        }
+
         ChunkVersion shardVersion;
         status = shardingState->refreshMetadataNow(txn, ns, &shardVersion);
         if (!status.isOK()) {

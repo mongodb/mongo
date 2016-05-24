@@ -53,9 +53,9 @@ load('./jstests/libs/cleanup_orphaned_util.js');
     assert.eq(null, coll.getDB().getLastError());
 
     //
-    // Start a moveChunk in the background from shard 0 to shard 1. Pause it at
-    // some points in the donor's and recipient's work flows, and test
-    // cleanupOrphaned.
+    // Start a moveChunk in the background from shard 0 to shard 1. Pause it at some points in the
+    // donor's and recipient's work flows and test cleanupOrphaned: it should fail on the donor
+    // while the migration is active.
     //
 
     var donor, recip;
@@ -67,9 +67,9 @@ load('./jstests/libs/cleanup_orphaned_util.js');
         donor = st.shard1;
     }
 
-    jsTest.log('setting failpoint startedMoveChunk');
+    jsTest.log('setting failpoint startedMoveChunk (donor) and cloned (recipient)');
     pauseMoveChunkAtStep(donor, moveChunkStepNames.startedMoveChunk);
-    pauseMigrateAtStep(recip, migrateStepNames.cloned);
+    pauseMigrateAtStep(recip, migrateStepNames.transferredMods);
 
     var joinMoveChunk = moveChunkParallel(staticMongod,
                                           st.s0.host,
@@ -79,8 +79,7 @@ load('./jstests/libs/cleanup_orphaned_util.js');
                                           recip.shardName);
 
     waitForMoveChunkStep(donor, moveChunkStepNames.startedMoveChunk);
-    waitForMigrateStep(recip, migrateStepNames.cloned);
-    proceedToMigrateStep(recip, migrateStepNames.transferredMods);
+    waitForMigrateStep(recip, migrateStepNames.transferredMods);
     // recipient has run _recvChunkStart and begun its migration thread;
     // 'doc' has been cloned and chunkWithDoc is noted as 'pending' on recipient.
 
@@ -89,9 +88,11 @@ load('./jstests/libs/cleanup_orphaned_util.js');
     assert.eq(1, donorColl.count());
     assert.eq(1, recipColl.count());
 
-    // cleanupOrphaned should go through two iterations, since the default chunk
-    // setup leaves two unowned ranges on each shard.
-    cleanupOrphaned(donor, ns, 2);
+    // cleanupOrphaned should go through two iterations, since the default chunk setup leaves two
+    // unowned ranges on each shard. Command fails on donor shard because of active migration.
+    assert.throws(function() {
+        cleanupOrphaned(donor, ns, 2);
+    });
     cleanupOrphaned(recip, ns, 2);
     assert.eq(1, donorColl.count());
     assert.eq(1, recipColl.count());
@@ -102,15 +103,26 @@ load('./jstests/libs/cleanup_orphaned_util.js');
     unpauseMigrateAtStep(recip, migrateStepNames.transferredMods);
     proceedToMigrateStep(recip, migrateStepNames.done);
 
-    // cleanupOrphaned removes migrated data from donor. The donor would
-    // otherwise clean them up itself, in the post-move delete phase.
-    cleanupOrphaned(donor, ns, 2);
-    assert.eq(0, donorColl.count());
+    // Donor cannot clean up orphans while there's an active migration.
+    assert.throws(function() {
+        cleanupOrphaned(donor, ns, 2);
+    });
+    assert.eq(1, donorColl.count());
     cleanupOrphaned(recip, ns, 2);
     assert.eq(1, recipColl.count());
 
-    // Let migration thread complete.
+    // Let recip side of the migration finish so that the donor proceeds with the commit.
     unpauseMigrateAtStep(recip, migrateStepNames.done);
+    waitForMoveChunkStep(donor, moveChunkStepNames.committed);
+
+    // Donor is paused after the migration chunk commit, but before it finishes the cleanup that
+    // includes running the range deleter. Thus it technically has orphaned data -- commit is
+    // complete, but moved data is still present. cleanupOrphaned can remove the data the donor
+    // would otherwise clean up itself in its post-move delete phase.
+    cleanupOrphaned(donor, ns, 2);
+    assert.eq(0, donorColl.count());
+
+    // Let migration thread complete.
     unpauseMoveChunkAtStep(donor, moveChunkStepNames.committed);
     joinMoveChunk();
 
