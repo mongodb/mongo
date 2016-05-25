@@ -183,6 +183,7 @@ functions:
       working_dir: src
       script: |
         set -o verbose
+        set -o errexit
 
         # create the target directory for the binaries
         mkdir -p src/mongo-tools
@@ -200,19 +201,10 @@ functions:
         git checkout v3.0
         . ./${set_tools_gopath|set_gopath.sh}
 
-        # In RHEL 5.5, /usr/bin/ld can't handle --build-id parameters, so
-        # use a wrapper if it's present on the system
-        #
-        if [ -d /opt/ldwrapper/bin ]
-        then
-          export PATH=/opt/ldwrapper/bin:$PATH
-        fi
-
         for i in bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop mongooplog; do
              ${gorootvars} go build -ldflags "-X github.com/mongodb/mongo-tools/common/options.Gitspec $(git rev-parse HEAD) -X github.com/mongodb/mongo-tools/common/options.VersionStr $(git --git-dir ../../.git describe)" ${tooltags|} -o "../mongo-tools/$i${exe|}" $i/main/$i.go
              echo $i;
         done
-        exit 0
 
 pre:
   - command: shell.exec
@@ -2355,7 +2347,7 @@ buildvariants:
   - rhel55-test
   expansions:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
-    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
@@ -2431,7 +2423,7 @@ buildvariants:
   - rhel55-test
   expansions:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
-    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux-debug
@@ -2497,7 +2489,7 @@ buildvariants:
   - rhel55-test
   expansions:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
-    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux-duroff
@@ -2545,7 +2537,7 @@ buildvariants:
   - rhel55-test
   expansions:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
-    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --release --variant-dir="linux2/release"
     test_flags: --continue-on-failure --wiredTigerCollectionConfig=type=lsm --wiredTigerIndexConfig=type=lsm
   tasks:
@@ -3450,8 +3442,8 @@ buildvariants:
   - rhel55-test
   expansions:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
-    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
-    tooltags: "-tags 'ssl sasl'"
+    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
+    tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl) -L/usr/lib64/sasl2" -tags 'sasl ssl'
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -3560,8 +3552,9 @@ buildvariants:
   - rhel55-test
   expansions:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
+    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl)" -tags 'ssl'
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
