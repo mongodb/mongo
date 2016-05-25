@@ -94,7 +94,7 @@ public:
                                                     kPrimaryOnlyReadPreference,
                                                     "admin",
                                                     parsedRequest.toCommandForConfig(),
-                                                    Shard::RetryPolicy::kNotIdempotent));
+                                                    Shard::RetryPolicy::kIdempotent));
         uassertStatusOK(cmdResponseStatus.commandStatus);
 
         string shardAdded;
