@@ -743,7 +743,11 @@ GeoNear2DSphereStage::GeoNear2DSphereStage(const GeoNearParams& nearParams,
     _specificStats.keyPattern = s2Index->keyPattern();
     _specificStats.indexName = s2Index->indexName();
     _specificStats.indexVersion = s2Index->version();
-    // TODO SERVER-23968: change nullptr to the appropriate collator.
+
+    // initialize2dsphereParams() does not require the collator during the GEO_NEAR_2DSPHERE stage.
+    // It only requires the collator for index key generation. For query execution,
+    // _nearParams.baseBounds should have collator-generated comparison keys in place of raw
+    // strings, and _nearParams.filter should have the collator.
     const CollatorInterface* collator = nullptr;
     ExpressionParams::initialize2dsphereParams(s2Index->infoObj(), collator, &_indexParams);
 }

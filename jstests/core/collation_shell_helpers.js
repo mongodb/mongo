@@ -316,6 +316,161 @@
         });
     }
 
+    // geoNear.
+    coll.drop();
+    assert.writeOK(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
+
+    // String field not indexed.
+    assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
+    assert.eq(0,
+              assert.commandWorked(db.runCommand({
+                  geoNear: coll.getName(),
+                  near: {type: "Point", coordinates: [0, 0]},
+                  spherical: true,
+                  query: {str: "ABC"}
+              })).results.length);
+    assert.eq(1,
+              assert.commandWorked(db.runCommand({
+                  geoNear: coll.getName(),
+                  near: {type: "Point", coordinates: [0, 0]},
+                  spherical: true,
+                  query: {str: "ABC"},
+                  collation: {locale: "en_US", strength: 2}
+              })).results.length);
+
+    // String field indexed without collation.
+    assert.commandWorked(coll.dropIndexes());
+    assert.commandWorked(coll.ensureIndex({geo: "2dsphere", str: 1}));
+    assert.eq(0,
+              assert.commandWorked(db.runCommand({
+                  geoNear: coll.getName(),
+                  near: {type: "Point", coordinates: [0, 0]},
+                  spherical: true,
+                  query: {str: "ABC"}
+              })).results.length);
+    assert.eq(1,
+              assert.commandWorked(db.runCommand({
+                  geoNear: coll.getName(),
+                  near: {type: "Point", coordinates: [0, 0]},
+                  spherical: true,
+                  query: {str: "ABC"},
+                  collation: {locale: "en_US", strength: 2}
+              })).results.length);
+
+    // String field indexed with non-matching collation.
+    assert.commandWorked(coll.dropIndexes());
+    assert.commandWorked(
+        coll.ensureIndex({geo: "2dsphere", str: 1}, {collation: {locale: "en_US", strength: 3}}));
+    assert.eq(0,
+              assert.commandWorked(db.runCommand({
+                  geoNear: coll.getName(),
+                  near: {type: "Point", coordinates: [0, 0]},
+                  spherical: true,
+                  query: {str: "ABC"}
+              })).results.length);
+    assert.eq(1,
+              assert.commandWorked(db.runCommand({
+                  geoNear: coll.getName(),
+                  near: {type: "Point", coordinates: [0, 0]},
+                  spherical: true,
+                  query: {str: "ABC"},
+                  collation: {locale: "en_US", strength: 2}
+              })).results.length);
+
+    // String field indexed with matching collation.
+    assert.commandWorked(coll.dropIndexes());
+    assert.commandWorked(
+        coll.ensureIndex({geo: "2dsphere", str: 1}, {collation: {locale: "en_US", strength: 2}}));
+    assert.eq(0,
+              assert.commandWorked(db.runCommand({
+                  geoNear: coll.getName(),
+                  near: {type: "Point", coordinates: [0, 0]},
+                  spherical: true,
+                  query: {str: "ABC"}
+              })).results.length);
+    assert.eq(1,
+              assert.commandWorked(db.runCommand({
+                  geoNear: coll.getName(),
+                  near: {type: "Point", coordinates: [0, 0]},
+                  spherical: true,
+                  query: {str: "ABC"},
+                  collation: {locale: "en_US", strength: 2}
+              })).results.length);
+
+    coll.drop();
+
+    // $nearSphere.
+    if (db.getMongo().useReadCommands()) {
+        assert.writeOK(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
+
+        // String field not indexed.
+        assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
+        assert.eq(0,
+                  coll.find({
+                      str: "ABC",
+                      geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}
+                  }).itcount());
+        assert.eq(1,
+                  coll.find({
+                      str: "ABC",
+                      geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}
+                  })
+                      .collation({locale: "en_US", strength: 2})
+                      .itcount());
+
+        // String field indexed without collation.
+        assert.commandWorked(coll.dropIndexes());
+        assert.commandWorked(coll.ensureIndex({geo: "2dsphere", str: 1}));
+        assert.eq(0,
+                  coll.find({
+                      str: "ABC",
+                      geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}
+                  }).itcount());
+        assert.eq(1,
+                  coll.find({
+                      str: "ABC",
+                      geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}
+                  })
+                      .collation({locale: "en_US", strength: 2})
+                      .itcount());
+
+        // String field indexed with non-matching collation.
+        assert.commandWorked(coll.dropIndexes());
+        assert.commandWorked(coll.ensureIndex({geo: "2dsphere", str: 1},
+                                              {collation: {locale: "en_US", strength: 3}}));
+        assert.eq(0,
+                  coll.find({
+                      str: "ABC",
+                      geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}
+                  }).itcount());
+        assert.eq(1,
+                  coll.find({
+                      str: "ABC",
+                      geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}
+                  })
+                      .collation({locale: "en_US", strength: 2})
+                      .itcount());
+
+        // String field indexed with matching collation.
+        assert.commandWorked(coll.dropIndexes());
+        assert.commandWorked(coll.ensureIndex({geo: "2dsphere", str: 1},
+                                              {collation: {locale: "en_US", strength: 2}}));
+        assert.eq(0,
+                  coll.find({
+                      str: "ABC",
+                      geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}
+                  }).itcount());
+        assert.eq(1,
+                  coll.find({
+                      str: "ABC",
+                      geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}
+                  })
+                      .collation({locale: "en_US", strength: 2})
+                      .itcount());
+
+        coll.drop();
+    }
+
     //
     // Tests for the bulk API.
     //
