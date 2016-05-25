@@ -54,29 +54,28 @@ AddShardRequest::AddShardRequest(ConnectionString connString)
 
 StatusWith<AddShardRequest> AddShardRequest::parseFromMongosCommand(const BSONObj& obj) {
     invariant(obj.nFields() >= 1);
-
-    auto firstElement = obj.firstElement();
-    invariant(firstElement.type() == BSONType::String);
-    invariant(mongosAddShard.name() == firstElement.fieldNameStringData() ||
-              mongosAddShardDeprecated.name() == firstElement.fieldNameStringData());
-
+    invariant(mongosAddShard.name() == obj.firstElement().fieldNameStringData() ||
+              mongosAddShardDeprecated.name() == obj.firstElement().fieldNameStringData());
     return parseInternalFields(obj);
 }
 
 StatusWith<AddShardRequest> AddShardRequest::parseFromConfigCommand(const BSONObj& obj) {
     invariant(obj.nFields() >= 1);
-
-    auto firstElement = obj.firstElement();
-    invariant(firstElement.type() == BSONType::String);
-    invariant(configsvrAddShard.name() == firstElement.fieldNameStringData());
-
+    invariant(configsvrAddShard.name() == obj.firstElement().fieldNameStringData());
     return parseInternalFields(obj);
 }
 
 StatusWith<AddShardRequest> AddShardRequest::parseInternalFields(const BSONObj& obj) {
     // required fields
 
-    auto swConnString = ConnectionString::parse(obj.firstElement().valuestrsafe());
+    auto firstElement = obj.firstElement();
+    if (firstElement.type() != BSONType::String) {
+        return {ErrorCodes::FailedToParse,
+                stream() << "The first argument to " << firstElement.fieldNameStringData()
+                         << " must be a string"};
+    }
+
+    auto swConnString = ConnectionString::parse(firstElement.valuestrsafe());
     if (!swConnString.isOK()) {
         return swConnString.getStatus();
     }
