@@ -2856,7 +2856,7 @@ buildvariants:
   - rhel55-32
   expansions:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
-    gorootvars: GOROOT=/opt/go32 PATH=/opt/go32/bin:$PATH
+    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH GOARCH=386 GOOS=linux
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
@@ -2892,7 +2892,7 @@ buildvariants:
   - rhel55-32
   expansions:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
-    gorootvars: GOROOT=/opt/go32 PATH=/opt/go32/bin:$PATH
+    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH GOARCH=386 GOOS=linux
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux-debug
