@@ -139,7 +139,7 @@ static DEMO_FILE_HANDLE *demo_handle_search(WT_FILE_SYSTEM *, const char *);
  * string_match --
  *      Return if a string matches a byte string of len bytes.
  */
-static inline bool
+static bool
 byte_string_match(const char *str, const char *bytes, size_t len)
 {
 	return (strncmp(str, bytes, len) == 0 && (str)[(len)] == '\0');

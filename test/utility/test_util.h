@@ -121,7 +121,7 @@ void *dstrdup(const void *);
 void  testutil_clean_work_dir(char *);
 void  testutil_cleanup(TEST_OPTS *);
 void  testutil_make_work_dir(char *);
-int   testutil_parse_opts(int, char *[], TEST_OPTS *);
+int   testutil_parse_opts(int, char * const *, TEST_OPTS *);
 void  testutil_work_dir_from_path(char *, size_t, const char *);
 void *thread_append(void *);
 void *thread_insert_append(void *);

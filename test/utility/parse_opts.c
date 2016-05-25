@@ -38,7 +38,7 @@ extern char *__wt_optarg;		/* argument associated with option */
  *    Parse command line options for a test case.
  */
 int
-testutil_parse_opts(int argc, char *argv[], TEST_OPTS *opts)
+testutil_parse_opts(int argc, char * const *argv, TEST_OPTS *opts)
 {
 	int ch;
 	size_t len;
@@ -52,8 +52,7 @@ testutil_parse_opts(int argc, char *argv[], TEST_OPTS *opts)
 	else
 		++opts->progname;
 
-	while ((ch =
-	    __wt_getopt(opts->progname,
+	while ((ch = __wt_getopt(opts->progname,
 		argc, argv, "A:h:n:o:pR:T:t:vW:")) != EOF)
 		switch (ch) {
 		case 'A': /* Number of append threads */
@@ -120,13 +119,13 @@ testutil_parse_opts(int argc, char *argv[], TEST_OPTS *opts)
 	 * Setup the home directory. It needs to be unique for every test
 	 * or the auto make parallel tester gets upset.
 	 */
-	len = (size_t)snprintf(NULL, 0, "WT_TEST.%s", opts->progname) + 1;
-	opts->home = (char *)malloc(len);
+	len = strlen("WT_TEST.")  + strlen(opts->progname) + 10;
+	opts->home = dmalloc(len);
 	snprintf(opts->home, len, "WT_TEST.%s", opts->progname);
 
 	/* Setup the default URI string */
-	len = (size_t)snprintf(NULL, 0, "table:%s", opts->progname) + 1;
-	opts->uri = (char *)malloc(len);
+	len = strlen("table:") + strlen(opts->progname) + 10;
+	opts->uri = dmalloc(len);
 	snprintf(opts->uri, len, "table:%s", opts->progname);
 
 	return (0);
