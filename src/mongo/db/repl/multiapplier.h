@@ -53,8 +53,6 @@ class MultiApplier {
     MONGO_DISALLOW_COPYING(MultiApplier);
 
 public:
-    static const size_t kReplWriterThreadCount = 16;
-
     /**
      * Operations sorted by timestamp in ascending order.
      */

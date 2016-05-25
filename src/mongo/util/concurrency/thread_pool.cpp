@@ -208,7 +208,7 @@ void ThreadPool::waitForIdle() {
     }
 }
 
-ThreadPool::Stats ThreadPool::getStats() {
+ThreadPool::Stats ThreadPool::getStats() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     Stats result;
     result.options = _options;

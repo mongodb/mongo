@@ -278,8 +278,7 @@ void ApplyBatchFinalizerForJournal::_run() {
 SyncTail::SyncTail(BackgroundSyncInterface* q, MultiSyncApplyFunc func)
     : _networkQueue(q),
       _applyFunc(func),
-      _writerPool(replWriterThreadCount, "repl writer worker "),
-      _prefetcherPool(replPrefetcherThreadCount, "repl prefetch worker ") {}
+      _writerPool(replWriterThreadCount, "repl writer worker ") {}
 
 SyncTail::~SyncTail() {}
 
@@ -534,6 +533,7 @@ OpTime SyncTail::multiApply(OperationContext* txn, const OpQueue& ops) {
     auto applyOperation = [this](const MultiApplier::Operations& ops) { _applyFunc(ops, this); };
     auto status =
         repl::multiApply(txn,
+                         &_writerPool,
                          MultiApplier::Operations(convertToVector.begin(), convertToVector.end()),
                          applyOperation);
     if (!status.isOK()) {
@@ -865,6 +865,10 @@ void SyncTail::setHostname(const std::string& hostname) {
     _hostname = hostname;
 }
 
+OldThreadPool* SyncTail::getWriterPool() {
+    return &_writerPool;
+}
+
 BSONObj SyncTail::getMissingDoc(OperationContext* txn, Database* db, const BSONObj& o) {
     OplogReader missingObjReader;  // why are we using OplogReader to run a non-oplog query?
     const char* ns = o.getStringField("ns");
@@ -1149,18 +1153,17 @@ void multiInitialSyncApply(const std::vector<OplogEntry>& ops, SyncTail* st) {
 }
 
 StatusWith<OpTime> multiApply(OperationContext* txn,
+                              OldThreadPool* workerPool,
                               const MultiApplier::Operations& ops,
                               MultiApplier::ApplyOperationFn applyOperation) {
     invariant(applyOperation);
 
-    OldThreadPool workerPool(MultiApplier::kReplWriterThreadCount, "repl writer worker ");
-
     if (getGlobalServiceContext()->getGlobalStorageEngine()->isMmapV1()) {
         // Use a ThreadPool to prefetch all the operations in a batch.
-        prefetchOps(ops, &workerPool);
+        prefetchOps(ops, workerPool);
     }
 
-    std::vector<std::vector<OplogEntry>> writerVectors(MultiApplier::kReplWriterThreadCount);
+    std::vector<std::vector<OplogEntry>> writerVectors(workerPool->getNumThreads());
 
     fillWriterVectors(txn, ops, &writerVectors);
     LOG(2) << "replication batch size is " << ops.size();
@@ -1179,11 +1182,11 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
                 "attempting to replicate ops while primary"};
     }
 
-    applyOps(writerVectors, &workerPool, applyOperation);
+    applyOps(writerVectors, workerPool, applyOperation);
 
     OpTime lastOpTime;
     {
-        ON_BLOCK_EXIT([&] { workerPool.join(); });
+        ON_BLOCK_EXIT([&] { workerPool->join(); });
         std::vector<BSONObj> raws;
         raws.reserve(ops.size());
         for (auto&& op : ops) {

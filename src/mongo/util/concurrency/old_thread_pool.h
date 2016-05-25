@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
@@ -52,6 +53,8 @@ public:
     explicit OldThreadPool(const DoNotStartThreadsTag&,
                            int nThreads = 8,
                            const std::string& threadNamePrefix = "");
+
+    std::size_t getNumThreads() const;
 
     // Launches the worker threads; call exactly once, if and only if
     // you used the DoNotStartThreadsTag form of the constructor.

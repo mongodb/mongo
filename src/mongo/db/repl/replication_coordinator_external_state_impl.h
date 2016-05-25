@@ -34,6 +34,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/repl/sync_source_feedback.h"
+#include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/stdx/mutex.h"
@@ -132,6 +133,11 @@ private:
     StartInitialSyncFn _startInitialSyncIfNeededFn;
     StartSteadyReplicationFn _startSteadReplicationFn;
     std::unique_ptr<stdx::thread> _initialSyncThread;
+
+    // Used by multiApply(), multiSyncApply() and multiInitialSyncApply() to apply operations read
+    // from sync source. The thread pool owned by "_syncTail" is used by repl::multiApply() to apply
+    // the sync source's operations in parallel.
+    std::unique_ptr<SyncTail> _syncTail;
 };
 
 }  // namespace repl

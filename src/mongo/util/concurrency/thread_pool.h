@@ -130,7 +130,7 @@ public:
     /**
      * Returns statistics about the thread pool's utilization.
      */
-    Stats getStats();
+    Stats getStats() const;
 
 private:
     using TaskList = std::deque<Task>;
@@ -197,7 +197,7 @@ private:
     const Options _options;
 
     // Mutex guarding all non-const member variables.
-    stdx::mutex _mutex;
+    mutable stdx::mutex _mutex;
 
     // This variable represents the lifecycle state of the pool.
     //

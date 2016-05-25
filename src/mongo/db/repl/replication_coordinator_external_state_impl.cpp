@@ -57,7 +57,6 @@
 #include "mongo/db/repl/rs_initialsync.h"
 #include "mongo/db/repl/snapshot_thread.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/s/sharding_state.h"
@@ -67,6 +66,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit.h"
@@ -141,6 +141,13 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
         _snapshotThread = SnapshotThread::start(getGlobalServiceContext());
     }
     getGlobalServiceContext()->getGlobalStorageEngine()->setJournalListener(this);
+
+    // repl::multiInitialSyncApply uses SyncTail::shouldRetry() (and implicitly getMissingDoc())
+    // to fetch missing documents during initial sync. Therefore, it is fine to construct SyncTail
+    // with invalid BackgroundSync and MultiSyncApplyFunc arguments because we will not be accessing
+    // any SyncTail functionality that require these constructor parameters.
+    _syncTail = stdx::make_unique<SyncTail>(nullptr, SyncTail::MultiSyncApplyFunc());
+
     _startedThreads = true;
 }
 
@@ -506,7 +513,7 @@ StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::multiApply(
     OperationContext* txn,
     const MultiApplier::Operations& ops,
     MultiApplier::ApplyOperationFn applyOperation) {
-    return repl::multiApply(txn, ops, applyOperation);
+    return repl::multiApply(txn, _syncTail->getWriterPool(), ops, applyOperation);
 }
 
 void ReplicationCoordinatorExternalStateImpl::multiSyncApply(const MultiApplier::Operations& ops) {
@@ -516,13 +523,8 @@ void ReplicationCoordinatorExternalStateImpl::multiSyncApply(const MultiApplier:
 
 void ReplicationCoordinatorExternalStateImpl::multiInitialSyncApply(
     const MultiApplier::Operations& ops, const HostAndPort& source) {
-    // repl::multiInitialSyncApply uses SyncTail::shouldRetry() (and implicitly getMissingDoc())
-    // to fetch missing documents during initial sync. Therefore, it is fine to construct SyncTail
-    // with invalid BackgroundSync and MultiSyncApplyFunc arguments because we will not be accessing
-    // any SyncTail functionality that require these constructor parameters.
-    SyncTail syncTail(nullptr, SyncTail::MultiSyncApplyFunc());
-    syncTail.setHostname(source.toString());
-    repl::multiInitialSyncApply(ops, &syncTail);
+    _syncTail->setHostname(source.toString());
+    repl::multiInitialSyncApply(ops, _syncTail.get());
 }
 
 

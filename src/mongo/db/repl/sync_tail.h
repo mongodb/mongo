@@ -146,6 +146,12 @@ public:
     void setHostname(const std::string& hostname);
 
     /**
+     * Returns writer thread pool.
+     * Used by ReplicationCoordinatorExternalStateImpl only.
+     */
+    OldThreadPool* getWriterPool();
+
+    /**
      * This variable determines the number of writer threads SyncTail will have. It has a default
      * value, which varies based on architecture and can be overridden using the
      * "replWriterThreadCount" server parameter.
@@ -175,8 +181,6 @@ private:
 
     // persistent pool of worker threads for writing ops to the databases
     OldThreadPool _writerPool;
-    // persistent pool of worker threads for prefetching
-    OldThreadPool _prefetcherPool;
 };
 
 /**
@@ -190,6 +194,7 @@ private:
  * Shared between here and MultiApplier.
  */
 StatusWith<OpTime> multiApply(OperationContext* txn,
+                              OldThreadPool* workerPool,
                               const MultiApplier::Operations& ops,
                               MultiApplier::ApplyOperationFn applyOperation);
 
