@@ -39,6 +39,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_connection.h"
@@ -59,14 +60,21 @@ using std::string;
 using std::unique_ptr;
 using std::vector;
 
+// TODO SERVER-23096: Initializing an empty _clusterId is a temporary hack. The _clusterId should
+// be queried from the config servers on sharding initialization and passed to the ShardRegistry
+// constructor.
 ShardRegistry::ShardRegistry(std::unique_ptr<ShardFactory> shardFactory,
                              const ConnectionString& configServerCS)
-    : _shardFactory(std::move(shardFactory)), _data() {
+    : _shardFactory(std::move(shardFactory)), _clusterId(), _data() {
     _initConfigServerCS = configServerCS;
 }
 
 ConnectionString ShardRegistry::getConfigServerConnectionString() const {
     return getConfigShard()->getConnString();
+}
+
+const OID& ShardRegistry::getClusterId() const {
+    return _clusterId;
 }
 
 void ShardRegistry::rebuildConfigShard() {

@@ -32,6 +32,8 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/s/write_ops/batched_update_document.h"
+#include "mongo/s/write_ops/batched_update_request.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -134,7 +136,10 @@ Status ShardIdentityType::validate() const {
         return {ErrorCodes::NoSuchKey, str::stream() << "missing " << shardName() << " field"};
     }
 
-    if (!_clusterId || _clusterId->isSet()) {
+    // TODO SERVER-23096: Once ShardRegistry::_clusterId is loaded from the config servers rather
+    // than initialized in the ShardRegistry constructor in each process, the isSet() check can
+    // be re-added.
+    if (!_clusterId /*|| !_clusterId->isSet()*/) {
         return {ErrorCodes::NoSuchKey, str::stream() << "missing " << clusterId() << " field"};
     }
 
@@ -202,6 +207,31 @@ const OID& ShardIdentityType::getClusterId() const {
 
 void ShardIdentityType::setClusterId(OID clusterId) {
     _clusterId = std::move(clusterId);
+}
+
+std::unique_ptr<BatchedUpdateRequest> ShardIdentityType::createUpsertForAddShard() const {
+    invariant(validate().isOK());
+
+    std::unique_ptr<BatchedUpdateDocument> updateDoc(new BatchedUpdateDocument());
+
+    BSONObjBuilder query;
+    query.append("_id", "shardIdentity");
+    query.append("shardName", getShardName());
+    query.append("clusterId", getClusterId());
+    updateDoc->setQuery(query.obj());
+
+    BSONObjBuilder update;
+    BSONObjBuilder setConfigBuilder(update.subobjStart("$set"));
+    setConfigBuilder.append(configsvrConnString(), getConfigsvrConnString().toString());
+    setConfigBuilder.doneFast();
+    updateDoc->setUpdateExpr(update.obj());
+
+    updateDoc->setUpsert(true);
+
+    std::unique_ptr<BatchedUpdateRequest> updateRequest(new BatchedUpdateRequest());
+    updateRequest->addToUpdates(updateDoc.release());
+
+    return updateRequest;
 }
 
 BSONObj ShardIdentityType::createConfigServerUpdateObject(const std::string& newConnString) {

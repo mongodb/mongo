@@ -32,6 +32,7 @@
 
 #include "mongo/client/connection_string.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/s/write_ops/batched_update_request.h"
 
 namespace mongo {
 
@@ -40,6 +41,8 @@ namespace mongo {
  */
 class ShardIdentityType {
 public:
+    ShardIdentityType() = default;
+
     // The _id value for this document type.
     static const std::string IdName;
 
@@ -76,6 +79,13 @@ public:
     bool isClusterIdSet() const;
     const OID& getClusterId() const;
     void setClusterId(OID clusterId);
+
+    /**
+     * Returns an update object that can be used to insert a shardIdentity doc on a shard or update
+     * the existing shardIdentity doc's configsvrConnString (if the _id, shardName, and clusterId
+     * match those in this ShardIdentityType instance).
+     */
+    std::unique_ptr<BatchedUpdateRequest> createUpsertForAddShard() const;
 
     /**
      * Returns an update object that can be used to update the config server field of the
