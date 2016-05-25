@@ -59,6 +59,8 @@
     checkLog(secondary, 'initial sync done');
 
     replSet.awaitReplication();
+    replSet.awaitSecondaryNodes();
+
     assert.eq(0,
               secondary.getDB('test').getCollection(name).count(),
               'collection successfully synced to secondary');
