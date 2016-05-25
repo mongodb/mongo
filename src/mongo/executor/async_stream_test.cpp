@@ -134,7 +134,11 @@ TEST(AsyncStreamTest, IsOpen) {
 
     server.shutdown();
 
-    ASSERT_FALSE(stream.isOpen());
+    // There is nothing we can wait on to determinstically know when
+    // the socket will transition to closed. Busy wait for that.
+    while (stream.isOpen()) {
+        stdx::this_thread::sleep_for(Milliseconds(1));
+    }
 }
 
 }  // namespace
