@@ -146,7 +146,9 @@ Status MetadataLoader::initChunks(OperationContext* txn,
 
     // Check to see if we should use the old version or not.
     if (oldMetadata) {
-        // If our epochs are compatible, it's useful to use the old metadata for diffs
+        // If our epochs are compatible, it's useful to use the old metadata for diffs: this leads
+        // to a performance gain because not all the chunks must be reloaded, just the ones this
+        // shard has not seen -- they will have higher versions than present in oldMetadata.
         if (oldMetadata->getCollVersion().hasEqualEpoch(epoch)) {
             fullReload = false;
             invariant(oldMetadata->isValid());
@@ -198,6 +200,14 @@ Status MetadataLoader::initChunks(OperationContext* txn,
             // Chunks found, return ok
             LOG(2) << "loaded " << diffsApplied << " chunks into new metadata for " << ns
                    << " with version " << metadata->_collVersion;
+
+            // If the last chunk was moved off of this shard, the shardVersion should be reset to
+            // zero (if we did not conduct a full reload and oldMetadata was present,
+            // versionMap[shard] was previously set to the oldMetadata's shardVersion for
+            // performance gains).
+            if (!fullReload && metadata->_chunksMap.size() == 0) {
+                versionMap[shard] = ChunkVersion(0, 0, epoch);
+            }
 
             metadata->_shardVersion = versionMap[shard];
             metadata->fillRanges();

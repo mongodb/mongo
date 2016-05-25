@@ -778,7 +778,9 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
         choice = chooseNewestVersion(beforeCollVersion, afterCollVersion, remoteCollVersion);
 
         if (choice == VersionChoice::Remote) {
-            dassert(!remoteCollVersion.epoch().isSet() || remoteShardVersion >= beforeShardVersion);
+            dassert(
+                !remoteCollVersion.epoch().isSet() || remoteShardVersion >= beforeShardVersion ||
+                (remoteShardVersion.minorVersion() == 0 && remoteShardVersion.majorVersion() == 0));
 
             if (!afterCollVersion.epoch().isSet()) {
                 // First metadata load
