@@ -82,14 +82,10 @@ static const int TempKeyMaxSize = 1024;  // this goes away with SERVER-3372
 
 static const WiredTigerItem emptyItem(NULL, 0);
 
+static const int kKeyStringV0Version = 6;
 static const int kKeyStringV1Version = 7;
-static const int kMinimumIndexVersion = 6;
-static const int kCurrentIndexVersion = kKeyStringV1Version;  // New indexes use this by default.
+static const int kMinimumIndexVersion = kKeyStringV0Version;
 static const int kMaximumIndexVersion = kKeyStringV1Version;
-static_assert(kCurrentIndexVersion >= kMinimumIndexVersion,
-              "kCurrentIndexVersion >= kMinimumIndexVersion");
-static_assert(kCurrentIndexVersion <= kMaximumIndexVersion,
-              "kCurrentIndexVersion <= kMaximumIndexVersion");
 
 bool hasFieldNames(const BSONObj& obj) {
     BSONForEach(e, obj) {
@@ -198,7 +194,7 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string&
 
     // Index metadata
     ss << ",app_metadata=("
-       << "formatVersion=" << (enableBSON1_1 ? kKeyStringV1Version : kCurrentIndexVersion) << ','
+       << "formatVersion=" << (enableBSON1_1 ? kKeyStringV1Version : kKeyStringV0Version) << ','
        << "infoObj=" << desc.infoObj().jsonString() << "),";
 
     LOG(3) << "index create string: " << ss.ss.str();
