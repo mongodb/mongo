@@ -542,34 +542,7 @@ Status IndexCatalog::_isSpecOk(OperationContext* txn, const BSONObj& spec) const
                                     << keyStatus.reason());
     }
 
-    const bool isSparse = spec["sparse"].trueValue();
-
-    // Ensure if there is a filter, its valid.
-    BSONElement filterElement = spec.getField("partialFilterExpression");
-    if (filterElement) {
-        if (isSparse) {
-            return Status(ErrorCodes::CannotCreateIndex,
-                          "cannot mix \"partialFilterExpression\" and \"sparse\" options");
-        }
-
-        if (filterElement.type() != Object) {
-            return Status(ErrorCodes::CannotCreateIndex,
-                          "\"partialFilterExpression\" for an index must be a document");
-        }
-        // TODO SERVER-23618: pass the appropriate CollatorInterface* instead of nullptr.
-        StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
-            filterElement.Obj(), ExtensionsCallbackDisallowExtensions(), nullptr);
-        if (!statusWithMatcher.isOK()) {
-            return statusWithMatcher.getStatus();
-        }
-        const std::unique_ptr<MatchExpression> filterExpr = std::move(statusWithMatcher.getValue());
-
-        Status status = _checkValidFilterExpressions(filterExpr.get());
-        if (!status.isOK()) {
-            return status;
-        }
-    }
-
+    std::unique_ptr<CollatorInterface> collator;
     BSONElement collationElement = spec.getField("collation");
     if (collationElement) {
         string pluginName = IndexNames::findPluginName(key);
@@ -587,6 +560,36 @@ Status IndexCatalog::_isSpecOk(OperationContext* txn, const BSONObj& spec) const
                                       ->makeFromBSON(collationElement.Obj());
         if (!statusWithCollator.isOK()) {
             return statusWithCollator.getStatus();
+        }
+        collator = std::move(statusWithCollator.getValue());
+    }
+
+    const bool isSparse = spec["sparse"].trueValue();
+
+    // Ensure if there is a filter, its valid.
+    BSONElement filterElement = spec.getField("partialFilterExpression");
+    if (filterElement) {
+        if (isSparse) {
+            return Status(ErrorCodes::CannotCreateIndex,
+                          "cannot mix \"partialFilterExpression\" and \"sparse\" options");
+        }
+
+        if (filterElement.type() != Object) {
+            return Status(ErrorCodes::CannotCreateIndex,
+                          "\"partialFilterExpression\" for an index must be a document");
+        }
+
+        // The collator must outlive the constructed MatchExpression.
+        StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
+            filterElement.Obj(), ExtensionsCallbackDisallowExtensions(), collator.get());
+        if (!statusWithMatcher.isOK()) {
+            return statusWithMatcher.getStatus();
+        }
+        const std::unique_ptr<MatchExpression> filterExpr = std::move(statusWithMatcher.getValue());
+
+        Status status = _checkValidFilterExpressions(filterExpr.get());
+        if (!status.isOK()) {
+            return status;
         }
     }
 

@@ -95,19 +95,6 @@ IndexCatalogEntry::IndexCatalogEntry(OperationContext* txn,
         _indexTracksPathLevelMultikeyInfo = !_indexMultikeyPaths.empty();
     }
 
-    if (BSONElement filterElement = _descriptor->getInfoElement("partialFilterExpression")) {
-        invariant(filterElement.isABSONObj());
-        BSONObj filter = filterElement.Obj();
-        // TODO SERVER-23618: pass the appropriate CollatorInterface* instead of nullptr.
-        StatusWithMatchExpression statusWithMatcher =
-            MatchExpressionParser::parse(filter, ExtensionsCallbackDisallowExtensions(), nullptr);
-        // this should be checked in create, so can blow up here
-        invariantOK(statusWithMatcher.getStatus());
-        _filterExpression = std::move(statusWithMatcher.getValue());
-        LOG(2) << "have filter expression for " << _ns << " " << _descriptor->indexName() << " "
-               << filter;
-    }
-
     if (BSONElement collationElement = _descriptor->getInfoElement("collation")) {
         invariant(collationElement.isABSONObj());
         BSONObj collation = collationElement.Obj();
@@ -115,6 +102,18 @@ IndexCatalogEntry::IndexCatalogEntry(OperationContext* txn,
             CollatorFactoryInterface::get(txn->getServiceContext())->makeFromBSON(collation);
         invariantOK(statusWithCollator.getStatus());
         _collator = std::move(statusWithCollator.getValue());
+    }
+
+    if (BSONElement filterElement = _descriptor->getInfoElement("partialFilterExpression")) {
+        invariant(filterElement.isABSONObj());
+        BSONObj filter = filterElement.Obj();
+        StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
+            filter, ExtensionsCallbackDisallowExtensions(), _collator.get());
+        // this should be checked in create, so can blow up here
+        invariantOK(statusWithMatcher.getStatus());
+        _filterExpression = std::move(statusWithMatcher.getValue());
+        LOG(2) << "have filter expression for " << _ns << " " << _descriptor->indexName() << " "
+               << filter;
     }
 }
 

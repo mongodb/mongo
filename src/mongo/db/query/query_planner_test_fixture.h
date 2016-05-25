@@ -68,6 +68,10 @@ protected:
 
     void addIndex(BSONObj keyPattern, const CollatorInterface* collator);
 
+    void addIndex(BSONObj keyPattern,
+                  MatchExpression* filterExpr,
+                  const CollatorInterface* collator);
+
     //
     // Execute planner.
     //
@@ -192,7 +196,8 @@ protected:
     /**
      * Helper function to parse a MatchExpression.
      */
-    static std::unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj);
+    static std::unique_ptr<MatchExpression> parseMatchExpression(
+        const BSONObj& obj, const CollatorInterface* collator = nullptr);
 
     //
     // Data members.

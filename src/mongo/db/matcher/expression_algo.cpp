@@ -37,6 +37,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/query/collation/collator_interface.h"
 
 namespace mongo {
 
@@ -94,7 +95,15 @@ bool _isSubsetOf(const ComparisonMatchExpression* lhs, const ComparisonMatchExpr
         return false;
     }
 
-    int cmp = compareElementValues(lhsData, rhsData);
+    // Either collator may be used by compareElementValues() here. If lhs (the query) contains
+    // string comparison, then _isSubsetOf will only be called if lhs and rhs have the same
+    // collator. Otherwise, the collator will not be used by compareElementValues().
+    if (!CollatorInterface::collatorsMatch(lhs->getCollator(), rhs->getCollator())) {
+        // TODO SERVER-23172: Check that lhsData does not contain string comparison in nested
+        // objects or arrays.
+        invariant(lhsData.type() != BSONType::String);
+    }
+    int cmp = compareElementValues(lhsData, rhsData, rhs->getCollator());
 
     // Check whether the two expressions are equivalent.
     if (lhs->matchType() == rhs->matchType() && cmp == 0) {
@@ -155,8 +164,7 @@ bool _isSubsetOf(const MatchExpression* lhs, const ComparisonMatchExpression* rh
         }
         for (BSONElement elem : ime->getEqualities()) {
             // Each element in the $in-array represents an equality predicate.
-            // TODO SERVER-23618: pass the appropriate collator to EqualityMatchExpression().
-            EqualityMatchExpression equality(nullptr);
+            EqualityMatchExpression equality(ime->getCollator());
             equality.init(lhs->path(), elem);
             if (!_isSubsetOf(&equality, rhs)) {
                 return false;

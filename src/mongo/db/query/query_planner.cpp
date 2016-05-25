@@ -851,12 +851,6 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
                     continue;
                 }
 
-                // If the index collation differs from the query collation, the index should not be
-                // used to provide a sort, because strings will be ordered incorrectly.
-                if (!CollatorInterface::collatorsMatch(index.collator, query.getCollator())) {
-                    continue;
-                }
-
                 // Partial indexes can only be used to provide a sort only if the query predicate is
                 // compatible.
                 if (index.filterExpr && !expression::isSubsetOf(query.root(), index.filterExpr)) {

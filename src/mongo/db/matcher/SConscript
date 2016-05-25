@@ -99,6 +99,7 @@ env.CppUnitTest(
         'expression_algo_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         'expression_algo',
     ],
 )

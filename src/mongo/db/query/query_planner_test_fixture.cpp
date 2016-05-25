@@ -139,6 +139,19 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern, const CollatorInterface* col
     params.indices.push_back(entry);
 }
 
+void QueryPlannerTest::addIndex(BSONObj keyPattern,
+                                MatchExpression* filterExpr,
+                                const CollatorInterface* collator) {
+    const bool sparse = false;
+    const bool unique = false;
+    const bool multikey = false;
+    const char name[] = "my_partial_index_with_collator";
+    const BSONObj infoObj;
+    IndexEntry entry(keyPattern, multikey, sparse, unique, name, filterExpr, infoObj);
+    entry.collator = collator;
+    params.indices.push_back(entry);
+}
+
 void QueryPlannerTest::runQuery(BSONObj query) {
     runQuerySortProjSkipNToReturn(query, BSONObj(), BSONObj(), 0, 0);
 }
@@ -399,8 +412,8 @@ void QueryPlannerTest::assertHasOneSolutionOf(const std::vector<std::string>& so
     FAIL(ss);
 }
 
-std::unique_ptr<MatchExpression> QueryPlannerTest::parseMatchExpression(const BSONObj& obj) {
-    const CollatorInterface* collator = nullptr;
+std::unique_ptr<MatchExpression> QueryPlannerTest::parseMatchExpression(
+    const BSONObj& obj, const CollatorInterface* collator) {
     StatusWithMatchExpression status =
         MatchExpressionParser::parse(obj, ExtensionsCallbackDisallowExtensions(), collator);
     if (!status.isOK()) {

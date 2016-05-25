@@ -206,6 +206,27 @@
                       .hint({str: 1})
                       .itcount());
         assert.commandWorked(coll.dropIndexes());
+
+        // With a partial index.
+        // {_id: 1, str: "foo"} will be indexed even though "foo" > "FOO", since the collation is
+        // case-insensitive.
+        assert.commandWorked(coll.ensureIndex({str: 1}, {
+            partialFilterExpression: {str: {$lte: "FOO"}},
+            collation: {locale: "en_US", strength: 2}
+        }));
+        assert.eq(1,
+                  coll.find({str: "foo"})
+                      .collation({locale: "en_US", strength: 2})
+                      .hint({str: 1})
+                      .itcount());
+        assert.writeOK(coll.insert({_id: 3, str: "goo"}));
+        assert.eq(0,
+                  coll.find({str: "goo"})
+                      .collation({locale: "en_US", strength: 2})
+                      .hint({str: 1})
+                      .itcount());
+        assert.writeOK(coll.remove({_id: 3}));
+        assert.commandWorked(coll.dropIndexes());
     } else {
         assert.throws(function() {
             coll.find().collation({locale: "fr"}).itcount();

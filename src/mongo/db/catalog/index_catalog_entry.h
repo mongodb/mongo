@@ -181,8 +181,8 @@ private:
 
     // Owned here.
     HeadManager* _headManager;
-    std::unique_ptr<MatchExpression> _filterExpression;
     std::unique_ptr<CollatorInterface> _collator;
+    std::unique_ptr<MatchExpression> _filterExpression;
 
     // cached stuff
 
