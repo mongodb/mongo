@@ -43,11 +43,9 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/util/clock_source_mock.h"
 
 namespace QueryStageSubplan {
 
-const std::unique_ptr<ClockSource> clockSource = stdx::make_unique<ClockSourceMock>();
 static const NamespaceString nss("unittests.QueryStageSubplan");
 
 class QueryStageSubplanBase {
@@ -89,6 +87,7 @@ protected:
 
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
     OperationContext& _txn = *_txnPtr;
+    ClockSource* _clock = _txn.getServiceContext()->getFastClockSource();
 
 private:
     DBDirectClient _client;
@@ -132,7 +131,7 @@ public:
             new SubplanStage(&_txn, collection, &ws, plannerParams, cq.get()));
 
         // Plan selection should succeed due to falling back on regular planning.
-        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, clockSource.get());
+        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, _clock);
         ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
     }
 };
@@ -175,7 +174,7 @@ public:
         std::unique_ptr<SubplanStage> subplan(
             new SubplanStage(&_txn, collection, &ws, plannerParams, cq.get()));
 
-        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, clockSource.get());
+        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, _clock);
         ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
 
         // Nothing is in the cache yet, so neither branch should have been planned from
@@ -233,7 +232,7 @@ public:
         std::unique_ptr<SubplanStage> subplan(
             new SubplanStage(&_txn, collection, &ws, plannerParams, cq.get()));
 
-        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, clockSource.get());
+        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, _clock);
         ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
 
         // Nothing is in the cache yet, so neither branch should have been planned from
@@ -292,7 +291,7 @@ public:
         std::unique_ptr<SubplanStage> subplan(
             new SubplanStage(&_txn, collection, &ws, plannerParams, cq.get()));
 
-        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, clockSource.get());
+        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, _clock);
         ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
 
         // Nothing is in the cache yet, so neither branch should have been planned from
@@ -549,7 +548,7 @@ public:
             new SubplanStage(&_txn, collection, &ws, plannerParams, cq.get()));
 
         // Plan selection should succeed due to falling back on regular planning.
-        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, clockSource.get());
+        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, _clock);
         ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
 
         // Work the stage until it produces all results.
@@ -607,7 +606,7 @@ public:
         std::unique_ptr<SubplanStage> subplan(
             new SubplanStage(&_txn, collection, &ws, plannerParams, cq.get()));
 
-        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, clockSource.get());
+        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, _clock);
         ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
 
         size_t numResults = 0;

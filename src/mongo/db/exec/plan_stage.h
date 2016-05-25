@@ -37,9 +37,10 @@
 
 namespace mongo {
 
+class ClockSource;
 class Collection;
-class RecordId;
 class OperationContext;
+class RecordId;
 
 /**
  * A PlanStage ("stage") is the basic building block of a "Query Execution Plan."  A stage is
@@ -356,6 +357,8 @@ protected:
      * Does the stage-specific invalidation work.
      */
     virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {}
+
+    ClockSource* getClock() const;
 
     OperationContext* getOpCtx() const {
         return _opCtx;
