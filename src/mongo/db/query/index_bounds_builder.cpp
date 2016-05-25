@@ -551,36 +551,34 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
                                                  : IndexBoundsBuilder::INEXACT_FETCH;
     } else if (MatchExpression::MATCH_IN == expr->matchType()) {
         const InMatchExpression* ime = static_cast<const InMatchExpression*>(expr);
-        const ArrayFilterEntries& afr = ime->getData();
 
         *tightnessOut = IndexBoundsBuilder::EXACT;
 
         // Create our various intervals.
 
         IndexBoundsBuilder::BoundsTightness tightness;
-        for (BSONElementSet::iterator it = afr.equalities().begin(); it != afr.equalities().end();
-             ++it) {
-            translateEquality(*it, index, isHashed, oilOut, &tightness);
+        for (auto&& equality : ime->getEqualities()) {
+            translateEquality(equality, index, isHashed, oilOut, &tightness);
             if (tightness != IndexBoundsBuilder::EXACT) {
                 *tightnessOut = tightness;
             }
         }
 
-        for (size_t i = 0; i < afr.numRegexes(); ++i) {
-            translateRegex(afr.regex(i), index, oilOut, &tightness);
+        for (auto&& regex : ime->getRegexes()) {
+            translateRegex(regex.get(), index, oilOut, &tightness);
             if (tightness != IndexBoundsBuilder::EXACT) {
                 *tightnessOut = tightness;
             }
         }
 
-        if (afr.hasNull()) {
+        if (ime->hasNull()) {
             // A null index key does not always match a null query value so we must fetch the
             // doc and run a full comparison.  See SERVER-4529.
             // TODO: Do we already set the tightnessOut by calling translateEquality?
             *tightnessOut = INEXACT_FETCH;
         }
 
-        if (afr.hasEmptyArray()) {
+        if (ime->hasEmptyArray()) {
             // Empty arrays are indexed as undefined.
             BSONObjBuilder undefinedBob;
             undefinedBob.appendUndefined("");

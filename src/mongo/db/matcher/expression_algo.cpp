@@ -150,11 +150,10 @@ bool _isSubsetOf(const MatchExpression* lhs, const ComparisonMatchExpression* rh
 
     if (lhs->matchType() == MatchExpression::MATCH_IN) {
         const InMatchExpression* ime = static_cast<const InMatchExpression*>(lhs);
-        const ArrayFilterEntries& arrayEntries = ime->getData();
-        if (arrayEntries.numRegexes() > 0) {
+        if (!ime->getRegexes().empty()) {
             return false;
         }
-        for (BSONElement elem : arrayEntries.equalities()) {
+        for (BSONElement elem : ime->getEqualities()) {
             // Each element in the $in-array represents an equality predicate.
             // TODO SERVER-23618: pass the appropriate collator to EqualityMatchExpression().
             EqualityMatchExpression equality(nullptr);
@@ -199,7 +198,7 @@ bool _isSubsetOf(const MatchExpression* lhs, const ExistsMatchExpression* rhs) {
             return true;
         case MatchExpression::MATCH_IN: {
             const InMatchExpression* ime = static_cast<const InMatchExpression*>(lhs);
-            return !ime->getData().hasNull();
+            return !ime->hasNull();
         }
         case MatchExpression::NOT:
             // An expression can only match a subset of the documents matched by another if they are
@@ -217,7 +216,7 @@ bool _isSubsetOf(const MatchExpression* lhs, const ExistsMatchExpression* rhs) {
                 case MatchExpression::MATCH_IN: {
                     const InMatchExpression* ime =
                         static_cast<const InMatchExpression*>(lhs->getChild(0));
-                    return ime->getData().hasNull();
+                    return ime->hasNull();
                 }
                 default:
                     return false;

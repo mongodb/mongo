@@ -1553,7 +1553,7 @@ TEST(InMatchExpression, MatchesElementSingle) {
     BSONObj notMatch = BSON("a" << 2);
     const CollatorInterface* collator = nullptr;
     InMatchExpression in(collator);
-    in.getArrayFilterEntries()->addEquality(operand.firstElement());
+    in.addEquality(operand.firstElement());
     ASSERT(in.matchesSingleElement(match["a"]));
     ASSERT(!in.matchesSingleElement(notMatch["a"]));
 }
@@ -1573,10 +1573,10 @@ TEST(InMatchExpression, MatchesElementMultiple) {
     BSONObj operand = BSON_ARRAY(1 << "r" << true << 1);
     const CollatorInterface* collator = nullptr;
     InMatchExpression in(collator);
-    in.getArrayFilterEntries()->addEquality(operand[0]);
-    in.getArrayFilterEntries()->addEquality(operand[1]);
-    in.getArrayFilterEntries()->addEquality(operand[2]);
-    in.getArrayFilterEntries()->addEquality(operand[3]);
+    in.addEquality(operand[0]);
+    in.addEquality(operand[1]);
+    in.addEquality(operand[2]);
+    in.addEquality(operand[3]);
 
     BSONObj matchFirst = BSON("a" << 1);
     BSONObj matchSecond = BSON("a"
@@ -1595,7 +1595,7 @@ TEST(InMatchExpression, MatchesScalar) {
     const CollatorInterface* collator = nullptr;
     InMatchExpression in(collator);
     in.init("a");
-    in.getArrayFilterEntries()->addEquality(operand.firstElement());
+    in.addEquality(operand.firstElement());
 
     ASSERT(in.matchesBSON(BSON("a" << 5.0), NULL));
     ASSERT(!in.matchesBSON(BSON("a" << 4), NULL));
@@ -1606,7 +1606,7 @@ TEST(InMatchExpression, MatchesArrayValue) {
     const CollatorInterface* collator = nullptr;
     InMatchExpression in(collator);
     in.init("a");
-    in.getArrayFilterEntries()->addEquality(operand.firstElement());
+    in.addEquality(operand.firstElement());
 
     ASSERT(in.matchesBSON(BSON("a" << BSON_ARRAY(5.0 << 6)), NULL));
     ASSERT(!in.matchesBSON(BSON("a" << BSON_ARRAY(6 << 7)), NULL));
@@ -1619,7 +1619,7 @@ TEST(InMatchExpression, MatchesNull) {
     const CollatorInterface* collator = nullptr;
     InMatchExpression in(collator);
     in.init("a");
-    in.getArrayFilterEntries()->addEquality(operand.firstElement());
+    in.addEquality(operand.firstElement());
 
     ASSERT(in.matchesBSON(BSONObj(), NULL));
     ASSERT(in.matchesBSON(BSON("a" << BSONNULL), NULL));
@@ -1634,7 +1634,7 @@ TEST(InMatchExpression, MatchesUndefined) {
     const CollatorInterface* collator = nullptr;
     InMatchExpression in(collator);
     in.init("a");
-    Status s = in.getArrayFilterEntries()->addEquality(operand.firstElement());
+    Status s = in.addEquality(operand.firstElement());
     ASSERT_NOT_OK(s);
 }
 
@@ -1643,7 +1643,7 @@ TEST(InMatchExpression, MatchesMinKey) {
     const CollatorInterface* collator = nullptr;
     InMatchExpression in(collator);
     in.init("a");
-    in.getArrayFilterEntries()->addEquality(operand.firstElement());
+    in.addEquality(operand.firstElement());
 
     ASSERT(in.matchesBSON(BSON("a" << MinKey), NULL));
     ASSERT(!in.matchesBSON(BSON("a" << MaxKey), NULL));
@@ -1655,7 +1655,7 @@ TEST(InMatchExpression, MatchesMaxKey) {
     const CollatorInterface* collator = nullptr;
     InMatchExpression in(collator);
     in.init("a");
-    in.getArrayFilterEntries()->addEquality(operand.firstElement());
+    in.addEquality(operand.firstElement());
 
     ASSERT(in.matchesBSON(BSON("a" << MaxKey), NULL));
     ASSERT(!in.matchesBSON(BSON("a" << MinKey), NULL));
@@ -1667,9 +1667,9 @@ TEST(InMatchExpression, MatchesFullArray) {
     const CollatorInterface* collator = nullptr;
     InMatchExpression in(collator);
     in.init("a");
-    in.getArrayFilterEntries()->addEquality(operand[0]);
-    in.getArrayFilterEntries()->addEquality(operand[1]);
-    in.getArrayFilterEntries()->addEquality(operand[2]);
+    in.addEquality(operand[0]);
+    in.addEquality(operand[1]);
+    in.addEquality(operand[2]);
 
     ASSERT(in.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2)), NULL));
     ASSERT(!in.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2 << 3)), NULL));
@@ -1682,8 +1682,8 @@ TEST(InMatchExpression, ElemMatchKey) {
     const CollatorInterface* collator = nullptr;
     InMatchExpression in(collator);
     in.init("a");
-    in.getArrayFilterEntries()->addEquality(operand[0]);
-    in.getArrayFilterEntries()->addEquality(operand[1]);
+    in.addEquality(operand[0]);
+    in.addEquality(operand[1]);
 
     MatchDetails details;
     details.requestElemMatchKey();
@@ -1718,7 +1718,7 @@ TEST(InMatchExpression, StringMatchingWithNullCollatorUsesBinaryComparison) {
                             << "string2");
     const CollatorInterface* collator = nullptr;
     InMatchExpression in(collator);
-    in.getArrayFilterEntries()->addEquality(operand.firstElement());
+    in.addEquality(operand.firstElement());
     ASSERT(!in.matchesSingleElement(notMatch["a"]));
 }
 
@@ -1728,84 +1728,9 @@ TEST(InMatchExpression, StringMatchingRespectsCollation) {
                          << "string2");
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     InMatchExpression in(&collator);
-    in.getArrayFilterEntries()->addEquality(operand.firstElement());
+    in.addEquality(operand.firstElement());
     ASSERT(in.matchesSingleElement(match["a"]));
 }
-
-/**
-TEST( InMatchExpression, MatchesIndexKeyScalar ) {
-    BSONObj operand = BSON( "$in" << BSON_ARRAY( 6 << 5 ) );
-    InMatchExpression in;
-    ASSERT( in.init( "a", operand[ "$in" ] ).isOK() );
-    IndexSpec indexSpec( BSON( "a" << 1 ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-            in.matchesIndexKey( BSON( "" << 6 ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-            in.matchesIndexKey( BSON( "" << 5 ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_False ==
-            in.matchesIndexKey( BSON( "" << 4 ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_False ==
-            in.matchesIndexKey( BSON( "" << BSON_ARRAY( 6 ) ), indexSpec ) );
-}
-
-TEST( InMatchExpression, MatchesIndexKeyMissing ) {
-    BSONObj operand = BSON( "$in" << BSON_ARRAY( 6 ) );
-    ComparisonMatchExpression eq
-        ASSERT( eq.init( "a", operand[ "$in" ] ).isOK() );
-    IndexSpec indexSpec( BSON( "b" << 1 ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-            eq.matchesIndexKey( BSON( "" << 6 ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-            eq.matchesIndexKey( BSON( "" << 4 ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-            eq.matchesIndexKey( BSON( "" << BSON_ARRAY( 8 << 6 ) ), indexSpec ) );
-}
-
-TEST( InMatchExpression, MatchesIndexKeyArray ) {
-    BSONObj operand = BSON( "$in" << BSON_ARRAY( 4 << BSON_ARRAY( 5 ) ) );
-    InMatchExpression in;
-    ASSERT( in.init( "a", operand[ "$in" ] ).isOK() );
-    IndexSpec indexSpec( BSON( "a" << 1 ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-            in.matchesIndexKey( BSON( "" << 4 ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-            in.matchesIndexKey( BSON( "" << 5 ), indexSpec ) );
-}
-
-TEST( InMatchExpression, MatchesIndexKeyArrayValue ) {
-    BSONObjBuilder inArray;
-    inArray.append( "0", 4 ).append( "1", 5 ).appendRegex( "2", "abc", "" );
-    BSONObj operand = BSONObjBuilder().appendArray( "$in", inArray.obj() ).obj();
-    InMatchExpression in;
-    ASSERT( in.init( "a", operand[ "$in" ] ).isOK() );
-    IndexSpec indexSpec( BSON( "loc" << "mockarrayvalue" << "a" << 1 ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-            in.matchesIndexKey( BSON( "" << "dummygeohash" << "" << 4 ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_False ==
-            in.matchesIndexKey( BSON( "" << "dummygeohash" << "" << 6 ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-            in.matchesIndexKey( BSON( "" << "dummygeohash" << "" << "abcd" ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-            in.matchesIndexKey( BSONObjBuilder()
-                                .append( "", "dummygeohash" )
-                                .appendRegex( "", "abc", "" ).obj(),
-                                indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_False ==
-            in.matchesIndexKey( BSON( "" << "dummygeohash" << "" << "ab" ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-            in.matchesIndexKey( BSON( "" << "dummygeohash" <<
-                                      "" << BSON_ARRAY( 8 << 5 ) ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_False ==
-            in.matchesIndexKey( BSON( "" << "dummygeohash" <<
-                                      "" << BSON_ARRAY( 8 << 9 ) ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_True ==
-            in.matchesIndexKey( BSON( "" << "dummygeohash" <<
-                                      "" << BSON_ARRAY( 8 << "abc" ) ), indexSpec ) );
-    ASSERT( MatchMatchExpression::PartialMatchResult_False ==
-            in.matchesIndexKey( BSON( "" << "dummygeohash" <<
-                                      "" << BSON_ARRAY( 8 << "ac" ) ), indexSpec ) );
-}
-*/
 
 std::vector<uint32_t> bsonArrayToBitPositions(const BSONArray& ba) {
     std::vector<uint32_t> bitPositions;

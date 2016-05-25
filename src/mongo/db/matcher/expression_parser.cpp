@@ -146,7 +146,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
             Status s = temp->init(name);
             if (!s.isOK())
                 return s;
-            s = _parseArrayFilterEntries(temp->getArrayFilterEntries(), e.Obj());
+            s = _parseInExpression(temp.get(), e.Obj());
             if (!s.isOK())
                 return s;
             return {std::move(temp)};
@@ -160,7 +160,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
             Status s = temp->init(name);
             if (!s.isOK())
                 return s;
-            s = _parseArrayFilterEntries(temp->getArrayFilterEntries(), e.Obj());
+            s = _parseInExpression(temp.get(), e.Obj());
             if (!s.isOK())
                 return s;
 
@@ -594,13 +594,13 @@ StatusWithMatchExpression MatchExpressionParser::_parseRegexDocument(const char*
     return {std::move(temp)};
 }
 
-Status MatchExpressionParser::_parseArrayFilterEntries(ArrayFilterEntries* entries,
-                                                       const BSONObj& theArray) {
+Status MatchExpressionParser::_parseInExpression(InMatchExpression* inExpression,
+                                                 const BSONObj& theArray) {
     BSONObjIterator i(theArray);
     while (i.more()) {
         BSONElement e = i.next();
 
-        // allow DBRefs but reject all fields with names starting wiht $
+        // Allow DBRefs, but reject all fields with names starting with $.
         if (_isExpressionDocument(e, false)) {
             return Status(ErrorCodes::BadValue, "cannot nest $ under $in");
         }
@@ -610,11 +610,11 @@ Status MatchExpressionParser::_parseArrayFilterEntries(ArrayFilterEntries* entri
             Status s = r->init("", e);
             if (!s.isOK())
                 return s;
-            s = entries->addRegex(r.release());
+            s = inExpression->addRegex(std::move(r));
             if (!s.isOK())
                 return s;
         } else {
-            Status s = entries->addEquality(e);
+            Status s = inExpression->addEquality(e);
             if (!s.isOK())
                 return s;
         }

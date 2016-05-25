@@ -530,134 +530,59 @@ bool TypeMatchExpression::equivalent(const MatchExpression* other) const {
 }
 
 
-// --------
-
-ArrayFilterEntries::ArrayFilterEntries(const CollatorInterface* collator)
-    : _hasNull(false), _hasEmptyArray(false), _equalities(collator), _collator(collator) {}
-
-ArrayFilterEntries::~ArrayFilterEntries() {
-    for (unsigned i = 0; i < _regexes.size(); i++)
-        delete _regexes[i];
-    _regexes.clear();
-}
-
-Status ArrayFilterEntries::addEquality(const BSONElement& e) {
-    if (e.type() == RegEx)
-        return Status(ErrorCodes::BadValue, "ArrayFilterEntries equality cannot be a regex");
-
-    if (e.type() == Undefined) {
-        return Status(ErrorCodes::BadValue, "ArrayFilterEntries equality cannot be undefined");
-    }
-
-    if (e.type() == jstNULL) {
-        _hasNull = true;
-    }
-
-    if (e.type() == Array && e.Obj().isEmpty())
-        _hasEmptyArray = true;
-
-    _equalities.insert(e);
-    return Status::OK();
-}
-
-Status ArrayFilterEntries::addRegex(RegexMatchExpression* expr) {
-    _regexes.push_back(expr);
-    return Status::OK();
-}
-
-bool ArrayFilterEntries::equivalent(const ArrayFilterEntries& other) const {
-    if (_hasNull != other._hasNull)
-        return false;
-
-    if (_regexes.size() != other._regexes.size())
-        return false;
-    for (unsigned i = 0; i < _regexes.size(); i++)
-        if (!_regexes[i]->equivalent(other._regexes[i]))
-            return false;
-
-    if (!CollatorInterface::collatorsMatch(_collator, other._collator)) {
-        return false;
-    }
-
-    return _equalities == other._equalities;
-}
-
-void ArrayFilterEntries::copyTo(ArrayFilterEntries& toFillIn) const {
-    toFillIn._hasNull = _hasNull;
-    toFillIn._hasEmptyArray = _hasEmptyArray;
-    toFillIn._equalities = _equalities;
-    for (unsigned i = 0; i < _regexes.size(); i++)
-        toFillIn._regexes.push_back(
-            static_cast<RegexMatchExpression*>(_regexes[i]->shallowClone().release()));
-}
-
-void ArrayFilterEntries::debugString(StringBuilder& debug) const {
-    debug << "[ ";
-    for (BSONElementSet::const_iterator it = _equalities.begin(); it != _equalities.end(); ++it) {
-        debug << it->toString(false) << " ";
-    }
-    for (size_t i = 0; i < _regexes.size(); ++i) {
-        _regexes[i]->shortDebugString(debug);
-        debug << " ";
-    }
-    debug << "]";
-}
-
-void ArrayFilterEntries::serialize(BSONArrayBuilder* out) const {
-    for (BSONElementSet::const_iterator it = _equalities.begin(); it != _equalities.end(); ++it) {
-        out->append(*it);
-    }
-    for (size_t i = 0; i < _regexes.size(); ++i) {
-        BSONObjBuilder regexBob;
-        _regexes[i]->serialize(&regexBob);
-        out->append(regexBob.obj().firstElement());
-    }
-    out->doneFast();
-}
-
 // -----------
+
+InMatchExpression::InMatchExpression(const CollatorInterface* collator)
+    : LeafMatchExpression(MATCH_IN), _equalities(collator), _collator(collator) {}
 
 Status InMatchExpression::init(StringData path) {
     return setPath(path);
 }
 
-bool InMatchExpression::_matchesRealElement(const BSONElement& e) const {
-    if (_arrayEntries.contains(e))
-        return true;
-
-    for (unsigned i = 0; i < _arrayEntries.numRegexes(); i++) {
-        if (_arrayEntries.regex(i)->matchesSingleElement(e))
-            return true;
+std::unique_ptr<MatchExpression> InMatchExpression::shallowClone() const {
+    auto next = stdx::make_unique<InMatchExpression>(_collator);
+    next->init(path());
+    if (getTag()) {
+        next->setTag(getTag()->clone());
     }
-
-    return false;
+    next->_hasNull = _hasNull;
+    next->_hasEmptyArray = _hasEmptyArray;
+    next->_equalities = _equalities;
+    for (auto&& regex : _regexes) {
+        std::unique_ptr<RegexMatchExpression> clonedRegex(
+            static_cast<RegexMatchExpression*>(regex->shallowClone().release()));
+        next->_regexes.push_back(std::move(clonedRegex));
+    }
+    return std::move(next);
 }
 
 bool InMatchExpression::matchesSingleElement(const BSONElement& e) const {
-    if (_arrayEntries.hasNull() && e.eoo())
+    if (_hasNull && e.eoo()) {
         return true;
-
-    if (_matchesRealElement(e))
+    }
+    if (_equalities.find(e) != _equalities.end()) {
         return true;
-
-    /*
-    if ( e.type() == Array ) {
-        BSONObjIterator i( e.Obj() );
-        while ( i.more() ) {
-            BSONElement sub = i.next();
-            if ( _matchesRealElement( sub ) )
-                return true;
+    }
+    for (auto&& regex : _regexes) {
+        if (regex->matchesSingleElement(e)) {
+            return true;
         }
     }
-    */
-
     return false;
 }
 
 void InMatchExpression::debugString(StringBuilder& debug, int level) const {
     _debugAddSpace(debug, level);
     debug << path() << " $in ";
-    _arrayEntries.debugString(debug);
+    debug << "[ ";
+    for (auto&& equality : _equalities) {
+        debug << equality.toString(false) << " ";
+    }
+    for (auto&& regex : _regexes) {
+        regex->shortDebugString(debug);
+        debug << " ";
+    }
+    debug << "]";
     MatchExpression::TagData* td = getTag();
     if (NULL != td) {
         debug << " ";
@@ -669,30 +594,64 @@ void InMatchExpression::debugString(StringBuilder& debug, int level) const {
 void InMatchExpression::serialize(BSONObjBuilder* out) const {
     BSONObjBuilder inBob(out->subobjStart(path()));
     BSONArrayBuilder arrBob(inBob.subarrayStart("$in"));
-    _arrayEntries.serialize(&arrBob);
+    for (auto&& _equality : _equalities) {
+        arrBob.append(_equality);
+    }
+    for (auto&& _regex : _regexes) {
+        BSONObjBuilder regexBob;
+        _regex->serialize(&regexBob);
+        arrBob.append(regexBob.obj().firstElement());
+    }
+    arrBob.doneFast();
     inBob.doneFast();
 }
 
 bool InMatchExpression::equivalent(const MatchExpression* other) const {
-    if (matchType() != other->matchType())
+    if (matchType() != other->matchType()) {
         return false;
-    const InMatchExpression* realOther = static_cast<const InMatchExpression*>(other);
-    return path() == realOther->path() && _arrayEntries.equivalent(realOther->_arrayEntries);
-}
-
-std::unique_ptr<MatchExpression> InMatchExpression::shallowClone() const {
-    std::unique_ptr<InMatchExpression> next =
-        stdx::make_unique<InMatchExpression>(_arrayEntries.getCollator());
-    copyTo(next.get());
-    if (getTag()) {
-        next->setTag(getTag()->clone());
     }
-    return std::move(next);
+    const InMatchExpression* realOther = static_cast<const InMatchExpression*>(other);
+    if (path() != realOther->path()) {
+        return false;
+    }
+    if (_hasNull != realOther->_hasNull) {
+        return false;
+    }
+    if (_regexes.size() != realOther->_regexes.size()) {
+        return false;
+    }
+    for (unsigned i = 0; i < _regexes.size(); i++) {
+        if (!_regexes[i]->equivalent(realOther->_regexes[i].get())) {
+            return false;
+        }
+    }
+    if (!CollatorInterface::collatorsMatch(_collator, realOther->_collator)) {
+        return false;
+    }
+    return _equalities == realOther->_equalities;
 }
 
-void InMatchExpression::copyTo(InMatchExpression* toFillIn) const {
-    toFillIn->init(path());
-    _arrayEntries.copyTo(toFillIn->_arrayEntries);
+Status InMatchExpression::addEquality(const BSONElement& elt) {
+    if (elt.type() == BSONType::RegEx) {
+        return Status(ErrorCodes::BadValue, "InMatchExpression equality cannot be a regex");
+    }
+    if (elt.type() == BSONType::Undefined) {
+        return Status(ErrorCodes::BadValue, "InMatchExpression equality cannot be undefined");
+    }
+
+    if (elt.type() == BSONType::jstNULL) {
+        _hasNull = true;
+    }
+    if (elt.type() == BSONType::Array && elt.Obj().isEmpty()) {
+        _hasEmptyArray = true;
+    }
+    _equalities.insert(elt);
+    return Status::OK();
+}
+
+Status InMatchExpression::addRegex(std::unique_ptr<RegexMatchExpression> expr) {
+    _regexes.push_back(std::move(expr));
+    return Status::OK();
 }
 
 // -----------

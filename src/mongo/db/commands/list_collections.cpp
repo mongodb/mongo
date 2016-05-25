@@ -84,10 +84,9 @@ boost::optional<vector<StringData>> _getExactNameMatches(const MatchExpression* 
         }
     } else if (matchType == MatchExpression::MATCH_IN) {
         auto matchIn = checked_cast<const InMatchExpression*>(matcher);
-        const ArrayFilterEntries& entries = matchIn->getData();
-        if (matchIn->path() == "name" && entries.numRegexes() == 0) {
+        if (matchIn->path() == "name" && matchIn->getRegexes().empty()) {
             vector<StringData> exactMatches;
-            for (auto&& elem : entries.equalities()) {
+            for (auto&& elem : matchIn->getEqualities()) {
                 if (elem.type() == String) {
                     exactMatches.push_back(elem.valueStringData());
                 }

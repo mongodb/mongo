@@ -51,7 +51,7 @@ void PlanCacheIndexabilityState::processSparseIndex(const BSONObj& keyPattern) {
                     return !queryExprEquality->getData().isNull();
                 } else if (queryExpr->matchType() == MatchExpression::MATCH_IN) {
                     const auto* queryExprIn = static_cast<const InMatchExpression*>(queryExpr);
-                    return !queryExprIn->getData().hasNull();
+                    return !queryExprIn->hasNull();
                 } else {
                     return true;
                 }

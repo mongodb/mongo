@@ -90,7 +90,7 @@ static bool boundsGeneratingNodeContainsComparisonToType(MatchExpression* node, 
 
     if (node->matchType() == MatchExpression::MATCH_IN) {
         const InMatchExpression* expr = static_cast<const InMatchExpression*>(node);
-        for (auto const& equality : expr->getData().equalities()) {
+        for (const auto& equality : expr->getEqualities()) {
             if (equality.type() == type) {
                 return true;
             }
@@ -212,7 +212,7 @@ bool QueryPlannerIXSelect::compatible(const BSONElement& elt,
         // Can't check for $in w/ null element w/a sparse index.
         if (exprtype == MatchExpression::MATCH_IN && index.sparse) {
             const InMatchExpression* expr = static_cast<const InMatchExpression*>(node);
-            if (expr->getData().hasNull()) {
+            if (expr->hasNull()) {
                 return false;
             }
         }
@@ -247,7 +247,7 @@ bool QueryPlannerIXSelect::compatible(const BSONElement& elt,
             // If it's a negated $in, it can't have any REGEX's inside.
             if (MatchExpression::MATCH_IN == childtype) {
                 InMatchExpression* ime = static_cast<InMatchExpression*>(node->getChild(0));
-                if (ime->getData().numRegexes() != 0) {
+                if (!ime->getRegexes().empty()) {
                     return false;
                 }
             }
@@ -300,7 +300,7 @@ bool QueryPlannerIXSelect::compatible(const BSONElement& elt,
         }
         if (exprtype == MatchExpression::MATCH_IN) {
             const InMatchExpression* expr = static_cast<const InMatchExpression*>(node);
-            return expr->getData().numRegexes() == 0;
+            return expr->getRegexes().empty();
         }
         return false;
     } else if (IndexNames::GEO_2DSPHERE == indexedFieldType) {

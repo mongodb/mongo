@@ -316,14 +316,9 @@ MatchExpression* CanonicalQuery::normalizeTree(MatchExpression* root) {
     } else if (MatchExpression::MATCH_IN == root->matchType()) {
         std::unique_ptr<InMatchExpression> in(static_cast<InMatchExpression*>(root));
 
-        ArrayFilterEntries* inArrayEntries = in->getArrayFilterEntries();
-        if (inArrayEntries->size() != 1) {
-            return in.release();
-        }
-
-        // We contain either a single $regex, or we are equivalent to a $eq.
-        if (inArrayEntries->numRegexes()) {
-            RegexMatchExpression* childRe = inArrayEntries->regex(0);
+        // IN of 1 regex is the regex.
+        if (in->getRegexes().size() == 1 && in->getEqualities().empty()) {
+            RegexMatchExpression* childRe = in->getRegexes().begin()->get();
             invariant(!childRe->getTag());
 
             // Create a new RegexMatchExpression, because 'childRe' does not have a path.
@@ -335,12 +330,17 @@ MatchExpression* CanonicalQuery::normalizeTree(MatchExpression* root) {
             return normalizeTree(re.release());
         }
 
-        auto eq = stdx::make_unique<EqualityMatchExpression>(in->getCollator());
-        eq->init(in->path(), *(inArrayEntries->equalities().begin()));
-        if (in->getTag()) {
-            eq->setTag(in->getTag()->clone());
+        // IN of 1 equality is the equality.
+        if (in->getEqualities().size() == 1 && in->getRegexes().empty()) {
+            auto eq = stdx::make_unique<EqualityMatchExpression>(in->getCollator());
+            eq->init(in->path(), *(in->getEqualities().begin()));
+            if (in->getTag()) {
+                eq->setTag(in->getTag()->clone());
+            }
+            return eq.release();
         }
-        return eq.release();
+
+        return in.release();
     }
 
     return root;
