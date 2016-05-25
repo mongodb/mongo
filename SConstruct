@@ -721,10 +721,6 @@ env_vars.Add('VERBOSE',
     default='auto',
 )
 
-# don't run configure if user calls --help
-if GetOption('help'):
-    Return()
-
 # -- Validate user provided options --
 
 # A dummy environment that should *only* have the variables we have set. In practice it has
@@ -740,6 +736,12 @@ variables_only_env = Environment(
     # Use the Variables specified above.
     variables=env_vars,
 )
+
+# don't run configure if user calls --help
+if GetOption('help'):
+    Help('\nThe following variables may also be set like scons VARIABLE=value\n', append=True);
+    Help(env_vars.GenerateHelpText(variables_only_env), append=True);
+    Return()
 
 if ('CC' in variables_only_env) != ('CXX' in variables_only_env):
     print('Cannot customize C compiler without customizing C++ compiler, and vice versa')
