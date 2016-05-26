@@ -3996,6 +3996,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: sunos5
     push_arch: x86_64
+    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
+    tooltags: -gccgoflags "-lsocket -lnsl"
     compile_flags: --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --static-libstdc++ --64 -j$(kstat cpu | sort -u | grep -c "^module") --release OBJCOPY=/opt/mongodbtoolchain/bin/objcopy
     test_flags: --continue-on-failure
   tasks:
