@@ -288,7 +288,7 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
         delete session;
 
     if (_engine && _engine->haveDropsQueued())
-        _engine->dropAllQueued();
+        _engine->dropSomeQueuedIdents();
 }
 
 void WiredTigerSessionCache::setJournalListener(JournalListener* jl) {
