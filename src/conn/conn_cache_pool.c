@@ -571,6 +571,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 	cp = __wt_process.cache_pool;
 	grow = false;
 	pool_full = cp->currently_used >= cp->size;
+	pct_full = 0;
 	/* Highest as a percentage, avoid 0 */
 	highest_percentile = (highest / 100) + 1;
 
