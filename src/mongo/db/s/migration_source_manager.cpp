@@ -366,10 +366,23 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
                                 "Failpoint 'failCommitMigrationCommand' generated error");
     }
 
-    if (!applyOpsStatus.isOK()) {
+    if (applyOpsStatus.isOK()) {
+        // Now that applyOps succeeded and the new collection version is committed, update the
+        // collection metadata to the new collection version and forget the migrated chunk.
+        ScopedTransaction scopedXact(txn, MODE_IX);
+        AutoGetCollection autoColl(txn, _args.getNss(), MODE_IX, MODE_X);
+
+        ChunkType migratingChunkToForget;
+        migratingChunkToForget.setMin(_args.getMinKey());
+        migratingChunkToForget.setMax(_args.getMaxKey());
+        _committedMetadata =
+            _committedMetadata->cloneMigrate(migratingChunkToForget, uncommittedCollVersion);
+        auto css = CollectionShardingState::get(txn, _args.getNss().ns());
+        css->setMetadata(_committedMetadata);
+    } else {
         // This could be an unrelated error (e.g. network error). Check whether the metadata update
-        // succeeded by refreshing the collection metadata and checking that the original chunks no
-        // longer exist.
+        // succeeded by refreshing the collection metadata from the config server and checking that
+        // the original chunks no longer exist.
 
         warning() << "Migration metadata commit may have failed: refreshing metadata to check"
                   << causedBy(applyOpsStatus);
@@ -435,21 +448,6 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
                                                << causedBy(applyOpsStatus)});
             }
         }
-    }
-
-    // Now that applyOps succeeded and the new collection version is committed, update the
-    // collection metadata to the new collection version and forget the migrated chunk.
-    {
-        ScopedTransaction scopedXact(txn, MODE_IX);
-        AutoGetCollection autoColl(txn, _args.getNss(), MODE_IX, MODE_X);
-
-        ChunkType migratingChunkToForget;
-        migratingChunkToForget.setMin(_args.getMinKey());
-        migratingChunkToForget.setMax(_args.getMaxKey());
-        _committedMetadata =
-            _committedMetadata->cloneMigrate(migratingChunkToForget, uncommittedCollVersion);
-        auto css = CollectionShardingState::get(txn, _args.getNss().ns());
-        css->setMetadata(_committedMetadata);
     }
 
     MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeLeavingCriticalSection);
