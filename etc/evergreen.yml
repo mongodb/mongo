@@ -4388,8 +4388,8 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
-    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
-    tooltags: "-tags 'ssl sasl'"
+    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
+    tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl)" -tags 'ssl'
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
