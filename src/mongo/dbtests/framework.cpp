@@ -102,14 +102,4 @@ int runDbTests(int argc, char** argv) {
 
 }  // namespace dbtests
 
-#ifdef _WIN32
-namespace ntservice {
-
-bool shouldStartService() {
-    return false;
-}
-
-}  // namespace ntservice
-#endif
-
 }  // namespace mongo

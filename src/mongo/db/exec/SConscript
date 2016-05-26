@@ -115,7 +115,6 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/serveronly",
         "$BUILD_DIR/mongo/dbtests/mocklib",
         "$BUILD_DIR/mongo/util/clock_source_mock",
-        "$BUILD_DIR/mongo/util/ntservice_mock",
     ],
 )
 
@@ -131,7 +130,6 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/query/collation/collator_factory_mock",
         "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
         "$BUILD_DIR/mongo/util/clock_source_mock",
-        "$BUILD_DIR/mongo/util/ntservice_mock",
     ],
 )
 
@@ -143,7 +141,6 @@ env.CppUnitTest(
     LIBDEPS = [
         "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
         "$BUILD_DIR/mongo/db/serveronly",
-        "$BUILD_DIR/mongo/util/ntservice_mock",
         "exec",
     ],
 )

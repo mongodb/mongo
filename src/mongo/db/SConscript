@@ -778,7 +778,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/serveronly',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/unittest/unittest',
-        '$BUILD_DIR/mongo/util/ntservice_mock',
     ],
 )
 

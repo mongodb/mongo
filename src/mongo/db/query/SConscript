@@ -96,7 +96,6 @@ env.CppUnitTest(
         "query_test_service_context",
         "$BUILD_DIR/mongo/db/serveronly",
         "$BUILD_DIR/mongo/dbtests/mocklib",
-        "$BUILD_DIR/mongo/util/ntservice_mock",
     ],
 )
 
@@ -403,6 +402,5 @@ env.CppUnitTest(
         "query_planner_test_fixture",
         "$BUILD_DIR/mongo/db/serveronly",
         "$BUILD_DIR/mongo/dbtests/mocklib",
-        "$BUILD_DIR/mongo/util/ntservice_mock",
     ],
 )

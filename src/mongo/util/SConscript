@@ -307,6 +307,7 @@ env.Library(
     ],
     LIBDEPS=[
         'foundation',
+        'signal_handlers',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
     ],
 )
@@ -347,13 +348,6 @@ if env.TargetOSIs('windows'):
             env['LIBS']
         ],
     )
-
-env.Library(
-    target='ntservice_mock',
-    source=[
-        'ntservice_mock.cpp',
-    ],
-)
 
 env.Library(
     target='elapsed_tracker',

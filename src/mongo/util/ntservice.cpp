@@ -37,8 +37,6 @@
 
 #include "mongo/util/ntservice.h"
 
-#include "mongo/db/client.h"
-#include "mongo/db/instance.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
@@ -533,7 +531,7 @@ const int kStopWaitHintMillis = 30000;
 static void serviceStop() {
     // VS2013 Doesn't support future<void>, so fake it with a bool.
     stdx::packaged_task<bool()> exitCleanlyTask([] {
-        Client::initThread("serviceStopWorker");
+        setThreadName("serviceStopWorker");
         // Stop the process
         // TODO: SERVER-5703, separate the "cleanup for shutdown" functionality from
         // the "terminate process" functionality in exitCleanly.
@@ -574,7 +572,7 @@ static void WINAPI initService(DWORD argc, LPTSTR* argv) {
 }
 
 static void serviceShutdown(const char* controlCodeName) {
-    Client::initThread("serviceShutdown");
+    setThreadName("serviceShutdown");
 
     log() << "got " << controlCodeName << " request from Windows Service Control Manager, "
           << (inShutdown() ? "already in shutdown" : "will terminate after current cmd ends");

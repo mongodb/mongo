@@ -119,9 +119,3 @@ TEST(NtService, RegressionSERVER_7252) {
     ASSERT_EQUALS(expectedServiceCommandLine,
                   constructUtf8WindowsCommandLine(ntservice::constructServiceArgv(inputArgvUtf8)));
 }
-
-// CRUTCHES!
-namespace mongo {
-void Client::initThread(const char* desc, AbstractMessagingPort* mp) {}
-void removeControlCHandler() {}
-}  // namespace mongo

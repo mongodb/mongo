@@ -164,7 +164,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         '$BUILD_DIR/mongo/util/net/message_port_mock',
-        '$BUILD_DIR/mongo/util/ntservice_mock',
     ],
 )
 
@@ -182,7 +181,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         '$BUILD_DIR/mongo/util/net/message_port_mock',
-        '$BUILD_DIR/mongo/util/ntservice_mock',
     ],
 )
 

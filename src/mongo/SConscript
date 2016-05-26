@@ -284,7 +284,6 @@ env.Install(
                     ],
                     LIBDEPS=[
                         "db/serveronly",
-                        "util/ntservice_mock",
                     ]),
     ])
 

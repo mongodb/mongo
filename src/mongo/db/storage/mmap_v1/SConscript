@@ -179,7 +179,6 @@ if mmapv1:
                 ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/db/serveronly',
-            '$BUILD_DIR/mongo/util/ntservice_mock',
             ],
         )
 

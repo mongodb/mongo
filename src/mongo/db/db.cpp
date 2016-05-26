@@ -1012,6 +1012,7 @@ static void shutdownTask() {
 
     getGlobalServiceContext()->setKillAllOperations();
 
+    Client::initThreadIfNotAlready();
     Client& client = cc();
     ServiceContext::UniqueOperationContext uniqueTxn;
     OperationContext* txn = client.getOperationContext();

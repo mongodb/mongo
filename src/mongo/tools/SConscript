@@ -12,7 +12,6 @@ mongobridge = env.Program(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/client/clientdriver",
-        "$BUILD_DIR/mongo/util/ntservice_mock",
         "$BUILD_DIR/mongo/util/signal_handlers",
         "$BUILD_DIR/mongo/util/options_parser/options_parser_init",
     ],

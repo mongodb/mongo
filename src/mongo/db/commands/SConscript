@@ -72,6 +72,7 @@ env.Library(
         '$BUILD_DIR/mongo/scripting/scripting_common',
         '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
         '$BUILD_DIR/mongo/util/foundation',
+        '$BUILD_DIR/mongo/util/ntservice',
         '$BUILD_DIR/mongo/util/processinfo',
         'server_status_core',
     ],
@@ -100,7 +101,6 @@ env.CppUnitTest(
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query/query_test_service_context",
         "$BUILD_DIR/mongo/db/serveronly",
-        "$BUILD_DIR/mongo/util/ntservice_mock",
     ],
 )
 
@@ -111,7 +111,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/serveronly",
-        "$BUILD_DIR/mongo/util/ntservice_mock",
     ],
 )
 
@@ -123,6 +122,5 @@ env.CppUnitTest(
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query/query_test_service_context",
         "$BUILD_DIR/mongo/db/serveronly",
-        "$BUILD_DIR/mongo/util/ntservice_mock",
     ],
 )

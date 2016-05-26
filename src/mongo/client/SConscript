@@ -247,7 +247,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/util/net/message_server_port',
         '$BUILD_DIR/mongo/util/net/network',
-        '$BUILD_DIR/mongo/util/ntservice_mock',
     ],
 )
 
