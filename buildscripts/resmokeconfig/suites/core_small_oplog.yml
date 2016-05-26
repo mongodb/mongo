@@ -17,6 +17,8 @@ executor:
     hooks:
     - class: ValidateCollections
     - class: CheckReplDBHash
+    - class: CleanEveryN
+      n: 20
     fixture:
       class: MasterSlaveFixture
       mongod_options:

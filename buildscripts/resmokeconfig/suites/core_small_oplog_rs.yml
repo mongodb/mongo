@@ -18,6 +18,8 @@ executor:
     hooks:
     - class: ValidateCollections
     - class: CheckReplDBHash
+    - class: CleanEveryN
+      n: 20
     fixture:
       class: ReplicaSetFixture
       mongod_options:
