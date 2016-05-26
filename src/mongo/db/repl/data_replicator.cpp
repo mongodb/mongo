@@ -44,6 +44,7 @@
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/rollback_checker.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -649,6 +650,13 @@ TimestampStatus DataReplicator::initialSync(OperationContext* txn) {
             attemptErrorStatus = _ensureGoodSyncSource_inlock();
         }
 
+        RollbackChecker rollbackChecker(_exec, _syncSource);
+        if (attemptErrorStatus.isOK()) {
+            lk.unlock();
+            attemptErrorStatus = rollbackChecker.reset_sync();
+            lk.lock();
+        }
+
         if (attemptErrorStatus.isOK()) {
             StatusWith<Event> status = _exec->makeEvent();
             if (!status.isOK()) {
@@ -700,6 +708,10 @@ TimestampStatus DataReplicator::initialSync(OperationContext* txn) {
                 _initialSyncState->dbsCloner.start();  // When the cloner is done applier starts.
                 invariant(_initialSyncState->finishEvent.isValid());
                 _exec->waitForEvent(_initialSyncState->finishEvent);
+                if (rollbackChecker.hasHadRollback()) {
+                    _initialSyncState->setStatus(Status(ErrorCodes::UnrecoverableRollbackError,
+                                                        "Rollback occurred during initial sync"));
+                }
                 attemptErrorStatus = _initialSyncState->status;
 
                 // Re-lock DataReplicator Internals

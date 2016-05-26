@@ -450,6 +450,8 @@ TEST_F(InitialSyncTest, Complete) {
      */
 
     const std::vector<BSONObj> responses = {
+        // get rollback id
+        fromjson(str::stream() << "{ok: 1, rbid:1}"),
         // get latest oplog ts
         fromjson(
             str::stream() << "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:["
@@ -485,6 +487,8 @@ TEST_F(InitialSyncTest, Complete) {
                              "{ts:Timestamp(2,2), h:1, ns:'b.c', v:" << OplogEntry::kOplogVersion
                           << ", op:'i', o:{_id:1, c:1}}]}}"),
         // Applier starts ...
+        // check for rollback
+        fromjson(str::stream() << "{ok: 1, rbid:1}"),
     };
 
     // Initial sync flag should not be set before starting.
@@ -525,6 +529,8 @@ TEST_F(InitialSyncTest, MissingDocOnMultiApplyCompletes) {
             };
 
     const std::vector<BSONObj> responses = {
+        // get rollback id
+        fromjson(str::stream() << "{ok: 1, rbid:1}"),
         // get latest oplog ts
         fromjson(
             str::stream() << "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:["
@@ -562,6 +568,8 @@ TEST_F(InitialSyncTest, MissingDocOnMultiApplyCompletes) {
             "{ok:1, cursor:{id:NumberLong(0), ns:'a.a', firstBatch:["
             "{_id:1, a:1} "
             "]}}"),
+        // check for rollback
+        fromjson(str::stream() << "{ok: 1, rbid:1}"),
     };
     startSync();
     setResponses(responses);
@@ -601,6 +609,8 @@ TEST_F(InitialSyncTest, Failpoint) {
 
 TEST_F(InitialSyncTest, FailsOnClone) {
     const std::vector<BSONObj> responses = {
+        // get rollback id
+        fromjson(str::stream() << "{ok: 1, rbid:1}"),
         // get latest oplog ts
         fromjson(
             str::stream() << "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:["
@@ -613,12 +623,65 @@ TEST_F(InitialSyncTest, FailsOnClone) {
                           << ", op:'i', o:{_id:1, a:1}}]}}"),
         // Clone Start
         // listDatabases
-        fromjson("{ok:0}")};
+        fromjson("{ok:0}"),
+        // get rollback id
+        fromjson(str::stream() << "{ok: 1, rbid:1}"),
+    };
     startSync();
     setResponses(responses);
     playResponses(true);
     verifySync(ErrorCodes::InitialSyncFailure);
 }
+
+TEST_F(InitialSyncTest, FailOnRollback) {
+    const std::vector<BSONObj> responses = {
+        // get rollback id
+        fromjson(str::stream() << "{ok: 1, rbid:1}"),
+        // get latest oplog ts
+        fromjson(
+            str::stream() << "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:["
+                             "{ts:Timestamp(1,1), h:1, ns:'a.a', v:" << OplogEntry::kOplogVersion
+                          << ", op:'i', o:{_id:1, a:1}}]}}"),
+        // oplog fetcher find
+        fromjson(
+            str::stream() << "{ok:1, cursor:{id:NumberLong(1), ns:'local.oplog.rs', firstBatch:["
+                             "{ts:Timestamp(1,1), h:1, ns:'a.a', v:" << OplogEntry::kOplogVersion
+                          << ", op:'i', o:{_id:1, a:1}}]}}"),
+        // Clone Start
+        // listDatabases
+        fromjson("{ok:1, databases:[{name:'a'}]}"),
+        // listCollections for "a"
+        fromjson(
+            "{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listCollections', firstBatch:["
+            "{name:'a', options:{}} "
+            "]}}"),
+        // listIndexes:a
+        fromjson(str::stream()
+                 << "{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listIndexes.a', firstBatch:["
+                    "{v:" << OplogEntry::kOplogVersion
+                 << ", key:{_id:1}, name:'_id_', ns:'a.a'}]}}"),
+        // find:a
+        fromjson(
+            "{ok:1, cursor:{id:NumberLong(0), ns:'a.a', firstBatch:["
+            "{_id:1, a:1} "
+            "]}}"),
+        // Clone Done
+        // get latest oplog ts
+        fromjson(
+            str::stream() << "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:["
+                             "{ts:Timestamp(2,2), h:1, ns:'b.c', v:" << OplogEntry::kOplogVersion
+                          << ", op:'i', o:{_id:1, c:1}}]}}"),
+        // Applier starts ...
+        // check for rollback
+        fromjson(str::stream() << "{ok: 1, rbid:2}"),
+    };
+
+    startSync();
+    setResponses({responses});
+    playResponses(true);
+    verifySync(ErrorCodes::InitialSyncFailure);
+}
+
 
 class TestSyncSourceSelector2 : public SyncSourceSelector {
 public:

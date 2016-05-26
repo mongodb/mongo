@@ -900,6 +900,7 @@ env.Library(
         'oplog_fetcher',
         'optime',
         'reporter',
+	'rollback_checker',
         'storage_interface',
         '$BUILD_DIR/mongo/client/fetcher',
     ],
@@ -915,6 +916,28 @@ env.CppUnitTest(
         'data_replicator',
         'data_replicator_external_state_mock',
         'replication_executor_test_fixture',
+        '$BUILD_DIR/mongo/unittest/concurrency',
+    ],
+)
+
+env.Library(
+    target='rollback_checker',
+    source=[
+        'rollback_checker.cpp',
+    ],
+    LIBDEPS=[
+        'replication_executor',
+    ],
+)
+
+env.CppUnitTest(
+    target='rollback_checker_test',
+    source=[
+        'rollback_checker_test.cpp',
+    ],
+    LIBDEPS=[
+        'replication_executor_test_fixture',
+        'rollback_checker',
         '$BUILD_DIR/mongo/unittest/concurrency',
     ],
 )
