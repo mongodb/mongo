@@ -345,7 +345,6 @@ if not has_option('noshell') and usemozjs:
     shell_core_env.Library("shell_core",
                 source=[
                     "shell/bench.cpp",
-                    "shell/clientAndShell.cpp",
                     "shell/linenoise.cpp",
                     "shell/mk_wcwidth.cpp",
                     "shell/mongo-server.cpp",
