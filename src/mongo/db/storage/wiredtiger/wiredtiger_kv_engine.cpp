@@ -558,7 +558,7 @@ bool WiredTigerKVEngine::_drop(StringData ident) {
         // this is expected, queue it up
         {
             stdx::lock_guard<stdx::mutex> lk(_identToDropMutex);
-            _identToDrop.insert(uri);
+            _identToDrop.push(uri);
         }
         _sessionCache->closeAll();
         return false;
@@ -578,7 +578,7 @@ bool WiredTigerKVEngine::haveDropsQueued() const {
     }
 
     // We only want to check the queue max once per second or we'll thrash
-    // This is done in haveDropsQueued, not dropAllQueued so we skip the mutex
+    // This is done in haveDropsQueued, not dropSomeQueuedIdents so we skip the mutex
     if (delta < Milliseconds(1000))
         return false;
 
@@ -587,41 +587,40 @@ bool WiredTigerKVEngine::haveDropsQueued() const {
     return !_identToDrop.empty();
 }
 
-void WiredTigerKVEngine::dropAllQueued() {
-    set<string> mine;
+void WiredTigerKVEngine::dropSomeQueuedIdents() {
+    int numInQueue;
+
+    WiredTigerSession session(_conn);
+
     {
         stdx::lock_guard<stdx::mutex> lk(_identToDropMutex);
-        mine = _identToDrop;
+        numInQueue = _identToDrop.size();
     }
 
-    set<string> deleted;
+    int numToDelete = 10;
+    int tenPercentQueue = numInQueue * 0.1;
+    if (tenPercentQueue > 10)
+        numToDelete = tenPercentQueue;
 
-    {
-        WiredTigerSession session(_conn);
-        for (set<string>::const_iterator it = mine.begin(); it != mine.end(); ++it) {
-            string uri = *it;
-            int ret = session.getSession()->drop(
-                session.getSession(), uri.c_str(), "force,lock_wait=false");
-            LOG(1) << "WT queued drop of  " << uri << " res " << ret;
-
-            if (ret == 0) {
-                deleted.insert(uri);
-                continue;
-            }
-
-            if (ret == EBUSY) {
-                // leave in qeuue
-                continue;
-            }
-
-            invariantWTOK(ret);
+    LOG(1) << "WT Queue is: " << numInQueue << " attempting to drop: " << numToDelete << " tables";
+    for (int i = 0; i < numToDelete; i++) {
+        string uri;
+        {
+            stdx::lock_guard<stdx::mutex> lk(_identToDropMutex);
+            if (_identToDrop.empty())
+                break;
+            uri = _identToDrop.front();
+            _identToDrop.pop();
         }
-    }
+        int ret =
+            session.getSession()->drop(session.getSession(), uri.c_str(), "force,lock_wait=false");
+        LOG(1) << "WT queued drop of  " << uri << " res " << ret;
 
-    {
-        stdx::lock_guard<stdx::mutex> lk(_identToDropMutex);
-        for (set<string>::const_iterator it = deleted.begin(); it != deleted.end(); ++it) {
-            _identToDrop.erase(*it);
+        if (ret == EBUSY) {
+            stdx::lock_guard<stdx::mutex> lk(_identToDropMutex);
+            _identToDrop.push(uri);
+        } else {
+            invariantWTOK(ret);
         }
     }
 }
