@@ -160,7 +160,7 @@ Status initializeGlobalShardingState(const ConnectionString& configCS,
         std::move(executorPool),
         networkPtr);
 
-    Status status = rawCatalogManager->startup();
+    auto status = rawCatalogManager->startup();
     if (!status.isOK()) {
         return status;
     }

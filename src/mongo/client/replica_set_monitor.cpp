@@ -37,7 +37,9 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/replica_set_monitor_internal.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
+#include "mongo/s/grid.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -70,6 +72,9 @@ typedef ReplicaSetMonitor::Refresher Refresher;
 typedef ScanState::UnconfirmedReplies UnconfirmedReplies;
 typedef SetState::Node Node;
 typedef SetState::Nodes Nodes;
+using executor::TaskExecutor;
+using CallbackArgs = TaskExecutor::CallbackArgs;
+using CallbackHandle = TaskExecutor::CallbackHandle;
 
 const double socketTimeoutSecs = 5;
 
@@ -82,113 +87,6 @@ const Milliseconds kFindHostMaxBackOffTime(500);
 // TODO: Move to ReplicaSetMonitorManager
 ReplicaSetMonitor::ConfigChangeHook asyncConfigChangeHook;
 ReplicaSetMonitor::ConfigChangeHook syncConfigChangeHook;
-
-// global background job responsible for checking every X amount of time
-class ReplicaSetMonitorWatcher : public BackgroundJob {
-public:
-    ReplicaSetMonitorWatcher() : _started(false), _stopRequested(false) {}
-
-    ~ReplicaSetMonitorWatcher() {
-        stop();
-
-        // We relying on the fact that if the monitor was rerun again, wait will not hang
-        // because _destroyingStatics will make the run method exit immediately.
-        dassert(StaticObserver::_destroyingStatics);
-        if (running()) {
-            wait();
-        }
-    }
-
-    virtual string name() const {
-        return "ReplicaSetMonitorWatcher";
-    }
-
-    void safeGo() {
-        stdx::lock_guard<stdx::mutex> lk(_monitorMutex);
-        if (_started)
-            return;
-
-        _started = true;
-        _stopRequested = false;
-
-        go();
-    }
-
-    /**
-     * Stops monitoring the sets and wait for the monitoring thread to terminate.
-     */
-    void stop() {
-        stdx::lock_guard<stdx::mutex> sl(_monitorMutex);
-        _stopRequested = true;
-        _stopRequestedCV.notify_one();
-    }
-
-protected:
-    void run() {
-        log() << "starting";  // includes thread name in output
-
-        // Added only for patching timing problems in test. Remove after tests
-        // are fixed - see 392b933598668768bf12b1e41ad444aa3548d970.
-        // Should not be needed after SERVER-7533 gets implemented and tests start
-        // using it.
-        if (!inShutdown() && !StaticObserver::_destroyingStatics) {
-            stdx::unique_lock<stdx::mutex> sl(_monitorMutex);
-            _stopRequestedCV.wait_for(sl, Seconds(10).toSystemDuration());
-        }
-
-        while (!inShutdown() && !StaticObserver::_destroyingStatics) {
-            {
-                stdx::lock_guard<stdx::mutex> sl(_monitorMutex);
-                if (_stopRequested) {
-                    break;
-                }
-            }
-
-            try {
-                checkAllSets();
-            } catch (const std::exception& e) {
-                error() << "check all sets failed: " << e.what();
-            } catch (...) {
-                error() << "unknown error";
-            }
-
-            stdx::unique_lock<stdx::mutex> sl(_monitorMutex);
-            if (_stopRequested) {
-                break;
-            }
-
-            _stopRequestedCV.wait_for(sl, Seconds(10).toSystemDuration());
-        }
-    }
-
-    void checkAllSets() {
-        for (const string& setName : globalRSMonitorManager.getAllSetNames()) {
-            shared_ptr<ReplicaSetMonitor> m = globalRSMonitorManager.getMonitor(setName);
-            if (!m) {
-                continue;
-            }
-
-            Timer t;
-            m->startOrContinueRefresh().refreshAll();
-            LOG(1) << "Refreshing replica set " << setName << " took " << t.millis() << " msec";
-
-            if (!m->isSetUsable()) {
-                log() << "Stopping periodic monitoring of set " << m->getName()
-                      << " because none of the hosts could be contacted for an extended period of "
-                         "time.";
-
-                ReplicaSetMonitor::remove(m->getName());
-            }
-        }
-    }
-
-    // protects _started, _stopRequested
-    stdx::mutex _monitorMutex;
-    bool _started;
-
-    stdx::condition_variable _stopRequestedCV;
-    bool _stopRequested;
-} replicaSetMonitorWatcher;
 
 StaticObserver staticObserver;
 
@@ -253,6 +151,11 @@ struct HostNotIn {
     }
     const std::set<HostAndPort>& _hosts;
 };
+/**
+ * Replica set refresh period on the task executor.
+ */
+const Seconds kRefreshPeriod(30);
+
 
 }  // namespace
 
@@ -266,7 +169,94 @@ const Seconds ReplicaSetMonitor::kDefaultFindHostTimeout(15);
 bool ReplicaSetMonitor::useDeterministicHostSelection = false;
 
 ReplicaSetMonitor::ReplicaSetMonitor(StringData name, const std::set<HostAndPort>& seeds)
-    : _state(std::make_shared<SetState>(name, seeds)) {}
+    : _state(std::make_shared<SetState>(name, seeds)),
+      _executor(globalRSMonitorManager.getExecutor()) {}
+
+void ReplicaSetMonitor::init() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    std::weak_ptr<ReplicaSetMonitor> that(shared_from_this());
+    auto status = _executor->scheduleWork([=](const CallbackArgs& cbArgs) {
+        if (auto ptr = that.lock()) {
+            ptr->_refresh(cbArgs);
+        }
+    });
+
+    if (status.getStatus() == ErrorCodes::ShutdownInProgress) {
+        LOG(1) << "Couldn't schedule refresh for " << getName()
+               << ". Executor shutdown in progress";
+        return;
+    }
+
+    if (!status.isOK()) {
+        severe() << "Can't start refresh for replica set " << getName()
+                 << causedBy(status.getStatus());
+        fassertFailed(40139);
+    }
+
+    _refresherHandle = status.getValue();
+}
+
+ReplicaSetMonitor::~ReplicaSetMonitor() {
+    // need this lock because otherwise can get race with scheduling in _refresh
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    invariant(_executor);
+
+    if (!_refresherHandle) {
+        return;
+    }
+    _executor->cancel(_refresherHandle);
+    // Note: calling _executor->wait(_refresherHandle); from the dispatcher thread will cause hang
+    // Its ok not to call it because the d-tor is called only when the last owning pointer goes out
+    // of scope, so as taskExecutor queue holds a weak pointer to RSM it will not be able to get a
+    // task to execute eliminating the need to call method "wait".
+    //
+    _refresherHandle = {};
+}
+
+void ReplicaSetMonitor::_refresh(const CallbackArgs& cbArgs) {
+    if (!cbArgs.status.isOK()) {
+        return;
+    }
+
+    Timer t;
+    startOrContinueRefresh().refreshAll();
+    LOG(1) << "Refreshing replica set " << getName() << " took " << t.millis() << " msec";
+
+    if (!isSetUsable()) {
+        log() << "Stopping periodic monitoring of set " << getName()
+              << " because none of the hosts could be contacted for an extended period of "
+                 "time.";
+
+        ReplicaSetMonitor::remove(getName());
+        return;
+    }
+
+    {
+        // reschedule itself
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        std::weak_ptr<ReplicaSetMonitor> that(shared_from_this());
+        auto status = _executor->scheduleWorkAt(_executor->now() + kRefreshPeriod,
+                                                [=](const CallbackArgs& cbArgs) {
+                                                    if (auto ptr = that.lock()) {
+                                                        ptr->_refresh(cbArgs);
+                                                    }
+                                                });
+
+        if (status.getStatus() == ErrorCodes::ShutdownInProgress) {
+            LOG(1) << "Cant schedule refresh for " << getName()
+                   << ". Executor shutdown in progress";
+            return;
+        }
+
+        if (!status.isOK()) {
+            severe() << "Can't continue refresh for replica set " << getName() << " due to "
+                     << status.getStatus().toString();
+            fassertFailed(40140);
+        }
+
+        _refresherHandle = status.getValue();
+    }
+}
 
 StatusWith<HostAndPort> ReplicaSetMonitor::getHostOrRefresh(const ReadPreferenceSetting& criteria,
                                                             Milliseconds maxWait) {
@@ -391,8 +381,6 @@ bool ReplicaSetMonitor::contains(const HostAndPort& host) const {
 void ReplicaSetMonitor::createIfNeeded(const string& name, const set<HostAndPort>& servers) {
     globalRSMonitorManager.getOrCreateMonitor(
         ConnectionString::forReplicaSet(name, vector<HostAndPort>(servers.begin(), servers.end())));
-
-    replicaSetMonitorWatcher.safeGo();
 }
 
 shared_ptr<ReplicaSetMonitor> ReplicaSetMonitor::get(const std::string& name) {
@@ -452,10 +440,6 @@ void ReplicaSetMonitor::appendInfo(BSONObjBuilder& bsonObjBuilder) const {
 }
 
 void ReplicaSetMonitor::cleanup() {
-    // Call cancel first, in case the RSMW was never started.
-    replicaSetMonitorWatcher.cancel();
-    replicaSetMonitorWatcher.stop();
-    replicaSetMonitorWatcher.wait();
     globalRSMonitorManager.removeAllMonitors();
     asyncConfigChangeHook = ReplicaSetMonitor::ConfigChangeHook();
     syncConfigChangeHook = ReplicaSetMonitor::ConfigChangeHook();

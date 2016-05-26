@@ -145,9 +145,15 @@ public:
      * @param shardFactory Makes shards
      * @param configServerCS ConnectionString used for communicating with the config servers
      */
-    ShardRegistry(std::unique_ptr<ShardFactory> shardFactory, ConnectionString configServerCS);
+    ShardRegistry(std::unique_ptr<ShardFactory> shardFactory,
+                  const ConnectionString& configServerCS);
 
     ~ShardRegistry() = default;
+
+    /**
+     *  Starts ReplicaSetMonitor by adding a config shard.
+     */
+    void startup();
 
     ConnectionString getConfigServerConnectionString() const;
 
@@ -160,12 +166,6 @@ public:
      * returned false.
      */
     bool reload(OperationContext* txn);
-
-    /**
-     * Invoked when the connection string for the config server changes. Updates the config server
-     * connection string and recreates the config server's shard.
-     */
-    void updateConfigServerConnectionString(ConnectionString configServerCS);
 
     /**
      * Throws out and reconstructs the config shard.  This has the effect that if replica set
@@ -230,13 +230,20 @@ public:
     void toBSON(BSONObjBuilder* result) const;
 
 private:
-    // Factory to create shards.  Never changed after startup so safe
-    // to access outside of _mutex.
+    /**
+     * Factory to create shards.  Never changed after startup so safe to access outside of _mutex.
+     */
     const std::unique_ptr<ShardFactory> _shardFactory;
+
+    /**
+     * Specified in the ShardRegistry c-tor. It's used only in startup() to initialize the config
+     * shard
+     */
+    ConnectionString _initConfigServerCS;
 
     ShardRegistryData _data;
 
-    // Protects the _reloadState.
+    // Protects the _reloadState and _initConfigServerCS during startup.
     mutable stdx::mutex _reloadMutex;
     stdx::condition_variable _inReloadCV;
 

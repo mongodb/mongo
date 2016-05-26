@@ -369,6 +369,9 @@ if not has_option('noshell') and usemozjs:
                     'util/options_parser/options_parser_init',
                     'util/processinfo',
                     'util/signal_handlers',
+                    'executor/thread_pool_task_executor',
+                    'executor/network_interface_thread_pool',
+                    'executor/network_interface_factory'
                 ],
     )
 

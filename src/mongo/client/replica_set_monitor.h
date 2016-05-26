@@ -31,9 +31,11 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <memory>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
@@ -49,7 +51,7 @@ typedef std::shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorPtr;
  * Holds state about a replica set and provides a means to refresh the local view.
  * All methods perform the required synchronization to allow callers from multiple threads.
  */
-class ReplicaSetMonitor {
+class ReplicaSetMonitor : public std::enable_shared_from_this<ReplicaSetMonitor> {
     MONGO_DISALLOW_COPYING(ReplicaSetMonitor);
 
 public:
@@ -64,6 +66,11 @@ public:
      * seeds must not be empty.
      */
     ReplicaSetMonitor(StringData name, const std::set<HostAndPort>& seeds);
+
+    /**
+     * Schedules the initial refresh task into task executor.
+     */
+    void init();
 
     /**
      * Returns a host matching the given read preference or an error, if no host matches.
@@ -224,10 +231,11 @@ public:
      * Allows tests to set initial conditions and introspect the current state.
      */
     explicit ReplicaSetMonitor(const SetStatePtr& initialState) : _state(initialState) {}
+    ~ReplicaSetMonitor();
 
     /**
      * If a ReplicaSetMonitor has been refreshed more than this many times in a row without
-     * finding any live nodes claiming to be in the set, the ReplicaSetMonitorWatcher will stop
+     * finding any live nodes claiming to be in the set, the ReplicaSetMonitor will stop
      * periodic background refreshes of this set.
      */
     static std::atomic<int> maxConsecutiveFailedChecks;  // NOLINT
@@ -248,7 +256,18 @@ public:
     static bool useDeterministicHostSelection;
 
 private:
+    /**
+     * A callback passed to a task executor to refresh the replica set. It reschedules itself until
+     * its canceled in d-tor.
+     */
+    void _refresh(const executor::TaskExecutor::CallbackArgs&);
+
+    // Serializes refresh and protects _refresherHandle
+    stdx::mutex _mutex;
+    executor::TaskExecutor::CallbackHandle _refresherHandle;
+
     const SetStatePtr _state;
+    executor::TaskExecutor* _executor;
 };
 
 

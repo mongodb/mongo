@@ -60,11 +60,9 @@ using std::unique_ptr;
 using std::vector;
 
 ShardRegistry::ShardRegistry(std::unique_ptr<ShardFactory> shardFactory,
-                             ConnectionString configServerCS)
+                             const ConnectionString& configServerCS)
     : _shardFactory(std::move(shardFactory)), _data() {
-    log() << "Setting config server connection string to: " << configServerCS.toString();
-    auto configShard = _shardFactory->createShard("config", configServerCS);
-    _data.addConfigShard(configShard);
+    _initConfigServerCS = configServerCS;
 }
 
 ConnectionString ShardRegistry::getConfigServerConnectionString() const {
@@ -136,6 +134,15 @@ void ShardRegistry::updateReplSetHosts(const ConnectionString& newConnString) {
               newConnString.type() == ConnectionString::CUSTOM);  // For dbtests
 
     _data.rebuildShardIfExists(newConnString, _shardFactory.get());
+}
+
+void ShardRegistry::startup() {
+    stdx::unique_lock<stdx::mutex> reloadLock(_reloadMutex);
+    invariant(_initConfigServerCS.isValid());
+    auto configShard = _shardFactory->createShard("config", _initConfigServerCS);
+    _data.addConfigShard(configShard);
+    // set to invalid so it cant be started more than once.
+    _initConfigServerCS = ConnectionString();
 }
 
 bool ShardRegistry::reload(OperationContext* txn) {

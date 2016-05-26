@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/string_map.h"
 
@@ -80,12 +81,20 @@ public:
      */
     void report(BSONObjBuilder* builder);
 
+    /**
+     * Returns an executor for running RSM tasks.
+     */
+    executor::TaskExecutor* getExecutor();
+
 private:
     using ReplicaSetMonitorsMap = StringMap<std::shared_ptr<ReplicaSetMonitor>>;
 
     // Protects access to the replica set monitors
     stdx::mutex _mutex;
     ReplicaSetMonitorsMap _monitors;
+
+    // Executor for monitoring replica sets.
+    std::unique_ptr<executor::TaskExecutor> _taskExecutor;
 };
 
 }  // namespace mongo

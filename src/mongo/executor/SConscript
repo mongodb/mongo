@@ -104,6 +104,9 @@ env.CppIntegrationTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/rpc/command_status',
         'network_interface_asio',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+        '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
+        '$BUILD_DIR/mongo/executor/network_interface_factory',
     ],
 )
 
@@ -186,6 +189,9 @@ env.CppUnitTest(
     LIBDEPS=[
         'async_timer_mock',
         'network_interface_asio',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+        '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
+        '$BUILD_DIR/mongo/executor/network_interface_factory'
     ],
 )
 
@@ -195,6 +201,9 @@ env.CppIntegrationTest(
         'network_interface_asio_integration_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+        '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
+        '$BUILD_DIR/mongo/executor/network_interface_factory',
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         'network_interface_asio',
@@ -208,6 +217,9 @@ env.CppIntegrationTest(
     ],
     LIBDEPS=[
         'network_interface_asio',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+        '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
+        '$BUILD_DIR/mongo/executor/network_interface_factory',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/rpc/command_status',
@@ -269,6 +281,9 @@ env.CppUnitTest(
         'connection_pool',
         'network_interface_asio',
         'network_interface_thread_pool',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+        '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
+        '$BUILD_DIR/mongo/executor/network_interface_factory'
     ],
 )
 

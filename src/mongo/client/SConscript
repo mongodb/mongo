@@ -209,13 +209,23 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/write_concern_options',
-        'clientdriver'
+        'clientdriver',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+        '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
+        '$BUILD_DIR/mongo/executor/network_interface_factory'
     ]
 )
 
 env.CppUnitTest('dbclient_rs_test',
                 ['dbclient_rs_test.cpp'],
-                LIBDEPS=['clientdriver', '$BUILD_DIR/mongo/dbtests/mocklib'])
+                LIBDEPS=[
+                    'clientdriver',
+                    '$BUILD_DIR/mongo/dbtests/mocklib',
+                    '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+                    '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
+                    '$BUILD_DIR/mongo/executor/network_interface_factory'
+                ]
+)
 
 env.CppUnitTest(
     target='scoped_db_conn_test',

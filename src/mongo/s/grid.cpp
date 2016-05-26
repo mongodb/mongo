@@ -79,6 +79,8 @@ void Grid::init(std::unique_ptr<CatalogManager> catalogManager,
     _balancerConfig = std::move(balancerConfig);
     _executorPool = std::move(executorPool);
     _network = network;
+
+    _shardRegistry->startup();
 }
 
 bool Grid::allowLocalHost() const {
