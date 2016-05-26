@@ -21,6 +21,11 @@ var st;
     jsTest.log("Enabling sharding on " + testDBName);
     assert.commandWorked(st.s0.adminCommand({enablesharding: testDBName}));
 
+    // Ensure shard0 as the primary shard so that after it is restarted, it can still perform a
+    // moveChunk (if it had no chunks, the moveChunk would fail).
+    jsTest.log("Ensuring " + st.shard0.name + " as primary shard");
+    st.ensurePrimaryShard(testDBName, st.shard0.name);
+
     jsTest.log("Creating a sharded collection " + dataCollectionName);
     assert.commandWorked(st.s0.adminCommand({shardcollection: dataCollectionName, key: {_id: 1}}));
 
