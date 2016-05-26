@@ -100,18 +100,20 @@ void NOINLINE_DECL AlignedBuilder::growReallocate(unsigned oldLen) {
     const unsigned oldSize = _p._size;
 
     // Warn for unexpectedly large buffer
-    wassert(_len <= kWarnSize);
+    if (_len > kWarnSize) {
+        log() << "warning: large amount of uncommitted data (" << _len << ") bytes";
+    }
 
     // Check validity of requested size
     invariant(_len > oldSize);
     if (_len > kMaxSize) {
-        log() << "error writing journal: too much uncommitted data (" << _len << " bytes)";
+        log() << "error writing journal: too much uncommitted data (" << _len << ") bytes)";
         log() << "shutting down immediately to avoid corruption";
         fassert(28614, _len <= kMaxSize);
     }
 
     // Use smaller maximum for debug builds, as we should never be close the the maximum
-    dassert(_len <= 512 * MB);
+    dassert(_len <= 1000 * MB);
 
     // Compute newSize by doubling the existing maximum size until the maximum is reached
     invariant(oldSize > 0);
