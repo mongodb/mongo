@@ -359,7 +359,7 @@ private:
     /**
      * Returns a new OperationContext. Private, for use by makeOperationContext.
      */
-    virtual std::unique_ptr<OperationContext> _newOpCtx(Client* client) = 0;
+    virtual std::unique_ptr<OperationContext> _newOpCtx(Client* client, unsigned opId) = 0;
 
     /**
      * Kills the given operation.
@@ -393,6 +393,9 @@ private:
 
     // protected by _mutex
     std::vector<KillOpListenerInterface*> _killOpListeners;
+
+    // Counter for assigning operation ids.
+    AtomicUInt32 _nextOpId{1};
 };
 
 /**

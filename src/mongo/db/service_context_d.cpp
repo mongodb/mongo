@@ -252,9 +252,9 @@ const StorageEngine::Factory* StorageFactoriesIteratorMongoD::next() {
     return _curr++->second;
 }
 
-std::unique_ptr<OperationContext> ServiceContextMongoD::_newOpCtx(Client* client) {
+std::unique_ptr<OperationContext> ServiceContextMongoD::_newOpCtx(Client* client, unsigned opId) {
     invariant(&cc() == client);
-    return std::unique_ptr<OperationContextImpl>(new OperationContextImpl());
+    return std::unique_ptr<OperationContextImpl>(new OperationContextImpl(client, opId));
 }
 
 void ServiceContextMongoD::setOpObserver(std::unique_ptr<OpObserver> opObserver) {

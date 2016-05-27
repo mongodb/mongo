@@ -53,11 +53,8 @@ public:
 
     OpObserver* getOpObserver() override;
 
-protected:
-    AtomicUInt32 _nextOpId{1};
-
 private:
-    std::unique_ptr<OperationContext> _newOpCtx(Client* client) override;
+    std::unique_ptr<OperationContext> _newOpCtx(Client* client, unsigned opId) override;
 };
 
 }  // namespace mongo

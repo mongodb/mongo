@@ -39,9 +39,9 @@
 namespace mongo {
 namespace repl {
 
-std::unique_ptr<OperationContext> ServiceContextReplMock::_newOpCtx(Client* client) {
+std::unique_ptr<OperationContext> ServiceContextReplMock::_newOpCtx(Client* client, unsigned opId) {
     return std::unique_ptr<OperationContext>(
-        new OperationContextNoop(client, _nextOpId.fetchAndAdd(1), new MMAPV1LockerImpl()));
+        new OperationContextNoop(client, opId, new MMAPV1LockerImpl()));
 }
 
 }  // namespace repl

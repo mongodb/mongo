@@ -65,18 +65,15 @@ private:
 
 const auto clientOperationInfoDecoration = Client::declareDecoration<ClientOperationInfo>();
 
-AtomicUInt32 nextOpId{1};
 }  // namespace
 
 using std::string;
 
-OperationContextImpl::OperationContextImpl()
-    : OperationContext(
-          &cc(), nextOpId.fetchAndAdd(1), clientOperationInfoDecoration(cc()).getLocker()) {
+OperationContextImpl::OperationContextImpl(Client* client, unsigned opId)
+    : OperationContext(client, opId, clientOperationInfoDecoration(client).getLocker()) {
     StorageEngine* storageEngine = getServiceContext()->getGlobalStorageEngine();
     setRecoveryUnit(storageEngine->newRecoveryUnit(), kNotInUnitOfWork);
 
-    auto client = getClient();
     stdx::lock_guard<Client> lk(*client);
     client->setOperationContext(this);
 }

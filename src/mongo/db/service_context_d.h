@@ -66,7 +66,7 @@ public:
     OpObserver* getOpObserver() override;
 
 private:
-    std::unique_ptr<OperationContext> _newOpCtx(Client* client) override;
+    std::unique_ptr<OperationContext> _newOpCtx(Client* client, unsigned opId) override;
 
     std::unique_ptr<StorageEngineLockFile> _lockFile;
 

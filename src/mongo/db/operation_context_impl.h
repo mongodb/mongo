@@ -45,7 +45,7 @@ public:
 private:
     friend class ServiceContextMongoD;
 
-    OperationContextImpl();
+    OperationContextImpl(Client* client, unsigned opId);
 };
 
 }  // namespace mongo
