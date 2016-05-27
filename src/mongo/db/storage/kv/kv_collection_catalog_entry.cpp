@@ -28,11 +28,14 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/db/storage/kv/kv_collection_catalog_entry.h"
 
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/storage/kv/kv_catalog.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -94,6 +97,21 @@ bool KVCollectionCatalogEntry::setIndexIsMultikey(OperationContext* txn,
     md.indexes[offset].multikey = multikey;
     _catalog->putMetaData(txn, ns().toString(), md);
     return true;
+}
+
+void KVCollectionCatalogEntry::removePathLevelMultikeyInfoFromAllIndexes(OperationContext* txn) {
+    MetaData md = _getMetaData(txn);
+    for (auto&& imd : md.indexes) {
+        if (imd.hasMultikeyPaths) {
+            log() << "Removing path-level multikey information from index " << imd.spec
+                  << " and any other indexes on collection '" << md.ns << "'";
+            // At least one index on this collection has path-level multikey information. We
+            // reserialize the collection metadata to remove the "multikeyPaths" elements from all
+            // the index metadata subdocuments.
+            _catalog->putMetaData(txn, ns().toString(), md);
+            return;
+        }
+    }
 }
 
 void KVCollectionCatalogEntry::setIndexHead(OperationContext* txn,

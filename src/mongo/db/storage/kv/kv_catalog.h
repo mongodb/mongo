@@ -90,6 +90,13 @@ public:
         return _featureTracker.get();
     }
 
+    /**
+     * Deletes the feature document managed by '_featureTracker' if it exists.
+     *
+     * It is invalid to call getFeatureTracker() after calling this function.
+     */
+    void destroyFeatureTracker(OperationContext* opCtx);
+
 private:
     class AddIdentChange;
     class RemoveIdentChange;

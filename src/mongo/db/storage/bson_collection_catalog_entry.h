@@ -80,6 +80,9 @@ public:
         bool ready;
         RecordId head;
         bool multikey;
+
+        // Set to true if the index metadata has path-level multikey information.
+        bool hasMultikeyPaths = false;
     };
 
     struct MetaData {

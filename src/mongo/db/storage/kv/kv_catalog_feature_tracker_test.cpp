@@ -494,5 +494,108 @@ TEST_F(KVCatalogFeatureTrackerTest,
     }
 }
 
+TEST_F(KVCatalogFeatureTrackerTest, FeatureDocumentStillHasNonRepairableFeaturesMarkedAsInUse) {
+    {
+        auto opCtx = newOperationContext();
+        ASSERT_OK(getFeatureTracker()->hasNoFeaturesMarkedAsInUse(opCtx.get()));
+    }
+
+    {
+        auto opCtx = newOperationContext();
+        {
+            WriteUnitOfWork wuow(opCtx.get());
+            getFeatureTracker()->markNonRepairableFeatureAsInUse(opCtx.get(),
+                                                                 kNonRepairableFeature1);
+            wuow.commit();
+        }
+
+        auto status = getFeatureTracker()->hasNoFeaturesMarkedAsInUse(opCtx.get());
+        ASSERT_EQ(ErrorCodes::MustUpgrade, status.code());
+        ASSERT_EQ(
+            "The data files use features not supported by this version of mongod; the NR feature"
+            " bits in positions [ 0 ] are still enabled",
+            status.reason());
+    }
+}
+
+TEST_F(KVCatalogFeatureTrackerTest, FeatureDocumentStillHasRepairableFeaturesMarkedAsInUse) {
+    {
+        auto opCtx = newOperationContext();
+        ASSERT_OK(getFeatureTracker()->hasNoFeaturesMarkedAsInUse(opCtx.get()));
+    }
+
+    {
+        auto opCtx = newOperationContext();
+        {
+            WriteUnitOfWork wuow(opCtx.get());
+            getFeatureTracker()->markRepairableFeatureAsInUse(opCtx.get(), kRepairableFeature1);
+            wuow.commit();
+        }
+
+        auto status = getFeatureTracker()->hasNoFeaturesMarkedAsInUse(opCtx.get());
+        ASSERT_EQ(ErrorCodes::MustUpgrade, status.code());
+        ASSERT_EQ(
+            "The data files use features not supported by this version of mongod; the R feature"
+            " bits in positions [ 0 ] are still enabled",
+            status.reason());
+    }
+}
+
+TEST_F(KVCatalogFeatureTrackerTest, FeatureDocumentCanBeDeleted) {
+    {
+        auto opCtx = newOperationContext();
+        {
+            WriteUnitOfWork wuow(opCtx.get());
+            getFeatureTracker()->markNonRepairableFeatureAsInUse(opCtx.get(),
+                                                                 kNonRepairableFeature1);
+            wuow.commit();
+        }
+    }
+
+    {
+        auto opCtx = newOperationContext();
+        auto cursor = getRecordStore()->getCursor(opCtx.get());
+        ASSERT_TRUE(static_cast<bool>(cursor->next()));
+    }
+
+    {
+        auto opCtx = newOperationContext();
+        {
+            WriteUnitOfWork wuow(opCtx.get());
+            getFeatureTracker()->deleteFeatureDocument(opCtx.get());
+            wuow.commit();
+        }
+    }
+
+    {
+        auto opCtx = newOperationContext();
+        auto cursor = getRecordStore()->getCursor(opCtx.get());
+        ASSERT_FALSE(static_cast<bool>(cursor->next()));
+    }
+}
+
+TEST_F(KVCatalogFeatureTrackerTest, DeleteFeatureDocumentDoesNothingIfFeatureDocumentDoesNotExist) {
+    {
+        auto opCtx = newOperationContext();
+        auto cursor = getRecordStore()->getCursor(opCtx.get());
+        ASSERT_FALSE(static_cast<bool>(cursor->next()));
+    }
+
+    {
+        auto opCtx = newOperationContext();
+        {
+            WriteUnitOfWork wuow(opCtx.get());
+            getFeatureTracker()->deleteFeatureDocument(opCtx.get());
+            wuow.commit();
+        }
+    }
+
+    {
+        auto opCtx = newOperationContext();
+        auto cursor = getRecordStore()->getCursor(opCtx.get());
+        ASSERT_FALSE(static_cast<bool>(cursor->next()));
+    }
+}
+
 }  // namespace
 }  // namespace mongo

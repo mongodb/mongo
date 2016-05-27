@@ -54,6 +54,8 @@ public:
                             StringData indexName,
                             bool multikey = true) final;
 
+    void removePathLevelMultikeyInfoFromAllIndexes(OperationContext* txn) final;
+
     void setIndexHead(OperationContext* txn, StringData indexName, const RecordId& newHead) final;
 
     Status removeIndex(OperationContext* txn, StringData indexName) final;

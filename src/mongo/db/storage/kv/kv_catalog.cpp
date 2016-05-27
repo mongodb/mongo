@@ -149,6 +149,41 @@ Status KVCatalog::FeatureTracker::isCompatibleWithCurrentCode(OperationContext* 
     return Status::OK();
 }
 
+Status KVCatalog::FeatureTracker::hasNoFeaturesMarkedAsInUse(OperationContext* opCtx) const {
+    FeatureBits versionInfo = getInfo(opCtx);
+
+    if (versionInfo.nonRepairableFeatures) {
+        StringBuilder sb;
+        sb << "The data files use features not supported by this version of mongod; the NR feature"
+              " bits in positions ";
+        appendPositionsOfBitsSet(versionInfo.nonRepairableFeatures, &sb);
+        sb << " are still enabled";
+        return {ErrorCodes::MustUpgrade, sb.str()};
+    }
+
+    if (versionInfo.repairableFeatures) {
+        StringBuilder sb;
+        sb << "The data files use features not supported by this version of mongod; the R feature"
+              " bits in positions ";
+        appendPositionsOfBitsSet(versionInfo.repairableFeatures, &sb);
+        sb << " are still enabled";
+        return {ErrorCodes::MustUpgrade, sb.str()};
+    }
+
+    return Status::OK();
+}
+
+void KVCatalog::FeatureTracker::deleteFeatureDocument(OperationContext* opCtx) {
+    std::unique_ptr<Lock::ResourceLock> rLk;
+    if (!_catalog->_isRsThreadSafe && opCtx->lockState()) {
+        rLk.reset(new Lock::ResourceLock(opCtx->lockState(), resourceIdCatalogMetadata, MODE_X));
+    }
+
+    if (!_rid.isNull()) {
+        _catalog->_rs->deleteRecord(opCtx, _rid);
+    }
+}
+
 std::unique_ptr<KVCatalog::FeatureTracker> KVCatalog::FeatureTracker::get(OperationContext* opCtx,
                                                                           KVCatalog* catalog,
                                                                           RecordId rid) {
@@ -642,4 +677,11 @@ bool KVCatalog::isUserDataIdent(StringData ident) const {
         ident.find("collection-") != std::string::npos ||
         ident.find("collection/") != std::string::npos;
 }
+
+void KVCatalog::destroyFeatureTracker(OperationContext* opCtx) {
+    invariant(_featureTracker);
+    _featureTracker->deleteFeatureDocument(opCtx);
+    _featureTracker.reset();
 }
+
+}  // namespace mongo

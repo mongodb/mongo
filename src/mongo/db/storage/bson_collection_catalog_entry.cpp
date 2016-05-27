@@ -189,6 +189,11 @@ void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
                 imd.head = RecordId(idx["head_a"].Int(), idx["head_b"].Int());
             }
             imd.multikey = idx["multikey"].trueValue();
+
+            if (idx["multikeyPaths"]) {
+                imd.hasMultikeyPaths = true;
+            }
+
             indexes.push_back(imd);
         }
     }

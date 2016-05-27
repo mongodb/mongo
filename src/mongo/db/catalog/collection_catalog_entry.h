@@ -69,6 +69,17 @@ public:
                                     StringData indexName,
                                     bool multikey = true) = 0;
 
+    /**
+     * Removes metadata about which path components cause an index to be multikey from all indexes
+     * that exist on this collection.
+     *
+     * This function is used to support downgrading from 3.4.
+     *
+     * This function should be overridden if the storage engine supports path-level multikey
+     * tracking.
+     */
+    virtual void removePathLevelMultikeyInfoFromAllIndexes(OperationContext* txn) {}
+
     virtual RecordId getIndexHead(OperationContext* txn, StringData indexName) const = 0;
 
     virtual void setIndexHead(OperationContext* txn,

@@ -133,6 +133,24 @@ public:
     virtual void finishInit() {}
 
     /**
+     * Returns whethers the data files are compatible with previous versions of the same major
+     * release.
+     *
+     *   - Status::OK() if there aren't any features unsupported by a previous version of the same
+     *     major release still enabled on some collection or index in the data files.
+     *
+     *   - ErrorCodes::MustUpgrade if a feature that is unsupported by a previous version of the
+     *     same major release is still enabled on some collection or index in the data files and a
+     *     newer version is required to start up and ensure downgrade-compatibility.
+     *
+     * This function should be overridden by a storage engine if additional steps are needed to
+     * ensure downgrade-compatibility.
+     */
+    virtual Status requireDataFileCompatibilityWithPriorRelease(OperationContext* opCtx) {
+        return Status::OK();
+    }
+
+    /**
      * Returns a new interface to the storage engine's recovery unit.  The recovery
      * unit is the durability interface.  For details, see recovery_unit.h
      *

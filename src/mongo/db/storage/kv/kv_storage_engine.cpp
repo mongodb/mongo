@@ -33,6 +33,7 @@
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
 #include "mongo/db/storage/kv/kv_database_catalog_entry.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/util/assert_util.h"
@@ -43,6 +44,9 @@ namespace mongo {
 
 using std::string;
 using std::vector;
+
+using NonRepairableFeature = KVCatalog::FeatureTracker::NonRepairableFeature;
+using RepairableFeature = KVCatalog::FeatureTracker::RepairableFeature;
 
 namespace {
 const std::string catalogInfo = "_mdb_catalog";
@@ -171,6 +175,37 @@ void KVStorageEngine::cleanShutdown() {
 KVStorageEngine::~KVStorageEngine() {}
 
 void KVStorageEngine::finishInit() {}
+
+Status KVStorageEngine::requireDataFileCompatibilityWithPriorRelease(OperationContext* opCtx) {
+    if (_catalog->getFeatureTracker()->isRepairableFeatureInUse(
+            opCtx, RepairableFeature::kPathLevelMultikeyTracking)) {
+        {
+            stdx::lock_guard<stdx::mutex> lk(_dbsLock);
+            for (auto&& db : _dbs) {
+                db.second->removePathLevelMultikeyInfoFromAllCollections(opCtx);
+            }
+        }
+
+        {
+            WriteUnitOfWork wuow(opCtx);
+            _catalog->getFeatureTracker()->markRepairableFeatureAsNotInUse(
+                opCtx, RepairableFeature::kPathLevelMultikeyTracking);
+            wuow.commit();
+        }
+    }
+
+    auto status = _catalog->getFeatureTracker()->hasNoFeaturesMarkedAsInUse(opCtx);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    {
+        WriteUnitOfWork wuow(opCtx);
+        _catalog->destroyFeatureTracker(opCtx);
+        wuow.commit();
+    }
+    return Status::OK();
+}
 
 RecoveryUnit* KVStorageEngine::newRecoveryUnit() {
     if (!_engine) {

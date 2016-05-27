@@ -66,6 +66,8 @@ public:
 
     virtual void finishInit();
 
+    virtual Status requireDataFileCompatibilityWithPriorRelease(OperationContext* opCtx);
+
     virtual RecoveryUnit* newRecoveryUnit();
 
     virtual void listDatabases(std::vector<std::string>* out) const;

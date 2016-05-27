@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/db/storage/kv/kv_database_catalog_entry.h"
 
 #include "mongo/db/operation_context.h"
@@ -36,6 +38,7 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -159,6 +162,19 @@ int64_t KVDatabaseCatalogEntry::sizeOnDisk(OperationContext* opCtx) const {
 void KVDatabaseCatalogEntry::appendExtraStats(OperationContext* opCtx,
                                               BSONObjBuilder* out,
                                               double scale) const {}
+
+void KVDatabaseCatalogEntry::removePathLevelMultikeyInfoFromAllCollections(
+    OperationContext* opCtx) {
+    for (auto&& collection : _collections) {
+        log() << "Checking collection '" << collection.first
+              << "' for indexes with path-level multikey information...";
+        WriteUnitOfWork wuow(opCtx);
+        collection.second->removePathLevelMultikeyInfoFromAllIndexes(opCtx);
+        wuow.commit();
+        log() << "Done checking collection '" << collection.first
+              << "' for indexes with path-level multikey information";
+    }
+}
 
 Status KVDatabaseCatalogEntry::currentFilesCompatible(OperationContext* opCtx) const {
     // Delegate to the FeatureTracker as to whether the data files are compatible or not.

@@ -491,6 +491,15 @@ static void repairDatabasesAndCheckVersion(OperationContext* txn) {
         }
     }
 
+    // We may have features enabled on a collection or index in the data files that are recognized
+    // by this version of mongod in order to support downgrading to an earlier version of the same
+    // major release or an earlier major release. Some features may require user-intervention in
+    // order to continue starting up, but a more descriptive error message is provided to the user.
+    // Other features may be able to automatically downconvert the data files and be disabled. In
+    // either case, we only start up if we can guarantee it'd be possible to continue downgrading to
+    // earlier versions of mongod.
+    fassert(40115, storageEngine->requireDataFileCompatibilityWithPriorRelease(txn));
+
     LOG(1) << "done repairDatabases" << endl;
 }
 

@@ -58,6 +58,14 @@ public:
     }
     virtual void markIndexSafe24AndUp(OperationContext* opCtx) {}
 
+    /**
+     * Removes metadata about which path components cause an index to be multikey from all indexes
+     * that exist on all collections of this database.
+     *
+     * This function is used to support downgrading from 3.4.
+     */
+    void removePathLevelMultikeyInfoFromAllCollections(OperationContext* opCtx);
+
     virtual Status currentFilesCompatible(OperationContext* opCtx) const;
 
     virtual void getCollectionNamespaces(std::list<std::string>* out) const;
