@@ -113,9 +113,7 @@ public:
      * Requires holding an exclusive database lock.
      */
     Status init(const std::vector<BSONObj>& specs);
-    Status init(const BSONObj& spec) {
-        return init(std::vector<BSONObj>(1, spec));
-    }
+    Status init(const BSONObj& spec);
 
     /**
      * Inserts all documents in the Collection into the indexes and logs with timing info.
