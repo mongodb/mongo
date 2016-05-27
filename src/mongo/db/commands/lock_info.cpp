@@ -67,6 +67,14 @@ public:
         help << "show all lock info on the server";
     }
 
+    Status checkAuthForCommand(ClientBasic* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) final {
+        bool isAuthorized = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+            ResourcePattern::forClusterResource(), ActionType::serverStatus);
+        return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
+    }
+
     CmdLockInfo() : Command("lockInfo", true) {}
 
     bool run(OperationContext* txn,
