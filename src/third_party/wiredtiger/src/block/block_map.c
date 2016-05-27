@@ -46,7 +46,7 @@ __wt_block_map(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * There may be no underlying functionality.
 	 */
 	handle = block->fh->handle;
-	if (handle->map == NULL)
+	if (handle->fh_map == NULL)
 		return (0);
 
 	/*
@@ -54,7 +54,7 @@ __wt_block_map(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * Ignore not-supported errors, we'll read the file through the cache
 	 * if map fails.
 	 */
-	ret = handle->map(handle,
+	ret = handle->fh_map(handle,
 	    (WT_SESSION *)session, mapped_regionp, lengthp, mapped_cookiep);
 	if (ret == ENOTSUP) {
 		*(void **)mapped_regionp = NULL;
@@ -76,6 +76,6 @@ __wt_block_unmap(WT_SESSION_IMPL *session,
 
 	/* Unmap the file from memory. */
 	handle = block->fh->handle;
-	return (handle->unmap(handle,
+	return (handle->fh_unmap(handle,
 	    (WT_SESSION *)session, mapped_region, length, mapped_cookie));
 }

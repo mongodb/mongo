@@ -22,11 +22,11 @@ __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
 
 	handle = fh->handle;
 	if (block)
-		return (handle->sync == NULL ? 0 :
-		    handle->sync(handle, (WT_SESSION *)session));
+		return (handle->fh_sync == NULL ? 0 :
+		    handle->fh_sync(handle, (WT_SESSION *)session));
 	else
-		return (handle->sync_nowait == NULL ? 0 :
-		    handle->sync_nowait(handle, (WT_SESSION *)session));
+		return (handle->fh_sync_nowait == NULL ? 0 :
+		    handle->fh_sync_nowait(handle, (WT_SESSION *)session));
 }
 
 /*
@@ -55,14 +55,14 @@ __wt_fallocate(
 	 * flavor, that failed, and we have to fallback to the locking flavor.
 	 */
 	handle = fh->handle;
-	if (handle->fallocate_nolock != NULL) {
-		if ((ret = handle->fallocate_nolock(
+	if (handle->fh_allocate_nolock != NULL) {
+		if ((ret = handle->fh_allocate_nolock(
 		    handle, (WT_SESSION *)session, offset, len)) == 0)
 			return (0);
 		WT_RET_ERROR_OK(ret, ENOTSUP);
 	}
-	if (handle->fallocate != NULL)
-		return (handle->fallocate(
+	if (handle->fh_allocate != NULL)
+		return (handle->fh_allocate(
 		    handle, (WT_SESSION *)session, offset, len));
 	return (ENOTSUP);
 }
@@ -80,8 +80,8 @@ __wt_file_lock(WT_SESSION_IMPL * session, WT_FH *fh, bool lock)
 	    "%s: handle-lock: %s", fh->handle->name, lock ? "lock" : "unlock"));
 
 	handle = fh->handle;
-	return (handle->lock == NULL ? 0 :
-	    handle->lock(handle, (WT_SESSION*)session, lock));
+	return (handle->fh_lock == NULL ? 0 :
+	    handle->fh_lock(handle, (WT_SESSION*)session, lock));
 }
 
 /*
@@ -98,7 +98,7 @@ __wt_read(
 
 	WT_STAT_FAST_CONN_INCR(session, read_io);
 
-	return (fh->handle->read(
+	return (fh->handle->fh_read(
 	    fh->handle, (WT_SESSION *)session, offset, len, buf));
 }
 
@@ -112,7 +112,7 @@ __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_HANDLEOPS, "%s: handle-size", fh->handle->name));
 
-	return (fh->handle->size(fh->handle, (WT_SESSION *)session, sizep));
+	return (fh->handle->fh_size(fh->handle, (WT_SESSION *)session, sizep));
 }
 
 /*
@@ -128,7 +128,8 @@ __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
 	    "%s: handle-truncate: %" PRIuMAX,
 	    fh->handle->name, (uintmax_t)len));
 
-	return (fh->handle->truncate(fh->handle, (WT_SESSION *)session, len));
+	return (fh->handle->fh_truncate(
+	    fh->handle, (WT_SESSION *)session, len));
 }
 
 /*
@@ -149,6 +150,6 @@ __wt_write(WT_SESSION_IMPL *session,
 
 	WT_STAT_FAST_CONN_INCR(session, write_io);
 
-	return (fh->handle->write(
+	return (fh->handle->fh_write(
 	    fh->handle, (WT_SESSION *)session, offset, len, buf));
 }

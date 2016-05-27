@@ -163,6 +163,8 @@ DEF_OPT_AS_UINT32(sample_rate, 50,
     "how often the latency of operations is measured. One for every operation,"
     "two for every second operation, three for every third operation etc.")
 DEF_OPT_AS_CONFIG_STRING(sess_config, "", "session configuration string")
+DEF_OPT_AS_UINT32(session_count_idle, 0,
+    "number of idle sessions to create. Default 0.")
 DEF_OPT_AS_CONFIG_STRING(table_config,
     "key_format=S,value_format=S,type=lsm,exclusive=true,"
     "allocation_size=4kb,internal_page_max=64kb,leaf_page_max=4kb,"

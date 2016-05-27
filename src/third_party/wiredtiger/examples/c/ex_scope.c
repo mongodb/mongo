@@ -182,7 +182,7 @@ main(void)
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	int ret, tret;
+	int ret;
 
 	/*
 	 * Create a clean test directory for this run of the test program if the
@@ -198,8 +198,8 @@ main(void)
 	if ((ret = wiredtiger_open(home, NULL, "create", &conn)) != 0 ||
 	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
-		    home, wiredtiger_strerror(ret));
-		return (ret);
+		    home == NULL ? "." : home, wiredtiger_strerror(ret));
+		return (EXIT_FAILURE);
 	}
 
 	ret = session->create(session,
@@ -211,8 +211,7 @@ main(void)
 	ret = cursor_scope_ops(cursor);
 
 	/* Close the connection and clean up. */
-	if ((tret = conn->close(conn, NULL)) != 0 && ret == 0)
-		ret = tret;
+	ret = conn->close(conn, NULL);
 
-	return (ret);
+	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }

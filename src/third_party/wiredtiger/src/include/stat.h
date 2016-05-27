@@ -275,6 +275,9 @@ struct __wt_connection_stats {
 	int64_t cache_eviction_worker_evicting;
 	int64_t cache_eviction_force_fail;
 	int64_t cache_eviction_hazard;
+	int64_t cache_hazard_checks;
+	int64_t cache_hazard_walks;
+	int64_t cache_hazard_max;
 	int64_t cache_inmem_splittable;
 	int64_t cache_inmem_split;
 	int64_t cache_eviction_internal;

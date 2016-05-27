@@ -1919,16 +1919,16 @@ __conn_chk_file_system(WT_SESSION_IMPL *session, bool readonly)
 		WT_RET_MSG(session, EINVAL,				\
 		    "a WT_FILE_SYSTEM.%s method must be configured", #name)
 
-	WT_CONN_SET_FILE_SYSTEM_REQ(directory_list);
-	WT_CONN_SET_FILE_SYSTEM_REQ(directory_list_free);
+	WT_CONN_SET_FILE_SYSTEM_REQ(fs_directory_list);
+	WT_CONN_SET_FILE_SYSTEM_REQ(fs_directory_list_free);
 	/* not required: directory_sync */
-	WT_CONN_SET_FILE_SYSTEM_REQ(exist);
-	WT_CONN_SET_FILE_SYSTEM_REQ(open_file);
+	WT_CONN_SET_FILE_SYSTEM_REQ(fs_exist);
+	WT_CONN_SET_FILE_SYSTEM_REQ(fs_open_file);
 	if (!readonly) {
-		WT_CONN_SET_FILE_SYSTEM_REQ(remove);
-		WT_CONN_SET_FILE_SYSTEM_REQ(rename);
+		WT_CONN_SET_FILE_SYSTEM_REQ(fs_remove);
+		WT_CONN_SET_FILE_SYSTEM_REQ(fs_rename);
 	}
-	WT_CONN_SET_FILE_SYSTEM_REQ(size);
+	WT_CONN_SET_FILE_SYSTEM_REQ(fs_size);
 
 	return (0);
 }
@@ -2011,6 +2011,14 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	/* Do standard I/O and error handling first. */
 	WT_ERR(__wt_os_stdio(session));
 	__wt_event_handler_set(session, event_handler);
+
+	/*
+	 * Set the default session's strerror method. If one of the extensions
+	 * being loaded reports an error via the WT_EXTENSION_API strerror
+	 * method, but doesn't supply that method a WT_SESSION handle, we'll
+	 * use the WT_CONNECTION_IMPL's default session and its strerror method.
+	 */
+	conn->default_session->iface.strerror = __wt_session_strerror;
 
 	/* Basic initialization of the connection structure. */
 	WT_ERR(__wt_connection_init(conn));

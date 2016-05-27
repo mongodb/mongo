@@ -101,7 +101,7 @@ main(void)
 
 	if ((ret = wiredtiger_open(home, NULL, "create", &conn)) != 0)
 		fprintf(stderr, "Error connecting to %s: %s\n",
-		    home, wiredtiger_strerror(ret));
+		    home == NULL ? "." : home, wiredtiger_strerror(ret));
 	/* Note: further error checking omitted for clarity. */
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
@@ -122,6 +122,6 @@ main(void)
 
 	ret = conn->close(conn, NULL);
 
-	return (ret);
+	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 /*! [thread main] */

@@ -5,6 +5,7 @@ no_scale_per_second_list = [
     'async: maximum work queue length',
     'cache: bytes currently in the cache',
     'cache: eviction currently operating in aggressive mode',
+    'cache: hazard pointer maximum array length',
     'cache: maximum bytes configured',
     'cache: maximum page size at eviction',
     'cache: pages currently held in the cache',

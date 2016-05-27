@@ -283,5 +283,5 @@ main(void)
 
 	ret = conn->close(conn, NULL);
 
-	return (ret);
+	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }

@@ -65,9 +65,9 @@ __stdio_init(WT_FSTREAM *fs, const char *name, FILE *fp)
 	fs->fp = fp;
 
 	fs->close = __stdio_close;
-	fs->flush = __stdio_flush;
-	fs->getline = __stdio_getline;
-	fs->printf = __stdio_printf;
+	fs->fstr_flush = __stdio_flush;
+	fs->fstr_getline = __stdio_getline;
+	fs->fstr_printf = __stdio_printf;
 }
 
 /*

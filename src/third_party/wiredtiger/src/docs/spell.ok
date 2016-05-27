@@ -81,6 +81,7 @@ Seward's
 SiH
 TXT
 URIs
+WILLNEED
 WiredTiger
 WiredTiger's
 WiredTigerCheckpoint
@@ -210,8 +211,8 @@ erlang
 errno
 exe
 fadvise
-fallocate
 failchk
+fallocate
 fd's
 fdatasync
 fieldname

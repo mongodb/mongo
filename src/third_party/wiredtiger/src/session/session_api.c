@@ -722,18 +722,29 @@ __wt_session_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {
 	WT_DECL_RET;
 	WT_CONFIG_ITEM cval;
-	bool lock_wait;
+	bool checkpoint_wait, lock_wait;
 
+	WT_RET(__wt_config_gets_def(session, cfg, "checkpoint_wait", 1, &cval));
+	checkpoint_wait = cval.val != 0;
 	WT_RET(__wt_config_gets_def(session, cfg, "lock_wait", 1, &cval));
 	lock_wait = cval.val != 0 || F_ISSET(session, WT_SESSION_LOCK_NO_WAIT);
 
 	if (!lock_wait)
 		F_SET(session, WT_SESSION_LOCK_NO_WAIT);
 
-	WT_WITH_CHECKPOINT_LOCK(session, ret,
-	    WT_WITH_SCHEMA_LOCK(session, ret,
-		WT_WITH_TABLE_LOCK(session, ret,
-		    ret = __wt_schema_drop(session, uri, cfg))));
+	/*
+	 * The checkpoint lock only is needed to avoid a spurious EBUSY error
+	 * return.
+	 */
+	if (checkpoint_wait)
+		WT_WITH_CHECKPOINT_LOCK(session, ret,
+		    WT_WITH_SCHEMA_LOCK(session, ret,
+			WT_WITH_TABLE_LOCK(session, ret,
+			    ret = __wt_schema_drop(session, uri, cfg))));
+	else
+		WT_WITH_SCHEMA_LOCK(session, ret,
+		    WT_WITH_TABLE_LOCK(session, ret,
+			ret = __wt_schema_drop(session, uri, cfg)));
 
 	if (!lock_wait)
 		F_CLR(session, WT_SESSION_LOCK_NO_WAIT);
@@ -1512,11 +1523,11 @@ err:	WT_TRET(__wt_writeunlock(session, txn_global->nsnap_rwlock));
 }
 
 /*
- * __session_strerror --
+ * __wt_session_strerror --
  *	WT_SESSION->strerror method.
  */
-static const char *
-__session_strerror(WT_SESSION *wt_session, int error)
+const char *
+__wt_session_strerror(WT_SESSION *wt_session, int error)
 {
 	WT_SESSION_IMPL *session;
 
@@ -1539,7 +1550,7 @@ __open_session(WT_CONNECTION_IMPL *conn,
 		NULL,
 		__session_close,
 		__session_reconfigure,
-		__session_strerror,
+		__wt_session_strerror,
 		__session_open_cursor,
 		__session_create,
 		__wt_session_compact,
@@ -1566,7 +1577,7 @@ __open_session(WT_CONNECTION_IMPL *conn,
 		NULL,
 		__session_close,
 		__session_reconfigure,
-		__session_strerror,
+		__wt_session_strerror,
 		__session_open_cursor,
 		__session_create_readonly,
 		__wt_session_compact_readonly,
@@ -1675,7 +1686,7 @@ __open_session(WT_CONNECTION_IMPL *conn,
 	 * __wt_hazard_close ensures the array is cleared - so it is safe to
 	 * reset the starting size on each open.
 	 */
-	session_ret->hazard_size = WT_HAZARD_INCR;
+	session_ret->hazard_size = 0;
 
 	/*
 	 * Configuration: currently, the configuration for open_session is the

@@ -146,6 +146,7 @@ IEC
 IEEE
 IKEY
 IMPL
+IMPL's
 INCR
 INIT
 INITIALIZER
@@ -880,6 +881,7 @@ os
 osfhandle
 ovfl
 ownp
+pR
 packv
 pagesize
 parens
@@ -925,6 +927,7 @@ pushms
 putK
 putV
 pv
+pvA
 pwrite
 py
 qdown
@@ -1079,6 +1082,7 @@ uncompresssed
 undef
 unencrypted
 unesc
+unescape
 unescaped
 unicode
 uninstantiated

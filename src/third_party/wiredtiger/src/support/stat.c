@@ -562,6 +562,9 @@ static const char * const __stats_connection_desc[] = {
 	"cache: eviction worker thread evicting pages",
 	"cache: failed eviction of pages that exceeded the in-memory maximum",
 	"cache: hazard pointer blocked page eviction",
+	"cache: hazard pointer check calls",
+	"cache: hazard pointer check entries walked",
+	"cache: hazard pointer maximum array length",
 	"cache: in-memory page passed criteria to be split",
 	"cache: in-memory page splits",
 	"cache: internal pages evicted",
@@ -765,6 +768,9 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_worker_evicting = 0;
 	stats->cache_eviction_force_fail = 0;
 	stats->cache_eviction_hazard = 0;
+	stats->cache_hazard_checks = 0;
+	stats->cache_hazard_walks = 0;
+	stats->cache_hazard_max = 0;
 	stats->cache_inmem_splittable = 0;
 	stats->cache_inmem_split = 0;
 	stats->cache_eviction_internal = 0;
@@ -905,6 +911,8 @@ void
 __wt_stat_connection_aggregate(
     WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *to)
 {
+	int64_t v;
+
 	to->lsm_work_queue_app += WT_STAT_READ(from, lsm_work_queue_app);
 	to->lsm_work_queue_manager +=
 	    WT_STAT_READ(from, lsm_work_queue_manager);
@@ -972,6 +980,10 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, cache_eviction_force_fail);
 	to->cache_eviction_hazard +=
 	    WT_STAT_READ(from, cache_eviction_hazard);
+	to->cache_hazard_checks += WT_STAT_READ(from, cache_hazard_checks);
+	to->cache_hazard_walks += WT_STAT_READ(from, cache_hazard_walks);
+	if ((v = WT_STAT_READ(from, cache_hazard_max)) > to->cache_hazard_max)
+		to->cache_hazard_max = v;
 	to->cache_inmem_splittable +=
 	    WT_STAT_READ(from, cache_inmem_splittable);
 	to->cache_inmem_split += WT_STAT_READ(from, cache_inmem_split);
