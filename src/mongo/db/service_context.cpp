@@ -276,4 +276,70 @@ BSONArray storageEngineList() {
 void appendStorageEngineList(BSONObjBuilder* result) {
     result->append("storageEngines", storageEngineList());
 }
+
+void ServiceContext::setKillAllOperations() {
+    stdx::lock_guard<stdx::mutex> clientLock(_mutex);
+    _globalKill.store(true);
+    for (const auto listener : _killOpListeners) {
+        try {
+            listener->interruptAll();
+        } catch (...) {
+            std::terminate();
+        }
+    }
+}
+
+void ServiceContext::_killOperation_inlock(OperationContext* opCtx, ErrorCodes::Error killCode) {
+    opCtx->markKilled(killCode);
+
+    for (const auto listener : _killOpListeners) {
+        try {
+            listener->interrupt(opCtx->getOpID());
+        } catch (...) {
+            std::terminate();
+        }
+    }
+}
+
+bool ServiceContext::killOperation(unsigned int opId) {
+    for (LockedClientsCursor cursor(this); Client* client = cursor.next();) {
+        stdx::lock_guard<Client> lk(*client);
+
+        OperationContext* opCtx = client->getOperationContext();
+        if (opCtx && opCtx->getOpID() == opId) {
+            _killOperation_inlock(opCtx, ErrorCodes::Interrupted);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void ServiceContext::killAllUserOperations(const OperationContext* txn,
+                                           ErrorCodes::Error killCode) {
+    for (LockedClientsCursor cursor(this); Client* client = cursor.next();) {
+        if (!client->isFromUserConnection()) {
+            // Don't kill system operations.
+            continue;
+        }
+
+        stdx::lock_guard<Client> lk(*client);
+        OperationContext* toKill = client->getOperationContext();
+
+        // Don't kill ourself.
+        if (toKill && toKill->getOpID() != txn->getOpID()) {
+            _killOperation_inlock(toKill, killCode);
+        }
+    }
+}
+
+void ServiceContext::unsetKillAllOperations() {
+    _globalKill.store(false);
+}
+
+void ServiceContext::registerKillOpListener(KillOpListenerInterface* listener) {
+    stdx::lock_guard<stdx::mutex> clientLock(_mutex);
+    _killOpListeners.push_back(listener);
+}
+
 }  // namespace mongo

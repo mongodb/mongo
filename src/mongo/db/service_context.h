@@ -33,6 +33,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
@@ -262,30 +263,32 @@ public:
     /**
      * Signal all OperationContext(s) that they have been killed.
      */
-    virtual void setKillAllOperations() = 0;
+    void setKillAllOperations();
 
     /**
      * Reset the operation kill state after a killAllOperations.
      * Used for testing.
      */
-    virtual void unsetKillAllOperations() = 0;
+    void unsetKillAllOperations();
 
     /**
      * Get the state for killing all operations.
      */
-    virtual bool getKillAllOperations() = 0;
+    bool getKillAllOperations() {
+        return _globalKill.loadRelaxed();
+    }
 
     /**
      * @param i opid of operation to kill
      * @return if operation was found
      **/
-    virtual bool killOperation(unsigned int opId) = 0;
+    bool killOperation(unsigned int opId);
 
     /**
      * Kills all operations that have a Client that is associated with an incoming user
      * connection, except for the one associated with txn.
      */
-    virtual void killAllUserOperations(const OperationContext* txn, ErrorCodes::Error killCode) = 0;
+    void killAllUserOperations(const OperationContext* txn, ErrorCodes::Error killCode);
 
     /**
      * Registers a listener to be notified each time an op is killed.
@@ -293,7 +296,7 @@ public:
      * listener does not become owned by the environment. As there is currently no way to
      * unregister, the listener object must outlive this ServiceContext object.
      */
-    virtual void registerKillOpListener(KillOpListenerInterface* listener) = 0;
+    void registerKillOpListener(KillOpListenerInterface* listener);
 
     //
     // Global OpObserver.
@@ -359,6 +362,14 @@ private:
     virtual std::unique_ptr<OperationContext> _newOpCtx(Client* client) = 0;
 
     /**
+     * Kills the given operation.
+     *
+     * Caller must own the service context's _mutex.
+     */
+    void _killOperation_inlock(OperationContext* opCtx, ErrorCodes::Error killCode);
+
+
+    /**
      * Vector of registered observers.
      */
     std::vector<std::unique_ptr<ClientObserver>> _clientObservers;
@@ -376,6 +387,12 @@ private:
      * A ClockSource implementation that is very precise but may be expensive to call.
      */
     std::unique_ptr<ClockSource> _preciseClockSource;
+
+    // Flag set to indicate that all operations are to be interrupted ASAP.
+    AtomicWord<bool> _globalKill{false};
+
+    // protected by _mutex
+    std::vector<KillOpListenerInterface*> _killOpListeners;
 };
 
 /**

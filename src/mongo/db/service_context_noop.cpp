@@ -67,23 +67,6 @@ StorageFactoriesIterator* ServiceContextNoop::makeStorageFactoriesIterator() {
     return new EmptySFI();
 }
 
-void ServiceContextNoop::setKillAllOperations() {}
-
-void ServiceContextNoop::unsetKillAllOperations() {}
-
-bool ServiceContextNoop::getKillAllOperations() {
-    return false;
-}
-
-bool ServiceContextNoop::killOperation(unsigned int opId) {
-    return false;
-}
-
-void ServiceContextNoop::killAllUserOperations(const OperationContext* txn,
-                                               ErrorCodes::Error killCode) {}
-
-void ServiceContextNoop::registerKillOpListener(KillOpListenerInterface* listener) {}
-
 std::unique_ptr<OperationContext> ServiceContextNoop::_newOpCtx(Client* client) {
     return stdx::make_unique<OperationContextNoop>(client, _nextOpId.fetchAndAdd(1));
 }
