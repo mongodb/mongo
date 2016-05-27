@@ -134,6 +134,9 @@ env.Library(
         'clock_source_mock.cpp',
         'tick_source_mock.cpp',
     ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
 )
 
 env.CppUnitTest(

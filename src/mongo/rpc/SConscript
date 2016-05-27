@@ -174,12 +174,8 @@ env.CppUnitTest(
         'reply_builder_test.cpp',
     ],
     LIBDEPS=[
-        'rpc',
         '$BUILD_DIR/mongo/client/clientdriver',
-        '$BUILD_DIR/mongo/db/write_concern_options',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
-        '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
-        '$BUILD_DIR/mongo/executor/network_interface_factory'
+        'rpc',
     ],
 )
 
