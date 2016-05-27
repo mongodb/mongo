@@ -9,6 +9,8 @@
 #include "wt_internal.h"
 
 static int __log_decompress(WT_SESSION_IMPL *, WT_ITEM *, WT_ITEM **);
+static int __log_openfile(
+	WT_SESSION_IMPL *, bool, WT_FH **, const char *, uint32_t);
 static int __log_read_internal(WT_SESSION_IMPL *, WT_ITEM *, WT_LSN *,
     uint32_t);
 static int __log_write_internal(WT_SESSION_IMPL *, WT_ITEM *, WT_LSN *,
@@ -44,6 +46,7 @@ __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	WT_FH *log_fh;
 	WT_LOG *log;
 
 	conn = S2C(session);
@@ -80,12 +83,21 @@ __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 	 * Sync the log file if needed.
 	 */
 	if (LOG_CMP(&log->sync_lsn, min_lsn) < 0) {
+		/*
+		 * Get our own file handle to the log file.  It is possible
+		 * for the file handle in the log structure to change out
+		 * from under us and either be NULL or point to a different
+		 * file than we want.
+		 */
+		WT_ERR(__log_openfile(session,
+		    false, &log_fh, WT_LOG_FILENAME, min_lsn->file));
 		WT_ERR(__wt_verbose(session, WT_VERB_LOG,
-		    "log_force_sync: sync to LSN %d/%lu",
-		    min_lsn->file, min_lsn->offset));
-		WT_ERR(__wt_fsync(session, log->log_fh));
+		    "log_force_sync: sync %s to LSN %d/%lu",
+		    log_fh->name, min_lsn->file, min_lsn->offset));
+		WT_ERR(__wt_fsync(session, log_fh));
 		log->sync_lsn = *min_lsn;
 		WT_STAT_FAST_CONN_INCR(session, log_sync);
+		WT_ERR(__wt_close(session, &log_fh));
 		WT_ERR(__wt_cond_signal(session, log->log_sync_cond));
 	}
 err:
