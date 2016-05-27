@@ -31,6 +31,7 @@
 #pragma once
 
 #include <map>
+#include <memory>
 #include <string>
 
 #include "mongo/base/string_data.h"
@@ -46,6 +47,8 @@ class RecordStore;
 
 class KVCatalog {
 public:
+    class FeatureTracker;
+
     /**
      * @param rs - does NOT take ownership
      */
@@ -82,6 +85,11 @@ public:
 
     bool isUserDataIdent(StringData ident) const;
 
+    FeatureTracker* getFeatureTracker() const {
+        invariant(_featureTracker);
+        return _featureTracker.get();
+    }
+
 private:
     class AddIdentChange;
     class RemoveIdentChange;
@@ -117,5 +125,9 @@ private:
     typedef std::map<std::string, Entry> NSToIdentMap;
     NSToIdentMap _idents;
     mutable stdx::mutex _identsLock;
+
+    // Manages the feature document that may be present in the KVCatalog. '_featureTracker' is
+    // guaranteed to be non-null after KVCatalog::init() is called.
+    std::unique_ptr<FeatureTracker> _featureTracker;
 };
 }
