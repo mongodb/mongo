@@ -91,7 +91,7 @@ OplogInterfaceLocal::OplogInterfaceLocal(OperationContext* txn, const std::strin
 
 std::string OplogInterfaceLocal::toString() const {
     return str::stream() << "LocalOplogInterface: "
-                            "operation context: " << _txn->getNS() << "/" << _txn->getOpID()
+                            "operation context: " << _txn->getOpID()
                          << "; collection: " << _collectionName;
 }
 

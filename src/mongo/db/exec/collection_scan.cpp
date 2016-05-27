@@ -213,8 +213,6 @@ void CollectionScan::doSaveState() {
 void CollectionScan::doRestoreState() {
     if (_cursor) {
         if (!_cursor->restore()) {
-            warning() << "Could not restore RecordCursor for CollectionScan: "
-                      << getOpCtx()->getNS();
             _isDead = true;
         }
     }

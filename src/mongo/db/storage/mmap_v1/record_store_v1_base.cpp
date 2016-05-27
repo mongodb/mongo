@@ -870,7 +870,7 @@ Status RecordStoreV1Base::touch(OperationContext* txn, BSONObjBuilder* output) c
         }
     }
 
-    std::string progress_msg = "touch " + std::string(txn->getNS()) + " extents";
+    std::string progress_msg = "touch " + ns() + " extents";
     stdx::unique_lock<Client> lk(*txn->getClient());
     ProgressMeterHolder pm(
         *txn->setMessage_inlock(progress_msg.c_str(), "Touch Progress", ranges.size()));

@@ -95,8 +95,4 @@ ProgressMeter* OperationContextImpl::setMessage_inlock(const char* msg,
     return &CurOp::get(this)->setMessage_inlock(msg, name, progressMeterTotal, secondsBetween);
 }
 
-string OperationContextImpl::getNS() const {
-    return CurOp::get(this)->getNS();
-}
-
 }  // namespace mongo

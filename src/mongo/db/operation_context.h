@@ -136,13 +136,6 @@ public:
                                              int secondsBetween = 3) = 0;
 
     /**
-     * Delegates to CurOp, but is included here to break dependencies.
-     *
-     * TODO: We return a string because of hopefully transient CurOp thread-unsafe insanity.
-     */
-    virtual std::string getNS() const = 0;
-
-    /**
      * Returns the service context under which this operation context runs.
      */
     ServiceContext* getServiceContext() const {

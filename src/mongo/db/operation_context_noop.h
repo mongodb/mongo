@@ -77,10 +77,6 @@ public:
         return &_pm;
     }
 
-    virtual std::string getNS() const override {
-        return std::string();
-    };
-
 private:
     std::unique_ptr<Locker> _locker;
     ProgressMeter _pm;

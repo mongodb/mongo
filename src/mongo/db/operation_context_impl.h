@@ -42,8 +42,6 @@ public:
                                              unsigned long long progressMeterTotal,
                                              int secondsBetween) override;
 
-    virtual std::string getNS() const override;
-
 private:
     friend class ServiceContextMongoD;
 
