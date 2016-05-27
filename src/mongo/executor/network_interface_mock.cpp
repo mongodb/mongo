@@ -563,8 +563,14 @@ NetworkInterfaceMock::InNetworkGuard::InNetworkGuard(NetworkInterfaceMock* net) 
     _net->enterNetwork();
 }
 
-NetworkInterfaceMock::InNetworkGuard::~InNetworkGuard() {
+void NetworkInterfaceMock::InNetworkGuard::dismiss() {
+    _callExitNetwork = false;
     _net->exitNetwork();
+}
+
+NetworkInterfaceMock::InNetworkGuard::~InNetworkGuard() {
+    if (_callExitNetwork)
+        _net->exitNetwork();
 }
 
 }  // namespace executor

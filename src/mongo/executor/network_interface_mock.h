@@ -427,15 +427,34 @@ private:
     RemoteCommandCompletionFn _onFinish;
 };
 
+/**
+ * RAII type to enter and exit network on construction/destruction.
+ *
+ * Calls enterNetwork on construction, and exitNetwork during destruction,
+ * unless dismissed.
+ *
+ * Not thread-safe.
+ */
 class NetworkInterfaceMock::InNetworkGuard {
     MONGO_DISALLOW_COPYING(InNetworkGuard);
 
 public:
+    /**
+     * Calls enterNetwork.
+     */
     explicit InNetworkGuard(NetworkInterfaceMock* net);
+    /**
+     * Calls exitNetwork, and disables the destructor from calling.
+     */
+    void dismiss();
+    /**
+     * Calls exitNetwork, unless dismiss has been called.
+     */
     ~InNetworkGuard();
 
 private:
     NetworkInterfaceMock* _net;
+    bool _callExitNetwork = true;
 };
 
 }  // namespace executor
