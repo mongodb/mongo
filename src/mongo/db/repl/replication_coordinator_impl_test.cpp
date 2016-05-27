@@ -385,7 +385,7 @@ TEST_F(ReplCoordTest,
 
 TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenInitiatingWithAnEmptyConfig) {
     OperationContextNoop txn;
-    init("");
+    init("mySet");
     start(HostAndPort("node1", 12345));
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 
@@ -398,7 +398,7 @@ TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenInitiatingWithAnEmpt
 
 TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenInitiatingWithoutAn_idField) {
     OperationContextNoop txn;
-    init("");
+    init("mySet");
     start(HostAndPort("node1", 12345));
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 
@@ -416,7 +416,7 @@ TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenInitiatingWithoutAn_
 TEST_F(ReplCoordTest,
        NodeReturnsInvalidReplicaSetConfigWhenInitiatingWithAConfigVersionNotEqualToOne) {
     OperationContextNoop txn;
-    init("");
+    init("mySet");
     start(HostAndPort("node1", 12345));
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 
@@ -434,140 +434,15 @@ TEST_F(ReplCoordTest,
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 }
 
-TEST_F(ReplCoordTest, InitiateFailsWithoutReplSetFlagWithMoreThanOneMember) {
+TEST_F(ReplCoordTest, InitiateFailsWithoutReplSetFlag) {
     OperationContextNoop txn;
     init("");
     start(HostAndPort("node1", 12345));
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 
     BSONObjBuilder result1;
-    auto status =
-        getReplCoord()->processReplSetInitiate(&txn,
-                                               BSON("_id"
-                                                    << "mySet"
-                                                    << "version" << 1 << "members"
-                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                             << "node1:12345")
-                                                                  << BSON("_id" << 1 << "host"
-                                                                                << "node2:12345"))),
-                                               &result1);
-    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
-    ASSERT_STRING_CONTAINS(status.reason(), "you can only specify one member in the config");
-    ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
-}
-
-TEST_F(ReplCoordTest, InitiateFailsWithoutReplSetFlagWithSelfMissing) {
-    OperationContextNoop txn;
-    init("");
-    start(HostAndPort("node1", 12345));
-    ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
-
-    BSONObjBuilder result1;
-    auto status =
-        getReplCoord()->processReplSetInitiate(&txn,
-                                               BSON("_id"
-                                                    << "mySet"
-                                                    << "version" << 1 << "members"
-                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                             << "node5:12345"))),
-                                               &result1);
-    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
-    ASSERT_STRING_CONTAINS(status.reason(), "No host described in new configuration");
-    ASSERT_STRING_CONTAINS(status.reason(), "maps to this node");
-    ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
-}
-
-TEST_F(ReplCoordTest, InitiateFailsWithoutReplSetFlagWithArbiterMember) {
-    OperationContextNoop txn;
-    init("");
-    start(HostAndPort("node1", 12345));
-    ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
-
-    BSONObjBuilder result1;
-    auto status = getReplCoord()->processReplSetInitiate(
-        &txn,
-        BSON("_id"
-             << "mySet"
-             << "version" << 1 << "members" << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                     << "node1:12345"
-                                                                     << "arbiterOnly" << true))),
-        &result1);
-    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
-    ASSERT_STRING_CONTAINS(status.reason(), "must contain at least one non-arbiter member");
-    ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
-}
-
-TEST_F(ReplCoordTest, InitiateFailsWithoutReplSetFlagWithPriorityZero) {
-    OperationContextNoop txn;
-    init("");
-    start(HostAndPort("node1", 12345));
-    ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
-
-    BSONObjBuilder result1;
-    auto status =
-        getReplCoord()->processReplSetInitiate(&txn,
-                                               BSON("_id"
-                                                    << "mySet"
-                                                    << "version" << 1 << "members"
-                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                             << "node1:12345"
-                                                                             << "priority" << 0))),
-                                               &result1);
-    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
-    ASSERT_STRING_CONTAINS(status.reason(), "must contain at least one non-arbiter member");
-    ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
-}
-
-TEST_F(ReplCoordTest, InitiateFailsWithoutReplSetFlagWithNoVotes) {
-    OperationContextNoop txn;
-    init("");
-    start(HostAndPort("node1", 12345));
-    ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
-
-    BSONObjBuilder result1;
-    auto status =
-        getReplCoord()->processReplSetInitiate(&txn,
-                                               BSON("_id"
-                                                    << "mySet"
-                                                    << "version" << 1 << "members"
-                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                             << "node1:12345"
-                                                                             << "votes" << 0))),
-                                               &result1);
-    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
-    ASSERT_STRING_CONTAINS(status.reason(), "priority must be 0 when non-voting (votes:0)");
-    ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
-}
-
-TEST_F(ReplCoordTest, InitiateFailsWithoutReplSetFlagWithHiddenMember) {
-    OperationContextNoop txn;
-    init("");
-    start(HostAndPort("node1", 12345));
-    ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
-
-    BSONObjBuilder result1;
-    auto status =
-        getReplCoord()->processReplSetInitiate(&txn,
-                                               BSON("_id"
-                                                    << "mySet"
-                                                    << "version" << 1 << "members"
-                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                             << "node1:12345"
-                                                                             << "hidden" << true))),
-                                               &result1);
-    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
-    ASSERT_STRING_CONTAINS(status.reason(), "priority must be 0 when hidden=true");
-    ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
-}
-
-TEST_F(ReplCoordTest, InitiatePassesWithoutReplSetFlagWithValidConfiguration) {
-    OperationContextNoop txn;
-    init("");
-    start(HostAndPort("node1", 12345));
-    ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
-
-    BSONObjBuilder result1;
-    ASSERT_OK(
+    ASSERT_EQUALS(
+        ErrorCodes::NoReplicationEnabled,
         getReplCoord()->processReplSetInitiate(&txn,
                                                BSON("_id"
                                                     << "mySet"
@@ -575,6 +450,7 @@ TEST_F(ReplCoordTest, InitiatePassesWithoutReplSetFlagWithValidConfiguration) {
                                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                              << "node1:12345"))),
                                                &result1));
+    ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 }
 
 TEST_F(ReplCoordTest, NodeReturnsOutOfDiskSpaceWhenInitiateCannotWriteConfigToDisk) {

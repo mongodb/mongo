@@ -2314,25 +2314,21 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
                                                           BSONObjBuilder* resultObj) {
     log() << "replSetInitiate admin command received from client";
 
-    // Skip config state changes if server is not running with replication enabled.
     const auto replEnabled = _settings.usingReplSets();
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    if (replEnabled) {
-        while (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {
-            _rsConfigStateChange.wait(lk);
-        }
+    if (!replEnabled) {
+        return Status(ErrorCodes::NoReplicationEnabled, "server is not running with --replSet");
+    }
+    while (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {
+        _rsConfigStateChange.wait(lk);
+    }
 
-        if (_rsConfigState != kConfigUninitialized) {
-            resultObj->append("info",
-                              "try querying local.system.replset to see current configuration");
-            return Status(ErrorCodes::AlreadyInitialized, "already initialized");
-        }
-        invariant(!_rsConfig.isInitialized());
-        _setConfigState_inlock(kConfigInitiating);
-    } else if (_externalState->loadLocalConfigDocument(txn).isOK()) {
+    if (_rsConfigState != kConfigUninitialized) {
         resultObj->append("info", "try querying local.system.replset to see current configuration");
         return Status(ErrorCodes::AlreadyInitialized, "already initialized");
     }
+    invariant(!_rsConfig.isInitialized());
+    _setConfigState_inlock(kConfigInitiating);
 
     ScopeGuard configStateGuard = MakeGuard(
         lockAndCall,
@@ -2341,17 +2337,13 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
             &ReplicationCoordinatorImpl::_setConfigState_inlock, this, kConfigUninitialized));
     lk.unlock();
 
-    if (!replEnabled) {
-        configStateGuard.Dismiss();
-    }
-
     ReplicaSetConfig newConfig;
     Status status = newConfig.initializeForInitiate(configObj, true);
     if (!status.isOK()) {
         error() << "replSet initiate got " << status << " while parsing " << configObj;
         return Status(ErrorCodes::InvalidReplicaSetConfig, status.reason());
     }
-    if (replEnabled && newConfig.getReplSetName() != _settings.ourSetName()) {
+    if (newConfig.getReplSetName() != _settings.ourSetName()) {
         str::stream errmsg;
         errmsg << "Attempting to initiate a replica set with name " << newConfig.getReplSetName()
                << ", but command line reports " << _settings.ourSetName() << "; rejecting";
@@ -2366,50 +2358,37 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
         return Status(ErrorCodes::InvalidReplicaSetConfig, myIndex.getStatus().reason());
     }
 
-    if (!replEnabled && newConfig.getNumMembers() != 1) {
-        str::stream errmsg;
-        errmsg << "When replication is not enabled (no --replSet option) you can only specify one "
-               << "member in the config. " << newConfig.getNumMembers() << " members found in"
-               << "configuration: " << newConfig.toBSON();
-        error() << std::string(errmsg);
-        return Status(ErrorCodes::InvalidReplicaSetConfig, errmsg);
-    }
-
     log() << "replSetInitiate config object with " << newConfig.getNumMembers()
           << " members parses ok";
 
-    if (replEnabled) {
-        status = checkQuorumForInitiate(&_replExecutor, newConfig, myIndex.getValue());
+    status = checkQuorumForInitiate(&_replExecutor, newConfig, myIndex.getValue());
 
-        if (!status.isOK()) {
-            error() << "replSetInitiate failed; " << status;
-            return status;
-        }
+    if (!status.isOK()) {
+        error() << "replSetInitiate failed; " << status;
+        return status;
     }
 
-    status = _externalState->initializeReplSetStorage(txn, newConfig.toBSON(), replEnabled);
+    status = _externalState->initializeReplSetStorage(txn, newConfig.toBSON());
     if (!status.isOK()) {
         error() << "replSetInitiate failed to store config document or create the oplog; "
                 << status;
         return status;
     }
 
-    if (replEnabled) {
-        // Since the JournalListener has not yet been set up, we must manually set our
-        // durableOpTime.
-        setMyLastDurableOpTime(getMyLastAppliedOpTime());
+    // Since the JournalListener has not yet been set up, we must manually set our
+    // durableOpTime.
+    setMyLastDurableOpTime(getMyLastAppliedOpTime());
 
-        {
-            LockGuard topoLock(_topoMutex);
-            _finishReplSetInitiate(newConfig, myIndex.getValue());
-        }
-
-        // A configuration passed to replSetInitiate() with the current node as an arbiter
-        // will fail validation with a "replSet initiate got ... while validating" reason.
-        invariant(!newConfig.getMemberAt(myIndex.getValue()).isArbiter());
-        _externalState->startThreads(_settings);
-        _startDataReplication(txn);
+    {
+        LockGuard topoLock(_topoMutex);
+        _finishReplSetInitiate(newConfig, myIndex.getValue());
     }
+
+    // A configuration passed to replSetInitiate() with the current node as an arbiter
+    // will fail validation with a "replSet initiate got ... while validating" reason.
+    invariant(!newConfig.getMemberAt(myIndex.getValue()).isArbiter());
+    _externalState->startThreads(_settings);
+    _startDataReplication(txn);
 
     configStateGuard.Dismiss();
     return Status::OK();

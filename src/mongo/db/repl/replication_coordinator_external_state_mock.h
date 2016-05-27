@@ -58,9 +58,7 @@ public:
     virtual void startSteadyStateReplication() override;
     virtual void startMasterSlave(OperationContext*);
     virtual void shutdown();
-    virtual Status initializeReplSetStorage(OperationContext* txn,
-                                            const BSONObj& config,
-                                            bool updateReplOpTime);
+    virtual Status initializeReplSetStorage(OperationContext* txn, const BSONObj& config);
     virtual void logTransitionToPrimaryToOplog(OperationContext* txn);
     virtual void forwardSlaveProgress();
     virtual OID ensureMe(OperationContext*);

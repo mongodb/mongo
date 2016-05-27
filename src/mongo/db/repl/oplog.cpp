@@ -363,7 +363,6 @@ void _logOpsInner(OperationContext* txn,
                   size_t nWriters,
                   Collection* oplogCollection,
                   ReplicationCoordinator::Mode replicationMode,
-                  bool updateReplOpTime,
                   OpTime finalOpTime) {
     ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
 
@@ -378,36 +377,32 @@ void _logOpsInner(OperationContext* txn,
     checkOplogInsert(oplogCollection->insertDocumentsForOplog(txn, writers, nWriters));
 
     // Set replCoord last optime only after we're sure the WUOW didn't abort and roll back.
-    if (updateReplOpTime) {
-        txn->recoveryUnit()->onCommit(
-            [replCoord, finalOpTime] { replCoord->setMyLastAppliedOpTimeForward(finalOpTime); });
-    }
+    txn->recoveryUnit()->onCommit(
+        [replCoord, finalOpTime] { replCoord->setMyLastAppliedOpTimeForward(finalOpTime); });
 
     ReplClientInfo::forClient(txn->getClient()).setLastOp(finalOpTime);
 }
 
-void _logOp(OperationContext* txn,
-            const char* opstr,
-            const char* ns,
-            const BSONObj& obj,
-            const BSONObj* o2,
-            bool fromMigrate,
-            const std::string& oplogName,
-            ReplicationCoordinator::Mode replMode,
-            bool updateOpTime) {
+void logOp(OperationContext* txn,
+           const char* opstr,
+           const char* ns,
+           const BSONObj& obj,
+           const BSONObj* o2,
+           bool fromMigrate) {
+    ReplicationCoordinator::Mode replMode = ReplicationCoordinator::get(txn)->getReplicationMode();
     NamespaceString nss(ns);
     if (oplogDisabled(txn, replMode, nss))
         return;
 
     ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-    Collection* oplog = getLocalOplogCollection(txn, oplogName);
+    Collection* oplog = getLocalOplogCollection(txn, _oplogCollectionName);
     Lock::DBLock lk(txn->lockState(), "local", MODE_IX);
-    Lock::CollectionLock lock(txn->lockState(), oplogName, MODE_IX);
+    Lock::CollectionLock lock(txn->lockState(), _oplogCollectionName, MODE_IX);
     OplogSlot slot;
     getNextOpTime(txn, oplog, replCoord, replMode, 1, &slot);
     auto writer = _logOpWriter(txn, opstr, nss, obj, o2, fromMigrate, slot.opTime, slot.hash);
     const DocWriter* basePtr = &writer;
-    _logOpsInner(txn, nss, &basePtr, 1, oplog, replMode, updateOpTime, slot.opTime);
+    _logOpsInner(txn, nss, &basePtr, 1, oplog, replMode, slot.opTime);
 }
 
 void logOps(OperationContext* txn,
@@ -440,19 +435,9 @@ void logOps(OperationContext* txn,
     for (size_t i = 0; i < count; i++) {
         basePtrs[i] = &writers[i];
     }
-    _logOpsInner(txn, nss, basePtrs.get(), count, oplog, replMode, true, slots[count - 1].opTime);
+    _logOpsInner(txn, nss, basePtrs.get(), count, oplog, replMode, slots[count - 1].opTime);
 }
 
-
-void logOp(OperationContext* txn,
-           const char* opstr,
-           const char* ns,
-           const BSONObj& obj,
-           const BSONObj* o2,
-           bool fromMigrate) {
-    ReplicationCoordinator::Mode replMode = ReplicationCoordinator::get(txn)->getReplicationMode();
-    _logOp(txn, opstr, ns, obj, o2, fromMigrate, _oplogCollectionName, replMode, true);
-}
 
 OpTime writeOpsToOplog(OperationContext* txn, const std::vector<BSONObj>& ops) {
     OpTime lastOptime;
@@ -532,14 +517,15 @@ long long getNewOplogSizeBytes(OperationContext* txn, const ReplSettings& replSe
 }
 }  // namespace
 
-void createOplog(OperationContext* txn, const std::string& oplogCollectionName, bool replEnabled) {
+void createOplog(OperationContext* txn) {
     ScopedTransaction transaction(txn, MODE_X);
     Lock::GlobalWrite lk(txn->lockState());
 
     const ReplSettings& replSettings = ReplicationCoordinator::get(txn)->getSettings();
+    bool replEnabled = replSettings.usingReplSets();
 
-    OldClientContext ctx(txn, oplogCollectionName);
-    Collection* collection = ctx.db()->getCollection(oplogCollectionName);
+    OldClientContext ctx(txn, _oplogCollectionName);
+    Collection* collection = ctx.db()->getCollection(_oplogCollectionName);
 
     if (collection) {
         if (replSettings.getOplogSizeBytes() != 0) {
@@ -558,7 +544,7 @@ void createOplog(OperationContext* txn, const std::string& oplogCollectionName, 
         }
 
         if (!replEnabled)
-            initTimestampFromOplog(txn, oplogCollectionName);
+            initTimestampFromOplog(txn, _oplogCollectionName);
         return;
     }
 
@@ -575,23 +561,17 @@ void createOplog(OperationContext* txn, const std::string& oplogCollectionName, 
 
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         WriteUnitOfWork uow(txn);
-        invariant(ctx.db()->createCollection(txn, oplogCollectionName, options));
+        invariant(ctx.db()->createCollection(txn, _oplogCollectionName, options));
         if (!replEnabled)
             getGlobalServiceContext()->getOpObserver()->onOpMessage(txn, BSONObj());
         uow.commit();
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createCollection", oplogCollectionName);
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createCollection", _oplogCollectionName);
 
     /* sync here so we don't get any surprising lag later when we try to sync */
     StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
     storageEngine->flushAllFiles(true);
     log() << "******" << endl;
-}
-
-void createOplog(OperationContext* txn) {
-    const auto replEnabled = ReplicationCoordinator::get(txn)->getReplicationMode() ==
-        ReplicationCoordinator::modeReplSet;
-    createOplog(txn, _oplogCollectionName, replEnabled);
 }
 
 // -------------------------------------

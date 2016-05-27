@@ -58,12 +58,6 @@ class ReplSettings;
  */
 void truncateOplogTo(OperationContext* txn, Timestamp truncateTimestamp);
 
-/**
- * Create a new capped collection for the oplog if it doesn't yet exist.
- * If the collection already exists, set the 'last' OpTime if master/slave (side effect!)
- */
-void createOplog(OperationContext* txn, const std::string& oplogCollectionName, bool replEnabled);
-
 /*
  * Create a new capped collection for the oplog using createOplog() if it doesn't yet exist.
  * Collection name will be "_oplogCollectionName" initialized in setOplogCollectionName().
@@ -102,19 +96,7 @@ void logOps(OperationContext* txn,
 
 /* For 'u' records, 'obj' captures the mutation made to the object but not
  * the object itself. 'o2' captures the the criteria for the object that will be modified.
- *
- * Sets replCoord last optime if 'updateReplOpTime' is true.
  */
-void _logOp(OperationContext* txn,
-            const char* opstr,
-            const char* ns,
-            const BSONObj& obj,
-            const BSONObj* o2,
-            bool fromMigrate,
-            const std::string& oplogCollectionName,
-            ReplicationCoordinator::Mode replicationMode,
-            bool updateReplOpTime);
-
 void logOp(OperationContext* txn,
            const char* opstr,
            const char* ns,

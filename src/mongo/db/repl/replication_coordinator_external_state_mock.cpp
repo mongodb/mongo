@@ -65,8 +65,7 @@ void ReplicationCoordinatorExternalStateMock::startSteadyStateReplication() {}
 
 void ReplicationCoordinatorExternalStateMock::startMasterSlave(OperationContext*) {}
 Status ReplicationCoordinatorExternalStateMock::initializeReplSetStorage(OperationContext* txn,
-                                                                         const BSONObj& config,
-                                                                         bool updateReplOpTime) {
+                                                                         const BSONObj& config) {
     return storeLocalConfigDocument(txn, config);
 }
 

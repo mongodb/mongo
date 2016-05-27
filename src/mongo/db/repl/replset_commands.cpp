@@ -354,15 +354,9 @@ public:
         std::string replSetString =
             ReplicationCoordinator::get(txn)->getSettings().getReplSetString();
         if (replSetString.empty()) {
-            if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-                return appendCommandStatus(result,
-                                           ReplicationCoordinator::get(txn)
-                                               ->processReplSetInitiate(txn, configObj, &result));
-            }
             return appendCommandStatus(result,
                                        Status(ErrorCodes::NoReplicationEnabled,
-                                              "This node was not started with the replSet "
-                                              "option"));
+                                              "This node was not started with the replSet option"));
         }
 
         if (configObj.isEmpty()) {

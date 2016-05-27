@@ -104,12 +104,9 @@ public:
     virtual void shutdown() = 0;
 
     /**
-     * Creates the oplog, writes the first entry and stores the replica set config document.  Sets
-     * replCoord last optime if 'updateReplOpTime' is true.
+     * Creates the oplog, writes the first entry and stores the replica set config document.
      */
-    virtual Status initializeReplSetStorage(OperationContext* txn,
-                                            const BSONObj& config,
-                                            bool updateReplOpTime) = 0;
+    virtual Status initializeReplSetStorage(OperationContext* txn, const BSONObj& config) = 0;
 
     /**
      * Writes a message about our transition to primary to the oplog.
