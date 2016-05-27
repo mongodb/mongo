@@ -841,6 +841,13 @@ Status storeServerOptions(const moe::Environment& params, const std::vector<std:
         serverGlobalParams.objcheck = params["net.wireObjectCheck"].as<bool>();
     }
 
+    if (params.count("net.bindIp")) {
+        // passing in wildcard is the same as default behavior; remove for SERVER-3350
+        if (serverGlobalParams.bind_ip == "0.0.0.0") {
+            serverGlobalParams.bind_ip = "";
+        }
+    }
+
 #ifndef _WIN32
     if (params.count("net.unixDomainSocket.pathPrefix")) {
         serverGlobalParams.socket = params["net.unixDomainSocket.pathPrefix"].as<string>();
