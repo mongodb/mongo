@@ -1060,11 +1060,16 @@ bool turnIxscanIntoCount(QuerySolution* soln) {
  */
 bool getDistinctNodeIndex(const std::vector<IndexEntry>& indices,
                           const std::string& field,
+                          const CollatorInterface* collator,
                           size_t* indexOut) {
     invariant(indexOut);
     bool isDottedField = str::contains(field, '.');
     int minFields = std::numeric_limits<int>::max();
     for (size_t i = 0; i < indices.size(); ++i) {
+        // Skip indices with non-matching collator.
+        if (!CollatorInterface::collatorsMatch(indices[i].collator, collator)) {
+            continue;
+        }
         // Skip special indices.
         if (!IndexNames::findPluginName(indices[i].keyPattern).empty()) {
             continue;
@@ -1290,9 +1295,7 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const string& field) {
 StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
                                                          Collection* collection,
                                                          const std::string& ns,
-                                                         const BSONObj& query,
-                                                         const std::string& field,
-                                                         bool isExplain,
+                                                         ParsedDistinct* parsedDistinct,
                                                          PlanExecutor::YieldPolicy yieldPolicy) {
     if (!collection) {
         // Treat collections that do not exist as empty collections.
@@ -1320,7 +1323,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
         IndexCatalogEntry* ice = ii.catalogEntry(desc);
         // The distinct hack can work if any field is in the index but it's not always clear
         // if it's a win unless it's the first field.
-        if (desc->keyPattern().firstElement().fieldName() == field) {
+        if (desc->keyPattern().firstElement().fieldName() == parsedDistinct->getKey()) {
             plannerParams.indices.push_back(IndexEntry(desc->keyPattern(),
                                                        desc->getAccessMethodName(),
                                                        desc->isMultikey(txn),
@@ -1339,16 +1342,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
     // If there are no suitable indices for the distinct hack bail out now into regular planning
     // with no projection.
     if (plannerParams.indices.empty()) {
-        auto qr = stdx::make_unique<QueryRequest>(collection->ns());
-        qr->setFilter(query);
-        qr->setExplain(isExplain);
-
-        auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(qr), extensionsCallback);
-        if (!statusWithCQ.isOK()) {
-            return statusWithCQ.getStatus();
-        }
-
-        return getExecutor(txn, collection, std::move(statusWithCQ.getValue()), yieldPolicy);
+        return getExecutor(txn, collection, parsedDistinct->releaseQuery(), yieldPolicy);
     }
 
     //
@@ -1358,11 +1352,9 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
     // Applying a projection allows the planner to try to give us covered plans that we can turn
     // into the projection hack.  getDistinctProjection deals with .find() projection semantics
     // (ie _id:1 being implied by default).
-    BSONObj projection = getDistinctProjection(field);
+    BSONObj projection = getDistinctProjection(parsedDistinct->getKey());
 
-    auto qr = stdx::make_unique<QueryRequest>(collection->ns());
-    qr->setFilter(query);
-    qr->setExplain(isExplain);
+    auto qr = stdx::make_unique<QueryRequest>(parsedDistinct->getQuery()->getQueryRequest());
     qr->setProj(projection);
 
     auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(qr), extensionsCallback);
@@ -1376,17 +1368,31 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
     // Not every index in plannerParams.indices may be suitable. Refer to
     // getDistinctNodeIndex().
     size_t distinctNodeIndex = 0;
-    if (query.isEmpty() && getDistinctNodeIndex(plannerParams.indices, field, &distinctNodeIndex)) {
+    if (parsedDistinct->getQuery()->getQueryRequest().getFilter().isEmpty() &&
+        getDistinctNodeIndex(plannerParams.indices,
+                             parsedDistinct->getKey(),
+                             cq->getCollator(),
+                             &distinctNodeIndex)) {
         auto dn = stdx::make_unique<DistinctNode>();
         dn->indexKeyPattern = plannerParams.indices[distinctNodeIndex].keyPattern;
         dn->direction = 1;
         IndexBoundsBuilder::allValuesBounds(dn->indexKeyPattern, &dn->bounds);
         dn->fieldNo = 0;
 
+        // An index with a non-simple collation requires a FETCH stage.
+        std::unique_ptr<QuerySolutionNode> solnRoot = std::move(dn);
+        if (plannerParams.indices[distinctNodeIndex].collator) {
+            if (!solnRoot->fetched()) {
+                auto fetch = stdx::make_unique<FetchNode>();
+                fetch->children.push_back(solnRoot.release());
+                solnRoot = std::move(fetch);
+            }
+        }
+
         QueryPlannerParams params;
 
         unique_ptr<QuerySolution> soln(
-            QueryPlannerAnalysis::analyzeDataAccess(*cq, params, dn.release()));
+            QueryPlannerAnalysis::analyzeDataAccess(*cq, params, solnRoot.release()));
         invariant(soln);
 
         unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
@@ -1415,7 +1421,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
 
     // We look for a solution that has an ixscan we can turn into a distinctixscan
     for (size_t i = 0; i < solutions.size(); ++i) {
-        if (turnIxscanIntoDistinctIxscan(solutions[i], field)) {
+        if (turnIxscanIntoDistinctIxscan(solutions[i], parsedDistinct->getKey())) {
             // Great, we can use solutions[i].  Clean up the other QuerySolution(s).
             for (size_t j = 0; j < solutions.size(); ++j) {
                 if (j != i) {
@@ -1450,17 +1456,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
         delete solutions[i];
     }
 
-    // We drop the projection from the 'cq'.  Unfortunately this is not trivial.
-    auto qrNoProjection = stdx::make_unique<QueryRequest>(collection->ns());
-    qrNoProjection->setFilter(query);
-    qrNoProjection->setExplain(isExplain);
-
-    statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(qrNoProjection), extensionsCallback);
-    if (!statusWithCQ.isOK()) {
-        return statusWithCQ.getStatus();
-    }
-
-    return getExecutor(txn, collection, std::move(statusWithCQ.getValue()), yieldPolicy);
+    return getExecutor(txn, collection, parsedDistinct->releaseQuery(), yieldPolicy);
 }
 
 }  // namespace mongo

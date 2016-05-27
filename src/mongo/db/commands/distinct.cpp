@@ -47,9 +47,11 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/parsed_distinct.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/stdx/memory.h"
@@ -105,27 +107,24 @@ public:
         help << "{ distinct : 'collection name' , key : 'a.b' , query : {} }";
     }
 
-    /**
-     * Used by explain() and run() to get the PlanExecutor for the query.
-     */
-    StatusWith<unique_ptr<PlanExecutor>> getPlanExecutor(OperationContext* txn,
-                                                         Collection* collection,
-                                                         const string& ns,
-                                                         const BSONObj& cmdObj,
-                                                         bool isExplain) const {
+    StatusWith<ParsedDistinct> parse(OperationContext* txn,
+                                     const NamespaceString& nss,
+                                     const BSONObj& cmdObj,
+                                     bool isExplain) const {
         // Extract the key field.
         BSONElement keyElt;
         auto statusKey = bsonExtractTypedField(cmdObj, kKeyField, BSONType::String, &keyElt);
         if (!statusKey.isOK()) {
             return {statusKey};
         }
-        string key = keyElt.valuestrsafe();
+        auto key = keyElt.valuestrsafe();
+
+        auto qr = stdx::make_unique<QueryRequest>(nss);
 
         // Extract the query field. If the query field is nonexistent, an empty query is used.
-        BSONObj query;
         if (BSONElement queryElt = cmdObj[kQueryField]) {
             if (queryElt.type() == BSONType::Object) {
-                query = queryElt.embeddedObject();
+                qr->setFilter(queryElt.embeddedObject());
             } else if (queryElt.type() != BSONType::jstNULL) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "\"" << kQueryField
@@ -139,9 +138,6 @@ public:
         }
 
         // Extract the collation field, if it exists.
-        // TODO SERVER-23473: Pass this collation spec object down so that it can be converted into
-        // a CollatorInterface.
-        BSONObj collation;
         if (BSONElement collationElt = cmdObj[kCollationField]) {
             if (collationElt.type() != BSONType::Object) {
                 return Status(ErrorCodes::TypeMismatch,
@@ -151,16 +147,18 @@ public:
                                             << ", found "
                                             << typeName(collationElt.type()));
             }
-            collation = collationElt.embeddedObject();
+            qr->setCollation(collationElt.embeddedObject());
         }
 
-        auto executor = getExecutorDistinct(
-            txn, collection, ns, query, key, isExplain, PlanExecutor::YIELD_AUTO);
-        if (!executor.isOK()) {
-            return executor.getStatus();
+        qr->setExplain(isExplain);
+
+        const ExtensionsCallbackReal extensionsCallback(txn, &nss);
+        auto cq = CanonicalQuery::canonicalize(txn, std::move(qr), extensionsCallback);
+        if (!cq.isOK()) {
+            return cq.getStatus();
         }
 
-        return std::move(executor.getValue());
+        return ParsedDistinct(std::move(cq.getValue()), std::move(key));
     }
 
     virtual Status explain(OperationContext* txn,
@@ -170,12 +168,19 @@ public:
                            const rpc::ServerSelectionMetadata&,
                            BSONObjBuilder* out) const {
         const string ns = parseNs(dbname, cmdObj);
+        const NamespaceString nss(ns);
+
+        auto parsedDistinct = parse(txn, nss, cmdObj, true);
+        if (!parsedDistinct.isOK()) {
+            return parsedDistinct.getStatus();
+        }
+
         AutoGetCollectionForRead ctx(txn, ns);
 
         Collection* collection = ctx.getCollection();
 
-        StatusWith<unique_ptr<PlanExecutor>> executor =
-            getPlanExecutor(txn, collection, ns, cmdObj, true);
+        auto executor = getExecutorDistinct(
+            txn, collection, ns, &parsedDistinct.getValue(), PlanExecutor::YIELD_AUTO);
         if (!executor.isOK()) {
             return executor.getStatus();
         }
@@ -193,11 +198,21 @@ public:
         Timer t;
 
         const string ns = parseNs(dbname, cmdObj);
+        const NamespaceString nss(ns);
+
+        auto parsedDistinct = parse(txn, nss, cmdObj, false);
+        if (!parsedDistinct.isOK()) {
+            return appendCommandStatus(result, parsedDistinct.getStatus());
+        }
+
+        auto collator = parsedDistinct.getValue().getQuery()->getCollator();
+
         AutoGetCollectionForRead ctx(txn, ns);
 
         Collection* collection = ctx.getCollection();
 
-        auto executor = getPlanExecutor(txn, collection, ns, cmdObj, false);
+        auto executor = getExecutorDistinct(
+            txn, collection, ns, &parsedDistinct.getValue(), PlanExecutor::YIELD_AUTO);
         if (!executor.isOK()) {
             return appendCommandStatus(result, executor.getStatus());
         }
@@ -215,7 +230,7 @@ public:
         char* start = bb.buf();
 
         BSONArrayBuilder arr(bb);
-        BSONElementSet values;
+        BSONElementSet values(collator);
 
         BSONObj obj;
         PlanExecutor::ExecState state;

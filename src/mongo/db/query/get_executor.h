@@ -32,6 +32,7 @@
 #include "mongo/db/ops/update_driver.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/parsed_distinct.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_settings.h"
@@ -112,9 +113,7 @@ StatusWith<std::unique_ptr<PlanExecutor>> getExecutorDistinct(
     OperationContext* txn,
     Collection* collection,
     const std::string& ns,
-    const BSONObj& query,
-    const std::string& field,
-    bool isExplain,
+    ParsedDistinct* parsedDistinct,
     PlanExecutor::YieldPolicy yieldPolicy);
 
 /*

@@ -242,10 +242,31 @@
     assert.eq(1, planStage.advanced);
 
     // Distinct.
-    assert.eq(["foo", "bar"], coll.distinct("str", {}, {collation: {locale: "fr"}}));
+    coll.drop();
+    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+    assert.writeOK(coll.insert({_id: 2, str: "FOO"}));
+
+    // Without an index.
+    var res = coll.distinct("str", {}, {collation: {locale: "en_US", strength: 2}});
+    assert.eq(1, res.length);
+    assert.eq("foo", res[0].toLowerCase());
+    assert.eq(2, coll.distinct("str", {}, {collation: {locale: "en_US", strength: 3}}).length);
+    assert.eq(
+        2, coll.distinct("_id", {str: "foo"}, {collation: {locale: "en_US", strength: 2}}).length);
+
+    // With an index.
+    coll.createIndex({str: 1}, {collation: {locale: "en_US", strength: 2}});
+    res = coll.distinct("str", {}, {collation: {locale: "en_US", strength: 2}});
+    assert.eq(1, res.length);
+    assert.eq("foo", res[0].toLowerCase());
+    assert.eq(2, coll.distinct("str", {}, {collation: {locale: "en_US", strength: 3}}).length);
+
     assert.commandWorked(coll.explain().distinct("str", {}, {collation: {locale: "fr"}}));
 
     // Find command.
+    coll.drop();
+    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+    assert.writeOK(coll.insert({_id: 2, str: "bar"}));
     if (db.getMongo().useReadCommands()) {
         // On _id field.
         assert.writeOK(coll.insert({_id: "foo"}));
