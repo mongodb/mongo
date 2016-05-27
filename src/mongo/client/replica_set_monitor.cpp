@@ -174,6 +174,7 @@ ReplicaSetMonitor::ReplicaSetMonitor(StringData name, const std::set<HostAndPort
 
 void ReplicaSetMonitor::init() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
+    invariant(_executor);
     std::weak_ptr<ReplicaSetMonitor> that(shared_from_this());
     auto status = _executor->scheduleWork([=](const CallbackArgs& cbArgs) {
         if (auto ptr = that.lock()) {
@@ -199,11 +200,10 @@ void ReplicaSetMonitor::init() {
 ReplicaSetMonitor::~ReplicaSetMonitor() {
     // need this lock because otherwise can get race with scheduling in _refresh
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    invariant(_executor);
-
-    if (!_refresherHandle) {
+    if (!_refresherHandle || !_executor) {
         return;
     }
+
     _executor->cancel(_refresherHandle);
     // Note: calling _executor->wait(_refresherHandle); from the dispatcher thread will cause hang
     // Its ok not to call it because the d-tor is called only when the last owning pointer goes out
@@ -233,6 +233,7 @@ void ReplicaSetMonitor::_refresh(const CallbackArgs& cbArgs) {
 
     {
         // reschedule itself
+        invariant(_executor);
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         std::weak_ptr<ReplicaSetMonitor> that(shared_from_this());
         auto status = _executor->scheduleWorkAt(_executor->now() + kRefreshPeriod,
