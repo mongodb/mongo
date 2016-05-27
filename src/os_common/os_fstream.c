@@ -16,16 +16,16 @@
  *	Close a stream handle.
  */
 static int
-__fstream_close(WT_SESSION_IMPL *session, WT_FSTREAM *fs)
+__fstream_close(WT_SESSION_IMPL *session, WT_FSTREAM *fstr)
 {
 	WT_DECL_RET;
 
-	if (!F_ISSET(fs, WT_STREAM_READ))
-		WT_TRET(fs->flush(session, fs));
+	if (!F_ISSET(fstr, WT_STREAM_READ))
+		WT_TRET(fstr->fstr_flush(session, fstr));
 
-	WT_TRET(__wt_close(session, &fs->fh));
-	__wt_buf_free(session, &fs->buf);
-	__wt_free(session, fs);
+	WT_TRET(__wt_close(session, &fstr->fh));
+	__wt_buf_free(session, &fstr->buf);
+	__wt_free(session, fstr);
 	return (ret);
 }
 
@@ -34,13 +34,13 @@ __fstream_close(WT_SESSION_IMPL *session, WT_FSTREAM *fs)
  *	Flush the data from a stream.
  */
 static int
-__fstream_flush(WT_SESSION_IMPL *session, WT_FSTREAM *fs)
+__fstream_flush(WT_SESSION_IMPL *session, WT_FSTREAM *fstr)
 {
-	if (fs->buf.size > 0) {
-		WT_RET(__wt_write(
-		    session, fs->fh, fs->off, fs->buf.size, fs->buf.data));
-		fs->off += (wt_off_t)fs->buf.size;
-		fs->buf.size = 0;
+	if (fstr->buf.size > 0) {
+		WT_RET(__wt_write(session,
+		    fstr->fh, fstr->off, fstr->buf.size, fstr->buf.data));
+		fstr->off += (wt_off_t)fstr->buf.size;
+		fstr->buf.size = 0;
 	}
 
 	return (0);
@@ -51,9 +51,9 @@ __fstream_flush(WT_SESSION_IMPL *session, WT_FSTREAM *fs)
  *	Stream flush unsupported.
  */
 static int
-__fstream_flush_notsup(WT_SESSION_IMPL *session, WT_FSTREAM *fs)
+__fstream_flush_notsup(WT_SESSION_IMPL *session, WT_FSTREAM *fstr)
 {
-	WT_RET_MSG(session, ENOTSUP, "%s: flush", fs->name);
+	WT_RET_MSG(session, ENOTSUP, "%s: flush", fstr->name);
 }
 
 /*
@@ -68,7 +68,7 @@ __fstream_flush_notsup(WT_SESSION_IMPL *session, WT_FSTREAM *fs)
  * (so the caller's EOF marker is a returned line length of 0).
  */
 static int
-__fstream_getline(WT_SESSION_IMPL *session, WT_FSTREAM *fs, WT_ITEM *buf)
+__fstream_getline(WT_SESSION_IMPL *session, WT_FSTREAM *fstr, WT_ITEM *buf)
 {
 	const char *p;
 	size_t len;
@@ -82,19 +82,20 @@ __fstream_getline(WT_SESSION_IMPL *session, WT_FSTREAM *fs, WT_ITEM *buf)
 
 	for (;;) {
 		/* Check if we need to refill the buffer. */
-		if (WT_PTRDIFF(fs->buf.data, fs->buf.mem) >= fs->buf.size) {
+		if (WT_PTRDIFF(fstr->buf.data, fstr->buf.mem) >=
+		    fstr->buf.size) {
 			len = WT_MIN(WT_STREAM_BUFSIZE,
-			    (size_t)(fs->size - fs->off));
+			    (size_t)(fstr->size - fstr->off));
 			if (len == 0)
 				break; /* EOF */
-			WT_RET(__wt_buf_initsize(session, &fs->buf, len));
+			WT_RET(__wt_buf_initsize(session, &fstr->buf, len));
 			WT_RET(__wt_read(
-			    session, fs->fh, fs->off, len, fs->buf.mem));
-			fs->off += (wt_off_t)len;
+			    session, fstr->fh, fstr->off, len, fstr->buf.mem));
+			fstr->off += (wt_off_t)len;
 		}
 
-		c = *(p = fs->buf.data);
-		fs->buf.data = ++p;
+		c = *(p = fstr->buf.data);
+		fstr->buf.data = ++p;
 
 		/* Leave space for a trailing NUL. */
 		WT_RET(__wt_buf_extend(session, buf, buf->size + 2));
@@ -116,10 +117,11 @@ __fstream_getline(WT_SESSION_IMPL *session, WT_FSTREAM *fs, WT_ITEM *buf)
  *	Stream getline unsupported.
  */
 static int
-__fstream_getline_notsup(WT_SESSION_IMPL *session, WT_FSTREAM *fs, WT_ITEM *buf)
+__fstream_getline_notsup(
+    WT_SESSION_IMPL *session, WT_FSTREAM *fstr, WT_ITEM *buf)
 {
 	WT_UNUSED(buf);
-	WT_RET_MSG(session, ENOTSUP, "%s: getline", fs->name);
+	WT_RET_MSG(session, ENOTSUP, "%s: getline", fstr->name);
 }
 
 /*
@@ -128,14 +130,14 @@ __fstream_getline_notsup(WT_SESSION_IMPL *session, WT_FSTREAM *fs, WT_ITEM *buf)
  */
 static int
 __fstream_printf(
-    WT_SESSION_IMPL *session, WT_FSTREAM *fs, const char *fmt, va_list ap)
+    WT_SESSION_IMPL *session, WT_FSTREAM *fstr, const char *fmt, va_list ap)
 {
 	WT_ITEM *buf;
 	va_list ap_copy;
 	size_t len, space;
 	char *p;
 
-	buf = &fs->buf;
+	buf = &fstr->buf;
 
 	for (;;) {
 		va_copy(ap_copy, ap);
@@ -149,7 +151,7 @@ __fstream_printf(
 			buf->size += len;
 
 			return (buf->size >= WT_STREAM_BUFSIZE ?
-			    __wt_fflush(session, fs) : 0);
+			    __wt_fflush(session, fstr) : 0);
 		}
 		WT_RET(__wt_buf_extend(session, buf, buf->size + len + 1));
 	}
@@ -161,11 +163,11 @@ __fstream_printf(
  */
 static int
 __fstream_printf_notsup(
-    WT_SESSION_IMPL *session, WT_FSTREAM *fs, const char *fmt, va_list ap)
+    WT_SESSION_IMPL *session, WT_FSTREAM *fstr, const char *fmt, va_list ap)
 {
 	WT_UNUSED(fmt);
 	WT_UNUSED(ap);
-	WT_RET_MSG(session, ENOTSUP, "%s: printf", fs->name);
+	WT_RET_MSG(session, ENOTSUP, "%s: printf", fstr->name);
 }
 
 /*
@@ -174,40 +176,42 @@ __fstream_printf_notsup(
  */
 int
 __wt_fopen(WT_SESSION_IMPL *session,
-    const char *name, uint32_t open_flags, uint32_t flags, WT_FSTREAM **fsp)
+    const char *name, uint32_t open_flags, uint32_t flags, WT_FSTREAM **fstrp)
 {
 	WT_DECL_RET;
 	WT_FH *fh;
-	WT_FSTREAM *fs;
+	WT_FSTREAM *fstr;
 
-	fs = NULL;
+	*fstrp = NULL;
+
+	fstr = NULL;
 
 	WT_RET(__wt_open(
 	    session, name, WT_OPEN_FILE_TYPE_REGULAR, open_flags, &fh));
 
-	WT_ERR(__wt_calloc_one(session, &fs));
-	fs->fh = fh;
-	fs->name = fh->name;
-	fs->flags = flags;
+	WT_ERR(__wt_calloc_one(session, &fstr));
+	fstr->fh = fh;
+	fstr->name = fh->name;
+	fstr->flags = flags;
 
-	fs->close = __fstream_close;
-	WT_ERR(__wt_filesize(session, fh, &fs->size));
+	fstr->close = __fstream_close;
+	WT_ERR(__wt_filesize(session, fh, &fstr->size));
 	if (LF_ISSET(WT_STREAM_APPEND))
-		fs->off = fs->size;
+		fstr->off = fstr->size;
 	if (LF_ISSET(WT_STREAM_APPEND | WT_STREAM_WRITE)) {
-		fs->flush = __fstream_flush;
-		fs->getline = __fstream_getline_notsup;
-		fs->printf = __fstream_printf;
+		fstr->fstr_flush = __fstream_flush;
+		fstr->fstr_getline = __fstream_getline_notsup;
+		fstr->fstr_printf = __fstream_printf;
 	} else {
 		WT_ASSERT(session, LF_ISSET(WT_STREAM_READ));
-		fs->flush = __fstream_flush_notsup;
-		fs->getline = __fstream_getline;
-		fs->printf = __fstream_printf_notsup;
+		fstr->fstr_flush = __fstream_flush_notsup;
+		fstr->fstr_getline = __fstream_getline;
+		fstr->fstr_printf = __fstream_printf_notsup;
 	}
-	*fsp = fs;
+	*fstrp = fstr;
 	return (0);
 
 err:	WT_TRET(__wt_close(session, &fh));
-	__wt_free(session, *fsp);
+	__wt_free(session, fstr);
 	return (ret);
 }

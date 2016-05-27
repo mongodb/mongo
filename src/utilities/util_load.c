@@ -366,6 +366,7 @@ config_update(WT_SESSION *session, char **list)
 			if (WT_PREFIX_MATCH(*listp, "colgroup:") ||
 			    WT_PREFIX_MATCH(*listp, "file:") ||
 			    WT_PREFIX_MATCH(*listp, "index:") ||
+			    WT_PREFIX_MATCH(*listp, "lsm:") ||
 			    WT_PREFIX_MATCH(*listp, "table:"))
 				if (config_rename(session, listp, cmdname))
 					return (1);

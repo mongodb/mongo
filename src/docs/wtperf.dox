@@ -232,6 +232,8 @@ operation,two for every second operation, three for every third
 operation etc.
 @par sess_config (string, default=)
 session configuration string
+@par session_count_idle (unsigned int, default=0)
+number of idle sessions to create. Default 0.
 @par table_config (string, default=key_format=S,value_format=S,type=lsm,exclusive=true,allocation_size=4kb,internal_page_max=64kb,leaf_page_max=4kb,split_pct=100)
 table configuration string
 @par table_count (unsigned int, default=1)

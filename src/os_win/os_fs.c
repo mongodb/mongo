@@ -498,21 +498,21 @@ directory_open:
 	WT_ERR(__wt_strdup(session, name, &file_handle->name));
 
 	file_handle->close = __win_file_close;
-	file_handle->lock = __win_file_lock;
+	file_handle->fh_lock = __win_file_lock;
 #ifdef WORDS_BIGENDIAN
 	/*
 	 * The underlying objects are little-endian, mapping objects isn't
 	 * currently supported on big-endian systems.
 	 */
 #else
-	file_handle->map = __wt_win_map;
-	file_handle->unmap = __wt_win_unmap;
+	file_handle->fh_map = __wt_win_map;
+	file_handle->fh_unmap = __wt_win_unmap;
 #endif
-	file_handle->read = __win_file_read;
-	file_handle->size = __win_file_size;
-	file_handle->sync = __win_file_sync;
-	file_handle->truncate = __win_file_truncate;
-	file_handle->write = __win_file_write;
+	file_handle->fh_read = __win_file_read;
+	file_handle->fh_size = __win_file_size;
+	file_handle->fh_sync = __win_file_sync;
+	file_handle->fh_truncate = __win_file_truncate;
+	file_handle->fh_write = __win_file_write;
 
 	*file_handlep = file_handle;
 
@@ -552,13 +552,13 @@ __wt_os_win(WT_SESSION_IMPL *session)
 	WT_RET(__wt_calloc_one(session, &file_system));
 
 	/* Initialize the Windows jump table. */
-	file_system->directory_list = __wt_win_directory_list;
-	file_system->directory_list_free = __wt_win_directory_list_free;
-	file_system->exist = __win_fs_exist;
-	file_system->open_file = __win_open_file;
-	file_system->remove = __win_fs_remove;
-	file_system->rename = __win_fs_rename;
-	file_system->size = __wt_win_fs_size;
+	file_system->fs_directory_list = __wt_win_directory_list;
+	file_system->fs_directory_list_free = __wt_win_directory_list_free;
+	file_system->fs_exist = __win_fs_exist;
+	file_system->fs_open_file = __win_open_file;
+	file_system->fs_remove = __win_fs_remove;
+	file_system->fs_rename = __win_fs_rename;
+	file_system->fs_size = __wt_win_fs_size;
 	file_system->terminate = __win_terminate;
 
 	/* Switch it into place. */

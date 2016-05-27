@@ -18,11 +18,8 @@ __metadata_config(WT_SESSION_IMPL *session, char **metaconfp)
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	const char *cfg[] = { WT_CONFIG_BASE(session, file_meta), NULL, NULL };
-	char *metaconf;
 
 	*metaconfp = NULL;
-
-	metaconf = NULL;
 
 	/* Create a turtle file with default values. */
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
@@ -31,14 +28,9 @@ __metadata_config(WT_SESSION_IMPL *session, char **metaconfp)
 	    WT_METAFILE_ID,
 	    WT_BTREE_MAJOR_VERSION_MAX, WT_BTREE_MINOR_VERSION_MAX));
 	cfg[1] = buf->data;
-	WT_ERR(__wt_config_collapse(session, cfg, &metaconf));
+	ret = __wt_config_collapse(session, cfg, metaconfp);
 
-	*metaconfp = metaconf;
-
-	if (0) {
-err:		__wt_free(session, metaconf);
-	}
-	__wt_scr_free(session, &buf);
+err:	__wt_scr_free(session, &buf);
 	return (ret);
 }
 

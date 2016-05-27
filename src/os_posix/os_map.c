@@ -40,7 +40,7 @@ __wt_posix_map(WT_FILE_HANDLE *fh, WT_SESSION *wt_session,
 	 * underneath us, our caller needs to ensure consistency of the mapped
 	 * region vs. any other file activity.
 	 */
-	WT_RET(fh->size(fh, wt_session, &file_size));
+	WT_RET(fh->fh_size(fh, wt_session, &file_size));
 	len = (size_t)file_size;
 
 	(void)__wt_verbose(session, WT_VERB_HANDLEOPS,

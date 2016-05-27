@@ -52,7 +52,7 @@ __wt_block_discard(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t added_size)
 
 	/* The file may not support this call. */
 	handle = block->fh->handle;
-	if (handle->fadvise == NULL)
+	if (handle->fh_advise == NULL)
 		return (0);
 
 	/* The call may not be configured. */
@@ -67,7 +67,7 @@ __wt_block_discard(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t added_size)
 		return (0);
 
 	block->os_cache = 0;
-	ret = handle->fadvise(handle, (WT_SESSION *)session,
+	ret = handle->fh_advise(handle, (WT_SESSION *)session,
 	    (wt_off_t)0, (wt_off_t)0, WT_FILE_HANDLE_DONTNEED);
 	return (ret == EBUSY || ret == ENOTSUP ? 0 : ret);
 }
@@ -128,7 +128,8 @@ __wt_block_extend(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * and remember that ftruncate requires locking.
 	 */
 	handle = fh->handle;
-	if (handle->fallocate != NULL || handle->fallocate_nolock != NULL) {
+	if (handle->fh_allocate != NULL ||
+	    handle->fh_allocate_nolock != NULL) {
 		/*
 		 * Release any locally acquired lock if not needed to extend the
 		 * file, extending the file may require updating on-disk file's
@@ -136,7 +137,7 @@ __wt_block_extend(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		 * configure for file extension on systems that require locking
 		 * over the extend call.)
 		 */
-		if (handle->fallocate_nolock != NULL && *release_lockp) {
+		if (handle->fh_allocate_nolock != NULL && *release_lockp) {
 			*release_lockp = locked = false;
 			__wt_spin_unlock(session, &block->live_lock);
 		}

@@ -259,20 +259,20 @@ class WiredTigerTestCase(unittest.TestCase):
             self.conn.close()
             self.conn = None
 
-    def open_conn(self):
+    def open_conn(self, directory="."):
         """
         Open the connection if already closed.
         """
         if self.conn == None:
-            self.conn = self.setUpConnectionOpen(".")
+            self.conn = self.setUpConnectionOpen(directory)
             self.session = self.setUpSessionOpen(self.conn)
 
-    def reopen_conn(self):
+    def reopen_conn(self, directory="."):
         """
         Reopen the connection.
         """
         self.close_conn()
-        self.open_conn()
+        self.open_conn(directory)
 
     def setUp(self):
         if not hasattr(self.__class__, 'wt_ntests'):

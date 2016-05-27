@@ -393,10 +393,16 @@ env.Append(BUILDERS={'SmokeTest' : Builder(action = builder_smoke_test)})
 
 #Build the tests and setup the "scons test" target
 
+testutil = env.Library('testutil',
+            [
+                'test/utility/misc.c',
+                'test/utility/parse_opts.c'
+            ])
+
 #Don't test bloom on Windows, its broken
 t = env.Program("t_bloom",
     "test/bloom/test_bloom.c",
-    LIBS=[wtlib] + wtlibs)
+    LIBS=[wtlib, testutil] + wtlibs)
 #env.Alias("check", env.SmokeTest(t))
 Default(t)
 
@@ -419,7 +425,7 @@ t = env.Program("t_fops",
     ["test/fops/file.c",
     "test/fops/fops.c",
     "test/fops/t.c"],
-    LIBS=[wtlib, shim] + wtlibs)
+    LIBS=[wtlib, shim, testutil] + wtlibs)
 env.Append(CPPPATH=["test/utility"])
 env.Alias("check", env.SmokeTest(t))
 Default(t)

@@ -26,7 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "test_util.i"
+#include "test_util.h"
 
 #define	HOME_SIZE	512
 #define	HOME_BASE	"WT_TEST"

@@ -30,7 +30,7 @@ __wt_fs_directory_list(WT_SESSION_IMPL *session,
 
 	file_system = S2C(session)->file_system;
 	wt_session = (WT_SESSION *)session;
-	ret = file_system->directory_list(
+	ret = file_system->fs_directory_list(
 	    file_system, wt_session, path, prefix, dirlistp, countp);
 
 	__wt_free(session, path);
@@ -52,7 +52,7 @@ __wt_fs_directory_list_free(
 	if (*dirlistp != NULL) {
 		file_system = S2C(session)->file_system;
 		wt_session = (WT_SESSION *)session;
-		ret = file_system->directory_list_free(
+		ret = file_system->fs_directory_list_free(
 		    file_system, wt_session, *dirlistp, count);
 	}
 
@@ -88,7 +88,7 @@ __wt_fs_directory_sync(WT_SESSION_IMPL *session, const char *name)
 	 * needed.
 	 */
 	file_system = S2C(session)->file_system;
-	if (file_system->directory_sync == NULL)
+	if (file_system->fs_directory_sync == NULL)
 		return (0);
 
 	copy = NULL;
@@ -109,7 +109,7 @@ __wt_fs_directory_sync(WT_SESSION_IMPL *session, const char *name)
 	}
 
 	wt_session = (WT_SESSION *)session;
-	ret = file_system->directory_sync(file_system, wt_session, name);
+	ret = file_system->fs_directory_sync(file_system, wt_session, name);
 
 	__wt_free(session, copy);
 	return (ret);
@@ -133,7 +133,7 @@ __wt_fs_exist(WT_SESSION_IMPL *session, const char *name, bool *existp)
 
 	file_system = S2C(session)->file_system;
 	wt_session = (WT_SESSION *)session;
-	ret = file_system->exist(file_system, wt_session, path, existp);
+	ret = file_system->fs_exist(file_system, wt_session, path, existp);
 
 	__wt_free(session, path);
 	return (ret);
@@ -169,7 +169,7 @@ __wt_fs_remove(WT_SESSION_IMPL *session, const char *name)
 
 	file_system = S2C(session)->file_system;
 	wt_session = (WT_SESSION *)session;
-	ret = file_system->remove(file_system, wt_session, path);
+	ret = file_system->fs_remove(file_system, wt_session, path);
 
 	__wt_free(session, path);
 	return (ret);
@@ -211,7 +211,8 @@ __wt_fs_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
 
 	file_system = S2C(session)->file_system;
 	wt_session = (WT_SESSION *)session;
-	ret = file_system->rename(file_system, wt_session, from_path, to_path);
+	ret = file_system->fs_rename(
+	    file_system, wt_session, from_path, to_path);
 
 err:	__wt_free(session, from_path);
 	__wt_free(session, to_path);
@@ -236,7 +237,7 @@ __wt_fs_size(WT_SESSION_IMPL *session, const char *name, wt_off_t *sizep)
 
 	file_system = S2C(session)->file_system;
 	wt_session = (WT_SESSION *)session;
-	ret = file_system->size(file_system, wt_session, path, sizep);
+	ret = file_system->fs_size(file_system, wt_session, path, sizep);
 
 	__wt_free(session, path);
 	return (ret);

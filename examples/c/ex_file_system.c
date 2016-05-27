@@ -28,12 +28,18 @@
  * ex_file_system.c
  * 	demonstrates how to use the custom file system interface
  */
-#include <assert.h>
-#include <stdlib.h>
 #include <errno.h>
+#include <inttypes.h>
+#include <stdlib.h>
 #include <string.h>
+#if (defined(_WIN32) && _MSC_VER < 1900)
+/* snprintf is not supported on <= VS2013 */
+#define	snprintf _snprintf
+#endif
 
 #include <wiredtiger.h>
+#include <wiredtiger_ext.h>
+
 #include "queue_example.h"
 
 static const char *home;
@@ -55,6 +61,8 @@ typedef struct {
 	/* Queue of file handles */
 	TAILQ_HEAD(demo_file_handle_qh, demo_file_handle) fileq;
 
+	WT_EXTENSION_API *wtext;		/* Extension functions */
+
 } DEMO_FILE_SYSTEM;
 
 typedef struct demo_file_handle {
@@ -69,8 +77,10 @@ typedef struct demo_file_handle {
 	uint32_t ref;				/* Reference count */
 
 	char	*buf;				/* In-memory contents */
-	size_t	 size;
+	size_t	 bufsize;			/* In-memory buffer size */
+
 	size_t	 off;				/* Read/write offset */
+	size_t	 size;				/* Read/write data size */
 } DEMO_FILE_HANDLE;
 
 /*
@@ -126,39 +136,110 @@ static DEMO_FILE_HANDLE *demo_handle_search(WT_FILE_SYSTEM *, const char *);
 #define	DEMO_FILE_SIZE_INCREMENT	32768
 
 /*
+ * string_match --
+ *      Return if a string matches a byte string of len bytes.
+ */
+static bool
+byte_string_match(const char *str, const char *bytes, size_t len)
+{
+	return (strncmp(str, bytes, len) == 0 && (str)[(len)] == '\0');
+}
+
+/*
  * demo_file_system_create --
  *	Initialization point for demo file system
  */
 int
 demo_file_system_create(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
 {
-	WT_FILE_SYSTEM *file_system;
 	DEMO_FILE_SYSTEM *demo_fs;
+	WT_CONFIG_ITEM k, v;
+	WT_CONFIG_PARSER *config_parser;
+	WT_EXTENSION_API *wtext;
+	WT_FILE_SYSTEM *file_system;
 	int ret = 0;
 
-	(void)config;						/* Unused */
+	wtext = conn->get_extension_api(conn);
 
-	if ((demo_fs = calloc(1, sizeof(DEMO_FILE_SYSTEM))) == NULL)
+	if ((demo_fs = calloc(1, sizeof(DEMO_FILE_SYSTEM))) == NULL) {
+		(void)wtext->err_printf(wtext, NULL,
+		    "demo_file_system_create: %s",
+		    wtext->strerror(wtext, NULL, ENOMEM));
 		return (ENOMEM);
+	}
+	demo_fs->wtext = wtext;
 	file_system = (WT_FILE_SYSTEM *)demo_fs;
 
-	/* Initialize the in-memory jump table. */
-	file_system->directory_list = demo_fs_directory_list;
-	file_system->directory_list_free = demo_fs_directory_list_free;
-	file_system->directory_sync = demo_fs_directory_sync;
-	file_system->exist = demo_fs_exist;
-	file_system->open_file = demo_fs_open;
-	file_system->remove = demo_fs_remove;
-	file_system->rename = demo_fs_rename;
-	file_system->size = demo_fs_size;
-	file_system->terminate = demo_fs_terminate;
-
-	if ((ret = conn->set_file_system(conn, file_system, NULL)) != 0) {
-		fprintf(stderr, "Error setting custom file system: %s\n",
-		    wiredtiger_strerror(ret));
+	/* Retrieve our configuration information, the "config" value. */
+	if ((ret = wtext->config_get(wtext, NULL, config, "config", &v)) != 0) {
+		(void)wtext->err_printf(wtext, NULL,
+		    "WT_EXTENSION_API.config_get: config: %s",
+		    wtext->strerror(wtext, NULL, ret));
 		goto err;
 	}
 
+	/* Open a WiredTiger parser on the "config" value. */
+	if ((ret = wtext->config_parser_open(
+	    wtext, NULL, v.str, v.len, &config_parser)) != 0) {
+		(void)wtext->err_printf(wtext, NULL,
+		    "WT_EXTENSION_API.config_parser_open: config: %s",
+		    wtext->strerror(wtext, NULL, ret));
+		goto err;
+	}
+
+	/* Step through our configuration values. */
+	printf("Custom file system configuration\n");
+	while ((ret = config_parser->next(config_parser, &k, &v)) == 0) {
+		if (byte_string_match("config_string", k.str, k.len)) {
+			printf("\t" "key %.*s=\"%.*s\"\n",
+			    (int)k.len, k.str, (int)v.len, v.str);
+			continue;
+		}
+		if (byte_string_match("config_value", k.str, k.len)) {
+			printf("\t" "key %.*s=%" PRId64 "\n",
+			    (int)k.len, k.str, v.val);
+			continue;
+		}
+		ret = EINVAL;
+		(void)wtext->err_printf(wtext, NULL,
+		    "WT_CONFIG_PARSER.next: unexpected configuration "
+		    "information: %.*s=%.*s: %s",
+		    (int)k.len, k.str, (int)v.len, v.str,
+		    wtext->strerror(wtext, NULL, ret));
+		goto err;
+	}
+
+	/* Check for expected parser termination and close the parser. */
+	if (ret != WT_NOTFOUND) {
+		(void)wtext->err_printf(wtext, NULL,
+		    "WT_CONFIG_PARSER.next: config: %s",
+		    wtext->strerror(wtext, NULL, ret));
+		goto err;
+	}
+	if ((ret = config_parser->close(config_parser)) != 0) {
+		(void)wtext->err_printf(wtext, NULL,
+		    "WT_CONFIG_PARSER.close: config: %s",
+		    wtext->strerror(wtext, NULL, ret));
+		goto err;
+	}
+
+	/* Initialize the in-memory jump table. */
+	file_system->fs_directory_list = demo_fs_directory_list;
+	file_system->fs_directory_list_free = demo_fs_directory_list_free;
+	file_system->fs_directory_sync = demo_fs_directory_sync;
+	file_system->fs_exist = demo_fs_exist;
+	file_system->fs_open_file = demo_fs_open;
+	file_system->fs_remove = demo_fs_remove;
+	file_system->fs_rename = demo_fs_rename;
+	file_system->fs_size = demo_fs_size;
+	file_system->terminate = demo_fs_terminate;
+
+	if ((ret = conn->set_file_system(conn, file_system, NULL)) != 0) {
+		(void)wtext->err_printf(wtext, NULL,
+		    "WT_CONNECTION.set_file_system: %s",
+		    wtext->strerror(wtext, NULL, ret));
+		goto err;
+	}
 	return (0);
 
 err:	free(demo_fs);
@@ -175,16 +256,17 @@ demo_fs_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
     const char *name, WT_OPEN_FILE_TYPE file_type, uint32_t flags,
     WT_FILE_HANDLE **file_handlep)
 {
-	WT_FILE_HANDLE *file_handle;
 	DEMO_FILE_HANDLE *demo_fh;
 	DEMO_FILE_SYSTEM *demo_fs;
+	WT_EXTENSION_API *wtext;
+	WT_FILE_HANDLE *file_handle;
 
 	(void)file_type;					/* Unused */
-	(void)session;						/* Unused */
 	(void)flags;						/* Unused */
 
 	demo_fs = (DEMO_FILE_SYSTEM *)file_system;
 	demo_fh = NULL;
+	wtext = demo_fs->wtext;
 
 	++demo_fs->opened_file_count;
 
@@ -195,9 +277,8 @@ demo_fs_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
 	demo_fh = demo_handle_search(file_system, name);
 	if (demo_fh != NULL) {
 		if (demo_fh->ref != 0) {
-			fprintf(stderr,
-			    "demo_file_open of already open file %s\n",
-			    name);
+			(void)wtext->err_printf(wtext, session,
+			    "demo_fs_open: %s: file already open", name);
 			return (EBUSY);
 		}
 
@@ -214,11 +295,11 @@ demo_fs_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
 
 	/* Initialize private information. */
 	demo_fh->ref = 1;
-	demo_fh->off = 0;
+	demo_fh->off = demo_fh->size = 0;
 	demo_fh->demo_fs = demo_fs;
 	if ((demo_fh->buf = calloc(1, DEMO_FILE_SIZE_INCREMENT)) == NULL)
 		goto enomem;
-	demo_fh->size = DEMO_FILE_SIZE_INCREMENT;
+	demo_fh->bufsize = DEMO_FILE_SIZE_INCREMENT;
 
 	/* Initialize public information. */
 	file_handle = (WT_FILE_HANDLE *)demo_fh;
@@ -231,20 +312,20 @@ demo_fs_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
 	 * the functionality.
 	 */
 	file_handle->close = demo_file_close;
-	file_handle->fadvise = NULL;
-	file_handle->fallocate = NULL;
-	file_handle->fallocate_nolock = NULL;
-	file_handle->lock = demo_file_lock;
-	file_handle->map = NULL;
-	file_handle->map_discard = NULL;
-	file_handle->map_preload = NULL;
-	file_handle->unmap = NULL;
-	file_handle->read = demo_file_read;
-	file_handle->size = demo_file_size;
-	file_handle->sync = demo_file_sync;
-	file_handle->sync_nowait = demo_file_sync_nowait;
-	file_handle->truncate = demo_file_truncate;
-	file_handle->write = demo_file_write;
+	file_handle->fh_advise = NULL;
+	file_handle->fh_allocate = NULL;
+	file_handle->fh_allocate_nolock = NULL;
+	file_handle->fh_lock = demo_file_lock;
+	file_handle->fh_map = NULL;
+	file_handle->fh_map_discard = NULL;
+	file_handle->fh_map_preload = NULL;
+	file_handle->fh_unmap = NULL;
+	file_handle->fh_read = demo_file_read;
+	file_handle->fh_size = demo_file_size;
+	file_handle->fh_sync = demo_file_sync;
+	file_handle->fh_sync_nowait = demo_file_sync_nowait;
+	file_handle->fh_truncate = demo_file_truncate;
+	file_handle->fh_write = demo_file_write;
 
 	TAILQ_INSERT_HEAD(&demo_fs->fileq, demo_fh, q);
 	++demo_fs->opened_unique_file_count;
@@ -456,12 +537,14 @@ static int
 demo_file_close(WT_FILE_HANDLE *file_handle, WT_SESSION *session)
 {
 	DEMO_FILE_HANDLE *demo_fh;
-
-	(void)session;						/* Unused */
+	WT_EXTENSION_API *wtext;
 
 	demo_fh = (DEMO_FILE_HANDLE *)file_handle;
+	wtext = demo_fh->demo_fs->wtext;
+
 	if (demo_fh->ref < 1) {
-		fprintf(stderr, "Closing already closed handle: %s\n",
+		(void)wtext->err_printf(wtext, session,
+		    "demo_file_close: %s: handle already closed",
 		    demo_fh->iface.name);
 		return (EINVAL);
 	}
@@ -496,11 +579,12 @@ demo_file_read(WT_FILE_HANDLE *file_handle,
     WT_SESSION *session, wt_off_t offset, size_t len, void *buf)
 {
 	DEMO_FILE_HANDLE *demo_fh;
-	int ret = 0;
+	WT_EXTENSION_API *wtext;
 	size_t off;
+	int ret = 0;
 
-	(void)session;						/* Unused */
 	demo_fh = (DEMO_FILE_HANDLE *)file_handle;
+	wtext = demo_fh->demo_fs->wtext;
 
 	off = (size_t)offset;
 	if (off < demo_fh->size) {
@@ -509,18 +593,19 @@ demo_file_read(WT_FILE_HANDLE *file_handle,
 		memcpy(buf, (uint8_t *)demo_fh->buf + off, len);
 		demo_fh->off = off + len;
 	} else
-		ret = EINVAL;
+		ret = EINVAL;		/* EOF */
 
 	if (ret == 0)
 		return (0);
+
 	/*
 	 * WiredTiger should never request data past the end of a file, so
 	 * flag an error if it does.
 	 */
-	fprintf(stderr,
-	    "%s: handle-read: failed to read %zu bytes at offset %zu\n",
-	    demo_fh->iface.name, len, off);
-	return (EINVAL);
+	(void)wtext->err_printf(wtext, session,
+	    "%s: handle-read: failed to read %zu bytes at offset %zu: %s",
+	    demo_fh->iface.name, len, off, wtext->strerror(wtext, NULL, ret));
+	return (ret);
 }
 
 /*
@@ -536,7 +621,6 @@ demo_file_size(
 	(void)session;						/* Unused */
 	demo_fh = (DEMO_FILE_HANDLE *)file_handle;
 
-	assert(demo_fh->size != 0);
 	*sizep = (wt_off_t)demo_fh->size;
 	return (0);
 }
@@ -578,20 +662,26 @@ demo_file_truncate(
     WT_FILE_HANDLE *file_handle, WT_SESSION *session, wt_off_t offset)
 {
 	DEMO_FILE_HANDLE *demo_fh;
+	WT_EXTENSION_API *wtext;
 	size_t off;
 
-	(void)session;						/* Unused */
 	demo_fh = (DEMO_FILE_HANDLE *)file_handle;
+	wtext = demo_fh->demo_fs->wtext;
 
 	/*
 	 * Grow the buffer as necessary, clear any new space in the file,
 	 * and reset the file's data length.
 	 */
 	off = (size_t)offset;
-	demo_fh->buf = realloc(demo_fh->buf, off);
-	if (demo_fh->buf == NULL) {
-		fprintf(stderr, "Failed to resize buffer in truncate\n");
-		return (ENOSPC);
+	if (demo_fh->bufsize < off ) {
+		if ((demo_fh->buf = realloc(demo_fh->buf, off)) == NULL) {
+			(void)wtext->err_printf(wtext, session,
+			    "demo_file_truncate: %s: failed to resize buffer",
+			    demo_fh->iface.name,
+			    wtext->strerror(wtext, NULL, ENOMEM));
+			return (ENOMEM);
+		}
+		demo_fh->bufsize = off;
 	}
 	if (demo_fh->size < off)
 		memset((uint8_t *)demo_fh->buf + demo_fh->size,
@@ -610,6 +700,7 @@ demo_file_write(WT_FILE_HANDLE *file_handle, WT_SESSION *session,
     wt_off_t offset, size_t len, const void *buf)
 {
 	DEMO_FILE_HANDLE *demo_fh;
+	size_t off;
 	int ret = 0;
 
 	demo_fh = (DEMO_FILE_HANDLE *)file_handle;
@@ -619,8 +710,11 @@ demo_file_write(WT_FILE_HANDLE *file_handle, WT_SESSION *session,
 	    offset + (wt_off_t)(len + DEMO_FILE_SIZE_INCREMENT))) != 0)
 		return (ret);
 
-	memcpy((uint8_t *)demo_fh->buf + offset, buf, len);
-	demo_fh->off = (size_t)offset + len;
+	off = (size_t)offset;
+	memcpy((uint8_t *)demo_fh->buf + off, buf, len);
+	if (off + len > demo_fh->size)
+		demo_fh->size = off + len;
+	demo_fh->off = off + len;
 
 	return (0);
 }
@@ -634,16 +728,16 @@ static int
 demo_handle_remove(WT_SESSION *session, DEMO_FILE_HANDLE *demo_fh)
 {
 	DEMO_FILE_SYSTEM *demo_fs;
+	WT_EXTENSION_API *wtext;
 
-	(void)session;						/* Unused */
 	demo_fs = demo_fh->demo_fs;
+	wtext = demo_fh->demo_fs->wtext;
 
 	if (demo_fh->ref != 0) {
-		fprintf(stderr,
-		    "demo_handle_remove on file %s with non-zero reference "
-		    "count of %u\n",
-		    demo_fh->iface.name, demo_fh->ref);
-		return (EINVAL);
+		(void)wtext->err_printf(wtext, session,
+		    "demo_handle_remove: %s: file is currently open",
+		    demo_fh->iface.name, wtext->strerror(wtext, NULL, EBUSY));
+		return (EBUSY);
 	}
 
 	TAILQ_REMOVE(&demo_fs->fileq, demo_fh, q);
@@ -682,8 +776,12 @@ int
 main(void)
 {
 	WT_CONNECTION *conn;
-	const char *open_config;
+	WT_CURSOR *cursor;
+	WT_SESSION *session;
+	const char *key, *open_config, *uri;
+	int i;
 	int ret = 0;
+	char kbuf[64];
 
 	/*
 	 * Create a clean test directory for this run of the test program if the
@@ -701,21 +799,89 @@ main(void)
 	 * Use the special local extension to indicate that the entry point is
 	 * in the same executable. Also enable early load for this extension,
 	 * since WiredTiger needs to be able to find it before doing any file
-	 * operations.
+	 * operations. Finally, pass in two pieces of configuration information
+	 * to our initialization function as the "config" value.
 	 */
-	open_config = "create,log=(enabled=true),extensions=(local="
-	    "{entry=demo_file_system_create,early_load=true})";
+	open_config = "create,log=(enabled=true),extensions=(local={"
+	    "entry=demo_file_system_create,early_load=true,"
+	    "config={config_string=\"demo-file-system\",config_value=37}"
+	    "})";
 	/* Open a connection to the database, creating it if necessary. */
 	if ((ret = wiredtiger_open(home, NULL, open_config, &conn)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
-		    home, wiredtiger_strerror(ret));
-		return (ret);
+		    home == NULL ? "." : home, wiredtiger_strerror(ret));
+		return (EXIT_FAILURE);
 	}
 	/*! [WT_FILE_SYSTEM register] */
 
-	if ((ret = conn->close(conn, NULL)) != 0)
-		fprintf(stderr, "Error closing connection to %s: %s\n",
-		    home, wiredtiger_strerror(ret));
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
+		fprintf(stderr, "WT_CONNECTION.open_session: %s\n",
+		    wiredtiger_strerror(ret));
+		return (EXIT_FAILURE);
+	}
+	uri = "table:fs";
+	if ((ret = session->create(
+	    session, uri, "key_format=S,value_format=S")) != 0) {
+		fprintf(stderr, "WT_SESSION.create: %s: %s\n",
+		    uri, wiredtiger_strerror(ret));
+		return (EXIT_FAILURE);
+	}
+	if ((ret = session->open_cursor(
+	    session, uri, NULL, NULL, &cursor)) != 0) {
+		fprintf(stderr, "WT_SESSION.open_cursor: %s: %s\n",
+		    uri, wiredtiger_strerror(ret));
+		return (EXIT_FAILURE);
+	}
+	for (i = 0; i < 1000; ++i) {
+		(void)snprintf(kbuf, sizeof(kbuf), "%010d KEY -----", i);
+		cursor->set_key(cursor, kbuf);
+		cursor->set_value(cursor, "--- VALUE ---");
+		if ((ret = cursor->insert(cursor)) != 0) {
+			fprintf(stderr, "WT_CURSOR.insert: %s: %s\n",
+			    kbuf, wiredtiger_strerror(ret));
+			return (EXIT_FAILURE);
+		}
+	}
+	if ((ret = cursor->close(cursor)) != 0) {
+		fprintf(stderr, "WT_CURSOR.close: %s\n",
+		    wiredtiger_strerror(ret));
+		return (EXIT_FAILURE);
+	}
+	if ((ret = session->open_cursor(
+	    session, uri, NULL, NULL, &cursor)) != 0) {
+		fprintf(stderr, "WT_SESSION.open_cursor: %s: %s\n",
+		    uri, wiredtiger_strerror(ret));
+		return (EXIT_FAILURE);
+	}
+	for (i = 0; i < 1000; ++i) {
+		if ((ret = cursor->next(cursor)) != 0) {
+			fprintf(stderr, "WT_CURSOR.insert: %s: %s\n",
+			    kbuf, wiredtiger_strerror(ret));
+			return (EXIT_FAILURE);
+		}
+		(void)snprintf(kbuf, sizeof(kbuf), "%010d KEY -----", i);
+		if ((ret = cursor->get_key(cursor, &key)) != 0) {
+			fprintf(stderr, "WT_CURSOR.get_key: %s\n",
+			    wiredtiger_strerror(ret));
+			return (EXIT_FAILURE);
+		}
+		if (strcmp(kbuf, key) != 0) {
+			fprintf(stderr, "Key mismatch: %s, %s\n", kbuf, key);
+			return (EXIT_FAILURE);
+		}
+	}
+	if ((ret = cursor->next(cursor)) != WT_NOTFOUND) {
+		fprintf(stderr,
+		    "WT_CURSOR.insert: expected WT_NOTFOUND, got %s\n",
+		    wiredtiger_strerror(ret));
+		return (EXIT_FAILURE);
+	}
 
-	return (ret);
+	if ((ret = conn->close(conn, NULL)) != 0) {
+		fprintf(stderr, "Error closing connection to %s: %s\n",
+		    home == NULL ? "." : home, wiredtiger_strerror(ret));
+		return (EXIT_FAILURE);
+	}
+
+	return (EXIT_SUCCESS);
 }

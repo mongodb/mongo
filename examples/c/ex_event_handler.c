@@ -112,7 +112,7 @@ config_event_handler(void)
 
 	/* Make an invalid API call, to ensure the event handler works. */
 	printf("ex_event_handler: expect an error message to follow\n");
-	(void)conn->open_session(conn, NULL, "isolation=invalid", &session);
+	ret = conn->open_session(conn, NULL, "isolation=invalid", &session);
 
 	ret = conn->close(conn, NULL);
 
@@ -122,6 +122,8 @@ config_event_handler(void)
 int
 main(void)
 {
+	int ret;
+
 	/*
 	 * Create a clean test directory for this run of the test program if the
 	 * environment variable isn't already set (as is done by make check).
@@ -132,5 +134,7 @@ main(void)
 	} else
 		home = NULL;
 
-	return (config_event_handler());
+	ret = config_event_handler();
+
+	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }

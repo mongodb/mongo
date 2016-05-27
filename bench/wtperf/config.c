@@ -47,6 +47,53 @@ static void config_opt_usage(void);
 	(strncmp(str, bytes, len) == 0 && (str)[(len)] == '\0')
 
 /*
+ * config_unescape --
+ *	Modify a string in place, replacing any backslash escape sequences.
+ *	The modified string is always shorter.
+ */
+static int
+config_unescape(char *orig)
+{
+	char ch, *dst, *s;
+
+	for (dst = s = orig; *s != '\0';) {
+		if ((ch = *s++) == '\\') {
+			ch = *s++;
+			switch (ch) {
+			case 'b':
+				*dst++ = '\b';
+				break;
+			case 'f':
+				*dst++ = '\f';
+				break;
+			case 'n':
+				*dst++ = '\n';
+				break;
+			case 'r':
+				*dst++ = '\r';
+				break;
+			case 't':
+				*dst++ = '\t';
+				break;
+			case '\\':
+			case '/':
+			case '\"':	/* Backslash needed for spell check. */
+				*dst++ = ch;
+				break;
+			default:
+				/* Note: Unicode (\u) not implemented. */
+				fprintf(stderr,
+				    "invalid escape in string: %s\n", orig);
+				return (EINVAL);
+			}
+		} else
+			*dst++ = ch;
+	}
+	*dst = '\0';
+	return (0);
+}
+
+/*
  * config_assign --
  *	Assign the src config to the dest, any storage allocated in dest is
  * freed as a result.
@@ -363,7 +410,8 @@ static int
 config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 {
 	CONFIG_OPT *popt;
-	char *newstr, **strp;
+	char *begin, *newstr, **strp;
+	int ret;
 	size_t i, newlen, nopt;
 	void *valueloc;
 
@@ -438,15 +486,20 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		}
 		strp = (char **)valueloc;
 		newlen = v->len + 1;
-		if (*strp == NULL) {
-			newstr = dstrdup(v->str);
-		} else {
-			newlen += (strlen(*strp) + 1);
+		if (*strp == NULL)
+			begin = newstr = dstrdup(v->str);
+		else {
+			newlen += strlen(*strp) + 1;
 			newstr = dcalloc(newlen, sizeof(char));
 			snprintf(newstr, newlen,
 			    "%s,%*s", *strp, (int)v->len, v->str);
 			/* Free the old value now we've copied it. */
 			free(*strp);
+			begin = &newstr[(newlen - 1) - v->len];
+		}
+		if ((ret = config_unescape(begin)) != 0) {
+			free(newstr);
+			return (ret);
 		}
 		*strp = newstr;
 		break;
@@ -487,84 +540,99 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 int
 config_opt_file(CONFIG *cfg, const char *filename)
 {
-	struct stat sb;
-	ssize_t read_size;
-	size_t buf_size, linelen, optionpos;
-	int contline, fd, linenum, ret;
-	char option[1024];
-	char *comment, *file_buf, *line, *ltrim, *rtrim;
+	FILE *fp;
+	size_t linelen, optionpos;
+	int linenum, ret;
+	bool contline;
+	char line[4 * 1024], option[4 * 1024];
+	char *comment, *ltrim, *rtrim;
 
-	file_buf = NULL;
+	ret = 0;
 
-	if ((fd = open(filename, O_RDONLY)) == -1) {
+	if ((fp = fopen(filename, "r")) == NULL) {
 		fprintf(stderr, "wtperf: %s: %s\n", filename, strerror(errno));
 		return (errno);
 	}
-	if ((ret = fstat(fd, &sb)) != 0) {
-		fprintf(stderr, "wtperf: stat of %s: %s\n",
-		    filename, strerror(errno));
-		ret = errno;
-		goto err;
-	}
-	buf_size = (size_t)sb.st_size;
-	file_buf = dcalloc(buf_size + 2, 1);
-	read_size = read(fd, file_buf, buf_size);
-	if (read_size == -1
-#ifndef _WIN32
-	/* Windows automatically translates \r\n -> \n so counts will be off */
-	|| (size_t)read_size != buf_size
-#endif
-	) {
-		fprintf(stderr,
-		    "wtperf: read unexpected amount from config file\n");
-		ret = EINVAL;
-		goto err;
-	}
-	/* Make sure the buffer is terminated correctly. */
-	file_buf[read_size] = '\0';
 
-	ret = 0;
 	optionpos = 0;
 	linenum = 0;
-	/*
-	 * We should switch this from using strtok to generating a single
-	 * WiredTiger configuration string compatible string, and using
-	 * the WiredTiger configuration parser to parse it at once.
-	 */
-#define	WTPERF_CONFIG_DELIMS	"\n\\"
-	for (line = strtok(file_buf, WTPERF_CONFIG_DELIMS);
-	    line != NULL;
-	    line = strtok(NULL, WTPERF_CONFIG_DELIMS)) {
+	while (fgets(line, sizeof(line), fp) != NULL) {
 		linenum++;
-		/* trim the line */
+
+		/* Skip leading space. */
 		for (ltrim = line; *ltrim && isspace(*ltrim); ltrim++)
 			;
-		rtrim = &ltrim[strlen(ltrim)];
-		if (rtrim > ltrim && rtrim[-1] == '\n')
-			rtrim--;
 
-		contline = (rtrim > ltrim && rtrim[-1] == '\\');
-		if (contline)
-			rtrim--;
-
-		comment = strchr(ltrim, '#');
-		if (comment != NULL && comment < rtrim)
-			rtrim = comment;
-		while (rtrim > ltrim && isspace(rtrim[-1]))
-			rtrim--;
-
-		linelen = (size_t)(rtrim - ltrim);
-		if (linelen == 0)
-			continue;
-
-		if (linelen + optionpos + 1 > sizeof(option)) {
-			fprintf(stderr, "wtperf: %s: %d: line overflow\n",
+		/*
+		 * Find the end of the line; if there's no trailing newline, the
+		 * the line is too long for the buffer or the file was corrupted
+		 * (there's no terminating newline in the file).
+		 */
+		for (rtrim = line; *rtrim && *rtrim != '\n'; rtrim++)
+			;
+		if (*rtrim != '\n') {
+			fprintf(stderr,
+			    "wtperf: %s: %d: configuration line too long\n",
 			    filename, linenum);
 			ret = EINVAL;
 			break;
 		}
-		*rtrim = '\0';
-		strncpy(&option[optionpos], ltrim, linelen);
+
+		/* Skip trailing space. */
+		while (rtrim > ltrim && isspace(rtrim[-1]))
+			rtrim--;
+
+		/*
+		 * If the last non-space character in the line is an escape, the
+		 * line will be continued. Checked early because the line might
+		 * otherwise be empty.
+		 */
+		contline = rtrim > ltrim && rtrim[-1] == '\\';
+		if (contline)
+			rtrim--;
+
+		/*
+		 * Discard anything after the first hash character. Check after
+		 * the escape character, the escape can appear after a comment.
+		 */
+		if ((comment = strchr(ltrim, '#')) != NULL)
+			rtrim = comment;
+
+		/* Skip trailing space again. */
+		while (rtrim > ltrim && isspace(rtrim[-1]))
+			rtrim--;
+
+		/*
+		 * Check for empty lines: note that the right-hand boundary can
+		 * cross over the left-hand boundary, less-than or equal to is
+		 * the correct test.
+		 */
+		if (rtrim <= ltrim) {
+			/*
+			 * If we're continuing from this line, or we haven't
+			 * started building an option, ignore this line.
+			 */
+			if (contline || optionpos == 0)
+				continue;
+
+			/*
+			 * An empty line terminating an option we're building;
+			 * clean things up so we can proceed.
+			 */
+			linelen = 0;
+		} else
+			linelen = (size_t)(rtrim - ltrim);
+		ltrim[linelen] = '\0';
+
+		if (linelen + optionpos + 1 > sizeof(option)) {
+			fprintf(stderr,
+			    "wtperf: %s: %d: option value overflow\n",
+			    filename, linenum);
+			ret = EINVAL;
+			break;
+		}
+
+		memcpy(&option[optionpos], ltrim, linelen);
 		option[optionpos + linelen] = '\0';
 		if (contline)
 			optionpos += linelen;
@@ -577,16 +645,19 @@ config_opt_file(CONFIG *cfg, const char *filename)
 			optionpos = 0;
 		}
 	}
-	if (ret == 0 && optionpos > 0) {
-		fprintf(stderr, "wtperf: %s: %d: last line continues\n",
-		    filename, linenum);
-		ret = EINVAL;
-		goto err;
+	if (ret == 0) {
+		if (ferror(fp)) {
+			fprintf(stderr, "wtperf: %s: read error\n", filename);
+			ret = errno;
+		}
+		if (optionpos > 0) {
+			fprintf(stderr, "wtperf: %s: %d: last line continues\n",
+			    filename, linenum);
+			ret = EINVAL;
+		}
 	}
 
-err:	if (fd != -1)
-		(void)close(fd);
-	free(file_buf);
+	(void)fclose(fp);
 	return (ret);
 }
 
@@ -754,7 +825,7 @@ config_consolidate(CONFIG *cfg)
 			 * as being the same key.
 			 */
 			if (strncmp(conf_line->string, test_line->string,
-			    (size_t)(string_key - conf_line->string + 1))
+			    (size_t)((string_key - conf_line->string) + 1))
 			    == 0) {
 				TAILQ_REMOVE(&cfg->config_head, conf_line, c);
 				free(conf_line->string);

@@ -51,7 +51,7 @@ __declspec(dllexport)
 #endif
 int add_my_encryptors(WT_CONNECTION *connection);
 
-static const char *home = NULL;
+static const char *home;
 
 #define	SYS_KEYID	"system"
 #define	SYS_PW		"system_password"
@@ -587,6 +587,8 @@ main(void)
 
 		printf("Verified key %s; value %s\n", key1, val1);
 	}
+
 	ret = conn->close(conn, NULL);
-	return (ret);
+
+	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
