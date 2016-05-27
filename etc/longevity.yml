@@ -29,6 +29,7 @@ functions:
         script: |
           rm -rf ./*
           mkdir src
+    - command: manifest.load
     - command: git.get_project
       params:
         directory: src
@@ -191,6 +192,7 @@ functions:
 tasks:
 - name: compile
   commands:
+    - command: manifest.load
     - command: git.get_project
       params:
         directory: src
