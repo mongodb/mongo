@@ -107,6 +107,7 @@ variables:
   - ubuntu1204
   - ubuntu1404
   - ubuntu1604
+  - ubuntu1404-jepsen
   - ubuntu1404-rocksdb
   - ubuntu1410-fast-clang
   - debian71
@@ -374,6 +375,7 @@ functions:
           sed -i -e "s/\"-Xmx.*\"/\"-Xmx$heap_space\"/" project.clj
     - command: shell.exec
       type: test
+      timeout_secs: 2700 # Timeout test if there is no output for more than 45 minutes.
       params:
         working_dir: src/jepsen/mongodb
         script: |
@@ -777,6 +779,30 @@ tasks:
       <<: *jepsen_config_vars
       jepsen_read_with_find_and_modify: --read-with-find-and-modify
       jepsen_storage_engine: --storage-engine wiredTiger
+
+- <<: *run_jepsen_template
+  name: jepsen_findAndModify_150s_WT
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+      jepsen_read_with_find_and_modify: --read-with-find-and-modify
+      jepsen_storage_engine: --storage-engine wiredTiger
+      jepsen_time_limit: --time-limit 150
+
+- <<: *run_jepsen_template
+  name: jepsen_findAndModify_600s_WT
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+      jepsen_read_with_find_and_modify: --read-with-find-and-modify
+      jepsen_storage_engine: --storage-engine wiredTiger
+      jepsen_time_limit: --time-limit 600
 
 ## jstestfuzz mmapv1 ##
 - <<: *jstestfuzz_template
@@ -6775,3 +6801,21 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+
+- name: ubuntu1404-jepsen
+  display_name: ~ Jepsen Ubuntu 14.04
+  run_on:
+  - ubuntu1404-jepsen
+  expansions:
+    compile_flags: MONGO_DISTMOD=ubuntu1404 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+  tasks:
+  - name: compile
+    distros:
+    - ubuntu1404-build
+  - name: jepsen_findAndModify_WT
+  - name: jepsen_findAndModify_150s_WT
+  - name: jepsen_findAndModify_600s_WT
+  - name: unittests
+    distros:
+    - ubuntu1404-test
