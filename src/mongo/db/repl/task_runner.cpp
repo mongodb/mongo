@@ -50,6 +50,7 @@ namespace mongo {
 namespace repl {
 
 namespace {
+using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
 /**
  * Runs a single task runner task.
@@ -80,8 +81,7 @@ TaskRunner::TaskRunner(OldThreadPool* threadPool)
 }
 
 TaskRunner::~TaskRunner() {
-    DESTRUCTOR_GUARD(stdx::unique_lock<stdx::mutex> lk(_mutex);
-                     if (!_active) { return; } _cancelRequested = true;
+    DESTRUCTOR_GUARD(UniqueLock lk(_mutex); if (!_active) { return; } _cancelRequested = true;
                      _condition.notify_all();
                      while (_active) { _condition.wait(lk); });
 }
@@ -165,21 +165,26 @@ void TaskRunner::_runTasks() {
     txn.reset();
 
     std::list<Task> tasks;
-    {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+    UniqueLock lk{_mutex};
+
+    auto cancelTasks = [&]() {
         tasks.swap(_tasks);
-    }
+        lk.unlock();
+        // Cancel remaining tasks with a CallbackCanceled status.
+        for (auto task : tasks) {
+            runSingleTask(task,
+                          nullptr,
+                          Status(ErrorCodes::CallbackCanceled,
+                                 "this task has been canceled by a previously invoked task"));
+        }
+        tasks.clear();
 
-    // Cancel remaining tasks with a CallbackCanceled status.
-    for (auto task : tasks) {
-        runSingleTask(task,
-                      nullptr,
-                      Status(ErrorCodes::CallbackCanceled,
-                             "this task has been canceled by a previously invoked task"));
-    }
+    };
+    cancelTasks();
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    lk.lock();
     _finishRunTasks_inlock();
+    cancelTasks();
 }
 
 void TaskRunner::_finishRunTasks_inlock() {
@@ -189,7 +194,7 @@ void TaskRunner::_finishRunTasks_inlock() {
 }
 
 TaskRunner::Task TaskRunner::_waitForNextTask() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    UniqueLock lk(_mutex);
 
     while (_tasks.empty() && !_cancelRequested) {
         _condition.wait(lk);
