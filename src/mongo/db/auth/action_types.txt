@@ -70,7 +70,6 @@
 "listIndexes",
 "listShards",
 "logRotate",
-"lockInfo",
 "moveChunk",
 "netstat",
 "planCacheIndexFilter", # view/update index filters
