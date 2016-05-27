@@ -58,7 +58,7 @@ public:
     }
     virtual void markIndexSafe24AndUp(OperationContext* opCtx) {}
 
-    virtual bool currentFilesCompatible(OperationContext* opCtx) const;
+    virtual Status currentFilesCompatible(OperationContext* opCtx) const;
 
     virtual void getCollectionNamespaces(std::list<std::string>* out) const;
 

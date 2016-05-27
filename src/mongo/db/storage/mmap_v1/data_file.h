@@ -30,8 +30,10 @@
 
 #pragma once
 
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/storage/mmap_v1/diskloc.h"
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
+#include "mongo/platform/bits.h"
 
 namespace mongo {
 
@@ -43,23 +45,49 @@ public:
     DataFileVersion(uint32_t major, uint32_t minor) : _major(major), _minor(minor) {}
 
     static DataFileVersion defaultForNewFiles() {
-        return DataFileVersion(kCurrentMajor, kIndexes24AndNewer | kMayHave28Freelist);
+        return DataFileVersion(kCurrentMajor, kIndexes24AndNewer | kMayHave30Freelist);
     }
 
-    bool isCompatibleWithCurrentCode() const {
-        if (_major != kCurrentMajor)
-            return false;
+    Status isCompatibleWithCurrentCode() const {
+        if (_major != kCurrentMajor) {
+            StringBuilder sb;
+            sb << "The data files have major version " << _major
+               << ", but this version of mongod only supports version " << kCurrentMajor;
+            return {ErrorCodes::MustUpgrade, sb.str()};
+        }
 
-        if (_minor & ~kUsedMinorFlagsMask)
-            return false;
+        uint32_t unrecognizedMinorBits = _minor & ~kUsedMinorFlagsMask;
+        if (unrecognizedMinorBits) {
+            StringBuilder sb;
+            sb << "The data files use features not recognized by this version of mongod; the"
+                  " feature bits in positions [ ";
+            bool firstIteration = true;
+            while (unrecognizedMinorBits) {
+                const int lowestSetBitPosition = countTrailingZeros64(unrecognizedMinorBits);
+                if (!firstIteration) {
+                    sb << ", ";
+                }
+                sb << lowestSetBitPosition;
+                unrecognizedMinorBits ^= (1 << lowestSetBitPosition);
+                firstIteration = false;
+            }
+            sb << " ] aren't recognized by this version of mongod";
+
+            return {ErrorCodes::MustUpgrade, sb.str()};
+        }
 
         const uint32_t indexCleanliness = _minor & kIndexPluginMask;
-        if (indexCleanliness != kIndexes24AndNewer && indexCleanliness != kIndexes22AndOlder)
-            return false;
+        if (indexCleanliness != kIndexes24AndNewer && indexCleanliness != kIndexes22AndOlder) {
+            StringBuilder sb;
+            sb << "The data files have index plugin version " << indexCleanliness
+               << ", but this version of mongod only supports versions " << kIndexes22AndOlder
+               << " and " << kIndexes24AndNewer;
+            return {ErrorCodes::MustUpgrade, sb.str()};
+        }
 
-        // We are compatible with either setting of kMayHave28Freelist.
+        // We are compatible with either setting of kMayHave30Freelist.
 
-        return true;
+        return Status::OK();
     }
 
     bool is24IndexClean() const {
@@ -69,11 +97,11 @@ public:
         _minor = ((_minor & ~kIndexPluginMask) | kIndexes24AndNewer);
     }
 
-    bool mayHave28Freelist() const {
-        return _minor & kMayHave28Freelist;
+    bool mayHave30Freelist() const {
+        return _minor & kMayHave30Freelist;
     }
-    void setMayHave28Freelist() {
-        _minor |= kMayHave28Freelist;
+    void setMayHave30Freelist() {
+        _minor |= kMayHave30Freelist;
     }
 
     uint32_t majorRaw() const {
@@ -95,7 +123,7 @@ private:
     static const uint32_t kIndexes22AndOlder = 5;
     static const uint32_t kIndexes24AndNewer = 6;
 
-    static const uint32_t kMayHave28Freelist = (1 << 4);
+    static const uint32_t kMayHave30Freelist = (1 << 4);
 
     // All set bits we know about are covered by this mask.
     static const uint32_t kUsedMinorFlagsMask = 0x1f;

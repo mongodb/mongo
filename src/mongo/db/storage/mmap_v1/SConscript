@@ -249,3 +249,11 @@ if mmapv1:
             ]
         )
 
+    env.CppUnitTest(
+        target='data_file_version_test',
+        source=[
+            'data_file_version_test.cpp',
+        ],
+        LIBDEPS=[
+        ],
+    )
