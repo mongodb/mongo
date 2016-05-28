@@ -60,6 +60,8 @@ CLANG_FORMAT_SOURCE_TAR_BASE = string.Template("clang+llvm-$version-$tar_path/bi
 # Has to match the string in SConstruct
 MODULE_DIR = "src/mongo/db/modules"
 
+##############################################################################
+
 # Copied from python 2.7 version of subprocess.py
 # Exception classes used by this module.
 class CalledProcessError(Exception):
@@ -405,13 +407,23 @@ class Repo(object):
         self.root = self._get_root()
 
     def _callgito(self, args):
-        """Call git for this repository
+        """Call git for this repository, and return the captured output
         """
         # These two flags are the equivalent of -C in newer versions of Git
         # but we use these to support versions pre 1.8.5 but it depends on the command
         # and what the current directory is
         return callo(['git', '--git-dir', os.path.join(self.path, ".git"),
                             '--work-tree', self.path] + args)
+
+    def _callgit(self, args):
+        """Call git for this repository without capturing output
+        This is designed to be used when git returns non-zero exit codes.
+        """
+        # These two flags are the equivalent of -C in newer versions of Git
+        # but we use these to support versions pre 1.8.5 but it depends on the command
+        # and what the current directory is
+        return subprocess.call(['git', '--git-dir', os.path.join(self.path, ".git"),
+                                '--work-tree', self.path] + args)
 
     def _get_local_dir(self, path):
         """Get a directory path relative to the git root directory
@@ -487,6 +499,97 @@ class Repo(object):
         valid_files = [os.path.normpath(os.path.join(self.root, f)) for f in valid_files]
 
         return valid_files
+
+    def is_detached(self):
+        """Is the current working tree in a detached HEAD state?
+        """
+        # symbolic-ref returns 1 if the repo is in a detached HEAD state
+        return self._callgit(["symbolic-ref", "--quiet", "HEAD"])
+
+    def is_ancestor(self, parent, child):
+        """Is the specified parent hash an ancestor of child hash?
+        """
+        # merge base returns 0 if parent is an ancestor of child
+        return not self._callgit(["merge-base", "--is-ancestor", parent, child]).rstrip()
+
+    def is_commit(self, sha1):
+        """Is the specified hash a valid git commit?
+        """
+        # cat-file -e returns 0 if it is a valid hash
+        return not self._callgit(["cat-file", "-e", "%s^{commit}" % sha1])
+
+    def is_working_tree_dirty(self):
+        """Does the current working tree have changes?
+        """
+        # diff returns 1 if the working tree has local changes
+        return self._callgit(["diff", "--quiet"])
+
+    def does_branch_exist(self, branch):
+        """Does the branch exist?
+        """
+        # rev-parse returns 0 if the branch exists
+        return not self._callgit(["rev-parse", "--verify", branch])
+
+    def get_merge_base(self, commit):
+        """Get the merge base between 'commit' and HEAD
+        """
+        return self._callgito(["merge-base", "HEAD", commit]).rstrip()
+
+    def get_branch_name(self):
+        """Get the current branch name, short form
+           This returns "master", not "refs/head/master"
+           Will not work if the current branch is detached
+        """
+        branch = self.rev_parse(["--abbrev-ref", "HEAD"])
+        if branch == "HEAD":
+            raise ValueError("Branch is currently detached")
+
+        return branch
+
+    def add(self, command):
+        """git add wrapper
+        """
+        return self._callgito(["add"] + command)
+
+    def checkout(self, command):
+        """git checkout wrapper
+        """
+        return self._callgito(["checkout"] + command)
+
+    def commit(self, command):
+        """git commit wrapper
+        """
+        return self._callgito(["commit"] + command)
+
+    def diff(self, command):
+        """git diff wrapper
+        """
+        return self._callgito(["diff"] + command)
+
+    def log(self, command):
+        """git log wrapper
+        """
+        return self._callgito(["log"] + command)
+
+    def rev_parse(self, command):
+        """git rev-parse wrapper
+        """
+        return self._callgito(["rev-parse"] + command).rstrip()
+
+    def rm(self, command):
+        """git rm wrapper
+        """
+        return self._callgito(["rm"] + command)
+
+    def show(self, command):
+        """git show wrapper
+        """
+        return self._callgito(["show"] + command)
+
+def get_list_from_lines(lines):
+    """"Convert a string containing a series of lines into a list of strings
+    """
+    return [line.rstrip() for line in lines.splitlines()]
 
 def get_files_to_check_working_tree():
     """Get a list of files to check form the working tree.
@@ -590,10 +693,142 @@ def format_func(clang_format):
 
     _format_files(clang_format, files)
 
+def reformat_branch(clang_format, commit_prior_to_reformat, commit_after_reformat):
+    """Reformat a branch made before a clang-format run
+    """
+    clang_format = ClangFormat(clang_format, _get_build_dir())
+
+    if os.getcwd() != get_base_dir():
+        raise ValueError("reformat-branch must be run from the repo root")
+
+    if not os.path.exists("buildscripts/clang_format.py"):
+        raise ValueError("reformat-branch is only supported in the mongo repo")
+
+    repo = Repo(get_base_dir())
+
+    # Validate that user passes valid commits
+    if not repo.is_commit(commit_prior_to_reformat):
+        raise ValueError("Commit Prior to Reformat '%s' is not a valid commit in this repo" %
+                commit_prior_to_reformat)
+
+    if not repo.is_commit(commit_after_reformat):
+        raise ValueError("Commit After Reformat '%s' is not a valid commit in this repo" %
+                commit_after_reformat)
+
+    if not repo.is_ancestor(commit_prior_to_reformat, commit_after_reformat):
+        raise ValueError("Commit Prior to Reformat '%s' is not a valid ancestor of Commit After" +
+                " Reformat '%s' in this rep", commit_prior_to_reformat, commit_after_reformat)
+
+    # Validate the user is on a local branch that has the right merge base
+    if repo.is_detached():
+        raise ValueError("You must not run this script in a detached HEAD state")
+
+    # Validate the user has no pending changes
+    if repo.is_working_tree_dirty():
+        raise ValueError("Your working tree has pending changes. You must have a clean working tree before proceeding.")
+
+    merge_base = repo.get_merge_base(commit_prior_to_reformat)
+
+    if not merge_base == commit_prior_to_reformat:
+        raise ValueError("Please rebase to '%s' and resolve all conflicts before running this script" % (commit_prior_to_reformat))
+
+    # We assume the target branch is master, it could be a different branch if needed for testing
+    merge_base = repo.get_merge_base("master")
+
+    if not merge_base == commit_prior_to_reformat:
+        raise ValueError("This branch appears to already have advanced too far through the merge process")
+
+    # Everything looks good so lets start going through all the commits
+    branch_name = repo.get_branch_name()
+    new_branch = "%s-reformatted" % branch_name
+
+    if repo.does_branch_exist(new_branch):
+        raise ValueError("The branch '%s' already exists. Please delete the branch '%s', or rename the current branch." % (new_branch, new_branch))
+
+    commits = get_list_from_lines(repo.log(["--reverse", "--pretty=format:%H", "%s..HEAD" % commit_prior_to_reformat]))
+
+    previous_commit_base = commit_after_reformat
+
+    files_match = re.compile('\\.(h|cpp|js)$')
+
+    # Go through all the commits the user made on the local branch and migrate to a new branch
+    # that is based on post_reformat commits instead
+    for commit_hash in commits:
+        repo.checkout(["--quiet", commit_hash])
+
+        deleted_files = []
+
+        # Format each of the files by checking out just a single commit from the user's branch
+        commit_files = get_list_from_lines(repo.diff(["HEAD~", "--name-only"]))
+
+        for commit_file in commit_files:
+
+            # Format each file needed if it was not deleted
+            if not os.path.exists(commit_file):
+                print("Skipping file '%s' since it has been deleted in commit '%s'" % (
+                        commit_file, commit_hash))
+                deleted_files.append(commit_file)
+                continue
+
+            if files_match.search(commit_file):
+                clang_format.format(commit_file)
+            else:
+                print("Skipping file '%s' since it is not a file clang_format should format" %
+                        commit_file)
+
+        # Check if anything needed reformatting, and if so amend the commit
+        if not repo.is_working_tree_dirty():
+            print ("Commit %s needed no reformatting" % commit_hash)
+        else:
+            repo.commit(["--all", "--amend", "--no-edit"])
+
+        # Rebase our new commit on top the post-reformat commit
+        previous_commit = repo.rev_parse(["HEAD"])
+
+        # Checkout the new branch with the reformatted commits
+        # Note: we will not name as a branch until we are done with all commits on the local branch
+        repo.checkout(["--quiet", previous_commit_base])
+
+        # Copy each file from the reformatted commit on top of the post reformat
+        diff_files = get_list_from_lines(repo.diff(["%s~..%s" % (previous_commit, previous_commit),
+            "--name-only"]))
+
+        for diff_file in diff_files:
+            # If the file was deleted in the commit we are reformatting, we need to delete it again
+            if diff_file in deleted_files:
+                repo.rm([diff_file])
+                continue
+
+            # The file has been added or modified, continue as normal
+            file_contents = repo.show(["%s:%s" % (previous_commit, diff_file)])
+
+            root_dir = os.path.dirname(diff_file)
+            if root_dir and not os.path.exists(root_dir):
+                os.makedirs(root_dir)
+
+            with open(diff_file, "w+") as new_file:
+                new_file.write(file_contents)
+
+            repo.add([diff_file])
+
+        # Create a new commit onto clang-formatted branch
+        repo.commit(["--reuse-message=%s" % previous_commit])
+
+        previous_commit_base = repo.rev_parse(["HEAD"])
+
+    # Create a new branch to mark the hashes we have been using
+    repo.checkout(["-b", new_branch])
+
+    print("reformat-branch is done running.")
+    print("A copy of your branch has been made named '%s', and formatted with clang-format." % new_branch)
+    print("The original branch has been left unchanged.")
+    print("The next step is to rebase the new branch on 'master'.")
+
+
 def usage():
     """Print usage
     """
-    print("clang-format.py supports 4 commands [ lint, lint-all, lint-patch, format ].")
+    print("clang-format.py supports 5 commands [ lint, lint-all, lint-patch, format, reformat-branch].")
 
 def main():
     """Main entry point
@@ -614,6 +849,13 @@ def main():
             lint_patch(options.clang_format, args[2:])
         elif command == "format":
             format_func(options.clang_format)
+        elif command == "reformat-branch":
+
+            if len(args) < 3:
+                print("ERROR: reformat-branch takes two parameters: commit_prior_to_reformat commit_after_reformat")
+                return
+
+            reformat_branch(options.clang_format, args[2], args[3])
         else:
             usage()
     else:
