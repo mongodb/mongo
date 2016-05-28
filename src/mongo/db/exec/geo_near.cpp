@@ -35,8 +35,8 @@
 #include "third_party/s2/s2regionintersection.h"
 
 #include "mongo/base/owned_pointer_vector.h"
-#include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/fetch.h"
+#include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/geoparser.h"

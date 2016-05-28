@@ -49,12 +49,9 @@
               }),
               "sort 1");
     assert.eq("sara,mark,joe,eliot,bob,allan",
-              db.foo.find()
-                  .sort({name: -1})
-                  .toArray()
-                  .map(function(z) {
-                      return z.name;
-                  }),
+              db.foo.find().sort({name: -1}).toArray().map(function(z) {
+                  return z.name;
+              }),
               "sort 2");
 
     // make sure we can't foce a split on an extreme key

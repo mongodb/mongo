@@ -572,17 +572,17 @@ Status RecordStoreV1Base::validate(OperationContext* txn,
     if (_details->firstExtent(txn).isNull())
         output->append("firstExtent", "null");
     else
-        output->append("firstExtent",
-                       str::stream()
-                           << _details->firstExtent(txn).toString() << " ns:"
-                           << _getExtent(txn, _details->firstExtent(txn))->nsDiagnostic.toString());
+        output->append(
+            "firstExtent",
+            str::stream() << _details->firstExtent(txn).toString() << " ns:"
+                          << _getExtent(txn, _details->firstExtent(txn))->nsDiagnostic.toString());
     if (_details->lastExtent(txn).isNull())
         output->append("lastExtent", "null");
     else
-        output->append("lastExtent",
-                       str::stream()
-                           << _details->lastExtent(txn).toString() << " ns:"
-                           << _getExtent(txn, _details->lastExtent(txn))->nsDiagnostic.toString());
+        output->append(
+            "lastExtent",
+            str::stream() << _details->lastExtent(txn).toString() << " ns:"
+                          << _getExtent(txn, _details->lastExtent(txn))->nsDiagnostic.toString());
 
     // 22222222222222222222222222
     {  // validate extent basics
@@ -784,9 +784,12 @@ Status RecordStoreV1Base::validate(OperationContext* txn,
                             break;
                         }
 
-                        string err(str::stream()
-                                   << "bad pointer in deleted record list: " << loc.toString()
-                                   << " bucket: " << i << " k: " << k);
+                        string err(str::stream() << "bad pointer in deleted record list: "
+                                                 << loc.toString()
+                                                 << " bucket: "
+                                                 << i
+                                                 << " k: "
+                                                 << k);
                         results->errors.push_back(err);
                         results->valid = false;
                         break;

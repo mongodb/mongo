@@ -382,9 +382,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
 
         // If we're a mongo object
         if (opts.getDB) {
-            opts = {
-                restart: opts.runId
-            };
+            opts = {restart: opts.runId};
         }
 
         // Initialize and create a copy of the opts
@@ -794,11 +792,10 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
 
         if (!Array.contains(allowedExitCodes, returnCode)) {
             throw new MongoRunner.StopError(
-            // clang-format off
+                // clang-format off
             `MongoDB process on port ${port} exited with error code ${returnCode}`,
-            // clang-format on
-            returnCode
-        );
+                // clang-format on
+                returnCode);
         }
 
         return returnCode;
@@ -884,10 +881,9 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                     }
                 }
                 if (!hasAuthMechs) {
-                    argArray.push(...[
-                        '--setParameter',
-                        "authenticationMechanisms=" + jsTest.options().authMechanism
-                    ]);
+                    argArray.push(
+                        ...['--setParameter',
+                            "authenticationMechanisms=" + jsTest.options().authMechanism]);
                 }
             }
             if (jsTest.options().auth) {
@@ -916,22 +912,16 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                     }
                 }
                 if (jsTest.options().wiredTigerEngineConfigString) {
-                    argArray.push(...[
-                        '--wiredTigerEngineConfigString',
-                        jsTest.options().wiredTigerEngineConfigString
-                    ]);
+                    argArray.push(...['--wiredTigerEngineConfigString',
+                                      jsTest.options().wiredTigerEngineConfigString]);
                 }
                 if (jsTest.options().wiredTigerCollectionConfigString) {
-                    argArray.push(...[
-                        '--wiredTigerCollectionConfigString',
-                        jsTest.options().wiredTigerCollectionConfigString
-                    ]);
+                    argArray.push(...['--wiredTigerCollectionConfigString',
+                                      jsTest.options().wiredTigerCollectionConfigString]);
                 }
                 if (jsTest.options().wiredTigerIndexConfigString) {
-                    argArray.push(...[
-                        '--wiredTigerIndexConfigString',
-                        jsTest.options().wiredTigerIndexConfigString
-                    ]);
+                    argArray.push(...['--wiredTigerIndexConfigString',
+                                      jsTest.options().wiredTigerIndexConfigString]);
                 }
                 // apply setParameters for mongod
                 if (jsTest.options().setParameters) {

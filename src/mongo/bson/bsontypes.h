@@ -29,9 +29,9 @@
 
 #pragma once
 
+#include "mongo/config.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/config.h"
 
 namespace mongo {
 

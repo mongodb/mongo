@@ -11,10 +11,7 @@ for (var n = 0; n < numTests; n++) {
     num = 0;
     for (x = 1; x < 9; x++) {
         for (y = 1; y < 9; y++) {
-            o = {
-                _id: num++,
-                loc: [x, y]
-            };
+            o = {_id: num++, loc: [x, y]};
             t.save(o);
         }
     }

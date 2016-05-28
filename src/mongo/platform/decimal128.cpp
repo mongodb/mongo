@@ -25,8 +25,8 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/platform/basic.h"
 
 #include <cmath>
 #include <cstdlib>

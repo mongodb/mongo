@@ -844,7 +844,7 @@ bool BSONIteratorSorted::ElementFieldCmp::operator()(const char* s1, const char*
 }
 
 BSONIteratorSorted::BSONIteratorSorted(const BSONObj& o, const ElementFieldCmp& cmp)
-    : _nfields(o.nFields()), _fields(new const char* [_nfields]) {
+    : _nfields(o.nFields()), _fields(new const char*[_nfields]) {
     int x = 0;
     BSONObjIterator i(o);
     while (i.more()) {

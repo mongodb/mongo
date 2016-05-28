@@ -73,10 +73,9 @@ load("jstests/libs/analyze_plan.js");
                   .sort({b: 1})
                   .returnKey()
                   .toArray();
-    assert.eq(results,
-              [
-                {a: 3, c: {'': 1}, d: {'': 1}},
-                {a: 2, c: {'': 2}, d: {'': 2}},
-                {a: 1, c: {'': 3}, d: {'': 3}}
-              ]);
+    assert.eq(results, [
+        {a: 3, c: {'': 1}, d: {'': 1}},
+        {a: 2, c: {'': 2}, d: {'': 2}},
+        {a: 1, c: {'': 3}, d: {'': 3}}
+    ]);
 })();

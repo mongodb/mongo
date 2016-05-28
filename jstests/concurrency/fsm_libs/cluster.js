@@ -97,10 +97,7 @@ var Cluster = function(options) {
     var initialized = false;
     var clusterStartTime;
 
-    var _conns = {
-        mongos: [],
-        mongod: []
-    };
+    var _conns = {mongos: [], mongod: []};
     var nextConn = 0;
     var replSets = [];
 
@@ -342,11 +339,7 @@ var Cluster = function(options) {
             return '';
         }
 
-        var cluster = {
-            mongos: [],
-            config: [],
-            shards: {}
-        };
+        var cluster = {mongos: [], config: [], shards: {}};
 
         var i = 0;
         var mongos = st.s0;

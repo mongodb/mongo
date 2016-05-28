@@ -488,10 +488,15 @@ void Stats::S::_asObj(BSONObjBuilder* builder) const {
       << _journaledBytes / (_uncompressedBytes + 1.0) << "commitsInWriteLock" << _commitsInWriteLock
       << "earlyCommits" << 0 << "timeMs"
       << BSON("dt" << _durationMillis << "prepLogBuffer" << (unsigned)(_prepLogBufferMicros / 1000)
-                   << "writeToJournal" << (unsigned)(_writeToJournalMicros / 1000)
-                   << "writeToDataFiles" << (unsigned)(_writeToDataFilesMicros / 1000)
-                   << "remapPrivateView" << (unsigned)(_remapPrivateViewMicros / 1000) << "commits"
-                   << (unsigned)(_commitsMicros / 1000) << "commitsInWriteLock"
+                   << "writeToJournal"
+                   << (unsigned)(_writeToJournalMicros / 1000)
+                   << "writeToDataFiles"
+                   << (unsigned)(_writeToDataFilesMicros / 1000)
+                   << "remapPrivateView"
+                   << (unsigned)(_remapPrivateViewMicros / 1000)
+                   << "commits"
+                   << (unsigned)(_commitsMicros / 1000)
+                   << "commitsInWriteLock"
                    << (unsigned)(_commitsInWriteLockMicros / 1000));
 
     if (storageGlobalParams.journalCommitIntervalMs != 0) {

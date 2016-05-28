@@ -78,9 +78,9 @@ Command::~Command() = default;
 string Command::parseNsFullyQualified(const string& dbname, const BSONObj& cmdObj) const {
     BSONElement first = cmdObj.firstElement();
     uassert(17005,
-            mongoutils::str::stream()
-                << "Main argument to " << first.fieldNameStringData()
-                << " must be a fully qualified namespace string.  Found: " << first.toString(false),
+            mongoutils::str::stream() << "Main argument to " << first.fieldNameStringData()
+                                      << " must be a fully qualified namespace string.  Found: "
+                                      << first.toString(false),
             first.type() == mongo::String &&
                 NamespaceString::validCollectionComponent(first.valuestr()));
     return first.String();
@@ -108,7 +108,9 @@ NamespaceString Command::parseNsCollectionRequired(const string& dbname,
 #if defined(CLC)
     DEV if (mongoutils::str::startsWith(coll, dbname + '.')) {
         log() << "DEBUG parseNs Command's collection name looks like it includes the db name\n"
-              << dbname << '\n' << coll << '\n' << cmdObj.toString();
+              << dbname << '\n'
+              << coll << '\n'
+              << cmdObj.toString();
         dassert(false);
     }
 #endif

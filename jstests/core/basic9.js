@@ -14,6 +14,5 @@ t.save({foo$foo: 5});
 t.save({foo$: 5});
 
 assert.throws(doBadSave, [{$foo: 5}], "key names aren't allowed to start with $ doesn't work");
-assert.throws(doBadSave,
-                  [{x: {$foo: 5}}],
-              "embedded key names aren't allowed to start with $ doesn't work");
+assert.throws(
+    doBadSave, [{x: {$foo: 5}}], "embedded key names aren't allowed to start with $ doesn't work");

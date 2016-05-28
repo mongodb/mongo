@@ -4,13 +4,9 @@ assert.eq(17,
               return 11 + 6;
           }),
           "A");
-assert.eq(17,
-          db.eval(
-              function(x) {
-                  return 10 + x;
-              },
-              7),
-          "B");
+assert.eq(17, db.eval(function(x) {
+    return 10 + x;
+}, 7), "B");
 
 // check that functions in system.js work
 db.system.js.insert({

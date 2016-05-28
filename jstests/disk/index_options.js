@@ -3,9 +3,7 @@ var baseName = "jstests_disk_index_options";
 load('jstests/libs/command_line/test_parsed_options.js');
 
 jsTest.log("Testing \"noIndexBuildRetry\" command line option");
-var expectedResult = {
-    "parsed": {"storage": {"indexBuildRetry": false}}
-};
+var expectedResult = {"parsed": {"storage": {"indexBuildRetry": false}}};
 testGetCmdLineOptsMongod({noIndexBuildRetry: ""}, expectedResult);
 
 jsTest.log("Testing \"storage.indexBuildRetry\" config file option");

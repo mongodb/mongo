@@ -30,8 +30,8 @@
 
 #include "mongo/rpc/legacy_request_builder.h"
 
-#include <utility>
 #include <tuple>
+#include <utility>
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/rpc/metadata.h"

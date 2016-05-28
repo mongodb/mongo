@@ -74,7 +74,10 @@ public:
                 BSONObj info;
                 BSONObj cmd = BSON("captrunc"
                                    << "b"
-                                   << "n" << 1 << "inc" << true);
+                                   << "n"
+                                   << 1
+                                   << "inc"
+                                   << true);
                 // cout << cmd.toString() << endl;
                 bool ok = client.runCommand("a", cmd, info);
                 // cout << info.toString() << endl;

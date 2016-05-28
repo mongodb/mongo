@@ -34,8 +34,8 @@
 #include <iostream>
 
 #include "mongo/db/client.h"
-#include "mongo/db/storage/paths.h"
 #include "mongo/db/storage/mmap_v1/compress.h"
+#include "mongo/db/storage/paths.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/queue.h"

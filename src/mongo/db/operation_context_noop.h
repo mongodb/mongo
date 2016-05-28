@@ -28,10 +28,10 @@
 #pragma once
 
 
-#include "mongo/db/operation_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker_noop.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 
 namespace mongo {

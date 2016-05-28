@@ -5,13 +5,11 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
 (function() {
     "use strict";
 
-    var coll = db.in;
+    var coll = db.in ;
     coll.drop();
 
     function testExpression(options) {
-        var pipeline = {
-            $project: {included: {$in: ["$elementField", {$literal: options.array}]}}
-        };
+        var pipeline = {$project: {included: {$in: ["$elementField", {$literal: options.array}]}}};
 
         coll.drop();
         assert.writeOK(coll.insert({elementField: options.element}));
@@ -20,9 +18,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
         assert.eq(res[0].included, options.elementIsIncluded);
 
         if (options.queryFormShouldBeEquivalent) {
-            var query = {
-                elementField: {$in: options.array}
-            };
+            var query = {elementField: {$in: options.array}};
             res = coll.find(query).toArray();
 
             if (options.elementIsIncluded) {
@@ -33,12 +29,8 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
         }
     }
 
-    testExpression({
-        element: 1,
-        array: [1, 2, 3],
-        elementIsIncluded: true,
-        queryFormShouldBeEquivalent: true
-    });
+    testExpression(
+        {element: 1, array: [1, 2, 3], elementIsIncluded: true, queryFormShouldBeEquivalent: true});
 
     testExpression({
         element: "A",
@@ -119,38 +111,24 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
     coll.drop();
     coll.insert({});
 
-    var pipeline = {
-        $project: {included: {$in: [[1, 2], 1]}}
-    };
+    var pipeline = {$project: {included: {$in: [[1, 2], 1]}}};
     assertErrorCode(coll, pipeline, 40081, "$in requires an array as a second argument");
 
-    pipeline = {
-        $project: {included: {$in: [1, null]}}
-    };
+    pipeline = {$project: {included: {$in: [1, null]}}};
     assertErrorCode(coll, pipeline, 40081, "$in requires an array as a second argument");
 
-    pipeline = {
-        $project: {included: {$in: [1, "$notAField"]}}
-    };
+    pipeline = {$project: {included: {$in: [1, "$notAField"]}}};
     assertErrorCode(coll, pipeline, 40081, "$in requires an array as a second argument");
 
-    pipeline = {
-        $project: {included: {$in: null}}
-    };
+    pipeline = {$project: {included: {$in: null}}};
     assertErrorCode(coll, pipeline, 16020, "$in requires two arguments");
 
-    pipeline = {
-        $project: {included: {$in: [1]}}
-    };
+    pipeline = {$project: {included: {$in: [1]}}};
     assertErrorCode(coll, pipeline, 16020, "$in requires two arguments");
 
-    pipeline = {
-        $project: {included: {$in: []}}
-    };
+    pipeline = {$project: {included: {$in: []}}};
     assertErrorCode(coll, pipeline, 16020, "$in requires two arguments");
 
-    pipeline = {
-        $project: {included: {$in: [1, 2, 3]}}
-    };
+    pipeline = {$project: {included: {$in: [1, 2, 3]}}};
     assertErrorCode(coll, pipeline, 16020, "$in requires two arguments");
 }());

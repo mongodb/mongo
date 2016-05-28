@@ -76,12 +76,8 @@ var makeStaleMongosTargetSingleShard = function() {
 };
 
 var checkAllRemoveQueries = function(makeMongosStaleFunc) {
-    var multi = {
-        justOne: false
-    };
-    var single = {
-        justOne: true
-    };
+    var multi = {justOne: false};
+    var single = {justOne: true};
 
     var doRemove = function(query, multiOption, makeMongosStaleFunc) {
         makeMongosStaleFunc();
@@ -119,23 +115,12 @@ var checkAllRemoveQueries = function(makeMongosStaleFunc) {
 };
 
 var checkAllUpdateQueries = function(makeMongosStaleFunc) {
-    var oUpdate = {
-        $inc: {fieldToUpdate: 1}
-    };  // op-style update (non-idempotent)
-    var rUpdate = {
-        x: 0,
-        fieldToUpdate: 1
-    };  // replacement-style update (idempotent)
-    var queryAfterUpdate = {
-        fieldToUpdate: 1
-    };
+    var oUpdate = {$inc: {fieldToUpdate: 1}};  // op-style update (non-idempotent)
+    var rUpdate = {x: 0, fieldToUpdate: 1};    // replacement-style update (idempotent)
+    var queryAfterUpdate = {fieldToUpdate: 1};
 
-    var multi = {
-        multi: true
-    };
-    var single = {
-        multi: false
-    };
+    var multi = {multi: true};
+    var single = {multi: false};
 
     var doUpdate = function(query, update, multiOption, makeMongosStaleFunc) {
         makeMongosStaleFunc();
@@ -200,20 +185,14 @@ var freshMongos = st.s0;
 var staleMongos = st.s1;
 
 var emptyQuery = {};
-var pointQuery = {
-    x: 0
-};
+var pointQuery = {x: 0};
 
 // Choose a range that would fall on only one shard.
 // Use (splitPoint - 1) because of SERVER-20768.
-var rangeQuery = {
-    x: {$gte: 0, $lt: splitPoint - 1}
-};
+var rangeQuery = {x: {$gte: 0, $lt: splitPoint - 1}};
 
 // Choose points that would fall on two different shards.
-var multiPointQuery = {
-    $or: [{x: 0}, {x: numShardKeys}]
-};
+var multiPointQuery = {$or: [{x: 0}, {x: numShardKeys}]};
 
 checkAllRemoveQueries(makeStaleMongosTargetSingleShard);
 checkAllRemoveQueries(makeStaleMongosTargetMultipleShards);

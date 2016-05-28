@@ -270,7 +270,8 @@ StatusWith<std::unique_ptr<CollectionMetadata>> CollectionMetadata::cloneMerge(
     if (!validStartEnd || !validNoHoles) {
         return {ErrorCodes::IllegalOperation,
                 stream() << "cannot merge range " << rangeToString(minKey, maxKey)
-                         << ", overlapping chunks " << overlapToString(overlap)
+                         << ", overlapping chunks "
+                         << overlapToString(overlap)
                          << (!validStartEnd ? " do not have the same min and max key"
                                             : " are not all adjacent")};
     }

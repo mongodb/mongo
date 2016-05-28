@@ -85,9 +85,7 @@ DBQuery.prototype._ensureSpecial = function() {
     if (this._special)
         return;
 
-    var n = {
-        query: this._query
-    };
+    var n = {query: this._query};
     this._query = n;
     this._special = true;
 };
@@ -343,9 +341,7 @@ DBQuery.prototype.toArray = function() {
 };
 
 DBQuery.prototype._convertToCountCmd = function(applySkipLimit) {
-    var cmd = {
-        count: this._collection.getName()
-    };
+    var cmd = {count: this._collection.getName()};
 
     if (this._query) {
         if (this._special) {
@@ -472,9 +468,7 @@ DBQuery.prototype.maxTimeMS = function(maxTimeMS) {
 };
 
 DBQuery.prototype.readConcern = function(level) {
-    var readConcernObj = {
-        level: level
-    };
+    var readConcernObj = {level: level};
 
     return this._addSpecial("readConcern", readConcernObj);
 };
@@ -493,9 +487,7 @@ DBQuery.prototype.collation = function(collationSpec) {
  * @return this cursor
  */
 DBQuery.prototype.readPref = function(mode, tagSet) {
-    var readPrefObj = {
-        mode: mode
-    };
+    var readPrefObj = {mode: mode};
 
     if (tagSet) {
         readPrefObj.tags = tagSet;
@@ -759,10 +751,7 @@ DBCommandCursor.prototype.close = function() {
  */
 DBCommandCursor.prototype._runGetMoreCommand = function() {
     // Construct the getMore command.
-    var getMoreCmd = {
-        getMore: this._cursorid,
-        collection: this._collName
-    };
+    var getMoreCmd = {getMore: this._cursorid, collection: this._collName};
 
     if (this._batchSize) {
         getMoreCmd["batchSize"] = this._batchSize;

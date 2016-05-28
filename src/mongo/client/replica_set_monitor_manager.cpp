@@ -80,7 +80,8 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
         _taskExecutor = stdx::make_unique<ThreadPoolTaskExecutor>(
             stdx::make_unique<NetworkInterfaceThreadPool>(netPtr), std::move(net));
         LOG(1) << "Starting up task executor for monitoring replica sets in response to request to "
-                  "monitor set: " << connStr.toString();
+                  "monitor set: "
+               << connStr.toString();
         _taskExecutor->startup();
     }
 

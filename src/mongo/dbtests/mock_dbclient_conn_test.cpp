@@ -36,8 +36,8 @@
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/sock.h"
-#include "mongo/util/timer.h"
 #include "mongo/util/net/socket_exception.h"
+#include "mongo/util/timer.h"
 
 #include <ctime>
 #include <string>
@@ -413,10 +413,16 @@ TEST(MockDBClientConnTest, CyclingCmd) {
         vector<BSONObj> isMasterSequence;
         isMasterSequence.push_back(BSON("set"
                                         << "a"
-                                        << "isMaster" << true << "ok" << 1));
+                                        << "isMaster"
+                                        << true
+                                        << "ok"
+                                        << 1));
         isMasterSequence.push_back(BSON("set"
                                         << "a"
-                                        << "isMaster" << false << "ok" << 1));
+                                        << "isMaster"
+                                        << false
+                                        << "ok"
+                                        << 1));
         server.setCommandReply("isMaster", isMasterSequence);
     }
 

@@ -431,7 +431,7 @@ void logOps(OperationContext* txn,
             txn, opstr, nss, begin[i], NULL, fromMigrate, slots[i].opTime, slots[i].hash));
     }
 
-    std::unique_ptr<DocWriter const* []> basePtrs(new DocWriter const* [count]);
+    std::unique_ptr<DocWriter const* []> basePtrs(new DocWriter const*[count]);
     for (size_t i = 0; i < count; i++) {
         basePtrs[i] = &writers[i];
     }
@@ -605,72 +605,73 @@ struct ApplyOpMetadata {
 
 std::map<std::string, ApplyOpMetadata> opsMap = {
     {"create",
-     {[](OperationContext* txn, const char* ns, BSONObj& cmd)
-          -> Status { return createCollection(txn, NamespaceString(ns).db().toString(), cmd); },
-      {ErrorCodes::NamespaceExists}}},
-    {"collMod",
      {[](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
+          return createCollection(txn, NamespaceString(ns).db().toString(), cmd);
+      },
+      {ErrorCodes::NamespaceExists}}},
+    {"collMod", {[](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
          BSONObjBuilder resultWeDontCareAbout;
          return collMod(txn, parseNs(ns, cmd), cmd, &resultWeDontCareAbout);
      }}},
     {"dropDatabase",
-     {[](OperationContext* txn, const char* ns, BSONObj& cmd)
-          -> Status { return dropDatabase(txn, NamespaceString(ns).db().toString()); },
+     {[](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
+          return dropDatabase(txn, NamespaceString(ns).db().toString());
+      },
       {ErrorCodes::NamespaceNotFound}}},
     {"drop",
      {[](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
-         BSONObjBuilder resultWeDontCareAbout;
-         return dropCollection(txn, parseNs(ns, cmd), resultWeDontCareAbout);
-     },
+          BSONObjBuilder resultWeDontCareAbout;
+          return dropCollection(txn, parseNs(ns, cmd), resultWeDontCareAbout);
+      },
       // IllegalOperation is necessary because in 3.0 we replicate drops of system.profile
       // TODO(dannenberg) remove IllegalOperation once we no longer need 3.0 compatibility
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IllegalOperation}}},
     // deleteIndex(es) is deprecated but still works as of April 10, 2015
     {"deleteIndex",
      {[](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
-         BSONObjBuilder resultWeDontCareAbout;
-         return dropIndexes(txn, parseNs(ns, cmd), cmd, &resultWeDontCareAbout);
-     },
+          BSONObjBuilder resultWeDontCareAbout;
+          return dropIndexes(txn, parseNs(ns, cmd), cmd, &resultWeDontCareAbout);
+      },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"deleteIndexes",
      {[](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
-         BSONObjBuilder resultWeDontCareAbout;
-         return dropIndexes(txn, parseNs(ns, cmd), cmd, &resultWeDontCareAbout);
-     },
+          BSONObjBuilder resultWeDontCareAbout;
+          return dropIndexes(txn, parseNs(ns, cmd), cmd, &resultWeDontCareAbout);
+      },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"dropIndex",
      {[](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
-         BSONObjBuilder resultWeDontCareAbout;
-         return dropIndexes(txn, parseNs(ns, cmd), cmd, &resultWeDontCareAbout);
-     },
+          BSONObjBuilder resultWeDontCareAbout;
+          return dropIndexes(txn, parseNs(ns, cmd), cmd, &resultWeDontCareAbout);
+      },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"dropIndexes",
      {[](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
-         BSONObjBuilder resultWeDontCareAbout;
-         return dropIndexes(txn, parseNs(ns, cmd), cmd, &resultWeDontCareAbout);
-     },
+          BSONObjBuilder resultWeDontCareAbout;
+          return dropIndexes(txn, parseNs(ns, cmd), cmd, &resultWeDontCareAbout);
+      },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"renameCollection",
      {[](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
-         return renameCollection(txn,
-                                 NamespaceString(cmd.firstElement().valuestrsafe()),
-                                 NamespaceString(cmd["to"].valuestrsafe()),
-                                 cmd["dropTarget"].trueValue(),
-                                 cmd["stayTemp"].trueValue());
-     },
+          return renameCollection(txn,
+                                  NamespaceString(cmd.firstElement().valuestrsafe()),
+                                  NamespaceString(cmd["to"].valuestrsafe()),
+                                  cmd["dropTarget"].trueValue(),
+                                  cmd["stayTemp"].trueValue());
+      },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::NamespaceExists}}},
     {"applyOps",
      {[](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
-         BSONObjBuilder resultWeDontCareAbout;
-         return applyOps(txn, nsToDatabase(ns), cmd, &resultWeDontCareAbout);
-     },
+          BSONObjBuilder resultWeDontCareAbout;
+          return applyOps(txn, nsToDatabase(ns), cmd, &resultWeDontCareAbout);
+      },
       {ErrorCodes::UnknownError}}},
-    {"convertToCapped",
-     {[](OperationContext* txn, const char* ns, BSONObj& cmd)
-          -> Status { return convertToCapped(txn, parseNs(ns, cmd), cmd["size"].number()); }}},
-    {"emptycapped",
-     {[](OperationContext* txn, const char* ns, BSONObj& cmd)
-          -> Status { return emptyCapped(txn, parseNs(ns, cmd)); }}},
+    {"convertToCapped", {[](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
+         return convertToCapped(txn, parseNs(ns, cmd), cmd["size"].number());
+     }}},
+    {"emptycapped", {[](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
+         return emptyCapped(txn, parseNs(ns, cmd));
+     }}},
 };
 
 }  // namespace
@@ -742,7 +743,9 @@ Status applyOperation_inlock(OperationContext* txn,
                     indexNss.isValid());
             uassert(ErrorCodes::InvalidNamespace,
                     str::stream() << "Database name mismatch for database ("
-                                  << nsToDatabaseSubstring(ns) << ") while creating index: " << op,
+                                  << nsToDatabaseSubstring(ns)
+                                  << ") while creating index: "
+                                  << op,
                     nsToDatabaseSubstring(ns) == indexNss.db());
 
             opCounters->gotInsert();
@@ -773,10 +776,10 @@ Status applyOperation_inlock(OperationContext* txn,
             }
             return Status::OK();
         }
-        uassert(
-            ErrorCodes::NamespaceNotFound,
-            str::stream() << "Failed to apply insert due to missing collection: " << op.toString(),
-            collection);
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "Failed to apply insert due to missing collection: "
+                              << op.toString(),
+                collection);
 
         if (fieldO.type() == Array) {
             // Batched inserts.

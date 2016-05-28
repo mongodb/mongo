@@ -47,8 +47,8 @@
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rslog.h"
-#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -466,14 +466,16 @@ void TopologyCoordinatorImpl::prepareFreshResponse(
         *result =
             Status(ErrorCodes::ReplicaSetNotFound,
                    str::stream() << "Wrong repl set name. Expected: " << _rsConfig.getReplSetName()
-                                 << ", received: " << args.setName);
+                                 << ", received: "
+                                 << args.setName);
         return;
     }
 
     if (args.id == static_cast<unsigned>(_selfConfig().getId())) {
         *result = Status(ErrorCodes::BadValue,
                          str::stream() << "Received replSetFresh command from member with the "
-                                          "same member ID as ourself: " << args.id);
+                                          "same member ID as ourself: "
+                                       << args.id);
         return;
     }
 
@@ -606,7 +608,8 @@ void TopologyCoordinatorImpl::prepareElectResponse(
     } else if (myver > args.cfgver) {
         // they are stale!
         log() << "replSetElect command received stale config version # during election. "
-                 "Our version: " << myver << ", their version: " << args.cfgver;
+                 "Our version: "
+              << myver << ", their version: " << args.cfgver;
         vote = -10000;
     } else if (!hopeful) {
         log() << "replSetElect couldn't find member with id " << args.whoid;
@@ -666,7 +669,8 @@ Status TopologyCoordinatorImpl::prepareHeartbeatResponse(Date_t now,
         response->noteMismatched();
         return Status(ErrorCodes::InconsistentReplicaSetNames,
                       str::stream() << "Our set name of " << ourSetName << " does not match name "
-                                    << rshb << " reported by remote node");
+                                    << rshb
+                                    << " reported by remote node");
     }
 
     const MemberState myState = getMemberState();
@@ -680,7 +684,8 @@ Status TopologyCoordinatorImpl::prepareHeartbeatResponse(Date_t now,
         if (args.getSenderId() == _selfConfig().getId()) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "Received heartbeat from member with the same "
-                                           "member ID as ourself: " << args.getSenderId());
+                                           "member ID as ourself: "
+                                        << args.getSenderId());
         }
     }
 
@@ -752,7 +757,8 @@ Status TopologyCoordinatorImpl::prepareHeartbeatResponseV1(Date_t now,
               << "; remote node's: " << rshb;
         return Status(ErrorCodes::InconsistentReplicaSetNames,
                       str::stream() << "Our set name of " << ourSetName << " does not match name "
-                                    << rshb << " reported by remote node");
+                                    << rshb
+                                    << " reported by remote node");
     }
 
     const MemberState myState = getMemberState();
@@ -765,7 +771,8 @@ Status TopologyCoordinatorImpl::prepareHeartbeatResponseV1(Date_t now,
         if (args.getSenderId() == _selfConfig().getId()) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "Received heartbeat from member with the same "
-                                           "member ID as ourself: " << args.getSenderId());
+                                           "member ID as ourself: "
+                                        << args.getSenderId());
         }
     }
 
@@ -988,7 +995,8 @@ HeartbeatResponseAction TopologyCoordinatorImpl::processHeartbeatResponse(
     const int memberIndex = _rsConfig.findMemberIndexByHostAndPort(target);
     if (memberIndex == -1) {
         LOG(1) << "Could not find " << target << " in current config so ignoring --"
-                                                 " current config: " << _rsConfig.toBSON();
+                                                 " current config: "
+               << _rsConfig.toBSON();
         HeartbeatResponseAction nextAction = HeartbeatResponseAction::makeNoAction();
         nextAction.setNextHeartbeatStartDate(nextHeartbeatStartDate);
         return nextAction;
@@ -1001,7 +1009,8 @@ HeartbeatResponseAction TopologyCoordinatorImpl::processHeartbeatResponse(
     if (!hbResponse.isOK()) {
         if (isUnauthorized) {
             LOG(1) << "setAuthIssue: heartbeat response failed due to authentication"
-                      " issue for member _id:" << member.getId();
+                      " issue for member _id:"
+                   << member.getId();
             hbData.setAuthIssue(now);
         } else if (hbStats.getNumFailuresSinceLastStart() > kMaxHeartbeatRetries ||
                    alreadyElapsed >= _rsConfig.getHeartbeatTimeoutPeriod()) {
@@ -1319,7 +1328,8 @@ Status TopologyCoordinatorImpl::checkShouldStandForElection(Date_t now,
         return {ErrorCodes::NodeNotElectable,
                 str::stream() << "Not standing for election because "
                               << _getUnelectableReasonString(unelectableReason)
-                              << "; my last optime is " << lastOpApplied.toString()
+                              << "; my last optime is "
+                              << lastOpApplied.toString()
                               << " and the newest is "
                               << _latestKnownOpTime(lastOpApplied).toString()};
     }

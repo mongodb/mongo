@@ -26,10 +26,7 @@ var $config = (function() {
             assertWhenOwnColl.gte(cursor.itcount(), 0);
         }
 
-        return {
-            modifyIndices: modifyIndices,
-            listIndices: listIndices
-        };
+        return {modifyIndices: modifyIndices, listIndices: listIndices};
     })();
 
     var transitions = {

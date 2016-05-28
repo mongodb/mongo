@@ -35,10 +35,7 @@
     var sLocal = slave.getDB("local");
     var sMinvalid = sLocal["replset.minvalid"];
     var stepDownSecs = 30;
-    var stepDownCmd = {
-        replSetStepDown: stepDownSecs,
-        force: true
-    };
+    var stepDownCmd = {replSetStepDown: stepDownSecs, force: true};
 
     // Write op
     assert.writeOK(mTest.foo.save({}, {writeConcern: {w: 3}}));
@@ -50,9 +47,11 @@
     var farFutureTS = new Timestamp(
         Math.floor(new Date().getTime() / 1000) + (60 * 60 * 24 * 5 /* in five days*/), 0);
     var rsgs = assert.commandWorked(mLocal.adminCommand("replSetGetStatus"));
-    var primaryOpTime = rsgs.members.filter(function(member) {
-        return member.self;
-    })[0].optime;
+    var primaryOpTime = rsgs.members
+                            .filter(function(member) {
+                                return member.self;
+                            })[0]
+                            .optime;
     jsTest.log("future TS: " + tojson(farFutureTS) + ", date:" + tsToDate(farFutureTS));
     // We do an update in case there is a minvalid document on the primary already.
     // If the doc doesn't exist then upsert:true will create it, and the writeConcern ensures

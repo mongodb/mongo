@@ -86,12 +86,11 @@
         },
         geoNear: {
             run: function(coll) {
-                var res = coll.runCommand('geoNear',
-                                          {
-                                            readConcern: {level: 'majority'},
-                                            near: [0, 0],
-                                            spherical: true,
-                                          });
+                var res = coll.runCommand('geoNear', {
+                    readConcern: {level: 'majority'},
+                    near: [0, 0],
+                    spherical: true,
+                });
                 assert.commandWorked(res);
                 assert.eq(res.results.length, 1, tojson(res));
                 return res.results[0].obj.state;
@@ -101,13 +100,12 @@
         },
         geoSearch: {
             run: function(coll) {
-                var res = coll.runCommand('geoSearch',
-                                          {
-                                            readConcern: {level: 'majority'},
-                                            near: [0, 0],
-                                            search: {_id: 1},  // Needed due to SERVER-23158.
-                                            maxDistance: 1,
-                                          });
+                var res = coll.runCommand('geoSearch', {
+                    readConcern: {level: 'majority'},
+                    near: [0, 0],
+                    search: {_id: 1},  // Needed due to SERVER-23158.
+                    maxDistance: 1,
+                });
                 assert.commandWorked(res);
                 assert.eq(res.results.length, 1, tojson(res));
                 return res.results[0].state;

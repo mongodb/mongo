@@ -76,8 +76,11 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNotNeeded) {
         checkReadConcern(findCmd, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         BSONObj versionDoc(BSON("_id" << 1 << "minCompatibleVersion"
-                                      << MIN_COMPATIBLE_CONFIG_VERSION << "currentVersion"
-                                      << CURRENT_CONFIG_VERSION << "clusterId" << OID::gen()));
+                                      << MIN_COMPATIBLE_CONFIG_VERSION
+                                      << "currentVersion"
+                                      << CURRENT_CONFIG_VERSION
+                                      << "clusterId"
+                                      << OID::gen()));
 
         return vector<BSONObj>{versionDoc};
     });

@@ -775,8 +775,8 @@ void DataReplicator::_onDataClonerFinish(const Status& status) {
         return;
     }
 
-    BSONObj query = BSON("find" << _opts.remoteOplogNS.coll() << "sort" << BSON("$natural" << -1)
-                                << "limit" << 1);
+    BSONObj query = BSON(
+        "find" << _opts.remoteOplogNS.coll() << "sort" << BSON("$natural" << -1) << "limit" << 1);
 
     TimestampStatus timestampStatus(ErrorCodes::BadValue, "");
     _tmpFetcher = stdx::make_unique<Fetcher>(

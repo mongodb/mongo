@@ -87,7 +87,8 @@ Status AuthzManagerExternalStateMongod::findOne(OperationContext* txn,
     }
     return Status(ErrorCodes::NoMatchingDocument,
                   mongoutils::str::stream() << "No document in " << collectionName.ns()
-                                            << " matches " << query);
+                                            << " matches "
+                                            << query);
 }
 
 }  // namespace mongo

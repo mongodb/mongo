@@ -43,8 +43,10 @@ LTC_EXPORT void* LTC_CALL XREALLOC(void* p, size_t n);
 LTC_EXPORT void* LTC_CALL XCALLOC(size_t n, size_t s);
 LTC_EXPORT void LTC_CALL XFREE(void* p);
 
-LTC_EXPORT void LTC_CALL
-XQSORT(void* base, size_t nmemb, size_t size, int (*compar)(const void*, const void*));
+LTC_EXPORT void LTC_CALL XQSORT(void* base,
+                                size_t nmemb,
+                                size_t size,
+                                int (*compar)(const void*, const void*));
 
 
 /* change the clock function too */

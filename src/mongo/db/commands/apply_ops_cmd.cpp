@@ -43,16 +43,16 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/dbhash.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -147,8 +147,8 @@ private:
         // op - operation type
         BSONElement opElement = obj.getField("op");
         if (opElement.eoo()) {
-            errmsg = str::stream()
-                << "op does not contain required \"op\" field: " << e.fieldName();
+            errmsg = str::stream() << "op does not contain required \"op\" field: "
+                                   << e.fieldName();
             return false;
         }
         if (opElement.type() != mongo::String) {
@@ -166,8 +166,8 @@ private:
         // Only operations of type 'n' are allowed to have an empty namespace.
         BSONElement nsElement = obj.getField("ns");
         if (nsElement.eoo()) {
-            errmsg = str::stream()
-                << "op does not contain required \"ns\" field: " << e.fieldName();
+            errmsg = str::stream() << "op does not contain required \"ns\" field: "
+                                   << e.fieldName();
             return false;
         }
         if (nsElement.type() != mongo::String) {
@@ -179,8 +179,8 @@ private:
             return false;
         }
         if (*opType != 'n' && nsElement.String().empty()) {
-            errmsg = str::stream()
-                << "\"ns\" field value cannot be empty when op type is not 'n': " << e.fieldName();
+            errmsg = str::stream() << "\"ns\" field value cannot be empty when op type is not 'n': "
+                                   << e.fieldName();
             return false;
         }
         return true;

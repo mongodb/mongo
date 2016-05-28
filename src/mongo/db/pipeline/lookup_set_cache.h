@@ -29,15 +29,15 @@
 
 #include "mongo/platform/basic.h"
 
-#include <unordered_map>
-#include <unordered_set>
-#include <iostream>
 #include <boost/intrusive_ptr.hpp>
-#include <boost/multi_index_container.hpp>
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/member.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
+#include <boost/multi_index_container.hpp>
 #include <boost/optional.hpp>
+#include <iostream>
+#include <unordered_map>
+#include <unordered_set>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/value.h"

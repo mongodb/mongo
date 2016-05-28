@@ -68,8 +68,10 @@ StatusWith<std::tuple<CursorId, BSONArray>> getBatchFromReply(std::int32_t reque
     if (header.getResponseToMsgId() != requestId) {
         return {ErrorCodes::ProtocolError,
                 str::stream() << "responseTo field of OP_REPLY header with value '"
-                              << header.getResponseToMsgId() << "' does not match requestId '"
-                              << requestId << "'"};
+                              << header.getResponseToMsgId()
+                              << "' does not match requestId '"
+                              << requestId
+                              << "'"};
     }
 
     if ((header.dataLen() < 0) ||
@@ -95,7 +97,8 @@ StatusWith<std::tuple<CursorId, BSONArray>> getBatchFromReply(std::int32_t reque
         if (qr.getNReturned() != 1) {
             return {ErrorCodes::BadValue,
                     str::stream() << "ResultFlag_ErrSet flag set on reply, but nReturned was '"
-                                  << qr.getNReturned() << "' - expected 1"};
+                                  << qr.getNReturned()
+                                  << "' - expected 1"};
         }
         // Convert error document to a Status.
         // Will throw if first document is invalid BSON.
@@ -121,7 +124,8 @@ StatusWith<std::tuple<CursorId, BSONArray>> getBatchFromReply(std::int32_t reque
         return {ErrorCodes::InvalidLength,
                 str::stream() << "Count of documents in OP_REPLY message (" << batch.arrSize()
                               << ") did not match the value specified in the nReturned field ("
-                              << qr.getNReturned() << ")"};
+                              << qr.getNReturned()
+                              << ")"};
     }
 
     return {std::make_tuple(qr.getCursorId(), batch.arr())};

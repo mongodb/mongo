@@ -3,10 +3,7 @@
 var baseName = "jstests_auth_repl";
 var rsName = baseName + "_rs";
 var rtName = baseName + "_rt";
-var mongoOptions = {
-    auth: null,
-    keyFile: "jstests/libs/key1"
-};
+var mongoOptions = {auth: null, keyFile: "jstests/libs/key1"};
 var authErrCode = 13;
 
 var AuthReplTest = function(spec) {
@@ -178,11 +175,9 @@ jsTest.log("1 test replica sets");
 var rs = new ReplSetTest({name: rsName, nodes: 2});
 var nodes = rs.startSet(mongoOptions);
 rs.initiate();
-authutil.asCluster(nodes,
-                   "jstests/libs/key1",
-                   function() {
-                       rs.awaitReplication();
-                   });
+authutil.asCluster(nodes, "jstests/libs/key1", function() {
+    rs.awaitReplication();
+});
 
 var primary = rs.getPrimary();
 var secondary = rs.getSecondary();
@@ -196,11 +191,9 @@ jsTest.log("2 test initial sync");
 rs = new ReplSetTest({name: rsName, nodes: 1, nodeOptions: mongoOptions});
 nodes = rs.startSet();
 rs.initiate();
-authutil.asCluster(nodes,
-                   "jstests/libs/key1",
-                   function() {
-                       rs.awaitReplication();
-                   });
+authutil.asCluster(nodes, "jstests/libs/key1", function() {
+    rs.awaitReplication();
+});
 
 primary = rs.getPrimary();
 

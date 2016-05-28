@@ -36,8 +36,8 @@
 #include <memory>
 
 #include "mongo/db/client.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/exit.h"

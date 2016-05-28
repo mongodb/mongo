@@ -24,12 +24,10 @@
     assert.commandFailed(coll.ensureIndex({x: 1}, {partialFilterExpression: {x: {$asdasd: 3}}}));
     assert.commandFailed(coll.ensureIndex({x: 1}, {partialFilterExpression: {$and: 5}}));
     assert.commandFailed(coll.ensureIndex({x: 1}, {partialFilterExpression: {x: /abc/}}));
-    assert.commandFailed(coll.ensureIndex(
-        {x: 1},
-        {
-          partialFilterExpression:
-              {$and: [{$and: [{x: {$lt: 2}}, {x: {$gt: 0}}]}, {x: {$exists: true}}]}
-        }));
+    assert.commandFailed(coll.ensureIndex({x: 1}, {
+        partialFilterExpression:
+            {$and: [{$and: [{x: {$lt: 2}}, {x: {$gt: 0}}]}, {x: {$exists: true}}]}
+    }));
 
     for (var i = 0; i < 10; i++) {
         assert.writeOK(coll.insert({x: i, a: i}));

@@ -9,10 +9,7 @@ coll.drop();
 
 coll.getMongo().getDB("admin").runCommand({setParameter: 1, verboseQueryLogging: true});
 
-var bigCRS = {
-    type: "name",
-    properties: {name: "urn:x-mongodb:crs:strictwinding:EPSG:4326"}
-};
+var bigCRS = {type: "name", properties: {name: "urn:x-mongodb:crs:strictwinding:EPSG:4326"}};
 
 var bigPoly20 = {
     type: "Polygon",
@@ -36,20 +33,11 @@ var line10 = {
     coordinates: [[5.0, 5.0], [5.0, -5.0], [-5.0, -5.0], [-5.0, 5.0], [5.0, 5.0]]
 };
 
-var centerPoint = {
-    type: "Point",
-    coordinates: [0, 0]
-};
+var centerPoint = {type: "Point", coordinates: [0, 0]};
 
-var polarPoint = {
-    type: "Point",
-    coordinates: [85, 85]
-};
+var polarPoint = {type: "Point", coordinates: [85, 85]};
 
-var lineEquator = {
-    type: "LineString",
-    coordinates: [[-20, 0], [20, 0]]
-};
+var lineEquator = {type: "LineString", coordinates: [[-20, 0], [20, 0]]};
 
 assert.writeOK(coll.insert({loc: poly10}));
 assert.writeOK(coll.insert({loc: line10}));
@@ -100,16 +88,8 @@ assert.commandWorked(coll.ensureIndex({loc: "2dsphere"}));
 assert.writeError(coll.insert({_id: "bigPoly10", loc: bigPoly10}));
 
 // Query geometries that don't support big CRS should error out.
-var bigPoint = {
-    type: "Point",
-    coordinates: [0, 0],
-    crs: bigCRS
-};
-var bigLine = {
-    type: "LineString",
-    coordinates: [[-20, 0], [20, 0]],
-    crs: bigCRS
-};
+var bigPoint = {type: "Point", coordinates: [0, 0], crs: bigCRS};
+var bigLine = {type: "LineString", coordinates: [[-20, 0], [20, 0]], crs: bigCRS};
 
 assert.throws(function() {
     coll.find({loc: {$geoIntersects: {$geometry: bigPoint}}}).itcount();

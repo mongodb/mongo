@@ -15,10 +15,7 @@
     var bulk = coll.initializeUnorderedBulkOp();
     print("Populate the collection with random data");
     for (var i = 0; i < numDocs; i++) {
-        var doc = {
-            "_id": i,
-            "field0": Random.rand()
-        };
+        var doc = {"_id": i, "field0": Random.rand()};
 
         bulk.insert(doc);
     }
@@ -28,9 +25,7 @@
     // field being actively indexed in the background
     bulk = coll.initializeUnorderedBulkOp();
     for (i = 0; i < numDocs; i++) {
-        var criteria = {
-            "_id": 1000
-        };
+        var criteria = {"_id": 1000};
         var mod = {};
 
         if (Random.rand() < .8) {

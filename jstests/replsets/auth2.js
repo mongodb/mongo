@@ -44,8 +44,8 @@ rs.initiate({
 var master = rs.getPrimary();
 
 print("add an admin user");
-master.getDB("admin")
-    .createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles}, {w: 3, wtimeout: 30000});
+master.getDB("admin").createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles},
+                                 {w: 3, wtimeout: 30000});
 var m = rs.nodes[0];
 
 print("starting 1 and 2 with key file");

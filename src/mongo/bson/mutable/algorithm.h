@@ -27,8 +27,8 @@
 
 #pragma once
 
-#include <cstddef>
 #include <algorithm>
+#include <cstddef>
 #include <vector>
 
 #include "mongo/bson/mutable/const_element.h"

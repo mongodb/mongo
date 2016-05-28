@@ -36,11 +36,9 @@
     jsTest.log("make common point");
 
     safeInsert();
-    authutil.asCluster(rs.nodes,
-                       keyfile,
-                       function() {
-                           rs.awaitReplication();
-                       });
+    authutil.asCluster(rs.nodes, keyfile, function() {
+        rs.awaitReplication();
+    });
 
     jsTest.log("write stuff to 0&2");
     rs.stop(1);
@@ -63,10 +61,8 @@
 
     jsTest.log("doing rollback!");
 
-    authutil.asCluster(rs.nodes,
-                       keyfile,
-                       function() {
-                           rs.awaitSecondaryNodes();
-                       });
+    authutil.asCluster(rs.nodes, keyfile, function() {
+        rs.awaitSecondaryNodes();
+    });
 
 }());

@@ -60,13 +60,9 @@ for (var i = 0; i < 3; i++) {
 
     // $op style
     if (i == 1)
-        expr = {
-            $set: {a: 1}
-        };
+        expr = {$set: {a: 1}};
     if (i == 2)
-        expr = {
-            $setOnInsert: {a: 1}
-        };
+        expr = {$setOnInsert: {a: 1}};
 
     var isReplStyle = i == 0;
 
@@ -135,13 +131,9 @@ for (var i = 0; i < 3; i++) {
 
     // $op style
     if (i == 1)
-        expr = {
-            $set: {a: 1}
-        };
+        expr = {$set: {a: 1}};
     if (i == 2)
-        expr = {
-            $setOnInsert: {a: 1}
-        };
+        expr = {$setOnInsert: {a: 1}};
 
     var isReplStyle = i == 0;
 
@@ -187,9 +179,7 @@ for (var i = 0; i < 3; i++) {
     }
 
     // nested field extraction
-    var docValue = isReplStyle ? undefined : {
-        x: 1
-    };
+    var docValue = isReplStyle ? undefined : {x: 1};
     assert.docEq(docValue, upsertedXVal({"x.x": 1}, expr));
     assert.docEq(docValue, upsertedXVal({"x.x": {$eq: 1}}, expr));
     assert.docEq(docValue, upsertedXVal({"x.x": {$all: [1]}}, expr));

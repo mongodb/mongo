@@ -12,10 +12,7 @@ function addConstructorsWithNew(constructorList) {
     // We use slice(0) here to make a copy of our lists
     var validWithNew = valid.concat(valid.slice(0).map(prependNew));
     var invalidWithNew = invalid.concat(invalid.slice(0).map(prependNew));
-    return {
-        "valid": validWithNew,
-        "invalid": invalidWithNew
-    };
+    return {"valid": validWithNew, "invalid": invalidWithNew};
 }
 
 function clientEvalConstructorTest(constructorList) {
@@ -142,12 +139,22 @@ var dbpointerConstructors = {
 };
 
 var objectidConstructors = {
-    "valid": ['ObjectId()', 'ObjectId("FFFFFFFFFFFFFFFFFFFFFFFF")', ],
-    "invalid": ['ObjectId(5)', 'ObjectId("FFFFFFFFFFFFFFFFFFFFFFFQ")', ]
+    "valid": [
+        'ObjectId()',
+        'ObjectId("FFFFFFFFFFFFFFFFFFFFFFFF")',
+    ],
+    "invalid": [
+        'ObjectId(5)',
+        'ObjectId("FFFFFFFFFFFFFFFFFFFFFFFQ")',
+    ]
 };
 
 var timestampConstructors = {
-    "valid": ['Timestamp()', 'Timestamp(0,0)', 'Timestamp(1.0,1.0)', ],
+    "valid": [
+        'Timestamp()',
+        'Timestamp(0,0)',
+        'Timestamp(1.0,1.0)',
+    ],
     "invalid": [
         'Timestamp(0)',
         'Timestamp(0,0,0)',
@@ -161,7 +168,9 @@ var timestampConstructors = {
 };
 
 var bindataConstructors = {
-    "valid": ['BinData(0,"test")', ],
+    "valid": [
+        'BinData(0,"test")',
+    ],
     "invalid": [
         'BinData(0,"test", "test")',
         'BinData()',
@@ -178,7 +187,9 @@ var bindataConstructors = {
 };
 
 var uuidConstructors = {
-    "valid": ['UUID("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")', ],
+    "valid": [
+        'UUID("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")',
+    ],
     "invalid": [
         'UUID("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 0)',
         'UUID()',
@@ -195,7 +206,9 @@ var uuidConstructors = {
 };
 
 var md5Constructors = {
-    "valid": ['MD5("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")', ],
+    "valid": [
+        'MD5("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")',
+    ],
     "invalid": [
         'MD5("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 0)',
         'MD5()',
@@ -238,7 +251,13 @@ var hexdataConstructors = {
 };
 
 var dateConstructors = {
-    "valid": ['Date()', 'Date(0)', 'Date(0,0)', 'Date(0,0,0)', 'Date("foo")', ],
+    "valid": [
+        'Date()',
+        'Date(0)',
+        'Date(0,0)',
+        'Date(0,0,0)',
+        'Date("foo")',
+    ],
     "invalid": []
 };
 

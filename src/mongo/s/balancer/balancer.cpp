@@ -366,11 +366,11 @@ void Balancer::_mainThread() {
             uassert(13258, "oids broken after resetting!", _checkOIDs(txn.get()));
 
             {
-                auto scopedDistLock = shardingContext->catalogManager(txn.get())
-                                          ->distLock(txn.get(),
-                                                     "balancer",
-                                                     "doing balance round",
-                                                     DistLockManager::kSingleLockAttemptTimeout);
+                auto scopedDistLock = shardingContext->catalogManager(txn.get())->distLock(
+                    txn.get(),
+                    "balancer",
+                    "doing balance round",
+                    DistLockManager::kSingleLockAttemptTimeout);
 
                 if (!scopedDistLock.isOK()) {
                     LOG(1) << "skipping balancing round" << causedBy(scopedDistLock.getStatus());
@@ -412,8 +412,8 @@ void Balancer::_mainThread() {
                     roundDetails.setSucceeded(static_cast<int>(candidateChunks.size()),
                                               _balancedLastTime);
 
-                    shardingContext->catalogManager(txn.get())
-                        ->logAction(txn.get(), "balancer.round", "", roundDetails.toBSON());
+                    shardingContext->catalogManager(txn.get())->logAction(
+                        txn.get(), "balancer.round", "", roundDetails.toBSON());
                 }
 
                 LOG(1) << "*** End of balancing round";
@@ -432,8 +432,8 @@ void Balancer::_mainThread() {
             // This round failed, tell the world!
             roundDetails.setFailed(e.what());
 
-            shardingContext->catalogManager(txn.get())
-                ->logAction(txn.get(), "balancer.round", "", roundDetails.toBSON());
+            shardingContext->catalogManager(txn.get())->logAction(
+                txn.get(), "balancer.round", "", roundDetails.toBSON());
 
             // Sleep a fair amount before retrying because of the error
             sleepFor(balanceRoundInterval);
@@ -464,7 +464,8 @@ bool Balancer::_init(OperationContext* txn) {
         return true;
     } catch (const std::exception& e) {
         warning() << "could not initialize balancer, please check that all shards and config "
-                     "servers are up: " << e.what();
+                     "servers are up: "
+                  << e.what();
         return false;
     }
 }

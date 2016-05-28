@@ -84,9 +84,16 @@ StatusWith<ReadPreference> parseReadPreferenceMode(StringData prefStr) {
     }
     return Status(ErrorCodes::FailedToParse,
                   str::stream() << "Could not parse $readPreference mode '" << prefStr
-                                << "'. Only the modes '" << kPrimaryOnly << "', '"
-                                << kPrimaryPreferred << "', " << kSecondaryOnly << "', '"
-                                << kSecondaryPreferred << "', and '" << kNearest
+                                << "'. Only the modes '"
+                                << kPrimaryOnly
+                                << "', '"
+                                << kPrimaryPreferred
+                                << "', "
+                                << kSecondaryOnly
+                                << "', '"
+                                << kSecondaryPreferred
+                                << "', and '"
+                                << kNearest
                                 << "' are supported.");
 }
 

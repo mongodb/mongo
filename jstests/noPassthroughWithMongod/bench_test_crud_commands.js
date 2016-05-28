@@ -7,9 +7,7 @@
     assert.commandWorked(coll.getDB().createCollection(coll.getName()));
 
     function makeDocument(docSize) {
-        var doc = {
-            "fieldName": ""
-        };
+        var doc = {"fieldName": ""};
         var longString = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
         while (Object.bsonsize(doc) < docSize) {
             if (Object.bsonsize(doc) < docSize - longString.length) {
@@ -22,12 +20,7 @@
     }
 
     function executeBenchRun(benchOps) {
-        var benchArgs = {
-            ops: benchOps,
-            parallel: 2,
-            seconds: 1,
-            host: db.getMongo().host
-        };
+        var benchArgs = {ops: benchOps, parallel: 2, seconds: 1, host: db.getMongo().host};
         if (jsTest.options().auth) {
             benchArgs['db'] = 'admin';
             benchArgs['username'] = jsTest.options().adminUser;
@@ -73,8 +66,8 @@
             assert.writeOK(coll.insert({}));
         }
 
-        var res = executeBenchRun(
-                [{ns: coll.getFullName(), op: "findOne", query: {}, readCmd: readCmd}]);
+        var res =
+            executeBenchRun([{ns: coll.getFullName(), op: "findOne", query: {}, readCmd: readCmd}]);
         assert.gt(res.findOne, 0, tojson(res));
     }
 

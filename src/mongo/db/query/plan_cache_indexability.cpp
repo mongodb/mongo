@@ -30,14 +30,14 @@
 
 #include "mongo/db/query/plan_cache_indexability.h"
 
-#include <memory>
 #include "mongo/base/init.h"
 #include "mongo/base/owned_pointer_vector.h"
-#include "mongo/db/query/index_entry.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/query/index_entry.h"
 #include "mongo/stdx/memory.h"
+#include <memory>
 
 namespace mongo {
 

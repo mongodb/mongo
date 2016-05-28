@@ -29,12 +29,12 @@
 #include "mongo/platform/basic.h"
 
 #include <cstddef>
-#include <type_traits>
 #include <jscustomallocator.h>
+#include <type_traits>
 
 #include "mongo/config.h"
-#include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/util/concurrency/threadlocal.h"
 
 #ifdef __linux__
 #include <malloc.h>
@@ -189,10 +189,13 @@ void js_free(void* p) {
         mongo::sm::total_bytes = tb - current;
     }
 
-    mongo::sm::wrap_alloc([](void* ptr, size_t b) {
-        std::free(ptr);
-        return nullptr;
-    }, p, 0);
+    mongo::sm::wrap_alloc(
+        [](void* ptr, size_t b) {
+            std::free(ptr);
+            return nullptr;
+        },
+        p,
+        0);
 }
 
 void* js_realloc(void* p, size_t bytes) {

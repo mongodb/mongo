@@ -65,10 +65,7 @@
 
     assert.commandWorked(coll.getMongo().getDB("admin").runCommand({setParameter: 1, logLevel: 4}));
     coll.remove({});
-    request = {
-        insert: coll.getName(),
-        documents: documents
-    };
+    request = {insert: coll.getName(), documents: documents};
     printjson(result = coll.runCommand(request));
     assert(result.ok);
     assert.eq(1000, result.n);

@@ -86,7 +86,8 @@ Status ModifierObjectReplace::init(const BSONElement& modExpr,
         // Impossible, really since the caller check this already...
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Document replacement expects a complete document"
-                                       " but the type supplied was " << modExpr.type());
+                                       " but the type supplied was "
+                                    << modExpr.type());
     }
 
     // Object replacements never have positional operator.
@@ -150,8 +151,10 @@ Status ModifierObjectReplace::apply() const {
                 if (srcIdElement.compareWithBSONElement(dstIdElement, true) != 0) {
                     return Status(ErrorCodes::ImmutableField,
                                   str::stream() << "The _id field cannot be changed from {"
-                                                << srcIdElement.toString() << "} to {"
-                                                << dstIdElement.toString() << "}.");
+                                                << srcIdElement.toString()
+                                                << "} to {"
+                                                << dstIdElement.toString()
+                                                << "}.");
                 }
                 continue;
             }

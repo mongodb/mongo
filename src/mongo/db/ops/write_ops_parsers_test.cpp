@@ -39,7 +39,9 @@ TEST(CommandWriteOpsParsers, CommonFields_BypassDocumentValidation) {
     for (BSONElement bypassDocumentValidation : BSON_ARRAY(true << false << 1 << 0 << 1.0 << 0.0)) {
         auto cmd = BSON("insert"
                         << "bar"
-                        << "documents" << BSON_ARRAY(BSONObj()) << "bypassDocumentValidation"
+                        << "documents"
+                        << BSON_ARRAY(BSONObj())
+                        << "bypassDocumentValidation"
                         << bypassDocumentValidation);
         auto op = parseInsertCommand("foo", cmd);
         ASSERT_EQ(op.bypassDocumentValidation, shouldBypassDocumentValidationForCommand(cmd));
@@ -50,7 +52,10 @@ TEST(CommandWriteOpsParsers, CommonFields_Ordered) {
     for (bool ordered : {true, false}) {
         auto cmd = BSON("insert"
                         << "bar"
-                        << "documents" << BSON_ARRAY(BSONObj()) << "ordered" << ordered);
+                        << "documents"
+                        << BSON_ARRAY(BSONObj())
+                        << "ordered"
+                        << ordered);
         auto op = parseInsertCommand("foo", cmd);
         ASSERT_EQ(op.continueOnError, !ordered);
     }
@@ -60,45 +65,55 @@ TEST(CommandWriteOpsParsers, CommonFields_IgnoredFields) {
     // These flags are ignored, so there is nothing to check other than that this doesn't throw.
     auto cmd = BSON("insert"
                     << "bar"
-                    << "documents" << BSON_ARRAY(BSONObj()) << "maxTimeMS" << 1000 << "shardVersion"
-                    << BSONObj() << "writeConcern" << BSONObj());
+                    << "documents"
+                    << BSON_ARRAY(BSONObj())
+                    << "maxTimeMS"
+                    << 1000
+                    << "shardVersion"
+                    << BSONObj()
+                    << "writeConcern"
+                    << BSONObj());
     parseInsertCommand("foo", cmd);
 }
 
 TEST(CommandWriteOpsParsers, GarbageFieldsAtTopLevel) {
     auto cmd = BSON("insert"
                     << "bar"
-                    << "documents" << BSON_ARRAY(BSONObj()) << "GARBAGE" << 1);
+                    << "documents"
+                    << BSON_ARRAY(BSONObj())
+                    << "GARBAGE"
+                    << 1);
     ASSERT_THROWS_CODE(parseInsertCommand("foo", cmd), UserException, ErrorCodes::FailedToParse);
 }
 
 TEST(CommandWriteOpsParsers, GarbageFieldsInUpdateDoc) {
-    auto cmd =
-        BSON("update"
-             << "bar"
-             << "updates" << BSON_ARRAY("q" << BSONObj() << "u" << BSONObj() << "GARBAGE" << 1));
+    auto cmd = BSON("update"
+                    << "bar"
+                    << "updates"
+                    << BSON_ARRAY("q" << BSONObj() << "u" << BSONObj() << "GARBAGE" << 1));
     ASSERT_THROWS_CODE(parseInsertCommand("foo", cmd), UserException, ErrorCodes::FailedToParse);
 }
 
 TEST(CommandWriteOpsParsers, GarbageFieldsInDeleteDoc) {
     auto cmd = BSON("delete"
                     << "bar"
-                    << "deletes" << BSON_ARRAY("q" << BSONObj() << "limit" << 0 << "GARBAGE" << 1));
+                    << "deletes"
+                    << BSON_ARRAY("q" << BSONObj() << "limit" << 0 << "GARBAGE" << 1));
 }
 
 TEST(CommandWriteOpsParsers, BadCollationFieldInUpdateDoc) {
-    auto cmd =
-        BSON("update"
-             << "bar"
-             << "updates" << BSON_ARRAY("q" << BSONObj() << "u" << BSONObj() << "collation" << 1));
+    auto cmd = BSON("update"
+                    << "bar"
+                    << "updates"
+                    << BSON_ARRAY("q" << BSONObj() << "u" << BSONObj() << "collation" << 1));
     ASSERT_THROWS_CODE(parseInsertCommand("foo", cmd), UserException, ErrorCodes::FailedToParse);
 }
 
 TEST(CommandWriteOpsParsers, BadCollationFieldInDeleteDoc) {
-    auto cmd =
-        BSON("delete"
-             << "bar"
-             << "deletes" << BSON_ARRAY("q" << BSONObj() << "limit" << 0 << "collation" << 1));
+    auto cmd = BSON("delete"
+                    << "bar"
+                    << "deletes"
+                    << BSON_ARRAY("q" << BSONObj() << "limit" << 0 << "collation" << 1));
     ASSERT_THROWS_CODE(parseInsertCommand("foo", cmd), UserException, ErrorCodes::FailedToParse);
 }
 
@@ -144,8 +159,11 @@ TEST(CommandWriteOpsParsers, Update) {
         for (bool multi : {false, true}) {
             auto cmd = BSON("update" << ns.coll() << "updates"
                                      << BSON_ARRAY(BSON("q" << query << "u" << update << "collation"
-                                                            << collation << "upsert" << upsert
-                                                            << "multi" << multi)));
+                                                            << collation
+                                                            << "upsert"
+                                                            << upsert
+                                                            << "multi"
+                                                            << multi)));
             auto op = parseUpdateCommand(ns.db(), cmd);
             ASSERT_EQ(op.ns.ns(), ns.ns());
             ASSERT(!op.bypassDocumentValidation);
@@ -166,9 +184,10 @@ TEST(CommandWriteOpsParsers, Remove) {
     const BSONObj collation = BSON("locale"
                                    << "en_US");
     for (bool multi : {false, true}) {
-        auto cmd = BSON("delete" << ns.coll() << "deletes"
-                                 << BSON_ARRAY(BSON("q" << query << "collation" << collation
-                                                        << "limit" << (multi ? 0 : 1))));
+        auto cmd =
+            BSON("delete" << ns.coll() << "deletes"
+                          << BSON_ARRAY(BSON("q" << query << "collation" << collation << "limit"
+                                                 << (multi ? 0 : 1))));
         auto op = parseDeleteCommand(ns.db(), cmd);
         ASSERT_EQ(op.ns.ns(), ns.ns());
         ASSERT(!op.bypassDocumentValidation);
@@ -185,7 +204,8 @@ TEST(CommandWriteOpsParsers, RemoveErrorsWithBadLimit) {
     for (BSONElement limit : BSON_ARRAY(-1 << 2 << 0.5)) {
         auto cmd = BSON("delete"
                         << "bar"
-                        << "deletes" << BSON_ARRAY("q" << BSONObj() << "limit" << limit));
+                        << "deletes"
+                        << BSON_ARRAY("q" << BSONObj() << "limit" << limit));
         ASSERT_THROWS_CODE(
             parseInsertCommand("foo", cmd), UserException, ErrorCodes::FailedToParse);
     }

@@ -6,10 +6,7 @@ t.drop();
 num = 0;
 for (x = 1; x < 9; x++) {
     for (y = 1; y < 9; y++) {
-        o = {
-            _id: num++,
-            loc: [x, y]
-        };
+        o = {_id: num++, loc: [x, y]};
         t.save(o);
     }
 }
@@ -25,15 +22,14 @@ assert.eq(num, t.find({loc: {"$within": {"$polygon": boxBounds}}}).count(), "Bou
 
 // Make sure we can add object-based polygons
 assert.eq(
-    num,
-    t.find({loc: {$within: {$polygon: {a: [-10, -10], b: [-10, 10], c: [10, 10], d: [10, -10]}}}})
-        .count());
+    num, t.find({
+              loc: {$within: {$polygon: {a: [-10, -10], b: [-10, 10], c: [10, 10], d: [10, -10]}}}
+          }).count());
 
 // Look in a box much bigger than the one we have data in
 boxBounds = [[-100, -100], [-100, 100], [100, 100], [100, -100]];
-assert.eq(num,
-          t.find({loc: {"$within": {"$polygon": boxBounds}}}).count(),
-          "Big Bounding Box Test");
+assert.eq(
+    num, t.find({loc: {"$within": {"$polygon": boxBounds}}}).count(), "Big Bounding Box Test");
 
 t.drop();
 

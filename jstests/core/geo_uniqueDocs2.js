@@ -54,30 +54,27 @@ assert(notUniqueInclude.results[0].loc);
 assert(uniqueInclude.results[0].loc);
 
 // For geoNear / uniqueDocs, 'num' limit seems to apply to locs.
-assert.eq(
-    1,
-    db.runCommand(
-           {geoNear: collName, near: [50, 50], num: 1, uniqueDocs: false, includeLocs: false})
-        .results.length);
+assert.eq(1,
+          db.runCommand(
+                {geoNear: collName, near: [50, 50], num: 1, uniqueDocs: false, includeLocs: false})
+              .results.length);
 
 // Check locs returned in includeLocs mode.
 t.remove({});
 objLocs = [{x: 20, y: 30, z: ['loc1', 'loca']}, {x: 40, y: 50, z: ['loc2', 'locb']}];
 t.save({loc: objLocs});
-results =
-    db.runCommand(
-           {geoNear: collName, near: [50, 50], num: 10, uniqueDocs: false, includeLocs: true})
-        .results;
+results = db.runCommand(
+                {geoNear: collName, near: [50, 50], num: 10, uniqueDocs: false, includeLocs: true})
+              .results;
 assert.contains(results[0].loc, objLocs);
 
 // Check locs returned in includeLocs mode, where locs are arrays.
 t.remove({});
 arrLocs = [[20, 30], [40, 50]];
 t.save({loc: arrLocs});
-results =
-    db.runCommand(
-           {geoNear: collName, near: [50, 50], num: 10, uniqueDocs: false, includeLocs: true})
-        .results;
+results = db.runCommand(
+                {geoNear: collName, near: [50, 50], num: 10, uniqueDocs: false, includeLocs: true})
+              .results;
 // The original loc arrays are returned as objects.
 expectedLocs = arrLocs;
 

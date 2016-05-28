@@ -19,9 +19,7 @@ assert.eq(1, t.find({a: {$gt: 2}}).itcount(), "D");
 t.drop();
 
 for (var i = 0; i < 100; i++) {
-    var o = {
-        i: i
-    };
+    var o = {i: i};
     if (i % 2 == 0)
         o.foo = i;
     t.save(o);

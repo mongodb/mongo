@@ -32,8 +32,8 @@
 
 #include "mongo/db/repl/repl_set_html_summary.h"
 
-#include <string>
 #include <sstream>
+#include <string>
 
 #include "mongo/util/mongoutils/html.h"
 #include "mongo/util/mongoutils/str.h"

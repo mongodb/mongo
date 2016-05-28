@@ -160,6 +160,7 @@ private:
 };
 
 typedef stdx::function<StatusWithMatchExpression(
-    const char* name, int type, const BSONObj& section)> MatchExpressionParserGeoCallback;
+    const char* name, int type, const BSONObj& section)>
+    MatchExpressionParserGeoCallback;
 extern MatchExpressionParserGeoCallback expressionParserGeoCallback;
 }

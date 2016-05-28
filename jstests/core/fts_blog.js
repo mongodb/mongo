@@ -9,8 +9,9 @@ t.save({_id: 3, title: "knives are Fun", text: "this is a new blog i am writing.
 // specify weights if you want a field to be more meaningull
 t.ensureIndex({"title": "text", text: "text"}, {weights: {title: 10}});
 
-res = t.find({"$text": {"$search": "blog"}}, {score: {"$meta": "textScore"}})
-          .sort({score: {"$meta": "textScore"}});
+res = t.find({"$text": {"$search": "blog"}}, {score: {"$meta": "textScore"}}).sort({
+    score: {"$meta": "textScore"}
+});
 assert.eq(3, res.length());
 assert.eq(1, res[0]._id);
 

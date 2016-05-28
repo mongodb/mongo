@@ -154,7 +154,8 @@ void StorageInterfaceImpl::setMinValid(OperationContext* txn,
             txn,
             _minValidNss.ns().c_str(),
             BSON("$set" << BSON("ts" << endOpTime.getTimestamp() << "t" << endOpTime.getTerm())
-                        << "$unset" << BSON(kBeginFieldName << 1)));
+                        << "$unset"
+                        << BSON(kBeginFieldName << 1)));
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
         txn, "StorageInterfaceImpl::setMinValid", _minValidNss.ns());
@@ -174,7 +175,8 @@ void StorageInterfaceImpl::setMinValid(OperationContext* txn, const BatchBoundar
         Helpers::putSingleton(txn,
                               _minValidNss.ns().c_str(),
                               BSON("$set" << BSON("ts" << end.getTimestamp() << "t" << end.getTerm()
-                                                       << kBeginFieldName << start.toBSON())));
+                                                       << kBeginFieldName
+                                                       << start.toBSON())));
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
         txn, "StorageInterfaceImpl::setMinValid", _minValidNss.ns());

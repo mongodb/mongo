@@ -19,8 +19,8 @@
             clusterId: ObjectId()
         };
 
-        var res = conn.getDB('admin')
-                      .system.version.update({_id: 'shardIdentity'}, shardIdentityDoc, true);
+        var res = conn.getDB('admin').system.version.update(
+            {_id: 'shardIdentity'}, shardIdentityDoc, true);
         assert.eq(1, res.nUpserted);
     };
 

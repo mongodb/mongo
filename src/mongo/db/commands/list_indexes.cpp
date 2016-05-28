@@ -107,8 +107,8 @@ public:
         }
 
         return Status(ErrorCodes::Unauthorized,
-                      str::stream()
-                          << "Not authorized to list indexes on collection: " << ns.coll());
+                      str::stream() << "Not authorized to list indexes on collection: "
+                                    << ns.coll());
     }
 
     CmdListIndexes() : Command("listIndexes") {}

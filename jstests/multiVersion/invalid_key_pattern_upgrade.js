@@ -8,7 +8,11 @@
 (function() {
     'use strict';
 
-    var testCases = [{a: 0}, {a: NaN}, {a: true}, ];
+    var testCases = [
+        {a: 0},
+        {a: NaN},
+        {a: true},
+    ];
 
     // The mongod should not start up when an index with an invalid key pattern exists.
     testCases.forEach(function(indexKeyPattern) {
@@ -49,7 +53,10 @@
     // replicates.
     testCases.forEach(function(indexKeyPattern) {
         var replSetName = 'invalid_key_pattern_replset';
-        var nodes = [{binVersion: '3.2'}, {binVersion: 'latest'}, ];
+        var nodes = [
+            {binVersion: '3.2'},
+            {binVersion: 'latest'},
+        ];
 
         var rst = new ReplSetTest({name: replSetName, nodes: nodes});
 

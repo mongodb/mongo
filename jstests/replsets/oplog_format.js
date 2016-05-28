@@ -169,8 +169,8 @@ assertLastOplog({$set: {"a.b": [{c: 1}, {c: 2}]}}, {_id: 1}, msg);
 
 var msg = "bad array $push $slice $sort reversed first two";
 coll.save({_id: 1, a: {b: [{c: 1}, {c: 2}]}});
-res = assert.writeOK(coll.update(
-    {_id: {$gt: 0}}, {$push: {"a.b": {$each: [{c: -1}], $slice: -2, $sort: {c: -1}}}}));
+res = assert.writeOK(
+    coll.update({_id: {$gt: 0}}, {$push: {"a.b": {$each: [{c: -1}], $slice: -2, $sort: {c: -1}}}}));
 assert.eq(res.nModified, 1, "update failed for '" + msg + "': " + res.toString());
 assert.docEq({_id: 1, a: {b: [{c: 1}, {c: -1}]}}, coll.findOne({}), msg);
 assertLastOplog({$set: {"a.b": [{c: 1}, {c: -1}]}}, {_id: 1}, msg);

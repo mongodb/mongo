@@ -20,10 +20,7 @@ function client2() {
     }
 
     for (var i = 0; i < 1000; i++) {
-        var options = {
-            out: {replace: 'bar'},
-            sort: {_id: -1}
-        };
+        var options = {out: {replace: 'bar'}, sort: {_id: -1}};
 
         db.remove_during_mr.mapReduce(mapper, reducer, options);
     }

@@ -27,8 +27,8 @@
 
 #pragma once
 
-#include <typeinfo>
 #include <string>
+#include <typeinfo>
 
 #include "mongo/base/status.h"  // NOTE: This is safe as utils depend on base
 #include "mongo/base/status_with.h"

@@ -36,8 +36,8 @@
 #include <vector>
 
 #include "mongo/base/status.h"
-#include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/options_parser/startup_option_init.h"
+#include "mongo/util/options_parser/startup_options.h"
 
 namespace mongo {
 
@@ -45,16 +45,19 @@ SASLSSPIGlobalParams saslSSPIGlobalParams;
 
 Status addSASLSSPIOptions(moe::OptionSection* options) {
     moe::OptionSection sspiOptions("Kerberos Options");
-    sspiOptions.addOptionChaining("security.sspiHostnameCanonicalization",
-                                  "sspiHostnameCanonicalization",
-                                  moe::String,
-                                  "DNS resolution strategy to use for hostname canonicalization. "
-                                  "May be one of: {none, forward, forwardAndReverse}")
+    sspiOptions
+        .addOptionChaining("security.sspiHostnameCanonicalization",
+                           "sspiHostnameCanonicalization",
+                           moe::String,
+                           "DNS resolution strategy to use for hostname canonicalization. "
+                           "May be one of: {none, forward, forwardAndReverse}")
         .setDefault(moe::Value(std::string("none")));
-    sspiOptions.addOptionChaining("security.sspiRealmOverride",
-                                  "sspiRealmOverride",
-                                  moe::String,
-                                  "Override the detected realm with the provided string").hidden();
+    sspiOptions
+        .addOptionChaining("security.sspiRealmOverride",
+                           "sspiRealmOverride",
+                           moe::String,
+                           "Override the detected realm with the provided string")
+        .hidden();
     return options->addSection(sspiOptions);
 }
 

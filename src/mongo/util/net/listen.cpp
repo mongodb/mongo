@@ -56,14 +56,14 @@
 #include <sys/resource.h>
 #include <sys/stat.h>
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netdb.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/un.h>
 #ifdef __OpenBSD__
 #include <sys/uio.h>
 #endif
@@ -323,7 +323,8 @@ void Listener::initAndListen() {
                     if (x == EMFILE || x == ENFILE) {
                         // Connection still in listen queue but we can't accept it yet
                         error() << "Out of file descriptors. Waiting one second before trying to "
-                                   "accept more connections." << warnings;
+                                   "accept more connections."
+                                << warnings;
                         sleepsecs(1);
                     }
                 }
@@ -545,7 +546,8 @@ void Listener::initAndListen() {
                 if (x == EMFILE || x == ENFILE) {
                     // Connection still in listen queue but we can't accept it yet
                     error() << "Out of file descriptors. Waiting one second before"
-                               " trying to accept more connections." << warnings;
+                               " trying to accept more connections."
+                            << warnings;
                     sleepsecs(1);
                 }
             }

@@ -34,13 +34,13 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/base/owned_pointer_map.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_create.h"
+#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/log.h"
@@ -150,7 +150,9 @@ StatusWith<CompactStats> Collection::compact(OperationContext* txn,
                 return StatusWith<CompactStats>(
                     ErrorCodes::CannotCreateIndex,
                     str::stream() << "Cannot compact collection due to invalid index " << spec
-                                  << ": " << keyStatus.reason() << " For more info see"
+                                  << ": "
+                                  << keyStatus.reason()
+                                  << " For more info see"
                                   << " http://dochub.mongodb.org/core/index-validation");
             }
             indexSpecs.push_back(spec);

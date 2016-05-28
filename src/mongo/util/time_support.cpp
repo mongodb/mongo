@@ -32,8 +32,8 @@
 #include <boost/thread/tss.hpp>
 #include <cstdint>
 #include <cstdio>
-#include <string>
 #include <iostream>
+#include <string>
 
 #include "mongo/base/init.h"
 #include "mongo/base/parse_number.h"
@@ -43,10 +43,10 @@
 #include "mongo/util/mongoutils/str.h"
 
 #ifdef _WIN32
-#include <boost/date_time/filetime_functions.hpp>
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/system_tick_source.h"
 #include "mongo/util/timer.h"
+#include <boost/date_time/filetime_functions.hpp>
 #endif
 
 #ifdef __sun
@@ -379,7 +379,7 @@ Status parseMillisFromToken(StringData millisStr, int* resultMillis) {
             millisMagnitude = 100;
         }
 
-        *resultMillis = *resultMillis* millisMagnitude;
+        *resultMillis = *resultMillis * millisMagnitude;
 
         if (*resultMillis < 0 || *resultMillis > 1000) {
             StringBuilder sb;
@@ -826,8 +826,8 @@ static unsigned long long resyncInterval = 0;
 static SimpleMutex _curTimeMicros64ReadMutex;
 static SimpleMutex _curTimeMicros64ResyncMutex;
 
-typedef WINBASEAPI VOID(WINAPI* pGetSystemTimePreciseAsFileTime)(_Out_ LPFILETIME
-                                                                     lpSystemTimeAsFileTime);
+typedef WINBASEAPI VOID(WINAPI* pGetSystemTimePreciseAsFileTime)(
+    _Out_ LPFILETIME lpSystemTimeAsFileTime);
 
 static pGetSystemTimePreciseAsFileTime GetSystemTimePreciseAsFileTimeFunc;
 

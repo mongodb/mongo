@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -38,7 +39,6 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/base/checked_cast.h"
 
 namespace mongo {
 
@@ -103,7 +103,8 @@ public:
                                        Status(ErrorCodes::BadValue,
                                               str::stream()
                                                   << "numCursors has to be between 1 and 10000"
-                                                  << " was: " << numCursors));
+                                                  << " was: "
+                                                  << numCursors));
 
         auto iterators = collection->getManyCursors(txn);
         if (iterators.size() < numCursors) {

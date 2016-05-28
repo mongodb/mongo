@@ -14,15 +14,13 @@ t.save({geo: {type: 'Point', coordinates: [0, 0]}, x: 'a'});
 t.save({geo: {type: 'Point', coordinates: [0, 0]}});
 
 // Expect 1 match, where x is 'a'
-assert.eq(1,
-          t.count({
-              geo: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}, $maxDistance: 20}},
-              x: 'a'
-          }));
+assert.eq(1, t.count({
+    geo: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}, $maxDistance: 20}},
+    x: 'a'
+}));
 
 // Expect 1 match, where x matches null (missing matches null).
-assert.eq(1,
-          t.count({
-              geo: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}, $maxDistance: 20}},
-              x: null
-          }));
+assert.eq(1, t.count({
+    geo: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}, $maxDistance: 20}},
+    x: null
+}));

@@ -40,8 +40,8 @@
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
-#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_manager.h"
@@ -462,8 +462,8 @@ bool DBConfig::_loadIfNeeded(OperationContext* txn, Counter reloadIteration) {
     // Load all collections
     vector<CollectionType> collections;
     repl::OpTime configOpTimeWhenLoadingColl;
-    uassertStatusOK(grid.catalogManager(txn)
-                        ->getCollections(txn, &_name, &collections, &configOpTimeWhenLoadingColl));
+    uassertStatusOK(grid.catalogManager(txn)->getCollections(
+        txn, &_name, &collections, &configOpTimeWhenLoadingColl));
 
     int numCollsErased = 0;
     int numCollsSharded = 0;

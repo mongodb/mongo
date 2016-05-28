@@ -47,8 +47,8 @@
 #include "mongo/db/repl/initial_sync.h"
 #include "mongo/db/repl/old_update_position_args.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
+#include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/replication_coordinator_external_state_impl.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -451,7 +451,8 @@ public:
                 txn,
                 BSON("msg"
                      << "Reconfig set"
-                     << "version" << parsedArgs.newConfigObj["version"]));
+                     << "version"
+                     << parsedArgs.newConfigObj["version"]));
         }
         wuow.commit();
 
@@ -837,7 +838,8 @@ public:
         BSONElement cfgverElement = cmdObj["cfgver"];
         uassert(28525,
                 str::stream() << "Expected cfgver argument to replSetFresh command to have "
-                                 "numeric type, but found " << typeName(cfgverElement.type()),
+                                 "numeric type, but found "
+                              << typeName(cfgverElement.type()),
                 cfgverElement.isNumber());
         parsedArgs.cfgver = cfgverElement.safeNumberLong();
         parsedArgs.opTime = Timestamp(cmdObj["opTime"].Date());
@@ -871,7 +873,8 @@ private:
         BSONElement cfgverElement = cmdObj["cfgver"];
         uassert(28526,
                 str::stream() << "Expected cfgver argument to replSetElect command to have "
-                                 "numeric type, but found " << typeName(cfgverElement.type()),
+                                 "numeric type, but found "
+                              << typeName(cfgverElement.type()),
                 cfgverElement.isNumber());
         parsedArgs.cfgver = cfgverElement.safeNumberLong();
         parsedArgs.round = cmdObj["round"].OID();

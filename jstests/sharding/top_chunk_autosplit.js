@@ -72,10 +72,7 @@ function runTest(test) {
     // Insert one doc at a time until first auto-split occurs on top chunk
     var xval = test.inserts.value;
     do {
-        var doc = {
-            x: xval,
-            val: largeStr
-        };
+        var doc = {x: xval, val: largeStr};
         coll.insert(doc);
         xval += test.inserts.inc;
     } while (getNumberOfChunks(configDB) <= numChunks);
@@ -108,44 +105,17 @@ var configDB = st.s.getDB('config');
 // Define shard key ranges for each of the shard nodes
 var MINVAL = -500;
 var MAXVAL = 1500;
-var lowChunkRange = {
-    min: MINVAL,
-    max: 0
-};
-var midChunkRange1 = {
-    min: 0,
-    max: 500
-};
-var midChunkRange2 = {
-    min: 500,
-    max: 1000
-};
-var highChunkRange = {
-    min: 1000,
-    max: MAXVAL
-};
+var lowChunkRange = {min: MINVAL, max: 0};
+var midChunkRange1 = {min: 0, max: 500};
+var midChunkRange2 = {min: 500, max: 1000};
+var highChunkRange = {min: 1000, max: MAXVAL};
 
-var lowChunkTagRange = {
-    min: MinKey,
-    max: 0
-};
-var highChunkTagRange = {
-    min: 1000,
-    max: MaxKey
-};
+var lowChunkTagRange = {min: MinKey, max: 0};
+var highChunkTagRange = {min: 1000, max: MaxKey};
 
-var lowChunkInserts = {
-    value: 0,
-    inc: -1
-};
-var midChunkInserts = {
-    value: 1,
-    inc: 1
-};
-var highChunkInserts = {
-    value: 1000,
-    inc: 1
-};
+var lowChunkInserts = {value: 0, inc: -1};
+var midChunkInserts = {value: 1, inc: 1};
+var highChunkInserts = {value: 1000, inc: 1};
 
 var lowChunk = 1;
 var highChunk = -1;

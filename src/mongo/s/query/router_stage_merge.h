@@ -29,9 +29,9 @@
 #pragma once
 
 #include "mongo/executor/task_executor.h"
-#include "mongo/s/query/router_exec_stage.h"
-#include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/s/query/async_results_merger.h"
+#include "mongo/s/query/cluster_client_cursor_params.h"
+#include "mongo/s/query/router_exec_stage.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {

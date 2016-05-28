@@ -42,18 +42,20 @@ using std::string;
 namespace {
 
 TEST(BatchedUpdateRequest, Basic) {
-    BSONArray updateArray = BSON_ARRAY(
-        BSON(BatchedUpdateDocument::query(BSON("a" << 1))
-             << BatchedUpdateDocument::updateExpr(BSON("$set" << BSON("a" << 1)))
-             << BatchedUpdateDocument::multi(false) << BatchedUpdateDocument::upsert(false))
-        << BSON(BatchedUpdateDocument::query(BSON("b" << 1))
-                << BatchedUpdateDocument::updateExpr(BSON("$set" << BSON("b" << 2)))
-                << BatchedUpdateDocument::multi(false) << BatchedUpdateDocument::upsert(false)));
+    BSONArray updateArray =
+        BSON_ARRAY(BSON(BatchedUpdateDocument::query(BSON("a" << 1))
+                        << BatchedUpdateDocument::updateExpr(BSON("$set" << BSON("a" << 1)))
+                        << BatchedUpdateDocument::multi(false)
+                        << BatchedUpdateDocument::upsert(false))
+                   << BSON(BatchedUpdateDocument::query(BSON("b" << 1))
+                           << BatchedUpdateDocument::updateExpr(BSON("$set" << BSON("b" << 2)))
+                           << BatchedUpdateDocument::multi(false)
+                           << BatchedUpdateDocument::upsert(false)));
 
-    BSONObj origUpdateRequestObj = BSON(BatchedUpdateRequest::collName("test")
-                                        << BatchedUpdateRequest::updates() << updateArray
-                                        << BatchedUpdateRequest::writeConcern(BSON("w" << 1))
-                                        << BatchedUpdateRequest::ordered(true));
+    BSONObj origUpdateRequestObj = BSON(
+        BatchedUpdateRequest::collName("test") << BatchedUpdateRequest::updates() << updateArray
+                                               << BatchedUpdateRequest::writeConcern(BSON("w" << 1))
+                                               << BatchedUpdateRequest::ordered(true));
 
     string errMsg;
     BatchedUpdateRequest request;

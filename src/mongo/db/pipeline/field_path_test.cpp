@@ -29,9 +29,9 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/dbtests/dbtests.h"
 
 namespace mongo {
 using std::string;

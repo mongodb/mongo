@@ -80,8 +80,7 @@ public:
      */
     struct LiteralTag {};
     template <size_t N>
-    StringData(const char(&val)[N], LiteralTag)
-        : StringData(&val[0], N - 1) {}
+    StringData(const char (&val)[N], LiteralTag) : StringData(&val[0], N - 1) {}
 
     /**
      * Constructs a StringData, for the case of a std::string. We can

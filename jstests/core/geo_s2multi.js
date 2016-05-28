@@ -28,39 +28,39 @@ multiPolygonA = {
 };
 assert.writeOK(t.insert({geo: multiPolygonA}));
 
-assert.eq(3,
-          t.find({geo: {$geoIntersects: {$geometry: {"type": "Point", "coordinates": [100, 0]}}}})
-              .itcount());
+assert.eq(3, t.find({
+                  geo: {$geoIntersects: {$geometry: {"type": "Point", "coordinates": [100, 0]}}}
+              }).itcount());
 assert.eq(3,
           t.find({
-              geo: {$geoIntersects: {$geometry: {"type": "Point", "coordinates": [101.0, 1.0]}}}
-          }).itcount());
+               geo: {$geoIntersects: {$geometry: {"type": "Point", "coordinates": [101.0, 1.0]}}}
+           }).itcount());
 
 // Inside the hole in multiPolygonA
 assert.eq(
-    0,
-    t.find({geo: {$geoIntersects: {$geometry: {"type": "Point", "coordinates": [100.21, 0.21]}}}})
-        .itcount());
+    0, t.find({
+            geo: {$geoIntersects: {$geometry: {"type": "Point", "coordinates": [100.21, 0.21]}}}
+        }).itcount());
 
 // One point inside the hole, one out.
 assert.eq(
     3,
     t.find({
-        geo: {
-            $geoIntersects:
-                {$geometry: {"type": "MultiPoint", "coordinates": [[100, 0], [100.21, 0.21]]}}
-        }
-    }).itcount());
+         geo: {
+             $geoIntersects:
+                 {$geometry: {"type": "MultiPoint", "coordinates": [[100, 0], [100.21, 0.21]]}}
+         }
+     }).itcount());
 assert.eq(
     3,
     t.find({
-        geo: {
-            $geoIntersects: {
-                $geometry:
-                    {"type": "MultiPoint", "coordinates": [[100, 0], [100.21, 0.21], [101, 1]]}
-            }
-        }
-    }).itcount());
+         geo: {
+             $geoIntersects: {
+                 $geometry:
+                     {"type": "MultiPoint", "coordinates": [[100, 0], [100.21, 0.21], [101, 1]]}
+             }
+         }
+     }).itcount());
 // Polygon contains itself and the multipoint.
 assert.eq(2, t.find({geo: {$geoWithin: {$geometry: multiPolygonA}}}).itcount());
 

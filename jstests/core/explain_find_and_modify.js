@@ -13,12 +13,8 @@
     var t = db.getCollection(cName);
 
     // Different types of findAndModify explain requests.
-    var explainRemove = {
-        explain: {findAndModify: cName, remove: true, query: {_id: 0}}
-    };
-    var explainUpdate = {
-        explain: {findAndModify: cName, update: {$inc: {i: 1}}, query: {_id: 0}}
-    };
+    var explainRemove = {explain: {findAndModify: cName, remove: true, query: {_id: 0}}};
+    var explainUpdate = {explain: {findAndModify: cName, update: {$inc: {i: 1}}, query: {_id: 0}}};
     var explainUpsert = {
         explain: {findAndModify: cName, update: {$inc: {i: 1}}, query: {_id: 0}, upsert: true}
     };
@@ -60,39 +56,24 @@
     assert.commandFailed(db.runCommand({remove: true, new: true}));
 
     // 4. Explaining findAndModify should not modify any contents of the collection.
-    var onlyDoc = {
-        _id: 0,
-        i: 1
-    };
+    var onlyDoc = {_id: 0, i: 1};
     assert.writeOK(t.insert(onlyDoc));
 
     // Explaining a delete should not delete anything.
-    var matchingRemoveCmd = {
-        findAndModify: cName,
-        remove: true,
-        query: {_id: onlyDoc._id}
-    };
+    var matchingRemoveCmd = {findAndModify: cName, remove: true, query: {_id: onlyDoc._id}};
     var res = db.runCommand({explain: matchingRemoveCmd});
     assert.commandWorked(res);
     assert.eq(t.find().itcount(), 1, "Explaining a remove should not remove any documents.");
 
     // Explaining an update should not update anything.
-    var matchingUpdateCmd = {
-        findAndModify: cName,
-        update: {x: "x"},
-        query: {_id: onlyDoc._id}
-    };
+    var matchingUpdateCmd = {findAndModify: cName, update: {x: "x"}, query: {_id: onlyDoc._id}};
     var res = db.runCommand({explain: matchingUpdateCmd});
     assert.commandWorked(res);
     assert.eq(t.findOne(), onlyDoc, "Explaining an update should not update any documents.");
 
     // Explaining an upsert should not insert anything.
-    var matchingUpsertCmd = {
-        findAndModify: cName,
-        update: {x: "x"},
-        query: {_id: "non-match"},
-        upsert: true
-    };
+    var matchingUpsertCmd =
+        {findAndModify: cName, update: {x: "x"}, query: {_id: "non-match"}, upsert: true};
     var res = db.runCommand({explain: matchingUpsertCmd});
     assert.commandWorked(res);
     assert.eq(t.find().itcount(), 1, "Explaining an upsert should not insert any documents.");
@@ -273,23 +254,21 @@
     function assertExplainResultsMatch(explainOut, expectedMatches, preMsg, currentPath) {
         // This is only used recursively, to keep track of where we are in the document.
         var isRootLevel = typeof currentPath === "undefined";
-        Object.keys(expectedMatches)
-            .forEach(function(key) {
-                var totalFieldName = isRootLevel ? key : currentPath + "." + key;
-                assert(explainOut.hasOwnProperty(key),
-                       preMsg + "Explain's output does not have a value for " + key);
-                if (typeof expectedMatches[key] === "object") {
-                    // Sub-doc, recurse to match on it's fields
-                    assertExplainResultsMatch(
-                        explainOut[key], expectedMatches[key], preMsg, totalFieldName);
-                } else {
-                    assert.eq(explainOut[key],
-                              expectedMatches[key],
-                              preMsg + "Explain's " + totalFieldName + " (" + explainOut[key] +
-                                  ")" + " does not match expected value (" + expectedMatches[key] +
-                                  ").");
-                }
-            });
+        Object.keys(expectedMatches).forEach(function(key) {
+            var totalFieldName = isRootLevel ? key : currentPath + "." + key;
+            assert(explainOut.hasOwnProperty(key),
+                   preMsg + "Explain's output does not have a value for " + key);
+            if (typeof expectedMatches[key] === "object") {
+                // Sub-doc, recurse to match on it's fields
+                assertExplainResultsMatch(
+                    explainOut[key], expectedMatches[key], preMsg, totalFieldName);
+            } else {
+                assert.eq(explainOut[key],
+                          expectedMatches[key],
+                          preMsg + "Explain's " + totalFieldName + " (" + explainOut[key] + ")" +
+                              " does not match expected value (" + expectedMatches[key] + ").");
+            }
+        });
     }
 
     /**

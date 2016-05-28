@@ -51,8 +51,8 @@
 #include <pcap.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string>
 #include <string.h>
+#include <string>
 #include <sys/types.h>
 
 #ifndef _WIN32
@@ -483,7 +483,8 @@ void usage() {
             "                else.  Spurious messages about invalid documents may result\n"
             "                when there are dropped tcp packets.\n"
             "<port0>...      These parameters are used to filter sniffing.  By default, \n"
-            "                only port 27017 is sniffed.\n" << endl;
+            "                only port 27017 is sniffed.\n"
+         << endl;
 }
 
 int toolMain(int argc, char** argv, char** envp) {

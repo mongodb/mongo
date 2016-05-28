@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include <boost/version.hpp>
 #include <sstream>
 #include <string>
 #include <vector>
-#include <boost/version.hpp>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"

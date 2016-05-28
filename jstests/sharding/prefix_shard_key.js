@@ -109,27 +109,23 @@
         _waitForDelete: true
     }));
 
-    var expectedShardCount = {
-        shard0000: 0,
-        shard0001: 0
-    };
-    config.chunks.find({ns: 'test.user'})
-        .forEach(function(chunkDoc) {
-            var min = chunkDoc.min.num;
-            var max = chunkDoc.max.num;
+    var expectedShardCount = {shard0000: 0, shard0001: 0};
+    config.chunks.find({ns: 'test.user'}).forEach(function(chunkDoc) {
+        var min = chunkDoc.min.num;
+        var max = chunkDoc.max.num;
 
-            if (min < 0 || min == MinKey) {
-                min = 0;
-            }
+        if (min < 0 || min == MinKey) {
+            min = 0;
+        }
 
-            if (max > 1000 || max == MaxKey) {
-                max = 1000;
-            }
+        if (max > 1000 || max == MaxKey) {
+            max = 1000;
+        }
 
-            if (max > 0) {
-                expectedShardCount[chunkDoc.shard] += (max - min);
-            }
-        });
+        if (max > 0) {
+            expectedShardCount[chunkDoc.shard] += (max - min);
+        }
+    });
 
     assert.eq(expectedShardCount['shard0000'], shard0.getDB('test').user.find().count());
     assert.eq(expectedShardCount['shard0001'], shard1.getDB('test').user.find().count());

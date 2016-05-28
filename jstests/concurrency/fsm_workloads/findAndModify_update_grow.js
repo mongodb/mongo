@@ -30,11 +30,7 @@ var $config = (function() {
         function makeDoc(tid) {
             // Use 32-bit integer for representing 'length' property
             // to ensure $mul does integer multiplication
-            var doc = {
-                _id: new ObjectId(),
-                tid: tid,
-                length: new NumberInt(1)
-            };
+            var doc = {_id: new ObjectId(), tid: tid, length: new NumberInt(1)};
             doc[uniqueFieldName] = makeStringOfLength(doc.length);
             return doc;
         }
@@ -70,17 +66,15 @@ var $config = (function() {
             var updatedLength = factor * this.length;
             var updatedValue = makeStringOfLength(updatedLength);
 
-            var update = {
-                $set: {},
-                $mul: {length: factor}
-            };
+            var update = {$set: {}, $mul: {length: factor}};
             update.$set[uniqueFieldName] = updatedValue;
 
             var res = db.runCommand({
                 findandmodify: db[collName].getName(),
                 query: {tid: this.tid},
                 sort: {length: 1},  // fetch document of smallest size
-                update: update, new: true
+                update: update,
+                new: true
             });
             assertAlways.commandWorked(res);
 
@@ -117,10 +111,7 @@ var $config = (function() {
 
     })();
 
-    var transitions = {
-        insert: {findAndModify: 1},
-        findAndModify: {findAndModify: 1}
-    };
+    var transitions = {insert: {findAndModify: 1}, findAndModify: {findAndModify: 1}};
 
     return {
         threadCount: 20,

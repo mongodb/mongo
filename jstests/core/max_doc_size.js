@@ -53,10 +53,7 @@ assert.neq(null, res.writeErrors);
 coll.drop();
 id = new ObjectId();
 coll.insert({_id: id});
-res = db.runCommand({
-    update: coll.getName(),
-    ordered: true,
-    updates: [{q: {_id: id}, u: {$set: {x: overBigStr}}}]
-});
+res = db.runCommand(
+    {update: coll.getName(), ordered: true, updates: [{q: {_id: id}, u: {$set: {x: overBigStr}}}]});
 assert(res.ok);
 assert.neq(null, res.writeErrors);

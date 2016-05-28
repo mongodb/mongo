@@ -24,11 +24,7 @@ indexTypes.forEach(function(indexType) {
                     pointDescription = (isLegacy ? "legacy coordinates" : "GeoJSON point");
 
                 function makeCommand(distance) {
-                    var command = {
-                        geoNear: t.getName(),
-                        near: pointType,
-                        spherical: spherical
-                    };
+                    var command = {geoNear: t.getName(), near: pointType, spherical: spherical};
                     command[optionName] = distance;
                     return command;
                 }
@@ -59,16 +55,14 @@ indexTypes.forEach(function(indexType) {
                 }
 
                 // Try several bad values for min/maxDistance.
-                badNumbers.concat(outOfRangeDistances)
-                    .forEach(function(badDistance) {
+                badNumbers.concat(outOfRangeDistances).forEach(function(badDistance) {
 
-                        var msg =
-                            ("geoNear with spherical=" + spherical + " and " + pointDescription +
-                             " and " + indexType + " index should've failed with " + optionName +
-                             " " + badDistance);
+                    var msg = ("geoNear with spherical=" + spherical + " and " + pointDescription +
+                               " and " + indexType + " index should've failed with " + optionName +
+                               " " + badDistance);
 
-                        assert.commandFailed(db.runCommand(makeCommand(badDistance)), msg);
-                    });
+                    assert.commandFailed(db.runCommand(makeCommand(badDistance)), msg);
+                });
 
                 // Bad values for limit / num.
                 ['num', 'limit'].forEach(function(limitOptionName) {

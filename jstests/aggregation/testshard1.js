@@ -46,26 +46,9 @@ being added as arrays within arrays.
 
 var count = 0;
 var strings = [
-    "one",
-    "two",
-    "three",
-    "four",
-    "five",
-    "six",
-    "seven",
-    "eight",
-    "nine",
-    "ten",
-    "eleven",
-    "twelve",
-    "thirteen",
-    "fourteen",
-    "fifteen",
-    "sixteen",
-    "seventeen",
-    "eighteen",
-    "nineteen",
-    "twenty"
+    "one",     "two",     "three",     "four",     "five",     "six",      "seven",
+    "eight",   "nine",    "ten",       "eleven",   "twelve",   "thirteen", "fourteen",
+    "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"
 ];
 
 jsTestLog("Bulk inserting data");
@@ -94,13 +77,11 @@ for (var i = 0; i < shards.length; i++) {
 }
 
 jsTestLog('a project and group in shards, result combined in mongos');
-var a1 = aggregateNoOrder(
-    db.ts1,
-    [
-      {$project: {cMod10: {$mod: ["$counter", 10]}, number: 1, counter: 1}},
-      {$group: {_id: "$cMod10", numberSet: {$addToSet: "$number"}, avgCounter: {$avg: "$cMod10"}}},
-      {$sort: {_id: 1}}
-    ]);
+var a1 = aggregateNoOrder(db.ts1, [
+    {$project: {cMod10: {$mod: ["$counter", 10]}, number: 1, counter: 1}},
+    {$group: {_id: "$cMod10", numberSet: {$addToSet: "$number"}, avgCounter: {$avg: "$cMod10"}}},
+    {$sort: {_id: 1}}
+]);
 
 for (i = 0; i < 10; ++i) {
     assert.eq(a1[i].avgCounter, a1[i]._id, 'agg sharded test avgCounter failed');
@@ -115,7 +96,7 @@ assert.eq(a2[0].total, (nItems / 2) * (1 + nItems), 'agg sharded test counter su
 
 jsTestLog('A group combining all documents into one, averaging a null field.');
 assert.eq(aggregateOrdered(db.ts1, [{$group: {_id: null, avg: {$avg: "$missing"}}}]),
-              [{_id: null, avg: null}]);
+          [{_id: null, avg: null}]);
 
 jsTestLog('an initial group starts the group in the shards, and combines them in mongos');
 var a3 =
@@ -126,19 +107,18 @@ for (i = 0; i < strings.length; ++i) {
 }
 
 jsTestLog('a match takes place in the shards; just returning the results from mongos');
-var a4 = aggregateNoOrder(db.ts1,
-                              [{
-                                 $match: {
-                                     $or: [
-                                         {counter: 55},
-                                         {counter: 1111},
-                                         {counter: 2222},
-                                         {counter: 33333},
-                                         {counter: 99999},
-                                         {counter: 55555}
-                                     ]
-                                 }
-                              }]);
+var a4 = aggregateNoOrder(db.ts1, [{
+                              $match: {
+                                  $or: [
+                                      {counter: 55},
+                                      {counter: 1111},
+                                      {counter: 2222},
+                                      {counter: 33333},
+                                      {counter: 99999},
+                                      {counter: 55555}
+                                  ]
+                              }
+                          }]);
 
 assert.eq(a4.length, 6, tojson(a4));
 for (i = 0; i < 6; ++i) {
@@ -192,13 +172,15 @@ function testAvgStdDev() {
     jsTestLog('testing $avg and $stdDevPop in sharded $group');
     // Note: not using aggregateOrdered since it requires exact results. $stdDevPop can vary
     // slightly between runs if a migration occurs. This is why we use assert.close below.
-    var res = db.ts1.aggregate([{
-        $group: {
-            _id: null,
-            avg: {$avg: '$counter'},
-            stdDevPop: {$stdDevPop: '$counter'},
-        }
-    }]).toArray();
+    var res = db.ts1
+                  .aggregate([{
+                      $group: {
+                          _id: null,
+                          avg: {$avg: '$counter'},
+                          stdDevPop: {$stdDevPop: '$counter'},
+                      }
+                  }])
+                  .toArray();
     // http://en.wikipedia.org/wiki/Arithmetic_progression#Sum
     var avg = (1 + nItems) / 2;
     assert.close(res[0].avg, avg, '', 10 /*decimal places*/);
@@ -233,10 +215,7 @@ db.literal.save({dollar: false});
 
 result = aggregateOrdered(
     db.literal,
-        [{
-           $project:
-               {_id: 0, cost: {$cond: ['$dollar', {$literal: '$1.00'}, {$literal: '$.99'}]}}
-        }]);
+    [{$project: {_id: 0, cost: {$cond: ['$dollar', {$literal: '$1.00'}, {$literal: '$.99'}]}}}]);
 
 assert.eq([{cost: '$.99'}], result);
 

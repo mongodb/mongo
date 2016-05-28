@@ -61,6 +61,5 @@ assert.eq(1, sc.findOne({_id: 90000}).a);
 m_hash = m.getDB("d").runCommand("dbhash");
 s_hash = s.getDB("d").runCommand("dbhash");
 
-assert.eq(m_hash.collections.c,
-          s_hash.collections.c,
-          "sad " + tojson(m_hash) + " " + tojson(s_hash));
+assert.eq(
+    m_hash.collections.c, s_hash.collections.c, "sad " + tojson(m_hash) + " " + tojson(s_hash));

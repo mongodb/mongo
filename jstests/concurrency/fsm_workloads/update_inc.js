@@ -27,9 +27,7 @@ var $config = (function() {
         },
 
         update: function update(db, collName) {
-            var updateDoc = {
-                $inc: {}
-            };
+            var updateDoc = {$inc: {}};
             updateDoc.$inc[this.fieldName] = 1;
 
             var res = db[collName].update({_id: this.id}, updateDoc);
@@ -74,16 +72,10 @@ var $config = (function() {
         }
     };
 
-    var transitions = {
-        init: {update: 1},
-        update: {find: 1},
-        find: {update: 1}
-    };
+    var transitions = {init: {update: 1}, update: {find: 1}, find: {update: 1}};
 
     function setup(db, collName, cluster) {
-        var doc = {
-            _id: this.id
-        };
+        var doc = {_id: this.id};
 
         // Pre-populate the fields we need to avoid size change for capped collections.
         for (var i = 0; i < this.threadCount; ++i) {

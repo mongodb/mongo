@@ -28,9 +28,9 @@
 
 #pragma once
 
-#include <vector>
 #include <memory>
 #include <utility>
+#include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"

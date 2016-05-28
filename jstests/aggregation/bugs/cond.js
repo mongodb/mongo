@@ -68,16 +68,15 @@ t.save({noonSense: 'pm', mealCombined: 'yes'});
 t.save({noonSense: 'pm', mealCombined: 'no'});
 assert.eq(['breakfast', 'brunch', 'linner', 'dinner'],
           t.aggregate({
-              $project: {
-                  a: {
-                      $cond: [
-                          {$eq: ['$noonSense', 'am']},
-                          {$cond: [{$eq: ['$mealCombined', 'yes']}, 'brunch', 'breakfast']},
-                          {$cond: [{$eq: ['$mealCombined', 'yes']}, 'linner', 'dinner']}
-                      ]
-                  }
-              }
-          })
-              .map(function(x) {
-                  return x.a;
-              }));
+               $project: {
+                   a: {
+                       $cond: [
+                           {$eq: ['$noonSense', 'am']},
+                           {$cond: [{$eq: ['$mealCombined', 'yes']}, 'brunch', 'breakfast']},
+                           {$cond: [{$eq: ['$mealCombined', 'yes']}, 'linner', 'dinner']}
+                       ]
+                   }
+               }
+           }).map(function(x) {
+              return x.a;
+          }));

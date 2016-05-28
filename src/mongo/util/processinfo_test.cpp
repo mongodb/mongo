@@ -32,8 +32,8 @@
 #include <iostream>
 #include <vector>
 
-#include "mongo/util/processinfo.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/processinfo.h"
 
 using mongo::ProcessInfo;
 using boost::optional;

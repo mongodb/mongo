@@ -258,9 +258,12 @@ public:
             cmd.append("indexes",
                        BSON_ARRAY(BSON("key" << BSON("loc"
                                                      << "geoHaystack"
-                                                     << "z" << 1.0) << "name"
+                                                     << "z"
+                                                     << 1.0)
+                                             << "name"
                                              << "loc_geoHaystack_z_1"
-                                             << "bucketSize" << static_cast<double>(0.7))));
+                                             << "bucketSize"
+                                             << static_cast<double>(0.7))));
 
             BSONObj result;
             ASSERT(db.runCommand(nsDb(), cmd.obj(), result));

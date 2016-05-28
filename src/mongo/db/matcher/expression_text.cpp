@@ -59,13 +59,15 @@ Status TextMatchExpression::init(OperationContext* txn,
         if (!db) {
             return {ErrorCodes::IndexNotFound,
                     str::stream() << "text index required for $text query (no such collection '"
-                                  << nss.ns() << "')"};
+                                  << nss.ns()
+                                  << "')"};
         }
         Collection* collection = db->getCollection(nss);
         if (!collection) {
             return {ErrorCodes::IndexNotFound,
                     str::stream() << "text index required for $text query (no such collection '"
-                                  << nss.ns() << "')"};
+                                  << nss.ns()
+                                  << "')"};
         }
         std::vector<IndexDescriptor*> idxMatches;
         collection->getIndexCatalog()->findIndexByType(txn, IndexNames::TEXT, idxMatches);

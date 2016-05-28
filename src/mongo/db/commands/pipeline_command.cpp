@@ -40,7 +40,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/pipeline_proxy.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -52,6 +51,7 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/stdx/memory.h"
 
@@ -127,7 +127,9 @@ static bool handleCursorCommand(OperationContext* txn,
         msgasserted(
             17391,
             str::stream() << "Aggregation has more results than fit in initial batch, but can't "
-                          << "create cursor since collection " << ns << " doesn't exist");
+                          << "create cursor since collection "
+                          << ns
+                          << " doesn't exist");
     }
 
     if (cursor) {

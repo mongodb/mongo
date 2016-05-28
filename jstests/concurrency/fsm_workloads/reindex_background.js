@@ -12,24 +12,22 @@
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/reindex.js');     // for $config
 
-var $config =
-    extendWorkload($config,
-                   function($config, $super) {
-                       $config.data.prefix = 'reindex_background';
+var $config = extendWorkload($config, function($config, $super) {
+    $config.data.prefix = 'reindex_background';
 
-                       $config.states.createIndexes = function createIndexes(db, collName) {
-                           var coll = db[this.threadCollName];
+    $config.states.createIndexes = function createIndexes(db, collName) {
+        var coll = db[this.threadCollName];
 
-                           // The number of indexes created here is also stored in data.nIndexes
-                           var textResult = coll.ensureIndex({text: 'text'}, {background: true});
-                           assertAlways.commandWorked(textResult);
+        // The number of indexes created here is also stored in data.nIndexes
+        var textResult = coll.ensureIndex({text: 'text'}, {background: true});
+        assertAlways.commandWorked(textResult);
 
-                           var geoResult = coll.ensureIndex({geo: '2dsphere'}, {background: true});
-                           assertAlways.commandWorked(geoResult);
+        var geoResult = coll.ensureIndex({geo: '2dsphere'}, {background: true});
+        assertAlways.commandWorked(geoResult);
 
-                           var integerResult = coll.ensureIndex({integer: 1}, {background: true});
-                           assertAlways.commandWorked(integerResult);
-                       };
+        var integerResult = coll.ensureIndex({integer: 1}, {background: true});
+        assertAlways.commandWorked(integerResult);
+    };
 
-                       return $config;
-                   });
+    return $config;
+});

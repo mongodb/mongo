@@ -51,18 +51,18 @@
 #include "mongo/tools/bridge_commands.h"
 #include "mongo/tools/mongobridge_options.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/abstract_message_port.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/message.h"
-#include "mongo/util/exit.h"
 #include "mongo/util/quick_exit.h"
-#include "mongo/util/static_observer.h"
 #include "mongo/util/signal_handlers.h"
+#include "mongo/util/static_observer.h"
 #include "mongo/util/text.h"
-#include "mongo/util/timer.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 

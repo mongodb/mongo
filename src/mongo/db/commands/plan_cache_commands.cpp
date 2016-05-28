@@ -30,8 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
-#include <string>
 #include <sstream>
+#include <string>
 
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
@@ -96,8 +96,8 @@ static Status getPlanCache(OperationContext* txn,
 // available to the client.
 //
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(SetupPlanCacheCommands,
-                                     MONGO_NO_PREREQUISITES)(InitializerContext* context) {
+MONGO_INITIALIZER_WITH_PREREQUISITES(SetupPlanCacheCommands, MONGO_NO_PREREQUISITES)
+(InitializerContext* context) {
     // PlanCacheCommand constructors refer to static ActionType instances.
     // Registering commands in a mongo static initializer ensures that
     // the ActionType construction will be completed first.

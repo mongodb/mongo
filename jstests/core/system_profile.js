@@ -26,25 +26,24 @@ assert.writeError(testDB.system.profile.remove({}));
 // Using findAndModify to write to "system.profile" should fail.
 assert.commandWorked(testDB.dropDatabase());
 assert.commandWorked(testDB.createCollection("system.profile"));
-assert.commandFailed(testDB.system.profile.runCommand("findAndModify",
-                                                      {query: {}, update: {a: 1}}));
-assert.commandFailed(testDB.system.profile.runCommand("findAndModify",
-                                                      {query: {}, update: {a: 1}, upsert: true}));
+assert.commandFailed(
+    testDB.system.profile.runCommand("findAndModify", {query: {}, update: {a: 1}}));
+assert.commandFailed(
+    testDB.system.profile.runCommand("findAndModify", {query: {}, update: {a: 1}, upsert: true}));
 assert.commandFailed(testDB.system.profile.runCommand("findAndModify", {query: {}, remove: true}));
 
 // Using mapReduce to write to "system.profile" should fail.
 assert.commandWorked(testDB.dropDatabase());
 assert.writeOK(testDB.foo.insert({val: 1}));
-assert.commandFailed(testDB.foo.runCommand("mapReduce",
-                                           {
-                                             map: function() {
-                                                 emit(0, this.val);
-                                             },
-                                             reduce: function(id, values) {
-                                                 return Array.sum(values);
-                                             },
-                                             out: "system.profile"
-                                           }));
+assert.commandFailed(testDB.foo.runCommand("mapReduce", {
+    map: function() {
+        emit(0, this.val);
+    },
+    reduce: function(id, values) {
+        return Array.sum(values);
+    },
+    out: "system.profile"
+}));
 
 // Using aggregate to write to "system.profile" should fail.
 assert.commandWorked(testDB.dropDatabase());

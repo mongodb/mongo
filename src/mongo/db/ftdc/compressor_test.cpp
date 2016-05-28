@@ -67,12 +67,18 @@ TEST(FTDCCompressor, TestBasic) {
 
     auto st = c.addSample(BSON("name"
                                << "joe"
-                               << "key1" << 33 << "key2" << 42),
+                               << "key1"
+                               << 33
+                               << "key2"
+                               << 42),
                           Date_t());
     ASSERT_HAS_SPACE(st);
     st = c.addSample(BSON("name"
                           << "joe"
-                          << "key1" << 34 << "key2" << 45),
+                          << "key1"
+                          << 34
+                          << "key2"
+                          << 45),
                      Date_t());
     ASSERT_HAS_SPACE(st);
 
@@ -179,89 +185,141 @@ TEST(FTDCCompressor, TestSchemaChanges) {
 
     auto st = c.addSample(BSON("name"
                                << "joe"
-                               << "key1" << 33 << "key2" << 42));
+                               << "key1"
+                               << 33
+                               << "key2"
+                               << 42));
     ASSERT_HAS_SPACE(st);
     st = c.addSample(BSON("name"
                           << "joe"
-                          << "key1" << 34 << "key2" << 45));
+                          << "key1"
+                          << 34
+                          << "key2"
+                          << 45));
     ASSERT_HAS_SPACE(st);
     st = c.addSample(BSON("name"
                           << "joe"
-                          << "key1" << 34 << "key2" << 45));
+                          << "key1"
+                          << 34
+                          << "key2"
+                          << 45));
     ASSERT_HAS_SPACE(st);
 
     // Add Field
     st = c.addSample(BSON("name"
                           << "joe"
-                          << "key1" << 34 << "key2" << 45 << "key3" << 47));
+                          << "key1"
+                          << 34
+                          << "key2"
+                          << 45
+                          << "key3"
+                          << 47));
     ASSERT_SCHEMA_CHANGED(st);
 
     st = c.addSample(BSON("name"
                           << "joe"
-                          << "key1" << 34 << "key2" << 45 << "key3" << 47));
+                          << "key1"
+                          << 34
+                          << "key2"
+                          << 45
+                          << "key3"
+                          << 47));
     ASSERT_HAS_SPACE(st);
 
     // Rename field
     st = c.addSample(BSON("name"
                           << "joe"
-                          << "key1" << 34 << "key5" << 45 << "key3" << 47));
+                          << "key1"
+                          << 34
+                          << "key5"
+                          << 45
+                          << "key3"
+                          << 47));
     ASSERT_SCHEMA_CHANGED(st);
 
     // Change type
     st = c.addSample(BSON("name"
                           << "joe"
-                          << "key1" << 34 << "key5"
+                          << "key1"
+                          << 34
+                          << "key5"
                           << "45"
-                          << "key3" << 47));
+                          << "key3"
+                          << 47));
     ASSERT_SCHEMA_CHANGED(st);
 
     // Add Field
     st = c.addSample(BSON("name"
                           << "joe"
-                          << "key1" << 34 << "key2" << 45 << "key3" << 47 << "key7" << 34 << "key9"
-                          << 45 << "key13" << 47));
+                          << "key1"
+                          << 34
+                          << "key2"
+                          << 45
+                          << "key3"
+                          << 47
+                          << "key7"
+                          << 34
+                          << "key9"
+                          << 45
+                          << "key13"
+                          << 47));
     ASSERT_SCHEMA_CHANGED(st);
 
     // Remove Field
     st = c.addSample(BSON("name"
                           << "joe"
-                          << "key7" << 34 << "key9" << 45 << "key13" << 47));
+                          << "key7"
+                          << 34
+                          << "key9"
+                          << 45
+                          << "key13"
+                          << 47));
     ASSERT_SCHEMA_CHANGED(st);
 
     st = c.addSample(BSON("name"
                           << "joe"
-                          << "key7" << 34 << "key9" << 45 << "key13" << 47));
+                          << "key7"
+                          << 34
+                          << "key9"
+                          << 45
+                          << "key13"
+                          << 47));
     ASSERT_HAS_SPACE(st);
 
     // Start new batch
     st = c.addSample(BSON("name"
                           << "joe"
-                          << "key7" << 5));
+                          << "key7"
+                          << 5));
     ASSERT_SCHEMA_CHANGED(st);
 
     // Change field to object
     st = c.addSample(BSON("name"
                           << "joe"
-                          << "key7" << BSON(  // nested object
-                                           "a" << 1)));
+                          << "key7"
+                          << BSON(  // nested object
+                                 "a" << 1)));
     ASSERT_SCHEMA_CHANGED(st);
 
     // Change field from object to number
     st = c.addSample(BSON("name"
                           << "joe"
-                          << "key7" << 7));
+                          << "key7"
+                          << 7));
     ASSERT_SCHEMA_CHANGED(st);
 
     // Change field from number to array
     st = c.addSample(BSON("name"
                           << "joe"
-                          << "key7" << BSON_ARRAY(13 << 17)));
+                          << "key7"
+                          << BSON_ARRAY(13 << 17)));
     ASSERT_SCHEMA_CHANGED(st);
 
     // Change field from array to number
     st = c.addSample(BSON("name"
                           << "joe"
-                          << "key7" << 19));
+                          << "key7"
+                          << 19));
     ASSERT_SCHEMA_CHANGED(st);
 
 
@@ -288,15 +346,24 @@ TEST(FTDCCompressor, TestNumbersCompat) {
 
     auto st = c.addSample(BSON("name"
                                << "joe"
-                               << "key1" << 33 << "key2" << 42LL));
+                               << "key1"
+                               << 33
+                               << "key2"
+                               << 42LL));
     ASSERT_HAS_SPACE(st);
     st = c.addSample(BSON("name"
                           << "joe"
-                          << "key1" << 34LL << "key2" << 45.0f));
+                          << "key1"
+                          << 34LL
+                          << "key2"
+                          << 45.0f));
     ASSERT_HAS_SPACE(st);
     st = c.addSample(BSON("name"
                           << "joe"
-                          << "key1" << static_cast<char>(32) << "key2" << 45.0F));
+                          << "key1"
+                          << static_cast<char>(32)
+                          << "key2"
+                          << 45.0F));
     ASSERT_HAS_SPACE(st);
 }
 
@@ -320,31 +387,49 @@ TEST(FTDCCompressor, Types) {
 
     auto st = c.addSample(BSON("name"
                                << "joe"
-                               << "key1" << 33 << "key2" << 42LL));
+                               << "key1"
+                               << 33
+                               << "key2"
+                               << 42LL));
     ASSERT_HAS_SPACE(st);
 
     const char bytes[] = {0x1, 0x2, 0x3};
-    BSONObj o = BSON("created" << DATENOW                       // date_t
-                               << "null" << BSONNULL            // { a : null }
-                               << "undefined" << BSONUndefined  // { a : undefined }
-                               << "obj" << BSON(                // nested object
-                                               "a"
-                                               << "abc"
-                                               << "b" << 123LL) << "foo"
+    BSONObj o = BSON("created" << DATENOW  // date_t
+                               << "null"
+                               << BSONNULL  // { a : null }
+                               << "undefined"
+                               << BSONUndefined  // { a : undefined }
+                               << "obj"
+                               << BSON(  // nested object
+                                      "a"
+                                      << "abc"
+                                      << "b"
+                                      << 123LL)
+                               << "foo"
                                << BSON_ARRAY("bar"
                                              << "baz"
-                                             << "qux")               // array of strings
-                               << "foo2" << BSON_ARRAY(5 << 6 << 7)  // array of ints
-                               << "bindata" << BSONBinData(&bytes[0], 3, bdtCustom)  // bindata
-                               << "oid" << OID("010203040506070809101112")           // oid
-                               << "bool" << true                                     // bool
-                               << "regex" << BSONRegEx("mongodb")                    // regex
-                               << "ref" << BSONDBRef("c", OID("010203040506070809101112"))  // ref
-                               << "code" << BSONCode("func f() { return 1; }")              // code
-                               << "codewscope" << BSONCodeWScope("func f() { return 1; }",
-                                                                 BSON("c" << true))  // codew
-                               << "minkey" << MINKEY                                 // minkey
-                               << "maxkey" << MAXKEY                                 // maxkey
+                                             << "qux")  // array of strings
+                               << "foo2"
+                               << BSON_ARRAY(5 << 6 << 7)  // array of ints
+                               << "bindata"
+                               << BSONBinData(&bytes[0], 3, bdtCustom)  // bindata
+                               << "oid"
+                               << OID("010203040506070809101112")  // oid
+                               << "bool"
+                               << true  // bool
+                               << "regex"
+                               << BSONRegEx("mongodb")  // regex
+                               << "ref"
+                               << BSONDBRef("c", OID("010203040506070809101112"))  // ref
+                               << "code"
+                               << BSONCode("func f() { return 1; }")  // code
+                               << "codewscope"
+                               << BSONCodeWScope("func f() { return 1; }",
+                                                 BSON("c" << true))  // codew
+                               << "minkey"
+                               << MINKEY  // minkey
+                               << "maxkey"
+                               << MAXKEY  // maxkey
                      );
 
     st = c.addSample(o);
@@ -355,11 +440,17 @@ TEST(FTDCCompressor, Types) {
 
     st = c.addSample(BSON("name"
                           << "joe"
-                          << "key1" << 34LL << "key2" << 45.0f));
+                          << "key1"
+                          << 34LL
+                          << "key2"
+                          << 45.0f));
     ASSERT_SCHEMA_CHANGED(st);
     st = c.addSample(BSON("name"
                           << "joe"
-                          << "key1" << static_cast<char>(32) << "key2" << 45.0F));
+                          << "key1"
+                          << static_cast<char>(32)
+                          << "key2"
+                          << 45.0F));
     ASSERT_HAS_SPACE(st);
 }
 
@@ -371,25 +462,37 @@ TEST(FTDCCompressor, TestFull) {
 
         auto st = c.addSample(BSON("name"
                                    << "joe"
-                                   << "key1" << 33 << "key2" << 42));
+                                   << "key1"
+                                   << 33
+                                   << "key2"
+                                   << 42));
         ASSERT_HAS_SPACE(st);
 
         for (size_t i = 0; i != FTDCConfig::kMaxSamplesPerArchiveMetricChunkDefault - 2; i++) {
             st = c.addSample(BSON("name"
                                   << "joe"
-                                  << "key1" << static_cast<long long int>(i * j) << "key2" << 45));
+                                  << "key1"
+                                  << static_cast<long long int>(i * j)
+                                  << "key2"
+                                  << 45));
             ASSERT_HAS_SPACE(st);
         }
 
         st = c.addSample(BSON("name"
                               << "joe"
-                              << "key1" << 34 << "key2" << 45));
+                              << "key1"
+                              << 34
+                              << "key2"
+                              << 45));
         ASSERT_FULL(st);
 
         // Add Value
         st = c.addSample(BSON("name"
                               << "joe"
-                              << "key1" << 34 << "key2" << 45));
+                              << "key1"
+                              << 34
+                              << "key2"
+                              << 45));
         ASSERT_HAS_SPACE(st);
     }
 }

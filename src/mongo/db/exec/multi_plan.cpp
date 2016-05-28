@@ -38,8 +38,8 @@
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/query/explain.h"
@@ -47,8 +47,8 @@
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/storage/record_fetcher.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 

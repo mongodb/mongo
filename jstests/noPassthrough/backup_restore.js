@@ -229,12 +229,8 @@
         rst.waitForState(rst.getSecondaries(), ReplSetTest.State.SECONDARY, 60 * 1000);
 
         // Add new hidden node to replSetTest
-        var hiddenCfg = {
-            restart: true,
-            oplogSize: 1024,
-            dbpath: hiddenDbpath,
-            replSet: replSetName
-        };
+        var hiddenCfg =
+            {restart: true, oplogSize: 1024, dbpath: hiddenDbpath, replSet: replSetName};
         rst.add(hiddenCfg);
         var hiddenHost = rst.nodes[numNodes].host;
 
@@ -257,12 +253,7 @@
         // Add new hidden secondary to replica set
         var rsConfig = primary.getDB("local").system.replset.findOne();
         rsConfig.version += 1;
-        var hiddenMember = {
-            _id: numNodes,
-            host: hiddenHost,
-            priority: 0,
-            hidden: true
-        };
+        var hiddenMember = {_id: numNodes, host: hiddenHost, priority: 0, hidden: true};
         rsConfig.members.push(hiddenMember);
         assert.commandWorked(primary.adminCommand({replSetReconfig: rsConfig}),
                              testName + ' failed to reconfigure replSet ' + tojson(rsConfig));

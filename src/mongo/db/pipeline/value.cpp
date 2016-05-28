@@ -30,9 +30,9 @@
 
 #include "mongo/db/pipeline/value.h"
 
+#include <boost/functional/hash.hpp>
 #include <cmath>
 #include <limits>
-#include <boost/functional/hash.hpp>
 
 #include "mongo/base/compare_numbers.h"
 #include "mongo/base/data_type_endian.h"

@@ -16,14 +16,10 @@
             },
             runCommand: function(db, cmd, opts) {
                 commandsRan.push({db: db, cmd: cmd, opts: opts});
-                return {
-                    ok: 1.0
-                };
+                return {ok: 1.0};
             },
             getReadPref: function() {
-                return {
-                    mode: "secondaryPreferred"
-                };
+                return {mode: "secondaryPreferred"};
             },
             getReadPrefMode: function() {
                 return "secondaryPreferred";

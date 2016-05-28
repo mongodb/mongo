@@ -98,7 +98,7 @@ const int nthr = 135;
 #endif
 class MongoMutexTest : public ThreadedTest<nthr> {
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
-    enum { N = 2000 };
+    enum {N = 2000};
 #else
     enum { N = 4000 /*0*/ };
 #endif

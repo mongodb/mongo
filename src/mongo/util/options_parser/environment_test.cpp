@@ -27,9 +27,9 @@
 
 #include "mongo/bson/util/builder.h"
 
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/options_parser/constraints.h"
 #include "mongo/util/options_parser/environment.h"
-#include "mongo/unittest/unittest.h"
 
 namespace {
 
@@ -146,7 +146,9 @@ TEST(ToBSONTests, DottedValues) {
     ASSERT_OK(environment.set(moe::Key("val2"), moe::Value(true)));
     ASSERT_OK(environment.set(moe::Key("val1.dotted2"), moe::Value(std::string("string"))));
     mongo::BSONObj obj = BSON("val1" << BSON("dotted1" << 6 << "dotted2"
-                                                       << "string") << "val2" << true);
+                                                       << "string")
+                                     << "val2"
+                                     << true);
     // TODO: Put a comparison here that doesn't depend on the field order.  Right now it is
     // based on the sort order of keys in a std::map.
     ASSERT_EQUALS(obj, environment.toBSON());
@@ -161,9 +163,12 @@ TEST(ToBSONTests, DeepDottedValues) {
     ASSERT_OK(environment.set(moe::Key("val2"), moe::Value(6.0)));
     mongo::BSONObj obj =
         BSON("val1" << BSON("first1" << BSON("second1" << BSON("third1" << 6 << "third2" << true)
-                                                       << "second2" << BSON("third1" << false))
+                                                       << "second2"
+                                                       << BSON("third1" << false))
                                      << "first2"
-                                     << "string") << "val2" << 6.0);
+                                     << "string")
+                    << "val2"
+                    << 6.0);
     // TODO: Put a comparison here that doesn't depend on the field order.  Right now it is
     // based on the sort order of keys in a std::map.
     ASSERT_EQUALS(obj, environment.toBSON());

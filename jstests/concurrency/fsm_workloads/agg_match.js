@@ -8,31 +8,29 @@
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/agg_base.js');    // for $config
 
-var $config = extendWorkload(
-    $config,
-    function($config, $super) {
+var $config = extendWorkload($config, function($config, $super) {
 
-        $config.data.getOutCollName = function getOutCollName(collName) {
-            return collName + '_out_agg_match';
-        };
+    $config.data.getOutCollName = function getOutCollName(collName) {
+        return collName + '_out_agg_match';
+    };
 
-        $config.states.query = function query(db, collName) {
-            // note that all threads output to the same collection
-            var otherCollName = this.getOutCollName(collName);
-            var cursor = db[collName].aggregate([{$match: {flag: true}}, {$out: otherCollName}]);
-            assertAlways.eq(0, cursor.itcount(), 'cursor returned by $out should always be empty');
-            // NOTE: This relies on the fast-path for .count() with no query being isolated.
-            // NOTE: There's a bug, SERVER-3645, where .count() is wrong on sharded collections, so
-            // we
-            // blacklisted this test for sharded clusters.
-            assertWhenOwnColl.eq(db[collName].count() / 2, db[otherCollName].count());
-        };
+    $config.states.query = function query(db, collName) {
+        // note that all threads output to the same collection
+        var otherCollName = this.getOutCollName(collName);
+        var cursor = db[collName].aggregate([{$match: {flag: true}}, {$out: otherCollName}]);
+        assertAlways.eq(0, cursor.itcount(), 'cursor returned by $out should always be empty');
+        // NOTE: This relies on the fast-path for .count() with no query being isolated.
+        // NOTE: There's a bug, SERVER-3645, where .count() is wrong on sharded collections, so
+        // we
+        // blacklisted this test for sharded clusters.
+        assertWhenOwnColl.eq(db[collName].count() / 2, db[otherCollName].count());
+    };
 
-        $config.teardown = function teardown(db, collName, cluster) {
-            $super.teardown.apply(this, arguments);
+    $config.teardown = function teardown(db, collName, cluster) {
+        $super.teardown.apply(this, arguments);
 
-            assertWhenOwnColl(db[this.getOutCollName(collName)].drop());
-        };
+        assertWhenOwnColl(db[this.getOutCollName(collName)].drop());
+    };
 
-        return $config;
-    });
+    return $config;
+});

@@ -29,8 +29,8 @@
 #pragma once
 
 #include "mongo/db/jsobj.h"
-#include "mongo/util/net/message.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/util/net/message.h"
 
 namespace mongo {
 

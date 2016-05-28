@@ -304,13 +304,16 @@ TEST_F(ApplierTest, ApplyOperationSuccessful) {
     Applier::Operations operationsToApply{
         OplogEntry(BSON("op"
                         << "a"
-                        << "ts" << Timestamp(Seconds(123), 0))),
+                        << "ts"
+                        << Timestamp(Seconds(123), 0))),
         OplogEntry(BSON("op"
                         << "b"
-                        << "ts" << Timestamp(Seconds(456), 0))),
+                        << "ts"
+                        << Timestamp(Seconds(456), 0))),
         OplogEntry(BSON("op"
                         << "c"
-                        << "ts" << Timestamp(Seconds(789), 0))),
+                        << "ts"
+                        << Timestamp(Seconds(789), 0))),
     };
     stdx::mutex mutex;
     StatusWith<Timestamp> result = getDetectableErrorStatus();
@@ -352,13 +355,16 @@ void ApplierTest::_testApplyOperationFailed(size_t opIndex, stdx::function<Statu
     Applier::Operations operationsToApply{
         OplogEntry(BSON("op"
                         << "a"
-                        << "ts" << Timestamp(Seconds(123), 0))),
+                        << "ts"
+                        << Timestamp(Seconds(123), 0))),
         OplogEntry(BSON("op"
                         << "b"
-                        << "ts" << Timestamp(Seconds(456), 0))),
+                        << "ts"
+                        << Timestamp(Seconds(456), 0))),
         OplogEntry(BSON("op"
                         << "c"
-                        << "ts" << Timestamp(Seconds(789), 0))),
+                        << "ts"
+                        << Timestamp(Seconds(789), 0))),
     };
     stdx::mutex mutex;
     StatusWith<Timestamp> result = getDetectableErrorStatus();
@@ -403,12 +409,11 @@ TEST_F(ApplierTest, ApplyOperationFailedOnFirstOperation) {
 }
 
 TEST_F(ApplierTest, ApplyOperationThrowsExceptionOnFirstOperation) {
-    _testApplyOperationFailed(0U,
-                              []() {
-                                  uasserted(ErrorCodes::OperationFailed, "");
-                                  MONGO_UNREACHABLE;
-                                  return Status(ErrorCodes::InternalError, "unreachable");
-                              });
+    _testApplyOperationFailed(0U, []() {
+        uasserted(ErrorCodes::OperationFailed, "");
+        MONGO_UNREACHABLE;
+        return Status(ErrorCodes::InternalError, "unreachable");
+    });
 }
 
 TEST_F(ApplierTest, ApplyOperationFailedOnSecondOperation) {
@@ -416,12 +421,11 @@ TEST_F(ApplierTest, ApplyOperationFailedOnSecondOperation) {
 }
 
 TEST_F(ApplierTest, ApplyOperationThrowsExceptionOnSecondOperation) {
-    _testApplyOperationFailed(1U,
-                              []() {
-                                  uasserted(ErrorCodes::OperationFailed, "");
-                                  MONGO_UNREACHABLE;
-                                  return Status(ErrorCodes::InternalError, "unreachable");
-                              });
+    _testApplyOperationFailed(1U, []() {
+        uasserted(ErrorCodes::OperationFailed, "");
+        MONGO_UNREACHABLE;
+        return Status(ErrorCodes::InternalError, "unreachable");
+    });
 }
 
 TEST_F(ApplierTest, ApplyOperationFailedOnLastOperation) {
@@ -429,12 +433,11 @@ TEST_F(ApplierTest, ApplyOperationFailedOnLastOperation) {
 }
 
 TEST_F(ApplierTest, ApplyOperationThrowsExceptionOnLastOperation) {
-    _testApplyOperationFailed(2U,
-                              []() {
-                                  uasserted(ErrorCodes::OperationFailed, "");
-                                  MONGO_UNREACHABLE;
-                                  return Status(ErrorCodes::InternalError, "unreachable");
-                              });
+    _testApplyOperationFailed(2U, []() {
+        uasserted(ErrorCodes::OperationFailed, "");
+        MONGO_UNREACHABLE;
+        return Status(ErrorCodes::InternalError, "unreachable");
+    });
 }
 
 class ApplyUntilAndPauseTest : public ApplierTest {};
@@ -454,8 +457,8 @@ TEST_F(ApplyUntilAndPauseTest, NoOperationsInRange) {
     auto result = applyUntilAndPause(
         &getReplExecutor(),
         {
-         OplogEntry(BSON("ts" << Timestamp(Seconds(456), 0))),
-         OplogEntry(BSON("ts" << Timestamp(Seconds(789), 0))),
+            OplogEntry(BSON("ts" << Timestamp(Seconds(456), 0))),
+            OplogEntry(BSON("ts" << Timestamp(Seconds(789), 0))),
         },
         [](OperationContext* txn, const OplogEntry& operation) { return Status::OK(); },
         Timestamp(Seconds(123), 0),
@@ -594,13 +597,16 @@ void _testApplyUntilAndPauseDiscardOperations(ReplicationExecutor* executor,
     Applier::Operations operationsToApply{
         OplogEntry(BSON("op"
                         << "a"
-                        << "ts" << Timestamp(Seconds(123), 0))),
+                        << "ts"
+                        << Timestamp(Seconds(123), 0))),
         OplogEntry(BSON("op"
                         << "b"
-                        << "ts" << Timestamp(Seconds(456), 0))),
+                        << "ts"
+                        << Timestamp(Seconds(456), 0))),
         OplogEntry(BSON("op"
                         << "c"
-                        << "ts" << Timestamp(Seconds(789), 0))),
+                        << "ts"
+                        << Timestamp(Seconds(789), 0))),
     };
     stdx::mutex mutex;
     StatusWith<Timestamp> completionResult = ApplyUntilAndPauseTest::getDetectableErrorStatus();

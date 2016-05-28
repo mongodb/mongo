@@ -32,7 +32,6 @@
 
 #include "mongo/db/query/planner_ixselect.h"
 
-#include <memory>
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
@@ -40,6 +39,7 @@
 #include "mongo/db/query/index_tag.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/text.h"
+#include <memory>
 
 using namespace mongo;
 

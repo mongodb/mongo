@@ -382,11 +382,11 @@ TEST_F(RemoteCommandRetrySchedulerTest, SchedulerIgnoresEmbeddedErrorInSuccessfu
     // Scheduler does not parse document in a successful response for embedded errors.
     // This is the case with some commands (e.g. find) which do not always return errors using the
     // wire protocol.
-    executor::RemoteCommandResponse response(BSON("ok" << 0 << "code"
-                                                       << int(ErrorCodes::FailedToParse) << "errmsg"
-                                                       << "injected error"),
-                                             BSON("z" << 456),
-                                             Milliseconds(100));
+    executor::RemoteCommandResponse response(
+        BSON("ok" << 0 << "code" << int(ErrorCodes::FailedToParse) << "errmsg"
+                  << "injected error"),
+        BSON("z" << 456),
+        Milliseconds(100));
 
     processNetworkResponse(response);
     checkCompletionStatus(&scheduler, callback, response);

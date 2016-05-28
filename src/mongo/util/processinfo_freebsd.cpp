@@ -41,8 +41,8 @@
 #include <unistd.h>
 #include <vm/vm_param.h>
 
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 #include "processinfo.h"
 
 using namespace std;

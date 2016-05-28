@@ -3,9 +3,7 @@ var t = db.array_match4;
 t.drop();
 t.save({a: [1, 2]});
 
-var query_gte = {
-    a: {$gte: [1, 2]}
-};
+var query_gte = {a: {$gte: [1, 2]}};
 
 //
 // without index

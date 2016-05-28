@@ -38,12 +38,7 @@ var $config = (function() {
         return reducedValue;
     }
 
-    var data = {
-        numDocs: 2000,
-        mapper: mapper,
-        reducer: reducer,
-        finalizer: finalizer
-    };
+    var data = {numDocs: 2000, mapper: mapper, reducer: reducer, finalizer: finalizer};
 
     var states = (function() {
 
@@ -53,26 +48,17 @@ var $config = (function() {
         }
 
         function mapReduce(db, collName) {
-            var options = {
-                finalize: this.finalizer,
-                out: {inline: 1}
-            };
+            var options = {finalize: this.finalizer, out: {inline: 1}};
 
             var res = db[collName].mapReduce(this.mapper, this.reducer, options);
             assertAlways.commandWorked(res);
         }
 
-        return {
-            init: init,
-            mapReduce: mapReduce
-        };
+        return {init: init, mapReduce: mapReduce};
 
     })();
 
-    var transitions = {
-        init: {mapReduce: 1},
-        mapReduce: {mapReduce: 1}
-    };
+    var transitions = {init: {mapReduce: 1}, mapReduce: {mapReduce: 1}};
 
     function makeDoc(keyLimit, valueLimit) {
         return {

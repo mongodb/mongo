@@ -133,7 +133,8 @@ public:
         shared_ptr<Shard> toShard = grid.shardRegistry()->getShard(txn, to);
         if (!toShard) {
             string msg(str::stream() << "Could not move database '" << dbname << "' to shard '"
-                                     << to << "' because the shard does not exist");
+                                     << to
+                                     << "' because the shard does not exist");
             log() << msg;
             return appendCommandStatus(result, Status(ErrorCodes::ShardNotFound, msg));
         }
@@ -192,8 +193,11 @@ public:
         bool worked = toconn->runCommand(
             dbname.c_str(),
             BSON("clone" << fromShard->getConnString().toString() << "collsToIgnore" << barr.arr()
-                         << bypassDocumentValidationCommandOption() << true
-                         << "_checkForCatalogChange" << true << "writeConcern"
+                         << bypassDocumentValidationCommandOption()
+                         << true
+                         << "_checkForCatalogChange"
+                         << true
+                         << "writeConcern"
                          << txn->getWriteConcern().toBSON()),
             cloneRes);
         toconn.done();
@@ -233,7 +237,8 @@ public:
                 }
             } catch (DBException& e) {
                 e.addContext(str::stream() << "movePrimary could not drop the database " << dbname
-                                           << " on " << oldPrimary);
+                                           << " on "
+                                           << oldPrimary);
                 throw;
             }
 
@@ -268,7 +273,9 @@ public:
                     } catch (DBException& e) {
                         e.addContext(str::stream()
                                      << "movePrimary could not drop the cloned collection "
-                                     << el.String() << " on " << oldPrimary);
+                                     << el.String()
+                                     << " on "
+                                     << oldPrimary);
                         throw;
                     }
                 }

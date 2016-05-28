@@ -123,7 +123,9 @@ void LogFile::synchronousAppend(const void* _buf, size_t _len) {
             else
                 uasserted(13517,
                           str::stream() << "error appending to file " << _name << ' ' << _len << ' '
-                                        << toWrite << ' ' << errnoWithDescription(e));
+                                        << toWrite
+                                        << ' '
+                                        << errnoWithDescription(e));
         } else {
             dassert(written == toWrite);
         }
@@ -137,10 +139,10 @@ void LogFile::synchronousAppend(const void* _buf, size_t _len) {
 
 /// posix
 
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #ifdef __linux__
 #include <linux/fs.h>

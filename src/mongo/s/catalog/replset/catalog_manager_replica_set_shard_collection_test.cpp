@@ -340,8 +340,11 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
     {
         BSONObj logChangeDetail =
             BSON("shardKey" << keyPattern.toBSON() << "collection" << ns << "primary"
-                            << shard.getName() + ":" + shard.getHost() << "initShards"
-                            << BSONArray() << "numChunks" << 1);
+                            << shard.getName() + ":" + shard.getHost()
+                            << "initShards"
+                            << BSONArray()
+                            << "numChunks"
+                            << 1);
         expectChangeLogCreate(configHost, BSON("ok" << 1));
         expectChangeLogInsert(
             configHost, network()->now(), "shardCollection.start", ns, logChangeDetail);
@@ -511,9 +514,11 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     {
         BSONObj logChangeDetail =
             BSON("shardKey" << keyPattern.toBSON() << "collection" << ns << "primary"
-                            << shard0.getName() + ":" + shard0.getHost() << "initShards"
+                            << shard0.getName() + ":" + shard0.getHost()
+                            << "initShards"
                             << BSON_ARRAY(shard0.getName() << shard1.getName() << shard2.getName())
-                            << "numChunks" << (int)expectedChunks.size());
+                            << "numChunks"
+                            << (int)expectedChunks.size());
         expectChangeLogCreate(configHost, BSON("ok" << 1));
         expectChangeLogInsert(
             configHost, network()->now(), "shardCollection.start", ns, logChangeDetail);
@@ -655,8 +660,11 @@ TEST_F(ShardCollectionTest, withInitialData) {
     {
         BSONObj logChangeDetail =
             BSON("shardKey" << keyPattern.toBSON() << "collection" << ns << "primary"
-                            << shard.getName() + ":" + shard.getHost() << "initShards"
-                            << BSONArray() << "numChunks" << 1);
+                            << shard.getName() + ":" + shard.getHost()
+                            << "initShards"
+                            << BSONArray()
+                            << "numChunks"
+                            << 1);
         expectChangeLogCreate(configHost, BSON("ok" << 1));
         expectChangeLogInsert(
             configHost, network()->now(), "shardCollection.start", ns, logChangeDetail);

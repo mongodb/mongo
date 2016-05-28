@@ -30,54 +30,54 @@ assert.throws(function() {
 
 assert.eq(2,
           t.find({
-              $or: [
-                  {loc: {$geoWithin: {$centerSphere: [p, 10]}}},
-                  {loc: {$geoWithin: {$centerSphere: [p, 10]}}}
-              ]
-          }).itcount(),
+               $or: [
+                   {loc: {$geoWithin: {$centerSphere: [p, 10]}}},
+                   {loc: {$geoWithin: {$centerSphere: [p, 10]}}}
+               ]
+           }).itcount(),
           'multiple $geoWithin clauses not supported by $or. index type: ' + indexname);
+assert.eq(
+    2,
+    t.find({
+         $or: [
+             {loc: {$geoIntersects: {$geometry: {type: 'LineString', coordinates: [p, q]}}}},
+             {
+               loc: {
+                   $geoIntersects:
+                       {$geometry: {type: 'LineString', coordinates: [[0, 0], [1, 1]]}}
+               }
+             }
+         ]
+     }).itcount(),
+    'multiple $geoIntersects LineString clauses not supported by $or. index type: ' + indexname);
 assert.eq(2,
           t.find({
-              $or: [
-                  {loc: {$geoIntersects: {$geometry: {type: 'LineString', coordinates: [p, q]}}}},
-                  {
-                    loc: {
-                        $geoIntersects:
-                            {$geometry: {type: 'LineString', coordinates: [[0, 0], [1, 1]]}}
-                    }
-                  }
-              ]
-          }).itcount(),
-          'multiple $geoIntersects LineString clauses not supported by $or. index type: ' +
-              indexname);
-assert.eq(2,
-          t.find({
-              $or: [
-                  {loc: {$geoIntersects: {$geometry: {type: 'Point', coordinates: p}}}},
-                  {loc: {$geoIntersects: {$geometry: {type: 'Point', coordinates: q}}}}
-              ]
-          }).itcount(),
+               $or: [
+                   {loc: {$geoIntersects: {$geometry: {type: 'Point', coordinates: p}}}},
+                   {loc: {$geoIntersects: {$geometry: {type: 'Point', coordinates: q}}}}
+               ]
+           }).itcount(),
           'multiple $geoIntersects Point clauses not supported by $or. index type: ' + indexname);
 assert.eq(
     2,
     t.find({
-        $or: [
-            {
-              loc: {
-                  $geoIntersects:
-                      {$geometry: {type: 'Polygon', coordinates: [[[0, 0], p, q, [0, 0]]]}}
-              }
-            },
-            {
-              loc: {
-                  $geoIntersects: {
-                      $geometry:
-                          {type: 'Polygon', coordinates: [[[0, 0], [1, 1], [0, 1], [0, 0]]]}
-                  }
-              }
-            }
-        ]
-    }).itcount(),
+         $or: [
+             {
+               loc: {
+                   $geoIntersects:
+                       {$geometry: {type: 'Polygon', coordinates: [[[0, 0], p, q, [0, 0]]]}}
+               }
+             },
+             {
+               loc: {
+                   $geoIntersects: {
+                       $geometry:
+                           {type: 'Polygon', coordinates: [[[0, 0], [1, 1], [0, 1], [0, 0]]]}
+                   }
+               }
+             }
+         ]
+     }).itcount(),
     'multiple $geoIntersects Polygon clauses not supported by $or. index type: ' + indexname);
 
 t.dropIndexes();
@@ -88,9 +88,9 @@ t.ensureIndex({loc: indexname});
 
 assert.eq(2,
           t.find({
-              $or: [
-                  {loc: {$geoWithin: {$centerSphere: [p, 10]}}},
-                  {loc: {$geoWithin: {$centerSphere: [p, 10]}}}
-              ]
-          }).itcount(),
+               $or: [
+                   {loc: {$geoWithin: {$centerSphere: [p, 10]}}},
+                   {loc: {$geoWithin: {$centerSphere: [p, 10]}}}
+               ]
+           }).itcount(),
           'multiple $geoWithin clauses not supported by $or. index type: ' + indexname);

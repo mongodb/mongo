@@ -32,8 +32,8 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/geo/shapes.h"
 #include "mongo/db/geo/r2_region_coverer.h"
+#include "mongo/db/geo/shapes.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

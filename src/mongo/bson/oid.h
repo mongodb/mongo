@@ -89,7 +89,7 @@ public:
     }
 
     /** init from a reference to a 12-byte array */
-    explicit OID(const unsigned char(&arr)[kOIDSize]) {
+    explicit OID(const unsigned char (&arr)[kOIDSize]) {
         std::memcpy(_data, arr, sizeof(arr));
     }
 

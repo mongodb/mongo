@@ -40,13 +40,13 @@
 #include "mongo/base/init.h"
 #include "mongo/config.h"
 #include "mongo/db/client.h"
-#include "mongo/db/storage/mmap_v1/mmap.h"
 #include "mongo/db/storage/mmap_v1/aligned_builder.h"
 #include "mongo/db/storage/mmap_v1/compress.h"
 #include "mongo/db/storage/mmap_v1/dur_journalformat.h"
 #include "mongo/db/storage/mmap_v1/dur_journalimpl.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/db/storage/mmap_v1/logfile.h"
+#include "mongo/db/storage/mmap_v1/mmap.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage/paths.h"
 #include "mongo/db/storage/storage_options.h"
@@ -569,10 +569,10 @@ void LSNFile::set(unsigned long long x) {
     if something highly surprising, throws to abort
 */
 unsigned long long LSNFile::get() {
-    uassert(
-        13614,
-        str::stream() << "unexpected version number of lsn file in journal/ directory got: " << ver,
-        ver == 0);
+    uassert(13614,
+            str::stream() << "unexpected version number of lsn file in journal/ directory got: "
+                          << ver,
+            ver == 0);
     if (~lsn != checkbytes) {
         log() << "lsnfile not valid. recovery will be from log start. lsn: " << hex << lsn
               << " checkbytes: " << hex << checkbytes << endl;

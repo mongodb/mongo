@@ -30,9 +30,9 @@
 
 #include "mongo/db/db_raii.h"
 
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/repl/replication_coordinator_global.h"

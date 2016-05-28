@@ -67,13 +67,11 @@ var authutil;
      */
     authutil.asCluster = function(conn, keyfile, action) {
         var ex;
-        authutil.assertAuthenticate(conn,
-                                    'local',
-                                    {
-                                      user: '__system',
-                                      mechanism: 'SCRAM-SHA-1',
-                                      pwd: cat(keyfile).replace(/[\011-\015\040]/g, '')
-                                    });
+        authutil.assertAuthenticate(conn, 'local', {
+            user: '__system',
+            mechanism: 'SCRAM-SHA-1',
+            pwd: cat(keyfile).replace(/[\011-\015\040]/g, '')
+        });
 
         try {
             return action();

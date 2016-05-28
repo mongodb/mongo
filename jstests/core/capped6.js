@@ -38,9 +38,7 @@
         var c = "";
         for (i = 0; i < maxDocuments; ++i, c += "-") {
             // The a values are strings of increasing length.
-            valueArray[i] = {
-                a: c
-            };
+            valueArray[i] = {a: c};
         }
         if (shouldReverse) {
             valueArray.reverse();

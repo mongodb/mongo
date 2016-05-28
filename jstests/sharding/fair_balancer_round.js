@@ -2,9 +2,7 @@
 // Tests that a balancer round loads newly sharded collection data
 //
 
-var options = {
-    mongosOptions: {verbose: 1}
-};
+var options = {mongosOptions: {verbose: 1}};
 
 var st = new ShardingTest({shards: 2, mongos: 2, other: options});
 
@@ -30,8 +28,8 @@ for (var i = 0; i < numSplits; i++) {
 st.stopMongos(0);
 
 // Start balancer, which lets the stale mongos balance
-assert.writeOK(staleMongos.getDB("config")
-                   .settings.update({_id: "balancer"}, {$set: {stopped: false}}, true));
+assert.writeOK(
+    staleMongos.getDB("config").settings.update({_id: "balancer"}, {$set: {stopped: false}}, true));
 
 // Make sure we eventually start moving chunks
 assert.soon(function() {

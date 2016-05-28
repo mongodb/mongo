@@ -44,9 +44,7 @@
         assert.writeOK(coll.insert({a: i}));
     }
 
-    var query = {
-        a: {$gte: 5}
-    };
+    var query = {a: {$gte: 5}};
     assert.eq(5, coll.count(query));
     profileObj = getLatestProfilerEntry(testDB);
 
@@ -62,9 +60,7 @@
     }
     assert.commandWorked(coll.createIndex({a: 1}));
 
-    query = {
-        a: {$gte: 5}
-    };
+    query = {a: {$gte: 5}};
     assert.eq(5, coll.count(query));
     profileObj = getLatestProfilerEntry(testDB);
 

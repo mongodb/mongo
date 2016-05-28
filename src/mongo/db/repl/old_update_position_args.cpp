@@ -141,8 +141,10 @@ BSONObj OldUpdatePositionArgs::toBSON() const {
              ++update) {
             updateArray.append(BSON(kMemberRIDFieldName << update->rid << kOpTimeFieldName
                                                         << update->ts.getTimestamp()
-                                                        << kConfigVersionFieldName << update->cfgver
-                                                        << kMemberIdFieldName << update->memberId));
+                                                        << kConfigVersionFieldName
+                                                        << update->cfgver
+                                                        << kMemberIdFieldName
+                                                        << update->memberId));
         }
         updateArray.doneFast();
     }

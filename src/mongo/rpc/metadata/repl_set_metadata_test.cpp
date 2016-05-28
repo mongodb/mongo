@@ -60,8 +60,14 @@ TEST(ReplResponseMetadataTest, Roundtrip) {
                             << BSON("ts" << opTime.getTimestamp() << "t" << opTime.getTerm())
                             << "lastOpVisible"
                             << BSON("ts" << opTime2.getTimestamp() << "t" << opTime2.getTerm())
-                            << "configVersion" << 6 << "replicaSetId" << metadata.getReplicaSetId()
-                            << "primaryIndex" << 12 << "syncSourceIndex" << -1)));
+                            << "configVersion"
+                            << 6
+                            << "replicaSetId"
+                            << metadata.getReplicaSetId()
+                            << "primaryIndex"
+                            << 12
+                            << "syncSourceIndex"
+                            << -1)));
 
     BSONObj serializedObj = builder.obj();
     ASSERT_EQ(expectedObj, serializedObj);

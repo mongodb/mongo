@@ -35,8 +35,8 @@
 #include "mongo/db/geo/r2_region_coverer.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/s2_common.h"
-#include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/index_bounds.h"
 #include "third_party/s2/s2cellunion.h"
 

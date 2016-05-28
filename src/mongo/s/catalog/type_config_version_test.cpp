@@ -253,10 +253,10 @@ TEST(Excludes, BadRangeArray) {
                       << "1.2.3");  // empty bound
     BSONArray includeArr = bab.arr();
 
-    auto versionInfoResult = VersionType::fromBSON(
-        BSON(VersionType::minCompatibleVersion(3)
-             << VersionType::currentVersion(4) << VersionType::clusterId(OID::gen())
-             << VersionType::excludingMongoVersions(includeArr)));
+    auto versionInfoResult = VersionType::fromBSON(BSON(
+        VersionType::minCompatibleVersion(3) << VersionType::currentVersion(4)
+                                             << VersionType::clusterId(OID::gen())
+                                             << VersionType::excludingMongoVersions(includeArr)));
     ASSERT_EQ(ErrorCodes::FailedToParse, versionInfoResult.getStatus());
 }
 

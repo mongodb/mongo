@@ -59,8 +59,8 @@ load('jstests/multiVersion/libs/auth_helpers.js');
             shardCollectionWithChunks(st, coll);
             adminDB.system.version.update(
                 {_id: "authSchema"}, {"currentVersion": 3}, {upsert: true});
-            localDB.getSiblingDB('admin')
-                .system.version.update({_id: "authSchema"}, {"currentVersion": 3}, {upsert: true});
+            localDB.getSiblingDB('admin').system.version.update(
+                {_id: "authSchema"}, {"currentVersion": 3}, {upsert: true});
 
             db.createUser({user: 'user1', pwd: 'pass', roles: jsTest.basicUserRoles});
             assert(db.auth({mechanism: 'MONGODB-CR', user: 'user1', pwd: 'pass'}));
@@ -238,10 +238,7 @@ load('jstests/multiVersion/libs/auth_helpers.js');
         var setupFunc = cmd.setupFunc;
         var confirmFunc = cmd.confirmFunc;
 
-        req.writeConcern = {
-            w: 'majority',
-            wtimeout: 25000
-        };
+        req.writeConcern = {w: 'majority', wtimeout: 25000};
         jsTest.log("Testing " + tojson(req));
 
         dropTestData();

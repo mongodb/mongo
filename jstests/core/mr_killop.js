@@ -51,12 +51,7 @@ function testOne(map, reduce, finalize, scope, childLoop, wait) {
     t.save({a: 1});
     t.save({a: 1});
 
-    spec = {
-        mapreduce: "jstests_mr_killop",
-        out: "jstests_mr_killop_out",
-        map: map,
-        reduce: reduce
-    };
+    spec = {mapreduce: "jstests_mr_killop", out: "jstests_mr_killop_out", map: map, reduce: reduce};
     if (finalize) {
         spec["finalize"] = finalize;
     }

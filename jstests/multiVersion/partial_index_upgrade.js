@@ -58,7 +58,10 @@
     // The secondary should terminate when the command to build an invalid partial index replicates.
     testCases.forEach(function(indexOptions) {
         var replSetName = 'partial_index_replset';
-        var nodes = [{binVersion: '3.0'}, {binVersion: 'latest'}, ];
+        var nodes = [
+            {binVersion: '3.0'},
+            {binVersion: 'latest'},
+        ];
 
         var rst = new ReplSetTest({name: replSetName, nodes: nodes});
 

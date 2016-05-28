@@ -47,12 +47,7 @@ for (var x = 0; x <= 10; x += 1) {
 /* $minDistance is supported for 2dsphere index only, not 2d or geoHaystack. */
 t.ensureIndex({loc: "2dsphere"});
 
-var n_docs = t.count(), geoJSONPoint =
-                            {
-                              type: 'Point',
-                              coordinates: [0, 0]
-                            },
-    legacyPoint = [0, 0];
+var n_docs = t.count(), geoJSONPoint = {type: 'Point', coordinates: [0, 0]}, legacyPoint = [0, 0];
 
 //
 // Test $near with GeoJSON point (required for $near with 2dsphere index).
@@ -67,9 +62,10 @@ assert.eq(n_docs - n_docs_within(1400),
           "Expected " + (n_docs - n_docs_within(1400)) +
               " points $near (0, 0) with $minDistance 1400 km, got " + n_min1400_count);
 
-var n_bw500_and_1000_count = t.find({
-    loc: {$near: {$geometry: geoJSONPoint, $minDistance: 500 * km, $maxDistance: 1000 * km}}
-}).count();
+var n_bw500_and_1000_count =
+    t.find({
+         loc: {$near: {$geometry: geoJSONPoint, $minDistance: 500 * km, $maxDistance: 1000 * km}}
+     }).count();
 
 assert.eq(n_docs_within(1000) - n_docs_within(500),
           n_bw500_and_1000_count,
@@ -92,12 +88,12 @@ assert.eq(n_docs - n_docs_within(1400),
               " points $nearSphere (0, 0) with $minDistance 1400 km, got " + n_min1400_count);
 
 n_bw500_and_1000_count = t.find({
-    loc: {
-        $nearSphere: legacyPoint,
-        $minDistance: metersToRadians(500 * km),
-        $maxDistance: metersToRadians(1000 * km)
-    }
-}).count();
+                              loc: {
+                                  $nearSphere: legacyPoint,
+                                  $minDistance: metersToRadians(500 * km),
+                                  $maxDistance: metersToRadians(1000 * km)
+                              }
+                          }).count();
 
 assert.eq(n_docs_within(1000) - n_docs_within(500),
           n_bw500_and_1000_count,
@@ -118,8 +114,9 @@ assert.eq(n_docs - n_docs_within(1400),
               " points $nearSphere (0, 0) with $minDistance 1400 km, got " + n_min1400_count);
 
 n_bw500_and_1000_count =
-    t.find({loc: {$nearSphere: geoJSONPoint, $minDistance: 500 * km, $maxDistance: 1000 * km}})
-        .count();
+    t.find({
+         loc: {$nearSphere: geoJSONPoint, $minDistance: 500 * km, $maxDistance: 1000 * km}
+     }).count();
 
 assert.eq(n_docs_within(1000) - n_docs_within(500),
           n_bw500_and_1000_count,

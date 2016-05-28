@@ -91,8 +91,8 @@ OplogInterfaceLocal::OplogInterfaceLocal(OperationContext* txn, const std::strin
 
 std::string OplogInterfaceLocal::toString() const {
     return str::stream() << "LocalOplogInterface: "
-                            "operation context: " << _txn->getOpID()
-                         << "; collection: " << _collectionName;
+                            "operation context: "
+                         << _txn->getOpID() << "; collection: " << _collectionName;
 }
 
 std::unique_ptr<OplogInterface::Iterator> OplogInterfaceLocal::makeIterator() const {

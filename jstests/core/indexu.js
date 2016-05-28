@@ -4,15 +4,9 @@
 t = db.jstests_indexu;
 t.drop();
 
-var dupDoc = {
-    a: [{'0': 1}]
-};  // There are two 'a.0' fields in this doc.
-var dupDoc2 = {
-    a: [{'1': 1}, 'c']
-};
-var noDupDoc = {
-    a: [{'1': 1}]
-};
+var dupDoc = {a: [{'0': 1}]};  // There are two 'a.0' fields in this doc.
+var dupDoc2 = {a: [{'1': 1}, 'c']};
+var noDupDoc = {a: [{'1': 1}]};
 
 // Test that we can't index dupDoc.
 assert.writeOK(t.save(dupDoc));

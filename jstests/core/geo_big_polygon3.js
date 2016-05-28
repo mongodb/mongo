@@ -10,18 +10,9 @@
 //    MapReduce with a big polygon
 //    CRS84 & EPSG4326 objects should be retrieved from query with big polygon
 
-var crs84CRS = {
-    type: "name",
-    properties: {name: "urn:ogc:def:crs:OGC:1.3:CRS84"}
-};
-var epsg4326CRS = {
-    type: "name",
-    properties: {name: "EPSG:4326"}
-};
-var strictCRS = {
-    type: "name",
-    properties: {name: "urn:x-mongodb:crs:strictwinding:EPSG:4326"}
-};
+var crs84CRS = {type: "name", properties: {name: "urn:ogc:def:crs:OGC:1.3:CRS84"}};
+var epsg4326CRS = {type: "name", properties: {name: "EPSG:4326"}};
+var strictCRS = {type: "name", properties: {name: "urn:x-mongodb:crs:strictwinding:EPSG:4326"}};
 
 var coll = db.geo_bigpoly_edgecases;
 coll.drop();
@@ -125,12 +116,9 @@ objects = [
       name: "NYC - Times Square to CitiField to JFK to Times Square - polygon",
       geo: {
           type: "Polygon",
-          coordinates: [[
-              [-73.9857, 40.7577],
-              [-73.7789, 40.6397],
-              [-73.8458, 40.7569],
-              [-73.9857, 40.7577]
-          ]],
+          coordinates: [
+              [[-73.9857, 40.7577], [-73.7789, 40.6397], [-73.8458, 40.7569], [-73.9857, 40.7577]]
+          ],
           crs: strictCRS
       }
     }
@@ -150,9 +138,8 @@ var poly = {
     crs: strictCRS
 };
 
-assert.eq(0,
-          coll.count({geo: {$geoWithin: {$geometry: poly}}}),
-          "ignore objects with strictCRS within");
+assert.eq(
+    0, coll.count({geo: {$geoWithin: {$geometry: poly}}}), "ignore objects with strictCRS within");
 assert.eq(0,
           coll.count({geo: {$geoIntersects: {$geometry: poly}}}),
           "ignore objects with strictCRS intersects");
@@ -162,9 +149,8 @@ coll.update({}, {$unset: {"geo.crs": ""}}, {multi: true});
 var totalDocs = coll.count();
 
 assert.eq(totalDocs, coll.count({geo: {$geoWithin: {$geometry: poly}}}), "no strictCRS within");
-assert.eq(totalDocs,
-          coll.count({geo: {$geoIntersects: {$geometry: poly}}}),
-          "no strictCRS intersects");
+assert.eq(
+    totalDocs, coll.count({geo: {$geoIntersects: {$geometry: poly}}}), "no strictCRS intersects");
 
 // Clear collection
 coll.remove({});

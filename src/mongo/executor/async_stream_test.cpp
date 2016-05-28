@@ -123,11 +123,10 @@ TEST(AsyncStreamTest, IsOpen) {
     executor::Deferred<bool> opened;
 
     log() << "opening up outgoing connection";
-    stream.connect(endpoints,
-                   [opened](std::error_code ec) mutable {
-                       log() << "opened outgoing connection";
-                       opened.emplace(!ec);
-                   });
+    stream.connect(endpoints, [opened](std::error_code ec) mutable {
+        log() << "opened outgoing connection";
+        opened.emplace(!ec);
+    });
 
     ASSERT_TRUE(opened.get());
     ASSERT_TRUE(stream.isOpen());

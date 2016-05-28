@@ -303,8 +303,7 @@ inline void swap(mongo::Value& lhs, mongo::Value& rhs) {
 class ImplicitValue : public Value {
 public:
     template <typename T>
-    ImplicitValue(T arg)
-        : Value(std::move(arg)) {}
+    ImplicitValue(T arg) : Value(std::move(arg)) {}
 };
 }
 

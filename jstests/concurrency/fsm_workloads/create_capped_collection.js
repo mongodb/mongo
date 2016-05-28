@@ -14,10 +14,7 @@ var $config = (function() {
     // Returns a document of the form { _id: ObjectId(...), field: '...' }
     // with specified BSON size.
     function makeDocWithSize(targetSize) {
-        var doc = {
-            _id: new ObjectId(),
-            field: ''
-        };
+        var doc = {_id: new ObjectId(), field: ''};
 
         var size = Object.bsonsize(doc);
         assertAlways.gte(targetSize, size);
@@ -45,11 +42,9 @@ var $config = (function() {
     // Returns an array containing the _id fields of all the documents
     // in the collection, sorted according to their insertion order.
     function getObjectIds(db, collName) {
-        return db[collName]
-            .find({}, {_id: 1})
-            .map(function(doc) {
-                return doc._id;
-            });
+        return db[collName].find({}, {_id: 1}).map(function(doc) {
+            return doc._id;
+        });
     }
 
     var data = {
@@ -148,17 +143,11 @@ var $config = (function() {
             this.verifySizeTruncation(db, myCollName, options);
         }
 
-        return {
-            init: init,
-            create: create
-        };
+        return {init: init, create: create};
 
     })();
 
-    var transitions = {
-        init: {create: 1},
-        create: {create: 1}
-    };
+    var transitions = {init: {create: 1}, create: {create: 1}};
 
     function teardown(db, collName, cluster) {
         var pattern = new RegExp('^' + this.prefix + '\\d+_\\d+$');

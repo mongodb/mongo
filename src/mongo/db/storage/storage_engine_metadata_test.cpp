@@ -36,8 +36,8 @@
 #include <ostream>
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/db/json.h"
+#include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 

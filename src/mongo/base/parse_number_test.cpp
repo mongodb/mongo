@@ -34,8 +34,8 @@
 
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
-#include "mongo/util/mongoutils/str.h"  // for str::stream()!
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/mongoutils/str.h"  // for str::stream()!
 
 #define ASSERT_PARSES(TYPE, INPUT_STRING, EXPECTED_VALUE)    \
     do {                                                     \

@@ -28,10 +28,10 @@
 
 #pragma once
 
+#include <functional>
+#include <map>
 #include <memory>
 #include <string>
-#include <map>
-#include <functional>
 
 #include "mongo/base/disallow_copying.h"
 

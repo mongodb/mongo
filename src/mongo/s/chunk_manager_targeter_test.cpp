@@ -319,7 +319,8 @@ TEST(CMCollapseTreeTest, Regex) {
     OrderedIntervalList expected;
     expected.intervals.push_back(Interval(BSON(""
                                                << ""
-                                               << "" << BSONObj()),
+                                               << ""
+                                               << BSONObj()),
                                           true,
                                           false));
     BSONObjBuilder builder;

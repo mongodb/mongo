@@ -32,13 +32,13 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/client/read_preference.h"
 #include "mongo/client/query.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/rpc/protocol.h"
 #include "mongo/rpc/metadata.h"
+#include "mongo/rpc/protocol.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/mongoutils/str.h"
@@ -232,9 +232,14 @@ public:
     }
 
     std::string toString() const {
-        return str::stream() << "QSpec " << BSON("ns" << _ns << "n2skip" << _ntoskip << "n2return"
-                                                      << _ntoreturn << "options" << _options
-                                                      << "query" << _query << "fields" << _fields);
+        return str::stream() << "QSpec "
+                             << BSON("ns" << _ns << "n2skip" << _ntoskip << "n2return" << _ntoreturn
+                                          << "options"
+                                          << _options
+                                          << "query"
+                                          << _query
+                                          << "fields"
+                                          << _fields);
     }
 };
 

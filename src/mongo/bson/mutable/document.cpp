@@ -777,8 +777,9 @@ public:
 
         // It should be impossible to have an opaque left child and be non-serialized,
         dassert(rep->serialized);
-        BSONElement childElt = (hasValue(*rep) ? getSerializedElement(*rep).embeddedObject()
-                                               : getObject(rep->objIdx)).firstElement();
+        BSONElement childElt =
+            (hasValue(*rep) ? getSerializedElement(*rep).embeddedObject() : getObject(rep->objIdx))
+                .firstElement();
 
         if (!childElt.eoo()) {
             // Do this now before other writes so compiler can exploit knowing

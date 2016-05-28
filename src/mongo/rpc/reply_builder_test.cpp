@@ -32,12 +32,12 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/rpc/command_reply.h"
-#include "mongo/rpc/legacy_reply.h"
 #include "mongo/rpc/command_reply_builder.h"
-#include "mongo/rpc/legacy_reply_builder.h"
 #include "mongo/rpc/document_range.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/rpc/legacy_reply.h"
+#include "mongo/rpc/legacy_reply_builder.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/unittest.h"
 
 namespace {
 

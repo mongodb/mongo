@@ -46,18 +46,18 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
 
-#define ASSERT_REASON_CONTAINS(STATUS, PATTERN)                      \
-    do {                                                             \
-        const mongo::Status s_ = (STATUS);                           \
-        ASSERT_FALSE(s_.reason().find(PATTERN) == std::string::npos) \
-            << #STATUS ".reason() == " << s_.reason();               \
+#define ASSERT_REASON_CONTAINS(STATUS, PATTERN)                                                 \
+    do {                                                                                        \
+        const mongo::Status s_ = (STATUS);                                                      \
+        ASSERT_FALSE(s_.reason().find(PATTERN) == std::string::npos) << #STATUS ".reason() == " \
+                                                                     << s_.reason();            \
     } while (false)
 
-#define ASSERT_NOT_REASON_CONTAINS(STATUS, PATTERN)                 \
-    do {                                                            \
-        const mongo::Status s_ = (STATUS);                          \
-        ASSERT_TRUE(s_.reason().find(PATTERN) == std::string::npos) \
-            << #STATUS ".reason() == " << s_.reason();              \
+#define ASSERT_NOT_REASON_CONTAINS(STATUS, PATTERN)                                            \
+    do {                                                                                       \
+        const mongo::Status s_ = (STATUS);                                                     \
+        ASSERT_TRUE(s_.reason().find(PATTERN) == std::string::npos) << #STATUS ".reason() == " \
+                                                                    << s_.reason();            \
     } while (false)
 
 namespace mongo {
@@ -155,7 +155,9 @@ ReplicaSetConfig assertMakeRSConfig(const BSONObj& configBson) {
 TEST_F(CheckQuorumForInitiate, ValidSingleNodeSet) {
     ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
                                                       << "rs0"
-                                                      << "version" << 1 << "members"
+                                                      << "version"
+                                                      << 1
+                                                      << "members"
                                                       << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                                << "h1"))));
     startQuorumCheck(config, 0);
@@ -166,7 +168,9 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckCanceledByShutdown) {
     _executor->shutdown();
     ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
                                                       << "rs0"
-                                                      << "version" << 1 << "members"
+                                                      << "version"
+                                                      << 1
+                                                      << "members"
                                                       << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                                << "h1"))));
     startQuorumCheck(config, 0);
@@ -177,18 +181,21 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSeveralDownNodes) {
     // In this test, "we" are host "h3:1".  All other nodes time out on
     // their heartbeat request, and so the quorum check for initiate
     // will fail because some members were unavailable.
-    ReplicaSetConfig config =
-        assertMakeRSConfig(BSON("_id"
-                                << "rs0"
-                                << "version" << 1 << "members"
-                                << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                         << "h1:1")
-                                              << BSON("_id" << 2 << "host"
-                                                            << "h2:1") << BSON("_id" << 3 << "host"
-                                                                                     << "h3:1")
-                                              << BSON("_id" << 4 << "host"
-                                                            << "h4:1") << BSON("_id" << 5 << "host"
-                                                                                     << "h5:1"))));
+    ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
+                                                      << "rs0"
+                                                      << "version"
+                                                      << 1
+                                                      << "members"
+                                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                               << "h1:1")
+                                                                    << BSON("_id" << 2 << "host"
+                                                                                  << "h2:1")
+                                                                    << BSON("_id" << 3 << "host"
+                                                                                  << "h3:1")
+                                                                    << BSON("_id" << 4 << "host"
+                                                                                  << "h4:1")
+                                                                    << BSON("_id" << 5 << "host"
+                                                                                  << "h5:1"))));
     startQuorumCheck(config, 2);
     _net->enterNetwork();
     const Date_t startDate = _net->now();
@@ -231,15 +238,19 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckSuccessForFiveNodes) {
     const ReplicaSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
-                                << "version" << 1 << "members"
+                                << "version"
+                                << 1
+                                << "members"
                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                          << "h1:1")
                                               << BSON("_id" << 2 << "host"
-                                                            << "h2:1") << BSON("_id" << 3 << "host"
-                                                                                     << "h3:1")
+                                                            << "h2:1")
+                                              << BSON("_id" << 3 << "host"
+                                                            << "h3:1")
                                               << BSON("_id" << 4 << "host"
-                                                            << "h4:1") << BSON("_id" << 5 << "host"
-                                                                                     << "h5:1"))));
+                                                            << "h4:1")
+                                              << BSON("_id" << 5 << "host"
+                                                            << "h5:1"))));
     const int myConfigIndex = 2;
     const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
 
@@ -274,18 +285,25 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToOneDownNode) {
     const ReplicaSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
-                                << "version" << 1 << "members"
+                                << "version"
+                                << 1
+                                << "members"
                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                          << "h1:1")
                                               << BSON("_id" << 2 << "host"
                                                             << "h2:1"
-                                                            << "priority" << 0 << "votes" << 0)
+                                                            << "priority"
+                                                            << 0
+                                                            << "votes"
+                                                            << 0)
                                               << BSON("_id" << 3 << "host"
-                                                            << "h3:1") << BSON("_id" << 4 << "host"
-                                                                                     << "h4:1")
+                                                            << "h3:1")
+                                              << BSON("_id" << 4 << "host"
+                                                            << "h4:1")
                                               << BSON("_id" << 5 << "host"
-                                                            << "h5:1") << BSON("_id" << 6 << "host"
-                                                                                     << "h6:1"))));
+                                                            << "h5:1")
+                                              << BSON("_id" << 6 << "host"
+                                                            << "h6:1"))));
     const int myConfigIndex = 2;
     const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
 
@@ -334,15 +352,19 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetNameMismatch) {
     const ReplicaSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
-                                << "version" << 1 << "members"
+                                << "version"
+                                << 1
+                                << "members"
                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                          << "h1:1")
                                               << BSON("_id" << 2 << "host"
-                                                            << "h2:1") << BSON("_id" << 3 << "host"
-                                                                                     << "h3:1")
+                                                            << "h2:1")
+                                              << BSON("_id" << 3 << "host"
+                                                            << "h3:1")
                                               << BSON("_id" << 4 << "host"
-                                                            << "h4:1") << BSON("_id" << 5 << "host"
-                                                                                     << "h5:1"))));
+                                                            << "h4:1")
+                                              << BSON("_id" << 5 << "host"
+                                                            << "h5:1"))));
     const int myConfigIndex = 2;
     const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
 
@@ -392,16 +414,21 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetIdMismatch) {
     const ReplicaSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
-                                << "version" << 1 << "members"
+                                << "version"
+                                << 1
+                                << "members"
                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                          << "h1:1")
                                               << BSON("_id" << 2 << "host"
-                                                            << "h2:1") << BSON("_id" << 3 << "host"
-                                                                                     << "h3:1")
+                                                            << "h2:1")
+                                              << BSON("_id" << 3 << "host"
+                                                            << "h3:1")
                                               << BSON("_id" << 4 << "host"
-                                                            << "h4:1") << BSON("_id" << 5 << "host"
-                                                                                     << "h5:1"))
-                                << "settings" << BSON("replicaSetId" << replicaSetId)));
+                                                            << "h4:1")
+                                              << BSON("_id" << 5 << "host"
+                                                            << "h5:1"))
+                                << "settings"
+                                << BSON("replicaSetId" << replicaSetId)));
     const int myConfigIndex = 2;
     const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
 
@@ -449,8 +476,10 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetIdMismatch) {
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
     ASSERT_REASON_CONTAINS(status,
                            str::stream() << "Our replica set ID of " << replicaSetId
-                                         << " did not match that of " << incompatibleHost.toString()
-                                         << ", which is " << unexpectedId);
+                                         << " did not match that of "
+                                         << incompatibleHost.toString()
+                                         << ", which is "
+                                         << unexpectedId);
     ASSERT_NOT_REASON_CONTAINS(status, "h1:1");
     ASSERT_NOT_REASON_CONTAINS(status, "h2:1");
     ASSERT_NOT_REASON_CONTAINS(status, "h3:1");
@@ -466,15 +495,19 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToInitializedNode) {
     const ReplicaSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
-                                << "version" << 1 << "members"
+                                << "version"
+                                << 1
+                                << "members"
                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                          << "h1:1")
                                               << BSON("_id" << 2 << "host"
-                                                            << "h2:1") << BSON("_id" << 3 << "host"
-                                                                                     << "h3:1")
+                                                            << "h2:1")
+                                              << BSON("_id" << 3 << "host"
+                                                            << "h3:1")
                                               << BSON("_id" << 4 << "host"
-                                                            << "h4:1") << BSON("_id" << 5 << "host"
-                                                                                     << "h5:1"))));
+                                                            << "h4:1")
+                                              << BSON("_id" << 5 << "host"
+                                                            << "h5:1"))));
     const int myConfigIndex = 2;
     const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
 
@@ -495,7 +528,8 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToInitializedNode) {
                                    startDate + Milliseconds(10),
                                    ResponseStatus(RemoteCommandResponse(BSON("ok" << 0 << "set"
                                                                                   << "rs0"
-                                                                                  << "v" << 1),
+                                                                                  << "v"
+                                                                                  << 1),
                                                                         BSONObj(),
                                                                         Milliseconds(8))));
         } else {
@@ -527,15 +561,19 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToInitializedNodeOnlyOneRespo
     const ReplicaSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
-                                << "version" << 1 << "members"
+                                << "version"
+                                << 1
+                                << "members"
                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                          << "h1:1")
                                               << BSON("_id" << 2 << "host"
-                                                            << "h2:1") << BSON("_id" << 3 << "host"
-                                                                                     << "h3:1")
+                                                            << "h2:1")
+                                              << BSON("_id" << 3 << "host"
+                                                            << "h3:1")
                                               << BSON("_id" << 4 << "host"
-                                                            << "h4:1") << BSON("_id" << 5 << "host"
-                                                                                     << "h5:1"))));
+                                                            << "h4:1")
+                                              << BSON("_id" << 5 << "host"
+                                                            << "h5:1"))));
     const int myConfigIndex = 2;
     const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
 
@@ -556,7 +594,8 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToInitializedNodeOnlyOneRespo
                                    startDate + Milliseconds(10),
                                    ResponseStatus(RemoteCommandResponse(BSON("ok" << 0 << "set"
                                                                                   << "rs0"
-                                                                                  << "v" << 1),
+                                                                                  << "v"
+                                                                                  << 1),
                                                                         BSONObj(),
                                                                         Milliseconds(8))));
         } else {
@@ -583,15 +622,19 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToNodeWithData) {
     const ReplicaSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
-                                << "version" << 1 << "members"
+                                << "version"
+                                << 1
+                                << "members"
                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                          << "h1:1")
                                               << BSON("_id" << 2 << "host"
-                                                            << "h2:1") << BSON("_id" << 3 << "host"
-                                                                                     << "h3:1")
+                                                            << "h2:1")
+                                              << BSON("_id" << 3 << "host"
+                                                            << "h3:1")
                                               << BSON("_id" << 4 << "host"
-                                                            << "h4:1") << BSON("_id" << 5 << "host"
-                                                                                     << "h5:1"))));
+                                                            << "h4:1")
+                                              << BSON("_id" << 5 << "host"
+                                                            << "h5:1"))));
     const int myConfigIndex = 2;
     const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
 
@@ -637,12 +680,15 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckVetoedDueToHigherConfigVersion) {
     const ReplicaSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
-                                << "version" << 2 << "members"
+                                << "version"
+                                << 2
+                                << "members"
                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                          << "h1:1")
                                               << BSON("_id" << 2 << "host"
-                                                            << "h2:1") << BSON("_id" << 3 << "host"
-                                                                                     << "h3:1"))));
+                                                            << "h2:1")
+                                              << BSON("_id" << 3 << "host"
+                                                            << "h3:1"))));
     const int myConfigIndex = 2;
     const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
 
@@ -663,7 +709,8 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckVetoedDueToHigherConfigVersion) {
                                    startDate + Milliseconds(10),
                                    ResponseStatus(RemoteCommandResponse(BSON("ok" << 0 << "set"
                                                                                   << "rs0"
-                                                                                  << "v" << 5),
+                                                                                  << "v"
+                                                                                  << 5),
                                                                         BSONObj(),
                                                                         Milliseconds(8))));
         } else {
@@ -688,12 +735,15 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckVetoedDueToIncompatibleSetName) {
     const ReplicaSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
-                                << "version" << 2 << "members"
+                                << "version"
+                                << 2
+                                << "members"
                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                          << "h1:1")
                                               << BSON("_id" << 2 << "host"
-                                                            << "h2:1") << BSON("_id" << 3 << "host"
-                                                                                     << "h3:1"))));
+                                                            << "h2:1")
+                                              << BSON("_id" << 3 << "host"
+                                                            << "h3:1"))));
     const int myConfigIndex = 2;
     const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
 
@@ -740,18 +790,27 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToInsufficientVoters) {
     const ReplicaSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
-                                << "version" << 2 << "members"
+                                << "version"
+                                << 2
+                                << "members"
                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                          << "h1:1")
                                               << BSON("_id" << 2 << "host"
-                                                            << "h2:1") << BSON("_id" << 3 << "host"
-                                                                                     << "h3:1")
+                                                            << "h2:1")
+                                              << BSON("_id" << 3 << "host"
+                                                            << "h3:1")
                                               << BSON("_id" << 4 << "host"
                                                             << "h4:1"
-                                                            << "votes" << 0 << "priority" << 0)
+                                                            << "votes"
+                                                            << 0
+                                                            << "priority"
+                                                            << 0)
                                               << BSON("_id" << 5 << "host"
                                                             << "h5:1"
-                                                            << "votes" << 0 << "priority" << 0))));
+                                                            << "votes"
+                                                            << 0
+                                                            << "priority"
+                                                            << 0))));
     const int myConfigIndex = 3;
     const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
 
@@ -797,18 +856,23 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToNoElectableNodeResponding) {
     const ReplicaSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
-                                << "version" << 2 << "members"
+                                << "version"
+                                << 2
+                                << "members"
                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                          << "h1:1")
                                               << BSON("_id" << 2 << "host"
-                                                            << "h2:1") << BSON("_id" << 3 << "host"
-                                                                                     << "h3:1")
+                                                            << "h2:1")
+                                              << BSON("_id" << 3 << "host"
+                                                            << "h3:1")
                                               << BSON("_id" << 4 << "host"
                                                             << "h4:1"
-                                                            << "priority" << 0)
+                                                            << "priority"
+                                                            << 0)
                                               << BSON("_id" << 5 << "host"
                                                             << "h5:1"
-                                                            << "priority" << 0))));
+                                                            << "priority"
+                                                            << 0))));
     const int myConfigIndex = 3;
     const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
 
@@ -850,18 +914,27 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckSucceedsWithAsSoonAsPossible) {
     const ReplicaSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
-                                << "version" << 2 << "members"
+                                << "version"
+                                << 2
+                                << "members"
                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                          << "h1:1")
                                               << BSON("_id" << 2 << "host"
-                                                            << "h2:1") << BSON("_id" << 3 << "host"
-                                                                                     << "h3:1")
+                                                            << "h2:1")
+                                              << BSON("_id" << 3 << "host"
+                                                            << "h3:1")
                                               << BSON("_id" << 4 << "host"
                                                             << "h4:1"
-                                                            << "votes" << 0 << "priority" << 0)
+                                                            << "votes"
+                                                            << 0
+                                                            << "priority"
+                                                            << 0)
                                               << BSON("_id" << 5 << "host"
                                                             << "h5:1"
-                                                            << "votes" << 0 << "priority" << 0))));
+                                                            << "votes"
+                                                            << 0
+                                                            << "priority"
+                                                            << 0))));
     const int myConfigIndex = 3;
     const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
 

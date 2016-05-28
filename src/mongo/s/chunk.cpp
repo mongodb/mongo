@@ -151,7 +151,8 @@ BSONObj Chunk::_getExtremeKey(OperationContext* txn, bool doSplitAtLower) const 
 
         uassert(28736,
                 str::stream() << "failed to initialize cursor during auto split due to "
-                              << "connection problem with " << conn->getServerAddress(),
+                              << "connection problem with "
+                              << conn->getServerAddress(),
                 cursor.get() != nullptr);
 
         if (cursor->more()) {
@@ -265,14 +266,16 @@ StatusWith<boost::optional<ChunkRange>> Chunk::split(OperationContext* txn,
     // It's also a good place to sanity check.
     if (_min == splitPoints.front()) {
         string msg(str::stream() << "not splitting chunk " << toString() << ", split point "
-                                 << splitPoints.front() << " is exactly on chunk bounds");
+                                 << splitPoints.front()
+                                 << " is exactly on chunk bounds");
         log() << msg;
         return Status(ErrorCodes::CannotSplit, msg);
     }
 
     if (_max == splitPoints.back()) {
         string msg(str::stream() << "not splitting chunk " << toString() << ", split point "
-                                 << splitPoints.back() << " is exactly on chunk bounds");
+                                 << splitPoints.back()
+                                 << " is exactly on chunk bounds");
         log() << msg;
         return Status(ErrorCodes::CannotSplit, msg);
     }

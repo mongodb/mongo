@@ -211,9 +211,7 @@ var RandomOps = {
         }
 
         var field = this.randomChoice(this.fieldNames);
-        var updateDoc = {
-            $set: {}
-        };
+        var updateDoc = {$set: {}};
         updateDoc.$set[field] = this.randomChoice(this.fieldValues);
         if (this.verbose) {
             print("Updating:");
@@ -432,9 +430,8 @@ var RandomOps = {
         if (this.verbose) {
             print("Converting " + coll.getFullName() + " to a capped collection.");
         }
-        assert.commandWorked(
-            conn.getDB(coll.getDB())
-                .runCommand({convertToCapped: coll.getName(), size: 1024 * 1024}));
+        assert.commandWorked(conn.getDB(coll.getDB())
+                                 .runCommand({convertToCapped: coll.getName(), size: 1024 * 1024}));
         if (this.verbose) {
             print("done.");
         }
@@ -671,18 +668,14 @@ function doMultiThreadedWork(primary, numThreads) {
         nodes["n" + node] = setups[i];
         node++;
     }
-    nodes["n" + 2 * setups.length] = {
-        arbiter: true
-    };
+    nodes["n" + 2 * setups.length] = {arbiter: true};
     var replTest = new ReplSetTest({nodes: nodes, name: name});
     var conns = replTest.startSet();
 
     var config = replTest.getReplSetConfig();
     // Make sure everyone is syncing from the primary, to ensure we have all combinations of
     // primary/secondary syncing.
-    config.settings = {
-        chainingAllowed: false
-    };
+    config.settings = {chainingAllowed: false};
     config.protocolVersion = 0;
     replTest.initiate(config);
     // Ensure all are synced.

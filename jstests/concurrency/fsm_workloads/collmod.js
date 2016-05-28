@@ -33,15 +33,11 @@ var $config = (function() {
             }
         }
 
-        return {
-            collMod: collMod
-        };
+        return {collMod: collMod};
 
     })();
 
-    var transitions = {
-        collMod: {collMod: 1}
-    };
+    var transitions = {collMod: {collMod: 1}};
 
     function setup(db, collName, cluster) {
         // other workloads that extend this one might have set 'this.threadCollName'

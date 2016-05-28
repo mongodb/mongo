@@ -33,8 +33,8 @@
 #include <map>
 #include <sstream>
 #include <string>
-#include <vector>
 #include <utility>
+#include <vector>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/platform/process_id.h"

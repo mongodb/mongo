@@ -33,9 +33,9 @@
 #include <cstdint>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 

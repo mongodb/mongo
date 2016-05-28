@@ -28,8 +28,8 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
 #include <boost/intrusive_ptr.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"

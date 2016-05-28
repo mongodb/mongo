@@ -29,9 +29,7 @@ filtered1.results.forEach(function(z) {
 function avgA(q, len) {
     if (!len)
         len = 10;
-    var realq = {
-        loc: {$near: [50, 50]}
-    };
+    var realq = {loc: {$near: [50, 50]}};
     if (q)
         Object.extend(realq, q);
     var as = t.find(realq).limit(len).map(function(z) {

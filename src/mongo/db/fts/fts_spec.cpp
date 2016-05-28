@@ -58,7 +58,7 @@ const std::string moduleDefaultLanguage("english");
 bool validateOverride(const string& override) {
     // The override field can't be empty, can't be prefixed with a dollar sign, and
     // can't contain a dot.
-    return !override.empty() && override[0] != '$' && override.find('.') == std::string::npos;
+    return !override.empty()&& override[0] != '$' && override.find('.') == std::string::npos;
 }
 }
 
@@ -90,8 +90,12 @@ FTSSpec::FTSSpec(const BSONObj& indexInfo) {
             msgasserted(17364,
                         str::stream() << "attempt to use unsupported textIndexVersion "
                                       << textIndexVersionElt.numberInt()
-                                      << "; versions supported: " << TEXT_INDEX_VERSION_3 << ", "
-                                      << TEXT_INDEX_VERSION_2 << ", " << TEXT_INDEX_VERSION_1);
+                                      << "; versions supported: "
+                                      << TEXT_INDEX_VERSION_3
+                                      << ", "
+                                      << TEXT_INDEX_VERSION_2
+                                      << ", "
+                                      << TEXT_INDEX_VERSION_1);
     }
 
     // Initialize _defaultLanguage.  Note that the FTSLanguage constructor requires
@@ -401,7 +405,9 @@ StatusWith<BSONObj> FTSSpec::fixSpec(const BSONObj& spec) {
             if (i->second <= 0 || i->second >= MAX_WORD_WEIGHT) {
                 return {ErrorCodes::CannotCreateIndex,
                         str::stream() << "text index weight must be in the exclusive interval (0,"
-                                      << MAX_WORD_WEIGHT << ") but found: " << i->second};
+                                      << MAX_WORD_WEIGHT
+                                      << ") but found: "
+                                      << i->second};
             }
 
             // Verify weight refers to a valid field.

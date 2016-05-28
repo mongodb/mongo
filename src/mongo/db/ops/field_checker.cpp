@@ -51,7 +51,8 @@ Status isUpdatable(const FieldRef& field) {
         if (part.empty()) {
             return Status(ErrorCodes::EmptyFieldName,
                           mongoutils::str::stream()
-                              << "The update path '" << field.dottedField()
+                              << "The update path '"
+                              << field.dottedField()
                               << "' contains an empty field name, which is not allowed.");
         }
     }

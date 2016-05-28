@@ -28,9 +28,9 @@
 
 #pragma once
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 
 /**

@@ -42,8 +42,10 @@ StatusWith<BSONObj> fixDocumentForInsert(const BSONObj& doc) {
     if (doc.objsize() > BSONObjMaxUserSize)
         return StatusWith<BSONObj>(ErrorCodes::BadValue,
                                    str::stream() << "object to insert too large"
-                                                 << ". size in bytes: " << doc.objsize()
-                                                 << ", max size: " << BSONObjMaxUserSize);
+                                                 << ". size in bytes: "
+                                                 << doc.objsize()
+                                                 << ", max size: "
+                                                 << BSONObjMaxUserSize);
 
     bool firstElementIsId = false;
     bool hasTimestampToFix = false;
@@ -162,9 +164,11 @@ Status userAllowedCreateNS(StringData db, StringData coll) {
 
     if (db.size() + 1 /* dot */ + coll.size() > NamespaceString::MaxNsCollectionLen)
         return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "fully qualified namespace " << db << '.' << coll << " is too long "
-                          << "(max is " << NamespaceString::MaxNsCollectionLen << " bytes)");
+                      str::stream() << "fully qualified namespace " << db << '.' << coll
+                                    << " is too long "
+                                    << "(max is "
+                                    << NamespaceString::MaxNsCollectionLen
+                                    << " bytes)");
 
     // check spceial areas
 

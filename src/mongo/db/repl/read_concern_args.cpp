@@ -125,7 +125,8 @@ Status ReadConcernArgs::initialize(const BSONElement& readConcernElem) {
         } else {
             return Status(ErrorCodes::InvalidOptions,
                           str::stream() << "Unrecognized option in " << kReadConcernFieldName
-                                        << ": " << fieldName);
+                                        << ": "
+                                        << fieldName);
         }
     }
 

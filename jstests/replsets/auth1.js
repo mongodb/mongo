@@ -32,9 +32,8 @@ m = runMongoProgram(
     "mongod", "--keyFile", key1_644, "--port", port[0], "--dbpath", MongoRunner.dataPath + name);
 
 print("should fail with wrong permissions");
-assert.eq(m,
-          _isWindows() ? 100 : 1,
-          "mongod should exit w/ 1 (EXIT_FAILURE): permissions too open");
+assert.eq(
+    m, _isWindows() ? 100 : 1, "mongod should exit w/ 1 (EXIT_FAILURE): permissions too open");
 MongoRunner.stopMongod(port[0]);
 
 print("add a user to server0: foo");
@@ -74,9 +73,14 @@ assert.eq(r.x, 1);
 slave.setSlaveOk();
 
 function doQueryOn(p) {
-    var error = assert.throws(function() {
-        r = p.getDB("test").foo.findOne();
-    }, [], "find did not throw, returned: " + tojson(r)).toString();
+    var error = assert
+                    .throws(
+                        function() {
+                            r = p.getDB("test").foo.findOne();
+                        },
+                        [],
+                        "find did not throw, returned: " + tojson(r))
+                    .toString();
     printjson(error);
     assert.gt(error.indexOf("not authorized"), -1, "error was non-auth");
 }

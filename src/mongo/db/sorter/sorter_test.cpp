@@ -32,9 +32,9 @@
 
 #include <boost/filesystem.hpp>
 
-#include "mongo/config.h"
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/init.h"
+#include "mongo/config.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/stdx/memory.h"
@@ -192,7 +192,7 @@ void _assertIteratorsEquivalent(It1 it1, It2 it2, int line) {
 #define ASSERT_ITERATORS_EQUIVALENT(it1, it2) _assertIteratorsEquivalent(it1, it2, __LINE__)
 
 template <int N>
-std::shared_ptr<IWIterator> makeInMemIterator(const int(&array)[N]) {
+std::shared_ptr<IWIterator> makeInMemIterator(const int (&array)[N]) {
     std::vector<IWPair> vec;
     for (int i = 0; i < N; i++)
         vec.push_back(IWPair(array[i], -array[i]));
@@ -200,7 +200,7 @@ std::shared_ptr<IWIterator> makeInMemIterator(const int(&array)[N]) {
 }
 
 template <typename IteratorPtr, int N>
-std::shared_ptr<IWIterator> mergeIterators(IteratorPtr(&array)[N],
+std::shared_ptr<IWIterator> mergeIterators(IteratorPtr (&array)[N],
                                            Direction Dir = ASC,
                                            const SortOptions& opts = SortOptions()) {
     std::vector<std::shared_ptr<IWIterator>> vec;

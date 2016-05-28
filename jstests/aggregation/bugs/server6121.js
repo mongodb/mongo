@@ -22,20 +22,22 @@ db.s6121.drop();
 db.s6121.save({date: new Timestamp(1341337661, 1)});
 db.s6121.save({date: new Date(1341337661000)});
 // Aggregate checking various combinations of the constant and the field
-var s6121 = db.s6121.aggregate({
-    $project: {
-        _id: 0,
-        dayOfMonth: {$dayOfMonth: '$date'},
-        dayOfWeek: {$dayOfWeek: '$date'},
-        dayOfYear: {$dayOfYear: '$date'},
-        hour: {$hour: '$date'},
-        minute: {$minute: '$date'},
-        month: {$month: '$date'},
-        second: {$second: '$date'},
-        week: {$week: '$date'},
-        year: {$year: '$date'}
-    }
-}).toArray();
+var s6121 = db.s6121
+                .aggregate({
+                    $project: {
+                        _id: 0,
+                        dayOfMonth: {$dayOfMonth: '$date'},
+                        dayOfWeek: {$dayOfWeek: '$date'},
+                        dayOfYear: {$dayOfYear: '$date'},
+                        hour: {$hour: '$date'},
+                        minute: {$minute: '$date'},
+                        month: {$month: '$date'},
+                        second: {$second: '$date'},
+                        week: {$week: '$date'},
+                        year: {$year: '$date'}
+                    }
+                })
+                .toArray();
 // Assert the two entries are equal
 assert.eq(s6121[0], s6121[1], 's6121 failed');
 

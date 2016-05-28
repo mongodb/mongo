@@ -53,18 +53,18 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/rs_initialsync.h"
+#include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/snapshot_thread.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/server_parameters.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_state_recovery.h"
+#include "mongo/db/server_parameters.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/executor/network_interface.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
@@ -350,12 +350,15 @@ StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::loadLastOpTime(Opera
         if (tsElement.eoo()) {
             return StatusWith<OpTime>(ErrorCodes::NoSuchKey,
                                       str::stream() << "Most recent entry in " << rsOplogName
-                                                    << " missing \"" << tsFieldName << "\" field");
+                                                    << " missing \""
+                                                    << tsFieldName
+                                                    << "\" field");
         }
         if (tsElement.type() != bsonTimestamp) {
             return StatusWith<OpTime>(ErrorCodes::TypeMismatch,
                                       str::stream() << "Expected type of \"" << tsFieldName
-                                                    << "\" in most recent " << rsOplogName
+                                                    << "\" in most recent "
+                                                    << rsOplogName
                                                     << " entry to have type Timestamp, but found "
                                                     << typeName(tsElement.type()));
         }
@@ -410,8 +413,8 @@ void ReplicationCoordinatorExternalStateImpl::updateShardIdentityConfigString(
     if (ShardingState::get(txn)->enabled()) {
         const auto configsvrConnStr =
             Grid::get(txn)->shardRegistry()->getConfigShard()->getConnString();
-        auto status = ShardingState::get(txn)
-                          ->updateShardIdentityConfigString(txn, configsvrConnStr.toString());
+        auto status = ShardingState::get(txn)->updateShardIdentityConfigString(
+            txn, configsvrConnStr.toString());
         if (!status.isOK()) {
             warning() << "error encountered while trying to update config connection string to "
                       << configsvrConnStr << causedBy(status);

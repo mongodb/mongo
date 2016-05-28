@@ -916,7 +916,8 @@ public:
         _client.insert("unittests.system.indexes",
                        BSON("ns" << ns() << "key" << BSON("a" << 1) << "name"
                                  << "foo"
-                                 << "sparse" << true));
+                                 << "sparse"
+                                 << true));
     }
     ~EmptyPushSparseIndex() {
         _client.dropIndexes(ns());
@@ -1410,10 +1411,12 @@ public:
     void run() {
         bool threw = false;
         BSONObj o = BSON("ns" << ns() << "o" << BSON("foo"
-                                                     << "bar") << "o2" << BSON("_id"
-                                                                               << "in oplog"
-                                                                               << "foo"
-                                                                               << "bar"));
+                                                     << "bar")
+                              << "o2"
+                              << BSON("_id"
+                                      << "in oplog"
+                                      << "foo"
+                                      << "bar"));
 
         ScopedTransaction transaction(&_txn, MODE_X);
         Lock::GlobalWrite lk(_txn.lockState());
@@ -1433,9 +1436,11 @@ public:
         // now this should succeed
         SyncTest t;
         verify(t.shouldRetry(&_txn, o));
-        verify(!_client.findOne(ns(),
-                                BSON("_id"
-                                     << "on remote")).isEmpty());
+        verify(!_client
+                    .findOne(ns(),
+                             BSON("_id"
+                                  << "on remote"))
+                    .isEmpty());
 
         // force it not to find an obj
         t.returnEmpty = true;

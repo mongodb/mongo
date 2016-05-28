@@ -88,9 +88,7 @@ Mongo.prototype.setLogLevel = function(logLevel, component) {
     } else if (component !== undefined) {
         throw Error("setLogLevel component must be a string:" + tojson(component));
     }
-    var vDoc = {
-        verbosity: logLevel
-    };
+    var vDoc = {verbosity: logLevel};
 
     // nest vDoc
     for (var key, obj; componentNames.length > 0;) {

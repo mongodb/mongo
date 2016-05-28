@@ -231,18 +231,16 @@ void ASIOConnection::refresh(Milliseconds timeout, RefreshCallback cb) {
             cb(this, failedResponse.getStatus());
         });
 
-        _global->_impl->_asyncRunCommand(
-            op,
-            [this, op](std::error_code ec, size_t bytes) {
-                cancelTimeout();
+        _global->_impl->_asyncRunCommand(op, [this, op](std::error_code ec, size_t bytes) {
+            cancelTimeout();
 
-                auto cb = std::move(_refreshCallback);
+            auto cb = std::move(_refreshCallback);
 
-                if (ec)
-                    return cb(this, Status(ErrorCodes::HostUnreachable, ec.message()));
+            if (ec)
+                return cb(this, Status(ErrorCodes::HostUnreachable, ec.message()));
 
-                cb(this, Status::OK());
-            });
+            cb(this, Status::OK());
+        });
     });
 }
 

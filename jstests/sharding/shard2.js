@@ -40,9 +40,8 @@ db.foo.save({num: 1, name: "eliot"});
 db.foo.save({num: 2, name: "sara"});
 db.foo.save({num: -1, name: "joe"});
 
-assert.eq(3,
-          s.getPrimaryShard("test").getDB("test").foo.find().length(),
-          "not right directly to db A");
+assert.eq(
+    3, s.getPrimaryShard("test").getDB("test").foo.find().length(), "not right directly to db A");
 assert.eq(3, db.foo.find().length(), "not right on shard");
 
 primary = s.getPrimaryShard("test").getDB("test");
@@ -58,12 +57,8 @@ placeCheck(2);
 
 // test move shard
 assert.throws(function() {
-    s.adminCommand({
-        movechunk: "test.foo",
-        find: {num: 1},
-        to: primary.getMongo().name,
-        _waitForDelete: true
-    });
+    s.adminCommand(
+        {movechunk: "test.foo", find: {num: 1}, to: primary.getMongo().name, _waitForDelete: true});
 });
 assert.throws(function() {
     s.adminCommand({movechunk: "test.foo", find: {num: 1}, to: "adasd", _waitForDelete: true});
@@ -74,9 +69,8 @@ s.adminCommand(
 assert.eq(2, secondary.foo.find().length(), "secondary should have 2 after move shard");
 assert.eq(1, primary.foo.find().length(), "primary should only have 1 after move shard");
 
-assert.eq(2,
-          s.config.chunks.count(),
-          "still should have 2 shards after move not:" + s.getChunksString());
+assert.eq(
+    2, s.config.chunks.count(), "still should have 2 shards after move not:" + s.getChunksString());
 chunks = s.config.chunks.find().toArray();
 assert.neq(chunks[0].shard, chunks[1].shard, "servers should NOT be the same after the move");
 

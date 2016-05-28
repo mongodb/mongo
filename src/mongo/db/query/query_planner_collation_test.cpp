@@ -90,9 +90,9 @@ TEST_F(QueryPlannerTest, StringComparisonAndNonStringComparisonCanUseSeparateInd
 
     // The string predicate can use index {a: 1}, since the collators match. The non-string
     // comparison can use index {b: 1}, even though the collators don't match.
-    runQueryAsCommand(fromjson(
-        "{find: 'testns', filter: {a: {$lt: 'foo'}, b: {$lte: 4}}, collation: {locale: "
-        "'reverse'}}"));
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {a: {$lt: 'foo'}, b: {$lte: 4}}, collation: {locale: "
+                 "'reverse'}}"));
 
     assertNumSolutions(3U);
     assertSolutionExists("{cscan: {dir: 1}}");
@@ -189,9 +189,9 @@ TEST_F(QueryPlannerTest, OrQueryResultsInCollscanWhenOnlyOneBranchHasIndexWithMa
     addIndex(fromjson("{a: 1}"), &reverseStringCollator);
     addIndex(fromjson("{b: 1}"), &alwaysEqualCollator);
 
-    runQueryAsCommand(fromjson(
-        "{find: 'testns', filter: {$or: [{a: 'foo'}, {b: 'bar'}]}, collation: {locale: "
-        "'reverse'}}"));
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {$or: [{a: 'foo'}, {b: 'bar'}]}, collation: {locale: "
+                 "'reverse'}}"));
 
     assertNumSolutions(1U);
     assertSolutionExists("{cscan: {dir: 1}}");
@@ -202,9 +202,9 @@ TEST_F(QueryPlannerTest, OrQueryCanBeIndexedWhenBothBranchesHaveIndexWithMatchin
     addIndex(fromjson("{a: 1}"), &collator);
     addIndex(fromjson("{b: 1}"), &collator);
 
-    runQueryAsCommand(fromjson(
-        "{find: 'testns', filter: {$or: [{a: 'foo'}, {b: 'bar'}]}, collation: {locale: "
-        "'reverse'}}"));
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {$or: [{a: 'foo'}, {b: 'bar'}]}, collation: {locale: "
+                 "'reverse'}}"));
 
     assertNumSolutions(2U);
     assertSolutionExists("{cscan: {dir: 1}}");

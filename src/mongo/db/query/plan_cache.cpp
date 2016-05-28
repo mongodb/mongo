@@ -32,19 +32,19 @@
 
 #include "mongo/db/query/plan_cache.h"
 
-#include <algorithm>
-#include <math.h>
-#include <memory>
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/client/dbclientinterface.h"  // For QueryOption_foobar
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/plan_ranker.h"
-#include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/query_knobs.h"
+#include "mongo/db/query/query_solution.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include <algorithm>
+#include <math.h>
+#include <memory>
 
 namespace mongo {
 namespace {

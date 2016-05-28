@@ -358,8 +358,8 @@ StatusWithMatchExpression MatchExpressionParser::_parse(const BSONObj& obj, int 
                 root->add(eq.release());
             } else {
                 return {Status(ErrorCodes::BadValue,
-                               mongoutils::str::stream()
-                                   << "unknown top level operator: " << e.fieldName())};
+                               mongoutils::str::stream() << "unknown top level operator: "
+                                                         << e.fieldName())};
             }
 
             continue;

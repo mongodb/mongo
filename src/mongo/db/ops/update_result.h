@@ -28,8 +28,8 @@
 
 #pragma once
 
-#include "mongo/db/jsobj.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/mongoutils/str.h"
 

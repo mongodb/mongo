@@ -28,8 +28,8 @@
 
 #pragma once
 
-#include <vector>
 #include <unordered_set>
+#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"

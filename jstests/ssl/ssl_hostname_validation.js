@@ -8,8 +8,8 @@ var CLIENT_CERT = "jstests/libs/client.pem";
 var BAD_SAN_CERT = "jstests/libs/badSAN.pem";
 
 function testCombination(certPath, allowInvalidHost, allowInvalidCert, shouldSucceed) {
-    var mongod = MongoRunner.runMongod(
-        {sslMode: "requireSSL", sslPEMKeyFile: certPath, sslCAFile: CA_CERT});
+    var mongod =
+        MongoRunner.runMongod({sslMode: "requireSSL", sslPEMKeyFile: certPath, sslCAFile: CA_CERT});
 
     var mongo;
     if (allowInvalidCert) {

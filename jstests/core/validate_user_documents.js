@@ -34,8 +34,7 @@ assert.commandWorked(mydb.runCommand({createUser: "spencer", pwd: "password", ro
 assert.commandWorked(mydb.runCommand({
     createUser: "andy",
     pwd: "password",
-    roles:
-        [{role: "dbAdmin", db: "validate_user_documents", hasRole: true, canDelegate: false}]
+    roles: [{role: "dbAdmin", db: "validate_user_documents", hasRole: true, canDelegate: false}]
 }));
 
 // Non-existent role; insert should fail

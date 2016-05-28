@@ -32,13 +32,13 @@
 #include <boost/config.hpp>
 #include <boost/intrusive_ptr.hpp>
 
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/intrusive_counter.h"
-#include "mongo/bson/timestamp.h"
 
 
 namespace mongo {

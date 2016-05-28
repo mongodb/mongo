@@ -29,10 +29,10 @@
 #pragma once
 
 #include <memory>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <set>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"

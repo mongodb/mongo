@@ -30,9 +30,9 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/db/ops/update_driver.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/ops/update_driver.h"
 
 namespace mongo {
 

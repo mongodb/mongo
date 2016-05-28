@@ -39,12 +39,7 @@ for (x = 0; x < 200; x++) {
 var chunkDoc = configDB.chunks.findOne();
 var chunkOwner = chunkDoc.shard;
 var toShard = configDB.shards.findOne({_id: {$ne: chunkOwner}})._id;
-var cmd = {
-    moveChunk: coll.getFullName(),
-    find: chunkDoc.min,
-    to: toShard,
-    _waitForDelete: true
-};
+var cmd = {moveChunk: coll.getFullName(), find: chunkDoc.min, to: toShard, _waitForDelete: true};
 var res = adminDB.runCommand(cmd);
 
 jsTest.log('move result: ' + tojson(res));

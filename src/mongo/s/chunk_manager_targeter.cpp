@@ -38,8 +38,8 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/sharding_raii.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/sharding_raii.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -553,7 +553,8 @@ Status ChunkManagerTargeter::targetAllShards(vector<ShardEndpoint*>* endpoints) 
     if (!_primary && !_manager) {
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << "could not target every shard with versions for "
-                                    << getNS().ns() << "; metadata not found");
+                                    << getNS().ns()
+                                    << "; metadata not found");
     }
 
     vector<ShardId> shardIds;

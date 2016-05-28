@@ -8,18 +8,14 @@
 // http://geojson.org/geojson-spec.html#polygon
 //
 
-var t = db.geo_s2disjoint_holes, coordinates = [
-    // One square.
-    [[9, 9], [9, 11], [11, 11], [11, 9], [9, 9]],
-    // Another disjoint square.
-    [[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]
-],
-    poly =
-        {
-          type: 'Polygon',
-          coordinates: coordinates
-        },
-    multiPoly = {
+var t = db.geo_s2disjoint_holes, coordinates =
+                                     [
+                                       // One square.
+                                       [[9, 9], [9, 11], [11, 11], [11, 9], [9, 9]],
+                                       // Another disjoint square.
+                                       [[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]
+                                     ],
+    poly = {type: 'Polygon', coordinates: coordinates}, multiPoly = {
         type: 'MultiPolygon',
         // Multi-polygon's coordinates are wrapped in one more array.
         coordinates: [coordinates]

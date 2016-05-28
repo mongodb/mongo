@@ -56,11 +56,7 @@ assert.writeOK(bulk.execute({w: 2}));
 
 testSecondaryMetrics(secondary, 1000, secondaryBaseOplogInserts);
 
-var options = {
-    writeConcern: {w: 2},
-    multi: true,
-    upsert: true
-};
+var options = {writeConcern: {w: 2}, multi: true, upsert: true};
 assert.writeOK(testDB.a.update({}, {$set: {d: new Date()}}, options));
 
 testSecondaryMetrics(secondary, 2000, secondaryBaseOplogInserts);

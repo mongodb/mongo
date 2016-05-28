@@ -31,12 +31,8 @@ var emptyShard = st.getShard(coll, {_id: -1});
 var admin = st.s.getDB("admin");
 assert.soon(
     function() {
-        var result = admin.runCommand({
-            moveChunk: "" + coll,
-            find: {_id: -1},
-            to: fullShard.shardName,
-            _waitForDelete: true
-        });
+        var result = admin.runCommand(
+            {moveChunk: "" + coll, find: {_id: -1}, to: fullShard.shardName, _waitForDelete: true});
         jsTestLog('moveChunk result = ' + tojson(result));
         return result.ok;
     },

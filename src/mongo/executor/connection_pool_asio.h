@@ -31,10 +31,10 @@
 
 #include <memory>
 
-#include "mongo/executor/connection_pool.h"
-#include "mongo/executor/network_interface_asio.h"
-#include "mongo/executor/network_interface.h"
 #include "mongo/executor/async_stream_interface.h"
+#include "mongo/executor/connection_pool.h"
+#include "mongo/executor/network_interface.h"
+#include "mongo/executor/network_interface_asio.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {

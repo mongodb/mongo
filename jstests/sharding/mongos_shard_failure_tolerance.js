@@ -32,8 +32,8 @@
     // Create the unsharded database
     assert.writeOK(collUnsharded.insert({some: "doc"}));
     assert.writeOK(collUnsharded.remove({}));
-    assert.commandWorked(admin.runCommand(
-        {movePrimary: collUnsharded.getDB().toString(), to: st.shard0.shardName}));
+    assert.commandWorked(
+        admin.runCommand({movePrimary: collUnsharded.getDB().toString(), to: st.shard0.shardName}));
 
     //
     // Setup is complete

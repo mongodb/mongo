@@ -47,12 +47,10 @@
             assert.eq(null, doc);
         }
 
-        var restartCmdLineOptions = Object.merge(
-            st.d0.fullOptions,
-            {
-              setParameter: 'recoverShardingState=' + (withRecovery ? 'true' : 'false'),
-              restart: true
-            });
+        var restartCmdLineOptions = Object.merge(st.d0.fullOptions, {
+            setParameter: 'recoverShardingState=' + (withRecovery ? 'true' : 'false'),
+            restart: true
+        });
 
         // Restart the shard that donated a chunk to trigger the optime recovery logic.
         st.stopMongod(0);

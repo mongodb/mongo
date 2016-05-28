@@ -32,8 +32,8 @@
 
 #include <algorithm>
 #include <cmath>
-#include <vector>
 #include <utility>
+#include <vector>
 
 #include "mongo/db/query/plan_ranker.h"
 

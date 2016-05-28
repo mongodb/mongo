@@ -164,12 +164,13 @@
         assert(!cursor.hasNext());
 
         // Aggregate query.
-        cursor = configDB.collections.aggregate([
-            {$match: {"key.b": 1}},
-            {$sort: {"_id": 1}},
-            {$project: {"keyb": "$key.b", "keyc": "$key.c"}}
-        ],
-                                                {cursor: {batchSize: 2}});
+        cursor = configDB.collections.aggregate(
+            [
+              {$match: {"key.b": 1}},
+              {$sort: {"_id": 1}},
+              {$project: {"keyb": "$key.b", "keyc": "$key.c"}}
+            ],
+            {cursor: {batchSize: 2}});
         assert.eq(cursor.objsLeftInBatch(), 2);
         assert.eq(cursor.next(), {_id: testNamespaces[3], keyb: 1, keyc: 1});
         assert.eq(cursor.next(), {_id: testNamespaces[2], keyb: 1});
@@ -220,8 +221,9 @@
             st.s.adminCommand({movechunk: testColl.getFullName(), find: {e: 12}, to: shard2}));
 
         // Find query.
-        cursor = configDB.chunks.find({ns: testColl.getFullName()},
-                                      {_id: 0, min: 1, max: 1, shard: 1}).sort({"min.e": 1});
+        cursor =
+            configDB.chunks.find({ns: testColl.getFullName()}, {_id: 0, min: 1, max: 1, shard: 1})
+                .sort({"min.e": 1});
         assert.eq(cursor.next(), {min: {e: {"$minKey": 1}}, "max": {"e": 2}, shard: shard2});
         assert.eq(cursor.next(), {min: {e: 2}, max: {e: 6}, shard: shard1});
         assert.eq(cursor.next(), {min: {e: 6}, max: {e: 8}, shard: shard1});
@@ -258,9 +260,7 @@
             }
         };
         var reduceFunction = function(key, values) {
-            return {
-                chunks: values.length
-            };
+            return {chunks: values.length};
         };
         result = configDB.chunks.mapReduce(mapFunction, reduceFunction, {out: {inline: 1}});
         assert.eq(result.ok, 1);
@@ -322,13 +322,14 @@
         assert(!cursor.hasNext());
 
         // Aggregate query.
-        cursor = userColl.aggregate([
-            {$match: {c: {$gt: 1}}},
-            {$unwind: "$u"},
-            {$group: {_id: "$u", sum: {$sum: "$c"}}},
-            {$sort: {_id: 1}}
-        ],
-                                    {cursor: {batchSize: 2}});
+        cursor = userColl.aggregate(
+            [
+              {$match: {c: {$gt: 1}}},
+              {$unwind: "$u"},
+              {$group: {_id: "$u", sum: {$sum: "$c"}}},
+              {$sort: {_id: 1}}
+            ],
+            {cursor: {batchSize: 2}});
         assert.eq(cursor.objsLeftInBatch(), 2);
         assert.eq(cursor.next(), {_id: 1, sum: 11});
         assert.eq(cursor.next(), {_id: 2, sum: 15});
@@ -365,18 +366,15 @@
             emit(this.g, 1);
         };
         var reduceFunction = function(key, values) {
-            return {
-                count: values.length
-            };
+            return {count: values.length};
         };
         result = userColl.mapReduce(mapFunction, reduceFunction, {out: {inline: 1}});
         assert.eq(result.ok, 1);
-        assert.eq(sortArrayById(result.results),
-                  [
-                    {_id: 1, value: {count: 2}},
-                    {_id: 2, value: {count: 3}},
-                    {_id: 3, value: {count: 2}}
-                  ]);
+        assert.eq(sortArrayById(result.results), [
+            {_id: 1, value: {count: 2}},
+            {_id: 2, value: {count: 3}},
+            {_id: 3, value: {count: 2}}
+        ]);
 
         assert(userColl.drop());
     };

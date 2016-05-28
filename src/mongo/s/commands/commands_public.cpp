@@ -995,7 +995,9 @@ public:
         if (!status.isOK()) {
             return Status(status.getStatus().code(),
                           str::stream() << "Passthrough command failed: " << command.toString()
-                                        << " on ns " << nss.ns() << ". Caused by "
+                                        << " on ns "
+                                        << nss.ns()
+                                        << ". Caused by "
                                         << causedBy(status.getStatus()));
         }
 
@@ -1003,7 +1005,8 @@ public:
         if (conf->isSharded(nss.ns())) {
             return Status(ErrorCodes::IllegalOperation,
                           str::stream() << "Passthrough command failed: " << command.toString()
-                                        << " on ns " << nss.ns()
+                                        << " on ns "
+                                        << nss.ns()
                                         << ". Cannot run on sharded namespace.");
         }
 
@@ -1018,8 +1021,10 @@ public:
                 conn.done();
                 return Status(ErrorCodes::OperationFailed,
                               str::stream() << "Passthrough command failed: " << command
-                                            << " on ns " << nss.ns()
-                                            << "; result: " << shardResult);
+                                            << " on ns "
+                                            << nss.ns()
+                                            << "; result: "
+                                            << shardResult);
             }
             conn.done();
         } catch (const DBException& ex) {
@@ -1175,8 +1180,10 @@ public:
             } else if (queryElt.type() != BSONType::jstNULL) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "\"query\" had the wrong type. Expected "
-                                            << typeName(BSONType::Object) << " or "
-                                            << typeName(BSONType::jstNULL) << ", found "
+                                            << typeName(BSONType::Object)
+                                            << " or "
+                                            << typeName(BSONType::jstNULL)
+                                            << ", found "
                                             << typeName(queryElt.type()));
             }
         }
@@ -1612,8 +1619,8 @@ public:
         }
 
         return Status(ErrorCodes::Unauthorized,
-                      str::stream()
-                          << "Not authorized to list indexes on collection: " << ns.coll());
+                      str::stream() << "Not authorized to list indexes on collection: "
+                                    << ns.coll());
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {

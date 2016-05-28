@@ -32,12 +32,12 @@
 
 #include "mongo/db/fts/fts_query_impl.h"
 
-#include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/fts/fts_query_parser.h"
+#include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/fts/fts_tokenizer.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stringutils.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 

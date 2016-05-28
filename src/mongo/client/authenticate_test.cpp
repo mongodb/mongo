@@ -63,10 +63,10 @@ public:
           _nonce("7ca422a24f326f2a"),
           _requests(),
           _responses() {
-        _runCommandCallback =
-            [this](RemoteCommandRequest request, RunCommandResultHandler handler) {
-                runCommand(std::move(request), handler);
-            };
+        _runCommandCallback = [this](RemoteCommandRequest request,
+                                     RunCommandResultHandler handler) {
+            runCommand(std::move(request), handler);
+        };
 
         // create our digest
         md5digest d;
@@ -130,7 +130,11 @@ public:
                     << "MONGODB-CR"
                     << "db"
                     << "admin"
-                    << "user" << _username << "pwd" << _password << "digest"
+                    << "user"
+                    << _username
+                    << "pwd"
+                    << _password
+                    << "digest"
                     << "true");
     }
 
@@ -140,7 +144,8 @@ public:
         pushRequest("$external",
                     BSON("authenticate" << 1 << "mechanism"
                                         << "MONGODB-X509"
-                                        << "user" << _username));
+                                        << "user"
+                                        << _username));
 
         // 2. Client receives 'ok'
         pushResponse(BSON("ok" << 1));
@@ -150,7 +155,8 @@ public:
                     << "MONGODB-X509"
                     << "db"
                     << "$external"
-                    << "user" << _username);
+                    << "user"
+                    << _username);
     }
 
 
@@ -178,11 +184,10 @@ TEST_F(AuthClientTest, MongoCR) {
 
 TEST_F(AuthClientTest, asyncMongoCR) {
     auto params = loadMongoCRConversation();
-    auth::authenticateClient(std::move(params),
-                             "",
-                             "",
-                             _runCommandCallback,
-                             [this](auth::AuthResponse response) { ASSERT(response.isOK()); });
+    auth::authenticateClient(
+        std::move(params), "", "", _runCommandCallback, [this](auth::AuthResponse response) {
+            ASSERT(response.isOK());
+        });
 }
 
 #ifdef MONGO_CONFIG_SSL
@@ -193,11 +198,10 @@ TEST_F(AuthClientTest, X509) {
 
 TEST_F(AuthClientTest, asyncX509) {
     auto params = loadX509Conversation();
-    auth::authenticateClient(std::move(params),
-                             "",
-                             _username,
-                             _runCommandCallback,
-                             [this](auth::AuthResponse response) { ASSERT(response.isOK()); });
+    auth::authenticateClient(
+        std::move(params), "", _username, _runCommandCallback, [this](auth::AuthResponse response) {
+            ASSERT(response.isOK());
+        });
 }
 #endif
 

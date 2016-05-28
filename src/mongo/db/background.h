@@ -33,9 +33,9 @@
 
 #pragma once
 
+#include <iosfwd>
 #include <map>
 #include <set>
-#include <iosfwd>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"

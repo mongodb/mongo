@@ -276,7 +276,8 @@ Status AsyncResultsMerger::askForNextBatch_inlock(size_t remoteIndex) {
                                 adjustedBatchSize,
                                 _awaitDataTimeout,
                                 boost::none,
-                                boost::none).toBSON();
+                                boost::none)
+                     .toBSON();
     } else {
         // Do the first time shard host resolution.
         invariant(_params.readPreference);
@@ -429,10 +430,10 @@ void AsyncResultsMerger::handleBatchResponse(
     if (!cursorResponseStatus.isOK()) {
         auto shard = remote.getShard();
         if (!shard) {
-            remote.status =
-                Status(cursorResponseStatus.getStatus().code(),
-                       str::stream() << "Could not find shard " << *remote.shardId
-                                     << " containing host " << remote.getTargetHost().toString());
+            remote.status = Status(cursorResponseStatus.getStatus().code(),
+                                   str::stream() << "Could not find shard " << *remote.shardId
+                                                 << " containing host "
+                                                 << remote.getTargetHost().toString());
         } else {
             shard->updateReplSetMonitor(remote.getTargetHost(), cursorResponseStatus.getStatus());
 
@@ -443,7 +444,8 @@ void AsyncResultsMerger::handleBatchResponse(
                                         Shard::RetryPolicy::kIdempotent)) {
                 invariant(remote.shardId);
                 LOG(1) << "Initial cursor establishment failed with retriable error and will be "
-                          "retried" << causedBy(cursorResponseStatus.getStatus());
+                          "retried"
+                       << causedBy(cursorResponseStatus.getStatus());
 
                 ++remote.retryCount;
 
@@ -489,7 +491,8 @@ void AsyncResultsMerger::handleBatchResponse(
             remote.status = Status(ErrorCodes::InternalError,
                                    str::stream() << "Missing field '"
                                                  << ClusterClientCursorParams::kSortKeyField
-                                                 << "' in document: " << obj);
+                                                 << "' in document: "
+                                                 << obj);
             return;
         }
 

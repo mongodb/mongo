@@ -66,8 +66,8 @@ Status checkAuthorizedToGrantRoles(AuthorizationSession* authzSession,
     for (size_t i = 0; i < roles.size(); ++i) {
         if (!authzSession->isAuthorizedToGrantRole(roles[i])) {
             return Status(ErrorCodes::Unauthorized,
-                          str::stream()
-                              << "Not authorized to grant role: " << roles[i].getFullName());
+                          str::stream() << "Not authorized to grant role: "
+                                        << roles[i].getFullName());
         }
     }
 
@@ -91,8 +91,8 @@ Status checkAuthorizedToRevokeRoles(AuthorizationSession* authzSession,
     for (size_t i = 0; i < roles.size(); ++i) {
         if (!authzSession->isAuthorizedToRevokeRole(roles[i])) {
             return Status(ErrorCodes::Unauthorized,
-                          str::stream()
-                              << "Not authorized to revoke role: " << roles[i].getFullName());
+                          str::stream() << "Not authorized to revoke role: "
+                                        << roles[i].getFullName());
         }
     }
     return Status::OK();
@@ -123,8 +123,8 @@ Status checkAuthForCreateUserCommand(ClientBasic* client,
     if (!authzSession->isAuthorizedForActionsOnResource(
             ResourcePattern::forDatabaseName(args.userName.getDB()), ActionType::createUser)) {
         return Status(ErrorCodes::Unauthorized,
-                      str::stream()
-                          << "Not authorized to create users on db: " << args.userName.getDB());
+                      str::stream() << "Not authorized to create users on db: "
+                                    << args.userName.getDB());
     }
 
     return checkAuthorizedToGrantRoles(authzSession, args.roles);
@@ -205,8 +205,8 @@ Status checkAuthForCreateRoleCommand(ClientBasic* client,
 
     if (!authzSession->isAuthorizedToCreateRole(args)) {
         return Status(ErrorCodes::Unauthorized,
-                      str::stream()
-                          << "Not authorized to create roles on db: " << args.roleName.getDB());
+                      str::stream() << "Not authorized to create roles on db: "
+                                    << args.roleName.getDB());
     }
 
     status = checkAuthorizedToGrantRoles(authzSession, args.roles);
@@ -441,7 +441,8 @@ Status checkAuthForRolesInfoCommand(ClientBasic* client,
                     ActionType::viewRole)) {
                 return Status(ErrorCodes::Unauthorized,
                               str::stream() << "Not authorized to view roles from the "
-                                            << args.roleNames[i].getDB() << " database");
+                                            << args.roleNames[i].getDB()
+                                            << " database");
             }
         }
     }

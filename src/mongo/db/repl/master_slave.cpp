@@ -975,8 +975,8 @@ int ReplSource::_sync_pullOpLog(OperationContext* txn, int& nApplied) {
                   << ((nextOpTime < syncedTo) ? "<??" : ">") << " syncedTo "
                   << syncedTo.toStringLong() << '\n'
                   << "time diff: " << (nextOpTime.getSecs() - syncedTo.getSecs()) << "sec\n"
-                  << "tailing: " << tailing << '\n' << "data too stale, halting replication"
-                  << endl;
+                  << "tailing: " << tailing << '\n'
+                  << "data too stale, halting replication" << endl;
             replInfo = replAllDead = "data too stale halted replication";
             verify(syncedTo < nextOpTime);
             throw SyncException();

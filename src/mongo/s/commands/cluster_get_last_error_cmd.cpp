@@ -30,11 +30,11 @@
 
 #include <vector>
 
+#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/s/client/dbclient_multi_command.h"
-#include "mongo/client/remote_command_targeter.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/grid.h"

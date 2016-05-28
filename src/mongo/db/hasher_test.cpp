@@ -30,10 +30,10 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/bson/bsontypes.h"
 
 #include "mongo/unittest/unittest.h"
 
@@ -271,7 +271,8 @@ TEST(BSONElementHasher, HashString) {
 TEST(BSONElementHasher, HashObject) {
     BSONObj o = BSON("check" << BSON("a"
                                      << "abc"
-                                     << "b" << 123LL));
+                                     << "b"
+                                     << 123LL));
     ASSERT_EQUALS(hashIt(o), 4771603801758380216LL);
 
     o = BSON("check" << BSONObj());

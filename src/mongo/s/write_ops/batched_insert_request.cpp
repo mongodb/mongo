@@ -147,8 +147,8 @@ bool BatchedInsertRequest::parseBSON(StringData dbName, const BSONObj& source, s
             std::initializer_list<StringData> ignoredFields = {"maxTimeMS", "shardVersion"};
             if (std::find(ignoredFields.begin(), ignoredFields.end(), sourceEl.fieldName()) ==
                 ignoredFields.end()) {
-                *errMsg = str::stream()
-                    << "Unknown option to insert command: " << sourceEl.fieldName();
+                *errMsg = str::stream() << "Unknown option to insert command: "
+                                        << sourceEl.fieldName();
                 return false;
             }
         }

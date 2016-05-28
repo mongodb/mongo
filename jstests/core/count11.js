@@ -5,12 +5,8 @@ var t = db.count11;
 
 t.drop();
 
-var validQuery = {
-    a: 1
-};
-var invalidQuery = {
-    a: {$invalid: 1}
-};
+var validQuery = {a: 1};
+var invalidQuery = {a: {$invalid: 1}};
 
 // Query non-existing collection with empty query.
 assert.eq(0, t.find().count());

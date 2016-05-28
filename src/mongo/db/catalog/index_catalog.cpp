@@ -38,8 +38,8 @@
 
 #include "mongo/db/audit.h"
 #include "mongo/db/background.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/catalog/index_key_validate.h"
@@ -47,7 +47,6 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_legacy.h"
@@ -56,12 +55,13 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/query/collation/collation_serializer.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -186,7 +186,8 @@ Status IndexCatalog::checkUnfinished() const {
 
     return Status(ErrorCodes::InternalError,
                   str::stream() << "IndexCatalog has left over indexes that must be cleared"
-                                << " ns: " << _collection->ns().ns());
+                                << " ns: "
+                                << _collection->ns().ns());
 }
 
 bool IndexCatalog::_shouldOverridePlugin(OperationContext* txn, const BSONObj& keyPattern) const {
@@ -199,7 +200,8 @@ bool IndexCatalog::_shouldOverridePlugin(OperationContext* txn, const BSONObj& k
         // supports an index plugin unsupported by this version.
         uassert(17197,
                 str::stream() << "Invalid index type '" << pluginName << "' "
-                              << "in index " << keyPattern,
+                              << "in index "
+                              << keyPattern,
                 known);
         return false;
     }
@@ -483,7 +485,8 @@ Status IndexCatalog::_isSpecOk(OperationContext* txn, const BSONObj& spec) const
         if (v != 0 && v != 1) {
             return Status(ErrorCodes::CannotCreateIndex,
                           str::stream() << "this version of mongod cannot build new indexes "
-                                        << "of version number " << v);
+                                        << "of version number "
+                                        << v);
         }
     }
 
@@ -508,7 +511,9 @@ Status IndexCatalog::_isSpecOk(OperationContext* txn, const BSONObj& spec) const
         return Status(ErrorCodes::CannotCreateIndex,
                       str::stream() << "the \"ns\" field of the index spec '"
                                     << specNamespace.valueStringData()
-                                    << "' does not match the collection name '" << nss.ns() << "'");
+                                    << "' does not match the collection name '"
+                                    << nss.ns()
+                                    << "'");
 
     // logical name of the index
     const BSONElement nameElem = spec["name"];
@@ -526,7 +531,8 @@ Status IndexCatalog::_isSpecOk(OperationContext* txn, const BSONObj& spec) const
     if (indexNamespace.length() > NamespaceString::MaxNsLen)
         return Status(ErrorCodes::CannotCreateIndex,
                       str::stream() << "namespace name generated from index name \""
-                                    << indexNamespace << "\" is too long (127 byte max)");
+                                    << indexNamespace
+                                    << "\" is too long (127 byte max)");
 
     const BSONObj key = spec.getObjectField("key");
     const Status keyStatus = validateKeyPattern(key);
@@ -650,9 +656,12 @@ Status IndexCatalog::_doesSpecConflictWithExisting(OperationContext* txn,
             if (!desc->keyPattern().equal(key))
                 return Status(ErrorCodes::IndexKeySpecsConflict,
                               str::stream() << "Trying to create an index "
-                                            << "with same name " << name
-                                            << " with different key spec " << key
-                                            << " vs existing spec " << desc->keyPattern());
+                                            << "with same name "
+                                            << name
+                                            << " with different key spec "
+                                            << key
+                                            << " vs existing spec "
+                                            << desc->keyPattern());
 
             IndexDescriptor temp(_collection, _getAccessMethodName(txn, key), spec);
             if (!desc->areIndexOptionsEquivalent(&temp))
@@ -702,7 +711,8 @@ Status IndexCatalog::_doesSpecConflictWithExisting(OperationContext* txn,
             return Status(ErrorCodes::CannotCreateIndex,
                           str::stream() << "only one text index per collection allowed, "
                                         << "found existing text index \""
-                                        << textIndexes[0]->indexName() << "\"");
+                                        << textIndexes[0]->indexName()
+                                        << "\"");
         }
     }
     return Status::OK();

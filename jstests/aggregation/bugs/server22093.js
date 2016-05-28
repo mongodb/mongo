@@ -22,9 +22,8 @@ load('jstests/libs/analyze_plan.js');
     assert.eq(simpleGroup.length, 1);
     assert.eq(simpleGroup[0]["count"], 15);
 
-    var explained =
-        coll.explain()
-            .aggregate([{$match: {foo: {$gt: 0}}}, {$group: {_id: null, count: {$sum: 1}}}]);
+    var explained = coll.explain().aggregate(
+        [{$match: {foo: {$gt: 0}}}, {$group: {_id: null, count: {$sum: 1}}}]);
 
     assert(planHasStage(explained.stages[0].$cursor.queryPlanner.winningPlan, "COUNT_SCAN"));
 

@@ -34,10 +34,10 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authz_session_external_state_mock.h"
-#include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/authz_manager_external_state_mock.h"
+#include "mongo/db/auth/authz_session_external_state_mock.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_noop.h"
@@ -175,36 +175,38 @@ public:
 TEST_F(AuthorizationManagerTest, testAcquireV2User) {
     OperationContextNoop txn;
 
-    ASSERT_OK(
-        externalState->insertPrivilegeDocument(&txn,
-                                               BSON("_id"
-                                                    << "admin.v2read"
-                                                    << "user"
-                                                    << "v2read"
-                                                    << "db"
-                                                    << "test"
-                                                    << "credentials" << BSON("MONGODB-CR"
-                                                                             << "password")
-                                                    << "roles" << BSON_ARRAY(BSON("role"
-                                                                                  << "read"
-                                                                                  << "db"
-                                                                                  << "test"))),
-                                               BSONObj()));
-    ASSERT_OK(
-        externalState->insertPrivilegeDocument(&txn,
-                                               BSON("_id"
-                                                    << "admin.v2cluster"
-                                                    << "user"
-                                                    << "v2cluster"
-                                                    << "db"
-                                                    << "admin"
-                                                    << "credentials" << BSON("MONGODB-CR"
-                                                                             << "password")
-                                                    << "roles" << BSON_ARRAY(BSON("role"
-                                                                                  << "clusterAdmin"
-                                                                                  << "db"
-                                                                                  << "admin"))),
-                                               BSONObj()));
+    ASSERT_OK(externalState->insertPrivilegeDocument(&txn,
+                                                     BSON("_id"
+                                                          << "admin.v2read"
+                                                          << "user"
+                                                          << "v2read"
+                                                          << "db"
+                                                          << "test"
+                                                          << "credentials"
+                                                          << BSON("MONGODB-CR"
+                                                                  << "password")
+                                                          << "roles"
+                                                          << BSON_ARRAY(BSON("role"
+                                                                             << "read"
+                                                                             << "db"
+                                                                             << "test"))),
+                                                     BSONObj()));
+    ASSERT_OK(externalState->insertPrivilegeDocument(&txn,
+                                                     BSON("_id"
+                                                          << "admin.v2cluster"
+                                                          << "user"
+                                                          << "v2cluster"
+                                                          << "db"
+                                                          << "admin"
+                                                          << "credentials"
+                                                          << BSON("MONGODB-CR"
+                                                                  << "password")
+                                                          << "roles"
+                                                          << BSON_ARRAY(BSON("role"
+                                                                             << "clusterAdmin"
+                                                                             << "db"
+                                                                             << "admin"))),
+                                                     BSONObj()));
 
     User* v2read;
     ASSERT_OK(authzManager->acquireUser(&txn, UserName("v2read", "test"), &v2read));
@@ -260,13 +262,13 @@ public:
 
 private:
     Status _getUserDocument(OperationContext* txn, const UserName& userName, BSONObj* userDoc) {
-        Status status =
-            findOne(txn,
-                    AuthorizationManager::usersCollectionNamespace,
-                    BSON(AuthorizationManager::USER_NAME_FIELD_NAME
-                         << userName.getUser() << AuthorizationManager::USER_DB_FIELD_NAME
-                         << userName.getDB()),
-                    userDoc);
+        Status status = findOne(txn,
+                                AuthorizationManager::usersCollectionNamespace,
+                                BSON(AuthorizationManager::USER_NAME_FIELD_NAME
+                                     << userName.getUser()
+                                     << AuthorizationManager::USER_DB_FIELD_NAME
+                                     << userName.getDB()),
+                                userDoc);
         if (status == ErrorCodes::NoMatchingDocument) {
             status = Status(ErrorCodes::UserNotFound,
                             mongoutils::str::stream() << "Could not find user "
@@ -301,27 +303,33 @@ public:
 TEST_F(AuthorizationManagerTest, testAcquireV2UserWithUnrecognizedActions) {
     OperationContextNoop txn;
 
-    ASSERT_OK(externalState->insertPrivilegeDocument(
-        &txn,
-        BSON("_id"
-             << "admin.myUser"
-             << "user"
-             << "myUser"
-             << "db"
-             << "test"
-             << "credentials" << BSON("MONGODB-CR"
-                                      << "password") << "roles" << BSON_ARRAY(BSON("role"
-                                                                                   << "myRole"
-                                                                                   << "db"
-                                                                                   << "test"))
-             << "inheritedPrivileges" << BSON_ARRAY(BSON("resource" << BSON("db"
-                                                                            << "test"
-                                                                            << "collection"
-                                                                            << "") << "actions"
-                                                                    << BSON_ARRAY("find"
-                                                                                  << "fakeAction"
-                                                                                  << "insert")))),
-        BSONObj()));
+    ASSERT_OK(
+        externalState->insertPrivilegeDocument(&txn,
+                                               BSON("_id"
+                                                    << "admin.myUser"
+                                                    << "user"
+                                                    << "myUser"
+                                                    << "db"
+                                                    << "test"
+                                                    << "credentials"
+                                                    << BSON("MONGODB-CR"
+                                                            << "password")
+                                                    << "roles"
+                                                    << BSON_ARRAY(BSON("role"
+                                                                       << "myRole"
+                                                                       << "db"
+                                                                       << "test"))
+                                                    << "inheritedPrivileges"
+                                                    << BSON_ARRAY(BSON(
+                                                           "resource" << BSON("db"
+                                                                              << "test"
+                                                                              << "collection"
+                                                                              << "")
+                                                                      << "actions"
+                                                                      << BSON_ARRAY("find"
+                                                                                    << "fakeAction"
+                                                                                    << "insert")))),
+                                               BSONObj()));
 
     User* myUser;
     ASSERT_OK(authzManager->acquireUser(&txn, UserName("myUser", "test"), &myUser));

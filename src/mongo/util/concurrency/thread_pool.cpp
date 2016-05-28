@@ -137,23 +137,21 @@ void ThreadPool::join() {
 }
 
 void ThreadPool::_join_inlock(stdx::unique_lock<stdx::mutex>* lk) {
-    _stateChange.wait(*lk,
-                      [this] {
-                          switch (_state) {
-                              case preStart:
-                                  return false;
-                              case running:
-                                  return false;
-                              case joinRequired:
-                                  return true;
-                              case joining:
-                              case shutdownComplete:
-                                  severe() << "Attempted to join pool " << _options.poolName
-                                           << " more than once";
-                                  fassertFailed(28700);
-                          }
-                          MONGO_UNREACHABLE;
-                      });
+    _stateChange.wait(*lk, [this] {
+        switch (_state) {
+            case preStart:
+                return false;
+            case running:
+                return false;
+            case joinRequired:
+                return true;
+            case joining:
+            case shutdownComplete:
+                severe() << "Attempted to join pool " << _options.poolName << " more than once";
+                fassertFailed(28700);
+        }
+        MONGO_UNREACHABLE;
+    });
     _setState_inlock(joining);
     ++_numIdleThreads;
     while (!_pendingTasks.empty()) {

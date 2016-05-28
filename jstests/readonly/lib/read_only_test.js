@@ -34,11 +34,7 @@ var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
         try {
             makeDirectoryReadOnly(this.dbpath);
 
-            var options = {
-                queryableBackupMode: "",
-                noCleanData: true,
-                dbpath: this.dbpath
-            };
+            var options = {queryableBackupMode: "", noCleanData: true, dbpath: this.dbpath};
 
             this.mongod = MongoRunner.runMongod(options);
 
@@ -71,17 +67,12 @@ var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
         jsTest.log("restarting shards...");
         try {
             for (var i = 0; i < this.nShards; ++i) {
-                var opts = {
-                    queryableBackupMode: "",
-                    dbpath: this.paths[i]
-                };
+                var opts = {queryableBackupMode: "", dbpath: this.paths[i]};
 
                 assert.commandWorked(this.shardingTest["d" + i].getDB("local").dropDatabase());
-                this.shardingTest.restartMongod(i,
-                                                opts,
-                                                () => {
-                                                    makeDirectoryReadOnly(this.paths[i]);
-                                                });
+                this.shardingTest.restartMongod(i, opts, () => {
+                    makeDirectoryReadOnly(this.paths[i]);
+                });
             }
 
             jsTest.log("restarting mongos...");

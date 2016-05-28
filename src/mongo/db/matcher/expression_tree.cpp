@@ -30,8 +30,8 @@
 
 #include "mongo/db/matcher/expression_tree.h"
 
-#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {

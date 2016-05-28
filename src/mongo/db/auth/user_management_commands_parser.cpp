@@ -684,8 +684,11 @@ Status parseAuthSchemaUpgradeCommand(const BSONObj& cmdObj,
     if (steps < minUpgradeSteps || steps > maxUpgradeSteps) {
         return Status(ErrorCodes::BadValue,
                       mongoutils::str::stream() << "Legal values for \"maxSteps\" are at least "
-                                                << minUpgradeSteps << " and no more than "
-                                                << maxUpgradeSteps << "; found " << steps);
+                                                << minUpgradeSteps
+                                                << " and no more than "
+                                                << maxUpgradeSteps
+                                                << "; found "
+                                                << steps);
     }
     parsedArgs->maxSteps = static_cast<int>(steps);
 

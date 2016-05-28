@@ -216,7 +216,9 @@ void OpObserver::onRenameCollection(OperationContext* txn,
     std::string dbName = fromCollection.db().toString() + ".$cmd";
     BSONObj cmdObj =
         BSON("renameCollection" << fromCollection.ns() << "to" << toCollection.ns() << "stayTemp"
-                                << stayTemp << "dropTarget" << dropTarget);
+                                << stayTemp
+                                << "dropTarget"
+                                << dropTarget);
 
     repl::logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
 

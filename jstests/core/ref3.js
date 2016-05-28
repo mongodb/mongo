@@ -4,10 +4,7 @@
 db.otherthings3.drop();
 db.things3.drop();
 
-var other = {
-    s: "other thing",
-    n: 1
-};
+var other = {s: "other thing", n: 1};
 db.otherthings3.save(other);
 
 db.things3.save({name: "abc"});

@@ -121,8 +121,9 @@ TEST(RollBackLocalOperationsTest, RollbackOperationFailed) {
         makeOpAndRecordId(2, 1), commonOperation,
     });
     OplogInterfaceMock localOplog(localOperations);
-    auto rollbackOperation =
-        [&](const BSONObj& operation) { return Status(ErrorCodes::OperationFailed, ""); };
+    auto rollbackOperation = [&](const BSONObj& operation) {
+        return Status(ErrorCodes::OperationFailed, "");
+    };
     RollBackLocalOperations finder(localOplog, rollbackOperation);
     auto result = finder.onRemoteOperation(commonOperation.first);
     ASSERT_EQUALS(ErrorCodes::OperationFailed, result.getStatus().code());
@@ -211,8 +212,9 @@ TEST(RollBackLocalOperationsTest, SameTimestampDifferentHashesRollbackOperationF
         makeOpAndRecordId(1, 3), commonOperation,
     });
     OplogInterfaceMock localOplog(localOperations);
-    auto rollbackOperation =
-        [&](const BSONObj& operation) { return Status(ErrorCodes::OperationFailed, ""); };
+    auto rollbackOperation = [&](const BSONObj& operation) {
+        return Status(ErrorCodes::OperationFailed, "");
+    };
     RollBackLocalOperations finder(localOplog, rollbackOperation);
     auto result = finder.onRemoteOperation(makeOp(1, 2));
     ASSERT_EQUALS(ErrorCodes::OperationFailed, result.getStatus().code());

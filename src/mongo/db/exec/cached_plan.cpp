@@ -209,7 +209,8 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
     if (!status.isOK()) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "error processing query: " << _canonicalQuery->toString()
-                                    << " planner returned error: " << status.reason());
+                                    << " planner returned error: "
+                                    << status.reason());
     }
 
     OwnedPointerVector<QuerySolution> solutions(rawSolutions);

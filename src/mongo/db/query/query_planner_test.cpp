@@ -666,9 +666,9 @@ TEST_F(QueryPlannerTest, OrOfAnd3) {
 // SERVER-12594: we don't yet collapse an OR of ANDs into a single ixscan.
 TEST_F(QueryPlannerTest, OrOfAnd4) {
     addIndex(BSON("a" << 1 << "b" << 1));
-    runQuery(fromjson(
-        "{$or: [{a:{$gt:1,$lt:5}, b:{$gt:0,$lt:3}, c:6}, "
-        "{a:3, b:{$gt:1,$lt:2}, c:{$gt:0,$lt:10}}]}"));
+    runQuery(
+        fromjson("{$or: [{a:{$gt:1,$lt:5}, b:{$gt:0,$lt:3}, c:6}, "
+                 "{a:3, b:{$gt:1,$lt:2}, c:{$gt:0,$lt:10}}]}"));
 
     assertNumSolutions(2U);
     assertSolutionExists("{cscan: {dir: 1}}");
@@ -684,9 +684,9 @@ TEST_F(QueryPlannerTest, OrOfAnd4) {
 // SERVER-12594: we don't yet collapse an OR of ANDs into a single ixscan.
 TEST_F(QueryPlannerTest, OrOfAnd5) {
     addIndex(BSON("a" << 1 << "b" << 1));
-    runQuery(fromjson(
-        "{$or: [{a:{$gt:1,$lt:5}, c:6}, "
-        "{a:3, b:{$gt:1,$lt:2}, c:{$gt:0,$lt:10}}]}"));
+    runQuery(
+        fromjson("{$or: [{a:{$gt:1,$lt:5}, c:6}, "
+                 "{a:3, b:{$gt:1,$lt:2}, c:{$gt:0,$lt:10}}]}"));
 
     assertNumSolutions(2U);
     assertSolutionExists("{cscan: {dir: 1}}");
@@ -870,9 +870,9 @@ TEST_F(QueryPlannerTest, OrInexactWithExact2) {
 // SERVER-13960: an exact, inexact covered, and inexact fetch predicate.
 TEST_F(QueryPlannerTest, OrAllThreeTightnesses) {
     addIndex(BSON("names" << 1));
-    runQuery(fromjson(
-        "{$or: [{names: 'frank'}, {names: /^al(ice)|(ex)/},"
-        "{names: {$elemMatch: {$eq: 'thomas'}}}]}"));
+    runQuery(
+        fromjson("{$or: [{names: 'frank'}, {names: /^al(ice)|(ex)/},"
+                 "{names: {$elemMatch: {$eq: 'thomas'}}}]}"));
 
     assertNumSolutions(2U);
     assertSolutionExists("{cscan: {dir: 1}}");
@@ -887,9 +887,9 @@ TEST_F(QueryPlannerTest, OrAllThreeTightnesses) {
 TEST_F(QueryPlannerTest, OrTwoInexactFetch) {
     // true means multikey
     addIndex(BSON("names" << 1), true);
-    runQuery(fromjson(
-        "{$or: [{names: {$elemMatch: {$eq: 'alexandra'}}},"
-        "{names: {$elemMatch: {$eq: 'thomas'}}}]}"));
+    runQuery(
+        fromjson("{$or: [{names: {$elemMatch: {$eq: 'alexandra'}}},"
+                 "{names: {$elemMatch: {$eq: 'thomas'}}}]}"));
 
     assertNumSolutions(2U);
     assertSolutionExists("{cscan: {dir: 1}}");
@@ -917,9 +917,9 @@ TEST_F(QueryPlannerTest, OrInexactCoveredMultikey) {
 TEST_F(QueryPlannerTest, OrElemMatchObject) {
     // true means multikey
     addIndex(BSON("a.b" << 1), true);
-    runQuery(fromjson(
-        "{$or: [{a: {$elemMatch: {b: {$lte: 1}}}},"
-        "{a: {$elemMatch: {b: {$gte: 4}}}}]}"));
+    runQuery(
+        fromjson("{$or: [{a: {$elemMatch: {b: {$lte: 1}}}},"
+                 "{a: {$elemMatch: {b: {$gte: 4}}}}]}"));
 
     assertNumSolutions(2U);
     assertSolutionExists("{cscan: {dir: 1}}");
@@ -935,9 +935,9 @@ TEST_F(QueryPlannerTest, OrElemMatchObject) {
 TEST_F(QueryPlannerTest, OrElemMatchObjectBeneathAnd) {
     // true means multikey
     addIndex(BSON("a.b" << 1), true);
-    runQuery(fromjson(
-        "{$or: [{'a.b': 0, a: {$elemMatch: {b: {$lte: 1}}}},"
-        "{a: {$elemMatch: {b: {$gte: 4}}}}]}"));
+    runQuery(
+        fromjson("{$or: [{'a.b': 0, a: {$elemMatch: {b: {$lte: 1}}}},"
+                 "{a: {$elemMatch: {b: {$gte: 4}}}}]}"));
 
     assertNumSolutions(3U);
     assertSolutionExists("{cscan: {dir: 1}}");
@@ -988,9 +988,9 @@ TEST_F(QueryPlannerTest, OrWithExactAndInexact) {
 // SERVER-13960: $in with exact, inexact covered, and inexact fetch predicates.
 TEST_F(QueryPlannerTest, OrWithExactAndInexact2) {
     addIndex(BSON("name" << 1));
-    runQuery(fromjson(
-        "{$or: [{name: {$in: ['thomas', /^alexand(er|ra)/]}},"
-        "{name: {$exists: false}}]}"));
+    runQuery(
+        fromjson("{$or: [{name: {$in: ['thomas', /^alexand(er|ra)/]}},"
+                 "{name: {$exists: false}}]}"));
 
     assertNumSolutions(2U);
     assertSolutionExists("{cscan: {dir: 1}}");
@@ -1005,9 +1005,9 @@ TEST_F(QueryPlannerTest, OrWithExactAndInexact2) {
 TEST_F(QueryPlannerTest, OrWithExactAndInexact3) {
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));
-    runQuery(fromjson(
-        "{$or: [{a: {$in: [/z/, /x/]}}, {a: 'w'},"
-        "{b: {$exists: false}}, {b: {$in: ['p']}}]}"));
+    runQuery(
+        fromjson("{$or: [{a: {$in: [/z/, /x/]}}, {a: 'w'},"
+                 "{b: {$exists: false}}, {b: {$in: ['p']}}]}"));
 
     assertNumSolutions(2U);
     assertSolutionExists("{cscan: {dir: 1}}");
@@ -1420,7 +1420,8 @@ TEST_F(QueryPlannerTest, CantUseHashedIndexToProvideSortWithIndexablePred) {
 TEST_F(QueryPlannerTest, CantUseTextIndexToProvideSort) {
     addIndex(BSON("x" << 1 << "_fts"
                       << "text"
-                      << "_ftsx" << 1));
+                      << "_ftsx"
+                      << 1));
     runQuerySortProj(BSONObj(), BSON("x" << 1), BSONObj());
 
     ASSERT_EQUALS(getNumSolutions(), 1U);
@@ -1766,10 +1767,9 @@ TEST_F(QueryPlannerTest, ManyInWithSort) {
 // SERVER-1205
 TEST_F(QueryPlannerTest, TooManyToExplode) {
     addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1));
-    runQuerySortProjSkipNToReturn(fromjson(
-                                      "{a: {$in: [1,2,3,4,5,6]},"
-                                      "b:{$in:[1,2,3,4,5,6,7,8]},"
-                                      "c:{$in:[1,2,3,4,5,6,7,8]}}"),
+    runQuerySortProjSkipNToReturn(fromjson("{a: {$in: [1,2,3,4,5,6]},"
+                                           "b:{$in:[1,2,3,4,5,6,7,8]},"
+                                           "c:{$in:[1,2,3,4,5,6,7,8]}}"),
                                   BSON("d" << 1),
                                   BSONObj(),
                                   0,
@@ -1962,11 +1962,10 @@ TEST_F(QueryPlannerTest, TooManyToExplodeOr) {
     addIndex(BSON("b" << 1 << "e" << 1));
     addIndex(BSON("c" << 1 << "e" << 1));
     addIndex(BSON("d" << 1 << "e" << 1));
-    runQuerySortProj(fromjson(
-                         "{$or: [{a: {$in: [1,2,3,4,5,6]},"
-                         "b: {$in: [1,2,3,4,5,6]}},"
-                         "{c: {$in: [1,2,3,4,5,6]},"
-                         "d: {$in: [1,2,3,4,5,6]}}]}"),
+    runQuerySortProj(fromjson("{$or: [{a: {$in: [1,2,3,4,5,6]},"
+                              "b: {$in: [1,2,3,4,5,6]}},"
+                              "{c: {$in: [1,2,3,4,5,6]},"
+                              "d: {$in: [1,2,3,4,5,6]}}]}"),
                      BSON("e" << 1),
                      BSONObj());
 
@@ -2004,9 +2003,8 @@ TEST_F(QueryPlannerTest, TooManyToExplodeOr) {
 TEST_F(QueryPlannerTest, ExplodeIxscanWithFilter) {
     addIndex(BSON("a" << 1 << "b" << 1));
 
-    runQuerySortProj(fromjson(
-                         "{$and: [{b: {$regex: 'foo', $options: 'i'}},"
-                         "{a: {$in: [1, 2]}}]}"),
+    runQuerySortProj(fromjson("{$and: [{b: {$regex: 'foo', $options: 'i'}},"
+                              "{a: {$in: [1, 2]}}]}"),
                      BSON("b" << 1),
                      BSONObj());
 
@@ -2106,9 +2104,9 @@ TEST_F(QueryPlannerTest, TwoPlansElemMatch) {
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("arr.x" << 1 << "a" << 1));
 
-    runQuery(fromjson(
-        "{arr: { $elemMatch : { x : 5 , y : 5 } },"
-        " a : 55 , b : { $in : [ 1 , 5 , 8 ] } }"));
+    runQuery(
+        fromjson("{arr: { $elemMatch : { x : 5 , y : 5 } },"
+                 " a : 55 , b : { $in : [ 1 , 5 , 8 ] } }"));
 
     // 2 indexed solns and one non-indexed
     ASSERT_EQUALS(getNumSolutions(), 3U);
@@ -2763,9 +2761,9 @@ TEST_F(QueryPlannerTest, NegatedRangeIntGTE) {
 
 TEST_F(QueryPlannerTest, TwoNegatedRanges) {
     addIndex(BSON("i" << 1));
-    runQuery(fromjson(
-        "{$and: [{i: {$not: {$lte: 'b'}}}, "
-        "{i: {$not: {$gte: 'f'}}}]}"));
+    runQuery(
+        fromjson("{$and: [{i: {$not: {$lte: 'b'}}}, "
+                 "{i: {$not: {$gte: 'f'}}}]}"));
 
     assertNumSolutions(2U);
     assertSolutionExists("{cscan: {dir: 1}}");
@@ -3273,14 +3271,14 @@ TEST_F(QueryPlannerTest, IntersectCanBeVeryBig) {
     addIndex(BSON("b" << 1));
     addIndex(BSON("c" << 1));
     addIndex(BSON("d" << 1));
-    runQuery(fromjson(
-        "{$or: [{ 'a' : null, 'b' : 94, 'c' : null, 'd' : null },"
-        "{ 'a' : null, 'b' : 98, 'c' : null, 'd' : null },"
-        "{ 'a' : null, 'b' : 1, 'c' : null, 'd' : null },"
-        "{ 'a' : null, 'b' : 2, 'c' : null, 'd' : null },"
-        "{ 'a' : null, 'b' : 7, 'c' : null, 'd' : null },"
-        "{ 'a' : null, 'b' : 9, 'c' : null, 'd' : null },"
-        "{ 'a' : null, 'b' : 16, 'c' : null, 'd' : null }]}"));
+    runQuery(
+        fromjson("{$or: [{ 'a' : null, 'b' : 94, 'c' : null, 'd' : null },"
+                 "{ 'a' : null, 'b' : 98, 'c' : null, 'd' : null },"
+                 "{ 'a' : null, 'b' : 1, 'c' : null, 'd' : null },"
+                 "{ 'a' : null, 'b' : 2, 'c' : null, 'd' : null },"
+                 "{ 'a' : null, 'b' : 7, 'c' : null, 'd' : null },"
+                 "{ 'a' : null, 'b' : 9, 'c' : null, 'd' : null },"
+                 "{ 'a' : null, 'b' : 16, 'c' : null, 'd' : null }]}"));
 
     assertNumSolutions(internalQueryEnumerationMaxOrSolutions);
 }
@@ -3549,13 +3547,13 @@ TEST_F(QueryPlannerTest, OrEnumerationLimit) {
 
     // 6 $or clauses, each with 2 indexed predicates
     // means 2^6 = 64 possibilities. We should hit the limit.
-    runQuery(fromjson(
-        "{$or: [{a: 1, b: 1},"
-        "{a: 2, b: 2},"
-        "{a: 3, b: 3},"
-        "{a: 4, b: 4},"
-        "{a: 5, b: 5},"
-        "{a: 6, b: 6}]}"));
+    runQuery(
+        fromjson("{$or: [{a: 1, b: 1},"
+                 "{a: 2, b: 2},"
+                 "{a: 3, b: 3},"
+                 "{a: 4, b: 4},"
+                 "{a: 5, b: 5},"
+                 "{a: 6, b: 6}]}"));
 
     assertNumSolutions(internalQueryEnumerationMaxOrSolutions);
 }
@@ -3569,10 +3567,10 @@ TEST_F(QueryPlannerTest, OrEnumerationLimit2) {
 
     // 3 $or clauses, and a few other preds. Each $or clause can
     // generate up to the max number of allowed $or enumerations.
-    runQuery(fromjson(
-        "{$or: [{a: 1, b: 1, c: 1, d: 1},"
-        "{a: 2, b: 2, c: 2, d: 2},"
-        "{a: 3, b: 3, c: 3, d: 3}]}"));
+    runQuery(
+        fromjson("{$or: [{a: 1, b: 1, c: 1, d: 1},"
+                 "{a: 2, b: 2, c: 2, d: 2},"
+                 "{a: 3, b: 3, c: 3, d: 3}]}"));
 
     assertNumSolutions(internalQueryEnumerationMaxOrSolutions);
 }

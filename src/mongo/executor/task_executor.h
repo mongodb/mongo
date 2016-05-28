@@ -28,9 +28,9 @@
 
 #pragma once
 
-#include <string>
-#include <memory>
 #include <functional>
+#include <memory>
+#include <string>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"

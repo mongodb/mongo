@@ -203,18 +203,21 @@ ReplicationCoordinator::Mode getReplicationModeFromSettings(const ReplSettings& 
 
 DataReplicatorOptions createDataReplicatorOptions(ReplicationCoordinator* replCoord) {
     DataReplicatorOptions options;
-    options.rollbackFn =
-        [](OperationContext*, const OpTime&, const HostAndPort&) -> Status { return Status::OK(); };
+    options.rollbackFn = [](OperationContext*, const OpTime&, const HostAndPort&) -> Status {
+        return Status::OK();
+    };
     options.prepareReplSetUpdatePositionCommandFn =
         [replCoord](ReplicationCoordinator::ReplSetUpdatePositionCommandStyle commandStyle)
-            -> StatusWith<BSONObj> {
-                return replCoord->prepareReplSetUpdatePositionCommand(commandStyle);
-            };
+        -> StatusWith<BSONObj> {
+            return replCoord->prepareReplSetUpdatePositionCommand(commandStyle);
+        };
     options.getMyLastOptime = [replCoord]() { return replCoord->getMyLastAppliedOpTime(); };
-    options.setMyLastOptime =
-        [replCoord](const OpTime& opTime) { replCoord->setMyLastAppliedOpTime(opTime); };
-    options.setFollowerMode =
-        [replCoord](const MemberState& newState) { return replCoord->setFollowerMode(newState); };
+    options.setMyLastOptime = [replCoord](const OpTime& opTime) {
+        replCoord->setMyLastAppliedOpTime(opTime);
+    };
+    options.setFollowerMode = [replCoord](const MemberState& newState) {
+        return replCoord->setFollowerMode(newState);
+    };
     options.getSlaveDelay = [replCoord]() { return replCoord->getSlaveDelaySecs(); };
     options.syncSourceSelector = replCoord;
     options.replBatchLimitBytes = dur::UncommittedBytesLimit;
@@ -367,8 +370,8 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* txn) {
     if (!status.isOK()) {
         error() << "Locally stored replica set configuration does not parse; See "
                    "http://www.mongodb.org/dochub/core/recover-replica-set-from-invalid-config "
-                   "for information on how to recover from this. Got \"" << status
-                << "\" while parsing " << cfg.getValue();
+                   "for information on how to recover from this. Got \""
+                << status << "\" while parsing " << cfg.getValue();
         fassertFailedNoTrace(28545);
     }
 
@@ -417,8 +420,8 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         } else {
             error() << "Locally stored replica set configuration is invalid; See "
                        "http://www.mongodb.org/dochub/core/recover-replica-set-from-invalid-config"
-                       " for information on how to recover from this. Got \"" << myIndex.getStatus()
-                    << "\" while validating " << localConfig.toBSON();
+                       " for information on how to recover from this. Got \""
+                    << myIndex.getStatus() << "\" while validating " << localConfig.toBSON();
             fassertFailedNoTrace(28544);
         }
     }
@@ -603,7 +606,8 @@ Status ReplicationCoordinatorImpl::waitForMemberState(MemberState expectedState,
     if (!_memberStateChange.wait_for(lk, timeout.toSystemDuration(), pred)) {
         return Status(ErrorCodes::ExceededTimeLimit,
                       str::stream() << "Timed out waiting for state to become "
-                                    << expectedState.toString() << ". Current state is "
+                                    << expectedState.toString()
+                                    << ". Current state is "
                                     << _memberState.toString());
     }
     return Status::OK();
@@ -835,7 +839,8 @@ void ReplicationCoordinatorImpl::_updateSlaveInfoDurableOpTime_inlock(SlaveInfo*
     if (slaveInfo->lastAppliedOpTime < opTime) {
         log() << "Durable progress (" << opTime << ") is ahead of the applied progress ("
               << slaveInfo->lastAppliedOpTime << ". This is likely due to a "
-                                                 "rollback. slaveInfo: " << slaveInfo->toString();
+                                                 "rollback. slaveInfo: "
+              << slaveInfo->toString();
         return;
     }
     slaveInfo->lastDurableOpTime = opTime;
@@ -1009,9 +1014,9 @@ void ReplicationCoordinatorImpl::_setMyLastDurableOpTime_inlock(const OpTime& op
     // lastAppliedOpTime cannot be behind lastDurableOpTime.
     if (mySlaveInfo->lastAppliedOpTime < opTime) {
         log() << "My durable progress (" << opTime << ") is ahead of my applied progress ("
-              << mySlaveInfo->lastAppliedOpTime
-              << ". This is likely due to a "
-                 "rollback. slaveInfo: " << mySlaveInfo->toString();
+              << mySlaveInfo->lastAppliedOpTime << ". This is likely due to a "
+                                                   "rollback. slaveInfo: "
+              << mySlaveInfo->toString();
         return;
     }
     _updateSlaveInfoDurableOpTime_inlock(mySlaveInfo, opTime);
@@ -2927,21 +2932,24 @@ SyncSourceResolverResponse ReplicationCoordinatorImpl::selectSyncSource(
         // Candidate found.
         Status queryStatus(ErrorCodes::NotYetInitialized, "not mutated");
         BSONObj firstObjFound;
-        auto work =
-            [&firstObjFound, &queryStatus](const StatusWith<Fetcher::QueryResponse>& queryResult,
-                                           NextAction* nextActiion,
-                                           BSONObjBuilder* bob) {
-                queryStatus = queryResult.getStatus();
-                if (queryResult.isOK() && !queryResult.getValue().documents.empty()) {
-                    firstObjFound = queryResult.getValue().documents.front();
-                }
-            };
+        auto work = [&firstObjFound,
+                     &queryStatus](const StatusWith<Fetcher::QueryResponse>& queryResult,
+                                   NextAction* nextActiion,
+                                   BSONObjBuilder* bob) {
+            queryStatus = queryResult.getStatus();
+            if (queryResult.isOK() && !queryResult.getValue().documents.empty()) {
+                firstObjFound = queryResult.getValue().documents.front();
+            }
+        };
         Fetcher candidateProber(&_replExecutor,
                                 candidate,
                                 "local",
                                 BSON("find"
                                      << "oplog.rs"
-                                     << "limit" << 1 << "sort" << BSON("$natural" << 1)),
+                                     << "limit"
+                                     << 1
+                                     << "sort"
+                                     << BSON("$natural" << 1)),
                                 work,
                                 rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
                                 Milliseconds(30000));
@@ -3414,8 +3422,9 @@ void ReplicationCoordinatorImpl::_resetElectionInfoOnProtocolVersionUpgrade(
 }
 
 CallbackHandle ReplicationCoordinatorImpl::_scheduleWork(const CallbackFn& work) {
-    auto scheduleFn =
-        [this](const CallbackFn& workWrapped) { return _replExecutor.scheduleWork(workWrapped); };
+    auto scheduleFn = [this](const CallbackFn& workWrapped) {
+        return _replExecutor.scheduleWork(workWrapped);
+    };
     return _wrapAndScheduleWork(scheduleFn, work);
 }
 
@@ -3440,8 +3449,9 @@ void ReplicationCoordinatorImpl::_scheduleWorkAtAndWaitForCompletion(Date_t when
 }
 
 CallbackHandle ReplicationCoordinatorImpl::_scheduleDBWork(const CallbackFn& work) {
-    auto scheduleFn =
-        [this](const CallbackFn& workWrapped) { return _replExecutor.scheduleDBWork(workWrapped); };
+    auto scheduleFn = [this](const CallbackFn& workWrapped) {
+        return _replExecutor.scheduleDBWork(workWrapped);
+    };
     return _wrapAndScheduleWork(scheduleFn, work);
 }
 

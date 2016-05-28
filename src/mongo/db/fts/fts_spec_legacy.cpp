@@ -241,7 +241,9 @@ StatusWith<BSONObj> FTSSpec::_fixSpecV1(const BSONObj& spec) {
             if (i->second <= 0 || i->second >= MAX_WORD_WEIGHT) {
                 return {ErrorCodes::CannotCreateIndex,
                         str::stream() << "text index weight must be in the exclusive interval (0,"
-                                      << MAX_WORD_WEIGHT << ") but found: " << i->second};
+                                      << MAX_WORD_WEIGHT
+                                      << ") but found: "
+                                      << i->second};
             }
             b.append(i->first, i->second);
         }

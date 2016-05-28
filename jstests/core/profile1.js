@@ -87,12 +87,8 @@
 
         resetProfile(2);
         db.profile1.drop();
-        var q = {
-            _id: 5
-        };
-        var u = {
-            $inc: {x: 1}
-        };
+        var q = {_id: 5};
+        var u = {$inc: {x: 1}};
         db.profile1.update(q, u);
         var r = profileCursor({ns: db.profile1.getFullName()}).sort({$natural: -1})[0];
         assert.eq(q, r.query, "Y1: " + tojson(r));

@@ -26,8 +26,8 @@
 *    it in the license file.
 */
 
-#include "mongo/db/jsobj.h"
 #include "mongo/db/geo/shapes.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/util/mongoutils/str.h"
 
 using std::abs;

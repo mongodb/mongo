@@ -17,9 +17,7 @@
     //
     // Test single insert.
     //
-    var doc = {
-        _id: 1
-    };
+    var doc = {_id: 1};
     var result = coll.insert(doc);
     if (isWriteCommand) {
         assert.writeOK(result);
@@ -76,9 +74,7 @@
     // Test insert options.
     //
     coll.drop();
-    doc = {
-        _id: 1
-    };
+    doc = {_id: 1};
     var wtimeout = 60000;
     assert.writeOK(coll.insert(doc, {writeConcern: {w: 1, wtimeout: wtimeout}, ordered: false}));
 

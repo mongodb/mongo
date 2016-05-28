@@ -192,9 +192,7 @@
         }
 
         // indexDetailsKey - show indexDetails results for this index key only.
-        var indexKey = {
-            a: 1
-        };
+        var indexKey = {a: 1};
         var indexName = getIndexName(indexKey);
         checkIndexDetails({indexDetails: true, indexDetailsKey: indexKey}, indexName);
 

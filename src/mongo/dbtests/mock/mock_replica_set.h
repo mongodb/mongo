@@ -27,12 +27,12 @@
 
 #pragma once
 
-#include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/db/repl/member_config.h"
 #include "mongo/db/repl/replica_set_config.h"
+#include "mongo/dbtests/mock/mock_remote_db_server.h"
 
-#include <string>
 #include <map>
+#include <string>
 #include <vector>
 
 namespace mongo {

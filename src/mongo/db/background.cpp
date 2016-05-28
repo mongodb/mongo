@@ -133,7 +133,8 @@ void BackgroundOperation::assertNoBgOpInProgForDb(StringData db) {
     uassert(ErrorCodes::BackgroundOperationInProgressForDatabase,
             mongoutils::str::stream()
                 << "cannot perform operation: a background operation is currently running for "
-                   "database " << db,
+                   "database "
+                << db,
             !inProgForDb(db));
 }
 
@@ -141,7 +142,8 @@ void BackgroundOperation::assertNoBgOpInProgForNs(StringData ns) {
     uassert(ErrorCodes::BackgroundOperationInProgressForNamespace,
             mongoutils::str::stream()
                 << "cannot perform operation: a background operation is currently running for "
-                   "collection " << ns,
+                   "collection "
+                << ns,
             !inProgForNs(ns));
 }
 

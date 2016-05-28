@@ -72,12 +72,7 @@ var $config = (function() {
             assertWhenOwnColl.eq(indexesCount, this.nIndexes);
         }
 
-        return {
-            init: init,
-            collectionSetup: collectionSetup,
-            compact: compact,
-            query: query
-        };
+        return {init: init, collectionSetup: collectionSetup, compact: compact, query: query};
     })();
 
     var transitions = {

@@ -30,8 +30,8 @@
 
 #pragma once
 
-#include "mongo/db/jsobj.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/update_result.h"
 

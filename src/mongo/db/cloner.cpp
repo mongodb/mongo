@@ -125,7 +125,8 @@ struct Cloner::Fun {
         unique_ptr<Lock::GlobalWrite> globalWriteLock(new Lock::GlobalWrite(txn->lockState()));
         uassert(ErrorCodes::NotMaster,
                 str::stream() << "Not primary while cloning collection " << from_collection.ns()
-                              << " to " << to_collection.ns(),
+                              << " to "
+                              << to_collection.ns(),
                 !txn->writesAreReplicated() ||
                     repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(to_collection));
 
@@ -279,7 +280,10 @@ void Cloner::copy(OperationContext* txn,
 
     uassert(ErrorCodes::NotMaster,
             str::stream() << "Not primary while cloning collection " << from_collection.ns()
-                          << " to " << to_collection.ns() << " with filter " << query.toString(),
+                          << " to "
+                          << to_collection.ns()
+                          << " with filter "
+                          << query.toString(),
             !txn->writesAreReplicated() ||
                 repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(to_collection));
 }
@@ -308,7 +312,9 @@ void Cloner::copyIndexes(OperationContext* txn,
 
     uassert(ErrorCodes::NotMaster,
             str::stream() << "Not primary while copying indexes from " << from_collection.ns()
-                          << " to " << to_collection.ns() << " (Cloner)",
+                          << " to "
+                          << to_collection.ns()
+                          << " (Cloner)",
             !txn->writesAreReplicated() ||
                 repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(to_collection));
 

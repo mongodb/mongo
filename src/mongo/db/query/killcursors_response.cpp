@@ -50,8 +50,8 @@ Status fillOutCursorArray(const BSONObj& cmdResponse,
 
     if (elt.type() != BSONType::Array) {
         return {ErrorCodes::FailedToParse,
-                str::stream() << "Field '" << fieldName
-                              << "' must be of type array in: " << cmdResponse};
+                str::stream() << "Field '" << fieldName << "' must be of type array in: "
+                              << cmdResponse};
     }
 
     for (BSONElement cursorElt : elt.Obj()) {

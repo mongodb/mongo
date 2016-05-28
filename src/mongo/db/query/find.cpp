@@ -42,7 +42,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/query/explain.h"
@@ -55,6 +54,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/stale_exception.h"
@@ -311,7 +311,9 @@ QueryResult::View getMore(OperationContext* txn,
         // there for the cursor.
         uassert(ErrorCodes::Unauthorized,
                 str::stream() << "Requested getMore on namespace " << ns << ", but cursor "
-                              << cursorid << " belongs to namespace " << cc->ns(),
+                              << cursorid
+                              << " belongs to namespace "
+                              << cc->ns(),
                 ns == cc->ns());
         *isCursorAuthorized = true;
 
@@ -504,9 +506,9 @@ std::string runQuery(OperationContext* txn,
 
     auto statusWithCQ = CanonicalQuery::canonicalize(txn, q, ExtensionsCallbackReal(txn, &nss));
     if (!statusWithCQ.isOK()) {
-        uasserted(
-            17287,
-            str::stream() << "Can't canonicalize query: " << statusWithCQ.getStatus().toString());
+        uasserted(17287,
+                  str::stream() << "Can't canonicalize query: "
+                                << statusWithCQ.getStatus().toString());
     }
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
     invariant(cq.get());

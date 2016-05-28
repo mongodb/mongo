@@ -32,8 +32,8 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/list.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/list.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 

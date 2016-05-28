@@ -15,12 +15,8 @@
         coll.insert({_id: i, s: "asdasdasdasdasdasdasd"});
     }
 
-    var dataSizeCommand = {
-        "dataSize": "test.foo",
-        "keyPattern": {"_id": 1},
-        "min": {"_id": 0},
-        "max": {"_id": N}
-    };
+    var dataSizeCommand =
+        {"dataSize": "test.foo", "keyPattern": {"_id": 1}, "min": {"_id": 0}, "max": {"_id": N}};
 
     assert.eq(N,
               db.runCommand(dataSizeCommand).numObjects,

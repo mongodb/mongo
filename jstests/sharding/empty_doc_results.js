@@ -2,10 +2,7 @@
 // Verifies that mongos correctly handles empty documents when all fields are projected out
 //
 
-var options = {
-    mongosOptions: {binVersion: ""},
-    shardOptions: {binVersion: ""}
-};
+var options = {mongosOptions: {binVersion: ""}, shardOptions: {binVersion: ""}};
 
 var st = new ShardingTest({shards: 2, other: options});
 

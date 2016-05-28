@@ -34,11 +34,11 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/document.h"
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/config.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/user_management_commands_parser.h"
-#include "mongo/client/dbclientinterface.h"
-#include "mongo/config.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/write_concern_error_detail.h"
@@ -85,8 +85,8 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        return grid.catalogManager(txn)
-            ->runUserManagementWriteCommand(txn, getName(), dbname, cmdObj, &result);
+        return grid.catalogManager(txn)->runUserManagementWriteCommand(
+            txn, getName(), dbname, cmdObj, &result);
     }
 
     virtual void redactForLogging(mutablebson::Document* cmdObj) {
@@ -395,8 +395,8 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        return grid.catalogManager(txn)
-            ->runUserManagementWriteCommand(txn, getName(), dbname, cmdObj, &result);
+        return grid.catalogManager(txn)->runUserManagementWriteCommand(
+            txn, getName(), dbname, cmdObj, &result);
     }
 
 } cmdCreateRole;
@@ -817,8 +817,8 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        return grid.catalogManager(txn)
-            ->runUserManagementWriteCommand(txn, getName(), dbname, cmdObj, &result);
+        return grid.catalogManager(txn)->runUserManagementWriteCommand(
+            txn, getName(), dbname, cmdObj, &result);
     }
 
 } cmdMergeAuthzCollections;
@@ -916,8 +916,8 @@ public:
              string& errmsg,
              BSONObjBuilder& result) {
         // Run the authSchemaUpgrade command on the config servers
-        if (!grid.catalogManager(txn)
-                 ->runUserManagementWriteCommand(txn, getName(), dbname, cmdObj, &result)) {
+        if (!grid.catalogManager(txn)->runUserManagementWriteCommand(
+                txn, getName(), dbname, cmdObj, &result)) {
             return false;
         }
 

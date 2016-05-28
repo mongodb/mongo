@@ -16,13 +16,12 @@ function distanceTotal(a, arr, f) {
     return total;
 }
 
-queries = [{near: [7, 8], maxDistance: 3, search: {z: 3}}, ];
+queries = [
+    {near: [7, 8], maxDistance: 3, search: {z: 3}},
+];
 
 answers = queries.map(function() {
-    return {
-        totalDistance: 0,
-        results: []
-    };
+    return {totalDistance: 0, results: []};
 });
 
 n = 0;

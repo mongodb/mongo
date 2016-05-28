@@ -32,8 +32,8 @@
 
 #include "mongo/db/storage/mmap_v1/record_store_v1_test_help.h"
 
-#include <boost/next_prior.hpp>
 #include <algorithm>
+#include <boost/next_prior.hpp>
 #include <map>
 #include <set>
 #include <vector>

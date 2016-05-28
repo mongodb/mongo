@@ -13,9 +13,7 @@ identityProjection = {
 
 /** Assert that an aggregation generated the expected error. */
 function assertError(expectedCode, matchSpec) {
-    matchStage = {
-        $match: matchSpec
-    };
+    matchStage = {$match: matchSpec};
     // Check where matching is folded in to DocumentSourceCursor.
     assertErrorCode(t, [matchStage], expectedCode);
     // Check where matching is not folded in to DocumentSourceCursor.
@@ -41,9 +39,7 @@ function assertResults(expectedResults, matchSpec) {
     if (expectedResults) {
         assertEqualResultsUnordered(expectedResults, findResults);
     }
-    matchStage = {
-        $match: matchSpec
-    };
+    matchStage = {$match: matchSpec};
     // Check where matching is folded in to DocumentSourceCursor.
     assertEqualResultsUnordered(findResults, t.aggregate(matchStage).toArray());
     // Check where matching is not folded in to DocumentSourceCursor.
@@ -176,11 +172,7 @@ function checkMatchResults(indexed) {
 
     // $and
     assertResults([{_id: 1, a: 2}], {$and: [{a: 2}, {_id: 1}]});
-    assertResults([],
-                  {
-                      $and:
-                          [{a: 1}, {_id: 1}]
-                  });
+    assertResults([], {$and: [{a: 1}, {_id: 1}]});
     assertResults([{_id: 1, a: 2}, {_id: 2, a: 3}],
                   {$and: [{$or: [{_id: 1}, {a: 3}]}, {$or: [{_id: 2}, {a: 2}]}]});
 

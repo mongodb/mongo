@@ -32,8 +32,8 @@
 
 #include "mongo/db/auth/security_key.h"
 
-#include <sys/stat.h>
 #include <string>
+#include <sys/stat.h>
 #include <vector>
 
 #include "mongo/base/status_with.h"
@@ -89,11 +89,14 @@ bool setUpSecurityKey(const string& filename) {
     if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_keyFile ||
         clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendKeyFile) {
         setInternalUserAuthParams(
-            BSON(saslCommandMechanismFieldName
-                 << "SCRAM-SHA-1" << saslCommandUserDBFieldName
-                 << internalSecurity.user->getName().getDB() << saslCommandUserFieldName
-                 << internalSecurity.user->getName().getUser() << saslCommandPasswordFieldName
-                 << credentials.password << saslCommandDigestPasswordFieldName << false));
+            BSON(saslCommandMechanismFieldName << "SCRAM-SHA-1" << saslCommandUserDBFieldName
+                                               << internalSecurity.user->getName().getDB()
+                                               << saslCommandUserFieldName
+                                               << internalSecurity.user->getName().getUser()
+                                               << saslCommandPasswordFieldName
+                                               << credentials.password
+                                               << saslCommandDigestPasswordFieldName
+                                               << false));
     }
 
     return true;

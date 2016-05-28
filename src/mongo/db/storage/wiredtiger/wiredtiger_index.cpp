@@ -37,22 +37,22 @@
 #include <set>
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/db/json.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/json.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/db/storage/storage_options.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/hex.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -60,7 +60,7 @@
 
 #if TRACING_ENABLED
 #define TRACE_CURSOR log() << "WT index (" << (const void*)&_idx << ") "
-#define TRACE_INDEX log() << "WT index (" << (const void*) this << ") "
+#define TRACE_INDEX log() << "WT index (" << (const void*)this << ") "
 #else
 #define TRACE_CURSOR \
     if (0)           \
@@ -141,7 +141,8 @@ StatusWith<std::string> WiredTigerIndex::parseIndexOptions(const BSONObj& option
             // Return error on first unrecognized field.
             return StatusWith<std::string>(ErrorCodes::InvalidOptions,
                                            str::stream() << '\'' << elem.fieldNameStringData()
-                                                         << '\'' << " is not a supported option.");
+                                                         << '\''
+                                                         << " is not a supported option.");
         }
     }
     return StatusWith<std::string>(ss.str());

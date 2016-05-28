@@ -74,10 +74,7 @@ var ReplSetTest = function(opts) {
     var self = this;
 
     // Replica set health states
-    var Health = {
-        UP: 1,
-        DOWN: 0
-    };
+    var Health = {UP: 1, DOWN: 0};
 
     var _alldbpaths;
     var _configSettings;
@@ -94,10 +91,7 @@ var ReplSetTest = function(opts) {
      * Populates a reference to all reachable nodes.
      */
     function _clearLiveNodes() {
-        self.liveNodes = {
-            master: null,
-            slaves: []
-        };
+        self.liveNodes = {master: null, slaves: []};
     }
 
     /**
@@ -310,10 +304,8 @@ var ReplSetTest = function(opts) {
     function _getLastCommittedOpTime(conn) {
         var replSetStatus =
             assert.commandWorked(conn.getDB("admin").runCommand({replSetGetStatus: 1}));
-        return (replSetStatus.OpTimes || replSetStatus.optimes).lastCommittedOpTime || {
-            ts: Timestamp(0, 0),
-            t: NumberLong(0)
-        };
+        return (replSetStatus.OpTimes || replSetStatus.optimes).lastCommittedOpTime ||
+            {ts: Timestamp(0, 0), t: NumberLong(0)};
     }
 
     /**
@@ -325,22 +317,14 @@ var ReplSetTest = function(opts) {
     function _getReadConcernMajorityOpTime(conn) {
         var replSetStatus =
             assert.commandWorked(conn.getDB("admin").runCommand({replSetGetStatus: 1}));
-        return (replSetStatus.OpTimes || replSetStatus.optimes).readConcernMajorityOpTime || {
-            ts: Timestamp(0, 0),
-            t: NumberLong(0)
-        };
+        return (replSetStatus.OpTimes || replSetStatus.optimes).readConcernMajorityOpTime ||
+            {ts: Timestamp(0, 0), t: NumberLong(0)};
     }
 
     function _isEarlierOpTime(ot1, ot2) {
         // Make sure both optimes have a timestamp and a term.
-        ot1 = ot1.t ? ot1 : {
-            ts: ot1,
-            t: NumberLong(-1)
-        };
-        ot2 = ot2.t ? ot2 : {
-            ts: ot2,
-            t: NumberLong(-1)
-        };
+        ot1 = ot1.t ? ot1 : {ts: ot1, t: NumberLong(-1)};
+        ot2 = ot2.t ? ot2 : {ts: ot2, t: NumberLong(-1)};
 
         // If both optimes have a term that's not -1 and one has a lower term, return that optime.
         if (!friendlyEqual(ot1.t, NumberLong(-1)) && !friendlyEqual(ot2.t, NumberLong(-1))) {
@@ -916,10 +900,7 @@ var ReplSetTest = function(opts) {
 
         options.restart = options.restart || restart;
 
-        var pathOpts = {
-            node: n,
-            set: this.name
-        };
+        var pathOpts = {node: n, set: this.name};
         options.pathOpts = Object.merge(options.pathOpts || {}, pathOpts);
 
         if (tojson(options) != tojson({}))
@@ -929,15 +910,13 @@ var ReplSetTest = function(opts) {
 
         if (_useBridge) {
             var bridgeOptions = Object.merge(_bridgeOptions, options.bridgeOptions || {});
-            bridgeOptions = Object.merge(
-                bridgeOptions,
-                {
-                  hostName: this.host,
-                  port: this.ports[n],
-                  // The mongod processes identify themselves to mongobridge as host:port, where the
-                  // host is the actual hostname of the machine and not localhost.
-                  dest: getHostName() + ":" + _unbridgedPorts[n],
-                });
+            bridgeOptions = Object.merge(bridgeOptions, {
+                hostName: this.host,
+                port: this.ports[n],
+                // The mongod processes identify themselves to mongobridge as host:port, where the
+                // host is the actual hostname of the machine and not localhost.
+                dest: getHostName() + ":" + _unbridgedPorts[n],
+            });
 
             this.nodes[n] = new MongoBridge(bridgeOptions);
         }
@@ -1117,9 +1096,7 @@ var ReplSetTest = function(opts) {
 
             this.query = function(ts) {
                 var coll = this.getOplogColl();
-                var query = {
-                    "ts": {"$gte": ts ? ts : new Timestamp()}
-                };
+                var query = {"ts": {"$gte": ts ? ts : new Timestamp()}};
                 this.cursor = coll.find(query).sort({$natural: 1});
                 this.cursor.addOption(DBQuery.Option.oplogReplay);
             };
@@ -1309,9 +1286,7 @@ ReplSetTest.awaitRSClientHosts = function(conn, host, hostOk, rs, timeout) {
     timeout = timeout || 60000;
 
     if (hostOk == undefined)
-        hostOk = {
-            ok: true
-        };
+        hostOk = {ok: true};
     if (host.host)
         host = host.host;
     if (rs)

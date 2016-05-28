@@ -31,8 +31,8 @@
 #include <string>
 #include <vector>
 
-#include "mongo/db/jsobj.h"
 #include "mongo/db/hasher.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
 

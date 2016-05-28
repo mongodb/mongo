@@ -63,7 +63,9 @@ StatusWith<ConfigServerMetadata> ConfigServerMetadata::readFromMetadata(
     } else if (metadataElem.type() != mongo::Object) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << "ConfigServerMetadata element has incorrect type: expected"
-                              << mongo::Object << " but got " << metadataElem.type()};
+                              << mongo::Object
+                              << " but got "
+                              << metadataElem.type()};
     }
 
     BSONObj configMetadataObj = metadataElem.Obj();

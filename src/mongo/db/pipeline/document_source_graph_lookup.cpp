@@ -358,9 +358,12 @@ void DocumentSourceGraphLookUp::checkMemoryUsage() {
 void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array, bool explain) const {
     // Serialize default options.
     MutableDocument spec(DOC("from" << _from.coll() << "as" << _as.getPath(false)
-                                    << "connectToField" << _connectToField.getPath(false)
-                                    << "connectFromField" << _connectFromField.getPath(false)
-                                    << "startWith" << _startWith->serialize(false)));
+                                    << "connectToField"
+                                    << _connectToField.getPath(false)
+                                    << "connectFromField"
+                                    << _connectFromField.getPath(false)
+                                    << "startWith"
+                                    << _startWith->serialize(false)));
 
     // depthField is optional; serialize it if it was specified.
     if (_depthField) {
@@ -376,7 +379,8 @@ void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array, bool
         const boost::optional<FieldPath> indexPath = (*_unwind)->indexPath();
         spec["unwinding"] =
             Value(DOC("preserveNullAndEmptyArrays"
-                      << (*_unwind)->preserveNullAndEmptyArrays() << "includeArrayIndex"
+                      << (*_unwind)->preserveNullAndEmptyArrays()
+                      << "includeArrayIndex"
                       << (indexPath ? Value((*indexPath).getPath(false)) : Value())));
     }
 
@@ -432,14 +436,14 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
                                   << typeName(argument.type()),
                     argument.isNumber());
             maxDepth = argument.safeNumberLong();
-            uassert(
-                40101,
-                str::stream() << "maxDepth requires a nonnegative argument, found: " << *maxDepth,
-                *maxDepth >= 0);
-            uassert(
-                40102,
-                str::stream() << "maxDepth could not be represented as a long long: " << *maxDepth,
-                *maxDepth == argument.number());
+            uassert(40101,
+                    str::stream() << "maxDepth requires a nonnegative argument, found: "
+                                  << *maxDepth,
+                    *maxDepth >= 0);
+            uassert(40102,
+                    str::stream() << "maxDepth could not be represented as a long long: "
+                                  << *maxDepth,
+                    *maxDepth == argument.number());
             continue;
         }
 
@@ -447,8 +451,8 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
             argName == "depthField" || argName == "connectToField") {
             // All remaining arguments to $graphLookup are expected to be strings.
             uassert(40103,
-                    str::stream() << "expected string as argument for " << argName
-                                  << ", found: " << argument.toString(false, false),
+                    str::stream() << "expected string as argument for " << argName << ", found: "
+                                  << argument.toString(false, false),
                     argument.type() == String);
         }
 
@@ -464,8 +468,8 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
             depthField = boost::optional<FieldPath>(FieldPath(argument.String()));
         } else {
             uasserted(40104,
-                      str::stream()
-                          << "Unknown argument to $graphLookup: " << argument.fieldName());
+                      str::stream() << "Unknown argument to $graphLookup: "
+                                    << argument.fieldName());
         }
     }
 

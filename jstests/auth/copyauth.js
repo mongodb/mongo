@@ -57,11 +57,10 @@ function ClusterSpawnHelper(clusterType, startWithAuth, startWithTransitionToAut
         replSetTest.startSet();
         replSetTest.initiate();
         if (startWithAuth) {
-            authutil.asCluster(replSetTest.nodes,
-                               replSetTestConfig.nodeOptions.keyFile,
-                               function() {
-                                   replSetTest.awaitReplication();
-                               });
+            authutil.asCluster(
+                replSetTest.nodes, replSetTestConfig.nodeOptions.keyFile, function() {
+                    replSetTest.awaitReplication();
+                });
         } else {
             replSetTest.awaitReplication();
         }
@@ -122,8 +121,8 @@ function copydbBetweenClustersTest(configObj) {
 
     if (configObj.isSourceUsingAuth) {
         // Create a super user so we can create a regular user and not be locked out afterwards
-        source.conn.getDB("admin")
-            .createUser({user: "sourceSuperUser", pwd: "sourceSuperUser", roles: ["root"]});
+        source.conn.getDB("admin").createUser(
+            {user: "sourceSuperUser", pwd: "sourceSuperUser", roles: ["root"]});
         source.conn.getDB("admin").auth("sourceSuperUser", "sourceSuperUser");
 
         source.conn.getDB(baseName)[baseName].save({i: 1});
@@ -157,8 +156,8 @@ function copydbBetweenClustersTest(configObj) {
                                     configObj.isTargetUsingTransitionToAuth);
 
     if (configObj.isTargetUsingAuth) {
-        target.conn.getDB("admin")
-            .createUser({user: "targetSuperUser", pwd: "targetSuperUser", roles: ["root"]});
+        target.conn.getDB("admin").createUser(
+            {user: "targetSuperUser", pwd: "targetSuperUser", roles: ["root"]});
 
         var readWhenLoggedOut = function() {
             target.conn.getDB(baseName)[baseName].findOne();

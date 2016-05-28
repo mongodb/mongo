@@ -37,8 +37,8 @@
 #include <iostream>
 #include <psapi.h>
 
-#include "mongo/util/processinfo.h"
 #include "mongo/util/log.h"
+#include "mongo/util/processinfo.h"
 
 using namespace std;
 using std::unique_ptr;

@@ -34,10 +34,10 @@
 
 #include <algorithm>
 
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_lib.h"
@@ -404,8 +404,8 @@ std::unique_ptr<MatchExpression> QueryPlannerTest::parseMatchExpression(const BS
     StatusWithMatchExpression status =
         MatchExpressionParser::parse(obj, ExtensionsCallbackDisallowExtensions(), collator);
     if (!status.isOK()) {
-        FAIL(str::stream() << "failed to parse query: " << obj.toString()
-                           << ". Reason: " << status.getStatus().toString());
+        FAIL(str::stream() << "failed to parse query: " << obj.toString() << ". Reason: "
+                           << status.getStatus().toString());
     }
     return std::move(status.getValue());
 }

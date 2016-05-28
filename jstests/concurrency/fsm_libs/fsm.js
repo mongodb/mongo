@@ -21,11 +21,7 @@ var fsm = (function() {
         // See fsm_libs/cluster.js for the format of args.cluster.
         var connCache;
         if (args.passConnectionCache) {
-            connCache = {
-                mongos: [],
-                config: [],
-                shards: {}
-            };
+            connCache = {mongos: [], config: [], shards: {}};
             connCache.mongos = args.cluster.mongos.map(connStr => new Mongo(connStr));
             connCache.config = args.cluster.config.map(connStr => new Mongo(connStr));
 
@@ -87,8 +83,5 @@ var fsm = (function() {
         assert(false, 'not reached');
     }
 
-    return {
-        run: runFSM,
-        _getWeightedRandomChoice: getWeightedRandomChoice
-    };
+    return {run: runFSM, _getWeightedRandomChoice: getWeightedRandomChoice};
 })();

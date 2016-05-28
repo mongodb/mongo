@@ -70,15 +70,15 @@ struct ProcPsinfo {
     ProcPsinfo() {
         FILE* f = fopen("/proc/self/psinfo", "r");
         massert(16846,
-                mongoutils::str::stream()
-                    << "couldn't open \"/proc/self/psinfo\": " << errnoWithDescription(),
+                mongoutils::str::stream() << "couldn't open \"/proc/self/psinfo\": "
+                                          << errnoWithDescription(),
                 f);
         size_t num = fread(&psinfo, sizeof(psinfo), 1, f);
         int err = errno;
         fclose(f);
         massert(16847,
-                mongoutils::str::stream()
-                    << "couldn't read from \"/proc/self/psinfo\": " << errnoWithDescription(err),
+                mongoutils::str::stream() << "couldn't read from \"/proc/self/psinfo\": "
+                                          << errnoWithDescription(err),
                 num == 1);
     }
     psinfo_t psinfo;
@@ -88,15 +88,15 @@ struct ProcUsage {
     ProcUsage() {
         FILE* f = fopen("/proc/self/usage", "r");
         massert(16848,
-                mongoutils::str::stream()
-                    << "couldn't open \"/proc/self/usage\": " << errnoWithDescription(),
+                mongoutils::str::stream() << "couldn't open \"/proc/self/usage\": "
+                                          << errnoWithDescription(),
                 f);
         size_t num = fread(&prusage, sizeof(prusage), 1, f);
         int err = errno;
         fclose(f);
         massert(16849,
-                mongoutils::str::stream()
-                    << "couldn't read from \"/proc/self/usage\": " << errnoWithDescription(err),
+                mongoutils::str::stream() << "couldn't read from \"/proc/self/usage\": "
+                                          << errnoWithDescription(err),
                 num == 1);
     }
     prusage_t prusage;

@@ -124,7 +124,9 @@ public:
         const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
         OperationContext& txn = *txnPtr;
         BSONObj spec(BSON("key" << BSON("a"
-                                        << "hashed") << "seed" << 0x5eed));
+                                        << "hashed")
+                                << "seed"
+                                << 0x5eed));
         BSONObj nullObj = BSON("a" << BSONNULL);
 
         BSONObjSet nullFieldKeySet;

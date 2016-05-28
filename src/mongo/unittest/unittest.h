@@ -126,21 +126,20 @@
  * Behaves like ASSERT_THROWS, above, but also fails if calling what() on the thrown exception
  * does not return a string equal to EXPECTED_WHAT.
  */
-#define ASSERT_THROWS_WHAT(STATEMENT, EXCEPTION_TYPE, EXPECTED_WHAT)                 \
-    ASSERT_THROWS_PRED(STATEMENT,                                                    \
-                       EXCEPTION_TYPE,                                               \
-                       ([&](const EXCEPTION_TYPE& ex) {                              \
-        return ::mongo::StringData(ex.what()) == ::mongo::StringData(EXPECTED_WHAT); \
+#define ASSERT_THROWS_WHAT(STATEMENT, EXCEPTION_TYPE, EXPECTED_WHAT)               \
+    ASSERT_THROWS_PRED(STATEMENT, EXCEPTION_TYPE, ([&](const EXCEPTION_TYPE& ex) { \
+                           return ::mongo::StringData(ex.what()) ==                \
+                               ::mongo::StringData(EXPECTED_WHAT);                 \
                        }))
 
 /**
  * Behaves like ASSERT_THROWS, above, but also fails if calling getCode() on the thrown exception
  * does not return an error code equal to EXPECTED_CODE.
  */
-#define ASSERT_THROWS_CODE(STATEMENT, EXCEPTION_TYPE, EXPECTED_CODE) \
-    ASSERT_THROWS_PRED(STATEMENT,                                    \
-                       EXCEPTION_TYPE,                               \
-                       ([](const EXCEPTION_TYPE& ex) { return (EXPECTED_CODE) == ex.getCode(); }))
+#define ASSERT_THROWS_CODE(STATEMENT, EXCEPTION_TYPE, EXPECTED_CODE)              \
+    ASSERT_THROWS_PRED(STATEMENT, EXCEPTION_TYPE, ([](const EXCEPTION_TYPE& ex) { \
+                           return (EXPECTED_CODE) == ex.getCode();                \
+                       }))
 
 /**
  * Behaves like ASSERT_THROWS, above, but also fails if calling getCode() on the thrown exception
@@ -148,11 +147,10 @@
  * does not return a string equal to EXPECTED_WHAT.
  */
 #define ASSERT_THROWS_CODE_AND_WHAT(STATEMENT, EXCEPTION_TYPE, EXPECTED_CODE, EXPECTED_WHAT) \
-    ASSERT_THROWS_PRED(STATEMENT,                                                            \
-                       EXCEPTION_TYPE,                                                       \
-                       ([](const EXCEPTION_TYPE& ex) {                                       \
-        return (EXPECTED_CODE) == ex.getCode() &&                                            \
-            ::mongo::StringData(ex.what()) == ::mongo::StringData(EXPECTED_WHAT);            \
+    ASSERT_THROWS_PRED(STATEMENT, EXCEPTION_TYPE, ([](const EXCEPTION_TYPE& ex) {            \
+                           return (EXPECTED_CODE) == ex.getCode() &&                         \
+                               ::mongo::StringData(ex.what()) ==                             \
+                               ::mongo::StringData(EXPECTED_WHAT);                           \
                        }))
 
 /**
@@ -534,12 +532,12 @@ private:
         std::shared_ptr<TestAssertionFailure> _assertion;                                     \
     }
 
-DECLARE_COMPARISON_ASSERTION(EQ, == );
-DECLARE_COMPARISON_ASSERTION(NE, != );
-DECLARE_COMPARISON_ASSERTION(LT, < );
-DECLARE_COMPARISON_ASSERTION(LTE, <= );
-DECLARE_COMPARISON_ASSERTION(GT, > );
-DECLARE_COMPARISON_ASSERTION(GTE, >= );
+DECLARE_COMPARISON_ASSERTION(EQ, ==);
+DECLARE_COMPARISON_ASSERTION(NE, !=);
+DECLARE_COMPARISON_ASSERTION(LT, <);
+DECLARE_COMPARISON_ASSERTION(LTE, <=);
+DECLARE_COMPARISON_ASSERTION(GT, >);
+DECLARE_COMPARISON_ASSERTION(GTE, >=);
 #undef DECLARE_COMPARISON_ASSERTION
 
 /**

@@ -351,7 +351,9 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
         } else if (!str::startsWith(fieldName, '$')) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Failed to parse: " << cmdObj.toString() << ". "
-                                        << "Unrecognized field '" << fieldName << "'.");
+                                        << "Unrecognized field '"
+                                        << fieldName
+                                        << "'.");
         }
     }
 
@@ -553,32 +555,32 @@ Status LiteParsedQuery::validate() const {
 
     if (_limit && *_limit < 0) {
         return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "Limit value must be non-negative, but received: " << *_limit);
+                      str::stream() << "Limit value must be non-negative, but received: "
+                                    << *_limit);
     }
 
     if (_batchSize && *_batchSize < 0) {
         return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "BatchSize value must be non-negative, but received: " << *_batchSize);
+                      str::stream() << "BatchSize value must be non-negative, but received: "
+                                    << *_batchSize);
     }
 
     if (_ntoreturn && *_ntoreturn < 0) {
         return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "NToReturn value must be non-negative, but received: " << *_ntoreturn);
+                      str::stream() << "NToReturn value must be non-negative, but received: "
+                                    << *_ntoreturn);
     }
 
     if (_maxScan < 0) {
         return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "MaxScan value must be non-negative, but received: " << _maxScan);
+                      str::stream() << "MaxScan value must be non-negative, but received: "
+                                    << _maxScan);
     }
 
     if (_maxTimeMS < 0) {
         return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "MaxTimeMS value must be non-negative, but received: " << _maxTimeMS);
+                      str::stream() << "MaxTimeMS value must be non-negative, but received: "
+                                    << _maxTimeMS);
     }
 
     if (_tailable) {
@@ -618,9 +620,10 @@ StatusWith<int> LiteParsedQuery::parseMaxTimeMS(BSONElement maxTimeMSElt) {
     }
     double maxTimeMSDouble = maxTimeMSElt.numberDouble();
     if (maxTimeMSElt.type() == mongo::NumberDouble && floor(maxTimeMSDouble) != maxTimeMSDouble) {
-        return StatusWith<int>(ErrorCodes::BadValue,
-                               (StringBuilder() << maxTimeMSElt.fieldNameStringData()
-                                                << " has non-integral value").str());
+        return StatusWith<int>(
+            ErrorCodes::BadValue,
+            (StringBuilder() << maxTimeMSElt.fieldNameStringData() << " has non-integral value")
+                .str());
     }
     return StatusWith<int>(static_cast<int>(maxTimeMSLongLong));
 }

@@ -77,20 +77,14 @@ function checkQuery(subQuery, bothMatch, elemMatch, nonElemMatch, additionalCons
     // Construct standard and elemMatch queries from subQuery.
     firstSubQueryKey = Object.keySet(subQuery)[0];
     if (firstSubQueryKey[0] == '$') {
-        standardQuery = {
-            $and: [{a: subQuery}, additionalConstraints]
-        };
+        standardQuery = {$and: [{a: subQuery}, additionalConstraints]};
     } else {
         // If the subQuery contains a field rather than operators, append to the 'a' field.
         modifiedSubQuery = {};
         modifiedSubQuery['a.' + firstSubQueryKey] = subQuery[firstSubQueryKey];
-        standardQuery = {
-            $and: [modifiedSubQuery, additionalConstraints]
-        };
+        standardQuery = {$and: [modifiedSubQuery, additionalConstraints]};
     }
-    elemMatchQuery = {
-        $and: [{a: {$elemMatch: subQuery}}, additionalConstraints]
-    };
+    elemMatchQuery = {$and: [{a: {$elemMatch: subQuery}}, additionalConstraints]};
     debug(elemMatchQuery);
 
     function maySave(aValue) {

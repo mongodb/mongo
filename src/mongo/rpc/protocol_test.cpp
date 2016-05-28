@@ -81,15 +81,16 @@ TEST(Protocol, parseProtocolSetFromIsMasterReply) {
         // MongoDB 3.2 (mongos)
         auto mongos32 =
             BSON("maxWireVersion" << static_cast<int>(WireVersion::FIND_COMMAND) << "minWireVersion"
-                                  << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE) << "msg"
+                                  << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE)
+                                  << "msg"
                                   << "isdbgrid");
 
         ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(mongos32)), supports::kOpQueryOnly);
     }
     {
         // MongoDB 3.0 (mongod)
-        auto mongod30 = BSON("maxWireVersion"
-                             << static_cast<int>(WireVersion::RELEASE_2_7_7) << "minWireVersion"
+        auto mongod30 = BSON(
+            "maxWireVersion" << static_cast<int>(WireVersion::RELEASE_2_7_7) << "minWireVersion"
                              << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE));
         ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(mongod30)), supports::kOpQueryOnly);
     }

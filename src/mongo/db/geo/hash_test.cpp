@@ -30,12 +30,12 @@
  * This file contains tests for mongo/db/geo/hash.cpp.
  */
 
-#include <bitset>
-#include <string>
-#include <sstream>
-#include <iomanip>
-#include <cmath>
 #include <algorithm>  // For max()
+#include <bitset>
+#include <cmath>
+#include <iomanip>
+#include <sstream>
+#include <string>
 
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/geo/shapes.h"

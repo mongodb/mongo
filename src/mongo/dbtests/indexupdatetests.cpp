@@ -372,8 +372,14 @@ public:
 
         const BSONObj spec = BSON("name"
                                   << "a"
-                                  << "ns" << coll->ns().ns() << "key" << BSON("a" << 1) << "unique"
-                                  << true << "background" << background);
+                                  << "ns"
+                                  << coll->ns().ns()
+                                  << "key"
+                                  << BSON("a" << 1)
+                                  << "unique"
+                                  << true
+                                  << "background"
+                                  << background);
 
         ASSERT_OK(indexer.init(spec));
         ASSERT_OK(indexer.insertAllDocumentsInCollection());
@@ -418,8 +424,14 @@ public:
 
         const BSONObj spec = BSON("name"
                                   << "a"
-                                  << "ns" << coll->ns().ns() << "key" << BSON("a" << 1) << "unique"
-                                  << true << "background" << background);
+                                  << "ns"
+                                  << coll->ns().ns()
+                                  << "key"
+                                  << BSON("a" << 1)
+                                  << "unique"
+                                  << true
+                                  << "background"
+                                  << background);
 
         ASSERT_OK(indexer.init(spec));
         const Status status = indexer.insertAllDocumentsInCollection();
@@ -463,8 +475,14 @@ public:
 
         const BSONObj spec = BSON("name"
                                   << "a"
-                                  << "ns" << coll->ns().ns() << "key" << BSON("a" << 1) << "unique"
-                                  << true << "background" << background);
+                                  << "ns"
+                                  << coll->ns().ns()
+                                  << "key"
+                                  << BSON("a" << 1)
+                                  << "unique"
+                                  << true
+                                  << "background"
+                                  << background);
 
         ASSERT_OK(indexer.init(spec));
 
@@ -729,7 +747,10 @@ public:
         ASSERT_OK(createIndex("unittest",
                               BSON("name"
                                    << "x"
-                                   << "ns" << _ns << "key" << BSON("x" << 1 << "y" << 1))));
+                                   << "ns"
+                                   << _ns
+                                   << "key"
+                                   << BSON("x" << 1 << "y" << 1))));
     }
 };
 
@@ -741,7 +762,11 @@ public:
                       createIndex("unittest",
                                   BSON("name"
                                        << "x"
-                                       << "ns" << _ns << "unique" << true << "key"
+                                       << "ns"
+                                       << _ns
+                                       << "unique"
+                                       << true
+                                       << "key"
                                        << BSON("x" << 1 << "y" << 1))));
     }
 };
@@ -752,7 +777,10 @@ public:
         ASSERT_OK(createIndex("unittest",
                               BSON("name"
                                    << "x"
-                                   << "ns" << _ns << "key" << BSON("x" << 1 << "y" << 1))));
+                                   << "ns"
+                                   << _ns
+                                   << "key"
+                                   << BSON("x" << 1 << "y" << 1))));
     }
 };
 
@@ -764,7 +792,10 @@ public:
                       createIndex("unittest",
                                   BSON("name"
                                        << "x"
-                                       << "ns" << _ns << "key" << BSON("y" << 1 << "x" << 1))));
+                                       << "ns"
+                                       << _ns
+                                       << "key"
+                                       << BSON("y" << 1 << "x" << 1))));
     }
 };
 
@@ -777,9 +808,17 @@ public:
         ASSERT_OK(createIndex("unittests",
                               BSON("name"
                                    << "super"
-                                   << "ns" << _ns << "unique" << 1 << "sparse" << true
-                                   << "expireAfterSeconds" << 3600 << "key" << BSON("superIdx"
-                                                                                    << "2d"))));
+                                   << "ns"
+                                   << _ns
+                                   << "unique"
+                                   << 1
+                                   << "sparse"
+                                   << true
+                                   << "expireAfterSeconds"
+                                   << 3600
+                                   << "key"
+                                   << BSON("superIdx"
+                                           << "2d"))));
     }
 };
 
@@ -791,9 +830,17 @@ public:
         ASSERT_OK(createIndex("unittests",
                               BSON("name"
                                    << "super2"
-                                   << "ns" << _ns << "expireAfterSeconds" << 3600 << "sparse"
-                                   << true << "unique" << 1 << "key" << BSON("superIdx"
-                                                                             << "2d"))));
+                                   << "ns"
+                                   << _ns
+                                   << "expireAfterSeconds"
+                                   << 3600
+                                   << "sparse"
+                                   << true
+                                   << "unique"
+                                   << 1
+                                   << "key"
+                                   << BSON("superIdx"
+                                           << "2d"))));
     }
 };
 
@@ -807,23 +854,40 @@ public:
                       createIndex("unittest",
                                   BSON("name"
                                        << "super2"
-                                       << "ns" << _ns << "unique" << false << "sparse" << true
-                                       << "expireAfterSeconds" << 3600 << "key" << BSON("superIdx"
-                                                                                        << "2d"))));
+                                       << "ns"
+                                       << _ns
+                                       << "unique"
+                                       << false
+                                       << "sparse"
+                                       << true
+                                       << "expireAfterSeconds"
+                                       << 3600
+                                       << "key"
+                                       << BSON("superIdx"
+                                               << "2d"))));
     }
 };
 
 class SameSpecDifferentSparse : public ComplexIndex {
 public:
     void run() {
-        ASSERT_EQUALS(
-            ErrorCodes::IndexOptionsConflict,
-            createIndex("unittest",
-                        BSON("name"
-                             << "super2"
-                             << "ns" << _ns << "unique" << 1 << "sparse" << false << "background"
-                             << true << "expireAfterSeconds" << 3600 << "key" << BSON("superIdx"
-                                                                                      << "2d"))));
+        ASSERT_EQUALS(ErrorCodes::IndexOptionsConflict,
+                      createIndex("unittest",
+                                  BSON("name"
+                                       << "super2"
+                                       << "ns"
+                                       << _ns
+                                       << "unique"
+                                       << 1
+                                       << "sparse"
+                                       << false
+                                       << "background"
+                                       << true
+                                       << "expireAfterSeconds"
+                                       << 3600
+                                       << "key"
+                                       << BSON("superIdx"
+                                               << "2d"))));
     }
 };
 
@@ -834,9 +898,17 @@ public:
                       createIndex("unittest",
                                   BSON("name"
                                        << "super2"
-                                       << "ns" << _ns << "unique" << 1 << "sparse" << true
-                                       << "expireAfterSeconds" << 2400 << "key" << BSON("superIdx"
-                                                                                        << "2d"))));
+                                       << "ns"
+                                       << _ns
+                                       << "unique"
+                                       << 1
+                                       << "sparse"
+                                       << true
+                                       << "expireAfterSeconds"
+                                       << 2400
+                                       << "key"
+                                       << BSON("superIdx"
+                                               << "2d"))));
     }
 };
 
@@ -883,7 +955,11 @@ protected:
     BSONObj _createSpec(T storageEngineValue) {
         return BSON("name"
                     << "super2"
-                    << "ns" << _ns << "key" << BSON("a" << 1) << "storageEngine"
+                    << "ns"
+                    << _ns
+                    << "key"
+                    << BSON("a" << 1)
+                    << "storageEngine"
                     << storageEngineValue);
     }
 };

@@ -19,8 +19,8 @@ load('jstests/libs/fts.js');
     assert.eq(
         [0],
         queryIDS(coll, "próximo vôo à", null, {$diacriticSensitive: true, $caseSensitive: true}));
-    assert.eq(
-        [0], queryIDS(coll, "Atlântico", null, {$diacriticSensitive: true, $caseSensitive: true}));
+    assert.eq([0],
+              queryIDS(coll, "Atlântico", null, {$diacriticSensitive: true, $caseSensitive: true}));
     assert.eq(
         [0],
         queryIDS(coll, "\"próximo\"", null, {$diacriticSensitive: true, $caseSensitive: true}));
@@ -47,8 +47,7 @@ load('jstests/libs/fts.js');
         queryIDS(coll, "proximo vôo à", null, {$diacriticSensitive: true, $caseSensitive: true}));
     assert.eq(
         [],
-        queryIDS(
-            coll, "À -próximo -Vôo", null, {$diacriticSensitive: true, $caseSensitive: true}));
+        queryIDS(coll, "À -próximo -Vôo", null, {$diacriticSensitive: true, $caseSensitive: true}));
     assert.eq(
         [],
         queryIDS(coll, "à proximo -Vôo", null, {$diacriticSensitive: true, $caseSensitive: true}));

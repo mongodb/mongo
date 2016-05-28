@@ -26,10 +26,10 @@
 *    it in the license file.
 */
 
+#include "mongo/db/index/hash_access_method.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/expression_params.h"
-#include "mongo/db/index/hash_access_method.h"
 
 namespace mongo {
 

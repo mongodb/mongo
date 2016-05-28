@@ -159,9 +159,8 @@ TEST(FTSQueryImpl, Phrase1) {
     ASSERT(q.parse(TEXT_INDEX_VERSION_3).isOK());
 
     ASSERT_EQUALS(q.toBSON(),
-                  fromjson(
-                      "{terms: ['fun', 'phrase', 'test'], negatedTerms: [], phrases: ['phrase "
-                      "test'], negatedPhrases: []}"));
+                  fromjson("{terms: ['fun', 'phrase', 'test'], negatedTerms: [], phrases: ['phrase "
+                           "test'], negatedPhrases: []}"));
     ASSERT_TRUE(q.getTermsForBounds() == q.getPositiveTerms());
 }
 
@@ -197,9 +196,8 @@ TEST(FTSQueryImpl, HyphenSurroundedByWhitespaceBeforePhraseShouldNotNegateEntire
     q.setDiacriticSensitive(false);
     ASSERT(q.parse(TEXT_INDEX_VERSION_3).isOK());
     ASSERT_EQUALS(q.toBSON(),
-                  fromjson(
-                      "{terms: ['fun', 'phrase', 'test'], negatedTerms: [], phrases: ['phrase "
-                      "test'], negatedPhrases: []}"));
+                  fromjson("{terms: ['fun', 'phrase', 'test'], negatedTerms: [], phrases: ['phrase "
+                           "test'], negatedPhrases: []}"));
 }
 
 TEST(FTSQueryImpl, HyphenBetweenTermAndPhraseShouldBeTreatedAsDelimiter) {
@@ -210,9 +208,8 @@ TEST(FTSQueryImpl, HyphenBetweenTermAndPhraseShouldBeTreatedAsDelimiter) {
     q.setDiacriticSensitive(false);
     ASSERT(q.parse(TEXT_INDEX_VERSION_3).isOK());
     ASSERT_EQUALS(q.toBSON(),
-                  fromjson(
-                      "{terms: ['fun', 'phrase', 'test'], negatedTerms: [], phrases: ['phrase "
-                      "test'], negatedPhrases: []}"));
+                  fromjson("{terms: ['fun', 'phrase', 'test'], negatedTerms: [], phrases: ['phrase "
+                           "test'], negatedPhrases: []}"));
 }
 
 TEST(FTSQueryImpl, HyphenShouldNegateAllSucceedingPhrasesSeparatedByHyphens) {
@@ -223,9 +220,8 @@ TEST(FTSQueryImpl, HyphenShouldNegateAllSucceedingPhrasesSeparatedByHyphens) {
     q.setDiacriticSensitive(false);
     ASSERT(q.parse(TEXT_INDEX_VERSION_3).isOK());
     ASSERT_EQUALS(q.toBSON(),
-                  fromjson(
-                      "{terms: ['anoth', 'phrase'], negatedTerms: [], phrases: ['another "
-                      "phrase'], negatedPhrases: ['really fun', 'stuff here']}"));
+                  fromjson("{terms: ['anoth', 'phrase'], negatedTerms: [], phrases: ['another "
+                           "phrase'], negatedPhrases: ['really fun', 'stuff here']}"));
 }
 
 TEST(FTSQueryImpl, CaseSensitiveOption) {
@@ -309,9 +305,8 @@ TEST(FTSQueryImpl, Mix1) {
     q.setDiacriticSensitive(false);
     ASSERT(q.parse(TEXT_INDEX_VERSION_3).isOK());
     ASSERT_EQUALS(q.toBSON(),
-                  fromjson(
-                      "{terms: ['industri'], negatedTerms: ['melbourn', 'physic'], phrases: "
-                      "['industry'], negatedPhrases: []}"));
+                  fromjson("{terms: ['industri'], negatedTerms: ['melbourn', 'physic'], phrases: "
+                           "['industry'], negatedPhrases: []}"));
 }
 
 TEST(FTSQueryImpl, NegPhrase2) {

@@ -30,10 +30,7 @@
         for (var i = 0; i < cmdOut.length; i++) {
             massaged = {};
             Object.extend(massaged, cmdOut[i].obj, /*deep=*/true);
-            massaged.stats = {
-                'dis': cmdOut[i].dis,
-                'loc': cmdOut[i].loc
-            };
+            massaged.stats = {'dis': cmdOut[i].dis, 'loc': cmdOut[i].loc};
 
             if (!friendlyEqual(massaged, aggOut[i])) {
                 allSame = false;  // don't bail yet since we want to print all differences
@@ -87,12 +84,7 @@
 
         // test with defaults
         var queryPoint = pointMaker.mkPt(0.25);  // stick to center of map
-        geoCmd = {
-            geoNear: coll,
-            near: queryPoint,
-            includeLocs: true,
-            spherical: true
-        };
+        geoCmd = {geoNear: coll, near: queryPoint, includeLocs: true, spherical: true};
         aggCmd = {
             $geoNear: {
                 near: queryPoint,

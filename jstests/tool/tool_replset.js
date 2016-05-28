@@ -67,17 +67,8 @@
 
     var x = master.getDB("foo").getCollection("bar").count();
     assert.eq(x, 100, "mongoimport should have successfully imported the collection");
-    var doc = {
-        _id: 5,
-        x: 17
-    };
-    var oplogEntry = {
-        ts: new Timestamp(),
-        "op": "i",
-        "ns": "foo.bar",
-        "o": doc,
-        "v": NumberInt(2)
-    };
+    var doc = {_id: 5, x: 17};
+    var oplogEntry = {ts: new Timestamp(), "op": "i", "ns": "foo.bar", "o": doc, "v": NumberInt(2)};
     assert.writeOK(master.getDB("local").oplog.rs.insert(oplogEntry));
 
     assert.eq(100,

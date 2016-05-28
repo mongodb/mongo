@@ -72,7 +72,8 @@ TEST(ShardType, AllOptionalsPresent) {
 
 TEST(ShardType, MaxSizeAsFloat) {
     BSONObj obj = BSON(ShardType::name("shard0000") << ShardType::host("localhost:27017")
-                                                    << ShardType::maxSizeMB() << 100.0);
+                                                    << ShardType::maxSizeMB()
+                                                    << 100.0);
     StatusWith<ShardType> shardRes = ShardType::fromBSON(obj);
     ASSERT(shardRes.isOK());
     ShardType shard = shardRes.getValue();

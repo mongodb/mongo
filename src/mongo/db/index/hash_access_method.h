@@ -32,8 +32,8 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/hasher.h"  // For HashSeed.
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {

@@ -3,18 +3,9 @@ var t = db.geo_s2holessameasshell;
 t.drop();
 t.ensureIndex({geo: "2dsphere"});
 
-var centerPoint = {
-    "type": "Point",
-    "coordinates": [0.5, 0.5]
-};
-var edgePoint = {
-    "type": "Point",
-    "coordinates": [0, 0.5]
-};
-var cornerPoint = {
-    "type": "Point",
-    "coordinates": [0, 0]
-};
+var centerPoint = {"type": "Point", "coordinates": [0.5, 0.5]};
+var edgePoint = {"type": "Point", "coordinates": [0, 0.5]};
+var cornerPoint = {"type": "Point", "coordinates": [0, 0]};
 
 // Various "edge" cases.  None of them should be returned by the non-polygon
 // polygon below.

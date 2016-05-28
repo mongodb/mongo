@@ -84,9 +84,11 @@ intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(
 Value DocumentSourceMergeCursors::serialize(bool explain) const {
     vector<Value> cursors;
     for (size_t i = 0; i < _cursorDescriptors.size(); i++) {
-        cursors.push_back(Value(
-            DOC("host" << Value(_cursorDescriptors[i].connectionString.toString()) << "ns"
-                       << _cursorDescriptors[i].ns << "id" << _cursorDescriptors[i].cursorId)));
+        cursors.push_back(
+            Value(DOC("host" << Value(_cursorDescriptors[i].connectionString.toString()) << "ns"
+                             << _cursorDescriptors[i].ns
+                             << "id"
+                             << _cursorDescriptors[i].cursorId)));
     }
     return Value(DOC(getSourceName() << Value(cursors)));
 }
@@ -137,7 +139,8 @@ Document DocumentSourceMergeCursors::nextSafeFrom(DBClientCursor* cursor) {
         const int code = next.hasField("code") ? next["code"].numberInt() : 17029;
         uasserted(code,
                   str::stream() << "Received error in response from " << cursor->originalHost()
-                                << ": " << next);
+                                << ": "
+                                << next);
     }
     return Document::fromBsonWithMetaData(next);
 }

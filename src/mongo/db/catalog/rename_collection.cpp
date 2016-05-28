@@ -78,7 +78,8 @@ Status renameCollection(OperationContext* txn,
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::NotMaster,
                       str::stream() << "Not primary while renaming collection " << source.ns()
-                                    << " to " << target.ns());
+                                    << " to "
+                                    << target.ns());
     }
 
     Database* const sourceDB = dbHolder().get(txn, source.db());

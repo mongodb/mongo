@@ -9,9 +9,7 @@ db.results.drop();
 var bulk = coll.initializeUnorderedBulkOp();
 print("Populate the collection with random data");
 for (var i = 0; i < 1e4; i++) {
-    var doc = {
-        "_id": i
-    };
+    var doc = {"_id": i};
 
     for (var j = 0; j < 100; j++) {
         // Skip some of the fields
@@ -89,9 +87,7 @@ for (var i = 0; i < 30; i++) {
 print("Do some sets and unsets");
 bulk = coll.initializeUnorderedBulkOp();
 for (i = 0; i < 1e4; i++) {
-    var criteria = {
-        _id: Random.randInt(1e5)
-    };
+    var criteria = {_id: Random.randInt(1e5)};
     var mod = {};
     if (Random.rand() < .5) {
         mod['$set'] = {};

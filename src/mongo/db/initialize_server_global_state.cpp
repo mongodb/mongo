@@ -38,9 +38,9 @@
 #include <signal.h>
 
 #ifndef _WIN32
-#include <syslog.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <syslog.h>
 #endif
 
 #include "mongo/base/init.h"
@@ -51,8 +51,8 @@
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/auth/security_key.h"
 #include "mongo/db/server_options.h"
-#include "mongo/logger/logger.h"
 #include "mongo/logger/console_appender.h"
+#include "mongo/logger/logger.h"
 #include "mongo/logger/message_event.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/logger/ramlog.h"
@@ -66,8 +66,8 @@
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/processinfo.h"
-#include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/quick_exit.h"
+#include "mongo/util/signal_handlers_synchronous.h"
 
 namespace fs = boost::filesystem;
 
@@ -200,7 +200,8 @@ void forkServerOrDie() {
 
 MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
                           ("GlobalLogManager", "EndStartupOptionHandling", "ForkServer"),
-                          ("default"))(InitializerContext*) {
+                          ("default"))
+(InitializerContext*) {
     using logger::LogManager;
     using logger::MessageEventEphemeral;
     using logger::MessageEventDetailsEncoder;
@@ -230,8 +231,9 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
 #endif  // defined(_WIN32)
     } else if (!serverGlobalParams.logpath.empty()) {
         fassert(16448, !serverGlobalParams.logWithSyslog);
-        std::string absoluteLogpath = boost::filesystem::absolute(serverGlobalParams.logpath,
-                                                                  serverGlobalParams.cwd).string();
+        std::string absoluteLogpath =
+            boost::filesystem::absolute(serverGlobalParams.logpath, serverGlobalParams.cwd)
+                .string();
 
         bool exists;
 
@@ -240,15 +242,16 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
         } catch (boost::filesystem::filesystem_error& e) {
             return Status(ErrorCodes::FileNotOpen,
                           mongoutils::str::stream() << "Failed probe for \"" << absoluteLogpath
-                                                    << "\": " << e.code().message());
+                                                    << "\": "
+                                                    << e.code().message());
         }
 
         if (exists) {
             if (boost::filesystem::is_directory(absoluteLogpath)) {
-                return Status(ErrorCodes::FileNotOpen,
-                              mongoutils::str::stream()
-                                  << "logpath \"" << absoluteLogpath
-                                  << "\" should name a file, not a directory.");
+                return Status(
+                    ErrorCodes::FileNotOpen,
+                    mongoutils::str::stream() << "logpath \"" << absoluteLogpath
+                                              << "\" should name a file, not a directory.");
             }
 
             if (!serverGlobalParams.logAppend && boost::filesystem::is_regular(absoluteLogpath)) {
@@ -260,7 +263,9 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
                     return Status(ErrorCodes::FileRenameFailed,
                                   mongoutils::str::stream()
                                       << "Could not rename preexisting log file \""
-                                      << absoluteLogpath << "\" to \"" << renameTarget
+                                      << absoluteLogpath
+                                      << "\" to \""
+                                      << renameTarget
                                       << "\"; run with --logappend or manually remove file: "
                                       << errnoWithDescription());
                 }
@@ -362,7 +367,9 @@ bool initializeServerGlobalState() {
         clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendX509) {
         setInternalUserAuthParams(
             BSON(saslCommandMechanismFieldName
-                 << "MONGODB-X509" << saslCommandUserDBFieldName << "$external"
+                 << "MONGODB-X509"
+                 << saslCommandUserDBFieldName
+                 << "$external"
                  << saslCommandUserFieldName
                  << getSSLManager()->getSSLConfiguration().clientSubjectName));
     }

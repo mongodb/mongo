@@ -106,15 +106,9 @@ coll.drop();
 // Test compatibility of various GeoJSON objects with both 2dsphere index versions.
 //
 
-var pointDoc = {
-    geo: {type: "Point", coordinates: [40, 5]}
-};
-var lineStringDoc = {
-    geo: {type: "LineString", coordinates: [[40, 5], [41, 6]]}
-};
-var polygonDoc = {
-    geo: {type: "Polygon", coordinates: [[[0, 0], [3, 6], [6, 1], [0, 0]]]}
-};
+var pointDoc = {geo: {type: "Point", coordinates: [40, 5]}};
+var lineStringDoc = {geo: {type: "LineString", coordinates: [[40, 5], [41, 6]]}};
+var polygonDoc = {geo: {type: "Polygon", coordinates: [[[0, 0], [3, 6], [6, 1], [0, 0]]]}};
 var multiPointDoc = {
     geo: {
         type: "MultiPoint",
@@ -144,12 +138,7 @@ var multiPolygonDoc = {
                [-73.9814, 40.7681],
                [-73.958, 40.8003]
             ]],
-            [[
-               [-73.958, 40.8003],
-               [-73.9498, 40.7968],
-               [-73.9737, 40.7648],
-               [-73.958, 40.8003]
-            ]]
+            [[[-73.958, 40.8003], [-73.9498, 40.7968], [-73.9737, 40.7648], [-73.958, 40.8003]]]
         ]
     }
 };

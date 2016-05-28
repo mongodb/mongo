@@ -10,12 +10,12 @@ function test(data, popExpected, sampExpected) {
         assert.writeOK(t.insert({num: data[i]}));
 
     var res = t.aggregate({
-        $group: {
-            _id: 1,
-            pop: {$stdDevPop: '$num'},
-            samp: {$stdDevSamp: '$num'},
-        }
-    }).next();
+                   $group: {
+                       _id: 1,
+                       pop: {$stdDevPop: '$num'},
+                       samp: {$stdDevSamp: '$num'},
+                   }
+               }).next();
 
     if (popExpected === null) {
         assert.isnull(res.pop);

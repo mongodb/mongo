@@ -3,9 +3,7 @@
  * can be found in dbtests/replica_set_monitor_test.cpp.
  */
 
-var PRI_TAG = {
-    dc: 'ny'
-};
+var PRI_TAG = {dc: 'ny'};
 var SEC_TAGS = [{dc: 'sf', s: "1"}, {dc: 'ma', s: "2"}, {dc: 'eu', s: "3"}, {dc: 'jp', s: "4"}];
 var NODES = SEC_TAGS.length + 1;
 
@@ -95,9 +93,7 @@ var doTest = function(useDollarQuerySyntax) {
 
     var getExplain = function(readPrefMode, readPrefTags) {
         if (useDollarQuerySyntax) {
-            var readPrefObj = {
-                mode: readPrefMode
-            };
+            var readPrefObj = {mode: readPrefMode};
 
             if (readPrefTags) {
                 readPrefObj.tags = readPrefTags;

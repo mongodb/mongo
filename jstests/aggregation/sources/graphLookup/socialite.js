@@ -30,18 +30,20 @@
     // Find the social network of "Darren", that is, people Darren follows, and people who are
     // followed by someone Darren follows, etc.
 
-    var res = users.aggregate({$match: {fullname: "Darren"}},
-                              {
-                                $graphLookup: {
-                                    from: "followers",
-                                    startWith: "$_id",
-                                    connectFromField: "_t",
-                                    connectToField: "_f",
-                                    as: "network"
-                                }
-                              },
-                              {$unwind: "$network"},
-                              {$project: {_id: "$network._t"}}).toArray();
+    var res = users
+                  .aggregate({$match: {fullname: "Darren"}},
+                             {
+                               $graphLookup: {
+                                   from: "followers",
+                                   startWith: "$_id",
+                                   connectFromField: "_t",
+                                   connectToField: "_f",
+                                   as: "network"
+                               }
+                             },
+                             {$unwind: "$network"},
+                             {$project: {_id: "$network._t"}})
+                  .toArray();
 
     // "djw" is followed, directly or indirectly, by "jsr" and "bmw".
     assert.eq(res.length, 2);

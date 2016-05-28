@@ -82,9 +82,7 @@
                 });
             },
             reduce: function(key, values) {
-                return {
-                    count: values.length
-                };
+                return {count: values.length};
             },
             out: "foo"
         },
@@ -103,10 +101,7 @@
     });
 
     function testValidWriteConcern(cmd) {
-        cmd.req.writeConcern = {
-            w: 1,
-            j: true
-        };
+        cmd.req.writeConcern = {w: 1, j: true};
         jsTest.log("Testing " + tojson(cmd.req));
 
         coll.drop();

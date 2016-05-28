@@ -35,15 +35,9 @@ var $config = (function() {
         var push = Random.rand() > 0.2;
 
         var updateDoc = {};
-        updateDoc[set ? '$set' : '$unset'] = {
-            x: x
-        };
-        updateDoc[push ? '$push' : '$pull'] = {
-            y: y
-        };
-        updateDoc.$inc = {
-            z: z
-        };
+        updateDoc[set ? '$set' : '$unset'] = {x: x};
+        updateDoc[push ? '$push' : '$pull'] = {y: y};
+        updateDoc.$inc = {z: z};
 
         return updateDoc;
     }
@@ -61,9 +55,7 @@ var $config = (function() {
         }
     };
 
-    var transitions = {
-        update: {update: 1}
-    };
+    var transitions = {update: {update: 1}};
 
     function setup(db, collName, cluster) {
         assertAlways.commandWorked(db[collName].ensureIndex({x: 1}));

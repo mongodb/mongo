@@ -35,8 +35,8 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/matcher/matchable.h"
 #include "mongo/db/matcher/match_details.h"
+#include "mongo/db/matcher/matchable.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {

@@ -3,10 +3,7 @@
  */
 var doTest = function() {
 
-    var rsOpts = {
-        oplogSize: 10,
-        useHostname: false
-    };
+    var rsOpts = {oplogSize: 10, useHostname: false};
     var st = new ShardingTest({
         keyFile: 'jstests/libs/key1',
         shards: 2,
@@ -132,12 +129,10 @@ var doTest = function() {
             assert.eq(100, res.results.length);
             assert.eq(45, res.results[0].value);
 
-            res = checkCommandSucceeded(
-                testDB,
-                {
-                  aggregate: 'foo',
-                  pipeline: [{$project: {j: 1}}, {$group: {_id: 'j', sum: {$sum: '$j'}}}]
-                });
+            res = checkCommandSucceeded(testDB, {
+                aggregate: 'foo',
+                pipeline: [{$project: {j: 1}}, {$group: {_id: 'j', sum: {$sum: '$j'}}}]
+            });
             assert.eq(4500, res.result[0].sum);
         } else {
             print("Checking read operations, should fail");
@@ -148,12 +143,10 @@ var doTest = function() {
             checkCommandFailed(testDB, {collstats: 'foo'});
             checkCommandFailed(testDB,
                                {mapreduce: 'foo', map: map, reduce: reduce, out: {inline: 1}});
-            checkCommandFailed(
-                testDB,
-                {
-                  aggregate: 'foo',
-                  pipeline: [{$project: {j: 1}}, {$group: {_id: 'j', sum: {$sum: '$j'}}}]
-                });
+            checkCommandFailed(testDB, {
+                aggregate: 'foo',
+                pipeline: [{$project: {j: 1}}, {$group: {_id: 'j', sum: {$sum: '$j'}}}]
+            });
         }
     };
 
@@ -233,10 +226,7 @@ var doTest = function() {
             checkCommandSucceeded(adminDB, {isdbgrid: 1});
             checkCommandSucceeded(adminDB, {ismaster: 1});
             checkCommandFailed(adminDB, {split: 'test.foo', find: {i: 1, j: 1}});
-            chunkKey = {
-                i: {$minKey: 1},
-                j: {$minKey: 1}
-            };
+            chunkKey = {i: {$minKey: 1}, j: {$minKey: 1}};
             checkCommandFailed(
                 adminDB,
                 {moveChunk: 'test.foo', find: chunkKey, to: st.rs1.name, _waitForDelete: true});

@@ -194,7 +194,8 @@ StatusWith<BSONObj> FTDCFileReader::readDocument() {
     if (readSize != _stream.gcount()) {
         return {ErrorCodes::FileStreamFailed,
                 str::stream() << "Failed to read " << readSize << " bytes from file \'"
-                              << _file.generic_string() << "\'"};
+                              << _file.generic_string()
+                              << "\'"};
     }
 
     ConstDataRange cdr(_buffer.data(), _buffer.data() + bsonLength);

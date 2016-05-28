@@ -33,8 +33,8 @@
     assert.eq('world', res.hello);
 
     // Test authenticate through new mongos.
-    var otherMongos = MongoRunner.runMongos(
-        {keyFile: "jstests/libs/key1", configdb: st.s.savedOptions.configdb});
+    var otherMongos =
+        MongoRunner.runMongos({keyFile: "jstests/libs/key1", configdb: st.s.savedOptions.configdb});
 
     assert.commandFailedWithCode(otherMongos.getDB('test').runCommand({find: 'user'}),
                                  ErrorCodes.Unauthorized);

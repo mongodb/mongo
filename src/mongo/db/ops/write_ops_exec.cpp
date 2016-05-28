@@ -209,8 +209,8 @@ bool handleError(OperationContext* txn,
                                    << demangleName(typeid(ex)));
         }
 
-        ShardingState::get(txn)
-            ->onStaleShardVersion(txn, wholeOp.ns, staleConfigException->getVersionReceived());
+        ShardingState::get(txn)->onStaleShardVersion(
+            txn, wholeOp.ns, staleConfigException->getVersionReceived());
         out->staleConfigException =
             stdx::make_unique<SendStaleConfigException>(*staleConfigException);
         return false;
@@ -230,7 +230,8 @@ static WriteResult::SingleResult createIndex(OperationContext* txn,
     uassert(ErrorCodes::TypeMismatch,
             str::stream() << "Expected \"ns\" field of index description to be a "
                              "string, "
-                             "but found a " << typeName(nsElement.type()),
+                             "but found a "
+                          << typeName(nsElement.type()),
             nsElement.type() == String);
     const NamespaceString ns(nsElement.valueStringData());
     uassert(ErrorCodes::InvalidOptions,

@@ -31,8 +31,8 @@
 #include <memory>
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/stage_types.h"
 

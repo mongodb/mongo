@@ -30,19 +30,19 @@
 
 #include "mongo/s/catalog/replset/replset_dist_lock_manager.h"
 
+#include <boost/optional.hpp>
+#include <boost/optional/optional_io.hpp>
 #include <map>
 #include <string>
 #include <type_traits>
 #include <vector>
-#include <boost/optional.hpp>
-#include <boost/optional/optional_io.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/service_context_noop.h"
@@ -364,9 +364,11 @@ TEST_F(RSDistLockMgrWithMockTickSource, LockSuccessAfterRetry) {
 
                         getMockCatalog()->expectNoGrabLock();
 
-                        getMockCatalog()->expectGetLockByName([](StringData name) {
-                            FAIL("should not attempt to overtake lock after successful lock");
-                        }, LocksType());
+                        getMockCatalog()->expectGetLockByName(
+                            [](StringData name) {
+                                FAIL("should not attempt to overtake lock after successful lock");
+                            },
+                            LocksType());
                     },
                     goodLockDoc);
             }
@@ -828,10 +830,12 @@ TEST_F(ReplSetDistLockManagerFixture, MultipleQueuedUnlock) {
      * Returns true if all values in the map are greater than 2.
      */
     auto mapEntriesGreaterThanTwo = [](const decltype(unlockIDMap)& map) -> bool {
-        auto iter = find_if(map.begin(),
-                            map.end(),
-                            [](const std::remove_reference<decltype(map)>::type::value_type& entry)
-                                -> bool { return entry.second < 3; });
+        auto iter = find_if(
+            map.begin(),
+            map.end(),
+            [](const std::remove_reference<decltype(map)>::type::value_type& entry) -> bool {
+                return entry.second < 3;
+            });
 
         return iter == map.end();
     };
@@ -844,10 +848,12 @@ TEST_F(ReplSetDistLockManagerFixture, MultipleQueuedUnlock) {
 
             // Wait until we see at least 2 unique lockSessionID more than twice.
             if (unlockIDMap.size() >= 2 && mapEntriesGreaterThanTwo(unlockIDMap)) {
-                getMockCatalog()->expectUnLock([&testMutex, &unlockCV](const OID& lockSessionID) {
-                    stdx::unique_lock<stdx::mutex> lk(testMutex);
-                    unlockCV.notify_all();
-                }, Status::OK());
+                getMockCatalog()->expectUnLock(
+                    [&testMutex, &unlockCV](const OID& lockSessionID) {
+                        stdx::unique_lock<stdx::mutex> lk(testMutex);
+                        unlockCV.notify_all();
+                    },
+                    Status::OK());
             }
         },
         {ErrorCodes::NetworkTimeout, "bad test network"});
@@ -910,10 +916,12 @@ TEST_F(ReplSetDistLockManagerFixture, MultipleQueuedUnlock) {
 
 TEST_F(ReplSetDistLockManagerFixture, CleanupPingOnShutdown) {
     bool stopPingCalled = false;
-    getMockCatalog()->expectStopPing([this, &stopPingCalled](StringData processID) {
-        ASSERT_EQUALS(getProcessID(), processID);
-        stopPingCalled = true;
-    }, Status::OK());
+    getMockCatalog()->expectStopPing(
+        [this, &stopPingCalled](StringData processID) {
+            ASSERT_EQUALS(getProcessID(), processID);
+            stopPingCalled = true;
+        },
+        Status::OK());
 
     getMgr()->shutDown(txn());
     ASSERT_TRUE(stopPingCalled);
@@ -989,9 +997,9 @@ TEST_F(ReplSetDistLockManagerFixture, CheckLockStatusNoLongerOwn) {
     auto& scopedLock = lockStatus.getValue();
 
     getMockCatalog()->expectNoGrabLock();
-    getMockCatalog()->expectGetLockByTS([&lockSessionID](const OID& ts) {
-        ASSERT_EQUALS(lockSessionID, ts);
-    }, {ErrorCodes::LockNotFound, "no lock"});
+    getMockCatalog()->expectGetLockByTS(
+        [&lockSessionID](const OID& ts) { ASSERT_EQUALS(lockSessionID, ts); },
+        {ErrorCodes::LockNotFound, "no lock"});
 
     ASSERT_NOT_OK(scopedLock.checkStatus());
 }
@@ -1028,9 +1036,9 @@ TEST_F(ReplSetDistLockManagerFixture, CheckLockStatusError) {
     auto& scopedLock = lockStatus.getValue();
 
     getMockCatalog()->expectNoGrabLock();
-    getMockCatalog()->expectGetLockByTS([&lockSessionID](const OID& ts) {
-        ASSERT_EQUALS(lockSessionID, ts);
-    }, {ErrorCodes::NetworkTimeout, "bad test network"});
+    getMockCatalog()->expectGetLockByTS(
+        [&lockSessionID](const OID& ts) { ASSERT_EQUALS(lockSessionID, ts); },
+        {ErrorCodes::NetworkTimeout, "bad test network"});
 
     ASSERT_NOT_OK(scopedLock.checkStatus());
 }
@@ -1264,9 +1272,9 @@ TEST_F(ReplSetDistLockManagerFixture, GetPingErrorWhileOvertaking) {
     getMockCatalog()->expectGetLockByName([](StringData name) { ASSERT_EQUALS("bar", name); },
                                           currentLockDoc);
 
-    getMockCatalog()->expectGetPing([](StringData process) {
-        ASSERT_EQUALS("otherProcess", process);
-    }, {ErrorCodes::NetworkTimeout, "bad test network"});
+    getMockCatalog()->expectGetPing(
+        [](StringData process) { ASSERT_EQUALS("otherProcess", process); },
+        {ErrorCodes::NetworkTimeout, "bad test network"});
 
     auto status = getMgr()->lock(txn(), "bar", "", Milliseconds(0), Milliseconds(0)).getStatus();
     ASSERT_NOT_OK(status);
@@ -1406,9 +1414,9 @@ TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfPingIsActive) {
         getMockCatalog()->expectGetPing(
             [](StringData process) { ASSERT_EQUALS("otherProcess", process); }, pingDoc);
 
-        getMockCatalog()->expectGetServerInfo([&getServerInfoCallCount]() {
-            getServerInfoCallCount++;
-        }, DistLockCatalog::ServerInfo(configServerLocalTime, OID()));
+        getMockCatalog()->expectGetServerInfo(
+            [&getServerInfoCallCount]() { getServerInfoCallCount++; },
+            DistLockCatalog::ServerInfo(configServerLocalTime, OID()));
 
         auto status =
             getMgr()->lock(txn(), "bar", "", Milliseconds(0), Milliseconds(0)).getStatus();
@@ -1419,9 +1427,9 @@ TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfPingIsActive) {
     ASSERT_EQUALS(kLoopCount, getServerInfoCallCount);
 
     configServerLocalTime += kLockExpiration;
-    getMockCatalog()->expectGetServerInfo([&getServerInfoCallCount]() {
-        getServerInfoCallCount++;
-    }, DistLockCatalog::ServerInfo(configServerLocalTime, OID()));
+    getMockCatalog()->expectGetServerInfo(
+        [&getServerInfoCallCount]() { getServerInfoCallCount++; },
+        DistLockCatalog::ServerInfo(configServerLocalTime, OID()));
 
     OID lockTS;
     // Make sure that overtake is now ok since ping is no longer updated.
@@ -1505,9 +1513,9 @@ TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfOwnerJustChanged) {
         getMockCatalog()->expectGetLockByName([](StringData name) { ASSERT_EQUALS("bar", name); },
                                               currentLockDoc);
 
-        getMockCatalog()->expectGetServerInfo([&getServerInfoCallCount]() {
-            getServerInfoCallCount++;
-        }, DistLockCatalog::ServerInfo(configServerLocalTime, OID()));
+        getMockCatalog()->expectGetServerInfo(
+            [&getServerInfoCallCount]() { getServerInfoCallCount++; },
+            DistLockCatalog::ServerInfo(configServerLocalTime, OID()));
 
         auto status =
             getMgr()->lock(txn(), "bar", "", Milliseconds(0), Milliseconds(0)).getStatus();
@@ -1518,9 +1526,9 @@ TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfOwnerJustChanged) {
     ASSERT_EQUALS(kLoopCount, getServerInfoCallCount);
 
     configServerLocalTime += kLockExpiration;
-    getMockCatalog()->expectGetServerInfo([&getServerInfoCallCount]() {
-        getServerInfoCallCount++;
-    }, DistLockCatalog::ServerInfo(configServerLocalTime, OID()));
+    getMockCatalog()->expectGetServerInfo(
+        [&getServerInfoCallCount]() { getServerInfoCallCount++; },
+        DistLockCatalog::ServerInfo(configServerLocalTime, OID()));
 
     OID lockTS;
     // Make sure that overtake is now ok since lock owner didn't change.
@@ -1607,9 +1615,9 @@ TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfElectionIdChanged) {
             [](StringData process) { ASSERT_EQUALS("otherProcess", process); }, fixedPingDoc);
 
         lastElectionId = OID::gen();
-        getMockCatalog()->expectGetServerInfo([&getServerInfoCallCount]() {
-            getServerInfoCallCount++;
-        }, DistLockCatalog::ServerInfo(configServerLocalTime, lastElectionId));
+        getMockCatalog()->expectGetServerInfo(
+            [&getServerInfoCallCount]() { getServerInfoCallCount++; },
+            DistLockCatalog::ServerInfo(configServerLocalTime, lastElectionId));
 
         auto status =
             getMgr()->lock(txn(), "bar", "", Milliseconds(0), Milliseconds(0)).getStatus();
@@ -1620,9 +1628,9 @@ TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfElectionIdChanged) {
     ASSERT_EQUALS(kLoopCount, getServerInfoCallCount);
 
     configServerLocalTime += kLockExpiration;
-    getMockCatalog()->expectGetServerInfo([&getServerInfoCallCount]() {
-        getServerInfoCallCount++;
-    }, DistLockCatalog::ServerInfo(configServerLocalTime, lastElectionId));
+    getMockCatalog()->expectGetServerInfo(
+        [&getServerInfoCallCount]() { getServerInfoCallCount++; },
+        DistLockCatalog::ServerInfo(configServerLocalTime, lastElectionId));
 
     OID lockTS;
     // Make sure that overtake is now ok since electionId didn't change.
@@ -1893,8 +1901,9 @@ TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfConfigServerClockGoesBackw
     }
 
     // Make config server time go backwards by lock expiration duration.
-    getMockCatalog()->expectGetServerInfo([]() {
-    }, DistLockCatalog::ServerInfo(configClock - kLockExpiration - Milliseconds(1), OID()));
+    getMockCatalog()->expectGetServerInfo(
+        []() {},
+        DistLockCatalog::ServerInfo(configClock - kLockExpiration - Milliseconds(1), OID()));
 
     // Second attempt should not overtake lock.
     {
@@ -1970,9 +1979,9 @@ TEST_F(RSDistLockMgrWithMockTickSource, CanOvertakeIfNoPingDocument) {
     getMockCatalog()->expectGetLockByName([](StringData name) { ASSERT_EQUALS("bar", name); },
                                           currentLockDoc);
 
-    getMockCatalog()->expectGetPing([](StringData process) {
-        ASSERT_EQUALS("otherProcess", process);
-    }, {ErrorCodes::NoMatchingDocument, "no ping"});
+    getMockCatalog()->expectGetPing(
+        [](StringData process) { ASSERT_EQUALS("otherProcess", process); },
+        {ErrorCodes::NoMatchingDocument, "no ping"});
 
     getMockCatalog()->expectGetServerInfo([]() {}, DistLockCatalog::ServerInfo(Date_t(), OID()));
 
@@ -1994,9 +2003,9 @@ TEST_F(RSDistLockMgrWithMockTickSource, CanOvertakeIfNoPingDocument) {
     getMockCatalog()->expectGetLockByName([](StringData name) { ASSERT_EQUALS("bar", name); },
                                           currentLockDoc);
 
-    getMockCatalog()->expectGetPing([](StringData process) {
-        ASSERT_EQUALS("otherProcess", process);
-    }, {ErrorCodes::NoMatchingDocument, "no ping"});
+    getMockCatalog()->expectGetPing(
+        [](StringData process) { ASSERT_EQUALS("otherProcess", process); },
+        {ErrorCodes::NoMatchingDocument, "no ping"});
 
     getMockCatalog()->expectGetServerInfo(
         []() {}, DistLockCatalog::ServerInfo(Date_t() + kLockExpiration + Milliseconds(1), OID()));

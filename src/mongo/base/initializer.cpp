@@ -27,10 +27,10 @@
 
 #include "mongo/base/initializer.h"
 
-#include <iostream>
+#include "mongo/base/global_initializer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/quick_exit.h"
-#include "mongo/base/global_initializer.h"
+#include <iostream>
 
 namespace mongo {
 

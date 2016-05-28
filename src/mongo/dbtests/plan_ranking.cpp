@@ -230,11 +230,11 @@ public:
         // both the {a:1} and {b:1} indices even though it performs poorly.
 
         soln = pickBestPlan(cq.get());
-        ASSERT(QueryPlannerTestLib::solutionMatches(
-            "{fetch: {node: {andSorted: {nodes: ["
-            "{ixscan: {filter: null, pattern: {a:1}}},"
-            "{ixscan: {filter: null, pattern: {b:1}}}]}}}}",
-            soln->root.get()));
+        ASSERT(
+            QueryPlannerTestLib::solutionMatches("{fetch: {node: {andSorted: {nodes: ["
+                                                 "{ixscan: {filter: null, pattern: {a:1}}},"
+                                                 "{ixscan: {filter: null, pattern: {b:1}}}]}}}}",
+                                                 soln->root.get()));
     }
 };
 
@@ -267,11 +267,11 @@ public:
         internalQueryForceIntersectionPlans = true;
 
         QuerySolution* soln = pickBestPlan(cq.get());
-        ASSERT(QueryPlannerTestLib::solutionMatches(
-            "{fetch: {node: {andHash: {nodes: ["
-            "{ixscan: {filter: null, pattern: {a:1}}},"
-            "{ixscan: {filter: null, pattern: {b:1}}}]}}}}",
-            soln->root.get()));
+        ASSERT(
+            QueryPlannerTestLib::solutionMatches("{fetch: {node: {andHash: {nodes: ["
+                                                 "{ixscan: {filter: null, pattern: {a:1}}},"
+                                                 "{ixscan: {filter: null, pattern: {b:1}}}]}}}}",
+                                                 soln->root.get()));
 
         // Confirm that a backup plan is available.
         ASSERT(hasBackupPlan());
@@ -550,10 +550,10 @@ public:
         // so we expect to choose {d: 1, e: 1}, as it allows us
         // to avoid the sort stage.
         QuerySolution* soln = pickBestPlan(cq.get());
-        ASSERT(QueryPlannerTestLib::solutionMatches(
-            "{fetch: {filter: {a:1}, node: "
-            "{ixscan: {filter: null, pattern: {d:1,e:1}}}}}",
-            soln->root.get()));
+        ASSERT(
+            QueryPlannerTestLib::solutionMatches("{fetch: {filter: {a:1}, node: "
+                                                 "{ixscan: {filter: null, pattern: {d:1,e:1}}}}}",
+                                                 soln->root.get()));
     }
 };
 

@@ -40,8 +40,8 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_manager_external_state_d.h"
-#include "mongo/db/client.h"
 #include "mongo/db/catalog/cursor_manager.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -370,8 +370,8 @@ void receivedQuery(OperationContext* txn,
         // If we got a stale config, wait in case the operation is stuck in a critical section
         if (e.getCode() == ErrorCodes::SendStaleConfig) {
             auto& sce = static_cast<const StaleConfigException&>(e);
-            ShardingState::get(txn)
-                ->onStaleShardVersion(txn, NamespaceString(sce.getns()), sce.getVersionReceived());
+            ShardingState::get(txn)->onStaleShardVersion(
+                txn, NamespaceString(sce.getns()), sce.getVersionReceived());
         }
 
         dbResponse.response.reset();
@@ -651,9 +651,12 @@ void assembleResponse(OperationContext* txn,
                     const ShardedConnectionInfo* connInfo = ShardedConnectionInfo::get(&c, false);
                     uassert(18663,
                             str::stream() << "legacy writeOps not longer supported for "
-                                          << "versioned connections, ns: " << nsString.ns()
-                                          << ", op: " << networkOpToString(op)
-                                          << ", remote: " << remote.toString(),
+                                          << "versioned connections, ns: "
+                                          << nsString.ns()
+                                          << ", op: "
+                                          << networkOpToString(op)
+                                          << ", remote: "
+                                          << remote.toString(),
                             connInfo == NULL);
                 }
 

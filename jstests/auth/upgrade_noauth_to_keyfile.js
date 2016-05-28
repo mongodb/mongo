@@ -12,17 +12,11 @@ load('jstests/multiVersion/libs/multi_rs.js');
     var keyFilePath = 'jstests/libs/key1';
 
     // Disable auth explicitly
-    var noAuthOptions = {
-        noauth: ''
-    };
+    var noAuthOptions = {noauth: ''};
 
     // Undefine the flags we're replacing, otherwise upgradeSet will keep old values.
-    var transitionToAuthOptions = {
-        noauth: undefined,
-        clusterAuthMode: 'keyFile',
-        keyFile: keyFilePath,
-        transitionToAuth: ''
-    };
+    var transitionToAuthOptions =
+        {noauth: undefined, clusterAuthMode: 'keyFile', keyFile: keyFilePath, transitionToAuth: ''};
     var keyFileOptions = {
         clusterAuthMode: 'keyFile',
         keyFile: keyFilePath,

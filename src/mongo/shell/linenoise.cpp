@@ -86,8 +86,8 @@
 #ifdef _WIN32
 
 #include <conio.h>
-#include <windows.h>
 #include <io.h>
+#include <windows.h>
 #define strcasecmp _stricmp
 #define strdup _strdup
 #define isatty _isatty
@@ -96,24 +96,24 @@
 
 #else /* _WIN32 */
 
+#include <cctype>
 #include <signal.h>
-#include <termios.h>
-#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
 #include <sys/ioctl.h>
-#include <cctype>
+#include <sys/types.h>
+#include <termios.h>
+#include <unistd.h>
 #include <wctype.h>
 
 #endif /* _WIN32 */
 
-#include <stdio.h>
-#include <errno.h>
-#include <fcntl.h>
 #include "linenoise.h"
 #include "linenoise_utf8.h"
 #include "mk_wcwidth.h"
+#include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
 #include <string>
 #include <vector>
 

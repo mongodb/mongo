@@ -10,10 +10,7 @@
     MockMongo.prototype = Mongo.prototype;
     MockMongo.prototype.runCommand = function(db, cmd, opts) {
         commandsRan.push({db: db, cmd: cmd, opts: opts});
-        return {
-            ok: 1,
-            n: 100
-        };
+        return {ok: 1, n: 100};
     };
     var db = new DB(new MockMongo(), "test");
 

@@ -29,25 +29,25 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
 
-#include <malloc.h>
 #include <iostream>
+#include <malloc.h>
 #include <sched.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <sys/mman.h>
 #include <sys/utsname.h>
+#include <unistd.h>
 #ifdef __UCLIBC__
 #include <features.h>
 #else
 #include <gnu/libc-version.h>
 #endif
 
-#include "processinfo.h"
 #include "boost/filesystem.hpp"
+#include "mongo/util/log.h"
+#include "processinfo.h"
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
 #include <mongo/util/file.h>
-#include "mongo/util/log.h"
 
 using namespace std;
 

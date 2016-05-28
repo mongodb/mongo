@@ -110,10 +110,7 @@ var $config = (function() {
 
     })();
 
-    var transitions = {
-        push: {push: 0.8, pull: 0.2},
-        pull: {push: 0.8, pull: 0.2}
-    };
+    var transitions = {push: {push: 0.8, pull: 0.2}, pull: {push: 0.8, pull: 0.2}};
 
     function setup(db, collName, cluster) {
         // index on 'arr', the field being updated

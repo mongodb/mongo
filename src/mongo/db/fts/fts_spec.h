@@ -31,8 +31,8 @@
 #pragma once
 
 #include <map>
-#include <vector>
 #include <string>
+#include <vector>
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/fts/fts_language.h"

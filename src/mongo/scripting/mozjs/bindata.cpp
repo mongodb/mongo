@@ -30,8 +30,8 @@
 
 #include "mongo/scripting/mozjs/bindata.h"
 
-#include <iomanip>
 #include <cctype>
+#include <iomanip>
 
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/internedstring.h"

@@ -25,9 +25,7 @@ assert.eq(8, t.findOne({_id: 2}).z, "C2");
 assert.eq(8, t.findOne({_id: 3}).z, "C3");
 
 // explain output should show that the ID hack was applied.
-var query = {
-    _id: {x: 2}
-};
+var query = {_id: {x: 2}};
 var explain = t.find(query).explain(true);
 print("explain for " + tojson(query, "", true) + " = " + tojson(explain));
 assert.eq(1, explain.executionStats.nReturned, "D1");
@@ -67,11 +65,10 @@ assert.eq({_id: 0, a: 0}, t.find({_id: 0}, {_id: 1, a: 1}).next());
 
 // Non-simple: exclusion.
 assert.eq({_id: 1, a: 1}, t.find({_id: 1}, {b: 0}).next());
-assert.eq(
-    {
-      _id: 0,
-    },
-    t.find({_id: 0}, {a: 0, b: 0}).next());
+assert.eq({
+    _id: 0,
+},
+          t.find({_id: 0}, {a: 0, b: 0}).next());
 
 // Non-simple: dotted fields.
 assert.eq({b: [{c: 1}, {c: 2}]}, t.find({_id: 0}, {_id: 0, "b.c": 1}).next());

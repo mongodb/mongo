@@ -394,10 +394,14 @@ class ExpressionRangedArity : public ExpressionNaryBase<SubClass> {
 public:
     void validateArguments(const Expression::ExpressionVector& args) const override {
         uassert(28667,
-                mongoutils::str::stream()
-                    << "Expression " << this->getOpName() << " takes at least " << MinArgs
-                    << " arguments, and at most " << MaxArgs << ", but " << args.size()
-                    << " were passed in.",
+                mongoutils::str::stream() << "Expression " << this->getOpName()
+                                          << " takes at least "
+                                          << MinArgs
+                                          << " arguments, and at most "
+                                          << MaxArgs
+                                          << ", but "
+                                          << args.size()
+                                          << " were passed in.",
                 MinArgs <= args.size() && args.size() <= MaxArgs);
     }
 };
@@ -409,7 +413,9 @@ public:
     void validateArguments(const Expression::ExpressionVector& args) const override {
         uassert(16020,
                 mongoutils::str::stream() << "Expression " << this->getOpName() << " takes exactly "
-                                          << NArgs << " arguments. " << args.size()
+                                          << NArgs
+                                          << " arguments. "
+                                          << args.size()
                                           << " were passed in.",
                 args.size() == NArgs);
     }

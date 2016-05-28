@@ -32,8 +32,8 @@
 
 #include "mongo/db/auth/security_key.h"
 
-#include <sys/stat.h>
 #include <string>
+#include <sys/stat.h>
 
 #include "mongo/base/status_with.h"
 #include "mongo/util/mongoutils/str.h"
@@ -92,9 +92,9 @@ StatusWith<std::string> readSecurityFile(const std::string& filename) {
         if ((buf < 'A' || buf > 'Z') && (buf < 'a' || buf > 'z') && (buf < '0' || buf > '9') &&
             buf != '+' && buf != '/' && buf != '=') {
             fclose(file);
-            return StatusWith<std::string>(ErrorCodes::UnsupportedFormat,
-                                           str::stream() << "invalid char in key file " << filename
-                                                         << ": " << buf);
+            return StatusWith<std::string>(
+                ErrorCodes::UnsupportedFormat,
+                str::stream() << "invalid char in key file " << filename << ": " << buf);
         }
 
         str += buf;

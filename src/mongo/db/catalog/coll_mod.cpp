@@ -105,9 +105,9 @@ Status collMod(OperationContext* txn,
             const IndexDescriptor* idx =
                 coll->getIndexCatalog()->findIndexByKeyPattern(txn, keyPattern);
             if (idx == NULL) {
-                errorStatus = Status(ErrorCodes::InvalidOptions,
-                                     str::stream() << "cannot find index " << keyPattern
-                                                   << " for ns " << nss.ns());
+                errorStatus = Status(
+                    ErrorCodes::InvalidOptions,
+                    str::stream() << "cannot find index " << keyPattern << " for ns " << nss.ns());
                 continue;
             }
             BSONElement oldExpireSecs = idx->infoObj().getField("expireAfterSeconds");

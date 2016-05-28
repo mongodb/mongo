@@ -80,11 +80,7 @@ var $config = (function() {
             }
         }
 
-        return {
-            dropColl: dropColl,
-            dropDB: dropDB,
-            mapReduce: mapReduce
-        };
+        return {dropColl: dropColl, dropDB: dropDB, mapReduce: mapReduce};
 
     })();
 

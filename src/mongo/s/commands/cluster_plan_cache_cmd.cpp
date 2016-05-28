@@ -26,15 +26,15 @@
  *    it in the license file.
  */
 
-#include "mongo/base/init.h"
 #include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/commands.h"
+#include "mongo/s/commands/strategy.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
-#include "mongo/s/commands/strategy.h"
 
 namespace mongo {
 

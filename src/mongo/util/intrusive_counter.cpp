@@ -39,7 +39,8 @@ using namespace mongoutils;
 intrusive_ptr<const RCString> RCString::create(StringData s) {
     uassert(16493,
             str::stream() << "Tried to create string longer than "
-                          << (BSONObjMaxUserSize / 1024 / 1024) << "MB",
+                          << (BSONObjMaxUserSize / 1024 / 1024)
+                          << "MB",
             s.size() < static_cast<size_t>(BSONObjMaxUserSize));
 
     const size_t sizeWithNUL = s.size() + 1;

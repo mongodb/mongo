@@ -65,8 +65,9 @@ TEST(AddShardRequest, ParseInternalFieldsInvalidConnectionString) {
 
 TEST(AddShardRequest, ParseInternalFieldsMissingMaxSize) {
     {
-        BSONObj obj = BSON(AddShardRequest::mongosAddShard
-                           << kConnString << AddShardRequest::shardName << kShardName);
+        BSONObj obj =
+            BSON(AddShardRequest::mongosAddShard << kConnString << AddShardRequest::shardName
+                                                 << kShardName);
 
         auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(obj);
         ASSERT_OK(swAddShardRequest.getStatus());
@@ -79,8 +80,9 @@ TEST(AddShardRequest, ParseInternalFieldsMissingMaxSize) {
     }
 
     {
-        BSONObj obj = BSON(AddShardRequest::configsvrAddShard
-                           << kConnString << AddShardRequest::shardName << kShardName);
+        BSONObj obj =
+            BSON(AddShardRequest::configsvrAddShard << kConnString << AddShardRequest::shardName
+                                                    << kShardName);
 
 
         auto swAddShardRequest = AddShardRequest::parseFromConfigCommand(obj);
@@ -96,8 +98,9 @@ TEST(AddShardRequest, ParseInternalFieldsMissingMaxSize) {
 
 TEST(AddShardRequest, ParseInternalFieldsMissingName) {
     {
-        BSONObj obj = BSON(AddShardRequest::mongosAddShard
-                           << kConnString << AddShardRequest::maxSizeMB << kMaxSizeMB);
+        BSONObj obj =
+            BSON(AddShardRequest::mongosAddShard << kConnString << AddShardRequest::maxSizeMB
+                                                 << kMaxSizeMB);
 
         auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(obj);
         ASSERT_OK(swAddShardRequest.getStatus());
@@ -110,8 +113,9 @@ TEST(AddShardRequest, ParseInternalFieldsMissingName) {
     }
 
     {
-        BSONObj obj = BSON(AddShardRequest::configsvrAddShard
-                           << kConnString << AddShardRequest::maxSizeMB << kMaxSizeMB);
+        BSONObj obj =
+            BSON(AddShardRequest::configsvrAddShard << kConnString << AddShardRequest::maxSizeMB
+                                                    << kMaxSizeMB);
 
         auto swAddShardRequest = AddShardRequest::parseFromConfigCommand(obj);
         ASSERT_OK(swAddShardRequest.getStatus());
@@ -126,9 +130,11 @@ TEST(AddShardRequest, ParseInternalFieldsMissingName) {
 
 TEST(AddShardRequest, ParseInternalFieldsAllFieldsPresent) {
     {
-        BSONObj obj = BSON(AddShardRequest::mongosAddShard
-                           << kConnString << AddShardRequest::shardName << kShardName
-                           << AddShardRequest::maxSizeMB << kMaxSizeMB);
+        BSONObj obj =
+            BSON(AddShardRequest::mongosAddShard << kConnString << AddShardRequest::shardName
+                                                 << kShardName
+                                                 << AddShardRequest::maxSizeMB
+                                                 << kMaxSizeMB);
 
         auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(obj);
         ASSERT_OK(swAddShardRequest.getStatus());
@@ -142,9 +148,11 @@ TEST(AddShardRequest, ParseInternalFieldsAllFieldsPresent) {
     }
 
     {
-        BSONObj obj = BSON(AddShardRequest::configsvrAddShard
-                           << kConnString << AddShardRequest::shardName << kShardName
-                           << AddShardRequest::maxSizeMB << kMaxSizeMB);
+        BSONObj obj =
+            BSON(AddShardRequest::configsvrAddShard << kConnString << AddShardRequest::shardName
+                                                    << kShardName
+                                                    << AddShardRequest::maxSizeMB
+                                                    << kMaxSizeMB);
 
         auto swAddShardRequest = AddShardRequest::parseFromConfigCommand(obj);
         ASSERT_OK(swAddShardRequest.getStatus());
@@ -161,9 +169,10 @@ TEST(AddShardRequest, ParseInternalFieldsAllFieldsPresent) {
 // Test converting a valid AddShardRequest to the internal config version of the command.
 
 TEST(AddShardRequest, ToCommandForConfig) {
-    BSONObj mongosCmdObj = BSON(AddShardRequest::mongosAddShard
-                                << kConnString << AddShardRequest::shardName << kShardName
-                                << AddShardRequest::maxSizeMB << kMaxSizeMB);
+    BSONObj mongosCmdObj = BSON(
+        AddShardRequest::mongosAddShard << kConnString << AddShardRequest::shardName << kShardName
+                                        << AddShardRequest::maxSizeMB
+                                        << kMaxSizeMB);
 
     auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(mongosCmdObj);
     ASSERT_OK(swAddShardRequest.getStatus());
@@ -176,8 +185,8 @@ TEST(AddShardRequest, ToCommandForConfig) {
 }
 
 TEST(AddShardRequest, ToCommandForConfigMissingName) {
-    BSONObj mongosCmdObj = BSON(AddShardRequest::mongosAddShard
-                                << kConnString << AddShardRequest::maxSizeMB << kMaxSizeMB);
+    BSONObj mongosCmdObj = BSON(
+        AddShardRequest::mongosAddShard << kConnString << AddShardRequest::maxSizeMB << kMaxSizeMB);
 
     auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(mongosCmdObj);
     ASSERT_OK(swAddShardRequest.getStatus());
@@ -190,8 +199,8 @@ TEST(AddShardRequest, ToCommandForConfigMissingName) {
 }
 
 TEST(AddShardRequest, ToCommandForConfigMissingMaxSize) {
-    BSONObj mongosCmdObj = BSON(AddShardRequest::mongosAddShard
-                                << kConnString << AddShardRequest::shardName << kShardName);
+    BSONObj mongosCmdObj = BSON(
+        AddShardRequest::mongosAddShard << kConnString << AddShardRequest::shardName << kShardName);
 
     auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(mongosCmdObj);
     ASSERT_OK(swAddShardRequest.getStatus());

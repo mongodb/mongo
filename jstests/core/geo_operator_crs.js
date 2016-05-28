@@ -12,15 +12,9 @@ coll.drop();
 assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
 
 var legacyZeroPt = [0, 0];
-var jsonZeroPt = {
-    type: "Point",
-    coordinates: [0, 0]
-};
+var jsonZeroPt = {type: "Point", coordinates: [0, 0]};
 var legacy90Pt = [90, 0];
-var json90Pt = {
-    type: "Point",
-    coordinates: [90, 0]
-};
+var json90Pt = {type: "Point", coordinates: [90, 0]};
 
 assert.writeOK(coll.insert({geo: json90Pt}));
 

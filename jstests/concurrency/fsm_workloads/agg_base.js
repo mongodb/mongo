@@ -45,9 +45,7 @@ var $config = (function() {
         }
     };
 
-    var transitions = {
-        query: {query: 1}
-    };
+    var transitions = {query: {query: 1}};
 
     function setup(db, collName, cluster) {
         // load example data
@@ -55,13 +53,12 @@ var $config = (function() {
         for (var i = 0; i < this.numDocs; ++i) {
             // note: padDoc caches the large string after allocating it once, so it's ok to call it
             // in this loop
-            bulk.insert(padDoc(
-                {
-                  flag: i % 2 ? true : false,
-                  rand: Random.rand(),
-                  randInt: Random.randInt(this.numDocs)
-                },
-                this.docSize));
+            bulk.insert(padDoc({
+                flag: i % 2 ? true : false,
+                rand: Random.rand(),
+                randInt: Random.randInt(this.numDocs)
+            },
+                               this.docSize));
         }
         var res = bulk.execute();
         assertWhenOwnColl.writeOK(res);

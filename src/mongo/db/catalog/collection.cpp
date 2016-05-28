@@ -306,7 +306,9 @@ StatusWithMatchExpression Collection::parseValidator(const BSONObj& validator) c
     if (ns().isOnInternalDb()) {
         return {ErrorCodes::InvalidOptions,
                 str::stream() << "Document validators are not allowed on collections in"
-                              << " the " << ns().db() << " database"};
+                              << " the "
+                              << ns().db()
+                              << " database"};
     }
 
     {
@@ -358,7 +360,8 @@ Status Collection::insertDocuments(OperationContext* txn,
         if (hasIdIndex && (*it)["_id"].eoo()) {
             return Status(ErrorCodes::InternalError,
                           str::stream() << "Collection::insertDocument got "
-                                           "document without _id for ns:" << _ns.ns());
+                                           "document without _id for ns:"
+                                        << _ns.ns());
         }
 
         auto status = checkValidation(txn, *it);
@@ -600,7 +603,9 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
     if (_recordStore->isCapped() && oldSize != newDoc.objsize())
         return {ErrorCodes::CannotGrowDocumentInCappedNamespace,
                 str::stream() << "Cannot change the size of a document in a capped collection: "
-                              << oldSize << " != " << newDoc.objsize()};
+                              << oldSize
+                              << " != "
+                              << newDoc.objsize()};
 
     // At the end of this step, we will have a map of UpdateTickets, one per index, which
     // represent the index updates needed to be done, based on the changes between oldDoc and

@@ -9,9 +9,7 @@
         // Use a "signature" value that won't typically match a value assigned in normal use.
         wtimeout: 60321
     };
-    var defaultReadConcern = {
-        level: "majority"
-    };
+    var defaultReadConcern = {level: "majority"};
 
     var originalDBQuery = DBQuery;
 
@@ -82,11 +80,19 @@
 
         // These commands do writes but do not support a writeConcern argument. Emulate it with a
         // getLastError command.
-        var commandsToEmulateWriteConcern = ["createIndexes", ];
+        var commandsToEmulateWriteConcern = [
+            "createIndexes",
+        ];
 
         // These are reading commands that support majority readConcern.
-        var commandsToForceReadConcern =
-            ["count", "distinct", "find", "geoNear", "geoSearch", "group", ];
+        var commandsToForceReadConcern = [
+            "count",
+            "distinct",
+            "find",
+            "geoNear",
+            "geoSearch",
+            "group",
+        ];
 
         var forceWriteConcern = Array.contains(commandsToForceWriteConcern, cmdName);
         var emulateWriteConcern = Array.contains(commandsToEmulateWriteConcern, cmdName);

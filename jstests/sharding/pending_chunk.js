@@ -23,10 +23,10 @@
 
     assert.commandWorked(admin.runCommand({split: ns, middle: {_id: 0}}));
     assert.commandWorked(admin.runCommand({split: ns, middle: {_id: 1}}));
-    assert.commandWorked(admin.runCommand(
-        {moveChunk: ns, find: {_id: 0}, to: shards[1]._id, _waitForDelete: true}));
-    assert.commandWorked(admin.runCommand(
-        {moveChunk: ns, find: {_id: 1}, to: shards[1]._id, _waitForDelete: true}));
+    assert.commandWorked(
+        admin.runCommand({moveChunk: ns, find: {_id: 0}, to: shards[1]._id, _waitForDelete: true}));
+    assert.commandWorked(
+        admin.runCommand({moveChunk: ns, find: {_id: 1}, to: shards[1]._id, _waitForDelete: true}));
 
     function getMetadata(shard) {
         var admin = shard.getDB('admin'),
@@ -50,8 +50,8 @@
     assert.neq(metadata.collVersion.t, 0);
     assert.eq(metadata.pending.length, 0);
 
-    assert.commandWorked(admin.runCommand(
-        {moveChunk: ns, find: {_id: 1}, to: shards[0]._id, _waitForDelete: true}));
+    assert.commandWorked(
+        admin.runCommand({moveChunk: ns, find: {_id: 1}, to: shards[0]._id, _waitForDelete: true}));
 
     metadata = getMetadata(shard0);
     assert.eq(metadata.shardVersion.t, 0);

@@ -27,10 +27,7 @@ function test(index) {
     var bulk = t.initializeUnorderedBulkOp();
     for (x = -179; x <= 179; x += skip) {
         for (y = -89; y <= 89; y += skip) {
-            o = {
-                _id: num++,
-                loc: [x, y]
-            };
+            o = {_id: num++, loc: [x, y]};
             bulk.insert(o);
             for (i = 0; i < searches.length; i++) {
                 if (Geo.sphereDistance([x, y], searches[i][0]) <= searches[i][1])
@@ -48,9 +45,7 @@ function test(index) {
     for (i = 0; i < searches.length; i++) {
         print('------------');
         print(tojson(searches[i]) + "\t" + correct[i].length);
-        q = {
-            loc: {$within: {$centerSphere: searches[i]}}
-        };
+        q = {loc: {$within: {$centerSphere: searches[i]}}};
 
         // correct[i].forEach( printjson )
         // printjson( q );

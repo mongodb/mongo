@@ -488,7 +488,8 @@ public:
 
         if (_forward && MONGO_FAIL_POINT(WTEmulateOutOfOrderNextRecordId)) {
             log() << "WTEmulateOutOfOrderNextRecordId fail point has triggerd so RecordId is now "
-                     "RecordId(1) instead of " << id;
+                     "RecordId(1) instead of "
+                  << id;
             // Replace the found RecordId with a (small) fake one.
             id = RecordId{1};
         }
@@ -649,7 +650,8 @@ StatusWith<std::string> WiredTigerRecordStore::parseOptionsField(const BSONObj o
             // Return error on first unrecognized field.
             return StatusWith<std::string>(ErrorCodes::InvalidOptions,
                                            str::stream() << '\'' << elem.fieldNameStringData()
-                                                         << '\'' << " is not a supported option.");
+                                                         << '\''
+                                                         << " is not a supported option.");
         }
     }
     return StatusWith<std::string>(ss.str());

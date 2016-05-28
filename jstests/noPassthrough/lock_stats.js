@@ -36,14 +36,10 @@
 
         //  The server was just started, so initial stats may be missing.
         if (!startStats.acquireWaitCount || !startStats.acquireWaitCount.W) {
-            startStats.acquireWaitCount = {
-                W: 0
-            };
+            startStats.acquireWaitCount = {W: 0};
         }
         if (!startStats.timeAcquiringMicros || !startStats.timeAcquiringMicros.W) {
-            startStats.timeAcquiringMicros = {
-                W: 0
-            };
+            startStats.timeAcquiringMicros = {W: 0};
         }
 
         var acquireWaitCount = endStats.acquireWaitCount.W - startStats.acquireWaitCount.W;

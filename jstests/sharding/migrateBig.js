@@ -42,11 +42,8 @@
     s.printShardingStatus();
 
     assert.throws(function() {
-        s.adminCommand({
-            movechunk: "test.foo",
-            find: {x: 50},
-            to: s.getOther(s.getPrimaryShard("test")).name
-        });
+        s.adminCommand(
+            {movechunk: "test.foo", find: {x: 50}, to: s.getOther(s.getPrimaryShard("test")).name});
     }, [], "move should fail");
 
     for (i = 0; i < 20; i += 2) {

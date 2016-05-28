@@ -69,11 +69,7 @@ var $config = (function() {
         }
     };
 
-    var transitions = {
-        init: {insert: 1},
-        insert: {find: 1},
-        find: {insert: 1}
-    };
+    var transitions = {init: {insert: 1}, insert: {find: 1}, find: {insert: 1}};
 
     function setup(db, collName, cluster) {
         var res = db[collName].ensureIndex(this.getIndexSpec());

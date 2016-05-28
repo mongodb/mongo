@@ -42,9 +42,7 @@ var initialInfo = master.getDB('admin').serverStatus({oplog: true}).oplog;
 
 // Do an insert to increment optime, but without rolling the oplog
 // latestOptime should be updated, but earliestOptime should be unchanged
-var options = {
-    writeConcern: {w: replTest.nodes.length}
-};
+var options = {writeConcern: {w: replTest.nodes.length}};
 assert.writeOK(master.getDB('test').foo.insert({a: 1}, options));
 assert(optimesAreEqual(replTest));
 

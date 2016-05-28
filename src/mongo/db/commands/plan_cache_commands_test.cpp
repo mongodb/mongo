@@ -202,8 +202,9 @@ TEST(PlanCacheCommandsTest, Canonicalize) {
     ASSERT_NOT_OK(PlanCacheCommand::canonicalize(&txn, nss.ns(), fromjson("{query: {}, sort: 1}"))
                       .getStatus());
     // Bad query (invalid sort order)
-    ASSERT_NOT_OK(PlanCacheCommand::canonicalize(
-                      &txn, nss.ns(), fromjson("{query: {}, sort: {a: 0}}")).getStatus());
+    ASSERT_NOT_OK(
+        PlanCacheCommand::canonicalize(&txn, nss.ns(), fromjson("{query: {}, sort: {a: 0}}"))
+            .getStatus());
 
     // Valid parameters
     auto statusWithCQ =
@@ -307,10 +308,12 @@ TEST(PlanCacheCommandsTest, planCacheClearOneKey) {
     // Check keys in cache before dropping {b: 1}
     vector<BSONObj> shapesBefore = getShapes(planCache);
     ASSERT_EQUALS(shapesBefore.size(), 2U);
-    BSONObj shapeA = BSON("query" << cqA->getQueryObj() << "sort" << cqA->getParsed().getSort()
-                                  << "projection" << cqA->getParsed().getProj());
-    BSONObj shapeB = BSON("query" << cqB->getQueryObj() << "sort" << cqB->getParsed().getSort()
-                                  << "projection" << cqB->getParsed().getProj());
+    BSONObj shapeA =
+        BSON("query" << cqA->getQueryObj() << "sort" << cqA->getParsed().getSort() << "projection"
+                     << cqA->getParsed().getProj());
+    BSONObj shapeB =
+        BSON("query" << cqB->getQueryObj() << "sort" << cqB->getParsed().getSort() << "projection"
+                     << cqB->getParsed().getProj());
     ASSERT_TRUE(std::find(shapesBefore.begin(), shapesBefore.end(), shapeA) != shapesBefore.end());
     ASSERT_TRUE(std::find(shapesBefore.begin(), shapesBefore.end(), shapeB) != shapesBefore.end());
 

@@ -49,32 +49,34 @@ RollbackChecker::RollbackChecker(executor::TaskExecutor* executor, HostAndPort s
 RollbackChecker::~RollbackChecker() {}
 
 RollbackChecker::CallbackHandle RollbackChecker::checkForRollback(const CallbackFn& nextAction) {
-    return _scheduleGetRollbackId([this, nextAction](const RemoteCommandCallbackArgs& args) {
-        if (args.response.getStatus() == ErrorCodes::CallbackCanceled) {
-            return;
-        }
-        if (!args.response.isOK()) {
-            nextAction(args.response.getStatus());
-            return;
-        }
-        if (auto rbidElement = args.response.getValue().data["rbid"]) {
-            int remoteRBID = rbidElement.numberInt();
-
-            UniqueLock lk(_mutex);
-            bool hadRollback = _checkForRollback_inlock(remoteRBID);
-            lk.unlock();
-
-            if (hadRollback) {
-                nextAction(Status(ErrorCodes::UnrecoverableRollbackError,
-                                  "RollbackChecker detected rollback occurred"));
-            } else {
-                nextAction(Status::OK());
+    return _scheduleGetRollbackId(
+        [this, nextAction](const RemoteCommandCallbackArgs& args) {
+            if (args.response.getStatus() == ErrorCodes::CallbackCanceled) {
+                return;
             }
-        } else {
-            nextAction(Status(ErrorCodes::CommandFailed,
-                              "replSetGetRBID command failed when checking for rollback"));
-        }
-    }, nextAction);
+            if (!args.response.isOK()) {
+                nextAction(args.response.getStatus());
+                return;
+            }
+            if (auto rbidElement = args.response.getValue().data["rbid"]) {
+                int remoteRBID = rbidElement.numberInt();
+
+                UniqueLock lk(_mutex);
+                bool hadRollback = _checkForRollback_inlock(remoteRBID);
+                lk.unlock();
+
+                if (hadRollback) {
+                    nextAction(Status(ErrorCodes::UnrecoverableRollbackError,
+                                      "RollbackChecker detected rollback occurred"));
+                } else {
+                    nextAction(Status::OK());
+                }
+            } else {
+                nextAction(Status(ErrorCodes::CommandFailed,
+                                  "replSetGetRBID command failed when checking for rollback"));
+            }
+        },
+        nextAction);
 }
 
 bool RollbackChecker::hasHadRollback() {
@@ -87,27 +89,29 @@ bool RollbackChecker::hasHadRollback() {
 }
 
 RollbackChecker::CallbackHandle RollbackChecker::reset(const CallbackFn& nextAction) {
-    return _scheduleGetRollbackId([this, nextAction](const RemoteCommandCallbackArgs& args) {
-        if (args.response.getStatus() == ErrorCodes::CallbackCanceled) {
-            return;
-        }
-        if (!args.response.isOK()) {
-            nextAction(args.response.getStatus());
-            return;
-        }
-        if (auto rbidElement = args.response.getValue().data["rbid"]) {
-            int newRBID = rbidElement.numberInt();
+    return _scheduleGetRollbackId(
+        [this, nextAction](const RemoteCommandCallbackArgs& args) {
+            if (args.response.getStatus() == ErrorCodes::CallbackCanceled) {
+                return;
+            }
+            if (!args.response.isOK()) {
+                nextAction(args.response.getStatus());
+                return;
+            }
+            if (auto rbidElement = args.response.getValue().data["rbid"]) {
+                int newRBID = rbidElement.numberInt();
 
-            UniqueLock lk(_mutex);
-            _setRBID_inlock(newRBID);
-            lk.unlock();
+                UniqueLock lk(_mutex);
+                _setRBID_inlock(newRBID);
+                lk.unlock();
 
-            nextAction(Status::OK());
-        } else {
-            nextAction(Status(ErrorCodes::CommandFailed,
-                              "replSetGetRBID command failed when checking for rollback"));
-        }
-    }, nextAction);
+                nextAction(Status::OK());
+            } else {
+                nextAction(Status(ErrorCodes::CommandFailed,
+                                  "replSetGetRBID command failed when checking for rollback"));
+            }
+        },
+        nextAction);
 }
 
 Status RollbackChecker::reset_sync() {

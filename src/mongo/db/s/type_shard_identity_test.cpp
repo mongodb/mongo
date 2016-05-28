@@ -47,7 +47,8 @@ TEST(ShardIdentityType, RoundTrip) {
                     << "test/a:123"
                     << "shardName"
                     << "s1"
-                    << "clusterId" << clusterId);
+                    << "clusterId"
+                    << clusterId);
 
     auto result = ShardIdentityType::fromBSON(doc);
     ASSERT_OK(result.getStatus());
@@ -68,7 +69,8 @@ TEST(ShardIdentityType, ParseMissingId) {
                     << "test/a:123"
                     << "shardName"
                     << "s1"
-                    << "clusterId" << OID::gen());
+                    << "clusterId"
+                    << OID::gen());
 
     auto result = ShardIdentityType::fromBSON(doc);
     ASSERT_NOT_OK(result.getStatus());
@@ -79,7 +81,8 @@ TEST(ShardIdentityType, ParseMissingConfigsvrConnString) {
                     << "shardIdentity"
                     << "shardName"
                     << "s1"
-                    << "clusterId" << OID::gen());
+                    << "clusterId"
+                    << OID::gen());
 
     auto result = ShardIdentityType::fromBSON(doc);
     ASSERT_NOT_OK(result.getStatus());
@@ -90,7 +93,8 @@ TEST(ShardIdentityType, ParseMissingShardName) {
                     << "shardIdentity"
                     << "configsvrConnectionString"
                     << "test/a:123"
-                    << "clusterId" << OID::gen());
+                    << "clusterId"
+                    << OID::gen());
 
     auto result = ShardIdentityType::fromBSON(doc);
     ASSERT_NOT_OK(result.getStatus());
@@ -116,7 +120,8 @@ TEST(ShardIdentityType, InvalidConnectionString) {
                     << "test/,,,"
                     << "shardName"
                     << "s1"
-                    << "clusterId" << clusterId);
+                    << "clusterId"
+                    << clusterId);
 
     ASSERT_EQ(ErrorCodes::FailedToParse, ShardIdentityType::fromBSON(doc).getStatus());
 }
@@ -129,7 +134,8 @@ TEST(ShardIdentityType, NonReplSetConnectionString) {
                     << "local:123"
                     << "shardName"
                     << "s1"
-                    << "clusterId" << clusterId);
+                    << "clusterId"
+                    << clusterId);
 
     ASSERT_EQ(ErrorCodes::UnsupportedFormat, ShardIdentityType::fromBSON(doc).getStatus());
 }

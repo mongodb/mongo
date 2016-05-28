@@ -31,8 +31,8 @@
 #include "mongo/s/write_ops/batch_write_exec.h"
 
 #include "mongo/base/owned_pointer_vector.h"
-#include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
+#include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/mock_multi_write_command.h"
 #include "mongo/s/client/shard_registry.h"

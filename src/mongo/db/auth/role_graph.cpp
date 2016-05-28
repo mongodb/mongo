@@ -119,8 +119,8 @@ Status RoleGraph::deleteRole(const RoleName& role) {
     }
     if (isBuiltinRole(role)) {
         return Status(ErrorCodes::InvalidRoleModification,
-                      mongoutils::str::stream()
-                          << "Cannot delete built-in role: " << role.getFullName(),
+                      mongoutils::str::stream() << "Cannot delete built-in role: "
+                                                << role.getFullName(),
                       0);
     }
 
@@ -183,8 +183,8 @@ Status RoleGraph::addRoleToRole(const RoleName& recipient, const RoleName& role)
     }
     if (isBuiltinRole(recipient)) {
         return Status(ErrorCodes::InvalidRoleModification,
-                      mongoutils::str::stream()
-                          << "Cannot grant roles to built-in role: " << role.getFullName());
+                      mongoutils::str::stream() << "Cannot grant roles to built-in role: "
+                                                << role.getFullName());
     }
     if (!roleExists(role)) {
         return Status(ErrorCodes::RoleNotFound,
@@ -212,8 +212,8 @@ Status RoleGraph::removeRoleFromRole(const RoleName& recipient, const RoleName& 
     }
     if (isBuiltinRole(recipient)) {
         return Status(ErrorCodes::InvalidRoleModification,
-                      mongoutils::str::stream()
-                          << "Cannot remove roles from built-in role: " << role.getFullName(),
+                      mongoutils::str::stream() << "Cannot remove roles from built-in role: "
+                                                << role.getFullName(),
                       0);
     }
     if (!roleExists(role)) {
@@ -252,8 +252,8 @@ Status RoleGraph::removeAllRolesFromRole(const RoleName& victim) {
     }
     if (isBuiltinRole(victim)) {
         return Status(ErrorCodes::InvalidRoleModification,
-                      mongoutils::str::stream()
-                          << "Cannot remove roles from built-in role: " << victim.getFullName(),
+                      mongoutils::str::stream() << "Cannot remove roles from built-in role: "
+                                                << victim.getFullName(),
                       0);
     }
 
@@ -281,8 +281,8 @@ Status RoleGraph::addPrivilegeToRole(const RoleName& role, const Privilege& priv
     }
     if (isBuiltinRole(role)) {
         return Status(ErrorCodes::InvalidRoleModification,
-                      mongoutils::str::stream()
-                          << "Cannot grant privileges to built-in role: " << role.getFullName(),
+                      mongoutils::str::stream() << "Cannot grant privileges to built-in role: "
+                                                << role.getFullName(),
                       0);
     }
 
@@ -308,8 +308,8 @@ Status RoleGraph::addPrivilegesToRole(const RoleName& role,
     }
     if (isBuiltinRole(role)) {
         return Status(ErrorCodes::InvalidRoleModification,
-                      mongoutils::str::stream()
-                          << "Cannot grant privileges to built-in role: " << role.getFullName(),
+                      mongoutils::str::stream() << "Cannot grant privileges to built-in role: "
+                                                << role.getFullName(),
                       0);
     }
 
@@ -330,8 +330,8 @@ Status RoleGraph::removePrivilegeFromRole(const RoleName& role,
     }
     if (isBuiltinRole(role)) {
         return Status(ErrorCodes::InvalidRoleModification,
-                      mongoutils::str::stream()
-                          << "Cannot remove privileges from built-in role: " << role.getFullName());
+                      mongoutils::str::stream() << "Cannot remove privileges from built-in role: "
+                                                << role.getFullName());
     }
 
     PrivilegeVector& currentPrivileges = _directPrivilegesForRole[role];
@@ -343,13 +343,14 @@ Status RoleGraph::removePrivilegeFromRole(const RoleName& role,
 
             if (!curActions.isSupersetOf(privilegeToRemove.getActions())) {
                 // Didn't possess all the actions being removed.
-                return Status(ErrorCodes::PrivilegeNotFound,
-                              mongoutils::str::stream()
-                                  << "Role: " << role.getFullName()
-                                  << " does not contain a privilege on "
-                                  << privilegeToRemove.getResourcePattern().toString()
-                                  << " with actions: " << privilegeToRemove.getActions().toString(),
-                              0);
+                return Status(
+                    ErrorCodes::PrivilegeNotFound,
+                    mongoutils::str::stream() << "Role: " << role.getFullName()
+                                              << " does not contain a privilege on "
+                                              << privilegeToRemove.getResourcePattern().toString()
+                                              << " with actions: "
+                                              << privilegeToRemove.getActions().toString(),
+                    0);
             }
 
             curPrivilege.removeActions(privilegeToRemove.getActions());
@@ -389,8 +390,8 @@ Status RoleGraph::removeAllPrivilegesFromRole(const RoleName& role) {
     }
     if (isBuiltinRole(role)) {
         return Status(ErrorCodes::InvalidRoleModification,
-                      mongoutils::str::stream()
-                          << "Cannot remove privileges from built-in role: " << role.getFullName());
+                      mongoutils::str::stream() << "Cannot remove privileges from built-in role: "
+                                                << role.getFullName());
     }
     _directPrivilegesForRole[role].clear();
     return Status::OK();

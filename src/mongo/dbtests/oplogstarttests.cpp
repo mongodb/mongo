@@ -223,8 +223,10 @@ protected:
     void buildCollection() {
         BSONObj info;
         // Create a collection with specified extent sizes
-        BSONObj command = BSON("create" << nss.coll() << "capped" << true << "$nExtents"
-                                        << extentSizes() << "autoIndexId" << false);
+        BSONObj command =
+            BSON("create" << nss.coll() << "capped" << true << "$nExtents" << extentSizes()
+                          << "autoIndexId"
+                          << false);
         ASSERT(client()->runCommand(nss.db().toString(), command, info));
 
         // Populate documents.

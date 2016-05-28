@@ -32,8 +32,8 @@
 
 #include "mongo/db/dbwebserver.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/repl_set_html_summary.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/util/mongoutils/html.h"
 #include "mongo/util/mongoutils/str.h"

@@ -13,32 +13,28 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWo
 load('jstests/concurrency/fsm_workloads/collmod.js');            // for $config
 load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
 
-var $config = extendWorkload($config,
-                             function($config, $super) {
-                                 $config.data.prefix = 'collmod_separate_collections';
-                                 $config.data.shardKey = {
-                                     createdAt: 1
-                                 };
+var $config = extendWorkload($config, function($config, $super) {
+    $config.data.prefix = 'collmod_separate_collections';
+    $config.data.shardKey = {createdAt: 1};
 
-                                 $config.states.init = function init(db, collName) {
-                                     this.threadCollName = this.prefix + '_' + this.tid;
-                                     $super.setup.call(this, db, this.threadCollName);
-                                 };
+    $config.states.init = function init(db, collName) {
+        this.threadCollName = this.prefix + '_' + this.tid;
+        $super.setup.call(this, db, this.threadCollName);
+    };
 
-                                 $config.transitions =
-                                     Object.extend({init: {collMod: 1}}, $super.transitions);
+    $config.transitions = Object.extend({init: {collMod: 1}}, $super.transitions);
 
-                                 $config.setup = function setup(db, collName, cluster) {
-                                     // no-op: since the init state is used to setup
-                                     // the separate collections on a per-thread basis.
-                                 };
+    $config.setup = function setup(db, collName, cluster) {
+        // no-op: since the init state is used to setup
+        // the separate collections on a per-thread basis.
+    };
 
-                                 $config.teardown = function teardown(db, collName, cluster) {
-                                     var pattern = new RegExp('^' + this.prefix + '_\\d+$');
-                                     dropCollections(db, pattern);
-                                     $super.teardown.apply(this, arguments);
-                                 };
+    $config.teardown = function teardown(db, collName, cluster) {
+        var pattern = new RegExp('^' + this.prefix + '_\\d+$');
+        dropCollections(db, pattern);
+        $super.teardown.apply(this, arguments);
+    };
 
-                                 $config.startState = 'init';
-                                 return $config;
-                             });
+    $config.startState = 'init';
+    return $config;
+});

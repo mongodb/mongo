@@ -28,10 +28,10 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/index/index_access_method.h"
-#include "mongo/unittest/unittest.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/json.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 

@@ -32,9 +32,7 @@
     var secondary30 = conns[1].getDB('test');
 
     // Create a collection with "indexOptionDefaults" specified.
-    var indexOptions = {
-        storageEngine: {wiredTiger: {configString: 'prefix_compression=false'}}
-    };
+    var indexOptions = {storageEngine: {wiredTiger: {configString: 'prefix_compression=false'}}};
     assert.commandWorked(primary32.runCommand({create: 'coll', indexOptionDefaults: indexOptions}));
 
     // Verify that the "indexOptionDefaults" field is present in the corresponding oplog entry.
@@ -90,9 +88,7 @@
     var secondary32 = conns[1].getDB('test');
 
     // Create a collection with "indexOptionDefaults" specified.
-    var indexOptions = {
-        storageEngine: {wiredTiger: {configString: 'prefix_compression=false'}}
-    };
+    var indexOptions = {storageEngine: {wiredTiger: {configString: 'prefix_compression=false'}}};
     assert.commandWorked(primary30.runCommand({create: 'coll', indexOptionDefaults: indexOptions}));
 
     // Verify that the "indexOptionDefaults" field is present in the corresponding oplog entry.

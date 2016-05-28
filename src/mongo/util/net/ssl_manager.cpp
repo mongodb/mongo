@@ -851,9 +851,9 @@ Status importCertStoreToX509_STORE(LPWSTR storeName, DWORD storeLocation, X509_S
     }
     int lastError = GetLastError();
     if (lastError != CRYPT_E_NOT_FOUND) {
-        return {
-            ErrorCodes::InvalidSSLConfiguration,
-            str::stream() << "Error enumerating certificates: " << errnoWithDescription(lastError)};
+        return {ErrorCodes::InvalidSSLConfiguration,
+                str::stream() << "Error enumerating certificates: "
+                              << errnoWithDescription(lastError)};
     }
 
     return Status::OK();
@@ -902,9 +902,9 @@ Status importKeychainToX509_STORE(X509_STORE* verifyStore) {
 
         auto rawData = makeCFTypeRefHolder(SecCertificateCopyData(cert));
         if (!rawData) {
-            return {
-                ErrorCodes::InvalidSSLConfiguration,
-                str::stream() << "Error enumerating certificates: " << OSStatusToString(status)};
+            return {ErrorCodes::InvalidSSLConfiguration,
+                    str::stream() << "Error enumerating certificates: "
+                                  << OSStatusToString(status)};
         }
         const uint8_t* rawDataPtr = CFDataGetBytePtr(rawData);
 
@@ -934,11 +934,14 @@ Status SSLManager::_setupSystemCA(SSL_CTX* context) {
     // On non-Windows/non-Apple platforms, the OpenSSL libraries should have been configured
     // with default locations for CA certificates.
     if (SSL_CTX_set_default_verify_paths(context) != 1) {
-        return {
-            ErrorCodes::InvalidSSLConfiguration,
-            str::stream() << "error loading system CA certificates "
-                          << "(default certificate file: " << X509_get_default_cert_file() << ", "
-                          << "default certificate path: " << X509_get_default_cert_dir() << ")"};
+        return {ErrorCodes::InvalidSSLConfiguration,
+                str::stream() << "error loading system CA certificates "
+                              << "(default certificate file: "
+                              << X509_get_default_cert_file()
+                              << ", "
+                              << "default certificate path: "
+                              << X509_get_default_cert_dir()
+                              << ")"};
     }
     return Status::OK();
 #else

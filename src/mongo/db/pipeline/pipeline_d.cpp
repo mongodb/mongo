@@ -37,13 +37,13 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_iterator.h"
 #include "mongo/db/exec/multi_iterator.h"
 #include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -51,11 +51,11 @@
 #include "mongo/db/query/collation/collation_serializer.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/db/s/sharded_connection_info.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/db/s/sharded_connection_info.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -84,9 +84,8 @@ public:
 
     bool isSharded(const NamespaceString& ns) final {
         const ChunkVersion unsharded(0, 0, OID());
-        return !(ShardingState::get(_ctx->opCtx)
-                     ->getVersion(ns.ns())
-                     .isWriteCompatibleWith(unsharded));
+        return !(
+            ShardingState::get(_ctx->opCtx)->getVersion(ns.ns()).isWriteCompatibleWith(unsharded));
     }
 
     bool isCapped(const NamespaceString& ns) final {

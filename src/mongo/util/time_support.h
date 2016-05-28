@@ -174,7 +174,7 @@ public:
 
     template <typename Duration>
     Date_t& operator-=(Duration d) {
-        return * this += (-d);
+        return *this += (-d);
     }
 
     template <typename Duration>

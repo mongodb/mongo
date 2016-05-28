@@ -29,8 +29,8 @@
 #include "mongo/db/ops/modifier_rename.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/algorithm.h"
+#include "mongo/bson/mutable/document.h"
 #include "mongo/db/ops/field_checker.h"
 #include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/path_support.h"
@@ -95,15 +95,16 @@ Status ModifierRename::init(const BSONElement& modExpr, const Options& opts, boo
     // Old restriction is that if the fields are the same then it is not allowed.
     if (_fromFieldRef == _toFieldRef)
         return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "The source and target field for $rename must differ: " << modExpr);
+                      str::stream() << "The source and target field for $rename must differ: "
+                                    << modExpr);
 
     // TODO: Remove this restriction by allowing moving deeping from the 'from' path
     // Old restriction is that if the to/from is on the same path it fails
     if (_fromFieldRef.isPrefixOf(_toFieldRef) || _toFieldRef.isPrefixOf(_fromFieldRef)) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "The source and target field for $rename must "
-                                       "not be on the same path: " << modExpr);
+                                       "not be on the same path: "
+                                    << modExpr);
     }
     // TODO: We can remove this restriction as long as there is only one,
     //       or it is the same array -- should think on this a bit.
@@ -161,9 +162,11 @@ Status ModifierRename::prepare(mutablebson::Element root,
             if (curr.getType() == Array)
                 return Status(ErrorCodes::BadValue,
                               str::stream() << "The source field cannot be an array element, '"
-                                            << _fromFieldRef.dottedField() << "' in doc with "
+                                            << _fromFieldRef.dottedField()
+                                            << "' in doc with "
                                             << findElementNamed(root.leftChild(), "_id").toString()
-                                            << " has an array field called '" << curr.getFieldName()
+                                            << " has an array field called '"
+                                            << curr.getFieldName()
                                             << "'");
             curr = curr.parent();
         }
@@ -191,9 +194,11 @@ Status ModifierRename::prepare(mutablebson::Element root,
             if (curr.getType() == Array)
                 return Status(ErrorCodes::BadValue,
                               str::stream() << "The destination field cannot be an array element, '"
-                                            << _fromFieldRef.dottedField() << "' in doc with "
+                                            << _fromFieldRef.dottedField()
+                                            << "' in doc with "
                                             << findElementNamed(root.leftChild(), "_id").toString()
-                                            << " has an array field called '" << curr.getFieldName()
+                                            << " has an array field called '"
+                                            << curr.getFieldName()
                                             << "'");
             curr = curr.parent();
         }

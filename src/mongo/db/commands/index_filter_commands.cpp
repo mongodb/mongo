@@ -30,8 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
-#include <string>
 #include <sstream>
+#include <string>
 
 #include "mongo/base/init.h"
 #include "mongo/base/owned_pointer_vector.h"
@@ -105,8 +105,8 @@ static Status getQuerySettingsAndPlanCache(OperationContext* txn,
 // available to the client.
 //
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(SetupIndexFilterCommands,
-                                     MONGO_NO_PREREQUISITES)(InitializerContext* context) {
+MONGO_INITIALIZER_WITH_PREREQUISITES(SetupIndexFilterCommands, MONGO_NO_PREREQUISITES)
+(InitializerContext* context) {
     new ListFilters();
     new ClearFilters();
     new SetFilter();

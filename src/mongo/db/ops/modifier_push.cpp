@@ -104,9 +104,9 @@ Status parseEachMode(ModifierPush::ModifierPushMode pushMode,
     *eachElem = modExpr.embeddedObject()[kEach];
     if (eachElem->type() != Array) {
         return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "The argument to $each in $push must be"
-                             " an array but it was of type: " << typeName(eachElem->type()));
+                      str::stream() << "The argument to $each in $push must be"
+                                       " an array but it was of type: "
+                                    << typeName(eachElem->type()));
     }
 
     // There must be only one $each clause.
@@ -149,8 +149,8 @@ Status parseEachMode(ModifierPush::ModifierPushMode pushMode,
             seenPosition = true;
         } else if (!mongoutils::str::equals(elem.fieldName(), kEach)) {
             return Status(ErrorCodes::BadValue,
-                          str::stream()
-                              << "Unrecognized clause in $push: " << elem.fieldNameStringData());
+                          str::stream() << "Unrecognized clause in $push: "
+                                        << elem.fieldNameStringData());
         }
     }
 
@@ -214,7 +214,8 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
     if (foundDollar && foundCount > 1) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Too many positional (i.e. '$') elements found in path '"
-                                    << _fieldRef.dottedField() << "'");
+                                    << _fieldRef.dottedField()
+                                    << "'");
     }
 
     //
@@ -264,7 +265,8 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
             if (_pushMode == PUSH_ALL) {
                 return Status(ErrorCodes::BadValue,
                               str::stream() << "$pushAll requires an array of values "
-                                               "but was given type: " << typeName(modExpr.type()));
+                                               "but was given type: "
+                                            << typeName(modExpr.type()));
             }
 
             _val = modExpr;
@@ -379,9 +381,9 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
                 for (size_t i = 0; i < sortField.numParts(); i++) {
                     if (sortField.getPart(i).size() == 0) {
                         return Status(ErrorCodes::BadValue,
-                                      str::stream()
-                                          << "The $sort field is a dotted field "
-                                             "but has an empty part: " << sortField.dottedField());
+                                      str::stream() << "The $sort field is a dotted field "
+                                                       "but has an empty part: "
+                                                    << sortField.dottedField());
                     }
                 }
             }
@@ -442,7 +444,9 @@ Status ModifierPush::prepare(mutablebson::Element root,
                           str::stream() << "The field '" << _fieldRef.dottedField() << "'"
                                         << " must be an array but is of type "
                                         << typeName(_preparedState->elemFound.getType())
-                                        << " in document {" << idElem.toString() << "}");
+                                        << " in document {"
+                                        << idElem.toString()
+                                        << "}");
         }
     } else {
         return status;
@@ -477,7 +481,8 @@ Status pushFirstElement(mb::Element& arrayElem,
         if (!fromElem.ok()) {
             return Status(ErrorCodes::InvalidLength,
                           str::stream() << "The specified position (" << appendPos << "/" << pos
-                                        << ") is invalid based on the length ( " << arraySize
+                                        << ") is invalid based on the length ( "
+                                        << arraySize
                                         << ") of the array");
         }
 

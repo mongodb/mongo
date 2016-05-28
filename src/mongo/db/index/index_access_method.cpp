@@ -32,8 +32,8 @@
 
 #include "mongo/db/index/btree_access_method.h"
 
-#include <vector>
 #include <utility>
+#include <vector>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -110,8 +110,8 @@ IndexAccessMethod::IndexAccessMethod(IndexCatalogEntry* btreeState, SortedDataIn
 
 bool IndexAccessMethod::ignoreKeyTooLong(OperationContext* txn) {
     // Ignore this error if we're on a secondary or if the user requested it
-    const auto canAcceptWritesForNs = repl::ReplicationCoordinator::get(txn)
-                                          ->canAcceptWritesFor(NamespaceString(_btreeState->ns()));
+    const auto canAcceptWritesForNs = repl::ReplicationCoordinator::get(txn)->canAcceptWritesFor(
+        NamespaceString(_btreeState->ns()));
     return !canAcceptWritesForNs || !failIndexKeyTooLong;
 }
 

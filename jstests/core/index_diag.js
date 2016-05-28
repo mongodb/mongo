@@ -16,10 +16,7 @@ function r(a) {
 }
 
 for (i = 1; i < 4; i++) {
-    o = {
-        _id: i,
-        x: -i
-    };
+    o = {_id: i, x: -i};
     t.insert(o);
     all.push(o);
     ids.push({_id: i});

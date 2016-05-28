@@ -107,8 +107,8 @@ std::string CollectionCloner::getDiagnosticString() const {
     output << " active: " << _active;
     output << " listIndexes fetcher: " << _listIndexesFetcher.getDiagnosticString();
     output << " find fetcher: " << _findFetcher.getDiagnosticString();
-    output << " database worked callback handle: " << (_dbWorkCallbackHandle.isValid() ? "valid"
-                                                                                       : "invalid");
+    output << " database worked callback handle: "
+           << (_dbWorkCallbackHandle.isValid() ? "valid" : "invalid");
     return output;
 }
 

@@ -38,8 +38,8 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authz_session_external_state.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authz_session_external_state.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/security_key.h"
 #include "mongo/db/auth/user_management_commands_parser.h"
@@ -338,7 +338,8 @@ Status AuthorizationSession::checkAuthorizedToGrantPrivilege(const Privilege& pr
                 ActionType::grantRole)) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "Not authorized to grant privileges on the "
-                                        << resource.databaseToMatch() << "database");
+                                        << resource.databaseToMatch()
+                                        << "database");
         }
     } else if (!isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName("admin"),
                                                  ActionType::grantRole)) {
@@ -358,7 +359,8 @@ Status AuthorizationSession::checkAuthorizedToRevokePrivilege(const Privilege& p
                 ActionType::revokeRole)) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "Not authorized to revoke privileges on the "
-                                        << resource.databaseToMatch() << "database");
+                                        << resource.databaseToMatch()
+                                        << "database");
         }
     } else if (!isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName("admin"),
                                                  ActionType::revokeRole)) {

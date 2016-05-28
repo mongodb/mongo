@@ -44,17 +44,11 @@ var $config = (function() {
             }
         }
 
-        return {
-            init: init,
-            createRole: createRole
-        };
+        return {init: init, createRole: createRole};
 
     })();
 
-    var transitions = {
-        init: {createRole: 1},
-        createRole: {createRole: 1}
-    };
+    var transitions = {init: {createRole: 1}, createRole: {createRole: 1}};
 
     function teardown(db, collName, cluster) {
         var pattern = new RegExp('^' + this.prefix + '\\d+_\\d+$');

@@ -24,8 +24,7 @@ load('jstests/libs/fts.js');
     assert.eq([0], queryIDS(coll, "\"próximo\"", null, {$diacriticSensitive: true}));
     assert.eq([0], queryIDS(coll, "\"põe\" atlântico", null, {$diacriticSensitive: true}));
     assert.eq(
-        [0],
-        queryIDS(coll, "\"próximo vôo\" \"único médico\"", null, {$diacriticSensitive: true}));
+        [0], queryIDS(coll, "\"próximo vôo\" \"único médico\"", null, {$diacriticSensitive: true}));
     assert.eq(
         [0],
         queryIDS(coll, "\"próximo vôo\" -\"unico médico\"", null, {$diacriticSensitive: true}));
@@ -38,7 +37,6 @@ load('jstests/libs/fts.js');
     assert.eq([], queryIDS(coll, "mo vô", null, {$diacriticSensitive: true}));
     assert.eq([], queryIDS(coll, "\"unico medico\"", null, {$diacriticSensitive: true}));
     assert.eq(
-        [],
-        queryIDS(coll, "\"próximo vôo\" -\"único médico\"", null, {$diacriticSensitive: true}));
+        [], queryIDS(coll, "\"próximo vôo\" -\"único médico\"", null, {$diacriticSensitive: true}));
 
 })();

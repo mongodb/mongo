@@ -35,9 +35,9 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/net/message.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/time_support.h"
-#include "mongo/util/net/message.h"
 
 namespace mongo {
 

@@ -5,14 +5,8 @@
  */
 
 // prepare a doc of 14K
-var doc = {
-    _id: new Object(),
-    data: "a"
-};
-var bigDoc = {
-    _id: new Object(),
-    data: "a"
-};
+var doc = {_id: new Object(), data: "a"};
+var bigDoc = {_id: new Object(), data: "a"};
 
 while (doc.data.length < 14 * 1024)
     doc.data += "a";

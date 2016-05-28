@@ -30,10 +30,10 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/fts/fts_element_iterator.h"
 #include "mongo/db/fts/fts_matcher.h"
 #include "mongo/db/fts/fts_phrase_matcher.h"
 #include "mongo/db/fts/fts_tokenizer.h"
-#include "mongo/db/fts/fts_element_iterator.h"
 
 namespace mongo {
 

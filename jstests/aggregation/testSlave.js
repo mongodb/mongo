@@ -7,9 +7,7 @@ replTest.awaitReplication();
 var primary = replTest.getPrimary().getDB('test');
 var secondary = replTest.getSecondary().getDB('test');
 
-var options = {
-    writeConcern: {w: 2}
-};
+var options = {writeConcern: {w: 2}};
 primary.agg.insert({}, options);
 primary.agg.insert({}, options);
 primary.agg.insert({}, options);

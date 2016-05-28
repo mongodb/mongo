@@ -41,14 +41,15 @@ doTest = function() {
     checkArrs([{_id: 0, a: 1}, {_id: 4, a: 1, b: 1}, {_id: 5, a: 1, b: 2}], a1);
 
     a1b2 = t.find({$or: [{a: 1}, {b: 2}]}).toArray();
-    checkArrs([
-        {_id: 0, a: 1},
-        {_id: 3, b: 2},
-        {_id: 4, a: 1, b: 1},
-        {_id: 5, a: 1, b: 2},
-        {_id: 7, a: 2, b: 2}
-    ],
-              a1b2);
+    checkArrs(
+        [
+          {_id: 0, a: 1},
+          {_id: 3, b: 2},
+          {_id: 4, a: 1, b: 1},
+          {_id: 5, a: 1, b: 2},
+          {_id: 7, a: 2, b: 2}
+        ],
+        a1b2);
 
     t.drop();
     t.save({a: [0, 1], b: [0, 1]});

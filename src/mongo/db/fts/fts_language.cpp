@@ -279,10 +279,11 @@ StatusWithFTSLanguage FTSLanguage::make(StringData langName, TextIndexVersion te
 
         if (it == languageMap->end()) {
             // TEXT_INDEX_VERSION_2 and above reject unrecognized language strings.
-            Status status = Status(ErrorCodes::BadValue,
-                                   mongoutils::str::stream()
-                                       << "unsupported language: \"" << langName
-                                       << "\" for text index version " << textIndexVersion);
+            Status status =
+                Status(ErrorCodes::BadValue,
+                       mongoutils::str::stream() << "unsupported language: \"" << langName
+                                                 << "\" for text index version "
+                                                 << textIndexVersion);
             return StatusWithFTSLanguage(status);
         }
 

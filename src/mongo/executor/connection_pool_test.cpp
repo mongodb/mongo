@@ -30,9 +30,9 @@
 #include "mongo/executor/connection_pool_test_fixture.h"
 
 #include "mongo/executor/connection_pool.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/stdx/future.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace executor {
@@ -56,7 +56,7 @@ private:
 };
 
 #define CONN2ID(swConn)                                                     \
-    [](StatusWith<ConnectionPool::ConnectionHandle> & swConn) {             \
+    [](StatusWith<ConnectionPool::ConnectionHandle>& swConn) {              \
         ASSERT(swConn.isOK());                                              \
         return static_cast<ConnectionImpl*>(swConn.getValue().get())->id(); \
     }(swConn)

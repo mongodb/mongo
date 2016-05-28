@@ -165,8 +165,7 @@ load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
     assertErrorCode(local, pipeline, 40105, "connectToField was not specified");
 
     pipeline = {
-        $graphLookup:
-            {from: "foreign", startWith: {$const: 0}, connectToField: "a", as: "output"}
+        $graphLookup: {from: "foreign", startWith: {$const: 0}, connectToField: "a", as: "output"}
     };
     assertErrorCode(local, pipeline, 40105, "connectFromField was not specified");
 
@@ -211,9 +210,7 @@ load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
 
     var initial = [];
     for (var i = 0; i < 8; i++) {
-        var obj = {
-            _id: i
-        };
+        var obj = {_id: i};
 
         obj['longString'] = new Array(14 * 1024 * 1024).join('x');
         initial.push(i);
@@ -238,10 +235,7 @@ load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
 
     var bulk = foreign.initializeUnorderedBulkOp();
     for (var i = 0; i < 14; i++) {
-        var obj = {
-            from: 0,
-            to: 1
-        };
+        var obj = {from: 0, to: 1};
         obj['s'] = new Array(7 * 1024 * 1024).join(' ');
         bulk.insert(obj);
     }
@@ -264,26 +258,24 @@ load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
 
     var bulk = foreign.initializeUnorderedBulkOp();
     for (var i = 0; i < 13; i++) {
-        var obj = {
-            from: 0,
-            to: 1
-        };
+        var obj = {from: 0, to: 1};
         obj['s'] = new Array(7 * 1024 * 1024).join(' ');
         bulk.insert(obj);
     }
     assert.writeOK(bulk.execute());
 
-    var res = local.aggregate(
-                        {
-                          $graphLookup: {
-                              from: "foreign",
-                              startWith: {$literal: 0},
-                              connectToField: "from",
-                              connectFromField: "to",
-                              as: "out"
-                          }
-                        },
-                        {$unwind: {path: "$out"}}).toArray();
+    var res = local
+                  .aggregate({
+                      $graphLookup: {
+                          from: "foreign",
+                          startWith: {$literal: 0},
+                          connectToField: "from",
+                          connectFromField: "to",
+                          as: "out"
+                      }
+                  },
+                             {$unwind: {path: "$out"}})
+                  .toArray();
 
     assert.eq(res.length, 13);
 }());

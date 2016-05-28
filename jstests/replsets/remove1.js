@@ -55,9 +55,8 @@ assert.soon(function() {
 });
 
 // Now we should successfully reconnect to the secondary.
-assert.eq(secondary.getDB("admin").runCommand({ping: 1}).ok,
-          1,
-          "we aren't connected to the secondary");
+assert.eq(
+    secondary.getDB("admin").runCommand({ping: 1}).ok, 1, "we aren't connected to the secondary");
 
 reconnect(master);
 

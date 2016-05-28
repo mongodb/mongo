@@ -370,7 +370,10 @@ db.p11.save({
 
 var p11 = db.runCommand({
     aggregate: "p11",
-    pipeline: [{$unwind: "$items.authors"}, {$project: {name: 1, author: "$items.authors"}}, ]
+    pipeline: [
+        {$unwind: "$items.authors"},
+        {$project: {name: 1, author: "$items.authors"}},
+    ]
 });
 
 p11result = [
@@ -418,8 +421,14 @@ assert.docEq(p13.result, p13result, 'p13 failed');
 var p14 = db.runCommand({
     aggregate: "article",
     pipeline: [{
-        $project:
-            {theRemainder: {$mod: [{$ifNull: ["$other.foo", "$other.bar"]}, "$pageViews", ]}}
+        $project: {
+            theRemainder: {
+                $mod: [
+                    {$ifNull: ["$other.foo", "$other.bar"]},
+                    "$pageViews",
+                ]
+            }
+        }
     }]
 });
 
@@ -788,9 +797,21 @@ g5.result.forEach(function(obj) {
 
 var g5result = [
     {"_id": {"tags": "filthy"}, "authors": ["jane"]},
-    {"_id": {"tags": "fun"}, "authors": ["bob", "dave", ]},
+    {
+      "_id": {"tags": "fun"},
+      "authors": [
+          "bob",
+          "dave",
+      ]
+    },
     {"_id": {"tags": "good"}, "authors": ["bob"]},
-    {"_id": {"tags": "nasty"}, "authors": ["dave", "jane", ]}
+    {
+      "_id": {"tags": "nasty"},
+      "authors": [
+          "dave",
+          "jane",
+      ]
+    }
 ];
 
 assert.docEq(g5.result, g5result, 'g5 failed');

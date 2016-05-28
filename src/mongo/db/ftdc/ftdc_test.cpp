@@ -109,8 +109,8 @@ void createDirectoryClean(const boost::filesystem::path& dir) {
     boost::filesystem::create_directory(dir);
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(FTDCTestInit,
-                                     ("ThreadNameInitializer"))(InitializerContext* context) {
+MONGO_INITIALIZER_WITH_PREREQUISITES(FTDCTestInit, ("ThreadNameInitializer"))
+(InitializerContext* context) {
     setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
 
     getGlobalServiceContext()->setFastClockSource(stdx::make_unique<ClockSourceMock>());

@@ -60,7 +60,8 @@ StatusWith<Milliseconds> getTimeoutMillis(const Date_t expDate, const Date_t now
     if (expDate <= nowDate) {
         return {ErrorCodes::ExceededTimeLimit,
                 str::stream() << "Went to run command, but it was too late. "
-                                 "Expiration was set to " << dateToISOStringUTC(expDate)};
+                                 "Expiration was set to "
+                              << dateToISOStringUTC(expDate)};
     }
     return expDate - nowDate;
 }
@@ -80,10 +81,10 @@ Status getStatusFromCursorResult(DBClientCursor& cursor) {
                   getErrField(error).valuestrsafe());
 }
 
-using RequestDownconverter = StatusWith<Message>(*)(const RemoteCommandRequest&);
-using ReplyUpconverter = StatusWith<RemoteCommandResponse>(*)(std::int32_t requestId,
-                                                              StringData cursorNamespace,
-                                                              const Message& response);
+using RequestDownconverter = StatusWith<Message> (*)(const RemoteCommandRequest&);
+using ReplyUpconverter = StatusWith<RemoteCommandResponse> (*)(std::int32_t requestId,
+                                                               StringData cursorNamespace,
+                                                               const Message& response);
 
 template <RequestDownconverter downconvertRequest, ReplyUpconverter upconvertReply>
 StatusWith<RemoteCommandResponse> runDownconvertedCommand(DBClientConnection* conn,
@@ -210,8 +211,11 @@ StatusWith<RemoteCommandResponse> RemoteCommandRunnerImpl::runCommand(
         return StatusWith<RemoteCommandResponse>(
             ErrorCodes::UnknownError,
             str::stream() << "Sending command " << request.cmdObj << " on database "
-                          << request.dbname << " over network to " << request.target.toString()
-                          << " received exception " << ex.what());
+                          << request.dbname
+                          << " over network to "
+                          << request.target.toString()
+                          << " received exception "
+                          << ex.what());
     }
 }
 

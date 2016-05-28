@@ -5,10 +5,7 @@ var t = db.geo_s2oddshapes;
 t.drop();
 t.ensureIndex({geo: "2dsphere"});
 
-var testPoint = {
-    name: "origin",
-    geo: {type: "Point", coordinates: [0.0, 0.0]}
-};
+var testPoint = {name: "origin", geo: {type: "Point", coordinates: [0.0, 0.0]}};
 
 var testHorizLine = {
     name: "horiz",
@@ -60,10 +57,7 @@ assert.eq(result.itcount(), 3);
 t.drop();
 t.ensureIndex({geo: "2dsphere"});
 
-var insidePoint = {
-    name: "inside",
-    geo: {type: "Point", name: "inside", coordinates: [100.0, 0.0]}
-};
+var insidePoint = {name: "inside", geo: {type: "Point", name: "inside", coordinates: [100.0, 0.0]}};
 
 var outsidePoint = {
     name: "inside",

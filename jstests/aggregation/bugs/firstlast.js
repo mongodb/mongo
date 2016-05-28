@@ -104,17 +104,5 @@ assertFirstLast([1, 2], [6], [], '$b.c');
 t.drop();
 t.save({a: 1, b: 1});
 t.save({a: 1, b: 2});
-assertFirstLast(1,
-                0,
-                [],
-                {
-$mod:
-    ['$b', 2]
-                });
-assertFirstLast(0,
-                1,
-                [],
-                {
-$mod:
-    [{$add: ['$b', 1]}, 2]
-                });
+assertFirstLast(1, 0, [], {$mod: ['$b', 2]});
+assertFirstLast(0, 1, [], {$mod: [{$add: ['$b', 1]}, 2]});

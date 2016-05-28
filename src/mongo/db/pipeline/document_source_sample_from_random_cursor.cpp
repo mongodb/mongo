@@ -106,9 +106,12 @@ boost::optional<Document> DocumentSourceSampleFromRandomCursor::getNextNonDuplic
         uassert(
             28793,
             str::stream()
-                << "The optimized $sample stage requires all documents have a " << _idField
+                << "The optimized $sample stage requires all documents have a "
+                << _idField
                 << " field in order to de-duplicate results, but encountered a document without a "
-                << _idField << " field: " << (*doc).toString(),
+                << _idField
+                << " field: "
+                << (*doc).toString(),
             !idField.missing());
 
         if (_seenDocs.insert(std::move(idField)).second) {
@@ -118,8 +121,9 @@ boost::optional<Document> DocumentSourceSampleFromRandomCursor::getNextNonDuplic
     }
     uasserted(28799,
               str::stream() << "$sample stage could not find a non-duplicate document after "
-                            << kMaxAttempts << " while using a random cursor. This is likely a "
-                                               "sporadic failure, please try again.");
+                            << kMaxAttempts
+                            << " while using a random cursor. This is likely a "
+                               "sporadic failure, please try again.");
 }
 
 Value DocumentSourceSampleFromRandomCursor::serialize(bool explain) const {

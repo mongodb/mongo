@@ -48,7 +48,9 @@ TEST(ValidateConfigForInitiate, VersionMustBe1) {
     ReplicaSetConfig config;
     ASSERT_OK(config.initializeForInitiate(BSON("_id"
                                                 << "rs0"
-                                                << "version" << 2 << "members"
+                                                << "version"
+                                                << 2
+                                                << "members"
                                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                          << "h1")))));
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
@@ -59,7 +61,9 @@ TEST(ValidateConfigForInitiate, MustFindSelf) {
     ReplicaSetConfig config;
     ASSERT_OK(config.initializeForInitiate(BSON("_id"
                                                 << "rs0"
-                                                << "version" << 1 << "members"
+                                                << "version"
+                                                << 1
+                                                << "members"
                                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                          << "h1")
                                                               << BSON("_id" << 2 << "host"
@@ -85,12 +89,15 @@ TEST(ValidateConfigForInitiate, SelfMustBeElectable) {
     ReplicaSetConfig config;
     ASSERT_OK(config.initializeForInitiate(BSON("_id"
                                                 << "rs0"
-                                                << "version" << 1 << "members"
+                                                << "version"
+                                                << 1
+                                                << "members"
                                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                          << "h1")
                                                               << BSON("_id" << 2 << "host"
                                                                             << "h2"
-                                                                            << "priority" << 0)
+                                                                            << "priority"
+                                                                            << 0)
                                                               << BSON("_id" << 3 << "host"
                                                                             << "h3")))));
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
@@ -108,25 +115,29 @@ TEST(ValidateConfigForReconfig, NewConfigVersionNumberMustBeHigherThanOld) {
     ReplicaSetConfig newConfig;
 
     // Two configurations, identical except for version.
-    ASSERT_OK(
-        oldConfig.initialize(BSON("_id"
-                                  << "rs0"
-                                  << "version" << 1 << "members"
-                                  << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                           << "h1")
-                                                << BSON("_id" << 2 << "host"
-                                                              << "h2") << BSON("_id" << 3 << "host"
-                                                                                     << "h3")))));
+    ASSERT_OK(oldConfig.initialize(BSON("_id"
+                                        << "rs0"
+                                        << "version"
+                                        << 1
+                                        << "members"
+                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                 << "h1")
+                                                      << BSON("_id" << 2 << "host"
+                                                                    << "h2")
+                                                      << BSON("_id" << 3 << "host"
+                                                                    << "h3")))));
 
-    ASSERT_OK(
-        newConfig.initialize(BSON("_id"
-                                  << "rs0"
-                                  << "version" << 3 << "members"
-                                  << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                           << "h1")
-                                                << BSON("_id" << 2 << "host"
-                                                              << "h2") << BSON("_id" << 3 << "host"
-                                                                                     << "h3")))));
+    ASSERT_OK(newConfig.initialize(BSON("_id"
+                                        << "rs0"
+                                        << "version"
+                                        << 3
+                                        << "members"
+                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                 << "h1")
+                                                      << BSON("_id" << 2 << "host"
+                                                                    << "h2")
+                                                      << BSON("_id" << 3 << "host"
+                                                                    << "h3")))));
 
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(newConfig.validate());
@@ -162,25 +173,29 @@ TEST(ValidateConfigForReconfig, NewConfigMustNotChangeSetName) {
     ReplicaSetConfig newConfig;
 
     // Two configurations, compatible except for set name.
-    ASSERT_OK(
-        oldConfig.initialize(BSON("_id"
-                                  << "rs0"
-                                  << "version" << 1 << "members"
-                                  << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                           << "h1")
-                                                << BSON("_id" << 2 << "host"
-                                                              << "h2") << BSON("_id" << 3 << "host"
-                                                                                     << "h3")))));
+    ASSERT_OK(oldConfig.initialize(BSON("_id"
+                                        << "rs0"
+                                        << "version"
+                                        << 1
+                                        << "members"
+                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                 << "h1")
+                                                      << BSON("_id" << 2 << "host"
+                                                                    << "h2")
+                                                      << BSON("_id" << 3 << "host"
+                                                                    << "h3")))));
 
-    ASSERT_OK(
-        newConfig.initialize(BSON("_id"
-                                  << "rs1"
-                                  << "version" << 3 << "members"
-                                  << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                           << "h1")
-                                                << BSON("_id" << 2 << "host"
-                                                              << "h2") << BSON("_id" << 3 << "host"
-                                                                                     << "h3")))));
+    ASSERT_OK(newConfig.initialize(BSON("_id"
+                                        << "rs1"
+                                        << "version"
+                                        << 3
+                                        << "members"
+                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                 << "h1")
+                                                      << BSON("_id" << 2 << "host"
+                                                                    << "h2")
+                                                      << BSON("_id" << 3 << "host"
+                                                                    << "h3")))));
 
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(newConfig.validate());
@@ -201,27 +216,33 @@ TEST(ValidateConfigForReconfig, NewConfigMustNotChangeSetId) {
     ReplicaSetConfig newConfig;
 
     // Two configurations, compatible except for set ID.
-    ASSERT_OK(
-        oldConfig.initialize(BSON("_id"
-                                  << "rs0"
-                                  << "version" << 1 << "members"
-                                  << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                           << "h1")
-                                                << BSON("_id" << 2 << "host"
-                                                              << "h2") << BSON("_id" << 3 << "host"
-                                                                                     << "h3"))
-                                  << "settings" << BSON("replicaSetId" << OID::gen()))));
+    ASSERT_OK(oldConfig.initialize(BSON("_id"
+                                        << "rs0"
+                                        << "version"
+                                        << 1
+                                        << "members"
+                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                 << "h1")
+                                                      << BSON("_id" << 2 << "host"
+                                                                    << "h2")
+                                                      << BSON("_id" << 3 << "host"
+                                                                    << "h3"))
+                                        << "settings"
+                                        << BSON("replicaSetId" << OID::gen()))));
 
-    ASSERT_OK(
-        newConfig.initialize(BSON("_id"
-                                  << "rs0"
-                                  << "version" << 3 << "members"
-                                  << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                           << "h1")
-                                                << BSON("_id" << 2 << "host"
-                                                              << "h2") << BSON("_id" << 3 << "host"
-                                                                                     << "h3"))
-                                  << "settings" << BSON("replicaSetId" << OID::gen()))));
+    ASSERT_OK(newConfig.initialize(BSON("_id"
+                                        << "rs0"
+                                        << "version"
+                                        << 3
+                                        << "members"
+                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                 << "h1")
+                                                      << BSON("_id" << 2 << "host"
+                                                                    << "h2")
+                                                      << BSON("_id" << 3 << "host"
+                                                                    << "h3"))
+                                        << "settings"
+                                        << BSON("replicaSetId" << OID::gen()))));
 
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(newConfig.validate());
@@ -248,40 +269,51 @@ TEST(ValidateConfigForReconfig, NewConfigMustNotFlipBuildIndexesFlag) {
     // The third, compatible with the first.
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version" << 1 << "members"
+                                        << "version"
+                                        << 1
+                                        << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
                                                       << BSON("_id" << 2 << "host"
                                                                     << "h2"
-                                                                    << "buildIndexes" << false
-                                                                    << "priority" << 0)
+                                                                    << "buildIndexes"
+                                                                    << false
+                                                                    << "priority"
+                                                                    << 0)
                                                       << BSON("_id" << 3 << "host"
                                                                     << "h3")))));
 
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version" << 3 << "members"
+                                        << "version"
+                                        << 3
+                                        << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
                                                       << BSON("_id" << 2 << "host"
                                                                     << "h2"
-                                                                    << "buildIndexes" << true
-                                                                    << "priority" << 0)
+                                                                    << "buildIndexes"
+                                                                    << true
+                                                                    << "priority"
+                                                                    << 0)
                                                       << BSON("_id" << 3 << "host"
                                                                     << "h3")))));
 
-    ASSERT_OK(
-        oldConfigRefresh.initialize(BSON("_id"
-                                         << "rs0"
-                                         << "version" << 2 << "members"
-                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                  << "h1")
-                                                       << BSON("_id" << 2 << "host"
-                                                                     << "h2"
-                                                                     << "buildIndexes" << false
-                                                                     << "priority" << 0)
-                                                       << BSON("_id" << 3 << "host"
-                                                                     << "h3")))));
+    ASSERT_OK(oldConfigRefresh.initialize(BSON("_id"
+                                               << "rs0"
+                                               << "version"
+                                               << 2
+                                               << "members"
+                                               << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                        << "h1")
+                                                             << BSON("_id" << 2 << "host"
+                                                                           << "h2"
+                                                                           << "buildIndexes"
+                                                                           << false
+                                                                           << "priority"
+                                                                           << 0)
+                                                             << BSON("_id" << 3 << "host"
+                                                                           << "h3")))));
 
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(newConfig.validate());
@@ -310,37 +342,45 @@ TEST(ValidateConfigForReconfig, NewConfigMustNotFlipArbiterFlag) {
     // The third, compatible with the first.
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version" << 1 << "members"
+                                        << "version"
+                                        << 1
+                                        << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
                                                       << BSON("_id" << 2 << "host"
                                                                     << "h2"
-                                                                    << "arbiterOnly" << false)
+                                                                    << "arbiterOnly"
+                                                                    << false)
                                                       << BSON("_id" << 3 << "host"
                                                                     << "h3")))));
 
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version" << 3 << "members"
+                                        << "version"
+                                        << 3
+                                        << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
                                                       << BSON("_id" << 2 << "host"
                                                                     << "h2"
-                                                                    << "arbiterOnly" << true)
+                                                                    << "arbiterOnly"
+                                                                    << true)
                                                       << BSON("_id" << 3 << "host"
                                                                     << "h3")))));
 
-    ASSERT_OK(
-        oldConfigRefresh.initialize(BSON("_id"
-                                         << "rs0"
-                                         << "version" << 2 << "members"
-                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                  << "h1")
-                                                       << BSON("_id" << 2 << "host"
-                                                                     << "h2"
-                                                                     << "arbiterOnly" << false)
-                                                       << BSON("_id" << 3 << "host"
-                                                                     << "h3")))));
+    ASSERT_OK(oldConfigRefresh.initialize(BSON("_id"
+                                               << "rs0"
+                                               << "version"
+                                               << 2
+                                               << "members"
+                                               << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                        << "h1")
+                                                             << BSON("_id" << 2 << "host"
+                                                                           << "h2"
+                                                                           << "arbiterOnly"
+                                                                           << false)
+                                                             << BSON("_id" << 3 << "host"
+                                                                           << "h3")))));
 
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(newConfig.validate());
@@ -369,15 +409,17 @@ TEST(ValidateConfigForReconfig, HostAndIdRemappingRestricted) {
     ReplicaSetConfig illegalNewConfigReusingHost;
     ReplicaSetConfig illegalNewConfigReusingId;
 
-    ASSERT_OK(
-        oldConfig.initialize(BSON("_id"
-                                  << "rs0"
-                                  << "version" << 1 << "members"
-                                  << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                           << "h1")
-                                                << BSON("_id" << 2 << "host"
-                                                              << "h2") << BSON("_id" << 3 << "host"
-                                                                                     << "h3")))));
+    ASSERT_OK(oldConfig.initialize(BSON("_id"
+                                        << "rs0"
+                                        << "version"
+                                        << 1
+                                        << "members"
+                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                 << "h1")
+                                                      << BSON("_id" << 2 << "host"
+                                                                    << "h2")
+                                                      << BSON("_id" << 3 << "host"
+                                                                    << "h3")))));
     ASSERT_OK(oldConfig.validate());
 
     //
@@ -387,7 +429,9 @@ TEST(ValidateConfigForReconfig, HostAndIdRemappingRestricted) {
     ASSERT_OK(
         legalNewConfigWithNewHostAndId.initialize(BSON("_id"
                                                        << "rs0"
-                                                       << "version" << 2 << "members"
+                                                       << "version"
+                                                       << 2
+                                                       << "members"
                                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                                 << "h1")
                                                                      << BSON("_id" << 4 << "host"
@@ -395,8 +439,9 @@ TEST(ValidateConfigForReconfig, HostAndIdRemappingRestricted) {
                                                                      << BSON("_id" << 3 << "host"
                                                                                    << "h3")))));
     ASSERT_OK(legalNewConfigWithNewHostAndId.validate());
-    ASSERT_OK(validateConfigForReconfig(
-                  &externalState, oldConfig, legalNewConfigWithNewHostAndId, false).getStatus());
+    ASSERT_OK(
+        validateConfigForReconfig(&externalState, oldConfig, legalNewConfigWithNewHostAndId, false)
+            .getStatus());
 
     //
     // Here, the new config is invalid because we've reused host name "h2" with
@@ -404,7 +449,9 @@ TEST(ValidateConfigForReconfig, HostAndIdRemappingRestricted) {
     //
     ASSERT_OK(illegalNewConfigReusingHost.initialize(BSON("_id"
                                                           << "rs0"
-                                                          << "version" << 2 << "members"
+                                                          << "version"
+                                                          << 2
+                                                          << "members"
                                                           << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                                    << "h1")
                                                                         << BSON("_id" << 4 << "host"
@@ -412,20 +459,24 @@ TEST(ValidateConfigForReconfig, HostAndIdRemappingRestricted) {
                                                                         << BSON("_id" << 3 << "host"
                                                                                       << "h3")))));
     ASSERT_OK(illegalNewConfigReusingHost.validate());
-    ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForReconfig(
-                      &externalState, oldConfig, illegalNewConfigReusingHost, false).getStatus());
+    ASSERT_EQUALS(
+        ErrorCodes::NewReplicaSetConfigurationIncompatible,
+        validateConfigForReconfig(&externalState, oldConfig, illegalNewConfigReusingHost, false)
+            .getStatus());
     // Forced reconfigs also do not allow this.
-    ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForReconfig(
-                      &externalState, oldConfig, illegalNewConfigReusingHost, true).getStatus());
+    ASSERT_EQUALS(
+        ErrorCodes::NewReplicaSetConfigurationIncompatible,
+        validateConfigForReconfig(&externalState, oldConfig, illegalNewConfigReusingHost, true)
+            .getStatus());
     //
     // Here, the new config is valid, because all we've changed is the name of
     // the host representing _id 2.
     //
     ASSERT_OK(illegalNewConfigReusingId.initialize(BSON("_id"
                                                         << "rs0"
-                                                        << "version" << 2 << "members"
+                                                        << "version"
+                                                        << 2
+                                                        << "members"
                                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                                  << "h1")
                                                                       << BSON("_id" << 2 << "host"
@@ -441,26 +492,30 @@ TEST(ValidateConfigForReconfig, MustFindSelf) {
     // Old and new config are same except for version change; this is just testing that we can
     // find ourself in the new config.
     ReplicaSetConfig oldConfig;
-    ASSERT_OK(
-        oldConfig.initialize(BSON("_id"
-                                  << "rs0"
-                                  << "version" << 1 << "members"
-                                  << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                           << "h1")
-                                                << BSON("_id" << 2 << "host"
-                                                              << "h2") << BSON("_id" << 3 << "host"
-                                                                                     << "h3")))));
+    ASSERT_OK(oldConfig.initialize(BSON("_id"
+                                        << "rs0"
+                                        << "version"
+                                        << 1
+                                        << "members"
+                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                 << "h1")
+                                                      << BSON("_id" << 2 << "host"
+                                                                    << "h2")
+                                                      << BSON("_id" << 3 << "host"
+                                                                    << "h3")))));
 
     ReplicaSetConfig newConfig;
-    ASSERT_OK(
-        newConfig.initialize(BSON("_id"
-                                  << "rs0"
-                                  << "version" << 2 << "members"
-                                  << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                           << "h1")
-                                                << BSON("_id" << 2 << "host"
-                                                              << "h2") << BSON("_id" << 3 << "host"
-                                                                                     << "h3")))));
+    ASSERT_OK(newConfig.initialize(BSON("_id"
+                                        << "rs0"
+                                        << "version"
+                                        << 2
+                                        << "members"
+                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                 << "h1")
+                                                      << BSON("_id" << 2 << "host"
+                                                                    << "h2")
+                                                      << BSON("_id" << 3 << "host"
+                                                                    << "h3")))));
     ReplicationCoordinatorExternalStateMock notPresentExternalState;
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
@@ -472,9 +527,10 @@ TEST(ValidateConfigForReconfig, MustFindSelf) {
     ASSERT_EQUALS(ErrorCodes::NodeNotFound,
                   validateConfigForReconfig(&notPresentExternalState, oldConfig, newConfig, false)
                       .getStatus());
-    ASSERT_EQUALS(ErrorCodes::DuplicateKey,
-                  validateConfigForReconfig(
-                      &presentThriceExternalState, oldConfig, newConfig, false).getStatus());
+    ASSERT_EQUALS(
+        ErrorCodes::DuplicateKey,
+        validateConfigForReconfig(&presentThriceExternalState, oldConfig, newConfig, false)
+            .getStatus());
     ASSERT_EQUALS(1,
                   unittest::assertGet(validateConfigForReconfig(
                       &presentOnceExternalState, oldConfig, newConfig, false)));
@@ -494,25 +550,30 @@ TEST(ValidateConfigForReconfig, SelfMustEndElectable) {
     // Old and new config are same except for version change and the electability of one node;
     // this is just testing that we must be electable in the new config.
     ReplicaSetConfig oldConfig;
-    ASSERT_OK(
-        oldConfig.initialize(BSON("_id"
-                                  << "rs0"
-                                  << "version" << 1 << "members"
-                                  << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                           << "h1")
-                                                << BSON("_id" << 2 << "host"
-                                                              << "h2") << BSON("_id" << 3 << "host"
-                                                                                     << "h3")))));
+    ASSERT_OK(oldConfig.initialize(BSON("_id"
+                                        << "rs0"
+                                        << "version"
+                                        << 1
+                                        << "members"
+                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                 << "h1")
+                                                      << BSON("_id" << 2 << "host"
+                                                                    << "h2")
+                                                      << BSON("_id" << 3 << "host"
+                                                                    << "h3")))));
 
     ReplicaSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version" << 2 << "members"
+                                        << "version"
+                                        << 2
+                                        << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
                                                       << BSON("_id" << 2 << "host"
                                                                     << "h2"
-                                                                    << "priority" << 0)
+                                                                    << "priority"
+                                                                    << 0)
                                                       << BSON("_id" << 3 << "host"
                                                                     << "h3")))));
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
@@ -533,7 +594,9 @@ TEST(ValidateConfigForInitiate, NewConfigInvalid) {
     ReplicaSetConfig newConfig;
     ASSERT_OK(newConfig.initializeForInitiate(BSON("_id"
                                                    << "rs0"
-                                                   << "version" << 2 << "members"
+                                                   << "version"
+                                                   << 2
+                                                   << "members"
                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                             << "h2")
                                                                  << BSON("_id" << 0 << "host"
@@ -552,14 +615,18 @@ TEST(ValidateConfigForReconfig, NewConfigInvalid) {
     ReplicaSetConfig oldConfig;
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version" << 1 << "members"
+                                        << "version"
+                                        << 1
+                                        << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")))));
 
     ReplicaSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version" << 2 << "members"
+                                        << "version"
+                                        << 2
+                                        << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")
                                                       << BSON("_id" << 0 << "host"
@@ -583,14 +650,18 @@ TEST(ValidateConfigForStartUp, NewConfigInvalid) {
     ReplicaSetConfig oldConfig;
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version" << 1 << "members"
+                                        << "version"
+                                        << 1
+                                        << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")))));
 
     ReplicaSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version" << 2 << "members"
+                                        << "version"
+                                        << 2
+                                        << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")
                                                       << BSON("_id" << 0 << "host"
@@ -610,7 +681,9 @@ TEST(ValidateConfigForStartUp, OldAndNewConfigIncompatible) {
     ReplicaSetConfig oldConfig;
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version" << 1 << "members"
+                                        << "version"
+                                        << 1
+                                        << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")
                                                       << BSON("_id" << 1 << "host"
@@ -620,7 +693,9 @@ TEST(ValidateConfigForStartUp, OldAndNewConfigIncompatible) {
     ReplicaSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version" << 2 << "members"
+                                        << "version"
+                                        << 2
+                                        << "members"
                                         << BSON_ARRAY(BSON("_id" << 2 << "host"
                                                                  << "h2")
                                                       << BSON("_id" << 1 << "host"
@@ -640,7 +715,9 @@ TEST(ValidateConfigForStartUp, OldAndNewConfigCompatible) {
     ReplicaSetConfig oldConfig;
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version" << 1 << "members"
+                                        << "version"
+                                        << 1
+                                        << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")
                                                       << BSON("_id" << 1 << "host"
@@ -650,10 +727,13 @@ TEST(ValidateConfigForStartUp, OldAndNewConfigCompatible) {
     ReplicaSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version" << 2 << "members"
+                                        << "version"
+                                        << 2
+                                        << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2"
-                                                                 << "priority" << 3)
+                                                                 << "priority"
+                                                                 << 3)
                                                       << BSON("_id" << 1 << "host"
                                                                     << "h3")))));
 
@@ -670,7 +750,9 @@ TEST(ValidateConfigForHeartbeatReconfig, NewConfigInvalid) {
     ReplicaSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version" << 2 << "members"
+                                        << "version"
+                                        << 2
+                                        << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")
                                                       << BSON("_id" << 0 << "host"
@@ -689,7 +771,9 @@ TEST(ValidateConfigForHeartbeatReconfig, NewConfigValid) {
     ReplicaSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version" << 2 << "members"
+                                        << "version"
+                                        << 2
+                                        << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")
                                                       << BSON("_id" << 1 << "host"
@@ -706,7 +790,9 @@ TEST(ValidateForReconfig, ForceStillNeedsValidConfig) {
     ReplicaSetConfig oldConfig;
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version" << 1 << "members"
+                                        << "version"
+                                        << 1
+                                        << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")
                                                       << BSON("_id" << 1 << "host"
@@ -716,7 +802,9 @@ TEST(ValidateForReconfig, ForceStillNeedsValidConfig) {
     ReplicaSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version" << 2 << "members"
+                                        << "version"
+                                        << 2
+                                        << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")
                                                       << BSON("_id" << 0 << "host"
@@ -735,7 +823,9 @@ TEST(ValidateForReconfig, ForceStillNeedsSelfPresent) {
     ReplicaSetConfig oldConfig;
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version" << 1 << "members"
+                                        << "version"
+                                        << 1
+                                        << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")
                                                       << BSON("_id" << 1 << "host"
@@ -745,7 +835,9 @@ TEST(ValidateForReconfig, ForceStillNeedsSelfPresent) {
     ReplicaSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version" << 2 << "members"
+                                        << "version"
+                                        << 2
+                                        << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h3")
                                                       << BSON("_id" << 2 << "host"

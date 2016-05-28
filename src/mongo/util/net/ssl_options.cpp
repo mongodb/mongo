@@ -36,18 +36,19 @@
 #include "mongo/base/status.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/log.h"
-#include "mongo/util/text.h"
 #include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/text.h"
 
 namespace mongo {
 
 using std::string;
 
 Status addSSLServerOptions(moe::OptionSection* options) {
-    options->addOptionChaining("net.ssl.sslOnNormalPorts",
-                               "sslOnNormalPorts",
-                               moe::Switch,
-                               "use ssl on configured ports")
+    options
+        ->addOptionChaining("net.ssl.sslOnNormalPorts",
+                            "sslOnNormalPorts",
+                            moe::Switch,
+                            "use ssl on configured ports")
         .setSources(moe::SourceAllLegacy)
         .incompatibleWith("net.ssl.mode");
 
@@ -60,8 +61,9 @@ Status addSSLServerOptions(moe::OptionSection* options) {
     options->addOptionChaining(
         "net.ssl.PEMKeyFile", "sslPEMKeyFile", moe::String, "PEM file for ssl");
 
-    options->addOptionChaining(
-                 "net.ssl.PEMKeyPassword", "sslPEMKeyPassword", moe::String, "PEM file password")
+    options
+        ->addOptionChaining(
+            "net.ssl.PEMKeyPassword", "sslPEMKeyPassword", moe::String, "PEM file password")
         .setImplicit(moe::Value(std::string("")));
 
     options->addOptionChaining("net.ssl.clusterFile",
@@ -69,10 +71,11 @@ Status addSSLServerOptions(moe::OptionSection* options) {
                                moe::String,
                                "Key file for internal SSL authentication");
 
-    options->addOptionChaining("net.ssl.clusterPassword",
-                               "sslClusterPassword",
-                               moe::String,
-                               "Internal authentication key file password")
+    options
+        ->addOptionChaining("net.ssl.clusterPassword",
+                            "sslClusterPassword",
+                            moe::String,
+                            "Internal authentication key file password")
         .setImplicit(moe::Value(std::string("")));
 
     options->addOptionChaining(
@@ -81,10 +84,12 @@ Status addSSLServerOptions(moe::OptionSection* options) {
     options->addOptionChaining(
         "net.ssl.CRLFile", "sslCRLFile", moe::String, "Certificate Revocation List file for SSL");
 
-    options->addOptionChaining("net.ssl.sslCipherConfig",
-                               "sslCipherConfig",
-                               moe::String,
-                               "OpenSSL cipher configuration string").hidden();
+    options
+        ->addOptionChaining("net.ssl.sslCipherConfig",
+                            "sslCipherConfig",
+                            moe::String,
+                            "OpenSSL cipher configuration string")
+        .hidden();
 
     options->addOptionChaining(
         "net.ssl.disabledProtocols",
@@ -123,36 +128,41 @@ Status addSSLServerOptions(moe::OptionSection* options) {
 Status addSSLClientOptions(moe::OptionSection* options) {
     options->addOptionChaining("ssl", "ssl", moe::Switch, "use SSL for all connections");
 
-    options->addOptionChaining(
-                 "ssl.CAFile", "sslCAFile", moe::String, "Certificate Authority file for SSL")
+    options
+        ->addOptionChaining(
+            "ssl.CAFile", "sslCAFile", moe::String, "Certificate Authority file for SSL")
         .requires("ssl");
 
-    options->addOptionChaining(
-                 "ssl.PEMKeyFile", "sslPEMKeyFile", moe::String, "PEM certificate/key file for SSL")
+    options
+        ->addOptionChaining(
+            "ssl.PEMKeyFile", "sslPEMKeyFile", moe::String, "PEM certificate/key file for SSL")
         .requires("ssl");
 
-    options->addOptionChaining("ssl.PEMKeyPassword",
-                               "sslPEMKeyPassword",
-                               moe::String,
-                               "password for key in PEM file for SSL").requires("ssl");
+    options
+        ->addOptionChaining("ssl.PEMKeyPassword",
+                            "sslPEMKeyPassword",
+                            moe::String,
+                            "password for key in PEM file for SSL")
+        .requires("ssl");
 
-    options->addOptionChaining("ssl.CRLFile",
-                               "sslCRLFile",
-                               moe::String,
-                               "Certificate Revocation List file for SSL")
+    options
+        ->addOptionChaining(
+            "ssl.CRLFile", "sslCRLFile", moe::String, "Certificate Revocation List file for SSL")
         .requires("ssl")
         .requires("ssl.CAFile");
 
-    options->addOptionChaining("net.ssl.allowInvalidHostnames",
-                               "sslAllowInvalidHostnames",
-                               moe::Switch,
-                               "allow connections to servers with non-matching hostnames")
+    options
+        ->addOptionChaining("net.ssl.allowInvalidHostnames",
+                            "sslAllowInvalidHostnames",
+                            moe::Switch,
+                            "allow connections to servers with non-matching hostnames")
         .requires("ssl");
 
-    options->addOptionChaining("ssl.allowInvalidCertificates",
-                               "sslAllowInvalidCertificates",
-                               moe::Switch,
-                               "allow connections to servers with invalid certificates")
+    options
+        ->addOptionChaining("ssl.allowInvalidCertificates",
+                            "sslAllowInvalidCertificates",
+                            moe::Switch,
+                            "allow connections to servers with invalid certificates")
         .requires("ssl");
 
     options->addOptionChaining(

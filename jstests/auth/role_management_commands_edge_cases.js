@@ -243,10 +243,7 @@ function runTest(conn) {
             db.grantPrivilegesToRole("role1", []);
         });
 
-        var basicPriv = {
-            resource: {db: 'test', collection: ""},
-            actions: ['find']
-        };
+        var basicPriv = {resource: {db: 'test', collection: ""}, actions: ['find']};
 
         // Invalid first argument
         assert.throws(function() {
@@ -302,10 +299,7 @@ function runTest(conn) {
                 "readWrite", [{resource: {db: 'test', collection: ''}, actions: ['find']}]);
         });
 
-        var basicPriv = {
-            resource: {db: 'test', collection: ""},
-            actions: ['find']
-        };
+        var basicPriv = {resource: {db: 'test', collection: ""}, actions: ['find']};
 
         // Invalid first argument
         assert.throws(function() {

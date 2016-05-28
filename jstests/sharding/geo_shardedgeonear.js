@@ -39,12 +39,7 @@ function test(db, sharded, indexType) {
     assert.commandWorked(db[coll].ensureIndex({loc: indexType}));
 
     var queryPoint = [0, 0];
-    geoCmd = {
-        geoNear: coll,
-        near: queryPoint,
-        spherical: true,
-        includeLocs: true
-    };
+    geoCmd = {geoNear: coll, near: queryPoint, spherical: true, includeLocs: true};
     assert.commandWorked(db.runCommand(geoCmd), tojson({sharded: sharded, indexType: indexType}));
 }
 

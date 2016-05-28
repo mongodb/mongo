@@ -23,10 +23,7 @@ function runTest(admindb) {
             {resource: {db: admindb.getName(), collection: sysCollections[i]}, actions: ['find']});
     }
 
-    var findPriv = {
-        resource: {db: admindb.getName(), collection: ""},
-        actions: ['find']
-    };
+    var findPriv = {resource: {db: admindb.getName(), collection: ""}, actions: ['find']};
 
     admindb.createRole({role: "FindInDB", roles: [], privileges: [findPriv]});
     admindb.createRole({role: "FindOnSysRes", roles: [], privileges: sysPrivs});

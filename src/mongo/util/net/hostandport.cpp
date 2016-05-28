@@ -36,8 +36,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/server_options.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -127,7 +127,8 @@ Status HostAndPort::initialize(StringData s) {
         } else if (colonPos != closeBracketPos + 1) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Extraneous characters between ']' and pre-port ':'"
-                                        << " in " << s.toString());
+                                        << " in "
+                                        << s.toString());
         }
     } else if (closeBracketPos != std::string::npos) {
         return Status(ErrorCodes::FailedToParse,
@@ -142,7 +143,8 @@ Status HostAndPort::initialize(StringData s) {
     if (hostPart.empty()) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "Empty host component parsing HostAndPort from \""
-                                    << escape(s.toString()) << "\"");
+                                    << escape(s.toString())
+                                    << "\"");
     }
 
     int port;
@@ -156,7 +158,8 @@ Status HostAndPort::initialize(StringData s) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Port number " << port
                                         << " out of range parsing HostAndPort from \""
-                                        << escape(s.toString()) << "\"");
+                                        << escape(s.toString())
+                                        << "\"");
         }
     } else {
         port = -1;

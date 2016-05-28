@@ -11,11 +11,7 @@ load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropColl
 
 var $config = (function() {
 
-    var data = {
-        numDocs: 1000,
-        prefix: 'distinct_fsm',
-        shardKey: {i: 1}
-    };
+    var data = {numDocs: 1000, prefix: 'distinct_fsm', shardKey: {i: 1}};
 
     var states = (function() {
 
@@ -35,17 +31,11 @@ var $config = (function() {
             assertWhenOwnColl.eq(this.numDocs, db[this.threadCollName].distinct('i').length);
         }
 
-        return {
-            init: init,
-            distinct: distinct
-        };
+        return {init: init, distinct: distinct};
 
     })();
 
-    var transitions = {
-        init: {distinct: 1},
-        distinct: {distinct: 1}
-    };
+    var transitions = {init: {distinct: 1}, distinct: {distinct: 1}};
 
     function teardown(db, collName, cluster) {
         var pattern = new RegExp('^' + this.prefix + '_\\d+$');

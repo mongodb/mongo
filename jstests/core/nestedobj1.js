@@ -1,14 +1,10 @@
 // SERVER-5127, SERVER-5036
 
 function makeNestObj(depth) {
-    toret = {
-        a: 1
-    };
+    toret = {a: 1};
 
     for (i = 1; i < depth; i++) {
-        toret = {
-            a: toret
-        };
+        toret = {a: toret};
     }
 
     return toret;

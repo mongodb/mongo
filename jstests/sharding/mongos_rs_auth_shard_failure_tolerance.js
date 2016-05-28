@@ -11,11 +11,7 @@
 // (connection connected after shard change).
 //
 
-var options = {
-    rs: true,
-    rsOptions: {nodes: 2},
-    keyFile: "jstests/libs/key1"
-};
+var options = {rs: true, rsOptions: {nodes: 2}, keyFile: "jstests/libs/key1"};
 
 var st = new ShardingTest({shards: 3, mongos: 1, other: options});
 
@@ -82,9 +78,7 @@ authDBUsers(mongosConnActive);
 var mongosConnIdle = null;
 var mongosConnNew = null;
 
-var wc = {
-    writeConcern: {w: 2, wtimeout: 60000}
-};
+var wc = {writeConcern: {w: 2, wtimeout: 60000}};
 
 assert.writeOK(mongosConnActive.getCollection(collSharded.toString()).insert({_id: -1}, wc));
 assert.writeOK(mongosConnActive.getCollection(collSharded.toString()).insert({_id: 1}, wc));

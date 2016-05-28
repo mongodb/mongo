@@ -53,10 +53,7 @@ assert.eq([{a: {b: 2}}, {a: {b: 3}}], t.findOne({_id: 7}).x);
 //
 
 // $push with $sort should not push a "$sort" field
-var doc8 = {
-    _id: 8,
-    x: [{a: 1}, {a: 2}]
-};
+var doc8 = {_id: 8, x: [{a: 1}, {a: 2}]};
 t.save(doc8);
 var res = t.update({_id: 8}, {$push: {x: {$sort: {a: -1}}}});
 assert.writeError(res);

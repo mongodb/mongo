@@ -53,8 +53,9 @@ TEST(DataTypeValidated, BSONValidationEnabled) {
 
     BSONObj valid = BSON("baz"
                          << "bar"
-                         << "garply" << BSON("foo"
-                                             << "bar"));
+                         << "garply"
+                         << BSON("foo"
+                                 << "bar"));
     char buf[1024] = {0};
     std::copy(valid.objdata(), valid.objdata() + valid.objsize(), begin(buf));
     {

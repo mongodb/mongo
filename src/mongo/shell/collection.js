@@ -192,27 +192,19 @@ DBCollection.prototype._massageObject = function(q) {
     var type = typeof q;
 
     if (type == "function")
-        return {
-            $where: q
-        };
+        return {$where: q};
 
     if (q.isObjectId)
-        return {
-            _id: q
-        };
+        return {_id: q};
 
     if (type == "object")
         return q;
 
     if (type == "string") {
         if (q.length == 24)
-            return {
-                _id: q
-            };
+            return {_id: q};
 
-        return {
-            $where: q
-        };
+        return {$where: q};
     }
 
     throw Error("don't know how to massage : " + type);
@@ -369,9 +361,7 @@ DBCollection.prototype.insert = function(obj, options, _allow_dot) {
 
         if (typeof(obj._id) == "undefined" && !Array.isArray(obj)) {
             var tmp = obj;  // don't want to modify input
-            obj = {
-                _id: new ObjectId()
-            };
+            obj = {_id: new ObjectId()};
             for (var key in tmp) {
                 obj[key] = tmp[key];
             }
@@ -428,12 +418,7 @@ DBCollection.prototype._parseRemove = function(t, justOne) {
         wc = this.getWriteConcern();
     }
 
-    return {
-        "query": query,
-        "justOne": justOne,
-        "wc": wc,
-        "collation": collation
-    };
+    return {"query": query, "justOne": justOne, "wc": wc, "collation": collation};
 };
 
 DBCollection.prototype.remove = function(t, justOne) {
@@ -645,11 +630,7 @@ DBCollection.prototype._genIndexName = function(keys) {
 };
 
 DBCollection.prototype._indexSpec = function(keys, options) {
-    var ret = {
-        ns: this._fullName,
-        key: keys,
-        name: this._genIndexName(keys)
-    };
+    var ret = {ns: this._fullName, key: keys, name: this._genIndexName(keys)};
 
     if (!options) {
     } else if (typeof(options) == "string")
@@ -710,15 +691,9 @@ DBCollection.prototype.createIndexes = function(keys, options) {
             // Return the first error
             var error = result.hasWriteErrors() ? result.getWriteErrors()[0]
                                                 : result.getWriteConcernError();
-            return {
-                ok: 0.0,
-                code: error.code,
-                errmsg: error.errmsg
-            };
+            return {ok: 0.0, code: error.code, errmsg: error.errmsg};
         } else {
-            return {
-                ok: 1.0
-            };
+            return {ok: 1.0};
         }
     } else {
         this._db.getCollection("system.indexes").insert(indexSpecs, 0, true);
@@ -771,9 +746,7 @@ DBCollection.prototype.drop = function() {
 };
 
 DBCollection.prototype.findAndModify = function(args) {
-    var cmd = {
-        findandmodify: this.getName()
-    };
+    var cmd = {findandmodify: this.getName()};
     for (var key in args) {
         cmd[key] = args[key];
     }
@@ -825,9 +798,7 @@ DBCollection.prototype._printExtraInfo = function(action, startTime) {
 };
 
 DBCollection.prototype.validate = function(full) {
-    var cmd = {
-        validate: this.getName()
-    };
+    var cmd = {validate: this.getName()};
 
     if (typeof(full) == 'object')  // support arbitrary options here
         Object.extend(cmd, full);
@@ -864,10 +835,7 @@ DBCollection.prototype.validate = function(full) {
  * getDiskStorageStats provides a human-readable summary of the command output
  */
 DBCollection.prototype.diskStorageStats = function(opt) {
-    var cmd = {
-        storageDetails: this.getName(),
-        analyze: 'diskStorage'
-    };
+    var cmd = {storageDetails: this.getName(), analyze: 'diskStorage'};
     if (typeof(opt) == 'object')
         Object.extend(cmd, opt);
 
@@ -894,11 +862,12 @@ DBCollection.prototype.getDiskStorageStats = function(params) {
     var BAR_WIDTH = 70;
 
     var formatSliceData = function(data) {
-        var bar = _barFormat([
-            [data.bsonBytes / data.onDiskBytes, "="],
-            [(data.recBytes - data.bsonBytes) / data.onDiskBytes, "-"]
-        ],
-                             BAR_WIDTH);
+        var bar = _barFormat(
+            [
+              [data.bsonBytes / data.onDiskBytes, "="],
+              [(data.recBytes - data.bsonBytes) / data.onDiskBytes, "-"]
+            ],
+            BAR_WIDTH);
 
         return sh._dataFormat(data.onDiskBytes).pad(9) + " " + data.numEntries.toFixed(0).pad(10) +
             " " + bar + "  " + (data.bsonBytes / data.onDiskBytes).toPercentStr().pad(8) + " " +
@@ -943,10 +912,7 @@ DBCollection.prototype.getDiskStorageStats = function(params) {
  * getPagesInRAM provides a human-readable summary of the command output
  */
 DBCollection.prototype.pagesInRAM = function(opt) {
-    var cmd = {
-        storageDetails: this.getName(),
-        analyze: 'pagesInRAM'
-    };
+    var cmd = {storageDetails: this.getName(), analyze: 'pagesInRAM'};
     if (typeof(opt) == 'object')
         Object.extend(cmd, opt);
 
@@ -1031,9 +997,7 @@ DBCollection.prototype.getShardVersion = function() {
 
 DBCollection.prototype._getIndexesSystemIndexes = function(filter) {
     var si = this.getDB().getCollection("system.indexes");
-    var query = {
-        ns: this.getFullName()
-    };
+    var query = {ns: this.getFullName()};
     if (filter)
         query = Object.extend(query, filter);
     return si.find(query).toArray();
@@ -1081,10 +1045,7 @@ DBCollection.prototype.getIndexKeys = function() {
 };
 
 DBCollection.prototype.hashAllDocs = function() {
-    var cmd = {
-        dbhash: 1,
-        collections: [this._shortName]
-    };
+    var cmd = {dbhash: 1, collections: [this._shortName]};
     var res = this._dbCommand(cmd);
     var hash = res.collections[this._shortName];
     assert(hash);
@@ -1296,9 +1257,7 @@ DBCollection.prototype.aggregate = function(pipeline, aggregateOptions) {
     // Assign the cleaned up options
     aggregateOptions = copy;
     // Create the initial command document
-    var cmd = {
-        pipeline: pipeline
-    };
+    var cmd = {pipeline: pipeline};
     Object.extend(cmd, aggregateOptions);
 
     if (!('cursor' in cmd)) {
@@ -1329,10 +1288,7 @@ DBCollection.prototype.aggregate = function(pipeline, aggregateOptions) {
 
         if ('result' in res && !("cursor" in res)) {
             // convert old-style output to cursor-style output
-            res.cursor = {
-                ns: '',
-                id: NumberLong(0)
-            };
+            res.cursor = {ns: '', id: NumberLong(0)};
             res.cursor.firstBatch = res.result;
             delete res.result;
         }
@@ -1407,11 +1363,7 @@ DBCollection.prototype.convertToSingleObject = function(valueField) {
 * @param optional object of optional fields;
 */
 DBCollection.prototype.mapReduce = function(map, reduce, optionsOrOutString) {
-    var c = {
-        mapreduce: this._shortName,
-        map: map,
-        reduce: reduce
-    };
+    var c = {mapreduce: this._shortName, map: map, reduce: reduce};
     assert(optionsOrOutString, "need to supply an optionsOrOutString");
 
     if (typeof(optionsOrOutString) == "string")
@@ -1776,11 +1728,7 @@ DBCollection.prototype.distinct = function(keyString, query, options) {
     }
 
     // Distinct command
-    var cmd = {
-        distinct: this.getName(),
-        key: keyString,
-        query: query || {}
-    };
+    var cmd = {distinct: this.getName(), key: keyString, query: query || {}};
 
     // Set maxTimeMS if provided
     if (opts.maxTimeMS) {
@@ -1925,8 +1873,10 @@ PlanCache.prototype.clear = function() {
  * List plans for a query shape.
  */
 PlanCache.prototype.getPlansByQuery = function(query, projection, sort) {
-    return this._runCommandThrowOnError("planCacheListPlans",
-                                        this._parseQueryShape(query, projection, sort)).plans;
+    return this
+        ._runCommandThrowOnError("planCacheListPlans",
+                                 this._parseQueryShape(query, projection, sort))
+        .plans;
 };
 
 /**

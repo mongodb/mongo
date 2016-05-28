@@ -291,7 +291,7 @@ void testSaveAndRestorePositionSeesNewInserts(bool forward, bool unique) {
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         {
-                                                         {key1, loc1}, {key3, loc1},
+                                                            {key1, loc1}, {key3, loc1},
                                                         });
 
     auto cursor = sorted->newCursor(opCtx.get(), forward);
@@ -325,7 +325,7 @@ void testSaveAndRestorePositionSeesNewInsertsAfterRemove(bool forward, bool uniq
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         {
-                                                         {key1, loc1}, {key3, loc1},
+                                                            {key1, loc1}, {key3, loc1},
                                                         });
 
     auto cursor = sorted->newCursor(opCtx.get(), forward);
@@ -365,7 +365,7 @@ void testSaveAndRestorePositionSeesNewInsertsAfterEOF(bool forward, bool unique)
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(false,
                                                         {
-                                                         {key1, loc1},
+                                                            {key1, loc1},
                                                         });
 
     auto cursor = sorted->newCursor(opCtx.get(), forward);
@@ -403,10 +403,11 @@ TEST(SortedDataInterface, SaveAndRestorePositionSeesNewInsertsAfterEOF_Reverse_S
 TEST(SortedDataInterface, SaveAndRestorePositionStandardIndexConsidersRecordId_Forward) {
     auto harnessHelper = newHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
-    auto sorted = harnessHelper->newSortedDataInterface(/*isUnique*/ false,
-                                                        {
-                                                         {key1, loc1}, {key2, loc1}, {key3, loc1},
-                                                        });
+    auto sorted =
+        harnessHelper->newSortedDataInterface(/*isUnique*/ false,
+                                              {
+                                                  {key1, loc1}, {key2, loc1}, {key3, loc1},
+                                              });
 
     auto cursor = sorted->newCursor(opCtx.get());
 
@@ -482,10 +483,11 @@ TEST(SortedDataInterface, SaveAndRestorePositionUniqueIndexWontReturnDupKeys_For
 TEST(SortedDataInterface, SaveAndRestorePositionStandardIndexConsidersRecordId_Reverse) {
     auto harnessHelper = newHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
-    auto sorted = harnessHelper->newSortedDataInterface(/*isUnique*/ false,
-                                                        {
-                                                         {key0, loc1}, {key1, loc1}, {key2, loc2},
-                                                        });
+    auto sorted =
+        harnessHelper->newSortedDataInterface(/*isUnique*/ false,
+                                              {
+                                                  {key0, loc1}, {key1, loc1}, {key2, loc2},
+                                              });
 
     auto cursor = sorted->newCursor(opCtx.get(), false);
 
@@ -561,10 +563,11 @@ TEST(SortedDataInterface, SaveAndRestorePositionUniqueIndexWontReturnDupKeys_Rev
 TEST(SortedDataInterface, SaveUnpositionedAndRestore) {
     auto harnessHelper = newHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
-    auto sorted = harnessHelper->newSortedDataInterface(false,
-                                                        {
-                                                         {key1, loc1}, {key2, loc1}, {key3, loc1},
-                                                        });
+    auto sorted =
+        harnessHelper->newSortedDataInterface(false,
+                                              {
+                                                  {key1, loc1}, {key2, loc1}, {key3, loc1},
+                                              });
 
     auto cursor = sorted->newCursor(opCtx.get());
 

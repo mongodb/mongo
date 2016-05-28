@@ -36,10 +36,10 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/db/background.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_create.h"
@@ -77,7 +77,10 @@ Status rebuildIndexesOnCollection(OperationContext* txn,
                 return Status(
                     ErrorCodes::CannotCreateIndex,
                     str::stream()
-                        << "Cannot rebuild index " << spec << ": " << keyStatus.reason()
+                        << "Cannot rebuild index "
+                        << spec
+                        << ": "
+                        << keyStatus.reason()
                         << " For more info see http://dochub.mongodb.org/core/index-validation");
             }
         }
@@ -194,8 +197,8 @@ Status repairDatabase(OperationContext* txn,
 
     if (engine->isMmapV1()) {
         // MMAPv1 is a layering violation so it implements its own repairDatabase.
-        return static_cast<MMAPV1Engine*>(engine)
-            ->repairDatabase(txn, dbName, preserveClonedFilesOnFailure, backupOriginalFiles);
+        return static_cast<MMAPV1Engine*>(engine)->repairDatabase(
+            txn, dbName, preserveClonedFilesOnFailure, backupOriginalFiles);
     }
 
     // These are MMAPv1 specific

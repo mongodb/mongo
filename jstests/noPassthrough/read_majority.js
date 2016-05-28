@@ -28,8 +28,8 @@ load("jstests/libs/analyze_plan.js");
     var t = db.readMajority;
 
     function assertNoReadMajoritySnapshotAvailable() {
-        var res = t.runCommand('find',
-                               {batchSize: 2, readConcern: {level: "majority"}, maxTimeMS: 1000});
+        var res =
+            t.runCommand('find', {batchSize: 2, readConcern: {level: "majority"}, maxTimeMS: 1000});
         assert.commandFailed(res);
         assert.eq(res.code, ErrorCodes.ExceededTimeLimit);
     }

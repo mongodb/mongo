@@ -55,15 +55,14 @@
         assert.neq(null, doc);
         assert.eq(0, doc.y, tojson(doc));
 
-        res = t.update(
-            {
-              $where: function() {
-                  return this.val === 0;
-              }
-            },
-            {$set: {y: 100}},
-            false,
-            true);
+        res = t.update({
+            $where: function() {
+                return this.val === 0;
+            }
+        },
+                       {$set: {y: 100}},
+                       false,
+                       true);
         assert.writeOK(res);
 
         doc = t.findOne({name: "testdoc"});

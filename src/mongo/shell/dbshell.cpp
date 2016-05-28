@@ -748,7 +748,8 @@ int _main(int argc, char* argv[], char** envp) {
                 hasMongoRC = true;
                 if (!scope->execFile(rcLocation, false, true)) {
                     cout << "The \".mongorc.js\" file located in your home folder could not be "
-                            "executed" << endl;
+                            "executed"
+                         << endl;
                     return -5;
                 }
             }

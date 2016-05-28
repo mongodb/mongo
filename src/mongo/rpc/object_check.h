@@ -29,8 +29,8 @@
 #pragma once
 
 #include "mongo/base/data_type_validated.h"
-#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/server_options.h"
 
 // We do not use the rpc namespace here so we can specialize Validator.

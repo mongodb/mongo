@@ -29,11 +29,10 @@
     assert.eq(col.find({'decimal': {$gte: NumberDecimal('2.000')}}).count(), 3);
     assert.eq(col.find({'decimal': {$lte: NumberDecimal('0.9999999999999999')}}).count(), 4);
 
-    assert.eq(
-        col.find({'decimal': {$nin: [NumberDecimal('Infinity'), NumberDecimal('-Infinity')]}})
-            .count(),
-        9,
-        'Infinity count incorrect');
+    assert.eq(col.find({'decimal': {$nin: [NumberDecimal('Infinity'), NumberDecimal('-Infinity')]}})
+                  .count(),
+              9,
+              'Infinity count incorrect');
 
     // Test $mod
     col.drop();

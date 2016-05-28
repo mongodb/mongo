@@ -90,16 +90,14 @@ TEST(QueryPlannerAnalysis, GetSortPatternSpecialIndexTypes) {
     ASSERT_EQUALS(fromjson("{a: 1}"),
                   QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1, b: 'text', c: 1}")));
     ASSERT_EQUALS(fromjson("{a: 1}"),
-                  QueryPlannerAnalysis::getSortPattern(fromjson(
-                      "{a: 1, b: '2dsphere',"
-                      " c: 1}")));
+                  QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1, b: '2dsphere',"
+                                                                " c: 1}")));
 
     ASSERT_EQUALS(fromjson("{a: 1, b: 1}"),
                   QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1, b: 1, c: 'text'}")));
     ASSERT_EQUALS(fromjson("{a: 1, b: 1}"),
-                  QueryPlannerAnalysis::getSortPattern(fromjson(
-                      "{a: 1, b: 1, c: 'text',"
-                      " d: 1}")));
+                  QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1, b: 1, c: 'text',"
+                                                                " d: 1}")));
 }
 
 // Test the generation of sort orders provided by an index scan done by

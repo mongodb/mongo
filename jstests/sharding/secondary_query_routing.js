@@ -4,9 +4,7 @@
  */
 (function() {
 
-    var rsOpts = {
-        nodes: 2
-    };
+    var rsOpts = {nodes: 2};
     var st = new ShardingTest({mongos: 2, shards: {rs0: rsOpts, rs1: rsOpts}});
 
     st.s0.adminCommand({enableSharding: 'test'});

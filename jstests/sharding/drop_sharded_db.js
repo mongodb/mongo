@@ -21,9 +21,7 @@
         dbC.getCollection("data" + (i % numColls)).insert({_id: i});
     }
 
-    var key = {
-        _id: 1
-    };
+    var key = {_id: 1};
     for (var i = 0; i < numColls; i++) {
         st.shardColl(dbA.getCollection("data" + i), key);
         st.shardColl(dbB.getCollection("data" + i), key);

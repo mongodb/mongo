@@ -62,9 +62,7 @@ var $config = (function() {
                     'inserted');
 
             var coords = [[[-26, -26], [-26, 26], [26, 26], [26, -26], [-26, -26]]];
-            var geoQuery = {
-                geo: {$geoWithin: {$geometry: {type: 'Polygon', coordinates: coords}}}
-            };
+            var geoQuery = {geo: {$geoWithin: {$geometry: {type: 'Polygon', coordinates: coords}}}};
 
             // We can only perform a geo query when we own the collection and are sure a geo index
             // is present. The same is true of text queries.
@@ -91,12 +89,7 @@ var $config = (function() {
             assertAlways.commandWorked(res);
         }
 
-        return {
-            init: init,
-            createIndexes: createIndexes,
-            reIndex: reIndex,
-            query: query
-        };
+        return {init: init, createIndexes: createIndexes, reIndex: reIndex, query: query};
     })();
 
     var transitions = {

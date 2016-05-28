@@ -32,9 +32,7 @@ r = function(key, values) {
     for (var i = 0; i < values.length; i++) {
         total += values[i].apples;
     }
-    return {
-        "apples": total
-    };
+    return {"apples": total};
 };
 
 // mapreduce without geo query works fine

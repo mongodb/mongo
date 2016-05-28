@@ -11,8 +11,10 @@ t.insert({_id: 2, a: "irrelevant content"});
 t.ensureIndex({a: "text"});
 
 // Project the text score.
-var results = t.find({$text: {$search: "textual content -irrelevant"}},
-                     {_idCopy: 0, score: {$meta: "textScore"}}).toArray();
+var results = t.find({$text: {$search: "textual content -irrelevant"}}, {
+                   _idCopy: 0,
+                   score: {$meta: "textScore"}
+               }).toArray();
 // printjson(results);
 // Scores should exist.
 assert.eq(results.length, 2);
@@ -29,8 +31,10 @@ scores[results[1]._id] = results[1].score;
 //
 
 // Project text score into 2 fields.
-results = t.find({$text: {$search: "textual content -irrelevant"}},
-                 {otherScore: {$meta: "textScore"}, score: {$meta: "textScore"}}).toArray();
+results = t.find({$text: {$search: "textual content -irrelevant"}}, {
+               otherScore: {$meta: "textScore"},
+               score: {$meta: "textScore"}
+           }).toArray();
 assert.eq(2, results.length);
 for (var i = 0; i < results.length; ++i) {
     assert.close(scores[results[i]._id], results[i].score);
@@ -41,8 +45,9 @@ for (var i = 0; i < results.length; ++i) {
 
 // Project text score into "x.$" shouldn't crash
 assert.throws(function() {
-    t.find({$text: {$search: "textual content -irrelevant"}}, {'x.$': {$meta: "textScore"}})
-        .toArray();
+    t.find({$text: {$search: "textual content -irrelevant"}}, {
+         'x.$': {$meta: "textScore"}
+     }).toArray();
 });
 
 // TODO: We can't project 'x.y':1 and 'x':1 (yet).
@@ -71,8 +76,10 @@ assert.throws(function() {
 
 // SERVER-12173
 // When $text operator is in $or, should evaluate first
-results = t.find({$or: [{$text: {$search: "textual content -irrelevant"}}, {_id: 1}]},
-                 {_idCopy: 0, score: {$meta: "textScore"}}).toArray();
+results = t.find({$or: [{$text: {$search: "textual content -irrelevant"}}, {_id: 1}]}, {
+               _idCopy: 0,
+               score: {$meta: "textScore"}
+           }).toArray();
 printjson(results);
 assert.eq(2, results.length);
 for (var i = 0; i < results.length; ++i) {

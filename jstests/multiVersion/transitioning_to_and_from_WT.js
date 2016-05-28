@@ -7,11 +7,10 @@
 
     jsTestLog("Setting up initial data set with the last stable version of mongod");
 
-    var toolTest = new ToolTest('transitioning_to_and_from_WT',
-                                {
-                                  binVersion: MongoRunner.getBinVersionFor("last-stable"),
-                                  storageEngine: "mmapv1",
-                                });
+    var toolTest = new ToolTest('transitioning_to_and_from_WT', {
+        binVersion: MongoRunner.getBinVersionFor("last-stable"),
+        storageEngine: "mmapv1",
+    });
 
     toolTest.dbpath = toolTest.root + "/original/";
     resetDbpath(toolTest.dbpath);

@@ -89,11 +89,8 @@ function expectState(rst, state) {
         // fail to
         // start up and won't automatically add "configsvr" to the replset config (SERVER-21236).
         jsTestLog("set initiated without configsvr, restarted adding --configsvr cmd line");
-        var rst = new ReplSetTest({
-            name: "configrs7",
-            nodes: 1,
-            nodeOptions: {journal: "", storageEngine: "wiredTiger"}
-        });
+        var rst = new ReplSetTest(
+            {name: "configrs7", nodes: 1, nodeOptions: {journal: "", storageEngine: "wiredTiger"}});
 
         rst.startSet();
         var conf = rst.getReplSetConfig();

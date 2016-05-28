@@ -56,9 +56,7 @@ function DataGenerator() {
     function GenObject(seed) {
         var seed = seed || 0;
 
-        return {
-            "object": true
-        };
+        return {"object": true};
     }
     // BSON Type: 4
     function GenArray(seed) {
@@ -647,9 +645,7 @@ function CollectionMetadataGenerator(options) {
         //"autoIndexId" : false // XXX: this doesn't exist in 2.4
     };
     // We need to explicitly enable usePowerOf2Sizes, since it's the default in 2.6 but not in 2.4
-    var normalCollectionMetadata = {
-        "usePowerOf2Sizes": true
-    };
+    var normalCollectionMetadata = {"usePowerOf2Sizes": true};
 
     return {
         "get": function() {

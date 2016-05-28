@@ -122,10 +122,12 @@ TEST(KeyPattern, GlobalMinMax) {
                   BSON("a" << MAXKEY << "b" << MINKEY));
 
     ASSERT_EQUALS(KeyPattern(BSON("a"
-                                  << "hashed")).globalMin(),
+                                  << "hashed"))
+                      .globalMin(),
                   BSON("a" << MINKEY));
     ASSERT_EQUALS(KeyPattern(BSON("a"
-                                  << "hashed")).globalMax(),
+                                  << "hashed"))
+                      .globalMax(),
                   BSON("a" << MAXKEY));
 
     //

@@ -66,8 +66,8 @@ StatusWith<KillCursorsRequest> KillCursorsRequest::parseFromBSON(const std::stri
 
     if (cmdObj[kCursorsField].type() != BSONType::Array) {
         return {ErrorCodes::FailedToParse,
-                str::stream() << "Field '" << kCursorsField
-                              << "' must be of type array in: " << cmdObj};
+                str::stream() << "Field '" << kCursorsField << "' must be of type array in: "
+                              << cmdObj};
     }
 
     std::vector<CursorId> cursorIds;

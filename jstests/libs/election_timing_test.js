@@ -48,10 +48,7 @@ var ElectionTimingTest = function(opts) {
 ElectionTimingTest.prototype._runTimingTest = function() {
     for (var run = 0; run < this.testRuns; run++) {
         var collectionName = "test." + this.name;
-        var cycleData = {
-            testRun: run,
-            results: []
-        };
+        var cycleData = {testRun: run, results: []};
 
         jsTestLog("Starting ReplSetTest for test " + this.name + " run: " + run);
         this.rst =

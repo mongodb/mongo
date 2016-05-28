@@ -11,10 +11,7 @@ load("jstests/replsets/rslib.js");
     // Initiate set with default for write concern
     var config = replTest.getReplSetConfig();
     config.settings = {};
-    config.settings.getLastErrorDefaults = {
-        'w': 3,
-        'wtimeout': 20000
-    };
+    config.settings.getLastErrorDefaults = {'w': 3, 'wtimeout': 20000};
     config.settings.heartbeatTimeoutSecs = 15;
     // Prevent node 2 from becoming primary, as we will attempt to set it to hidden later.
     config.members[2].priority = 0;

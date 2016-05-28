@@ -102,10 +102,9 @@ void NetworkInterfaceASIO::_setupSocket(AsyncOp* op, tcp::resolver::iterator end
 
     auto& stream = op->connection().stream();
 
-    stream.connect(std::move(endpoints),
-                   [this, op](std::error_code ec) {
-                       _validateAndRun(op, ec, [this, op]() { _runIsMaster(op); });
-                   });
+    stream.connect(std::move(endpoints), [this, op](std::error_code ec) {
+        _validateAndRun(op, ec, [this, op]() { _runIsMaster(op); });
+    });
 }
 
 }  // namespace executor

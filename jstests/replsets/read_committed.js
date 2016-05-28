@@ -11,9 +11,7 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
 (function() {
     "use strict";
 
-    const majorityWriteConcern = {
-        writeConcern: {w: "majority", wtimeout: 60 * 1000}
-    };
+    const majorityWriteConcern = {writeConcern: {w: "majority", wtimeout: 60 * 1000}};
 
     // Each test case includes a 'prepareCollection' method that sets up the initial state starting
     // with an empty collection, a 'write' method that does some write, and two arrays,
@@ -105,13 +103,12 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
 
     function readLatestOplogEntry(readConcernLevel) {
         var oplog = primary.getDB('local').oplog.rs;
-        var res = oplog.runCommand('find',
-                                   {
-                                     "readConcern": {"level": readConcernLevel},
-                                     "maxTimeMS": 3000,
-                                     sort: {$natural: -1},
-                                     limit: 1,
-                                   });
+        var res = oplog.runCommand('find', {
+            "readConcern": {"level": readConcernLevel},
+            "maxTimeMS": 3000,
+            sort: {$natural: -1},
+            limit: 1,
+        });
         assert.commandWorked(res);
         return new DBCommandCursor(coll.getMongo(), res).toArray()[0];
     }

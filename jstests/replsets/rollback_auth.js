@@ -125,15 +125,14 @@
     // Modify the the user and role in a way that will be rolled back.
     b.grantPrivilegesToRole(
         'myRole',
-            [{resource: {db: 'test', collection: 'foo'}, actions: ['collStats']}],
+        [{resource: {db: 'test', collection: 'foo'}, actions: ['collStats']}],
         {});  // Default write concern will wait for majority, which will time out.
-    b.createRole(
-        {
-          role: 'temporaryRole',
-          roles: [],
-          privileges: [{resource: {db: 'test', collection: 'bar'}, actions: ['collStats']}]
-        },
-        {});  // Default write concern will wait for majority, which will time out.
+    b.createRole({
+        role: 'temporaryRole',
+        roles: [],
+        privileges: [{resource: {db: 'test', collection: 'bar'}, actions: ['collStats']}]
+    },
+                 {});  // Default write concern will wait for majority, which will time out.
     b.grantRolesToUser('spencer',
                        ['temporaryRole'],
                        {});  // Default write concern will wait for majority, which will time out.
@@ -172,13 +171,12 @@
     a.grantPrivilegesToRole(
         'myRole', [{resource: {db: 'test', collection: 'baz'}, actions: ['collStats']}], {});
 
-    a.createRole(
-        {
-          role: 'persistentRole',
-          roles: [],
-          privileges: [{resource: {db: 'test', collection: 'foobar'}, actions: ['collStats']}]
-        },
-        {});
+    a.createRole({
+        role: 'persistentRole',
+        roles: [],
+        privileges: [{resource: {db: 'test', collection: 'foobar'}, actions: ['collStats']}]
+    },
+                 {});
     a.grantRolesToUser('spencer', ['persistentRole'], {});
     A.logout();
     a.auth('spencer', 'pwd');
@@ -191,11 +189,9 @@
     // bring B back in contact with A
     // as A is primary, B will roll back and then catch up
     replTest.restart(1);
-    authutil.asCluster(replTest.nodes,
-                       'jstests/libs/key1',
-                       function() {
-                           replTest.awaitReplication();
-                       });
+    authutil.asCluster(replTest.nodes, 'jstests/libs/key1', function() {
+        replTest.awaitReplication();
+    });
     assert.soon(function() {
         return b.auth('spencer', 'pwd');
     });

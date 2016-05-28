@@ -33,8 +33,8 @@
 
 #include "mongo/platform/random.h"
 #include "mongo/platform/unordered_map.h"
-#include "mongo/util/string_map.h"
 #include "mongo/util/log.h"
+#include "mongo/util/string_map.h"
 #include "mongo/util/timer.h"
 
 namespace {

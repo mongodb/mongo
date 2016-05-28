@@ -70,7 +70,7 @@ inline SafeNum SafeNum::operator+(const SafeNum& rhs) const {
 }
 
 inline SafeNum& SafeNum::operator+=(const SafeNum& rhs) {
-    return * this = addInternal(*this, rhs);
+    return *this = addInternal(*this, rhs);
 }
 
 inline SafeNum SafeNum::operator*(const SafeNum& rhs) const {
@@ -78,7 +78,7 @@ inline SafeNum SafeNum::operator*(const SafeNum& rhs) const {
 }
 
 inline SafeNum& SafeNum::operator*=(const SafeNum& rhs) {
-    return * this = mulInternal(*this, rhs);
+    return *this = mulInternal(*this, rhs);
 }
 
 inline SafeNum SafeNum::bitAnd(const SafeNum& rhs) const {
@@ -90,7 +90,7 @@ inline SafeNum SafeNum::operator&(const SafeNum& rhs) const {
 }
 
 inline SafeNum& SafeNum::operator&=(const SafeNum& rhs) {
-    return * this = bitAnd(rhs);
+    return *this = bitAnd(rhs);
 }
 
 inline SafeNum SafeNum::bitOr(const SafeNum& rhs) const {
@@ -102,7 +102,7 @@ inline SafeNum SafeNum::operator|(const SafeNum& rhs) const {
 }
 
 inline SafeNum& SafeNum::operator|=(const SafeNum& rhs) {
-    return * this = bitOr(rhs);
+    return *this = bitOr(rhs);
 }
 
 inline SafeNum SafeNum::bitXor(const SafeNum& rhs) const {
@@ -114,7 +114,7 @@ inline SafeNum SafeNum::operator^(const SafeNum& rhs) const {
 }
 
 inline SafeNum& SafeNum::operator^=(const SafeNum& rhs) {
-    return * this = bitXor(rhs);
+    return *this = bitXor(rhs);
 }
 
 inline bool SafeNum::isValid() const {

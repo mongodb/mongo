@@ -73,10 +73,9 @@ if (jsTest.options().storageEngine && jsTest.options().storageEngine !== "wiredT
 
     // Test that the restarted secondary did NOT do an initial sync by checking the log
     var res = secondary1.adminCommand({getLog: "global"});
-    assert(!contains(res.log,
-                     function(v) {
-                         return v.indexOf("initial sync") != -1;
-                     }));
+    assert(!contains(res.log, function(v) {
+        return v.indexOf("initial sync") != -1;
+    }));
 
     jsTestLog("check data is in both collections");
     assert.eq(secondary1.getDB("test").foo.count(), 100);

@@ -329,7 +329,8 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::_getMigrateCandi
                 // some progress balancing.
                 return {ErrorCodes::IllegalOperation,
                         str::stream()
-                            << "Tag boundaries " << tagInfo.toString()
+                            << "Tag boundaries "
+                            << tagInfo.toString()
                             << " fall in the middle of an existing chunk. Balancing for collection "
                             << nss.ns()
                             << " will be postponed until the chunk is split appropriately."};

@@ -63,9 +63,9 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/index_builder.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_builder.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/jsobj.h"
@@ -90,13 +90,13 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/write_concern.h"
-#include "mongo/rpc/request_interface.h"
-#include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/rpc/protocol.h"
+#include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/rpc/request_interface.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -1379,7 +1379,8 @@ void Command::execCommand(OperationContext* txn,
                     34422,
                     str::stream()
                         << "Received a command with sharding chunk version information but this "
-                           "node is not sharding aware: " << request.getCommandArgs().jsonString(),
+                           "node is not sharding aware: "
+                        << request.getCommandArgs().jsonString(),
                     !oss.hasShardVersion() ||
                         ChunkVersion::isIgnoredVersion(oss.getShardVersion(commandNS)));
             }
@@ -1405,8 +1406,8 @@ void Command::execCommand(OperationContext* txn,
         // If we got a stale config, wait in case the operation is stuck in a critical section
         if (e.getCode() == ErrorCodes::SendStaleConfig) {
             auto& sce = static_cast<const StaleConfigException&>(e);
-            ShardingState::get(txn)
-                ->onStaleShardVersion(txn, NamespaceString(sce.getns()), sce.getVersionReceived());
+            ShardingState::get(txn)->onStaleShardVersion(
+                txn, NamespaceString(sce.getns()), sce.getVersionReceived());
         }
 
         BSONObjBuilder metadataBob;
@@ -1509,8 +1510,8 @@ bool Command::run(OperationContext* txn,
 
                 // Wait until a snapshot is available.
                 while (status == ErrorCodes::ReadConcernMajorityNotAvailableYet) {
-                    LOG(debugLevel)
-                        << "Snapshot not available for readConcern: " << readConcernArgs;
+                    LOG(debugLevel) << "Snapshot not available for readConcern: "
+                                    << readConcernArgs;
                     replCoord->waitUntilSnapshotCommitted(txn, SnapshotName::min());
                     status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
                 }

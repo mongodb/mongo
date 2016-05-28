@@ -28,9 +28,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/lookup_set_cache.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {
 

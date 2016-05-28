@@ -30,8 +30,8 @@
 
 #include "mongo/scripting/mozjs/minkey.h"
 
-#include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/wrapconstrainedmethod.h"

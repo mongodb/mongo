@@ -29,8 +29,8 @@
 
 #include "mongo/util/options_parser/options_parser.h"
 
-#include <boost/program_options.hpp>
 #include <algorithm>
+#include <boost/program_options.hpp>
 #include <cerrno>
 #include <fstream>
 #include <stdio.h>
@@ -40,8 +40,8 @@
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/options_parser/constraints.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_description.h"

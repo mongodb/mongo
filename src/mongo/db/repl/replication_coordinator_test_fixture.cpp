@@ -34,9 +34,9 @@
 
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/is_master_response.h"
-#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/storage_interface_mock.h"
@@ -238,13 +238,14 @@ void ReplCoordTest::simulateSuccessfulDryRun(
         if (request.cmdObj.firstElement().fieldNameStringData() == "replSetRequestVotes") {
             ASSERT_TRUE(request.cmdObj.getBoolField("dryRun"));
             onDryRunRequest(request);
-            net->scheduleResponse(
-                noi,
-                net->now(),
-                makeResponseStatus(BSON("ok" << 1 << "reason"
-                                             << ""
-                                             << "term" << request.cmdObj["term"].Long()
-                                             << "voteGranted" << true)));
+            net->scheduleResponse(noi,
+                                  net->now(),
+                                  makeResponseStatus(BSON("ok" << 1 << "reason"
+                                                               << ""
+                                                               << "term"
+                                                               << request.cmdObj["term"].Long()
+                                                               << "voteGranted"
+                                                               << true)));
             voteRequests++;
         } else {
             error() << "Black holing unexpected request to " << request.target << ": "
@@ -298,13 +299,14 @@ void ReplCoordTest::simulateSuccessfulV1Election() {
             hbResp.setConfigVersion(rsConfig.getConfigVersion());
             net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON(true)));
         } else if (request.cmdObj.firstElement().fieldNameStringData() == "replSetRequestVotes") {
-            net->scheduleResponse(
-                noi,
-                net->now(),
-                makeResponseStatus(BSON("ok" << 1 << "reason"
-                                             << ""
-                                             << "term" << request.cmdObj["term"].Long()
-                                             << "voteGranted" << true)));
+            net->scheduleResponse(noi,
+                                  net->now(),
+                                  makeResponseStatus(BSON("ok" << 1 << "reason"
+                                                               << ""
+                                                               << "term"
+                                                               << request.cmdObj["term"].Long()
+                                                               << "voteGranted"
+                                                               << true)));
         } else {
             error() << "Black holing unexpected request to " << request.target << ": "
                     << request.cmdObj;
@@ -359,8 +361,8 @@ void ReplCoordTest::simulateSuccessfulElection() {
             net->scheduleResponse(
                 noi,
                 net->now(),
-                makeResponseStatus(BSON("ok" << 1 << "fresher" << false << "opTime" << Date_t()
-                                             << "veto" << false)));
+                makeResponseStatus(BSON(
+                    "ok" << 1 << "fresher" << false << "opTime" << Date_t() << "veto" << false)));
         } else if (request.cmdObj.firstElement().fieldNameStringData() == "replSetElect") {
             net->scheduleResponse(noi,
                                   net->now(),

@@ -32,13 +32,13 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/query/index_bounds.h"
-#include "mongo/db/json.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/json.h"
+#include "mongo/db/query/index_bounds.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/text.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/text.h"
 
 using namespace mongo;
 

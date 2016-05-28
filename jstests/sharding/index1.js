@@ -118,9 +118,11 @@
 
             // Make sure the index created is unique!
             assert.eq(1,
-                      coll.getIndexes().filter(function(z) {
-                          return friendlyEqual(z.key, {num: 1}) && z.unique;
-                      }).length);
+                      coll.getIndexes()
+                          .filter(function(z) {
+                              return friendlyEqual(z.key, {num: 1}) && z.unique;
+                          })
+                          .length);
         }
         if (i == 7) {
             coll.remove({});
@@ -156,9 +158,11 @@
 
             // Make sure the index created is unique!
             assert.eq(1,
-                      coll.getIndexes().filter(function(z) {
-                          return friendlyEqual(z.key, {num: 1}) && z.unique;
-                      }).length);
+                      coll.getIndexes()
+                          .filter(function(z) {
+                              return friendlyEqual(z.key, {num: 1}) && z.unique;
+                          })
+                          .length);
         }
         if (i == 9) {
             // Unique index exists on a different field as well

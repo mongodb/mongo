@@ -112,12 +112,12 @@ TEST(CanonicalQueryTest, IsValidText) {
     ASSERT_OK(isValid("{$text: {$search: 's'}}", *lpq));
 
     // Valid: TEXT inside OR.
-    ASSERT_OK(isValid(
-        "{$or: ["
-        "    {$text: {$search: 's'}},"
-        "    {a: 1}"
-        "]}",
-        *lpq));
+    ASSERT_OK(
+        isValid("{$or: ["
+                "    {$text: {$search: 's'}},"
+                "    {a: 1}"
+                "]}",
+                *lpq));
 
     // Valid: TEXT outside NOR.
     ASSERT_OK(isValid("{$text: {$search: 's'}, $nor: [{a: 1}, {b: 1}]}", *lpq));
@@ -126,37 +126,37 @@ TEST(CanonicalQueryTest, IsValidText) {
     ASSERT_NOT_OK(isValid("{$nor: [{$text: {$search: 's'}}, {a: 1}]}", *lpq));
 
     // Invalid: TEXT inside NOR.
-    ASSERT_NOT_OK(isValid(
-        "{$nor: ["
-        "    {$or: ["
-        "        {$text: {$search: 's'}},"
-        "        {a: 1}"
-        "    ]},"
-        "    {a: 2}"
-        "]}",
-        *lpq));
+    ASSERT_NOT_OK(
+        isValid("{$nor: ["
+                "    {$or: ["
+                "        {$text: {$search: 's'}},"
+                "        {a: 1}"
+                "    ]},"
+                "    {a: 2}"
+                "]}",
+                *lpq));
 
     // Invalid: >1 TEXT.
-    ASSERT_NOT_OK(isValid(
-        "{$and: ["
-        "    {$text: {$search: 's'}},"
-        "    {$text: {$search: 't'}}"
-        "]}",
-        *lpq));
+    ASSERT_NOT_OK(
+        isValid("{$and: ["
+                "    {$text: {$search: 's'}},"
+                "    {$text: {$search: 't'}}"
+                "]}",
+                *lpq));
 
     // Invalid: >1 TEXT.
-    ASSERT_NOT_OK(isValid(
-        "{$and: ["
-        "    {$or: ["
-        "        {$text: {$search: 's'}},"
-        "        {a: 1}"
-        "    ]},"
-        "    {$or: ["
-        "        {$text: {$search: 't'}},"
-        "        {b: 1}"
-        "    ]}"
-        "]}",
-        *lpq));
+    ASSERT_NOT_OK(
+        isValid("{$and: ["
+                "    {$or: ["
+                "        {$text: {$search: 's'}},"
+                "        {a: 1}"
+                "    ]},"
+                "    {$or: ["
+                "        {$text: {$search: 't'}},"
+                "        {b: 1}"
+                "    ]}"
+                "]}",
+                *lpq));
 }
 
 TEST(CanonicalQueryTest, IsValidTextTailable) {
@@ -178,61 +178,61 @@ TEST(CanonicalQueryTest, IsValidGeo) {
     ASSERT_OK(isValid("{a: {$near: [0, 0]}}", *lpq));
 
     // Valid: GEO_NEAR inside nested AND.
-    ASSERT_OK(isValid(
-        "{$and: ["
-        "    {$and: ["
-        "        {a: {$near: [0, 0]}},"
-        "        {b: 1}"
-        "    ]},"
-        "    {c: 1}"
-        "]}",
-        *lpq));
+    ASSERT_OK(
+        isValid("{$and: ["
+                "    {$and: ["
+                "        {a: {$near: [0, 0]}},"
+                "        {b: 1}"
+                "    ]},"
+                "    {c: 1}"
+                "]}",
+                *lpq));
 
     // Invalid: >1 GEO_NEAR.
-    ASSERT_NOT_OK(isValid(
-        "{$and: ["
-        "    {a: {$near: [0, 0]}},"
-        "    {b: {$near: [0, 0]}}"
-        "]}",
-        *lpq));
+    ASSERT_NOT_OK(
+        isValid("{$and: ["
+                "    {a: {$near: [0, 0]}},"
+                "    {b: {$near: [0, 0]}}"
+                "]}",
+                *lpq));
 
     // Invalid: >1 GEO_NEAR.
-    ASSERT_NOT_OK(isValid(
-        "{$and: ["
-        "    {a: {$geoNear: [0, 0]}},"
-        "    {b: {$near: [0, 0]}}"
-        "]}",
-        *lpq));
+    ASSERT_NOT_OK(
+        isValid("{$and: ["
+                "    {a: {$geoNear: [0, 0]}},"
+                "    {b: {$near: [0, 0]}}"
+                "]}",
+                *lpq));
 
     // Invalid: >1 GEO_NEAR.
-    ASSERT_NOT_OK(isValid(
-        "{$and: ["
-        "    {$and: ["
-        "        {a: {$near: [0, 0]}},"
-        "        {b: 1}"
-        "    ]},"
-        "    {$and: ["
-        "        {c: {$near: [0, 0]}},"
-        "        {d: 1}"
-        "    ]}"
-        "]}",
-        *lpq));
+    ASSERT_NOT_OK(
+        isValid("{$and: ["
+                "    {$and: ["
+                "        {a: {$near: [0, 0]}},"
+                "        {b: 1}"
+                "    ]},"
+                "    {$and: ["
+                "        {c: {$near: [0, 0]}},"
+                "        {d: 1}"
+                "    ]}"
+                "]}",
+                *lpq));
 
     // Invalid: GEO_NEAR inside NOR.
-    ASSERT_NOT_OK(isValid(
-        "{$nor: ["
-        "    {a: {$near: [0, 0]}},"
-        "    {b: 1}"
-        "]}",
-        *lpq));
+    ASSERT_NOT_OK(
+        isValid("{$nor: ["
+                "    {a: {$near: [0, 0]}},"
+                "    {b: 1}"
+                "]}",
+                *lpq));
 
     // Invalid: GEO_NEAR inside OR.
-    ASSERT_NOT_OK(isValid(
-        "{$or: ["
-        "    {a: {$near: [0, 0]}},"
-        "    {b: 1}"
-        "]}",
-        *lpq));
+    ASSERT_NOT_OK(
+        isValid("{$or: ["
+                "    {a: {$near: [0, 0]}},"
+                "    {b: 1}"
+                "]}",
+                *lpq));
 }
 
 TEST(CanonicalQueryTest, IsValidTextAndGeo) {
@@ -247,13 +247,13 @@ TEST(CanonicalQueryTest, IsValidTextAndGeo) {
     ASSERT_NOT_OK(isValid("{$text: {$search: 's'}, a: {$geoNear: [0, 0]}}", *lpq));
 
     // Invalid: TEXT and GEO_NEAR.
-    ASSERT_NOT_OK(isValid(
-        "{$or: ["
-        "    {$text: {$search: 's'}},"
-        "    {a: 1}"
-        " ],"
-        " b: {$near: [0, 0]}}",
-        *lpq));
+    ASSERT_NOT_OK(
+        isValid("{$or: ["
+                "    {$text: {$search: 's'}},"
+                "    {a: 1}"
+                " ],"
+                " b: {$near: [0, 0]}}",
+                *lpq));
 }
 
 TEST(CanonicalQueryTest, IsValidTextAndNaturalAscending) {

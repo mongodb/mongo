@@ -40,12 +40,13 @@
     // Should not throw exception, since slaveOk'd
     assert.eq(10,
               coll.group({
-                  key: {i: true},
-                  reduce: function(obj, ctx) {
-                      ctx.count += 1;
-                  },
-                  initial: {count: 0}
-              }).length);
+                      key: {i: true},
+                      reduce: function(obj, ctx) {
+                          ctx.count += 1;
+                      },
+                      initial: {count: 0}
+                  })
+                  .length);
 
     try {
         conn.setSlaveOk(false);

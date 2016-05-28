@@ -36,10 +36,10 @@
 
 #include "mongo/base/init.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
-#include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/options_parser/startup_option_init.h"
+#include "mongo/util/options_parser/startup_options.h"
 
 
 namespace mongo {

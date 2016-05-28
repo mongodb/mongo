@@ -500,7 +500,9 @@ Collection* Database::createCollection(OperationContext* txn,
         // This check only applies for actual collections, not indexes or other types of ns.
         uassert(17381,
                 str::stream() << "fully qualified namespace " << ns << " is too long "
-                              << "(max is " << NamespaceString::MaxNsCollectionLen << " bytes)",
+                              << "(max is "
+                              << NamespaceString::MaxNsCollectionLen
+                              << " bytes)",
                 ns.size() <= NamespaceString::MaxNsCollectionLen);
     }
 

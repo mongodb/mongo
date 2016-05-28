@@ -44,9 +44,7 @@ var $config = (function() {
          */
         genUpdateDoc: function genUpdateDoc() {
             var newVal = Random.randInt(this.nDocs);
-            return {
-                $set: {a: newVal}
-            };
+            return {$set: {a: newVal}};
         }
     };
 

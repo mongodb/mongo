@@ -28,8 +28,8 @@
 
 #pragma once
 
-#include <string>
 #include <iosfwd>
+#include <string>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"

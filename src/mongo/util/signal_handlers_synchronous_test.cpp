@@ -31,11 +31,11 @@
 #include "mongo/platform/basic.h"
 
 #include <cmath>
-#include <cstdlib>
 #include <csignal>
+#include <cstdlib>
 
-#include "mongo/unittest/unittest.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 
 namespace {

@@ -30,14 +30,14 @@
 
 #include "mongo/db/exec/collection_scan.h"
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/storage/record_fetcher.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
@@ -74,7 +74,8 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
             ErrorCodes::CappedPositionLost,
             str::stream()
                 << "CollectionScan died due to position in capped collection being deleted. "
-                << "Last seen record id: " << _lastSeenId);
+                << "Last seen record id: "
+                << _lastSeenId);
         *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
         return PlanStage::DEAD;
     }
@@ -107,7 +108,8 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                     Status status(ErrorCodes::CappedPositionLost,
                                   str::stream() << "CollectionScan died due to failure to restore "
                                                 << "tailable cursor position. "
-                                                << "Last seen record id: " << _lastSeenId);
+                                                << "Last seen record id: "
+                                                << _lastSeenId);
                     *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
                     return PlanStage::DEAD;
                 }

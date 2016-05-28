@@ -89,10 +89,12 @@ assert.throws(function() {
     return t.count({loc: {$foo: [0, 0]}});
 });
 assert.throws(function() {
-    return t.find({
-        "nonGeo": "pointA",
-        "geo": {"$geoIntersects": {"$geometry": somepoly}, "$near": {"$geometry": somepoly}}
-    }).count();
+    return t
+        .find({
+            "nonGeo": "pointA",
+            "geo": {"$geoIntersects": {"$geometry": somepoly}, "$near": {"$geometry": somepoly}}
+        })
+        .count();
 });
 
 // If we specify a datum, it has to be valid (WGS84).

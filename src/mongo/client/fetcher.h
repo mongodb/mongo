@@ -40,8 +40,8 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
 

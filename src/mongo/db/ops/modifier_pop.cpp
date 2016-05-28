@@ -89,7 +89,8 @@ Status ModifierPop::init(const BSONElement& modExpr, const Options& opts, bool* 
     if (foundDollar && foundCount > 1) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Too many positional (i.e. '$') elements found in path '"
-                                    << _fieldRef.dottedField() << "'");
+                                    << _fieldRef.dottedField()
+                                    << "'");
     }
 
     //
@@ -136,9 +137,9 @@ Status ModifierPop::prepare(mutablebson::Element root,
             // array.
             if (_preparedState->pathFoundElement.getType() != Array) {
                 mb::Element idElem = mb::findFirstChildNamed(root, "_id");
-                return Status(ErrorCodes::BadValue,
-                              str::stream()
-                                  << "Can only $pop from arrays. {" << idElem.toString()
+                return Status(
+                    ErrorCodes::BadValue,
+                    str::stream() << "Can only $pop from arrays. {" << idElem.toString()
                                   << "} has the field '"
                                   << _preparedState->pathFoundElement.getFieldName()
                                   << "' of non-array type "
@@ -190,7 +191,9 @@ Status ModifierPop::log(LogBuilder* logBuilder) const {
     if (!logElement.ok()) {
         return Status(ErrorCodes::InternalError,
                       str::stream() << "Could not append entry to $pop oplog entry: "
-                                    << "set '" << _fieldRef.dottedField() << "' -> "
+                                    << "set '"
+                                    << _fieldRef.dottedField()
+                                    << "' -> "
                                     << _preparedState->pathFoundElement.toString());
     }
     return logBuilder->addToSets(logElement);

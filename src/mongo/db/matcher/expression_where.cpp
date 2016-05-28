@@ -34,11 +34,11 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/memory.h"
 

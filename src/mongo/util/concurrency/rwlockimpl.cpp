@@ -34,9 +34,9 @@
 #define NOMINMAX
 #include <windows.h>
 #endif
+#include <boost/version.hpp>
 #include <map>
 #include <set>
-#include <boost/version.hpp>
 
 #include "mongo/config.h"
 #include "mongo/stdx/condition_variable.h"

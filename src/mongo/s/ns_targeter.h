@@ -30,13 +30,13 @@
 
 #include <string>
 
-#include "mongo/bson/bsonobj.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/write_ops/batched_update_document.h"
 #include "mongo/s/write_ops/batched_delete_document.h"
+#include "mongo/s/write_ops/batched_update_document.h"
 
 namespace mongo {
 

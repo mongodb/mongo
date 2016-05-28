@@ -88,10 +88,22 @@ TEST(ReplicaSetMonitor, IsMasterReplyRSNotInitiated) {
     BSONObj ismaster = BSON(
         "ismaster" << false << "secondary" << false << "info"
                    << "can't get local.system.replset config from self or any seed (EMPTYCONFIG)"
-                   << "isreplicaset" << true << "maxBsonObjectSize" << 16777216
-                   << "maxMessageSizeBytes" << 48000000 << "maxWriteBatchSize" << 1000
-                   << "localTime" << mongo::jsTime() << "maxWireVersion" << 2 << "minWireVersion"
-                   << 0 << "ok" << 1);
+                   << "isreplicaset"
+                   << true
+                   << "maxBsonObjectSize"
+                   << 16777216
+                   << "maxMessageSizeBytes"
+                   << 48000000
+                   << "maxWriteBatchSize"
+                   << 1000
+                   << "localTime"
+                   << mongo::jsTime()
+                   << "maxWireVersion"
+                   << 2
+                   << "minWireVersion"
+                   << 0
+                   << "ok"
+                   << 1);
 
     IsMasterReply imr(HostAndPort(), -1, ismaster);
 
@@ -110,15 +122,34 @@ TEST(ReplicaSetMonitor, IsMasterReplyRSNotInitiated) {
 TEST(ReplicaSetMonitor, IsMasterReplyRSPrimary) {
     BSONObj ismaster = BSON("setName"
                             << "test"
-                            << "setVersion" << 1 << "electionId" << OID("7fffffff0000000000000001")
-                            << "ismaster" << true << "secondary" << false << "hosts"
-                            << BSON_ARRAY("mongo.example:3000") << "primary"
+                            << "setVersion"
+                            << 1
+                            << "electionId"
+                            << OID("7fffffff0000000000000001")
+                            << "ismaster"
+                            << true
+                            << "secondary"
+                            << false
+                            << "hosts"
+                            << BSON_ARRAY("mongo.example:3000")
+                            << "primary"
                             << "mongo.example:3000"
                             << "me"
                             << "mongo.example:3000"
-                            << "maxBsonObjectSize" << 16777216 << "maxMessageSizeBytes" << 48000000
-                            << "maxWriteBatchSize" << 1000 << "localTime" << mongo::jsTime()
-                            << "maxWireVersion" << 2 << "minWireVersion" << 0 << "ok" << 1);
+                            << "maxBsonObjectSize"
+                            << 16777216
+                            << "maxMessageSizeBytes"
+                            << 48000000
+                            << "maxWriteBatchSize"
+                            << 1000
+                            << "localTime"
+                            << mongo::jsTime()
+                            << "maxWireVersion"
+                            << 2
+                            << "minWireVersion"
+                            << 0
+                            << "ok"
+                            << 1);
 
     IsMasterReply imr(HostAndPort("mongo.example:3000"), -1, ismaster);
 
@@ -138,16 +169,38 @@ TEST(ReplicaSetMonitor, IsMasterReplyRSPrimary) {
 TEST(ReplicaSetMonitor, IsMasterReplyPassiveSecondary) {
     BSONObj ismaster = BSON("setName"
                             << "test"
-                            << "setVersion" << 2 << "electionId" << OID("7fffffff0000000000000001")
-                            << "ismaster" << false << "secondary" << true << "hosts"
-                            << BSON_ARRAY("mongo.example:3000") << "passives"
-                            << BSON_ARRAY("mongo.example:3001") << "primary"
+                            << "setVersion"
+                            << 2
+                            << "electionId"
+                            << OID("7fffffff0000000000000001")
+                            << "ismaster"
+                            << false
+                            << "secondary"
+                            << true
+                            << "hosts"
+                            << BSON_ARRAY("mongo.example:3000")
+                            << "passives"
+                            << BSON_ARRAY("mongo.example:3001")
+                            << "primary"
                             << "mongo.example:3000"
-                            << "passive" << true << "me"
+                            << "passive"
+                            << true
+                            << "me"
                             << "mongo.example:3001"
-                            << "maxBsonObjectSize" << 16777216 << "maxMessageSizeBytes" << 48000000
-                            << "maxWriteBatchSize" << 1000 << "localTime" << mongo::jsTime()
-                            << "maxWireVersion" << 2 << "minWireVersion" << 0 << "ok" << 1);
+                            << "maxBsonObjectSize"
+                            << 16777216
+                            << "maxMessageSizeBytes"
+                            << 48000000
+                            << "maxWriteBatchSize"
+                            << 1000
+                            << "localTime"
+                            << mongo::jsTime()
+                            << "maxWireVersion"
+                            << 2
+                            << "minWireVersion"
+                            << 0
+                            << "ok"
+                            << 1);
 
     IsMasterReply imr(HostAndPort("mongo.example:3001"), -1, ismaster);
 
@@ -168,15 +221,38 @@ TEST(ReplicaSetMonitor, IsMasterReplyPassiveSecondary) {
 TEST(ReplicaSetMonitor, IsMasterReplyHiddenSecondary) {
     BSONObj ismaster = BSON("setName"
                             << "test"
-                            << "setVersion" << 2 << "electionId" << OID("7fffffff0000000000000001")
-                            << "ismaster" << false << "secondary" << true << "hosts"
-                            << BSON_ARRAY("mongo.example:3000") << "primary"
+                            << "setVersion"
+                            << 2
+                            << "electionId"
+                            << OID("7fffffff0000000000000001")
+                            << "ismaster"
+                            << false
+                            << "secondary"
+                            << true
+                            << "hosts"
+                            << BSON_ARRAY("mongo.example:3000")
+                            << "primary"
                             << "mongo.example:3000"
-                            << "passive" << true << "hidden" << true << "me"
+                            << "passive"
+                            << true
+                            << "hidden"
+                            << true
+                            << "me"
                             << "mongo.example:3001"
-                            << "maxBsonObjectSize" << 16777216 << "maxMessageSizeBytes" << 48000000
-                            << "maxWriteBatchSize" << 1000 << "localTime" << mongo::jsTime()
-                            << "maxWireVersion" << 2 << "minWireVersion" << 0 << "ok" << 1);
+                            << "maxBsonObjectSize"
+                            << 16777216
+                            << "maxMessageSizeBytes"
+                            << 48000000
+                            << "maxWriteBatchSize"
+                            << 1000
+                            << "localTime"
+                            << mongo::jsTime()
+                            << "maxWireVersion"
+                            << 2
+                            << "minWireVersion"
+                            << 0
+                            << "ok"
+                            << 1);
 
     IsMasterReply imr(HostAndPort("mongo.example:3001"), -1, ismaster);
 
@@ -196,20 +272,40 @@ TEST(ReplicaSetMonitor, IsMasterReplyHiddenSecondary) {
 TEST(ReplicaSetMonitor, IsMasterSecondaryWithTags) {
     BSONObj ismaster = BSON("setName"
                             << "test"
-                            << "setVersion" << 2 << "electionId" << OID("7fffffff0000000000000001")
-                            << "ismaster" << false << "secondary" << true << "hosts"
+                            << "setVersion"
+                            << 2
+                            << "electionId"
+                            << OID("7fffffff0000000000000001")
+                            << "ismaster"
+                            << false
+                            << "secondary"
+                            << true
+                            << "hosts"
                             << BSON_ARRAY("mongo.example:3000"
-                                          << "mongo.example:3001") << "primary"
+                                          << "mongo.example:3001")
+                            << "primary"
                             << "mongo.example:3000"
                             << "me"
                             << "mongo.example:3001"
-                            << "maxBsonObjectSize" << 16777216 << "maxMessageSizeBytes" << 48000000
-                            << "maxWriteBatchSize" << 1000 << "localTime" << mongo::jsTime()
-                            << "maxWireVersion" << 2 << "minWireVersion" << 0 << "tags"
+                            << "maxBsonObjectSize"
+                            << 16777216
+                            << "maxMessageSizeBytes"
+                            << 48000000
+                            << "maxWriteBatchSize"
+                            << 1000
+                            << "localTime"
+                            << mongo::jsTime()
+                            << "maxWireVersion"
+                            << 2
+                            << "minWireVersion"
+                            << 0
+                            << "tags"
                             << BSON("dc"
                                     << "nyc"
                                     << "use"
-                                    << "production") << "ok" << 1);
+                                    << "production")
+                            << "ok"
+                            << 1);
 
     IsMasterReply imr(HostAndPort("mongo.example:3001"), -1, ismaster);
 
@@ -249,10 +345,16 @@ TEST(ReplicaSetMonitor, CheckAllSeedsSerial) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster" << primary << "secondary" << !primary
-                                        << "hosts" << BSON_ARRAY("a"
-                                                                 << "b"
-                                                                 << "c") << "ok" << true));
+                                        << "ismaster"
+                                        << primary
+                                        << "secondary"
+                                        << !primary
+                                        << "hosts"
+                                        << BSON_ARRAY("a"
+                                                      << "b"
+                                                      << "c")
+                                        << "ok"
+                                        << true));
     }
 
     NextStep ns = refresher.getNextStep();
@@ -299,10 +401,16 @@ TEST(ReplicaSetMonitor, CheckAllSeedsParallel) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster" << primary << "secondary" << !primary
-                                        << "hosts" << BSON_ARRAY("a"
-                                                                 << "b"
-                                                                 << "c") << "ok" << true));
+                                        << "ismaster"
+                                        << primary
+                                        << "secondary"
+                                        << !primary
+                                        << "hosts"
+                                        << BSON_ARRAY("a"
+                                                      << "b"
+                                                      << "c")
+                                        << "ok"
+                                        << true));
     }
 
     // Now all hosts have returned data
@@ -340,10 +448,16 @@ TEST(ReplicaSetMonitor, NoMasterInitAllUp) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster" << false << "secondary" << true << "hosts"
+                                        << "ismaster"
+                                        << false
+                                        << "secondary"
+                                        << true
+                                        << "hosts"
                                         << BSON_ARRAY("a"
                                                       << "b"
-                                                      << "c") << "ok" << true));
+                                                      << "c")
+                                        << "ok"
+                                        << true));
     }
 
     NextStep ns = refresher.getNextStep();
@@ -380,11 +494,17 @@ TEST(ReplicaSetMonitor, MasterNotInSeeds_NoPrimaryInIsMaster) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster" << false << "secondary" << true << "hosts"
+                                        << "ismaster"
+                                        << false
+                                        << "secondary"
+                                        << true
+                                        << "hosts"
                                         << BSON_ARRAY("a"
                                                       << "b"
                                                       << "c"
-                                                      << "d") << "ok" << true));
+                                                      << "d")
+                                        << "ok"
+                                        << true));
     }
 
     // Only look at "d" after exhausting all other hosts
@@ -395,11 +515,17 @@ TEST(ReplicaSetMonitor, MasterNotInSeeds_NoPrimaryInIsMaster) {
                                -1,
                                BSON("setName"
                                     << "name"
-                                    << "ismaster" << true << "secondary" << false << "hosts"
+                                    << "ismaster"
+                                    << true
+                                    << "secondary"
+                                    << false
+                                    << "hosts"
                                     << BSON_ARRAY("a"
                                                   << "b"
                                                   << "c"
-                                                  << "d") << "ok" << true));
+                                                  << "d")
+                                    << "ok"
+                                    << true));
 
 
     ns = refresher.getNextStep();
@@ -449,13 +575,19 @@ TEST(ReplicaSetMonitor, MasterNotInSeeds_PrimaryInIsMaster) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster" << primary << "secondary" << !primary
+                                        << "ismaster"
+                                        << primary
+                                        << "secondary"
+                                        << !primary
                                         << "primary"
                                         << "d"
-                                        << "hosts" << BSON_ARRAY("a"
-                                                                 << "b"
-                                                                 << "c"
-                                                                 << "d") << "ok" << true));
+                                        << "hosts"
+                                        << BSON_ARRAY("a"
+                                                      << "b"
+                                                      << "c"
+                                                      << "d")
+                                        << "ok"
+                                        << true));
     }
 
     NextStep ns = refresher.getNextStep();
@@ -501,8 +633,14 @@ TEST(ReplicaSetMonitor, SlavesUsableEvenIfNoMaster) {
                                -1,
                                BSON("setName"
                                     << "name"
-                                    << "ismaster" << false << "secondary" << true << "hosts"
-                                    << BSON_ARRAY("a") << "ok" << true));
+                                    << "ismaster"
+                                    << false
+                                    << "secondary"
+                                    << true
+                                    << "hosts"
+                                    << BSON_ARRAY("a")
+                                    << "ok"
+                                    << true));
 
     // Check intended conditions for entry to refreshUntilMatches.
     ASSERT(state->currentScan->hostsToScan.empty());
@@ -547,10 +685,16 @@ TEST(ReplicaSetMonitor, MultipleMasterLastNodeWins) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster" << true << "secondary" << false << "hosts"
+                                        << "ismaster"
+                                        << true
+                                        << "secondary"
+                                        << false
+                                        << "hosts"
                                         << BSON_ARRAY("a"
                                                       << "b"
-                                                      << "c") << "ok" << true));
+                                                      << "c")
+                                        << "ok"
+                                        << true));
 
         // Ensure the set primary is the host we just got a reply from
         HostAndPort currentPrimary = state->getMatchingHost(primaryOnly);
@@ -594,9 +738,14 @@ TEST(ReplicaSetMonitor, MasterIsSourceOfTruth) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster" << primary << "secondary" << !primary
-                                        << "hosts" << (primary ? primaryHosts : secondaryHosts)
-                                        << "ok" << true));
+                                        << "ismaster"
+                                        << primary
+                                        << "secondary"
+                                        << !primary
+                                        << "hosts"
+                                        << (primary ? primaryHosts : secondaryHosts)
+                                        << "ok"
+                                        << true));
 
         ns = refresher.getNextStep();
     }
@@ -643,8 +792,14 @@ TEST(ReplicaSetMonitor, MultipleMastersDisagree) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster" << true << "secondary" << false << "hosts"
-                                        << hostsForSeed[i % 2] << "ok" << true));
+                                        << "ismaster"
+                                        << true
+                                        << "secondary"
+                                        << false
+                                        << "hosts"
+                                        << hostsForSeed[i % 2]
+                                        << "ok"
+                                        << true));
 
         // Ensure the primary is the host we just got a reply from
         HostAndPort currentPrimary = state->getMatchingHost(primaryOnly);
@@ -673,8 +828,14 @@ TEST(ReplicaSetMonitor, MultipleMastersDisagree) {
                                -1,
                                BSON("setName"
                                     << "name"
-                                    << "ismaster" << false << "secondary" << true << "hosts"
-                                    << hostsForSeed[0] << "ok" << true));
+                                    << "ismaster"
+                                    << false
+                                    << "secondary"
+                                    << true
+                                    << "hosts"
+                                    << hostsForSeed[0]
+                                    << "ok"
+                                    << true));
 
     // scan should be complete
     ns = refresher.getNextStep();
@@ -721,10 +882,16 @@ TEST(ReplicaSetMonitor, GetMatchingDuringScan) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster" << primary << "secondary" << !primary
-                                        << "hosts" << BSON_ARRAY("a"
-                                                                 << "b"
-                                                                 << "c") << "ok" << true));
+                                        << "ismaster"
+                                        << primary
+                                        << "secondary"
+                                        << !primary
+                                        << "hosts"
+                                        << BSON_ARRAY("a"
+                                                      << "b"
+                                                      << "c")
+                                        << "ok"
+                                        << true));
 
         bool hasPrimary = !(state->getMatchingHost(primaryOnly).empty());
         bool hasSecondary = !(state->getMatchingHost(secondaryOnly).empty());
@@ -761,10 +928,16 @@ TEST(ReplicaSetMonitor, OutOfBandFailedHost) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster" << primary << "secondary" << !primary
-                                        << "hosts" << BSON_ARRAY("a"
-                                                                 << "b"
-                                                                 << "c") << "ok" << true));
+                                        << "ismaster"
+                                        << primary
+                                        << "secondary"
+                                        << !primary
+                                        << "hosts"
+                                        << BSON_ARRAY("a"
+                                                      << "b"
+                                                      << "c")
+                                        << "ok"
+                                        << true));
 
         if (i >= 1) {
             HostAndPort a("a");
@@ -811,10 +984,17 @@ TEST(ReplicaSetMonitorTests, NewPrimaryWithMaxElectionId) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster" << true << "secondary" << false << "hosts"
+                                        << "ismaster"
+                                        << true
+                                        << "secondary"
+                                        << false
+                                        << "hosts"
                                         << BSON_ARRAY("a"
                                                       << "b"
-                                                      << "c") << "electionId" << OID::gen() << "ok"
+                                                      << "c")
+                                        << "electionId"
+                                        << OID::gen()
+                                        << "ok"
                                         << true));
 
         // Ensure the set primary is the host we just got a reply from
@@ -862,12 +1042,18 @@ TEST(ReplicaSetMonitorTests, IgnoreElectionIdFromSecondaries) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster" << primary << "secondary" << !primary
+                                        << "ismaster"
+                                        << primary
+                                        << "secondary"
+                                        << !primary
                                         << "electionId"
-                                        << (primary ? primaryElectionId : OID::gen()) << "hosts"
+                                        << (primary ? primaryElectionId : OID::gen())
+                                        << "hosts"
                                         << BSON_ARRAY("a"
                                                       << "b"
-                                                      << "c") << "ok" << true));
+                                                      << "c")
+                                        << "ok"
+                                        << true));
     }
 
     // check that the SetState's maxElectionId == primary's electionId
@@ -901,11 +1087,20 @@ TEST(ReplicaSetMonitorTests, StalePrimaryWithObsoleteElectionId) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster" << true << "secondary" << false
-                                        << "setVersion" << 1 << "electionId" << secondElectionId
-                                        << "hosts" << BSON_ARRAY("a"
-                                                                 << "b"
-                                                                 << "c") << "ok" << true));
+                                        << "ismaster"
+                                        << true
+                                        << "secondary"
+                                        << false
+                                        << "setVersion"
+                                        << 1
+                                        << "electionId"
+                                        << secondElectionId
+                                        << "hosts"
+                                        << BSON_ARRAY("a"
+                                                      << "b"
+                                                      << "c")
+                                        << "ok"
+                                        << true));
 
         Node* node = state->findNode(ns.host);
         ASSERT(node);
@@ -925,11 +1120,18 @@ TEST(ReplicaSetMonitorTests, StalePrimaryWithObsoleteElectionId) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster" << true << "secondary" << false
-                                        << "electionId" << firstElectionId << "hosts"
+                                        << "ismaster"
+                                        << true
+                                        << "secondary"
+                                        << false
+                                        << "electionId"
+                                        << firstElectionId
+                                        << "hosts"
                                         << BSON_ARRAY("a"
                                                       << "b"
-                                                      << "c") << "ok" << true));
+                                                      << "c")
+                                        << "ok"
+                                        << true));
 
         Node* node = state->findNode(ns.host);
         ASSERT(node);
@@ -951,10 +1153,16 @@ TEST(ReplicaSetMonitorTests, StalePrimaryWithObsoleteElectionId) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster" << false << "secondary" << true << "hosts"
+                                        << "ismaster"
+                                        << false
+                                        << "secondary"
+                                        << true
+                                        << "hosts"
                                         << BSON_ARRAY("a"
                                                       << "b"
-                                                      << "c") << "ok" << true));
+                                                      << "c")
+                                        << "ok"
+                                        << true));
 
         Node* node = state->findNode(ns.host);
         ASSERT(node);
@@ -997,11 +1205,20 @@ TEST(ReplicaSetMonitorTests, TwoPrimaries2ndHasNewerConfigVersion) {
                                -1,
                                BSON("setName"
                                     << "name"
-                                    << "ismaster" << true << "secondary" << false << "setVersion"
-                                    << 1 << "electionId" << OID("7fffffff0000000000000001")
-                                    << "hosts" << BSON_ARRAY("a"
-                                                             << "b"
-                                                             << "c") << "ok" << true));
+                                    << "ismaster"
+                                    << true
+                                    << "secondary"
+                                    << false
+                                    << "setVersion"
+                                    << 1
+                                    << "electionId"
+                                    << OID("7fffffff0000000000000001")
+                                    << "hosts"
+                                    << BSON_ARRAY("a"
+                                                  << "b"
+                                                  << "c")
+                                    << "ok"
+                                    << true));
 
     // check that the SetState's maxElectionId == primary's electionId
     ASSERT_EQUALS(state->maxElectionId, OID("7fffffff0000000000000001"));
@@ -1014,11 +1231,20 @@ TEST(ReplicaSetMonitorTests, TwoPrimaries2ndHasNewerConfigVersion) {
                                -1,
                                BSON("setName"
                                     << "name"
-                                    << "ismaster" << true << "secondary" << false << "setVersion"
-                                    << 2 << "electionId" << primaryElectionId << "hosts"
+                                    << "ismaster"
+                                    << true
+                                    << "secondary"
+                                    << false
+                                    << "setVersion"
+                                    << 2
+                                    << "electionId"
+                                    << primaryElectionId
+                                    << "hosts"
                                     << BSON_ARRAY("a"
                                                   << "b"
-                                                  << "c") << "ok" << true));
+                                                  << "c")
+                                    << "ok"
+                                    << true));
 
     ASSERT_EQUALS(state->maxElectionId, primaryElectionId);
     ASSERT_EQUALS(state->configVersion, 2);
@@ -1040,11 +1266,20 @@ TEST(ReplicaSetMonitorTests, TwoPrimaries2ndHasOlderConfigVersion) {
                                -1,
                                BSON("setName"
                                     << "name"
-                                    << "ismaster" << true << "secondary" << false << "electionId"
-                                    << primaryElectionId << "setVersion" << 2 << "hosts"
+                                    << "ismaster"
+                                    << true
+                                    << "secondary"
+                                    << false
+                                    << "electionId"
+                                    << primaryElectionId
+                                    << "setVersion"
+                                    << 2
+                                    << "hosts"
                                     << BSON_ARRAY("a"
                                                   << "b"
-                                                  << "c") << "ok" << true));
+                                                  << "c")
+                                    << "ok"
+                                    << true));
 
     ASSERT_EQUALS(state->maxElectionId, primaryElectionId);
     ASSERT_EQUALS(state->configVersion, 2);
@@ -1054,11 +1289,20 @@ TEST(ReplicaSetMonitorTests, TwoPrimaries2ndHasOlderConfigVersion) {
                                -1,
                                BSON("setName"
                                     << "name"
-                                    << "ismaster" << true << "secondary" << false << "setVersion"
-                                    << 1 << "electionId" << OID("7fffffff0000000000000001")
-                                    << "hosts" << BSON_ARRAY("a"
-                                                             << "b"
-                                                             << "c") << "ok" << true));
+                                    << "ismaster"
+                                    << true
+                                    << "secondary"
+                                    << false
+                                    << "setVersion"
+                                    << 1
+                                    << "electionId"
+                                    << OID("7fffffff0000000000000001")
+                                    << "hosts"
+                                    << BSON_ARRAY("a"
+                                                  << "b"
+                                                  << "c")
+                                    << "ok"
+                                    << true));
 
     ASSERT_EQUALS(state->maxElectionId, primaryElectionId);
     ASSERT_EQUALS(state->configVersion, 2);

@@ -64,9 +64,8 @@ assert.eq(numDocs,
 
 // Make sure it's sharded and split
 var newNumChunks = config.chunks.count({ns: testDB.mrShardedOut._fullName});
-assert.gt(newNumChunks,
-          1,
-          "Sharding FAILURE: " + testDB.mrShardedOut._fullName + " has only 1 chunk");
+assert.gt(
+    newNumChunks, 1, "Sharding FAILURE: " + testDB.mrShardedOut._fullName + " has only 1 chunk");
 
 // Check that there are no "jumbo" chunks.
 var objSize = Object.bsonsize(testDB.mrShardedOut.findOne());
@@ -74,13 +73,11 @@ var docsPerChunk = 1024 * 1024 / objSize * 1.1;  // 1MB chunk size + allowance
 
 st.printShardingStatus(true);
 
-config.chunks.find({ns: testDB.mrShardedOut.getFullName()})
-    .forEach(function(chunkDoc) {
-        var count =
-            testDB.mrShardedOut.find({_id: {$gte: chunkDoc.min._id, $lt: chunkDoc.max._id}})
-                .itcount();
-        assert.lte(count, docsPerChunk, 'Chunk has too many docs: ' + tojson(chunkDoc));
-    });
+config.chunks.find({ns: testDB.mrShardedOut.getFullName()}).forEach(function(chunkDoc) {
+    var count =
+        testDB.mrShardedOut.find({_id: {$gte: chunkDoc.min._id, $lt: chunkDoc.max._id}}).itcount();
+    assert.lte(count, docsPerChunk, 'Chunk has too many docs: ' + tojson(chunkDoc));
+});
 
 // Check that chunks for the newly created sharded output collection are well distributed.
 var shard0Chunks =
@@ -127,9 +124,8 @@ assert.eq(numDocs,
 
 // Make sure it's sharded and split
 newNumChunks = config.chunks.count({ns: testDB.mrShardedOut._fullName});
-assert.gt(newNumChunks,
-          1,
-          "Sharding FAILURE: " + testDB.mrShardedOut._fullName + " has only 1 chunk");
+assert.gt(
+    newNumChunks, 1, "Sharding FAILURE: " + testDB.mrShardedOut._fullName + " has only 1 chunk");
 
 st.printShardingStatus(true);
 

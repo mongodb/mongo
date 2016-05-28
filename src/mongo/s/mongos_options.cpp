@@ -99,14 +99,15 @@ Status addMongosOptions(moe::OptionSection* options) {
     sharding_options.addOptionChaining(
         "sharding.chunkSize", "chunkSize", moe::Int, "maximum amount of data per chunk");
 
-    sharding_options.addOptionChaining("net.http.JSONPEnabled",
-                                       "jsonp",
-                                       moe::Switch,
-                                       "allow JSONP access via http (has security implications)")
+    sharding_options
+        .addOptionChaining("net.http.JSONPEnabled",
+                           "jsonp",
+                           moe::Switch,
+                           "allow JSONP access via http (has security implications)")
         .setSources(moe::SourceAllLegacy);
 
-    sharding_options.addOptionChaining(
-                         "noscripting", "noscripting", moe::Switch, "disable scripting engine")
+    sharding_options
+        .addOptionChaining("noscripting", "noscripting", moe::Switch, "disable scripting engine")
         .setSources(moe::SourceAllLegacy);
 
 
@@ -122,15 +123,14 @@ Status addMongosOptions(moe::OptionSection* options) {
     options->addSection(ssl_options);
 #endif
 
-    options->addOptionChaining("noAutoSplit",
-                               "noAutoSplit",
-                               moe::Switch,
-                               "do not send split commands with writes")
+    options
+        ->addOptionChaining(
+            "noAutoSplit", "noAutoSplit", moe::Switch, "do not send split commands with writes")
         .hidden()
         .setSources(moe::SourceAllLegacy);
 
-    options->addOptionChaining(
-                 "sharding.autoSplit", "", moe::Bool, "send split commands with writes")
+    options
+        ->addOptionChaining("sharding.autoSplit", "", moe::Bool, "send split commands with writes")
         .setSources(moe::SourceYAMLConfig);
 
 

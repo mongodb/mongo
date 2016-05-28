@@ -24,7 +24,8 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
     assert.writeOK(local.insert({}));
 
     var res = st.s.getDB("graphLookup")
-                  .local.aggregate({
+                  .local
+                  .aggregate({
                       $graphLookup: {
                           from: "foreign",
                           startWith: {$literal: 0},

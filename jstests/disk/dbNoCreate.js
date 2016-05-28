@@ -12,6 +12,5 @@ t.drop();
 MongoRunner.stopMongod(m);
 
 m = MongoRunner.runMongod({restart: true, cleanData: false, dbpath: m.dbpath});
-assert.eq(-1,
-          m.getDBNames().indexOf(baseName),
-          "found " + baseName + " in " + tojson(m.getDBNames()));
+assert.eq(
+    -1, m.getDBNames().indexOf(baseName), "found " + baseName + " in " + tojson(m.getDBNames()));

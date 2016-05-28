@@ -21,9 +21,7 @@ var $config = (function() {
                 initial: {bucketCount: 0, bucketSum: 0},
                 $keyf: function $keyf(doc) {
                     // place doc.rand into appropriate bucket
-                    return {
-                        bucket: Math.floor(doc.rand * 10) + 1
-                    };
+                    return {bucket: Math.floor(doc.rand * 10) + 1};
                 },
                 $reduce: function $reduce(curr, result) {
                     result.bucketCount++;
@@ -63,15 +61,11 @@ var $config = (function() {
             }.bind(this));
         }
 
-        return {
-            group: group
-        };
+        return {group: group};
 
     })();
 
-    var transitions = {
-        group: {group: 1}
-    };
+    var transitions = {group: {group: 1}};
 
     function setup(db, collName, cluster) {
         var bulk = db[collName].initializeUnorderedBulkOp();

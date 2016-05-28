@@ -16,11 +16,7 @@ function getShapes(collection) {
 }
 // Utility function to list plans for a query.
 function getPlans(query, sort, projection) {
-    var key = {
-        query: query,
-        sort: sort,
-        projection: projection
-    };
+    var key = {query: query, sort: sort, projection: projection};
     var res = t.runCommand('planCacheListPlans', key);
     assert.commandWorked(res, 'planCacheListPlans(' + tojson(key, '', true) + ' failed');
     assert(res.hasOwnProperty('plans'),
@@ -37,17 +33,9 @@ t.ensureIndex({a: 1});
 t.ensureIndex({b: 1});
 
 // Populate plan cache.
-var queryB = {
-    a: {$gte: 199},
-    b: -1
-};
-var projectionB = {
-    _id: 0,
-    b: 1
-};
-var sortC = {
-    c: -1
-};
+var queryB = {a: {$gte: 199}, b: -1};
+var projectionB = {_id: 0, b: 1};
+var sortC = {c: -1};
 assert.eq(1, t.find(queryB, projectionB).sort(sortC).itcount(), 'unexpected document count');
 assert.eq(1, t.find(queryB, projectionB).itcount(), 'unexpected document count');
 assert.eq(1, t.find(queryB).sort(sortC).itcount(), 'unexpected document count');
@@ -124,11 +112,7 @@ assert.eq(getPlans(queryB, {}, {}),
 //     projection: <projection>,
 //     sort: <sort>
 // }
-var shapeB = {
-    query: queryB,
-    projection: projectionB,
-    sort: sortC
-};
+var shapeB = {query: queryB, projection: projectionB, sort: sortC};
 assert.eq(getPlans(queryB, sortC, projectionB),
           planCache.getPlansByQuery(shapeB),
           'collection.getPlanCache().getPlansByQuery() did not accept query shape object');
@@ -141,12 +125,13 @@ assert.eq(0,
           planCache.getPlansByQuery({query: queryB}).length,
           'collection.getPlanCache.getPlansByQuery should return empty results on ' +
               'incomplete query shape');
-assert.eq(0,
-          planCache.getPlansByQuery(
-                        {query: queryB, sort: sortC, projection: projectionB, unknown_field: 1})
-              .length,
-          'collection.getPlanCache.getPlansByQuery should return empty results on ' +
-              'invalid query shape');
+assert.eq(
+    0,
+    planCache
+        .getPlansByQuery({query: queryB, sort: sortC, projection: projectionB, unknown_field: 1})
+        .length,
+    'collection.getPlanCache.getPlansByQuery should return empty results on ' +
+        'invalid query shape');
 
 //
 // collection.getPlanCache().clearPlansByQuery

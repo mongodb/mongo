@@ -42,14 +42,14 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/user_name.h"
 #include "mongo/db/auth/user.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/background.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/stats/snapshots.h"
 #include "mongo/rpc/command_reply.h"
 #include "mongo/rpc/command_reply_builder.h"
@@ -451,7 +451,8 @@ void DbWebServer::doRequest(const char* rq,
             "These read-only context-less commands can be executed from the web "
             "interface. Results are json format, unless ?text=1 is appended in which "
             "case the result is output as text for easier human viewing",
-            "Commands") << ": ";
+            "Commands")
+       << ": ";
 
     auto m = Command::commandsByBestName();
 

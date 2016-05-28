@@ -36,8 +36,8 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/s/query/cluster_find.h"
 #include "mongo/s/commands/strategy.h"
+#include "mongo/s/query/cluster_find.h"
 
 namespace mongo {
 namespace {

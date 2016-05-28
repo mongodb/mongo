@@ -53,7 +53,8 @@ Status AuthzManagerExternalStateLocal::initialize(OperationContext* txn) {
                     << status.reason();
         } else {
             error() << "Could not generate role graph from admin.system.roles; "
-                       "only system roles available: " << status;
+                       "only system roles available: "
+                    << status;
         }
     }
 
@@ -81,8 +82,11 @@ Status AuthzManagerExternalStateLocal::getStoredAuthorizationVersion(OperationCo
             return Status(ErrorCodes::TypeMismatch,
                           mongoutils::str::stream()
                               << "Could not determine schema version of authorization data.  "
-                                 "Bad (non-numeric) type " << typeName(versionElement.type())
-                              << " (" << versionElement.type() << ") for "
+                                 "Bad (non-numeric) type "
+                              << typeName(versionElement.type())
+                              << " ("
+                              << versionElement.type()
+                              << ") for "
                               << AuthorizationManager::schemaVersionFieldName
                               << " field in version document");
         }
@@ -123,7 +127,8 @@ void addPrivilegeObjectsOrWarningsToArrayElement(mutablebson::Element privileges
                         std::string(mongoutils::str::stream()
                                     << "Skipped privileges on resource "
                                     << privileges[i].getResourcePattern().toString()
-                                    << ". Reason: " << errmsg)));
+                                    << ". Reason: "
+                                    << errmsg)));
         }
     }
 }
@@ -222,7 +227,8 @@ Status AuthzManagerExternalStateLocal::_getUserDocument(OperationContext* txn,
     Status status = findOne(txn,
                             AuthorizationManager::usersCollectionNamespace,
                             BSON(AuthorizationManager::USER_NAME_FIELD_NAME
-                                 << userName.getUser() << AuthorizationManager::USER_DB_FIELD_NAME
+                                 << userName.getUser()
+                                 << AuthorizationManager::USER_DB_FIELD_NAME
                                  << userName.getDB()),
                             userDoc);
     if (status == ErrorCodes::NoMatchingDocument) {
@@ -324,7 +330,8 @@ void addRoleFromDocumentOrWarn(RoleGraph* roleGraph, const BSONObj& doc) {
     Status status = roleGraph->addRoleFromDocument(doc);
     if (!status.isOK()) {
         warning() << "Skipping invalid admin.system.roles document while calculating privileges"
-                     " for user-defined roles:  " << status << "; document " << doc;
+                     " for user-defined roles:  "
+                  << status << "; document " << doc;
     }
 }
 
@@ -352,7 +359,8 @@ Status AuthzManagerExternalStateLocal::_initializeRoleGraph(OperationContext* tx
     RoleGraphState newState;
     if (status == ErrorCodes::GraphContainsCycle) {
         error() << "Inconsistent role graph during authorization manager initialization.  Only "
-                   "direct privileges available. " << status.reason();
+                   "direct privileges available. "
+                << status.reason();
         newState = roleGraphStateHasCycle;
         status = Status::OK();
     } else if (status.isOK()) {
@@ -400,8 +408,8 @@ public:
             if (_isO2Set)
                 oplogEntryBuilder << "o2" << _o2;
             error() << "Unsupported modification to roles collection in oplog; "
-                       "restart this process to reenable user-defined roles; " << status.reason()
-                    << "; Oplog entry: " << oplogEntryBuilder.done();
+                       "restart this process to reenable user-defined roles; "
+                    << status.reason() << "; Oplog entry: " << oplogEntryBuilder.done();
         } else if (!status.isOK()) {
             warning() << "Skipping bad update to roles collection in oplog. " << status
                       << " Oplog entry: " << _op;
@@ -410,8 +418,8 @@ public:
         if (status == ErrorCodes::GraphContainsCycle) {
             _externalState->_roleGraphState = _externalState->roleGraphStateHasCycle;
             error() << "Inconsistent role graph during authorization manager initialization.  "
-                       "Only direct privileges available. " << status.reason()
-                    << " after applying oplog entry " << _op;
+                       "Only direct privileges available. "
+                    << status.reason() << " after applying oplog entry " << _op;
         } else {
             fassert(17183, status);
             _externalState->_roleGraphState = _externalState->roleGraphStateConsistent;

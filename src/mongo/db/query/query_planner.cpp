@@ -40,10 +40,10 @@
 #include "mongo/db/matcher/expression_text.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/plan_enumerator.h"
 #include "mongo/db/query/planner_access.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/planner_ixselect.h"
-#include "mongo/db/query/plan_enumerator.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/util/log.h"
@@ -398,8 +398,7 @@ Status QueryPlanner::planFromCache(const CanonicalQuery& query,
     // The planner requires a defined sort order.
     sortUsingTags(clone.get());
 
-    LOG(5) << "Tagged tree:" << endl
-           << clone->toString();
+    LOG(5) << "Tagged tree:" << endl << clone->toString();
 
     // Use the cached index assignments to build solnRoot.
     QuerySolutionNode* solnRoot = QueryPlannerAccess::buildIndexedDataAccess(
@@ -415,8 +414,8 @@ Status QueryPlanner::planFromCache(const CanonicalQuery& query,
     QuerySolution* soln = QueryPlannerAnalysis::analyzeDataAccess(query, params, solnRoot);
     if (!soln) {
         return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "Failed to analyze plan from cache. Query: " << query.toStringShort());
+                      str::stream() << "Failed to analyze plan from cache. Query: "
+                                    << query.toStringShort());
     }
 
     LOG(5) << "Planner: solution constructed from the cache:\n" << soln->toString();
@@ -677,8 +676,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
     }
 
     // query.root() is now annotated with RelevantTag(s).
-    LOG(5) << "Rated tree:" << endl
-           << query.root()->toString();
+    LOG(5) << "Rated tree:" << endl << query.root()->toString();
 
     // If there is a GEO_NEAR it must have an index it can use directly.
     const MatchExpression* gnNode = NULL;
@@ -744,8 +742,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
 
         MatchExpression* rawTree;
         while (isp.getNext(&rawTree) && (out->size() < params.maxIndexedSolutions)) {
-            LOG(5) << "About to build solntree from tagged tree:" << endl
-                   << rawTree->toString();
+            LOG(5) << "About to build solntree from tagged tree:" << endl << rawTree->toString();
 
             // The tagged tree produced by the plan enumerator is not guaranteed
             // to be canonically sorted. In order to be compatible with the cached
@@ -771,8 +768,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
 
             QuerySolution* soln = QueryPlannerAnalysis::analyzeDataAccess(query, params, solnRoot);
             if (NULL != soln) {
-                LOG(5) << "Planner: adding solution:" << endl
-                       << soln->toString();
+                LOG(5) << "Planner: adding solution:" << endl << soln->toString();
                 if (indexTreeStatus.isOK()) {
                     SolutionCacheData* scd = new SolutionCacheData();
                     scd->tree.reset(autoData.release());
@@ -918,8 +914,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
             scd->solnType = SolutionCacheData::COLLSCAN_SOLN;
             collscan->cacheData.reset(scd);
             out->push_back(collscan);
-            LOG(5) << "Planner: outputting a collscan:" << endl
-                   << collscan->toString();
+            LOG(5) << "Planner: outputting a collscan:" << endl << collscan->toString();
         }
     }
 

@@ -31,9 +31,8 @@ db.bar.ensureIndex({x: 1});
 barDocCount = db.bar.count();
 assert.gt(barDocCount, 0, "No documents inserted");
 assert.lt(db.bar.count(), 1000, "Capped collection didn't evict documents");
-assert.eq(5,
-          db.foo.getIndexes().length + db.bar.getIndexes().length,
-          "Indexes weren't created right");
+assert.eq(
+    5, db.foo.getIndexes().length + db.bar.getIndexes().length, "Indexes weren't created right");
 
 // Full dump/restore
 

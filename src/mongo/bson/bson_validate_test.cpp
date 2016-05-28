@@ -30,10 +30,10 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/data_view.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/platform/random.h"
 #include "mongo/bson/bson_validate.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/platform/random.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
 namespace {
@@ -148,15 +148,23 @@ TEST(BSONValidate, Fuzz) {
     log() << "BSONValidate Fuzz random seed: " << seed << endl;
     PseudoRandom randomSource(seed);
 
-    BSONObj original =
-        BSON("one" << 3 << "two" << 5 << "three" << BSONObj() << "four"
-                   << BSON("five" << BSON("six" << 11)) << "seven" << BSON_ARRAY("a"
-                                                                                 << "bb"
-                                                                                 << "ccc" << 5)
-                   << "eight" << BSONDBRef("rrr", OID("01234567890123456789aaaa")) << "_id"
-                   << OID("deadbeefdeadbeefdeadbeef") << "nine"
-                   << BSONBinData("\x69\xb7", 2, BinDataGeneral) << "ten"
-                   << Date_t::fromMillisSinceEpoch(44) << "eleven" << BSONRegEx("foooooo", "i"));
+    BSONObj original = BSON("one" << 3 << "two" << 5 << "three" << BSONObj() << "four"
+                                  << BSON("five" << BSON("six" << 11))
+                                  << "seven"
+                                  << BSON_ARRAY("a"
+                                                << "bb"
+                                                << "ccc"
+                                                << 5)
+                                  << "eight"
+                                  << BSONDBRef("rrr", OID("01234567890123456789aaaa"))
+                                  << "_id"
+                                  << OID("deadbeefdeadbeefdeadbeef")
+                                  << "nine"
+                                  << BSONBinData("\x69\xb7", 2, BinDataGeneral)
+                                  << "ten"
+                                  << Date_t::fromMillisSinceEpoch(44)
+                                  << "eleven"
+                                  << BSONRegEx("foooooo", "i"));
 
     int32_t fuzzFrequencies[] = {2, 10, 20, 100, 1000};
     for (size_t i = 0; i < sizeof(fuzzFrequencies) / sizeof(int32_t); ++i) {

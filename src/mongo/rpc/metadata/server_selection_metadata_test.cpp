@@ -112,18 +112,21 @@ TEST(ServerSelectionMetadata, UpconvertValidMetadata) {
 
     // Wrapped in 'query', with readPref.
     checkUpconvert(BSON("query" << BSON("pong" << 1 << "foo"
-                                               << "bar") << "$readPreference"
+                                               << "bar")
+                                << "$readPreference"
                                 << BSON("mode"
                                         << "primary"
-                                        << "tags" << BSON("dc"
-                                                          << "ny"))),
+                                        << "tags"
+                                        << BSON("dc"
+                                                << "ny"))),
                    0,
                    BSON("pong" << 1 << "foo"
                                << "bar"),
                    BSON("$ssm" << BSON("$readPreference" << BSON("mode"
                                                                  << "primary"
-                                                                 << "tags" << BSON("dc"
-                                                                                   << "ny")))));
+                                                                 << "tags"
+                                                                 << BSON("dc"
+                                                                         << "ny")))));
     // Unwrapped, no readPref, no slaveOk
     checkUpconvert(BSON("ping" << 1), 0, BSON("ping" << 1), BSONObj());
 
@@ -133,15 +136,17 @@ TEST(ServerSelectionMetadata, UpconvertValidMetadata) {
                         << "$queryOptions"
                         << BSON("$readPreference" << BSON("mode"
                                                           << "nearest"
-                                                          << "tags" << BSON("rack"
-                                                                            << "city")))),
+                                                          << "tags"
+                                                          << BSON("rack"
+                                                                  << "city")))),
                    0,
                    BSON("pang"
                         << "pong"),
                    BSON("$ssm" << BSON("$readPreference" << BSON("mode"
                                                                  << "nearest"
-                                                                 << "tags" << BSON("rack"
-                                                                                   << "city")))));
+                                                                 << "tags"
+                                                                 << BSON("rack"
+                                                                         << "city")))));
 }
 
 void checkUpconvertFails(const BSONObj& legacyCommand, ErrorCodes::Error error) {
@@ -156,27 +161,35 @@ void checkUpconvertFails(const BSONObj& legacyCommand, ErrorCodes::Error error) 
 TEST(ServerSelectionMetadata, UpconvertInvalidMetadata) {
     // $readPreference not an object.
     checkUpconvertFails(BSON("$query" << BSON("pang"
-                                              << "pong") << "$readPreference" << 2),
+                                              << "pong")
+                                      << "$readPreference"
+                                      << 2),
                         ErrorCodes::TypeMismatch);
 
     // has $maxTimeMS option
     checkUpconvertFails(BSON("query" << BSON("foo"
-                                             << "bar") << "$maxTimeMS" << 200),
+                                             << "bar")
+                                     << "$maxTimeMS"
+                                     << 200),
                         ErrorCodes::InvalidOptions);
     checkUpconvertFails(BSON("$query" << BSON("foo"
-                                              << "bar") << "$maxTimeMS" << 200),
+                                              << "bar")
+                                      << "$maxTimeMS"
+                                      << 200),
                         ErrorCodes::InvalidOptions);
 
     // has $queryOptions field, but invalid $readPreference
     checkUpconvertFails(BSON("ping"
                              << "pong"
-                             << "$queryOptions" << BSON("$readPreference" << 1.2)),
+                             << "$queryOptions"
+                             << BSON("$readPreference" << 1.2)),
                         ErrorCodes::TypeMismatch);
 
     // has $queryOptions field, but no $readPreference
     checkUpconvertFails(BSON("ping"
                              << "pong"
-                             << "$queryOptions" << BSONObj()),
+                             << "$queryOptions"
+                             << BSONObj()),
                         ErrorCodes::NoSuchKey);
 
     // invalid wrapped query

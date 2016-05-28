@@ -28,9 +28,7 @@ function moveChunkParallel(staticMongod, mongosURL, findCriteria, bounds, ns, to
         assert((findCriteria || bounds) && !(findCriteria && bounds),
                'Specify either findCriteria or bounds, but not both.');
 
-        var mongos = new Mongo(mongosURL), admin = mongos.getDB('admin'), cmd = {
-            moveChunk: ns
-        };
+        var mongos = new Mongo(mongosURL), admin = mongos.getDB('admin'), cmd = {moveChunk: ns};
 
         if (findCriteria) {
             cmd.find = findCriteria;

@@ -11,11 +11,9 @@ for (i = 1; i < 10; i++) {
 }
 
 t.createIndex({a: 1}, {name: "aaa"});
-var result = t.createIndex(
-    {a: 1},
-    {
-      name: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    });
+var result = t.createIndex({a: 1}, {
+    name: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+});
 assert(!result.ok);
 assert(result.errmsg.indexOf("too long") >= 0);

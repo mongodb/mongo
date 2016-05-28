@@ -30,8 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
-#include <vector>
 #include <tuple>
+#include <vector>
 
 #include "mongo/client/connpool.h"
 #include "mongo/db/auth/action_type.h"
@@ -128,8 +128,10 @@ public:
                     if (fieldName == kOpIdFieldName) {
                         uassert(28630,
                                 str::stream() << "expected numeric opid from currentOp response"
-                                              << " from shard " << shardName
-                                              << ", got: " << shardOpElement,
+                                              << " from shard "
+                                              << shardName
+                                              << ", got: "
+                                              << shardOpElement,
                                 shardOpElement.isNumber());
 
                         modifiedShardOpBob.append(kOpIdFieldName,

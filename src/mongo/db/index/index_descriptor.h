@@ -32,9 +32,9 @@
 
 #include <string>
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/catalog/collection.h"
 
 #include "mongo/util/stacktrace.h"
 

@@ -78,8 +78,10 @@ bool shouldStartService() {
     return _startService;
 }
 
-static DWORD WINAPI
-serviceCtrl(DWORD dwControl, DWORD dwEventType, LPVOID lpEventData, LPVOID lpContext);
+static DWORD WINAPI serviceCtrl(DWORD dwControl,
+                                DWORD dwEventType,
+                                LPVOID lpEventData,
+                                LPVOID lpContext);
 
 void configureService(ServiceCallback serviceCallback,
                       const moe::Environment& params,
@@ -586,8 +588,10 @@ static void serviceShutdown(const char* controlCodeName) {
     // Note: we will report exit status in initService
 }
 
-static DWORD WINAPI
-serviceCtrl(DWORD dwControl, DWORD dwEventType, LPVOID lpEventData, LPVOID lpContext) {
+static DWORD WINAPI serviceCtrl(DWORD dwControl,
+                                DWORD dwEventType,
+                                LPVOID lpEventData,
+                                LPVOID lpContext) {
     switch (dwControl) {
         case SERVICE_CONTROL_INTERROGATE:
             // Return NO_ERROR per MSDN even though we do nothing for this control code.

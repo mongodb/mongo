@@ -45,11 +45,11 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
+#include "mongo/db/storage/mmap_v1/file_allocator.h"
 #include "mongo/db/storage/mmap_v1/mmap.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/util/file.h"
-#include "mongo/db/storage/mmap_v1/file_allocator.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -95,8 +95,7 @@ void _deleteDataFiles(const std::string& database) {
         virtual const char* op() const {
             return "remove";
         }
-    }
-    deleter;
+    } deleter;
     _applyOpToDataFiles(database, deleter, true);
 }
 
@@ -290,9 +289,11 @@ Status MMAPV1Engine::repairDatabase(OperationContext* txn,
 
     if (freeSize > -1 && freeSize < totalSize) {
         return Status(ErrorCodes::OutOfDiskSpace,
-                      str::stream()
-                          << "Cannot repair database " << dbName << " having size: " << totalSize
-                          << " (bytes) because free disk space is: " << freeSize << " (bytes)");
+                      str::stream() << "Cannot repair database " << dbName << " having size: "
+                                    << totalSize
+                                    << " (bytes) because free disk space is: "
+                                    << freeSize
+                                    << " (bytes)");
     }
 
     txn->checkForInterrupt();

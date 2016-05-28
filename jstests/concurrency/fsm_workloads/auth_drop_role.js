@@ -44,24 +44,12 @@ var $config = (function() {
             assertAlways.isnull(db.getRole(roleName), "role '" + roleName + "' should not exist");
         }
 
-        return {
-            init: init,
-            createAndDropRole: createAndDropRole
-        };
+        return {init: init, createAndDropRole: createAndDropRole};
 
     })();
 
-    var transitions = {
-        init: {createAndDropRole: 1},
-        createAndDropRole: {createAndDropRole: 1}
-    };
+    var transitions = {init: {createAndDropRole: 1}, createAndDropRole: {createAndDropRole: 1}};
 
-    return {
-        threadCount: 10,
-        iterations: 20,
-        data: data,
-        states: states,
-        transitions: transitions
-    };
+    return {threadCount: 10, iterations: 20, data: data, states: states, transitions: transitions};
 
 })();

@@ -14,7 +14,11 @@
     var originalGetCollection = DB.prototype.getCollection;
 
     // Blacklisted namespaces that should not be sharded.
-    var blacklistedNamespaces = [/\$cmd/, /^admin\./, /\.system\./, ];
+    var blacklistedNamespaces = [
+        /\$cmd/,
+        /^admin\./,
+        /\.system\./,
+    ];
 
     DB.prototype.getCollection = function() {
         var dbName = this.getName();

@@ -11,15 +11,9 @@ var sin = Math.sin;
 var cos = Math.cos;
 var atan2 = Math.atan2;
 
-var originGeo = {
-    type: "Point",
-    coordinates: [20.0, 20.0]
-};
+var originGeo = {type: "Point", coordinates: [20.0, 20.0]};
 // Center point for all tests.
-var origin = {
-    name: "origin",
-    geo: originGeo
-};
+var origin = {name: "origin", geo: originGeo};
 
 /*
  * Convenience function for checking that coordinates match.  threshold let's you
@@ -163,9 +157,7 @@ function validateOrdering(query) {
     }
 }
 
-var query = {
-    geo: {$geoNear: {$geometry: originGeo}}
-};
+var query = {geo: {$geoNear: {$geometry: originGeo}}};
 
 // Test a uniform distribution of 1000 points.
 uniformPoints(origin, 1000, 0.5, 1.5);

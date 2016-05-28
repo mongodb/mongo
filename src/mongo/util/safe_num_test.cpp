@@ -30,11 +30,11 @@
 #include "mongo/platform/basic.h"
 #undef MONGO_PCH_WHITELISTED  // for malloc/realloc pulled from bson
 
-#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/util/safe_num.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/safe_num.h"
 
 namespace {
 

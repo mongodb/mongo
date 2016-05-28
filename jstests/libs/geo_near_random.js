@@ -65,12 +65,7 @@ GeoNearRandomTest.prototype.testPt = function(pt, opts) {
 
     print("testing point: " + tojson(pt) + " opts: " + tojson(opts));
 
-    var cmd = {
-        geoNear: this.t.getName(),
-        near: pt,
-        num: 1,
-        spherical: opts.sphere
-    };
+    var cmd = {geoNear: this.t.getName(), near: pt, num: 1, spherical: opts.sphere};
 
     var last = db.runCommand(cmd).results;
     for (var i = 2; i <= opts.nToTest; i++) {
@@ -97,9 +92,7 @@ GeoNearRandomTest.prototype.testPt = function(pt, opts) {
             return x.obj;
         });
 
-        var query = {
-            loc: {}
-        };
+        var query = {loc: {}};
         query.loc[opts.sphere ? '$nearSphere' : '$near'] = pt;
         var near = this.t.find(query).limit(opts.nToTest).toArray();
 

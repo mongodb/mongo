@@ -401,7 +401,8 @@ void NamespaceDetailsCollectionCatalogEntry::updateValidator(OperationContext* t
     _updateSystemNamespaces(
         txn,
         BSON("$set" << BSON("options.validator" << validator << "options.validationLevel"
-                                                << validationLevel << "options.validationAction"
+                                                << validationLevel
+                                                << "options.validationAction"
                                                 << validationAction)));
 }
 

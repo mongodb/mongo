@@ -28,10 +28,7 @@ var lineWithDupes = {
     _id: "line",
     geo: {type: "LineString", coordinates: [[40, 5], [40, 5], [40, 5], [41, 6], [41, 6]]}
 };
-var lineWithoutDupes = {
-    type: "LineString",
-    coordinates: [[40, 5], [41, 6]]
-};
+var lineWithoutDupes = {type: "LineString", coordinates: [[40, 5], [41, 6]]};
 
 // Polygon
 var polygonWithDupes = {

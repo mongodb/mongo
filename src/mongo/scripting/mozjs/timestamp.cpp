@@ -56,7 +56,9 @@ double getTimestampArg(JSContext* cx, JS::CallArgs args, int idx, std::string na
     if (val < 0 || val > maxArgVal) {
         uasserted(ErrorCodes::BadValue,
                   str::stream() << name << " must be non-negative and not greater than "
-                                << maxArgVal << ", got " << val);
+                                << maxArgVal
+                                << ", got "
+                                << val);
     }
     return val;
 }

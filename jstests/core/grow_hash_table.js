@@ -11,12 +11,8 @@ var testDB = db.getSiblingDB('grow_hash_table');
 var doTest = function(count) {
     print('Testing with count of ' + count);
     testDB.dropDatabase();
-    var id = {
-        data: 1
-    };
-    var doc = {
-        _id: id
-    };
+    var id = {data: 1};
+    var doc = {_id: id};
     var projection = {};
 
     // Create a document and a projection with fields r1, r2, r3 ...

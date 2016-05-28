@@ -106,16 +106,10 @@ function retryOnNetworkError(func) {
                 }
 
                 print('*** Continuous stepdown thread completed successfully');
-                return {
-                    ok: 1
-                };
+                return {ok: 1};
             } catch (e) {
                 print('*** Continuous stepdown thread caught exception: ' + tojson(e));
-                return {
-                    ok: 0,
-                    error: e.toString(),
-                    stack: e.stack
-                };
+                return {ok: 0, error: e.toString(), stack: e.stack};
             }
         }
 
@@ -209,12 +203,12 @@ function retryOnNetworkError(func) {
 
         // Set electionTimeoutMillis to 5 seconds, from 10, so that chunk migrations don't
         // time out because of the CSRS primary being down so often for so long.
-        arguments[0].configReplSetTestOptions = Object.merge(arguments[0].configReplSetTestOptions,
-                                                             {
-                                                               settings: {
-                                                                   electionTimeoutMillis: 5000,
-                                                               },
-                                                             });
+        arguments[0].configReplSetTestOptions =
+            Object.merge(arguments[0].configReplSetTestOptions, {
+                settings: {
+                    electionTimeoutMillis: 5000,
+                },
+            });
 
         // Construct the original object
         originalShardingTest.apply(this, arguments);

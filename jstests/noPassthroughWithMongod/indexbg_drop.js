@@ -39,10 +39,7 @@ var secondId = replTest.getNodeId(second);
 var masterDB = master.getDB(dbname);
 var secondDB = second.getDB(dbname);
 
-var dc = {
-    dropIndexes: collection,
-    index: "i_1"
-};
+var dc = {dropIndexes: collection, index: "i_1"};
 
 // set up collections
 masterDB.dropDatabase();

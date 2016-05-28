@@ -28,11 +28,11 @@
 
 #include "mongo/db/query/parsed_projection.h"
 
-#include <memory>
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/unittest/unittest.h"
+#include <memory>
 
 namespace {
 
@@ -56,8 +56,10 @@ unique_ptr<ParsedProjection> createParsedProjection(const BSONObj& query, const 
     Status status = ParsedProjection::make(
         projObj, queryMatchExpr.get(), &out, ExtensionsCallbackDisallowExtensions());
     if (!status.isOK()) {
-        FAIL(mongoutils::str::stream() << "failed to parse projection " << projObj
-                                       << " (query: " << query << "): " << status.toString());
+        FAIL(mongoutils::str::stream() << "failed to parse projection " << projObj << " (query: "
+                                       << query
+                                       << "): "
+                                       << status.toString());
     }
     ASSERT(out);
     return unique_ptr<ParsedProjection>(out);

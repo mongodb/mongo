@@ -15,9 +15,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and testExp
             var input = indexOfSpec[0];
             var token = indexOfSpec[1];
             var start = indexOfSpec.length > 2 ? indexOfSpec[2] : 0;
-            var end = indexOfSpec.length > 3 ? indexOfSpec[3] : {
-                $strLenCP: input
-            };
+            var end = indexOfSpec.length > 3 ? indexOfSpec[3] : {$strLenCP: input};
 
             var substrExpr = {
                 $indexOfCP: [{$substrCP: [input, start, {$subtract: [end, start]}]}, token]
@@ -107,23 +105,15 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and testExp
     };
     assertErrorCode(coll, pipeline, 40094);
 
-    pipeline = {
-        $project: {output: {$indexOfCP: ["abc", "b", "bad"]}}
-    };
+    pipeline = {$project: {output: {$indexOfCP: ["abc", "b", "bad"]}}};
     assertErrorCode(coll, pipeline, 40096);
 
-    pipeline = {
-        $project: {output: {$indexOfCP: ["abc", "b", 0, "bad"]}}
-    };
+    pipeline = {$project: {output: {$indexOfCP: ["abc", "b", 0, "bad"]}}};
     assertErrorCode(coll, pipeline, 40096);
 
-    pipeline = {
-        $project: {output: {$indexOfCP: ["abc", "b", -1]}}
-    };
+    pipeline = {$project: {output: {$indexOfCP: ["abc", "b", -1]}}};
     assertErrorCode(coll, pipeline, 40097);
 
-    pipeline = {
-        $project: {output: {$indexOfCP: ["abc", "b", 1, -1]}}
-    };
+    pipeline = {$project: {output: {$indexOfCP: ["abc", "b", 1, -1]}}};
     assertErrorCode(coll, pipeline, 40097);
 }());

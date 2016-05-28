@@ -84,7 +84,8 @@ Status ModifierCurrentDate::init(const BSONElement& modExpr,
     if (foundDollar && foundCount > 1) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Too many positional (i.e. '$') elements found in path '"
-                                    << _updatePath.dottedField() << "'");
+                                    << _updatePath.dottedField()
+                                    << "'");
     }
 
     // Validate and store the type to produce
@@ -113,7 +114,8 @@ Status ModifierCurrentDate::init(const BSONElement& modExpr,
                                       str::stream()
                                           << "The only valid field of the option is '$type': "
                                              "{$currentDate: {field : {$type: 'date/timestamp'}}}; "
-                                          << "arg: " << argObj);
+                                          << "arg: "
+                                          << argObj);
                     }
                 }
             }

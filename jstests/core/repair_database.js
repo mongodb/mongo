@@ -13,10 +13,7 @@ mydb.dropDatabase();
 var myColl = mydb.a;
 
 // 2
-var doc = {
-    _id: 1,
-    a: "hello world"
-};
+var doc = {_id: 1, a: "hello world"};
 myColl.insert(doc);
 myColl.ensureIndex({a: 1});
 mydb.repairDatabase();

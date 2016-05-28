@@ -10,10 +10,7 @@ function debug(x) {
 
 /** Generate an object with a string field of specified length */
 function obj(size, x) {
-    return {
-        X: x,
-        a: new Array(size + 1).toString()
-    };
+    return {X: x, a: new Array(size + 1).toString()};
 }
 
 function withinTwo(a, b) {

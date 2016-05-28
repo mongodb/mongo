@@ -49,7 +49,7 @@ namespace dur {
  *
  *  For each op we want to journal, we define a subclass.
  */
-class DurOp {/* copyable */
+class DurOp { /* copyable */
 public:
     // @param opcode a sentinel value near max unsigned which uniquely identifies the operation.
     // @see dur::JEntry

@@ -125,10 +125,10 @@ void DocumentSourceCursor::loadBatch() {
                           << WorkingSetCommon::toStatusString(obj),
             state != PlanExecutor::DEAD);
 
-    uassert(
-        17285,
-        str::stream() << "cursor encountered an error: " << WorkingSetCommon::toStatusString(obj),
-        state != PlanExecutor::FAILURE);
+    uassert(17285,
+            str::stream() << "cursor encountered an error: "
+                          << WorkingSetCommon::toStatusString(obj),
+            state != PlanExecutor::FAILURE);
 
     massert(17286,
             str::stream() << "Unexpected return from PlanExecutor::getNext: " << state,

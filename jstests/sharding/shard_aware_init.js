@@ -40,8 +40,8 @@
             mongodConn = MongoRunner.runMongod(options);
             waitForMaster(mongodConn);
 
-            var res = mongodConn.getDB('admin')
-                          .system.version.update({_id: 'shardIdentity'}, shardIdentityDoc);
+            var res = mongodConn.getDB('admin').system.version.update({_id: 'shardIdentity'},
+                                                                      shardIdentityDoc);
             assert.eq(1, res.nModified);
 
             MongoRunner.stopMongod(mongodConn.port);
@@ -60,8 +60,8 @@
             return mongodConn;
         };
 
-        assert.writeOK(mongodConn.getDB('admin')
-                           .system.version.update({_id: 'shardIdentity'}, shardIdentityDoc, true));
+        assert.writeOK(mongodConn.getDB('admin').system.version.update(
+            {_id: 'shardIdentity'}, shardIdentityDoc, true));
 
         var res = mongodConn.getDB('admin').runCommand({shardingState: 1});
 
@@ -98,8 +98,7 @@
         waitForMaster(mongodConn);
 
         assert.writeOK(mongodConn.getDB('admin').system.version.update(
-            {_id: 'shardIdentity'},
-            {_id: 'shardIdentity', shardName: 'x', clusterId: ObjectId()}));
+            {_id: 'shardIdentity'}, {_id: 'shardIdentity', shardName: 'x', clusterId: ObjectId()}));
 
         MongoRunner.stopMongod(mongodConn.port);
 

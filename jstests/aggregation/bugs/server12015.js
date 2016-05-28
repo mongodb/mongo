@@ -12,10 +12,7 @@ load("jstests/aggregation/extras/utils.js");  // For orderedArrayEq.
     "use strict";
     var coll = db.server12015;
     coll.drop();
-    var indexSpec = {
-        a: 1,
-        b: 1
-    };
+    var indexSpec = {a: 1, b: 1};
 
     assert.writeOK(coll.insert({_id: 0, a: 0, b: 0}));
     assert.writeOK(coll.insert({_id: 1, a: 0, b: 1}));

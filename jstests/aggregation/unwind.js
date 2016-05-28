@@ -12,7 +12,6 @@ t.insert({_id: 6, x: 4});
 
 var res = t.aggregate([{$unwind: "$x"}, {$sort: {_id: 1}}]).toArray();
 assert.eq(4, res.length);
-assert.eq([1, 2, 3, 4],
-          res.map(function(z) {
-              return z.x;
-          }));
+assert.eq([1, 2, 3, 4], res.map(function(z) {
+    return z.x;
+}));

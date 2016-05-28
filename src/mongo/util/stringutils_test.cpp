@@ -29,8 +29,8 @@
 
 #include "mongo/unittest/unittest.h"
 
-#include "mongo/util/stringutils.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 

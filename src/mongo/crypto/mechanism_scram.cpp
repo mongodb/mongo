@@ -156,8 +156,10 @@ BSONObj generateCredentials(const std::string& hashedPassword, int iterationCoun
     std::string encodedServerKey = base64::encode(reinterpret_cast<char*>(serverKey), hashSize);
 
     return BSON(iterationCountFieldName << iterationCount << saltFieldName << encodedUserSalt
-                                        << storedKeyFieldName << encodedStoredKey
-                                        << serverKeyFieldName << encodedServerKey);
+                                        << storedKeyFieldName
+                                        << encodedStoredKey
+                                        << serverKeyFieldName
+                                        << encodedServerKey);
 }
 
 std::string generateClientProof(const unsigned char saltedPassword[hashSize],

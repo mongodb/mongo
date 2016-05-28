@@ -89,8 +89,10 @@ Status LogBuilder::addToSetsWithNewFieldName(StringData name, const mutablebson:
     if (!elemToSet.ok())
         return Status(ErrorCodes::InternalError,
                       str::stream() << "Could not create new '" << name
-                                    << "' element from existing element '" << val.getFieldName()
-                                    << "' of type " << typeName(val.getType()));
+                                    << "' element from existing element '"
+                                    << val.getFieldName()
+                                    << "' of type "
+                                    << typeName(val.getType()));
 
     return addToSets(elemToSet);
 }
@@ -100,8 +102,10 @@ Status LogBuilder::addToSetsWithNewFieldName(StringData name, const BSONElement&
     if (!elemToSet.ok())
         return Status(ErrorCodes::InternalError,
                       str::stream() << "Could not create new '" << name
-                                    << "' element from existing element '" << val.fieldName()
-                                    << "' of type " << typeName(val.type()));
+                                    << "' element from existing element '"
+                                    << val.fieldName()
+                                    << "' of type "
+                                    << typeName(val.type()));
 
     return addToSets(elemToSet);
 }

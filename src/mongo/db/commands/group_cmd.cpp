@@ -94,8 +94,8 @@ private:
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         std::string ns = parseNs(dbname, cmdObj);
-        if (!AuthorizationSession::get(client)
-                 ->isAuthorizedForActionsOnNamespace(NamespaceString(ns), ActionType::find)) {
+        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnNamespace(
+                NamespaceString(ns), ActionType::find)) {
             return Status(ErrorCodes::Unauthorized, "unauthorized");
         }
         return Status::OK();

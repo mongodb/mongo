@@ -40,8 +40,8 @@
 #include <sys/vmmeter.h>
 #include <unistd.h>
 
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 #include "processinfo.h"
 
 using namespace std;

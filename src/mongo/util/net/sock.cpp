@@ -34,14 +34,14 @@
 #include "mongo/util/net/sock.h"
 
 #if !defined(_WIN32)
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <sys/un.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netdb.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/un.h>
 #if defined(__OpenBSD__)
 #include <sys/uio.h>
 #endif
@@ -54,8 +54,8 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/socket_poll.h"

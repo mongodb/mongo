@@ -35,7 +35,6 @@ t.update({"a": 0}, {$set: {"c.c": 1}});
 t.update({"a": 0}, {$inc: {"c.c": 1}});
 
 // edge cases
-assert.throws(doBadUpdate,
-              [{a: 0}, {"": {"b.b": 1}}],
-              "must deny '' embedded '.' in key of update");
+assert.throws(
+    doBadUpdate, [{a: 0}, {"": {"b.b": 1}}], "must deny '' embedded '.' in key of update");
 t.update({"a": 0}, {});

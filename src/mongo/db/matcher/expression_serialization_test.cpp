@@ -666,19 +666,18 @@ TEST(SerializeBasic, ExpressionNotWithRegexValueAndOptionsSerializesCorrectly) {
 
 TEST(SerializeBasic, ExpressionNotWithGeoSerializesCorrectly) {
     const CollatorInterface* collator = nullptr;
-    Matcher original(fromjson(
-                         "{x: {$not: {$geoIntersects: {$geometry: {type: 'Polygon', "
-                         "coordinates: [[[0,0], [5,0], "
-                         "[5, 5], [0, 5], [0, 0]]]}}}}}"),
+    Matcher original(fromjson("{x: {$not: {$geoIntersects: {$geometry: {type: 'Polygon', "
+                              "coordinates: [[[0,0], [5,0], "
+                              "[5, 5], [0, 5], [0, 0]]]}}}}}"),
                      ExtensionsCallbackNoop(),
                      collator);
     Matcher reserialized(
         serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
-    ASSERT_EQ(*reserialized.getQuery(),
-              fromjson(
-                  "{$nor: [{$and: [{x: {$geoIntersects: {$geometry: {type: 'Polygon', coordinates: "
-                  "[[[0,0], "
-                  "[5,0], [5, 5], [0, 5], [0, 0]]]}}}}]}]}"));
+    ASSERT_EQ(
+        *reserialized.getQuery(),
+        fromjson("{$nor: [{$and: [{x: {$geoIntersects: {$geometry: {type: 'Polygon', coordinates: "
+                 "[[[0,0], "
+                 "[5,0], [5, 5], [0, 5], [0, 0]]]}}}}]}]}"));
 
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
     BSONObj obj =
@@ -803,10 +802,10 @@ TEST(SerializeBasic, ExpressionGeoWithinSerializesCorrectly) {
         collator);
     Matcher reserialized(
         serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
-    ASSERT_EQ(*reserialized.getQuery(),
-              fromjson(
-                  "{x: {$geoWithin: {$geometry: {type: 'Polygon', coordinates: [[[0,0], [10,0], "
-                  "[10, 10], [0, 10], [0, 0]]]}}}}"));
+    ASSERT_EQ(
+        *reserialized.getQuery(),
+        fromjson("{x: {$geoWithin: {$geometry: {type: 'Polygon', coordinates: [[[0,0], [10,0], "
+                 "[10, 10], [0, 10], [0, 0]]]}}}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: {type: 'Point', coordinates: [5, 5]}}");
@@ -826,10 +825,10 @@ TEST(SerializeBasic, ExpressionGeoIntersectsSerializesCorrectly) {
         collator);
     Matcher reserialized(
         serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
-    ASSERT_EQ(*reserialized.getQuery(),
-              fromjson(
-                  "{x: {$geoIntersects: {$geometry: {type: 'Polygon', coordinates: [[[0,0], [5,0], "
-                  "[5, 5], [0, 5], [0, 0]]]}}}}"));
+    ASSERT_EQ(
+        *reserialized.getQuery(),
+        fromjson("{x: {$geoIntersects: {$geometry: {type: 'Polygon', coordinates: [[[0,0], [5,0], "
+                 "[5, 5], [0, 5], [0, 0]]]}}}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj =
@@ -849,17 +848,16 @@ TEST(SerializeBasic, ExpressionGeoIntersectsSerializesCorrectly) {
 TEST(SerializeBasic, ExpressionNearSerializesCorrectly) {
     const CollatorInterface* collator = nullptr;
     Matcher original(
-        fromjson(
-            "{x: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}, $maxDistance: 10, "
-            "$minDistance: 1}}}"),
+        fromjson("{x: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}, $maxDistance: 10, "
+                 "$minDistance: 1}}}"),
         ExtensionsCallbackNoop(),
         collator);
     Matcher reserialized(
         serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
-    ASSERT_EQ(*reserialized.getQuery(),
-              fromjson(
-                  "{x: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}, $maxDistance: 10, "
-                  "$minDistance: 1}}}"));
+    ASSERT_EQ(
+        *reserialized.getQuery(),
+        fromjson("{x: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}, $maxDistance: 10, "
+                 "$minDistance: 1}}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 
@@ -874,9 +872,8 @@ TEST(SerializeBasic, ExpressionNearSphereSerializesCorrectly) {
     Matcher reserialized(
         serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(),
-              fromjson(
-                  "{x: {$nearSphere: {$geometry: {type: 'Point', coordinates: [0, 0]}, "
-                  "$maxDistance: 10, $minDistance: 1}}}"));
+              fromjson("{x: {$nearSphere: {$geometry: {type: 'Point', coordinates: [0, 0]}, "
+                       "$maxDistance: 10, $minDistance: 1}}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 
@@ -888,9 +885,8 @@ TEST(SerializeBasic, ExpressionTextSerializesCorrectly) {
     Matcher reserialized(
         serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(),
-              fromjson(
-                  "{$text: {$search: 'a', $language: 'en', $caseSensitive: true, "
-                  "$diacriticSensitive: false}}"));
+              fromjson("{$text: {$search: 'a', $language: 'en', $caseSensitive: true, "
+                       "$diacriticSensitive: false}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 
@@ -902,9 +898,8 @@ TEST(SerializeBasic, ExpressionTextWithDefaultLanguageSerializesCorrectly) {
     Matcher reserialized(
         serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_EQ(*reserialized.getQuery(),
-              fromjson(
-                  "{$text: {$search: 'a', $language: '', $caseSensitive: false, "
-                  "$diacriticSensitive: false}}"));
+              fromjson("{$text: {$search: 'a', $language: '', $caseSensitive: false, "
+                       "$diacriticSensitive: false}}"));
     ASSERT_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 

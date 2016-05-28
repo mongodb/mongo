@@ -22,11 +22,7 @@ MR.emit = function(k, v) {
     var num = nativeHelper.apply(get_num_, [k]);
     var data = $arr[num];
     if (!data) {
-        data = {
-            key: k,
-            values: new Array(1000),
-            count: 0
-        };
+        data = {key: k, values: new Array(1000), count: 0};
         $arr[num] = data;
     }
     data.values[data.count++] = v;

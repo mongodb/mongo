@@ -85,16 +85,18 @@ Status TcmallocNumericPropertyServerParameter::set(const BSONElement& newValueEl
         return Status(ErrorCodes::TypeMismatch,
                       str::stream() << "Expected server parameter " << newValueElement.fieldName()
                                     << " to have numeric type, but found "
-                                    << newValueElement.toString(false) << " of type "
+                                    << newValueElement.toString(false)
+                                    << " of type "
                                     << typeName(newValueElement.type()));
     }
     long long valueAsLongLong = newValueElement.safeNumberLong();
     if (valueAsLongLong < 0 ||
         static_cast<unsigned long long>(valueAsLongLong) > std::numeric_limits<size_t>::max()) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "Value " << newValueElement.toString(false) << " is out of range for "
-                          << newValueElement.fieldName() << "; expected a value between 0 and "
+        return Status(
+            ErrorCodes::BadValue,
+            str::stream() << "Value " << newValueElement.toString(false) << " is out of range for "
+                          << newValueElement.fieldName()
+                          << "; expected a value between 0 and "
                           << std::min<unsigned long long>(std::numeric_limits<size_t>::max(),
                                                           std::numeric_limits<long long>::max()));
     }
@@ -128,7 +130,8 @@ TcmallocNumericPropertyServerParameter tcmallocAggressiveMemoryDecommit(
 
 MONGO_INITIALIZER_GENERAL(TcmallocConfigurationDefaults,
                           ("SystemInfo"),
-                          ("BeginStartupOptionHandling"))(InitializerContext*) {
+                          ("BeginStartupOptionHandling"))
+(InitializerContext*) {
     // Before processing the command line options, if the user has not specified a value in via
     // the environment, set tcmalloc.max_total_thread_cache_bytes to its default value.
     if (getenv("TCMALLOC_MAX_TOTAL_THREAD_CACHE_BYTES")) {

@@ -30,8 +30,8 @@
 
 #include "mongo/db/exec/sort_key_generator.h"
 #include "mongo/db/json.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/db/query/query_test_service_context.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

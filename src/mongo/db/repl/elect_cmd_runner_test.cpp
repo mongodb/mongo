@@ -99,9 +99,13 @@ ReplicaSetConfig assertMakeRSConfig(const BSONObj& configBson) {
 const BSONObj makeElectRequest(const ReplicaSetConfig& rsConfig, int selfIndex) {
     const MemberConfig& myConfig = rsConfig.getMemberAt(selfIndex);
     return BSON("replSetElect" << 1 << "set" << rsConfig.getReplSetName() << "who"
-                               << myConfig.getHostAndPort().toString() << "whoid"
-                               << myConfig.getId() << "cfgver" << rsConfig.getConfigVersion()
-                               << "round" << 380865962699346850ll);
+                               << myConfig.getHostAndPort().toString()
+                               << "whoid"
+                               << myConfig.getId()
+                               << "cfgver"
+                               << rsConfig.getConfigVersion()
+                               << "round"
+                               << 380865962699346850ll);
 }
 
 BSONObj stripRound(const BSONObj& orig) {
@@ -158,7 +162,9 @@ TEST_F(ElectCmdRunnerTest, OneNode) {
     // Only one node in the config.
     const ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
                                                             << "rs0"
-                                                            << "version" << 1 << "members"
+                                                            << "version"
+                                                            << 1
+                                                            << "members"
                                                             << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                                      << "h1"))));
 
@@ -174,7 +180,9 @@ TEST_F(ElectCmdRunnerTest, TwoNodes) {
     const ReplicaSetConfig config =
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
-                                << "version" << 1 << "members"
+                                << "version"
+                                << 1
+                                << "members"
                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                          << "h0")
                                               << BSON("_id" << 2 << "host"
@@ -210,7 +218,9 @@ TEST_F(ElectCmdRunnerTest, ShuttingDown) {
     // Two nodes, we are node h1.  Shutdown happens while we're scheduling remote commands.
     ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
                                                       << "rs0"
-                                                      << "version" << 1 << "members"
+                                                      << "version"
+                                                      << 1
+                                                      << "members"
                                                       << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                                << "h0")
                                                                     << BSON("_id" << 2 << "host"
@@ -307,26 +317,33 @@ protected:
     BSONObj threeNodesTwoArbitersConfig() {
         return BSON("_id"
                     << "rs0"
-                    << "version" << 1 << "members"
+                    << "version"
+                    << 1
+                    << "members"
                     << BSON_ARRAY(BSON("_id" << 0 << "host"
                                              << "host0")
                                   << BSON("_id" << 1 << "host"
                                                 << "host1"
-                                                << "arbiterOnly" << true)
+                                                << "arbiterOnly"
+                                                << true)
                                   << BSON("_id" << 2 << "host"
                                                 << "host2"
-                                                << "arbiterOnly" << true)));
+                                                << "arbiterOnly"
+                                                << true)));
     }
 
     BSONObj basicThreeNodeConfig() {
         return BSON("_id"
                     << "rs0"
-                    << "version" << 1 << "members"
+                    << "version"
+                    << 1
+                    << "members"
                     << BSON_ARRAY(BSON("_id" << 0 << "host"
                                              << "host0")
                                   << BSON("_id" << 1 << "host"
-                                                << "host1") << BSON("_id" << 2 << "host"
-                                                                          << "host2")));
+                                                << "host1")
+                                  << BSON("_id" << 2 << "host"
+                                                << "host2")));
     }
 
 private:

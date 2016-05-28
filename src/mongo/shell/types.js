@@ -565,10 +565,7 @@ Map.prototype._get = function(key) {
             return a[i];
         }
     }
-    var o = {
-        key: key,
-        value: null
-    };
+    var o = {key: key, value: null};
     a.push(o);
     return o;
 };

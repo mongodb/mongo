@@ -39,16 +39,12 @@
     assert.lt(20, diff1(), "big differential here");
     print(diff1());
 
-    assert.soon(
-        function() {
-            var d = diff1();
-            return d < 5;
-            // Make sure there's enough time here, since balancing can sleep for 15s or so between
-            // balances.
-        },
-        "balance didn't happen",
-        1000 * 60 * 5,
-        5000);
+    assert.soon(function() {
+        var d = diff1();
+        return d < 5;
+        // Make sure there's enough time here, since balancing can sleep for 15s or so between
+        // balances.
+    }, "balance didn't happen", 1000 * 60 * 5, 5000);
 
     s.stop();
 })();

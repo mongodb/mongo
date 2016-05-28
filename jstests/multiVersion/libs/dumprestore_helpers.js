@@ -83,22 +83,20 @@ function multiVersionDumpRestoreTest(configObj) {
 
     // Dump using the specified version of mongodump from the running mongod or mongos instance.
     if (configObj.dumpType === "mongod") {
-        MongoRunner.runMongoTool("mongodump",
-                                 {
-                                   out: configObj.dumpDir,
-                                   binVersion: configObj.mongoDumpVersion,
-                                   host: serverSource.host,
-                                   db: testBaseName
-                                 });
+        MongoRunner.runMongoTool("mongodump", {
+            out: configObj.dumpDir,
+            binVersion: configObj.mongoDumpVersion,
+            host: serverSource.host,
+            db: testBaseName
+        });
         MongoRunner.stopMongod(serverSource.port);
     } else { /* "mongos" */
-        MongoRunner.runMongoTool("mongodump",
-                                 {
-                                   out: configObj.dumpDir,
-                                   binVersion: configObj.mongoDumpVersion,
-                                   host: serverSource.host,
-                                   db: testBaseName
-                                 });
+        MongoRunner.runMongoTool("mongodump", {
+            out: configObj.dumpDir,
+            binVersion: configObj.mongoDumpVersion,
+            host: serverSource.host,
+            db: testBaseName
+        });
         shardingTest.stop();
     }
 
@@ -106,13 +104,12 @@ function multiVersionDumpRestoreTest(configObj) {
     if (configObj.restoreType === "mongod") {
         var serverDest = MongoRunner.runMongod({binVersion: configObj.serverDestVersion});
 
-        MongoRunner.runMongoTool("mongorestore",
-                                 {
-                                   dir: configObj.dumpDir + "/" + testBaseName,
-                                   binVersion: configObj.mongoRestoreVersion,
-                                   host: serverDest.host,
-                                   db: testBaseName
-                                 });
+        MongoRunner.runMongoTool("mongorestore", {
+            dir: configObj.dumpDir + "/" + testBaseName,
+            binVersion: configObj.mongoRestoreVersion,
+            host: serverDest.host,
+            db: testBaseName
+        });
     } else { /* "mongos" */
         var shardingTestConfig = {
             name: testBaseName + "_sharded_dest",
@@ -124,13 +121,12 @@ function multiVersionDumpRestoreTest(configObj) {
         };
         var shardingTest = new ShardingTest(shardingTestConfig);
         serverDest = shardingTest.s;
-        MongoRunner.runMongoTool("mongorestore",
-                                 {
-                                   dir: configObj.dumpDir + "/" + testBaseName,
-                                   binVersion: configObj.mongoRestoreVersion,
-                                   host: serverDest.host,
-                                   db: testBaseName
-                                 });
+        MongoRunner.runMongoTool("mongorestore", {
+            dir: configObj.dumpDir + "/" + testBaseName,
+            binVersion: configObj.mongoRestoreVersion,
+            host: serverDest.host,
+            db: testBaseName
+        });
     }
 
     var destDB = serverDest.getDB(testBaseName);

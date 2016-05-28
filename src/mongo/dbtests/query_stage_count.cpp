@@ -70,10 +70,13 @@ public:
         _coll = _ctx.db()->createCollection(&_txn, ns());
 
         _coll->getIndexCatalog()->createIndexOnEmptyCollection(&_txn,
-                                                               BSON("key"
-                                                                    << BSON("x" << 1) << "name"
-                                                                    << "x_1"
-                                                                    << "ns" << ns() << "v" << 1));
+                                                               BSON("key" << BSON("x" << 1)
+                                                                          << "name"
+                                                                          << "x_1"
+                                                                          << "ns"
+                                                                          << ns()
+                                                                          << "v"
+                                                                          << 1));
 
         for (int i = 0; i < kDocuments; i++) {
             insert(BSON(GENOID << "x" << i));

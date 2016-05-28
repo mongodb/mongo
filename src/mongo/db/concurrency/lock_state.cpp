@@ -34,8 +34,8 @@
 
 #include <vector>
 
-#include "mongo/db/service_context.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/service_context.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/synchronization.h"

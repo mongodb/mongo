@@ -39,7 +39,13 @@ assert(!resultsEq(t1result, t1resultf2, verbose), 't2a failed');
 assert(!resultsEq(t1resultf2, t1result, verbose), 't2b failed');
 
 var t1resultf3 = [
-    {"_id": ObjectId("4dc07fedd8420ab8d0d4066d"), "pageViews": 5, "tags": ["fun", ]},
+    {
+      "_id": ObjectId("4dc07fedd8420ab8d0d4066d"),
+      "pageViews": 5,
+      "tags": [
+          "fun",
+      ]
+    },
     {"_id": ObjectId("4dc07fedd8420ab8d0d4066e"), "pageViews": 7, "tags": ["fun", "nasty"]},
     {"_id": ObjectId("4dc07fedd8420ab8d0d4066f"), "pageViews": 6, "tags": ["filthy"]}
 ];

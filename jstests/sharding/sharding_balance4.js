@@ -35,13 +35,9 @@
     //
 
     function doUpdate(bulk, includeString, optionalId) {
-        var up = {
-            $inc: {x: 1}
-        };
+        var up = {$inc: {x: 1}};
         if (includeString) {
-            up["$set"] = {
-                s: bigString
-            };
+            up["$set"] = {s: bigString};
         }
         var myid = optionalId == undefined ? Random.randInt(N) : optionalId;
         bulk.find({_id: myid}).upsert().update(up);

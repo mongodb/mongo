@@ -23,8 +23,8 @@
     assert.commandFailed(
         db.getSiblingDB("admin").createCollection(collName, {validator: {a: {$exists: true}}}));
     if (!db.runCommand("isdbgrid").isdbgrid) {
-        assert.commandFailed(db.getSiblingDB("local")
-                                 .createCollection(collName, {validator: {a: {$exists: true}}}));
+        assert.commandFailed(
+            db.getSiblingDB("local").createCollection(collName, {validator: {a: {$exists: true}}}));
     }
     assert.commandFailed(
         db.getSiblingDB("config").createCollection(collName, {validator: {a: {$exists: true}}}));

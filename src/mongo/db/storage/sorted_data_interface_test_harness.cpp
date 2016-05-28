@@ -529,10 +529,10 @@ TEST(SortedDataInterface, Locate4) {
     auto harnessHelper = newHarnessHelper();
     auto sorted = harnessHelper->newSortedDataInterface(false,
                                                         {
-                                                         {BSON("" << 1), RecordId(1, 2)},
-                                                         {BSON("" << 1), RecordId(1, 4)},
-                                                         {BSON("" << 1), RecordId(1, 6)},
-                                                         {BSON("" << 2), RecordId(1, 8)},
+                                                            {BSON("" << 1), RecordId(1, 2)},
+                                                            {BSON("" << 1), RecordId(1, 4)},
+                                                            {BSON("" << 1), RecordId(1, 6)},
+                                                            {BSON("" << 2), RecordId(1, 8)},
                                                         });
 
     {

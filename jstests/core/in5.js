@@ -4,30 +4,20 @@ t = db.in5;
 function go(fn) {
     t.drop();
     o = {};
-    o[fn] = {
-        a: 1,
-        b: 2
-    };
+    o[fn] = {a: 1, b: 2};
     t.insert(o);
 
     x = {};
-    x[fn] = {
-        a: 1,
-        b: 2
-    };
+    x[fn] = {a: 1, b: 2};
     assert.eq(1, t.find(x).itcount(), "A1 - " + fn);
 
     y = {};
-    y[fn] = {
-        $in: [{a: 1, b: 2}]
-    };
+    y[fn] = {$in: [{a: 1, b: 2}]};
     assert.eq(1, t.find(y).itcount(), "A2 - " + fn);
 
     z = {};
     z[fn + ".a"] = 1;
-    z[fn + ".b"] = {
-        $in: [2]
-    };
+    z[fn + ".b"] = {$in: [2]};
     assert.eq(1, t.find(z).itcount(), "A3 - " + fn);  // SERVER-1366
 
     i = {};

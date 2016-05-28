@@ -304,8 +304,8 @@ void BackgroundSync::_produce(
         log() << "Our newest OpTime : " << lastOpTimeFetched;
         log() << "Earliest OpTime available is " << syncSourceResp.earliestOpTimeSeen;
         log() << "See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember";
-        StorageInterface::get(txn)
-            ->setMinValid(txn, {lastOpTimeFetched, syncSourceResp.earliestOpTimeSeen});
+        StorageInterface::get(txn)->setMinValid(
+            txn, {lastOpTimeFetched, syncSourceResp.earliestOpTimeSeen});
         auto status = _replCoord->setMaintenanceMode(true);
         if (!status.isOK()) {
             warning() << "Failed to transition into maintenance mode.";
@@ -439,10 +439,11 @@ void BackgroundSync::_produce(
         if (!boundaries.start.isNull() || boundaries.end > lastApplied) {
             fassertNoTrace(18750,
                            Status(ErrorCodes::UnrecoverableRollbackError,
-                                  str::stream()
-                                      << "need to rollback, but in inconsistent state. "
-                                      << "minvalid: " << boundaries.end.toString()
-                                      << " > our last optime: " << lastApplied.toString()));
+                                  str::stream() << "need to rollback, but in inconsistent state. "
+                                                << "minvalid: "
+                                                << boundaries.end.toString()
+                                                << " > our last optime: "
+                                                << lastApplied.toString()));
         }
 
         _rollback(txn, source, getConnection);

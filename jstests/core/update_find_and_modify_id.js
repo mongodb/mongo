@@ -2,10 +2,7 @@
 // an _id in the update document, as long as the _id will not be modified
 
 var t = db.jstests_server4516;
-var startingDoc = {
-    _id: 1,
-    a: 1
-};
+var startingDoc = {_id: 1, a: 1};
 
 function prepare() {
     t.drop();

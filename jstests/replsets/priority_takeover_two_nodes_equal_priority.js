@@ -8,8 +8,14 @@ load('jstests/replsets/rslib.js');
     'use strict';
 
     var name = 'priority_takeover_two_nodes_equal_priority';
-    var replSet = new ReplSetTest(
-        {name: name, nodes: [{rsConfig: {priority: 3}}, {rsConfig: {priority: 3}}, {}, ]});
+    var replSet = new ReplSetTest({
+        name: name,
+        nodes: [
+            {rsConfig: {priority: 3}},
+            {rsConfig: {priority: 3}},
+            {},
+        ]
+    });
     replSet.startSet();
     replSet.initiate();
 

@@ -49,19 +49,26 @@ TEST(BsonCheck, CheckHasOnlyLegalFields) {
     ASSERT_OK(bsonCheckOnlyHasFields("",
                                      BSON("aField"
                                           << "value"
-                                          << "thirdField" << 1 << "anotherField" << 2),
+                                          << "thirdField"
+                                          << 1
+                                          << "anotherField"
+                                          << 2),
                                      legals));
     ASSERT_OK(bsonCheckOnlyHasFields("",
                                      BSON("aField"
                                           << "value"
-                                          << "thirdField" << 1),
+                                          << "thirdField"
+                                          << 1),
                                      legals));
 
     ASSERT_EQUALS(ErrorCodes::BadValue,
                   bsonCheckOnlyHasFields("",
                                          BSON("aField"
                                               << "value"
-                                              << "illegal" << 4 << "thirdField" << 1),
+                                              << "illegal"
+                                              << 4
+                                              << "thirdField"
+                                              << 1),
                                          legals));
 }
 

@@ -86,8 +86,9 @@ void FreshnessScanner::Algorithm::processResponse(const RemoteCommandRequest& re
         int index = _rsConfig.findMemberIndexByHostAndPort(request.target);
         FreshnessInfo freshnessInfo{index, lastOpTime};
 
-        auto cmp =
-            [](const FreshnessInfo& a, const FreshnessInfo& b) { return a.opTime > b.opTime; };
+        auto cmp = [](const FreshnessInfo& a, const FreshnessInfo& b) {
+            return a.opTime > b.opTime;
+        };
         auto iter =
             std::upper_bound(_freshnessInfos.begin(), _freshnessInfos.end(), freshnessInfo, cmp);
         _freshnessInfos.insert(iter, freshnessInfo);

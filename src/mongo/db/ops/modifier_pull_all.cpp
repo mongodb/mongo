@@ -105,7 +105,8 @@ Status ModifierPullAll::init(const BSONElement& modExpr, const Options& opts, bo
     if (foundDollar && foundCount > 1) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Too many positional (i.e. '$') elements found in path '"
-                                    << _fieldRef.dottedField() << "'");
+                                    << _fieldRef.dottedField()
+                                    << "'");
     }
 
     //
@@ -155,9 +156,9 @@ Status ModifierPullAll::prepare(mutablebson::Element root,
             // array.
             if (_preparedState->pathFoundElement.getType() != Array) {
                 mb::Element idElem = mb::findElementNamed(root.leftChild(), "_id");
-                return Status(ErrorCodes::BadValue,
-                              str::stream()
-                                  << "Can only apply $pullAll to an array. " << idElem.toString()
+                return Status(
+                    ErrorCodes::BadValue,
+                    str::stream() << "Can only apply $pullAll to an array. " << idElem.toString()
                                   << " has the field "
                                   << _preparedState->pathFoundElement.getFieldName()
                                   << " of non-array type "
@@ -227,7 +228,9 @@ Status ModifierPullAll::log(LogBuilder* logBuilder) const {
     if (!logElement.ok()) {
         return Status(ErrorCodes::InternalError,
                       str::stream() << "Could not append entry to $pullAll oplog entry: "
-                                    << "set '" << _fieldRef.dottedField() << "' -> "
+                                    << "set '"
+                                    << _fieldRef.dottedField()
+                                    << "' -> "
                                     << _preparedState->pathFoundElement.toString());
     }
     return logBuilder->addToSets(logElement);

@@ -316,7 +316,8 @@ TEST_F(
                                _createConfig(true),
                                dataReplicatorExternalState.get(),
                                enqueueDocumentsFn,
-                               [](Status, OpTimeWithHash) {}).getCommandObject_forTest();
+                               [](Status, OpTimeWithHash) {})
+                      .getCommandObject_forTest();
     ASSERT_EQUALS(mongo::BSONType::Object, cmdObj["filter"].type());
     ASSERT_EQUALS(BSON("ts" << BSON("$gte" << lastFetched.opTime.getTimestamp())),
                   cmdObj["filter"].Obj());
@@ -335,7 +336,8 @@ TEST_F(
                                _createConfig(true),
                                dataReplicatorExternalState.get(),
                                enqueueDocumentsFn,
-                               [](Status, OpTimeWithHash) {}).getCommandObject_forTest();
+                               [](Status, OpTimeWithHash) {})
+                      .getCommandObject_forTest();
     ASSERT_EQUALS(mongo::BSONType::Object, cmdObj["filter"].type());
     ASSERT_EQUALS(BSON("ts" << BSON("$gte" << lastFetched.opTime.getTimestamp())),
                   cmdObj["filter"].Obj());
@@ -351,7 +353,8 @@ TEST_F(OplogFetcherTest, MetadataObjectContainsReplSetMetadataFieldUnderProtocol
                                     _createConfig(true),
                                     dataReplicatorExternalState.get(),
                                     enqueueDocumentsFn,
-                                    [](Status, OpTimeWithHash) {}).getMetadataObject_forTest();
+                                    [](Status, OpTimeWithHash) {})
+                           .getMetadataObject_forTest();
     ASSERT_EQUALS(1, metadataObj.nFields());
     ASSERT_EQUALS(1, metadataObj[rpc::kReplSetMetadataFieldName].numberInt());
 }
@@ -364,7 +367,8 @@ TEST_F(OplogFetcherTest, MetadataObjectIsEmptyUnderProtocolVersion0) {
                                     _createConfig(false),
                                     dataReplicatorExternalState.get(),
                                     enqueueDocumentsFn,
-                                    [](Status, OpTimeWithHash) {}).getMetadataObject_forTest();
+                                    [](Status, OpTimeWithHash) {})
+                           .getMetadataObject_forTest();
     ASSERT_EQUALS(BSONObj(), metadataObj);
 }
 
@@ -377,7 +381,8 @@ TEST_F(OplogFetcherTest, RemoteCommandTimeoutShouldEqualElectionTimeout) {
                                 config,
                                 dataReplicatorExternalState.get(),
                                 enqueueDocumentsFn,
-                                [](Status, OpTimeWithHash) {}).getRemoteCommandTimeout_forTest();
+                                [](Status, OpTimeWithHash) {})
+                       .getRemoteCommandTimeout_forTest();
     ASSERT_EQUALS(config.getElectionTimeoutPeriod(), timeout);
 }
 
@@ -390,7 +395,8 @@ TEST_F(OplogFetcherTest, AwaitDataTimeoutShouldEqualHalfElectionTimeoutUnderProt
                                 config,
                                 dataReplicatorExternalState.get(),
                                 enqueueDocumentsFn,
-                                [](Status, OpTimeWithHash) {}).getAwaitDataTimeout_forTest();
+                                [](Status, OpTimeWithHash) {})
+                       .getAwaitDataTimeout_forTest();
     ASSERT_EQUALS(config.getElectionTimeoutPeriod() / 2, timeout);
 }
 
@@ -402,7 +408,8 @@ TEST_F(OplogFetcherTest, AwaitDataTimeoutShouldBeAConstantUnderProtocolVersion0)
                                 _createConfig(false),
                                 dataReplicatorExternalState.get(),
                                 enqueueDocumentsFn,
-                                [](Status, OpTimeWithHash) {}).getAwaitDataTimeout_forTest();
+                                [](Status, OpTimeWithHash) {})
+                       .getAwaitDataTimeout_forTest();
     ASSERT_EQUALS(OplogFetcher::kDefaultProtocolZeroAwaitDataTimeout, timeout);
 }
 

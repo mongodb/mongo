@@ -34,10 +34,10 @@
 #include "mongo/db/geo/r2_region_coverer.h"
 
 #include "mongo/base/init.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/platform/random.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/geo/geometry_container.h"
+#include "mongo/platform/random.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
 namespace {
@@ -278,7 +278,8 @@ GeometryContainer* getRandomCircle(double radius) {
     container->parseFromQuery(
         BSON("$center" << BSON_ARRAY(BSON_ARRAY(randDouble(radius, MAXBOUND - radius)
                                                 << randDouble(radius, MAXBOUND - radius))
-                                     << radius)).firstElement());
+                                     << radius))
+            .firstElement());
     return container;
 }
 

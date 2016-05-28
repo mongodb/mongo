@@ -114,9 +114,11 @@
     res = t.runCommand("createIndexes", {indexes: [{key: {"c": 1}, sparse: true, name: "c_1"}]});
     assert.eq(6, t.getIndexes().length);
     assert.eq(1,
-              t.getIndexes().filter(function(z) {
-                  return z.sparse;
-              }).length);
+              t.getIndexes()
+                  .filter(function(z) {
+                      return z.sparse;
+                  })
+                  .length);
 
     res = t.runCommand("createIndexes", {indexes: [{key: {"x": "foo"}, name: "x_1"}]});
     assert(!res.ok);

@@ -42,9 +42,8 @@ MONGO_INITIALIZER(FailPointRegistry)(InitializerContext* context) {
     return Status::OK();
 }
 
-MONGO_INITIALIZER_GENERAL(AllFailPointsRegistered,
-                          MONGO_NO_PREREQUISITES,
-                          MONGO_NO_DEPENDENTS)(InitializerContext* context) {
+MONGO_INITIALIZER_GENERAL(AllFailPointsRegistered, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS)
+(InitializerContext* context) {
     _fpRegistry->freeze();
     return Status::OK();
 }

@@ -5,10 +5,7 @@ t.drop();
 
 // Self-intersecting polygon, triggers
 // "Exterior shell of polygon is invalid".
-var geometry = {
-    type: "Polygon",
-    coordinates: [[[0, 0], [0, 1], [1, 1], [-2, -1], [0, 0]]]
-};
+var geometry = {type: "Polygon", coordinates: [[[0, 0], [0, 1], [1, 1], [-2, -1], [0, 0]]]};
 
 t.insert({_id: 42, geometry: geometry});
 var err = t.createIndex({geometry: '2dsphere'});

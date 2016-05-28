@@ -32,22 +32,22 @@
 
 #include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
 
-#include <boost/filesystem/path.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 #include <fstream>
 
 #include "mongo/db/mongod_options.h"
-#include "mongo/db/storage/mmap_v1/mmap.h"
 #include "mongo/db/storage/mmap_v1/data_file_sync.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
 #include "mongo/db/storage/mmap_v1/dur_recover.h"
 #include "mongo/db/storage/mmap_v1/dur_recovery_unit.h"
+#include "mongo/db/storage/mmap_v1/file_allocator.h"
+#include "mongo/db/storage/mmap_v1/mmap.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/mmap_v1/file_allocator.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/log.h"
 
@@ -132,9 +132,11 @@ void checkForUncleanShutdown(MMAPV1Engine* storageEngine,
     if (!storageGlobalParams.dur && dur::haveJournalFiles()) {
         log() << "**************" << endl;
         log() << "Error: journal files are present in journal directory, yet starting without "
-                 "journaling enabled." << endl;
+                 "journaling enabled."
+              << endl;
         log() << "It is recommended that you start with journaling enabled so that recovery may "
-                 "occur." << endl;
+                 "occur."
+              << endl;
         log() << "**************" << endl;
         uasserted(13597, "can't start without --journal enabled when journal/ files are present");
     }
@@ -149,11 +151,14 @@ void checkForUncleanShutdown(MMAPV1Engine* storageEngine,
     if (!storageGlobalParams.dur && dur::haveJournalFiles()) {
         log() << "**************" << endl;
         log() << "Error: journal files are present in journal directory, yet starting without "
-                 "--journal enabled." << endl;
+                 "--journal enabled."
+              << endl;
         log() << "It is recommended that you start with journaling enabled so that recovery may "
-                 "occur." << endl;
+                 "occur."
+              << endl;
         log() << "Alternatively (not recommended), you can backup everything, then delete the "
-                 "journal files, and run --repair" << endl;
+                 "journal files, and run --repair"
+              << endl;
         log() << "**************" << endl;
         uasserted(13618, "can't start without --journal enabled when journal/ files are present");
     }

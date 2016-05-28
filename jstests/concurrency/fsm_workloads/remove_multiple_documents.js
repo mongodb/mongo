@@ -34,17 +34,8 @@ var $config = (function() {
         }
     };
 
-    var transitions = {
-        init: {count: 1},
-        count: {remove: 1},
-        remove: {remove: 0.825, count: 0.125}
-    };
+    var transitions = {init: {count: 1}, count: {remove: 1}, remove: {remove: 0.825, count: 0.125}};
 
-    return {
-        threadCount: 10,
-        iterations: 20,
-        states: states,
-        transitions: transitions
-    };
+    return {threadCount: 10, iterations: 20, states: states, transitions: transitions};
 
 })();

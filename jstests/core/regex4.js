@@ -8,9 +8,8 @@ t.save({name: "bob"});
 t.save({name: "aaron"});
 
 assert.eq(2, t.find({name: /^e.*/}).count(), "no index count");
-assert.eq(4,
-          t.find({name: /^e.*/}).explain(true).executionStats.totalDocsExamined,
-          "no index explain");
+assert.eq(
+    4, t.find({name: /^e.*/}).explain(true).executionStats.totalDocsExamined, "no index explain");
 // assert.eq( 2 , t.find( { name : { $ne : /^e.*/ } } ).count() , "no index count ne" ); //
 // SERVER-251
 

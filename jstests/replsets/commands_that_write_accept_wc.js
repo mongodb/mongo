@@ -99,9 +99,7 @@ load('jstests/libs/write_concern_util.js');
                 });
             },
             reduce: function(key, values) {
-                return {
-                    count: values.length
-                };
+                return {count: values.length};
             },
             out: "foo"
         },
@@ -120,10 +118,7 @@ load('jstests/libs/write_concern_util.js');
     });
 
     function testValidWriteConcern(cmd) {
-        cmd.req.writeConcern = {
-            w: 'majority',
-            wtimeout: 25000
-        };
+        cmd.req.writeConcern = {w: 'majority', wtimeout: 25000};
         jsTest.log("Testing " + tojson(cmd.req));
 
         dropTestCollection();
@@ -136,9 +131,7 @@ load('jstests/libs/write_concern_util.js');
     }
 
     function testInvalidWriteConcern(cmd) {
-        cmd.req.writeConcern = {
-            w: 'invalid'
-        };
+        cmd.req.writeConcern = {w: 'invalid'};
         jsTest.log("Testing " + tojson(cmd.req));
 
         dropTestCollection();

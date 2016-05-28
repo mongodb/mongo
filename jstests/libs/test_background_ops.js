@@ -43,9 +43,7 @@ var waitForLock = function(mongo, name) {
     };
 
     // Return an object we can invoke unlock on
-    return {
-        unlock: unlock
-    };
+    return {unlock: unlock};
 };
 
 /**

@@ -243,8 +243,10 @@ BSONElement BtreeKeyGeneratorV1::extractNextElement(const BSONObj& obj,
     uassert(16746,
             mongoutils::str::stream()
                 << "Ambiguous field name found in array (do not use numeric field names in "
-                   "embedded elements in an array), field: '" << arrField.fieldName()
-                << "' for array: " << positionalInfo.arrayObj,
+                   "embedded elements in an array), field: '"
+                << arrField.fieldName()
+                << "' for array: "
+                << positionalInfo.arrayObj,
             !haveObjField || !positionalInfo.hasPositionallyIndexedElt());
 
     *arrayNestedArray = false;

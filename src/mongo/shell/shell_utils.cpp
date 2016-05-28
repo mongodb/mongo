@@ -31,13 +31,13 @@
 
 #include "mongo/shell/shell_utils.h"
 
-#include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/index/external_key_generator.h"
 #include "mongo/platform/random.h"
-#include "mongo/shell/bench.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/shell/bench.h"
 #include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils_extended.h"
 #include "mongo/shell/shell_utils_launcher.h"

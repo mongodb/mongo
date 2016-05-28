@@ -51,12 +51,11 @@ var composer = (function() {
                 }
 
                 var args = configs[workload];
-                Object.keys(args.states)
-                    .forEach(function(state) {
-                        if (state !== args.startState) {
-                            otherStates.push({workload: workload, state: state});
-                        }
-                    });
+                Object.keys(args.states).forEach(function(state) {
+                    if (state !== args.startState) {
+                        otherStates.push({workload: workload, state: state});
+                    }
+                });
             });
 
             var next = getRandomElem(otherStates, Random.rand());
@@ -70,8 +69,6 @@ var composer = (function() {
         return items[Math.floor(randVal * items.length)];
     }
 
-    return {
-        run: runCombinedFSM
-    };
+    return {run: runCombinedFSM};
 
 })();

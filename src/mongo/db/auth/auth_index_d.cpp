@@ -61,16 +61,20 @@ std::string v3SystemRolesIndexName;
 
 MONGO_INITIALIZER(AuthIndexKeyPatterns)(InitializerContext*) {
     v1SystemUsersKeyPattern = BSON("user" << 1 << "userSource" << 1);
-    v3SystemUsersKeyPattern = BSON(AuthorizationManager::USER_NAME_FIELD_NAME
-                                   << 1 << AuthorizationManager::USER_DB_FIELD_NAME << 1);
-    v3SystemRolesKeyPattern = BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
-                                   << 1 << AuthorizationManager::ROLE_DB_FIELD_NAME << 1);
+    v3SystemUsersKeyPattern = BSON(
+        AuthorizationManager::USER_NAME_FIELD_NAME << 1 << AuthorizationManager::USER_DB_FIELD_NAME
+                                                   << 1);
+    v3SystemRolesKeyPattern = BSON(
+        AuthorizationManager::ROLE_NAME_FIELD_NAME << 1 << AuthorizationManager::ROLE_DB_FIELD_NAME
+                                                   << 1);
     v3SystemUsersIndexName =
         std::string(str::stream() << AuthorizationManager::USER_NAME_FIELD_NAME << "_1_"
-                                  << AuthorizationManager::USER_DB_FIELD_NAME << "_1");
+                                  << AuthorizationManager::USER_DB_FIELD_NAME
+                                  << "_1");
     v3SystemRolesIndexName =
         std::string(str::stream() << AuthorizationManager::ROLE_NAME_FIELD_NAME << "_1_"
-                                  << AuthorizationManager::ROLE_DB_FIELD_NAME << "_1");
+                                  << AuthorizationManager::ROLE_DB_FIELD_NAME
+                                  << "_1");
 
     return Status::OK();
 }
@@ -113,12 +117,16 @@ void createSystemIndexes(OperationContext* txn, Collection* collection) {
         collection->getIndexCatalog()->createIndexOnEmptyCollection(
             txn,
             BSON("name" << v3SystemUsersIndexName << "ns" << collection->ns().ns() << "key"
-                        << v3SystemUsersKeyPattern << "unique" << true));
+                        << v3SystemUsersKeyPattern
+                        << "unique"
+                        << true));
     } else if (ns == AuthorizationManager::rolesCollectionNamespace) {
         collection->getIndexCatalog()->createIndexOnEmptyCollection(
             txn,
             BSON("name" << v3SystemRolesIndexName << "ns" << collection->ns().ns() << "key"
-                        << v3SystemRolesKeyPattern << "unique" << true));
+                        << v3SystemRolesKeyPattern
+                        << "unique"
+                        << true));
     }
 }
 

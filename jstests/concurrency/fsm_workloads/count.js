@@ -53,24 +53,12 @@ var $config = (function() {
             assertWhenOwnColl.eq(this.getCount(db, {i: num}), this.countPerNum);
         }
 
-        return {
-            init: init,
-            count: count
-        };
+        return {init: init, count: count};
 
     })();
 
-    var transitions = {
-        init: {count: 1},
-        count: {count: 1}
-    };
+    var transitions = {init: {count: 1}, count: {count: 1}};
 
-    return {
-        data: data,
-        threadCount: 10,
-        iterations: 20,
-        states: states,
-        transitions: transitions
-    };
+    return {data: data, threadCount: 10, iterations: 20, states: states, transitions: transitions};
 
 })();

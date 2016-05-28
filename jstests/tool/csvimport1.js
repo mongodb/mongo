@@ -17,8 +17,7 @@ base.push({
 });
 base.push({
     a: 3,
-    b:
-        "  This line contains the empty string and has leading and trailing whitespace inside the quotes!  ",
+    b: "  This line contains the empty string and has leading and trailing whitespace inside the quotes!  ",
     "c": ""
 });
 base.push({a: 4, b: "", "c": "How are empty entries handled?"});

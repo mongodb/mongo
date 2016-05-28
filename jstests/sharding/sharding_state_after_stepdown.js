@@ -38,22 +38,12 @@
         st.rs0.stop(rs0Primary);
         st.rs1.stop(rs1Primary);
 
-        ReplSetTest.awaitRSClientHosts(mongos,
-                                       [rs0Primary, rs1Primary],
-                                       {
-                                           ok:
-                                               false
-                                       });
+        ReplSetTest.awaitRSClientHosts(mongos, [rs0Primary, rs1Primary], {ok: false});
 
         st.rs0.start(rs0Primary, Object.extend(rs0Primary.savedOptions, {restart: true}));
         st.rs1.start(rs1Primary, Object.extend(rs1Primary.savedOptions, {restart: true}));
 
-        ReplSetTest.awaitRSClientHosts(mongos,
-                                       [rs0Primary, rs1Primary],
-                                       {
-                                           ismaster:
-                                               true
-                                       });
+        ReplSetTest.awaitRSClientHosts(mongos, [rs0Primary, rs1Primary], {ismaster: true});
     };
 
     restartPrimaries();
@@ -109,12 +99,7 @@
             // Expected connection exception, will check for stepdown later
         }
 
-        ReplSetTest.awaitRSClientHosts(mongos,
-                                       [rs0Primary, rs1Primary],
-                                       {
-                                           secondary:
-                                               true
-                                       });
+        ReplSetTest.awaitRSClientHosts(mongos, [rs0Primary, rs1Primary], {secondary: true});
 
         assert.commandWorked(new Mongo(rs0Primary.host).adminCommand({replSetFreeze: 0}));
         assert.commandWorked(new Mongo(rs1Primary.host).adminCommand({replSetFreeze: 0}));
@@ -126,12 +111,7 @@
         assert.commandWorked(rs0Primary.adminCommand({connPoolSync: true}));
         assert.commandWorked(rs1Primary.adminCommand({connPoolSync: true}));
 
-        ReplSetTest.awaitRSClientHosts(mongos,
-                                       [rs0Primary, rs1Primary],
-                                       {
-                                           ismaster:
-                                               true
-                                       });
+        ReplSetTest.awaitRSClientHosts(mongos, [rs0Primary, rs1Primary], {ismaster: true});
     };
 
     stepDownPrimaries();
@@ -140,30 +120,26 @@
     //
     // No sharding metadata until shards are hit by a metadata operation
     assert.eq({},
-              st.rs0.getPrimary().adminCommand({
-                  getShardVersion: collSharded.toString(),
-                  fullMetadata: true
-              }).metadata);
+              st.rs0.getPrimary()
+                  .adminCommand({getShardVersion: collSharded.toString(), fullMetadata: true})
+                  .metadata);
     assert.eq({},
-              st.rs1.getPrimary().adminCommand({
-                  getShardVersion: collSharded.toString(),
-                  fullMetadata: true
-              }).metadata);
+              st.rs1.getPrimary()
+                  .adminCommand({getShardVersion: collSharded.toString(), fullMetadata: true})
+                  .metadata);
 
     //
     //
     // Metadata commands should enable sharding data implicitly
     assert.commandWorked(mongos.adminCommand({split: collSharded.toString(), middle: {_id: 0}}));
     assert.eq({},
-              st.rs0.getPrimary().adminCommand({
-                  getShardVersion: collSharded.toString(),
-                  fullMetadata: true
-              }).metadata);
+              st.rs0.getPrimary()
+                  .adminCommand({getShardVersion: collSharded.toString(), fullMetadata: true})
+                  .metadata);
     assert.neq({},
-               st.rs1.getPrimary().adminCommand({
-                   getShardVersion: collSharded.toString(),
-                   fullMetadata: true
-               }).metadata);
+               st.rs1.getPrimary()
+                   .adminCommand({getShardVersion: collSharded.toString(), fullMetadata: true})
+                   .metadata);
 
     //
     //
@@ -171,15 +147,13 @@
     assert.commandWorked(mongos.adminCommand(
         {moveChunk: collSharded.toString(), find: {_id: 0}, to: shards[0]._id}));
     assert.neq({},
-               st.rs0.getPrimary().adminCommand({
-                   getShardVersion: collSharded.toString(),
-                   fullMetadata: true
-               }).metadata);
+               st.rs0.getPrimary()
+                   .adminCommand({getShardVersion: collSharded.toString(), fullMetadata: true})
+                   .metadata);
     assert.neq({},
-               st.rs1.getPrimary().adminCommand({
-                   getShardVersion: collSharded.toString(),
-                   fullMetadata: true
-               }).metadata);
+               st.rs1.getPrimary()
+                   .adminCommand({getShardVersion: collSharded.toString(), fullMetadata: true})
+                   .metadata);
 
     st.stop();
 

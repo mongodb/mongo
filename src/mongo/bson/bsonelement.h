@@ -37,9 +37,9 @@
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
+#include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
-#include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/config.h"
 #include "mongo/platform/decimal128.h"

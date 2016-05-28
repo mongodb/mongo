@@ -18,11 +18,7 @@ var $config = (function() {
     var states = (function() {
 
         function makeDoc(tid) {
-            return {
-                _id: new ObjectId(),
-                tid: tid,
-                value: 0
-            };
+            return {_id: new ObjectId(), tid: tid, value: 0};
         }
 
         function init(db, collName) {
@@ -40,7 +36,8 @@ var $config = (function() {
                 findandmodify: db[collName].getName(),
                 query: {tid: this.tid},
                 sort: {value: 1},
-                update: {$max: {value: updatedValue}}, new: true
+                update: {$max: {value: updatedValue}},
+                new: true
             });
             assertAlways.commandWorked(res);
 
@@ -60,7 +57,8 @@ var $config = (function() {
                 findandmodify: db[collName].getName(),
                 query: {tid: this.tid},
                 sort: {value: -1},
-                update: {$min: {value: updatedValue}}, new: true
+                update: {$min: {value: updatedValue}},
+                new: true
             });
             assertAlways.commandWorked(res);
 

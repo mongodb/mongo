@@ -36,8 +36,8 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/bson_serializable.h"
-#include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/s/write_ops/batched_upsert_detail.h"
+#include "mongo/s/write_ops/write_error_detail.h"
 
 namespace mongo {
 

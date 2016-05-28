@@ -1,9 +1,7 @@
 t = db.insert1;
 t.drop();
 
-var o = {
-    a: 1
-};
+var o = {a: 1};
 t.insert(o);
 var doc = t.findOne();
 assert.eq(1, doc.a);

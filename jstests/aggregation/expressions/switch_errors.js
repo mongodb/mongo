@@ -8,24 +8,16 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
     var coll = db.switch;
     coll.drop();
 
-    var pipeline = {
-        "$project": {"output": {"$switch": "not an object"}}
-    };
+    var pipeline = {"$project": {"output": {"$switch": "not an object"}}};
     assertErrorCode(coll, pipeline, 40060, "$switch requires an object as an argument.");
 
-    pipeline = {
-        "$project": {"output": {"$switch": {"branches": "not an array"}}}
-    };
+    pipeline = {"$project": {"output": {"$switch": {"branches": "not an array"}}}};
     assertErrorCode(coll, pipeline, 40061, "$switch requires 'branches' to be an array.");
 
-    pipeline = {
-        "$project": {"output": {"$switch": {"branches": ["not an object"]}}}
-    };
+    pipeline = {"$project": {"output": {"$switch": {"branches": ["not an object"]}}}};
     assertErrorCode(coll, pipeline, 40062, "$switch requires each branch to be an object.");
 
-    pipeline = {
-        "$project": {"output": {"$switch": {"branches": [{}]}}}
-    };
+    pipeline = {"$project": {"output": {"$switch": {"branches": [{}]}}}};
     assertErrorCode(coll, pipeline, 40064, "$switch requires each branch have a 'case'.");
 
     pipeline = {
@@ -47,19 +39,13 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
     };
     assertErrorCode(coll, pipeline, 40063, "$switch found a branch with an unknown argument");
 
-    pipeline = {
-        "$project": {"output": {"$switch": {"notAnArgument": 1}}}
-    };
+    pipeline = {"$project": {"output": {"$switch": {"notAnArgument": 1}}}};
     assertErrorCode(coll, pipeline, 40067, "$switch found an unknown argument");
 
-    pipeline = {
-        "$project": {"output": {"$switch": {"branches": []}}}
-    };
+    pipeline = {"$project": {"output": {"$switch": {"branches": []}}}};
     assertErrorCode(coll, pipeline, 40068, "$switch requires at least one branch");
 
-    pipeline = {
-        "$project": {"output": {"$switch": {}}}
-    };
+    pipeline = {"$project": {"output": {"$switch": {}}}};
     assertErrorCode(coll, pipeline, 40068, "$switch requires at least one branch");
 
     coll.insert({x: 1});

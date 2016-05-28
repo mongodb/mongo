@@ -7,9 +7,7 @@
     // Check the defaults are correct
     //
     function getparam(field) {
-        var q = {
-            getParameter: 1
-        };
+        var q = {getParameter: 1};
         q[field] = 1;
 
         var ret = admin.runCommand(q);

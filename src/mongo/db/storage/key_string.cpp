@@ -718,9 +718,9 @@ void KeyString::_appendNumberDecimal(const Decimal128 dec, bool invert) {
         // in the normal range of double, so the decimal can be represented with at least 15 digits
         // of precision by the double 'bin'
     } else if (dec.getCoefficientHigh() == 0 && dec.getCoefficientLow() < k1E15) {
-        dassert(Decimal128(std::abs(bin),
-                           Decimal128::kRoundTo15Digits,
-                           Decimal128::kRoundTowardPositive).isEqual(dec.toAbs()));
+        dassert(Decimal128(
+                    std::abs(bin), Decimal128::kRoundTo15Digits, Decimal128::kRoundTowardPositive)
+                    .isEqual(dec.toAbs()));
         _appendDoubleWithoutTypeBits(bin, kDCMEqualToDoubleRoundedUpTo15Digits, invert);
         return;
     } else {
@@ -752,10 +752,10 @@ void KeyString::_appendNumberDecimal(const Decimal128 dec, bool invert) {
     // Now we know that we can recover the original decimal value (but not its precision, which is
     // given by the type bits) from the binary double plus the decimal continuation.
     uint64_t decimalContinuation = decDiff.getCoefficientLow();
-    dassert(storedValue.add(Decimal128(isNegative,
-                                       storedValue.getBiasedExponent(),
-                                       0,
-                                       decimalContinuation)).isEqual(dec));
+    dassert(
+        storedValue
+            .add(Decimal128(isNegative, storedValue.getBiasedExponent(), 0, decimalContinuation))
+            .isEqual(dec));
     decimalContinuation = endian::nativeToBig(decimalContinuation);
     _append(decimalContinuation, isNegative ? !invert : invert);
 }
@@ -976,9 +976,10 @@ void KeyString::_appendTinyDecimalWithoutTypeBits(const Decimal128 dec,
     _append(endian::nativeToBig(encoded), isNegative ? !invert : invert);
 
     Decimal128 storedVal(scaledBin, Decimal128::kRoundTo34Digits, Decimal128::kRoundTowardPositive);
-    storedVal = storedVal.multiply(kTinyDoubleExponentDownshiftFactorAsDecimal,
-                                   Decimal128::kRoundTowardZero)
-                    .add(Decimal128::kLargestNegativeExponentZero);
+    storedVal =
+        storedVal
+            .multiply(kTinyDoubleExponentDownshiftFactorAsDecimal, Decimal128::kRoundTowardZero)
+            .add(Decimal128::kLargestNegativeExponentZero);
     dassert(storedVal.isLess(magnitude));
     Decimal128 decDiff = magnitude.subtract(storedVal);
     dassert(decDiff.getBiasedExponent() == storedVal.getBiasedExponent() || decDiff.isZero());

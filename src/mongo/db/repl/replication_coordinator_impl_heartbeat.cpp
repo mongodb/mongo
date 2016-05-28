@@ -146,11 +146,11 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         if (replMetadata.isOK() && _rsConfig.isInitialized() && _rsConfig.hasReplicaSetId() &&
             replMetadata.getValue().getReplicaSetId().isSet() &&
             _rsConfig.getReplicaSetId() != replMetadata.getValue().getReplicaSetId()) {
-            responseStatus =
-                Status(ErrorCodes::InvalidReplicaSetConfig,
-                       str::stream()
-                           << "replica set IDs do not match, ours: " << _rsConfig.getReplicaSetId()
-                           << "; remote node's: " << replMetadata.getValue().getReplicaSetId());
+            responseStatus = Status(ErrorCodes::InvalidReplicaSetConfig,
+                                    str::stream() << "replica set IDs do not match, ours: "
+                                                  << _rsConfig.getReplicaSetId()
+                                                  << "; remote node's: "
+                                                  << replMetadata.getValue().getReplicaSetId());
             // Ignore metadata.
             replMetadata = responseStatus;
         }
@@ -435,14 +435,16 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
 
     if (!myIndex.getStatus().isOK() && myIndex.getStatus() != ErrorCodes::NodeNotFound) {
         warning() << "Not persisting new configuration in heartbeat response to disk because "
-                     "it is invalid: " << myIndex.getStatus();
+                     "it is invalid: "
+                  << myIndex.getStatus();
     } else {
         Status status = _externalState->storeLocalConfigDocument(cbd.txn, newConfig.toBSON());
 
         lk.lock();
         if (!status.isOK()) {
             error() << "Ignoring new configuration in heartbeat response because we failed to"
-                       " write it to stable storage; " << status;
+                       " write it to stable storage; "
+                    << status;
             invariant(_rsConfigState == kConfigHBReconfiguring);
             if (_rsConfig.isInitialized()) {
                 _setConfigState_inlock(kConfigSteady);

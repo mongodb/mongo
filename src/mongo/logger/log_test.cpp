@@ -376,7 +376,8 @@ void testEncodedLogLine(const MessageEventEphemeral& event, const std::string& e
     std::string s = os.str();
     if (s.find(expectedSubstring) == std::string::npos) {
         FAIL(str::stream() << "encoded log line does not contain substring \"" << expectedSubstring
-                           << "\". log line: " << s);
+                           << "\". log line: "
+                           << s);
     }
 }
 

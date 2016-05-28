@@ -102,10 +102,7 @@ function runOneTest(conn, t) {
                 var actions = p.actions;
 
                 for (var k = 0; k < actions.length; k++) {
-                    var privDoc = {
-                        resource: resource,
-                        actions: [actions[k]]
-                    };
+                    var privDoc = {resource: resource, actions: [actions[k]]};
                     msg = testInsufficientPrivileges(conn, t, testcase, [privDoc]);
                     if (msg) {
                         failures.push(t.testname + ": " + msg);
@@ -157,14 +154,8 @@ function createUsers(conn) {
     adminDb.logout();
 }
 
-var opts = {
-    auth: "",
-    enableExperimentalStorageDetailsCmd: ""
-};
-var impls = {
-    createUsers: createUsers,
-    runOneTest: runOneTest
-};
+var opts = {auth: "", enableExperimentalStorageDetailsCmd: ""};
+var impls = {createUsers: createUsers, runOneTest: runOneTest};
 
 // run all tests standalone
 var conn = MongoRunner.runMongod(opts);

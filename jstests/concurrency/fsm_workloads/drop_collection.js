@@ -30,24 +30,12 @@ var $config = (function() {
             assertAlways(db[myCollName].drop());
         }
 
-        return {
-            init: init,
-            createAndDrop: createAndDrop
-        };
+        return {init: init, createAndDrop: createAndDrop};
 
     })();
 
-    var transitions = {
-        init: {createAndDrop: 1},
-        createAndDrop: {createAndDrop: 1}
-    };
+    var transitions = {init: {createAndDrop: 1}, createAndDrop: {createAndDrop: 1}};
 
-    return {
-        threadCount: 10,
-        iterations: 10,
-        data: data,
-        states: states,
-        transitions: transitions
-    };
+    return {threadCount: 10, iterations: 10, data: data, states: states, transitions: transitions};
 
 })();

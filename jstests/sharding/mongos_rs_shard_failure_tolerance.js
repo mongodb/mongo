@@ -50,9 +50,7 @@
     var mongosConnIdle = null;
     var mongosConnNew = null;
 
-    var wc = {
-        writeConcern: {w: 2, wtimeout: 60000}
-    };
+    var wc = {writeConcern: {w: 2, wtimeout: 60000}};
 
     assert.writeOK(mongosConnActive.getCollection(collSharded.toString()).insert({_id: -1}, wc));
     assert.writeOK(mongosConnActive.getCollection(collSharded.toString()).insert({_id: 1}, wc));

@@ -499,7 +499,8 @@ void Pipeline::run(BSONObjBuilder& result) {
         // object will be too large, assert. the extra 1KB is for headers
         uassert(16389,
                 str::stream() << "aggregation result exceeds maximum document size ("
-                              << BSONObjMaxUserSize / (1024 * 1024) << "MB)",
+                              << BSONObjMaxUserSize / (1024 * 1024)
+                              << "MB)",
                 resultArray.len() < BSONObjMaxUserSize - 1024);
     }
 

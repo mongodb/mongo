@@ -40,11 +40,11 @@
 
 #pragma once
 
+#include "mongo/base/global_initializer.h"
+#include "mongo/base/global_initializer_registerer.h"
 #include "mongo/base/initializer.h"
 #include "mongo/base/initializer_context.h"
 #include "mongo/base/initializer_function.h"
-#include "mongo/base/global_initializer.h"
-#include "mongo/base/global_initializer_registerer.h"
 #include "mongo/base/make_string_vector.h"
 #include "mongo/base/status.h"
 

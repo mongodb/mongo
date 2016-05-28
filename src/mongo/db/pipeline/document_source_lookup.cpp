@@ -93,9 +93,9 @@ boost::optional<Document> DocumentSourceLookUp::getNext() {
     if (!_additionalFilter && _matchSrc) {
         // We have internalized a $match, but have not yet computed the descended $match that should
         // be applied to our queries.
-        _additionalFilter = DocumentSourceMatch::descendMatchOnPath(_matchSrc->getMatchExpression(),
-                                                                    _as.getPath(false),
-                                                                    pExpCtx)->getQuery();
+        _additionalFilter = DocumentSourceMatch::descendMatchOnPath(
+                                _matchSrc->getMatchExpression(), _as.getPath(false), pExpCtx)
+                                ->getQuery();
     }
 
     if (_handlingUnwind) {
@@ -120,7 +120,8 @@ boost::optional<Document> DocumentSourceLookUp::getNext() {
         objsize += result.objsize();
         uassert(4568,
                 str::stream() << "Total size of documents in " << _fromNs.coll() << " matching "
-                              << query << " exceeds maximum document size",
+                              << query
+                              << " exceeds maximum document size",
                 objsize <= BSONObjMaxInternalSize);
         results.push_back(Value(result));
     }
@@ -224,23 +225,23 @@ Pipeline::SourceContainer::iterator DocumentSourceLookUp::optimizeAt(
     }
 
     bool isMatchOnlyOnAs = true;
-    auto computeWhetherMatchOnAs =
-        [&isMatchOnlyOnAs, &outputPath](MatchExpression* expression, std::string path) -> void {
-            // If 'expression' is the child of a $elemMatch, we cannot internalize the $match. For
-            // example, {b: {$elemMatch: {$gt: 1, $lt: 4}}}, where "b" is our "_as" field. This is
-            // because there's no way to modify the expression to be a match just on 'b'--we cannot
-            // change the path to an empty string, or remove the node entirely.
-            if (expression->matchType() == MatchExpression::ELEM_MATCH_VALUE ||
-                expression->matchType() == MatchExpression::ELEM_MATCH_OBJECT) {
-                isMatchOnlyOnAs = false;
-            }
-            if (expression->numChildren() == 0) {
-                // 'expression' is a leaf node; examine the path. It is important that 'outputPath'
-                // not equal 'path', because we cannot change the expression {b: {$eq: 3}}, where
-                // 'path' is 'b', to be a match on a subfield, since no subfield exists.
-                isMatchOnlyOnAs = isMatchOnlyOnAs && expression::isPathPrefixOf(outputPath, path);
-            }
-        };
+    auto computeWhetherMatchOnAs = [&isMatchOnlyOnAs, &outputPath](MatchExpression* expression,
+                                                                   std::string path) -> void {
+        // If 'expression' is the child of a $elemMatch, we cannot internalize the $match. For
+        // example, {b: {$elemMatch: {$gt: 1, $lt: 4}}}, where "b" is our "_as" field. This is
+        // because there's no way to modify the expression to be a match just on 'b'--we cannot
+        // change the path to an empty string, or remove the node entirely.
+        if (expression->matchType() == MatchExpression::ELEM_MATCH_VALUE ||
+            expression->matchType() == MatchExpression::ELEM_MATCH_OBJECT) {
+            isMatchOnlyOnAs = false;
+        }
+        if (expression->numChildren() == 0) {
+            // 'expression' is a leaf node; examine the path. It is important that 'outputPath'
+            // not equal 'path', because we cannot change the expression {b: {$eq: 3}}, where
+            // 'path' is 'b', to be a match on a subfield, since no subfield exists.
+            isMatchOnlyOnAs = isMatchOnlyOnAs && expression::isPathPrefixOf(outputPath, path);
+        }
+    };
 
     expression::mapOver(dependent->getMatchExpression(), computeWhetherMatchOnAs);
 
@@ -375,23 +376,27 @@ boost::optional<Document> DocumentSourceLookUp::unwindResult() {
 void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array, bool explain) const {
     MutableDocument output(
         DOC(getSourceName() << DOC("from" << _fromNs.coll() << "as" << _as.getPath(false)
-                                          << "localField" << _localField.getPath(false)
-                                          << "foreignField" << _foreignField.getPath(false))));
+                                          << "localField"
+                                          << _localField.getPath(false)
+                                          << "foreignField"
+                                          << _foreignField.getPath(false))));
     if (explain) {
         if (_handlingUnwind) {
             const boost::optional<FieldPath> indexPath = _unwindSrc->indexPath();
             output[getSourceName()]["unwinding"] =
                 Value(DOC("preserveNullAndEmptyArrays"
-                          << _unwindSrc->preserveNullAndEmptyArrays() << "includeArrayIndex"
+                          << _unwindSrc->preserveNullAndEmptyArrays()
+                          << "includeArrayIndex"
                           << (indexPath ? Value(indexPath->getPath(false)) : Value())));
         }
 
         if (_matchSrc) {
             // Our output does not have to be parseable, so include a "matching" field with the
             // descended match expression.
-            output[getSourceName()]["matching"] = Value(
-                DocumentSourceMatch::descendMatchOnPath(
-                    _matchSrc->getMatchExpression(), _as.getPath(false), pExpCtx)->getQuery());
+            output[getSourceName()]["matching"] =
+                Value(DocumentSourceMatch::descendMatchOnPath(
+                          _matchSrc->getMatchExpression(), _as.getPath(false), pExpCtx)
+                          ->getQuery());
         }
 
         array.push_back(Value(output.freeze()));

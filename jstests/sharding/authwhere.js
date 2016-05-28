@@ -10,12 +10,8 @@
     var adminUser = {
         user: "admin",
         pwd: "a",
-        roles: [
-            "readWriteAnyDatabase",
-            "dbAdminAnyDatabase",
-            "userAdminAnyDatabase",
-            "clusterAdmin"
-        ]
+        roles:
+            ["readWriteAnyDatabase", "dbAdminAnyDatabase", "userAdminAnyDatabase", "clusterAdmin"]
     };
 
     var test1Reader = {

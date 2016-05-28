@@ -309,7 +309,8 @@ intrusive_ptr<DocumentSource> DocumentSourceUnwind::createFromBson(
                 indexPath = subElem.String();
                 uassert(28822,
                         str::stream() << "includeArrayIndex option to $unwind stage should not be "
-                                         "prefixed with a '$': " << (*indexPath),
+                                         "prefixed with a '$': "
+                                      << (*indexPath),
                         (*indexPath)[0] != '$');
             } else {
                 uasserted(28811,

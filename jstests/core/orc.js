@@ -22,24 +22,22 @@ t.ensureIndex({a: -1, b: 1, c: 1});
 
 // sanity test
 t.save({a: null, b: 4, c: 4});
-assert.eq(1,
-          t.count({
-              $or: [
-                  {a: null, b: {$gte: 0, $lte: 5}, c: {$gte: 0, $lte: 5}},
-                  {a: null, b: {$gte: 3, $lte: 8}, c: {$gte: 3, $lte: 8}}
-              ]
-          }));
+assert.eq(1, t.count({
+    $or: [
+        {a: null, b: {$gte: 0, $lte: 5}, c: {$gte: 0, $lte: 5}},
+        {a: null, b: {$gte: 3, $lte: 8}, c: {$gte: 3, $lte: 8}}
+    ]
+}));
 
 // from here on is SERVER-2245
 t.remove({});
 t.save({b: 4, c: 4});
-assert.eq(1,
-          t.count({
-              $or: [
-                  {a: null, b: {$gte: 0, $lte: 5}, c: {$gte: 0, $lte: 5}},
-                  {a: null, b: {$gte: 3, $lte: 8}, c: {$gte: 3, $lte: 8}}
-              ]
-          }));
+assert.eq(1, t.count({
+    $or: [
+        {a: null, b: {$gte: 0, $lte: 5}, c: {$gte: 0, $lte: 5}},
+        {a: null, b: {$gte: 3, $lte: 8}, c: {$gte: 3, $lte: 8}}
+    ]
+}));
 
 // t.remove({});
 // t.save( {a:[],b:4,c:4} );

@@ -33,28 +33,27 @@ load('jstests/aggregation/extras/utils.js');
     // valid use of $abs: numbers become positive, null/undefined/nonexistent become null
 
     var results = coll.aggregate([{$project: {a: {$abs: "$a"}}}]).toArray();
-    assert.eq(results,
-              [
-                {_id: 0, a: 5},
-                {_id: 1, a: 5},
-                {_id: 2, a: 5.5},
-                {_id: 3, a: 5.5},
-                {_id: 4, a: 5},
-                {_id: 5, a: 5},
-                {_id: 6, a: NumberLong("5")},
-                {_id: 7, a: NumberLong("5")},
-                {_id: 8, a: 0},
-                {_id: 9, a: 0},
-                {_id: 10, a: 0},
-                {_id: 11, a: NumberLong(Math.pow(2, 31))},
-                {_id: 12, a: Math.pow(2, 31)},
-                {_id: 13, a: NumberLong("1152921504606846977")},
-                {_id: 14, a: NumberLong("1152921504606846977")},
-                {_id: 15, a: null},
-                {_id: 16, a: null},
-                {_id: 17, a: NaN},
-                {_id: 18, a: null},
-              ]);
+    assert.eq(results, [
+        {_id: 0, a: 5},
+        {_id: 1, a: 5},
+        {_id: 2, a: 5.5},
+        {_id: 3, a: 5.5},
+        {_id: 4, a: 5},
+        {_id: 5, a: 5},
+        {_id: 6, a: NumberLong("5")},
+        {_id: 7, a: NumberLong("5")},
+        {_id: 8, a: 0},
+        {_id: 9, a: 0},
+        {_id: 10, a: 0},
+        {_id: 11, a: NumberLong(Math.pow(2, 31))},
+        {_id: 12, a: Math.pow(2, 31)},
+        {_id: 13, a: NumberLong("1152921504606846977")},
+        {_id: 14, a: NumberLong("1152921504606846977")},
+        {_id: 15, a: null},
+        {_id: 16, a: null},
+        {_id: 17, a: NaN},
+        {_id: 18, a: null},
+    ]);
     // Invalid
 
     // using $abs on string

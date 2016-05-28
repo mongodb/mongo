@@ -30,8 +30,8 @@
 
 #pragma once
 
-#include <string>
 #include <map>
+#include <string>
 
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"

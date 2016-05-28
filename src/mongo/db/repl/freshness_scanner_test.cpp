@@ -58,22 +58,29 @@ public:
     }
 
     virtual void setUp() {
-        ASSERT_OK(
-            _config.initialize(BSON("_id"
-                                    << "rs0"
-                                    << "version" << 1 << "members"
-                                    << BSON_ARRAY(
-                                           BSON("_id" << 0 << "host"
-                                                      << "host0")
-                                           << BSON("_id" << 1 << "host"
-                                                         << "host1") << BSON("_id" << 2 << "host"
-                                                                                   << "host2")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "host3"
-                                                         << "votes" << 0 << "priority" << 0)
-                                           << BSON("_id" << 4 << "host"
-                                                         << "host4"
-                                                         << "votes" << 0 << "priority" << 0)))));
+        ASSERT_OK(_config.initialize(BSON("_id"
+                                          << "rs0"
+                                          << "version"
+                                          << 1
+                                          << "members"
+                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                   << "host0")
+                                                        << BSON("_id" << 1 << "host"
+                                                                      << "host1")
+                                                        << BSON("_id" << 2 << "host"
+                                                                      << "host2")
+                                                        << BSON("_id" << 3 << "host"
+                                                                      << "host3"
+                                                                      << "votes"
+                                                                      << 0
+                                                                      << "priority"
+                                                                      << 0)
+                                                        << BSON("_id" << 4 << "host"
+                                                                      << "host4"
+                                                                      << "votes"
+                                                                      << 0
+                                                                      << "priority"
+                                                                      << 0)))));
         ASSERT_OK(_config.validate());
 
         _net = new NetworkInterfaceMock;

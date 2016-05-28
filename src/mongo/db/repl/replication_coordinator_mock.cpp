@@ -32,12 +32,12 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/write_concern_options.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_response.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/db/storage/snapshot_name.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

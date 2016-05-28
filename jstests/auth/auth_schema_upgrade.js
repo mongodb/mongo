@@ -69,10 +69,7 @@ testAuthSchemaUpgrade(conn);
 MongoRunner.stopMongod(conn);
 
 jsTest.log('Test authSchemUpgrade sharded');
-var dopts = {
-    smallfiles: "",
-    nopreallocj: ""
-};
+var dopts = {smallfiles: "", nopreallocj: ""};
 var st = new ShardingTest({
     shards: 1,
     mongos: 1,

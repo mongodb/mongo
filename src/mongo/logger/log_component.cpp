@@ -46,7 +46,7 @@ std::string _dottedNames[LogComponent::kNumLogComponents + 1];
  * Returns StringData created from a string literal
  */
 template <size_t N>
-StringData createStringData(const char(&val)[N]) {
+StringData createStringData(const char (&val)[N]) {
     return StringData(val, StringData::LiteralTag());
 }
 
@@ -54,8 +54,8 @@ StringData createStringData(const char(&val)[N]) {
 // Fully initialize _dottedNames before we enter multithreaded execution.
 //
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(SetupDottedNames,
-                                     MONGO_NO_PREREQUISITES)(InitializerContext* context) {
+MONGO_INITIALIZER_WITH_PREREQUISITES(SetupDottedNames, MONGO_NO_PREREQUISITES)
+(InitializerContext* context) {
     for (int i = 0; i <= int(LogComponent::kNumLogComponents); ++i) {
         logger::LogComponent component = static_cast<logger::LogComponent::Value>(i);
         component.getDottedName();

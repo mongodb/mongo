@@ -40,10 +40,9 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cloner.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/initial_sync.h"
@@ -52,6 +51,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -143,7 +143,8 @@ void checkAdminDatabasePostClone(OperationContext* txn, Database* adminDb) {
                  << " but could not find an auth schema version document in "
                  << AuthorizationManager::versionCollectionNamespace;
         severe() << "This indicates that the primary of this replica set was not successfully "
-                    "upgraded to schema version " << AuthorizationManager::schemaVersion26Final
+                    "upgraded to schema version "
+                 << AuthorizationManager::schemaVersion26Final
                  << ", which is the minimum supported schema version in this version of MongoDB";
         fassertFailedNoTrace(28620);
     }

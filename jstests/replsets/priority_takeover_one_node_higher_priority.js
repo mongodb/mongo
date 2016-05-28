@@ -8,8 +8,14 @@
     load('jstests/replsets/rslib.js');
 
     var name = 'priority_takeover_one_node_higher_priority';
-    var replSet = new ReplSetTest(
-        {name: name, nodes: [{rsConfig: {priority: 3}}, {}, {rsConfig: {arbiterOnly: true}}, ]});
+    var replSet = new ReplSetTest({
+        name: name,
+        nodes: [
+            {rsConfig: {priority: 3}},
+            {},
+            {rsConfig: {arbiterOnly: true}},
+        ]
+    });
     replSet.startSet();
     replSet.initiate();
 

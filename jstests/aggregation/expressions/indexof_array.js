@@ -46,23 +46,15 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and testExp
     };
     assertErrorCode(coll, pipeline, 40090);
 
-    pipeline = {
-        $project: {output: {$indexOfArray: [[1, 2, 3], 2, "bad"]}}
-    };
+    pipeline = {$project: {output: {$indexOfArray: [[1, 2, 3], 2, "bad"]}}};
     assertErrorCode(coll, pipeline, 40096);
 
-    pipeline = {
-        $project: {output: {$indexOfArray: [[1, 2, 3], 2, 0, "bad"]}}
-    };
+    pipeline = {$project: {output: {$indexOfArray: [[1, 2, 3], 2, 0, "bad"]}}};
     assertErrorCode(coll, pipeline, 40096);
 
-    pipeline = {
-        $project: {output: {$indexOfArray: [[1, 2, 3], 2, -1]}}
-    };
+    pipeline = {$project: {output: {$indexOfArray: [[1, 2, 3], 2, -1]}}};
     assertErrorCode(coll, pipeline, 40097);
 
-    pipeline = {
-        $project: {output: {$indexOfArray: [[1, 2, 3], 2, 1, -1]}}
-    };
+    pipeline = {$project: {output: {$indexOfArray: [[1, 2, 3], 2, 1, -1]}}};
     assertErrorCode(coll, pipeline, 40097);
 }());

@@ -18,7 +18,10 @@ var coll = mongod.getCollection("test.batch_write_command_wc_repl");
 //
 // Basic insert, default WC
 coll.remove({});
-printjson(request = {insert: coll.getName(), documents: [{a: 1}]});
+printjson(request = {
+    insert: coll.getName(),
+    documents: [{a: 1}]
+});
 printjson(result = coll.runCommand(request));
 assert(result.ok);
 assert.eq(1, result.n);
@@ -27,7 +30,11 @@ assert.eq(1, coll.count());
 //
 // Basic insert, majority WC
 coll.remove({});
-printjson(request = {insert: coll.getName(), documents: [{a: 1}], writeConcern: {w: 'majority'}});
+printjson(request = {
+    insert: coll.getName(),
+    documents: [{a: 1}],
+    writeConcern: {w: 'majority'}
+});
 printjson(result = coll.runCommand(request));
 assert(result.ok);
 assert.eq(1, result.n);
@@ -36,7 +43,11 @@ assert.eq(1, coll.count());
 //
 // Basic insert, immediate bad wMode error
 coll.remove({});
-printjson(request = {insert: coll.getName(), documents: [{a: 1}], writeConcern: {w: 'invalid'}});
+printjson(request = {
+    insert: coll.getName(),
+    documents: [{a: 1}],
+    writeConcern: {w: 'invalid'}
+});
 printjson(result = coll.runCommand(request));
 assert(!result.ok);
 assert.eq(0, coll.count());
@@ -44,8 +55,11 @@ assert.eq(0, coll.count());
 //
 // Basic insert, error on WC with wtimeout
 coll.remove({});
-printjson(
-    request = {insert: coll.getName(), documents: [{a: 1}], writeConcern: {w: 2, wtimeout: 1}});
+printjson(request = {
+    insert: coll.getName(),
+    documents: [{a: 1}],
+    writeConcern: {w: 2, wtimeout: 1}
+});
 printjson(result = coll.runCommand(request));
 assert(result.ok);
 assert.eq(1, result.n);

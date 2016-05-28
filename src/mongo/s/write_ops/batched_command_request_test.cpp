@@ -41,8 +41,12 @@ TEST(BatchedCommandRequest, BasicInsert) {
 
     BSONObj origInsertRequestObj = BSON("insert"
                                         << "test"
-                                        << "documents" << insertArray << "writeConcern"
-                                        << BSON("w" << 1) << "ordered" << true);
+                                        << "documents"
+                                        << insertArray
+                                        << "writeConcern"
+                                        << BSON("w" << 1)
+                                        << "ordered"
+                                        << true);
 
     std::string errMsg;
     BatchedCommandRequest insertRequest(BatchedCommandRequest::BatchType_Insert);
@@ -59,8 +63,13 @@ TEST(BatchedCommandRequest, InsertWithShardVersion) {
 
     BSONObj origInsertRequestObj = BSON("insert"
                                         << "test"
-                                        << "documents" << insertArray << "writeConcern"
-                                        << BSON("w" << 1) << "ordered" << true << "shardVersion"
+                                        << "documents"
+                                        << insertArray
+                                        << "writeConcern"
+                                        << BSON("w" << 1)
+                                        << "ordered"
+                                        << true
+                                        << "shardVersion"
                                         << BSON_ARRAY(Timestamp(1, 2) << epoch));
 
     std::string errMsg;
@@ -98,7 +107,9 @@ TEST(BatchedCommandRequest, InsertClone) {
 TEST(BatchedCommandRequest, InsertIndexClone) {
     BSONObj indexSpec(BSON("ns"
                            << "xyz.user"
-                           << "key" << BSON("x" << 1) << "name"
+                           << "key"
+                           << BSON("x" << 1)
+                           << "name"
                            << "y"));
 
     auto insertRequest = stdx::make_unique<BatchedInsertRequest>();

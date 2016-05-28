@@ -12,9 +12,7 @@ a.start();
 b.start();
 a.join();
 b.join();
-assert.lt(a.returnData().getMilliseconds(),
-          start.getMilliseconds() + 15000,
-          "A took more than 15s");
-assert.lt(b.returnData().getMilliseconds(),
-          start.getMilliseconds() + 15000,
-          "B took more than 15s");
+assert.lt(
+    a.returnData().getMilliseconds(), start.getMilliseconds() + 15000, "A took more than 15s");
+assert.lt(
+    b.returnData().getMilliseconds(), start.getMilliseconds() + 15000, "B took more than 15s");

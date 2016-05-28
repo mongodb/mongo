@@ -160,17 +160,16 @@
 
     // Positive test for "mapReduce".
     configureMaxTimeAlwaysTimeOut("alwaysOn");
-    res = coll.runCommand("mapReduce",
-                          {
-                            map: function() {
-                                emit(0, 0);
-                            },
-                            reduce: function(key, values) {
-                                return 0;
-                            },
-                            out: {inline: 1},
-                            maxTimeMS: 60 * 1000
-                          });
+    res = coll.runCommand("mapReduce", {
+        map: function() {
+            emit(0, 0);
+        },
+        reduce: function(key, values) {
+            return 0;
+        },
+        out: {inline: 1},
+        maxTimeMS: 60 * 1000
+    });
     assert.commandFailed(
         res, "expected mapReduce to fail in mongod due to maxTimeAlwaysTimeOut fail point");
     assert.eq(
@@ -180,17 +179,16 @@
 
     // Negative test for "mapReduce".
     configureMaxTimeAlwaysTimeOut("off");
-    assert.commandWorked(coll.runCommand("mapReduce",
-                                         {
-                                           map: function() {
-                                               emit(0, 0);
-                                           },
-                                           reduce: function(key, values) {
-                                               return 0;
-                                           },
-                                           out: {inline: 1},
-                                           maxTimeMS: 60 * 1000
-                                         }),
+    assert.commandWorked(coll.runCommand("mapReduce", {
+        map: function() {
+            emit(0, 0);
+        },
+        reduce: function(key, values) {
+            return 0;
+        },
+        out: {inline: 1},
+        maxTimeMS: 60 * 1000
+    }),
                          "expected mapReduce to not hit time limit in mongod");
 
     // Positive test for "aggregate".

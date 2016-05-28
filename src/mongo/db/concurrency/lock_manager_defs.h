@@ -29,8 +29,8 @@
 #pragma once
 
 #include <cstdint>
-#include <string>
 #include <limits>
+#include <string>
 
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"

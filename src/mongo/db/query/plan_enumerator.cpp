@@ -32,8 +32,8 @@
 
 #include <set>
 
-#include "mongo/db/query/indexability.h"
 #include "mongo/db/query/index_tag.h"
+#include "mongo/db/query/indexability.h"
 #include "mongo/util/log.h"
 #include "mongo/util/string_map.h"
 
@@ -332,8 +332,7 @@ bool PlanEnumerator::getNext(MatchExpression** tree) {
     sortUsingTags(*tree);
 
     _root->resetTag();
-    LOG(5) << "Enumerator: memo just before moving:" << endl
-           << dumpMemo();
+    LOG(5) << "Enumerator: memo just before moving:" << endl << dumpMemo();
     _done = nextMemo(memoIDForNode(_root));
     return true;
 }

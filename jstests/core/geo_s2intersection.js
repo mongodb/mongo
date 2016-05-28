@@ -10,10 +10,7 @@ var canonLine = {
     geo: {type: "LineString", coordinates: [[0.0, 0.0], [1.0, 0.0]]}
 };
 
-var canonPoint = {
-    name: 'canonPoint',
-    geo: {type: "Point", coordinates: [10.0, 10.0]}
-};
+var canonPoint = {name: 'canonPoint', geo: {type: "Point", coordinates: [10.0, 10.0]}};
 
 var canonPoly = {
     name: 'canonPoly',
@@ -28,10 +25,7 @@ t.insert(canonPoint);
 t.insert(canonPoly);
 
 // Case 1: Basic sanity intersection.
-var testLine = {
-    type: "LineString",
-    coordinates: [[0.5, 0.5], [0.5, -0.5]]
-};
+var testLine = {type: "LineString", coordinates: [[0.5, 0.5], [0.5, -0.5]]};
 
 var result = t.find({geo: {$geoIntersects: {$geometry: testLine}}});
 assert.eq(result.count(), 1);
@@ -127,10 +121,7 @@ assert.eq(result.count(), 1);
 assert.eq(result[0]['name'], 'canonPoint');
 
 // Case 10: Sanity point non-intersection.
-var testPoint = {
-    type: "Point",
-    coordinates: [12.0, 12.0]
-};
+var testPoint = {type: "Point", coordinates: [12.0, 12.0]};
 
 result = t.find({geo: {$geoIntersects: {$geometry: testPoint}}});
 assert.eq(result.count(), 0);
@@ -152,12 +143,8 @@ t.drop();
 t.ensureIndex({a: "2dsphere"});
 t.insert({a: {type: "Polygon", coordinates: [[[0, 0], [3, 6], [6, 0], [0, 0]]]}});
 
-var firstPoint = {
-    $geometry: {type: "Point", coordinates: [3.0, 1.0]}
-};
-var secondPoint = {
-    $geometry: {type: "Point", coordinates: [4.0, 1.0]}
-};
+var firstPoint = {$geometry: {type: "Point", coordinates: [3.0, 1.0]}};
+var secondPoint = {$geometry: {type: "Point", coordinates: [4.0, 1.0]}};
 
 // First point should intersect with the polygon.
 result = t.find({a: {$geoIntersects: firstPoint}});

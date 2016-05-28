@@ -38,8 +38,8 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/global_conn_pool.h"
-#include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/config.h"
 #include "mongo/db/audit.h"
@@ -63,14 +63,14 @@
 #include "mongo/s/balancer/balancer.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/catalog/type_lockpings.h"
+#include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard_connection.h"
-#include "mongo/s/client/shard_remote.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/client/shard_remote.h"
 #include "mongo/s/client/sharding_connection_hook_for_mongos.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/commands/request.h"
@@ -78,10 +78,10 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/mongos_options.h"
 #include "mongo/s/query/cluster_cursor_cleanup_job.h"
+#include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/sharding_egress_metadata_hook_for_mongos.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/s/version_mongos.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/admin_access.h"
@@ -421,9 +421,8 @@ static ExitCode runMongosServer() {
     return inShutdown() ? EXIT_CLEAN : EXIT_NET_ERROR;
 }
 
-MONGO_INITIALIZER_GENERAL(ForkServer,
-                          ("EndStartupOptionHandling"),
-                          ("default"))(InitializerContext* context) {
+MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
+(InitializerContext* context) {
     mongo::forkServerOrDie();
     return Status::OK();
 }
@@ -508,9 +507,8 @@ MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
 }
 
 #ifdef MONGO_CONFIG_SSL
-MONGO_INITIALIZER_GENERAL(setSSLManagerType,
-                          MONGO_NO_PREREQUISITES,
-                          ("SSLManager"))(InitializerContext* context) {
+MONGO_INITIALIZER_GENERAL(setSSLManagerType, MONGO_NO_PREREQUISITES, ("SSLManager"))
+(InitializerContext* context) {
     isSSLServer = true;
     return Status::OK();
 }

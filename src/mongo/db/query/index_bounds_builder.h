@@ -28,8 +28,8 @@
 
 #pragma once
 
-#include "mongo/db/jsobj.h"
 #include "mongo/db/hasher.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_entry.h"

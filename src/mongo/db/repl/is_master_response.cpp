@@ -219,7 +219,8 @@ Status IsMasterResponse::initialize(const BSONObj& doc) {
                           str::stream() << "Found \"" << kIsReplicaSetFieldName
                                         << "\" field which should indicate that no valid config "
                                            "is loaded, but we didn't also have an \""
-                                        << kInfoFieldName << "\" field as we expected");
+                                        << kInfoFieldName
+                                        << "\" field as we expected");
         }
     }
 
@@ -246,7 +247,8 @@ Status IsMasterResponse::initialize(const BSONObj& doc) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "Elements in \"" << kHostsFieldName
                                             << "\" array of isMaster response must be of type "
-                                            << typeName(String) << " but found type "
+                                            << typeName(String)
+                                            << " but found type "
                                             << typeName(hostElement.type()));
             }
             _hosts.push_back(HostAndPort(hostElement.String()));
@@ -266,7 +268,8 @@ Status IsMasterResponse::initialize(const BSONObj& doc) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "Elements in \"" << kPassivesFieldName
                                             << "\" array of isMaster response must be of type "
-                                            << typeName(String) << " but found type "
+                                            << typeName(String)
+                                            << " but found type "
                                             << typeName(passiveElement.type()));
             }
             _passives.push_back(HostAndPort(passiveElement.String()));
@@ -286,7 +289,8 @@ Status IsMasterResponse::initialize(const BSONObj& doc) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "Elements in \"" << kArbitersFieldName
                                             << "\" array of isMaster response must be of type "
-                                            << typeName(String) << " but found type "
+                                            << typeName(String)
+                                            << " but found type "
                                             << typeName(arbiterElement.type()));
             }
             _arbiters.push_back(HostAndPort(arbiterElement.String()));
@@ -359,7 +363,8 @@ Status IsMasterResponse::initialize(const BSONObj& doc) {
                               str::stream() << "Elements in \"" << kTagsFieldName
                                             << "\" obj "
                                                "of isMaster response must be of type "
-                                            << typeName(String) << " but found type "
+                                            << typeName(String)
+                                            << " but found type "
                                             << typeName(tagsElement.type()));
             }
             _tags[tagElement.fieldNameStringData().toString()] = tagElement.String();
@@ -391,7 +396,8 @@ Status IsMasterResponse::initialize(const BSONObj& doc) {
                               str::stream() << "Elements in \"" << kLastWriteOpTimeFieldName
                                             << "\" obj "
                                                "of isMaster response must be of type "
-                                            << typeName(Object) << " but found type "
+                                            << typeName(Object)
+                                            << " but found type "
                                             << typeName(lastWriteOpTimeElement.type()));
             }
             auto lastWriteOpTime = OpTime::parseFromOplogEntry(lastWriteOpTimeElement.Obj());
@@ -411,7 +417,8 @@ Status IsMasterResponse::initialize(const BSONObj& doc) {
                               str::stream() << "Elements in \"" << kLastWriteDateFieldName
                                             << "\" obj "
                                                "of isMaster response must be of type "
-                                            << typeName(Date) << " but found type "
+                                            << typeName(Date)
+                                            << " but found type "
                                             << typeName(lastWriteDateElement.type()));
             }
             if (_lastWrite) {
@@ -431,7 +438,8 @@ Status IsMasterResponse::initialize(const BSONObj& doc) {
                               str::stream() << "Elements in \"" << kLastMajorityWriteOpTimeFieldName
                                             << "\" obj "
                                                "of isMaster response must be of type "
-                                            << typeName(Object) << " but found type "
+                                            << typeName(Object)
+                                            << " but found type "
                                             << typeName(lastMajorityWriteOpTimeElement.type()));
             }
             auto lastMajorityWriteOpTime =
@@ -452,7 +460,8 @@ Status IsMasterResponse::initialize(const BSONObj& doc) {
                               str::stream() << "Elements in \"" << kLastMajorityWriteDateFieldName
                                             << "\" obj "
                                                "of isMaster response must be of type "
-                                            << typeName(Date) << " but found type "
+                                            << typeName(Date)
+                                            << " but found type "
                                             << typeName(lastMajorityWriteDateElement.type()));
             }
             if (_lastMajorityWrite) {

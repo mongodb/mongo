@@ -7,18 +7,13 @@ load('jstests/ssl/libs/ssl_helpers.js');
     'use strict';
 
     // Disable auth explicitly
-    var noAuthOptions = {
-        noauth: ''
-    };
+    var noAuthOptions = {noauth: ''};
     var transitionToAuthOptions = {
         clusterAuthMode: 'keyFile',
         keyFile: KEYFILE,
         transitionToAuth: ''
     };
-    var keyFileOptions = {
-        clusterAuthMode: 'keyFile',
-        keyFile: KEYFILE
-    };
+    var keyFileOptions = {clusterAuthMode: 'keyFile', keyFile: KEYFILE};
 
     print('=== Testing no-auth/transitionToAuth cluster ===');
     mixedShardTest(noAuthOptions, transitionToAuthOptions, true);

@@ -33,9 +33,9 @@
 #include <string>
 #include <vector>
 
-#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/util/assert_util.h"
 

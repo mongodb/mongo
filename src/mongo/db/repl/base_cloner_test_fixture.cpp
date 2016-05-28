@@ -32,8 +32,8 @@
 
 #include <memory>
 
-#include "mongo/stdx/thread.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/stdx/thread.h"
 
 namespace mongo {
 namespace repl {
@@ -45,7 +45,8 @@ const HostAndPort BaseClonerTest::target("localhost", -1);
 const NamespaceString BaseClonerTest::nss("db.coll");
 const BSONObj BaseClonerTest::idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
                                                      << "_id_"
-                                                     << "ns" << nss.ns());
+                                                     << "ns"
+                                                     << nss.ns());
 
 // static
 BSONObj BaseClonerTest::createCursorResponse(CursorId cursorId,

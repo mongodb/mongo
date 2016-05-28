@@ -146,8 +146,7 @@ public:
 
     /// Any number of values
     template <typename Container>
-    InMemIterator(const Container& input)
-        : _data(input.begin(), input.end()) {}
+    InMemIterator(const Container& input) : _data(input.begin(), input.end()) {}
 
     bool more() {
         return !_data.empty();
@@ -167,7 +166,8 @@ template <typename Key, typename Value>
 class FileIterator : public SortIteratorInterface<Key, Value> {
 public:
     typedef std::pair<typename Key::SorterDeserializeSettings,
-                      typename Value::SorterDeserializeSettings> Settings;
+                      typename Value::SorterDeserializeSettings>
+        Settings;
     typedef std::pair<Key, Value> Data;
 
     FileIterator(const std::string& fileName,
@@ -179,8 +179,8 @@ public:
           _fileDeleter(fileDeleter),
           _file(_fileName.c_str(), std::ios::in | std::ios::binary) {
         massert(16814,
-                str::stream() << "error opening file \"" << _fileName
-                              << "\": " << myErrnoWithDescription(),
+                str::stream() << "error opening file \"" << _fileName << "\": "
+                              << myErrnoWithDescription(),
                 _file.good());
 
         massert(16815,
@@ -274,8 +274,8 @@ private:
             }
 
             msgasserted(16817,
-                        str::stream() << "error reading file \"" << _fileName
-                                      << "\": " << myErrnoWithDescription());
+                        str::stream() << "error reading file \"" << _fileName << "\": "
+                                      << myErrnoWithDescription());
         }
         verify(_file.gcount() == static_cast<std::streamsize>(size));
     }
@@ -419,7 +419,8 @@ public:
     typedef std::pair<Key, Value> Data;
     typedef SortIteratorInterface<Key, Value> Iterator;
     typedef std::pair<typename Key::SorterDeserializeSettings,
-                      typename Value::SorterDeserializeSettings> Settings;
+                      typename Value::SorterDeserializeSettings>
+        Settings;
 
     NoLimitSorter(const SortOptions& opts,
                   const Comparator& comp,
@@ -489,7 +490,8 @@ private:
             // need to be revisited.
             uasserted(16819,
                       str::stream()
-                          << "Sort exceeded memory limit of " << _opts.maxMemoryUsageBytes
+                          << "Sort exceeded memory limit of "
+                          << _opts.maxMemoryUsageBytes
                           << " bytes, but did not opt in to external sorting. Aborting operation."
                           << " Pass allowDiskUse:true to opt in.");
         }
@@ -569,7 +571,8 @@ public:
     typedef std::pair<Key, Value> Data;
     typedef SortIteratorInterface<Key, Value> Iterator;
     typedef std::pair<typename Key::SorterDeserializeSettings,
-                      typename Value::SorterDeserializeSettings> Settings;
+                      typename Value::SorterDeserializeSettings>
+        Settings;
 
     TopKSorter(const SortOptions& opts,
                const Comparator& comp,
@@ -765,7 +768,8 @@ private:
             // need to be revisited.
             uasserted(16820,
                       str::stream()
-                          << "Sort exceeded memory limit of " << _opts.maxMemoryUsageBytes
+                          << "Sort exceeded memory limit of "
+                          << _opts.maxMemoryUsageBytes
                           << " bytes, but did not opt in to external sorting. Aborting operation."
                           << " Pass allowDiskUse:true to opt in.");
         }
@@ -840,8 +844,8 @@ SortedFileWriter<Key, Value>::SortedFileWriter(const SortOptions& opts, const Se
 
     _file.open(_fileName.c_str(), std::ios::binary | std::ios::out);
     massert(16818,
-            str::stream() << "error opening file \"" << _fileName
-                          << "\": " << sorter::myErrnoWithDescription(),
+            str::stream() << "error opening file \"" << _fileName << "\": "
+                          << sorter::myErrnoWithDescription(),
             _file.good());
 
     _fileDeleter = std::make_shared<sorter::FileDeleter>(_fileName);
@@ -905,8 +909,8 @@ void SortedFileWriter<Key, Value>::spill() {
 
     } catch (const std::exception&) {
         msgasserted(16821,
-                    str::stream() << "error writing to file \"" << _fileName
-                                  << "\": " << sorter::myErrnoWithDescription());
+                    str::stream() << "error writing to file \"" << _fileName << "\": "
+                                  << sorter::myErrnoWithDescription());
     }
 
     _buffer.reset();

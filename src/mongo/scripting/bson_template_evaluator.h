@@ -47,8 +47,8 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/platform/random.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -94,7 +94,8 @@ public:
     typedef stdx::function<Status(BsonTemplateEvaluator* btl,
                                   const char* fieldName,
                                   const BSONObj& in,
-                                  BSONObjBuilder& builder)> OperatorFn;
+                                  BSONObjBuilder& builder)>
+        OperatorFn;
 
     /*
      * @params seed : Random seed to be used when generating random data

@@ -155,7 +155,8 @@ void NetworkInterfaceASIO::startup() {
                 _io_service.run();
             } catch (...) {
                 severe() << "Uncaught exception in NetworkInterfaceASIO IO "
-                            "worker thread of type: " << exceptionToStatus();
+                            "worker thread of type: "
+                         << exceptionToStatus();
                 fassertFailed(28820);
             }
         });

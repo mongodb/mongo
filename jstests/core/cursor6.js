@@ -8,14 +8,9 @@ function eq(one, two) {
 function check(indexed) {
     var hint;
     if (indexed) {
-        hint = {
-            a: 1,
-            b: -1
-        };
+        hint = {a: 1, b: -1};
     } else {
-        hint = {
-            $natural: 1
-        };
+        hint = {$natural: 1};
     }
 
     f = r.find().sort({a: 1, b: 1}).hint(hint);

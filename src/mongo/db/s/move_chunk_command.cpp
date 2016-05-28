@@ -90,9 +90,10 @@ private:
      */
     DistLockManager::ScopedDistLock _acquireDistLock(OperationContext* txn,
                                                      const MoveChunkRequest& args) {
-        const std::string whyMessage(str::stream() << "migrating chunk [" << args.getMinKey()
-                                                   << ", " << args.getMaxKey() << ") in "
-                                                   << args.getNss().ns());
+        const std::string whyMessage(
+            str::stream() << "migrating chunk [" << args.getMinKey() << ", " << args.getMaxKey()
+                          << ") in "
+                          << args.getNss().ns());
         auto distLockStatus =
             grid.catalogManager(txn)->distLock(txn, args.getNss().ns(), whyMessage);
         if (!distLockStatus.isOK()) {

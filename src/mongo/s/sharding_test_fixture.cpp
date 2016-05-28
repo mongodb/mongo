@@ -343,8 +343,9 @@ void ShardingTestFixture::expectConfigCollectionCreate(const HostAndPort& config
         ASSERT_EQUALS(configHost, request.target);
         ASSERT_EQUALS("config", request.dbname);
 
-        BSONObj expectedCreateCmd = BSON("create" << collName << "capped" << true << "size"
-                                                  << cappedSize << "maxTimeMS" << 30000);
+        BSONObj expectedCreateCmd =
+            BSON("create" << collName << "capped" << true << "size" << cappedSize << "maxTimeMS"
+                          << 30000);
         ASSERT_EQUALS(expectedCreateCmd, request.cmdObj);
 
         return response;

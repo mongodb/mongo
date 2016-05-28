@@ -30,8 +30,8 @@
 
 #include <atomic>
 
-#include "mongo/db/query/explain_common.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/db/query/explain_common.h"
 #include "mongo/s/client/shard.h"
 
 namespace mongo {

@@ -29,9 +29,9 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/counter.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/commands/server_status_metric.h"
 
 namespace mongo {
 namespace {

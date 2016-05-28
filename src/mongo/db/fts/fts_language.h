@@ -30,11 +30,11 @@
 
 #pragma once
 
+#include "mongo/base/status_with.h"
 #include "mongo/db/fts/fts_basic_phrase_matcher.h"
 #include "mongo/db/fts/fts_phrase_matcher.h"
 #include "mongo/db/fts/fts_unicode_phrase_matcher.h"
 #include "mongo/db/fts/fts_util.h"
-#include "mongo/base/status_with.h"
 
 #include <string>
 

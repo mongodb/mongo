@@ -32,8 +32,8 @@
 
 #include "mongo/db/commands/find_and_modify.h"
 
-#include <memory>
 #include <boost/optional.hpp>
+#include <memory>
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -127,7 +127,8 @@ StatusWith<boost::optional<BSONObj>> advanceExecutor(OperationContext* txn,
         const std::string opstr = isRemove ? "delete" : "update";
         return {ErrorCodes::OperationFailed,
                 str::stream() << "executor returned " << PlanExecutor::statestr(state)
-                              << " while executing " << opstr};
+                              << " while executing "
+                              << opstr};
     }
 
     invariant(state == PlanExecutor::IS_EOF);
@@ -376,8 +377,8 @@ public:
                 // Attach the namespace and database profiling level to the current op.
                 {
                     stdx::lock_guard<Client> lk(*txn->getClient());
-                    CurOp::get(txn)
-                        ->enter_inlock(nsString.ns().c_str(), autoDb.getDb()->getProfilingLevel());
+                    CurOp::get(txn)->enter_inlock(nsString.ns().c_str(),
+                                                  autoDb.getDb()->getProfilingLevel());
                 }
 
                 auto css = CollectionShardingState::get(txn, nsString);
@@ -444,8 +445,8 @@ public:
                 // Attach the namespace and database profiling level to the current op.
                 {
                     stdx::lock_guard<Client> lk(*txn->getClient());
-                    CurOp::get(txn)
-                        ->enter_inlock(nsString.ns().c_str(), autoDb.getDb()->getProfilingLevel());
+                    CurOp::get(txn)->enter_inlock(nsString.ns().c_str(),
+                                                  autoDb.getDb()->getProfilingLevel());
                 }
 
                 auto css = CollectionShardingState::get(txn, nsString);

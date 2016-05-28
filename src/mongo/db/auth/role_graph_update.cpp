@@ -87,7 +87,9 @@ Status checkIdMatchesRoleName(const BSONElement& idElement, const RoleName& role
         return Status(ErrorCodes::FailedToParse,
                       mongoutils::str::stream()
                           << "Role document _id fields must be encoded as the string "
-                             "dbname.rolename.  Found " << idField << " for "
+                             "dbname.rolename.  Found "
+                          << idField
+                          << " for "
                           << roleName.getFullName());
     }
     return Status::OK();

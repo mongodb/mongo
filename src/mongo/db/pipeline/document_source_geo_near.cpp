@@ -30,8 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

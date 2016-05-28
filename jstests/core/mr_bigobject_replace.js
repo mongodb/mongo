@@ -14,10 +14,7 @@
         // Returns a document of the form { _id: ObjectId(...), value: '...' } with the specified
         // 'targetSize' in bytes.
         function makeDocWithSize(targetSize) {
-            var doc = {
-                _id: new ObjectId(),
-                value: ''
-            };
+            var doc = {_id: new ObjectId(), value: ''};
 
             var size = Object.bsonsize(doc);
             assert.gte(targetSize, size);
@@ -41,13 +38,12 @@
         // Insert a document so the mapper gets run.
         assert.writeOK(db.input.insert({}));
 
-        var res = db.runCommand(Object.extend(
-            {
-              mapReduce: "input",
-              map: mapper,
-              out: {replace: "mr_bigobject_replace"},
-            },
-            testOptions));
+        var res = db.runCommand(Object.extend({
+            mapReduce: "input",
+            map: mapper,
+            out: {replace: "mr_bigobject_replace"},
+        },
+                                              testOptions));
 
         assert.commandFailed(res, "creating a document larger than 16MB didn't fail");
         assert.lte(0,

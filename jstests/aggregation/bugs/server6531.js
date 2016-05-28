@@ -10,12 +10,8 @@ for (var x = 0; x < 10; x++) {
 }
 
 function test(variant) {
-    query = {
-        loc: {$within: {$center: [[5, 5], 3]}}
-    };
-    sort = {
-        _id: 1
-    };
+    query = {loc: {$within: {$center: [[5, 5], 3]}}};
+    sort = {_id: 1};
     aggOut = c.aggregate({$match: query}, {$sort: sort});
     cursor = c.find(query).sort(sort);
 

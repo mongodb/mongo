@@ -70,12 +70,8 @@
 
     // group command errors if plan executor is killed.
     res = db.runCommand({
-        group: {
-            ns: coll.getFullName(),
-            key: "_id",
-            $reduce: function(curr, result) {},
-            initial: {}
-        }
+        group:
+            {ns: coll.getFullName(), key: "_id", $reduce: function(curr, result) {}, initial: {}}
     });
     assert.commandFailed(res);
     assert(res.errmsg.indexOf("hit planExecutorAlwaysDead fail point") > -1);

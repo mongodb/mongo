@@ -30,8 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/network_connection_hook.h"
+#include "mongo/executor/network_interface_mock.h"
 
 #include <algorithm>
 #include <iterator>
@@ -400,27 +400,27 @@ void NetworkInterfaceMock::_connectThenEnqueueOperation_inlock(const HostAndPort
     }
 
     // The completion handler for the postconnect command schedules the original command.
-    auto postconnectCompletionHandler =
-        [this, op](StatusWith<RemoteCommandResponse> response) mutable {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
-            if (!response.isOK()) {
-                op.setResponse(_now_inlock(), response.getStatus());
-                op.finishResponse();
-                return;
-            }
+    auto postconnectCompletionHandler = [this,
+                                         op](StatusWith<RemoteCommandResponse> response) mutable {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        if (!response.isOK()) {
+            op.setResponse(_now_inlock(), response.getStatus());
+            op.finishResponse();
+            return;
+        }
 
-            auto handleStatus =
-                _hook->handleReply(op.getRequest().target, std::move(response.getValue()));
+        auto handleStatus =
+            _hook->handleReply(op.getRequest().target, std::move(response.getValue()));
 
-            if (!handleStatus.isOK()) {
-                op.setResponse(_now_inlock(), handleStatus);
-                op.finishResponse();
-                return;
-            }
+        if (!handleStatus.isOK()) {
+            op.setResponse(_now_inlock(), handleStatus);
+            op.finishResponse();
+            return;
+        }
 
-            _enqueueOperation_inlock(std::move(op));
-            _connections.emplace(op.getRequest().target);
-        };
+        _enqueueOperation_inlock(std::move(op));
+        _connections.emplace(op.getRequest().target);
+    };
 
     auto postconnectOp = NetworkOperation(op.getCallbackHandle(),
                                           std::move(*hookPostconnectCommand),

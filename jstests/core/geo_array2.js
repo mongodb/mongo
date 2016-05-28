@@ -40,8 +40,7 @@ for (var t = 0; t < 2; t++) {
             // Do near check
 
             var nearResults =
-                db.runCommand(
-                       {geoNear: "geoarray2", near: center, num: count, query: {type: type}})
+                db.runCommand({geoNear: "geoarray2", near: center, num: count, query: {type: type}})
                     .results;
             // printjson( nearResults )
 
@@ -76,10 +75,11 @@ for (var t = 0; t < 2; t++) {
             // Earth Radius from geoconstants.h
             var eRad = 6378.1;
 
-            nearResults = db.geoarray2.find({
-                loc: {$nearSphere: center, $maxDistance: 500 /* km */ / eRad},
-                type: type
-            }).toArray();
+            nearResults =
+                db.geoarray2
+                    .find(
+                        {loc: {$nearSphere: center, $maxDistance: 500 /* km */ / eRad}, type: type})
+                    .toArray();
 
             assert.eq(nearResults.length, count);
 

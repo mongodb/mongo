@@ -46,25 +46,33 @@ TEST(ChunkType, MissingRequiredFields) {
     ChunkVersion chunkVersion(1, 2, OID::gen());
 
     BSONObj objModNS =
-        BSON(ChunkType::name("test.mycol-a_MinKey")
-             << ChunkType::min(BSON("a" << 10 << "b" << 10)) << ChunkType::max(BSON("a" << 20))
-             << "lastmod" << Timestamp(chunkVersion.toLong()) << "lastmodEpoch"
-             << chunkVersion.epoch() << ChunkType::shard("shard0001"));
+        BSON(ChunkType::name("test.mycol-a_MinKey") << ChunkType::min(BSON("a" << 10 << "b" << 10))
+                                                    << ChunkType::max(BSON("a" << 20))
+                                                    << "lastmod"
+                                                    << Timestamp(chunkVersion.toLong())
+                                                    << "lastmodEpoch"
+                                                    << chunkVersion.epoch()
+                                                    << ChunkType::shard("shard0001"));
     StatusWith<ChunkType> chunkRes = ChunkType::fromBSON(objModNS);
     ASSERT_FALSE(chunkRes.isOK());
 
     BSONObj objModKeys =
-        BSON(ChunkType::name("test.mycol-a_MinKey")
-             << ChunkType::ns("test.mycol") << "lastmod" << Timestamp(chunkVersion.toLong())
-             << "lastmodEpoch" << chunkVersion.epoch() << ChunkType::shard("shard0001"));
+        BSON(ChunkType::name("test.mycol-a_MinKey") << ChunkType::ns("test.mycol") << "lastmod"
+                                                    << Timestamp(chunkVersion.toLong())
+                                                    << "lastmodEpoch"
+                                                    << chunkVersion.epoch()
+                                                    << ChunkType::shard("shard0001"));
     chunkRes = ChunkType::fromBSON(objModKeys);
     ASSERT_FALSE(chunkRes.isOK());
 
     BSONObj objModShard =
-        BSON(ChunkType::name("test.mycol-a_MinKey")
-             << ChunkType::ns("test.mycol") << ChunkType::min(BSON("a" << 10 << "b" << 10))
-             << ChunkType::max(BSON("a" << 20)) << "lastmod" << Timestamp(chunkVersion.toLong())
-             << "lastmodEpoch" << chunkVersion.epoch());
+        BSON(ChunkType::name("test.mycol-a_MinKey") << ChunkType::ns("test.mycol")
+                                                    << ChunkType::min(BSON("a" << 10 << "b" << 10))
+                                                    << ChunkType::max(BSON("a" << 20))
+                                                    << "lastmod"
+                                                    << Timestamp(chunkVersion.toLong())
+                                                    << "lastmodEpoch"
+                                                    << chunkVersion.epoch());
     chunkRes = ChunkType::fromBSON(objModShard);
     ASSERT_FALSE(chunkRes.isOK());
 }
@@ -72,10 +80,14 @@ TEST(ChunkType, MissingRequiredFields) {
 TEST(ChunkType, MinAndMaxShardKeysDifferInNumberOfKeys) {
     ChunkVersion chunkVersion(1, 2, OID::gen());
     BSONObj obj =
-        BSON(ChunkType::name("test.mycol-a_MinKey")
-             << ChunkType::ns("test.mycol") << ChunkType::min(BSON("a" << 10 << "b" << 10))
-             << ChunkType::max(BSON("a" << 20)) << "lastmod" << Timestamp(chunkVersion.toLong())
-             << "lastmodEpoch" << chunkVersion.epoch() << ChunkType::shard("shard0001"));
+        BSON(ChunkType::name("test.mycol-a_MinKey") << ChunkType::ns("test.mycol")
+                                                    << ChunkType::min(BSON("a" << 10 << "b" << 10))
+                                                    << ChunkType::max(BSON("a" << 20))
+                                                    << "lastmod"
+                                                    << Timestamp(chunkVersion.toLong())
+                                                    << "lastmodEpoch"
+                                                    << chunkVersion.epoch()
+                                                    << ChunkType::shard("shard0001"));
     StatusWith<ChunkType> chunkRes = ChunkType::fromBSON(obj);
     ASSERT_OK(chunkRes.getStatus());
     ASSERT_FALSE(chunkRes.getValue().validate().isOK());
@@ -83,11 +95,14 @@ TEST(ChunkType, MinAndMaxShardKeysDifferInNumberOfKeys) {
 
 TEST(ChunkType, MinAndMaxShardKeysDifferInKeyNames) {
     ChunkVersion chunkVersion(1, 2, OID::gen());
-    BSONObj obj =
-        BSON(ChunkType::name("test.mycol-a_MinKey")
-             << ChunkType::ns("test.mycol") << ChunkType::min(BSON("a" << 10))
-             << ChunkType::max(BSON("b" << 20)) << "lastmod" << Timestamp(chunkVersion.toLong())
-             << "lastmodEpoch" << chunkVersion.epoch() << ChunkType::shard("shard0001"));
+    BSONObj obj = BSON(ChunkType::name("test.mycol-a_MinKey") << ChunkType::ns("test.mycol")
+                                                              << ChunkType::min(BSON("a" << 10))
+                                                              << ChunkType::max(BSON("b" << 20))
+                                                              << "lastmod"
+                                                              << Timestamp(chunkVersion.toLong())
+                                                              << "lastmodEpoch"
+                                                              << chunkVersion.epoch()
+                                                              << ChunkType::shard("shard0001"));
     StatusWith<ChunkType> chunkRes = ChunkType::fromBSON(obj);
     ASSERT_OK(chunkRes.getStatus());
     ASSERT_FALSE(chunkRes.getValue().validate().isOK());
@@ -95,11 +110,14 @@ TEST(ChunkType, MinAndMaxShardKeysDifferInKeyNames) {
 
 TEST(ChunkType, NotAscending) {
     ChunkVersion chunkVersion(1, 2, OID::gen());
-    BSONObj obj =
-        BSON(ChunkType::name("test.mycol-a_MinKey")
-             << ChunkType::ns("test.mycol") << ChunkType::min(BSON("a" << 20))
-             << ChunkType::max(BSON("a" << 10)) << "lastmod" << Timestamp(chunkVersion.toLong())
-             << "lastmodEpoch" << chunkVersion.epoch() << ChunkType::shard("shard0001"));
+    BSONObj obj = BSON(ChunkType::name("test.mycol-a_MinKey") << ChunkType::ns("test.mycol")
+                                                              << ChunkType::min(BSON("a" << 20))
+                                                              << ChunkType::max(BSON("a" << 10))
+                                                              << "lastmod"
+                                                              << Timestamp(chunkVersion.toLong())
+                                                              << "lastmodEpoch"
+                                                              << chunkVersion.epoch()
+                                                              << ChunkType::shard("shard0001"));
     StatusWith<ChunkType> chunkRes = ChunkType::fromBSON(obj);
     ASSERT_OK(chunkRes.getStatus());
     ASSERT_FALSE(chunkRes.getValue().validate().isOK());
@@ -107,11 +125,14 @@ TEST(ChunkType, NotAscending) {
 
 TEST(ChunkType, CorrectContents) {
     ChunkVersion chunkVersion(1, 2, OID::gen());
-    BSONObj obj =
-        BSON(ChunkType::name("test.mycol-a_MinKey")
-             << ChunkType::ns("test.mycol") << ChunkType::min(BSON("a" << 10))
-             << ChunkType::max(BSON("a" << 20)) << "lastmod" << Timestamp(chunkVersion.toLong())
-             << "lastmodEpoch" << chunkVersion.epoch() << ChunkType::shard("shard0001"));
+    BSONObj obj = BSON(ChunkType::name("test.mycol-a_MinKey") << ChunkType::ns("test.mycol")
+                                                              << ChunkType::min(BSON("a" << 10))
+                                                              << ChunkType::max(BSON("a" << 20))
+                                                              << "lastmod"
+                                                              << Timestamp(chunkVersion.toLong())
+                                                              << "lastmodEpoch"
+                                                              << chunkVersion.epoch()
+                                                              << ChunkType::shard("shard0001"));
     StatusWith<ChunkType> chunkRes = ChunkType::fromBSON(obj);
     ASSERT_OK(chunkRes.getStatus());
     ChunkType chunk = chunkRes.getValue();
@@ -126,13 +147,18 @@ TEST(ChunkType, CorrectContents) {
 }
 
 TEST(ChunkType, Pre22Format) {
-    ChunkType chunk = assertGet(
-        ChunkType::fromBSON(BSON("_id"
-                                 << "test.mycol-a_MinKey"
-                                 << "lastmod" << Date_t::fromMillisSinceEpoch(1) << "ns"
-                                 << "test.mycol"
-                                 << "min" << BSON("a" << 10) << "max" << BSON("a" << 20) << "shard"
-                                 << "shard0001")));
+    ChunkType chunk = assertGet(ChunkType::fromBSON(BSON("_id"
+                                                         << "test.mycol-a_MinKey"
+                                                         << "lastmod"
+                                                         << Date_t::fromMillisSinceEpoch(1)
+                                                         << "ns"
+                                                         << "test.mycol"
+                                                         << "min"
+                                                         << BSON("a" << 10)
+                                                         << "max"
+                                                         << BSON("a" << 20)
+                                                         << "shard"
+                                                         << "shard0001")));
 
     ASSERT_OK(chunk.validate());
     ASSERT_EQUALS(chunk.getNS(), "test.mycol");

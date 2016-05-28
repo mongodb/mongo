@@ -336,11 +336,9 @@ void MozJSProxyScope::implThread(void* arg) {
 
     while (true) {
         stdx::unique_lock<stdx::mutex> lk(proxy->_mutex);
-        proxy->_condvar.wait(lk,
-                             [proxy] {
-                                 return proxy->_state == State::ProxyRequest ||
-                                     proxy->_state == State::Shutdown;
-                             });
+        proxy->_condvar.wait(lk, [proxy] {
+            return proxy->_state == State::ProxyRequest || proxy->_state == State::Shutdown;
+        });
 
         if (proxy->_state == State::Shutdown)
             break;

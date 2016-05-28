@@ -127,8 +127,10 @@ public:
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "\"" << kQueryField
                                             << "\" had the wrong type. Expected "
-                                            << typeName(BSONType::Object) << " or "
-                                            << typeName(BSONType::jstNULL) << ", found "
+                                            << typeName(BSONType::Object)
+                                            << " or "
+                                            << typeName(BSONType::jstNULL)
+                                            << ", found "
                                             << typeName(queryElt.type()));
             }
         }
@@ -142,7 +144,8 @@ public:
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "\"" << kCollationField
                                             << "\" had the wrong type. Expected "
-                                            << typeName(BSONType::Object) << ", found "
+                                            << typeName(BSONType::Object)
+                                            << ", found "
                                             << typeName(collationElt.type()));
             }
             collation = collationElt.embeddedObject();
@@ -198,8 +201,8 @@ public:
 
         {
             stdx::lock_guard<Client>(*txn->getClient());
-            CurOp::get(txn)
-                ->setPlanSummary_inlock(Explain::getPlanSummary(executor.getValue().get()));
+            CurOp::get(txn)->setPlanSummary_inlock(
+                Explain::getPlanSummary(executor.getValue().get()));
         }
 
         string key = cmdObj[kKeyField].valuestrsafe();

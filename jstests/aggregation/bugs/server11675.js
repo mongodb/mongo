@@ -88,57 +88,57 @@ var server11675 = function() {
                           return obj;
                       });
     var res = t.aggregate([
-        {$match: {$text: {$search: 'apple banana'}}},
-        {$sort: {textScore: {$meta: 'textScore'}}}
-    ]).toArray();
+                   {$match: {$text: {$search: 'apple banana'}}},
+                   {$sort: {textScore: {$meta: 'textScore'}}}
+               ]).toArray();
     assert.eq(res, findRes);
 
     // Make sure {$meta: 'textScore'} can be used as a sub-expression
     var res = t.aggregate([
-        {$match: {_id: 1, $text: {$search: 'apple'}}},
-        {
-          $project: {
-              words: 1,
-              score: {$meta: 'textScore'},
-              wordsTimesScore: {$multiply: ['$words', {$meta: 'textScore'}]}
-          }
-        }
-    ]).toArray();
+                   {$match: {_id: 1, $text: {$search: 'apple'}}},
+                   {
+                     $project: {
+                         words: 1,
+                         score: {$meta: 'textScore'},
+                         wordsTimesScore: {$multiply: ['$words', {$meta: 'textScore'}]}
+                     }
+                   }
+               ]).toArray();
     assert.eq(res[0].wordsTimesScore, res[0].words * res[0].score, tojson(res));
 
     // And can be used in $group
     var res = t.aggregate([
-        {$match: {_id: 1, $text: {$search: 'apple banana'}}},
-        {$group: {_id: {$meta: 'textScore'}, score: {$first: {$meta: 'textScore'}}}}
-    ]).toArray();
+                   {$match: {_id: 1, $text: {$search: 'apple banana'}}},
+                   {$group: {_id: {$meta: 'textScore'}, score: {$first: {$meta: 'textScore'}}}}
+               ]).toArray();
     assert.eq(res[0]._id, res[0].score, tojson(res));
 
     // Make sure metadata crosses shard -> merger boundary
     var res = t.aggregate([
-        {$match: {_id: 1, $text: {$search: 'apple'}}},
-        {$project: {scoreOnShard: {$meta: 'textScore'}}},
-        {$limit: 1}  // force a split. later stages run on merger
-        ,
-        {$project: {scoreOnShard: 1, scoreOnMerger: {$meta: 'textScore'}}}
-    ]).toArray();
+                   {$match: {_id: 1, $text: {$search: 'apple'}}},
+                   {$project: {scoreOnShard: {$meta: 'textScore'}}},
+                   {$limit: 1}  // force a split. later stages run on merger
+                   ,
+                   {$project: {scoreOnShard: 1, scoreOnMerger: {$meta: 'textScore'}}}
+               ]).toArray();
     assert.eq(res[0].scoreOnMerger, res[0].scoreOnShard);
     var score = res[0].scoreOnMerger;  // save for later tests
 
     // Make sure metadata crosses shard -> merger boundary even if not used on shard
     var res = t.aggregate([
-        {$match: {_id: 1, $text: {$search: 'apple'}}},
-        {$limit: 1}  // force a split. later stages run on merger
-        ,
-        {$project: {scoreOnShard: 1, scoreOnMerger: {$meta: 'textScore'}}}
-    ]).toArray();
+                   {$match: {_id: 1, $text: {$search: 'apple'}}},
+                   {$limit: 1}  // force a split. later stages run on merger
+                   ,
+                   {$project: {scoreOnShard: 1, scoreOnMerger: {$meta: 'textScore'}}}
+               ]).toArray();
     assert.eq(res[0].scoreOnMerger, score);
 
     // Make sure metadata works if first $project doesn't use it.
     var res = t.aggregate([
-        {$match: {_id: 1, $text: {$search: 'apple'}}},
-        {$project: {_id: 1}},
-        {$project: {_id: 1, score: {$meta: 'textScore'}}}
-    ]).toArray();
+                   {$match: {_id: 1, $text: {$search: 'apple'}}},
+                   {$project: {_id: 1}},
+                   {$project: {_id: 1, score: {$meta: 'textScore'}}}
+               ]).toArray();
     assert.eq(res[0].score, score);
 
     // Make sure the metadata is 'missing()' when it doesn't exist because it was never created
@@ -147,20 +147,20 @@ var server11675 = function() {
 
     // Make sure the metadata is 'missing()' when it doesn't exist because the document changed
     var res = t.aggregate([
-        {$match: {_id: 1, $text: {$search: 'apple banana'}}},
-        {$group: {_id: 1, score: {$first: {$meta: 'textScore'}}}},
-        {$project: {_id: 1, scoreAgain: {$meta: 'textScore'}}},
-    ]).toArray();
+                   {$match: {_id: 1, $text: {$search: 'apple banana'}}},
+                   {$group: {_id: 1, score: {$first: {$meta: 'textScore'}}}},
+                   {$project: {_id: 1, scoreAgain: {$meta: 'textScore'}}},
+               ]).toArray();
     assert(!("scoreAgain" in res[0]));
 
     // Make sure metadata works after a $unwind
     t.insert({_id: 5, text: 'mango', words: [1, 2, 3]});
     var res = t.aggregate([
-        {$match: {$text: {$search: 'mango'}}},
-        {$project: {score: {$meta: "textScore"}, _id: 1, words: 1}},
-        {$unwind: '$words'},
-        {$project: {scoreAgain: {$meta: "textScore"}, score: 1}}
-    ]).toArray();
+                   {$match: {$text: {$search: 'mango'}}},
+                   {$project: {score: {$meta: "textScore"}, _id: 1, words: 1}},
+                   {$unwind: '$words'},
+                   {$project: {scoreAgain: {$meta: "textScore"}, score: 1}}
+               ]).toArray();
     assert.eq(res[0].scoreAgain, res[0].score);
 
     // Error checking

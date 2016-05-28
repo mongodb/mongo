@@ -83,9 +83,7 @@ function doIt() {
                     for (var j = 0; j < inLength; ++j) {
                         vals.push(r(alphas[i]));
                     }
-                    spec[fields[i]] = {
-                        $in: vals
-                    };
+                    spec[fields[i]] = {$in: vals};
                     break;
                 }
                 case 2 /* equality */: {

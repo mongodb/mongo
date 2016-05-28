@@ -32,9 +32,9 @@
 
 #include "mongo/db/storage/storage_engine_metadata.h"
 
-#include <cstdio>
 #include <boost/filesystem.hpp>
 #include <boost/optional.hpp>
+#include <cstdio>
 #include <fstream>
 #include <limits>
 #include <ostream>
@@ -158,16 +158,17 @@ Status StorageEngineMetadata::read() {
     } catch (const std::exception& ex) {
         return Status(ErrorCodes::FileStreamFailed,
                       str::stream() << "Unexpected error reading BSON data from " << filename
-                                    << ": " << ex.what());
+                                    << ": "
+                                    << ex.what());
     }
 
     BSONObj obj;
     try {
         obj = BSONObj(&buffer[0]);
     } catch (DBException& ex) {
-        return Status(ErrorCodes::FailedToParse,
-                      str::stream() << "Failed to convert data in " << filename
-                                    << " to BSON: " << ex.what());
+        return Status(
+            ErrorCodes::FailedToParse,
+            str::stream() << "Failed to convert data in " << filename << " to BSON: " << ex.what());
     }
 
     // Validate 'storage.engine' field.
@@ -235,8 +236,11 @@ Status StorageEngineMetadata::write() const {
     } catch (const std::exception& ex) {
         return Status(ErrorCodes::FileRenameFailed,
                       str::stream() << "Unexpected error while renaming temporary metadata file "
-                                    << metadataTempPath.string() << " to " << metadataPath.string()
-                                    << ": " << ex.what());
+                                    << metadataTempPath.string()
+                                    << " to "
+                                    << metadataPath.string()
+                                    << ": "
+                                    << ex.what());
     }
 
     return Status::OK();
@@ -252,7 +256,9 @@ Status StorageEngineMetadata::validateStorageEngineOption<bool>(StringData field
     if (!element.isBoolean()) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "Expected boolean field " << fieldName << " but got "
-                                    << typeName(element.type()) << " instead: " << element);
+                                    << typeName(element.type())
+                                    << " instead: "
+                                    << element);
     }
     if (element.boolean() == expectedValue) {
         return Status::OK();
@@ -260,9 +266,12 @@ Status StorageEngineMetadata::validateStorageEngineOption<bool>(StringData field
     return Status(
         ErrorCodes::InvalidOptions,
         str::stream() << "Requested option conflicts with current storage engine option for "
-                      << fieldName << "; you requested " << (expectedValue ? "true" : "false")
+                      << fieldName
+                      << "; you requested "
+                      << (expectedValue ? "true" : "false")
                       << " but the current server storage is already set to "
-                      << (element.boolean() ? "true" : "false") << " and cannot be changed");
+                      << (element.boolean() ? "true" : "false")
+                      << " and cannot be changed");
 }
 
 }  // namespace mongo

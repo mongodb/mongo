@@ -105,8 +105,8 @@ var $config = (function() {
                 for (var i = 0; i < this.nDocumentsToUpdate; ++i) {
                     // Do randomized updates on index x. A document is not guaranteed
                     // to match the randomized 'x' predicate.
-                    res = coll.update({x: Random.randInt(highest), tid: this.tid},
-                                      {$inc: {crud: 1}});
+                    res =
+                        coll.update({x: Random.randInt(highest), tid: this.tid}, {$inc: {crud: 1}});
                     assertAlways.writeOK(res);
                     if (db.getMongo().writeMode() === 'commands') {
                         assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));
@@ -207,10 +207,8 @@ var $config = (function() {
                 setParameter: 1,
                 internalQueryExecYieldIterations: internalQueryExecYieldIterations
             }));
-            assertAlways.commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQueryExecYieldPeriodMS: internalQueryExecYieldPeriodMS
-            }));
+            assertAlways.commandWorked(db.adminCommand(
+                {setParameter: 1, internalQueryExecYieldPeriodMS: internalQueryExecYieldPeriodMS}));
         });
     }
 

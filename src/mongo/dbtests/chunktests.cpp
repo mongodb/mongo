@@ -127,8 +127,9 @@ class MultiShardBase : public Base {
         return BSON_ARRAY(BSON("a"
                                << "x")
                           << BSON("a"
-                                  << "y") << BSON("a"
-                                                  << "z"));
+                                  << "y")
+                          << BSON("a"
+                                  << "z"));
     }
 };
 

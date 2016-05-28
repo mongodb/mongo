@@ -19,10 +19,16 @@
         other: {
             chunkSize: 1,
             rs0: {
-                nodes: [{rsConfig: {votes: 1}}, {rsConfig: {priority: 0, votes: 0}}, ],
+                nodes: [
+                    {rsConfig: {votes: 1}},
+                    {rsConfig: {priority: 0, votes: 0}},
+                ],
             },
             rs1: {
-                nodes: [{rsConfig: {votes: 1}}, {rsConfig: {priority: 0, votes: 0}}, ],
+                nodes: [
+                    {rsConfig: {votes: 1}},
+                    {rsConfig: {priority: 0, votes: 0}},
+                ],
             }
         }
     });

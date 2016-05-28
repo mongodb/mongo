@@ -40,10 +40,7 @@ var $config = (function() {
         function count(db, collName) {
             var coll = db.getSiblingDB(this.dbName)[collName];
 
-            var cmdObj = {
-                query: {a: 1, b: {$gt: Random.rand()}},
-                limit: Random.randInt(10)
-            };
+            var cmdObj = {query: {a: 1, b: {$gt: Random.rand()}}, limit: Random.randInt(10)};
 
             // We can't use assertAlways.commandWorked here because the plan
             // executor can be killed during the count.
@@ -61,17 +58,11 @@ var $config = (function() {
             populateData(myDB, collName);
         }
 
-        return {
-            count: count,
-            dropDB: dropDB
-        };
+        return {count: count, dropDB: dropDB};
 
     })();
 
-    var transitions = {
-        count: {count: 0.95, dropDB: 0.05},
-        dropDB: {count: 0.95, dropDB: 0.05}
-    };
+    var transitions = {count: {count: 0.95, dropDB: 0.05}, dropDB: {count: 0.95, dropDB: 0.05}};
 
     function setup(db, collName, cluster) {
         var myDB = db.getSiblingDB(this.dbName);

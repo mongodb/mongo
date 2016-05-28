@@ -28,14 +28,12 @@ assert.neq(undefined,
 assert.commandFailed(db.adminCommand({"setParameter": 1, logComponentVerbosity: "not an object"}));
 
 // Non-numeric verbosity for component should be rejected.
-assert.commandFailed(db.adminCommand({
-    "setParameter": 1,
-    logComponentVerbosity: {storage: {journal: {verbosity: "not a number"}}}
-}));
+assert.commandFailed(db.adminCommand(
+    {"setParameter": 1, logComponentVerbosity: {storage: {journal: {verbosity: "not a number"}}}}));
 
 // Invalid component shall be rejected
-assert.commandFailed(db.adminCommand(
-    {"setParameter": 1, logComponentVerbosity: {NoSuchComponent: {verbosity: 2}}}));
+assert.commandFailed(
+    db.adminCommand({"setParameter": 1, logComponentVerbosity: {NoSuchComponent: {verbosity: 2}}}));
 
 // Set multiple component log levels at once.
 (function() {

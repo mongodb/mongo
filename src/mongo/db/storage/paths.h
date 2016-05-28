@@ -31,9 +31,9 @@
 #pragma once
 
 #include <boost/filesystem/path.hpp>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #include "mongo/util/mongoutils/str.h"
 

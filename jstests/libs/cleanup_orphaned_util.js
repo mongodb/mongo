@@ -94,12 +94,8 @@ function testCleanupOrphaned(options) {
 
     assert.commandWorked(admin.runCommand({split: coll.getFullName(), middle: oneQuarter}));
 
-    assert.commandWorked(admin.runCommand({
-        moveChunk: coll.getFullName(),
-        find: beginning,
-        to: shards[1]._id,
-        _waitForDelete: true
-    }));
+    assert.commandWorked(admin.runCommand(
+        {moveChunk: coll.getFullName(), find: beginning, to: shards[1]._id, _waitForDelete: true}));
 
     // 1/4 of the data is on the first shard.
     // shard 0:            [threeQuarters,  middle)

@@ -22,9 +22,7 @@ t.ensureIndex({tags: 1});
 for (i = 0; i < 200; i++) {
     for (var j = 0; j < 10; j++)
         t.save({tags: getTags(100)});
-    var q = {
-        tags: {$in: getTags(10)}
-    };
+    var q = {tags: {$in: getTags(10)}};
     var before = t.find(q).count();
     var res = t.remove(q);
     var after = t.find(q).count();

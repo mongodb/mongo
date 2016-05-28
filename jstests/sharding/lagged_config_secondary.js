@@ -9,8 +9,8 @@
     var configSecondaryToKill = configSecondaryList[0];
     var delayedConfigSecondary = configSecondaryList[1];
 
-    delayedConfigSecondary.getDB('admin')
-        .adminCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
+    delayedConfigSecondary.getDB('admin').adminCommand(
+        {configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
 
     var testDB = st.s.getDB('test');
     testDB.adminCommand({enableSharding: 'test'});

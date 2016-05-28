@@ -86,14 +86,8 @@ var commandNotSupportedCode = 115;
 var shard0name = "shard0000";
 
 // useful shorthand when defining the tests below
-var roles_write = {
-    readWrite: 1,
-    readWriteAnyDatabase: 1,
-    dbOwner: 1,
-    restore: 1,
-    root: 1,
-    __system: 1
-};
+var roles_write =
+    {readWrite: 1, readWriteAnyDatabase: 1, dbOwner: 1, restore: 1, root: 1, __system: 1};
 var roles_read = {
     read: 1,
     readAnyDatabase: 1,
@@ -104,25 +98,9 @@ var roles_read = {
     root: 1,
     __system: 1
 };
-var roles_readAny = {
-    readAnyDatabase: 1,
-    readWriteAnyDatabase: 1,
-    backup: 1,
-    root: 1,
-    __system: 1
-};
-var roles_dbAdmin = {
-    dbAdmin: 1,
-    dbAdminAnyDatabase: 1,
-    dbOwner: 1,
-    root: 1,
-    __system: 1
-};
-var roles_dbAdminAny = {
-    dbAdminAnyDatabase: 1,
-    root: 1,
-    __system: 1
-};
+var roles_readAny = {readAnyDatabase: 1, readWriteAnyDatabase: 1, backup: 1, root: 1, __system: 1};
+var roles_dbAdmin = {dbAdmin: 1, dbAdminAnyDatabase: 1, dbOwner: 1, root: 1, __system: 1};
+var roles_dbAdminAny = {dbAdminAnyDatabase: 1, root: 1, __system: 1};
 var roles_writeDbAdmin = {
     readWrite: 1,
     readWriteAnyDatabase: 1,
@@ -132,12 +110,7 @@ var roles_writeDbAdmin = {
     root: 1,
     __system: 1
 };
-var roles_writeDbAdminAny = {
-    readWriteAnyDatabase: 1,
-    dbAdminAnyDatabase: 1,
-    root: 1,
-    __system: 1
-};
+var roles_writeDbAdminAny = {readWriteAnyDatabase: 1, dbAdminAnyDatabase: 1, root: 1, __system: 1};
 var roles_readDbAdmin = {
     read: 1,
     readAnyDatabase: 1,
@@ -149,31 +122,11 @@ var roles_readDbAdmin = {
     root: 1,
     __system: 1
 };
-var roles_readDbAdminAny = {
-    readAnyDatabase: 1,
-    readWriteAnyDatabase: 1,
-    dbAdminAnyDatabase: 1,
-    root: 1,
-    __system: 1
-};
-var roles_monitoring = {
-    clusterMonitor: 1,
-    clusterAdmin: 1,
-    root: 1,
-    __system: 1
-};
-var roles_hostManager = {
-    hostManager: 1,
-    clusterAdmin: 1,
-    root: 1,
-    __system: 1
-};
-var roles_clusterManager = {
-    clusterManager: 1,
-    clusterAdmin: 1,
-    root: 1,
-    __system: 1
-};
+var roles_readDbAdminAny =
+    {readAnyDatabase: 1, readWriteAnyDatabase: 1, dbAdminAnyDatabase: 1, root: 1, __system: 1};
+var roles_monitoring = {clusterMonitor: 1, clusterAdmin: 1, root: 1, __system: 1};
+var roles_hostManager = {hostManager: 1, clusterAdmin: 1, root: 1, __system: 1};
+var roles_clusterManager = {clusterManager: 1, clusterAdmin: 1, root: 1, __system: 1};
 var roles_all = {
     read: 1,
     readAnyDatabase: 1,
@@ -653,8 +606,7 @@ var authCommandsLib = {
               {
                 runOnDb: secondDbName,
                 roles: roles_readAny,
-                privileges:
-                    [{resource: {db: secondDbName, collection: "x"}, actions: ["find"]}]
+                privileges: [{resource: {db: secondDbName, collection: "x"}, actions: ["find"]}]
               }
           ]
         },
@@ -668,10 +620,9 @@ var authCommandsLib = {
               {
                 runOnDb: firstDbName,
                 roles: Object.extend({restore: 1}, roles_writeDbAdmin),
-                privileges: [{
-                    resource: {db: firstDbName, collection: "x"},
-                    actions: ["createCollection"]
-                }]
+                privileges: [
+                    {resource: {db: firstDbName, collection: "x"}, actions: ["createCollection"]}
+                ]
               },
               {
                 runOnDb: firstDbName,
@@ -890,8 +841,7 @@ var authCommandsLib = {
               {
                 runOnDb: firstDbName,
                 roles: roles_read,
-                privileges:
-                    [{resource: {db: firstDbName, collection: "coll"}, actions: ["find"]}]
+                privileges: [{resource: {db: firstDbName, collection: "coll"}, actions: ["find"]}]
               },
               {
                 runOnDb: secondDbName,
@@ -1161,8 +1111,7 @@ var authCommandsLib = {
               {
                 runOnDb: secondDbName,
                 roles: roles_readAny,
-                privileges:
-                    [{resource: {db: secondDbName, collection: "x"}, actions: ["find"]}]
+                privileges: [{resource: {db: secondDbName, collection: "x"}, actions: ["find"]}]
               }
           ]
         },
@@ -1187,8 +1136,7 @@ var authCommandsLib = {
               {
                 runOnDb: secondDbName,
                 roles: roles_readAny,
-                privileges:
-                    [{resource: {db: secondDbName, collection: "x"}, actions: ["find"]}]
+                privileges: [{resource: {db: secondDbName, collection: "x"}, actions: ["find"]}]
               }
           ]
         },
@@ -1350,8 +1298,7 @@ var authCommandsLib = {
               {
                 runOnDb: secondDbName,
                 roles: roles_readAny,
-                privileges:
-                    [{resource: {db: secondDbName, collection: "x"}, actions: ["find"]}]
+                privileges: [{resource: {db: secondDbName, collection: "x"}, actions: ["find"]}]
               }
           ]
         },
@@ -1619,8 +1566,7 @@ var authCommandsLib = {
               {
                 runOnDb: secondDbName,
                 roles: roles_readAny,
-                privileges:
-                    [{resource: {db: secondDbName, collection: "x"}, actions: ["find"]}]
+                privileges: [{resource: {db: secondDbName, collection: "x"}, actions: ["find"]}]
               }
           ]
         },
@@ -1860,10 +1806,9 @@ var authCommandsLib = {
               {
                 runOnDb: secondDbName,
                 roles: roles_dbAdminAny,
-                privileges: [{
-                    resource: {db: secondDbName, collection: ""},
-                    actions: ["enableProfiler"]
-                }]
+                privileges: [
+                    {resource: {db: secondDbName, collection: ""}, actions: ["enableProfiler"]}
+                ]
               }
           ]
         },
@@ -1908,8 +1853,7 @@ var authCommandsLib = {
         },
         {
           testname: "renameCollection_sameDb",
-          command:
-              {renameCollection: firstDbName + ".x", to: firstDbName + ".y", dropTarget: true},
+          command: {renameCollection: firstDbName + ".x", to: firstDbName + ".y", dropTarget: true},
           setup: function(db) {
               db.getSisterDB(firstDbName).x.save({});
           },
@@ -2003,8 +1947,7 @@ var authCommandsLib = {
               {
                 runOnDb: firstDbName,
                 roles: roles_dbAdmin,
-                privileges:
-                    [{resource: {db: firstDbName, collection: "x"}, actions: ["reIndex"]}]
+                privileges: [{resource: {db: firstDbName, collection: "x"}, actions: ["reIndex"]}]
               },
               {
                 runOnDb: secondDbName,
@@ -2058,10 +2001,9 @@ var authCommandsLib = {
                 runOnDb: secondDbName,
                 roles:
                     {dbAdminAnyDatabase: 1, hostManager: 1, clusterAdmin: 1, root: 1, __system: 1},
-                privileges: [{
-                    resource: {db: secondDbName, collection: ""},
-                    actions: ["repairDatabase"]
-                }]
+                privileges: [
+                    {resource: {db: secondDbName, collection: ""}, actions: ["repairDatabase"]}
+                ]
               }
           ]
         },

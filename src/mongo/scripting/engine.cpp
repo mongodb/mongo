@@ -33,13 +33,13 @@
 
 #include "mongo/scripting/engine.h"
 
-#include <cctype>
 #include <boost/filesystem/operations.hpp>
+#include <cctype>
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"

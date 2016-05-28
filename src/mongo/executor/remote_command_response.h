@@ -29,8 +29,8 @@
 #pragma once
 
 #include <iosfwd>
-#include <string>
 #include <memory>
+#include <string>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/util/net/message.h"

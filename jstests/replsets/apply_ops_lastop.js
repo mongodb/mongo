@@ -27,15 +27,12 @@
     var insertApplyOps = [{op: "i", ns: 'foo.bar', o: {_id: 1, a: "b"}}];
     var deleteApplyOps = [{op: "d", ns: 'foo.bar', o: {_id: 1, a: "b"}}];
     var badPreCondition = [{ns: 'foo.bar', q: {_id: 10, a: "aaa"}, res: {a: "aaa"}}];
-    var majorityWriteConcern = {
-        w: 'majority',
-        wtimeout: 30000
-    };
+    var majorityWriteConcern = {w: 'majority', wtimeout: 30000};
 
     // Set up some data
     assert.writeOK(coll.insert({x: 1}));  // creating the collection so applyOps works
-    assert.commandWorked(m1.getDB('foo').runCommand(
-        {applyOps: insertApplyOps, writeConcern: majorityWriteConcern}));
+    assert.commandWorked(
+        m1.getDB('foo').runCommand({applyOps: insertApplyOps, writeConcern: majorityWriteConcern}));
     var insertOp = m1.getDB('foo').getLastErrorObj('majority', 30000).lastOp;
 
     // No-op applyOps

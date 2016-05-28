@@ -190,8 +190,8 @@ t.drop();
 t.ensureIndex({"a.b": 1});
 t.insert({_id: 0, a: [{b: 1}, {b: 2}]});
 t.insert({_id: 1, a: [{b: 2}, {b: 4}]});
-cursor = t.find(
-    {"a.b": 2, $or: [{a: {$elemMatch: {b: {$lte: 1}}}}, {a: {$elemMatch: {b: {$gte: 4}}}}]});
+cursor =
+    t.find({"a.b": 2, $or: [{a: {$elemMatch: {b: {$lte: 1}}}}, {a: {$elemMatch: {b: {$gte: 4}}}}]});
 assert.eq(2, cursor.itcount(), "case 14");
 
 // Case 15: $or below $elemMatch.

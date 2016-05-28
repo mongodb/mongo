@@ -281,9 +281,9 @@ public:
             if (it->first == it->second->getName())
                 commands.push_back(it->second);
         }
-        std::sort(commands.begin(),
-                  commands.end(),
-                  [](Command* lhs, Command* rhs) { return (lhs->getName()) < (rhs->getName()); });
+        std::sort(commands.begin(), commands.end(), [](Command* lhs, Command* rhs) {
+            return (lhs->getName()) < (rhs->getName());
+        });
 
         BSONObjBuilder b(result.subobjStart("commands"));
         for (const auto& c : commands) {
@@ -414,7 +414,8 @@ public:
                 result,
                 Status(ErrorCodes::TypeMismatch,
                        str::stream() << "Argument to getLog must be of type String; found "
-                                     << val.toString(false) << " of type "
+                                     << val.toString(false)
+                                     << " of type "
                                      << typeName(val.type())));
         }
 

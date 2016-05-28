@@ -38,8 +38,8 @@
 #include "mongo/db/storage/mmap_v1/btree/btree_logic.h"
 #include "mongo/db/storage/mmap_v1/btree/key.h"
 #include "mongo/db/storage/mmap_v1/diskloc.h"
-#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_base.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -396,7 +396,8 @@ bool BtreeLogic<BtreeLayout>::pushBack(BucketType* bucket,
         const FullKey klast = getFullKey(bucket, bucket->n - 1);
         if (klast.data.woCompare(key, _ordering) > 0) {
             log() << "btree bucket corrupt? "
-                     "consider reindexing or running validate command" << endl;
+                     "consider reindexing or running validate command"
+                  << endl;
             log() << "  klast: " << klast.data.toString() << endl;
             log() << "  key:   " << key.toString() << endl;
             invariant(false);

@@ -28,8 +28,8 @@
 
 #pragma once
 
-#include <memory>
 #include <boost/filesystem/path.hpp>
+#include <memory>
 
 #include "mongo/db/db.h"
 #include "mongo/db/record_id.h"

@@ -15,10 +15,7 @@ function m() {
 }
 
 function r(who, values) {
-    var n = {
-        totalSize: 0,
-        num: 0
-    };
+    var n = {totalSize: 0, num: 0};
     for (var i = 0; i < values.length; i++) {
         n.totalSize += values[i].totalSize;
         n.num += values[i].num;

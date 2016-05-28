@@ -15,13 +15,9 @@ function f() {
         patt = {};
         patt[x] = 1;
         if (x == 20)
-            patt = {
-                x: 1
-            };
+            patt = {x: 1};
         if (x == 64)
-            patt = {
-                y: 1
-            };
+            patt = {y: 1};
         lastErr = t.ensureIndex(patt);
         x++;
     }

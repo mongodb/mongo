@@ -33,8 +33,8 @@
 #include "mongo/db/query/plan_cache.h"
 
 #include <algorithm>
-#include <ostream>
 #include <memory>
+#include <ostream>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
@@ -318,9 +318,9 @@ TEST(PlanCacheTest, ShouldNotCacheQueryWithMax) {
  * the planner is able to come up with a cacheable solution.
  */
 TEST(PlanCacheTest, ShouldCacheQueryWithGeoWithinLegacyCoordinates) {
-    unique_ptr<CanonicalQuery> cq(canonicalize(
-        "{a: {$geoWithin: "
-        "{$box: [[-180, -90], [180, 90]]}}}"));
+    unique_ptr<CanonicalQuery> cq(
+        canonicalize("{a: {$geoWithin: "
+                     "{$box: [[-180, -90], [180, 90]]}}}"));
     assertShouldCacheQuery(*cq);
 }
 
@@ -328,10 +328,10 @@ TEST(PlanCacheTest, ShouldCacheQueryWithGeoWithinLegacyCoordinates) {
  * $geoWithin queries with GeoJSON coordinates are supported by the index bounds builder.
  */
 TEST(PlanCacheTest, ShouldCacheQueryWithGeoWithinJSONCoordinates) {
-    unique_ptr<CanonicalQuery> cq(canonicalize(
-        "{a: {$geoWithin: "
-        "{$geometry: {type: 'Polygon', coordinates: "
-        "[[[0, 0], [0, 90], [90, 0], [0, 0]]]}}}}"));
+    unique_ptr<CanonicalQuery> cq(
+        canonicalize("{a: {$geoWithin: "
+                     "{$geometry: {type: 'Polygon', coordinates: "
+                     "[[[0, 0], [0, 90], [90, 0], [0, 0]]]}}}}"));
     assertShouldCacheQuery(*cq);
 }
 
@@ -339,11 +339,11 @@ TEST(PlanCacheTest, ShouldCacheQueryWithGeoWithinJSONCoordinates) {
  * $geoWithin queries with both legacy and GeoJSON coordinates are cacheable.
  */
 TEST(PlanCacheTest, ShouldCacheQueryWithGeoWithinLegacyAndJSONCoordinates) {
-    unique_ptr<CanonicalQuery> cq(canonicalize(
-        "{$or: [{a: {$geoWithin: {$geometry: {type: 'Polygon', "
-        "coordinates: [[[0, 0], [0, 90], "
-        "[90, 0], [0, 0]]]}}}},"
-        "{a: {$geoWithin: {$box: [[-180, -90], [180, 90]]}}}]}"));
+    unique_ptr<CanonicalQuery> cq(
+        canonicalize("{$or: [{a: {$geoWithin: {$geometry: {type: 'Polygon', "
+                     "coordinates: [[[0, 0], [0, 90], "
+                     "[90, 0], [0, 0]]]}}}},"
+                     "{a: {$geoWithin: {$box: [[-180, -90], [180, 90]]}}}]}"));
     assertShouldCacheQuery(*cq);
 }
 
@@ -351,10 +351,10 @@ TEST(PlanCacheTest, ShouldCacheQueryWithGeoWithinLegacyAndJSONCoordinates) {
  * $geoIntersects queries are always cacheable because they support GeoJSON coordinates only.
  */
 TEST(PlanCacheTest, ShouldCacheQueryWithGeoIntersects) {
-    unique_ptr<CanonicalQuery> cq(canonicalize(
-        "{a: {$geoIntersects: "
-        "{$geometry: {type: 'Point', coordinates: "
-        "[10.0, 10.0]}}}}"));
+    unique_ptr<CanonicalQuery> cq(
+        canonicalize("{a: {$geoIntersects: "
+                     "{$geometry: {type: 'Point', coordinates: "
+                     "[10.0, 10.0]}}}}"));
     assertShouldCacheQuery(*cq);
 }
 
@@ -363,9 +363,9 @@ TEST(PlanCacheTest, ShouldCacheQueryWithGeoIntersects) {
  * between flat and spherical queries.
  */
 TEST(PlanCacheTest, ShouldNotCacheQueryWithGeoNear) {
-    unique_ptr<CanonicalQuery> cq(canonicalize(
-        "{a: {$geoNear: {$geometry: {type: 'Point',"
-        "coordinates: [0,0]}, $maxDistance:100}}}"));
+    unique_ptr<CanonicalQuery> cq(
+        canonicalize("{a: {$geoNear: {$geometry: {type: 'Point',"
+                     "coordinates: [0,0]}, $maxDistance:100}}}"));
     assertShouldCacheQuery(*cq);
 }
 
@@ -1279,14 +1279,14 @@ TEST(PlanCacheTest, ComputeKeyGeoWithin) {
     PlanCache planCache;
 
     // Legacy coordinates.
-    unique_ptr<CanonicalQuery> cqLegacy(canonicalize(
-        "{a: {$geoWithin: "
-        "{$box: [[-180, -90], [180, 90]]}}}"));
+    unique_ptr<CanonicalQuery> cqLegacy(
+        canonicalize("{a: {$geoWithin: "
+                     "{$box: [[-180, -90], [180, 90]]}}}"));
     // GeoJSON coordinates.
-    unique_ptr<CanonicalQuery> cqNew(canonicalize(
-        "{a: {$geoWithin: "
-        "{$geometry: {type: 'Polygon', coordinates: "
-        "[[[0, 0], [0, 90], [90, 0], [0, 0]]]}}}}"));
+    unique_ptr<CanonicalQuery> cqNew(
+        canonicalize("{a: {$geoWithin: "
+                     "{$geometry: {type: 'Polygon', coordinates: "
+                     "[[[0, 0], [0, 90], [90, 0], [0, 0]]]}}}}"));
     ASSERT_NOT_EQUALS(planCache.computeKey(*cqLegacy), planCache.computeKey(*cqNew));
 }
 

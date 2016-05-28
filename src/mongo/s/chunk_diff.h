@@ -75,8 +75,8 @@ public:
     typedef typename std::map<BSONObj, ValType, BSONObjCmp> RangeMap;
 
     // Pair of iterators defining a subset of ranges
-    typedef
-        typename std::pair<typename RangeMap::iterator, typename RangeMap::iterator> RangeOverlap;
+    typedef typename std::pair<typename RangeMap::iterator, typename RangeMap::iterator>
+        RangeOverlap;
 
     // Map of shard identifiers to the maximum chunk version on that shard
     typedef typename std::map<ShardId, ChunkVersion> MaxChunkVersionMap;

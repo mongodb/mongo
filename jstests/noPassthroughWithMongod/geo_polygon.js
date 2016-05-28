@@ -5,10 +5,7 @@ num = 0;
 var bulk = t.initializeUnorderedBulkOp();
 for (x = -180; x < 180; x += .5) {
     for (y = -180; y < 180; y += .5) {
-        o = {
-            _id: num++,
-            loc: [x, y]
-        };
+        o = {_id: num++, loc: [x, y]};
         bulk.insert(o);
     }
 }
@@ -27,8 +24,8 @@ for (var n = 0; n < numTests; n++) {
     assert.eq(
         num,
         t.find({
-            loc: {"$within": {"$polygon": [[-180, -180], [-180, 180], [180, 180], [180, -180]]}}
-        }).count(),
+             loc: {"$within": {"$polygon": [[-180, -180], [-180, 180], [180, 180], [180, -180]]}}
+         }).count(),
         "Bounding Box Test");
 
     assert.eq(
@@ -44,15 +41,17 @@ for (var n = 0; n < numTests; n++) {
         // slope falls.
         assert.between(
             341 - 18,
-            t.find({loc: {"$within": {"$polygon": [[0, 0], [0, 10], [10, 10], [10, 0], [5, 5]]}}})
-                .count(),
+            t.find({
+                 loc: {"$within": {"$polygon": [[0, 0], [0, 10], [10, 10], [10, 0], [5, 5]]}}
+             }).count(),
             341,
             "Square Missing Chunk Test",
             true);
         assert.between(
             21 - 2,
-            t.find({loc: {"$within": {"$polygon": [[0, 0], [0, 2], [2, 2], [2, 0], [1, 1]]}}})
-                .count(),
+            t.find({
+                 loc: {"$within": {"$polygon": [[0, 0], [0, 2], [2, 2], [2, 0], [1, 1]]}}
+             }).count(),
             21,
             "Square Missing Chunk Test 2",
             true);

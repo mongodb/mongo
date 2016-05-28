@@ -22,10 +22,7 @@ var $config = (function() {
         uniqueDBName: 'findAndModify_remove_queue',
 
         newDocForInsert: function newDocForInsert(i) {
-            return {
-                _id: i,
-                rand: Random.rand()
-            };
+            return {_id: i, rand: Random.rand()};
         },
 
         getIndexSpecs: function getIndexSpecs() {
@@ -38,9 +35,7 @@ var $config = (function() {
             // Use a separate database to avoid conflicts with other FSM workloads.
             var ownedDB = db.getSiblingDB(db.getName() + this.uniqueDBName);
 
-            var updateDoc = {
-                $push: {}
-            };
+            var updateDoc = {$push: {}};
             updateDoc.$push[this.opName] = id;
 
             var res = ownedDB[collName].update({_id: this.tid}, updateDoc, {upsert: true});
@@ -64,12 +59,8 @@ var $config = (function() {
     var states = (function() {
 
         function remove(db, collName) {
-            var res = db.runCommand({
-                findAndModify: db[collName].getName(),
-                query: {},
-                sort: {rand: -1},
-                remove: true
-            });
+            var res = db.runCommand(
+                {findAndModify: db[collName].getName(), query: {}, sort: {rand: -1}, remove: true});
             assertAlways.commandWorked(res);
 
             var doc = res.value;
@@ -86,15 +77,11 @@ var $config = (function() {
             }
         }
 
-        return {
-            remove: remove
-        };
+        return {remove: remove};
 
     })();
 
-    var transitions = {
-        remove: {remove: 1}
-    };
+    var transitions = {remove: {remove: 1}};
 
     function setup(db, collName, cluster) {
         // Each thread should remove exactly one document per iteration.
@@ -193,10 +180,7 @@ var $config = (function() {
             if (!smallestValueIsSet) {
                 return null;
             }
-            return {
-                value: smallestValue,
-                indices: smallestIndices
-            };
+            return {value: smallestValue, indices: smallestIndices};
         }
     }
 

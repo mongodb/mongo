@@ -12,12 +12,12 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
     coll.insert({});
 
     assertErrorCode(coll,
-                        [{$project: {strLen: {$strLenBytes: 1}}}],
+                    [{$project: {strLen: {$strLenBytes: 1}}}],
                     34473,
                     "$strLenBytes requires a string argument.");
 
     assertErrorCode(coll,
-                        [{$project: {strLen: {$strLenCP: 1}}}],
+                    [{$project: {strLen: {$strLenCP: 1}}}],
                     34471,
                     "$strLenCP requires a string argument.");
 }());

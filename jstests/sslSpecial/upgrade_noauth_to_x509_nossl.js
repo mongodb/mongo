@@ -16,9 +16,7 @@ load('jstests/ssl/libs/ssl_helpers.js');
     var dbName = 'upgradeToX509';
 
     // Disable auth explicitly
-    var noAuth = {
-        noauth: ''
-    };
+    var noAuth = {noauth: ''};
 
     // Undefine the flags we're replacing, otherwise upgradeSet will keep old values.
     var transitionToX509AllowSSL =

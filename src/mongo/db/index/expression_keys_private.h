@@ -30,8 +30,8 @@
 
 #include <vector>
 
-#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/hasher.h"
 
 namespace mongo {

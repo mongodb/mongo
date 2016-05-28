@@ -31,8 +31,8 @@
 #include <cstring>
 #include <limits>
 
-#include "mongo/base/data_type.h"
 #include "mongo/base/data_range.h"
+#include "mongo/base/data_type.h"
 #include "mongo/platform/endian.h"
 #include "mongo/util/mongoutils/str.h"
 

@@ -32,7 +32,6 @@
 
 #include "mongo/db/query/query_planner_test_lib.h"
 
-#include <ostream>
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -42,6 +41,7 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include <ostream>
 
 namespace {
 

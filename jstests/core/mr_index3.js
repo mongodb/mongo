@@ -17,20 +17,16 @@ r = function(key, values) {
 };
 
 a1 = db.runCommand({mapreduce: 'mr_index3', map: m, reduce: r, out: {inline: true}}).results;
-a2 = db.runCommand({
-    mapreduce: 'mr_index3',
-    map: m,
-    reduce: r,
-    query: {name: 'name1'},
-    out: {inline: true}
-}).results;
+a2 = db.runCommand(
+           {mapreduce: 'mr_index3', map: m, reduce: r, query: {name: 'name1'}, out: {inline: true}})
+         .results;
 a3 = db.runCommand({
-    mapreduce: 'mr_index3',
-    map: m,
-    reduce: r,
-    query: {name: {$gt: 'name'}},
-    out: {inline: true}
-}).results;
+           mapreduce: 'mr_index3',
+           map: m,
+           reduce: r,
+           query: {name: {$gt: 'name'}},
+           out: {inline: true}
+       }).results;
 
 assert.eq([{"_id": "cat", "value": 3}, {"_id": "dog", "value": 2}, {"_id": "mouse", "value": 1}],
           a1,
@@ -41,20 +37,16 @@ assert.eq(a1, a3, "A3");
 t.ensureIndex({name: 1, tags: 1});
 
 b1 = db.runCommand({mapreduce: 'mr_index3', map: m, reduce: r, out: {inline: true}}).results;
-b2 = db.runCommand({
-    mapreduce: 'mr_index3',
-    map: m,
-    reduce: r,
-    query: {name: 'name1'},
-    out: {inline: true}
-}).results;
+b2 = db.runCommand(
+           {mapreduce: 'mr_index3', map: m, reduce: r, query: {name: 'name1'}, out: {inline: true}})
+         .results;
 b3 = db.runCommand({
-    mapreduce: 'mr_index3',
-    map: m,
-    reduce: r,
-    query: {name: {$gt: 'name'}},
-    out: {inline: true}
-}).results;
+           mapreduce: 'mr_index3',
+           map: m,
+           reduce: r,
+           query: {name: {$gt: 'name'}},
+           out: {inline: true}
+       }).results;
 
 assert.eq(a1, b1, "AB1");
 assert.eq(a2, b2, "AB2");

@@ -71,7 +71,8 @@ protected:
     void expectFindOnConfigSendChunksDefault() {
         BSONObj chunk = BSON(
             ChunkType::name("test.foo-a_MinKey")
-            << ChunkType::ns("test.foo") << ChunkType::min(BSON("a" << MINKEY))
+            << ChunkType::ns("test.foo")
+            << ChunkType::min(BSON("a" << MINKEY))
             << ChunkType::max(BSON("a" << MAXKEY))
             << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(_maxCollVersion.toLong()))
             << ChunkType::DEPRECATED_epoch(_maxCollVersion.epoch())

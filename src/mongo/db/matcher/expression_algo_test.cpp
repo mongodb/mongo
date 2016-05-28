@@ -73,9 +73,10 @@ TEST(ExpressionAlgoIsSubsetOf, NullAndOmittedField) {
     // an Undefined type.
     BSONObj undefined = fromjson("{a: undefined}");
     const CollatorInterface* collator = nullptr;
-    ASSERT_EQUALS(ErrorCodes::BadValue,
-                  MatchExpressionParser::parse(
-                      undefined, ExtensionsCallbackDisallowExtensions(), collator).getStatus());
+    ASSERT_EQUALS(
+        ErrorCodes::BadValue,
+        MatchExpressionParser::parse(undefined, ExtensionsCallbackDisallowExtensions(), collator)
+            .getStatus());
 
     ParsedMatchExpression empty("{}");
     ParsedMatchExpression null("{a: null}");
@@ -839,11 +840,11 @@ TEST(SplitMatchExpression, ComplexMatchExpressionSplitsCorrectly) {
     splitExpr.second->serialize(&secondBob);
 
     ASSERT_EQUALS(firstBob.obj(), fromjson("{$or: [{'a.b': {$eq: 3}}, {'a.b.c': {$eq: 4}}]}"));
-    ASSERT_EQUALS(secondBob.obj(),
-                  fromjson(
-                      "{$and: [{$nor: [{$and: [{x: {$size: 2}}]}]}, {$nor: [{x: {$gt: 4}}, {$and: "
-                      "[{$nor: [{$and: [{x: "
-                      "{$eq: 1}}]}]}, {y: {$eq: 3}}]}]}]}"));
+    ASSERT_EQUALS(
+        secondBob.obj(),
+        fromjson("{$and: [{$nor: [{$and: [{x: {$size: 2}}]}]}, {$nor: [{x: {$gt: 4}}, {$and: "
+                 "[{$nor: [{$and: [{x: "
+                 "{$eq: 1}}]}]}, {y: {$eq: 3}}]}]}]}"));
 }
 
 TEST(MapOverMatchExpression, DoesMapOverLogicalNodes) {
@@ -909,9 +910,9 @@ TEST(MapOverMatchExpression, DoesMapOverNodesWithMultipleChildren) {
     ASSERT_OK(swMatchExpression.getStatus());
 
     size_t nodeCount = 0;
-    expression::mapOver(swMatchExpression.getValue().get(),
-                        [&nodeCount](MatchExpression* expression, std::string path)
-                            -> void { ++nodeCount; });
+    expression::mapOver(
+        swMatchExpression.getValue().get(),
+        [&nodeCount](MatchExpression* expression, std::string path) -> void { ++nodeCount; });
 
     ASSERT_EQ(nodeCount, 3U);
 }

@@ -79,7 +79,8 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
         log() << "** WARNING: Access control is not enabled for the database."
               << startupWarningsLog;
         log() << "**          Read and write access to data and configuration is "
-                 "unrestricted." << startupWarningsLog;
+                 "unrestricted."
+              << startupWarningsLog;
         warned = true;
     }
 

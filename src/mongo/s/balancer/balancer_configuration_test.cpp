@@ -194,41 +194,44 @@ TEST(BalancerSettingsType, BalancingWindowStopLessThanStart) {
 }
 
 TEST(BalancerSettingsType, InvalidBalancingWindowStartEqualsStop) {
-    ASSERT_NOT_OK(
-        BalancerSettingsType::fromBSON(BSON("activeWindow" << BSON("start"
-                                                                   << "00:00"
-                                                                   << "stop"
-                                                                   << "00:00"))).getStatus());
+    ASSERT_NOT_OK(BalancerSettingsType::fromBSON(BSON("activeWindow" << BSON("start"
+                                                                             << "00:00"
+                                                                             << "stop"
+                                                                             << "00:00")))
+                      .getStatus());
 }
 
 TEST(BalancerSettingsType, InvalidBalancingWindowTimeFormat) {
     ASSERT_NOT_OK(BalancerSettingsType::fromBSON(BSON("activeWindow" << BSON("start"
                                                                              << "23"
                                                                              << "stop"
-                                                                             << "6"))).getStatus());
-
-    ASSERT_NOT_OK(BalancerSettingsType::fromBSON(
-                      BSON("activeWindow" << BSON("start" << 23LL << "stop"
-                                                          << "6:00"))).getStatus());
+                                                                             << "6")))
+                      .getStatus());
 
     ASSERT_NOT_OK(
-        BalancerSettingsType::fromBSON(BSON("activeWindow" << BSON("start"
-                                                                   << "23:00"
-                                                                   << "stop" << 6LL))).getStatus());
+        BalancerSettingsType::fromBSON(BSON("activeWindow" << BSON("start" << 23LL << "stop"
+                                                                           << "6:00")))
+            .getStatus());
+
+    ASSERT_NOT_OK(BalancerSettingsType::fromBSON(BSON("activeWindow" << BSON("start"
+                                                                             << "23:00"
+                                                                             << "stop"
+                                                                             << 6LL)))
+                      .getStatus());
 }
 
 TEST(BalancerSettingsType, InvalidBalancingWindowFormat) {
-    ASSERT_NOT_OK(
-        BalancerSettingsType::fromBSON(BSON("activeWindow" << BSON("begin"
-                                                                   << "23:00"
-                                                                   << "stop"
-                                                                   << "6:00"))).getStatus());
+    ASSERT_NOT_OK(BalancerSettingsType::fromBSON(BSON("activeWindow" << BSON("begin"
+                                                                             << "23:00"
+                                                                             << "stop"
+                                                                             << "6:00")))
+                      .getStatus());
 
-    ASSERT_NOT_OK(
-        BalancerSettingsType::fromBSON(BSON("activeWindow" << BSON("start"
-                                                                   << "23:00"
-                                                                   << "end"
-                                                                   << "6:00"))).getStatus());
+    ASSERT_NOT_OK(BalancerSettingsType::fromBSON(BSON("activeWindow" << BSON("start"
+                                                                             << "23:00"
+                                                                             << "end"
+                                                                             << "6:00")))
+                      .getStatus());
 }
 
 TEST(ChunkSizeSettingsType, NormalValues) {
@@ -255,7 +258,8 @@ TEST(ChunkSizeSettingsType, IllegalValues) {
     ASSERT_NOT_OK(ChunkSizeSettingsType::fromBSON(BSON("value" << -1)).getStatus());
     ASSERT_NOT_OK(ChunkSizeSettingsType::fromBSON(BSON("value" << 1025)).getStatus());
     ASSERT_NOT_OK(ChunkSizeSettingsType::fromBSON(BSON("value"
-                                                       << "WrongType")).getStatus());
+                                                       << "WrongType"))
+                      .getStatus());
     ASSERT_NOT_OK(ChunkSizeSettingsType::fromBSON(BSON("IllegalKey" << 1)).getStatus());
 }
 

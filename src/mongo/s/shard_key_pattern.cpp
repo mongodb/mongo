@@ -62,7 +62,10 @@ Status ShardKeyPattern::checkShardKeySize(const BSONObj& shardKey) {
 
     return Status(ErrorCodes::ShardKeyTooBig,
                   stream() << "shard keys must be less than " << kMaxShardKeySizeBytes
-                           << " bytes, but key " << shardKey << " is " << shardKey.objsize()
+                           << " bytes, but key "
+                           << shardKey
+                           << " is "
+                           << shardKey.objsize()
                            << " bytes");
 }
 

@@ -57,10 +57,7 @@ load('jstests/libs/write_concern_util.js');
         _waitForDelete: true
     };
 
-    req.writeConcern = {
-        w: 1,
-        wtimeout: 30000
-    };
+    req.writeConcern = {w: 1, wtimeout: 30000};
     jsTest.log("Testing " + tojson(req));
     var res = db.adminCommand(req);
     assert.commandWorked(res);
@@ -68,10 +65,7 @@ load('jstests/libs/write_concern_util.js');
     checkChunkCount(2, 0);
 
     // This should pass because w: majority is always passed to config servers.
-    req.writeConcern = {
-        w: 2,
-        wtimeout: 30000
-    };
+    req.writeConcern = {w: 2, wtimeout: 30000};
     jsTest.log("Testing " + tojson(req));
     req.to = s1;
     res = db.adminCommand(req);
@@ -80,10 +74,7 @@ load('jstests/libs/write_concern_util.js');
     checkChunkCount(1, 1);
 
     // This should fail because the writeConcern cannot be satisfied on the to shard.
-    req.writeConcern = {
-        w: 4,
-        wtimeout: 3000
-    };
+    req.writeConcern = {w: 4, wtimeout: 3000};
     jsTest.log("Testing " + tojson(req));
     req.to = s0;
     res = db.adminCommand(req);
@@ -92,10 +83,7 @@ load('jstests/libs/write_concern_util.js');
     checkChunkCount(1, 1);
 
     // This should fail because the writeConcern cannot be satisfied on the from shard.
-    req.writeConcern = {
-        w: 6,
-        wtimeout: 3000
-    };
+    req.writeConcern = {w: 6, wtimeout: 3000};
     jsTest.log("Testing " + tojson(req));
     req.to = s0;
     res = db.adminCommand(req);
@@ -104,10 +92,7 @@ load('jstests/libs/write_concern_util.js');
     checkChunkCount(1, 1);
 
     // This should fail because the writeConcern is invalid and cannot be satisfied anywhere.
-    req.writeConcern = {
-        w: "invalid",
-        wtimeout: 3000
-    };
+    req.writeConcern = {w: "invalid", wtimeout: 3000};
     jsTest.log("Testing " + tojson(req));
     req.to = s0;
     res = db.adminCommand(req);

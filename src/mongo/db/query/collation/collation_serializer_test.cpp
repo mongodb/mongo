@@ -44,13 +44,22 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesDefaults) {
 
     BSONObj expectedObj = BSON("locale"
                                << "myLocale"
-                               << "caseLevel" << false << "caseFirst"
+                               << "caseLevel"
+                               << false
+                               << "caseFirst"
                                << "off"
-                               << "strength" << 3 << "numericOrdering" << false << "alternate"
+                               << "strength"
+                               << 3
+                               << "numericOrdering"
+                               << false
+                               << "alternate"
                                << "non-ignorable"
                                << "maxVariable"
                                << "punct"
-                               << "normalization" << false << "backwards" << false);
+                               << "normalization"
+                               << false
+                               << "backwards"
+                               << false);
 
     ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
@@ -62,13 +71,22 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesCaseFirstUpper) {
 
     BSONObj expectedObj = BSON("locale"
                                << "myLocale"
-                               << "caseLevel" << false << "caseFirst"
+                               << "caseLevel"
+                               << false
+                               << "caseFirst"
                                << "upper"
-                               << "strength" << 3 << "numericOrdering" << false << "alternate"
+                               << "strength"
+                               << 3
+                               << "numericOrdering"
+                               << false
+                               << "alternate"
                                << "non-ignorable"
                                << "maxVariable"
                                << "punct"
-                               << "normalization" << false << "backwards" << false);
+                               << "normalization"
+                               << false
+                               << "backwards"
+                               << false);
 
     ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
@@ -80,13 +98,22 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesCaseFirstLower) {
 
     BSONObj expectedObj = BSON("locale"
                                << "myLocale"
-                               << "caseLevel" << false << "caseFirst"
+                               << "caseLevel"
+                               << false
+                               << "caseFirst"
                                << "lower"
-                               << "strength" << 3 << "numericOrdering" << false << "alternate"
+                               << "strength"
+                               << 3
+                               << "numericOrdering"
+                               << false
+                               << "alternate"
                                << "non-ignorable"
                                << "maxVariable"
                                << "punct"
-                               << "normalization" << false << "backwards" << false);
+                               << "normalization"
+                               << false
+                               << "backwards"
+                               << false);
 
     ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
@@ -98,13 +125,22 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesPrimaryStrength) {
 
     BSONObj expectedObj = BSON("locale"
                                << "myLocale"
-                               << "caseLevel" << false << "caseFirst"
+                               << "caseLevel"
+                               << false
+                               << "caseFirst"
                                << "off"
-                               << "strength" << 1 << "numericOrdering" << false << "alternate"
+                               << "strength"
+                               << 1
+                               << "numericOrdering"
+                               << false
+                               << "alternate"
                                << "non-ignorable"
                                << "maxVariable"
                                << "punct"
-                               << "normalization" << false << "backwards" << false);
+                               << "normalization"
+                               << false
+                               << "backwards"
+                               << false);
 
     ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
@@ -116,13 +152,22 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesSecondaryStrength) {
 
     BSONObj expectedObj = BSON("locale"
                                << "myLocale"
-                               << "caseLevel" << false << "caseFirst"
+                               << "caseLevel"
+                               << false
+                               << "caseFirst"
                                << "off"
-                               << "strength" << 2 << "numericOrdering" << false << "alternate"
+                               << "strength"
+                               << 2
+                               << "numericOrdering"
+                               << false
+                               << "alternate"
                                << "non-ignorable"
                                << "maxVariable"
                                << "punct"
-                               << "normalization" << false << "backwards" << false);
+                               << "normalization"
+                               << false
+                               << "backwards"
+                               << false);
 
     ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
@@ -134,13 +179,22 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesQuaternaryStrength) {
 
     BSONObj expectedObj = BSON("locale"
                                << "myLocale"
-                               << "caseLevel" << false << "caseFirst"
+                               << "caseLevel"
+                               << false
+                               << "caseFirst"
                                << "off"
-                               << "strength" << 4 << "numericOrdering" << false << "alternate"
+                               << "strength"
+                               << 4
+                               << "numericOrdering"
+                               << false
+                               << "alternate"
                                << "non-ignorable"
                                << "maxVariable"
                                << "punct"
-                               << "normalization" << false << "backwards" << false);
+                               << "normalization"
+                               << false
+                               << "backwards"
+                               << false);
 
     ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
@@ -152,13 +206,22 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesIdenticalStrength) {
 
     BSONObj expectedObj = BSON("locale"
                                << "myLocale"
-                               << "caseLevel" << false << "caseFirst"
+                               << "caseLevel"
+                               << false
+                               << "caseFirst"
                                << "off"
-                               << "strength" << 5 << "numericOrdering" << false << "alternate"
+                               << "strength"
+                               << 5
+                               << "numericOrdering"
+                               << false
+                               << "alternate"
                                << "non-ignorable"
                                << "maxVariable"
                                << "punct"
-                               << "normalization" << false << "backwards" << false);
+                               << "normalization"
+                               << false
+                               << "backwards"
+                               << false);
 
     ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
@@ -170,13 +233,22 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesAlternateShifted) {
 
     BSONObj expectedObj = BSON("locale"
                                << "myLocale"
-                               << "caseLevel" << false << "caseFirst"
+                               << "caseLevel"
+                               << false
+                               << "caseFirst"
                                << "off"
-                               << "strength" << 3 << "numericOrdering" << false << "alternate"
+                               << "strength"
+                               << 3
+                               << "numericOrdering"
+                               << false
+                               << "alternate"
                                << "shifted"
                                << "maxVariable"
                                << "punct"
-                               << "normalization" << false << "backwards" << false);
+                               << "normalization"
+                               << false
+                               << "backwards"
+                               << false);
 
     ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
@@ -188,13 +260,22 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesMaxVariableSpace) {
 
     BSONObj expectedObj = BSON("locale"
                                << "myLocale"
-                               << "caseLevel" << false << "caseFirst"
+                               << "caseLevel"
+                               << false
+                               << "caseFirst"
                                << "off"
-                               << "strength" << 3 << "numericOrdering" << false << "alternate"
+                               << "strength"
+                               << 3
+                               << "numericOrdering"
+                               << false
+                               << "alternate"
                                << "non-ignorable"
                                << "maxVariable"
                                << "space"
-                               << "normalization" << false << "backwards" << false);
+                               << "normalization"
+                               << false
+                               << "backwards"
+                               << false);
 
     ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }

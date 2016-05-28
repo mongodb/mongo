@@ -10,43 +10,38 @@
 load('jstests/concurrency/fsm_libs/extend_workload.js');            // for extendWorkload
 load('jstests/concurrency/fsm_workloads/indexed_insert_where.js');  // for $config
 
-var $config = extendWorkload(
-    $config,
-    function($config, $super) {
-        $config.data.randomBound = 10;
-        $config.data.generateDocumentToInsert = function generateDocumentToInsert() {
-            return {
-                tid: this.tid,
-                x: Random.randInt(this.randomBound)
-            };
-        };
+var $config = extendWorkload($config, function($config, $super) {
+    $config.data.randomBound = 10;
+    $config.data.generateDocumentToInsert = function generateDocumentToInsert() {
+        return {tid: this.tid, x: Random.randInt(this.randomBound)};
+    };
 
-        $config.states.update = function update(db, collName) {
-            var res = db[collName].update(
-                // Server-side JS does not support Random.randInt, so use Math.floor/random instead
-                {
-                  $where: 'this.x === Math.floor(Math.random() * ' + this.randomBound + ') ' +
-                      '&& this.tid === ' + this.tid
-                },
-                {$set: {x: Random.randInt(this.randomBound)}},
-                {multi: true});
-            assertAlways.writeOK(res);
+    $config.states.update = function update(db, collName) {
+        var res = db[collName].update(
+            // Server-side JS does not support Random.randInt, so use Math.floor/random instead
+            {
+              $where: 'this.x === Math.floor(Math.random() * ' + this.randomBound + ') ' +
+                  '&& this.tid === ' + this.tid
+            },
+            {$set: {x: Random.randInt(this.randomBound)}},
+            {multi: true});
+        assertAlways.writeOK(res);
 
-            if (db.getMongo().writeMode() === 'commands') {
-                assertWhenOwnColl.gte(res.nModified, 0);
-                assertWhenOwnColl.lte(res.nModified, this.insertedDocuments);
-            }
-        };
+        if (db.getMongo().writeMode() === 'commands') {
+            assertWhenOwnColl.gte(res.nModified, 0);
+            assertWhenOwnColl.lte(res.nModified, this.insertedDocuments);
+        }
+    };
 
-        $config.transitions = {
-            insert: {insert: 0.2, update: 0.4, query: 0.4},
-            update: {insert: 0.4, update: 0.2, query: 0.4},
-            query: {insert: 0.4, update: 0.4, query: 0.2}
-        };
+    $config.transitions = {
+        insert: {insert: 0.2, update: 0.4, query: 0.4},
+        update: {insert: 0.4, update: 0.2, query: 0.4},
+        query: {insert: 0.4, update: 0.4, query: 0.2}
+    };
 
-        $config.setup = function setup(db, collName, cluster) {
-            /* no-op to prevent index from being created */
-        };
+    $config.setup = function setup(db, collName, cluster) {
+        /* no-op to prevent index from being created */
+    };
 
-        return $config;
-    });
+    return $config;
+});

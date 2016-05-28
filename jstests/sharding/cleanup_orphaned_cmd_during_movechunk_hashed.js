@@ -31,11 +31,7 @@ load('./jstests/libs/cleanup_orphaned_util.js');
 
     var found = false;
     for (var i = 0; i < 10000; i++) {
-        var doc =
-                {
-                  key: ObjectId()
-                },
-            hash = mongos.adminCommand({_hashBSONElement: doc.key}).out;
+        var doc = {key: ObjectId()}, hash = mongos.adminCommand({_hashBSONElement: doc.key}).out;
 
         print('doc.key ' + doc.key + ' hashes to ' + hash);
 

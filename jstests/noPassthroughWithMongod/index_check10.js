@@ -69,9 +69,7 @@ function doIt() {
                 for (var j = 0; j < Random.randInt(15); ++j) {
                     vals.push(r());
                 }
-                spec[fields[i]] = {
-                    $in: vals
-                };
+                spec[fields[i]] = {$in: vals};
             }
         }
         s = sort();

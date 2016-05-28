@@ -40,8 +40,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/base_cloner.h"
 #include "mongo/db/repl/replication_executor.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
 

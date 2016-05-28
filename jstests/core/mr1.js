@@ -34,9 +34,7 @@ r = function(key, values) {
     for (var i = 0; i < values.length; i++) {
         total += values[i].count;
     }
-    return {
-        count: total
-    };
+    return {count: total};
 };
 
 r2 = function(key, values) {
@@ -136,19 +134,14 @@ if (true) {
     printjson(db.runCommand({mapreduce: "mr1", map: m, reduce: r, verbose: true, out: "mr1_out"}));
 }
 
-print("t1: " +
-      Date.timeFunc(
-          function() {
-              var out = db.runCommand({mapreduce: "mr1", map: m, reduce: r, out: "mr1_out"});
-              if (ks == "_id")
-                  assert(out.ok, "XXX : " + tojson(out));
-              db[out.result].drop();
-          },
-          10) +
-      " (~500 on 2.8ghz) - itcount: " +
-      Date.timeFunc(function() {
-          db.mr1.find().itcount();
-      }, 10));
+print("t1: " + Date.timeFunc(function() {
+    var out = db.runCommand({mapreduce: "mr1", map: m, reduce: r, out: "mr1_out"});
+    if (ks == "_id")
+        assert(out.ok, "XXX : " + tojson(out));
+    db[out.result].drop();
+}, 10) + " (~500 on 2.8ghz) - itcount: " + Date.timeFunc(function() {
+    db.mr1.find().itcount();
+}, 10));
 
 // test doesn't exist
 res =
@@ -169,10 +162,9 @@ if (true) {
 
     res = db.runCommand({mapreduce: "mr1", out: "mr1_foo", map: m, reduce: r});
     d(res);
-    print("t2: " + res.timeMillis + " (~3500 on 2.8ghz) - itcount: " +
-          Date.timeFunc(function() {
-              db.mr1.find().itcount();
-          }));
+    print("t2: " + res.timeMillis + " (~3500 on 2.8ghz) - itcount: " + Date.timeFunc(function() {
+        db.mr1.find().itcount();
+    }));
     x = db[res.result];
     z = {};
     x.find().forEach(function(a) {

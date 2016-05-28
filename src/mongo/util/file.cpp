@@ -136,10 +136,14 @@ void File::read(fileofs o, char* data, unsigned len) {
     } else if (bytesRead != len) {
         _bad = true;
         msgasserted(10438,
-                    mongoutils::str::stream()
-                        << "In File::read(), ReadFile for '" << _name << "' read " << bytesRead
-                        << " bytes while trying to read " << len << " bytes starting at offset "
-                        << o << ", truncated file?");
+                    mongoutils::str::stream() << "In File::read(), ReadFile for '" << _name
+                                              << "' read "
+                                              << bytesRead
+                                              << " bytes while trying to read "
+                                              << len
+                                              << " bytes starting at offset "
+                                              << o
+                                              << ", truncated file?");
     }
 }
 
@@ -259,10 +263,14 @@ void File::read(fileofs o, char* data, unsigned len) {
     } else if (bytesRead != static_cast<ssize_t>(len)) {
         _bad = true;
         msgasserted(16569,
-                    mongoutils::str::stream()
-                        << "In File::read(), ::pread for '" << _name << "' read " << bytesRead
-                        << " bytes while trying to read " << len << " bytes starting at offset "
-                        << o << ", truncated file?");
+                    mongoutils::str::stream() << "In File::read(), ::pread for '" << _name
+                                              << "' read "
+                                              << bytesRead
+                                              << " bytes while trying to read "
+                                              << len
+                                              << " bytes starting at offset "
+                                              << o
+                                              << ", truncated file?");
     }
 }
 

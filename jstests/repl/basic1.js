@@ -92,9 +92,7 @@ block();
 checkNumCollections("MR4");
 
 var t = am.rpos;
-var writeOption = {
-    writeConcern: {w: 2, wtimeout: 3000}
-};
+var writeOption = {writeConcern: {w: 2, wtimeout: 3000}};
 t.insert({_id: 1, a: [{n: "a", c: 1}, {n: "b", c: 1}, {n: "c", c: 1}], b: [1, 2, 3]}, writeOption);
 check("after pos 1 ");
 
@@ -114,11 +112,7 @@ printjson(as.rpos.findOne());
 // ).forEach( printjson )
 
 t = am.b;
-var updateOption = {
-    upsert: true,
-    multi: false,
-    writeConcern: {w: 2, wtimeout: 3000}
-};
+var updateOption = {upsert: true, multi: false, writeConcern: {w: 2, wtimeout: 3000}};
 t.update({_id: "fun"}, {$inc: {"a.b.c.x": 6743}}, updateOption);
 check("b 1");
 
@@ -142,9 +136,8 @@ assert.soon(function() {
     return am.lotOfIndexes.getIndexes().length == as.lotOfIndexes.getIndexes().length;
 }, "lots of indexes a");
 
-assert.eq(am.lotOfIndexes.getIndexes().length,
-          as.lotOfIndexes.getIndexes().length,
-          "lots of indexes b");
+assert.eq(
+    am.lotOfIndexes.getIndexes().length, as.lotOfIndexes.getIndexes().length, "lots of indexes b");
 
 // multi-update with $inc
 

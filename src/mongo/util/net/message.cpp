@@ -31,8 +31,8 @@
 
 #include "mongo/util/net/message.h"
 
-#include <fcntl.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <time.h>
 
 #include "mongo/util/net/listen.h"

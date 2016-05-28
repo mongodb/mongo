@@ -49,8 +49,8 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/chunk.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/log.h"
@@ -514,7 +514,8 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* txn
     if (!idx) {
         return {ErrorCodes::IndexNotFound,
                 str::stream() << "can't find index with prefix " << _shardKeyPattern.toBSON()
-                              << " in storeCurrentLocs for " << _args.getNss().ns()};
+                              << " in storeCurrentLocs for "
+                              << _args.getNss().ns()};
     }
 
     // Install the stage, which will listen for notifications on the collection
@@ -604,10 +605,19 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* txn
         return {
             ErrorCodes::ChunkTooBig,
             str::stream() << "Cannot move chunk: the maximum number of documents for a chunk is "
-                          << maxRecsWhenFull << ", the maximum chunk size is "
-                          << _args.getMaxChunkSizeBytes() << ", average document size is "
-                          << avgRecSize << ". Found " << recCount << " documents in chunk "
-                          << " ns: " << _args.getNss().ns() << " " << _args.getMinKey() << " -> "
+                          << maxRecsWhenFull
+                          << ", the maximum chunk size is "
+                          << _args.getMaxChunkSizeBytes()
+                          << ", average document size is "
+                          << avgRecSize
+                          << ". Found "
+                          << recCount
+                          << " documents in chunk "
+                          << " ns: "
+                          << _args.getNss().ns()
+                          << " "
+                          << _args.getMinKey()
+                          << " -> "
                           << _args.getMaxKey()};
     }
 

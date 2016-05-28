@@ -47,9 +47,8 @@ assert.eq(1,
           t.find({group: 3, 'x.a': 2}, {'x.$': 1}).toArray()[0].x.length,
           "single object match (array length match)");
 
-assert.eq(2,
-          t.find({group: 3, 'x.a': 1}, {'x.$': 1}).toArray()[0].x[0].b,
-          "single object match first");
+assert.eq(
+    2, t.find({group: 3, 'x.a': 1}, {'x.$': 1}).toArray()[0].x[0].b, "single object match first");
 
 assert.eq(undefined,
           t.find({group: 3, 'x.a': 2}, {_id: 0, 'x.$': 1}).toArray()[0]._id,
@@ -149,9 +148,8 @@ if (false) {
 //
 // SERVER-2238:  $elemMatch projections
 //
-assert.eq(-6,
-          t.find({group: 4}, {x: {$elemMatch: {a: -6}}}).toArray()[0].x[0].a,
-          "single object match");
+assert.eq(
+    -6, t.find({group: 4}, {x: {$elemMatch: {a: -6}}}).toArray()[0].x[0].a, "single object match");
 
 assert.eq(1,
           t.find({group: 4}, {x: {$elemMatch: {a: -6}}}).toArray()[0].x.length,
@@ -184,9 +182,8 @@ assert.eq([1],
 
 // but this may become a user assertion, since a single element of an array can't match more than
 // one value
-assert.eq([1],
-          t.find({group: 1}, {x: {$elemMatch: {$all: [1]}}}).toArray()[0].x,
-          "$in number match");
+assert.eq(
+    [1], t.find({group: 1}, {x: {$elemMatch: {$all: [1]}}}).toArray()[0].x, "$in number match");
 
 assert.eq([{a: 'string', b: date1}],
           t.find({group: 6}, {x: {$elemMatch: {a: 'string'}}}).toArray()[0].x,
@@ -212,10 +209,10 @@ assert.eq([{a: 2, c: 3}],
           t.find({group: 3}, {x: {$elemMatch: {a: {$mod: [2, 0]}}}}).toArray()[0].x,
           "mixed object match on mod");
 
-assert.eq({"x": [{"a": 1, "b": 2}], "y": [{"c": 3, "d": 4}]},
-          t.find({group: 10}, {_id: 0, x: {$elemMatch: {a: 1}}, y: {$elemMatch: {c: 3}}})
-              .toArray()[0],
-          "multiple $elemMatch on unique fields 1");
+assert.eq(
+    {"x": [{"a": 1, "b": 2}], "y": [{"c": 3, "d": 4}]},
+    t.find({group: 10}, {_id: 0, x: {$elemMatch: {a: 1}}, y: {$elemMatch: {c: 3}}}).toArray()[0],
+    "multiple $elemMatch on unique fields 1");
 
 assert.eq({"x": [{"y": [{"a": 1, "b": 2}, {"a": 3, "b": 4}]}]},
           t.find({group: 8}, {_id: 0, x: {$elemMatch: {y: {$elemMatch: {a: 3}}}}}).toArray()[0],

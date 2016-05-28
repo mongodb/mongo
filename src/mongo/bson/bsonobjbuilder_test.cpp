@@ -33,8 +33,8 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 
-#include <sstream>
 #include "mongo/unittest/unittest.h"
+#include <sstream>
 
 namespace {
 
@@ -300,7 +300,9 @@ TEST(BSONObjBuilderTest, ResumeBuildingWithNesting) {
     auto obj = BSONObj(b.buf());
     ASSERT_EQ(obj,
               BSON("ll" << BSON("f" << BSON("cc"
-                                            << "dd")) << "a" << BSON("c" << 3)));
+                                            << "dd"))
+                        << "a"
+                        << BSON("c" << 3)));
 }
 
 TEST(BSONObjBuilderTest, ResetToEmptyResultsInEmptyObj) {

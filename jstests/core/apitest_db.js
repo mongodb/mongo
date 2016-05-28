@@ -73,9 +73,9 @@ assert.docEq(validStorageEngineOptions,
 // The indexOptionDefaults must be a document that contains only a storageEngine field.
 db.idxOptions.drop();
 assert.commandFailed(db.createCollection('idxOptions', {indexOptionDefaults: 'not a document'}));
-assert.commandFailed(db.createCollection('idxOptions',
-                                         {indexOptionDefaults: {unknownOption: true}}),
-                     'created a collection with an unknown option to indexOptionDefaults');
+assert.commandFailed(
+    db.createCollection('idxOptions', {indexOptionDefaults: {unknownOption: true}}),
+    'created a collection with an unknown option to indexOptionDefaults');
 assert.commandWorked(db.createCollection('idxOptions', {indexOptionDefaults: {}}),
                      'should have been able to specify an empty object for indexOptionDefaults');
 assert(db.idxOptions.drop());
@@ -99,9 +99,7 @@ assert.commandFailed(
 var alternateStorageEngine =
     db.serverBuildInfo().storageEngines.find(engine => engine !== storageEngineName);
 if (alternateStorageEngine) {
-    var indexOptions = {
-        storageEngine: {[alternateStorageEngine]: {}}
-    };
+    var indexOptions = {storageEngine: {[alternateStorageEngine]: {}}};
     assert.commandWorked(db.createCollection('idxOptions', {indexOptionDefaults: indexOptions}),
                          'should have been able to configure a non-active storage engine');
     assert(db.idxOptions.drop());

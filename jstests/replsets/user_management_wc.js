@@ -132,10 +132,7 @@ load('jstests/multiVersion/libs/auth_helpers.js');
     }
 
     function testValidWriteConcern(cmd) {
-        cmd.req.writeConcern = {
-            w: 'majority',
-            wtimeout: 25000
-        };
+        cmd.req.writeConcern = {w: 'majority', wtimeout: 25000};
         jsTest.log("Testing " + tojson(cmd.req));
 
         dropUsersAndRoles();
@@ -148,9 +145,7 @@ load('jstests/multiVersion/libs/auth_helpers.js');
     }
 
     function testInvalidWriteConcern(cmd) {
-        cmd.req.writeConcern = {
-            w: 15
-        };
+        cmd.req.writeConcern = {w: 15};
         jsTest.log("Testing " + tojson(cmd.req));
 
         dropUsersAndRoles();

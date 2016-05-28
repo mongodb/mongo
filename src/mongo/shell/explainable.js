@@ -126,23 +126,15 @@ var Explainable = (function() {
 
         this.findAndModify = function(params) {
             var famCmd = Object.extend({"findAndModify": this._collection.getName()}, params);
-            var explainCmd = {
-                "explain": famCmd,
-                "verbosity": this._verbosity
-            };
+            var explainCmd = {"explain": famCmd, "verbosity": this._verbosity};
             var explainResult = this._collection.runReadCommand(explainCmd);
             return throwOrReturn(explainResult);
         };
 
         this.group = function(params) {
             params.ns = this._collection.getName();
-            var grpCmd = {
-                "group": this._collection.getDB()._groupFixParms(params)
-            };
-            var explainCmd = {
-                "explain": grpCmd,
-                "verbosity": this._verbosity
-            };
+            var grpCmd = {"group": this._collection.getDB()._groupFixParms(params)};
+            var explainCmd = {"explain": grpCmd, "verbosity": this._verbosity};
             var explainResult = this._collection.runReadCommand(explainCmd);
             return throwOrReturn(explainResult);
         };
@@ -158,10 +150,7 @@ var Explainable = (function() {
                 distinctCmd.collation = options.collation;
             }
 
-            var explainCmd = {
-                explain: distinctCmd,
-                verbosity: this._verbosity
-            };
+            var explainCmd = {explain: distinctCmd, verbosity: this._verbosity};
             var explainResult = this._collection.runReadCommand(explainCmd);
             return throwOrReturn(explainResult);
         };

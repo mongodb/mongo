@@ -32,8 +32,8 @@
 
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/value.h"
-#include "mongo/util/string_map.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 

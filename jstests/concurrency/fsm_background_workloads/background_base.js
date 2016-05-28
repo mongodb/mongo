@@ -31,10 +31,7 @@ var $config = (function() {
         }
     };
 
-    var transitions = {
-        wait: {checkForTermination: 1},
-        checkForTermination: {wait: 1}
-    };
+    var transitions = {wait: {checkForTermination: 1}, checkForTermination: {wait: 1}};
 
     var teardown = function teardown(db, collName, cluster) {
         db.getSiblingDB('config').fsm_background.drop();

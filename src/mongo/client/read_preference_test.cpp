@@ -52,13 +52,15 @@ TEST(ReadPreferenceSetting, ParseValid) {
     // that the tags are parsed as the empty TagSet.
     checkParse(BSON("mode"
                     << "primary"
-                    << "tags" << BSON_ARRAY(BSONObj())),
+                    << "tags"
+                    << BSON_ARRAY(BSONObj())),
                ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
 
     checkParse(BSON("mode"
                     << "secondaryPreferred"
-                    << "tags" << BSON_ARRAY(BSON("dc"
-                                                 << "ny"))),
+                    << "tags"
+                    << BSON_ARRAY(BSON("dc"
+                                       << "ny"))),
                ReadPreferenceSetting(ReadPreference::SecondaryPreferred,
                                      TagSet(BSON_ARRAY(BSON("dc"
                                                             << "ny")))));
@@ -73,8 +75,9 @@ TEST(ReadPreferenceSetting, ParseInvalid) {
     // mode primary can not have tags
     checkParseFails(BSON("mode"
                          << "primary"
-                         << "tags" << BSON_ARRAY(BSON("foo"
-                                                      << "bar"))));
+                         << "tags"
+                         << BSON_ARRAY(BSON("foo"
+                                            << "bar"))));
     // bad mode
     checkParseFails(BSON("mode"
                          << "khalesi"));

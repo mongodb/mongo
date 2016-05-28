@@ -77,7 +77,8 @@ Status ModifierCompare::init(const BSONElement& modExpr, const Options& opts, bo
     if (foundDollar && foundCount > 1) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Too many positional (i.e. '$') elements found in path '"
-                                    << _updatePath.dottedField() << "'");
+                                    << _updatePath.dottedField()
+                                    << "'");
     }
 
     // Store value for later.

@@ -10,18 +10,13 @@
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/distinct.js');    // for $config
 
-var $config = extendWorkload($config,
-                             function($config, $super) {
-                                 $config.data.prefix = 'distinct_projection_fsm';
+var $config = extendWorkload($config, function($config, $super) {
+    $config.data.prefix = 'distinct_projection_fsm';
 
-                                 $config.states.distinct = function distinct(db, collName) {
-                                     var query = {
-                                         i: {$lt: this.numDocs / 2}
-                                     };
-                                     assertWhenOwnColl.eq(
-                                         this.numDocs / 2,
-                                         db[this.threadCollName].distinct('i', query).length);
-                                 };
+    $config.states.distinct = function distinct(db, collName) {
+        var query = {i: {$lt: this.numDocs / 2}};
+        assertWhenOwnColl.eq(this.numDocs / 2, db[this.threadCollName].distinct('i', query).length);
+    };
 
-                                 return $config;
-                             });
+    return $config;
+});

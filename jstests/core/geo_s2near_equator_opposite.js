@@ -14,12 +14,16 @@ t.ensureIndex({loc: '2dsphere'});
 // upper bound for half of earth's circumference in meters
 var dist = 40075000 / 2 + 1;
 
-var nearSphereCount = t.find({
-    loc: {$nearSphere: {$geometry: {type: 'Point', coordinates: [180, 0]}, $maxDistance: dist}}
-}).itcount();
+var nearSphereCount =
+    t.find({
+         loc: {
+             $nearSphere: {$geometry: {type: 'Point', coordinates: [180, 0]}, $maxDistance: dist}
+         }
+     }).itcount();
 var nearCount =
-    t.find({loc: {$near: {$geometry: {type: 'Point', coordinates: [180, 0]}, $maxDistance: dist}}})
-        .itcount();
+    t.find({
+         loc: {$near: {$geometry: {type: 'Point', coordinates: [180, 0]}, $maxDistance: dist}}
+     }).itcount();
 var geoNearResult = db.runCommand(
     {geoNear: t.getName(), near: {type: 'Point', coordinates: [180, 0]}, spherical: true});
 

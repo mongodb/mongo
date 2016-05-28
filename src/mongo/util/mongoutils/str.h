@@ -36,8 +36,8 @@
  * TODO: Retire the mongoutils namespace, and move str under the mongo namespace.
  */
 
-#include <string>
 #include <sstream>
+#include <string>
 
 #include "mongo/bson/util/builder.h"
 

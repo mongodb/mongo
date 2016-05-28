@@ -30,11 +30,11 @@
 
 #pragma once
 
-#include <string>
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/platform/atomic_word.h"
+#include <string>
 
 namespace mongo {
 

@@ -30,8 +30,8 @@
 
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 
-#include <utility>
 #include <tuple>
+#include <utility>
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
@@ -160,7 +160,9 @@ StatusWith<ServerSelectionMetadata> ServerSelectionMetadata::readFromMetadata(
     } else if (metadataElem.type() != mongo::Object) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << "ServerSelectionMetadata element has incorrect type: expected"
-                              << mongo::Object << " but got " << metadataElem.type()};
+                              << mongo::Object
+                              << " but got "
+                              << metadataElem.type()};
     }
 
     bool secondaryOk = false;
@@ -174,7 +176,9 @@ StatusWith<ServerSelectionMetadata> ServerSelectionMetadata::readFromMetadata(
             if (ssmElem.type() != mongo::Object) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "ReadPreference has incorrect type: expected"
-                                            << mongo::Object << "but got" << metadataElem.type());
+                                            << mongo::Object
+                                            << "but got"
+                                            << metadataElem.type());
             }
             auto parsedRps = ReadPreferenceSetting::fromBSON(ssmElem.Obj());
             if (!parsedRps.isOK()) {

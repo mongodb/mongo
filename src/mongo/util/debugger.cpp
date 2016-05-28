@@ -34,8 +34,8 @@
 #include <cstdlib>
 
 #if defined(USE_GDBSERVER)
-#include <unistd.h>
 #include <cstdio>
+#include <unistd.h>
 #endif
 
 #ifndef _WIN32

@@ -140,7 +140,8 @@ TEST_F(CollectionClonerTest, RemoteCollectionMissing) {
 
     processNetworkResponse(BSON("ok" << 0 << "errmsg"
                                      << ""
-                                     << "code" << ErrorCodes::NamespaceNotFound));
+                                     << "code"
+                                     << ErrorCodes::NamespaceNotFound));
 
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, getStatus().code());
     ASSERT_FALSE(collectionCloner->isActive());
@@ -238,10 +239,12 @@ TEST_F(CollectionClonerTest, BeginCollection) {
     const std::vector<BSONObj> specs = {idIndexSpec,
                                         BSON("v" << 1 << "key" << BSON("a" << 1) << "name"
                                                  << "a_1"
-                                                 << "ns" << nss.ns()),
+                                                 << "ns"
+                                                 << nss.ns()),
                                         BSON("v" << 1 << "key" << BSON("b" << 1) << "name"
                                                  << "b_1"
-                                                 << "ns" << nss.ns())};
+                                                 << "ns"
+                                                 << nss.ns())};
 
     processNetworkResponse(createListIndexesResponse(1, BSON_ARRAY(specs[0] << specs[1])));
 
@@ -329,7 +332,8 @@ TEST_F(CollectionClonerTest, FindCommandFailed) {
 
     processNetworkResponse(BSON("ok" << 0 << "errmsg"
                                      << ""
-                                     << "code" << ErrorCodes::CursorNotFound));
+                                     << "code"
+                                     << ErrorCodes::CursorNotFound));
 
     ASSERT_EQUALS(ErrorCodes::CursorNotFound, getStatus().code());
     ASSERT_FALSE(collectionCloner->isActive());

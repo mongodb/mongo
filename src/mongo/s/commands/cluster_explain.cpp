@@ -150,14 +150,16 @@ Status ClusterExplain::validateShardResults(const vector<Strategy::CommandResult
             return Status(error,
                           str::stream() << "Explain command on shard "
                                         << shardResults[i].target.toString()
-                                        << " failed, caused by: " << shardResults[i].result);
+                                        << " failed, caused by: "
+                                        << shardResults[i].result);
         }
 
         if (Object != shardResults[i].result["queryPlanner"].type()) {
             return Status(ErrorCodes::OperationFailed,
                           str::stream() << "Explain command on shard "
                                         << shardResults[i].target.toString()
-                                        << " failed, caused by: " << shardResults[i].result);
+                                        << " failed, caused by: "
+                                        << shardResults[i].result);
         }
 
         if (shardResults[i].result.hasField("executionStats")) {

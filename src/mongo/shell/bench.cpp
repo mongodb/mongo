@@ -34,8 +34,8 @@
 
 #include "mongo/shell/bench.h"
 
-#include <pcrecpp.h>
 #include <iostream>
+#include <pcrecpp.h>
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/namespace_string.h"
@@ -322,7 +322,8 @@ BenchRunOp opFromBson(const BSONObj& op) {
         } else if (name == "query") {
             uassert(34389,
                     str::stream() << "Field 'query' is only valid for findOne, find, update, and "
-                                     "remove types. Type is " << opType,
+                                     "remove types. Type is "
+                                  << opType,
                     (opType == "findOne") || (opType == "query") ||
                         (opType == "find" || (opType == "update") || (opType == "delete") ||
                          (opType == "remove")));
@@ -886,8 +887,9 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                                 BSONObjBuilder builder;
                                 builder.append("update", nsToCollectionSubstring(op.ns));
                                 BSONArrayBuilder docBuilder(builder.subarrayStart("updates"));
-                                docBuilder.append(BSON("q" << query << "u" << update << "multi"
-                                                           << op.multi << "upsert" << op.upsert));
+                                docBuilder.append(BSON(
+                                    "q" << query << "u" << update << "multi" << op.multi << "upsert"
+                                        << op.upsert));
                                 docBuilder.done();
                                 builder.append("writeConcern", op.writeConcern);
                                 conn->runCommand(nsToDatabaseSubstring(op.ns).toString(),
@@ -1082,7 +1084,8 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                     {
                         stats.trappedErrors.push_back(BSON("error" << ex.what() << "op"
                                                                    << opTypeName.find(op.op)->second
-                                                                   << "count" << count));
+                                                                   << "count"
+                                                                   << count));
                     }
                     if (_config->breakOnTrap)
                         return;
@@ -1169,11 +1172,11 @@ void BenchRunner::start() {
         if (_config->username != "") {
             string errmsg;
             if (!conn->auth("admin", _config->username, _config->password, errmsg)) {
-                uasserted(16704,
-                          str::stream()
-                              << "User " << _config->username
-                              << " could not authenticate to admin db; admin db access is "
-                                 "required to use benchRun with auth enabled");
+                uasserted(
+                    16704,
+                    str::stream() << "User " << _config->username
+                                  << " could not authenticate to admin db; admin db access is "
+                                     "required to use benchRun with auth enabled");
             }
         }
 
@@ -1206,11 +1209,11 @@ void BenchRunner::stop() {
             string errmsg;
             // this can only fail if admin access was revoked since start of run
             if (!conn->auth("admin", _config->username, _config->password, errmsg)) {
-                uasserted(16705,
-                          str::stream()
-                              << "User " << _config->username
-                              << " could not authenticate to admin db; admin db access is "
-                                 "still required to use benchRun with auth enabled");
+                uasserted(
+                    16705,
+                    str::stream() << "User " << _config->username
+                                  << " could not authenticate to admin db; admin db access is "
+                                     "still required to use benchRun with auth enabled");
             }
         }
     }

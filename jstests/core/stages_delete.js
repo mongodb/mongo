@@ -1,8 +1,6 @@
 // Test basic delete stage functionality.
 var coll = db.stages_delete;
-var collScanStage = {
-    cscan: {args: {direction: 1}, filter: {deleteMe: true}}
-};
+var collScanStage = {cscan: {args: {direction: 1}, filter: {deleteMe: true}}};
 var deleteStage;
 
 // Test delete stage with isMulti: true.

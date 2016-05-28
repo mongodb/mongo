@@ -55,13 +55,15 @@
     assert.eq("add_shard2_rs1", shard._id, "t2 name");
 
     // step 3. replica set w/ name given
-    assert(s.admin.runCommand({
-        "addshard": "add_shard2_rs2/" + getHostName() + ":" + master2.port,
-        "name": "myshard"
-    }).ok,
+    assert(s.admin
+               .runCommand({
+                   "addshard": "add_shard2_rs2/" + getHostName() + ":" + master2.port,
+                   "name": "myshard"
+               })
+               .ok,
            "failed to add shard in step 4");
-    shard = s.getDB("config")
-                .shards.findOne({"_id": {"$nin": ["shard0000", "bar", "add_shard2_rs1"]}});
+    shard =
+        s.getDB("config").shards.findOne({"_id": {"$nin": ["shard0000", "bar", "add_shard2_rs1"]}});
     assert(shard, "shard wasn't found");
     assert.eq("myshard", shard._id, "t3 name");
 
@@ -77,15 +79,18 @@
 
     // step 5. replica set w/ a wrong host
     var portWithoutHostRunning = allocatePort();
-    assert(!s.admin.runCommand(
-                        {addshard: "add_shard2_rs2/NonExistingHost:" + portWithoutHostRunning}).ok,
-           "accepted bad hostname in step 5");
+    assert(
+        !s.admin.runCommand({addshard: "add_shard2_rs2/NonExistingHost:" + portWithoutHostRunning})
+             .ok,
+        "accepted bad hostname in step 5");
 
     // step 6. replica set w/ mixed wrong/right hosts
-    assert(!s.admin.runCommand({
-        addshard: "add_shard2_rs2/" + getHostName() + ":" + master2.port + ",foo:" +
-            portWithoutHostRunning
-    }).ok,
+    assert(!s.admin
+                .runCommand({
+                    addshard: "add_shard2_rs2/" + getHostName() + ":" + master2.port + ",foo:" +
+                        portWithoutHostRunning
+                })
+                .ok,
            "accepted bad hostname in step 6");
 
     // Cannot add invalid stand alone host.

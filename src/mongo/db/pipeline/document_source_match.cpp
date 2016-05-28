@@ -404,31 +404,29 @@ boost::intrusive_ptr<DocumentSourceMatch> DocumentSourceMatch::descendMatchOnPat
     MatchExpression* matchExpr,
     const std::string& descendOn,
     intrusive_ptr<ExpressionContext> expCtx) {
-    expression::mapOver(matchExpr,
-                        [&descendOn](MatchExpression* node, std::string path) -> void {
-                            // Cannot call this method on a $match including a $elemMatch.
-                            invariant(node->matchType() != MatchExpression::ELEM_MATCH_OBJECT &&
-                                      node->matchType() != MatchExpression::ELEM_MATCH_VALUE);
-                            // Logical nodes do not have a path, but both 'leaf' and 'array' nodes
-                            // do.
-                            if (node->isLogical()) {
-                                return;
-                            }
+    expression::mapOver(matchExpr, [&descendOn](MatchExpression* node, std::string path) -> void {
+        // Cannot call this method on a $match including a $elemMatch.
+        invariant(node->matchType() != MatchExpression::ELEM_MATCH_OBJECT &&
+                  node->matchType() != MatchExpression::ELEM_MATCH_VALUE);
+        // Logical nodes do not have a path, but both 'leaf' and 'array' nodes
+        // do.
+        if (node->isLogical()) {
+            return;
+        }
 
-                            auto leafPath = node->path();
-                            invariant(expression::isPathPrefixOf(descendOn, leafPath));
+        auto leafPath = node->path();
+        invariant(expression::isPathPrefixOf(descendOn, leafPath));
 
-                            auto newPath = leafPath.substr(descendOn.size() + 1);
-                            if (node->isLeaf() &&
-                                node->matchType() != MatchExpression::TYPE_OPERATOR &&
-                                node->matchType() != MatchExpression::WHERE) {
-                                auto leafNode = static_cast<LeafMatchExpression*>(node);
-                                leafNode->setPath(newPath);
-                            } else if (node->isArray()) {
-                                auto arrayNode = static_cast<ArrayMatchingMatchExpression*>(node);
-                                arrayNode->setPath(newPath);
-                            }
-                        });
+        auto newPath = leafPath.substr(descendOn.size() + 1);
+        if (node->isLeaf() && node->matchType() != MatchExpression::TYPE_OPERATOR &&
+            node->matchType() != MatchExpression::WHERE) {
+            auto leafNode = static_cast<LeafMatchExpression*>(node);
+            leafNode->setPath(newPath);
+        } else if (node->isArray()) {
+            auto arrayNode = static_cast<ArrayMatchingMatchExpression*>(node);
+            arrayNode->setPath(newPath);
+        }
+    });
 
     BSONObjBuilder query;
     matchExpr->serialize(&query);
@@ -479,15 +477,13 @@ DocumentSource::GetDepsReturn DocumentSourceMatch::getDependencies(DepsTracker* 
 }
 
 void DocumentSourceMatch::addDependencies(DepsTracker* deps) const {
-    expression::mapOver(_expression.get(),
-                        [deps](MatchExpression* node, std::string path) -> void {
-                            if (!path.empty() &&
-                                (node->numChildren() == 0 ||
-                                 node->matchType() == MatchExpression::ELEM_MATCH_VALUE ||
-                                 node->matchType() == MatchExpression::ELEM_MATCH_OBJECT)) {
-                                deps->fields.insert(path);
-                            }
-                        });
+    expression::mapOver(_expression.get(), [deps](MatchExpression* node, std::string path) -> void {
+        if (!path.empty() &&
+            (node->numChildren() == 0 || node->matchType() == MatchExpression::ELEM_MATCH_VALUE ||
+             node->matchType() == MatchExpression::ELEM_MATCH_OBJECT)) {
+            deps->fields.insert(path);
+        }
+    });
 }
 
 DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,

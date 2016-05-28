@@ -29,8 +29,8 @@
         clusterId: ObjectId()
     };
 
-    assert.writeOK(primaryConn.getDB('admin')
-                       .system.version.insert(shardIdentityDoc, {writeConcern: {w: 'majority'}}));
+    assert.writeOK(primaryConn.getDB('admin').system.version.insert(
+        shardIdentityDoc, {writeConcern: {w: 'majority'}}));
 
     replTest.stopMaster();
     replTest.waitForMaster();

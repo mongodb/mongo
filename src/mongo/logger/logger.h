@@ -27,8 +27,8 @@
 
 #pragma once
 
-#include "mongo/logger/message_log_domain.h"
 #include "mongo/logger/log_manager.h"
+#include "mongo/logger/message_log_domain.h"
 #include "mongo/logger/rotatable_file_manager.h"
 
 namespace mongo {

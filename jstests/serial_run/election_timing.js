@@ -130,8 +130,8 @@
         });
 
         var resAvg = Array.avg(allResults);
-        var resMin = Math.min(... allResults);
-        var resMax = Math.max(... allResults);
+        var resMin = Math.min(...allResults);
+        var resMax = Math.max(...allResults);
         var resStdDev = Array.stdDev(allResults);
 
         jsTestLog("Results: " + tc.name + " Average over " + allResults.length + " runs: " +

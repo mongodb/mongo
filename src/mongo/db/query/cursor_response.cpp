@@ -123,24 +123,24 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
     BSONElement cursorElt = cmdResponse[kCursorField];
     if (cursorElt.type() != BSONType::Object) {
         return {ErrorCodes::TypeMismatch,
-                str::stream() << "Field '" << kCursorField
-                              << "' must be a nested object in: " << cmdResponse};
+                str::stream() << "Field '" << kCursorField << "' must be a nested object in: "
+                              << cmdResponse};
     }
     BSONObj cursorObj = cursorElt.Obj();
 
     BSONElement idElt = cursorObj[kIdField];
     if (idElt.type() != BSONType::NumberLong) {
-        return {ErrorCodes::TypeMismatch,
-                str::stream() << "Field '" << kIdField
-                              << "' must be of type long in: " << cmdResponse};
+        return {
+            ErrorCodes::TypeMismatch,
+            str::stream() << "Field '" << kIdField << "' must be of type long in: " << cmdResponse};
     }
     cursorId = idElt.Long();
 
     BSONElement nsElt = cursorObj[kNsField];
     if (nsElt.type() != BSONType::String) {
         return {ErrorCodes::TypeMismatch,
-                str::stream() << "Field '" << kNsField
-                              << "' must be of type string in: " << cmdResponse};
+                str::stream() << "Field '" << kNsField << "' must be of type string in: "
+                              << cmdResponse};
     }
     fullns = nsElt.String();
 
@@ -152,16 +152,18 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
     if (batchElt.type() != BSONType::Array) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << "Must have array field '" << kBatchFieldInitial << "' or '"
-                              << kBatchField << "' in: " << cmdResponse};
+                              << kBatchField
+                              << "' in: "
+                              << cmdResponse};
     }
     batchObj = batchElt.Obj();
 
     std::vector<BSONObj> batch;
     for (BSONElement elt : batchObj) {
         if (elt.type() != BSONType::Object) {
-            return {
-                ErrorCodes::BadValue,
-                str::stream() << "getMore response batch contains a non-object element: " << elt};
+            return {ErrorCodes::BadValue,
+                    str::stream() << "getMore response batch contains a non-object element: "
+                                  << elt};
         }
 
         batch.push_back(elt.Obj().getOwned());

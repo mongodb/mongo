@@ -45,10 +45,10 @@ namespace {
 TEST(BatchedInsertRequest, Basic) {
     BSONArray insertArray = BSON_ARRAY(BSON("a" << 1) << BSON("b" << 1));
 
-    BSONObj origInsertRequestObj = BSON(BatchedInsertRequest::collName("test")
-                                        << BatchedInsertRequest::documents() << insertArray
-                                        << BatchedInsertRequest::writeConcern(BSON("w" << 1))
-                                        << BatchedInsertRequest::ordered(true));
+    BSONObj origInsertRequestObj = BSON(
+        BatchedInsertRequest::collName("test") << BatchedInsertRequest::documents() << insertArray
+                                               << BatchedInsertRequest::writeConcern(BSON("w" << 1))
+                                               << BatchedInsertRequest::ordered(true));
 
     string errMsg;
     BatchedInsertRequest request;

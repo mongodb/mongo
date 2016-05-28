@@ -33,9 +33,9 @@
 
 #include "mongo/db/repl/sync_tail.h"
 
+#include "third_party/murmurhash3/MurmurHash3.h"
 #include <boost/functional/hash.hpp>
 #include <memory>
-#include "third_party/murmurhash3/MurmurHash3.h"
 
 #include "mongo/base/counter.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -749,7 +749,8 @@ void SyncTail::oplogApplication() {
                            str::stream() << "Attempted to apply an oplog entry ("
                                          << lastOpTime.toString()
                                          << ") which is not greater than our lastWrittenOptime ("
-                                         << lastWriteOpTime.toString() << ")."));
+                                         << lastWriteOpTime.toString()
+                                         << ")."));
         }
 
         handleSlaveDelay(lastOpTime.getTimestamp());
@@ -1029,9 +1030,7 @@ void multiSyncApply(const std::vector<OplogEntry>& ops, SyncTail*) {
             int batchSize = 0;
             int batchCount = 0;
             auto endOfGroupableOpsIterator = std::find_if(
-                oplogEntriesIterator + 1,
-                oplogEntryPointers.end(),
-                [&](OplogEntry* nextEntry) {
+                oplogEntriesIterator + 1, oplogEntryPointers.end(), [&](OplogEntry* nextEntry) {
                     return nextEntry->opType[0] != 'i' ||  // Must be an insert.
                         nextEntry->ns != entry->ns ||      // Must be the same namespace.
                         // Must not create too large an object.

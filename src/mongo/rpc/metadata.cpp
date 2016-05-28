@@ -34,8 +34,8 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
-#include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
+#include "mongo/rpc/metadata/sharding_metadata.h"
 
 namespace mongo {
 namespace rpc {

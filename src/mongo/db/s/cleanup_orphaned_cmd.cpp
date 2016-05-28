@@ -44,10 +44,10 @@
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/service_context.h"
+#include "mongo/db/s/chunk_move_write_concern_options.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/s/chunk_move_write_concern_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
 #include "mongo/util/log.h"
 

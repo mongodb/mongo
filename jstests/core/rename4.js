@@ -101,9 +101,8 @@ good({aa: 1, b: 2}, {$rename: {z: 'c'}, $set: {b: 5}}, {aa: 1, b: 5});
 good({a: {z: 1, b: 1}}, {$rename: {'a.b': 'a.c'}}, {a: {c: 1, z: 1}});
 good({a: {z: 1, tomato: 1}}, {$rename: {'a.tomato': 'a.potato'}}, {a: {potato: 1, z: 1}});
 good({a: {z: 1, b: 1, c: 1}}, {$rename: {'a.b': 'a.c'}}, {a: {c: 1, z: 1}});
-good({a: {z: 1, tomato: 1, potato: 1}},
-     {$rename: {'a.tomato': 'a.potato'}},
-     {a: {potato: 1, z: 1}});
+good(
+    {a: {z: 1, tomato: 1, potato: 1}}, {$rename: {'a.tomato': 'a.potato'}}, {a: {potato: 1, z: 1}});
 good({a: {z: 1, b: 1}}, {$rename: {'a.b': 'a.cc'}}, {a: {cc: 1, z: 1}});
 good({a: {z: 1, b: 1, c: 1}}, {$rename: {'a.b': 'aa.c'}}, {a: {c: 1, z: 1}, aa: {c: 1}});
 

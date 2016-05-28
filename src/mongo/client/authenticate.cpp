@@ -31,9 +31,9 @@
 
 #include "mongo/client/authenticate.h"
 
-#include "mongo/bson/json.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/config.h"
@@ -160,26 +160,25 @@ void authMongoCR(RunCommandHook runCommand, const BSONObj& params, AuthCompletio
     if (!nonceRequest.isOK())
         return handler(std::move(nonceRequest.getStatus()));
 
-    runCommand(nonceRequest.getValue(),
-               [runCommand, params, handler](AuthResponse response) {
-                   if (!response.isOK())
-                       return handler(std::move(response));
+    runCommand(nonceRequest.getValue(), [runCommand, params, handler](AuthResponse response) {
+        if (!response.isOK())
+            return handler(std::move(response));
 
-                   // Ensure response was valid
-                   std::string nonce;
-                   BSONObj nonceResponse = response.getValue().data;
-                   auto valid = bsonExtractStringField(nonceResponse, "nonce", &nonce);
-                   if (!valid.isOK())
-                       return handler({ErrorCodes::AuthenticationFailed,
-                                       "Invalid nonce response: " + nonceResponse.toString()});
+        // Ensure response was valid
+        std::string nonce;
+        BSONObj nonceResponse = response.getValue().data;
+        auto valid = bsonExtractStringField(nonceResponse, "nonce", &nonce);
+        if (!valid.isOK())
+            return handler({ErrorCodes::AuthenticationFailed,
+                            "Invalid nonce response: " + nonceResponse.toString()});
 
-                   // Step 2: send authenticate command, receive response
-                   auto authRequest = createMongoCRAuthenticateCmd(params, nonce);
-                   if (!authRequest.isOK())
-                       return handler(std::move(authRequest.getStatus()));
+        // Step 2: send authenticate command, receive response
+        auto authRequest = createMongoCRAuthenticateCmd(params, nonce);
+        if (!authRequest.isOK())
+            return handler(std::move(authRequest.getStatus()));
 
-                   runCommand(authRequest.getValue(), handler);
-               });
+        runCommand(authRequest.getValue(), handler);
+    });
 }
 
 //
@@ -216,7 +215,8 @@ AuthRequest createX509AuthCmd(const BSONObj& params, StringData clientName) {
 
     request.cmdObj = BSON("authenticate" << 1 << "mechanism"
                                          << "MONGODB-X509"
-                                         << "user" << username);
+                                         << "user"
+                                         << username);
     return std::move(request);
 }
 
@@ -332,19 +332,15 @@ void authenticateClient(const BSONObj& params,
     } else {
         // Run synchronously through async framework
         // NOTE: this assumes that runCommand executes synchronously.
-        asyncAuth(runCommand,
-                  params,
-                  hostname,
-                  clientName,
-                  [](AuthResponse response) {
-                      // DBClient expects us to throw in case of an auth error.
-                      uassertStatusOK(response);
+        asyncAuth(runCommand, params, hostname, clientName, [](AuthResponse response) {
+            // DBClient expects us to throw in case of an auth error.
+            uassertStatusOK(response);
 
-                      auto serverResponse = response.getValue().data;
-                      uassert(ErrorCodes::AuthenticationFailed,
-                              serverResponse["errmsg"].str(),
-                              isOk(serverResponse));
-                  });
+            auto serverResponse = response.getValue().data;
+            uassert(ErrorCodes::AuthenticationFailed,
+                    serverResponse["errmsg"].str(),
+                    isOk(serverResponse));
+        });
     }
 }
 
@@ -352,10 +348,14 @@ BSONObj buildAuthParams(StringData dbname,
                         StringData username,
                         StringData passwordText,
                         bool digestPassword) {
-    return BSON(saslCommandMechanismFieldName
-                << "SCRAM-SHA-1" << saslCommandUserDBFieldName << dbname << saslCommandUserFieldName
-                << username << saslCommandPasswordFieldName << passwordText
-                << saslCommandDigestPasswordFieldName << digestPassword);
+    return BSON(saslCommandMechanismFieldName << "SCRAM-SHA-1" << saslCommandUserDBFieldName
+                                              << dbname
+                                              << saslCommandUserFieldName
+                                              << username
+                                              << saslCommandPasswordFieldName
+                                              << passwordText
+                                              << saslCommandDigestPasswordFieldName
+                                              << digestPassword);
 }
 
 StringData getSaslCommandUserDBFieldName() {

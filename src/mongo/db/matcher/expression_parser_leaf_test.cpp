@@ -446,7 +446,9 @@ TEST(MatchExpressionParserLeafTest, INSingleDBRef) {
     OID oid = OID::gen();
     BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$ref"
                                                               << "coll"
-                                                              << "$id" << oid << "$db"
+                                                              << "$id"
+                                                              << oid
+                                                              << "$db"
                                                               << "db"))));
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
@@ -456,11 +458,15 @@ TEST(MatchExpressionParserLeafTest, INSingleDBRef) {
     OID oidx = OID::gen();
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
                                                             << "collx"
-                                                            << "$id" << oidx << "$db"
+                                                            << "$id"
+                                                            << oidx
+                                                            << "$db"
                                                             << "db"))));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
                                                             << "coll"
-                                                            << "$id" << oidx << "$db"
+                                                            << "$id"
+                                                            << oidx
+                                                            << "$db"
                                                             << "db"))));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$id" << oid << "$ref"
                                                                   << "coll"
@@ -476,28 +482,39 @@ TEST(MatchExpressionParserLeafTest, INSingleDBRef) {
                                                                              << "db")))));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
                                                             << "coll"
-                                                            << "$id" << oid << "$db"
+                                                            << "$id"
+                                                            << oid
+                                                            << "$db"
                                                             << "dbx"))));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$db"
                                                             << "db"
                                                             << "$ref"
                                                             << "coll"
-                                                            << "$id" << oid))));
+                                                            << "$id"
+                                                            << oid))));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
                                                            << "coll"
-                                                           << "$id" << oid << "$db"
+                                                           << "$id"
+                                                           << oid
+                                                           << "$db"
                                                            << "db"))));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
                                                                       << "coll"
-                                                                      << "$id" << oid << "$db"
+                                                                      << "$id"
+                                                                      << oid
+                                                                      << "$db"
                                                                       << "db")))));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
                                                                       << "collx"
-                                                                      << "$id" << oidx << "$db"
+                                                                      << "$id"
+                                                                      << oidx
+                                                                      << "$db"
                                                                       << "db")
                                                                  << BSON("$ref"
                                                                          << "coll"
-                                                                         << "$id" << oid << "$db"
+                                                                         << "$id"
+                                                                         << oid
+                                                                         << "$db"
                                                                          << "db")))));
 }
 
@@ -506,11 +523,15 @@ TEST(MatchExpressionParserLeafTest, INMultipleDBRef) {
     OID oidy = OID::gen();
     BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$ref"
                                                               << "colly"
-                                                              << "$id" << oidy << "$db"
+                                                              << "$id"
+                                                              << oidy
+                                                              << "$db"
                                                               << "db")
                                                          << BSON("$ref"
                                                                  << "coll"
-                                                                 << "$id" << oid << "$db"
+                                                                 << "$id"
+                                                                 << oid
+                                                                 << "$db"
                                                                  << "db"))));
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
@@ -520,11 +541,15 @@ TEST(MatchExpressionParserLeafTest, INMultipleDBRef) {
     OID oidx = OID::gen();
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
                                                             << "collx"
-                                                            << "$id" << oidx << "$db"
+                                                            << "$id"
+                                                            << oidx
+                                                            << "$db"
                                                             << "db"))));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
                                                             << "coll"
-                                                            << "$id" << oidx << "$db"
+                                                            << "$id"
+                                                            << oidx
+                                                            << "$db"
                                                             << "db"))));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$id" << oid << "$ref"
                                                                   << "coll"
@@ -532,11 +557,15 @@ TEST(MatchExpressionParserLeafTest, INMultipleDBRef) {
                                                                   << "db"))));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
                                                                        << "coll"
-                                                                       << "$id" << oidy << "$db"
+                                                                       << "$id"
+                                                                       << oidy
+                                                                       << "$db"
                                                                        << "db")))));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
                                                                        << "colly"
-                                                                       << "$id" << oid << "$db"
+                                                                       << "$id"
+                                                                       << oid
+                                                                       << "$db"
                                                                        << "db")))));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$id" << oid << "$ref"
                                                                              << "coll"
@@ -544,7 +573,9 @@ TEST(MatchExpressionParserLeafTest, INMultipleDBRef) {
                                                                              << "db")))));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
                                                                        << "coll"
-                                                                       << "$id" << oid << "$db"
+                                                                       << "$id"
+                                                                       << oid
+                                                                       << "$db"
                                                                        << "dbx")))));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$id" << oidy << "$ref"
                                                                              << "colly"
@@ -552,59 +583,87 @@ TEST(MatchExpressionParserLeafTest, INMultipleDBRef) {
                                                                              << "db")))));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
                                                                        << "collx"
-                                                                       << "$id" << oidx << "$db"
+                                                                       << "$id"
+                                                                       << oidx
+                                                                       << "$db"
                                                                        << "db")
                                                                   << BSON("$ref"
                                                                           << "coll"
-                                                                          << "$id" << oidx << "$db"
+                                                                          << "$id"
+                                                                          << oidx
+                                                                          << "$db"
                                                                           << "db")))));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
                                                                        << "collx"
-                                                                       << "$id" << oidx << "$db"
+                                                                       << "$id"
+                                                                       << oidx
+                                                                       << "$db"
                                                                        << "db")
                                                                   << BSON("$ref"
                                                                           << "colly"
-                                                                          << "$id" << oidx << "$db"
+                                                                          << "$id"
+                                                                          << oidx
+                                                                          << "$db"
                                                                           << "db")))));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
                                                                        << "collx"
-                                                                       << "$id" << oidx << "$db"
+                                                                       << "$id"
+                                                                       << oidx
+                                                                       << "$db"
                                                                        << "db")
                                                                   << BSON("$ref"
                                                                           << "coll"
-                                                                          << "$id" << oid << "$db"
+                                                                          << "$id"
+                                                                          << oid
+                                                                          << "$db"
                                                                           << "dbx")))));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
                                                            << "coll"
-                                                           << "$id" << oid << "$db"
+                                                           << "$id"
+                                                           << oid
+                                                           << "$db"
                                                            << "db"))));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
                                                            << "colly"
-                                                           << "$id" << oidy << "$db"
+                                                           << "$id"
+                                                           << oidy
+                                                           << "$db"
                                                            << "db"))));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
                                                                       << "coll"
-                                                                      << "$id" << oid << "$db"
+                                                                      << "$id"
+                                                                      << oid
+                                                                      << "$db"
                                                                       << "db")))));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
                                                                       << "colly"
-                                                                      << "$id" << oidy << "$db"
+                                                                      << "$id"
+                                                                      << oidy
+                                                                      << "$db"
                                                                       << "db")))));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
                                                                       << "collx"
-                                                                      << "$id" << oidx << "$db"
+                                                                      << "$id"
+                                                                      << oidx
+                                                                      << "$db"
                                                                       << "db")
                                                                  << BSON("$ref"
                                                                          << "coll"
-                                                                         << "$id" << oid << "$db"
+                                                                         << "$id"
+                                                                         << oid
+                                                                         << "$db"
                                                                          << "db")))));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
                                                                       << "collx"
-                                                                      << "$id" << oidx << "$db"
+                                                                      << "$id"
+                                                                      << oidx
+                                                                      << "$db"
                                                                       << "db")
                                                                  << BSON("$ref"
                                                                          << "colly"
-                                                                         << "$id" << oidy << "$db"
+                                                                         << "$id"
+                                                                         << oidy
+                                                                         << "$db"
                                                                          << "db")))));
 }
 
@@ -612,7 +671,10 @@ TEST(MatchExpressionParserLeafTest, INDBRefWithOptionalField1) {
     OID oid = OID::gen();
     BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$ref"
                                                               << "coll"
-                                                              << "$id" << oid << "foo" << 12345))));
+                                                              << "$id"
+                                                              << oid
+                                                              << "foo"
+                                                              << 12345))));
     const CollatorInterface* collator = nullptr;
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
@@ -621,19 +683,28 @@ TEST(MatchExpressionParserLeafTest, INDBRefWithOptionalField1) {
     OID oidx = OID::gen();
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
                                                             << "coll"
-                                                            << "$id" << oidx << "$db"
+                                                            << "$id"
+                                                            << oidx
+                                                            << "$db"
                                                             << "db"))));
-    ASSERT(result.getValue()->matchesBSON(
-        BSON("x" << BSON_ARRAY(BSON("$ref"
-                                    << "coll"
-                                    << "$id" << oid << "foo" << 12345)))));
-    ASSERT(result.getValue()->matchesBSON(
-        BSON("x" << BSON_ARRAY(BSON("$ref"
-                                    << "collx"
-                                    << "$id" << oidx << "foo" << 12345)
-                               << BSON("$ref"
-                                       << "coll"
-                                       << "$id" << oid << "foo" << 12345)))));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
+                                                                      << "coll"
+                                                                      << "$id"
+                                                                      << oid
+                                                                      << "foo"
+                                                                      << 12345)))));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
+                                                                      << "collx"
+                                                                      << "$id"
+                                                                      << oidx
+                                                                      << "foo"
+                                                                      << 12345)
+                                                                 << BSON("$ref"
+                                                                         << "coll"
+                                                                         << "$id"
+                                                                         << oid
+                                                                         << "foo"
+                                                                         << 12345)))));
 }
 
 TEST(MatchExpressionParserLeafTest, INInvalidDBRefs) {
@@ -648,7 +719,8 @@ TEST(MatchExpressionParserLeafTest, INInvalidDBRefs) {
     // second field is not $id
     query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$ref"
                                                       << "coll"
-                                                      << "$foo" << 1))));
+                                                      << "$foo"
+                                                      << 1))));
     result = MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_FALSE(result.isOK());
 
@@ -662,7 +734,8 @@ TEST(MatchExpressionParserLeafTest, INInvalidDBRefs) {
     // missing $id and $ref field
     query = BSON("x" << BSON("$in" << BSON_ARRAY(BSON("$db"
                                                       << "test"
-                                                      << "foo" << 3))));
+                                                      << "foo"
+                                                      << 3))));
     result = MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions(), collator);
     ASSERT_FALSE(result.isOK());
 }
@@ -1011,20 +1084,25 @@ TEST(MatchExpressionParserLeafTest, TypeBadString) {
     const CollatorInterface* collator = nullptr;
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: null}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: true}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: {}}}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(fromjson("{a: {$type: ObjectId('000000000000000000000000')}}"),
                                      ExtensionsCallbackDisallowExtensions(),
-                                     collator).getStatus());
+                                     collator)
+            .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: []}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameDouble) {
@@ -1198,59 +1276,75 @@ TEST(MatchExpressionParserTest, BitTestMatchExpressionValidMask) {
     const CollatorInterface* collator = nullptr;
     ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllSet" << 54)),
                                            ExtensionsCallbackDisallowExtensions(),
-                                           collator).getStatus());
+                                           collator)
+                  .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(
                   BSON("a" << BSON("$bitsAllSet" << std::numeric_limits<long long>::max())),
                   ExtensionsCallbackDisallowExtensions(),
-                  collator).getStatus());
+                  collator)
+                  .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllSet" << k2Power53)),
                                            ExtensionsCallbackDisallowExtensions(),
-                                           collator).getStatus());
+                                           collator)
+                  .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllSet" << k2Power53 - 1)),
                                            ExtensionsCallbackDisallowExtensions(),
-                                           collator).getStatus());
+                                           collator)
+                  .getStatus());
 
     ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllClear" << 54)),
                                            ExtensionsCallbackDisallowExtensions(),
-                                           collator).getStatus());
+                                           collator)
+                  .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(
                   BSON("a" << BSON("$bitsAllClear" << std::numeric_limits<long long>::max())),
                   ExtensionsCallbackDisallowExtensions(),
-                  collator).getStatus());
+                  collator)
+                  .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllClear" << k2Power53)),
                                            ExtensionsCallbackDisallowExtensions(),
-                                           collator).getStatus());
+                                           collator)
+                  .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllClear" << k2Power53 - 1)),
                                            ExtensionsCallbackDisallowExtensions(),
-                                           collator).getStatus());
+                                           collator)
+                  .getStatus());
 
     ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnySet" << 54)),
                                            ExtensionsCallbackDisallowExtensions(),
-                                           collator).getStatus());
+                                           collator)
+                  .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(
                   BSON("a" << BSON("$bitsAnySet" << std::numeric_limits<long long>::max())),
                   ExtensionsCallbackDisallowExtensions(),
-                  collator).getStatus());
+                  collator)
+                  .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnySet" << k2Power53)),
                                            ExtensionsCallbackDisallowExtensions(),
-                                           collator).getStatus());
+                                           collator)
+                  .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnySet" << k2Power53 - 1)),
                                            ExtensionsCallbackDisallowExtensions(),
-                                           collator).getStatus());
+                                           collator)
+                  .getStatus());
 
     ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnyClear" << 54)),
                                            ExtensionsCallbackDisallowExtensions(),
-                                           collator).getStatus());
+                                           collator)
+                  .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(
                   BSON("a" << BSON("$bitsAnyClear" << std::numeric_limits<long long>::max())),
                   ExtensionsCallbackDisallowExtensions(),
-                  collator).getStatus());
+                  collator)
+                  .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnyClear" << k2Power53)),
                                            ExtensionsCallbackDisallowExtensions(),
-                                           collator).getStatus());
+                                           collator)
+                  .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnyClear" << k2Power53 - 1)),
                                            ExtensionsCallbackDisallowExtensions(),
-                                           collator).getStatus());
+                                           collator)
+                  .getStatus());
 }
 
 TEST(MatchExpressionParserTest, BitTestMatchExpressionValidArray) {
@@ -1263,63 +1357,79 @@ TEST(MatchExpressionParserTest, BitTestMatchExpressionValidArray) {
     const CollatorInterface* collator = nullptr;
     ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllSet" << BSON_ARRAY(0))),
                                            ExtensionsCallbackDisallowExtensions(),
-                                           collator).getStatus());
+                                           collator)
+                  .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(
                   BSON("a" << BSON("$bitsAllSet" << BSON_ARRAY(0 << 1 << 2 << 3))),
                   ExtensionsCallbackDisallowExtensions(),
-                  collator).getStatus());
+                  collator)
+                  .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllSet" << bsonArrayLongLong)),
                                            ExtensionsCallbackDisallowExtensions(),
-                                           collator).getStatus());
+                                           collator)
+                  .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(
                   BSON("a" << BSON("$bitsAllSet" << BSON_ARRAY(std::numeric_limits<int>::max()))),
                   ExtensionsCallbackDisallowExtensions(),
-                  collator).getStatus());
+                  collator)
+                  .getStatus());
 
     ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllClear" << BSON_ARRAY(0))),
                                            ExtensionsCallbackDisallowExtensions(),
-                                           collator).getStatus());
+                                           collator)
+                  .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(
                   BSON("a" << BSON("$bitsAllClear" << BSON_ARRAY(0 << 1 << 2 << 3))),
                   ExtensionsCallbackDisallowExtensions(),
-                  collator).getStatus());
+                  collator)
+                  .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllClear" << bsonArrayLongLong)),
                                            ExtensionsCallbackDisallowExtensions(),
-                                           collator).getStatus());
+                                           collator)
+                  .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(
                   BSON("a" << BSON("$bitsAllClear" << BSON_ARRAY(std::numeric_limits<int>::max()))),
                   ExtensionsCallbackDisallowExtensions(),
-                  collator).getStatus());
+                  collator)
+                  .getStatus());
 
     ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnySet" << BSON_ARRAY(0))),
                                            ExtensionsCallbackDisallowExtensions(),
-                                           collator).getStatus());
+                                           collator)
+                  .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(
                   BSON("a" << BSON("$bitsAnySet" << BSON_ARRAY(0 << 1 << 2 << 3))),
                   ExtensionsCallbackDisallowExtensions(),
-                  collator).getStatus());
+                  collator)
+                  .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnySet" << bsonArrayLongLong)),
                                            ExtensionsCallbackDisallowExtensions(),
-                                           collator).getStatus());
+                                           collator)
+                  .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(
                   BSON("a" << BSON("$bitsAnySet" << BSON_ARRAY(std::numeric_limits<int>::max()))),
                   ExtensionsCallbackDisallowExtensions(),
-                  collator).getStatus());
+                  collator)
+                  .getStatus());
 
     ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnyClear" << BSON_ARRAY(0))),
                                            ExtensionsCallbackDisallowExtensions(),
-                                           collator).getStatus());
+                                           collator)
+                  .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(
                   BSON("a" << BSON("$bitsAnyClear" << BSON_ARRAY(0 << 1 << 2 << 3))),
                   ExtensionsCallbackDisallowExtensions(),
-                  collator).getStatus());
+                  collator)
+                  .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnyClear" << bsonArrayLongLong)),
                                            ExtensionsCallbackDisallowExtensions(),
-                                           collator).getStatus());
+                                           collator)
+                  .getStatus());
     ASSERT_OK(MatchExpressionParser::parse(
                   BSON("a" << BSON("$bitsAnyClear" << BSON_ARRAY(std::numeric_limits<int>::max()))),
                   ExtensionsCallbackDisallowExtensions(),
-                  collator).getStatus());
+                  collator)
+                  .getStatus());
 }
 
 TEST(MatchExpressionParserTest, BitTestMatchExpressionValidBinData) {
@@ -1328,94 +1438,117 @@ TEST(MatchExpressionParserTest, BitTestMatchExpressionValidBinData) {
         MatchExpressionParser::parse(
             fromjson("{a: {$bitsAllSet: {$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}}"),
             ExtensionsCallbackDisallowExtensions(),
-            collator).getStatus());
+            collator)
+            .getStatus());
 
     ASSERT_OK(
         MatchExpressionParser::parse(
             fromjson(
                 "{a: {$bitsAllClear: {$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}}"),
             ExtensionsCallbackDisallowExtensions(),
-            collator).getStatus());
+            collator)
+            .getStatus());
 
     ASSERT_OK(
         MatchExpressionParser::parse(
             fromjson("{a: {$bitsAnySet: {$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}}"),
             ExtensionsCallbackDisallowExtensions(),
-            collator).getStatus());
+            collator)
+            .getStatus());
 
     ASSERT_OK(
         MatchExpressionParser::parse(
             fromjson(
                 "{a: {$bitsAnyClear: {$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}}"),
             ExtensionsCallbackDisallowExtensions(),
-            collator).getStatus());
+            collator)
+            .getStatus());
 }
 
 TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidMaskType) {
     const CollatorInterface* collator = nullptr;
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: null}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: true}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: {}}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: ''}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
 
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: null}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: true}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: {}}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: ''}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(
                       fromjson("{a: {$bitsAllClear: ObjectId('000000000000000000000000')}}"),
                       ExtensionsCallbackDisallowExtensions(),
-                      collator).getStatus());
+                      collator)
+                      .getStatus());
 
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: null}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: true}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: {}}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: ''}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(
                       fromjson("{a: {$bitsAnySet: ObjectId('000000000000000000000000')}}"),
                       ExtensionsCallbackDisallowExtensions(),
-                      collator).getStatus());
+                      collator)
+                      .getStatus());
 
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: null}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: true}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: {}}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: ''}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(
                       fromjson("{a: {$bitsAnyClear: ObjectId('000000000000000000000000')}}"),
                       ExtensionsCallbackDisallowExtensions(),
-                      collator).getStatus());
+                      collator)
+                      .getStatus());
 }
 
 TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidMaskValue) {
@@ -1424,296 +1557,376 @@ TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidMaskValue) {
     const CollatorInterface* collator = nullptr;
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: NaN}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: -54}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(
                       BSON("a" << BSON("$bitsAllSet" << std::numeric_limits<double>::max())),
                       ExtensionsCallbackDisallowExtensions(),
-                      collator).getStatus());
+                      collator)
+                      .getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllSet" << kLongLongMaxAsDouble)),
                                      ExtensionsCallbackDisallowExtensions(),
-                                     collator).getStatus());
+                                     collator)
+            .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: 2.5}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
 
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: NaN}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: -54}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(
                       BSON("a" << BSON("$bitsAllClear" << std::numeric_limits<double>::max())),
                       ExtensionsCallbackDisallowExtensions(),
-                      collator).getStatus());
+                      collator)
+                      .getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllClear" << kLongLongMaxAsDouble)),
                                      ExtensionsCallbackDisallowExtensions(),
-                                     collator).getStatus());
+                                     collator)
+            .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: 2.5}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
 
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: NaN}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: -54}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(
                       BSON("a" << BSON("$bitsAnySet" << std::numeric_limits<double>::max())),
                       ExtensionsCallbackDisallowExtensions(),
-                      collator).getStatus());
+                      collator)
+                      .getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnySet" << kLongLongMaxAsDouble)),
                                      ExtensionsCallbackDisallowExtensions(),
-                                     collator).getStatus());
+                                     collator)
+            .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: 2.5}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
 
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: NaN}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: -54}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(
                       BSON("a" << BSON("$bitsAnyClear" << std::numeric_limits<double>::max())),
                       ExtensionsCallbackDisallowExtensions(),
-                      collator).getStatus());
+                      collator)
+                      .getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnyClear" << kLongLongMaxAsDouble)),
                                      ExtensionsCallbackDisallowExtensions(),
-                                     collator).getStatus());
+                                     collator)
+            .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: 2.5}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
 }
 
 TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidArray) {
     const CollatorInterface* collator = nullptr;
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [null]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [true]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: ['']}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [{}]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [[]]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [-1]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [2.5]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
             fromjson(
                 "{a: {$bitsAllSet: [{$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}]}}"),
             ExtensionsCallbackDisallowExtensions(),
-            collator).getStatus());
+            collator)
+            .getStatus());
 
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [null]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [true]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: ['']}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [{}]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [[]]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [-1]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [2.5]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
             fromjson(
                 "{a: {$bitsAllClear: [{$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}]}}"),
             ExtensionsCallbackDisallowExtensions(),
-            collator).getStatus());
+            collator)
+            .getStatus());
 
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [null]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [true]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: ['']}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [{}]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [[]]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [-1]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [2.5]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
             fromjson(
                 "{a: {$bitsAnySet: [{$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}]}}"),
             ExtensionsCallbackDisallowExtensions(),
-            collator).getStatus());
+            collator)
+            .getStatus());
 
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [null]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [true]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: ['']}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [{}]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [[]]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [-1]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [2.5]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
             fromjson(
                 "{a: {$bitsAnyClear: [{$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}]}}"),
             ExtensionsCallbackDisallowExtensions(),
-            collator).getStatus());
+            collator)
+            .getStatus());
 }
 
 TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidArrayValue) {
     const CollatorInterface* collator = nullptr;
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [-54]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [NaN]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [2.5]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [1e100]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [-1e100]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
             BSON("a" << BSON("$bitsAllSet" << BSON_ARRAY(std::numeric_limits<long long>::max()))),
             ExtensionsCallbackDisallowExtensions(),
-            collator).getStatus());
+            collator)
+            .getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
             BSON("a" << BSON("$bitsAllSet" << BSON_ARRAY(std::numeric_limits<long long>::min()))),
             ExtensionsCallbackDisallowExtensions(),
-            collator).getStatus());
+            collator)
+            .getStatus());
 
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [-54]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [NaN]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [2.5]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [1e100]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [-1e100]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
             BSON("a" << BSON("$bitsAllClear" << BSON_ARRAY(std::numeric_limits<long long>::max()))),
             ExtensionsCallbackDisallowExtensions(),
-            collator).getStatus());
+            collator)
+            .getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
             BSON("a" << BSON("$bitsAllClear" << BSON_ARRAY(std::numeric_limits<long long>::min()))),
             ExtensionsCallbackDisallowExtensions(),
-            collator).getStatus());
+            collator)
+            .getStatus());
 
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [-54]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [NaN]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [2.5]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [1e100]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [-1e100]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
             BSON("a" << BSON("$bitsAnySet" << BSON_ARRAY(std::numeric_limits<long long>::max()))),
             ExtensionsCallbackDisallowExtensions(),
-            collator).getStatus());
+            collator)
+            .getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
             BSON("a" << BSON("$bitsAnySet" << BSON_ARRAY(std::numeric_limits<long long>::min()))),
             ExtensionsCallbackDisallowExtensions(),
-            collator).getStatus());
+            collator)
+            .getStatus());
 
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [-54]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [NaN]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [2.5]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [1e100]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [-1e100]}}"),
                                                ExtensionsCallbackDisallowExtensions(),
-                                               collator).getStatus());
+                                               collator)
+                      .getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
             BSON("a" << BSON("$bitsAnyClear" << BSON_ARRAY(std::numeric_limits<long long>::max()))),
             ExtensionsCallbackDisallowExtensions(),
-            collator).getStatus());
+            collator)
+            .getStatus());
     ASSERT_NOT_OK(
         MatchExpressionParser::parse(
             BSON("a" << BSON("$bitsAnyClear" << BSON_ARRAY(std::numeric_limits<long long>::min()))),
             ExtensionsCallbackDisallowExtensions(),
-            collator).getStatus());
+            collator)
+            .getStatus());
 }
 }

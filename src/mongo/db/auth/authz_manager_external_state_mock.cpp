@@ -77,7 +77,8 @@ void addPrivilegeObjectsOrWarningsToArrayElement(mutablebson::Element privileges
                         std::string(mongoutils::str::stream()
                                     << "Skipped privileges on resource "
                                     << privileges[i].getResourcePattern().toString()
-                                    << ". Reason: " << errmsg)));
+                                    << ". Reason: "
+                                    << errmsg)));
         }
     }
 }

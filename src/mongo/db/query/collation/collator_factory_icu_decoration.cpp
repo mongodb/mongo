@@ -37,9 +37,8 @@ namespace mongo {
 
 namespace {
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(CreateCollatorFactory,
-                                     ("SetGlobalEnvironment",
-                                      "LoadICUData"))(InitializerContext* context) {
+MONGO_INITIALIZER_WITH_PREREQUISITES(CreateCollatorFactory, ("SetGlobalEnvironment", "LoadICUData"))
+(InitializerContext* context) {
     CollatorFactoryInterface::set(getGlobalServiceContext(),
                                   stdx::make_unique<CollatorFactoryICU>());
     return Status::OK();

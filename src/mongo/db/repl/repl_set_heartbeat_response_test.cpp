@@ -713,7 +713,8 @@ TEST(ReplSetHeartbeatResponse, InitializeHeartbeatMeessageWrongType) {
     ReplSetHeartbeatResponse hbResponse;
     BSONObj initializerObj =
         BSON("ok" << 1.0 << "v" << 2 <<  // needs a version to get this far in initialize()
-             "hbmsg" << 4);
+             "hbmsg"
+                  << 4);
     Status result = hbResponse.initialize(initializerObj, 0);
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
     ASSERT_EQUALS(
@@ -726,7 +727,8 @@ TEST(ReplSetHeartbeatResponse, InitializeSyncingToWrongType) {
     ReplSetHeartbeatResponse hbResponse;
     BSONObj initializerObj =
         BSON("ok" << 1.0 << "v" << 2 <<  // needs a version to get this far in initialize()
-             "syncingTo" << 4);
+             "syncingTo"
+                  << 4);
     Status result = hbResponse.initialize(initializerObj, 0);
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
     ASSERT_EQUALS(
@@ -739,7 +741,8 @@ TEST(ReplSetHeartbeatResponse, InitializeConfigWrongType) {
     ReplSetHeartbeatResponse hbResponse;
     BSONObj initializerObj =
         BSON("ok" << 1.0 << "v" << 2 <<  // needs a version to get this far in initialize()
-             "config" << 4);
+             "config"
+                  << 4);
     Status result = hbResponse.initialize(initializerObj, 0);
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
     ASSERT_EQUALS(
@@ -752,7 +755,8 @@ TEST(ReplSetHeartbeatResponse, InitializeBadConfig) {
     ReplSetHeartbeatResponse hbResponse;
     BSONObj initializerObj =
         BSON("ok" << 1.0 << "v" << 2 <<  // needs a version to get this far in initialize()
-             "config" << BSON("illegalFieldName" << 2));
+             "config"
+                  << BSON("illegalFieldName" << 2));
     Status result = hbResponse.initialize(initializerObj, 0);
     ASSERT_EQUALS(ErrorCodes::BadValue, result);
     ASSERT_EQUALS("Unexpected field illegalFieldName in replica set configuration",

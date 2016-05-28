@@ -143,7 +143,9 @@ bool MessagingPort::recv(Message& m) {
             LOG(_psock->getLogLevel()) << msg;
             std::stringstream ss;
             ss << "HTTP/1.0 200 OK\r\nConnection: close\r\nContent-Type: "
-                  "text/plain\r\nContent-Length: " << msg.size() << "\r\n\r\n" << msg;
+                  "text/plain\r\nContent-Length: "
+               << msg.size() << "\r\n\r\n"
+               << msg;
             string s = ss.str();
             send(s.c_str(), s.size(), "http");
             return false;

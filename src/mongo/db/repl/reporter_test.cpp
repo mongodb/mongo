@@ -32,8 +32,8 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/reporter.h"
 #include "mongo/db/repl/update_position_args.h"
-#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/task_executor_proxy.h"
 #include "mongo/unittest/unittest.h"
@@ -370,7 +370,8 @@ TEST_F(ReporterTestNoTriggerAtSetUp,
     processNetworkResponse(BSON("ok" << 0 << "code" << int(ErrorCodes::InvalidReplicaSetConfig)
                                      << "errmsg"
                                      << "newer config"
-                                     << "configVersion" << 100));
+                                     << "configVersion"
+                                     << 100));
 
     ASSERT_EQUALS(Status(ErrorCodes::InvalidReplicaSetConfig, "invalid config"), reporter->join());
     assertReporterDone();
@@ -389,7 +390,8 @@ TEST_F(ReporterTest, InvalidReplicaSetResponseWithSameConfigVersionOnSyncTargetS
     processNetworkResponse(BSON("ok" << 0 << "code" << int(ErrorCodes::InvalidReplicaSetConfig)
                                      << "errmsg"
                                      << "invalid config"
-                                     << "configVersion" << posUpdater->getConfigVersion()));
+                                     << "configVersion"
+                                     << posUpdater->getConfigVersion()));
 
     ASSERT_EQUALS(Status(ErrorCodes::InvalidReplicaSetConfig, "invalid config"), reporter->join());
     assertReporterDone();
@@ -406,7 +408,8 @@ TEST_F(
     processNetworkResponse(BSON("ok" << 0 << "code" << int(ErrorCodes::InvalidReplicaSetConfig)
                                      << "errmsg"
                                      << "newer config"
-                                     << "configVersion" << posUpdater->getConfigVersion() + 1));
+                                     << "configVersion"
+                                     << posUpdater->getConfigVersion() + 1));
 
     ASSERT_TRUE(reporter->isActive());
 }
@@ -430,7 +433,8 @@ TEST_F(
     commandRequest = processNetworkResponse(
         BSON("ok" << 0 << "code" << int(ErrorCodes::InvalidReplicaSetConfig) << "errmsg"
                   << "newer config"
-                  << "configVersion" << posUpdater->getConfigVersion() + 1));
+                  << "configVersion"
+                  << posUpdater->getConfigVersion() + 1));
     ASSERT_EQUALS(expectedOldStyleCommandRequest, commandRequest);
 
     ASSERT_TRUE(reporter->isActive());
@@ -526,7 +530,7 @@ TEST_F(ReporterTestNoTriggerAtSetUp, CommandPreparationFailureStopsTheReporter) 
     Status expectedStatus(ErrorCodes::UnknownError, "unknown error");
     prepareReplSetUpdatePositionCommandFn =
         [expectedStatus](ReplicationCoordinator::ReplSetUpdatePositionCommandStyle commandStyle)
-            -> StatusWith<BSONObj> { return expectedStatus; };
+        -> StatusWith<BSONObj> { return expectedStatus; };
     ASSERT_OK(reporter->trigger());
 
     ASSERT_EQUALS(expectedStatus, reporter->join());
@@ -544,7 +548,7 @@ TEST_F(ReporterTest, CommandPreparationFailureDuringRescheduleStopsTheReporter) 
     Status expectedStatus(ErrorCodes::UnknownError, "unknown error");
     prepareReplSetUpdatePositionCommandFn =
         [expectedStatus](ReplicationCoordinator::ReplSetUpdatePositionCommandStyle commandStyle)
-            -> StatusWith<BSONObj> { return expectedStatus; };
+        -> StatusWith<BSONObj> { return expectedStatus; };
 
     processNetworkResponse(BSON("ok" << 1));
 
@@ -704,7 +708,7 @@ TEST_F(ReporterTest, KeepAliveTimeoutFailingToScheduleRemoteCommandShouldMakeRep
     Status expectedStatus(ErrorCodes::UnknownError, "failed to prepare update command");
     prepareReplSetUpdatePositionCommandFn =
         [expectedStatus](ReplicationCoordinator::ReplSetUpdatePositionCommandStyle commandStyle)
-            -> StatusWith<BSONObj> { return expectedStatus; };
+        -> StatusWith<BSONObj> { return expectedStatus; };
 
     runUntil(until);
 

@@ -131,9 +131,9 @@ TEST(CollectionOptions, InvalidStorageEngineField) {
 
 TEST(CollectionOptions, ParseEngineField) {
     CollectionOptions opts;
-    ASSERT_OK(opts.parse(fromjson(
-        "{unknownField: 1, "
-        "storageEngine: {storageEngine1: {x: 1, y: 2}, storageEngine2: {a: 1, b:2}}}")));
+    ASSERT_OK(opts.parse(
+        fromjson("{unknownField: 1, "
+                 "storageEngine: {storageEngine1: {x: 1, y: 2}, storageEngine2: {a: 1, b:2}}}")));
     checkRoundTrip(opts);
 
     // Unrecognized field should not be present in BSON representation.

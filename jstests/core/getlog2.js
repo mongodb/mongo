@@ -26,15 +26,14 @@ if (db.isMaster().msg != "isdbgrid") {
     });
 
     // run a slow update
-    glcol.update(
-        {
-          "SENTINEL": 1,
-          "$where": function() {
-              sleep(1000);
-              return true;
-          }
-        },
-        {"x": "x"});
+    glcol.update({
+        "SENTINEL": 1,
+        "$where": function() {
+            sleep(1000);
+            return true;
+        }
+    },
+                 {"x": "x"});
 
     var resp = db.adminCommand({getLog: "global"});
     assert(resp.ok == 1, "error executing getLog command");
@@ -42,21 +41,19 @@ if (db.isMaster().msg != "isdbgrid") {
     assert(resp.log.length > 0, "no log lines");
 
     // ensure that slow query is logged in detail
-    assert(contains(resp.log,
-                    function(v) {
-                        print(v);
-                        var opString = db.getMongo().useReadCommands() ? " find " : " query ";
-                        var filterString = db.getMongo().useReadCommands() ? "filter:" : "query:";
-                        return v.indexOf(opString) != -1 && v.indexOf(filterString) != -1 &&
-                            v.indexOf("keysExamined:") != -1 && v.indexOf("docsExamined:") != -1 &&
-                            v.indexOf("SENTINEL") != -1;
-                    }));
+    assert(contains(resp.log, function(v) {
+        print(v);
+        var opString = db.getMongo().useReadCommands() ? " find " : " query ";
+        var filterString = db.getMongo().useReadCommands() ? "filter:" : "query:";
+        return v.indexOf(opString) != -1 && v.indexOf(filterString) != -1 &&
+            v.indexOf("keysExamined:") != -1 && v.indexOf("docsExamined:") != -1 &&
+            v.indexOf("SENTINEL") != -1;
+    }));
 
     // same, but for update
-    assert(contains(resp.log,
-                    function(v) {
-                        return v.indexOf(" update ") != -1 && v.indexOf("query") != -1 &&
-                            v.indexOf("keysExamined:") != -1 && v.indexOf("docsExamined:") != -1 &&
-                            v.indexOf("SENTINEL") != -1;
-                    }));
+    assert(contains(resp.log, function(v) {
+        return v.indexOf(" update ") != -1 && v.indexOf("query") != -1 &&
+            v.indexOf("keysExamined:") != -1 && v.indexOf("docsExamined:") != -1 &&
+            v.indexOf("SENTINEL") != -1;
+    }));
 }

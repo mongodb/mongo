@@ -56,7 +56,7 @@ namespace mongo {
 
 class Accumulator : public RefCountable {
 public:
-    using Factory = boost::intrusive_ptr<Accumulator>(*)();
+    using Factory = boost::intrusive_ptr<Accumulator> (*)();
 
     Accumulator() = default;
 

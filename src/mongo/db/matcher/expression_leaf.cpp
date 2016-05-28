@@ -31,11 +31,11 @@
 #include "mongo/db/matcher/expression_leaf.h"
 
 #include <cmath>
-#include <unordered_map>
 #include <pcrecpp.h>
+#include <unordered_map>
 
-#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/config.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/jsobj.h"

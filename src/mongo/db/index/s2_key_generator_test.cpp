@@ -33,8 +33,8 @@
 #include "mongo/db/index/expression_keys_private.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/index/s2_common.h"
 #include "mongo/db/index/expression_params.h"
+#include "mongo/db/index/s2_common.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
@@ -67,7 +67,8 @@ bool assertKeysetsEqual(const BSONObjSet& expectedKeys, const BSONObjSet& actual
 long long getCellID(int x, int y) {
     BSONObj obj = BSON("a" << BSON("type"
                                    << "Point"
-                                   << "coordinates" << BSON_ARRAY(x << y)));
+                                   << "coordinates"
+                                   << BSON_ARRAY(x << y)));
     BSONObj keyPattern = fromjson("{a: '2dsphere'}");
     BSONObj infoObj = fromjson("{key: {a: '2dsphere'}, '2dsphereIndexVersion': 3}");
     S2IndexingParams params;
@@ -109,7 +110,8 @@ TEST(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldBeforeGeoField) {
     BSONObjSet expectedKeys;
     expectedKeys.insert(BSON(""
                              << "gnirts"
-                             << "" << getCellID(0, 0)));
+                             << ""
+                             << getCellID(0, 0)));
 
     ASSERT(assertKeysetsEqual(expectedKeys, actualKeys));
 }
@@ -127,7 +129,9 @@ TEST(S2KeyGeneratorTest, CollationAppliedToAllNonGeoStringFields) {
     BSONObjSet expectedKeys;
     expectedKeys.insert(BSON(""
                              << "gnirts"
-                             << "" << getCellID(0, 0) << ""
+                             << ""
+                             << getCellID(0, 0)
+                             << ""
                              << "2gnirts"));
 
     ASSERT(assertKeysetsEqual(expectedKeys, actualKeys));

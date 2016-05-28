@@ -70,14 +70,8 @@
     }
 
     function test(userName) {
-        var user = {
-            user: userName,
-            db: dbName
-        };
-        var role = {
-            role: "root",
-            db: "admin"
-        };
+        var user = {user: userName, db: dbName};
+        var role = {role: "root", db: "admin"};
         myDB.createUser({user: userName, pwd: "weak password", roles: [role]});
         myDB.auth(userName, "weak password");
 

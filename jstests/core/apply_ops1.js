@@ -156,10 +156,7 @@
     assert.eq(1, t.find().count(), "Duplicate insert failed");
     assert.eq(true, a.results[0], "Bad result value for duplicate insert");
 
-    var o = {
-        _id: 5,
-        x: 17
-    };
+    var o = {_id: 5, x: 17};
     assert.eq(o, t.findOne(), "Mismatching document inserted.");
 
     var res = db.runCommand({
@@ -243,8 +240,9 @@
     res = t.getIndexes();
     assert.eq(1,
               res.filter(function(element, index, array) {
-                  return element.name == 'a_1';
-              }).length,
+                     return element.name == 'a_1';
+                 })
+                  .length,
               'Foreground index not found in listIndexes result: ' + tojson(res));
 
     // Background indexes are created in the foreground when processed by applyOps.
@@ -265,7 +263,8 @@
     res = t.getIndexes();
     assert.eq(1,
               res.filter(function(element, index, array) {
-                  return element.name == 'b_1';
-              }).length,
+                     return element.name == 'b_1';
+                 })
+                  .length,
               'Background index not found in listIndexes result: ' + tojson(res));
 })();

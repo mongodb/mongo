@@ -28,10 +28,10 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/master_slave.h"  // replSettings
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/operation_context.h"
 
 namespace mongo {
 

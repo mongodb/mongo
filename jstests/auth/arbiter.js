@@ -19,16 +19,9 @@ replTest.initiate({
 var primaryAdmin = replTest.nodes[0].getDB("admin");
 var arbiterAdmin = replTest.nodes[2].getDB("admin");
 
-var cmd0 = {
-    getCmdLineOpts: 1
-};
-var cmd1 = {
-    getParameter: 1,
-    logLevel: 1
-};
-var cmd2 = {
-    serverStatus: 1
-};
+var cmd0 = {getCmdLineOpts: 1};
+var cmd1 = {getParameter: 1, logLevel: 1};
+var cmd2 = {serverStatus: 1};
 
 assert.commandFailedWithCode(primaryAdmin.runCommand(cmd0), 13);
 assert.commandFailedWithCode(primaryAdmin.runCommand(cmd1), 13);

@@ -13,10 +13,7 @@ if (/V8/.test(interpreterVersion()) && db.runCommand({buildinfo: 1}).javascriptE
         var tid = tid || 0;
         var threadStart = new Date();
         job(tid);
-        return {
-            "threadStart": threadStart,
-            "threadEnd": new Date()
-        };
+        return {"threadStart": threadStart, "threadEnd": new Date()};
     };
 
     // function timeMultipleThreads

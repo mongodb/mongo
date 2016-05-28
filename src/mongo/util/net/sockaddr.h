@@ -32,10 +32,10 @@
 
 #ifndef _WIN32
 
+#include <errno.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/un.h>
-#include <errno.h>
 
 #ifdef __OpenBSD__
 #include <sys/uio.h>

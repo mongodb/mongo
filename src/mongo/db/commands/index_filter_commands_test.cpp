@@ -308,13 +308,13 @@ TEST(IndexFilterCommandsTest, SetAndClearFilters) {
     addQueryShapeToPlanCache(txn.get(), &planCache, "{a: 1, b: 1}", "{a: -1}", "{_id: 0, a: 1}");
     ASSERT_TRUE(planCacheContains(planCache, "{a: 1, b: 1}", "{a: -1}", "{_id: 0, a: 1}"));
 
-    ASSERT_OK(SetFilter::set(txn.get(),
-                             &querySettings,
-                             &planCache,
-                             nss.ns(),
-                             fromjson(
-                                 "{query: {a: 1, b: 1}, sort: {a: -1}, projection: {_id: 0, a: 1}, "
-                                 "indexes: [{a: 1}]}")));
+    ASSERT_OK(
+        SetFilter::set(txn.get(),
+                       &querySettings,
+                       &planCache,
+                       nss.ns(),
+                       fromjson("{query: {a: 1, b: 1}, sort: {a: -1}, projection: {_id: 0, a: 1}, "
+                                "indexes: [{a: 1}]}")));
     vector<BSONObj> filters = getFilters(querySettings);
     ASSERT_EQUALS(filters.size(), 1U);
 
@@ -328,13 +328,13 @@ TEST(IndexFilterCommandsTest, SetAndClearFilters) {
 
     // Replacing the hint for the same query shape ({a: 1, b: 1} and {b: 2, a: 3}
     // share same shape) should not change the query settings size.
-    ASSERT_OK(SetFilter::set(txn.get(),
-                             &querySettings,
-                             &planCache,
-                             nss.ns(),
-                             fromjson(
-                                 "{query: {b: 2, a: 3}, sort: {a: -1}, projection: {_id: 0, a: 1}, "
-                                 "indexes: [{a: 1, b: 1}]}")));
+    ASSERT_OK(
+        SetFilter::set(txn.get(),
+                       &querySettings,
+                       &planCache,
+                       nss.ns(),
+                       fromjson("{query: {b: 2, a: 3}, sort: {a: -1}, projection: {_id: 0, a: 1}, "
+                                "indexes: [{a: 1, b: 1}]}")));
     filters = getFilters(querySettings);
     ASSERT_EQUALS(filters.size(), 1U);
 

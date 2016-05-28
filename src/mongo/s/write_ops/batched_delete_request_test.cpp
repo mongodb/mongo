@@ -46,10 +46,10 @@ TEST(BatchedDeleteRequest, Basic) {
         BSON(BatchedDeleteDocument::query(BSON("a" << 1)) << BatchedDeleteDocument::limit(1))
         << BSON(BatchedDeleteDocument::query(BSON("b" << 1)) << BatchedDeleteDocument::limit(1)));
 
-    BSONObj origDeleteRequestObj = BSON(BatchedDeleteRequest::collName("test")
-                                        << BatchedDeleteRequest::deletes() << deleteArray
-                                        << BatchedDeleteRequest::writeConcern(BSON("w" << 1))
-                                        << BatchedDeleteRequest::ordered(true));
+    BSONObj origDeleteRequestObj = BSON(
+        BatchedDeleteRequest::collName("test") << BatchedDeleteRequest::deletes() << deleteArray
+                                               << BatchedDeleteRequest::writeConcern(BSON("w" << 1))
+                                               << BatchedDeleteRequest::ordered(true));
 
     string errMsg;
     BatchedDeleteRequest request;

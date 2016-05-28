@@ -4,12 +4,8 @@
 var t = db.jstests_geo_s2explain;
 t.drop();
 
-var point1 = {
-    loc: {type: "Point", coordinates: [10, 10]}
-};
-var point2 = {
-    loc: {type: "Point", coordinates: [10.001, 10]}
-};
+var point1 = {loc: {type: "Point", coordinates: [10, 10]}};
+var point2 = {loc: {type: "Point", coordinates: [10.001, 10]}};
 assert.writeOK(t.insert([point1, point2]));
 
 assert.commandWorked(t.ensureIndex({loc: "2dsphere"}));

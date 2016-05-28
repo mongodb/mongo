@@ -17,9 +17,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and testExp
             var start = indexOfSpec.length > 2 ? indexOfSpec[2] : 0;
             // Use $strLenBytes because JavaScript's length property is based off of UTF-16, not the
             // actual number of bytes.
-            var end = indexOfSpec.length > 3 ? indexOfSpec[3] : {
-                $strLenBytes: input
-            };
+            var end = indexOfSpec.length > 3 ? indexOfSpec[3] : {$strLenBytes: input};
 
             var substrExpr = {
                 $indexOfBytes: [{$substrBytes: [input, start, {$subtract: [end, start]}]}, token]
@@ -127,23 +125,15 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and testExp
     };
     assertErrorCode(coll, pipeline, 40092);
 
-    pipeline = {
-        $project: {output: {$indexOfBytes: ["abc", "b", "bad"]}}
-    };
+    pipeline = {$project: {output: {$indexOfBytes: ["abc", "b", "bad"]}}};
     assertErrorCode(coll, pipeline, 40096);
 
-    pipeline = {
-        $project: {output: {$indexOfBytes: ["abc", "b", 0, "bad"]}}
-    };
+    pipeline = {$project: {output: {$indexOfBytes: ["abc", "b", 0, "bad"]}}};
     assertErrorCode(coll, pipeline, 40096);
 
-    pipeline = {
-        $project: {output: {$indexOfBytes: ["abc", "b", -1]}}
-    };
+    pipeline = {$project: {output: {$indexOfBytes: ["abc", "b", -1]}}};
     assertErrorCode(coll, pipeline, 40097);
 
-    pipeline = {
-        $project: {output: {$indexOfBytes: ["abc", "b", 1, -1]}}
-    };
+    pipeline = {$project: {output: {$indexOfBytes: ["abc", "b", 1, -1]}}};
     assertErrorCode(coll, pipeline, 40097);
 }());

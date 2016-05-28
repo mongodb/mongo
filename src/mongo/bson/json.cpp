@@ -76,9 +76,9 @@ enum {
     DATE_RESERVE_SIZE = 64
 };
 
-static const char* LBRACE = "{", * RBRACE = "}", * LBRACKET = "[", * RBRACKET = "]", * LPAREN = "(",
-                   * RPAREN = ")", * COLON = ":", * COMMA = ",", * FORWARDSLASH = "/",
-                   * SINGLEQUOTE = "'", * DOUBLEQUOTE = "\"";
+static const char *LBRACE = "{", *RBRACE = "}", *LBRACKET = "[", *RBRACKET = "]", *LPAREN = "(",
+                  *RPAREN = ")", *COLON = ":", *COMMA = ",", *FORWARDSLASH = "/",
+                  *SINGLEQUOTE = "'", *DOUBLEQUOTE = "\"";
 
 JParse::JParse(StringData str)
     : _buf(str.rawData()), _input(_buf), _input_end(_input + str.size()) {}

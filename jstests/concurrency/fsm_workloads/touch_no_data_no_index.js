@@ -10,22 +10,16 @@
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/touch_base.js');  // for $config
 
-var $config =
-    extendWorkload($config,
-                   function($config, $super) {
-                       $config.data.generateTouchCmdObj = function generateTouchCmdObj(collName) {
-                           return {
-                               touch: collName,
-                               data: false,
-                               index: false
-                           };
-                       };
+var $config = extendWorkload($config, function($config, $super) {
+    $config.data.generateTouchCmdObj = function generateTouchCmdObj(collName) {
+        return {touch: collName, data: false, index: false};
+    };
 
-                       $config.states.touch = function touch(db, collName) {
-                           var res = db.runCommand(this.generateTouchCmdObj(collName));
-                           // The command always fails because "index" and "data" are both false
-                           assertAlways.commandFailed(res);
-                       };
+    $config.states.touch = function touch(db, collName) {
+        var res = db.runCommand(this.generateTouchCmdObj(collName));
+        // The command always fails because "index" and "data" are both false
+        assertAlways.commandFailed(res);
+    };
 
-                       return $config;
-                   });
+    return $config;
+});

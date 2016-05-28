@@ -25,23 +25,23 @@
 
         function checkOutput() {
             var logContents = "";
-            assert.soon(() =>
-                        {
-                            logContents = rawMongoProgramOutput();
-                            return matchFn(logContents);
-                        },
-                        function() {
-                            // We can't just return a string because it will be well over the max
-                            // line length.
-                            // So we just print manually.
-                            print("================ BEGIN LOG CONTENTS ==================");
-                            logContents.split(/\n/).forEach((line) => {
-                                print(line);
-                            });
-                            print("================ END LOG CONTENTS =====================");
-                            return "";
-                        },
-                        30000);
+            assert.soon(
+                () => {
+                    logContents = rawMongoProgramOutput();
+                    return matchFn(logContents);
+                },
+                function() {
+                    // We can't just return a string because it will be well over the max
+                    // line length.
+                    // So we just print manually.
+                    print("================ BEGIN LOG CONTENTS ==================");
+                    logContents.split(/\n/).forEach((line) => {
+                        print(line);
+                    });
+                    print("================ END LOG CONTENTS =====================");
+                    return "";
+                },
+                30000);
         }
 
         try {
@@ -55,12 +55,9 @@
     function runAllTests(launcher) {
         const SIGSEGV = 11;
         const SIGABRT = 6;
-        testShutdownLogging(launcher,
-                            function(conn) {
-                                conn.getDB('admin').shutdownServer();
-                            },
-                            makeRegExMatchFn(/shutdown command received/),
-                            MongoRunner.EXIT_CLEAN);
+        testShutdownLogging(launcher, function(conn) {
+            conn.getDB('admin').shutdownServer();
+        }, makeRegExMatchFn(/shutdown command received/), MongoRunner.EXIT_CLEAN);
 
         testShutdownLogging(launcher,
                             makeShutdownByCrashFn('fault'),
@@ -88,9 +85,7 @@
 
         runAllTests({
             start: function(opts) {
-                var actualOpts = {
-                    nojournal: ""
-                };
+                var actualOpts = {nojournal: ""};
                 Object.extend(actualOpts, opts);
                 return MongoRunner.runMongod(actualOpts);
             },
@@ -105,9 +100,7 @@
         var st = new ShardingTest({shards: 1, other: {shardOptions: {nojournal: ""}}});
         var mongosLauncher = {
             start: function(opts) {
-                var actualOpts = {
-                    configdb: st._configDB
-                };
+                var actualOpts = {configdb: st._configDB};
                 Object.extend(actualOpts, opts);
                 return MongoRunner.runMongos(actualOpts);
             },

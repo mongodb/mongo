@@ -92,10 +92,7 @@ sh.shardCollection = function(fullName, key, unique) {
     assert(key, "need a key");
     assert(typeof(key) == "object", "key needs to be an object");
 
-    var cmd = {
-        shardCollection: fullName,
-        key: key
-    };
+    var cmd = {shardCollection: fullName, key: key};
     if (unique)
         cmd.unique = true;
 
@@ -356,9 +353,7 @@ sh._lastMigration = function(ns) {
         }
     }
 
-    var searchDoc = {
-        what: /^moveChunk/
-    };
+    var searchDoc = {what: /^moveChunk/};
     if (coll)
         searchDoc.ns = coll + "";
     if (dbase)
@@ -466,11 +461,7 @@ sh.getRecentFailedRounds = function(configDB) {
     if (configDB === undefined)
         configDB = db.getSiblingDB('config');
     var balErrs = configDB.actionlog.find({what: "balancer.round"}).sort({time: -1}).limit(5);
-    var result = {
-        count: 0,
-        lastErr: "",
-        lastTime: " "
-    };
+    var result = {count: 0, lastErr: "", lastTime: " "};
     if (balErrs != null) {
         balErrs.forEach(function(r) {
             if (r.details.errorOccured) {
@@ -494,41 +485,51 @@ sh.getRecentMigrations = function(configDB) {
     var yesterday = new Date(new Date() - 24 * 60 * 60 * 1000);
 
     // Successful migrations.
-    var result = configDB.changelog.aggregate([
-        {
-          $match: {
-              time: {$gt: yesterday},
-              what: "moveChunk.from", 'details.errmsg': {$exists: false}, 'details.note': 'success'
-          }
-        },
-        {$group: {_id: {msg: "$details.errmsg"}, count: {$sum: 1}}},
-        {$project: {_id: {$ifNull: ["$_id.msg", "Success"]}, count: "$count"}}
-    ]).toArray();
+    var result = configDB.changelog
+                     .aggregate([
+                         {
+                           $match: {
+                               time: {$gt: yesterday},
+                               what: "moveChunk.from",
+                               'details.errmsg': {$exists: false},
+                               'details.note': 'success'
+                           }
+                         },
+                         {$group: {_id: {msg: "$details.errmsg"}, count: {$sum: 1}}},
+                         {$project: {_id: {$ifNull: ["$_id.msg", "Success"]}, count: "$count"}}
+                     ])
+                     .toArray();
 
     // Failed migrations.
-    result = result.concat(configDB.changelog.aggregate([
-        {
-          $match: {
-              time: {$gt: yesterday},
-              what: "moveChunk.from",
-              $or: [{'details.errmsg': {$exists: true}}, {'details.note': {$ne: 'success'}}]
-          }
-        },
-        {
-          $group: {
-              _id: {msg: "$details.errmsg", from: "$details.from", to: "$details.to"},
-              count: {$sum: 1}
-          }
-        },
-        {
-          $project: {
-              _id: {$ifNull: ['$_id.msg', 'aborted']},
-              from: "$_id.from",
-              to: "$_id.to",
-              count: "$count"
-          }
-        }
-    ]).toArray());
+    result = result.concat(
+        configDB.changelog
+            .aggregate([
+                {
+                  $match: {
+                      time: {$gt: yesterday},
+                      what: "moveChunk.from",
+                      $or: [
+                          {'details.errmsg': {$exists: true}},
+                          {'details.note': {$ne: 'success'}}
+                      ]
+                  }
+                },
+                {
+                  $group: {
+                      _id: {msg: "$details.errmsg", from: "$details.from", to: "$details.to"},
+                      count: {$sum: 1}
+                  }
+                },
+                {
+                  $project: {
+                      _id: {$ifNull: ['$_id.msg', 'aborted']},
+                      from: "$_id.from",
+                      to: "$_id.to",
+                      count: "$count"
+                  }
+                }
+            ])
+            .toArray());
 
     return result;
 };
@@ -588,17 +589,16 @@ function printShardingStatus(configDB, verbose) {
         };
 
         if (verbose) {
-            configDB.mongos.find(recentMongosQuery)
-                .sort({ping: -1})
-                .forEach(function(z) {
-                    output("\t" + tojsononeline(z));
-                });
+            configDB.mongos.find(recentMongosQuery).sort({ping: -1}).forEach(function(z) {
+                output("\t" + tojsononeline(z));
+            });
         } else {
-            configDB.mongos.aggregate([
-                {$match: recentMongosQuery},
-                {$group: {_id: "$mongoVersion", num: {$sum: 1}}},
-                {$sort: {num: -1}}
-            ])
+            configDB.mongos
+                .aggregate([
+                    {$match: recentMongosQuery},
+                    {$group: {_id: "$mongoVersion", num: {$sum: 1}}},
+                    {$sort: {num: -1}}
+                ])
                 .forEach(function(z) {
                     output("\t" + tojson(z._id) + " : " + z.num);
                 });
@@ -733,12 +733,10 @@ function printShardingStatus(configDB, verbose) {
                                 "\t\t\ttoo many chunks to print, use verbose if you want to force print");
                         }
 
-                        configDB.tags.find({ns: coll._id})
-                            .sort({min: 1})
-                            .forEach(function(tag) {
-                                output("\t\t\t tag: " + tag.tag + "  " + tojson(tag.min) +
-                                       " -->> " + tojson(tag.max));
-                            });
+                        configDB.tags.find({ns: coll._id}).sort({min: 1}).forEach(function(tag) {
+                            output("\t\t\t tag: " + tag.tag + "  " + tojson(tag.min) + " -->> " +
+                                   tojson(tag.max));
+                        });
                     }
                 });
         }
@@ -783,23 +781,21 @@ function printShardingSizes(configDB) {
                 .sort({_id: 1})
                 .forEach(function(coll) {
                     output("\t\t" + coll._id + " chunks:");
-                    configDB.chunks.find({"ns": coll._id})
-                        .sort({min: 1})
-                        .forEach(function(chunk) {
-                            var mydb = shards[chunk.shard].getDB(db._id);
-                            var out = mydb.runCommand({
-                                dataSize: coll._id,
-                                keyPattern: coll.key,
-                                min: chunk.min,
-                                max: chunk.max
-                            });
-                            delete out.millis;
-                            delete out.ok;
-
-                            output("\t\t\t" + tojson(chunk.min) + " -->> " + tojson(chunk.max) +
-                                   " on : " + chunk.shard + " " + tojson(out));
-
+                    configDB.chunks.find({"ns": coll._id}).sort({min: 1}).forEach(function(chunk) {
+                        var mydb = shards[chunk.shard].getDB(db._id);
+                        var out = mydb.runCommand({
+                            dataSize: coll._id,
+                            keyPattern: coll.key,
+                            min: chunk.min,
+                            max: chunk.max
                         });
+                        delete out.millis;
+                        delete out.ok;
+
+                        output("\t\t\t" + tojson(chunk.min) + " -->> " + tojson(chunk.max) +
+                               " on : " + chunk.shard + " " + tojson(out));
+
+                    });
                 });
         }
     });

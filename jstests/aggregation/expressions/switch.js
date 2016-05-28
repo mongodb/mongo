@@ -99,8 +99,7 @@
     pipeline = {
         "$project": {
             "_id": 0,
-            "output":
-                {"$switch": {"branches": [{"case": true, "then": null}], "default": false}}
+            "output": {"$switch": {"branches": [{"case": true, "then": null}], "default": false}}
         }
     };
     res = coll.aggregate(pipeline).toArray();
@@ -125,8 +124,7 @@
     pipeline = {
         "$project": {
             "_id": 0,
-            "output":
-                {"$switch": {"branches": [{"case": null, "then": false}], "default": null}}
+            "output": {"$switch": {"branches": [{"case": null, "then": false}], "default": null}}
         }
     };
     res = coll.aggregate(pipeline).toArray();

@@ -49,9 +49,7 @@
 
     // write that should reach all nodes
     var timeout = 60 * 1000;
-    var options = {
-        writeConcern: {w: numNodes, wtimeout: timeout}
-    };
+    var options = {writeConcern: {w: numNodes, wtimeout: timeout}};
     assert.writeOK(primary.getDB(name).foo.insert({x: 1}, options));
 
     var config = primary.getDB("local").system.replset.findOne();

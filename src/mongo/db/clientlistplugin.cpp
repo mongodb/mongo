@@ -63,7 +63,8 @@ public:
            << th(a("", "Connections to the database, both internal and external.", "Client"))
            << th(a("http://dochub.mongodb.org/core/viewingandterminatingcurrentoperation",
                    "",
-                   "OpId")) << "<th>Locking</th>"
+                   "OpId"))
+           << "<th>Locking</th>"
            << "<th>Waiting</th>"
            << "<th>SecsRunning</th>"
            << "<th>Op</th>"

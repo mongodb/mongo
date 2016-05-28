@@ -404,10 +404,7 @@ load('jstests/libs/write_concern_util.js');
     });
 
     function testValidWriteConcern(cmd) {
-        cmd.req.writeConcern = {
-            w: 'majority',
-            wtimeout: 25000
-        };
+        cmd.req.writeConcern = {w: 'majority', wtimeout: 25000};
         jsTest.log("Testing " + tojson(cmd.req));
 
         dropTestDatabase();
@@ -420,9 +417,7 @@ load('jstests/libs/write_concern_util.js');
     }
 
     function testInvalidWriteConcern(cmd) {
-        cmd.req.writeConcern = {
-            w: 'invalid'
-        };
+        cmd.req.writeConcern = {w: 'invalid'};
         jsTest.log("Testing " + tojson(cmd.req));
 
         dropTestDatabase();

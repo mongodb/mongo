@@ -95,12 +95,7 @@ while (bigStr.length < 1000000) {
 
 // Insert enough documents to exceed the 32 MB in-memory sort limit.
 for (var i = 0; i < 40; i++) {
-    var doc = {
-        x: 1,
-        y: 1,
-        z: i,
-        big: bigStr
-    };
+    var doc = {x: 1, y: 1, z: i, big: bigStr};
     t.insert(doc);
 }
 

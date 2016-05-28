@@ -205,8 +205,8 @@ TEST(Registration, ComposableWithImplicit) {
     try {
         std::vector<std::string> implicitVal;
         implicitVal.push_back("implicit");
-        testOpts.addOptionChaining(
-                     "setParameter", "setParameter", moe::StringVector, "Multiple Values")
+        testOpts
+            .addOptionChaining("setParameter", "setParameter", moe::StringVector, "Multiple Values")
             .setImplicit(moe::Value(implicitVal))
             .composing();
         FAIL("Was able to register composable option with implicit value");
@@ -216,8 +216,8 @@ TEST(Registration, ComposableWithImplicit) {
     try {
         std::vector<std::string> implicitVal;
         implicitVal.push_back("implicit");
-        testOpts.addOptionChaining(
-                     "setParameter", "setParameter", moe::StringVector, "Multiple Values")
+        testOpts
+            .addOptionChaining("setParameter", "setParameter", moe::StringVector, "Multiple Values")
             .composing()
             .setImplicit(moe::Value(implicitVal));
         FAIL("Was able to set implicit value on composable option");
@@ -230,8 +230,8 @@ TEST(Registration, ComposableWithDefault) {
     try {
         std::vector<std::string> defaultVal;
         defaultVal.push_back("default");
-        testOpts.addOptionChaining(
-                     "setParameter", "setParameter", moe::StringVector, "Multiple Values")
+        testOpts
+            .addOptionChaining("setParameter", "setParameter", moe::StringVector, "Multiple Values")
             .setDefault(moe::Value(defaultVal))
             .composing();
         FAIL("Was able to register composable option with default value");
@@ -241,8 +241,8 @@ TEST(Registration, ComposableWithDefault) {
     try {
         std::vector<std::string> defaultVal;
         defaultVal.push_back("default");
-        testOpts.addOptionChaining(
-                     "setParameter", "setParameter", moe::StringVector, "Multiple Values")
+        testOpts
+            .addOptionChaining("setParameter", "setParameter", moe::StringVector, "Multiple Values")
             .composing()
             .setDefault(moe::Value(defaultVal));
         FAIL("Was able to set default value on composable option");
@@ -867,8 +867,9 @@ TEST(Style, Verbosity) {
 
     /* support for -vv -vvvv etc. */
     for (std::string s = "vv"; s.length() <= 12; s.append("v")) {
-        testOpts.addOptionChaining(
-                     s.c_str(), s.c_str(), moe::Switch, "higher verbosity levels (hidden)")
+        testOpts
+            .addOptionChaining(
+                s.c_str(), s.c_str(), moe::Switch, "higher verbosity levels (hidden)")
             .hidden();
     }
 
@@ -3782,8 +3783,7 @@ TEST(YAMLConfigFile, DeprecatedDottedNameMultipleDeprecated) {
         std::map<std::string, std::string> env_map;
 
         std::stringstream ss;
-        ss << deprecatedDottedNames[0] << ": 6" << std::endl
-           << deprecatedDottedNames[1] << ": 7";
+        ss << deprecatedDottedNames[0] << ": 6" << std::endl << deprecatedDottedNames[1] << ": 7";
         parser.setConfig("config.yaml", ss.str());
 
         ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));

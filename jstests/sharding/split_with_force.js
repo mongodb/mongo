@@ -40,13 +40,15 @@ jsTest.log("Get split points of the chunk using force : true...");
 
 var maxChunkSizeBytes = 1024 * 1024;
 
-var splitKeys = shardAdmin.runCommand({
-    splitVector: coll + "",
-    keyPattern: {_id: 1},
-    min: {_id: 0},
-    max: {_id: MaxKey},
-    force: true
-}).splitKeys;
+var splitKeys = shardAdmin
+                    .runCommand({
+                        splitVector: coll + "",
+                        keyPattern: {_id: 1},
+                        min: {_id: 0},
+                        max: {_id: MaxKey},
+                        force: true
+                    })
+                    .splitKeys;
 
 printjson(splitKeys);
 printjson(coll.stats());

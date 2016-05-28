@@ -135,23 +135,22 @@ static Deferred<std::vector<T>> collect(std::vector<Deferred<T>>& ds, ThreadPool
     collectState->mem.resize(collectState->goal);
 
     for (std::size_t i = 0; i < ds.size(); ++i) {
-        ds[i].then(pool,
-                   [collectState, out, i](T res) mutable {
-                       // The bool return is unused.
-                       stdx::lock_guard<stdx::mutex> lk(collectState->mtx);
-                       collectState->mem[i] = std::move(res);
+        ds[i].then(pool, [collectState, out, i](T res) mutable {
+            // The bool return is unused.
+            stdx::lock_guard<stdx::mutex> lk(collectState->mtx);
+            collectState->mem[i] = std::move(res);
 
-                       // If we're done.
-                       if (collectState->goal == ++collectState->numFinished) {
-                           std::vector<T> outInitialized;
-                           outInitialized.reserve(collectState->mem.size());
-                           for (auto&& mem_entry : collectState->mem) {
-                               outInitialized.emplace_back(std::move(*mem_entry));
-                           }
-                           out.emplace(outInitialized);
-                       }
-                       return true;
-                   });
+            // If we're done.
+            if (collectState->goal == ++collectState->numFinished) {
+                std::vector<T> outInitialized;
+                outInitialized.reserve(collectState->mem.size());
+                for (auto&& mem_entry : collectState->mem) {
+                    outInitialized.emplace_back(std::move(*mem_entry));
+                }
+                out.emplace(outInitialized);
+            }
+            return true;
+        });
     }
     return out;
 }

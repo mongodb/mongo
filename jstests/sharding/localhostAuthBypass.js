@@ -107,17 +107,13 @@ var assertCannotRunCommands = function(mongo, st) {
         {param: "userCacheInvalidationIntervalSecs", val: 300}
     ];
     params.forEach(function(p) {
-        var cmd = {
-            setParameter: 1
-        };
+        var cmd = {setParameter: 1};
         cmd[p.param] = p.val;
         assert.commandFailedWithCode(
             mongo.getDB("admin").runCommand(cmd), authorizeErrorCode, "setParameter: " + p.param);
     });
     params.forEach(function(p) {
-        var cmd = {
-            getParameter: 1
-        };
+        var cmd = {getParameter: 1};
         cmd[p.param] = 1;
         assert.commandFailedWithCode(
             mongo.getDB("admin").runCommand(cmd), authorizeErrorCode, "getParameter: " + p.param);

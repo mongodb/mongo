@@ -58,7 +58,7 @@ assert.eq([], listCollections(/tmp\.agg_out/));
 
 // basic test
 test(input,
-         [{$project: {a: {$add: ['$_id', '$_id']}}}],
+     [{$project: {a: {$add: ['$_id', '$_id']}}}],
      [{_id: 1, a: 2}, {_id: 2, a: 4}, {_id: 3, a: 6}]);
 
 // test with indexes
@@ -66,7 +66,7 @@ assert.eq(output.getIndexes().length, 1);
 output.ensureIndex({a: 1});
 assert.eq(output.getIndexes().length, 2);
 test(input,
-         [{$project: {a: {$multiply: ['$_id', '$_id']}}}],
+     [{$project: {a: {$multiply: ['$_id', '$_id']}}}],
      [{_id: 1, a: 1}, {_id: 2, a: 4}, {_id: 3, a: 9}]);
 
 // test with empty result set and make sure old result is gone, but indexes remain
@@ -81,13 +81,11 @@ test(input, [{$project: {b: "$_id"}}], [{_id: 1, b: 1}, {_id: 2, b: 2}, {_id: 3,
 // test with full text index
 output.ensureIndex({c: "text"});
 assert.eq(output.getIndexes().length, 4);
-test(input,
-         [{$project: {c: {$concat: ["hello there ", "_id"]}}}],
-     [
-       {_id: 1, c: "hello there _id"},
-       {_id: 2, c: "hello there _id"},
-       {_id: 3, c: "hello there _id"}
-     ]);
+test(input, [{$project: {c: {$concat: ["hello there ", "_id"]}}}], [
+    {_id: 1, c: "hello there _id"},
+    {_id: 2, c: "hello there _id"},
+    {_id: 3, c: "hello there _id"}
+]);
 
 // test with capped collection
 cappedOutput.drop();

@@ -98,18 +98,17 @@ for (var b = 0; b < bits.length; b++) {
                 assert.gte(a[k].dis, distance);
             }
 
-            r = t.find(
-                {
-                  loc: {
-                      $within: {
-                          $box: [
-                              [center[j][0] - radius[i], center[j][1] - radius[i]],
-                              [center[j][0] + radius[i], center[j][1] + radius[i]]
-                          ]
-                      }
-                  }
-                },
-                {_id: 1});
+            r = t.find({
+                loc: {
+                    $within: {
+                        $box: [
+                            [center[j][0] - radius[i], center[j][1] - radius[i]],
+                            [center[j][0] + radius[i], center[j][1] + radius[i]]
+                        ]
+                    }
+                }
+            },
+                       {_id: 1});
             assert.eq(9, r.count());
         }
     }

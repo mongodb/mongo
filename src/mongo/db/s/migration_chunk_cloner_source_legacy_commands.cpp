@@ -38,9 +38,9 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
 
 /**
  * This file contains commands, which are specific to the legacy chunk cloner source.

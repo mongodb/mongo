@@ -74,9 +74,9 @@ StatusWith<Protocol> negotiate(ProtocolSet fst, ProtocolSet snd) {
 
     ProtocolSet common = fst & snd;
 
-    auto it = std::find_if(begin(kPreferredProtos),
-                           end(kPreferredProtos),
-                           [common](Protocol p) { return common & static_cast<ProtocolSet>(p); });
+    auto it = std::find_if(begin(kPreferredProtos), end(kPreferredProtos), [common](Protocol p) {
+        return common & static_cast<ProtocolSet>(p);
+    });
 
     if (it == end(kPreferredProtos)) {
         return Status(ErrorCodes::RPCProtocolNegotiationFailed, "No common protocol found.");

@@ -35,9 +35,9 @@
 #error This file should only be included in SSL-enabled builds
 #endif
 
-#include <openssl/sha.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
+#include <openssl/sha.h>
 
 namespace mongo {
 namespace crypto {

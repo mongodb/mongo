@@ -17,9 +17,7 @@ for (var fields = 1; fields < maxFields; fields++) {
     for (var i = 0; i < totalPts; i++) {
         var ii = i % 10000;
 
-        var doc = {
-            loc: [ii % 100, Math.floor(ii / 100)]
-        };
+        var doc = {loc: [ii % 100, Math.floor(ii / 100)]};
 
         // Add fields with different kinds of data
         for (var j = 0; j < fields; j++) {
@@ -49,9 +47,7 @@ for (var fields = 1; fields < maxFields; fields++) {
         if (j % 3 == 0) {
             field = "abcdefg";
         } else if (j % 3 == 1) {
-            field = {
-                $lte: new Date()
-            };
+            field = {$lte: new Date()};
         } else {
             field = true;
         }

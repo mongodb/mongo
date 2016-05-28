@@ -36,32 +36,16 @@ t.save({a: 1, b: 1});
 // Add 2 indexes.
 // 1st index is more efficient.
 // 2nd and 3rd indexes will be used to test index filters.
-var indexA1 = {
-    a: 1
-};
-var indexA1B1 = {
-    a: 1,
-    b: 1
-};
-var indexA1C1 = {
-    a: 1,
-    c: 1
-};
+var indexA1 = {a: 1};
+var indexA1B1 = {a: 1, b: 1};
+var indexA1C1 = {a: 1, c: 1};
 t.ensureIndex(indexA1);
 t.ensureIndex(indexA1B1);
 t.ensureIndex(indexA1C1);
 
-var queryA1 = {
-    a: 1,
-    b: 1
-};
-var projectionA1 = {
-    _id: 0,
-    a: 1
-};
-var sortA1 = {
-    a: -1
-};
+var queryA1 = {a: 1, b: 1};
+var projectionA1 = {_id: 0, a: 1};
+var sortA1 = {a: -1};
 
 //
 // Tests for planCacheListFilters, planCacheClearFilters, planCacheSetFilter
@@ -110,17 +94,12 @@ assert.eq(0, filters.length, 'unexpected number of index filters in planCacheLis
 
 // Check details of winning plan in plan cache before setting index filter.
 assert.eq(1, t.find(queryA1, projectionA1).sort(sortA1).itcount(), 'unexpected document count');
-var shape = {
-    query: queryA1,
-    sort: sortA1,
-    projection: projectionA1
-};
+var shape = {query: queryA1, sort: sortA1, projection: projectionA1};
 var planBeforeSetFilter = getPlans(shape)[0];
 print('Winning plan (before setting index filters) = ' + tojson(planBeforeSetFilter));
 // Check filterSet field in plan details
-assert.eq(false,
-          planBeforeSetFilter.filterSet,
-          'missing or invalid filterSet field in plan details');
+assert.eq(
+    false, planBeforeSetFilter.filterSet, 'missing or invalid filterSet field in plan details');
 
 // Adding index filters to a non-existent collection should be an error.
 assert.commandFailed(missingCollection.runCommand(
@@ -132,9 +111,8 @@ assert.commandWorked(t.runCommand(
     'planCacheSetFilter',
     {query: queryA1, sort: sortA1, projection: projectionA1, indexes: [indexA1B1, indexA1C1]}));
 filters = getFilters();
-assert.eq(1,
-          filters.length,
-          'no change in query settings after successfully setting index filters');
+assert.eq(
+    1, filters.length, 'no change in query settings after successfully setting index filters');
 assert.eq(queryA1, filters[0].query, 'unexpected query in filters');
 assert.eq(sortA1, filters[0].sort, 'unexpected sort in filters');
 assert.eq(projectionA1, filters[0].projection, 'unexpected projection in filters');
@@ -196,13 +174,9 @@ if (db.isMaster().msg !== "isdbgrid") {
                   .queryPlanner.indexFilterSet);
 
     // With two filters set.
-    assert.commandWorked(t.runCommand('planCacheSetFilter',
-                                      {
-                                        query: queryA1,
-                                        projection: projectionA1,
-                                        sort: sortA1,
-                                        indexes: [indexA1B1, indexA1C1]
-                                      }));
+    assert.commandWorked(t.runCommand(
+        'planCacheSetFilter',
+        {query: queryA1, projection: projectionA1, sort: sortA1, indexes: [indexA1B1, indexA1C1]}));
     assert.eq(true, t.find({z: 1}).explain('queryPlanner').queryPlanner.indexFilterSet);
     assert.eq(true,
               t.find(queryA1, projectionA1)

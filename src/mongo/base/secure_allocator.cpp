@@ -225,9 +225,8 @@ std::shared_ptr<Allocation> lastAllocation = nullptr;
 
 }  // namespace
 
-MONGO_INITIALIZER_GENERAL(SecureAllocator,
-                          ("SystemInfo"),
-                          MONGO_NO_DEPENDENTS)(InitializerContext* context) {
+MONGO_INITIALIZER_GENERAL(SecureAllocator, ("SystemInfo"), MONGO_NO_DEPENDENTS)
+(InitializerContext* context) {
     return Status::OK();
 }
 

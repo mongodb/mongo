@@ -83,9 +83,7 @@ for (var t = 0; t < numTests; t++) {
         var total = 0;
         for (var i = 0; i < vals.length; i++)
             total += vals[i].c;
-        return {
-            c: total
-        };
+        return {c: total};
     };
 
     printjson(coll.find({_id: 0}).itcount());

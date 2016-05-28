@@ -113,14 +113,13 @@ function runTest(conn) {
         assert.commandFailedWithCode(db.runCommand({collMod: 'foo', usePowerOf2Sizes: true}),
                                      authzErrorCode);
 
-        testUserAdmin.grantRolesToUser('spencer',
-                                       [
-                                         'readWrite',
-                                         'dbAdmin',
-                                         {role: 'readWrite', db: 'test'},
-                                         {role: 'testRole', db: 'test'},
-                                         'readWrite'
-                                       ]);
+        testUserAdmin.grantRolesToUser('spencer', [
+            'readWrite',
+            'dbAdmin',
+            {role: 'readWrite', db: 'test'},
+            {role: 'testRole', db: 'test'},
+            'readWrite'
+        ]);
 
         assert.commandWorked(db.runCommand({collMod: 'foo', usePowerOf2Sizes: true}));
         assert.writeOK(db.foo.update({}, {$inc: {a: 1}}));
@@ -135,13 +134,11 @@ function runTest(conn) {
     (function testRevokeRolesFromUser() {
         jsTestLog("Testing revokeRolesFromUser");
 
-        testUserAdmin.revokeRolesFromUser(
-            'spencer',
-            [
-              'readWrite',
-              {role: 'dbAdmin', db: 'test2'},  // role user doesnt have
-              "testRole"
-            ]);
+        testUserAdmin.revokeRolesFromUser('spencer', [
+            'readWrite',
+            {role: 'dbAdmin', db: 'test2'},  // role user doesnt have
+            "testRole"
+        ]);
 
         assert.commandWorked(db.runCommand({collMod: 'foo', usePowerOf2Sizes: true}));
         hasAuthzError(db.foo.update({}, {$inc: {a: 1}}));

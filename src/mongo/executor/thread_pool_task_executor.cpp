@@ -264,20 +264,18 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleWorkAt(
         return cbHandle;
     }
     lk.unlock();
-    _net->setAlarm(when,
-                   [this, when, cbHandle] {
-                       auto cbState =
-                           checked_cast<CallbackState*>(getCallbackFromHandle(cbHandle.getValue()));
-                       if (cbState->canceled.load()) {
-                           return;
-                       }
-                       invariant(now() >= when);
-                       stdx::unique_lock<stdx::mutex> lk(_mutex);
-                       if (cbState->canceled.load()) {
-                           return;
-                       }
-                       scheduleIntoPool_inlock(&_sleepersQueue, cbState->iter, std::move(lk));
-                   });
+    _net->setAlarm(when, [this, when, cbHandle] {
+        auto cbState = checked_cast<CallbackState*>(getCallbackFromHandle(cbHandle.getValue()));
+        if (cbState->canceled.load()) {
+            return;
+        }
+        invariant(now() >= when);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        if (cbState->canceled.load()) {
+            return;
+        }
+        scheduleIntoPool_inlock(&_sleepersQueue, cbState->iter, std::move(lk));
+    });
 
     return cbHandle;
 }
@@ -350,9 +348,9 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleRemoteC
             if (_inShutdown) {
                 return;
             }
-            LOG(3) << "Received remote response: " << (response.isOK()
-                                                           ? response.getValue().toString()
-                                                           : response.getStatus().toString());
+            LOG(3) << "Received remote response: "
+                   << (response.isOK() ? response.getValue().toString()
+                                       : response.getStatus().toString());
             swap(cbState->callback, newCb);
             scheduleIntoPool_inlock(&_networkInProgressQueue, cbState->iter, std::move(lk));
         });

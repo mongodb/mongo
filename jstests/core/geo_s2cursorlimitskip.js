@@ -23,9 +23,7 @@ function insertRandomPoints(num, minDist, maxDist) {
     for (var i = 0; i < num; i++) {
         var lat = sign() * (minDist + random() * (maxDist - minDist));
         var lng = sign() * (minDist + random() * (maxDist - minDist));
-        var point = {
-            geo: {type: "Point", coordinates: [lng, lat]}
-        };
+        var point = {geo: {type: "Point", coordinates: [lng, lat]}};
         assert.writeOK(t.insert(point));
     }
 }
@@ -37,8 +35,9 @@ var batchSize = 4;
 // Insert points between 0.01 and 1.0 away.
 insertRandomPoints(totalPointCount, 0.01, 1.0);
 
-var cursor = t.find({geo: {$geoNear: {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}})
-                 .batchSize(batchSize);
+var cursor = t.find({
+                  geo: {$geoNear: {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}
+              }).batchSize(batchSize);
 assert.eq(cursor.count(), totalPointCount);
 
 // Disable profiling in order to drop the system.profile collection.
@@ -48,8 +47,8 @@ testDB.setProfilingLevel(0);
 testDB.system.profile.drop();
 // Create 4MB system.profile collection to prevent the 'getmore' operations from overwriting the
 // original query.
-assert.commandWorked(testDB.createCollection("system.profile",
-                                             {capped: true, size: 4 * 1024 * 1024}));
+assert.commandWorked(
+    testDB.createCollection("system.profile", {capped: true, size: 4 * 1024 * 1024}));
 testDB.setProfilingLevel(2);
 
 for (var j = 0; j < initialAdvance; j++) {
@@ -81,14 +80,16 @@ assert(!cursor.hasNext());
 
 var someLimit = 23;
 // Make sure limit does something.
-cursor = t.find({geo: {$geoNear: {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}})
-             .limit(someLimit);
+cursor = t.find({
+              geo: {$geoNear: {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}
+          }).limit(someLimit);
 // Count doesn't work here -- ignores limit/skip, so we use itcount.
 assert.eq(cursor.itcount(), someLimit);
 // Make sure skip works by skipping some stuff ourselves.
 var someSkip = 3;
-cursor = t.find({geo: {$geoNear: {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}})
-             .limit(someLimit + someSkip);
+cursor = t.find({
+              geo: {$geoNear: {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}
+          }).limit(someLimit + someSkip);
 for (var i = 0; i < someSkip; ++i) {
     cursor.next();
 }

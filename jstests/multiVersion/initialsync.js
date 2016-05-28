@@ -8,10 +8,7 @@ var newVersion = "latest";
 var name = "multiversioninitsync";
 
 var multitest = function(replSetVersion, newNodeVersion) {
-    var nodes = {
-        n1: {binVersion: replSetVersion},
-        n2: {binVersion: replSetVersion}
-    };
+    var nodes = {n1: {binVersion: replSetVersion}, n2: {binVersion: replSetVersion}};
 
     print("Start up a two-node " + replSetVersion + " replica set.");
     var rst = new ReplSetTest({name: name, nodes: nodes});

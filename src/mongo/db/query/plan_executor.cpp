@@ -40,8 +40,8 @@
 #include "mongo/db/exec/subplan.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/record_fetcher.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
@@ -556,7 +556,8 @@ Status PlanExecutor::executePlan() {
     if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
         return Status(ErrorCodes::OperationFailed,
                       str::stream() << "Exec error: " << WorkingSetCommon::toStatusString(obj)
-                                    << ", state: " << PlanExecutor::statestr(state));
+                                    << ", state: "
+                                    << PlanExecutor::statestr(state));
     }
 
     invariant(PlanExecutor::IS_EOF == state);

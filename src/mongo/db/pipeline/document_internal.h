@@ -30,11 +30,11 @@
 
 #include <third_party/murmurhash3/MurmurHash3.h>
 
-#include <boost/intrusive_ptr.hpp>
 #include <bitset>
+#include <boost/intrusive_ptr.hpp>
 
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 /** Helper class to make the position in a document abstract

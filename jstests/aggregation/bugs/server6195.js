@@ -27,7 +27,7 @@ assertErrorCode(c, {$project: {str: {$concat: [1]}}}, 16702);
 assertErrorCode(c, {$project: {str: {$concat: [NumberInt(1)]}}}, 16702);
 assertErrorCode(c, {$project: {str: {$concat: [NumberLong(1)]}}}, 16702);
 assertErrorCode(c, {$project: {str: {$concat: [true]}}}, 16702);
-assertErrorCode(c, {$project: {str: {$concat: [function(){}]}}}, 16702);
+assertErrorCode(c, {$project: {str: {$concat: [function() {}]}}}, 16702);
 assertErrorCode(c, {$project: {str: {$concat: [{}]}}}, 16702);
 assertErrorCode(c, {$project: {str: {$concat: [[]]}}}, 16702);
 assertErrorCode(c, {$project: {str: {$concat: [new Timestamp(0, 0)]}}}, 16702);

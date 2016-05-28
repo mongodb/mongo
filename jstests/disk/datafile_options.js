@@ -3,9 +3,7 @@ var baseName = "jstests_disk_datafile_options";
 load('jstests/libs/command_line/test_parsed_options.js');
 
 jsTest.log("Testing \"noprealloc\" command line option");
-var expectedResult = {
-    "parsed": {"storage": {"mmapv1": {"preallocDataFiles": false}}}
-};
+var expectedResult = {"parsed": {"storage": {"mmapv1": {"preallocDataFiles": false}}}};
 testGetCmdLineOptsMongod({noprealloc: ""}, expectedResult);
 
 jsTest.log("Testing \"storage.mmapv1.preallocDataFiles\" config file option");

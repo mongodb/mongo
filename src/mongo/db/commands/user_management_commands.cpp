@@ -95,7 +95,8 @@ BSONArray roleSetToBSONArray(const unordered_set<RoleName>& roles) {
     for (unordered_set<RoleName>::const_iterator it = roles.begin(); it != roles.end(); ++it) {
         const RoleName& role = *it;
         rolesArrayBuilder.append(BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
-                                      << role.getRole() << AuthorizationManager::ROLE_DB_FIELD_NAME
+                                      << role.getRole()
+                                      << AuthorizationManager::ROLE_DB_FIELD_NAME
                                       << role.getDB()));
     }
     return rolesArrayBuilder.arr();
@@ -106,7 +107,8 @@ BSONArray rolesVectorToBSONArray(const std::vector<RoleName>& roles) {
     for (std::vector<RoleName>::const_iterator it = roles.begin(); it != roles.end(); ++it) {
         const RoleName& role = *it;
         rolesArrayBuilder.append(BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
-                                      << role.getRole() << AuthorizationManager::ROLE_DB_FIELD_NAME
+                                      << role.getRole()
+                                      << AuthorizationManager::ROLE_DB_FIELD_NAME
                                       << role.getDB()));
     }
     return rolesArrayBuilder.arr();
@@ -172,9 +174,9 @@ Status checkOkayToGrantRolesToRole(OperationContext* txn,
         }
 
         if (role.getDB() != "admin" && roleToAdd.getDB() != role.getDB()) {
-            return Status(ErrorCodes::InvalidRoleModification,
-                          str::stream()
-                              << "Roles on the \'" << role.getDB()
+            return Status(
+                ErrorCodes::InvalidRoleModification,
+                str::stream() << "Roles on the \'" << role.getDB()
                               << "\' database cannot be granted roles from other databases");
         }
 
@@ -195,11 +197,11 @@ Status checkOkayToGrantRolesToRole(OperationContext* txn,
         }
 
         if (sequenceContains(indirectRoles, role)) {
-            return Status(ErrorCodes::InvalidRoleModification,
-                          mongoutils::str::stream()
-                              << "Granting " << roleToAdd.getFullName() << " to "
-                              << role.getFullName()
-                              << " would introduce a cycle in the role graph.");
+            return Status(
+                ErrorCodes::InvalidRoleModification,
+                mongoutils::str::stream() << "Granting " << roleToAdd.getFullName() << " to "
+                                          << role.getFullName()
+                                          << " would introduce a cycle in the role graph.");
         }
     }
     return Status::OK();
@@ -421,13 +423,14 @@ Status insertRoleDocument(OperationContext* txn, const BSONObj& roleObj) {
  * Updates the given role object with the given update modifier.
  */
 Status updateRoleDocument(OperationContext* txn, const RoleName& role, const BSONObj& updateObj) {
-    Status status = updateOneAuthzDocument(
-        txn,
-        AuthorizationManager::rolesCollectionNamespace,
-        BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
-             << role.getRole() << AuthorizationManager::ROLE_DB_FIELD_NAME << role.getDB()),
-        updateObj,
-        false);
+    Status status = updateOneAuthzDocument(txn,
+                                           AuthorizationManager::rolesCollectionNamespace,
+                                           BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
+                                                << role.getRole()
+                                                << AuthorizationManager::ROLE_DB_FIELD_NAME
+                                                << role.getDB()),
+                                           updateObj,
+                                           false);
     if (status.isOK()) {
         return status;
     }
@@ -481,13 +484,14 @@ Status insertPrivilegeDocument(OperationContext* txn, const BSONObj& userObj) {
 Status updatePrivilegeDocument(OperationContext* txn,
                                const UserName& user,
                                const BSONObj& updateObj) {
-    Status status = updateOneAuthzDocument(
-        txn,
-        AuthorizationManager::usersCollectionNamespace,
-        BSON(AuthorizationManager::USER_NAME_FIELD_NAME
-             << user.getUser() << AuthorizationManager::USER_DB_FIELD_NAME << user.getDB()),
-        updateObj,
-        false);
+    Status status = updateOneAuthzDocument(txn,
+                                           AuthorizationManager::usersCollectionNamespace,
+                                           BSON(AuthorizationManager::USER_NAME_FIELD_NAME
+                                                << user.getUser()
+                                                << AuthorizationManager::USER_DB_FIELD_NAME
+                                                << user.getDB()),
+                                           updateObj,
+                                           false);
     if (status.isOK()) {
         return status;
     }
@@ -554,7 +558,8 @@ Status requireAuthSchemaVersion26Final(OperationContext* txn, AuthorizationManag
                       str::stream()
                           << "User and role management commands require auth data to have "
                           << "at least schema version "
-                          << AuthorizationManager::schemaVersion26Final << " but found "
+                          << AuthorizationManager::schemaVersion26Final
+                          << " but found "
                           << foundSchemaVersion);
     }
     return writeAuthSchemaVersionIfNeeded(txn, authzManager, foundSchemaVersion);
@@ -577,7 +582,8 @@ Status requireAuthSchemaVersion26UpgradeOrFinal(OperationContext* txn,
         return Status(ErrorCodes::AuthSchemaIncompatible,
                       str::stream() << "The usersInfo and rolesInfo commands require auth data to "
                                     << "have at least schema version "
-                                    << AuthorizationManager::schemaVersion26Upgrade << " but found "
+                                    << AuthorizationManager::schemaVersion26Upgrade
+                                    << " but found "
                                     << foundSchemaVersion);
     }
     return Status::OK();
@@ -1901,7 +1907,8 @@ public:
         ss << "Drops a single role.  Before deleting the role completely it must remove it "
               "from any users or roles that reference it.  If any errors occur in the middle "
               "of that process it's possible to be left in a state where the role has been "
-              "removed from some user/roles but otherwise still exists." << endl;
+              "removed from some user/roles but otherwise still exists."
+           << endl;
     }
 
     virtual Status checkAuthForCommand(ClientBasic* client,
@@ -1967,11 +1974,12 @@ public:
             ErrorCodes::Error code = status.code() == ErrorCodes::UnknownError
                 ? ErrorCodes::UserModificationFailed
                 : status.code();
-            return appendCommandStatus(
-                result,
-                Status(code,
-                       str::stream() << "Failed to remove role " << roleName.getFullName()
-                                     << " from all users: " << status.reason()));
+            return appendCommandStatus(result,
+                                       Status(code,
+                                              str::stream() << "Failed to remove role "
+                                                            << roleName.getFullName()
+                                                            << " from all users: "
+                                                            << status.reason()));
         }
 
         // Remove this role from all other roles
@@ -2019,7 +2027,8 @@ public:
                 Status(status.code(),
                        str::stream() << "Removed role " << roleName.getFullName()
                                      << " from all users and roles but failed to actually delete"
-                                        " the role itself: " << status.reason()));
+                                        " the role itself: "
+                                     << status.reason()));
         }
 
         dassert(nMatched == 0 || nMatched == 1);
@@ -2052,7 +2061,8 @@ public:
               "it must remove them from any users or other roles that reference them.  If any "
               "errors occur in the middle of that process it's possible to be left in a state "
               "where the roles have been removed from some user/roles but otherwise still "
-              "exist." << endl;
+              "exist."
+           << endl;
     }
 
     virtual Status checkAuthForCommand(ClientBasic* client,
@@ -2100,9 +2110,10 @@ public:
                 : status.code();
             return appendCommandStatus(result,
                                        Status(code,
-                                              str::stream()
-                                                  << "Failed to remove roles from \"" << dbname
-                                                  << "\" db from all users: " << status.reason()));
+                                              str::stream() << "Failed to remove roles from \""
+                                                            << dbname
+                                                            << "\" db from all users: "
+                                                            << status.reason()));
         }
 
         // Remove these roles from all other roles
@@ -2125,9 +2136,10 @@ public:
                 : status.code();
             return appendCommandStatus(result,
                                        Status(code,
-                                              str::stream()
-                                                  << "Failed to remove roles from \"" << dbname
-                                                  << "\" db from all roles: " << status.reason()));
+                                              str::stream() << "Failed to remove roles from \""
+                                                            << dbname
+                                                            << "\" db from all roles: "
+                                                            << status.reason()));
         }
 
         audit::logDropAllRolesFromDatabase(ClientBasic::getCurrent(), dbname);
@@ -2143,7 +2155,8 @@ public:
                        str::stream() << "Removed roles from \"" << dbname
                                      << "\" db "
                                         " from all users and roles but failed to actually delete"
-                                        " those roles themselves: " << status.reason()));
+                                        " those roles themselves: "
+                                     << status.reason()));
         }
 
         result.append("n", nMatched);
@@ -2535,7 +2548,9 @@ public:
             BSONObj query =
                 db.empty() ? BSONObj() : BSON(AuthorizationManager::USER_DB_FIELD_NAME << db);
             BSONObj fields = BSON(AuthorizationManager::USER_NAME_FIELD_NAME
-                                  << 1 << AuthorizationManager::USER_DB_FIELD_NAME << 1);
+                                  << 1
+                                  << AuthorizationManager::USER_DB_FIELD_NAME
+                                  << 1);
 
             Status status =
                 queryAuthzDocument(txn,
@@ -2613,7 +2628,9 @@ public:
             BSONObj query =
                 db.empty() ? BSONObj() : BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << db);
             BSONObj fields = BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
-                                  << 1 << AuthorizationManager::ROLE_DB_FIELD_NAME << 1);
+                                  << 1
+                                  << AuthorizationManager::ROLE_DB_FIELD_NAME
+                                  << 1);
 
             Status status =
                 queryAuthzDocument(txn,
@@ -2741,7 +2758,8 @@ void updateUserCredentials(OperationContext* txn,
             mongoutils::str::stream()
                 << "While preparing to upgrade user doc from "
                    "2.6/3.0 user data schema to the 3.0+ SCRAM only schema, found a user doc "
-                   "with missing or incorrectly formatted credentials: " << userDoc.toString(),
+                   "with missing or incorrectly formatted credentials: "
+                << userDoc.toString(),
             credentialsElement.type() == Object);
 
     BSONObj credentialsObj = credentialsElement.Obj();
@@ -2758,7 +2776,8 @@ void updateUserCredentials(OperationContext* txn,
             mongoutils::str::stream()
                 << "While preparing to upgrade user doc from "
                    "2.6/3.0 user data schema to the 3.0+ SCRAM only schema, found a user doc "
-                   "missing MONGODB-CR credentials :" << userDoc.toString(),
+                   "missing MONGODB-CR credentials :"
+                << userDoc.toString(),
             !mongoCRElement.eoo());
 
     std::string hashedPassword = mongoCRElement.String();

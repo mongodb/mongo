@@ -29,8 +29,8 @@
 #pragma once
 
 #include "mongo/db/commands.h"
-#include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/query_settings.h"
 
 namespace mongo {
 

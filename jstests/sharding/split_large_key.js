@@ -38,10 +38,7 @@
     tests.forEach(function(test) {
         var collName = "split_large_key_" + test.name;
         var midKey = {};
-        var chunkKeys = {
-            min: {},
-            max: {}
-        };
+        var chunkKeys = {min: {}, max: {}};
         for (var k in test.key) {
             // new Array with join creates string length 1 less than size, so add 1
             midKey[k] = new Array(test.keyFieldSize + 1).join('a');

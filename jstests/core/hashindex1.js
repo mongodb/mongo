@@ -5,17 +5,12 @@ t.drop();
 load("jstests/libs/analyze_plan.js");
 
 // test non-single field hashed indexes don't get created (maybe change later)
-var badspec = {
-    a: "hashed",
-    b: 1
-};
+var badspec = {a: "hashed", b: 1};
 t.ensureIndex(badspec);
 assert.eq(t.getIndexes().length, 1, "only _id index should be created");
 
 // test unique index not created (maybe change later)
-var goodspec = {
-    a: "hashed"
-};
+var goodspec = {a: "hashed"};
 t.ensureIndex(goodspec, {"unique": true});
 assert.eq(t.getIndexes().length, 1, "unique index got created.");
 
@@ -67,9 +62,7 @@ var explain = t.find({$and: [{a: {$in: [1, 2]}}, {a: {$gt: 1}}]}).explain();
 assert(isIxscan(explain.queryPlanner.winningPlan), "not using hashed index");
 
 // test creation of index based on hash of _id index
-var goodspec2 = {
-    '_id': "hashed"
-};
+var goodspec2 = {'_id': "hashed"};
 t.ensureIndex(goodspec2);
 assert.eq(t.getIndexes().length, 3, "_id index didn't get created");
 
@@ -79,9 +72,7 @@ assert.eq(t.find({_id: newid}).hint({_id: 1}).toArray()[0]._id,
           "using hashed index and different index returns different docs");
 
 // test creation of sparse hashed index
-var sparseindex = {
-    b: "hashed"
-};
+var sparseindex = {b: "hashed"};
 t.ensureIndex(sparseindex, {"sparse": true});
 assert.eq(t.getIndexes().length, 4, "sparse index didn't get created");
 

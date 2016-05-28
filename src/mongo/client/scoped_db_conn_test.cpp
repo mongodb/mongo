@@ -29,8 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
-#include <vector>
 #include <string>
+#include <vector>
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/global_conn_pool.h"
@@ -207,8 +207,8 @@ public:
                 break;
             }
             if (timer.seconds() > 20) {
-                FAIL(str::stream()
-                     << "Timed out connecting to dummy server: " << connectStatus.toString());
+                FAIL(str::stream() << "Timed out connecting to dummy server: "
+                                   << connectStatus.toString());
             }
         }
     }

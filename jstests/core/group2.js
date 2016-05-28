@@ -25,9 +25,7 @@ assert.eq(1, result[1].count, "G");
 assert.eq(1, result[2].count, "H");
 
 var keyFn = function(x) {
-    return {
-        a: 'a' in x ? x.a : null
-    };
+    return {a: 'a' in x ? x.a : null};
 };
 
 delete cmd.key;

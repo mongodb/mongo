@@ -36,8 +36,8 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/constants.h"
-#include "mongo/client/dbclientcursor.h"
 #include "mongo/client/dbclient_rs.h"
+#include "mongo/client/dbclientcursor.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/s/catalog/catalog_cache.h"
@@ -316,7 +316,12 @@ BSONObj ParallelConnectionState::toBSON() const {
 
 BSONObj ParallelConnectionMetadata::toBSON() const {
     return BSON("state" << (pcState ? pcState->toBSON() : BSONObj()) << "retryNext" << retryNext
-                        << "init" << initialized << "finish" << finished << "errored" << errored);
+                        << "init"
+                        << initialized
+                        << "finish"
+                        << finished
+                        << "errored"
+                        << errored);
 }
 
 void ParallelSortClusteredCursor::fullInit(OperationContext* txn) {
@@ -1040,13 +1045,14 @@ void ParallelSortClusteredCursor::_oldInit() {
                 conns[i]->done();
 
                 // Version is zero b/c this is deprecated codepath
-                staleConfigExs.push_back(
-                    str::stream() << "stale config detected for "
-                                  << RecvStaleConfigException(_ns,
-                                                              "ParallelCursor::_init",
-                                                              ChunkVersion(0, 0, OID()),
-                                                              ChunkVersion(0, 0, OID())).what()
-                                  << errLoc);
+                staleConfigExs.push_back(str::stream()
+                                         << "stale config detected for "
+                                         << RecvStaleConfigException(_ns,
+                                                                     "ParallelCursor::_init",
+                                                                     ChunkVersion(0, 0, OID()),
+                                                                     ChunkVersion(0, 0, OID()))
+                                                .what()
+                                         << errLoc);
                 break;
             }
 
@@ -1107,8 +1113,8 @@ void ParallelSortClusteredCursor::_oldInit() {
                     _cursors[i].reset(NULL, NULL);
 
                     if (!retry) {
-                        socketExs.push_back(str::stream()
-                                            << "error querying server: " << servers[i]);
+                        socketExs.push_back(str::stream() << "error querying server: "
+                                                          << servers[i]);
                         conns[i]->done();
                     } else {
                         retryQueries.insert(i);

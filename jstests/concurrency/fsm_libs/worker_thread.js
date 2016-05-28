@@ -62,21 +62,20 @@ var workerThread = (function() {
                 // configurable, enumerable, and writable. To prevent workloads from changing
                 // the iterations and threadCount properties in their state functions, we redefine
                 // them here as non-configurable, non-enumerable, and non-writable.
-                Object.defineProperties(data,
-                                        {
-                                          'iterations': {
-                                              configurable: false,
-                                              enumerable: false,
-                                              writable: false,
-                                              value: data.iterations
-                                          },
-                                          'threadCount': {
-                                              configurable: false,
-                                              enumerable: false,
-                                              writable: false,
-                                              value: data.threadCount
-                                          }
-                                        });
+                Object.defineProperties(data, {
+                    'iterations': {
+                        configurable: false,
+                        enumerable: false,
+                        writable: false,
+                        value: data.iterations
+                    },
+                    'threadCount': {
+                        configurable: false,
+                        enumerable: false,
+                        writable: false,
+                        value: data.threadCount
+                    }
+                });
 
                 data.tid = args.tid;
                 configs[workload] = {
@@ -103,9 +102,7 @@ var workerThread = (function() {
 
                 Random.setRandomSeed(args.seed);
                 run(configs);
-                return {
-                    ok: 1
-                };
+                return {ok: 1};
             } catch (e) {
                 args.errorLatch.countDown();
                 return {
@@ -124,8 +121,6 @@ var workerThread = (function() {
         }
     }
 
-    return {
-        main: main
-    };
+    return {main: main};
 
 })();

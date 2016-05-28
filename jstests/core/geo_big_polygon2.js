@@ -5,23 +5,11 @@
 //  - Big polygon objects cannot be stored
 //    Try all different shapes queries against various stored geo points, line & polygons
 
-var crs84CRS = {
-    type: "name",
-    properties: {name: "urn:ogc:def:crs:OGC:1.3:CRS84"}
-};
-var epsg4326CRS = {
-    type: "name",
-    properties: {name: "EPSG:4326"}
-};
-var strictCRS = {
-    type: "name",
-    properties: {name: "urn:x-mongodb:crs:strictwinding:EPSG:4326"}
-};
+var crs84CRS = {type: "name", properties: {name: "urn:ogc:def:crs:OGC:1.3:CRS84"}};
+var epsg4326CRS = {type: "name", properties: {name: "EPSG:4326"}};
+var strictCRS = {type: "name", properties: {name: "urn:x-mongodb:crs:strictwinding:EPSG:4326"}};
 // invalid CRS name
-var badCRS = {
-    type: "name",
-    properties: {name: "urn:x-mongodb:crs:invalid:EPSG:4326"}
-};
+var badCRS = {type: "name", properties: {name: "urn:x-mongodb:crs:invalid:EPSG:4326"}};
 
 // helper to generate a line along a longitudinal
 function genLonLine(lon, startLat, endLat, latStep) {
@@ -206,8 +194,7 @@ var objects = [
     },
     {
       name: "two points (MultiPoint) but only one in: Shenzhen, Guangdong, China",
-      geo:
-          {type: "MultiPoint", coordinates: [[114.0538788, 22.5551603], [113.743858, 23.025815]]}
+      geo: {type: "MultiPoint", coordinates: [[114.0538788, 22.5551603], [113.743858, 23.025815]]}
     },
     {
       name: "multi line string: new zealand bays",
@@ -606,9 +593,7 @@ indexes.forEach(function(index) {
 
         // geoWithin query
         var docArray = [];
-        var q = {
-            geo: {$geoWithin: {$geometry: p}}
-        };
+        var q = {geo: {$geoWithin: {$geometry: p}}};
         // Test query in aggregate
         docArray = coll.aggregate({$match: q}).toArray();
         assert.eq(p.nW, docArray.length, "aggregate within " + p.name);
@@ -616,9 +601,7 @@ indexes.forEach(function(index) {
         assert.eq(p.nW, docArray.length, "within " + p.name);
 
         // geoIntersects query
-        q = {
-            geo: {$geoIntersects: {$geometry: p}}
-        };
+        q = {geo: {$geoIntersects: {$geometry: p}}};
         // Test query in aggregate
         docArray = coll.aggregate({$match: q}).toArray();
         assert.eq(p.nI, docArray.length, "aggregate intersects " + p.name);

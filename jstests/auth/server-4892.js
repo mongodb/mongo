@@ -46,44 +46,42 @@ function expectNumLiveCursors(mongod, expectedNumLiveCursors) {
                expectedNumLiveCursors + ")");
 }
 
-withMongod({noauth: ""},
-           function setupTest(mongod) {
-               var admin, somedb, conn;
-               conn = new Mongo(mongod.host);
-               admin = conn.getDB('admin');
-               somedb = conn.getDB('somedb');
-               admin.createUser({user: 'admin', pwd: 'admin', roles: jsTest.adminUserRoles});
-               admin.auth('admin', 'admin');
-               somedb.createUser({user: 'frim', pwd: 'fram', roles: jsTest.basicUserRoles});
-               somedb.data.drop();
-               for (var i = 0; i < 10; ++i) {
-                   assert.writeOK(somedb.data.insert({val: i}));
-               }
-               admin.logout();
-           });
+withMongod({noauth: ""}, function setupTest(mongod) {
+    var admin, somedb, conn;
+    conn = new Mongo(mongod.host);
+    admin = conn.getDB('admin');
+    somedb = conn.getDB('somedb');
+    admin.createUser({user: 'admin', pwd: 'admin', roles: jsTest.adminUserRoles});
+    admin.auth('admin', 'admin');
+    somedb.createUser({user: 'frim', pwd: 'fram', roles: jsTest.basicUserRoles});
+    somedb.data.drop();
+    for (var i = 0; i < 10; ++i) {
+        assert.writeOK(somedb.data.insert({val: i}));
+    }
+    admin.logout();
+});
 
-withMongod({auth: ""},
-           function runTest(mongod) {
-               var conn = new Mongo(mongod.host);
-               var somedb = conn.getDB('somedb');
-               somedb.auth('frim', 'fram');
+withMongod({auth: ""}, function runTest(mongod) {
+    var conn = new Mongo(mongod.host);
+    var somedb = conn.getDB('somedb');
+    somedb.auth('frim', 'fram');
 
-               expectNumLiveCursors(mongod, 0);
+    expectNumLiveCursors(mongod, 0);
 
-               var cursor = somedb.data.find({}, {'_id': 1}).batchSize(1);
-               cursor.next();
-               expectNumLiveCursors(mongod, 1);
+    var cursor = somedb.data.find({}, {'_id': 1}).batchSize(1);
+    cursor.next();
+    expectNumLiveCursors(mongod, 1);
 
-               cursor = null;
-               // NOTE(schwerin): We assume that after setting cursor = null, there are no remaining
-               // references
-               // to the cursor, and that gc() will deterministically garbage collect it.
-               gc();
+    cursor = null;
+    // NOTE(schwerin): We assume that after setting cursor = null, there are no remaining
+    // references
+    // to the cursor, and that gc() will deterministically garbage collect it.
+    gc();
 
-               // NOTE(schwerin): dbKillCursors gets piggybacked on subsequent messages on the
-               // connection, so we
-               // have to force a message to the server.
-               somedb.data.findOne();
+    // NOTE(schwerin): dbKillCursors gets piggybacked on subsequent messages on the
+    // connection, so we
+    // have to force a message to the server.
+    somedb.data.findOne();
 
-               expectNumLiveCursors(mongod, 0);
-           });
+    expectNumLiveCursors(mongod, 0);
+});

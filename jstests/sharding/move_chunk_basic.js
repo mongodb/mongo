@@ -33,10 +33,10 @@
         assert(aChunk);
 
         // Error if either of the bounds is not a valid shard key (BSON object - 1 yields a NaN)
-        assert.commandFailed(mongos.adminCommand(
-            {moveChunk: ns, bounds: [aChunk.min - 1, aChunk.max], to: shard1}));
-        assert.commandFailed(mongos.adminCommand(
-            {moveChunk: ns, bounds: [aChunk.min, aChunk.max - 1], to: shard1}));
+        assert.commandFailed(
+            mongos.adminCommand({moveChunk: ns, bounds: [aChunk.min - 1, aChunk.max], to: shard1}));
+        assert.commandFailed(
+            mongos.adminCommand({moveChunk: ns, bounds: [aChunk.min, aChunk.max - 1], to: shard1}));
 
         // Fail if find and bounds are both set.
         assert.commandFailed(mongos.adminCommand(

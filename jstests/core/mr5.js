@@ -22,10 +22,7 @@ r = function(k, v) {
             total += v[i].stats[j];
         }
     }
-    return {
-        stats: stats,
-        total: total
-    };
+    return {stats: stats, total: total};
 };
 
 res = t.mapReduce(m, r, {out: "mr5_out", scope: {xx: 1}});
@@ -41,11 +38,7 @@ res.drop();
 m = function() {
     var x = "partner";
     var y = "visits";
-    emit(this [x],
-         {
-             stats:
-                 [this[y]]
-         });
+    emit(this[x], {stats: [this[y]]});
 };
 
 res = t.mapReduce(m, r, {out: "mr5_out", scope: {xx: 1}});

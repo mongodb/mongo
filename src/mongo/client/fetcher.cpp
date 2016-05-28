@@ -69,12 +69,13 @@ Status parseCursorResponse(const BSONObj& obj,
     if (cursorElement.eoo()) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "cursor response must contain '" << kCursorFieldName
-                                    << "' field: " << obj);
+                                    << "' field: "
+                                    << obj);
     }
     if (!cursorElement.isABSONObj()) {
-        return Status(ErrorCodes::FailedToParse,
-                      str::stream() << "'" << kCursorFieldName
-                                    << "' field must be an object: " << obj);
+        return Status(
+            ErrorCodes::FailedToParse,
+            str::stream() << "'" << kCursorFieldName << "' field must be an object: " << obj);
     }
     BSONObj cursorObj = cursorElement.Obj();
 
@@ -82,13 +83,17 @@ Status parseCursorResponse(const BSONObj& obj,
     if (cursorIdElement.eoo()) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "cursor response must contain '" << kCursorFieldName << "."
-                                    << kCursorIdFieldName << "' field: " << obj);
+                                    << kCursorIdFieldName
+                                    << "' field: "
+                                    << obj);
     }
     if (cursorIdElement.type() != mongo::NumberLong) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "'" << kCursorFieldName << "." << kCursorIdFieldName
                                     << "' field must be a 'long' but was a '"
-                                    << typeName(cursorIdElement.type()) << "': " << obj);
+                                    << typeName(cursorIdElement.type())
+                                    << "': "
+                                    << obj);
     }
     batchData->cursorId = cursorIdElement.numberLong();
 
@@ -96,19 +101,25 @@ Status parseCursorResponse(const BSONObj& obj,
     if (namespaceElement.eoo()) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "cursor response must contain "
-                                    << "'" << kCursorFieldName << "." << kNamespaceFieldName
-                                    << "' field: " << obj);
+                                    << "'"
+                                    << kCursorFieldName
+                                    << "."
+                                    << kNamespaceFieldName
+                                    << "' field: "
+                                    << obj);
     }
     if (namespaceElement.type() != mongo::String) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "'" << kCursorFieldName << "." << kNamespaceFieldName
-                                    << "' field must be a string: " << obj);
+                                    << "' field must be a string: "
+                                    << obj);
     }
     NamespaceString tempNss(namespaceElement.valuestrsafe());
     if (!tempNss.isValid()) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "'" << kCursorFieldName << "." << kNamespaceFieldName
-                                    << "' contains an invalid namespace: " << obj);
+                                    << "' contains an invalid namespace: "
+                                    << obj);
     }
     batchData->nss = tempNss;
 
@@ -116,20 +127,27 @@ Status parseCursorResponse(const BSONObj& obj,
     if (batchElement.eoo()) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "cursor response must contain '" << kCursorFieldName << "."
-                                    << batchFieldName << "' field: " << obj);
+                                    << batchFieldName
+                                    << "' field: "
+                                    << obj);
     }
     if (!batchElement.isABSONObj()) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "'" << kCursorFieldName << "." << batchFieldName
-                                    << "' field must be an array: " << obj);
+                                    << "' field must be an array: "
+                                    << obj);
     }
     BSONObj batchObj = batchElement.Obj();
     for (auto itemElement : batchObj) {
         if (!itemElement.isABSONObj()) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "found non-object " << itemElement << " in "
-                                        << "'" << kCursorFieldName << "." << batchFieldName
-                                        << "' field: " << obj);
+                                        << "'"
+                                        << kCursorFieldName
+                                        << "."
+                                        << batchFieldName
+                                        << "' field: "
+                                        << obj);
         }
         batchData->documents.push_back(itemElement.Obj().getOwned());
     }

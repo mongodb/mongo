@@ -77,9 +77,8 @@ wait(function() {
     return config2.version == config.version && (config3 && config3.version == config.version);
 });
 
-replTest.waitForState(slave2,
-                      [ReplSetTest.State.SECONDARY, ReplSetTest.State.RECOVERING],
-                      60 * 1000);
+replTest.waitForState(
+    slave2, [ReplSetTest.State.SECONDARY, ReplSetTest.State.RECOVERING], 60 * 1000);
 
 print("7. Kill the secondary in the middle of syncing");
 replTest.stop(slave1);

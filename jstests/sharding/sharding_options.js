@@ -4,9 +4,7 @@ load('jstests/libs/command_line/test_parsed_options.js');
 
 // Move Paranoia
 jsTest.log("Testing \"moveParanoia\" command line option");
-var expectedResult = {
-    "parsed": {"sharding": {"archiveMovedChunks": true}}
-};
+var expectedResult = {"parsed": {"sharding": {"archiveMovedChunks": true}}};
 testGetCmdLineOptsMongod({moveParanoia: ""}, expectedResult);
 
 jsTest.log("Testing \"noMoveParanoia\" command line option");
@@ -51,9 +49,7 @@ testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_shardingrole.js
 
 // Auto Splitting
 jsTest.log("Testing \"noAutoSplit\" command line option");
-var expectedResult = {
-    "parsed": {"sharding": {"autoSplit": false}}
-};
+var expectedResult = {"parsed": {"sharding": {"autoSplit": false}}};
 testGetCmdLineOptsMongos({noAutoSplit: ""}, expectedResult);
 
 jsTest.log("Testing \"sharding.autoSplit\" config file option");

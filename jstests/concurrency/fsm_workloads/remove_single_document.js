@@ -23,9 +23,7 @@ var $config = (function() {
         }
     };
 
-    var transitions = {
-        remove: {remove: 1}
-    };
+    var transitions = {remove: {remove: 1}};
 
     function setup(db, collName, cluster) {
         // insert enough documents so that each thread can remove exactly one per iteration

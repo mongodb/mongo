@@ -3,9 +3,7 @@
 function generatePoint() {
     var longitude = Math.random() * 10 - 5;
     var latitude = Math.random() * 10 - 5;
-    var pt = {
-        geometry: {type: "Point", coordinates: [longitude, latitude]}
-    };
+    var pt = {geometry: {type: "Point", coordinates: [longitude, latitude]}};
     return pt;
 }
 
@@ -49,9 +47,7 @@ function get2dsphereIndexVersion(coll) {
     return -1;
 }
 
-var nearQuery = {
-    geometry: {$near: {$geometry: {type: "Point", coordinates: [0, 0]}}}
-};
+var nearQuery = {geometry: {$near: {$geometry: {type: "Point", coordinates: [0, 0]}}}};
 
 var mongod = MongoRunner.runMongod({binVersion: "3.0"});
 var coll = getCollection(mongod);

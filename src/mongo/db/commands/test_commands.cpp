@@ -41,11 +41,11 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -263,11 +263,11 @@ public:
             for (int i = 0; i < n + 1; ++i) {
                 PlanExecutor::ExecState state = exec->getNext(nullptr, &end);
                 if (PlanExecutor::ADVANCED != state) {
-                    return appendCommandStatus(result,
-                                               {ErrorCodes::IllegalOperation,
-                                                str::stream()
-                                                    << "invalid n, collection contains fewer than "
-                                                    << n << " documents"});
+                    return appendCommandStatus(
+                        result,
+                        {ErrorCodes::IllegalOperation,
+                         str::stream() << "invalid n, collection contains fewer than " << n
+                                       << " documents"});
                 }
             }
         }

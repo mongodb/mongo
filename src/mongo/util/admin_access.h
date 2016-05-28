@@ -31,8 +31,8 @@
 
 #pragma once
 
-#include "mongo/db/jsobj.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
 

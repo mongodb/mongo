@@ -60,27 +60,31 @@ SASLGlobalParams::SASLGlobalParams() {
 Status addSASLOptions(moe::OptionSection* options) {
     moe::OptionSection saslOptions("SASL Options");
 
-    saslOptions.addOptionChaining("security.authenticationMechanisms",
-                                  "",
-                                  moe::StringVector,
-                                  "List of supported authentication mechanisms.  "
-                                  "Default is MONGODB-CR, SCRAM-SHA-1 and MONGODB-X509.")
+    saslOptions
+        .addOptionChaining("security.authenticationMechanisms",
+                           "",
+                           moe::StringVector,
+                           "List of supported authentication mechanisms.  "
+                           "Default is MONGODB-CR, SCRAM-SHA-1 and MONGODB-X509.")
         .setSources(moe::SourceYAMLConfig);
 
-    saslOptions.addOptionChaining(
-                    "security.sasl.hostName", "", moe::String, "Fully qualified server domain name")
+    saslOptions
+        .addOptionChaining(
+            "security.sasl.hostName", "", moe::String, "Fully qualified server domain name")
         .setSources(moe::SourceYAMLConfig);
 
-    saslOptions.addOptionChaining("security.sasl.serviceName",
-                                  "",
-                                  moe::String,
-                                  "Registered name of the service using SASL")
+    saslOptions
+        .addOptionChaining("security.sasl.serviceName",
+                           "",
+                           moe::String,
+                           "Registered name of the service using SASL")
         .setSources(moe::SourceYAMLConfig);
 
-    saslOptions.addOptionChaining("security.sasl.saslauthdSocketPath",
-                                  "",
-                                  moe::String,
-                                  "Path to Unix domain socket file for saslauthd")
+    saslOptions
+        .addOptionChaining("security.sasl.saslauthdSocketPath",
+                           "",
+                           moe::String,
+                           "Path to Unix domain socket file for saslauthd")
         .setSources(moe::SourceYAMLConfig);
 
     Status ret = options->addSection(saslOptions);
@@ -178,11 +182,11 @@ public:
 
     virtual Status validate(const int& newValue) {
         if (newValue < minimumScramIterationCount) {
-            return Status(ErrorCodes::BadValue,
-                          mongoutils::str::stream()
-                              << "Invalid value for SCRAM iteration count: " << newValue
-                              << " is less than the minimum SCRAM iteration count, "
-                              << minimumScramIterationCount);
+            return Status(
+                ErrorCodes::BadValue,
+                mongoutils::str::stream() << "Invalid value for SCRAM iteration count: " << newValue
+                                          << " is less than the minimum SCRAM iteration count, "
+                                          << minimumScramIterationCount);
         }
 
         return Status::OK();

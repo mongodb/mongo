@@ -9,9 +9,7 @@ t.drop();
 t.ensureIndex({locs: "2d"});
 t.save({locs: [[49.999, 49.999], [50.0, 50.0], [50.001, 50.001]]});
 
-var q = {
-    locs: {$near: [50.0, 50.0]}
-};
+var q = {locs: {$near: [50.0, 50.0]}};
 assert.eq(1, t.find(q).itcount(), 'duplicates returned from query');
 
 var res = t.update({locs: {$near: [50.0, 50.0]}}, {$inc: {touchCount: 1}}, false, true);

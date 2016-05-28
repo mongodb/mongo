@@ -30,8 +30,8 @@
 
 #pragma once
 
-#include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/platform/unordered_set.h"
+#include "mongo/util/concurrency/spin_lock.h"
 
 #include "mongo/db/storage/mmap_v1/diskloc.h"
 #include "mongo/db/storage/record_store.h"

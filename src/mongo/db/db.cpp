@@ -441,7 +441,8 @@ static void repairDatabasesAndCheckVersion(OperationContext* txn) {
                 status = {ErrorCodes::MustUpgrade, status.reason()};
             }
             severe() << "Unable to start mongod due to an incompatibility with the data files and"
-                        " this version of mongod: " << status;
+                        " this version of mongod: "
+                     << status;
             severe() << "Please consult our documentation when trying to downgrade to a previous"
                         " major release";
             quickExit(EXIT_NEED_UPGRADE);
@@ -835,9 +836,8 @@ int main(int argc, char* argv[], char** envp) {
 }
 #endif
 
-MONGO_INITIALIZER_GENERAL(ForkServer,
-                          ("EndStartupOptionHandling"),
-                          ("default"))(InitializerContext* context) {
+MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
+(InitializerContext* context) {
     mongo::forkServerOrDie();
     return Status::OK();
 }
@@ -949,9 +949,8 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
 }
 
 #ifdef MONGO_CONFIG_SSL
-MONGO_INITIALIZER_GENERAL(setSSLManagerType,
-                          MONGO_NO_PREREQUISITES,
-                          ("SSLManager"))(InitializerContext* context) {
+MONGO_INITIALIZER_GENERAL(setSSLManagerType, MONGO_NO_PREREQUISITES, ("SSLManager"))
+(InitializerContext* context) {
     isSSLServer = true;
     return Status::OK();
 }

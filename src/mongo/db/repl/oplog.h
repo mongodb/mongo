@@ -32,8 +32,8 @@
 #include <deque>
 #include <string>
 
-#include "mongo/base/status.h"
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/status.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/stdx/functional.h"

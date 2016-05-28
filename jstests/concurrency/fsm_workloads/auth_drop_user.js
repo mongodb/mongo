@@ -37,24 +37,12 @@ var $config = (function() {
             assertAlways.isnull(db.getUser(username), "user '" + username + "' should not exist");
         }
 
-        return {
-            init: init,
-            createAndDropUser: createAndDropUser
-        };
+        return {init: init, createAndDropUser: createAndDropUser};
 
     })();
 
-    var transitions = {
-        init: {createAndDropUser: 1},
-        createAndDropUser: {createAndDropUser: 1}
-    };
+    var transitions = {init: {createAndDropUser: 1}, createAndDropUser: {createAndDropUser: 1}};
 
-    return {
-        threadCount: 10,
-        iterations: 20,
-        data: data,
-        states: states,
-        transitions: transitions
-    };
+    return {threadCount: 10, iterations: 20, data: data, states: states, transitions: transitions};
 
 })();

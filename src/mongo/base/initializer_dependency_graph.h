@@ -28,8 +28,8 @@
 #pragma once
 
 #include <string>
-#include <vector>
 #include <utility>
+#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/initializer_function.h"

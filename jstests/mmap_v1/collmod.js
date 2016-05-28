@@ -54,9 +54,8 @@ assert.eq(0, res.ok, "TTL mod shouldn't work with non-numeric expireAfterSeconds
 var res =
     db.runCommand({"collMod": coll, "index": {"keyPattern": {a: 1}, "expireAfterSeconds": 100}});
 debug(res);
-assert.eq(1,
-          db.system.indexes.count({key: {a: 1}, expireAfterSeconds: 100}),
-          "TTL index not modified");
+assert.eq(
+    1, db.system.indexes.count({key: {a: 1}, expireAfterSeconds: 100}), "TTL index not modified");
 
 // try to modify a faulty TTL index with a non-numeric expireAfterSeconds field
 t.dropIndex({a: 1});

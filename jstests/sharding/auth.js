@@ -3,23 +3,11 @@
 (function() {
     'use strict';
 
-    var adminUser = {
-        db: "admin",
-        username: "foo",
-        password: "bar"
-    };
+    var adminUser = {db: "admin", username: "foo", password: "bar"};
 
-    var testUser = {
-        db: "test",
-        username: "bar",
-        password: "baz"
-    };
+    var testUser = {db: "test", username: "bar", password: "baz"};
 
-    var testUserReadOnly = {
-        db: "test",
-        username: "sad",
-        password: "bat"
-    };
+    var testUserReadOnly = {db: "test", username: "sad", password: "bat"};
 
     function login(userObj, thingToUse) {
         if (!thingToUse) {
@@ -58,9 +46,11 @@
     }
 
     print("Configuration: Add user " + tojson(adminUser));
-    s.getDB(adminUser.db)
-        .createUser(
-            {user: adminUser.username, pwd: adminUser.password, roles: jsTest.adminUserRoles});
+    s.getDB(adminUser.db).createUser({
+        user: adminUser.username,
+        pwd: adminUser.password,
+        roles: jsTest.adminUserRoles
+    });
     login(adminUser);
 
     // Set the chunk size, disable the secondary throttle (so the test doesn't run so slow)
@@ -80,11 +70,9 @@
     d1.initiate();
 
     print("d1 initiated");
-    var shardName = authutil.asCluster(d1.nodes,
-                                       "jstests/libs/key2",
-                                       function() {
-                                           return getShardName(d1);
-                                       });
+    var shardName = authutil.asCluster(d1.nodes, "jstests/libs/key2", function() {
+        return getShardName(d1);
+    });
 
     print("adding shard w/out auth " + shardName);
     logout(adminUser);
@@ -124,15 +112,16 @@
 
     d1.waitForState(d1.getSecondaries(), ReplSetTest.State.SECONDARY, 5 * 60 * 1000);
 
-    s.getDB(testUser.db)
-        .createUser(
-            {user: testUser.username, pwd: testUser.password, roles: jsTest.basicUserRoles});
-    s.getDB(testUserReadOnly.db)
-        .createUser({
-            user: testUserReadOnly.username,
-            pwd: testUserReadOnly.password,
-            roles: jsTest.readOnlyUserRoles
-        });
+    s.getDB(testUser.db).createUser({
+        user: testUser.username,
+        pwd: testUser.password,
+        roles: jsTest.basicUserRoles
+    });
+    s.getDB(testUserReadOnly.db).createUser({
+        user: testUserReadOnly.username,
+        pwd: testUserReadOnly.password,
+        roles: jsTest.readOnlyUserRoles
+    });
 
     logout(adminUser);
 
@@ -162,11 +151,9 @@
     d2.initiate();
     d2.awaitSecondaryNodes();
 
-    shardName = authutil.asCluster(d2.nodes,
-                                   "jstests/libs/key1",
-                                   function() {
-                                       return getShardName(d2);
-                                   });
+    shardName = authutil.asCluster(d2.nodes, "jstests/libs/key1", function() {
+        return getShardName(d2);
+    });
 
     print("adding shard " + shardName);
     login(adminUser);
@@ -254,16 +241,12 @@
     d1.waitForState(d1.getSecondaries(), ReplSetTest.State.SECONDARY, 5 * 60 * 1000);
     d2.waitForState(d2.getSecondaries(), ReplSetTest.State.SECONDARY, 5 * 60 * 1000);
 
-    authutil.asCluster(d1.nodes,
-                       "jstests/libs/key1",
-                       function() {
-                           d1.awaitReplication(120000);
-                       });
-    authutil.asCluster(d2.nodes,
-                       "jstests/libs/key1",
-                       function() {
-                           d2.awaitReplication(120000);
-                       });
+    authutil.asCluster(d1.nodes, "jstests/libs/key1", function() {
+        d1.awaitReplication(120000);
+    });
+    authutil.asCluster(d2.nodes, "jstests/libs/key1", function() {
+        d2.awaitReplication(120000);
+    });
 
     // add admin on shard itself, hack to prevent localhost auth bypass
     d1.getPrimary()

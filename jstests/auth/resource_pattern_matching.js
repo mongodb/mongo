@@ -135,7 +135,7 @@ function run_tests(granter, verifier) {
     run_test("specific",
              granter,
              verifier,
-                 [{resource: {db: "a", collection: "a"}, actions: ["find"]}],
+             [{resource: {db: "a", collection: "a"}, actions: ["find"]}],
              {
                "a.a": should_find,
                "a.b": should_fail_find,
@@ -143,50 +143,39 @@ function run_tests(granter, verifier) {
                "b.b": should_fail_find
              });
 
-    run_test("glob_collection",
-             granter,
-             verifier,
-                 [{resource: {db: "a", collection: ""}, actions: ["find"]}],
-             {
-               "a.a": should_find,
-               "a.b": should_find,
-               "b.a": should_fail_find,
-               "b.b": should_fail_find
-             });
+    run_test(
+        "glob_collection",
+        granter,
+        verifier,
+        [{resource: {db: "a", collection: ""}, actions: ["find"]}],
+        {"a.a": should_find, "a.b": should_find, "b.a": should_fail_find, "b.b": should_fail_find});
 
-    run_test("glob_database",
-             granter,
-             verifier,
-                 [{resource: {db: "", collection: "a"}, actions: ["find"]}],
-             {
-               "a.a": should_find,
-               "a.b": should_fail_find,
-               "b.a": should_find,
-               "b.b": should_fail_find
-             });
+    run_test(
+        "glob_database",
+        granter,
+        verifier,
+        [{resource: {db: "", collection: "a"}, actions: ["find"]}],
+        {"a.a": should_find, "a.b": should_fail_find, "b.a": should_find, "b.b": should_fail_find});
 
     run_test("glob_all",
              granter,
              verifier,
-                 [{resource: {db: "", collection: ""}, actions: ["find"]}],
+             [{resource: {db: "", collection: ""}, actions: ["find"]}],
              {"a.a": should_find, "a.b": should_find, "b.a": should_find, "b.b": should_find});
 
-    run_test("any_resource",
-             granter,
-             verifier,
-                 [{resource: {anyResource: true}, actions: ["find"]}],
-             {
-               "a.a": should_find,
-               "a.b": should_find,
-               "b.a": should_find,
-               "b.b": should_find,
-               "c.a": should_find
-             });
+    run_test(
+        "any_resource", granter, verifier, [{resource: {anyResource: true}, actions: ["find"]}], {
+            "a.a": should_find,
+            "a.b": should_find,
+            "b.a": should_find,
+            "b.b": should_find,
+            "c.a": should_find
+        });
 
     run_test("no_global_access",
              granter,
              verifier,
-                 [{resource: {db: "$", collection: "cmd"}, actions: ["find"]}],
+             [{resource: {db: "$", collection: "cmd"}, actions: ["find"]}],
              {
                "a.a": function(testdb, testcol) {
                    var r = testdb.stats();

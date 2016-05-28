@@ -36,11 +36,11 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/write_concern_options.h"
@@ -117,7 +117,8 @@ Status validateWriteConcern(OperationContext* txn,
                 ErrorCodes::BadValue,
                 str::stream()
                     << "w:1 and w:'majority' are the only valid write concerns when writing to "
-                       "config servers, got: " << writeConcern.toBSON().toString());
+                       "config servers, got: "
+                    << writeConcern.toBSON().toString());
         }
 
         if (replMode == repl::ReplicationCoordinator::modeReplSet && !isLocalDb &&
@@ -127,7 +128,8 @@ Status validateWriteConcern(OperationContext* txn,
                 ErrorCodes::BadValue,
                 str::stream()
                     << "w: 'majority' is the only valid write concern when writing to config "
-                       "server replica sets, got: " << writeConcern.toBSON().toString());
+                       "server replica sets, got: "
+                    << writeConcern.toBSON().toString());
         }
     }
 

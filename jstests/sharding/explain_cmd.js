@@ -50,10 +50,8 @@ assert.eq(2, explain.queryPlanner.winningPlan.shards.length);
 assert.eq(2, explain.executionStats.executionStages.shards.length);
 
 // An explain of a command that doesn't exist should fail gracefully.
-explain = db.runCommand({
-    explain: {nonexistent: collSharded.getName(), query: {b: 1}},
-    verbosity: "allPlansExecution"
-});
+explain = db.runCommand(
+    {explain: {nonexistent: collSharded.getName(), query: {b: 1}}, verbosity: "allPlansExecution"});
 printjson(explain);
 assert.commandFailed(explain);
 

@@ -571,9 +571,8 @@ TEST(IndexBoundsBuilderTest, TranslateLteBinData) {
     ASSERT_EQ(oil.intervals.size(), 1U);
     ASSERT_EQ(Interval::INTERVAL_EQUALS,
               oil.intervals[0].compare(
-                  Interval(fromjson(
-                               "{'': {$binary: '', $type: '00'},"
-                               "'': {$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}"),
+                  Interval(fromjson("{'': {$binary: '', $type: '00'},"
+                                    "'': {$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}"),
                            true,
                            true)));
     ASSERT_EQ(tightness, IndexBoundsBuilder::EXACT);
@@ -593,9 +592,8 @@ TEST(IndexBoundsBuilderTest, TranslateLtBinData) {
     ASSERT_EQ(oil.intervals.size(), 1U);
     ASSERT_EQ(Interval::INTERVAL_EQUALS,
               oil.intervals[0].compare(
-                  Interval(fromjson(
-                               "{'': {$binary: '', $type: '00'},"
-                               "'': {$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}"),
+                  Interval(fromjson("{'': {$binary: '', $type: '00'},"
+                                    "'': {$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}"),
                            true,
                            false)));
     ASSERT_EQ(tightness, IndexBoundsBuilder::EXACT);
@@ -615,9 +613,8 @@ TEST(IndexBoundsBuilderTest, TranslateGtBinData) {
     ASSERT_EQ(oil.intervals.size(), 1U);
     ASSERT_EQ(Interval::INTERVAL_EQUALS,
               oil.intervals[0].compare(
-                  Interval(fromjson(
-                               "{'': {$binary: '////////////////////////////', $type: '00'},"
-                               "'': ObjectId('000000000000000000000000')}"),
+                  Interval(fromjson("{'': {$binary: '////////////////////////////', $type: '00'},"
+                                    "'': ObjectId('000000000000000000000000')}"),
                            false,
                            false)));
     ASSERT_EQ(tightness, IndexBoundsBuilder::EXACT);
@@ -637,9 +634,8 @@ TEST(IndexBoundsBuilderTest, TranslateGteBinData) {
     ASSERT_EQ(oil.intervals.size(), 1U);
     ASSERT_EQ(Interval::INTERVAL_EQUALS,
               oil.intervals[0].compare(
-                  Interval(fromjson(
-                               "{'': {$binary: '////////////////////////////', $type: '00'},"
-                               "'': ObjectId('000000000000000000000000')}"),
+                  Interval(fromjson("{'': {$binary: '////////////////////////////', $type: '00'},"
+                                    "'': ObjectId('000000000000000000000000')}"),
                            true,
                            false)));
     ASSERT_EQ(tightness, IndexBoundsBuilder::EXACT);

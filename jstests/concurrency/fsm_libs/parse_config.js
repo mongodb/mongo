@@ -36,44 +36,40 @@ function parseConfig(config) {
 
     assert.eq('object', typeof config.states);
     assert.gt(Object.keys(config.states).length, 0);
-    Object.keys(config.states)
-        .forEach(function(k) {
-            assert.eq(
-                'function', typeof config.states[k], 'config.states.' + k + ' is not a function');
-            if (config.passConnectionCache) {
-                assert.eq(3,
-                          config.states[k].length,
-                          'if passConnectionCache is true, state functions should ' +
-                              'accept 3 parameters: db, collName, and connCache');
-            } else {
-                assert.eq(2,
-                          config.states[k].length,
-                          'if passConnectionCache is false, state functions should ' +
-                              'accept 2 parameters: db and collName');
-            }
-        });
+    Object.keys(config.states).forEach(function(k) {
+        assert.eq('function', typeof config.states[k], 'config.states.' + k + ' is not a function');
+        if (config.passConnectionCache) {
+            assert.eq(3,
+                      config.states[k].length,
+                      'if passConnectionCache is true, state functions should ' +
+                          'accept 3 parameters: db, collName, and connCache');
+        } else {
+            assert.eq(2,
+                      config.states[k].length,
+                      'if passConnectionCache is false, state functions should ' +
+                          'accept 2 parameters: db and collName');
+        }
+    });
 
     // assert all states mentioned in config.transitions are present in config.states
     assert.eq('object', typeof config.transitions);
     assert.gt(Object.keys(config.transitions).length, 0);
-    Object.keys(config.transitions)
-        .forEach(function(fromState) {
-            assert(config.states.hasOwnProperty(fromState),
-                   'config.transitions contains a state not in config.states: ' + fromState);
+    Object.keys(config.transitions).forEach(function(fromState) {
+        assert(config.states.hasOwnProperty(fromState),
+               'config.transitions contains a state not in config.states: ' + fromState);
 
-            assert.gt(Object.keys(config.transitions[fromState]).length, 0);
-            Object.keys(config.transitions[fromState])
-                .forEach(function(toState) {
-                    assert(config.states.hasOwnProperty(toState),
-                           'config.transitions.' + fromState +
-                               ' contains a state not in config.states: ' + toState);
-                    assert.eq('number',
-                              typeof config.transitions[fromState][toState],
-                              'transitions.' + fromState + '.' + toState + ' should be a number');
-                    assert(!isNaN(config.transitions[fromState][toState]),
-                           'transitions.' + fromState + '.' + toState + ' cannot be NaN');
-                });
+        assert.gt(Object.keys(config.transitions[fromState]).length, 0);
+        Object.keys(config.transitions[fromState]).forEach(function(toState) {
+            assert(config.states.hasOwnProperty(toState),
+                   'config.transitions.' + fromState + ' contains a state not in config.states: ' +
+                       toState);
+            assert.eq('number',
+                      typeof config.transitions[fromState][toState],
+                      'transitions.' + fromState + '.' + toState + ' should be a number');
+            assert(!isNaN(config.transitions[fromState][toState]),
+                   'transitions.' + fromState + '.' + toState + ' cannot be NaN');
         });
+    });
 
     config.setup = config.setup || function() {};
     assert.eq('function', typeof config.setup);

@@ -100,10 +100,9 @@
     // Removed the assertion because it was too flaky.  Printing a warning instead (dan)
     jsTestLog("making sure we dropped some dups");
     var res = secondary.adminCommand({getLog: "global"});
-    var droppedDups = (contains(res.log,
-                                function(v) {
-                                    return v.indexOf("index build dropped" /* NNN dups*/) != -1;
-                                }));
+    var droppedDups = (contains(res.log, function(v) {
+        return v.indexOf("index build dropped" /* NNN dups*/) != -1;
+    }));
     if (!droppedDups) {
         jsTestLog(
             "Warning: Test did not trigger duplicate documents, this run will be a false negative");

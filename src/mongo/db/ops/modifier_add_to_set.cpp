@@ -124,7 +124,8 @@ Status ModifierAddToSet::init(const BSONElement& modExpr, const Options& opts, b
     if (foundDollar && foundCount > 1) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Too many positional (i.e. '$') elements found in path '"
-                                    << _fieldRef.dottedField() << "'");
+                                    << _fieldRef.dottedField()
+                                    << "'");
     }
 
     // TODO: The driver could potentially do this re-writing.
@@ -247,11 +248,12 @@ Status ModifierAddToSet::prepare(mb::Element root, StringData matchedField, Exec
     if (_preparedState->elemFound.getType() != mongo::Array) {
         mb::Element idElem = mb::findElementNamed(root.leftChild(), "_id");
         return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "Cannot apply $addToSet to a non-array field. Field named '"
-                          << _preparedState->elemFound.getFieldName() << "' has a non-array type "
-                          << typeName(_preparedState->elemFound.getType()) << " in the document "
-                          << idElem.toString());
+                      str::stream() << "Cannot apply $addToSet to a non-array field. Field named '"
+                                    << _preparedState->elemFound.getFieldName()
+                                    << "' has a non-array type "
+                                    << typeName(_preparedState->elemFound.getType())
+                                    << " in the document "
+                                    << idElem.toString());
     }
 
     // If the array is empty, then we don't need to check anything: all of the values are
@@ -387,7 +389,8 @@ Status ModifierAddToSet::log(LogBuilder* logBuilder) const {
         if (!status.isOK()) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "Could not append entry for $addToSet oplog entry."
-                                        << "Underlying cause: " << status.toString());
+                                        << "Underlying cause: "
+                                        << status.toString());
         }
         curr = curr.rightSibling();
     }

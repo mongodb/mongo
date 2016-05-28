@@ -30,8 +30,8 @@
 
 
 #include "mongo/base/status.h"
-#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/btree_key_generator.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/jsobj.h"
 

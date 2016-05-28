@@ -32,9 +32,9 @@
 
 #include "mongo/scripting/mozjs/implscope.h"
 
+#include <js/CharacterEncoding.h>
 #include <jscustomallocator.h>
 #include <jsfriendapi.h>
-#include <js/CharacterEncoding.h>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/operation_context.h"

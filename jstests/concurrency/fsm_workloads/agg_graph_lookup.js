@@ -7,28 +7,28 @@
  */
 var $config = (function() {
 
-    var data = {
-        numDocs: 1000
-    };
+    var data = {numDocs: 1000};
 
     var states = {
         query: function query(db, collName) {
             var limitAmount = 20;
             var startingId = Random.randInt(this.numDocs - limitAmount);
-            var res = db[collName].aggregate([
-                {$match: {_id: {$gt: startingId}}},
-                {
-                  $graphLookup: {
-                      from: collName,
-                      startWith: "$to",
-                      connectToField: "_id",
-                      connectFromField: "to",
-                      maxDepth: 10,
-                      as: "out",
-                  }
-                },
-                {$limit: limitAmount}
-            ]).toArray();
+            var res = db[collName]
+                          .aggregate([
+                              {$match: {_id: {$gt: startingId}}},
+                              {
+                                $graphLookup: {
+                                    from: collName,
+                                    startWith: "$to",
+                                    connectToField: "_id",
+                                    connectFromField: "to",
+                                    maxDepth: 10,
+                                    as: "out",
+                                }
+                              },
+                              {$limit: limitAmount}
+                          ])
+                          .toArray();
 
             assertWhenOwnColl.eq(res.length, limitAmount);
         },
@@ -40,10 +40,7 @@ var $config = (function() {
         }
     };
 
-    var transitions = {
-        query: {query: 0.5, update: 0.5},
-        update: {query: 0.5, update: 0.5}
-    };
+    var transitions = {query: {query: 0.5, update: 0.5}, update: {query: 0.5, update: 0.5}};
 
     function setup(db, collName, cluster) {
         // Load example data.

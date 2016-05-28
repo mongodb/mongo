@@ -3,9 +3,7 @@ var baseName = "jstests_auth_auth_options";
 load('jstests/libs/command_line/test_parsed_options.js');
 
 jsTest.log("Testing \"auth\" command line option");
-var expectedResult = {
-    "parsed": {"security": {"authorization": "enabled"}}
-};
+var expectedResult = {"parsed": {"security": {"authorization": "enabled"}}};
 
 testGetCmdLineOptsMongod({auth: ""}, expectedResult);
 

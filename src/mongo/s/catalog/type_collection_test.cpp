@@ -28,8 +28,8 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/bson/oid.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/oid.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
@@ -47,10 +47,12 @@ TEST(CollectionType, Empty) {
 
 TEST(CollectionType, Basic) {
     const OID oid = OID::gen();
-    StatusWith<CollectionType> status = CollectionType::fromBSON(BSON(
-        CollectionType::fullNs("db.coll")
-        << CollectionType::epoch(oid) << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
-        << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)));
+    StatusWith<CollectionType> status =
+        CollectionType::fromBSON(BSON(CollectionType::fullNs("db.coll")
+                                      << CollectionType::epoch(oid)
+                                      << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
+                                      << CollectionType::keyPattern(BSON("a" << 1))
+                                      << CollectionType::unique(true)));
     ASSERT_TRUE(status.isOK());
 
     CollectionType coll = status.getValue();
@@ -88,11 +90,16 @@ TEST(CollectionType, EpochCorrectness) {
 }
 
 TEST(CollectionType, Pre22Format) {
-    CollectionType coll = assertGet(
-        CollectionType::fromBSON(BSON("_id"
-                                      << "db.coll"
-                                      << "lastmod" << Date_t::fromMillisSinceEpoch(1) << "dropped"
-                                      << false << "key" << BSON("a" << 1) << "unique" << false)));
+    CollectionType coll = assertGet(CollectionType::fromBSON(BSON("_id"
+                                                                  << "db.coll"
+                                                                  << "lastmod"
+                                                                  << Date_t::fromMillisSinceEpoch(1)
+                                                                  << "dropped"
+                                                                  << false
+                                                                  << "key"
+                                                                  << BSON("a" << 1)
+                                                                  << "unique"
+                                                                  << false)));
 
     ASSERT(coll.getNs() == NamespaceString{"db.coll"});
     ASSERT(!coll.getEpoch().isSet());
@@ -105,10 +112,12 @@ TEST(CollectionType, Pre22Format) {
 
 TEST(CollectionType, InvalidCollectionNamespace) {
     const OID oid = OID::gen();
-    StatusWith<CollectionType> result = CollectionType::fromBSON(BSON(
-        CollectionType::fullNs("foo\\bar.coll")
-        << CollectionType::epoch(oid) << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
-        << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)));
+    StatusWith<CollectionType> result =
+        CollectionType::fromBSON(BSON(CollectionType::fullNs("foo\\bar.coll")
+                                      << CollectionType::epoch(oid)
+                                      << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
+                                      << CollectionType::keyPattern(BSON("a" << 1))
+                                      << CollectionType::unique(true)));
     ASSERT_TRUE(result.isOK());
     CollectionType collType = result.getValue();
     ASSERT_FALSE(collType.validate().isOK());

@@ -255,8 +255,8 @@ public:
         int newValue;
         if (!newValueElement.coerce(&newValue) || newValue < 0)
             return Status(ErrorCodes::BadValue,
-                          mongoutils::str::stream()
-                              << "Invalid value for logLevel: " << newValueElement);
+                          mongoutils::str::stream() << "Invalid value for logLevel: "
+                                                    << newValueElement);
         LogSeverity newSeverity =
             (newValue > 0) ? LogSeverity::Debug(newValue) : LogSeverity::Log();
         globalLogDomain()->setMinimumLoggedSeverity(newSeverity);
@@ -483,7 +483,8 @@ public:
         if (str != "disabled" && str != "allowSSL" && str != "preferSSL" && str != "requireSSL") {
             return Status(ErrorCodes::BadValue,
                           mongoutils::str::stream()
-                              << "Invalid value for sslMode via setParameter command: " << str);
+                              << "Invalid value for sslMode via setParameter command: "
+                              << str);
         }
 
         int oldMode = sslGlobalParams.sslMode.load();
@@ -495,7 +496,9 @@ public:
             return Status(ErrorCodes::BadValue,
                           mongoutils::str::stream()
                               << "Illegal state transition for sslMode, attempt to change from "
-                              << sslModeStr() << " to " << str);
+                              << sslModeStr()
+                              << " to "
+                              << str);
         }
         return Status::OK();
     }
@@ -566,7 +569,9 @@ public:
 #ifdef MONGO_CONFIG_SSL
             setInternalUserAuthParams(
                 BSON(saslCommandMechanismFieldName
-                     << "MONGODB-X509" << saslCommandUserDBFieldName << "$external"
+                     << "MONGODB-X509"
+                     << saslCommandUserDBFieldName
+                     << "$external"
                      << saslCommandUserFieldName
                      << getSSLManager()->getSSLConfiguration().clientSubjectName));
 #endif
@@ -576,7 +581,9 @@ public:
             return Status(ErrorCodes::BadValue,
                           mongoutils::str::stream()
                               << "Illegal state transition for clusterAuthMode, change from "
-                              << clusterAuthModeStr() << " to " << str);
+                              << clusterAuthModeStr()
+                              << " to "
+                              << str);
         }
         return Status::OK();
     }

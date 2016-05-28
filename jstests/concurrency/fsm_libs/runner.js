@@ -214,9 +214,7 @@ var runner = (function() {
                 myDB[collName].drop();
 
                 if (cluster.isSharded()) {
-                    var shardKey = context[workload].config.data.shardKey || {
-                        _id: 'hashed'
-                    };
+                    var shardKey = context[workload].config.data.shardKey || {_id: 'hashed'};
                     // TODO: allow workload config data to specify split
                     cluster.shardCollection(myDB[collName], shardKey, false);
                 }
@@ -328,11 +326,13 @@ var runner = (function() {
                 numUniqueTraces + ' of which were unique:\n\n';
 
             return summary +
-                uniqueTraces.map(function(obj) {
-                    var line = pluralize('thread', obj.freq) + ' with tids ' +
-                        JSON.stringify(obj.tids) + ' threw\n';
-                    return indent(line + obj.value, 8);
-                }).join('\n\n');
+                uniqueTraces
+                    .map(function(obj) {
+                        var line = pluralize('thread', obj.freq) + ' with tids ' +
+                            JSON.stringify(obj.tids) + ' threw\n';
+                        return indent(line + obj.value, 8);
+                    })
+                    .join('\n\n');
         }
 
         if (workerErrs.length > 0) {
@@ -401,9 +401,7 @@ var runner = (function() {
         workloads.forEach(function(workload) {
             load(workload);  // for $config
             assert.neq('undefined', typeof $config, '$config was not defined by ' + workload);
-            context[workload] = {
-                config: parseConfig($config)
-            };
+            context[workload] = {config: parseConfig($config)};
             if (applyMultipliers) {
                 context[workload].config.iterations *= executionOptions.iterationMultiplier;
                 context[workload].config.threadCount *= executionOptions.threadMultiplier;
@@ -525,7 +523,7 @@ var runner = (function() {
             } finally {
                 // Threads must be joined before destruction, so do this
                 // even in the presence of exceptions.
-                errors.push(... threadMgr.joinAll().map(
+                errors.push(...threadMgr.joinAll().map(
                     e => new WorkloadFailure(
                         e.err, e.stack, e.tid, 'Foreground ' + e.workloads.join(' '))));
             }
@@ -630,8 +628,8 @@ var runner = (function() {
         var dbHashBlacklist = ['local'];
 
         if (cleanupOptions.dropDatabaseBlacklist) {
-            dbBlacklist.push(... cleanupOptions.dropDatabaseBlacklist);
-            dbHashBlacklist.push(... cleanupOptions.dropDatabaseBlacklist);
+            dbBlacklist.push(...cleanupOptions.dropDatabaseBlacklist);
+            dbHashBlacklist.push(...cleanupOptions.dropDatabaseBlacklist);
         }
         if (!cleanupOptions.keepExistingDatabases) {
             dropAllDatabases(cluster.getDB('test'), dbBlacklist);
@@ -703,7 +701,7 @@ var runner = (function() {
             } finally {
                 // Set a flag so background threads know to terminate.
                 bgThreadMgr.markAllForTermination();
-                errors.push(... bgThreadMgr.joinAll().map(
+                errors.push(...bgThreadMgr.joinAll().map(
                     e => new WorkloadFailure(
                         e.err, e.stack, e.tid, 'Background ' + e.workloads.join(' '))));
             }

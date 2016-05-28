@@ -180,12 +180,10 @@ function runTest(conn) {
     (function testGrantPrivilegesToRole() {
         jsTestLog("Testing grantPrivilegesToRole");
 
-        adminUserAdmin.grantPrivilegesToRole(
-            'adminRole',
-            [
-              {resource: {cluster: true}, actions: ['serverStatus']},
-              {resource: {db: "", collection: ""}, actions: ['find']}
-            ]);
+        adminUserAdmin.grantPrivilegesToRole('adminRole', [
+            {resource: {cluster: true}, actions: ['serverStatus']},
+            {resource: {db: "", collection: ""}, actions: ['find']}
+        ]);
         assert.doesNotThrow(function() {
             db.foo.findOne();
         });
@@ -197,12 +195,10 @@ function runTest(conn) {
         assert.commandWorked(db.adminCommand('serverStatus'));
 
         testUserAdmin.updateUser('testUser', {roles: ['testRole2']});
-        testUserAdmin.grantPrivilegesToRole(
-            'testRole2',
-            [
-              {resource: {db: 'test', collection: ''}, actions: ['insert', 'update']},
-              {resource: {db: 'test', collection: 'foo'}, actions: ['find']}
-            ]);
+        testUserAdmin.grantPrivilegesToRole('testRole2', [
+            {resource: {db: 'test', collection: ''}, actions: ['insert', 'update']},
+            {resource: {db: 'test', collection: 'foo'}, actions: ['find']}
+        ]);
         assert.doesNotThrow(function() {
             db.foo.findOne();
         });
@@ -219,7 +215,7 @@ function runTest(conn) {
 
         testUserAdmin.revokePrivilegesFromRole(
             'testRole2',
-                [{resource: {db: 'test', collection: ''}, actions: ['insert', 'update', 'find']}]);
+            [{resource: {db: 'test', collection: ''}, actions: ['insert', 'update', 'find']}]);
         assert.doesNotThrow(function() {
             db.foo.findOne();
         });

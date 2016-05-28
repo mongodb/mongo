@@ -42,22 +42,13 @@ assert.eq(null, gleObj.err);
 
 // Using an explicit optime on the new client should work if the optime is earlier than the
 // secondary was locked
-var gleOpTimeBefore = {
-    getLastError: true,
-    w: 2,
-    wOpTime: opTimeBeforeFailure
-};
+var gleOpTimeBefore = {getLastError: true, w: 2, wOpTime: opTimeBeforeFailure};
 gleObj = newClientConn.getCollection(coll.toString()).getDB().runCommand(gleOpTimeBefore);
 assert.eq(null, gleObj.err);
 
 // Using an explicit optime on the new client should not work if the optime is later than the
 // secondary was locked
-var gleOpTimeAfter = {
-    getLastError: true,
-    w: 2,
-    wtimeout: 1000,
-    wOpTime: opTimeAfterFailure
-};
+var gleOpTimeAfter = {getLastError: true, w: 2, wtimeout: 1000, wOpTime: opTimeAfterFailure};
 gleObj = newClientConn.getCollection(coll.toString()).getDB().runCommand(gleOpTimeAfter);
 assert.neq(null, gleObj.err);
 assert(gleObj.wtimeout);

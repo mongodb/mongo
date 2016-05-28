@@ -54,8 +54,9 @@ Status cursorNotFoundStatus(const NamespaceString& nss, CursorId cursorId) {
 
 Status cursorInUseStatus(const NamespaceString& nss, CursorId cursorId) {
     return {ErrorCodes::CursorInUse,
-            str::stream() << "Cursor already in use (namespace: '" << nss.ns()
-                          << "', id: " << cursorId << ")."};
+            str::stream() << "Cursor already in use (namespace: '" << nss.ns() << "', id: "
+                          << cursorId
+                          << ")."};
 }
 
 //

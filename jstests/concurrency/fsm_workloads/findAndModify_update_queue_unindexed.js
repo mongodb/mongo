@@ -16,16 +16,15 @@
 load('jstests/concurrency/fsm_libs/extend_workload.js');                  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/findAndModify_update_queue.js');  // for $config
 
-var $config = extendWorkload($config,
-                             function($config, $super) {
+var $config = extendWorkload($config, function($config, $super) {
 
-                                 // Use the workload name as the database name, since the workload
-                                 // name is assumed to be unique.
-                                 $config.data.uniqueDBName = 'findAndModify_update_queue_unindexed';
+    // Use the workload name as the database name, since the workload
+    // name is assumed to be unique.
+    $config.data.uniqueDBName = 'findAndModify_update_queue_unindexed';
 
-                                 $config.data.getIndexSpecs = function getIndexSpecs() {
-                                     return [];
-                                 };
+    $config.data.getIndexSpecs = function getIndexSpecs() {
+        return [];
+    };
 
-                                 return $config;
-                             });
+    return $config;
+});

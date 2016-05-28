@@ -317,7 +317,9 @@ bool ASIOMessagingPort::recv(Message& m) {
                 LOG(_logLevel) << httpMsg;
                 std::stringstream ss;
                 ss << "HTTP/1.0 200 OK\r\nConnection: close\r\nContent-Type: "
-                      "text/plain\r\nContent-Length: " << httpMsg.size() << "\r\n\r\n" << httpMsg;
+                      "text/plain\r\nContent-Length: "
+                   << httpMsg.size() << "\r\n\r\n"
+                   << httpMsg;
                 auto s = ss.str();
                 send(s.c_str(), s.size(), nullptr);
                 return false;

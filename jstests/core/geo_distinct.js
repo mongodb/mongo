@@ -60,10 +60,7 @@ for (var i = 0; i < 50; ++i) {
     coll.insert({zone: 4, loc: {type: 'Point', coordinates: [10, 10]}});
     coll.insert({zone: 5, loc: {type: 'Point', coordinates: [20, 20]}});
 }
-var originGeoJSON = {
-    type: 'Point',
-    coordinates: [0, 0]
-};
+var originGeoJSON = {type: 'Point', coordinates: [0, 0]};
 
 // Test distinct with $nearSphere query predicate.
 

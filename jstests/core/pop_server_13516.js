@@ -4,10 +4,7 @@ var t = db.jstests_pop_server_13516;
 t.drop();
 
 var id = NumberInt(0);
-var object = {
-    _id: id,
-    data: []
-};
+var object = {_id: id, data: []};
 
 for (var i = 0; i < 4096; i++) {
     object.data[i] = 0;

@@ -28,8 +28,8 @@
 
 #pragma once
 
-#include <vector>
 #include <set>
+#include <vector>
 
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/sort_key_generator.h"

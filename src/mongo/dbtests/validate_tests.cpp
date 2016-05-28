@@ -167,13 +167,16 @@ public:
             wunit.commit();
         }
 
-        auto status =
-            dbtests::createIndexFromSpec(&_txn,
-                                         coll->ns().ns(),
-                                         BSON("name"
-                                              << "a"
-                                              << "ns" << coll->ns().ns() << "key" << BSON("a" << 1)
-                                              << "background" << false));
+        auto status = dbtests::createIndexFromSpec(&_txn,
+                                                   coll->ns().ns(),
+                                                   BSON("name"
+                                                        << "a"
+                                                        << "ns"
+                                                        << coll->ns().ns()
+                                                        << "key"
+                                                        << BSON("a" << 1)
+                                                        << "background"
+                                                        << false));
 
         ASSERT_OK(status);
         ASSERT_TRUE(checkValid());
@@ -225,13 +228,16 @@ public:
             wunit.commit();
         }
 
-        auto status =
-            dbtests::createIndexFromSpec(&_txn,
-                                         coll->ns().ns(),
-                                         BSON("name"
-                                              << "a"
-                                              << "ns" << coll->ns().ns() << "key" << BSON("a" << 1)
-                                              << "background" << false));
+        auto status = dbtests::createIndexFromSpec(&_txn,
+                                                   coll->ns().ns(),
+                                                   BSON("name"
+                                                        << "a"
+                                                        << "ns"
+                                                        << coll->ns().ns()
+                                                        << "key"
+                                                        << BSON("a" << 1)
+                                                        << "background"
+                                                        << false));
 
         ASSERT_OK(status);
         ASSERT_TRUE(checkValid());
@@ -355,13 +361,16 @@ public:
         ASSERT_TRUE(checkValid());
 
         // Create multi-key index.
-        auto status =
-            dbtests::createIndexFromSpec(&_txn,
-                                         coll->ns().ns(),
-                                         BSON("name"
-                                              << "multikey_index"
-                                              << "ns" << coll->ns().ns() << "key"
-                                              << BSON("a.b" << 1) << "background" << false));
+        auto status = dbtests::createIndexFromSpec(&_txn,
+                                                   coll->ns().ns(),
+                                                   BSON("name"
+                                                        << "multikey_index"
+                                                        << "ns"
+                                                        << coll->ns().ns()
+                                                        << "key"
+                                                        << BSON("a.b" << 1)
+                                                        << "background"
+                                                        << false));
 
         ASSERT_OK(status);
         ASSERT_TRUE(checkValid());
@@ -416,13 +425,18 @@ public:
         }
 
         // Create a sparse index.
-        auto status =
-            dbtests::createIndexFromSpec(&_txn,
-                                         coll->ns().ns(),
-                                         BSON("name"
-                                              << "sparse_index"
-                                              << "ns" << coll->ns().ns() << "key" << BSON("a" << 1)
-                                              << "background" << false << "sparse" << true));
+        auto status = dbtests::createIndexFromSpec(&_txn,
+                                                   coll->ns().ns(),
+                                                   BSON("name"
+                                                        << "sparse_index"
+                                                        << "ns"
+                                                        << coll->ns().ns()
+                                                        << "key"
+                                                        << BSON("a" << 1)
+                                                        << "background"
+                                                        << false
+                                                        << "sparse"
+                                                        << true));
 
         ASSERT_OK(status);
         ASSERT_TRUE(checkValid());
@@ -469,14 +483,18 @@ public:
         }
 
         // Create a partial index.
-        auto status =
-            dbtests::createIndexFromSpec(&_txn,
-                                         coll->ns().ns(),
-                                         BSON("name"
-                                              << "partial_index"
-                                              << "ns" << coll->ns().ns() << "key" << BSON("a" << 1)
-                                              << "background" << false << "partialFilterExpression"
-                                              << BSON("a" << BSON("$gt" << 1))));
+        auto status = dbtests::createIndexFromSpec(&_txn,
+                                                   coll->ns().ns(),
+                                                   BSON("name"
+                                                        << "partial_index"
+                                                        << "ns"
+                                                        << coll->ns().ns()
+                                                        << "key"
+                                                        << BSON("a" << 1)
+                                                        << "background"
+                                                        << false
+                                                        << "partialFilterExpression"
+                                                        << BSON("a" << BSON("$gt" << 1))));
 
         ASSERT_OK(status);
         ASSERT_TRUE(checkValid());
@@ -529,17 +547,23 @@ public:
                                                    coll->ns().ns(),
                                                    BSON("name"
                                                         << "compound_index_1"
-                                                        << "ns" << coll->ns().ns() << "key"
+                                                        << "ns"
+                                                        << coll->ns().ns()
+                                                        << "key"
                                                         << BSON("a" << 1 << "b" << -1)
-                                                        << "background" << false));
+                                                        << "background"
+                                                        << false));
         ASSERT_OK(status);
 
         status = dbtests::createIndexFromSpec(&_txn,
                                               coll->ns().ns(),
                                               BSON("name"
                                                    << "compound_index_2"
-                                                   << "ns" << coll->ns().ns() << "key"
-                                                   << BSON("a" << -1 << "b" << 1) << "background"
+                                                   << "ns"
+                                                   << coll->ns().ns()
+                                                   << "key"
+                                                   << BSON("a" << -1 << "b" << 1)
+                                                   << "background"
                                                    << false));
 
         ASSERT_OK(status);
@@ -588,7 +612,8 @@ public:
             &_txn,
             coll->ns().ns(),
             BSON("name" << indexName << "ns" << coll->ns().ns() << "key" << BSON("a" << 1)
-                        << "background" << false));
+                        << "background"
+                        << false));
 
         ASSERT_OK(status);
         ASSERT_TRUE(checkValid());
@@ -648,7 +673,8 @@ public:
             &_txn,
             coll->ns().ns(),
             BSON("name" << indexName << "ns" << coll->ns().ns() << "key" << BSON("a" << 1)
-                        << "background" << false));
+                        << "background"
+                        << false));
 
         ASSERT_OK(status);
         ASSERT_TRUE(checkValid());

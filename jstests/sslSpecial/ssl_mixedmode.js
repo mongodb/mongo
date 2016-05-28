@@ -6,9 +6,7 @@
 load("jstests/libs/ssl_test.js");
 
 function testCombination(sslMode, sslShell, shouldSucceed) {
-    var serverOptionOverrides = {
-        sslMode: sslMode
-    };
+    var serverOptionOverrides = {sslMode: sslMode};
 
     var clientOptions =
         sslShell ? SSLTest.prototype.defaultSSLClientOptions : SSLTest.prototype.noSSLClientOptions;

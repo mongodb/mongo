@@ -29,9 +29,8 @@ assert.eq(1, t.find({a: a}).count(), "C B");
 assert.eq(1, t.find({a: b}).count(), "C C");
 assert.eq(1, t.find({a: new RegExp(a)}).count(), "C D");
 assert.eq(1, t.find({a: new RegExp(b)}).count(), "C E");
-assert.eq(2,
-          t.find({a: new RegExp(a, "i")}).count(),
-          "C F is spidermonkey built with UTF-8 support?");
+assert.eq(
+    2, t.find({a: new RegExp(a, "i")}).count(), "C F is spidermonkey built with UTF-8 support?");
 
 // same tests as above but using {$regex: "a|b", $options: "imx"} syntax.
 t.drop();

@@ -28,8 +28,8 @@
 
 #pragma once
 
-#include <set>
 #include <boost/optional/optional.hpp>
+#include <set>
 
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/canonical_query.h"

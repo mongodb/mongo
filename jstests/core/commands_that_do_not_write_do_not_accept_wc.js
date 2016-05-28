@@ -22,9 +22,7 @@
             });
         },
         reduce: function(key, values) {
-            return {
-                count: values.length
-            };
+            return {count: values.length};
         },
         out: {inline: 1}
     });

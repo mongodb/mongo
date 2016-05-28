@@ -374,11 +374,13 @@ void MongoBase::Functions::auth::call(JSContext* cx, JS::CallArgs args) {
             params = ValueWriter(cx, args.get(0)).toBSON();
             break;
         case 3:
-            params = BSON(saslCommandMechanismFieldName
-                          << "MONGODB-CR" << saslCommandUserDBFieldName
-                          << ValueWriter(cx, args[0]).toString() << saslCommandUserFieldName
-                          << ValueWriter(cx, args[1]).toString() << saslCommandPasswordFieldName
-                          << ValueWriter(cx, args[2]).toString());
+            params =
+                BSON(saslCommandMechanismFieldName << "MONGODB-CR" << saslCommandUserDBFieldName
+                                                   << ValueWriter(cx, args[0]).toString()
+                                                   << saslCommandUserFieldName
+                                                   << ValueWriter(cx, args[1]).toString()
+                                                   << saslCommandPasswordFieldName
+                                                   << ValueWriter(cx, args[2]).toString());
             break;
         default:
             uasserted(ErrorCodes::BadValue, "mongoAuth takes 1 object or 3 string arguments");
@@ -485,7 +487,8 @@ void MongoBase::Functions::copyDatabaseWithSCRAM::call(JSContext* cx, JS::CallAr
 
     BSONObj saslFirstCommandPrefix =
         BSON("copydbsaslstart" << 1 << "fromhost" << fromHost << "fromdb" << fromDb
-                               << saslCommandMechanismFieldName << "SCRAM-SHA-1");
+                               << saslCommandMechanismFieldName
+                               << "SCRAM-SHA-1");
 
     BSONObj saslFollowupCommandPrefix =
         BSON("copydb" << 1 << "fromhost" << fromHost << "fromdb" << fromDb << "todb" << toDb);

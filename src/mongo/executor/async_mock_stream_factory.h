@@ -30,8 +30,8 @@
 
 #include <asio.hpp>
 #include <cstdint>
-#include <queue>
 #include <memory>
+#include <queue>
 #include <unordered_map>
 
 #include "mongo/executor/async_stream_factory_interface.h"

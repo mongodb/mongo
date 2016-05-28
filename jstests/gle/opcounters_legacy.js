@@ -170,10 +170,7 @@ assert.eq(metricsObj.serverStatus.failed,
 serverStatus = db.runCommand({serverStatus: 1});
 opCounters = serverStatus.opcounters;
 metricsObj = serverStatus.metrics.commands;
-var countVal = {
-    "total": 0,
-    "failed": 0
-};
+var countVal = {"total": 0, "failed": 0};
 if (metricsObj.count != null) {
     countVal = metricsObj.count;
 }

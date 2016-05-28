@@ -44,8 +44,14 @@ static_assert(sizeof(Extent) - 4 == 48 + 128, "sizeof(Extent) - 4 == 48 + 128");
 
 BSONObj Extent::dump() const {
     return BSON("loc" << myLoc.toString() << "xnext" << xnext.toString() << "xprev"
-                      << xprev.toString() << "nsdiag" << nsDiagnostic.toString() << "size" << length
-                      << "firstRecord" << firstRecord.toString() << "lastRecord"
+                      << xprev.toString()
+                      << "nsdiag"
+                      << nsDiagnostic.toString()
+                      << "size"
+                      << length
+                      << "firstRecord"
+                      << firstRecord.toString()
+                      << "lastRecord"
                       << lastRecord.toString());
 }
 

@@ -3,10 +3,7 @@
 // are user documents stored in the configuration information, it must assume that
 // there are.
 
-var dopts = {
-    smallfiles: "",
-    nopreallocj: ""
-};
+var dopts = {smallfiles: "", nopreallocj: ""};
 var st = new ShardingTest({
     shards: 1,
     mongos: 1,

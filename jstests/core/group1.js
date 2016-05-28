@@ -88,9 +88,8 @@ p = {
     initial: {count: 0},
     finalize: "abc"
 };
-assert.commandFailedWithCode(db.runCommand({group: p}),
-                             ErrorCodes.JSInterpreterFailure,
-                             "Illegal finalize function");
+assert.commandFailedWithCode(
+    db.runCommand({group: p}), ErrorCodes.JSInterpreterFailure, "Illegal finalize function");
 
 p = {
     ns: "group1",
@@ -103,9 +102,8 @@ p = {
         ob;
     }
 };
-assert.commandFailedWithCode(db.runCommand({group: p}),
-                             ErrorCodes.JSInterpreterFailure,
-                             "Illegal finalize function 2");
+assert.commandFailedWithCode(
+    db.runCommand({group: p}), ErrorCodes.JSInterpreterFailure, "Illegal finalize function 2");
 
 p = {
     ns: "group1",
@@ -118,9 +116,8 @@ p = {
         ob;
     }
 };
-assert.commandFailedWithCode(db.runCommand({group: p}),
-                             ErrorCodes.JSInterpreterFailure,
-                             "Illegal keyf function");
+assert.commandFailedWithCode(
+    db.runCommand({group: p}), ErrorCodes.JSInterpreterFailure, "Illegal keyf function");
 
 p = {
     ns: "group1",
@@ -128,9 +125,8 @@ p = {
     $reduce: "abc",
     initial: {count: 0}
 };
-assert.commandFailedWithCode(db.runCommand({group: p}),
-                             ErrorCodes.JSInterpreterFailure,
-                             "Illegal reduce function");
+assert.commandFailedWithCode(
+    db.runCommand({group: p}), ErrorCodes.JSInterpreterFailure, "Illegal reduce function");
 
 p = {
     ns: "group1",
@@ -140,8 +136,7 @@ p = {
     },
     initial: {count: 0}
 };
-assert.commandFailedWithCode(db.runCommand({group: p}),
-                             ErrorCodes.JSInterpreterFailure,
-                             "Illegal reduce function 2");
+assert.commandFailedWithCode(
+    db.runCommand({group: p}), ErrorCodes.JSInterpreterFailure, "Illegal reduce function 2");
 
 t.drop();

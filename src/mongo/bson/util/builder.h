@@ -32,8 +32,8 @@
 #include <cfloat>
 #include <sstream>
 #include <stdio.h>
-#include <string>
 #include <string.h>
+#include <string>
 
 
 #include "mongo/base/data_type_endian.h"

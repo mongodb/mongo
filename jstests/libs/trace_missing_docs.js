@@ -23,12 +23,8 @@ function traceMissingDoc(coll, doc, mongos) {
         if (doc[k] == undefined) {
             jsTest.log("Shard key " + tojson(shardKey) + " not found in doc " + tojson(doc) +
                        ", falling back to _id search...");
-            shardKeyPatt = {
-                _id: 1
-            };
-            shardKey = {
-                _id: doc['_id']
-            };
+            shardKeyPatt = {_id: 1};
+            shardKey = {_id: doc['_id']};
             break;
         }
         shardKey[k] = doc[k];
@@ -70,9 +66,7 @@ function traceMissingDoc(coll, doc, mongos) {
 
         // Find ops
         addToOps(oplog.find(addKeyQuery({op: 'i'}, 'o')));
-        var updateQuery = {
-            $or: [addKeyQuery({op: 'u'}, 'o2'), {op: 'u', 'o2._id': doc['_id']}]
-        };
+        var updateQuery = {$or: [addKeyQuery({op: 'u'}, 'o2'), {op: 'u', 'o2._id': doc['_id']}]};
         addToOps(oplog.find(updateQuery));
         addToOps(oplog.find({op: 'd', 'o._id': doc['_id']}));
     }

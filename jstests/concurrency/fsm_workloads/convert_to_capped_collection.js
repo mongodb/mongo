@@ -13,9 +13,7 @@ load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');
 
 var $config = (function() {
     // TODO: This workload may fail if an iteration multiplier is specified.
-    var data = {
-        prefix: 'convert_to_capped_collection'
-    };
+    var data = {prefix: 'convert_to_capped_collection'};
 
     var states = (function() {
 
@@ -62,16 +60,10 @@ var $config = (function() {
             });
         }
 
-        return {
-            init: init,
-            convertToCapped: convertToCapped
-        };
+        return {init: init, convertToCapped: convertToCapped};
     })();
 
-    var transitions = {
-        init: {convertToCapped: 1},
-        convertToCapped: {convertToCapped: 1}
-    };
+    var transitions = {init: {convertToCapped: 1}, convertToCapped: {convertToCapped: 1}};
 
     function setup(db, collName, cluster) {
         // Initial size should not be a power of 256.

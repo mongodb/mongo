@@ -90,8 +90,8 @@ function testRadAndDegreesOK(distance) {
     assert.eq(resRadians.itcount(), resMeters.itcount());
 
     // Also, geoNear should behave the same way.
-    resGNMeters = db.runCommand(
-        {geoNear: t.getName(), near: origin, maxDistance: distance, spherical: true});
+    resGNMeters =
+        db.runCommand({geoNear: t.getName(), near: origin, maxDistance: distance, spherical: true});
     resGNRadians = db.runCommand({
         geoNear: t.getName(),
         near: [0, 0],

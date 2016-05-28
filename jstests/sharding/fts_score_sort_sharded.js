@@ -51,8 +51,9 @@ assert.throws(function() {
 });
 
 // Projection specified with incorrect field name.
-cursor = coll.find({$text: {$search: "pizza"}}, {t: {$meta: "textScore"}})
-             .sort({s: {$meta: "textScore"}});
+cursor = coll.find({$text: {$search: "pizza"}}, {t: {$meta: "textScore"}}).sort({
+    s: {$meta: "textScore"}
+});
 assert.throws(function() {
     cursor.next();
 });

@@ -34,19 +34,19 @@
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
 
-#include <mach/vm_statistics.h>
-#include <mach/task_info.h>
-#include <mach/mach_init.h>
-#include <mach/mach_host.h>
-#include <mach/mach_traps.h>
-#include <mach/task.h>
-#include <mach/vm_map.h>
-#include <mach/shared_region.h>
 #include <iostream>
+#include <mach/mach_host.h>
+#include <mach/mach_init.h>
+#include <mach/mach_traps.h>
+#include <mach/shared_region.h>
+#include <mach/task.h>
+#include <mach/task_info.h>
+#include <mach/vm_map.h>
+#include <mach/vm_statistics.h>
 
-#include <sys/types.h>
 #include <sys/mman.h>
 #include <sys/sysctl.h>
+#include <sys/types.h>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/util/log.h"

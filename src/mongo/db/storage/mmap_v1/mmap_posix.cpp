@@ -37,10 +37,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "mongo/platform/atomic_word.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/storage/mmap_v1/file_allocator.h"
 #include "mongo/db/storage/mmap_v1/mmap.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"
@@ -162,7 +162,8 @@ void* MemoryMappedFile::map(const char* filename, unsigned long long& length) {
     unsigned long long filelen = lseek(fd, 0, SEEK_END);
     uassert(10447,
             str::stream() << "map file alloc failed, wanted: " << length << " filelen: " << filelen
-                          << ' ' << sizeof(size_t),
+                          << ' '
+                          << sizeof(size_t),
             filelen == length);
     lseek(fd, 0, SEEK_SET);
 
@@ -174,7 +175,8 @@ void* MemoryMappedFile::map(const char* filename, unsigned long long& length) {
         if (errno == ENOMEM) {
             if (sizeof(void*) == 4)
                 error() << "mmap failed with out of memory. You are using a 32-bit build and "
-                           "probably need to upgrade to 64" << endl;
+                           "probably need to upgrade to 64"
+                        << endl;
             else
                 error() << "mmap failed with out of memory. (64 bit build)" << endl;
         }
@@ -202,7 +204,8 @@ void* MemoryMappedFile::createPrivateMap() {
         if (errno == ENOMEM) {
             if (sizeof(void*) == 4) {
                 error() << "mmap private failed with out of memory. You are using a 32-bit build "
-                           "and probably need to upgrade to 64" << endl;
+                           "and probably need to upgrade to 64"
+                        << endl;
             } else {
                 error() << "mmap private failed with out of memory. (64 bit build)" << endl;
             }

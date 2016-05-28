@@ -64,7 +64,8 @@ Status bsonCheckOnlyHasFields(StringData objectName,
         if (occurrences[i] > 1) {
             return Status(ErrorCodes::DuplicateKey,
                           str::stream() << "Field " << *curr << " appears " << occurrences[i]
-                                        << " times in " << objectName);
+                                        << " times in "
+                                        << objectName);
         }
     }
     return Status::OK();
@@ -77,7 +78,7 @@ Status bsonCheckOnlyHasFields(StringData objectName,
 template <typename StringType, int N>
 Status bsonCheckOnlyHasFields(StringData objectName,
                               const BSONObj& o,
-                              const StringType(&legals)[N]) {
+                              const StringType (&legals)[N]) {
     return bsonCheckOnlyHasFields(objectName, o, &legals[0], legals + N);
 }
 

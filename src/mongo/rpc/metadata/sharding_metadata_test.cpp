@@ -53,7 +53,8 @@ TEST(ShardingMetadata, ReadFromMetadata) {
         auto sm = checkParse(
             BSON("$gleStats" << BSON("lastOpTime" << BSON("ts" << kLastOpTime.getTimestamp() << "t"
                                                                << kLastOpTime.getTerm())
-                                                  << "electionId" << kElectionId)));
+                                                  << "electionId"
+                                                  << kElectionId)));
         ASSERT_EQ(sm.getLastElectionId(), kElectionId);
         ASSERT_EQ(sm.getLastOpTime(), kLastOpTime);
     }
@@ -87,7 +88,8 @@ TEST(ShardingMetadata, ReadFromInvalidMetadata) {
         checkParseFails(
             BSON("$gleStats" << BSON("lastOpTime" << BSON("ts" << kLastOpTime.getTimestamp() << "t"
                                                                << kLastOpTime.getTerm())
-                                                  << "electionId" << 3)),
+                                                  << "electionId"
+                                                  << 3)),
             ErrorCodes::TypeMismatch);
     }
     {
@@ -101,7 +103,9 @@ TEST(ShardingMetadata, ReadFromInvalidMetadata) {
         checkParseFails(
             BSON("$gleStats" << BSON("lastOpTime" << BSON("ts" << kLastOpTime.getTimestamp() << "t"
                                                                << kLastOpTime.getTerm())
-                                                  << "electionId" << kElectionId << "extra"
+                                                  << "electionId"
+                                                  << kElectionId
+                                                  << "extra"
                                                   << "this should not be here")),
             ErrorCodes::InvalidOptions);
     }
@@ -131,14 +135,16 @@ TEST(ShardingMetadata, UpconvertValidMetadata) {
         checkUpconvert(
             BSON("ok" << 1 << "$gleStats"
                       << BSON("lastOpTime" << BSON("ts" << kLastOpTime.getTimestamp() << "t"
-                                                        << kLastOpTime.getTerm()) << "electionId"
+                                                        << kLastOpTime.getTerm())
+                                           << "electionId"
                                            << kElectionId)),
 
             BSON("ok" << 1),
 
             BSON("$gleStats" << BSON("lastOpTime" << BSON("ts" << kLastOpTime.getTimestamp() << "t"
                                                                << kLastOpTime.getTerm())
-                                                  << "electionId" << kElectionId)));
+                                                  << "electionId"
+                                                  << kElectionId)));
     }
     {
         checkUpconvert(
@@ -146,8 +152,10 @@ TEST(ShardingMetadata, UpconvertValidMetadata) {
                       << "some other stuff"
                       << "$gleStats"
                       << BSON("lastOpTime" << BSON("ts" << kLastOpTime.getTimestamp() << "t"
-                                                        << kLastOpTime.getTerm()) << "electionId"
-                                           << kElectionId) << "morestuff"
+                                                        << kLastOpTime.getTerm())
+                                           << "electionId"
+                                           << kElectionId)
+                      << "morestuff"
                       << "more other stuff"),
 
             BSON("ok" << 1 << "somestuff"
@@ -157,7 +165,8 @@ TEST(ShardingMetadata, UpconvertValidMetadata) {
 
             BSON("$gleStats" << BSON("lastOpTime" << BSON("ts" << kLastOpTime.getTimestamp() << "t"
                                                                << kLastOpTime.getTerm())
-                                                  << "electionId" << kElectionId)));
+                                                  << "electionId"
+                                                  << kElectionId)));
     }
 }
 
@@ -181,13 +190,15 @@ TEST(ShardingMetadata, UpconvertInvalidMetadata) {
                             ErrorCodes::TypeMismatch);
     }
     {
-        checkUpconvertFails(BSON("ok"
-                                 << 1 << "$gleStats"
-                                 << BSON("lastOpTime" << BSON("ts" << kLastOpTime.getTimestamp()
-                                                                   << "t" << kLastOpTime.getTerm())
-                                                      << "electionId" << kElectionId << "krandom"
-                                                      << "shouldnotbehere")),
-                            ErrorCodes::InvalidOptions);
+        checkUpconvertFails(
+            BSON("ok" << 1 << "$gleStats"
+                      << BSON("lastOpTime" << BSON("ts" << kLastOpTime.getTimestamp() << "t"
+                                                        << kLastOpTime.getTerm())
+                                           << "electionId"
+                                           << kElectionId
+                                           << "krandom"
+                                           << "shouldnotbehere")),
+            ErrorCodes::InvalidOptions);
     }
 }
 
@@ -205,9 +216,11 @@ TEST(ShardingMetadata, Downconvert) {
             BSON("ok" << 1),
             BSON("$gleStats" << BSON("lastOpTime" << BSON("ts" << kLastOpTime.getTimestamp() << "t"
                                                                << kLastOpTime.getTerm())
-                                                  << "electionId" << kElectionId)),
-            BSON("ok" << 1 << "$gleStats" << BSON("lastOpTime" << kLastOpTime.getTimestamp()
-                                                               << "electionId" << kElectionId)));
+                                                  << "electionId"
+                                                  << kElectionId)),
+            BSON("ok" << 1 << "$gleStats"
+                      << BSON("lastOpTime" << kLastOpTime.getTimestamp() << "electionId"
+                                           << kElectionId)));
     }
     { checkDownconvert(BSON("ok" << 1), BSONObj(), BSON("ok" << 1)); }
 }

@@ -28,9 +28,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include <array>
 #include <cstdint>
 #include <limits>
-#include <array>
 
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"

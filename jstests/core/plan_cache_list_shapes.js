@@ -34,9 +34,8 @@ t.ensureIndex({a: 1});
 t.ensureIndex({a: 1, b: 1});
 
 // Run a query.
-assert.eq(1,
-          t.find({a: 1, b: 1}, {_id: 1, a: 1}).sort({a: -1}).itcount(),
-          'unexpected document count');
+assert.eq(
+    1, t.find({a: 1, b: 1}, {_id: 1, a: 1}).sort({a: -1}).itcount(), 'unexpected document count');
 
 // We now expect the two indices to be compared and a cache entry to exist.
 // Retrieve query shapes from the test collection

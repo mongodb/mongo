@@ -30,10 +30,10 @@
 
 #include "mongo/db/ops/update_lifecycle_impl.h"
 
-#include "mongo/db/client.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/field_ref.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/client.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/sharding_state.h"
 

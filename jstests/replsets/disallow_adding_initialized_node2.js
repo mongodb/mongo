@@ -12,12 +12,22 @@
     'use strict';
 
     var name = 'disallow_adding_initialized_node2';
-    var replSetA = new ReplSetTest(
-        {name: name, nodes: [{rsConfig: {_id: 10}}, {rsConfig: {_id: 11, arbiterOnly: true}}, ]});
+    var replSetA = new ReplSetTest({
+        name: name,
+        nodes: [
+            {rsConfig: {_id: 10}},
+            {rsConfig: {_id: 11, arbiterOnly: true}},
+        ]
+    });
     replSetA.startSet({dbpath: "$set-A-$node"});
     replSetA.initiate();
 
-    var replSetB = new ReplSetTest({name: name, nodes: [{rsConfig: {_id: 20}}, ]});
+    var replSetB = new ReplSetTest({
+        name: name,
+        nodes: [
+            {rsConfig: {_id: 20}},
+        ]
+    });
     replSetB.startSet({dbpath: "$set-B-$node"});
     replSetB.initiate();
 

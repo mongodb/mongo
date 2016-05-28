@@ -1,18 +1,10 @@
 var t = db.geob;
 t.drop();
 
-var a = {
-    p: [0, 0]
-};
-var b = {
-    p: [1, 0]
-};
-var c = {
-    p: [3, 4]
-};
-var d = {
-    p: [0, 6]
-};
+var a = {p: [0, 0]};
+var b = {p: [1, 0]};
+var c = {p: [3, 4]};
+var d = {p: [0, 6]};
 
 t.save(a);
 t.save(b);

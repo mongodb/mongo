@@ -29,9 +29,9 @@
 
 #include <atomic>
 #include <memory>
+#include <memory>
 #include <set>
 #include <string>
-#include <memory>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"

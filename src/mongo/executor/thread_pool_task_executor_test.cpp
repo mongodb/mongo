@@ -48,10 +48,9 @@ namespace executor {
 namespace {
 
 MONGO_INITIALIZER(ThreadPoolExecutorCommonTests)(InitializerContext*) {
-    addTestsForExecutor("ThreadPoolExecutorCommon",
-                        [](std::unique_ptr<NetworkInterfaceMock>* net) {
-                            return makeThreadPoolTestExecutor(std::move(*net));
-                        });
+    addTestsForExecutor("ThreadPoolExecutorCommon", [](std::unique_ptr<NetworkInterfaceMock>* net) {
+        return makeThreadPoolTestExecutor(std::move(*net));
+    });
     return Status::OK();
 }
 
@@ -100,14 +99,16 @@ TEST_F(ThreadPoolExecutorTest, ShutdownAndScheduleRaceDoesNotCrash) {
     auto& executor = getExecutor();
     launchExecutorThread();
 
-    ASSERT_OK(executor.scheduleWork([&](const TaskExecutor::CallbackArgs& cbData) {
-        status1 = cbData.status;
-        if (!status1.isOK())
-            return;
-        barrier.countDownAndWait();
-        cb2 = cbData.executor->scheduleWork(
-            [&status2](const TaskExecutor::CallbackArgs& cbData) { status2 = cbData.status; });
-    }).getStatus());
+    ASSERT_OK(executor
+                  .scheduleWork([&](const TaskExecutor::CallbackArgs& cbData) {
+                      status1 = cbData.status;
+                      if (!status1.isOK())
+                          return;
+                      barrier.countDownAndWait();
+                      cb2 = cbData.executor->scheduleWork([&status2](
+                          const TaskExecutor::CallbackArgs& cbData) { status2 = cbData.status; });
+                  })
+                  .getStatus());
 
     auto fpTPTE1 =
         getGlobalFailPointRegistry()->getFailPoint("scheduleIntoPoolSpinsUntilThreadPoolShutsDown");

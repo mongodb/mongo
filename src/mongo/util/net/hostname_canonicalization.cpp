@@ -34,10 +34,10 @@
 
 #if !defined(_WIN32)
 #include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <netdb.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #endif
 
 #include "mongo/util/log.h"

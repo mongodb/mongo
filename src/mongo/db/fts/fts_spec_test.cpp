@@ -184,7 +184,9 @@ TEST(FTSSpec, ScoreSingleField1) {
     BSONObj user = BSON("key" << BSON("title"
                                       << "text"
                                       << "text"
-                                      << "text") << "weights" << BSON("title" << 10));
+                                      << "text")
+                              << "weights"
+                              << BSON("title" << 10));
 
     FTSSpec spec(assertGet(FTSSpec::fixSpec(user)));
 
@@ -202,7 +204,9 @@ TEST(FTSSpec, ScoreMultipleField1) {
     BSONObj user = BSON("key" << BSON("title"
                                       << "text"
                                       << "text"
-                                      << "text") << "weights" << BSON("title" << 10));
+                                      << "text")
+                              << "weights"
+                              << BSON("title" << 10));
 
     FTSSpec spec(assertGet(FTSSpec::fixSpec(user)));
 
@@ -243,7 +247,9 @@ TEST(FTSSpec, ScoreRepeatWord) {
     BSONObj user = BSON("key" << BSON("title"
                                       << "text"
                                       << "text"
-                                      << "text") << "weights" << BSON("title" << 10));
+                                      << "text")
+                              << "weights"
+                              << BSON("title" << 10));
 
     FTSSpec spec(assertGet(FTSSpec::fixSpec(user)));
 
@@ -268,7 +274,8 @@ TEST(FTSSpec, Extra1) {
 TEST(FTSSpec, Extra2) {
     BSONObj user = BSON("key" << BSON("data"
                                       << "text"
-                                      << "x" << 1));
+                                      << "x"
+                                      << 1));
     BSONObj fixed = assertGet(FTSSpec::fixSpec(user));
     FTSSpec spec(fixed);
     ASSERT_EQUALS(0U, spec.numExtraBefore());
@@ -286,7 +293,8 @@ TEST(FTSSpec, Extra3) {
 
     ASSERT_EQUALS(BSON("x" << 1 << "_fts"
                            << "text"
-                           << "_ftsx" << 1),
+                           << "_ftsx"
+                           << 1),
                   fixed["key"].Obj());
     ASSERT_EQUALS(BSON("data" << 1), fixed["weights"].Obj());
 
@@ -512,7 +520,9 @@ TEST(FTSSpec, NestedLanguages_Wildcard) {
 // Multi-language test_6: test wildcard spec with override
 TEST(FTSSpec, NestedLanguages_WildcardOverride) {
     BSONObj indexSpec = BSON("key" << BSON("$**"
-                                           << "text") << "weights" << BSON("d.e.f" << 20));
+                                           << "text")
+                                   << "weights"
+                                   << BSON("d.e.f" << 20));
     FTSSpec spec(assertGet(FTSSpec::fixSpec(indexSpec)));
     TermFrequencyMap tfm;
 

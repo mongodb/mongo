@@ -28,8 +28,8 @@
 
 #include "mongo/platform/basic.h"
 
-#include <string>
 #include <map>
+#include <string>
 #include <utility>
 #include <vector>
 

@@ -24,10 +24,7 @@ runReadOnlyTest(function() {
                   name: "The Counting Room",
                   loc: {type: "Point", coordinates: [40.7209601, -73.9588041]}
                 },
-                {
-                  name: "Kinfolk 94",
-                  loc: {type: "Point", coordinates: [40.7217058, -73.9605489]}
-                }
+                {name: "Kinfolk 94", loc: {type: "Point", coordinates: [40.7217058, -73.9605489]}}
             ];
 
             writableCollection.insertMany(locDocs);

@@ -11,36 +11,35 @@ function test(date, testSynthetics) {
                                                   : 'ISODate("%Y-%m-%dT%H:%M:%S.%LZ")';
 
     // Can't use aggregate helper or assertErrorCode because we need to handle multiple error types
-    var res = c.runCommand('aggregate',
-                           {
-                             pipeline: [{
-                                 $project: {
-                                     _id: 0,
-                                     year: {$year: '$date'},
-                                     month: {$month: '$date'},
-                                     dayOfMonth: {$dayOfMonth: '$date'},
-                                     hour: {$hour: '$date'},
-                                     minute: {$minute: '$date'},
-                                     second: {$second: '$date'}
+    var res = c.runCommand('aggregate', {
+        pipeline: [{
+            $project: {
+                _id: 0,
+                year: {$year: '$date'},
+                month: {$month: '$date'},
+                dayOfMonth: {$dayOfMonth: '$date'},
+                hour: {$hour: '$date'},
+                minute: {$minute: '$date'},
+                second: {$second: '$date'}
 
-                                     // server-6666
-                                     ,
-                                     millisecond: {$millisecond: '$date'}
+                // server-6666
+                ,
+                millisecond: {$millisecond: '$date'}
 
-                                     // server-9289
-                                     ,
-                                     millisecondPlusTen: {$millisecond: {$add: ['$date', 10]}}
+                // server-9289
+                ,
+                millisecondPlusTen: {$millisecond: {$add: ['$date', 10]}}
 
-                                     // $substr will call coerceToString
-                                     ,
-                                     string: {$substr: ['$date', 0, 1000]}
+                // $substr will call coerceToString
+                ,
+                string: {$substr: ['$date', 0, 1000]}
 
-                                     // server-11118
-                                     ,
-                                     format: {$dateToString: {format: ISOfmt, date: '$date'}}
-                                 }
-                             }]
-                           });
+                // server-11118
+                ,
+                format: {$dateToString: {format: ISOfmt, date: '$date'}}
+            }
+        }]
+    });
 
     if (date.valueOf() < 0 && _isWindows() && res.code == 16422) {
         // some versions of windows (but not all) fail with dates before 1970
@@ -55,20 +54,19 @@ function test(date, testSynthetics) {
     }
 
     assert.commandWorked(res);
-    assert.eq(res.result[0],
-              {
-                year: date.getUTCFullYear(),
-                month: date.getUTCMonth() + 1  // jan == 1
-                ,
-                dayOfMonth: date.getUTCDate(),
-                hour: date.getUTCHours(),
-                minute: date.getUTCMinutes(),
-                second: date.getUTCSeconds(),
-                millisecond: date.getUTCMilliseconds(),
-                millisecondPlusTen: ((date.getUTCMilliseconds() + 10) % 1000),
-                string: date.tojson().slice(9, 28),
-                format: date.tojson()
-              });
+    assert.eq(res.result[0], {
+        year: date.getUTCFullYear(),
+        month: date.getUTCMonth() + 1  // jan == 1
+        ,
+        dayOfMonth: date.getUTCDate(),
+        hour: date.getUTCHours(),
+        minute: date.getUTCMinutes(),
+        second: date.getUTCSeconds(),
+        millisecond: date.getUTCMilliseconds(),
+        millisecondPlusTen: ((date.getUTCMilliseconds() + 10) % 1000),
+        string: date.tojson().slice(9, 28),
+        format: date.tojson()
+    });
 
     if (testSynthetics) {
         // Tests with this set all have the same value for these fields

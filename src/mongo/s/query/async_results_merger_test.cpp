@@ -873,7 +873,8 @@ TEST_F(AsyncResultsMergerTest, KillTwoOutstandingBatches) {
     // command against this id.
     BSONObj expectedCmdObj = BSON("killCursors"
                                   << "testcoll"
-                                  << "cursors" << BSON_ARRAY(CursorId(123)));
+                                  << "cursors"
+                                  << BSON_ARRAY(CursorId(123)));
     ASSERT_EQ(getFirstPendingRequest().cmdObj, expectedCmdObj);
 
     // Ensure that we properly signal both those waiting for the kill, and those waiting for more
@@ -919,7 +920,8 @@ TEST_F(AsyncResultsMergerTest, KillOutstandingGetMore) {
     // scheduled.
     BSONObj expectedCmdObj = BSON("killCursors"
                                   << "testcoll"
-                                  << "cursors" << BSON_ARRAY(CursorId(123)));
+                                  << "cursors"
+                                  << BSON_ARRAY(CursorId(123)));
     ASSERT_EQ(getFirstPendingRequest().cmdObj, expectedCmdObj);
 
     // Ensure that we properly signal both those waiting for the kill, and those waiting for more
@@ -1331,7 +1333,8 @@ TEST_F(AsyncResultsMergerTest, GetMoreRequestIncludesMaxTimeMS) {
     // Pending getMore request should include maxTimeMS.
     BSONObj expectedCmdObj = BSON("getMore" << CursorId(123) << "collection"
                                             << "testcoll"
-                                            << "maxTimeMS" << 789);
+                                            << "maxTimeMS"
+                                            << 789);
     ASSERT_EQ(getFirstPendingRequest().cmdObj, expectedCmdObj);
 
     responses.clear();

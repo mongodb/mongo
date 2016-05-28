@@ -98,7 +98,8 @@ StatusWith<BSONObj> extractFindAndModifyNewObj(StatusWith<Shard::CommandResponse
             return {ErrorCodes::UnsupportedFormat,
                     str::stream() << "expected an object from the findAndModify response '"
                                   << kFindAndModifyResponseResultDocField
-                                  << "'field, got: " << newDocElem};
+                                  << "'field, got: "
+                                  << newDocElem};
         }
 
         return newDocElem.Obj().getOwned();
@@ -191,10 +192,14 @@ StatusWith<LocksType> DistLockCatalogImpl::grabLock(OperationContext* txn,
                                                     StringData processId,
                                                     Date_t time,
                                                     StringData why) {
-    BSONObj newLockDetails(BSON(LocksType::lockID(lockSessionID)
-                                << LocksType::state(LocksType::LOCKED) << LocksType::who() << who
-                                << LocksType::process() << processId << LocksType::when(time)
-                                << LocksType::why() << why));
+    BSONObj newLockDetails(BSON(
+        LocksType::lockID(lockSessionID) << LocksType::state(LocksType::LOCKED) << LocksType::who()
+                                         << who
+                                         << LocksType::process()
+                                         << processId
+                                         << LocksType::when(time)
+                                         << LocksType::why()
+                                         << why));
 
     auto request = FindAndModifyRequest::makeUpdate(
         _locksNS,
@@ -246,10 +251,14 @@ StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(OperationContext* txn,
         BSON(LocksType::name() << lockID << LocksType::state(LocksType::UNLOCKED)));
     orQueryBuilder.append(BSON(LocksType::name() << lockID << LocksType::lockID(currentHolderTS)));
 
-    BSONObj newLockDetails(BSON(LocksType::lockID(lockSessionID)
-                                << LocksType::state(LocksType::LOCKED) << LocksType::who() << who
-                                << LocksType::process() << processId << LocksType::when(time)
-                                << LocksType::why() << why));
+    BSONObj newLockDetails(BSON(
+        LocksType::lockID(lockSessionID) << LocksType::state(LocksType::LOCKED) << LocksType::who()
+                                         << who
+                                         << LocksType::process()
+                                         << processId
+                                         << LocksType::when(time)
+                                         << LocksType::why()
+                                         << why));
 
     auto request = FindAndModifyRequest::makeUpdate(
         _locksNS, BSON("$or" << orQueryBuilder.arr()), BSON("$set" << newLockDetails));
@@ -343,7 +352,8 @@ Status DistLockCatalogImpl::unlockAll(OperationContext* txn, const std::string& 
         return Status(ErrorCodes::FailedToParse,
                       str::stream()
                           << "Failed to parse config server response to batch request for "
-                             "unlocking existing distributed locks" << causedBy(errmsg));
+                             "unlocking existing distributed locks"
+                          << causedBy(errmsg));
     }
     return batchResponse.toStatus();
 }

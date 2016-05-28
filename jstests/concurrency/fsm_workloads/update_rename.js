@@ -20,15 +20,11 @@ var $config = (function() {
             var to = choose(fieldNames.filter(function(n) {
                 return n !== from;
             }));
-            var updater = {
-                $rename: {}
-            };
+            var updater = {$rename: {}};
             updater.$rename[from] = to;
 
             var query = {};
-            query[from] = {
-                $exists: 1
-            };
+            query[from] = {$exists: 1};
 
             var res = db[collName].update(query, updater);
 
@@ -40,9 +36,7 @@ var $config = (function() {
         }
     };
 
-    var transitions = {
-        update: {update: 1}
-    };
+    var transitions = {update: {update: 1}};
 
     function setup(db, collName, cluster) {
         // Create an index on all but one fieldName key to make it possible to test renames

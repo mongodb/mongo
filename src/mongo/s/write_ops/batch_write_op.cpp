@@ -572,7 +572,7 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
     vector<WriteErrorDetail*>::iterator itemErrorIt = itemErrors.begin();
     int index = 0;
     WriteErrorDetail* lastError = NULL;
-    for (vector<TargetedWrite*>::const_iterator it = targetedBatch.getWrites().begin();
+    for (vector<TargetedWrite *>::const_iterator it = targetedBatch.getWrites().begin();
          it != targetedBatch.getWrites().end();
          ++it, ++index) {
         const TargetedWrite* write = *it;

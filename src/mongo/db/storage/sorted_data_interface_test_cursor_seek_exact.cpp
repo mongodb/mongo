@@ -38,10 +38,11 @@ namespace mongo {
 void testSeekExact_Hit(bool unique, bool forward) {
     auto harnessHelper = newHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
-    auto sorted = harnessHelper->newSortedDataInterface(unique,
-                                                        {
-                                                         {key1, loc1}, {key2, loc1}, {key3, loc1},
-                                                        });
+    auto sorted =
+        harnessHelper->newSortedDataInterface(unique,
+                                              {
+                                                  {key1, loc1}, {key2, loc1}, {key3, loc1},
+                                              });
 
     auto cursor = sorted->newCursor(opCtx.get(), forward);
 
@@ -71,9 +72,9 @@ void testSeekExact_Miss(bool unique, bool forward) {
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         {
-                                                         {key1, loc1},
-                                                         // No key2.
-                                                         {key3, loc1},
+                                                            {key1, loc1},
+                                                            // No key2.
+                                                            {key3, loc1},
                                                         });
 
     auto cursor = sorted->newCursor(opCtx.get(), forward);
@@ -105,7 +106,7 @@ TEST(SortedDataInterface, SeekExact_HitWithDups_Forward) {
     auto sorted = harnessHelper->newSortedDataInterface(
         false,
         {
-         {key1, loc1}, {key2, loc1}, {key2, loc2}, {key3, loc1},
+            {key1, loc1}, {key2, loc1}, {key2, loc2}, {key3, loc1},
         });
 
     auto cursor = sorted->newCursor(opCtx.get());
@@ -124,7 +125,7 @@ TEST(SortedDataInterface, SeekExact_HitWithDups_Reverse) {
     auto sorted = harnessHelper->newSortedDataInterface(
         false,
         {
-         {key1, loc1}, {key2, loc1}, {key2, loc2}, {key3, loc1},
+            {key1, loc1}, {key2, loc1}, {key2, loc2}, {key3, loc1},
         });
 
     auto cursor = sorted->newCursor(opCtx.get(), false);

@@ -31,9 +31,9 @@
 #include <boost/intrusive_ptr.hpp>
 #include <stdlib.h>
 
-#include "mongo/platform/atomic_word.h"
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/allocator.h"
 
 namespace mongo {

@@ -107,8 +107,8 @@ Status wrappedRun(OperationContext* txn,
             collection->getIndexCatalog()->findIndexByKeyPattern(txn, f.embeddedObject());
         if (desc == NULL) {
             return Status(ErrorCodes::IndexNotFound,
-                          str::stream()
-                              << "can't find index with key: " << f.embeddedObject().toString());
+                          str::stream() << "can't find index with key: "
+                                        << f.embeddedObject().toString());
         }
 
         if (desc->isIdIndex()) {

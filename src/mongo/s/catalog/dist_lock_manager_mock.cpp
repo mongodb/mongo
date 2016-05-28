@@ -34,9 +34,9 @@
 
 #include <algorithm>
 
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/time_support.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
@@ -47,8 +47,14 @@ void NoLockFuncSet(StringData name,
                    Milliseconds waitFor,
                    Milliseconds lockTryInterval) {
     FAIL(str::stream() << "Lock not expected to be called. "
-                       << "Name: " << name << ", whyMessage: " << whyMessage
-                       << ", waitFor: " << waitFor << ", lockTryInterval: " << lockTryInterval);
+                       << "Name: "
+                       << name
+                       << ", whyMessage: "
+                       << whyMessage
+                       << ", waitFor: "
+                       << waitFor
+                       << ", lockTryInterval: "
+                       << lockTryInterval);
 }
 
 }  // namespace
@@ -90,9 +96,9 @@ StatusWith<DistLockManager::ScopedDistLock> DistLockManagerMock::lockWithSession
         return _lockReturnStatus;
     }
 
-    if (_locks.end() != std::find_if(_locks.begin(),
-                                     _locks.end(),
-                                     [name](LockInfo info) -> bool { return info.name == name; })) {
+    if (_locks.end() != std::find_if(_locks.begin(), _locks.end(), [name](LockInfo info) -> bool {
+            return info.name == name;
+        })) {
         return Status(ErrorCodes::LockBusy,
                       str::stream() << "Lock \"" << name << "\" is already taken");
     }
@@ -111,9 +117,9 @@ void DistLockManagerMock::unlockAll(OperationContext* txn, const std::string& pr
 
 void DistLockManagerMock::unlock(OperationContext* txn, const DistLockHandle& lockHandle) {
     std::vector<LockInfo>::iterator it =
-        std::find_if(_locks.begin(),
-                     _locks.end(),
-                     [&lockHandle](LockInfo info) -> bool { return info.lockID == lockHandle; });
+        std::find_if(_locks.begin(), _locks.end(), [&lockHandle](LockInfo info) -> bool {
+            return info.lockID == lockHandle;
+        });
     if (it == _locks.end()) {
         return;
     }

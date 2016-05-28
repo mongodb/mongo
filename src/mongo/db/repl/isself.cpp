@@ -37,15 +37,15 @@
 #include "mongo/base/init.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/db/commands.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 #if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__sun) || \
     defined(__OpenBSD__)
@@ -66,11 +66,11 @@
 #endif
 
 #elif defined(_WIN32)
+#include <Ws2tcpip.h>
 #include <boost/asio/detail/socket_ops.hpp>
 #include <boost/system/error_code.hpp>
 #include <iphlpapi.h>
 #include <winsock2.h>
-#include <Ws2tcpip.h>
 #endif  // defined(_WIN32)
 
 namespace mongo {

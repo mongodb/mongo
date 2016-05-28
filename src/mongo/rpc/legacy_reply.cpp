@@ -30,8 +30,8 @@
 
 #include "mongo/rpc/legacy_reply.h"
 
-#include <utility>
 #include <tuple>
+#include <utility>
 
 #include "mongo/rpc/legacy_reply_builder.h"
 #include "mongo/rpc/metadata.h"
@@ -51,17 +51,20 @@ LegacyReply::LegacyReply(const Message* message) : _message(std::move(message)) 
 
     uassert(ErrorCodes::BadValue,
             str::stream() << "Got legacy command reply with a bad cursorId field,"
-                          << " expected a value of 0 but got " << qr.getCursorId(),
+                          << " expected a value of 0 but got "
+                          << qr.getCursorId(),
             qr.getCursorId() == 0);
 
     uassert(ErrorCodes::BadValue,
             str::stream() << "Got legacy command reply with a bad nReturned field,"
-                          << " expected a value of 1 but got " << qr.getNReturned(),
+                          << " expected a value of 1 but got "
+                          << qr.getNReturned(),
             qr.getNReturned() == 1);
 
     uassert(ErrorCodes::BadValue,
             str::stream() << "Got legacy command reply with a bad startingFrom field,"
-                          << " expected a value of 0 but got " << qr.getStartingFrom(),
+                          << " expected a value of 0 but got "
+                          << qr.getStartingFrom(),
             qr.getStartingFrom() == 0);
 
     std::tie(_commandReply, _metadata) =

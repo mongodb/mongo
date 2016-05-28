@@ -108,18 +108,18 @@ assertSubstring('cde', '$z', {$add: ['$b', 1]}, {$add: [2, '$d']});
 assert.eq(
     'e',
     t.aggregate({
-        $project: {
-            a: {
-                $substrBytes: [
-                    {
-                      $substrBytes:
-                          [{$substrBytes: [{$substrBytes: ['abcdefghij', 1, 6]}, 2, 5]}, 0, 3]
-                    },
-                    1,
-                    1
-                ]
-            }
-        }
-    })
+         $project: {
+             a: {
+                 $substrBytes: [
+                     {
+                       $substrBytes:
+                           [{$substrBytes: [{$substrBytes: ['abcdefghij', 1, 6]}, 2, 5]}, 0, 3]
+                     },
+                     1,
+                     1
+                 ]
+             }
+         }
+     })
         .toArray()[0]
         .a);

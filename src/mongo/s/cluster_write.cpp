@@ -266,7 +266,8 @@ void ClusterWriter::write(OperationContext* txn,
                                     str::stream()
                                         << "unable to target"
                                         << (request->isInsertIndexRequest() ? " index" : "")
-                                        << " write op for collection " << request->getTargetingNS()
+                                        << " write op for collection "
+                                        << request->getTargetingNS()
                                         << causedBy(targetInitStatus)),
                              response);
                 return;

@@ -200,16 +200,23 @@ rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData databas
     // more helpful error message. Note that call() can itself throw a socket exception.
     uassert(ErrorCodes::HostUnreachable,
             str::stream() << "network error while attempting to run "
-                          << "command '" << command << "' "
-                          << "on host '" << host << "' ",
+                          << "command '"
+                          << command
+                          << "' "
+                          << "on host '"
+                          << host
+                          << "' ",
             call(requestMsg, replyMsg, false, &host));
 
     auto commandReply = rpc::makeReply(&replyMsg);
 
     uassert(ErrorCodes::RPCProtocolNegotiationFailed,
             str::stream() << "Mismatched RPC protocols - request was '"
-                          << networkOpToString(requestMsg.operation()) << "' '"
-                          << " but reply was '" << networkOpToString(replyMsg.operation()) << "' ",
+                          << networkOpToString(requestMsg.operation())
+                          << "' '"
+                          << " but reply was '"
+                          << networkOpToString(replyMsg.operation())
+                          << "' ",
             requestBuilder->getProtocol() == commandReply->getProtocol());
 
     if (ErrorCodes::SendStaleConfig ==
@@ -281,7 +288,8 @@ bool DBClientWithCommands::runPseudoCommand(StringData db,
         if (status == ErrorCodes::CommandResultSchemaViolation) {
             msgasserted(28624,
                         str::stream() << "Received bad " << realCommandName
-                                      << " response from server: " << info);
+                                      << " response from server: "
+                                      << info);
         } else if (status == ErrorCodes::CommandNotFound) {
             NamespaceString pseudoCommandNss(db, pseudoCommandCol);
             // if this throws we just let it escape as that's how runCommand works.
@@ -689,7 +697,10 @@ void DBClientInterface::findN(vector<BSONObj>& out,
 
     uassert(10276,
             str::stream() << "DBClientBase::findN: transport error: " << getServerAddress()
-                          << " ns: " << ns << " query: " << query.toString(),
+                          << " ns: "
+                          << ns
+                          << " query: "
+                          << query.toString(),
             c.get());
 
     if (c->hasResultFlag(ResultFlag_ShardConfigStale)) {
@@ -844,7 +855,8 @@ Status DBClientConnection::connectSocketOnly(const HostAndPort& serverAddress) {
     if (!osAddr.isValid()) {
         return Status(ErrorCodes::InvalidOptions,
                       str::stream() << "couldn't initialize connection to host "
-                                    << serverAddress.host() << ", address is invalid");
+                                    << serverAddress.host()
+                                    << ", address is invalid");
     }
 
     if (isMessagePortImplASIO()) {

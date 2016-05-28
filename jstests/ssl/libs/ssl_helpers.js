@@ -9,9 +9,7 @@ var CLIENT_CERT = "jstests/libs/client.pem";
 
 // Note: "sslAllowInvalidCertificates" is enabled to avoid
 // hostname conflicts with our testing certificates
-var disabled = {
-    sslMode: "disabled"
-};
+var disabled = {sslMode: "disabled"};
 var allowSSL = {
     sslMode: "allowSSL",
     sslAllowInvalidCertificates: "",
@@ -81,10 +79,13 @@ function testShardedLookup(shardingTest) {
     assert.writeOK(fooBulk.execute());
     assert.writeOK(barBulk.execute());
 
-    var docs = lookupdb.foo.aggregate([
-        {$sort: {_id: 1}},
-        {$lookup: {from: "bar", localField: "_id", foreignField: "_id", as: "bar_docs"}}
-    ]).toArray();
+    var docs =
+        lookupdb.foo
+            .aggregate([
+                {$sort: {_id: 1}},
+                {$lookup: {from: "bar", localField: "_id", foreignField: "_id", as: "bar_docs"}}
+            ])
+            .toArray();
     assert.eq(lookupShouldReturn, docs, "error $lookup failed in this configuration");
     assert.commandWorked(lookupdb.dropDatabase());
 }

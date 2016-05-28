@@ -52,8 +52,14 @@ void noGrabLockFuncSet(StringData lockID,
                        Date_t time,
                        StringData why) {
     FAIL(str::stream() << "grabLock not expected to be called. "
-                       << "lockID: " << lockID << ", who: " << who << ", processId: " << processId
-                       << ", why: " << why);
+                       << "lockID: "
+                       << lockID
+                       << ", who: "
+                       << who
+                       << ", processId: "
+                       << processId
+                       << ", why: "
+                       << why);
 }
 
 void noOvertakeLockFuncSet(StringData lockID,
@@ -64,13 +70,22 @@ void noOvertakeLockFuncSet(StringData lockID,
                            Date_t time,
                            StringData why) {
     FAIL(str::stream() << "overtakeLock not expected to be called. "
-                       << "lockID: " << lockID << ", currentHolderTS: " << currentHolderTS
-                       << ", who: " << who << ", processId: " << processId << ", why: " << why);
+                       << "lockID: "
+                       << lockID
+                       << ", currentHolderTS: "
+                       << currentHolderTS
+                       << ", who: "
+                       << who
+                       << ", processId: "
+                       << processId
+                       << ", why: "
+                       << why);
 }
 
 void noUnLockFuncSet(const OID& lockSessionID) {
     FAIL(str::stream() << "unlock not expected to be called. "
-                       << "lockSessionID: " << lockSessionID);
+                       << "lockSessionID: "
+                       << lockSessionID);
 }
 
 void noPingFuncSet(StringData processID, Date_t ping) {
@@ -79,22 +94,26 @@ void noPingFuncSet(StringData processID, Date_t ping) {
 
 void noStopPingFuncSet(StringData processID) {
     FAIL(str::stream() << "stopPing not expected to be called. "
-                       << "processID: " << processID);
+                       << "processID: "
+                       << processID);
 }
 
 void noGetLockByTSSet(const OID& lockSessionID) {
     FAIL(str::stream() << "getLockByTS not expected to be called. "
-                       << "lockSessionID: " << lockSessionID);
+                       << "lockSessionID: "
+                       << lockSessionID);
 }
 
 void noGetLockByNameSet(StringData name) {
     FAIL(str::stream() << "getLockByName not expected to be called. "
-                       << "lockName: " << name);
+                       << "lockName: "
+                       << name);
 }
 
 void noGetPingSet(StringData processId) {
     FAIL(str::stream() << "getPing not expected to be called. "
-                       << "lockName: " << processId);
+                       << "lockName: "
+                       << processId);
 }
 
 void noGetServerInfoSet() {

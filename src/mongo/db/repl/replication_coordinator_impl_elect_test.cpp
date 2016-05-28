@@ -77,7 +77,8 @@ void ReplCoordElectTest::simulateFreshEnoughForElectability() {
                 net->now(),
                 makeResponseStatus(BSON("ok" << 1 << "fresher" << false << "opTime"
                                              << Date_t::fromMillisSinceEpoch(Timestamp(0, 0).asLL())
-                                             << "veto" << false)));
+                                             << "veto"
+                                             << false)));
         } else {
             error() << "Black holing unexpected request to " << request.target << ": "
                     << request.cmdObj;
@@ -95,7 +96,9 @@ TEST_F(ReplCoordElectTest, StartElectionDoesNotStartAnElectionWhenNodeHasNoOplog
     startCapturingLogMessages();
     assertStartSuccess(BSON("_id"
                             << "mySet"
-                            << "version" << 1 << "members"
+                            << "version"
+                            << 1
+                            << "members"
                             << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                      << "node1:12345")
                                           << BSON("_id" << 2 << "host"
@@ -112,16 +115,22 @@ TEST_F(ReplCoordElectTest, StartElectionDoesNotStartAnElectionWhenNodeHasNoOplog
  * vote(s) to win.
  */
 TEST_F(ReplCoordElectTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
-    assertStartSuccess(
-        BSON("_id"
-             << "mySet"
-             << "version" << 1 << "members"
-             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                      << "node1:12345")
-                           << BSON("_id" << 2 << "host"
-                                         << "node2:12345"
-                                         << "votes" << 0 << "hidden" << true << "priority" << 0))),
-        HostAndPort("node1", 12345));
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version"
+                            << 1
+                            << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "node1:12345")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "node2:12345"
+                                                        << "votes"
+                                                        << 0
+                                                        << "hidden"
+                                                        << true
+                                                        << "priority"
+                                                        << 0))),
+                       HostAndPort("node1", 12345));
 
     getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
     // Fake OpTime from initiate, or a write op.
@@ -166,7 +175,9 @@ TEST_F(ReplCoordElectTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
     startCapturingLogMessages();
     assertStartSuccess(BSON("_id"
                             << "mySet"
-                            << "version" << 1 << "members"
+                            << "version"
+                            << 1
+                            << "members"
                             << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                      << "node1:12345"))),
                        HostAndPort("node1", 12345));
@@ -197,7 +208,9 @@ TEST_F(ReplCoordElectTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
 TEST_F(ReplCoordElectTest, ElectionSucceedsWhenAllNodesVoteYea) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version" << 1 << "members"
+                             << "version"
+                             << 1
+                             << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
@@ -221,7 +234,9 @@ TEST_F(ReplCoordElectTest, ElectionFailsWhenOneNodeVotesNay) {
     startCapturingLogMessages();
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version" << 1 << "members"
+                             << "version"
+                             << 1
+                             << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
@@ -266,7 +281,9 @@ TEST_F(ReplCoordElectTest, VotesWithStringValuesAreNotCountedAsYeas) {
     startCapturingLogMessages();
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version" << 1 << "members"
+                             << "version"
+                             << 1
+                             << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
@@ -298,7 +315,8 @@ TEST_F(ReplCoordElectTest, VotesWithStringValuesAreNotCountedAsYeas) {
                                   net->now(),
                                   makeResponseStatus(BSON("ok" << 1 << "vote"
                                                                << "yea"
-                                                               << "round" << OID())));
+                                                               << "round"
+                                                               << OID())));
         }
         net->runReadyNetworkOperations();
     }
@@ -311,7 +329,9 @@ TEST_F(ReplCoordElectTest, VotesWithStringValuesAreNotCountedAsYeas) {
 TEST_F(ReplCoordElectTest, ElectionsAbortWhenNodeTransitionsToRollbackState) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version" << 1 << "members"
+                             << "version"
+                             << 1
+                             << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
@@ -344,19 +364,22 @@ TEST_F(ReplCoordElectTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     // start up, receive reconfig via heartbeat while at the same time, become candidate.
     // candidate state should be cleared.
     OperationContextNoop txn;
-    assertStartSuccess(
-        BSON("_id"
-             << "mySet"
-             << "version" << 2 << "members"
-             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                      << "node1:12345")
-                           << BSON("_id" << 2 << "host"
-                                         << "node2:12345") << BSON("_id" << 3 << "host"
-                                                                         << "node3:12345")
-                           << BSON("_id" << 4 << "host"
-                                         << "node4:12345") << BSON("_id" << 5 << "host"
-                                                                         << "node5:12345"))),
-        HostAndPort("node1", 12345));
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version"
+                            << 2
+                            << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "node1:12345")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "node2:12345")
+                                          << BSON("_id" << 3 << "host"
+                                                        << "node3:12345")
+                                          << BSON("_id" << 4 << "host"
+                                                        << "node4:12345")
+                                          << BSON("_id" << 5 << "host"
+                                                        << "node5:12345"))),
+                       HostAndPort("node1", 12345));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(100, 0), 0));
 
@@ -370,7 +393,9 @@ TEST_F(ReplCoordElectTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     ReplicaSetConfig config;
     config.initialize(BSON("_id"
                            << "mySet"
-                           << "version" << 3 << "members"
+                           << "version"
+                           << 3
+                           << "members"
                            << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                     << "node1:12345")
                                          << BSON("_id" << 2 << "host"
@@ -428,19 +453,21 @@ TEST_F(ReplCoordElectTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     stopCapturingLogMessages();
     // ensure node does not stand for election
     ASSERT_EQUALS(1,
-                  countLogLinesContaining(
-                      "Not standing for election; processing "
-                      "a configuration change"));
+                  countLogLinesContaining("Not standing for election; processing "
+                                          "a configuration change"));
     getExternalState()->setStoreLocalConfigDocumentToHang(false);
 }
 
 TEST_F(ReplCoordElectTest, StepsDownRemoteIfNodeHasHigherPriorityThanCurrentPrimary) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version" << 1 << "members"
+                             << "version"
+                             << 1
+                             << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345"
-                                                      << "priority" << 2)
+                                                      << "priority"
+                                                      << 2)
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
@@ -501,23 +528,27 @@ TEST_F(ReplCoordElectTest, StepsDownRemoteIfNodeHasHigherPriorityThanCurrentPrim
     net->exitNetwork();
     ASSERT_EQUALS(1,
                   countLogLinesContaining(str::stream() << "stepdown of primary("
-                                                        << target.toString() << ") succeeded"));
+                                                        << target.toString()
+                                                        << ") succeeded"));
 }
 
 TEST_F(ReplCoordElectTest, NodeCancelsElectionUponReceivingANewConfigDuringFreshnessCheckingPhase) {
     // Start up and become electable.
     OperationContextNoop txn;
-    assertStartSuccess(
-        BSON("_id"
-             << "mySet"
-             << "version" << 2 << "members"
-             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                      << "node1:12345")
-                           << BSON("_id" << 3 << "host"
-                                         << "node3:12345") << BSON("_id" << 2 << "host"
-                                                                         << "node2:12345"))
-             << "settings" << BSON("heartbeatIntervalMillis" << 100)),
-        HostAndPort("node1", 12345));
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version"
+                            << 2
+                            << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "node1:12345")
+                                          << BSON("_id" << 3 << "host"
+                                                        << "node3:12345")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "node2:12345"))
+                            << "settings"
+                            << BSON("heartbeatIntervalMillis" << 100)),
+                       HostAndPort("node1", 12345));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(100, 0), 0));
     getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(100, 0), 0));
@@ -542,10 +573,13 @@ TEST_F(ReplCoordElectTest, NodeCancelsElectionUponReceivingANewConfigDuringFresh
     ReplicationCoordinatorImpl::ReplSetReconfigArgs config = {
         BSON("_id"
              << "mySet"
-             << "version" << 4 << "members" << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                     << "node1:12345")
-                                                          << BSON("_id" << 2 << "host"
-                                                                        << "node2:12345"))),
+             << "version"
+             << 4
+             << "members"
+             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                      << "node1:12345")
+                           << BSON("_id" << 2 << "host"
+                                         << "node2:12345"))),
         true};
 
     BSONObjBuilder result;
@@ -560,17 +594,20 @@ TEST_F(ReplCoordElectTest, NodeCancelsElectionUponReceivingANewConfigDuringFresh
 TEST_F(ReplCoordElectTest, NodeCancelsElectionUponReceivingANewConfigDuringElectionPhase) {
     // Start up and become electable.
     OperationContextNoop txn;
-    assertStartSuccess(
-        BSON("_id"
-             << "mySet"
-             << "version" << 2 << "members"
-             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                      << "node1:12345")
-                           << BSON("_id" << 3 << "host"
-                                         << "node3:12345") << BSON("_id" << 2 << "host"
-                                                                         << "node2:12345"))
-             << "settings" << BSON("heartbeatIntervalMillis" << 100)),
-        HostAndPort("node1", 12345));
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version"
+                            << 2
+                            << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "node1:12345")
+                                          << BSON("_id" << 3 << "host"
+                                                        << "node3:12345")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "node2:12345"))
+                            << "settings"
+                            << BSON("heartbeatIntervalMillis" << 100)),
+                       HostAndPort("node1", 12345));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(100, 0), 0));
     getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(100, 0), 0));
@@ -582,10 +619,13 @@ TEST_F(ReplCoordElectTest, NodeCancelsElectionUponReceivingANewConfigDuringElect
     ReplicationCoordinatorImpl::ReplSetReconfigArgs config = {
         BSON("_id"
              << "mySet"
-             << "version" << 4 << "members" << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                     << "node1:12345")
-                                                          << BSON("_id" << 2 << "host"
-                                                                        << "node2:12345"))),
+             << "version"
+             << 4
+             << "members"
+             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                      << "node1:12345")
+                           << BSON("_id" << 2 << "host"
+                                         << "node2:12345"))),
         true};
 
     BSONObjBuilder result;

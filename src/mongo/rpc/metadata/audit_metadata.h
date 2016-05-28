@@ -32,9 +32,9 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/auth/user_name.h"
 #include "mongo/db/auth/role_name.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 class BSONObj;

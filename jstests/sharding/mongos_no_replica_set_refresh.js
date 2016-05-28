@@ -10,7 +10,11 @@ load("jstests/replsets/rslib.js");
         mongos: 1,
         other: {
             rs0: {
-                nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}, ],
+                nodes: [
+                    {},
+                    {rsConfig: {priority: 0}},
+                    {rsConfig: {priority: 0}},
+                ],
             }
         }
     });

@@ -26,10 +26,10 @@
     var stringNotIntCode = 14;
 
     // Expect a failure with a string argument.
-    assert.commandFailedWithCode(primary.getDB('admin').runCommand(
-                                     {replSetStepDown: 10, secondaryCatchUpPeriodSecs: 'STR'}),
-                                 stringNotIntCode,
-                                 'Expected string argument to secondaryCatchupPeriodSecs to fail.');
+    assert.commandFailedWithCode(
+        primary.getDB('admin').runCommand({replSetStepDown: 10, secondaryCatchUpPeriodSecs: 'STR'}),
+        stringNotIntCode,
+        'Expected string argument to secondaryCatchupPeriodSecs to fail.');
 
     // Expect a failure with a longer secondaryCatchupPeriodSecs than the stepdown period.
     assert.commandFailedWithCode(
@@ -44,8 +44,8 @@
                          'Failed to configure rsSyncApplyStop failpoint.');
 
     function disableFailPoint() {
-        assert.commandWorked(secondary.getDB('admin')
-                                 .runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'}),
+        assert.commandWorked(secondary.getDB('admin').runCommand(
+                                 {configureFailPoint: 'rsSyncApplyStop', mode: 'off'}),
                              'Failed to disable rsSyncApplyStop failpoint.');
     }
 
@@ -60,8 +60,7 @@
         jsTestLog('Try to step down.');
         var startTime = new Date();
         assert.commandFailedWithCode(
-            primary.getDB('admin')
-                .runCommand({replSetStepDown: 10, secondaryCatchUpPeriodSecs: 1}),
+            primary.getDB('admin').runCommand({replSetStepDown: 10, secondaryCatchUpPeriodSecs: 1}),
             noCaughtUpSecondariesCode,
             'Expected replSetStepDown to fail, since no secondaries should be caught up.');
         var endTime = new Date();

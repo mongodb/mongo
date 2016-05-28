@@ -294,13 +294,19 @@ bool checkShardVersion(OperationContext* txn,
             const ChunkVersion refVersion(refManager->getVersion(shard->getId()));
             const ChunkVersion currentVersion(manager->getVersion(shard->getId()));
 
-            string msg(str::stream()
-                       << "manager (" << currentVersion.toString() << " : "
-                       << manager->getSequenceNumber() << ") "
-                       << "not compatible with reference manager (" << refVersion.toString()
-                       << " : " << refManager->getSequenceNumber() << ") "
-                       << "on shard " << shard->getId() << " (" << shard->getConnString().toString()
-                       << ")");
+            string msg(str::stream() << "manager (" << currentVersion.toString() << " : "
+                                     << manager->getSequenceNumber()
+                                     << ") "
+                                     << "not compatible with reference manager ("
+                                     << refVersion.toString()
+                                     << " : "
+                                     << refManager->getSequenceNumber()
+                                     << ") "
+                                     << "on shard "
+                                     << shard->getId()
+                                     << " ("
+                                     << shard->getConnString().toString()
+                                     << ")");
 
             throw SendStaleConfigException(ns, msg, refVersion, currentVersion);
         }
@@ -309,9 +315,13 @@ bool checkShardVersion(OperationContext* txn,
                                  << ((manager.get() == 0) ? string("<none>") : str::stream()
                                              << manager->getSequenceNumber())
                                  << ") but has reference manager ("
-                                 << refManager->getSequenceNumber() << ") "
-                                 << "on conn " << conn->getServerAddress() << " ("
-                                 << conn_in->getServerAddress() << ")");
+                                 << refManager->getSequenceNumber()
+                                 << ") "
+                                 << "on conn "
+                                 << conn->getServerAddress()
+                                 << " ("
+                                 << conn_in->getServerAddress()
+                                 << ")");
 
         throw SendStaleConfigException(
             ns, msg, refManager->getVersion(shard->getId()), ChunkVersion::UNSHARDED());

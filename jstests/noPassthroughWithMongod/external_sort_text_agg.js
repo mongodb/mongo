@@ -8,12 +8,13 @@ for (i = 0; i < 100; i++) {
 }
 
 var score = t.find({$text: {$search: "asdf"}}, {score: {$meta: 'textScore'}}).next().score;
-var res = t.aggregate([
-    {$match: {$text: {$search: "asdf"}}},
-    {$sort: {"_id": 1}},
-    {$project: {string: "$text", score: {$meta: "textScore"}}}
-],
-                      {allowDiskUse: true});
+var res = t.aggregate(
+    [
+      {$match: {$text: {$search: "asdf"}}},
+      {$sort: {"_id": 1}},
+      {$project: {string: "$text", score: {$meta: "textScore"}}}
+    ],
+    {allowDiskUse: true});
 // we must use .next() rather than a $limit because a $limit will optimize away the external sort
 printjson(res.next());
 assert.eq(res.next().score, score);

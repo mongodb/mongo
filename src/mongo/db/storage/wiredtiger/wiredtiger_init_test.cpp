@@ -29,12 +29,12 @@
 #include "mongo/platform/basic.h"
 
 
-#include "mongo/db/service_context.h"
 #include "mongo/db/json.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
-#include "mongo/db/storage/storage_options.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -94,9 +94,15 @@ void _testValidateMetadata(const StorageEngine::Factory* factory,
     if (expectedCode != status.code()) {
         FAIL(str::stream()
              << "Unexpected StorageEngine::Factory::validateMetadata result. Expected: "
-             << ErrorCodes::errorString(expectedCode) << " but got " << status.toString()
-             << " instead. metadataOptions: " << metadataOptions << "; directoryPerDB: "
-             << directoryPerDB << "; directoryForIndexes: " << directoryForIndexes);
+             << ErrorCodes::errorString(expectedCode)
+             << " but got "
+             << status.toString()
+             << " instead. metadataOptions: "
+             << metadataOptions
+             << "; directoryPerDB: "
+             << directoryPerDB
+             << "; directoryForIndexes: "
+             << directoryForIndexes);
     }
 }
 

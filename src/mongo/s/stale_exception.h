@@ -47,8 +47,11 @@ public:
                          ChunkVersion wanted)
         : AssertionException(
               str::stream() << raw << " ( ns : " << ns << ", received : " << received.toString()
-                            << ", wanted : " << wanted.toString() << ", "
-                            << (code == ErrorCodes::SendStaleConfig ? "send" : "recv") << " )",
+                            << ", wanted : "
+                            << wanted.toString()
+                            << ", "
+                            << (code == ErrorCodes::SendStaleConfig ? "send" : "recv")
+                            << " )",
               code),
           _ns(ns),
           _received(received),
@@ -56,16 +59,18 @@ public:
 
     /** Preferred if we're rebuilding this from a thrown exception */
     StaleConfigException(const std::string& raw, int code, const BSONObj& error)
-        : AssertionException(str::stream()
-                                 << raw << " ( ns : " << (error["ns"].type() == String
-                                                              ? error["ns"].String()
-                                                              : std::string("<unknown>"))
-                                 << ", received : "
-                                 << ChunkVersion::fromBSON(error, "vReceived").toString()
-                                 << ", wanted : "
-                                 << ChunkVersion::fromBSON(error, "vWanted").toString() << ", "
-                                 << (code == ErrorCodes::SendStaleConfig ? "send" : "recv") << " )",
-                             code),
+        : AssertionException(
+              str::stream() << raw << " ( ns : " << (error["ns"].type() == String
+                                                         ? error["ns"].String()
+                                                         : std::string("<unknown>"))
+                            << ", received : "
+                            << ChunkVersion::fromBSON(error, "vReceived").toString()
+                            << ", wanted : "
+                            << ChunkVersion::fromBSON(error, "vWanted").toString()
+                            << ", "
+                            << (code == ErrorCodes::SendStaleConfig ? "send" : "recv")
+                            << " )",
+              code),
           // For legacy reasons, we may not always get a namespace here
           _ns(error["ns"].type() == String ? error["ns"].String() : ""),
           _received(ChunkVersion::fromBSON(error, "vReceived")),

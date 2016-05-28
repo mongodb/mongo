@@ -9,9 +9,13 @@ function testFormat(date, formatStr, expectedStr) {
     db.dates.drop();
     db.dates.insert({date: date});
 
-    var res = db.dates.aggregate([{
-        $project: {_id: 0, formatted: {$dateToString: {format: formatStr, date: "$date"}}}
-    }]).toArray();
+    var res =
+        db.dates
+            .aggregate([{
+                $project:
+                    {_id: 0, formatted: {$dateToString: {format: formatStr, date: "$date"}}}
+            }])
+            .toArray();
 
     assert.eq(res[0].formatted, expectedStr);
 }
@@ -36,18 +40,16 @@ function testDateValueError(dateVal, errCode) {
 var now = ISODate();
 
 // Use all modifiers we can test with js provided function
-testFormat(now,
-           "%%-%Y-%m-%d-%H-%M-%S-%L",
-           [
-             "%",
-             now.getUTCFullYear().zeroPad(4),
-             (now.getUTCMonth() + 1).zeroPad(2),
-             now.getUTCDate().zeroPad(2),
-             now.getUTCHours().zeroPad(2),
-             now.getUTCMinutes().zeroPad(2),
-             now.getUTCSeconds().zeroPad(2),
-             now.getUTCMilliseconds().zeroPad(3)
-           ].join("-"));
+testFormat(now, "%%-%Y-%m-%d-%H-%M-%S-%L", [
+    "%",
+    now.getUTCFullYear().zeroPad(4),
+    (now.getUTCMonth() + 1).zeroPad(2),
+    now.getUTCDate().zeroPad(2),
+    now.getUTCHours().zeroPad(2),
+    now.getUTCMinutes().zeroPad(2),
+    now.getUTCSeconds().zeroPad(2),
+    now.getUTCMilliseconds().zeroPad(3)
+].join("-"));
 
 // Padding tests
 var padme = ISODate("2001-02-03T04:05:06.007Z");
@@ -62,20 +64,18 @@ testFormat(padme, "%S", padme.getUTCSeconds().zeroPad(2));
 testFormat(padme, "%L", padme.getUTCMilliseconds().zeroPad(3));
 
 // no space and multiple characters between modifiers
-testFormat(now,
-           "%d%d***%d***%d**%d*%d",
-           [
-             now.getUTCDate().zeroPad(2),
-             now.getUTCDate().zeroPad(2),
-             "***",
-             now.getUTCDate().zeroPad(2),
-             "***",
-             now.getUTCDate().zeroPad(2),
-             "**",
-             now.getUTCDate().zeroPad(2),
-             "*",
-             now.getUTCDate().zeroPad(2)
-           ].join(""));
+testFormat(now, "%d%d***%d***%d**%d*%d", [
+    now.getUTCDate().zeroPad(2),
+    now.getUTCDate().zeroPad(2),
+    "***",
+    now.getUTCDate().zeroPad(2),
+    "***",
+    now.getUTCDate().zeroPad(2),
+    "**",
+    now.getUTCDate().zeroPad(2),
+    "*",
+    now.getUTCDate().zeroPad(2)
+].join(""));
 
 // JS doesn't have equivalents of these format specifiers
 testFormat(ISODate('1999-01-02 03:04:05.006Z'), "%U-%w-%j", "00-7-002");

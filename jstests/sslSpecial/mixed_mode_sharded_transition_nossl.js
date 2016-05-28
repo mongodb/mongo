@@ -12,9 +12,7 @@ load('jstests/ssl/libs/ssl_helpers.js');
     'use strict';
 
     // Disable auth explicitly
-    var noAuthOptions = {
-        noauth: ''
-    };
+    var noAuthOptions = {noauth: ''};
     var transitionToX509AllowSSL =
         Object.merge(allowSSL, {transitionToAuth: '', clusterAuthMode: 'x509'});
     var x509RequireSSL = Object.merge(requireSSL, {clusterAuthMode: 'x509'});

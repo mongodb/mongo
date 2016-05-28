@@ -162,10 +162,7 @@
         };
         var collName = getCollName(testCollDetailsNum);
 
-        var cmdObj = {
-            shardCollection: collName,
-            key: {_id: 1}
-        };
+        var cmdObj = {shardCollection: collName, key: {_id: 1}};
         if (args.unique) {
             cmdObj.unique = true;
         }

@@ -13,9 +13,7 @@
  * was able to refresh before proceeding to check.
  */
 
-var rsOpt = {
-    oplogSize: 10
-};
+var rsOpt = {oplogSize: 10};
 var st = new ShardingTest({shards: 1, rs: rsOpt});
 var mongos = st.s;
 var replTest = st.rs0;

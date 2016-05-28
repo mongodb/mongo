@@ -36,10 +36,9 @@ checkElemMatch({'a.b.c': 1},
                {a: {$elemMatch: {b: {$elemMatch: {c: {$gte: 1, $in: [2]}}}}}});
 
 // Two nested $elemMatch expressions.
-checkElemMatch(
-    {'a.d.e': 1, 'a.b.c': 1},
-    {a: [{b: [{c: 1}], d: [{e: 1}]}]},
-    {a: {$elemMatch: {d: {$elemMatch: {e: {$lte: 1}}}, b: {$elemMatch: {c: {$gte: 1}}}}}});
+checkElemMatch({'a.d.e': 1, 'a.b.c': 1}, {a: [{b: [{c: 1}], d: [{e: 1}]}]}, {
+    a: {$elemMatch: {d: {$elemMatch: {e: {$lte: 1}}}, b: {$elemMatch: {c: {$gte: 1}}}}}
+});
 
 // A non $elemMatch expression and a nested $elemMatch expression.
 checkElemMatch({'a.x': 1, 'a.b.c': 1},

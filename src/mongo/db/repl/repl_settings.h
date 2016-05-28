@@ -32,8 +32,8 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
 namespace repl {

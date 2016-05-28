@@ -8,9 +8,7 @@
  */
 var $config = (function() {
 
-    var data = {
-        shardKey: {tid: 1}
-    };
+    var data = {shardKey: {tid: 1}};
 
     var states = (function() {
 
@@ -42,24 +40,12 @@ var $config = (function() {
             this.iter++;
         }
 
-        return {
-            init: init,
-            insertAndRemove: insertAndRemove
-        };
+        return {init: init, insertAndRemove: insertAndRemove};
 
     })();
 
-    var transitions = {
-        init: {insertAndRemove: 1},
-        insertAndRemove: {insertAndRemove: 1}
-    };
+    var transitions = {init: {insertAndRemove: 1}, insertAndRemove: {insertAndRemove: 1}};
 
-    return {
-        threadCount: 20,
-        iterations: 20,
-        data: data,
-        states: states,
-        transitions: transitions
-    };
+    return {threadCount: 20, iterations: 20, data: data, states: states, transitions: transitions};
 
 })();

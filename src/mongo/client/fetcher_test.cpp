@@ -32,8 +32,8 @@
 
 #include "mongo/client/fetcher.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata.h"
 
 #include "mongo/unittest/unittest.h"
@@ -423,7 +423,8 @@ TEST_F(FetcherTest, FindCommandFailed2) {
     ASSERT_OK(fetcher->schedule());
     processNetworkResponse(BSON("ok" << 0 << "errmsg"
                                      << "bad hint"
-                                     << "code" << int(ErrorCodes::BadValue)),
+                                     << "code"
+                                     << int(ErrorCodes::BadValue)),
                            ReadyQueueState::kEmpty,
                            FetcherState::kInactive);
     ASSERT_EQUALS(ErrorCodes::BadValue, status.code());
@@ -449,7 +450,10 @@ TEST_F(FetcherTest, CursorIdFieldMissing) {
     ASSERT_OK(fetcher->schedule());
     processNetworkResponse(BSON("cursor" << BSON("ns"
                                                  << "db.coll"
-                                                 << "firstBatch" << BSONArray()) << "ok" << 1),
+                                                 << "firstBatch"
+                                                 << BSONArray())
+                                         << "ok"
+                                         << 1),
                            ReadyQueueState::kEmpty,
                            FetcherState::kInactive);
     ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
@@ -460,7 +464,10 @@ TEST_F(FetcherTest, CursorIdNotLongNumber) {
     ASSERT_OK(fetcher->schedule());
     processNetworkResponse(BSON("cursor" << BSON("id" << 123.1 << "ns"
                                                       << "db.coll"
-                                                      << "firstBatch" << BSONArray()) << "ok" << 1),
+                                                      << "firstBatch"
+                                                      << BSONArray())
+                                         << "ok"
+                                         << 1),
                            ReadyQueueState::kEmpty,
                            FetcherState::kInactive);
     ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
@@ -480,10 +487,11 @@ TEST_F(FetcherTest, NamespaceFieldMissing) {
 
 TEST_F(FetcherTest, NamespaceNotAString) {
     ASSERT_OK(fetcher->schedule());
-    processNetworkResponse(BSON("cursor" << BSON("id" << 123LL << "ns" << 123 << "firstBatch"
-                                                      << BSONArray()) << "ok" << 1),
-                           ReadyQueueState::kEmpty,
-                           FetcherState::kInactive);
+    processNetworkResponse(
+        BSON("cursor" << BSON("id" << 123LL << "ns" << 123 << "firstBatch" << BSONArray()) << "ok"
+                      << 1),
+        ReadyQueueState::kEmpty,
+        FetcherState::kInactive);
     ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
     ASSERT_STRING_CONTAINS(status.reason(), "'cursor.ns' field must be a string");
 }
@@ -492,7 +500,10 @@ TEST_F(FetcherTest, NamespaceEmpty) {
     ASSERT_OK(fetcher->schedule());
     processNetworkResponse(BSON("cursor" << BSON("id" << 123LL << "ns"
                                                       << ""
-                                                      << "firstBatch" << BSONArray()) << "ok" << 1),
+                                                      << "firstBatch"
+                                                      << BSONArray())
+                                         << "ok"
+                                         << 1),
                            ReadyQueueState::kEmpty,
                            FetcherState::kInactive);
     ASSERT_EQUALS(ErrorCodes::BadValue, status.code());
@@ -503,7 +514,10 @@ TEST_F(FetcherTest, NamespaceMissingCollectionName) {
     ASSERT_OK(fetcher->schedule());
     processNetworkResponse(BSON("cursor" << BSON("id" << 123LL << "ns"
                                                       << "db."
-                                                      << "firstBatch" << BSONArray()) << "ok" << 1),
+                                                      << "firstBatch"
+                                                      << BSONArray())
+                                         << "ok"
+                                         << 1),
                            ReadyQueueState::kEmpty,
                            FetcherState::kInactive);
     ASSERT_EQUALS(ErrorCodes::BadValue, status.code());
@@ -513,7 +527,9 @@ TEST_F(FetcherTest, NamespaceMissingCollectionName) {
 TEST_F(FetcherTest, FirstBatchFieldMissing) {
     ASSERT_OK(fetcher->schedule());
     processNetworkResponse(BSON("cursor" << BSON("id" << 0LL << "ns"
-                                                      << "db.coll") << "ok" << 1),
+                                                      << "db.coll")
+                                         << "ok"
+                                         << 1),
                            ReadyQueueState::kEmpty,
                            FetcherState::kInactive);
     ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
@@ -524,7 +540,10 @@ TEST_F(FetcherTest, FirstBatchNotAnArray) {
     ASSERT_OK(fetcher->schedule());
     processNetworkResponse(BSON("cursor" << BSON("id" << 0LL << "ns"
                                                       << "db.coll"
-                                                      << "firstBatch" << 123) << "ok" << 1),
+                                                      << "firstBatch"
+                                                      << 123)
+                                         << "ok"
+                                         << 1),
                            ReadyQueueState::kEmpty,
                            FetcherState::kInactive);
     ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
@@ -533,12 +552,14 @@ TEST_F(FetcherTest, FirstBatchNotAnArray) {
 
 TEST_F(FetcherTest, FirstBatchArrayContainsNonObject) {
     ASSERT_OK(fetcher->schedule());
-    processNetworkResponse(
-        BSON("cursor" << BSON("id" << 0LL << "ns"
-                                   << "db.coll"
-                                   << "firstBatch" << BSON_ARRAY(8)) << "ok" << 1),
-        ReadyQueueState::kEmpty,
-        FetcherState::kInactive);
+    processNetworkResponse(BSON("cursor" << BSON("id" << 0LL << "ns"
+                                                      << "db.coll"
+                                                      << "firstBatch"
+                                                      << BSON_ARRAY(8))
+                                         << "ok"
+                                         << 1),
+                           ReadyQueueState::kEmpty,
+                           FetcherState::kInactive);
     ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
     ASSERT_STRING_CONTAINS(status.reason(), "found non-object");
     ASSERT_STRING_CONTAINS(status.reason(), "in 'cursor.firstBatch' field");
@@ -548,7 +569,10 @@ TEST_F(FetcherTest, FirstBatchEmptyArray) {
     ASSERT_OK(fetcher->schedule());
     processNetworkResponse(BSON("cursor" << BSON("id" << 0LL << "ns"
                                                       << "db.coll"
-                                                      << "firstBatch" << BSONArray()) << "ok" << 1),
+                                                      << "firstBatch"
+                                                      << BSONArray())
+                                         << "ok"
+                                         << 1),
                            ReadyQueueState::kEmpty,
                            FetcherState::kInactive);
     ASSERT_OK(status);
@@ -560,12 +584,14 @@ TEST_F(FetcherTest, FirstBatchEmptyArray) {
 TEST_F(FetcherTest, FetchOneDocument) {
     ASSERT_OK(fetcher->schedule());
     const BSONObj doc = BSON("_id" << 1);
-    processNetworkResponse(
-        BSON("cursor" << BSON("id" << 0LL << "ns"
-                                   << "db.coll"
-                                   << "firstBatch" << BSON_ARRAY(doc)) << "ok" << 1),
-        ReadyQueueState::kEmpty,
-        FetcherState::kInactive);
+    processNetworkResponse(BSON("cursor" << BSON("id" << 0LL << "ns"
+                                                      << "db.coll"
+                                                      << "firstBatch"
+                                                      << BSON_ARRAY(doc))
+                                         << "ok"
+                                         << 1),
+                           ReadyQueueState::kEmpty,
+                           FetcherState::kInactive);
     ASSERT_OK(status);
     ASSERT_EQUALS(0, cursorId);
     ASSERT_EQUALS("db.coll", nss.ns());
@@ -586,12 +612,14 @@ TEST_F(FetcherTest, SetNextActionToContinueWhenNextBatchIsNotAvailable) {
         *nextAction = Fetcher::NextAction::kGetMore;
         ASSERT_FALSE(getMoreBob);
     };
-    processNetworkResponse(
-        BSON("cursor" << BSON("id" << 0LL << "ns"
-                                   << "db.coll"
-                                   << "firstBatch" << BSON_ARRAY(doc)) << "ok" << 1),
-        ReadyQueueState::kEmpty,
-        FetcherState::kInactive);
+    processNetworkResponse(BSON("cursor" << BSON("id" << 0LL << "ns"
+                                                      << "db.coll"
+                                                      << "firstBatch"
+                                                      << BSON_ARRAY(doc))
+                                         << "ok"
+                                         << 1),
+                           ReadyQueueState::kEmpty,
+                           FetcherState::kInactive);
     ASSERT_OK(status);
     ASSERT_EQUALS(0, cursorId);
     ASSERT_EQUALS("db.coll", nss.ns());
@@ -617,13 +645,15 @@ TEST_F(FetcherTest, FetchMultipleBatches) {
 
     const BSONObj doc = BSON("_id" << 1);
 
-    processNetworkResponse(
-        BSON("cursor" << BSON("id" << 1LL << "ns"
-                                   << "db.coll"
-                                   << "firstBatch" << BSON_ARRAY(doc)) << "ok" << 1),
-        Milliseconds(100),
-        ReadyQueueState::kHasReadyRequests,
-        FetcherState::kActive);
+    processNetworkResponse(BSON("cursor" << BSON("id" << 1LL << "ns"
+                                                      << "db.coll"
+                                                      << "firstBatch"
+                                                      << BSON_ARRAY(doc))
+                                         << "ok"
+                                         << 1),
+                           Milliseconds(100),
+                           ReadyQueueState::kHasReadyRequests,
+                           FetcherState::kActive);
 
     ASSERT_OK(status);
     ASSERT_EQUALS(1LL, cursorId);
@@ -636,13 +666,15 @@ TEST_F(FetcherTest, FetchMultipleBatches) {
 
     const BSONObj doc2 = BSON("_id" << 2);
 
-    processNetworkResponse(
-        BSON("cursor" << BSON("id" << 1LL << "ns"
-                                   << "db.coll"
-                                   << "nextBatch" << BSON_ARRAY(doc2)) << "ok" << 1),
-        Milliseconds(200),
-        ReadyQueueState::kHasReadyRequests,
-        FetcherState::kActive);
+    processNetworkResponse(BSON("cursor" << BSON("id" << 1LL << "ns"
+                                                      << "db.coll"
+                                                      << "nextBatch"
+                                                      << BSON_ARRAY(doc2))
+                                         << "ok"
+                                         << 1),
+                           Milliseconds(200),
+                           ReadyQueueState::kHasReadyRequests,
+                           FetcherState::kActive);
 
     ASSERT_OK(status);
     ASSERT_EQUALS(1LL, cursorId);
@@ -655,13 +687,15 @@ TEST_F(FetcherTest, FetchMultipleBatches) {
 
     const BSONObj doc3 = BSON("_id" << 3);
 
-    processNetworkResponse(
-        BSON("cursor" << BSON("id" << 0LL << "ns"
-                                   << "db.coll"
-                                   << "nextBatch" << BSON_ARRAY(doc3)) << "ok" << 1),
-        Milliseconds(300),
-        ReadyQueueState::kEmpty,
-        FetcherState::kInactive);
+    processNetworkResponse(BSON("cursor" << BSON("id" << 0LL << "ns"
+                                                      << "db.coll"
+                                                      << "nextBatch"
+                                                      << BSON_ARRAY(doc3))
+                                         << "ok"
+                                         << 1),
+                           Milliseconds(300),
+                           ReadyQueueState::kEmpty,
+                           FetcherState::kInactive);
 
     ASSERT_OK(status);
     ASSERT_EQUALS(0, cursorId);
@@ -680,12 +714,14 @@ TEST_F(FetcherTest, ScheduleGetMoreAndCancel) {
 
     const BSONObj doc = BSON("_id" << 1);
 
-    processNetworkResponse(
-        BSON("cursor" << BSON("id" << 1LL << "ns"
-                                   << "db.coll"
-                                   << "firstBatch" << BSON_ARRAY(doc)) << "ok" << 1),
-        ReadyQueueState::kHasReadyRequests,
-        FetcherState::kActive);
+    processNetworkResponse(BSON("cursor" << BSON("id" << 1LL << "ns"
+                                                      << "db.coll"
+                                                      << "firstBatch"
+                                                      << BSON_ARRAY(doc))
+                                         << "ok"
+                                         << 1),
+                           ReadyQueueState::kHasReadyRequests,
+                           FetcherState::kActive);
 
     ASSERT_OK(status);
     ASSERT_EQUALS(1LL, cursorId);
@@ -695,12 +731,14 @@ TEST_F(FetcherTest, ScheduleGetMoreAndCancel) {
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);
 
     const BSONObj doc2 = BSON("_id" << 2);
-    processNetworkResponse(
-        BSON("cursor" << BSON("id" << 1LL << "ns"
-                                   << "db.coll"
-                                   << "nextBatch" << BSON_ARRAY(doc2)) << "ok" << 1),
-        ReadyQueueState::kHasReadyRequests,
-        FetcherState::kActive);
+    processNetworkResponse(BSON("cursor" << BSON("id" << 1LL << "ns"
+                                                      << "db.coll"
+                                                      << "nextBatch"
+                                                      << BSON_ARRAY(doc2))
+                                         << "ok"
+                                         << 1),
+                           ReadyQueueState::kHasReadyRequests,
+                           FetcherState::kActive);
 
     ASSERT_OK(status);
     ASSERT_EQUALS(1LL, cursorId);
@@ -727,12 +765,14 @@ TEST_F(FetcherTest, ScheduleGetMoreButShutdown) {
 
     const BSONObj doc = BSON("_id" << 1);
 
-    processNetworkResponse(
-        BSON("cursor" << BSON("id" << 1LL << "ns"
-                                   << "db.coll"
-                                   << "firstBatch" << BSON_ARRAY(doc)) << "ok" << 1),
-        ReadyQueueState::kHasReadyRequests,
-        FetcherState::kActive);
+    processNetworkResponse(BSON("cursor" << BSON("id" << 1LL << "ns"
+                                                      << "db.coll"
+                                                      << "firstBatch"
+                                                      << BSON_ARRAY(doc))
+                                         << "ok"
+                                         << 1),
+                           ReadyQueueState::kHasReadyRequests,
+                           FetcherState::kActive);
 
     ASSERT_OK(status);
     ASSERT_EQUALS(1LL, cursorId);
@@ -743,12 +783,14 @@ TEST_F(FetcherTest, ScheduleGetMoreButShutdown) {
 
     const BSONObj doc2 = BSON("_id" << 2);
 
-    processNetworkResponse(
-        BSON("cursor" << BSON("id" << 1LL << "ns"
-                                   << "db.coll"
-                                   << "nextBatch" << BSON_ARRAY(doc2)) << "ok" << 1),
-        ReadyQueueState::kHasReadyRequests,
-        FetcherState::kActive);
+    processNetworkResponse(BSON("cursor" << BSON("id" << 1LL << "ns"
+                                                      << "db.coll"
+                                                      << "nextBatch"
+                                                      << BSON_ARRAY(doc2))
+                                         << "ok"
+                                         << 1),
+                           ReadyQueueState::kHasReadyRequests,
+                           FetcherState::kActive);
 
     ASSERT_OK(status);
     ASSERT_EQUALS(1LL, cursorId);
@@ -780,12 +822,14 @@ TEST_F(FetcherTest, EmptyGetMoreRequestAfterFirstBatchMakesFetcherInactiveAndKil
 
     const BSONObj doc = BSON("_id" << 1);
 
-    processNetworkResponse(
-        BSON("cursor" << BSON("id" << 1LL << "ns"
-                                   << "db.coll"
-                                   << "firstBatch" << BSON_ARRAY(doc)) << "ok" << 1),
-        ReadyQueueState::kHasReadyRequests,
-        FetcherState::kInactive);
+    processNetworkResponse(BSON("cursor" << BSON("id" << 1LL << "ns"
+                                                      << "db.coll"
+                                                      << "firstBatch"
+                                                      << BSON_ARRAY(doc))
+                                         << "ok"
+                                         << 1),
+                           ReadyQueueState::kHasReadyRequests,
+                           FetcherState::kInactive);
 
     ASSERT_OK(status);
     ASSERT_EQUALS(1LL, cursorId);
@@ -835,12 +879,14 @@ TEST_F(FetcherTest, UpdateNextActionAfterSecondBatch) {
 
     const BSONObj doc = BSON("_id" << 1);
 
-    processNetworkResponse(
-        BSON("cursor" << BSON("id" << 1LL << "ns"
-                                   << "db.coll"
-                                   << "firstBatch" << BSON_ARRAY(doc)) << "ok" << 1),
-        ReadyQueueState::kHasReadyRequests,
-        FetcherState::kActive);
+    processNetworkResponse(BSON("cursor" << BSON("id" << 1LL << "ns"
+                                                      << "db.coll"
+                                                      << "firstBatch"
+                                                      << BSON_ARRAY(doc))
+                                         << "ok"
+                                         << 1),
+                           ReadyQueueState::kHasReadyRequests,
+                           FetcherState::kActive);
 
     ASSERT_OK(status);
     ASSERT_EQUALS(1LL, cursorId);
@@ -853,12 +899,14 @@ TEST_F(FetcherTest, UpdateNextActionAfterSecondBatch) {
 
     callbackHook = setNextActionToNoAction;
 
-    processNetworkResponse(
-        BSON("cursor" << BSON("id" << 1LL << "ns"
-                                   << "db.coll"
-                                   << "nextBatch" << BSON_ARRAY(doc2)) << "ok" << 1),
-        ReadyQueueState::kHasReadyRequests,
-        FetcherState::kInactive);
+    processNetworkResponse(BSON("cursor" << BSON("id" << 1LL << "ns"
+                                                      << "db.coll"
+                                                      << "nextBatch"
+                                                      << BSON_ARRAY(doc2))
+                                         << "ok"
+                                         << 1),
+                           ReadyQueueState::kHasReadyRequests,
+                           FetcherState::kInactive);
 
     ASSERT_OK(status);
     ASSERT_EQUALS(1LL, cursorId);
@@ -928,12 +976,14 @@ TEST_F(FetcherTest, ShutdownDuringSecondBatch) {
 
     const BSONObj doc = BSON("_id" << 1);
 
-    processNetworkResponse(
-        BSON("cursor" << BSON("id" << 1LL << "ns"
-                                   << "db.coll"
-                                   << "firstBatch" << BSON_ARRAY(doc)) << "ok" << 1),
-        ReadyQueueState::kHasReadyRequests,
-        FetcherState::kActive);
+    processNetworkResponse(BSON("cursor" << BSON("id" << 1LL << "ns"
+                                                      << "db.coll"
+                                                      << "firstBatch"
+                                                      << BSON_ARRAY(doc))
+                                         << "ok"
+                                         << 1),
+                           ReadyQueueState::kHasReadyRequests,
+                           FetcherState::kActive);
 
     ASSERT_OK(status);
     ASSERT_EQUALS(1LL, cursorId);
@@ -953,12 +1003,14 @@ TEST_F(FetcherTest, ShutdownDuringSecondBatch) {
                               &getExecutor(),
                               &isShutdownCalled);
 
-    processNetworkResponse(
-        BSON("cursor" << BSON("id" << 1LL << "ns"
-                                   << "db.coll"
-                                   << "nextBatch" << BSON_ARRAY(doc2)) << "ok" << 1),
-        ReadyQueueState::kEmpty,
-        FetcherState::kInactive);
+    processNetworkResponse(BSON("cursor" << BSON("id" << 1LL << "ns"
+                                                      << "db.coll"
+                                                      << "nextBatch"
+                                                      << BSON_ARRAY(doc2))
+                                         << "ok"
+                                         << 1),
+                           ReadyQueueState::kEmpty,
+                           FetcherState::kInactive);
 
     // Fetcher should attempt (unsuccessfully) to schedule a killCursors command.
     ASSERT_EQUALS(
@@ -996,12 +1048,14 @@ TEST_F(FetcherTest, FetcherAppliesRetryPolicyToFirstCommandButNotToGetMoreReques
                            "second",
                            ReadyQueueState::kHasReadyRequests,
                            FetcherState::kActive);
-    processNetworkResponse(
-        BSON("cursor" << BSON("id" << 1LL << "ns"
-                                   << "db.coll"
-                                   << "firstBatch" << BSON_ARRAY(doc)) << "ok" << 1),
-        ReadyQueueState::kHasReadyRequests,
-        FetcherState::kActive);
+    processNetworkResponse(BSON("cursor" << BSON("id" << 1LL << "ns"
+                                                      << "db.coll"
+                                                      << "firstBatch"
+                                                      << BSON_ARRAY(doc))
+                                         << "ok"
+                                         << 1),
+                           ReadyQueueState::kHasReadyRequests,
+                           FetcherState::kActive);
     ASSERT_OK(status);
     ASSERT_EQUALS(1LL, cursorId);
     ASSERT_EQUALS("db.coll", nss.ns());

@@ -86,9 +86,9 @@
 // get the definitions from ntstatus.h, which has a more complete list.
 #define WIN32_NO_STATUS
 
+#include <windows.h>
 #include <winsock2.h>  //this must be included before the first windows.h include
 #include <ws2tcpip.h>
-#include <windows.h>
 
 #undef WIN32_NO_STATUS
 

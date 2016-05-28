@@ -56,9 +56,7 @@ var $config = (function() {
         }
     };
 
-    var transitions = {
-        update: {update: 1}
-    };
+    var transitions = {update: {update: 1}};
 
     function setup(db, collName, cluster) {
         assertAlways.commandWorked(db[collName].ensureIndex({a: 1}));

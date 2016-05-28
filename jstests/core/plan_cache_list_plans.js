@@ -5,11 +5,7 @@ t.drop();
 
 // Utility function to list plans for a query.
 function getPlans(query, sort, projection) {
-    var key = {
-        query: query,
-        sort: sort,
-        projection: projection
-    };
+    var key = {query: query, sort: sort, projection: projection};
     var res = t.runCommand('planCacheListPlans', key);
     assert.commandWorked(res, 'planCacheListPlans(' + tojson(key, '', true) + ' failed');
     assert(res.hasOwnProperty('plans'),
@@ -32,9 +28,8 @@ assert.eq(0,
           'planCacheListPlans should return empty results on unknown query shape');
 
 // Create a cache entry.
-assert.eq(1,
-          t.find({a: 1, b: 1}, {_id: 0, a: 1}).sort({a: -1}).itcount(),
-          'unexpected document count');
+assert.eq(
+    1, t.find({a: 1, b: 1}, {_id: 0, a: 1}).sort({a: -1}).itcount(), 'unexpected document count');
 
 // Retrieve plans for valid cache entry.
 var plans = getPlans({a: 1, b: 1}, {a: -1}, {_id: 0, a: 1});

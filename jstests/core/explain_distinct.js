@@ -10,10 +10,7 @@
     var coll = db[collName];
 
     function runDistinctExplain(collection, keyString, query) {
-        var distinctCmd = {
-            distinct: collection.getName(),
-            key: keyString
-        };
+        var distinctCmd = {distinct: collection.getName(), key: keyString};
 
         if (typeof query !== 'undefined') {
             distinctCmd.query = query;

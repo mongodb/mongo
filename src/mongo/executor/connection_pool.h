@@ -28,8 +28,8 @@
 #pragma once
 
 #include <memory>
-#include <unordered_map>
 #include <queue>
+#include <unordered_map>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/stdx/chrono.h"

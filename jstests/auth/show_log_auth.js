@@ -11,14 +11,18 @@ function assertStartsWith(s, prefix) {
     assert.eq(s.substr(0, prefix.length), prefix);
 }
 
-assertStartsWith(print.captureAllOutput(function() {
-    shellHelper.show('logs');
-}).output[0],
+assertStartsWith(print
+                     .captureAllOutput(function() {
+                         shellHelper.show('logs');
+                     })
+                     .output[0],
                  'Error while trying to show logs');
 
-assertStartsWith(print.captureAllOutput(function() {
-    shellHelper.show('log ' + baseName);
-}).output[0],
+assertStartsWith(print
+                     .captureAllOutput(function() {
+                         shellHelper.show('log ' + baseName);
+                     })
+                     .output[0],
                  'Error while trying to show ' + baseName + ' log');
 
 db.auth("admin", "pass");

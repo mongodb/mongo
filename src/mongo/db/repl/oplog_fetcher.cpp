@@ -127,17 +127,26 @@ Status checkRemoteOplogStart(const Fetcher::Documents& documents, OpTimeWithHash
     if (!opTimeResult.isOK()) {
         return Status(ErrorCodes::OplogStartMissing,
                       str::stream() << "our last op time fetched: " << lastFetched.opTime.toString()
-                                    << " (hash: " << lastFetched.value << ")"
+                                    << " (hash: "
+                                    << lastFetched.value
+                                    << ")"
                                     << ". failed to parse optime from first oplog on source: "
-                                    << o.toString() << ": " << opTimeResult.getStatus().toString());
+                                    << o.toString()
+                                    << ": "
+                                    << opTimeResult.getStatus().toString());
     }
     auto opTime = opTimeResult.getValue();
     long long hash = o["h"].numberLong();
     if (opTime != lastFetched.opTime || hash != lastFetched.value) {
         return Status(ErrorCodes::OplogStartMissing,
                       str::stream() << "our last op time fetched: " << lastFetched.opTime.toString()
-                                    << ". source's GTE: " << opTime.toString() << " hashes: ("
-                                    << lastFetched.value << "/" << hash << ")");
+                                    << ". source's GTE: "
+                                    << opTime.toString()
+                                    << " hashes: ("
+                                    << lastFetched.value
+                                    << "/"
+                                    << hash
+                                    << ")");
     }
     return Status::OK();
 }
@@ -149,7 +158,8 @@ StatusWith<OplogFetcher::DocumentsInfo> OplogFetcher::validateDocuments(
     if (first && documents.empty()) {
         return Status(ErrorCodes::OplogStartMissing,
                       str::stream() << "The first batch of oplog entries is empty, but expected at "
-                                       "least 1 document matching ts: " << lastTS.toString());
+                                       "least 1 document matching ts: "
+                                    << lastTS.toString());
     }
 
     DocumentsInfo info;
@@ -178,8 +188,11 @@ StatusWith<OplogFetcher::DocumentsInfo> OplogFetcher::validateDocuments(
         if (lastTS >= docTS) {
             return Status(ErrorCodes::OplogOutOfOrder,
                           str::stream() << "Out of order entries in oplog. lastTS: "
-                                        << lastTS.toString() << " outOfOrderTS:" << docTS.toString()
-                                        << " at count:" << info.networkDocumentCount);
+                                        << lastTS.toString()
+                                        << " outOfOrderTS:"
+                                        << docTS.toString()
+                                        << " at count:"
+                                        << info.networkDocumentCount);
         }
         lastTS = docTS;
     }
@@ -348,12 +361,14 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
 
     if (_dataReplicatorExternalState->shouldStopFetching(_fetcher.getSource(), metadata)) {
         _onShutdown(Status(ErrorCodes::InvalidSyncSource,
-                           str::stream()
-                               << "sync source " << _fetcher.getSource().toString()
-                               << " (last optime: " << metadata.getLastOpVisible().toString()
-                               << "; sync source index: " << metadata.getSyncSourceIndex()
-                               << "; primary index: " << metadata.getPrimaryIndex()
-                               << ") is no longer valid"),
+                           str::stream() << "sync source " << _fetcher.getSource().toString()
+                                         << " (last optime: "
+                                         << metadata.getLastOpVisible().toString()
+                                         << "; sync source index: "
+                                         << metadata.getSyncSourceIndex()
+                                         << "; primary index: "
+                                         << metadata.getPrimaryIndex()
+                                         << ") is no longer valid"),
                     opTimeWithHash);
         return;
     }

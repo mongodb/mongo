@@ -32,8 +32,8 @@
 
 #include "mongo/platform/basic.h"
 
-#include <ostream>
 #include <DbgHelp.h>
+#include <ostream>
 
 #include "mongo/config.h"
 #include "mongo/util/assert_util.h"

@@ -37,8 +37,8 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/log.h"
-#include "mongo/util/stringutils.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
@@ -97,9 +97,9 @@ Status ActionSet::parseActionSetFromString(const std::string& actionsString, Act
     }
     std::string unrecognizedActionsString;
     joinStringDelim(unrecognizedActions, &unrecognizedActionsString, ',');
-    return Status(
-        ErrorCodes::FailedToParse,
-        str::stream() << "Unrecognized action privilege strings: " << unrecognizedActionsString);
+    return Status(ErrorCodes::FailedToParse,
+                  str::stream() << "Unrecognized action privilege strings: "
+                                << unrecognizedActionsString);
 }
 
 Status ActionSet::parseActionSetFromStringVector(const std::vector<std::string>& actionsVector,

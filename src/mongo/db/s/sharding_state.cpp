@@ -54,18 +54,18 @@
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
-#include <iostream>
-#include <iomanip>
-#include <ctime>
 #include <chrono>
+#include <ctime>
+#include <iomanip>
+#include <iostream>
 
 namespace mongo {
 
@@ -462,7 +462,8 @@ Status ShardingState::initializeFromShardIdentity(const ShardIdentityType& shard
         if (_shardName != shardIdentity.getShardName()) {
             return {ErrorCodes::InconsistentShardIdentity,
                     str::stream() << "shard name previously set as " << _shardName
-                                  << " is different from stored: " << shardIdentity.getShardName()};
+                                  << " is different from stored: "
+                                  << shardIdentity.getShardName()};
         }
 
         auto prevConfigsvrConnStr = grid.shardRegistry()->getConfigServerConnectionString();
@@ -477,7 +478,8 @@ Status ShardingState::initializeFromShardIdentity(const ShardIdentityType& shard
             return {ErrorCodes::InconsistentShardIdentity,
                     str::stream() << "config server connection string previously set as "
                                   << prevConfigsvrConnStr.toString()
-                                  << " is different from stored: " << configSvrConnStr.toString()};
+                                  << " is different from stored: "
+                                  << configSvrConnStr.toString()};
         }
 
         // clusterId will only be unset if sharding state was initialized via the sharding
@@ -487,7 +489,8 @@ Status ShardingState::initializeFromShardIdentity(const ShardIdentityType& shard
         } else if (_clusterId != shardIdentity.getClusterId()) {
             return {ErrorCodes::InconsistentShardIdentity,
                     str::stream() << "cluster id previously set as " << _clusterId
-                                  << " is different from stored: " << shardIdentity.getClusterId()};
+                                  << " is different from stored: "
+                                  << shardIdentity.getClusterId()};
         }
 
         return Status::OK();

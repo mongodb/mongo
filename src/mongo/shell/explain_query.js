@@ -150,9 +150,7 @@ var DBExplainQuery = (function() {
                     innerCmd = this._query._convertToCommand(canAttachReadPref);
                 }
 
-                var explainCmd = {
-                    explain: innerCmd
-                };
+                var explainCmd = {explain: innerCmd};
                 explainCmd["verbosity"] = this._verbosity;
 
                 var explainDb = this._query._db;

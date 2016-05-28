@@ -166,8 +166,9 @@ TEST_F(NetworkInterfaceASIOTest, CancelOperation) {
 
     // simulate isMaster reply.
     stream->simulateServer(rpc::Protocol::kOpQuery,
-                           [](RemoteCommandRequest request)
-                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               return simulateIsMaster(request);
+                           });
 
     {
         // Cancel operation while blocked in the write for determinism. By calling cancel here we
@@ -196,8 +197,9 @@ TEST_F(NetworkInterfaceASIOTest, ImmediateCancel) {
     auto stream = streamFactory().blockUntilStreamExists(testHost);
     ConnectEvent{stream}.skip();
     stream->simulateServer(rpc::Protocol::kOpQuery,
-                           [](RemoteCommandRequest request)
-                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               return simulateIsMaster(request);
+                           });
 
     auto& result = deferred.get();
     ASSERT(result == ErrorCodes::CallbackCanceled);
@@ -214,8 +216,9 @@ TEST_F(NetworkInterfaceASIOTest, LateCancel) {
     auto stream = streamFactory().blockUntilStreamExists(testHost);
     ConnectEvent{stream}.skip();
     stream->simulateServer(rpc::Protocol::kOpQuery,
-                           [](RemoteCommandRequest request)
-                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               return simulateIsMaster(request);
+                           });
 
     // Simulate user command
     stream->simulateServer(rpc::Protocol::kOpCommandV1,
@@ -244,8 +247,9 @@ TEST_F(NetworkInterfaceASIOTest, CancelWithNetworkError) {
 
     // simulate isMaster reply.
     stream->simulateServer(rpc::Protocol::kOpQuery,
-                           [](RemoteCommandRequest request)
-                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               return simulateIsMaster(request);
+                           });
 
     {
         WriteEvent{stream}.skip();
@@ -272,8 +276,9 @@ TEST_F(NetworkInterfaceASIOTest, CancelWithTimeout) {
     ConnectEvent{stream}.skip();
 
     stream->simulateServer(rpc::Protocol::kOpQuery,
-                           [](RemoteCommandRequest request)
-                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               return simulateIsMaster(request);
+                           });
 
     {
         WriteEvent write{stream};
@@ -299,8 +304,9 @@ TEST_F(NetworkInterfaceASIOTest, TimeoutWithNetworkError) {
     auto stream = streamFactory().blockUntilStreamExists(testHost);
     ConnectEvent{stream}.skip();
     stream->simulateServer(rpc::Protocol::kOpQuery,
-                           [](RemoteCommandRequest request)
-                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               return simulateIsMaster(request);
+                           });
 
     {
         WriteEvent{stream}.skip();
@@ -327,8 +333,9 @@ TEST_F(NetworkInterfaceASIOTest, CancelWithTimeoutAndNetworkError) {
     auto stream = streamFactory().blockUntilStreamExists(testHost);
     ConnectEvent{stream}.skip();
     stream->simulateServer(rpc::Protocol::kOpQuery,
-                           [](RemoteCommandRequest request)
-                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               return simulateIsMaster(request);
+                           });
 
     {
         WriteEvent{stream}.skip();
@@ -358,8 +365,9 @@ TEST_F(NetworkInterfaceASIOTest, AsyncOpTimeout) {
 
     // Simulate isMaster reply.
     stream->simulateServer(rpc::Protocol::kOpQuery,
-                           [](RemoteCommandRequest request)
-                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               return simulateIsMaster(request);
+                           });
 
     {
         // Wait for the operation to block on write so we know it's been added.
@@ -393,27 +401,28 @@ TEST_F(NetworkInterfaceASIOTest, StartCommand) {
 
     // simulate isMaster reply.
     stream->simulateServer(rpc::Protocol::kOpQuery,
-                           [](RemoteCommandRequest request)
-                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               return simulateIsMaster(request);
+                           });
 
     auto expectedMetadata = BSON("meep"
                                  << "beep");
     auto expectedCommandReply = BSON("boop"
                                      << "bop"
-                                     << "ok" << 1.0);
+                                     << "ok"
+                                     << 1.0);
 
     // simulate user command
-    stream->simulateServer(rpc::Protocol::kOpCommandV1,
-                           [&](RemoteCommandRequest request) -> RemoteCommandResponse {
-                               ASSERT_EQ(std::string{request.cmdObj.firstElementFieldName()},
-                                         "foo");
-                               ASSERT_EQ(request.dbname, "testDB");
+    stream->simulateServer(
+        rpc::Protocol::kOpCommandV1, [&](RemoteCommandRequest request) -> RemoteCommandResponse {
+            ASSERT_EQ(std::string{request.cmdObj.firstElementFieldName()}, "foo");
+            ASSERT_EQ(request.dbname, "testDB");
 
-                               RemoteCommandResponse response;
-                               response.data = expectedCommandReply;
-                               response.metadata = expectedMetadata;
-                               return response;
-                           });
+            RemoteCommandResponse response;
+            response.data = expectedCommandReply;
+            response.metadata = expectedMetadata;
+            return response;
+        });
 
     auto& res = deferred.get();
 
@@ -450,8 +459,9 @@ public:
         auto stream = streamFactory().blockUntilStreamExists(testHost);
         ConnectEvent{stream}.skip();
         stream->simulateServer(rpc::Protocol::kOpQuery,
-                               [](RemoteCommandRequest request)
-                                   -> RemoteCommandResponse { return simulateIsMaster(request); });
+                               [](RemoteCommandRequest request) -> RemoteCommandResponse {
+                                   return simulateIsMaster(request);
+                               });
 
         uint32_t messageId = 0;
 
@@ -499,11 +509,9 @@ public:
 };
 
 TEST_F(MalformedMessageTest, messageHeaderWrongResponseTo) {
-    runMessageTest(ErrorCodes::ProtocolError,
-                   false,
-                   [](MsgData::View message) {
-                       message.setResponseToMsgId(message.getResponseToMsgId() + 1);
-                   });
+    runMessageTest(ErrorCodes::ProtocolError, false, [](MsgData::View message) {
+        message.setResponseToMsgId(message.getResponseToMsgId() + 1);
+    });
 }
 
 TEST_F(MalformedMessageTest, messageHeaderlenZero) {
@@ -512,15 +520,15 @@ TEST_F(MalformedMessageTest, messageHeaderlenZero) {
 }
 
 TEST_F(MalformedMessageTest, MessageHeaderLenTooSmall) {
-    runMessageTest(ErrorCodes::InvalidLength,
-                   false,
-                   [](MsgData::View message) { message.setLen(6); });  // min is 16
+    runMessageTest(ErrorCodes::InvalidLength, false, [](MsgData::View message) {
+        message.setLen(6);
+    });  // min is 16
 }
 
 TEST_F(MalformedMessageTest, MessageHeaderLenTooLarge) {
-    runMessageTest(ErrorCodes::InvalidLength,
-                   false,
-                   [](MsgData::View message) { message.setLen(48000001); });  // max is 48000000
+    runMessageTest(ErrorCodes::InvalidLength, false, [](MsgData::View message) {
+        message.setLen(48000001);
+    });  // max is 48000000
 }
 
 TEST_F(MalformedMessageTest, MessageHeaderLenNegative) {
@@ -529,27 +537,27 @@ TEST_F(MalformedMessageTest, MessageHeaderLenNegative) {
 }
 
 TEST_F(MalformedMessageTest, MessageLenSmallerThanActual) {
-    runMessageTest(ErrorCodes::InvalidBSON,
-                   true,
-                   [](MsgData::View message) { message.setLen(message.getLen() - 10); });
+    runMessageTest(ErrorCodes::InvalidBSON, true, [](MsgData::View message) {
+        message.setLen(message.getLen() - 10);
+    });
 }
 
 TEST_F(MalformedMessageTest, FailedToReadAllBytesForMessage) {
-    runMessageTest(ErrorCodes::InvalidLength,
-                   true,
-                   [](MsgData::View message) { message.setLen(message.getLen() + 100); });
+    runMessageTest(ErrorCodes::InvalidLength, true, [](MsgData::View message) {
+        message.setLen(message.getLen() + 100);
+    });
 }
 
 TEST_F(MalformedMessageTest, UnsupportedOpcode) {
-    runMessageTest(ErrorCodes::UnsupportedFormat,
-                   true,
-                   [](MsgData::View message) { message.setOperation(2222); });
+    runMessageTest(ErrorCodes::UnsupportedFormat, true, [](MsgData::View message) {
+        message.setOperation(2222);
+    });
 }
 
 TEST_F(MalformedMessageTest, MismatchedOpcode) {
-    runMessageTest(ErrorCodes::UnsupportedFormat,
-                   true,
-                   [](MsgData::View message) { message.setOperation(2006); });
+    runMessageTest(ErrorCodes::UnsupportedFormat, true, [](MsgData::View message) {
+        message.setOperation(2006);
+    });
 }
 
 class NetworkInterfaceASIOConnectionHookTest : public NetworkInterfaceASIOTest {
@@ -605,14 +613,14 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, ValidateHostInvalid) {
 
     // simulate isMaster reply.
     stream->simulateServer(
-        rpc::Protocol::kOpQuery,
-        [](RemoteCommandRequest request) -> RemoteCommandResponse {
+        rpc::Protocol::kOpQuery, [](RemoteCommandRequest request) -> RemoteCommandResponse {
             RemoteCommandResponse response;
             response.data =
-                BSON("minWireVersion"
-                     << mongo::WireSpec::instance().minWireVersionIncoming << "maxWireVersion"
-                     << mongo::WireSpec::instance().maxWireVersionIncoming << "TESTKEY"
-                     << "TESTVALUE");
+                BSON("minWireVersion" << mongo::WireSpec::instance().minWireVersionIncoming
+                                      << "maxWireVersion"
+                                      << mongo::WireSpec::instance().maxWireVersionIncoming
+                                      << "TESTKEY"
+                                      << "TESTVALUE");
             return response;
         });
 
@@ -637,8 +645,9 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsError) {
     Status makeRequestError{ErrorCodes::DBPathInUse, "bloooh"};
 
     start(makeTestHook(
-        [&](const HostAndPort& remoteHost, const RemoteCommandResponse& isMasterReply)
-            -> Status { return Status::OK(); },
+        [&](const HostAndPort& remoteHost, const RemoteCommandResponse& isMasterReply) -> Status {
+            return Status::OK();
+        },
         [&](const HostAndPort& remoteHost) -> StatusWith<boost::optional<RemoteCommandRequest>> {
             makeRequestCalled = true;
             return makeRequestError;
@@ -659,8 +668,9 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsError) {
 
     // simulate isMaster reply.
     stream->simulateServer(rpc::Protocol::kOpQuery,
-                           [](RemoteCommandRequest request)
-                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               return simulateIsMaster(request);
+                           });
 
     // We should stop here.
     auto& res = deferred.get();
@@ -676,8 +686,9 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
     bool handleReplyCalled = false;
 
     start(makeTestHook(
-        [&](const HostAndPort& remoteHost, const RemoteCommandResponse& isMasterReply)
-            -> Status { return Status::OK(); },
+        [&](const HostAndPort& remoteHost, const RemoteCommandResponse& isMasterReply) -> Status {
+            return Status::OK();
+        },
         [&](const HostAndPort& remoteHost) -> StatusWith<boost::optional<RemoteCommandRequest>> {
             makeRequestCalled = true;
             return {boost::none};
@@ -692,7 +703,8 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
 
     auto commandReply = BSON("foo"
                              << "boo"
-                             << "ok" << 1.0);
+                             << "ok"
+                             << 1.0);
 
     auto metadata = BSON("aaa"
                          << "bbb");
@@ -704,8 +716,9 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
 
     // simulate isMaster reply.
     stream->simulateServer(rpc::Protocol::kOpQuery,
-                           [](RemoteCommandRequest request)
-                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               return simulateIsMaster(request);
+                           });
 
     // Simulate user command.
     stream->simulateServer(rpc::Protocol::kOpCommandV1,
@@ -739,14 +752,16 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
 
     BSONObj hookCommandReply = BSON("blah"
                                     << "blah"
-                                    << "ok" << 1.0);
+                                    << "ok"
+                                    << 1.0);
     BSONObj hookReplyMetadata = BSON("1111" << 2222);
 
     Status handleReplyError{ErrorCodes::AuthSchemaIncompatible, "daowdjkpowkdjpow"};
 
     start(makeTestHook(
-        [&](const HostAndPort& remoteHost, const RemoteCommandResponse& isMasterReply)
-            -> Status { return Status::OK(); },
+        [&](const HostAndPort& remoteHost, const RemoteCommandResponse& isMasterReply) -> Status {
+            return Status::OK();
+        },
         [&](const HostAndPort& remoteHost) -> StatusWith<boost::optional<RemoteCommandRequest>> {
             makeRequestCalled = true;
             return {boost::make_optional<RemoteCommandRequest>(
@@ -769,8 +784,9 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
 
     // simulate isMaster reply.
     stream->simulateServer(rpc::Protocol::kOpQuery,
-                           [](RemoteCommandRequest request)
-                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               return simulateIsMaster(request);
+                           });
 
     // Simulate hook reply
     stream->simulateServer(rpc::Protocol::kOpCommandV1,
@@ -873,8 +889,9 @@ TEST_F(NetworkInterfaceASIOMetadataTest, Metadata) {
 
     // simulate isMaster reply.
     stream->simulateServer(rpc::Protocol::kOpQuery,
-                           [](RemoteCommandRequest request)
-                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               return simulateIsMaster(request);
+                           });
 
     // Simulate hook reply
     stream->simulateServer(rpc::Protocol::kOpCommandV1,

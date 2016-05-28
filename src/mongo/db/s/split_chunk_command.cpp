@@ -220,7 +220,8 @@ public:
         //
 
         const string whyMessage(str::stream() << "splitting chunk [" << min << ", " << max
-                                              << ") in " << nss.toString());
+                                              << ") in "
+                                              << nss.toString());
         auto scopedDistLock = grid.catalogManager(txn)->distLock(
             txn, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
         if (!scopedDistLock.isOK()) {
@@ -453,8 +454,8 @@ public:
                 chunkDetail.append("of", newChunksSize);
                 appendShortVersion(chunkDetail.subobjStart("chunk"), *newChunks[i]);
 
-                grid.catalogManager(txn)
-                    ->logChange(txn, "multi-split", nss.ns(), chunkDetail.obj());
+                grid.catalogManager(txn)->logChange(
+                    txn, "multi-split", nss.ns(), chunkDetail.obj());
             }
         }
 

@@ -35,8 +35,8 @@
 #include "mongo/base/data_cursor.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/base/status.h"
-#include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/parallel.h"
@@ -44,22 +44,22 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/max_time.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/max_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find_common.h"
-#include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/query/getmore_request.h"
+#include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/bson_serializable.h"
 #include "mongo/s/catalog/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/version_manager.h"
-#include "mongo/s/chunk_manager.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/commands/request.h"
 #include "mongo/s/config.h"
@@ -67,8 +67,8 @@
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/cluster_find.h"
 #include "mongo/s/stale_exception.h"
-#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batch_upconvert.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/timer.h"
@@ -413,7 +413,9 @@ void Strategy::killCursors(OperationContext* txn, Request& request) {
     const int numCursors = dbMessage.pullInt();
     massert(34425,
             str::stream() << "Invalid killCursors message. numCursors: " << numCursors
-                          << ", message size: " << dbMessage.msg().dataSize() << ".",
+                          << ", message size: "
+                          << dbMessage.msg().dataSize()
+                          << ".",
             dbMessage.msg().dataSize() == 8 + (8 * numCursors));
     uassert(28794,
             str::stream() << "numCursors must be between 1 and 29999.  numCursors: " << numCursors

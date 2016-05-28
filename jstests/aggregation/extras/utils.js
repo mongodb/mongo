@@ -259,13 +259,9 @@ function assertErrorCode(coll, pipe, code, errmsg) {
     assert.eq(res.code, code);
 
     // Test with cursors
-    var cmd = {
-        pipeline: pipe
-    };
+    var cmd = {pipeline: pipe};
     // cmd.cursor = {};
-    cmd.cursor = {
-        batchSize: 0
-    };
+    cmd.cursor = {batchSize: 0};
 
     var cursorRes = coll.runCommand("aggregate", cmd);
     if (cursorRes.ok) {

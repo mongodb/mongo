@@ -35,24 +35,12 @@ var $config = (function() {
             assertWhenOwnColl.eq(this.modulus, db[collName].distinct('i', {tid: this.tid}).length);
         }
 
-        return {
-            init: init,
-            distinct: distinct
-        };
+        return {init: init, distinct: distinct};
 
     })();
 
-    var transitions = {
-        init: {distinct: 1},
-        distinct: {distinct: 1}
-    };
+    var transitions = {init: {distinct: 1}, distinct: {distinct: 1}};
 
-    return {
-        data: data,
-        threadCount: 10,
-        iterations: 20,
-        states: states,
-        transitions: transitions
-    };
+    return {data: data, threadCount: 10, iterations: 20, states: states, transitions: transitions};
 
 })();

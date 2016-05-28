@@ -16,11 +16,11 @@ var admin = setupConn.getDB('admin');
 admin.createUser({user: 'admin', pwd: 'password', roles: jsTest.adminUserRoles});
 admin.auth('admin', 'password');
 
-setupConn.getDB('foo')
-    .createUser({user: 'foo', pwd: 'foopwd', roles: jsTest.basicUserRoles}, {w: NUM_NODES});
+setupConn.getDB('foo').createUser({user: 'foo', pwd: 'foopwd', roles: jsTest.basicUserRoles},
+                                  {w: NUM_NODES});
 setupConn.getDB('foo').logout();
-setupConn.getDB('bar')
-    .createUser({user: 'bar', pwd: 'barpwd', roles: jsTest.basicUserRoles}, {w: NUM_NODES});
+setupConn.getDB('bar').createUser({user: 'bar', pwd: 'barpwd', roles: jsTest.basicUserRoles},
+                                  {w: NUM_NODES});
 setupConn.getDB('bar').logout();
 
 var replConn0 = new Mongo(rsTest.getURL());

@@ -32,13 +32,13 @@
 
 #include "mongo/db/exec/projection_exec.h"
 
-#include <memory>
-#include "mongo/db/json.h"
 #include "mongo/db/exec/working_set_computed_data.h"
+#include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
+#include <memory>
 
 using namespace mongo;
 

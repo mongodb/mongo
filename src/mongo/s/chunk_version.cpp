@@ -30,9 +30,9 @@
 
 #include "mongo/s/chunk_version.h"
 
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/util/mongoutils/str.h"
 

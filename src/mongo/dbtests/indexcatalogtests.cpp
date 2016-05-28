@@ -138,7 +138,8 @@ public:
         ASSERT_OK(dbtests::createIndexFromSpec(&txn,
                                                _ns,
                                                BSON("name" << indexName << "ns" << _ns << "key"
-                                                           << BSON("x" << 1) << "expireAfterSeconds"
+                                                           << BSON("x" << 1)
+                                                           << "expireAfterSeconds"
                                                            << 5)));
 
         const IndexDescriptor* desc = _catalog->findIndexByName(&txn, indexName);

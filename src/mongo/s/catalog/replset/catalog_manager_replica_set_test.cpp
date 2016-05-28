@@ -32,8 +32,8 @@
 
 #include <pcrecpp.h>
 
-#include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/bson/json.h"
+#include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -658,9 +658,13 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandSuccess) {
         // Since no write concern was sent we will add w:majority
         ASSERT_EQUALS(BSON("dropUser"
                            << "test"
-                           << "writeConcern" << BSON("w"
-                                                     << "majority"
-                                                     << "wtimeout" << 0) << "maxTimeMS" << 30000),
+                           << "writeConcern"
+                           << BSON("w"
+                                   << "majority"
+                                   << "wtimeout"
+                                   << 0)
+                           << "maxTimeMS"
+                           << 30000),
                       request.cmdObj);
 
         ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
@@ -679,14 +683,14 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandInvalidWriteConce
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     BSONObjBuilder responseBuilder;
-    bool ok =
-        catalogManager()->runUserManagementWriteCommand(operationContext(),
-                                                        "dropUser",
-                                                        "test",
-                                                        BSON("dropUser"
-                                                             << "test"
-                                                             << "writeConcern" << BSON("w" << 2)),
-                                                        &responseBuilder);
+    bool ok = catalogManager()->runUserManagementWriteCommand(operationContext(),
+                                                              "dropUser",
+                                                              "test",
+                                                              BSON("dropUser"
+                                                                   << "test"
+                                                                   << "writeConcern"
+                                                                   << BSON("w" << 2)),
+                                                              &responseBuilder);
     ASSERT_FALSE(ok);
 
     Status commandStatus = getStatusFromCommandResult(responseBuilder.obj());
@@ -708,31 +712,35 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandRewriteWriteConce
         },
         Status::OK());
 
-    auto future =
-        launchAsync([this] {
-            BSONObjBuilder responseBuilder;
-            bool ok =
-                catalogManager()->runUserManagementWriteCommand(
-                    operationContext(),
-                    "dropUser",
-                    "test",
-                    BSON("dropUser"
-                         << "test"
-                         << "writeConcern" << BSON("w" << 1 << "wtimeout" << 30)),
-                    &responseBuilder);
-            ASSERT_FALSE(ok);
+    auto future = launchAsync([this] {
+        BSONObjBuilder responseBuilder;
+        bool ok =
+            catalogManager()->runUserManagementWriteCommand(operationContext(),
+                                                            "dropUser",
+                                                            "test",
+                                                            BSON("dropUser"
+                                                                 << "test"
+                                                                 << "writeConcern"
+                                                                 << BSON("w" << 1 << "wtimeout"
+                                                                             << 30)),
+                                                            &responseBuilder);
+        ASSERT_FALSE(ok);
 
-            Status commandStatus = getStatusFromCommandResult(responseBuilder.obj());
-            ASSERT_EQUALS(ErrorCodes::UserNotFound, commandStatus);
-        });
+        Status commandStatus = getStatusFromCommandResult(responseBuilder.obj());
+        ASSERT_EQUALS(ErrorCodes::UserNotFound, commandStatus);
+    });
 
     onCommand([](const RemoteCommandRequest& request) {
         ASSERT_EQUALS("test", request.dbname);
         ASSERT_EQUALS(BSON("dropUser"
                            << "test"
-                           << "writeConcern" << BSON("w"
-                                                     << "majority"
-                                                     << "wtimeout" << 30) << "maxTimeMS" << 30000),
+                           << "writeConcern"
+                           << BSON("w"
+                                   << "majority"
+                                   << "wtimeout"
+                                   << 30)
+                           << "maxTimeMS"
+                           << 30000),
                       request.cmdObj);
 
         ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
@@ -815,9 +823,13 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandNotMasterRetrySuc
         // Since no write concern was sent we will add w:majority
         ASSERT_EQUALS(BSON("dropUser"
                            << "test"
-                           << "writeConcern" << BSON("w"
-                                                     << "majority"
-                                                     << "wtimeout" << 0) << "maxTimeMS" << 30000),
+                           << "writeConcern"
+                           << BSON("w"
+                                   << "majority"
+                                   << "wtimeout"
+                                   << 0)
+                           << "maxTimeMS"
+                           << 30000),
                       request.cmdObj);
 
         ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
@@ -1193,9 +1205,10 @@ TEST_F(CatalogManagerReplSetTest, GetTagForChunkOneTagFound) {
 
         ASSERT_EQ(query->ns(), TagsType::ConfigNS);
         ASSERT_EQ(query->getFilter(),
-                  BSON(TagsType::ns(chunk.getNS())
-                       << TagsType::min() << BSON("$lte" << chunk.getMin()) << TagsType::max()
-                       << BSON("$gte" << chunk.getMax())));
+                  BSON(TagsType::ns(chunk.getNS()) << TagsType::min()
+                                                   << BSON("$lte" << chunk.getMin())
+                                                   << TagsType::max()
+                                                   << BSON("$gte" << chunk.getMax())));
 
         checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
@@ -1237,9 +1250,10 @@ TEST_F(CatalogManagerReplSetTest, GetTagForChunkNoTagFound) {
 
         ASSERT_EQ(query->ns(), TagsType::ConfigNS);
         ASSERT_EQ(query->getFilter(),
-                  BSON(TagsType::ns(chunk.getNS())
-                       << TagsType::min() << BSON("$lte" << chunk.getMin()) << TagsType::max()
-                       << BSON("$gte" << chunk.getMax())));
+                  BSON(TagsType::ns(chunk.getNS()) << TagsType::min()
+                                                   << BSON("$lte" << chunk.getMin())
+                                                   << TagsType::max()
+                                                   << BSON("$gte" << chunk.getMax())));
 
         checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
@@ -1278,9 +1292,10 @@ TEST_F(CatalogManagerReplSetTest, GetTagForChunkInvalidTagDoc) {
 
         ASSERT_EQ(query->ns(), TagsType::ConfigNS);
         ASSERT_EQ(query->getFilter(),
-                  BSON(TagsType::ns(chunk.getNS())
-                       << TagsType::min() << BSON("$lte" << chunk.getMin()) << TagsType::max()
-                       << BSON("$gte" << chunk.getMax())));
+                  BSON(TagsType::ns(chunk.getNS()) << TagsType::min()
+                                                   << BSON("$lte" << chunk.getMin())
+                                                   << TagsType::max()
+                                                   << BSON("$gte" << chunk.getMax())));
 
         checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
@@ -1388,7 +1403,8 @@ TEST_F(CatalogManagerReplSetTest, ApplyChunkOpsDeprecatedSuccessful) {
             ASSERT_EQUALS("config", request.dbname);
             ASSERT_EQUALS(BSON("w"
                                << "majority"
-                               << "wtimeout" << 15000),
+                               << "wtimeout"
+                               << 15000),
                           request.cmdObj["writeConcern"].Obj());
             ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
             ASSERT_EQUALS(updateOps, request.cmdObj["applyOps"].Obj());
@@ -1925,10 +1941,12 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingNoDBExists) {
         shardRegistry()->getShard(operationContext(), "shard0")->getTargeter());
     shardTargeter->setFindHostReturnValue(HostAndPort("shard0:12"));
 
-    distLock()->expectLock([](StringData name, StringData whyMessage, Milliseconds, Milliseconds) {
-        ASSERT_EQ("test", name);
-        ASSERT_FALSE(whyMessage.empty());
-    }, Status::OK());
+    distLock()->expectLock(
+        [](StringData name, StringData whyMessage, Milliseconds, Milliseconds) {
+            ASSERT_EQ("test", name);
+            ASSERT_FALSE(whyMessage.empty());
+        },
+        Status::OK());
 
     auto future = launchAsync([this] {
         auto status = catalogManager()->enableSharding(operationContext(), "test");

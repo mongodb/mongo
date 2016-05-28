@@ -103,7 +103,9 @@ void* MemoryMappedFile::map(const char* filename) {
     } catch (boost::filesystem::filesystem_error& e) {
         uasserted(15922,
                   mongoutils::str::stream() << "couldn't get file length when opening mapping "
-                                            << filename << ' ' << e.what());
+                                            << filename
+                                            << ' '
+                                            << e.what());
     }
     return map(filename, l);
 }

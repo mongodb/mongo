@@ -47,9 +47,7 @@
                 testObj.currentOpFilter.ns = coll.getFullName();
                 testObj.currentOpFilter.planSummary = testObj.planSummary;
                 if (testObj.hasOwnProperty("command")) {
-                    testObj.currentOpFilter["query." + testObj.command] = {
-                        $exists: true
-                    };
+                    testObj.currentOpFilter["query." + testObj.command] = {$exists: true};
                 } else if (testObj.hasOwnProperty("operation")) {
                     testObj.currentOpFilter.op = testObj.operation;
                 }
@@ -132,7 +130,7 @@
                   reduce: function() {},
                   initial: {}
               }),
-                            [{"a": 1}]);
+                        [{"a": 1}]);
           },
           command: "group",
           planSummary: "COLLSCAN",

@@ -69,8 +69,8 @@ Status checkAuthForCopydbCommand(ClientBasic* client,
         actions.addAction(ActionType::bypassDocumentValidation);
     }
 
-    if (!AuthorizationSession::get(client)
-             ->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(todb), actions)) {
+    if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+            ResourcePattern::forDatabaseName(todb), actions)) {
         return Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 

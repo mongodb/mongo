@@ -31,9 +31,9 @@
 #include <list>
 #include <memory>
 
-#include "mongo/db/jsobj.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"

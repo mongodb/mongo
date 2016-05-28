@@ -134,10 +134,9 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
 
     };
 
-    _asyncRunCommand(op,
-                     [this, op, parseIsMaster](std::error_code ec, size_t bytes) {
-                         _validateAndRun(op, ec, std::move(parseIsMaster));
-                     });
+    _asyncRunCommand(op, [this, op, parseIsMaster](std::error_code ec, size_t bytes) {
+        _validateAndRun(op, ec, std::move(parseIsMaster));
+    });
 }
 
 void NetworkInterfaceASIO::_authenticate(AsyncOp* op) {

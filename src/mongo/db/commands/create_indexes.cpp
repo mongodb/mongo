@@ -41,13 +41,13 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/service_context.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/scopeguard.h"
 
@@ -130,8 +130,8 @@ public:
                     BSONElement e = it.next();
                     StringData fieldName(e.fieldName(), e.fieldNameSize());
                     if (std::find(keys.begin(), keys.end(), fieldName) != keys.end()) {
-                        errmsg = str::stream()
-                            << "duplicate keys detected in index spec: " << indexKey;
+                        errmsg = str::stream() << "duplicate keys detected in index spec: "
+                                               << indexKey;
                         return false;
                     }
                     keys.push_back(fieldName);
@@ -286,7 +286,8 @@ public:
                             Status(ErrorCodes::NotMaster,
                                    str::stream()
                                        << "Not primary while creating background indexes in "
-                                       << ns.ns() << ": cleaning up index build failure due to "
+                                       << ns.ns()
+                                       << ": cleaning up index build failure due to "
                                        << e.toString()));
                     }
                 } catch (...) {

@@ -87,7 +87,8 @@ TEST(IndexKeyValidateTest, KeyElementBooleanValueFails) {
     ASSERT_EQ(ErrorCodes::CannotCreateIndex,
               validateKeyPattern(BSON("a"
                                       << "2dsphere"
-                                      << "b" << true)));
+                                      << "b"
+                                      << true)));
 }
 
 TEST(IndexKeyValidateTest, KeyElementNullValueFails) {

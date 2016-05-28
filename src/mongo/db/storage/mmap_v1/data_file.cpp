@@ -38,11 +38,11 @@
 #include <utility>
 #include <vector>
 
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
-#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/file_allocator.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -211,7 +211,9 @@ void DataFileHeader::init(OperationContext* txn, int fileno, int filelength, con
 
         massert(13640,
                 str::stream() << "DataFileHeader looks corrupt at file open filelength:"
-                              << filelength << " fileno:" << fileno,
+                              << filelength
+                              << " fileno:"
+                              << fileno,
                 filelength > 32768);
 
         // The writes done in this function must not be rolled back. If the containing

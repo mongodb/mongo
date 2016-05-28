@@ -20,15 +20,14 @@ t.save({_id: 2, a: 1, b: 1});
 t.save({_id: 3, a: 2, b: 2});
 t.save({_id: 4, a: 3, b: 3});
 t.save({_id: 5, a: 3, b: 3});
-checkDedup(
-    {
-      $or: [
-          {a: {$gte: 0, $lte: 2}, b: {$gte: 0, $lte: 2}},
-          {a: {$gte: 1, $lte: 3}, b: {$gte: 1, $lte: 3}},
-          {a: {$gte: 1, $lte: 4}, b: {$gte: 1, $lte: 4}}
-      ]
-    },
-    [1, 2, 3, 4, 5]);
+checkDedup({
+    $or: [
+        {a: {$gte: 0, $lte: 2}, b: {$gte: 0, $lte: 2}},
+        {a: {$gte: 1, $lte: 3}, b: {$gte: 1, $lte: 3}},
+        {a: {$gte: 1, $lte: 4}, b: {$gte: 1, $lte: 4}}
+    ]
+},
+           [1, 2, 3, 4, 5]);
 
 // Deduping multikey
 t.drop();

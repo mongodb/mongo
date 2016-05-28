@@ -7,11 +7,7 @@ st.adminCommand(
 
 var db = st.s.getDB('test');
 var offerChange = db.getCollection('offerChange');
-var testDoc = {
-    "_id": 123,
-    "categoryId": 9881,
-    "store": "NEW"
-};
+var testDoc = {"_id": 123, "categoryId": 9881, "store": "NEW"};
 
 offerChange.remove({}, false);
 offerChange.insert(testDoc);

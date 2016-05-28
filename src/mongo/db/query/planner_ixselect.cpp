@@ -40,8 +40,8 @@
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_text.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/indexability.h"
 #include "mongo/db/query/index_tag.h"
+#include "mongo/db/query/indexability.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/util/log.h"
 

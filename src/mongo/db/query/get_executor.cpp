@@ -51,8 +51,8 @@
 #include "mongo/db/exec/sort_key_generator.h"
 #include "mongo/db/exec/subplan.h"
 #include "mongo/db/exec/update.h"
-#include "mongo/db/index_names.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
@@ -71,14 +71,14 @@
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/stage_builder.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/server_parameters.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/storage/storage_options.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/server_parameters.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/oplog_hack.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -774,7 +774,8 @@ inline void validateUpdate(const char* ns, const BSONObj& updateobj, const BSONO
            has pointers into it */
         uassert(10156,
                 str::stream() << "cannot update system collection: " << ns << " q: " << patternOrig
-                              << " u: " << updateobj,
+                              << " u: "
+                              << updateobj,
                 legalClientSystemNS(ns, true));
     }
 }

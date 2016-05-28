@@ -162,42 +162,38 @@ jsTestName = function() {
     return "__unknown_name__";
 };
 
-var _jsTestOptions = {
-    enableTestCommands: true
-};  // Test commands should be enabled by default
+var _jsTestOptions = {enableTestCommands: true};  // Test commands should be enabled by default
 
 jsTestOptions = function() {
     if (TestData) {
-        return Object.merge(
-            _jsTestOptions,
-            {
-              setParameters: TestData.setParameters,
-              setParametersMongos: TestData.setParametersMongos,
-              storageEngine: TestData.storageEngine,
-              wiredTigerEngineConfigString: TestData.wiredTigerEngineConfigString,
-              wiredTigerCollectionConfigString: TestData.wiredTigerCollectionConfigString,
-              wiredTigerIndexConfigString: TestData.wiredTigerIndexConfigString,
-              noJournal: TestData.noJournal,
-              noJournalPrealloc: TestData.noJournalPrealloc,
-              auth: TestData.auth,
-              keyFile: TestData.keyFile,
-              authUser: "__system",
-              authPassword: TestData.keyFileData,
-              authMechanism: TestData.authMechanism,
-              adminUser: TestData.adminUser || "admin",
-              adminPassword: TestData.adminPassword || "password",
-              useLegacyConfigServers: TestData.useLegacyConfigServers || false,
-              useLegacyReplicationProtocol: TestData.useLegacyReplicationProtocol || false,
-              enableMajorityReadConcern: TestData.enableMajorityReadConcern,
-              writeConcernMajorityShouldJournal: TestData.writeConcernMajorityShouldJournal,
-              enableEncryption: TestData.enableEncryption,
-              encryptionKeyFile: TestData.encryptionKeyFile,
-              auditDestination: TestData.auditDestination,
-              minPort: TestData.minPort,
-              maxPort: TestData.maxPort,
-              // Note: does not support the array version
-              mongosBinVersion: TestData.mongosBinVersion || "",
-            });
+        return Object.merge(_jsTestOptions, {
+            setParameters: TestData.setParameters,
+            setParametersMongos: TestData.setParametersMongos,
+            storageEngine: TestData.storageEngine,
+            wiredTigerEngineConfigString: TestData.wiredTigerEngineConfigString,
+            wiredTigerCollectionConfigString: TestData.wiredTigerCollectionConfigString,
+            wiredTigerIndexConfigString: TestData.wiredTigerIndexConfigString,
+            noJournal: TestData.noJournal,
+            noJournalPrealloc: TestData.noJournalPrealloc,
+            auth: TestData.auth,
+            keyFile: TestData.keyFile,
+            authUser: "__system",
+            authPassword: TestData.keyFileData,
+            authMechanism: TestData.authMechanism,
+            adminUser: TestData.adminUser || "admin",
+            adminPassword: TestData.adminPassword || "password",
+            useLegacyConfigServers: TestData.useLegacyConfigServers || false,
+            useLegacyReplicationProtocol: TestData.useLegacyReplicationProtocol || false,
+            enableMajorityReadConcern: TestData.enableMajorityReadConcern,
+            writeConcernMajorityShouldJournal: TestData.writeConcernMajorityShouldJournal,
+            enableEncryption: TestData.enableEncryption,
+            encryptionKeyFile: TestData.encryptionKeyFile,
+            auditDestination: TestData.auditDestination,
+            minPort: TestData.minPort,
+            maxPort: TestData.maxPort,
+            // Note: does not support the array version
+            mongosBinVersion: TestData.mongosBinVersion || "",
+        });
     }
     return _jsTestOptions;
 };
@@ -290,19 +286,12 @@ defaultPrompt = function() {
             try {
                 var prompt = replSetMemberStatePrompt();
                 // set our status that it was good
-                db.getMongo().authStatus = {
-                    replSetGetStatus: true,
-                    isMaster: true
-                };
+                db.getMongo().authStatus = {replSetGetStatus: true, isMaster: true};
                 return prefix + prompt;
             } catch (e) {
                 // don't have permission to run that, or requires auth
                 // print(e);
-                status = {
-                    authRequired: true,
-                    replSetGetStatus: false,
-                    isMaster: true
-                };
+                status = {authRequired: true, replSetGetStatus: false, isMaster: true};
             }
         }
         // auth detected
@@ -338,9 +327,7 @@ defaultPrompt = function() {
     } catch (ex) {
         printjson(ex);
         // reset status and let it figure it out next time.
-        status = {
-            isMaster: true
-        };
+        status = {isMaster: true};
     }
 
     db.getMongo().authStatus = status;
@@ -540,8 +527,8 @@ shellAutocomplete = function(
 
     var worker = function(prefix) {
         var global = (function() {
-            return this;
-        }).call();  // trick to get global object
+                         return this;
+                     }).call();  // trick to get global object
 
         var curObj = global;
         var parts = prefix.split('.');
@@ -999,9 +986,7 @@ _awaitRSHostViaRSMonitor = function(hostAddr, desiredState, rsName, timeout) {
     timeout = timeout || 60 * 1000;
 
     if (desiredState == undefined) {
-        desiredState = {
-            ok: true
-        };
+        desiredState = {ok: true};
     }
 
     print("Awaiting " + hostAddr + " to be " + tojson(desiredState) + " in " + " rs " + rsName);
@@ -1123,9 +1108,7 @@ rs._runCmd = function(c) {
 };
 rs.reconfig = function(cfg, options) {
     cfg.version = rs.conf().version + 1;
-    cmd = {
-        replSetReconfig: cfg
-    };
+    cmd = {replSetReconfig: cfg};
     for (var i in options) {
         cmd[i] = options[i];
     }
@@ -1147,10 +1130,7 @@ rs.add = function(hostport, arb) {
         if (c.members[i]._id > max)
             max = c.members[i]._id;
     if (isString(hostport)) {
-        cfg = {
-            _id: max + 1,
-            host: hostport
-        };
+        cfg = {_id: max + 1, host: hostport};
         if (arb)
             cfg.arbiterOnly = true;
     } else if (arb == true) {
@@ -1168,9 +1148,7 @@ rs.syncFrom = function(host) {
     return db._adminCommand({replSetSyncFrom: host});
 };
 rs.stepDown = function(stepdownSecs, catchUpSecs) {
-    var cmdObj = {
-        replSetStepDown: stepdownSecs === undefined ? 60 : stepdownSecs
-    };
+    var cmdObj = {replSetStepDown: stepdownSecs === undefined ? 60 : stepdownSecs};
     if (catchUpSecs !== undefined) {
         cmdObj['secondaryCatchUpPeriodSecs'] = catchUpSecs;
     }
@@ -1229,9 +1207,7 @@ rs.debug.nullLastOpWritten = function(primary, secondary) {
     if (!last.value.o || !last.value.o._id) {
         print("couldn't find an _id?");
     } else {
-        last.value.o = {
-            _id: last.value.o._id
-        };
+        last.value.o = {_id: last.value.o._id};
     }
 
     print("nulling out this op:");

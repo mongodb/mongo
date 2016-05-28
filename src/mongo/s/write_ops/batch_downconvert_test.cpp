@@ -202,9 +202,14 @@ TEST(LegacyGLESuppress, StripCode) {
 TEST(LegacyGLESuppress, TimeoutDupError24) {
     const BSONObj gleResponse = BSON("ok" << 0.0 << "err"
                                           << "message"
-                                          << "code" << 12345 << "err"
+                                          << "code"
+                                          << 12345
+                                          << "err"
                                           << "timeout"
-                                          << "code" << 56789 << "wtimeout" << true);
+                                          << "code"
+                                          << 56789
+                                          << "wtimeout"
+                                          << true);
 
     BSONObj stripped = stripNonWCInfo(gleResponse);
     ASSERT_EQUALS(stripped.nFields(), 4);

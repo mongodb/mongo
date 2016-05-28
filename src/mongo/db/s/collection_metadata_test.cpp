@@ -116,7 +116,8 @@ TEST_F(NoChunkFixture, IsKeyValid) {
     ASSERT_TRUE(getCollMetadata().isValidKey(BSON("a" << 3)));
     ASSERT_FALSE(getCollMetadata().isValidKey(BSON("a"
                                                    << "abcde"
-                                                   << "b" << 1)));
+                                                   << "b"
+                                                   << 1)));
     ASSERT_FALSE(getCollMetadata().isValidKey(BSON("c"
                                                    << "abcde")));
 }
@@ -333,10 +334,12 @@ protected:
 
         BSONObj fooSingle = BSON(
             ChunkType::name("test.foo-a_10")
-            << ChunkType::ns("test.foo") << ChunkType::min(BSON("a" << 10))
+            << ChunkType::ns("test.foo")
+            << ChunkType::min(BSON("a" << 10))
             << ChunkType::max(BSON("a" << 20))
             << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(chunkVersion.toLong()))
-            << ChunkType::DEPRECATED_epoch(epoch) << ChunkType::shard("shard0000"));
+            << ChunkType::DEPRECATED_epoch(epoch)
+            << ChunkType::shard("shard0000"));
         std::vector<BSONObj> chunksToSend{fooSingle};
 
         auto future = launchAsync([this] {
@@ -587,10 +590,12 @@ protected:
 
         BSONObj fooSingle = BSON(
             ChunkType::name("test.foo-a_MinKey")
-            << ChunkType::ns("test.foo") << ChunkType::min(BSON("a" << MINKEY << "b" << MINKEY))
+            << ChunkType::ns("test.foo")
+            << ChunkType::min(BSON("a" << MINKEY << "b" << MINKEY))
             << ChunkType::max(BSON("a" << MAXKEY << "b" << MAXKEY))
             << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(chunkVersion.toLong()))
-            << ChunkType::DEPRECATED_epoch(epoch) << ChunkType::shard("shard0000"));
+            << ChunkType::DEPRECATED_epoch(epoch)
+            << ChunkType::shard("shard0000"));
         std::vector<BSONObj> chunksToSend{fooSingle};
 
         auto future = launchAsync([this] {
@@ -654,16 +659,20 @@ protected:
         std::vector<BSONObj> chunksToSend;
         chunksToSend.push_back(BSON(
             ChunkType::name("test.foo-a_10")
-            << ChunkType::ns("test.foo") << ChunkType::min(BSON("a" << 10 << "b" << 0))
+            << ChunkType::ns("test.foo")
+            << ChunkType::min(BSON("a" << 10 << "b" << 0))
             << ChunkType::max(BSON("a" << 20 << "b" << 0))
             << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(chunkVersion.toLong()))
-            << ChunkType::DEPRECATED_epoch(epoch) << ChunkType::shard("shard0000")));
+            << ChunkType::DEPRECATED_epoch(epoch)
+            << ChunkType::shard("shard0000")));
         chunksToSend.push_back(BSON(
             ChunkType::name("test.foo-a_10")
-            << ChunkType::ns("test.foo") << ChunkType::min(BSON("a" << 30 << "b" << 0))
+            << ChunkType::ns("test.foo")
+            << ChunkType::min(BSON("a" << 30 << "b" << 0))
             << ChunkType::max(BSON("a" << 40 << "b" << 0))
             << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(chunkVersion.toLong()))
-            << ChunkType::DEPRECATED_epoch(epoch) << ChunkType::shard("shard0000")));
+            << ChunkType::DEPRECATED_epoch(epoch)
+            << ChunkType::shard("shard0000")));
 
         auto future = launchAsync([this] {
             MetadataLoader loader;
@@ -847,30 +856,36 @@ protected:
             ChunkVersion version(1, 1, epoch);
             chunksToSend.push_back(BSON(
                 ChunkType::name("x.y-a_MinKey")
-                << ChunkType::ns("x.y") << ChunkType::min(BSON("a" << MINKEY))
+                << ChunkType::ns("x.y")
+                << ChunkType::min(BSON("a" << MINKEY))
                 << ChunkType::max(BSON("a" << 10))
                 << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(version.toLong()))
-                << ChunkType::DEPRECATED_epoch(version.epoch()) << ChunkType::shard("shard0000")));
+                << ChunkType::DEPRECATED_epoch(version.epoch())
+                << ChunkType::shard("shard0000")));
         }
 
         {
             ChunkVersion version(1, 3, epoch);
             chunksToSend.push_back(BSON(
                 ChunkType::name("x.y-a_10")
-                << ChunkType::ns("x.y") << ChunkType::min(BSON("a" << 10))
+                << ChunkType::ns("x.y")
+                << ChunkType::min(BSON("a" << 10))
                 << ChunkType::max(BSON("a" << 20))
                 << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(version.toLong()))
-                << ChunkType::DEPRECATED_epoch(version.epoch()) << ChunkType::shard("shard0000")));
+                << ChunkType::DEPRECATED_epoch(version.epoch())
+                << ChunkType::shard("shard0000")));
         }
 
         {
             ChunkVersion version(1, 2, epoch);
             chunksToSend.push_back(BSON(
                 ChunkType::name("x.y-a_30")
-                << ChunkType::ns("x.y") << ChunkType::min(BSON("a" << 30))
+                << ChunkType::ns("x.y")
+                << ChunkType::min(BSON("a" << 30))
                 << ChunkType::max(BSON("a" << MAXKEY))
                 << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(version.toLong()))
-                << ChunkType::DEPRECATED_epoch(version.epoch()) << ChunkType::shard("shard0000")));
+                << ChunkType::DEPRECATED_epoch(version.epoch())
+                << ChunkType::shard("shard0000")));
         }
 
         auto future = launchAsync([this] {

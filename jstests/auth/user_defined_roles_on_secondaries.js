@@ -87,13 +87,12 @@
     rstest.add();
     rstest.reInitiate();
 
-    rstest.getPrimary().getDB("db1").createRole(
-        {
-          role: "r3",
-          roles: ["r1", "r2"],
-          privileges: [{resource: {db: "db1", collection: "log"}, actions: ["update"]}]
-        },
-        {w: 2});
+    rstest.getPrimary().getDB("db1").createRole({
+        role: "r3",
+        roles: ["r1", "r2"],
+        privileges: [{resource: {db: "db1", collection: "log"}, actions: ["update"]}]
+    },
+                                                {w: 2});
 
     // Verify that both members of the set see the same role graph.
     rstest.nodes.forEach(function(node) {

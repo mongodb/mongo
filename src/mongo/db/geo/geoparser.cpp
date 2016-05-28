@@ -30,9 +30,9 @@
 
 #include "mongo/db/geo/geoparser.h"
 
+#include <cmath>
 #include <string>
 #include <vector>
-#include <cmath>
 
 #include "mongo/db/geo/shapes.h"
 #include "mongo/db/jsobj.h"
@@ -227,7 +227,8 @@ static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem,
                 "Secondary loops not contained by first exterior loop - "
                 "secondary loops must be holes: "
                 << coordinateElt.toString(false)
-                << " first loop: " << elem.Obj().firstElement().toString(false));
+                << " first loop: "
+                << elem.Obj().firstElement().toString(false));
         }
     }
 

@@ -8,10 +8,7 @@ var res;
 var t = db.update_server_12848;
 t.drop();
 
-var orig = {
-    "_id": 1,
-    "a": [1, []]
-};
+var orig = {"_id": 1, "a": [1, []]};
 res = t.insert(orig);
 assert.writeOK(res, "insert");
 assert.eq(orig, t.findOne());
@@ -19,8 +16,5 @@ assert.eq(orig, t.findOne());
 res = t.update({"_id": 1}, {$addToSet: {"a.1": 1}});
 assert.writeOK(res, "update");
 
-var updated = {
-    "_id": 1,
-    "a": [1, [1]]
-};
+var updated = {"_id": 1, "a": [1, [1]]};
 assert.eq(updated, t.findOne());

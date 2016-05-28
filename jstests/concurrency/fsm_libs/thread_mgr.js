@@ -211,22 +211,18 @@ workerThread.fsm = function(workloads, args, options) {
     load('jstests/concurrency/fsm_libs/worker_thread.js');  // for workerThread.main
     load('jstests/concurrency/fsm_libs/fsm.js');            // for fsm.run
 
-    return workerThread.main(workloads,
-                             args,
-                             function(configs) {
-                                 var workloads = Object.keys(configs);
-                                 assert.eq(1, workloads.length);
-                                 fsm.run(configs[workloads[0]]);
-                             });
+    return workerThread.main(workloads, args, function(configs) {
+        var workloads = Object.keys(configs);
+        assert.eq(1, workloads.length);
+        fsm.run(configs[workloads[0]]);
+    });
 };
 
 workerThread.composed = function(workloads, args, options) {
     load('jstests/concurrency/fsm_libs/worker_thread.js');  // for workerThread.main
     load('jstests/concurrency/fsm_libs/composer.js');       // for composer.run
 
-    return workerThread.main(workloads,
-                             args,
-                             function(configs) {
-                                 composer.run(workloads, configs, options);
-                             });
+    return workerThread.main(workloads, args, function(configs) {
+        composer.run(workloads, configs, options);
+    });
 };

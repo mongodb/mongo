@@ -37,8 +37,8 @@
 #include <iostream>
 
 #include "mongo/db/storage/mmap_v1/dur.h"
-#include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
+#include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stacktrace.h"
 

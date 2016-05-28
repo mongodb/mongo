@@ -4,9 +4,7 @@
     "use strict";
 
     function makeDocument(docSize) {
-        var doc = {
-            "fieldName": ""
-        };
+        var doc = {"fieldName": ""};
         var longString = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
         while (Object.bsonsize(doc) < docSize) {
             if (Object.bsonsize(doc) < docSize - longString.length) {

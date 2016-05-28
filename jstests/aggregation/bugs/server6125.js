@@ -10,9 +10,7 @@
 // to make results array nested (problem 2)
 function nestArray(nstArray) {
     for (x = 0; x < nstArray.length; x++) {
-        nstArray[x].a = {
-            b: nstArray[x].a
-        };
+        nstArray[x].a = {b: nstArray[x].a};
     }
 }
 

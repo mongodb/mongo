@@ -25,8 +25,8 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/bson/bsontypes.h"
 
 #include <cstdint>
 #include <ctime>

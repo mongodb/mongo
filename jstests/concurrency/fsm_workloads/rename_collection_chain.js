@@ -36,17 +36,11 @@ var $config = (function() {
             this.fromCollName = toCollName;
         }
 
-        return {
-            init: init,
-            rename: rename
-        };
+        return {init: init, rename: rename};
 
     })();
 
-    var transitions = {
-        init: {rename: 1},
-        rename: {rename: 1}
-    };
+    var transitions = {init: {rename: 1}, rename: {rename: 1}};
 
     function teardown(db, collName, cluster) {
         var pattern = new RegExp('^' + this.prefix + '\\d+_\\d+$');

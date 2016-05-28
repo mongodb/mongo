@@ -15,14 +15,10 @@ var $config = (function() {
             db[collName].update({a: 1, b: 1}, {$set: {c: newC}}, {multi: true});
         }
 
-        return {
-            multiUpdate: multiUpdate
-        };
+        return {multiUpdate: multiUpdate};
     })();
 
-    var transitions = {
-        multiUpdate: {multiUpdate: 1.0}
-    };
+    var transitions = {multiUpdate: {multiUpdate: 1.0}};
 
     function setup(db, collName, cluster) {
         assertAlways.commandWorked(db[collName].ensureIndex({a: 1}));

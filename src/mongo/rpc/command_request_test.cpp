@@ -36,8 +36,8 @@
 #include "mongo/rpc/command_request.h"
 #include "mongo/rpc/command_request_builder.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/net/message.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/net/message.h"
 
 namespace {
 

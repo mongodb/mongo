@@ -71,7 +71,8 @@ public:
 
         BSONObj spec = BSON("key" << BSON("a" << 1) << "name"
                                   << "testIndex"
-                                  << "ns" << ns);
+                                  << "ns"
+                                  << ns);
 
         IndexDescriptor desc(NULL, "", spec);
 

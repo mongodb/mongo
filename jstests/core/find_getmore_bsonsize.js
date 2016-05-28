@@ -74,10 +74,7 @@
         bigStr += bigStr;
     }
     bigStr = bigStr.substring(0, (16 * oneMB) - 32);
-    var maxSizeDoc = {
-        _id: 0,
-        padding: bigStr
-    };
+    var maxSizeDoc = {_id: 0, padding: bigStr};
     assert.eq(Object.bsonsize(maxSizeDoc), 16 * oneMB);
     assert.writeOK(coll.insert(maxSizeDoc));
 

@@ -33,8 +33,8 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
 
 namespace mongo {
@@ -55,8 +55,10 @@ public:
     virtual BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const {
         auto engine = txn->getClient()->getServiceContext()->getGlobalStorageEngine();
         return BSON("name" << storageGlobalParams.engine << "supportsCommittedReads"
-                           << bool(engine->getSnapshotManager()) << "readOnly"
-                           << storageGlobalParams.readOnly << "persistent"
+                           << bool(engine->getSnapshotManager())
+                           << "readOnly"
+                           << storageGlobalParams.readOnly
+                           << "persistent"
                            << !engine->isEphemeral());
     }
 

@@ -56,10 +56,8 @@ doTest = function(signal) {
 
     var a = replTest.getPrimary().getDB("two");
     for (var i = 0; i < 20000; i++)
-        a.coll.insert({
-            i: i,
-            s: "a                                                                       b"
-        });
+        a.coll.insert(
+            {i: i, s: "a                                                                       b"});
 
     // Start a second node
     var second = replTest.add();

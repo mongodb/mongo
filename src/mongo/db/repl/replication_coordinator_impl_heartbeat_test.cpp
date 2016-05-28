@@ -90,7 +90,9 @@ TEST_F(ReplCoordHBTest, NodeJoinsExistingReplSetWhenReceivingAConfigContainingTh
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
     ReplicaSetConfig rsConfig = assertMakeRSConfigV0(BSON("_id"
                                                           << "mySet"
-                                                          << "version" << 3 << "members"
+                                                          << "version"
+                                                          << 3
+                                                          << "members"
                                                           << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                                    << "h1:1")
                                                                         << BSON("_id" << 2 << "host"
@@ -154,7 +156,9 @@ TEST_F(ReplCoordHBTest,
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
     ReplicaSetConfig rsConfig = assertMakeRSConfigV0(BSON("_id"
                                                           << "mySet"
-                                                          << "version" << 3 << "members"
+                                                          << "version"
+                                                          << 3
+                                                          << "members"
                                                           << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                                    << "h1:1")
                                                                         << BSON("_id" << 2 << "host"
@@ -230,7 +234,9 @@ TEST_F(ReplCoordHBTest,
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
     assertStartSuccess(BSON("_id"
                             << "mySet"
-                            << "version" << 1 << "members"
+                            << "version"
+                            << 1
+                            << "members"
                             << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                      << "node1:12345")
                                           << BSON("_id" << 2 << "host"
@@ -243,12 +249,12 @@ TEST_F(ReplCoordHBTest,
     const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
     const RemoteCommandRequest& request = noi->getRequest();
     log() << request.target.toString() << " processing " << request.cmdObj;
-    getNet()->scheduleResponse(
-        noi,
-        getNet()->now(),
-        makeResponseStatus(BSON("ok" << 0.0 << "errmsg"
-                                     << "unauth'd"
-                                     << "code" << ErrorCodes::Unauthorized)));
+    getNet()->scheduleResponse(noi,
+                               getNet()->now(),
+                               makeResponseStatus(BSON("ok" << 0.0 << "errmsg"
+                                                            << "unauth'd"
+                                                            << "code"
+                                                            << ErrorCodes::Unauthorized)));
 
     if (request.target != HostAndPort("node2", 12345) &&
         request.cmdObj.firstElement().fieldNameStringData() != "replSetHeartbeat") {

@@ -46,10 +46,7 @@ assert.writeOK(res);
 assert.eq(coll.findOne({_id: 6}).a, 1e-15);
 
 // $max with positional operator
-var insertdoc = {
-    _id: 7,
-    y: [{a: 2}, {a: 6}, {a: [9, 1, 1]}]
-};
+var insertdoc = {_id: 7, y: [{a: 2}, {a: 6}, {a: [9, 1, 1]}]};
 coll.insert(insertdoc);
 res = coll.update({_id: 7, "y.a": 6}, {$max: {"y.$.a": 7}});
 assert.writeOK(res);

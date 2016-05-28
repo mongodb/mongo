@@ -20,15 +20,11 @@
             },
             runCommand: function(db, cmd, opts) {
                 commandsRan.push({db: db, cmd: cmd, opts: opts});
-                return {
-                    ok: 1.0
-                };
+                return {ok: 1.0};
             },
             insert: function(db, indexSpecs, opts) {
                 insertsRan.push({db: db, indexSpecs: indexSpecs, opts: opts});
-                return {
-                    ok: 1.0
-                };
+                return {ok: 1.0};
             },
             getWriteConcern: function() {
                 return null;

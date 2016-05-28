@@ -162,17 +162,14 @@ collSharded.remove({});
 collCompound.remove({});
 collNested.remove({});
 assert.writeError(collSharded.update({a: /abcde.*/}, {$set: {a: /abcde.*/}}, {upsert: true}));
-assert.writeError(collCompound.update({a: /abcde.*/},
-                                      {$set: {a: /abcde.*/, b: 1}},
-                                      {upsert: true}));
+assert.writeError(
+    collCompound.update({a: /abcde.*/}, {$set: {a: /abcde.*/, b: 1}}, {upsert: true}));
 // Exact regex in query never equality
-assert.writeError(collNested.update({'a.b': /abcde.*/},
-                                    {$set: {'a.b': /abcde.*/}},
-                                    {upsert: true}));
+assert.writeError(
+    collNested.update({'a.b': /abcde.*/}, {$set: {'a.b': /abcde.*/}}, {upsert: true}));
 // Even nested regexes are not extracted in queries
-assert.writeError(collNested.update({a: {b: /abcde.*/}},
-                                    {$set: {'a.b': /abcde.*/}},
-                                    {upsert: true}));
+assert.writeError(
+    collNested.update({a: {b: /abcde.*/}}, {$set: {'a.b': /abcde.*/}}, {upsert: true}));
 assert.writeError(collNested.update({c: 1}, {$set: {'a.b': /abcde.*/}}, {upsert: true}));
 
 //

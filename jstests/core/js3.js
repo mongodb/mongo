@@ -18,14 +18,12 @@ for (z = 0; z < 2; z++) {
     for (i = 0; i < 1000; i++)
         t.save({
             i: i,
-            z:
-                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            z: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         });
 
-    assert(33 ==
-           db.dbEval(function() {
-               return 33;
-           }));
+    assert(33 == db.dbEval(function() {
+        return 33;
+    }));
 
     db.dbEval(function() {
         db.jstests_js3.save({i: -1, z: "server side"});
@@ -33,12 +31,11 @@ for (z = 0; z < 2; z++) {
 
     assert(t.findOne({i: -1}));
 
-    assert(2 ==
-           t.find({
-               $where: function() {
-                   return obj.i == 7 || obj.i == 8;
-               }
-           }).length());
+    assert(2 == t.find({
+                     $where: function() {
+                         return obj.i == 7 || obj.i == 8;
+                     }
+                 }).length());
 
     // NPE test
     var ok = false;
@@ -62,10 +59,10 @@ for (z = 0; z < 2; z++) {
     debug("before indexed find");
 
     arr = t.find({
-        $where: function() {
-            return obj.i == 7 || obj.i == 8;
-        }
-    }).toArray();
+               $where: function() {
+                   return obj.i == 7 || obj.i == 8;
+               }
+           }).toArray();
     debug(arr);
     assert.eq(2, arr.length);
 
@@ -74,8 +71,7 @@ for (z = 0; z < 2; z++) {
     for (i = 1000; i < 2000; i++)
         t.save({
             i: i,
-            z:
-                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            z: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         });
 
     assert(t.find().count() == 2001);

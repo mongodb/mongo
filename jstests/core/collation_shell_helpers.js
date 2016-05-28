@@ -47,49 +47,46 @@
         db.createCollection("collation_shell_helpers", {collation: {locale: "fr_CA"}}));
     var collectionInfos = db.getCollectionInfos({name: "collation_shell_helpers"});
     assert.eq(collectionInfos.length, 1);
-    assert.eq(collectionInfos[0].options.collation,
-              {
-                locale: "fr_CA",
-                caseLevel: false,
-                caseFirst: "off",
-                strength: 3,
-                numericOrdering: false,
-                alternate: "non-ignorable",
-                maxVariable: "punct",
-                normalization: false,
-                backwards: true
-              });
+    assert.eq(collectionInfos[0].options.collation, {
+        locale: "fr_CA",
+        caseLevel: false,
+        caseFirst: "off",
+        strength: 3,
+        numericOrdering: false,
+        alternate: "non-ignorable",
+        maxVariable: "punct",
+        normalization: false,
+        backwards: true
+    });
 
     // Ensure that an index with no collation inherits the collection-default collation.
     assert.commandWorked(coll.ensureIndex({a: 1}));
-    assertIndexHasCollation({a: 1},
-                            {
-                              locale: "fr_CA",
-                              caseLevel: false,
-                              caseFirst: "off",
-                              strength: 3,
-                              numericOrdering: false,
-                              alternate: "non-ignorable",
-                              maxVariable: "punct",
-                              normalization: false,
-                              backwards: true
-                            });
+    assertIndexHasCollation({a: 1}, {
+        locale: "fr_CA",
+        caseLevel: false,
+        caseFirst: "off",
+        strength: 3,
+        numericOrdering: false,
+        alternate: "non-ignorable",
+        maxVariable: "punct",
+        normalization: false,
+        backwards: true
+    });
 
     // Ensure that an index which specifies an overriding collation does not use the collection
     // default.
     assert.commandWorked(coll.ensureIndex({b: 1}, {collation: {locale: "en_US"}}));
-    assertIndexHasCollation({b: 1},
-                            {
-                              locale: "en_US",
-                              caseLevel: false,
-                              caseFirst: "off",
-                              strength: 3,
-                              numericOrdering: false,
-                              alternate: "non-ignorable",
-                              maxVariable: "punct",
-                              normalization: false,
-                              backwards: false
-                            });
+    assertIndexHasCollation({b: 1}, {
+        locale: "en_US",
+        caseLevel: false,
+        caseFirst: "off",
+        strength: 3,
+        numericOrdering: false,
+        alternate: "non-ignorable",
+        maxVariable: "punct",
+        normalization: false,
+        backwards: false
+    });
 
     coll.drop();
 
@@ -106,58 +103,54 @@
     assert.commandFailed(coll.ensureIndex({a: 1}, {collation: {locale: "en", strength: 99}}));
 
     assert.commandWorked(coll.ensureIndex({a: 1}, {collation: {locale: "en_US"}}));
-    assertIndexHasCollation({a: 1},
-                            {
-                              locale: "en_US",
-                              caseLevel: false,
-                              caseFirst: "off",
-                              strength: 3,
-                              numericOrdering: false,
-                              alternate: "non-ignorable",
-                              maxVariable: "punct",
-                              normalization: false,
-                              backwards: false
-                            });
+    assertIndexHasCollation({a: 1}, {
+        locale: "en_US",
+        caseLevel: false,
+        caseFirst: "off",
+        strength: 3,
+        numericOrdering: false,
+        alternate: "non-ignorable",
+        maxVariable: "punct",
+        normalization: false,
+        backwards: false
+    });
 
     assert.commandWorked(coll.createIndex({b: 1}, {collation: {locale: "en_US"}}));
-    assertIndexHasCollation({b: 1},
-                            {
-                              locale: "en_US",
-                              caseLevel: false,
-                              caseFirst: "off",
-                              strength: 3,
-                              numericOrdering: false,
-                              alternate: "non-ignorable",
-                              maxVariable: "punct",
-                              normalization: false,
-                              backwards: false
-                            });
+    assertIndexHasCollation({b: 1}, {
+        locale: "en_US",
+        caseLevel: false,
+        caseFirst: "off",
+        strength: 3,
+        numericOrdering: false,
+        alternate: "non-ignorable",
+        maxVariable: "punct",
+        normalization: false,
+        backwards: false
+    });
 
     assert.commandWorked(coll.createIndexes([{c: 1}, {d: 1}], {collation: {locale: "fr_CA"}}));
-    assertIndexHasCollation({c: 1},
-                            {
-                              locale: "fr_CA",
-                              caseLevel: false,
-                              caseFirst: "off",
-                              strength: 3,
-                              numericOrdering: false,
-                              alternate: "non-ignorable",
-                              maxVariable: "punct",
-                              normalization: false,
-                              backwards: true
-                            });
-    assertIndexHasCollation({d: 1},
-                            {
-                              locale: "fr_CA",
-                              caseLevel: false,
-                              caseFirst: "off",
-                              strength: 3,
-                              numericOrdering: false,
-                              alternate: "non-ignorable",
-                              maxVariable: "punct",
-                              normalization: false,
-                              backwards: true
-                            });
+    assertIndexHasCollation({c: 1}, {
+        locale: "fr_CA",
+        caseLevel: false,
+        caseFirst: "off",
+        strength: 3,
+        numericOrdering: false,
+        alternate: "non-ignorable",
+        maxVariable: "punct",
+        normalization: false,
+        backwards: true
+    });
+    assertIndexHasCollation({d: 1}, {
+        locale: "fr_CA",
+        caseLevel: false,
+        caseFirst: "off",
+        strength: 3,
+        numericOrdering: false,
+        alternate: "non-ignorable",
+        maxVariable: "punct",
+        normalization: false,
+        backwards: true
+    });
 
     // TODO SERVER-23791: Test that queries with matching collations can use these indices, and that
     // the indices contain collator-generated comparison keys rather than the verbatim indexed
@@ -172,21 +165,8 @@
     assert.writeOK(coll.insert({_id: 2, str: "bar"}));
 
     // Aggregation.
-    assert.eq(2,
-              coll.aggregate([],
-                             {
-                                 collation : {
-                                 locale:
-                                     "fr"
-                                 }
-                             }).itcount());
-    assert.commandWorked(coll.explain().aggregate([],
-                                                  {
-                                                      collation : {
-                                                      locale:
-                                                          "fr"
-                                                      }
-                                                  }));
+    assert.eq(2, coll.aggregate([], {collation: {locale: "fr"}}).itcount());
+    assert.commandWorked(coll.explain().aggregate([], {collation: {locale: "fr"}}));
 
     // Count command.
     assert.eq(0, coll.find({str: "FOO"}).count());
@@ -236,28 +216,24 @@
     assert.commandWorked(coll.find().collation({locale: "fr"}).explain());
 
     // findAndModify.
-    assert.eq({_id: 2, str: "baz"},
-              coll.findAndModify({
-                  query: {str: "bar"},
-                  update: {$set: {str: "baz"}}, new: true,
-                  collation: {locale: "fr"}
-              }));
-    assert.commandWorked(coll.explain().findAndModify({
+    assert.eq({_id: 2, str: "baz"}, coll.findAndModify({
         query: {str: "bar"},
-        update: {$set: {str: "baz"}}, new: true,
+        update: {$set: {str: "baz"}},
+        new: true,
         collation: {locale: "fr"}
     }));
+    assert.commandWorked(coll.explain().findAndModify(
+        {query: {str: "bar"}, update: {$set: {str: "baz"}}, new: true, collation: {locale: "fr"}}));
 
     // Group.
-    assert.eq([{str: "foo", count: 1}, {str: "baz", count: 1}],
-              coll.group({
-                  key: {str: 1},
-                  initial: {count: 0},
-                  reduce: function(curr, result) {
-                      result.count += 1;
-                  },
-                  collation: {locale: "fr"}
-              }));
+    assert.eq([{str: "foo", count: 1}, {str: "baz", count: 1}], coll.group({
+        key: {str: 1},
+        initial: {count: 0},
+        reduce: function(curr, result) {
+            result.count += 1;
+        },
+        collation: {locale: "fr"}
+    }));
     assert.commandWorked(coll.explain().group({
         key: {str: 1},
         initial: {count: 0},
@@ -323,79 +299,95 @@
     // String field not indexed.
     assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
     assert.eq(0,
-              assert.commandWorked(db.runCommand({
-                  geoNear: coll.getName(),
-                  near: {type: "Point", coordinates: [0, 0]},
-                  spherical: true,
-                  query: {str: "ABC"}
-              })).results.length);
+              assert
+                  .commandWorked(db.runCommand({
+                      geoNear: coll.getName(),
+                      near: {type: "Point", coordinates: [0, 0]},
+                      spherical: true,
+                      query: {str: "ABC"}
+                  }))
+                  .results.length);
     assert.eq(1,
-              assert.commandWorked(db.runCommand({
-                  geoNear: coll.getName(),
-                  near: {type: "Point", coordinates: [0, 0]},
-                  spherical: true,
-                  query: {str: "ABC"},
-                  collation: {locale: "en_US", strength: 2}
-              })).results.length);
+              assert
+                  .commandWorked(db.runCommand({
+                      geoNear: coll.getName(),
+                      near: {type: "Point", coordinates: [0, 0]},
+                      spherical: true,
+                      query: {str: "ABC"},
+                      collation: {locale: "en_US", strength: 2}
+                  }))
+                  .results.length);
 
     // String field indexed without collation.
     assert.commandWorked(coll.dropIndexes());
     assert.commandWorked(coll.ensureIndex({geo: "2dsphere", str: 1}));
     assert.eq(0,
-              assert.commandWorked(db.runCommand({
-                  geoNear: coll.getName(),
-                  near: {type: "Point", coordinates: [0, 0]},
-                  spherical: true,
-                  query: {str: "ABC"}
-              })).results.length);
+              assert
+                  .commandWorked(db.runCommand({
+                      geoNear: coll.getName(),
+                      near: {type: "Point", coordinates: [0, 0]},
+                      spherical: true,
+                      query: {str: "ABC"}
+                  }))
+                  .results.length);
     assert.eq(1,
-              assert.commandWorked(db.runCommand({
-                  geoNear: coll.getName(),
-                  near: {type: "Point", coordinates: [0, 0]},
-                  spherical: true,
-                  query: {str: "ABC"},
-                  collation: {locale: "en_US", strength: 2}
-              })).results.length);
+              assert
+                  .commandWorked(db.runCommand({
+                      geoNear: coll.getName(),
+                      near: {type: "Point", coordinates: [0, 0]},
+                      spherical: true,
+                      query: {str: "ABC"},
+                      collation: {locale: "en_US", strength: 2}
+                  }))
+                  .results.length);
 
     // String field indexed with non-matching collation.
     assert.commandWorked(coll.dropIndexes());
     assert.commandWorked(
         coll.ensureIndex({geo: "2dsphere", str: 1}, {collation: {locale: "en_US", strength: 3}}));
     assert.eq(0,
-              assert.commandWorked(db.runCommand({
-                  geoNear: coll.getName(),
-                  near: {type: "Point", coordinates: [0, 0]},
-                  spherical: true,
-                  query: {str: "ABC"}
-              })).results.length);
+              assert
+                  .commandWorked(db.runCommand({
+                      geoNear: coll.getName(),
+                      near: {type: "Point", coordinates: [0, 0]},
+                      spherical: true,
+                      query: {str: "ABC"}
+                  }))
+                  .results.length);
     assert.eq(1,
-              assert.commandWorked(db.runCommand({
-                  geoNear: coll.getName(),
-                  near: {type: "Point", coordinates: [0, 0]},
-                  spherical: true,
-                  query: {str: "ABC"},
-                  collation: {locale: "en_US", strength: 2}
-              })).results.length);
+              assert
+                  .commandWorked(db.runCommand({
+                      geoNear: coll.getName(),
+                      near: {type: "Point", coordinates: [0, 0]},
+                      spherical: true,
+                      query: {str: "ABC"},
+                      collation: {locale: "en_US", strength: 2}
+                  }))
+                  .results.length);
 
     // String field indexed with matching collation.
     assert.commandWorked(coll.dropIndexes());
     assert.commandWorked(
         coll.ensureIndex({geo: "2dsphere", str: 1}, {collation: {locale: "en_US", strength: 2}}));
     assert.eq(0,
-              assert.commandWorked(db.runCommand({
-                  geoNear: coll.getName(),
-                  near: {type: "Point", coordinates: [0, 0]},
-                  spherical: true,
-                  query: {str: "ABC"}
-              })).results.length);
+              assert
+                  .commandWorked(db.runCommand({
+                      geoNear: coll.getName(),
+                      near: {type: "Point", coordinates: [0, 0]},
+                      spherical: true,
+                      query: {str: "ABC"}
+                  }))
+                  .results.length);
     assert.eq(1,
-              assert.commandWorked(db.runCommand({
-                  geoNear: coll.getName(),
-                  near: {type: "Point", coordinates: [0, 0]},
-                  spherical: true,
-                  query: {str: "ABC"},
-                  collation: {locale: "en_US", strength: 2}
-              })).results.length);
+              assert
+                  .commandWorked(db.runCommand({
+                      geoNear: coll.getName(),
+                      near: {type: "Point", coordinates: [0, 0]},
+                      spherical: true,
+                      query: {str: "ABC"},
+                      collation: {locale: "en_US", strength: 2}
+                  }))
+                  .results.length);
 
     coll.drop();
 
@@ -407,14 +399,15 @@
         assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
         assert.eq(0,
                   coll.find({
-                      str: "ABC",
-                      geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}
-                  }).itcount());
+                          str: "ABC",
+                          geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}
+                      })
+                      .itcount());
         assert.eq(1,
                   coll.find({
-                      str: "ABC",
-                      geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}
-                  })
+                          str: "ABC",
+                          geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}
+                      })
                       .collation({locale: "en_US", strength: 2})
                       .itcount());
 
@@ -423,14 +416,15 @@
         assert.commandWorked(coll.ensureIndex({geo: "2dsphere", str: 1}));
         assert.eq(0,
                   coll.find({
-                      str: "ABC",
-                      geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}
-                  }).itcount());
+                          str: "ABC",
+                          geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}
+                      })
+                      .itcount());
         assert.eq(1,
                   coll.find({
-                      str: "ABC",
-                      geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}
-                  })
+                          str: "ABC",
+                          geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}
+                      })
                       .collation({locale: "en_US", strength: 2})
                       .itcount());
 
@@ -440,14 +434,15 @@
                                               {collation: {locale: "en_US", strength: 3}}));
         assert.eq(0,
                   coll.find({
-                      str: "ABC",
-                      geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}
-                  }).itcount());
+                          str: "ABC",
+                          geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}
+                      })
+                      .itcount());
         assert.eq(1,
                   coll.find({
-                      str: "ABC",
-                      geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}
-                  })
+                          str: "ABC",
+                          geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}
+                      })
                       .collation({locale: "en_US", strength: 2})
                       .itcount());
 
@@ -457,14 +452,15 @@
                                               {collation: {locale: "en_US", strength: 2}}));
         assert.eq(0,
                   coll.find({
-                      str: "ABC",
-                      geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}
-                  }).itcount());
+                          str: "ABC",
+                          geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}
+                      })
+                      .itcount());
         assert.eq(1,
                   coll.find({
-                      str: "ABC",
-                      geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}
-                  })
+                          str: "ABC",
+                          geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}
+                      })
                       .collation({locale: "en_US", strength: 2})
                       .itcount());
 
@@ -684,11 +680,8 @@
     } else {
         assert.throws(function() {
             coll.bulkWrite([{
-                replaceOne: {
-                    filter: {str: "foo"},
-                    replacement: {str: "bar"},
-                    collation: {locale: "fr"}
-                }
+                replaceOne:
+                    {filter: {str: "foo"}, replacement: {str: "bar"}, collation: {locale: "fr"}}
             }]);
         });
     }

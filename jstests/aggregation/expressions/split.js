@@ -38,35 +38,23 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and testExp
     testExpression(coll, {$split: ["a", "$a"]}, null);
 
     // Ensure that $split errors when given more or less than two arguments.
-    var pipeline = {
-        $project: {split: {$split: []}}
-    };
+    var pipeline = {$project: {split: {$split: []}}};
     assertErrorCode(coll, pipeline, 16020);
 
-    pipeline = {
-        $project: {split: {$split: ["a"]}}
-    };
+    pipeline = {$project: {split: {$split: ["a"]}}};
     assertErrorCode(coll, pipeline, 16020);
 
-    pipeline = {
-        $project: {split: {$split: ["a", "b", "c"]}}
-    };
+    pipeline = {$project: {split: {$split: ["a", "b", "c"]}}};
     assertErrorCode(coll, pipeline, 16020);
 
     // Ensure that $split errors when given non-string input.
-    pipeline = {
-        $project: {split: {$split: [1, "abc"]}}
-    };
+    pipeline = {$project: {split: {$split: [1, "abc"]}}};
     assertErrorCode(coll, pipeline, 40085);
 
-    pipeline = {
-        $project: {split: {$split: ["abc", 1]}}
-    };
+    pipeline = {$project: {split: {$split: ["abc", 1]}}};
     assertErrorCode(coll, pipeline, 40086);
 
     // Ensure that $split errors when given an empty separator.
-    pipeline = {
-        $project: {split: {$split: ["abc", ""]}}
-    };
+    pipeline = {$project: {split: {$split: ["abc", ""]}}};
     assertErrorCode(coll, pipeline, 40087);
 }());

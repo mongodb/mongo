@@ -31,8 +31,8 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "mongo/base/status.h"
 #include "mongo/base/data_type.h"
+#include "mongo/base/status.h"
 
 namespace mongo {
 /**

@@ -346,9 +346,9 @@ TEST(LiteParsedQueryTest, ValidateSortOrder) {
     ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson("{a: {$meta: 1}}")));
     ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson("{a: {$meta: \"image\"}}")));
     ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson("{a: {$world: \"textScore\"}}")));
-    ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson(
-        "{a: {$meta: \"textScore\","
-        " b: 1}}")));
+    ASSERT_FALSE(
+        LiteParsedQuery::isValidSortOrder(fromjson("{a: {$meta: \"textScore\","
+                                                   " b: 1}}")));
     ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson("{'': 1}")));
     ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson("{'': -1}")));
 }

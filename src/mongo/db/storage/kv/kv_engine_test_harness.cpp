@@ -30,8 +30,8 @@
 
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
 
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/kv/kv_catalog.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"

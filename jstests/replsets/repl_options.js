@@ -3,9 +3,7 @@ var baseName = "jstests_repl_repl_options";
 load('jstests/libs/command_line/test_parsed_options.js');
 
 jsTest.log("Testing \"replSet\" command line option");
-var expectedResult = {
-    "parsed": {"replication": {"replSet": "mycmdlinename"}}
-};
+var expectedResult = {"parsed": {"replication": {"replSet": "mycmdlinename"}}};
 testGetCmdLineOptsMongod({replSet: "mycmdlinename"}, expectedResult);
 
 jsTest.log("Testing \"replication.replSetName\" config file option");

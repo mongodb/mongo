@@ -16,16 +16,15 @@ assert.writeOK(bulk.execute());
 join = startParallelShell(
     "while( db.foo.findOne( { _id : 0 } ).x == 1 ); db.foo.ensureIndex( { x : 1 } );");
 
-t.update(
-    {
-      $where: function() {
-          sleep(1);
-          return true;
-      }
-    },
-    {$set: {x: 5}},
-    false,
-    true);
+t.update({
+    $where: function() {
+        sleep(1);
+        return true;
+    }
+},
+         {$set: {x: 5}},
+         false,
+         true);
 db.getLastError();
 
 join();

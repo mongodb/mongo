@@ -24,10 +24,7 @@ var $config = (function() {
         }
     };
 
-    var transitions = {
-        set: {set: 0.5, unset: 0.5},
-        unset: {set: 0.5, unset: 0.5}
-    };
+    var transitions = {set: {set: 0.5, unset: 0.5}, unset: {set: 0.5, unset: 0.5}};
 
     function setup(db, collName, cluster) {
         // index on 'value', the field being updated
@@ -83,13 +80,9 @@ var $config = (function() {
                 var value = Random.randInt(5);
 
                 var updater = {};
-                updater[set ? '$set' : '$unset'] = {
-                    value: value
-                };
+                updater[set ? '$set' : '$unset'] = {value: value};
 
-                var query = {
-                    _id: docIndex
-                };
+                var query = {_id: docIndex};
                 var res = this.doUpdate(db, collName, query, updater);
                 this.assertResult(db, res);
             },

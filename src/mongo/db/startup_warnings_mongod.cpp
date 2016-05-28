@@ -41,8 +41,8 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/startup_warnings_common.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/version.h"
 
@@ -109,9 +109,9 @@ StatusWith<std::string> StartupWarningsMongod::readTransparentHugePagesParameter
 
         opMode = line.substr(posBegin + 1, posEnd - posBegin - 1);
         if (opMode.empty()) {
-            return StatusWith<std::string>(ErrorCodes::BadValue,
-                                           str::stream() << "invalid mode in " << filename << ": '"
-                                                         << line << "'");
+            return StatusWith<std::string>(
+                ErrorCodes::BadValue,
+                str::stream() << "invalid mode in " << filename << ": '" << line << "'");
         }
 
         // Check against acceptable values of opMode.
@@ -120,12 +120,16 @@ StatusWith<std::string> StartupWarningsMongod::readTransparentHugePagesParameter
                 ErrorCodes::BadValue,
                 str::stream()
                     << "** WARNING: unrecognized transparent Huge Pages mode of operation in "
-                    << filename << ": '" << opMode << "''");
+                    << filename
+                    << ": '"
+                    << opMode
+                    << "''");
         }
     } catch (const boost::filesystem::filesystem_error& err) {
         return StatusWith<std::string>(ErrorCodes::UnknownError,
                                        str::stream() << "Failed to probe \"" << err.path1().string()
-                                                     << "\": " << err.code().message());
+                                                     << "\": "
+                                                     << err.code().message());
     }
 
     return StatusWith<std::string>(opMode);

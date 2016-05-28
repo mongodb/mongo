@@ -62,17 +62,17 @@ resetCollection();
 // Case 1: missing parameters
 
 assert.eq(false, db.runCommand({splitVector: "test.jstests_splitvector"}).ok, "1a");
-assert.eq(false,
-          db.runCommand({splitVector: "test.jstests_splitvector", maxChunkSize: 1}).ok,
-          "1b");
+assert.eq(
+    false, db.runCommand({splitVector: "test.jstests_splitvector", maxChunkSize: 1}).ok, "1b");
 
 // -------------------------
 // Case 2: missing index
 
-assert.eq(false,
-          db.runCommand(
-                 {splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1}).ok,
-          "2");
+assert.eq(
+    false,
+    db.runCommand({splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1})
+        .ok,
+    "2");
 
 // -------------------------
 // Case 3: empty collection

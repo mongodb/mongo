@@ -11,10 +11,7 @@ function d(k, q) {
 }
 
 for (i = 0; i < 1000; i++) {
-    o = {
-        a: r(i * 5),
-        b: r(i)
-    };
+    o = {a: r(i * 5), b: r(i)};
     t.insert(o);
 }
 

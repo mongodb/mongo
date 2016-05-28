@@ -84,14 +84,15 @@ Status addMongoShellOptions(moe::OptionSection* options) {
     authenticationOptions.addOptionChaining(
         "username", "username,u", moe::String, "username for authentication");
 
-    authenticationOptions.addOptionChaining(
-                              "password", "password,p", moe::String, "password for authentication")
+    authenticationOptions
+        .addOptionChaining("password", "password,p", moe::String, "password for authentication")
         .setImplicit(moe::Value(std::string("")));
 
-    authenticationOptions.addOptionChaining("authenticationDatabase",
-                                            "authenticationDatabase",
-                                            moe::String,
-                                            "user source (defaults to dbname)")
+    authenticationOptions
+        .addOptionChaining("authenticationDatabase",
+                           "authenticationDatabase",
+                           moe::String,
+                           "user source (defaults to dbname)")
         .setDefault(moe::Value(std::string("")));
 
     authenticationOptions.addOptionChaining("authenticationMechanism",
@@ -99,11 +100,11 @@ Status addMongoShellOptions(moe::OptionSection* options) {
                                             moe::String,
                                             "authentication mechanism");
 
-    authenticationOptions.addOptionChaining(
-                              "gssapiServiceName",
-                              "gssapiServiceName",
-                              moe::String,
-                              "Service name to use when authenticating using GSSAPI/Kerberos")
+    authenticationOptions
+        .addOptionChaining("gssapiServiceName",
+                           "gssapiServiceName",
+                           moe::String,
+                           "Service name to use when authenticating using GSSAPI/Kerberos")
         .setDefault(moe::Value(std::string(saslDefaultServiceName)));
 
     authenticationOptions.addOptionChaining(
@@ -128,10 +129,11 @@ Status addMongoShellOptions(moe::OptionSection* options) {
                                moe::Switch,
                                "disable the Javascript Just In Time compiler");
 
-    options->addOptionChaining("disableJavaScriptProtection",
-                               "disableJavaScriptProtection",
-                               moe::Switch,
-                               "allow automatic JavaScript function marshalling")
+    options
+        ->addOptionChaining("disableJavaScriptProtection",
+                            "disableJavaScriptProtection",
+                            moe::Switch,
+                            "allow automatic JavaScript function marshalling")
         .incompatibleWith("enableJavaScriptProtection");
 
     Status ret = Status::OK();
@@ -142,11 +144,11 @@ Status addMongoShellOptions(moe::OptionSection* options) {
     }
 #endif
 
-    options->addOptionChaining(
-                 "enableJavaScriptProtection",
-                 "enableJavaScriptProtection",
-                 moe::Switch,
-                 "disable automatic JavaScript function marshalling (defaults to true)")
+    options
+        ->addOptionChaining("enableJavaScriptProtection",
+                            "enableJavaScriptProtection",
+                            moe::Switch,
+                            "disable automatic JavaScript function marshalling (defaults to true)")
         .hidden()
         .incompatibleWith("disableJavaScriptProtection");
 
@@ -165,27 +167,33 @@ Status addMongoShellOptions(moe::OptionSection* options) {
     // for testing, will kill op without prompting
     options->addOptionChaining("autokillop", "autokillop", moe::Switch, "autokillop").hidden();
 
-    options->addOptionChaining("useLegacyWriteOps",
-                               "useLegacyWriteOps",
-                               moe::Switch,
-                               "use legacy write ops instead of write commands").hidden();
+    options
+        ->addOptionChaining("useLegacyWriteOps",
+                            "useLegacyWriteOps",
+                            moe::Switch,
+                            "use legacy write ops instead of write commands")
+        .hidden();
 
-    options->addOptionChaining("writeMode",
-                               "writeMode",
-                               moe::String,
-                               "mode to determine how writes are done:"
-                               " commands, compatibility, legacy").hidden();
+    options
+        ->addOptionChaining("writeMode",
+                            "writeMode",
+                            moe::String,
+                            "mode to determine how writes are done:"
+                            " commands, compatibility, legacy")
+        .hidden();
 
-    options->addOptionChaining("readMode",
-                               "readMode",
-                               moe::String,
-                               "mode to determine how .find() queries are done:"
-                               " commands, compatibility, legacy").hidden();
+    options
+        ->addOptionChaining("readMode",
+                            "readMode",
+                            moe::String,
+                            "mode to determine how .find() queries are done:"
+                            " commands, compatibility, legacy")
+        .hidden();
 
-    options->addOptionChaining("rpcProtocols",
-                               "rpcProtocols",
-                               moe::String,
-                               " none, opQueryOnly, opCommandOnly, all").hidden();
+    options
+        ->addOptionChaining(
+            "rpcProtocols", "rpcProtocols", moe::String, " none, opQueryOnly, opCommandOnly, all")
+        .hidden();
 
     return Status::OK();
 }
@@ -313,7 +321,8 @@ Status storeMongoShellOptions(const moe::Environment& params,
             throw MsgAssertionException(
                 17397,
                 mongoutils::str::stream()
-                    << "Unknown readMode option: '" << mode
+                    << "Unknown readMode option: '"
+                    << mode
                     << "'. Valid modes are: {commands, compatibility, legacy}");
         }
         shellGlobalParams.readMode = mode;

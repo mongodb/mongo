@@ -16,9 +16,7 @@ function testWithCollectionIndexIds(capped, sparse, useIds) {
     toInsert = {};
     if (capped) {
         // Add a singleton array as padding, so the push later on will not change document size.
-        toInsert = {
-            p: [1]
-        };
+        toInsert = {p: [1]};
     }
     if (useIds) {  // Insert wiith an auto generated _id.
         mc.insert(toInsert);
@@ -35,14 +33,10 @@ function testWithCollectionIndexIds(capped, sparse, useIds) {
         return sc.count() > 0;
     }, "doc not replicated soon enough", 60 * 1000);
 
-    modifiers = {
-        $push: {a: 1}
-    };
+    modifiers = {$push: {a: 1}};
     if (capped) {
         // Delete our singleton array to balance the new singleton array we're going to create.
-        modifiers['$unset'] = {
-            p: 1
-        };
+        modifiers['$unset'] = {p: 1};
     }
     assert.writeOK(mc.update({}, modifiers));
 

@@ -109,7 +109,8 @@ Status StorageEngineLockFile::open() {
     } catch (const std::exception& ex) {
         return Status(ErrorCodes::UnknownError,
                       str::stream() << "Unable to check existence of data directory " << _dbpath
-                                    << ": " << ex.what());
+                                    << ": "
+                                    << ex.what());
     }
 
     HANDLE lockFileHandle = CreateFileA(_filespec.c_str(),
@@ -170,12 +171,16 @@ Status StorageEngineLockFile::writePid() {
         int errorcode = GetLastError();
         return Status(ErrorCodes::FileStreamFailed,
                       str::stream() << "Unable to write process id " << pid.toString()
-                                    << " to file: " << _filespec << ' '
+                                    << " to file: "
+                                    << _filespec
+                                    << ' '
                                     << errnoWithDescription(errorcode));
     } else if (bytesWritten == 0) {
         return Status(ErrorCodes::FileStreamFailed,
                       str::stream() << "Unable to write process id " << pid.toString()
-                                    << " to file: " << _filespec << " no data written.");
+                                    << " to file: "
+                                    << _filespec
+                                    << " no data written.");
     }
 
     ::FlushFileBuffers(_lockFileHandle->_handle);

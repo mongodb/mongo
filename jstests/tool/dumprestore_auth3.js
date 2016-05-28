@@ -4,9 +4,7 @@
 
 // Runs the tool with the given name against the given mongod.
 function runTool(toolName, mongod, options) {
-    var opts = {
-        host: mongod.host
-    };
+    var opts = {host: mongod.host};
     Object.extend(opts, options);
     MongoRunner.runMongoTool(toolName, opts);
 }
@@ -138,15 +136,13 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
 
     jsTestLog("Restore foo database (and user data) with --drop so it overrides the changes made");
     // Restore with --drop to override the changes to user data
-    runTool("mongorestore",
-            mongod,
-            {
-              dir: dumpDir + "foo/",
-              db: 'foo',
-              drop: "",
-              restoreDbUsersAndRoles: "",
-              writeConcern: "0"
-            });
+    runTool("mongorestore", mongod, {
+        dir: dumpDir + "foo/",
+        db: 'foo',
+        drop: "",
+        restoreDbUsersAndRoles: "",
+        writeConcern: "0"
+    });
     db = mongod.getDB('foo');
     admindb = mongod.getDB('admin');
 

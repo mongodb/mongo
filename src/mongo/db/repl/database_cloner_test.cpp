@@ -190,7 +190,8 @@ TEST_F(DatabaseClonerTest, InvalidListCollectionsFilter) {
 
     processNetworkResponse(BSON("ok" << 0 << "errmsg"
                                      << "unknown operator"
-                                     << "code" << ErrorCodes::BadValue));
+                                     << "code"
+                                     << ErrorCodes::BadValue));
 
     ASSERT_EQUALS(ErrorCodes::BadValue, getStatus().code());
     ASSERT_FALSE(databaseCloner->isActive());
@@ -214,8 +215,9 @@ TEST_F(DatabaseClonerTest, ListCollectionsReturnedNoCollections) {
 }
 
 TEST_F(DatabaseClonerTest, ListCollectionsPredicate) {
-    DatabaseCloner::ListCollectionsPredicateFn pred =
-        [](const BSONObj& info) { return info["name"].String() != "b"; };
+    DatabaseCloner::ListCollectionsPredicateFn pred = [](const BSONObj& info) {
+        return info["name"].String() != "b";
+    };
     databaseCloner.reset(new DatabaseCloner(
         &getReplExecutor(),
         target,
@@ -232,13 +234,16 @@ TEST_F(DatabaseClonerTest, ListCollectionsPredicate) {
 
     const std::vector<BSONObj> sourceInfos = {BSON("name"
                                                    << "a"
-                                                   << "options" << BSONObj()),
+                                                   << "options"
+                                                   << BSONObj()),
                                               BSON("name"
                                                    << "b"
-                                                   << "options" << BSONObj()),
+                                                   << "options"
+                                                   << BSONObj()),
                                               BSON("name"
                                                    << "c"
-                                                   << "options" << BSONObj())};
+                                                   << "options"
+                                                   << BSONObj())};
     processNetworkResponse(createListCollectionsResponse(
         0, BSON_ARRAY(sourceInfos[0] << sourceInfos[1] << sourceInfos[2])));
 
@@ -256,10 +261,12 @@ TEST_F(DatabaseClonerTest, ListCollectionsMultipleBatches) {
 
     const std::vector<BSONObj> sourceInfos = {BSON("name"
                                                    << "a"
-                                                   << "options" << BSONObj()),
+                                                   << "options"
+                                                   << BSONObj()),
                                               BSON("name"
                                                    << "b"
-                                                   << "options" << BSONObj())};
+                                                   << "options"
+                                                   << BSONObj())};
     processNetworkResponse(createListCollectionsResponse(1, BSON_ARRAY(sourceInfos[0])));
 
     ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
@@ -305,11 +312,11 @@ TEST_F(DatabaseClonerTest, CollectionInfoNameNotAString) {
 
 TEST_F(DatabaseClonerTest, CollectionInfoNameEmpty) {
     ASSERT_OK(databaseCloner->start());
-    processNetworkResponse(
-        createListCollectionsResponse(0,
-                                      BSON_ARRAY(BSON("name"
-                                                      << ""
-                                                      << "options" << BSONObj()))));
+    processNetworkResponse(createListCollectionsResponse(0,
+                                                         BSON_ARRAY(BSON("name"
+                                                                         << ""
+                                                                         << "options"
+                                                                         << BSONObj()))));
     ASSERT_EQUALS(ErrorCodes::BadValue, getStatus().code());
     ASSERT_STRING_CONTAINS(getStatus().reason(), "invalid collection namespace: db.");
     ASSERT_FALSE(databaseCloner->isActive());
@@ -317,14 +324,15 @@ TEST_F(DatabaseClonerTest, CollectionInfoNameEmpty) {
 
 TEST_F(DatabaseClonerTest, CollectionInfoNameDuplicate) {
     ASSERT_OK(databaseCloner->start());
-    processNetworkResponse(
-        createListCollectionsResponse(0,
-                                      BSON_ARRAY(BSON("name"
-                                                      << "a"
-                                                      << "options" << BSONObj())
-                                                 << BSON("name"
-                                                         << "a"
-                                                         << "options" << BSONObj()))));
+    processNetworkResponse(createListCollectionsResponse(0,
+                                                         BSON_ARRAY(BSON("name"
+                                                                         << "a"
+                                                                         << "options"
+                                                                         << BSONObj())
+                                                                    << BSON("name"
+                                                                            << "a"
+                                                                            << "options"
+                                                                            << BSONObj()))));
     ASSERT_EQUALS(ErrorCodes::DuplicateKey, getStatus().code());
     ASSERT_STRING_CONTAINS(getStatus().reason(), "duplicate collection name 'a'");
     ASSERT_FALSE(databaseCloner->isActive());
@@ -345,7 +353,8 @@ TEST_F(DatabaseClonerTest, CollectionInfoOptionsNotAnObject) {
     processNetworkResponse(createListCollectionsResponse(0,
                                                          BSON_ARRAY(BSON("name"
                                                                          << "a"
-                                                                         << "options" << 123))));
+                                                                         << "options"
+                                                                         << 123))));
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, getStatus().code());
     ASSERT_STRING_CONTAINS(getStatus().reason(), "'options' field must be an object");
     ASSERT_FALSE(databaseCloner->isActive());
@@ -355,11 +364,11 @@ TEST_F(DatabaseClonerTest, InvalidCollectionOptions) {
     ASSERT_OK(databaseCloner->start());
 
     processNetworkResponse(
-        createListCollectionsResponse(
-            0,
-            BSON_ARRAY(BSON("name"
-                            << "a"
-                            << "options" << BSON("storageEngine" << 1)))));
+        createListCollectionsResponse(0,
+                                      BSON_ARRAY(BSON("name"
+                                                      << "a"
+                                                      << "options"
+                                                      << BSON("storageEngine" << 1)))));
 
     ASSERT_EQUALS(ErrorCodes::BadValue, getStatus().code());
     ASSERT_FALSE(databaseCloner->isActive());
@@ -380,11 +389,11 @@ TEST_F(DatabaseClonerTest, ListCollectionsReturnsEmptyCollectionName) {
         stdx::bind(&DatabaseClonerTest::setStatus, this, stdx::placeholders::_1)));
     ASSERT_OK(databaseCloner->start());
 
-    processNetworkResponse(
-        createListCollectionsResponse(0,
-                                      BSON_ARRAY(BSON("name"
-                                                      << ""
-                                                      << "options" << BSONObj()))));
+    processNetworkResponse(createListCollectionsResponse(0,
+                                                         BSON_ARRAY(BSON("name"
+                                                                         << ""
+                                                                         << "options"
+                                                                         << BSONObj()))));
 
     ASSERT_EQUALS(ErrorCodes::BadValue, getStatus().code());
     ASSERT_STRING_CONTAINS(getStatus().reason(), "invalid collection namespace: db.");
@@ -397,11 +406,11 @@ TEST_F(DatabaseClonerTest, StartFirstCollectionClonerFailed) {
     databaseCloner->setStartCollectionClonerFn(
         [](CollectionCloner& cloner) { return Status(ErrorCodes::OperationFailed, ""); });
 
-    processNetworkResponse(
-        createListCollectionsResponse(0,
-                                      BSON_ARRAY(BSON("name"
-                                                      << "a"
-                                                      << "options" << BSONObj()))));
+    processNetworkResponse(createListCollectionsResponse(0,
+                                                         BSON_ARRAY(BSON("name"
+                                                                         << "a"
+                                                                         << "options"
+                                                                         << BSONObj()))));
 
     ASSERT_EQUALS(ErrorCodes::OperationFailed, getStatus().code());
     ASSERT_FALSE(databaseCloner->isActive());
@@ -424,14 +433,15 @@ TEST_F(DatabaseClonerTest, StartSecondCollectionClonerFailed) {
         return cloner.start();
     });
 
-    processNetworkResponse(
-        createListCollectionsResponse(0,
-                                      BSON_ARRAY(BSON("name"
-                                                      << "a"
-                                                      << "options" << BSONObj())
-                                                 << BSON("name"
-                                                         << "b"
-                                                         << "options" << BSONObj()))));
+    processNetworkResponse(createListCollectionsResponse(0,
+                                                         BSON_ARRAY(BSON("name"
+                                                                         << "a"
+                                                                         << "options"
+                                                                         << BSONObj())
+                                                                    << BSON("name"
+                                                                            << "b"
+                                                                            << "options"
+                                                                            << BSONObj()))));
 
     processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
     processNetworkResponse(createCursorResponse(0, BSONArray()));
@@ -452,10 +462,12 @@ TEST_F(DatabaseClonerTest, FirstCollectionListIndexesFailed) {
 
     const std::vector<BSONObj> sourceInfos = {BSON("name"
                                                    << "a"
-                                                   << "options" << BSONObj()),
+                                                   << "options"
+                                                   << BSONObj()),
                                               BSON("name"
                                                    << "b"
-                                                   << "options" << BSONObj())};
+                                                   << "options"
+                                                   << BSONObj())};
     processNetworkResponse(
         createListCollectionsResponse(0, BSON_ARRAY(sourceInfos[0] << sourceInfos[1])));
 
@@ -466,7 +478,8 @@ TEST_F(DatabaseClonerTest, FirstCollectionListIndexesFailed) {
     // This affects the order of the network responses.
     processNetworkResponse(BSON("ok" << 0 << "errmsg"
                                      << ""
-                                     << "code" << ErrorCodes::NamespaceNotFound));
+                                     << "code"
+                                     << ErrorCodes::NamespaceNotFound));
 
     processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
     processNetworkResponse(createCursorResponse(0, BSONArray()));
@@ -497,10 +510,12 @@ TEST_F(DatabaseClonerTest, CreateCollections) {
 
     const std::vector<BSONObj> sourceInfos = {BSON("name"
                                                    << "a"
-                                                   << "options" << BSONObj()),
+                                                   << "options"
+                                                   << BSONObj()),
                                               BSON("name"
                                                    << "b"
-                                                   << "options" << BSONObj())};
+                                                   << "options"
+                                                   << BSONObj())};
     processNetworkResponse(
         createListCollectionsResponse(0, BSON_ARRAY(sourceInfos[0] << sourceInfos[1])));
 

@@ -49,8 +49,8 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
@@ -137,8 +137,8 @@ public:
         }
         const GetMoreRequest& request = parseStatus.getValue();
 
-        return AuthorizationSession::get(client)
-            ->checkAuthForGetMore(request.nss, request.cursorid, request.term.is_initialized());
+        return AuthorizationSession::get(client)->checkAuthForGetMore(
+            request.nss, request.cursorid, request.term.is_initialized());
     }
 
     bool run(OperationContext* txn,

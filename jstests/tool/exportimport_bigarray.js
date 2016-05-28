@@ -11,10 +11,7 @@ dst.drop();
 
 // Calculate the number of documents it takes to get above 16MB (here using 20MB just to be safe)
 var bigString = new Array(1025).toString();
-var doc = {
-    _id: new ObjectId(),
-    x: bigString
-};
+var doc = {_id: new ObjectId(), x: bigString};
 var docSize = Object.bsonsize(doc);
 var numDocs = Math.floor(20 * 1024 * 1024 / docSize);
 

@@ -48,8 +48,8 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
-#include "mongo/util/string_map.h"
 #include "mongo/util/static_observer.h"
+#include "mongo/util/string_map.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -300,7 +300,9 @@ StatusWith<HostAndPort> ReplicaSetMonitor::getHostOrRefresh(const ReadPreference
 
     return Status(ErrorCodes::FailedToSatisfyReadPreference,
                   str::stream() << "could not find host matching read preference "
-                                << criteria.toString() << " for set " << getName());
+                                << criteria.toString()
+                                << " for set "
+                                << getName());
 }
 
 HostAndPort ReplicaSetMonitor::getMasterOrUassert() {

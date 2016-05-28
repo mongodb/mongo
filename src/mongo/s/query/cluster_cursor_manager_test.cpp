@@ -34,8 +34,8 @@
 
 #include "mongo/s/query/cluster_client_cursor_mock.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/util/clock_source_mock.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
 

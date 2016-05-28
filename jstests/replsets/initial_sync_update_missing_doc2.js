@@ -60,10 +60,7 @@
 
     checkLog(secondary,
              'initial sync - initialSyncHangBeforeGettingMissingDocument fail point enabled');
-    var doc = {
-        _id: 0,
-        x: 3
-    };
+    var doc = {_id: 0, x: 3};
     // Re-insert deleted document.
     assert.writeOK(coll.insert(doc, {writeConcern: {w: 1}}));
 

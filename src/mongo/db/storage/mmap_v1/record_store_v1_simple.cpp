@@ -37,17 +37,17 @@
 #include "mongo/base/counter.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/client.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/extent.h"
 #include "mongo/db/storage/mmap_v1/extent_manager.h"
 #include "mongo/db/storage/mmap_v1/record.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_simple_iterator.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
-#include "mongo/util/progress_meter.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/progress_meter.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/touch_pages.h"
 
@@ -152,7 +152,8 @@ StatusWith<DiskLoc> SimpleRecordStoreV1::allocRecord(OperationContext* txn,
         return StatusWith<DiskLoc>(
             ErrorCodes::InvalidLength,
             str::stream() << "Attempting to allocate a record larger than maximum size: "
-                          << lengthWithHeaders << " > 16.5MB");
+                          << lengthWithHeaders
+                          << " > 16.5MB");
     }
 
     DiskLoc loc = _allocFromExistingExtents(txn, lengthWithHeaders);

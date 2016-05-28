@@ -30,8 +30,8 @@
 
 #include <set>
 
-#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_base.h"
+#include "mongo/db/storage/record_store.h"
 
 namespace mongo {
 

@@ -303,7 +303,8 @@ std::vector<DocumentSourceMergeCursors::CursorDescriptor> PipelineCommand::parse
                 invariant(errCode == result["code"].numberInt() || errCode == 17022);
                 uasserted(errCode,
                           str::stream() << "sharded pipeline failed on shard "
-                                        << shardResults[i].shardTargetId << ": "
+                                        << shardResults[i].shardTargetId
+                                        << ": "
                                         << result.toString());
             }
 
@@ -321,7 +322,8 @@ std::vector<DocumentSourceMergeCursors::CursorDescriptor> PipelineCommand::parse
 
             massert(17025,
                     str::stream() << "shard " << shardResults[i].shardTargetId
-                                  << " returned invalid ns: " << cursor["ns"],
+                                  << " returned invalid ns: "
+                                  << cursor["ns"],
                     NamespaceString(cursor["ns"].String()).isValid());
 
             cursors.emplace_back(
@@ -340,8 +342,8 @@ void PipelineCommand::uassertAllShardsSupportExplain(
     const vector<Strategy::CommandResult>& shardResults) {
     for (size_t i = 0; i < shardResults.size(); i++) {
         uassert(17403,
-                str::stream() << "Shard " << shardResults[i].target.toString()
-                              << " failed: " << shardResults[i].result,
+                str::stream() << "Shard " << shardResults[i].target.toString() << " failed: "
+                              << shardResults[i].result,
                 shardResults[i].result["ok"].trueValue());
 
         uassert(17404,
@@ -400,10 +402,10 @@ BSONObj PipelineCommand::aggRunCommand(DBClientBase* conn,
                               0,     // nToSkip
                               NULL,  // fieldsToReturn
                               queryOptions);
-    massert(
-        17014,
-        str::stream() << "aggregate command didn't return results on host: " << conn->toString(),
-        cursor && cursor->more());
+    massert(17014,
+            str::stream() << "aggregate command didn't return results on host: "
+                          << conn->toString(),
+            cursor && cursor->more());
 
     BSONObj result = cursor->nextSafe().getOwned();
 

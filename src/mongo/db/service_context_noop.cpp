@@ -30,8 +30,8 @@
 
 #include "mongo/db/service_context_noop.h"
 
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {

@@ -19,9 +19,8 @@ t.insert({"loc": [3, -1]});
 
 // OK!
 print(t.count());
-assert.eq(7,
-          t.count({"loc": {"$within": {"$box": [[2, -2], [46, 2]]}}}),
-          "Not all locations found!");
+assert.eq(
+    7, t.count({"loc": {"$within": {"$box": [[2, -2], [46, 2]]}}}), "Not all locations found!");
 
 // Test normal lookup of a small square of points as a sanity check.
 

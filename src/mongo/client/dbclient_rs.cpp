@@ -152,7 +152,8 @@ ReplicaSetMonitorPtr DBClientReplicaSet::_getMonitor() const {
     // If you can't get a ReplicaSetMonitor then this connection isn't valid
     uassert(16340,
             str::stream() << "No replica set monitor active and no cached seed "
-                             "found for set: " << _setName,
+                             "found for set: "
+                          << _setName,
             rsm);
     return rsm;
 }
@@ -162,7 +163,8 @@ string DBClientReplicaSet::getServerAddress() const {
     ReplicaSetMonitorPtr rsm = ReplicaSetMonitor::get(_setName);
     if (!rsm) {
         warning() << "Trying to get server address for DBClientReplicaSet, but no "
-                     "ReplicaSetMonitor exists for " << _setName;
+                     "ReplicaSetMonitor exists for "
+                  << _setName;
         return str::stream() << _setName << "/";
     }
     return rsm->getServerAddress();
@@ -312,8 +314,10 @@ DBClientConnection* DBClientReplicaSet::checkMaster() {
         monitor->failedHost(_masterHost);
         uasserted(ErrorCodes::FailedToSatisfyReadPreference,
                   str::stream() << "can't connect to new replica set master ["
-                                << _masterHost.toString() << "]"
-                                << (errmsg.empty() ? "" : ", err: ") << errmsg);
+                                << _masterHost.toString()
+                                << "]"
+                                << (errmsg.empty() ? "" : ", err: ")
+                                << errmsg);
     }
 
     resetMaster();
@@ -509,10 +513,12 @@ unique_ptr<DBClientCursor> DBClientReplicaSet::query(const string& ns,
     if (_isSecondaryQuery(ns, query.obj, *readPref)) {
         LOG(3) << "dbclient_rs query using secondary or tagged node selection in "
                << _getMonitor()->getName() << ", read pref is " << readPref->toBSON()
-               << " (primary : " << (_master.get() != NULL ? _master->getServerAddress()
-                                                           : "[not cached]") << ", lastTagged : "
-               << (_lastSlaveOkConn.get() != NULL ? _lastSlaveOkConn->getServerAddress()
-                                                  : "[not cached]") << ")" << endl;
+               << " (primary : "
+               << (_master.get() != NULL ? _master->getServerAddress() : "[not cached]")
+               << ", lastTagged : " << (_lastSlaveOkConn.get() != NULL
+                                            ? _lastSlaveOkConn->getServerAddress()
+                                            : "[not cached]")
+               << ")" << endl;
 
         string lastNodeErrMsg;
         for (size_t retry = 0; retry < MAX_RETRY; retry++) {
@@ -561,10 +567,12 @@ BSONObj DBClientReplicaSet::findOne(const string& ns,
     if (_isSecondaryQuery(ns, query.obj, *readPref)) {
         LOG(3) << "dbclient_rs findOne using secondary or tagged node selection in "
                << _getMonitor()->getName() << ", read pref is " << readPref->toBSON()
-               << " (primary : " << (_master.get() != NULL ? _master->getServerAddress()
-                                                           : "[not cached]") << ", lastTagged : "
-               << (_lastSlaveOkConn.get() != NULL ? _lastSlaveOkConn->getServerAddress()
-                                                  : "[not cached]") << ")" << endl;
+               << " (primary : "
+               << (_master.get() != NULL ? _master->getServerAddress() : "[not cached]")
+               << ", lastTagged : " << (_lastSlaveOkConn.get() != NULL
+                                            ? _lastSlaveOkConn->getServerAddress()
+                                            : "[not cached]")
+               << ")" << endl;
 
         string lastNodeErrMsg;
 
@@ -742,7 +750,8 @@ void DBClientReplicaSet::say(Message& toSend, bool isRetry, string* actualServer
                    << (_master.get() != NULL ? _master->getServerAddress() : "[not cached]")
                    << ", lastTagged : " << (_lastSlaveOkConn.get() != NULL
                                                 ? _lastSlaveOkConn->getServerAddress()
-                                                : "[not cached]") << ")" << endl;
+                                                : "[not cached]")
+                   << ")" << endl;
 
             string lastNodeErrMsg;
 
@@ -936,7 +945,8 @@ rpc::UniqueReply DBClientReplicaSet::runCommandWithMetadata(StringData database,
     }
     uasserted(ErrorCodes::NodeNotFound,
               str::stream() << "Could not satisfy $readPreference of '" << readPref.toBSON() << "' "
-                            << "while attempting to run command " << command);
+                            << "while attempting to run command "
+                            << command);
 }
 
 bool DBClientReplicaSet::call(Message& toSend,
@@ -959,7 +969,8 @@ bool DBClientReplicaSet::call(Message& toSend,
                    << (_master.get() != NULL ? _master->getServerAddress() : "[not cached]")
                    << ", lastTagged : " << (_lastSlaveOkConn.get() != NULL
                                                 ? _lastSlaveOkConn->getServerAddress()
-                                                : "[not cached]") << ")" << endl;
+                                                : "[not cached]")
+                   << ")" << endl;
 
             for (size_t retry = 0; retry < MAX_RETRY; retry++) {
                 try {

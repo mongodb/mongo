@@ -32,8 +32,8 @@
 #include "mongo/db/storage/mmap_v1/record_store_v1_capped_iterator.h"
 
 #include "mongo/db/operation_context_noop.h"
-#include "mongo/db/storage/mmap_v1/record.h"
 #include "mongo/db/storage/mmap_v1/extent.h"
+#include "mongo/db/storage/mmap_v1/record.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_test_help.h"
 
 #include "mongo/unittest/unittest.h"

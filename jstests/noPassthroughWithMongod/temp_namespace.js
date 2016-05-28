@@ -17,9 +17,11 @@ d.runCommand({create: testname + 'keep3'});
 d[testname + 'keep4'].insert({});
 
 function countCollectionNames(theDB, regex) {
-    return theDB.getCollectionNames().filter(function(z) {
-        return z.match(regex);
-    }).length;
+    return theDB.getCollectionNames()
+        .filter(function(z) {
+            return z.match(regex);
+        })
+        .length;
 }
 
 assert.eq(countCollectionNames(d, /temp\d$/), 2);

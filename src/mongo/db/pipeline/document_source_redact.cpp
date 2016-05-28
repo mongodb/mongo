@@ -150,7 +150,8 @@ boost::optional<Document> DocumentSourceRedact::redactObject() {
         uasserted(17053,
                   str::stream() << "$redact's expression should not return anything "
                                 << "aside from the variables $$KEEP, $$DESCEND, and "
-                                << "$$PRUNE, but returned " << expressionResult.toString());
+                                << "$$PRUNE, but returned "
+                                << expressionResult.toString());
     }
 }
 

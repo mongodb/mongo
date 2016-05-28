@@ -131,12 +131,12 @@ for (var test = 0; test < numTests; test++) {
 
     // geoNear
     results = db.runCommand({
-        geoNear: "sphere",
-        near: startPoint,
-        maxDistance: radius,
-        num: 2 * pointsIn,
-        spherical: true
-    }).results;
+                    geoNear: "sphere",
+                    near: startPoint,
+                    maxDistance: radius,
+                    num: 2 * pointsIn,
+                    spherical: true
+                }).results;
 
     /*
     printjson( results );

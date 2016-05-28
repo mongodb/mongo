@@ -34,9 +34,9 @@
 
 #pragma once
 
-#include <map>
 #include <cmath>
 #include <limits>
+#include <map>
 
 #include "mongo/base/data_view.h"
 #include "mongo/base/parse_number.h"

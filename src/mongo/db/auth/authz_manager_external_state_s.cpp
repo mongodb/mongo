@@ -69,8 +69,8 @@ Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(OperationC
     // that runs this command
     BSONObj getParameterCmd = BSON("getParameter" << 1 << authSchemaVersionServerParameter << 1);
     BSONObjBuilder builder;
-    const bool ok = grid.catalogManager(txn)
-                        ->runUserManagementReadCommand(txn, "admin", getParameterCmd, &builder);
+    const bool ok = grid.catalogManager(txn)->runUserManagementReadCommand(
+        txn, "admin", getParameterCmd, &builder);
     BSONObj cmdResult = builder.obj();
     if (!ok) {
         return getStatusFromCommandResult(cmdResult);
@@ -92,11 +92,14 @@ Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* txn
         BSON("usersInfo" << BSON_ARRAY(BSON(AuthorizationManager::USER_NAME_FIELD_NAME
                                             << userName.getUser()
                                             << AuthorizationManager::USER_DB_FIELD_NAME
-                                            << userName.getDB())) << "showPrivileges" << true
-                         << "showCredentials" << true);
+                                            << userName.getDB()))
+                         << "showPrivileges"
+                         << true
+                         << "showCredentials"
+                         << true);
     BSONObjBuilder builder;
-    const bool ok = grid.catalogManager(txn)
-                        ->runUserManagementReadCommand(txn, "admin", usersInfoCmd, &builder);
+    const bool ok = grid.catalogManager(txn)->runUserManagementReadCommand(
+        txn, "admin", usersInfoCmd, &builder);
     BSONObj cmdResult = builder.obj();
     if (!ok) {
         return getStatusFromCommandResult(cmdResult);
@@ -110,7 +113,9 @@ Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* txn
     if (foundUsers.size() > 1) {
         return Status(ErrorCodes::UserDataInconsistent,
                       str::stream() << "Found multiple users on the \"" << userName.getDB()
-                                    << "\" database with name \"" << userName.getUser() << "\"");
+                                    << "\" database with name \""
+                                    << userName.getUser()
+                                    << "\"");
     }
     *result = foundUsers[0].Obj().getOwned();
     return Status::OK();
@@ -121,13 +126,15 @@ Status AuthzManagerExternalStateMongos::getRoleDescription(OperationContext* txn
                                                            bool showPrivileges,
                                                            BSONObj* result) {
     BSONObj rolesInfoCmd =
-        BSON("rolesInfo" << BSON_ARRAY(BSON(
-                                AuthorizationManager::ROLE_NAME_FIELD_NAME
-                                << roleName.getRole() << AuthorizationManager::ROLE_DB_FIELD_NAME
-                                << roleName.getDB())) << "showPrivileges" << showPrivileges);
+        BSON("rolesInfo" << BSON_ARRAY(BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
+                                            << roleName.getRole()
+                                            << AuthorizationManager::ROLE_DB_FIELD_NAME
+                                            << roleName.getDB()))
+                         << "showPrivileges"
+                         << showPrivileges);
     BSONObjBuilder builder;
-    const bool ok = grid.catalogManager(txn)
-                        ->runUserManagementReadCommand(txn, "admin", rolesInfoCmd, &builder);
+    const bool ok = grid.catalogManager(txn)->runUserManagementReadCommand(
+        txn, "admin", rolesInfoCmd, &builder);
     BSONObj cmdResult = builder.obj();
     if (!ok) {
         return getStatusFromCommandResult(cmdResult);
@@ -141,7 +148,9 @@ Status AuthzManagerExternalStateMongos::getRoleDescription(OperationContext* txn
     if (foundRoles.size() > 1) {
         return Status(ErrorCodes::RoleDataInconsistent,
                       str::stream() << "Found multiple roles on the \"" << roleName.getDB()
-                                    << "\" database with name \"" << roleName.getRole() << "\"");
+                                    << "\" database with name \""
+                                    << roleName.getRole()
+                                    << "\"");
     }
     *result = foundRoles[0].Obj().getOwned();
     return Status::OK();
@@ -152,8 +161,9 @@ Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(OperationContex
                                                                  bool showPrivileges,
                                                                  bool showBuiltinRoles,
                                                                  std::vector<BSONObj>* result) {
-    BSONObj rolesInfoCmd = BSON("rolesInfo" << 1 << "showPrivileges" << showPrivileges
-                                            << "showBuiltinRoles" << showBuiltinRoles);
+    BSONObj rolesInfoCmd =
+        BSON("rolesInfo" << 1 << "showPrivileges" << showPrivileges << "showBuiltinRoles"
+                         << showBuiltinRoles);
     BSONObjBuilder builder;
     const bool ok =
         grid.catalogManager(txn)->runUserManagementReadCommand(txn, dbname, rolesInfoCmd, &builder);
@@ -170,8 +180,8 @@ Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(OperationContex
 bool AuthzManagerExternalStateMongos::hasAnyPrivilegeDocuments(OperationContext* txn) {
     BSONObj usersInfoCmd = BSON("usersInfo" << 1);
     BSONObjBuilder userBuilder;
-    bool ok = grid.catalogManager(txn)
-                  ->runUserManagementReadCommand(txn, "admin", usersInfoCmd, &userBuilder);
+    bool ok = grid.catalogManager(txn)->runUserManagementReadCommand(
+        txn, "admin", usersInfoCmd, &userBuilder);
     if (!ok) {
         // If we were unable to complete the query,
         // it's best to assume that there _are_ privilege documents.  This might happen
@@ -188,8 +198,8 @@ bool AuthzManagerExternalStateMongos::hasAnyPrivilegeDocuments(OperationContext*
 
     BSONObj rolesInfoCmd = BSON("rolesInfo" << 1);
     BSONObjBuilder roleBuilder;
-    ok = grid.catalogManager(txn)
-             ->runUserManagementReadCommand(txn, "admin", rolesInfoCmd, &roleBuilder);
+    ok = grid.catalogManager(txn)->runUserManagementReadCommand(
+        txn, "admin", rolesInfoCmd, &roleBuilder);
     if (!ok) {
         return true;
     }

@@ -41,8 +41,7 @@ r = function(k, v) {
     return total;
 };
 
-assert.eq({1: t.count() * s.length},
-          t.mapReduce(m, r, "mr_bigobject_out").convertToSingleObject(),
-          "A1");
+assert.eq(
+    {1: t.count() * s.length}, t.mapReduce(m, r, "mr_bigobject_out").convertToSingleObject(), "A1");
 
 t.drop();

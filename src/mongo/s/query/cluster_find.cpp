@@ -87,7 +87,9 @@ StatusWith<std::unique_ptr<LiteParsedQuery>> transformQueryForShards(const LiteP
                 ErrorCodes::Overflow,
                 str::stream()
                     << "sum of limit and skip cannot be represented as a 64-bit integer, limit: "
-                    << *lpq.getLimit() << ", skip: " << lpq.getSkip().value_or(0));
+                    << *lpq.getLimit()
+                    << ", skip: "
+                    << lpq.getSkip().value_or(0));
         }
         newLimit = newLimitValue;
     }
@@ -103,8 +105,10 @@ StatusWith<std::unique_ptr<LiteParsedQuery>> transformQueryForShards(const LiteP
                 return Status(ErrorCodes::Overflow,
                               str::stream()
                                   << "sum of ntoreturn and skip cannot be represented as a 64-bit "
-                                     "integer, ntoreturn: " << *lpq.getNToReturn()
-                                  << ", skip: " << lpq.getSkip().value_or(0));
+                                     "integer, ntoreturn: "
+                                  << *lpq.getNToReturn()
+                                  << ", skip: "
+                                  << lpq.getSkip().value_or(0));
             }
             newLimit = newLimitValue;
         } else {
@@ -114,8 +118,10 @@ StatusWith<std::unique_ptr<LiteParsedQuery>> transformQueryForShards(const LiteP
                 return Status(ErrorCodes::Overflow,
                               str::stream()
                                   << "sum of ntoreturn and skip cannot be represented as a 64-bit "
-                                     "integer, ntoreturn: " << *lpq.getNToReturn()
-                                  << ", skip: " << lpq.getSkip().value_or(0));
+                                     "integer, ntoreturn: "
+                                  << *lpq.getNToReturn()
+                                  << ", skip: "
+                                  << lpq.getSkip().value_or(0));
             }
             newNToReturn = newNToReturnValue;
         }
@@ -288,7 +294,8 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
         return {ErrorCodes::BadValue,
                 str::stream() << "Projection contains illegal field '"
                               << ClusterClientCursorParams::kSortKeyField
-                              << "': " << query.getParsed().getProj()};
+                              << "': "
+                              << query.getParsed().getProj()};
     }
 
     auto dbConfig = grid.catalogCache()->getDatabase(txn, query.nss().db().toString());

@@ -76,7 +76,8 @@ void DocumentSourceSort::serializeToArray(vector<Value>& array, bool explain) co
         array.push_back(
             Value(DOC(getSourceName()
                       << DOC("sortKey" << serializeSortKey(explain) << "mergePresorted"
-                                       << (_mergingPresorted ? Value(true) : Value()) << "limit"
+                                       << (_mergingPresorted ? Value(true) : Value())
+                                       << "limit"
                                        << (limitSrc ? Value(limitSrc->getLimit()) : Value())))));
     } else {  // one Value for $sort and maybe a Value for $limit
         MutableDocument inner(serializeSortKey(explain));

@@ -28,8 +28,8 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/util/progress_meter.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/progress_meter.h"
 
 namespace {
 

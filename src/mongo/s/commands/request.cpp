@@ -40,8 +40,8 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/cluster_last_error_info.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/commands/strategy.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 

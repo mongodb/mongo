@@ -31,9 +31,9 @@
 #include <iostream>
 #include <string>
 
+#include "mongo/db/catalog/index_create.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/catalog/index_create.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
@@ -91,7 +91,8 @@ public:
             const bool match = (expectedMultikeyPaths == actualMultikeyPaths);
             if (!match) {
                 FAIL(str::stream() << "Expected: " << dumpMultikeyPaths(expectedMultikeyPaths)
-                                   << ", Actual: " << dumpMultikeyPaths(actualMultikeyPaths));
+                                   << ", Actual: "
+                                   << dumpMultikeyPaths(actualMultikeyPaths));
             }
             ASSERT_TRUE(match);
         } else {
@@ -150,7 +151,10 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnIndexCreation) {
     createIndex(collection,
                 BSON("name"
                      << "a_1_b_1"
-                     << "ns" << _nss.ns() << "key" << keyPattern));
+                     << "ns"
+                     << _nss.ns()
+                     << "key"
+                     << keyPattern));
 
     assertMultikeyPaths(collection, keyPattern, {std::set<size_t>{}, {0U}});
 }
@@ -181,7 +185,10 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnIndexCreationWithMultipleDocuments) {
     createIndex(collection,
                 BSON("name"
                      << "a_1_b_1"
-                     << "ns" << _nss.ns() << "key" << keyPattern));
+                     << "ns"
+                     << _nss.ns()
+                     << "key"
+                     << keyPattern));
 
     assertMultikeyPaths(collection, keyPattern, {{0U}, {0U}});
 }
@@ -195,7 +202,10 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentInsert) {
     createIndex(collection,
                 BSON("name"
                      << "a_1_b_1"
-                     << "ns" << _nss.ns() << "key" << keyPattern));
+                     << "ns"
+                     << _nss.ns()
+                     << "key"
+                     << keyPattern));
 
     {
         WriteUnitOfWork wuow(_opCtx.get());
@@ -235,7 +245,10 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdate) {
     createIndex(collection,
                 BSON("name"
                      << "a_1_b_1"
-                     << "ns" << _nss.ns() << "key" << keyPattern));
+                     << "ns"
+                     << _nss.ns()
+                     << "key"
+                     << keyPattern));
 
     {
         WriteUnitOfWork wuow(_opCtx.get());
@@ -285,7 +298,10 @@ TEST_F(MultikeyPathsTest, PathsNotUpdatedOnDocumentDelete) {
     createIndex(collection,
                 BSON("name"
                      << "a_1_b_1"
-                     << "ns" << _nss.ns() << "key" << keyPattern));
+                     << "ns"
+                     << _nss.ns()
+                     << "key"
+                     << keyPattern));
 
     {
         WriteUnitOfWork wuow(_opCtx.get());
@@ -326,13 +342,19 @@ TEST_F(MultikeyPathsTest, PathsUpdatedForMultipleIndexesOnDocumentInsert) {
     createIndex(collection,
                 BSON("name"
                      << "a_1_b_1"
-                     << "ns" << _nss.ns() << "key" << keyPatternAB));
+                     << "ns"
+                     << _nss.ns()
+                     << "key"
+                     << keyPatternAB));
 
     BSONObj keyPatternAC = BSON("a" << 1 << "c" << 1);
     createIndex(collection,
                 BSON("name"
                      << "a_1_c_1"
-                     << "ns" << _nss.ns() << "key" << keyPatternAC));
+                     << "ns"
+                     << _nss.ns()
+                     << "key"
+                     << keyPatternAC));
     {
         WriteUnitOfWork wuow(_opCtx.get());
         OpDebug* const nullOpDebug = nullptr;

@@ -51,13 +51,10 @@ var $config = (function() {
             // because docs with lower i are newer, so they have had fewer
             // opportunities to have n incremented.)
             var prevN = Infinity;
-            db[collName]
-                .find({tid: this.tid})
-                .sort({i: 1})
-                .forEach(function(doc) {
-                    assertWhenOwnColl.gte(prevN, doc.n);
-                    prevN = doc.n;
-                });
+            db[collName].find({tid: this.tid}).sort({i: 1}).forEach(function(doc) {
+                assertWhenOwnColl.gte(prevN, doc.n);
+                prevN = doc.n;
+            });
         }
     };
 

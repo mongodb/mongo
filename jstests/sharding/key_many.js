@@ -115,9 +115,7 @@
     function makeInQuery() {
         if (curT.compound) {
             // cheating a bit...
-            return {
-                'o.a': {$in: [1, 2]}
-            };
+            return {'o.a': {$in: [1, 2]}};
         } else {
             return makeObjectDotted({$in: curT.values});
         }
@@ -178,26 +176,26 @@
         assert.eq(
             6, c.find().sort(makeObjectDotted(1)).count(), curT.name + " total count with count()");
 
-        assert.eq(
-            2,
-            c.find({$or: [makeObjectDotted(curT.values[2]), makeObjectDotted(curT.values[4])]})
-                .count(),
-            curT.name + " $or count()");
-        assert.eq(
-            2,
-            c.find({$or: [makeObjectDotted(curT.values[2]), makeObjectDotted(curT.values[4])]})
-                .itcount(),
-            curT.name + " $or itcount()");
-        assert.eq(
-            4,
-            c.find({$nor: [makeObjectDotted(curT.values[2]), makeObjectDotted(curT.values[4])]})
-                .count(),
-            curT.name + " $nor count()");
-        assert.eq(
-            4,
-            c.find({$nor: [makeObjectDotted(curT.values[2]), makeObjectDotted(curT.values[4])]})
-                .itcount(),
-            curT.name + " $nor itcount()");
+        assert.eq(2,
+                  c.find({
+                       $or: [makeObjectDotted(curT.values[2]), makeObjectDotted(curT.values[4])]
+                   }).count(),
+                  curT.name + " $or count()");
+        assert.eq(2,
+                  c.find({
+                       $or: [makeObjectDotted(curT.values[2]), makeObjectDotted(curT.values[4])]
+                   }).itcount(),
+                  curT.name + " $or itcount()");
+        assert.eq(4,
+                  c.find({
+                       $nor: [makeObjectDotted(curT.values[2]), makeObjectDotted(curT.values[4])]
+                   }).count(),
+                  curT.name + " $nor count()");
+        assert.eq(4,
+                  c.find({
+                       $nor: [makeObjectDotted(curT.values[2]), makeObjectDotted(curT.values[4])]
+                   }).itcount(),
+                  curT.name + " $nor itcount()");
 
         var stats = c.stats();
         printjson(stats);

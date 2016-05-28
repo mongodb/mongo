@@ -3,13 +3,9 @@
 
 function makeNestArr(depth) {
     if (depth == 1) {
-        return {
-            a: [depth]
-        };
+        return {a: [depth]};
     } else {
-        return {
-            a: [makeNestArr(depth - 1)]
-        };
+        return {a: [makeNestArr(depth - 1)]};
     }
 }
 

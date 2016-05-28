@@ -38,8 +38,8 @@ startMongoProgramNoConnect("mongo",
                            dbname);
 
 // migrate while deletions are happening
-var moveResult = s.adminCommand(
-    {moveChunk: ns, find: {a: 1}, to: st.getOther(st.getPrimaryShard(dbname)).name});
+var moveResult =
+    s.adminCommand({moveChunk: ns, find: {a: 1}, to: st.getOther(st.getPrimaryShard(dbname)).name});
 // check if migration worked
 assert(moveResult.ok, "migration didn't work while doing deletes");
 

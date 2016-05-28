@@ -50,22 +50,31 @@ void checkTypeInArray(BSONType expectedType,
                       const BSONElement& arrayElem) {
     uassert(ErrorCodes::TypeMismatch,
             str::stream() << "Wrong type for " << arrayElem.fieldNameStringData() << '['
-                          << elem.fieldNameStringData() << "]. Expected a "
-                          << typeName(expectedType) << ", got a " << typeName(elem.type()) << '.',
+                          << elem.fieldNameStringData()
+                          << "]. Expected a "
+                          << typeName(expectedType)
+                          << ", got a "
+                          << typeName(elem.type())
+                          << '.',
             elem.type() == expectedType);
 }
 
 void checkType(BSONType expectedType, const BSONElement& elem) {
     uassert(ErrorCodes::TypeMismatch,
             str::stream() << "Wrong type for '" << elem.fieldNameStringData() << "'. Expected a "
-                          << typeName(expectedType) << ", got a " << typeName(elem.type()) << '.',
+                          << typeName(expectedType)
+                          << ", got a "
+                          << typeName(elem.type())
+                          << '.',
             elem.type() == expectedType);
 }
 
 void checkOpCountForCommand(size_t numOps) {
     uassert(ErrorCodes::InvalidLength,
             str::stream() << "Write batch sizes must be between 1 and " << kMaxWriteBatchSize
-                          << ". Got " << numOps << " operations.",
+                          << ". Got "
+                          << numOps
+                          << " operations.",
             numOps != 0 && numOps <= kMaxWriteBatchSize);
 }
 
@@ -108,7 +117,8 @@ void parseWriteCommand(StringData dbName,
                 "writeConcern", "maxTimeMS", "shardVersion"};
             uassert(ErrorCodes::FailedToParse,
                     str::stream() << "Unknown option to " << cmd.firstElementFieldName()
-                                  << " command: " << fieldName,
+                                  << " command: "
+                                  << fieldName,
                     std::find(ignoredFields.begin(), ignoredFields.end(), fieldName) !=
                         ignoredFields.end());
         }
@@ -116,7 +126,8 @@ void parseWriteCommand(StringData dbName,
 
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "The " << uniqueFieldName << " option is required to the "
-                          << cmd.firstElementFieldName() << " command.",
+                          << cmd.firstElementFieldName()
+                          << " command.",
             haveUniqueField);
 }
 }

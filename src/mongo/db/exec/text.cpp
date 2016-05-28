@@ -32,9 +32,9 @@
 
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/index_scan.h"
-#include "mongo/db/exec/text_or.h"
-#include "mongo/db/exec/text_match.h"
 #include "mongo/db/exec/scoped_timer.h"
+#include "mongo/db/exec/text_match.h"
+#include "mongo/db/exec/text_or.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/fts/fts_index_format.h"
 #include "mongo/db/jsobj.h"

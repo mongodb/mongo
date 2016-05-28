@@ -30,8 +30,8 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/exec/ensure_sorted.h"
-#include "mongo/db/exec/sort_key_generator.h"
 #include "mongo/db/exec/queued_data_stage.h"
+#include "mongo/db/exec/sort_key_generator.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/stdx/memory.h"

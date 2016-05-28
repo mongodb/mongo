@@ -93,20 +93,22 @@ StatusWith<std::vector<LogComponentSetting>> parseLogComponentSettings(const BSO
         const LogComponent curr = _getComponentForShortName(shortName);
 
         if (curr == LogComponent::kNumLogComponents || curr.parent() != parentComponent) {
-            return StatusWith<Result>(ErrorCodes::BadValue,
-                                      str::stream() << "Invalid component name "
-                                                    << parentComponent.getDottedName() << "."
-                                                    << shortName);
+            return StatusWith<Result>(
+                ErrorCodes::BadValue,
+                str::stream() << "Invalid component name " << parentComponent.getDottedName() << "."
+                              << shortName);
         }
         if (elem.isNumber()) {
             levelsToSet.push_back(LogComponentSetting(curr, elem.numberInt()));
             continue;
         }
         if (elem.type() != Object) {
-            return StatusWith<Result>(
-                ErrorCodes::BadValue,
-                str::stream() << "Invalid type " << typeName(elem.type()) << "for component "
-                              << parentComponent.getDottedName() << "." << shortName);
+            return StatusWith<Result>(ErrorCodes::BadValue,
+                                      str::stream() << "Invalid type " << typeName(elem.type())
+                                                    << "for component "
+                                                    << parentComponent.getDottedName()
+                                                    << "."
+                                                    << shortName);
         }
         iterators.push_back(iter);
         parentComponent = curr;

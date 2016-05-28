@@ -182,13 +182,15 @@
     printjson(db.foo6.getIndexes());
 
     assert.eq(2,
-              db.foo6.group({
-                  key: {a: 1},
-                  initial: {count: 0},
-                  reduce: function(z, prev) {
-                      prev.count++;
-                  }
-              }).length);
+              db.foo6
+                  .group({
+                      key: {a: 1},
+                      initial: {count: 0},
+                      reduce: function(z, prev) {
+                          prev.count++;
+                      }
+                  })
+                  .length);
 
     assert.eq(3, db.foo6.find().count());
     assert(s.admin.runCommand({shardcollection: "test.foo6", key: {a: 1}}).ok);
@@ -202,11 +204,8 @@
     // Remove when SERVER-10232 is fixed
 
     assert.soon(function() {
-        var cmdRes = s.admin.runCommand({
-            movechunk: "test.foo6",
-            find: {a: 3},
-            to: s.getOther(s.getPrimaryShard("test")).name
-        });
+        var cmdRes = s.admin.runCommand(
+            {movechunk: "test.foo6", find: {a: 3}, to: s.getOther(s.getPrimaryShard("test")).name});
         return cmdRes.ok;
     }, 'move chunk test.foo6', 60000, 1000);
 

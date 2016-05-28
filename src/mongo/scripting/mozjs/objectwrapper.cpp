@@ -524,8 +524,11 @@ BSONObj ObjectWrapper::toBSON() {
     const int sizeWithEOO = b.len() + 1 /*EOO*/ - 4 /*BSONObj::Holder ref count*/;
     uassert(17260,
             str::stream() << "Converting from JavaScript to BSON failed: "
-                          << "Object size " << sizeWithEOO << " exceeds limit of "
-                          << BSONObjMaxInternalSize << " bytes.",
+                          << "Object size "
+                          << sizeWithEOO
+                          << " exceeds limit of "
+                          << BSONObjMaxInternalSize
+                          << " bytes.",
             sizeWithEOO <= BSONObjMaxInternalSize);
 
     return b.obj();
