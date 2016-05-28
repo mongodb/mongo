@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/read_concern_response.h"
 #include "mongo/unittest/unittest.h"

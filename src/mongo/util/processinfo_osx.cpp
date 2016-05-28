@@ -30,9 +30,6 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
 
 #include "mongo/platform/basic.h"
-#include "mongo/util/processinfo.h"
-#include "mongo/util/log.h"
-#include "mongo/db/jsobj.h"
 
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
@@ -50,6 +47,10 @@
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <sys/sysctl.h>
+
+#include "mongo/db/jsobj.h"
+#include "mongo/util/log.h"
+#include "mongo/util/processinfo.h"
 
 using namespace std;
 

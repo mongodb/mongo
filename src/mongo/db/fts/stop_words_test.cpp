@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/fts/stop_words.h"
 #include "mongo/unittest/unittest.h"

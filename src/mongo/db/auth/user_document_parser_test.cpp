@@ -29,6 +29,7 @@
  * Unit tests of the UserDocumentParser type.
  */
 
+#include "mongo/platform/basic.h"
 
 #include "mongo/base/status.h"
 #include "mongo/db/auth/action_set.h"

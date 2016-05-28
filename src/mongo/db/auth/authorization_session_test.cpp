@@ -25,6 +25,8 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 /**
  * Unit tests of the AuthorizationSession type.
  */

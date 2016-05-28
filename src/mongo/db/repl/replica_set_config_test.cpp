@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/bson/json.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"

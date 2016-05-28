@@ -28,6 +28,7 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
 
 #include "mongo/bson/json.h"
 #include "mongo/db/fts/fts_query_impl.h"

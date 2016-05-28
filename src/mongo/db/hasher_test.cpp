@@ -28,6 +28,8 @@
 
 /** Unit tests for BSONElementHasher. */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/hasher.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"

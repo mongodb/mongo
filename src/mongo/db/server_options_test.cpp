@@ -25,6 +25,8 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_helpers.h"

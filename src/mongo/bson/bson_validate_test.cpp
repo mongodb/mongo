@@ -27,6 +27,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/base/data_view.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/unittest/unittest.h"

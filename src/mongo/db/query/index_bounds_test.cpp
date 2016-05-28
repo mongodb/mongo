@@ -30,6 +30,8 @@
  * This file contains tests for mongo/db/query/index_bounds.cpp
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/json.h"
 #include "mongo/db/jsobj.h"
