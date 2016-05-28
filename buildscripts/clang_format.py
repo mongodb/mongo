@@ -41,17 +41,17 @@ from buildscripts import moduleconfig
 #
 
 # Expected version of clang-format
-CLANG_FORMAT_VERSION = "3.6.0"
+CLANG_FORMAT_VERSION = "3.8.0"
+CLANG_FORMAT_SHORT_VERSION = "3.8"
 
 # Name of clang-format as a binary
 CLANG_FORMAT_PROGNAME = "clang-format"
 
 # URL location of the "cached" copy of clang-format to download
 # for users which do not have clang-format installed
-CLANG_FORMAT_HTTP_LINUX_CACHE = "https://s3.amazonaws.com/boxes.10gen.com/build/clang-format-rhel55.tar.gz"
+CLANG_FORMAT_HTTP_LINUX_CACHE = "https://s3.amazonaws.com/boxes.10gen.com/build/clang-format-3.8-rhel55.tar.gz"
 
-# URL on LLVM's website to download the clang tarball
-CLANG_FORMAT_SOURCE_URL_BASE = string.Template("http://llvm.org/releases/$version/clang+llvm-$version-$llvm_distro.tar.xz")
+CLANG_FORMAT_HTTP_DARWIN_CACHE = "https://s3.amazonaws.com/boxes.10gen.com/build/clang%2Bllvm-3.8.0-x86_64-apple-darwin.tar.xz"
 
 # Path in the tarball to the clang-format binary
 CLANG_FORMAT_SOURCE_TAR_BASE = string.Template("clang+llvm-$version-$tar_path/bin/" + CLANG_FORMAT_PROGNAME)
@@ -115,13 +115,6 @@ def callo(args):
     """
     return check_output(args)
 
-def get_llvm_url(version, llvm_distro):
-    """Get the url to download clang-format from llvm.org
-    """
-    return CLANG_FORMAT_SOURCE_URL_BASE.substitute(
-        version=version,
-        llvm_distro=llvm_distro)
-
 def get_tar_path(version, tar_path):
     """ Get the path to clang-format in the llvm tarball
     """
@@ -143,94 +136,84 @@ def extract_clang_format(tar_path):
                 tarfp.extract(name)
         tarfp.close()
 
-def get_clang_format_from_llvm(llvm_distro, tar_path, dest_file):
-    """Download clang-format from llvm.org, unpack the tarball,
-    and put clang-format in the specified place
+def get_clang_format_from_cache_and_extract(url, tarball_ext):
+    """Get clang-format from mongodb's cache
+    and extract the tarball
     """
-    # Build URL
-    url = get_llvm_url(CLANG_FORMAT_VERSION, llvm_distro)
-
     dest_dir = tempfile.gettempdir()
-    temp_tar_file = os.path.join(dest_dir, "temp.tar.xz")
+    temp_tar_file = os.path.join(dest_dir, "temp.tar" + tarball_ext)
 
-    # Download from LLVM
+    # Download from file
     print("Downloading clang-format %s from %s, saving to %s" % (CLANG_FORMAT_VERSION,
             url, temp_tar_file))
     urllib.urlretrieve(url, temp_tar_file)
 
     extract_clang_format(temp_tar_file)
 
+def get_clang_format_from_darwin_cache(dest_file):
+    """Download clang-format from llvm.org, unpack the tarball,
+    and put clang-format in the specified place
+    """
+    get_clang_format_from_cache_and_extract(CLANG_FORMAT_HTTP_DARWIN_CACHE, ".xz")
+
     # Destination Path
-    shutil.move(get_tar_path(CLANG_FORMAT_VERSION, tar_path), dest_file)
+    shutil.move(get_tar_path(CLANG_FORMAT_VERSION, "x86_64-apple-darwin"), dest_file)
 
 def get_clang_format_from_linux_cache(dest_file):
     """Get clang-format from mongodb's cache
     """
-    # Get URL
-    url = CLANG_FORMAT_HTTP_LINUX_CACHE
-
-    dest_dir = tempfile.gettempdir()
-    temp_tar_file = os.path.join(dest_dir, "temp.tar.xz")
-
-    # Download the file
-    print("Downloading clang-format %s from %s, saving to %s" % (CLANG_FORMAT_VERSION,
-            url, temp_tar_file))
-    urllib.urlretrieve(url, temp_tar_file)
-
-    extract_clang_format(temp_tar_file)
+    get_clang_format_from_cache_and_extract(CLANG_FORMAT_HTTP_LINUX_CACHE, ".gz")
 
     # Destination Path
-    shutil.move("llvm/Release/bin/clang-format", dest_file)
+    shutil.move("build/bin/clang-format", dest_file)
 
 class ClangFormat(object):
     """Class encapsulates finding a suitable copy of clang-format,
     and linting/formating an individual file
     """
     def __init__(self, path, cache_dir):
-        if os.path.exists('/usr/bin/clang-format-3.6'):
-            clang_format_progname = 'clang-format-3.6'
-        else:
-            clang_format_progname = CLANG_FORMAT_PROGNAME
-
-        # Initialize clang-format configuration information
-        if sys.platform.startswith("linux"):
-              #"3.6.0/clang+llvm-3.6.0-x86_64-linux-gnu-ubuntu-14.04.tar.xz
-            self.platform = "linux_x64"
-            self.llvm_distro = "x86_64-linux-gnu-ubuntu"
-            self.tar_path = "x86_64-linux-gnu"
-        elif sys.platform == "win32":
-            self.platform = "windows_x64"
-            self.llvm_distro = "windows_x64"
-            self.tar_path = None
-            clang_format_progname += ".exe"
-        elif sys.platform == "darwin":
-             #"3.6.0/clang+llvm-3.6.0-x86_64-apple-darwin.tar.xz
-            self.platform = "darwin_x64"
-            self.llvm_distro = "x86_64-apple-darwin"
-            self.tar_path = "x86_64-apple-darwin"
-
         self.path = None
+        clang_format_progname_ext = ""
 
-        # Find Clang-Format now
+        if sys.platform == "win32":
+            clang_format_progname_ext += ".exe"
+
+        # Check the clang-format the user specified
         if path is not None:
             if os.path.isfile(path):
                 self.path = path
             else:
                 print("WARNING: Could not find clang-format %s" % (path))
 
-        # Check the envionrment variable
+        # Check the environment variable
         if "MONGO_CLANG_FORMAT" in os.environ:
             self.path = os.environ["MONGO_CLANG_FORMAT"]
 
-            if self.path and not self._validate_version(warn=True):
+            if self.path and not self._validate_version():
                 self.path = None
 
         # Check the users' PATH environment variable now
         if self.path is None:
-            self.path = spawn.find_executable(clang_format_progname)
+            # Check for various versions staring with binaries with version specific suffixes in the
+            # user's path
+            programs = [
+                    CLANG_FORMAT_PROGNAME + "-" + CLANG_FORMAT_VERSION,
+                    CLANG_FORMAT_PROGNAME + "-" + CLANG_FORMAT_SHORT_VERSION,
+                    CLANG_FORMAT_PROGNAME,
+                    ]
 
-            if self.path and not self._validate_version(warn=True):
-                self.path = None
+            if sys.platform == "win32":
+                for i in range(len(programs)):
+                    programs[i] += '.exe'
+
+            for program in programs:
+                self.path = spawn.find_executable(program)
+
+                if self.path:
+                    if not self._validate_version():
+                        self.path = None
+                    else:
+                        break
 
         # If Windows, try to grab it from Program Files
         if sys.platform == "win32":
@@ -243,23 +226,28 @@ class ClangFormat(object):
             if not os.path.isdir(cache_dir):
                 os.makedirs(cache_dir)
 
-            self.path = os.path.join(cache_dir, clang_format_progname)
+            self.path = os.path.join(cache_dir, CLANG_FORMAT_PROGNAME + "-" + CLANG_FORMAT_VERSION + clang_format_progname_ext)
 
-            if not os.path.isfile(self.path):
+            # Download a new version if the cache is empty or stale
+            if not os.path.isfile(self.path) or not self._validate_version():
                 if sys.platform.startswith("linux"):
                     get_clang_format_from_linux_cache(self.path)
                 elif sys.platform == "darwin":
-                    get_clang_format_from_llvm(self.llvm_distro, self.tar_path, self.path)
+                    get_clang_format_from_darwin_cache(self.path)
                 else:
                     print("ERROR: clang-format.py does not support downloading clang-format " +
                         " on this platform, please install clang-format " + CLANG_FORMAT_VERSION)
 
         # Validate we have the correct version
-        self._validate_version()
+        # We only can fail here if the user specified a clang-format binary and it is the wrong
+        # version
+        if not self._validate_version():
+            print("ERROR: exiting because of previous warning.")
+            sys.exit(1)
 
         self.print_lock = threading.Lock()
 
-    def _validate_version(self, warn=False):
+    def _validate_version(self):
         """Validate clang-format is the expected version
         """
         cf_version = callo([self.path, "--version"])
@@ -267,9 +255,8 @@ class ClangFormat(object):
         if CLANG_FORMAT_VERSION in cf_version:
             return True
 
-        if warn:
-            print("WARNING: clang-format found in path, but incorrect version found at " +
-                    self.path + " with version: " + cf_version)
+        print("WARNING: clang-format found in path, but incorrect version found at " +
+                self.path + " with version: " + cf_version)
 
         return False
 
