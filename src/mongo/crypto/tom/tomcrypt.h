@@ -78,6 +78,7 @@ enum {
     CRYPT_PK_INVALID_PADDING  /* Invalid padding on input */
 };
 
+// clang-format off
 #include "tomcrypt_cfg.h"
 #include "tomcrypt_macros.h"
 #include "tomcrypt_cipher.h"
@@ -89,6 +90,7 @@ enum {
 #include "tomcrypt_misc.h"
 #include "tomcrypt_argchk.h"
 //#include <tomcrypt_pkcs.h>
+// clang-format on
 
 #ifdef __cplusplus
 }
