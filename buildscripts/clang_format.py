@@ -510,7 +510,7 @@ class Repo(object):
         """Is the specified parent hash an ancestor of child hash?
         """
         # merge base returns 0 if parent is an ancestor of child
-        return not self._callgit(["merge-base", "--is-ancestor", parent, child]).rstrip()
+        return not self._callgit(["merge-base", "--is-ancestor", parent, child])
 
     def is_commit(self, sha1):
         """Is the specified hash a valid git commit?
@@ -716,8 +716,8 @@ def reformat_branch(clang_format, commit_prior_to_reformat, commit_after_reforma
                 commit_after_reformat)
 
     if not repo.is_ancestor(commit_prior_to_reformat, commit_after_reformat):
-        raise ValueError("Commit Prior to Reformat '%s' is not a valid ancestor of Commit After" +
-                " Reformat '%s' in this rep", commit_prior_to_reformat, commit_after_reformat)
+        raise ValueError(("Commit Prior to Reformat '%s' is not a valid ancestor of Commit After" +
+                " Reformat '%s' in this repo") % (commit_prior_to_reformat, commit_after_reformat))
 
     # Validate the user is on a local branch that has the right merge base
     if repo.is_detached():
@@ -819,8 +819,8 @@ def reformat_branch(clang_format, commit_prior_to_reformat, commit_after_reforma
     # Create a new branch to mark the hashes we have been using
     repo.checkout(["-b", new_branch])
 
-    print("reformat-branch is done running.")
-    print("A copy of your branch has been made named '%s', and formatted with clang-format." % new_branch)
+    print("reformat-branch is done running.\n")
+    print("A copy of your branch has been made named '%s', and formatted with clang-format.\n" % new_branch)
     print("The original branch has been left unchanged.")
     print("The next step is to rebase the new branch on 'master'.")
 
