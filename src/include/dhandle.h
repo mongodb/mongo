@@ -65,14 +65,6 @@ struct __wt_data_handle {
 	WT_DATA_SOURCE *dsrc;		/* Data source for this handle */
 	void *handle;			/* Generic handle */
 
-	/*
-	 * Data handles can be closed without holding the schema lock; threads
-	 * walk the list of open handles, operating on them (checkpoint is the
-	 * best example).  To avoid sources disappearing underneath checkpoint,
-	 * lock the data handle when closing it.
-	 */
-	WT_SPINLOCK	close_lock;	/* Lock to close the handle */
-
 					/* Data-source statistics */
 	WT_DSRC_STATS *stats[WT_COUNTER_SLOTS];
 	WT_DSRC_STATS  stat_array[WT_COUNTER_SLOTS];

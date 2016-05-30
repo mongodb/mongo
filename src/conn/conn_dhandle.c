@@ -21,7 +21,6 @@ __conn_dhandle_destroy(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
 	__wt_free(session, dhandle->name);
 	__wt_free(session, dhandle->checkpoint);
 	__wt_free(session, dhandle->handle);
-	__wt_spin_destroy(session, &dhandle->close_lock);
 	__wt_overwrite_and_free(session, dhandle);
 
 	return (ret);
@@ -51,9 +50,6 @@ __conn_dhandle_alloc(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_calloc_one(session, &btree));
 	dhandle->handle = btree;
 	btree->dhandle = dhandle;
-
-	WT_ERR(__wt_spin_init(
-	    session, &dhandle->close_lock, "data handle close"));
 
 	__wt_stat_dsrc_init(dhandle);
 
@@ -160,7 +156,6 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	 * the list of open handles (for example, checkpoint).  Acquire the
 	 * handle's close lock.
 	 */
-	__wt_spin_lock(session, &dhandle->close_lock);
 
 	/*
 	 * The close can fail if an update cannot be written, return the EBUSY
@@ -200,9 +195,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	    F_ISSET(dhandle, WT_DHANDLE_DEAD) ||
 	    !F_ISSET(dhandle, WT_DHANDLE_OPEN));
 
-err:	__wt_spin_unlock(session, &dhandle->close_lock);
-
-	if (no_schema_lock)
+err:	if (no_schema_lock)
 		F_CLR(session, WT_SESSION_NO_SCHEMA_LOCK);
 
 	__wt_evict_file_exclusive_off(session);
