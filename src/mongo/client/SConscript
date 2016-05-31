@@ -228,14 +228,6 @@ env.CppUnitTest(
     ]
 )
 
-env.CppUnitTest('dbclient_rs_test',
-                ['dbclient_rs_test.cpp'],
-                LIBDEPS=[
-                    'clientdriver',
-                    '$BUILD_DIR/mongo/dbtests/mocklib',
-                ]
-)
-
 env.CppUnitTest(
     target='scoped_db_conn_test',
     source=[
