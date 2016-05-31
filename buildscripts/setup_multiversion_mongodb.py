@@ -44,6 +44,11 @@ def version_tuple(version):
     RC_OFFSET = -100
     version_parts = re.split(r'\.|-', version[0])
 
+    if version_parts[-1] == "pre":
+        # Prior to improvements for how the version string is managed within the server
+        # (SERVER-17782), the binary archives would contain a trailing "-pre".
+        version_parts.pop()
+
     if version_parts[-1].startswith("rc"):
         rc_part = version_parts.pop()
         rc_part = rc_part.split('rc')[1]
@@ -52,12 +57,17 @@ def version_tuple(version):
         # releases to be sorted in ascending order (e.g., 2.6.0-rc1,
         # 2.6.0-rc2, 2.6.0).
         version_parts.append(int(rc_part) + RC_OFFSET)
+    elif version_parts[0].startswith("v") and version_parts[-1] == "latest":
+        version_parts[0] = version_parts[0][1:]
+        # The "<branchname>-latest" versions are weighted the highest when a particular major
+        # release is requested.
+        version_parts[-1] = float("inf")
     else:
         # Non-RC releases have an extra 0 appended so version tuples like
         # (2, 6, 0, -100) and (2, 6, 0, 0) sort in ascending order.
         version_parts.append(0)
 
-    return tuple(map(int, version_parts))
+    return tuple(map(float, version_parts))
 
 class MultiVersionDownloader :
 
@@ -116,13 +126,16 @@ class MultiVersionDownloader :
 
         urls = []
         for link_version, link_url in self.links.iteritems():
-            if link_version.startswith(version):
-                # If we have a "-" in our version, exact match only
-                if version.find("-") >= 0:
-                    if link_version != version: continue
-                elif link_version.find("-") >= 0:
-                    continue
-
+            if link_version.startswith(version) or link_version == "v%s-latest" % (version):
+                # The 'link_version' is a candidate for the requested 'version' if
+                #   (a) it is a prefix of the requested version, or if
+                #   (b) it is the "<branchname>-latest" version and the requested version is for a
+                #       particular major release.
+                if "-" in version:
+                    # The requested 'version' contains a hyphen, so we only consider exact matches
+                    # to that version.
+                    if link_version != version:
+                        continue
                 urls.append((link_version, link_url))
 
         if len(urls) == 0:
@@ -156,17 +169,32 @@ class MultiVersionDownloader :
             if file_suffix == ".zip":
                 # Support .zip downloads, used for Windows binaries.
                 with zipfile.ZipFile(temp_file) as zf:
+                    # Use the name of the root directory in the archive as the name of the directory
+                    # to extract the binaries into inside 'self.install_dir'. The name of the root
+                    # directory nearly always matches the parsed URL text, with the exception of
+                    # versions such as "v3.2-latest" that instead contain the githash.
+                    extract_dir = os.path.dirname(zf.namelist()[0])
                     zf.extractall(temp_dir)
             elif file_suffix == ".tgz":
                 # Support .tgz downloads, used for Linux binaries.
                 with closing(tarfile.open(temp_file, 'r:gz')) as tf:
+                    # Use the name of the root directory in the archive as the name of the directory
+                    # to extract the binaries into inside 'self.install_dir'. The name of the root
+                    # directory nearly always matches the parsed URL text, with the exception of
+                    # versions such as "v3.2-latest" that instead contain the githash.
+                    extract_dir = os.path.dirname(tf.getnames()[0])
                     tf.extractall(path=temp_dir)
             else:
                 raise Exception("Unsupported file extension %s" % file_suffix)
     
             temp_install_dir = os.path.join(temp_dir, extract_dir)
     
-            shutil.move(temp_install_dir, self.install_dir)
+            # We may not have been able to determine whether we already downloaded the requested
+            # version due to the ambiguity in the parsed URL text, so we check for it again using
+            # the adjusted 'extract_dir' value.
+            already_downloaded = os.path.isdir(os.path.join(self.install_dir, extract_dir))
+            if not already_downloaded:
+                shutil.move(temp_install_dir, self.install_dir)
     
             shutil.rmtree(temp_dir)
             os.remove(temp_file)
