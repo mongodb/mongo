@@ -1168,7 +1168,21 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
                               OldThreadPool* workerPool,
                               const MultiApplier::Operations& ops,
                               MultiApplier::ApplyOperationFn applyOperation) {
-    invariant(applyOperation);
+    if (!txn) {
+        return {ErrorCodes::BadValue, "invalid operation context"};
+    }
+
+    if (!workerPool) {
+        return {ErrorCodes::BadValue, "invalid worker pool"};
+    }
+
+    if (ops.empty()) {
+        return {ErrorCodes::EmptyArrayOperation, "no operations provided to multiApply"};
+    }
+
+    if (!applyOperation) {
+        return {ErrorCodes::BadValue, "invalid apply operation function"};
+    }
 
     if (getGlobalServiceContext()->getGlobalStorageEngine()->isMmapV1()) {
         // Use a ThreadPool to prefetch all the operations in a batch.

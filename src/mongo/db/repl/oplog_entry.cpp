@@ -108,6 +108,12 @@ std::string OplogEntry::toString() const {
     return raw.toString();
 }
 
+OplogEntry OplogEntry::getOwned() const {
+    OplogEntry copy(*this);
+    copy.raw = copy.raw.getOwned();
+    return copy;
+}
+
 std::ostream& operator<<(std::ostream& s, const OplogEntry& o) {
     return s << o.toString();
 }

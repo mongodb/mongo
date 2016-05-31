@@ -63,6 +63,11 @@ struct OplogEntry {
     StringData getCollectionName() const;
     std::string toString() const;
 
+    /**
+     *  Returns a copy of this oplog entry with its own copy of "raw".
+     */
+    OplogEntry getOwned() const;
+
     BSONObj raw;  // Owned.
 
     StringData ns = "";
