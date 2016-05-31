@@ -267,9 +267,6 @@ class _MongoSFixture(interface.Fixture):
         self.mongos = None
 
     def setup(self):
-        if "chunkSize" not in self.mongos_options:
-            self.mongos_options["chunkSize"] = 50
-
         if "port" not in self.mongos_options:
             self.mongos_options["port"] = core.network.PortAllocator.next_fixture_port(self.job_num)
         self.port = self.mongos_options["port"]

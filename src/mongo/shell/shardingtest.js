@@ -1012,10 +1012,6 @@ var ShardingTest = function(params) {
     otherParams.useBridge = otherParams.useBridge || false;
     otherParams.bridgeOptions = otherParams.bridgeOptions || {};
 
-    if (otherParams.chunkSize && numMongos === 0) {
-        throw Error('Cannot set chunk size without any running mongos instances');
-    }
-
     var keyFile = otherParams.keyFile || otherParams.extraOptions.keyFile;
     var hostName = getHostName();
 
@@ -1209,7 +1205,7 @@ var ShardingTest = function(params) {
 
     rstOptions.nodes = nodeOptions;
 
-    // Start the config server
+    // Start the config server's replica set
     this.configRS = new ReplSetTest(rstOptions);
     this.configRS.startSet(startOptions);
 
@@ -1220,7 +1216,23 @@ var ShardingTest = function(params) {
     this.configRS.initiate(config, null, initiateTimeout);
 
     // Wait for master to be elected before starting mongos
-    this.configRS.getPrimary();
+    var csrsPrimary = this.configRS.getPrimary();
+
+    // If chunkSize has been requested for this test, write the configuration
+    if (otherParams.chunkSize) {
+        function setChunkSize() {
+            assert.writeOK(csrsPrimary.getDB('config').settings.update(
+                {_id: 'chunksize'},
+                {$set: {value: otherParams.chunkSize}},
+                {upsert: true, writeConcern: {w: 'majority', wtimeout: 30000}}));
+        }
+
+        if (keyFile) {
+            authutil.asCluster(csrsPrimary, keyFile, setChunkSize);
+        } else {
+            setChunkSize();
+        }
+    }
 
     this._configDB = this.configRS.getURL();
     this._configServers = this.configRS.nodes;
@@ -1230,7 +1242,7 @@ var ShardingTest = function(params) {
         this["c" + i] = conn;
     }
 
-    printjson("config servers: " + this._configDB);
+    printjson('Config servers: ' + this._configDB);
 
     var configConnection = _connectWithRetry(this._configDB);
 
@@ -1248,10 +1260,6 @@ var ShardingTest = function(params) {
             verbose: verboseLevel || 0,
             keyFile: keyFile,
         };
-
-        if (otherParams.chunkSize) {
-            options.chunkSize = otherParams.chunkSize;
-        }
 
         if (otherParams.mongosOptions && otherParams.mongosOptions.binVersion) {
             otherParams.mongosOptions.binVersion =
@@ -1301,25 +1309,18 @@ var ShardingTest = function(params) {
 
     // If auth is enabled for the test, login the mongos connections as system in order to
     // configure the instances and then log them out again.
-    if (keyFile) {
-        authutil.assertAuthenticate(this._mongos, 'admin', {
-            user: '__system',
-            mechanism: 'MONGODB-CR',
-            pwd: cat(keyFile).replace(/[\011-\015\040]/g, '')
-        });
-    }
 
-    try {
+    function configureCluster() {
         // Disable the balancer unless it is explicitly turned on
         if (!otherParams.enableBalancer) {
-            this.stopBalancer();
+            self.stopBalancer();
         }
 
         // Lower the mongos replica set monitor's threshold for deeming RS shard hosts as
         // inaccessible in order to speed up tests, which shutdown entire shards and check for
         // errors. This attempt is best-effort and failure should not have effect on the actual
         // test execution, just the execution time.
-        this._mongos.forEach(function(mongos) {
+        self._mongos.forEach(function(mongos) {
             var res = mongos.adminCommand({setParameter: 1, replMonitorMaxFailedChecks: 2});
 
             // For tests, which use x509 certificate for authentication, the command above will not
@@ -1328,10 +1329,12 @@ var ShardingTest = function(params) {
                 assert.commandWorked(res);
             }
         });
-    } finally {
-        if (keyFile) {
-            authutil.logout(this._mongos, 'admin');
-        }
+    }
+
+    if (keyFile) {
+        authutil.asCluster(this._mongos, keyFile, configureCluster);
+    } else {
+        configureCluster();
     }
 
     try {

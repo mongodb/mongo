@@ -120,7 +120,7 @@ public:
     // The key under which this setting is stored on the config server
     static const char kKey[];
 
-    // Default value used for the max chunk size if one is not specified in the balancer
+    // Default value to use for the max chunk size if one is not specified in the balancer
     // configuration
     static const uint64_t kDefaultMaxChunkSizeBytes;
 
@@ -128,7 +128,7 @@ public:
      * Constructs a settings object with the default values. To be used when no chunk size settings
      * have been specified.
      */
-    static ChunkSizeSettingsType createDefault(int maxChunkSizeBytes);
+    static ChunkSizeSettingsType createDefault();
 
     /**
      * Interprets the BSON content as chunk size settings and extracts the respective values.
@@ -160,11 +160,8 @@ public:
     /**
      * Primes the balancer configuration with some default values. The effective settings may change
      * at a later time after a call to refresh().
-     *
-     * defaultMaxChunkSizeBytes indicates the value to be use for the MaxChunkSize parameter if one
-     *  has not been specified in config.settings. This parameter must have been pre-validated.
      */
-    BalancerConfiguration(uint64_t defaultMaxChunkSizeBytes);
+    BalancerConfiguration();
     ~BalancerConfiguration();
 
     /**
@@ -218,10 +215,6 @@ private:
     // The latest read balancer settings and a mutex to protect its swaps
     mutable stdx::mutex _balancerSettingsMutex;
     BalancerSettingsType _balancerSettings;
-
-    // Default value for use for the max chunk size if the setting is not present in the balancer
-    // configuration
-    const uint64_t _defaultMaxChunkSizeBytes;
 
     // Max chunk size after which a chunk would be considered jumbo and won't be moved. This value
     // is read on the critical path after each write operation, that's why it is cached.

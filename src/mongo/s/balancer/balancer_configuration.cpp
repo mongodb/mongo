@@ -56,13 +56,9 @@ const char BalancerSettingsType::kKey[] = "balancer";
 const char ChunkSizeSettingsType::kKey[] = "chunksize";
 const uint64_t ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes{64 * 1024 * 1024};
 
-BalancerConfiguration::BalancerConfiguration(uint64_t defaultMaxChunkSizeBytes)
+BalancerConfiguration::BalancerConfiguration()
     : _balancerSettings(BalancerSettingsType::createDefault()),
-      _defaultMaxChunkSizeBytes(defaultMaxChunkSizeBytes) {
-    // The default must always be created with the max chunk size value prevalidated
-    invariant(ChunkSizeSettingsType::checkMaxChunkSizeValid(_defaultMaxChunkSizeBytes));
-    _maxChunkSizeBytes.store(_defaultMaxChunkSizeBytes);
-}
+      _maxChunkSizeBytes(ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes) {}
 
 BalancerConfiguration::~BalancerConfiguration() = default;
 
@@ -128,8 +124,7 @@ Status BalancerConfiguration::_refreshBalancerSettings(OperationContext* txn) {
 }
 
 Status BalancerConfiguration::_refreshChunkSizeSettings(OperationContext* txn) {
-    ChunkSizeSettingsType settings =
-        ChunkSizeSettingsType::createDefault(_defaultMaxChunkSizeBytes);
+    ChunkSizeSettingsType settings = ChunkSizeSettingsType::createDefault();
 
     auto settingsObjStatus =
         grid.catalogManager(txn)->getGlobalSettings(txn, ChunkSizeSettingsType::kKey);
@@ -266,14 +261,8 @@ bool BalancerSettingsType::isTimeInBalancingWindow(const boost::posix_time::ptim
 
 ChunkSizeSettingsType::ChunkSizeSettingsType() = default;
 
-ChunkSizeSettingsType ChunkSizeSettingsType::createDefault(int maxChunkSizeBytes) {
-    // The default must always be created with the max chunk size value prevalidated
-    invariant(ChunkSizeSettingsType::checkMaxChunkSizeValid(maxChunkSizeBytes));
-
-    ChunkSizeSettingsType settings;
-    settings._maxChunkSizeBytes = maxChunkSizeBytes;
-
-    return settings;
+ChunkSizeSettingsType ChunkSizeSettingsType::createDefault() {
+    return ChunkSizeSettingsType();
 }
 
 StatusWith<ChunkSizeSettingsType> ChunkSizeSettingsType::fromBSON(const BSONObj& obj) {

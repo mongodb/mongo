@@ -35,7 +35,6 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
-#include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_local.h"
 #include "mongo/s/client/shard_remote.h"
@@ -75,9 +74,9 @@ Status initializeGlobalShardingStateForMongod(const ConnectionString& configCS) 
     auto shardFactory =
         stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
-    return initializeGlobalShardingState(
-        configCS, ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes, std::move(shardFactory), []() {
-            return stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>();
-        });
+    return initializeGlobalShardingState(configCS, std::move(shardFactory), []() {
+        return stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>();
+    });
 }
-}
+
+}  // namespace mongo

@@ -61,6 +61,7 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/s/balancer/balancer.h"
+#include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_lockpings.h"
@@ -299,11 +300,10 @@ static Status initializeSharding(OperationContext* txn) {
     auto shardFactory =
         stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
-    Status status = initializeGlobalShardingState(
-        mongosGlobalParams.configdbs,
-        mongosGlobalParams.maxChunkSizeBytes,
-        std::move(shardFactory),
-        []() { return stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>(); });
+    Status status =
+        initializeGlobalShardingState(mongosGlobalParams.configdbs, std::move(shardFactory), []() {
+            return stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>();
+        });
 
     if (!status.isOK()) {
         return status;

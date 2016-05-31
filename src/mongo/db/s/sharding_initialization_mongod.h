@@ -31,6 +31,7 @@
 #include "mongo/base/status.h"
 
 namespace mongo {
+
 class ConnectionString;
 
 /**
@@ -40,4 +41,5 @@ class ConnectionString;
  * NOTE: This does not initialize ShardingState, which should only be done for shard servers.
  */
 Status initializeGlobalShardingStateForMongod(const ConnectionString& configCS);
-}
+
+}  // namespace mongo

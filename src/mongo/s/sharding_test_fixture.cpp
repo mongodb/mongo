@@ -169,14 +169,13 @@ void ShardingTestFixture::setUp() {
 
     // For now initialize the global grid object. All sharding objects will be accessible from there
     // until we get rid of it.
-    grid.init(
-        std::move(cm),
-        stdx::make_unique<CatalogCache>(),
-        std::move(shardRegistry),
-        stdx::make_unique<ClusterCursorManager>(_service->getPreciseClockSource()),
-        stdx::make_unique<BalancerConfiguration>(ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes),
-        std::move(executorPool),
-        _mockNetwork);
+    grid.init(std::move(cm),
+              stdx::make_unique<CatalogCache>(),
+              std::move(shardRegistry),
+              stdx::make_unique<ClusterCursorManager>(_service->getPreciseClockSource()),
+              stdx::make_unique<BalancerConfiguration>(),
+              std::move(executorPool),
+              _mockNetwork);
 }
 
 void ShardingTestFixture::tearDown() {

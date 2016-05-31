@@ -51,7 +51,6 @@ using ShardingEgressMetadataHookBuilder =
  * CatalogManager, ShardingRegistry, and grid objects.
  */
 Status initializeGlobalShardingState(const ConnectionString& configCS,
-                                     uint64_t maxChunkSizeBytes,
                                      std::unique_ptr<ShardFactory> shardFactory,
                                      rpc::ShardingEgressMetadataHookBuilder hookBuilder);
 

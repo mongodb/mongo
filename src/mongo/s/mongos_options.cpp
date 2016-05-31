@@ -206,21 +206,6 @@ Status storeMongosOptions(const moe::Environment& params, const std::vector<std:
         return ret;
     }
 
-    if (params.count("sharding.chunkSize")) {
-        const int maxChunkSizeMB = params["sharding.chunkSize"].as<int>();
-        if (maxChunkSizeMB <= 0) {
-            return Status(ErrorCodes::BadValue, "error: need a positive chunksize");
-        }
-
-        const uint64_t maxChunkSizeBytes = maxChunkSizeMB * 1024 * 1024;
-
-        if (!ChunkSizeSettingsType::checkMaxChunkSizeValid(maxChunkSizeBytes)) {
-            return Status(ErrorCodes::BadValue, "MaxChunkSize invalid");
-        }
-
-        mongosGlobalParams.maxChunkSizeBytes = maxChunkSizeBytes;
-    }
-
     if (params.count("net.port")) {
         int port = params["net.port"].as<int>();
         if (port <= 0 || port > 65535) {

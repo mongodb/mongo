@@ -42,7 +42,6 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
-#include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
@@ -684,7 +683,7 @@ TEST_F(ShardCollectionTest, withInitialData) {
         ASSERT_EQUALS(keyPattern.toBSON(), request.cmdObj["keyPattern"].Obj());
         ASSERT_EQUALS(keyPattern.getKeyPattern().globalMin(), request.cmdObj["min"].Obj());
         ASSERT_EQUALS(keyPattern.getKeyPattern().globalMax(), request.cmdObj["max"].Obj());
-        ASSERT_EQUALS(ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
+        ASSERT_EQUALS(64 * 1024 * 1024ULL,
                       static_cast<uint64_t>(request.cmdObj["maxChunkSizeBytes"].numberLong()));
         ASSERT_EQUALS(0, request.cmdObj["maxSplitPoints"].numberLong());
         ASSERT_EQUALS(0, request.cmdObj["maxChunkObjects"].numberLong());

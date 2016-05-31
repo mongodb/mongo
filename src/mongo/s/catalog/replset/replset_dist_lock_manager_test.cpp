@@ -167,8 +167,7 @@ protected:
                   nullptr,
                   std::move(shardRegistry),
                   nullptr,
-                  stdx::make_unique<BalancerConfiguration>(
-                      ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes),
+                  stdx::make_unique<BalancerConfiguration>(),
                   nullptr,
                   nullptr);
 

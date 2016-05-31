@@ -95,7 +95,7 @@ protected:
 TEST_F(BalancerConfigurationTestFixture, NoConfigurationDocuments) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    BalancerConfiguration config(1024 * 1024ULL);
+    BalancerConfiguration config;
 
     auto future = launchAsync([&] { ASSERT_OK(config.refreshAndCheck(operationContext())); });
 
@@ -107,13 +107,13 @@ TEST_F(BalancerConfigurationTestFixture, NoConfigurationDocuments) {
     ASSERT(config.isBalancerActive());
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kDefault,
               config.getSecondaryThrottle().getSecondaryThrottle());
-    ASSERT_EQ(1024 * 1024ULL, config.getMaxChunkSizeBytes());
+    ASSERT_EQ(64 * 1024 * 1024ULL, config.getMaxChunkSizeBytes());
 }
 
 TEST_F(BalancerConfigurationTestFixture, ChunkSizeSettingsDocumentOnly) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    BalancerConfiguration config(1024 * 1024ULL);
+    BalancerConfiguration config;
 
     auto future = launchAsync([&] { ASSERT_OK(config.refreshAndCheck(operationContext())); });
 
@@ -131,7 +131,7 @@ TEST_F(BalancerConfigurationTestFixture, ChunkSizeSettingsDocumentOnly) {
 TEST_F(BalancerConfigurationTestFixture, BalancerSettingsDocumentOnly) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    BalancerConfiguration config(1024 * 1024ULL);
+    BalancerConfiguration config;
 
     auto future = launchAsync([&] { ASSERT_OK(config.refreshAndCheck(operationContext())); });
 
@@ -144,7 +144,7 @@ TEST_F(BalancerConfigurationTestFixture, BalancerSettingsDocumentOnly) {
     ASSERT(!config.isBalancerActive());
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kDefault,
               config.getSecondaryThrottle().getSecondaryThrottle());
-    ASSERT_EQ(1024 * 1024ULL, config.getMaxChunkSizeBytes());
+    ASSERT_EQ(64 * 1024 * 1024ULL, config.getMaxChunkSizeBytes());
 }
 
 TEST(BalancerSettingsType, BalancerDisabled) {

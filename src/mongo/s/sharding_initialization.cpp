@@ -129,7 +129,6 @@ std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(
 }  // namespace
 
 Status initializeGlobalShardingState(const ConnectionString& configCS,
-                                     uint64_t maxChunkSizeBytes,
                                      std::unique_ptr<ShardFactory> shardFactory,
                                      rpc::ShardingEgressMetadataHookBuilder hookBuilder) {
     if (configCS.type() == ConnectionString::INVALID) {
@@ -156,7 +155,7 @@ Status initializeGlobalShardingState(const ConnectionString& configCS,
         stdx::make_unique<CatalogCache>(),
         std::move(shardRegistry),
         stdx::make_unique<ClusterCursorManager>(getGlobalServiceContext()->getPreciseClockSource()),
-        stdx::make_unique<BalancerConfiguration>(maxChunkSizeBytes),
+        stdx::make_unique<BalancerConfiguration>(),
         std::move(executorPool),
         networkPtr);
 

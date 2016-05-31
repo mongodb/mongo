@@ -236,61 +236,48 @@ sh.waitForPingChange = function(activePings, timeout, interval) {
     return remainingPings;
 };
 
-sh.waitForBalancerOff = function(timeout, interval) {
-    var pings = sh._getConfigDB().mongos.find().toArray();
-    var activePings = [];
-    for (var i = 0; i < pings.length; i++) {
-        if (!pings[i].waiting)
-            activePings.push(pings[i]);
-    }
-
-    print("Waiting for active hosts...");
-
-    activePings = sh.waitForPingChange(activePings, 60 * 1000);
-
-    // After 1min, we assume that all hosts with unchanged pings are either
-    // offline (this is enough time for a full errored balance round, if a network
-    // issue, which would reload settings) or balancing, which we wait for next
-    // Legacy hosts we always have to wait for
-
-    print("Waiting for the balancer lock...");
-
-    // Wait for the balancer lock to become inactive
-    // We can guess this is stale after 15 mins, but need to double-check manually
-    try {
-        sh.waitForDLock("balancer", false, 15 * 60 * 1000);
-    } catch (e) {
-        print(
-            "Balancer still may be active, you must manually verify this is not the case using the config.changelog collection.");
-        throw Error(e);
-    }
-
-    print("Waiting again for active hosts after balancer is off...");
-
-    // Wait a short time afterwards, to catch the host which was balancing earlier
-    activePings = sh.waitForPingChange(activePings, 5 * 1000);
-
-    // Warn about all the stale host pings remaining
-    for (var i = 0; i < activePings.length; i++) {
-        print("Warning : host " + activePings[i]._id + " seems to have been offline since " +
-              activePings[i].ping);
-    }
-
-};
-
 sh.waitForBalancer = function(onOrNot, timeout, interval) {
-
-    // If we're waiting for the balancer to turn on or switch state or
-    // go to a particular state
+    // If we're waiting for the balancer to turn on or switch state or go to a particular state
     if (onOrNot) {
-        // Just wait for the balancer lock to change, can't ensure we'll ever see it
-        // actually locked
+        // Just wait for the balancer lock to change, can't ensure we'll ever see it actually locked
         sh.waitForDLock("balancer", undefined, timeout, interval);
     } else {
         // Otherwise we need to wait until we're sure balancing stops
-        sh.waitForBalancerOff(timeout, interval);
-    }
+        var activePings = [];
+        sh._getConfigDB().mongos.find().forEach(function(ping) {
+            if (!ping.waiting)
+                activePings.push(ping);
+        });
 
+        print("Waiting for active hosts...");
+        activePings = sh.waitForPingChange(activePings, 60 * 1000);
+
+        // After 1min, we assume that all hosts with unchanged pings are either offline (this is
+        // enough time for a full errored balance round, if a network issue, which would reload
+        // settings) or balancing, which we wait for next. Legacy hosts we always have to wait for.
+        print("Waiting for the balancer lock...");
+
+        // Wait for the balancer lock to become inactive. We can guess this is stale after 15 mins,
+        // but need to double-check manually.
+        try {
+            sh.waitForDLock("balancer", false, 15 * 60 * 1000);
+        } catch (e) {
+            print(
+                "Balancer still may be active, you must manually verify this is not the case using the config.changelog collection.");
+            throw Error(e);
+        }
+
+        print("Waiting again for active hosts after balancer is off...");
+
+        // Wait a short time afterwards, to catch the host which was balancing earlier
+        activePings = sh.waitForPingChange(activePings, 5 * 1000);
+
+        // Warn about all the stale host pings remaining
+        activePings.forEach(function(activePing) {
+            print("Warning : host " + activePing._id + " seems to have been offline since " +
+                  activePing.ping);
+        });
+    }
 };
 
 sh.disableBalancing = function(coll) {
