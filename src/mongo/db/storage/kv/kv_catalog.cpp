@@ -44,6 +44,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/platform/bits.h"
 #include "mongo/platform/random.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -122,6 +123,12 @@ bool KVCatalog::FeatureTracker::isFeatureDocument(BSONObj obj) {
 }
 
 Status KVCatalog::FeatureTracker::isCompatibleWithCurrentCode(OperationContext* opCtx) const {
+    std::unique_ptr<Lock::ResourceLock> rLk;
+    if (!_catalog->_isRsThreadSafe && opCtx->lockState()) {
+        rLk = stdx::make_unique<Lock::ResourceLock>(
+            opCtx->lockState(), resourceIdCatalogMetadata, MODE_S);
+    }
+
     FeatureBits versionInfo = getInfo(opCtx);
 
     uint64_t unrecognizedNonRepairableFeatures =
