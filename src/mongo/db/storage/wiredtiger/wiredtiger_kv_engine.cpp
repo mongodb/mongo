@@ -545,8 +545,8 @@ bool WiredTigerKVEngine::_drop(StringData ident) {
 
     WiredTigerSession session(_conn);
 
-    int ret =
-        session.getSession()->drop(session.getSession(), uri.c_str(), "force,lock_wait=false");
+    int ret = session.getSession()->drop(
+        session.getSession(), uri.c_str(), "force,checkpoint_wait=false");
     LOG(1) << "WT drop of  " << uri << " res " << ret;
 
     if (ret == 0) {
@@ -612,8 +612,8 @@ void WiredTigerKVEngine::dropSomeQueuedIdents() {
             uri = _identToDrop.front();
             _identToDrop.pop();
         }
-        int ret =
-            session.getSession()->drop(session.getSession(), uri.c_str(), "force,lock_wait=false");
+        int ret = session.getSession()->drop(
+            session.getSession(), uri.c_str(), "force,checkpoint_wait=false");
         LOG(1) << "WT queued drop of  " << uri << " res " << ret;
 
         if (ret == EBUSY) {
