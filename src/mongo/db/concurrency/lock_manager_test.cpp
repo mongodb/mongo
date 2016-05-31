@@ -414,7 +414,42 @@ TEST(LockManager, ConflictCancelMultipleWaiting) {
     lockMgr.unlock(&request[0]);
 }
 
-TEST(LockManager, ConflictCancelWaitingConversion) {
+TEST(LockManager, CancelWaitingConversionWeakModes) {
+    LockManager lockMgr;
+    const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
+
+    MMAPV1LockerImpl locker1;
+    MMAPV1LockerImpl locker2;
+
+    LockRequestCombo request1(&locker1);
+    LockRequestCombo request2(&locker2);
+
+    // First request granted right away
+    ASSERT(LOCK_OK == lockMgr.lock(resId, &request1, MODE_IS));
+    ASSERT(request1.numNotifies == 0);
+
+    // Second request is granted right away
+    ASSERT(LOCK_OK == lockMgr.lock(resId, &request2, MODE_IX));
+    ASSERT(request2.numNotifies == 0);
+
+    // Convert first request to conflicting
+    ASSERT(LOCK_WAITING == lockMgr.convert(resId, &request1, MODE_S));
+    ASSERT(request1.mode == MODE_IS);
+    ASSERT(request1.convertMode == MODE_S);
+    ASSERT(request1.numNotifies == 0);
+
+    // Cancel the conflicting conversion
+    lockMgr.unlock(&request1);
+    ASSERT(request1.mode == MODE_IS);
+    ASSERT(request1.convertMode == MODE_NONE);
+    ASSERT(request1.numNotifies == 0);
+
+    // Free the remaining locks so the LockManager destructor does not complain
+    lockMgr.unlock(&request1);
+    lockMgr.unlock(&request2);
+}
+
+TEST(LockManager, CancelWaitingConversionStrongModes) {
     LockManager lockMgr;
     const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 

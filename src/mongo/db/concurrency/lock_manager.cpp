@@ -618,6 +618,7 @@ bool LockManager::unlock(LockRequest* request) {
     } else if (request->status == LockRequest::STATUS_CONVERTING) {
         // This cancels a pending convert request
         invariant(request->recursiveCount > 0);
+        invariant(lock->conversionsCount > 0);
 
         // Lock only goes from GRANTED to CONVERTING, so cancelling the conversion request
         // brings it back to the previous granted mode.
