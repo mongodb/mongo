@@ -22,6 +22,7 @@ env.Library(
         'transport_layer.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/unittest/unittest',
         '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/util/net/network',
     ],
