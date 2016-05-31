@@ -275,7 +275,8 @@ public:
     virtual void resetLastOpTimesFromOplog(OperationContext* txn) override;
 
     virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
-                                        const rpc::ReplSetMetadata& metadata) override;
+                                        const OpTime& syncSourceLastOpTime,
+                                        bool syncSourceHasSyncSource) override;
 
     virtual SyncSourceResolverResponse selectSyncSource(OperationContext* txn,
                                                         const OpTime& lastOpTimeFetched) override;

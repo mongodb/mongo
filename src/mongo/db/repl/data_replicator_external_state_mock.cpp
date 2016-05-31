@@ -47,10 +47,11 @@ void DataReplicatorExternalStateMock::processMetadata(const rpc::ReplSetMetadata
 }
 
 bool DataReplicatorExternalStateMock::shouldStopFetching(const HostAndPort& source,
-                                                         const rpc::ReplSetMetadata& metadata) {
+                                                         const OpTime& sourceOpTime,
+                                                         bool sourceHasSyncSource) {
     lastSyncSourceChecked = source;
-    syncSourceLastOpTime = metadata.getLastOpVisible();
-    syncSourceHasSyncSource = metadata.getSyncSourceIndex() != -1;
+    syncSourceLastOpTime = sourceOpTime;
+    syncSourceHasSyncSource = sourceHasSyncSource;
     return shouldStopFetchingResult;
 }
 

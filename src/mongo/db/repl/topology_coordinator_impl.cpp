@@ -2300,11 +2300,10 @@ long long TopologyCoordinatorImpl::getTerm() {
     return _term;
 }
 
-// TODO(siyuan): Merge _hddata into _slaveInfo, so that we have a single view of the
-// replset. Passing metadata is unnecessary.
 bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentSource,
                                                      const OpTime& myLastOpTime,
-                                                     const rpc::ReplSetMetadata& metadata,
+                                                     const OpTime& syncSourceLastOpTime,
+                                                     bool syncSourceHasSyncSource,
                                                      Date_t now) const {
     // Methodology:
     // If there exists a viable sync source member other than currentSource, whose oplog has
@@ -2318,16 +2317,14 @@ bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentS
         return true;
     }
 
-    if (metadata.getConfigVersion() != _rsConfig.getConfigVersion()) {
+    const int currentSourceIndex = _rsConfig.findMemberIndexByHostAndPort(currentSource);
+    if (currentSourceIndex == -1) {
         return true;
     }
-
-    const int currentSourceIndex = _rsConfig.findMemberIndexByHostAndPort(currentSource);
-    invariant(currentSourceIndex != -1);
     invariant(currentSourceIndex != _selfIndex);
 
     OpTime currentSourceOpTime =
-        std::max(metadata.getLastOpVisible(), _hbdata.at(currentSourceIndex).getAppliedOpTime());
+        std::max(syncSourceLastOpTime, _hbdata.at(currentSourceIndex).getAppliedOpTime());
 
     if (currentSourceOpTime.isNull()) {
         // Haven't received a heartbeat from the sync source yet, so can't tell if we should
@@ -2335,10 +2332,9 @@ bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentS
         return false;
     }
 
-    // Change sync source if they are not ahead of us, and don't have a sync source,
-    // unless they are primary.
-    if (_rsConfig.getProtocolVersion() == 1 && metadata.getSyncSourceIndex() == -1 &&
-        currentSourceOpTime <= myLastOpTime && metadata.getPrimaryIndex() != currentSourceIndex) {
+    if (_rsConfig.getProtocolVersion() == 1 && !syncSourceHasSyncSource &&
+        currentSourceOpTime <= myLastOpTime &&
+        _hbdata.at(currentSourceIndex).getState() != MemberState::RS_PRIMARY) {
         return true;
     }
 

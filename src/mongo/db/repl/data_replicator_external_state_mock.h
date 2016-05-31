@@ -48,7 +48,8 @@ public:
     void processMetadata(const rpc::ReplSetMetadata& metadata) override;
 
     bool shouldStopFetching(const HostAndPort& source,
-                            const rpc::ReplSetMetadata& metadata) override;
+                            const OpTime& sourceOpTime,
+                            bool sourceHasSyncSource) override;
 
     // Returned by getCurrentTermAndLastCommittedOpTime.
     long long currentTerm = OpTime::kUninitializedTerm;

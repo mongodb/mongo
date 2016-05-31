@@ -357,7 +357,8 @@ void ReplicationCoordinatorMock::resetLastOpTimesFromOplog(OperationContext* txn
 }
 
 bool ReplicationCoordinatorMock::shouldChangeSyncSource(const HostAndPort& currentSource,
-                                                        const rpc::ReplSetMetadata& metadata) {
+                                                        const OpTime& syncSourceLastOpTime,
+                                                        bool syncSourceHasSyncSource) {
     invariant(false);
 }
 

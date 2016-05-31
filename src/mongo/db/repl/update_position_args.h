@@ -40,7 +40,7 @@ class Status;
 namespace repl {
 
 /**
- * Arguments to the update position command.
+ * Arguments to the handshake command.
  */
 class UpdatePositionArgs {
 public:

@@ -156,7 +156,8 @@ public:
     virtual void clearSyncSourceBlacklist();
     virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
                                         const OpTime& myLastOpTime,
-                                        const rpc::ReplSetMetadata& metadata,
+                                        const OpTime& syncSourceLastOpTime,
+                                        bool syncSourceHasSyncSource,
                                         Date_t now) const;
     virtual bool becomeCandidateIfStepdownPeriodOverAndSingleNodeSet(Date_t now);
     virtual void setElectionSleepUntil(Date_t newTime);
