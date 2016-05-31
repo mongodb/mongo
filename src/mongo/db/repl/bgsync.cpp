@@ -127,9 +127,6 @@ size_t getSize(const BSONObj& o) {
 
 MONGO_FP_DECLARE(rsBgSyncProduce);
 
-BackgroundSync* BackgroundSync::s_instance = 0;
-stdx::mutex BackgroundSync::s_mutex;
-
 // The number and time spent reading batches off the network
 static TimerStats getmoreReplStats;
 static ServerStatusMetricField<TimerStats> displayBatchesRecieved("repl.network.getmores",
@@ -155,8 +152,6 @@ static ServerStatusMetricField<int> displayBufferMaxSize("repl.buffer.maxSizeByt
                                                          &bufferMaxSizeGauge);
 
 
-BackgroundSyncInterface::~BackgroundSyncInterface() {}
-
 BackgroundSync::BackgroundSync()
     : _buffer(bufferMaxSizeGauge, &getSize),
       _threadPoolTaskExecutor(makeThreadPool(),
@@ -165,14 +160,6 @@ BackgroundSync::BackgroundSync()
       _syncSourceResolver(_replCoord),
       _lastOpTimeFetched(Timestamp(std::numeric_limits<int>::max(), 0),
                          std::numeric_limits<long long>::max()) {}
-
-BackgroundSync* BackgroundSync::get() {
-    stdx::unique_lock<stdx::mutex> lock(s_mutex);
-    if (s_instance == NULL && !inShutdown()) {
-        s_instance = new BackgroundSync();
-    }
-    return s_instance;
-}
 
 void BackgroundSync::shutdown() {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
@@ -664,26 +651,6 @@ long long BackgroundSync::_readLastAppliedHash(OperationContext* txn) {
         fassertFailed(18902);
     }
     return hash;
-}
-
-bool BackgroundSync::getInitialSyncRequestedFlag() const {
-    stdx::lock_guard<stdx::mutex> lock(_initialSyncMutex);
-    return _initialSyncRequestedFlag;
-}
-
-void BackgroundSync::setInitialSyncRequestedFlag(bool value) {
-    stdx::lock_guard<stdx::mutex> lock(_initialSyncMutex);
-    _initialSyncRequestedFlag = value;
-}
-
-BackgroundSync::IndexPrefetchConfig BackgroundSync::getIndexPrefetchConfig() const {
-    stdx::lock_guard<stdx::mutex> lock(_indexPrefetchMutex);
-    return _indexPrefetchConfig;
-}
-
-void BackgroundSync::setIndexPrefetchConfig(const IndexPrefetchConfig cfg) {
-    stdx::lock_guard<stdx::mutex> lock(_indexPrefetchMutex);
-    _indexPrefetchConfig = cfg;
 }
 
 bool BackgroundSync::shouldStopFetching() const {

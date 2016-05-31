@@ -32,7 +32,6 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
-#include "mongo/db/repl/bgsync.h"
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
@@ -43,6 +42,14 @@ extern double replElectionTimeoutOffsetLimitFraction;
 
 class ReplSettings {
 public:
+    // Allow index prefetching to be turned on/off
+    enum class IndexPrefetchConfig {
+        UNINITIALIZED = 0,
+        PREFETCH_NONE = 1,
+        PREFETCH_ID_ONLY = 2,
+        PREFETCH_ALL = 3
+    };
+
     std::string ourSetName() const;
     bool usingReplSets() const;
 
@@ -62,11 +69,11 @@ public:
     std::string getReplSetString() const;
 
     /**
-     * Note: _prefetchIndexMode is initialized to BackgroundSync::UNINITIALIZED by default.
+     * Note: _prefetchIndexMode is initialized to UNINITIALIZED by default.
      * To check whether _prefetchIndexMode has been set to a valid value, call
      * isPrefetchIndexModeSet().
      */
-    BackgroundSync::IndexPrefetchConfig getPrefetchIndexMode() const;
+    IndexPrefetchConfig getPrefetchIndexMode() const;
 
     /**
       * Checks that _prefetchIndexMode has been set.
@@ -119,7 +126,7 @@ private:
     std::string _replSetString;  // --replSet[/<seedlist>]
 
     // --indexPrefetch
-    BackgroundSync::IndexPrefetchConfig _prefetchIndexMode = BackgroundSync::UNINITIALIZED;
+    IndexPrefetchConfig _prefetchIndexMode = IndexPrefetchConfig::UNINITIALIZED;
 };
 
 }  // namespace repl

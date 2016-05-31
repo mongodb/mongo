@@ -39,6 +39,7 @@
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/topology_coordinator.h"
+#include "mongo/db/server_options.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/util/time_support.h"
 

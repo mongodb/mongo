@@ -38,6 +38,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/unique_message.h"

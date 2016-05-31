@@ -30,6 +30,7 @@
 
 #include <memory>
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
@@ -50,29 +51,8 @@ class OperationContext;
 
 namespace repl {
 
-class Member;
 class ReplicationCoordinator;
 class ReplicationCoordinatorExternalState;
-
-// This interface exists to facilitate easier testing;
-// the test infrastructure implements these functions with stubs.
-class BackgroundSyncInterface {
-public:
-    virtual ~BackgroundSyncInterface();
-
-    // Gets the head of the buffer, but does not remove it.
-    // Returns true if an element was present at the head;
-    // false if the queue was empty.
-    virtual bool peek(BSONObj* op) = 0;
-
-    // Deletes objects in the queue;
-    // called by sync thread after it has applied an op
-    virtual void consume() = 0;
-
-    // wait up to 1 second for more ops to appear
-    virtual void waitForMore() = 0;
-};
-
 
 /**
  * Lock order:
@@ -80,28 +60,17 @@ public:
  * 2. rwlock
  * 3. BackgroundSync::_mutex
  */
-class BackgroundSync : public BackgroundSyncInterface {
+class BackgroundSync {
 public:
-    // Allow index prefetching to be turned on/off
-    enum IndexPrefetchConfig {
-        UNINITIALIZED = 0,
-        PREFETCH_NONE = 1,
-        PREFETCH_ID_ONLY = 2,
-        PREFETCH_ALL = 3
-    };
-
-    // TODO: remove, once initialSyncRequestedFlag and indexPrefetchConfig go somewhere else.
-    static BackgroundSync* get();
+    BackgroundSync();
+    MONGO_DISALLOW_COPYING(BackgroundSync);
 
     // stop syncing (when this node becomes a primary, e.g.)
     void stop();
 
-
     void shutdown();
 
     bool isStopped() const;
-
-    virtual ~BackgroundSync() {}
 
     /**
      * Starts the producer thread which runs until shutdown. Upon resolving the current sync source
@@ -117,10 +86,10 @@ public:
 
     // Interface implementation
 
-    virtual bool peek(BSONObj* op);
-    virtual void consume();
-    virtual void clearSyncTarget();
-    virtual void waitForMore();
+    bool peek(BSONObj* op);
+    void consume();
+    void clearSyncTarget();
+    void waitForMore();
 
     // For monitoring
     BSONObj getCounters();
@@ -132,12 +101,6 @@ public:
      * Cancel existing find/getMore commands on the sync source's oplog collection.
      */
     void cancelFetcher();
-
-    bool getInitialSyncRequestedFlag() const;
-    void setInitialSyncRequestedFlag(bool value);
-
-    IndexPrefetchConfig getIndexPrefetchConfig() const;
-    void setIndexPrefetchConfig(const IndexPrefetchConfig cfg);
 
     /**
      * Returns true if any of the following is true:
@@ -152,10 +115,6 @@ public:
     void pushTestOpToBuffer(const BSONObj& op);
 
 private:
-    BackgroundSync();
-    BackgroundSync(const BackgroundSync& s);
-    BackgroundSync operator=(const BackgroundSync& s);
-
     // Production thread
     void _producerThread(ReplicationCoordinatorExternalState* replicationCoordinatorExternalState);
     void _produce(OperationContext* txn,
@@ -196,24 +155,11 @@ private:
 
     long long _readLastAppliedHash(OperationContext* txn);
 
-    static BackgroundSync* s_instance;
-    // protects creation of s_instance
-    static stdx::mutex s_mutex;
-
     // Production thread
     BlockingQueue<BSONObj> _buffer;
 
     // Task executor used to run find/getMore commands on sync source.
     executor::ThreadPoolTaskExecutor _threadPoolTaskExecutor;
-
-    // bool for indicating resync need on this node and the mutex that protects it
-    // The resync command sets this flag; the Applier thread observes and clears it.
-    mutable stdx::mutex _initialSyncMutex;
-    bool _initialSyncRequestedFlag = false;
-
-    // This setting affects the Applier prefetcher behavior.
-    mutable stdx::mutex _indexPrefetchMutex;
-    IndexPrefetchConfig _indexPrefetchConfig = PREFETCH_ALL;
 
     // A pointer to the replication coordinator running the show.
     ReplicationCoordinator* _replCoord;

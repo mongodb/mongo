@@ -780,6 +780,12 @@ public:
     virtual WriteConcernOptions populateUnsetWriteConcernOptionsSyncMode(
         WriteConcernOptions wc) = 0;
 
+    virtual bool getInitialSyncRequestedFlag() const = 0;
+    virtual void setInitialSyncRequestedFlag(bool value) = 0;
+
+    virtual ReplSettings::IndexPrefetchConfig getIndexPrefetchConfig() const = 0;
+    virtual void setIndexPrefetchConfig(const ReplSettings::IndexPrefetchConfig cfg) = 0;
+
 protected:
     ReplicationCoordinator();
 };

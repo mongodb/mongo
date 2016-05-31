@@ -30,10 +30,14 @@
 
 namespace mongo {
 namespace repl {
+
+class BackgroundSync;
+
 /**
  * Begins an initial sync of a node.  This drops all data, chooses a sync source,
  * and runs the cloner from that sync source.  The node's state is not changed.
  */
-void syncDoInitialSync();
-}
-}
+void syncDoInitialSync(BackgroundSync* bgsync);
+
+}  // namespace repl
+}  // namespace mongo

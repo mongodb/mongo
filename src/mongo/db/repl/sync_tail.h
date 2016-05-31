@@ -44,7 +44,7 @@ class Database;
 class OperationContext;
 
 namespace repl {
-class BackgroundSyncInterface;
+class BackgroundSync;
 class ReplicationCoordinator;
 class OpTime;
 
@@ -83,7 +83,7 @@ public:
      */
     using ApplyCommandInLockFn = stdx::function<Status(OperationContext*, const BSONObj&)>;
 
-    SyncTail(BackgroundSyncInterface* q, MultiSyncApplyFunc func);
+    SyncTail(BackgroundSync* q, MultiSyncApplyFunc func);
     virtual ~SyncTail();
 
     /**
@@ -174,7 +174,7 @@ private:
 
     std::string _hostname;
 
-    BackgroundSyncInterface* _networkQueue;
+    BackgroundSync* _networkQueue;
 
     // Function to use during applyOps
     MultiSyncApplyFunc _applyFunc;

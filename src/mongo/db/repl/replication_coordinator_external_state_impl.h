@@ -32,6 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/repl/sync_source_feedback.h"
 #include "mongo/db/repl/sync_tail.h"
@@ -110,6 +111,13 @@ private:
     // for forwarding replication progress information upstream when there is chained
     // replication.
     SyncSourceFeedback _syncSourceFeedback;
+
+    // The BackgroundSync class is responsible for pulling ops off the network from the sync source
+    // and into a BlockingQueue.
+    // We can't create it on construction because it needs a fully constructed
+    // ReplicationCoordinator, but this ExternalState object is constructed prior to the
+    // ReplicationCoordinator.
+    std::unique_ptr<BackgroundSync> _bgSync;
 
     // Thread running SyncSourceFeedback::run().
     std::unique_ptr<stdx::thread> _syncSourceFeedbackThread;

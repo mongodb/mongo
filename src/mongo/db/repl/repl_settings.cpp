@@ -29,8 +29,11 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
 
 #include "mongo/db/repl/repl_settings.h"
-#include "mongo/util/log.h"
+
 #include <string>
+
+#include "mongo/db/repl/bgsync.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
@@ -93,12 +96,12 @@ std::string ReplSettings::getReplSetString() const {
     return _replSetString;
 }
 
-BackgroundSync::IndexPrefetchConfig ReplSettings::getPrefetchIndexMode() const {
+ReplSettings::IndexPrefetchConfig ReplSettings::getPrefetchIndexMode() const {
     return _prefetchIndexMode;
 }
 
 bool ReplSettings::isPrefetchIndexModeSet() const {
-    return _prefetchIndexMode != BackgroundSync::UNINITIALIZED;
+    return _prefetchIndexMode != IndexPrefetchConfig::UNINITIALIZED;
 }
 
 /**
@@ -150,16 +153,16 @@ void ReplSettings::setReplSetString(std::string replSetString) {
 
 void ReplSettings::setPrefetchIndexMode(std::string prefetchIndexModeString) {
     if (prefetchIndexModeString.empty()) {
-        _prefetchIndexMode = BackgroundSync::UNINITIALIZED;
+        _prefetchIndexMode = IndexPrefetchConfig::UNINITIALIZED;
     } else {
         if (prefetchIndexModeString == "none")
-            _prefetchIndexMode = BackgroundSync::PREFETCH_NONE;
+            _prefetchIndexMode = IndexPrefetchConfig::PREFETCH_NONE;
         else if (prefetchIndexModeString == "_id_only")
-            _prefetchIndexMode = BackgroundSync::PREFETCH_ID_ONLY;
+            _prefetchIndexMode = IndexPrefetchConfig::PREFETCH_ID_ONLY;
         else if (prefetchIndexModeString == "all")
-            _prefetchIndexMode = BackgroundSync::PREFETCH_ALL;
+            _prefetchIndexMode = IndexPrefetchConfig::PREFETCH_ALL;
         else {
-            _prefetchIndexMode = BackgroundSync::PREFETCH_ALL;
+            _prefetchIndexMode = IndexPrefetchConfig::PREFETCH_ALL;
             warning() << "unrecognized indexPrefetchMode setting \"" << prefetchIndexModeString
                       << "\", defaulting to \"all\"";
         }

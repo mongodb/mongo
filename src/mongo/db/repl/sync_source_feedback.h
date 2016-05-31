@@ -38,6 +38,7 @@ struct HostAndPort;
 class OperationContext;
 
 namespace repl {
+class BackgroundSync;
 class Reporter;
 
 class SyncSourceFeedback {
@@ -51,7 +52,7 @@ public:
      * update occurs within the _keepAliveInterval, progress is forwarded to let the upstream node
      * know that this node, along with the alive nodes chaining through it, are still alive.
      */
-    void run();
+    void run(BackgroundSync* bgsync);
 
     /// Signals the run() method to terminate.
     void shutdown();
@@ -60,7 +61,7 @@ private:
     /* Inform the sync target of our current position in the oplog, as well as the positions
      * of all secondaries chained through us.
      */
-    Status _updateUpstream(OperationContext* txn);
+    Status _updateUpstream(OperationContext* txn, BackgroundSync* bgsync);
 
     // protects cond, _shutdownSignaled, _keepAliveInterval, and _positionChanged.
     stdx::mutex _mtx;

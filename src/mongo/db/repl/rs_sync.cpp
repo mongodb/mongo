@@ -60,7 +60,7 @@
 namespace mongo {
 namespace repl {
 
-void runSyncThread() {
+void runSyncThread(BackgroundSync* bgsync) {
     Client::initThread("rsSync");
     AuthorizationSession::get(cc())->grantInternalAuthorization();
     ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
@@ -68,7 +68,7 @@ void runSyncThread() {
     // Overwrite prefetch index mode in BackgroundSync if ReplSettings has a mode set.
     ReplSettings replSettings = replCoord->getSettings();
     if (replSettings.isPrefetchIndexModeSet())
-        BackgroundSync::get()->setIndexPrefetchConfig(replSettings.getPrefetchIndexMode());
+        replCoord->setIndexPrefetchConfig(replSettings.getPrefetchIndexMode());
 
     while (!inShutdown()) {
         // After a reconfig, we may not be in the replica set anymore, so
@@ -105,7 +105,7 @@ void runSyncThread() {
             }
 
             /* we have some data.  continue tailing. */
-            SyncTail tail(BackgroundSync::get(), multiSyncApply);
+            SyncTail tail(bgsync, multiSyncApply);
             tail.oplogApplication();
         } catch (...) {
             std::terminate();

@@ -36,6 +36,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"

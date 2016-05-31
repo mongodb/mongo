@@ -252,6 +252,12 @@ public:
     virtual WriteConcernOptions populateUnsetWriteConcernOptionsSyncMode(
         WriteConcernOptions wc) override;
 
+    virtual bool getInitialSyncRequestedFlag() const override;
+    virtual void setInitialSyncRequestedFlag(bool value) override;
+
+    virtual ReplSettings::IndexPrefetchConfig getIndexPrefetchConfig() const override;
+    virtual void setIndexPrefetchConfig(const ReplSettings::IndexPrefetchConfig cfg) override;
+
 private:
     AtomicUInt64 _snapshotNameGenerator;
     const ReplSettings _settings;

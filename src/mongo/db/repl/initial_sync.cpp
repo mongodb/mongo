@@ -46,7 +46,7 @@ namespace repl {
 
 unsigned replSetForceInitialSyncFailure = 0;
 
-InitialSync::InitialSync(BackgroundSyncInterface* q, MultiSyncApplyFunc func) : SyncTail(q, func) {}
+InitialSync::InitialSync(BackgroundSync* q, MultiSyncApplyFunc func) : SyncTail(q, func) {}
 
 InitialSync::~InitialSync() {}
 

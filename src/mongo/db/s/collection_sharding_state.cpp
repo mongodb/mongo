@@ -43,6 +43,7 @@
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
+#include "mongo/db/server_options.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/stale_exception.h"
 

@@ -34,6 +34,7 @@
 
 namespace mongo {
 
+class OperationContext;
 class Timestamp;
 
 namespace repl {

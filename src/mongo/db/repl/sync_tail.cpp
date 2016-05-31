@@ -275,7 +275,7 @@ void ApplyBatchFinalizerForJournal::_run() {
 }
 }  // anonymous namespace containing ApplyBatchFinalizer definitions.
 
-SyncTail::SyncTail(BackgroundSyncInterface* q, MultiSyncApplyFunc func)
+SyncTail::SyncTail(BackgroundSync* q, MultiSyncApplyFunc func)
     : _networkQueue(q),
       _applyFunc(func),
       _writerPool(replWriterThreadCount, "repl writer worker ") {}
@@ -706,7 +706,7 @@ void SyncTail::oplogApplication() {
         OpQueue ops;
 
         do {
-            if (BackgroundSync::get()->getInitialSyncRequestedFlag()) {
+            if (replCoord->getInitialSyncRequestedFlag()) {
                 // got a resync command
                 return;
             }

@@ -484,8 +484,11 @@ void ReplicationCoordinatorImpl::_stopDataReplication() {}
 void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn) {
     // When initial sync is done, callback.
     OnInitialSyncFinishedFn callback{[this]() {
-        log() << "Initial sync done, starting steady state replication.";
-        _externalState->startSteadyStateReplication();
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        if (!_inShutdown) {
+            log() << "Initial sync done, starting steady state replication.";
+            _externalState->startSteadyStateReplication();
+        }
     }};
 
     const auto lastApplied = getMyLastAppliedOpTime();
@@ -3515,6 +3518,28 @@ CallbackFn ReplicationCoordinatorImpl::_wrapAsCallbackFn(const stdx::function<vo
 
         work();
     };
+}
+
+
+bool ReplicationCoordinatorImpl::getInitialSyncRequestedFlag() const {
+    stdx::lock_guard<stdx::mutex> lock(_initialSyncMutex);
+    return _initialSyncRequestedFlag;
+}
+
+void ReplicationCoordinatorImpl::setInitialSyncRequestedFlag(bool value) {
+    stdx::lock_guard<stdx::mutex> lock(_initialSyncMutex);
+    _initialSyncRequestedFlag = value;
+}
+
+ReplSettings::IndexPrefetchConfig ReplicationCoordinatorImpl::getIndexPrefetchConfig() const {
+    stdx::lock_guard<stdx::mutex> lock(_indexPrefetchMutex);
+    return _indexPrefetchConfig;
+}
+
+void ReplicationCoordinatorImpl::setIndexPrefetchConfig(
+    const ReplSettings::IndexPrefetchConfig cfg) {
+    stdx::lock_guard<stdx::mutex> lock(_indexPrefetchMutex);
+    _indexPrefetchConfig = cfg;
 }
 
 

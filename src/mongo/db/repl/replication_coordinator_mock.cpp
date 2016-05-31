@@ -438,5 +438,18 @@ WriteConcernOptions ReplicationCoordinatorMock::populateUnsetWriteConcernOptions
     return wc;
 }
 
+bool ReplicationCoordinatorMock::getInitialSyncRequestedFlag() const {
+    return false;
+}
+
+void ReplicationCoordinatorMock::setInitialSyncRequestedFlag(bool value) {}
+
+ReplSettings::IndexPrefetchConfig ReplicationCoordinatorMock::getIndexPrefetchConfig() const {
+    return ReplSettings::IndexPrefetchConfig();
+}
+
+void ReplicationCoordinatorMock::setIndexPrefetchConfig(
+    const ReplSettings::IndexPrefetchConfig cfg) {}
+
 }  // namespace repl
 }  // namespace mongo

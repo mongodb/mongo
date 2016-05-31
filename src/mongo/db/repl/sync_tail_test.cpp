@@ -50,19 +50,6 @@ namespace {
 using namespace mongo;
 using namespace mongo::repl;
 
-class BackgroundSyncMock : public BackgroundSyncInterface {
-public:
-    bool peek(BSONObj* op) override;
-    void consume() override;
-    void waitForMore() override;
-};
-
-bool BackgroundSyncMock::peek(BSONObj* op) {
-    return false;
-}
-void BackgroundSyncMock::consume() {}
-void BackgroundSyncMock::waitForMore() {}
-
 class SyncTailTest : public ServiceContextMongoDTest {
 protected:
     void _testSyncApplyInsertDocument(LockMode expectedMode);
@@ -105,13 +92,6 @@ void SyncTailTest::tearDown() {
     }
     _txn.reset();
     setGlobalReplicationCoordinator(nullptr);
-}
-
-TEST_F(SyncTailTest, Peek) {
-    BackgroundSyncMock bgsync;
-    SyncTail syncTail(&bgsync, [](const std::vector<OplogEntry>& ops, SyncTail* st) {});
-    BSONObj obj;
-    ASSERT_FALSE(syncTail.peek(&obj));
 }
 
 TEST_F(SyncTailTest, SyncApplyNoNamespaceBadOp) {

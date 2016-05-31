@@ -40,8 +40,10 @@
 
 namespace mongo {
 namespace repl {
+class BackgroundSync;
+
 // Body of the thread that will do the background sync.
-void runSyncThread();
+void runSyncThread(BackgroundSync* bgsync);
 
 }  // namespace repl
 }  // namespace mongo

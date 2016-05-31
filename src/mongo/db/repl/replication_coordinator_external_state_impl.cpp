@@ -104,13 +104,12 @@ void ReplicationCoordinatorExternalStateImpl::startInitialSync(OnInitialSyncFini
         log() << "Starting replication fetcher thread";
 
         // Start bgsync.
-        BackgroundSync* bgsync = BackgroundSync::get();
-        invariant(!(bgsync == nullptr && !inShutdownStrict()));  // bgsync can be null @shutdown.
+        _bgSync.reset(new BackgroundSync());
         invariant(!_producerThread);  // The producer thread should not be init'd before this.
         _producerThread.reset(
-            new stdx::thread(stdx::bind(&BackgroundSync::producerThread, bgsync, this)));
+            new stdx::thread(stdx::bind(&BackgroundSync::producerThread, _bgSync.get(), this)));
         // Do initial sync.
-        syncDoInitialSync();
+        syncDoInitialSync(_bgSync.get());
         finished();
     }});
 }
@@ -118,17 +117,17 @@ void ReplicationCoordinatorExternalStateImpl::startInitialSync(OnInitialSyncFini
 void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication() {
     if (!_producerThread) {
         log() << "Starting replication fetcher thread";
-        BackgroundSync* bgsync = BackgroundSync::get();
+        _bgSync.reset(new BackgroundSync());
         _producerThread.reset(
-            new stdx::thread(stdx::bind(&BackgroundSync::producerThread, bgsync, this)));
+            new stdx::thread(stdx::bind(&BackgroundSync::producerThread, _bgSync.get(), this)));
     }
     log() << "Starting replication applier threads";
     invariant(!_applierThread);
-    _applierThread.reset(new stdx::thread(runSyncThread));
+    _applierThread.reset(new stdx::thread(stdx::bind(&runSyncThread, _bgSync.get())));
     log() << "Starting replication reporter thread";
     invariant(!_syncSourceFeedbackThread);
-    _syncSourceFeedbackThread.reset(
-        new stdx::thread(stdx::bind(&SyncSourceFeedback::run, &_syncSourceFeedback)));
+    _syncSourceFeedbackThread.reset(new stdx::thread(
+        stdx::bind(&SyncSourceFeedback::run, &_syncSourceFeedback, _bgSync.get())));
 }
 
 void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& settings) {
@@ -168,10 +167,7 @@ void ReplicationCoordinatorExternalStateImpl::shutdown() {
         }
 
         if (_producerThread) {
-            BackgroundSync* bgsync = BackgroundSync::get();
-            if (bgsync) {
-                bgsync->shutdown();
-            }
+            _bgSync->shutdown();
             _producerThread->join();
         }
         if (_snapshotThread)
@@ -423,17 +419,14 @@ void ReplicationCoordinatorExternalStateImpl::updateShardIdentityConfigString(
 }
 
 void ReplicationCoordinatorExternalStateImpl::signalApplierToChooseNewSyncSource() {
-    auto bgsync = BackgroundSync::get();
-    if (bgsync) {
-        bgsync->clearSyncTarget();
+    if (_bgSync) {
+        _bgSync->clearSyncTarget();
     }
 }
 
 void ReplicationCoordinatorExternalStateImpl::signalApplierToCancelFetcher() {
-    auto bgsync = BackgroundSync::get();
-    if (bgsync) {
-        bgsync->cancelFetcher();
-    }
+    invariant(_bgSync);
+    _bgSync->cancelFetcher();
 }
 
 void ReplicationCoordinatorExternalStateImpl::dropAllTempCollections(OperationContext* txn) {
