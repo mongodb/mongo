@@ -36,7 +36,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
@@ -95,15 +95,15 @@ public:
             return appendCommandStatus(result, Status(ErrorCodes::ShardNotFound, msg));
         }
 
-        auto catalogManager = grid.catalogManager(txn);
+        auto catalogClient = grid.catalogClient(txn);
         StatusWith<ShardDrainingStatus> removeShardResult =
-            catalogManager->removeShard(txn, s->getId());
+            catalogClient->removeShard(txn, s->getId());
         if (!removeShardResult.isOK()) {
             return appendCommandStatus(result, removeShardResult.getStatus());
         }
 
         vector<string> databases;
-        Status status = catalogManager->getDatabasesForShard(txn, s->getId(), &databases);
+        Status status = catalogClient->getDatabasesForShard(txn, s->getId(), &databases);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -136,12 +136,12 @@ public:
                 break;
             case ShardDrainingStatus::ONGOING: {
                 vector<ChunkType> chunks;
-                Status status = catalogManager->getChunks(txn,
-                                                          BSON(ChunkType::shard(s->getId())),
-                                                          BSONObj(),
-                                                          boost::none,  // return all
-                                                          &chunks,
-                                                          nullptr);
+                Status status = catalogClient->getChunks(txn,
+                                                         BSON(ChunkType::shard(s->getId())),
+                                                         BSONObj(),
+                                                         boost::none,  // return all
+                                                         &chunks,
+                                                         nullptr);
                 if (!status.isOK()) {
                     return appendCommandStatus(result, status);
                 }

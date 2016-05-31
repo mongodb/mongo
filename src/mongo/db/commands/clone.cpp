@@ -107,8 +107,8 @@ public:
         opts.checkForCatalogChange = cmdObj["_checkForCatalogChange"].trueValue();
 
         if (opts.checkForCatalogChange) {
-            auto catalogManager = grid.catalogManager(txn);
-            if (!catalogManager) {
+            auto catalogClient = grid.catalogClient(txn);
+            if (!catalogClient) {
                 return appendCommandStatus(
                     result,
                     Status(ErrorCodes::NotYetInitialized,

@@ -32,7 +32,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/s/catalog/catalog_cache.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/grid.h"
 
@@ -67,7 +67,7 @@ StatusWith<ScopedShardDatabase> ScopedShardDatabase::getOrCreate(OperationContex
 
     if (dbStatus == ErrorCodes::NamespaceNotFound) {
         auto statusCreateDb =
-            Grid::get(txn)->catalogManager(txn)->createDatabase(txn, dbName.toString());
+            Grid::get(txn)->catalogClient(txn)->createDatabase(txn, dbName.toString());
         if (statusCreateDb.isOK() || statusCreateDb == ErrorCodes::NamespaceExists) {
             return getExisting(txn, dbName);
         }

@@ -48,7 +48,7 @@ using ShardingEgressMetadataHookBuilder =
 
 /**
  * Takes in the connection string for reaching the config servers and initializes the global
- * CatalogManager, ShardingRegistry, and grid objects.
+ * ShardingCatalogClient, ShardingCatalogManager, ShardRegistry, and Grid objects.
  */
 Status initializeGlobalShardingState(const ConnectionString& configCS,
                                      std::unique_ptr<ShardFactory> shardFactory,

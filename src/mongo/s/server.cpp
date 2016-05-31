@@ -62,7 +62,7 @@
 #include "mongo/platform/process_id.h"
 #include "mongo/s/balancer/balancer.h"
 #include "mongo/s/balancer/balancer_configuration.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/s/catalog/type_locks.h"
@@ -139,7 +139,7 @@ static void cleanupTask() {
         auto cursorManager = grid.getCursorManager();
         cursorManager->shutdown();
         grid.getExecutorPool()->shutdownAndJoin();
-        grid.catalogManager(txn)->shutDown(txn);
+        grid.catalogClient(txn)->shutDown(txn);
     }
 
     audit::logShutdown(ClientBasic::getCurrent());
@@ -314,8 +314,8 @@ static Status initializeSharding(OperationContext* txn) {
         return status;
     }
 
-    auto catalogManager = grid.catalogManager(txn);
-    status = catalogManager->initConfigVersion(txn);
+    auto catalogClient = grid.catalogClient(txn);
+    status = catalogClient->initConfigVersion(txn);
     if (!status.isOK()) {
         return status;
     }

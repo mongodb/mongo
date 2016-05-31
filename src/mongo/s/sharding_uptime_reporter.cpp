@@ -34,7 +34,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/server_options.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_mongos.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/exit.h"
@@ -87,7 +87,7 @@ void ShardingUptimeReporter::reportStatus(OperationContext* txn, bool isBalancer
     mType.setMongoVersion(versionString);
 
     try {
-        Grid::get(txn)->catalogManager(txn)->updateConfigDocument(
+        Grid::get(txn)->catalogClient(txn)->updateConfigDocument(
             txn,
             MongosType::ConfigNS,
             BSON(MongosType::name(getInstanceId())),

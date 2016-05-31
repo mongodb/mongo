@@ -83,8 +83,6 @@
 #include "mongo/rpc/legacy_request_builder.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/request_interface.h"
-#include "mongo/s/catalog/catalog_manager.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"  // for SendStaleConfigException
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/memory.h"

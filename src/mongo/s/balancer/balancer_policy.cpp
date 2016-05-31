@@ -36,7 +36,7 @@
 
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_manager.h"

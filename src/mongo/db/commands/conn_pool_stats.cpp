@@ -90,7 +90,7 @@ public:
         auto grid = Grid::get(txn);
         if (grid->shardRegistry()) {
             grid->getExecutorPool()->appendConnectionStats(&stats);
-            grid->catalogManager(txn)->appendConnectionStats(&stats);
+            grid->catalogClient(txn)->appendConnectionStats(&stats);
         }
 
         // Output to a BSON object.

@@ -35,7 +35,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -121,7 +121,7 @@ void ClusterStatisticsImpl::_refreshShardStats(OperationContext* txn) {
     // db.serverStatus() (mem.mapped) to all shards.
     //
     // TODO: skip unresponsive shards and mark information as stale.
-    auto shardsStatus = Grid::get(txn)->catalogManager(txn)->getAllShards(txn);
+    auto shardsStatus = Grid::get(txn)->catalogClient(txn)->getAllShards(txn);
     uassertStatusOK(shardsStatus.getStatus());
 
     const vector<ShardType> shards(std::move(shardsStatus.getValue().value));

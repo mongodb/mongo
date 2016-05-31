@@ -44,7 +44,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/catalog_cache.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/sharded_command_processing.h"
 #include "mongo/s/config.h"
@@ -151,7 +151,7 @@ public:
               << " to: " << toShard->toString();
 
         string whyMessage(str::stream() << "Moving primary shard of " << dbname);
-        auto scopedDistLock = grid.catalogManager(txn)->distLock(
+        auto scopedDistLock = grid.catalogClient(txn)->distLock(
             txn, dbname + "-movePrimary", whyMessage, DistLockManager::kSingleLockAttemptTimeout);
 
         if (!scopedDistLock.isOK()) {
@@ -165,8 +165,8 @@ public:
         BSONObj moveStartDetails =
             _buildMoveEntry(dbname, fromShard->toString(), toShard->toString(), shardedColls);
 
-        auto catalogManager = grid.catalogManager(txn);
-        catalogManager->logChange(txn, "movePrimary.start", dbname, moveStartDetails);
+        auto catalogClient = grid.catalogClient(txn);
+        catalogClient->logChange(txn, "movePrimary.start", dbname, moveStartDetails);
 
         BSONArrayBuilder barr;
         barr.append(shardedColls);
@@ -174,8 +174,7 @@ public:
         ScopedDbConnection toconn(toShard->getConnString());
 
         {
-            // Make sure the target node is sharding aware so that it can detect catalog manager
-            // swaps.
+            // Make sure the target node is sharding aware.
             auto ssvRequest = SetShardVersionRequest::makeForInitNoPersist(
                 grid.shardRegistry()->getConfigServerConnectionString(),
                 toShard->getId(),
@@ -290,7 +289,7 @@ public:
         BSONObj moveFinishDetails =
             _buildMoveEntry(dbname, oldPrimary, toShard->toString(), shardedColls);
 
-        catalogManager->logChange(txn, "movePrimary", dbname, moveFinishDetails);
+        catalogClient->logChange(txn, "movePrimary", dbname, moveFinishDetails);
         return true;
     }
 

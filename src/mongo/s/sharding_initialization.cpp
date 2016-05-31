@@ -48,9 +48,9 @@
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
-#include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/dist_lock_catalog_impl.h"
 #include "mongo/s/catalog/replset/replset_dist_lock_manager.h"
+#include "mongo/s/catalog/replset/sharding_catalog_client_impl.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/sharding_network_connection_hook.h"
@@ -77,9 +77,9 @@ std::unique_ptr<ThreadPoolTaskExecutor> makeTaskExecutor(std::unique_ptr<Network
         stdx::make_unique<NetworkInterfaceThreadPool>(netPtr), std::move(net));
 }
 
-std::unique_ptr<CatalogManager> makeCatalogManager(ServiceContext* service,
-                                                   ShardRegistry* shardRegistry,
-                                                   const HostAndPort& thisHost) {
+std::unique_ptr<ShardingCatalogClient> makeCatalogClient(ServiceContext* service,
+                                                         ShardRegistry* shardRegistry,
+                                                         const HostAndPort& thisHost) {
     std::unique_ptr<SecureRandom> rng(SecureRandom::create());
     std::string distLockProcessId = str::stream()
         << thisHost.toString() << ':'
@@ -94,7 +94,7 @@ std::unique_ptr<CatalogManager> makeCatalogManager(ServiceContext* service,
                                                   ReplSetDistLockManager::kDistLockPingInterval,
                                                   ReplSetDistLockManager::kDistLockExpirationTime);
 
-    return stdx::make_unique<CatalogManagerReplicaSet>(
+    return stdx::make_unique<ShardingCatalogClientImpl>(
         std::move(distLockManager),
         makeTaskExecutor(
             executor::makeNetworkInterface("NetworkInterfaceASIO-AddShard-TaskExecutor")));
@@ -145,13 +145,13 @@ Status initializeGlobalShardingState(const ConnectionString& configCS,
 
     auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS));
 
-    auto catalogManager = makeCatalogManager(getGlobalServiceContext(),
-                                             shardRegistry.get(),
-                                             HostAndPort(getHostName(), serverGlobalParams.port));
+    auto catalogClient = makeCatalogClient(getGlobalServiceContext(),
+                                           shardRegistry.get(),
+                                           HostAndPort(getHostName(), serverGlobalParams.port));
 
-    auto rawCatalogManager = catalogManager.get();
+    auto rawCatalogClient = catalogClient.get();
     grid.init(
-        std::move(catalogManager),
+        std::move(catalogClient),
         stdx::make_unique<CatalogCache>(),
         std::move(shardRegistry),
         stdx::make_unique<ClusterCursorManager>(getGlobalServiceContext()->getPreciseClockSource()),
@@ -159,7 +159,7 @@ Status initializeGlobalShardingState(const ConnectionString& configCS,
         std::move(executorPool),
         networkPtr);
 
-    auto status = rawCatalogManager->startup();
+    auto status = rawCatalogClient->startup();
     if (!status.isOK()) {
         return status;
     }

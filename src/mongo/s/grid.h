@@ -37,7 +37,7 @@ namespace mongo {
 
 class BalancerConfiguration;
 class CatalogCache;
-class CatalogManager;
+class ShardingCatalogClient;
 class ClusterCursorManager;
 class OperationContext;
 class ShardRegistry;
@@ -68,7 +68,7 @@ public:
      * NOTE: Unit-tests are allowed to call it more than once, provided they reset the object's
      *       state using clearForUnitTests.
      */
-    void init(std::unique_ptr<CatalogManager> catalogManager,
+    void init(std::unique_ptr<ShardingCatalogClient> catalogClient,
               std::unique_ptr<CatalogCache> catalogCache,
               std::unique_ptr<ShardRegistry> shardRegistry,
               std::unique_ptr<ClusterCursorManager> cursorManager,
@@ -91,11 +91,11 @@ public:
     void setAllowLocalHost(bool allow);
 
     /**
-     * Returns a pointer to a CatalogManager to use for accessing catalog data stored on the config
-     * servers.
+     * Returns a pointer to a ShardingCatalogClient to use for accessing catalog data stored on the
+     * config servers.
      */
-    CatalogManager* catalogManager(OperationContext* txn) {
-        return _catalogManager.get();
+    ShardingCatalogClient* catalogClient(OperationContext* txn) {
+        return _catalogClient.get();
     }
 
     CatalogCache* catalogCache() const {
@@ -148,7 +148,7 @@ public:
     void clearForUnitTests();
 
 private:
-    std::unique_ptr<CatalogManager> _catalogManager;
+    std::unique_ptr<ShardingCatalogClient> _catalogClient;
     std::unique_ptr<CatalogCache> _catalogCache;
     std::unique_ptr<ShardRegistry> _shardRegistry;
     std::unique_ptr<ClusterCursorManager> _cursorManager;

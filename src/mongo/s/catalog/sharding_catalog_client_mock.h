@@ -28,18 +28,18 @@
 
 #pragma once
 
-#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 
 namespace mongo {
 
 /**
- * A dummy implementation of CatalogManager for testing purposes.
+ * A dummy implementation of ShardingCatalogClient for testing purposes.
  */
-class CatalogManagerMock : public CatalogManager {
+class ShardingCatalogClientMock : public ShardingCatalogClient {
 public:
-    CatalogManagerMock();
-    ~CatalogManagerMock();
+    ShardingCatalogClientMock();
+    ~ShardingCatalogClientMock();
 
     Status startup() override;
 

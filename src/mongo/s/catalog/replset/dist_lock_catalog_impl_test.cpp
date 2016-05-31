@@ -46,8 +46,8 @@
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
-#include "mongo/s/catalog/catalog_manager_mock.h"
 #include "mongo/s/catalog/replset/dist_lock_catalog_impl.h"
+#include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/client/shard_factory.h"
@@ -160,7 +160,7 @@ private:
 
         _distLockCatalog = stdx::make_unique<DistLockCatalogImpl>(shardRegistry.get());
 
-        grid.init(stdx::make_unique<CatalogManagerMock>(),
+        grid.init(stdx::make_unique<ShardingCatalogClientMock>(),
                   stdx::make_unique<CatalogCache>(),
                   std::move(shardRegistry),
                   std::unique_ptr<ClusterCursorManager>{nullptr},
@@ -180,7 +180,7 @@ private:
 
     std::unique_ptr<executor::NetworkTestEnv> _networkTestEnv;
 
-    CatalogManagerMock _catalogMgr;
+    ShardingCatalogClientMock _catalogMgr;
 
     std::unique_ptr<DistLockCatalogImpl> _distLockCatalog;
     OperationContextNoop _txn;

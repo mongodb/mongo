@@ -77,7 +77,7 @@ protected:
         auto future = launchAsync([this] {
             MetadataLoader loader;
             auto status = loader.makeCollectionMetadata(operationContext(),
-                                                        catalogManager(),
+                                                        catalogClient(),
                                                         "test.foo",
                                                         "shard0000",
                                                         NULL, /* no old metadata */
@@ -345,7 +345,7 @@ protected:
         auto future = launchAsync([this] {
             MetadataLoader loader;
             auto status = loader.makeCollectionMetadata(operationContext(),
-                                                        catalogManager(),
+                                                        catalogClient(),
                                                         "test.foo",
                                                         "shard0000",
                                                         NULL, /* no old metadata */
@@ -601,7 +601,7 @@ protected:
         auto future = launchAsync([this] {
             MetadataLoader loader;
             auto status = loader.makeCollectionMetadata(operationContext(),
-                                                        catalogManager(),
+                                                        catalogClient(),
                                                         "test.foo",
                                                         "shard0000",
                                                         NULL, /* no old metadata */
@@ -677,7 +677,7 @@ protected:
         auto future = launchAsync([this] {
             MetadataLoader loader;
             auto status = loader.makeCollectionMetadata(operationContext(),
-                                                        catalogManager(),
+                                                        catalogClient(),
                                                         "test.foo",
                                                         "shard0000",
                                                         NULL, /* no old metadata */
@@ -891,7 +891,7 @@ protected:
         auto future = launchAsync([this] {
             MetadataLoader loader;
             auto status = loader.makeCollectionMetadata(operationContext(),
-                                                        catalogManager(),
+                                                        catalogClient(),
                                                         "test.foo",
                                                         "shard0000",
                                                         NULL, /* no old metadata */

@@ -32,7 +32,7 @@
 
 
 #include "mongo/base/status_with.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
@@ -55,7 +55,7 @@ StatusWith<shared_ptr<DBConfig>> CatalogCache::getDatabase(OperationContext* txn
     }
 
     // Need to load from the store
-    auto status = grid.catalogManager(txn)->getDatabase(txn, dbName);
+    auto status = grid.catalogClient(txn)->getDatabase(txn, dbName);
     if (!status.isOK()) {
         return status.getStatus();
     }

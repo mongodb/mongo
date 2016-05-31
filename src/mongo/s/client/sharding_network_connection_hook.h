@@ -34,8 +34,8 @@ namespace mongo {
 
 /**
  * An implementation of NetworkConnectionHook for handling sharding-specific operations such
- * as sending sharding initialization information to shards and indicating up the call stack that
- * swapping the active catalog manager is needed during upgrade to CSRS.
+ * as sending sharding initialization information to shards and maintaining this process' notion of
+ * the config server optime.
  */
 class ShardingNetworkConnectionHook final : public executor::NetworkConnectionHook {
 public:
@@ -43,9 +43,8 @@ public:
     virtual ~ShardingNetworkConnectionHook() = default;
 
     /**
-     * Looks for the presence of a configsvr field in the ismaster response.  If no such field
-     * exits, does nothing and returns Status::OK().  If the field is present, asks the grid
-     * whether swapping catalog managers is needed and returns its response.
+     * Checks that the given host is valid to be used in this sharded cluster, based on its
+     * isMaster response.
      */
     Status validateHost(const HostAndPort& remoteHost,
                         const executor::RemoteCommandResponse& isMasterReply) override;

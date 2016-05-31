@@ -46,7 +46,7 @@
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/balancer/cluster_statistics_impl.h"
 #include "mongo/s/catalog/catalog_cache.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
@@ -220,7 +220,7 @@ Status executeSingleMigration(OperationContext* txn,
         // Send the first moveChunk command with the balancer holding the distlock.
         {
             StatusWith<DistLockManager::ScopedDistLock> distLockStatus =
-                grid.catalogManager(txn)->distLock(txn, nss.ns(), whyMessage);
+                Grid::get(txn)->catalogClient(txn)->distLock(txn, nss.ns(), whyMessage);
             if (!distLockStatus.isOK()) {
                 const std::string msg = str::stream()
                     << "Could not acquire collection lock for " << nss.ns() << " to migrate chunk ["
@@ -413,7 +413,7 @@ void Balancer::_mainThread() {
             uassert(13258, "oids broken after resetting!", _checkOIDs(txn.get()));
 
             {
-                auto scopedDistLock = shardingContext->catalogManager(txn.get())->distLock(
+                auto scopedDistLock = shardingContext->catalogClient(txn.get())->distLock(
                     txn.get(),
                     "balancer",
                     "doing balance round",
@@ -459,7 +459,7 @@ void Balancer::_mainThread() {
                     roundDetails.setSucceeded(static_cast<int>(candidateChunks.size()),
                                               _balancedLastTime);
 
-                    shardingContext->catalogManager(txn.get())->logAction(
+                    shardingContext->catalogClient(txn.get())->logAction(
                         txn.get(), "balancer.round", "", roundDetails.toBSON());
                 }
 
@@ -479,7 +479,7 @@ void Balancer::_mainThread() {
             // This round failed, tell the world!
             roundDetails.setFailed(e.what());
 
-            shardingContext->catalogManager(txn.get())->logAction(
+            shardingContext->catalogClient(txn.get())->logAction(
                 txn.get(), "balancer.round", "", roundDetails.toBSON());
 
             // Sleep a fair amount before retrying because of the error

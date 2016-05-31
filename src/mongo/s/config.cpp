@@ -39,7 +39,7 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
@@ -125,7 +125,7 @@ void CollectionInfo::save(OperationContext* txn, const string& ns) {
         coll.setUpdatedAt(Date_t::now());
     }
 
-    uassertStatusOK(grid.catalogManager(txn)->updateCollection(txn, ns, coll));
+    uassertStatusOK(grid.catalogClient(txn)->updateCollection(txn, ns, coll));
     _dirty = false;
 }
 
@@ -311,12 +311,12 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
     vector<ChunkType> newestChunk;
     if (oldVersion.isSet() && !forceReload) {
         uassertStatusOK(
-            grid.catalogManager(txn)->getChunks(txn,
-                                                BSON(ChunkType::ns(ns)),
-                                                BSON(ChunkType::DEPRECATED_lastmod() << -1),
-                                                1,
-                                                &newestChunk,
-                                                nullptr));
+            grid.catalogClient(txn)->getChunks(txn,
+                                               BSON(ChunkType::ns(ns)),
+                                               BSON(ChunkType::DEPRECATED_lastmod() << -1),
+                                               1,
+                                               &newestChunk,
+                                               nullptr));
 
         if (!newestChunk.empty()) {
             invariant(newestChunk.size() == 1);
@@ -442,7 +442,7 @@ bool DBConfig::_loadIfNeeded(OperationContext* txn, Counter reloadIteration) {
         return true;
     }
 
-    auto status = grid.catalogManager(txn)->getDatabase(txn, _name);
+    auto status = grid.catalogClient(txn)->getDatabase(txn, _name);
     if (status == ErrorCodes::NamespaceNotFound) {
         return false;
     }
@@ -462,7 +462,7 @@ bool DBConfig::_loadIfNeeded(OperationContext* txn, Counter reloadIteration) {
     // Load all collections
     vector<CollectionType> collections;
     repl::OpTime configOpTimeWhenLoadingColl;
-    uassertStatusOK(grid.catalogManager(txn)->getCollections(
+    uassertStatusOK(grid.catalogClient(txn)->getCollections(
         txn, &_name, &collections, &configOpTimeWhenLoadingColl));
 
     int numCollsErased = 0;
@@ -501,7 +501,7 @@ void DBConfig::_save(OperationContext* txn, bool db, bool coll) {
         dbt.setPrimary(_primaryId);
         dbt.setSharded(_shardingEnabled);
 
-        uassertStatusOK(grid.catalogManager(txn)->updateDatabase(txn, _name, dbt));
+        uassertStatusOK(grid.catalogClient(txn)->updateDatabase(txn, _name, dbt));
     }
 
     if (coll) {
@@ -542,12 +542,12 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
      */
 
     log() << "DBConfig::dropDatabase: " << _name;
-    grid.catalogManager(txn)->logChange(txn, "dropDatabase.start", _name, BSONObj());
+    grid.catalogClient(txn)->logChange(txn, "dropDatabase.start", _name, BSONObj());
 
     // 1
     grid.catalogCache()->invalidate(_name);
 
-    Status result = grid.catalogManager(txn)->removeConfigDocuments(
+    Status result = grid.catalogClient(txn)->removeConfigDocuments(
         txn, DatabaseType::ConfigNS, BSON(DatabaseType::name(_name)));
     if (!result.isOK()) {
         errmsg = result.reason();
@@ -617,7 +617,7 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
 
     LOG(1) << "\t dropped primary db for: " << _name;
 
-    grid.catalogManager(txn)->logChange(txn, "dropDatabase", _name, BSONObj());
+    grid.catalogClient(txn)->logChange(txn, "dropDatabase", _name, BSONObj());
 
     return true;
 }
@@ -650,7 +650,7 @@ bool DBConfig::_dropShardedCollections(OperationContext* txn,
 
         i->second.getCM()->getAllShardIds(&shardIds);
 
-        uassertStatusOK(grid.catalogManager(txn)->dropCollection(txn, NamespaceString(i->first)));
+        uassertStatusOK(grid.catalogClient(txn)->dropCollection(txn, NamespaceString(i->first)));
 
         // We should warn, but it's not a fatal error if someone else reloaded the db/coll as
         // unsharded in the meantime
@@ -721,7 +721,7 @@ void ConfigServer::replicaSetChangeConfigServerUpdateHook(const string& setName,
             return;
         }
 
-        auto status = grid.catalogManager(txn.get())->updateConfigDocument(
+        auto status = grid.catalogClient(txn.get())->updateConfigDocument(
             txn.get(),
             ShardType::ConfigNS,
             BSON(ShardType::name(s->getId())),

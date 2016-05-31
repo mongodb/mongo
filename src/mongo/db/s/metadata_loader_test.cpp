@@ -115,7 +115,7 @@ protected:
 
         auto future = launchAsync([this, ns, shardName, metadata] {
             auto status = loader().makeCollectionMetadata(operationContext(),
-                                                          catalogManager(),
+                                                          catalogClient(),
                                                           ns,
                                                           shardName,
                                                           NULL, /* no old metadata */
@@ -160,7 +160,7 @@ TEST_F(MetadataLoaderFixture, DroppedColl) {
         MetadataLoader loader;
         CollectionMetadata metadata;
         auto status = loader.makeCollectionMetadata(operationContext(),
-                                                    catalogManager(),
+                                                    catalogClient(),
                                                     "test.foo",
                                                     "shard0000",
                                                     NULL, /* no old metadata */
@@ -176,7 +176,7 @@ TEST_F(MetadataLoaderFixture, EmptyColl) {
         MetadataLoader loader;
         CollectionMetadata metadata;
         auto status = loader.makeCollectionMetadata(operationContext(),
-                                                    catalogManager(),
+                                                    catalogClient(),
                                                     "test.foo",
                                                     "shard0000",
                                                     NULL, /* no old metadata */
@@ -193,7 +193,7 @@ TEST_F(MetadataLoaderFixture, BadColl) {
         MetadataLoader loader;
         CollectionMetadata metadata;
         auto status = loader.makeCollectionMetadata(operationContext(),
-                                                    catalogManager(),
+                                                    catalogClient(),
                                                     "test.foo",
                                                     "shard0000",
                                                     NULL, /* no old metadata */
@@ -221,7 +221,7 @@ TEST_F(MetadataLoaderFixture, BadChunk) {
         MetadataLoader loader;
         CollectionMetadata metadata;
         auto status = loader.makeCollectionMetadata(operationContext(),
-                                                    catalogManager(),
+                                                    catalogClient(),
                                                     "test.foo",
                                                     "shard0000",
                                                     NULL, /* no old metadata */
@@ -248,7 +248,7 @@ TEST_F(MetadataLoaderFixture, NoChunksIsDropped) {
         MetadataLoader loader;
         CollectionMetadata metadata;
         auto status = loader.makeCollectionMetadata(operationContext(),
-                                                    catalogManager(),
+                                                    catalogClient(),
                                                     "test.foo",
                                                     "shard0000",
                                                     NULL, /* no old metadata */
@@ -286,7 +286,7 @@ TEST_F(MetadataLoaderFixture, CheckNumChunk) {
         MetadataLoader loader;
         CollectionMetadata metadata;
         auto status = loader.makeCollectionMetadata(operationContext(),
-                                                    catalogManager(),
+                                                    catalogClient(),
                                                     "test.foo",
                                                     "shard0000",
                                                     NULL, /* no old metadata */
@@ -311,7 +311,7 @@ TEST_F(MetadataLoaderFixture, SingleChunkCheckNumChunk) {
         MetadataLoader loader;
         CollectionMetadata metadata;
         auto status = loader.makeCollectionMetadata(operationContext(),
-                                                    catalogManager(),
+                                                    catalogClient(),
                                                     "test.foo",
                                                     "shard0000",
                                                     NULL, /* no old metadata */
@@ -331,7 +331,7 @@ TEST_F(MetadataLoaderFixture, SingleChunkGetNext) {
         MetadataLoader loader;
         CollectionMetadata metadata;
         auto status = loader.makeCollectionMetadata(operationContext(),
-                                                    catalogManager(),
+                                                    catalogClient(),
                                                     "test.foo",
                                                     "shard0000",
                                                     NULL, /* no old metadata */
@@ -351,7 +351,7 @@ TEST_F(MetadataLoaderFixture, SingleChunkGetShardKey) {
         MetadataLoader loader;
         CollectionMetadata metadata;
         auto status = loader.makeCollectionMetadata(operationContext(),
-                                                    catalogManager(),
+                                                    catalogClient(),
                                                     "test.foo",
                                                     "shard0000",
                                                     NULL, /* no old metadata */
@@ -371,7 +371,7 @@ TEST_F(MetadataLoaderFixture, SingleChunkGetMaxCollVersion) {
         MetadataLoader loader;
         CollectionMetadata metadata;
         auto status = loader.makeCollectionMetadata(operationContext(),
-                                                    catalogManager(),
+                                                    catalogClient(),
                                                     "test.foo",
                                                     "shard0000",
                                                     NULL, /* no old metadata */
@@ -389,7 +389,7 @@ TEST_F(MetadataLoaderFixture, SingleChunkGetMaxShardVersion) {
         MetadataLoader loader;
         CollectionMetadata metadata;
         auto status = loader.makeCollectionMetadata(operationContext(),
-                                                    catalogManager(),
+                                                    catalogClient(),
                                                     "test.foo",
                                                     "shard0000",
                                                     NULL, /* no old metadata */
@@ -407,7 +407,7 @@ TEST_F(MetadataLoaderFixture, NoChunks) {
         MetadataLoader loader;
         CollectionMetadata metadata;
         auto status = loader.makeCollectionMetadata(operationContext(),
-                                                    catalogManager(),
+                                                    catalogClient(),
                                                     "test.foo",
                                                     "shard0000",
                                                     NULL, /* no old metadata */

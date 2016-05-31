@@ -45,7 +45,7 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/catalog_cache.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
@@ -561,7 +561,7 @@ public:
             return passthrough(txn, db.get(), cmdObj, result);
         }
 
-        uassertStatusOK(grid.catalogManager(txn)->dropCollection(txn, fullns));
+        uassertStatusOK(grid.catalogClient(txn)->dropCollection(txn, fullns));
 
         // Force a full reload next time the just dropped namespace is accessed
         db->invalidateNs(fullns.ns());

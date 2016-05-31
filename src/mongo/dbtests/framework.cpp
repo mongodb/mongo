@@ -43,8 +43,6 @@
 #include "mongo/db/service_context_d.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework_options.h"
-#include "mongo/s/catalog/catalog_manager.h"
-#include "mongo/s/grid.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"

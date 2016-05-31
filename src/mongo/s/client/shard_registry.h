@@ -105,7 +105,7 @@ public:
 
 private:
     /**
-     * Reads shards docs from the catalog manager and fills in maps.
+     * Reads shards docs from the catalog client and fills in maps.
      */
     void _init(OperationContext* txn, ShardFactory* factory);
 

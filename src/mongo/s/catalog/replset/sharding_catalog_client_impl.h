@@ -30,7 +30,7 @@
 
 #include "mongo/client/connection_string.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/stdx/mutex.h"
 
@@ -45,13 +45,13 @@ class TaskExecutor;
 }  // namespace executor
 
 /**
- * Implements the catalog manager for talking to replica set config servers.
+ * Implements the catalog client for reading from replica set config servers.
  */
-class CatalogManagerReplicaSet final : public CatalogManager {
+class ShardingCatalogClientImpl final : public ShardingCatalogClient {
 public:
-    CatalogManagerReplicaSet(std::unique_ptr<DistLockManager> distLockManager,
-                             std::unique_ptr<executor::TaskExecutor> addShardExecutor);
-    virtual ~CatalogManagerReplicaSet();
+    ShardingCatalogClientImpl(std::unique_ptr<DistLockManager> distLockManager,
+                              std::unique_ptr<executor::TaskExecutor> addShardExecutor);
+    virtual ~ShardingCatalogClientImpl();
 
     /**
      * Safe to call multiple times as long as the calls are externally synchronized to be

@@ -47,7 +47,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_diff.h"
@@ -262,7 +262,7 @@ bool ChunkManager::_load(OperationContext* txn,
 
     repl::OpTime opTime;
     std::vector<ChunkType> chunks;
-    uassertStatusOK(grid.catalogManager(txn)->getChunks(
+    uassertStatusOK(grid.catalogClient(txn)->getChunks(
         txn, diffQuery.query, diffQuery.sort, boost::none, &chunks, &opTime));
 
     invariant(opTime >= _configOpTime);
@@ -427,8 +427,8 @@ Status ChunkManager::createFirstChunks(OperationContext* txn,
         chunk.setShard(shardIds[i % shardIds.size()]);
         chunk.setVersion(version);
 
-        Status status = grid.catalogManager(txn)->insertConfigDocument(
-            txn, ChunkType::ConfigNS, chunk.toBSON());
+        Status status =
+            grid.catalogClient(txn)->insertConfigDocument(txn, ChunkType::ConfigNS, chunk.toBSON());
         if (!status.isOK()) {
             const string errMsg = str::stream() << "Creating first chunks failed: "
                                                 << status.reason();

@@ -29,7 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 

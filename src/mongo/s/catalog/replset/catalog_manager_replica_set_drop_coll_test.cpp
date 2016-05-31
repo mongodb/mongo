@@ -36,8 +36,8 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
-#include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
+#include "mongo/s/catalog/replset/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_version.h"
@@ -174,7 +174,7 @@ private:
 
 TEST_F(DropColl2ShardTest, Basic) {
     auto future = launchAsync([this] {
-        auto status = catalogManager()->dropCollection(operationContext(), dropNS());
+        auto status = catalogClient()->dropCollection(operationContext(), dropNS());
         ASSERT_OK(status);
     });
 
@@ -203,7 +203,7 @@ TEST_F(DropColl2ShardTest, Basic) {
 
 TEST_F(DropColl2ShardTest, NSNotFound) {
     auto future = launchAsync([this] {
-        auto status = catalogManager()->dropCollection(operationContext(), dropNS());
+        auto status = catalogClient()->dropCollection(operationContext(), dropNS());
         ASSERT_OK(status);
     });
 
@@ -255,7 +255,7 @@ TEST_F(DropColl2ShardTest, ConfigTargeterError) {
     configTargeter()->setFindHostReturnValue({ErrorCodes::HostUnreachable, "bad test network"});
 
     auto future = launchAsync([this] {
-        auto status = catalogManager()->dropCollection(operationContext(), dropNS());
+        auto status = catalogClient()->dropCollection(operationContext(), dropNS());
         ASSERT_EQ(ErrorCodes::HostUnreachable, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -268,7 +268,7 @@ TEST_F(DropColl2ShardTest, DistLockBusy) {
                            {ErrorCodes::LockBusy, "test lock taken"});
 
     auto future = launchAsync([this] {
-        auto status = catalogManager()->dropCollection(operationContext(), dropNS());
+        auto status = catalogClient()->dropCollection(operationContext(), dropNS());
         ASSERT_EQ(ErrorCodes::LockBusy, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -288,7 +288,7 @@ TEST_F(DropColl2ShardTest, FirstShardTargeterError) {
     shard1Targeter->setFindHostReturnValue({ErrorCodes::HostUnreachable, "bad test network"});
 
     auto future = launchAsync([this] {
-        auto status = catalogManager()->dropCollection(operationContext(), dropNS());
+        auto status = catalogClient()->dropCollection(operationContext(), dropNS());
         ASSERT_EQ(ErrorCodes::HostUnreachable, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -304,7 +304,7 @@ TEST_F(DropColl2ShardTest, FirstShardTargeterError) {
 
 TEST_F(DropColl2ShardTest, FirstShardDropError) {
     auto future = launchAsync([this] {
-        auto status = catalogManager()->dropCollection(operationContext(), dropNS());
+        auto status = catalogClient()->dropCollection(operationContext(), dropNS());
         ASSERT_EQ(ErrorCodes::CallbackCanceled, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -325,7 +325,7 @@ TEST_F(DropColl2ShardTest, FirstShardDropError) {
 
 TEST_F(DropColl2ShardTest, FirstShardDropCmdError) {
     auto future = launchAsync([this] {
-        auto status = catalogManager()->dropCollection(operationContext(), dropNS());
+        auto status = catalogClient()->dropCollection(operationContext(), dropNS());
         ASSERT_EQ(ErrorCodes::OperationFailed, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -352,7 +352,7 @@ TEST_F(DropColl2ShardTest, SecondShardTargeterError) {
     shard2Targeter->setFindHostReturnValue({ErrorCodes::HostUnreachable, "bad test network"});
 
     auto future = launchAsync([this] {
-        auto status = catalogManager()->dropCollection(operationContext(), dropNS());
+        auto status = catalogClient()->dropCollection(operationContext(), dropNS());
         ASSERT_EQ(ErrorCodes::HostUnreachable, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -370,7 +370,7 @@ TEST_F(DropColl2ShardTest, SecondShardTargeterError) {
 
 TEST_F(DropColl2ShardTest, SecondShardDropError) {
     auto future = launchAsync([this] {
-        auto status = catalogManager()->dropCollection(operationContext(), dropNS());
+        auto status = catalogClient()->dropCollection(operationContext(), dropNS());
         ASSERT_EQ(ErrorCodes::CallbackCanceled, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -393,7 +393,7 @@ TEST_F(DropColl2ShardTest, SecondShardDropError) {
 
 TEST_F(DropColl2ShardTest, SecondShardDropCmdError) {
     auto future = launchAsync([this] {
-        auto status = catalogManager()->dropCollection(operationContext(), dropNS());
+        auto status = catalogClient()->dropCollection(operationContext(), dropNS());
         ASSERT_EQ(ErrorCodes::OperationFailed, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -415,7 +415,7 @@ TEST_F(DropColl2ShardTest, SecondShardDropCmdError) {
 
 TEST_F(DropColl2ShardTest, CleanupChunkError) {
     auto future = launchAsync([this] {
-        auto status = catalogManager()->dropCollection(operationContext(), dropNS());
+        auto status = catalogClient()->dropCollection(operationContext(), dropNS());
         ASSERT_EQ(ErrorCodes::Unauthorized, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -439,7 +439,7 @@ TEST_F(DropColl2ShardTest, CleanupChunkError) {
 
 TEST_F(DropColl2ShardTest, SSVCmdErrorOnShard1) {
     auto future = launchAsync([this] {
-        auto status = catalogManager()->dropCollection(operationContext(), dropNS());
+        auto status = catalogClient()->dropCollection(operationContext(), dropNS());
         ASSERT_EQ(ErrorCodes::Unauthorized, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -465,7 +465,7 @@ TEST_F(DropColl2ShardTest, SSVCmdErrorOnShard1) {
 
 TEST_F(DropColl2ShardTest, SSVErrorOnShard1) {
     auto future = launchAsync([this] {
-        auto status = catalogManager()->dropCollection(operationContext(), dropNS());
+        auto status = catalogClient()->dropCollection(operationContext(), dropNS());
         ASSERT_EQ(ErrorCodes::CallbackCanceled, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -491,7 +491,7 @@ TEST_F(DropColl2ShardTest, SSVErrorOnShard1) {
 
 TEST_F(DropColl2ShardTest, UnsetCmdErrorOnShard1) {
     auto future = launchAsync([this] {
-        auto status = catalogManager()->dropCollection(operationContext(), dropNS());
+        auto status = catalogClient()->dropCollection(operationContext(), dropNS());
         ASSERT_EQ(ErrorCodes::Unauthorized, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -519,7 +519,7 @@ TEST_F(DropColl2ShardTest, UnsetCmdErrorOnShard1) {
 
 TEST_F(DropColl2ShardTest, UnsetErrorOnShard1) {
     auto future = launchAsync([this] {
-        auto status = catalogManager()->dropCollection(operationContext(), dropNS());
+        auto status = catalogClient()->dropCollection(operationContext(), dropNS());
         ASSERT_EQ(ErrorCodes::CallbackCanceled, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -547,7 +547,7 @@ TEST_F(DropColl2ShardTest, UnsetErrorOnShard1) {
 
 TEST_F(DropColl2ShardTest, SSVCmdErrorOnShard2) {
     auto future = launchAsync([this] {
-        auto status = catalogManager()->dropCollection(operationContext(), dropNS());
+        auto status = catalogClient()->dropCollection(operationContext(), dropNS());
         ASSERT_EQ(ErrorCodes::Unauthorized, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -576,7 +576,7 @@ TEST_F(DropColl2ShardTest, SSVCmdErrorOnShard2) {
 
 TEST_F(DropColl2ShardTest, SSVErrorOnShard2) {
     auto future = launchAsync([this] {
-        auto status = catalogManager()->dropCollection(operationContext(), dropNS());
+        auto status = catalogClient()->dropCollection(operationContext(), dropNS());
         ASSERT_EQ(ErrorCodes::CallbackCanceled, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -605,7 +605,7 @@ TEST_F(DropColl2ShardTest, SSVErrorOnShard2) {
 
 TEST_F(DropColl2ShardTest, UnsetCmdErrorOnShard2) {
     auto future = launchAsync([this] {
-        auto status = catalogManager()->dropCollection(operationContext(), dropNS());
+        auto status = catalogClient()->dropCollection(operationContext(), dropNS());
         ASSERT_EQ(ErrorCodes::Unauthorized, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -636,7 +636,7 @@ TEST_F(DropColl2ShardTest, UnsetCmdErrorOnShard2) {
 
 TEST_F(DropColl2ShardTest, UnsetErrorOnShard2) {
     auto future = launchAsync([this] {
-        auto status = catalogManager()->dropCollection(operationContext(), dropNS());
+        auto status = catalogClient()->dropCollection(operationContext(), dropNS());
         ASSERT_EQ(ErrorCodes::CallbackCanceled, status.code());
         ASSERT_FALSE(status.reason().empty());
     });

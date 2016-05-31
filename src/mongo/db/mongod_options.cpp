@@ -47,7 +47,7 @@
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/logger/console_appender.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_options.h"

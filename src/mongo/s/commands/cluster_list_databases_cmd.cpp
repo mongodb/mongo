@@ -35,7 +35,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/commands.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -163,8 +163,8 @@ public:
         }
 
         // Get information for config and admin dbs from the config servers.
-        auto catalogManager = grid.catalogManager(txn);
-        auto appendStatus = catalogManager->appendInfoForConfigServerDatabases(txn, &dbListBuilder);
+        auto catalogClient = grid.catalogClient(txn);
+        auto appendStatus = catalogClient->appendInfoForConfigServerDatabases(txn, &dbListBuilder);
         if (!appendStatus.isOK()) {
             return Command::appendCommandStatus(result, appendStatus);
         }

@@ -39,7 +39,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/client/dbclient_multi_command.h"
@@ -253,7 +253,7 @@ void ClusterWriter::write(OperationContext* txn,
             request = requestWithWriteConcern.get();
         }
 
-        grid.catalogManager(txn)->writeConfigServerDirect(txn, *request, response);
+        grid.catalogClient(txn)->writeConfigServerDirect(txn, *request, response);
     } else {
         TargeterStats targeterStats;
 

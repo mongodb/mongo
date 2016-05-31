@@ -156,8 +156,6 @@ public:
 
     /**
      * Makes a best-effort attempt to unlock all locks owned by the given processID.
-     * Only implemented for the ReplSetDistLockManager and only used after catalog manager swap
-     * during upgrade to CSRS.
      */
     virtual void unlockAll(OperationContext* txn, const std::string& processID) = 0;
 

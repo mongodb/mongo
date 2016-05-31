@@ -82,7 +82,7 @@ MoveTimingHelper::~MoveTimingHelper() {
             _b.append("errmsg", *_cmdErrmsg);
         }
 
-        grid.catalogManager(_txn)->logChange(
+        grid.catalogClient(_txn)->logChange(
             _txn, str::stream() << "moveChunk." << _where, _ns, _b.obj());
     } catch (const std::exception& e) {
         warning() << "couldn't record timing for moveChunk '" << _where << "': " << e.what();

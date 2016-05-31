@@ -52,7 +52,7 @@
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
@@ -211,7 +211,7 @@ void ShardingState::shutDown(OperationContext* txn) {
 
     if (_getInitializationState() == InitializationState::kInitialized) {
         grid.getExecutorPool()->shutdownAndJoin();
-        grid.catalogManager(txn)->shutDown(txn);
+        grid.catalogClient(txn)->shutDown(txn);
     }
 }
 
@@ -698,7 +698,7 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
 
     {
         Status status = mdLoader.makeCollectionMetadata(txn,
-                                                        grid.catalogManager(txn),
+                                                        grid.catalogClient(txn),
                                                         ns,
                                                         getShardName(),
                                                         fullReload ? nullptr : beforeMetadata.get(),

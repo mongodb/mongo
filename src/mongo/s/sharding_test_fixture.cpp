@@ -50,7 +50,7 @@
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
-#include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
+#include "mongo/s/catalog/replset/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -121,13 +121,14 @@ void ShardingTestFixture::setUp() {
 
     auto uniqueDistLockManager = stdx::make_unique<DistLockManagerMock>();
     _distLockManager = uniqueDistLockManager.get();
-    std::unique_ptr<CatalogManagerReplicaSet> cm(stdx::make_unique<CatalogManagerReplicaSet>(
-        std::move(uniqueDistLockManager), std::move(specialExec)));
-    _catalogManagerRS = cm.get();
-    cm->startup();
+    std::unique_ptr<ShardingCatalogClientImpl> catalogClient(
+        stdx::make_unique<ShardingCatalogClientImpl>(std::move(uniqueDistLockManager),
+                                                     std::move(specialExec)));
+    _catalogClient = catalogClient.get();
+    catalogClient->startup();
 
     ConnectionString configCS = ConnectionString::forReplicaSet(
-        "CatalogManagerReplSetTest", {HostAndPort{"TestHost1"}, HostAndPort{"TestHost2"}});
+        "configRS", {HostAndPort{"TestHost1"}, HostAndPort{"TestHost2"}});
 
     auto targeterFactory(stdx::make_unique<RemoteCommandTargeterFactoryMock>());
     auto targeterFactoryPtr = targeterFactory.get();
@@ -169,7 +170,7 @@ void ShardingTestFixture::setUp() {
 
     // For now initialize the global grid object. All sharding objects will be accessible from there
     // until we get rid of it.
-    grid.init(std::move(cm),
+    grid.init(std::move(catalogClient),
               stdx::make_unique<CatalogCache>(),
               std::move(shardRegistry),
               stdx::make_unique<ClusterCursorManager>(_service->getPreciseClockSource()),
@@ -180,7 +181,7 @@ void ShardingTestFixture::setUp() {
 
 void ShardingTestFixture::tearDown() {
     grid.getExecutorPool()->shutdownAndJoin();
-    grid.catalogManager(_opCtx.get())->shutDown(_opCtx.get());
+    grid.catalogClient(_opCtx.get())->shutDown(_opCtx.get());
     grid.clearForUnitTests();
 
     _opCtx.reset();
@@ -195,12 +196,12 @@ void ShardingTestFixture::shutdownExecutor() {
     }
 }
 
-CatalogManager* ShardingTestFixture::catalogManager() const {
-    return grid.catalogManager(_opCtx.get());
+ShardingCatalogClient* ShardingTestFixture::catalogClient() const {
+    return grid.catalogClient(_opCtx.get());
 }
 
-CatalogManagerReplicaSet* ShardingTestFixture::getCatalogManagerReplicaSet() const {
-    return _catalogManagerRS;
+ShardingCatalogClientImpl* ShardingTestFixture::getCatalogClient() const {
+    return _catalogClient;
 }
 
 ShardRegistry* ShardingTestFixture::shardRegistry() const {

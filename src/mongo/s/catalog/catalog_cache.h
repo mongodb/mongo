@@ -37,7 +37,7 @@
 
 namespace mongo {
 
-class CatalogManager;
+class ShardingCatalogClient;
 class DBConfig;
 class OperationContext;
 template <typename T>
@@ -47,7 +47,7 @@ class StatusWith;
 /**
  * This is the root of the "read-only" hierarchy of cached catalog metadata. It is read only
  * in the sense that it only reads from the persistent store, but never writes to it. Instead
- * writes happen thorugh the CatalogManager and the cache hierarchy needs to be invalidated.
+ * writes happen through the ShardingCatalogManager and the cache hierarchy needs to be invalidated.
  */
 class CatalogCache {
     MONGO_DISALLOW_COPYING(CatalogCache);

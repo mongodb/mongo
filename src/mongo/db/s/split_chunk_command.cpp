@@ -222,7 +222,7 @@ public:
         const string whyMessage(str::stream() << "splitting chunk [" << min << ", " << max
                                               << ") in "
                                               << nss.toString());
-        auto scopedDistLock = grid.catalogManager(txn)->distLock(
+        auto scopedDistLock = grid.catalogClient(txn)->distLock(
             txn, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
         if (!scopedDistLock.isOK()) {
             errmsg = str::stream() << "could not acquire collection lock for " << nss.toString()
@@ -401,7 +401,7 @@ public:
         // 4. apply the batch of updates to remote and local metadata
         //
 
-        Status applyOpsStatus = grid.catalogManager(txn)->applyChunkOpsDeprecated(
+        Status applyOpsStatus = grid.catalogClient(txn)->applyChunkOpsDeprecated(
             txn, updates.arr(), preCond.arr(), nss.ns(), nextChunkVersion);
         if (!applyOpsStatus.isOK()) {
             return appendCommandStatus(result, applyOpsStatus);
@@ -441,7 +441,7 @@ public:
             appendShortVersion(logDetail.subobjStart("left"), *newChunks[0]);
             appendShortVersion(logDetail.subobjStart("right"), *newChunks[1]);
 
-            grid.catalogManager(txn)->logChange(txn, "split", nss.ns(), logDetail.obj());
+            grid.catalogClient(txn)->logChange(txn, "split", nss.ns(), logDetail.obj());
         } else {
             BSONObj beforeDetailObj = logDetail.obj();
             BSONObj firstDetailObj = beforeDetailObj.getOwned();
@@ -454,8 +454,7 @@ public:
                 chunkDetail.append("of", newChunksSize);
                 appendShortVersion(chunkDetail.subobjStart("chunk"), *newChunks[i]);
 
-                grid.catalogManager(txn)->logChange(
-                    txn, "multi-split", nss.ns(), chunkDetail.obj());
+                grid.catalogClient(txn)->logChange(txn, "multi-split", nss.ns(), chunkDetail.obj());
             }
         }
 

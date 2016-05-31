@@ -38,8 +38,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/replica_set_monitor.h"
-#include "mongo/s/catalog/catalog_manager.h"
-#include "mongo/s/catalog/type_config_version.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_connection.h"
@@ -200,7 +199,7 @@ ShardRegistryData::ShardRegistryData(OperationContext* txn, ShardFactory* shardF
 }
 
 void ShardRegistryData::_init(OperationContext* txn, ShardFactory* shardFactory) {
-    auto shardsStatus = grid.catalogManager(txn)->getAllShards(txn);
+    auto shardsStatus = grid.catalogClient(txn)->getAllShards(txn);
 
     if (!shardsStatus.isOK()) {
         uasserted(shardsStatus.getStatus().code(),

@@ -38,7 +38,7 @@
 #include "mongo/platform/random.h"
 #include "mongo/s/balancer/balancer.h"
 #include "mongo/s/balancer/balancer_configuration.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
@@ -349,7 +349,7 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {
 
         bool shouldBalance = balancerConfig->isBalancerActive();
         if (shouldBalance) {
-            auto collStatus = grid.catalogManager(txn)->getCollection(txn, _manager->getns());
+            auto collStatus = grid.catalogClient(txn)->getCollection(txn, _manager->getns());
             if (!collStatus.isOK()) {
                 warning() << "Auto-split for " << _manager->getns()
                           << " failed to load collection metadata"
@@ -439,11 +439,11 @@ void Chunk::markAsJumbo(OperationContext* txn) const {
     const string chunkName = ChunkType::genID(_manager->getns(), _min);
 
     auto status =
-        grid.catalogManager(txn)->updateConfigDocument(txn,
-                                                       ChunkType::ConfigNS,
-                                                       BSON(ChunkType::name(chunkName)),
-                                                       BSON("$set" << BSON(ChunkType::jumbo(true))),
-                                                       false);
+        grid.catalogClient(txn)->updateConfigDocument(txn,
+                                                      ChunkType::ConfigNS,
+                                                      BSON(ChunkType::name(chunkName)),
+                                                      BSON("$set" << BSON(ChunkType::jumbo(true))),
+                                                      false);
     if (!status.isOK()) {
         warning() << "couldn't set jumbo for chunk: " << chunkName << causedBy(status.getStatus());
     }

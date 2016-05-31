@@ -46,7 +46,7 @@
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
-#include "mongo/s/catalog/catalog_manager_mock.h"
+#include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_remote.h"
@@ -110,7 +110,7 @@ void initGrid(OperationContext* txn, const ConnectionString& configConnString) {
     auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(shardFactory), configConnString));
 
     grid.init(
-        stdx::make_unique<CatalogManagerMock>(),
+        stdx::make_unique<ShardingCatalogClientMock>(),
         stdx::make_unique<CatalogCache>(),
         std::move(shardRegistry),
         stdx::make_unique<ClusterCursorManager>(txn->getServiceContext()->getPreciseClockSource()),

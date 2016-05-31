@@ -41,7 +41,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_state_recovery.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -187,14 +187,14 @@ Status MigrationSourceManager::startClone(OperationContext* txn) {
     invariant(_state == kCreated);
     auto scopedGuard = MakeGuard([&] { cleanupOnError(txn); });
 
-    grid.catalogManager(txn)->logChange(
-        txn,
-        "moveChunk.start",
-        _args.getNss().ns(),
-        BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey() << "from"
-                   << _args.getFromShardId()
-                   << "to"
-                   << _args.getToShardId()));
+    grid.catalogClient(txn)->logChange(txn,
+                                       "moveChunk.start",
+                                       _args.getNss().ns(),
+                                       BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey()
+                                                  << "from"
+                                                  << _args.getFromShardId()
+                                                  << "to"
+                                                  << _args.getToShardId()));
 
     _cloneDriver = stdx::make_unique<MigrationChunkClonerSourceLegacy>(
         _args, _committedMetadata->getKeyPattern());
@@ -388,7 +388,7 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
 
     MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeCommitMigration);
 
-    Status applyOpsStatus = grid.catalogManager(txn)->applyChunkOpsDeprecated(
+    Status applyOpsStatus = grid.catalogClient(txn)->applyChunkOpsDeprecated(
         txn, updates.arr(), preCond.arr(), _args.getNss().ns(), nextVersion);
 
     if (MONGO_FAIL_POINT(failCommitMigrationCommand)) {
@@ -419,7 +419,7 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
 
         // Need to get the latest optime in case the refresh request goes to a secondary --
         // otherwise the read won't wait for the write that applyChunkOpsDeprecated may have done.
-        Status status = grid.catalogManager(txn)->logChange(
+        Status status = grid.catalogClient(txn)->logChange(
             txn,
             "moveChunk.validating",
             _args.getNss().ns(),
@@ -492,14 +492,14 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
     scopedGuard.Dismiss();
     _cleanup(txn);
 
-    grid.catalogManager(txn)->logChange(
-        txn,
-        "moveChunk.commit",
-        _args.getNss().ns(),
-        BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey() << "from"
-                   << _args.getFromShardId()
-                   << "to"
-                   << _args.getToShardId()));
+    grid.catalogClient(txn)->logChange(txn,
+                                       "moveChunk.commit",
+                                       _args.getNss().ns(),
+                                       BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey()
+                                                  << "from"
+                                                  << _args.getFromShardId()
+                                                  << "to"
+                                                  << _args.getToShardId()));
 
     return Status::OK();
 }
@@ -509,14 +509,14 @@ void MigrationSourceManager::cleanupOnError(OperationContext* txn) {
         return;
     }
 
-    grid.catalogManager(txn)->logChange(
-        txn,
-        "moveChunk.error",
-        _args.getNss().ns(),
-        BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey() << "from"
-                   << _args.getFromShardId()
-                   << "to"
-                   << _args.getToShardId()));
+    grid.catalogClient(txn)->logChange(txn,
+                                       "moveChunk.error",
+                                       _args.getNss().ns(),
+                                       BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey()
+                                                  << "from"
+                                                  << _args.getFromShardId()
+                                                  << "to"
+                                                  << _args.getToShardId()));
 
     _cleanup(txn);
 }

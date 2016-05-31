@@ -36,7 +36,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -105,7 +105,7 @@ Status BalancerConfiguration::_refreshBalancerSettings(OperationContext* txn) {
     BalancerSettingsType settings = BalancerSettingsType::createDefault();
 
     auto settingsObjStatus =
-        Grid::get(txn)->catalogManager(txn)->getGlobalSettings(txn, BalancerSettingsType::kKey);
+        Grid::get(txn)->catalogClient(txn)->getGlobalSettings(txn, BalancerSettingsType::kKey);
     if (settingsObjStatus.isOK()) {
         auto settingsStatus = BalancerSettingsType::fromBSON(settingsObjStatus.getValue());
         if (!settingsStatus.isOK()) {
@@ -127,7 +127,7 @@ Status BalancerConfiguration::_refreshChunkSizeSettings(OperationContext* txn) {
     ChunkSizeSettingsType settings = ChunkSizeSettingsType::createDefault();
 
     auto settingsObjStatus =
-        grid.catalogManager(txn)->getGlobalSettings(txn, ChunkSizeSettingsType::kKey);
+        grid.catalogClient(txn)->getGlobalSettings(txn, ChunkSizeSettingsType::kKey);
     if (settingsObjStatus.isOK()) {
         auto settingsStatus = ChunkSizeSettingsType::fromBSON(settingsObjStatus.getValue());
         if (!settingsStatus.isOK()) {

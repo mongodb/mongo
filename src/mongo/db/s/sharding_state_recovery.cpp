@@ -294,10 +294,10 @@ Status ShardingStateRecovery::recover(OperationContext* txn) {
 
     // Need to fetch the latest uptime from the config server, so do a logging write
     Status status =
-        grid.catalogManager(txn)->logChange(txn,
-                                            "Sharding minOpTime recovery",
-                                            NamespaceString::kConfigCollectionNamespace.ns(),
-                                            recoveryDocBSON);
+        grid.catalogClient(txn)->logChange(txn,
+                                           "Sharding minOpTime recovery",
+                                           NamespaceString::kConfigCollectionNamespace.ns(),
+                                           recoveryDocBSON);
     if (!status.isOK())
         return status;
 

@@ -77,20 +77,24 @@ enum ShardDrainingStatus {
 };
 
 /**
- * Abstracts reads and writes of the sharding catalog metadata.
+ * Abstracts reads of the sharding catalog metadata.
  *
  * All implementations of this interface should go directly to the persistent backing store
  * and should avoid doing any caching of their own. The caching is delegated to a parallel
  * read-only view of the catalog, which is maintained by a higher level code.
+ *
+ * TODO: For now this also includes some methods that write the sharding catalog metadata.  Those
+ * should eventually all be moved to ShardingCatalogManager as catalog manipulation operations
+ * move to be run on the config server primary.
  */
-class CatalogManager {
-    MONGO_DISALLOW_COPYING(CatalogManager);
+class ShardingCatalogClient {
+    MONGO_DISALLOW_COPYING(ShardingCatalogClient);
 
 public:
-    virtual ~CatalogManager() = default;
+    virtual ~ShardingCatalogClient() = default;
 
     /**
-     * Performs implementation-specific startup tasks. Must be run after the catalog manager
+     * Performs implementation-specific startup tasks. Must be run after the catalog client
      * has been installed into the global 'grid' object. Implementation do not need to guarantee
      * thread safety so callers should employ proper synchronization when calling this method.
      */
@@ -437,7 +441,7 @@ public:
                                                       BSONArrayBuilder* builder) = 0;
 
     /**
-     * Append information about the connection pools owned by the CatalogManager.
+     * Append information about the connection pools owned by the CatalogClient.
      */
     virtual void appendConnectionStats(executor::ConnectionPoolStats* stats) = 0;
 
@@ -452,13 +456,14 @@ public:
      * Obtains a reference to the distributed lock manager instance to use for synchronizing
      * system-wide changes.
      *
-     * The returned reference is valid only as long as the catalog manager is valid and should not
+     * The returned reference is valid only as long as the catalog client is valid and should not
      * be cached.
      */
     virtual DistLockManager* getDistLockManager() = 0;
 
+
 protected:
-    CatalogManager() = default;
+    ShardingCatalogClient() = default;
 };
 
 }  // namespace mongo

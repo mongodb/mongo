@@ -36,8 +36,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
+#include "mongo/s/catalog/replset/sharding_catalog_client_impl.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -171,9 +171,9 @@ protected:
 
     Status log(const std::string& what, const std::string& ns, const BSONObj& detail) {
         if (_configCollType == ChangeLog) {
-            return catalogManager()->logChange(operationContext(), what, ns, detail);
+            return catalogClient()->logChange(operationContext(), what, ns, detail);
         } else {
-            return catalogManager()->logAction(operationContext(), what, ns, detail);
+            return catalogClient()->logAction(operationContext(), what, ns, detail);
         }
     }
 

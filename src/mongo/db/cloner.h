@@ -35,7 +35,6 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/s/catalog/catalog_manager.h"
 
 namespace mongo {
 
@@ -119,6 +118,7 @@ private:
  *                holding a distributed lock (such as movePrimary).  Indicates that we need to
  *                be periodically checking to see if the catalog manager has swapped and fail
  *                if it has so that we don't block the mongos that initiated the command.
+ *                TODO: This can be removed now - it was only used during 3.0->3.2 upgrade.
  *  createCollections - When 'true', will fetch a list of collections from the remote and create
  *                them.  When 'false', assumes collections have already been created ahead of time.
  */

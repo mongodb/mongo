@@ -41,7 +41,7 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
@@ -69,7 +69,7 @@ Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(OperationC
     // that runs this command
     BSONObj getParameterCmd = BSON("getParameter" << 1 << authSchemaVersionServerParameter << 1);
     BSONObjBuilder builder;
-    const bool ok = grid.catalogManager(txn)->runUserManagementReadCommand(
+    const bool ok = grid.catalogClient(txn)->runUserManagementReadCommand(
         txn, "admin", getParameterCmd, &builder);
     BSONObj cmdResult = builder.obj();
     if (!ok) {
@@ -98,8 +98,8 @@ Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* txn
                          << "showCredentials"
                          << true);
     BSONObjBuilder builder;
-    const bool ok = grid.catalogManager(txn)->runUserManagementReadCommand(
-        txn, "admin", usersInfoCmd, &builder);
+    const bool ok =
+        grid.catalogClient(txn)->runUserManagementReadCommand(txn, "admin", usersInfoCmd, &builder);
     BSONObj cmdResult = builder.obj();
     if (!ok) {
         return getStatusFromCommandResult(cmdResult);
@@ -133,8 +133,8 @@ Status AuthzManagerExternalStateMongos::getRoleDescription(OperationContext* txn
                          << "showPrivileges"
                          << showPrivileges);
     BSONObjBuilder builder;
-    const bool ok = grid.catalogManager(txn)->runUserManagementReadCommand(
-        txn, "admin", rolesInfoCmd, &builder);
+    const bool ok =
+        grid.catalogClient(txn)->runUserManagementReadCommand(txn, "admin", rolesInfoCmd, &builder);
     BSONObj cmdResult = builder.obj();
     if (!ok) {
         return getStatusFromCommandResult(cmdResult);
@@ -166,7 +166,7 @@ Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(OperationContex
                          << showBuiltinRoles);
     BSONObjBuilder builder;
     const bool ok =
-        grid.catalogManager(txn)->runUserManagementReadCommand(txn, dbname, rolesInfoCmd, &builder);
+        grid.catalogClient(txn)->runUserManagementReadCommand(txn, dbname, rolesInfoCmd, &builder);
     BSONObj cmdResult = builder.obj();
     if (!ok) {
         return getStatusFromCommandResult(cmdResult);
@@ -180,7 +180,7 @@ Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(OperationContex
 bool AuthzManagerExternalStateMongos::hasAnyPrivilegeDocuments(OperationContext* txn) {
     BSONObj usersInfoCmd = BSON("usersInfo" << 1);
     BSONObjBuilder userBuilder;
-    bool ok = grid.catalogManager(txn)->runUserManagementReadCommand(
+    bool ok = grid.catalogClient(txn)->runUserManagementReadCommand(
         txn, "admin", usersInfoCmd, &userBuilder);
     if (!ok) {
         // If we were unable to complete the query,
@@ -198,7 +198,7 @@ bool AuthzManagerExternalStateMongos::hasAnyPrivilegeDocuments(OperationContext*
 
     BSONObj rolesInfoCmd = BSON("rolesInfo" << 1);
     BSONObjBuilder roleBuilder;
-    ok = grid.catalogManager(txn)->runUserManagementReadCommand(
+    ok = grid.catalogClient(txn)->runUserManagementReadCommand(
         txn, "admin", rolesInfoCmd, &roleBuilder);
     if (!ok) {
         return true;

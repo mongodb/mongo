@@ -48,7 +48,6 @@
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"

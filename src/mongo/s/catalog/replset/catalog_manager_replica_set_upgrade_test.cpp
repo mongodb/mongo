@@ -36,8 +36,8 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog/config_server_version.h"
-#include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
+#include "mongo/s/catalog/replset/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/batched_update_request.h"
@@ -63,7 +63,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNotNeeded) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future =
-        launchAsync([this] { ASSERT_OK(catalogManager()->initConfigVersion(operationContext())); });
+        launchAsync([this] { ASSERT_OK(catalogClient()->initConfigVersion(operationContext())); });
 
     onFindCommand([this](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
@@ -92,7 +92,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitTargetError) {
     configTargeter()->setFindHostReturnValue({ErrorCodes::InternalError, "Bad test network"});
 
     auto future = launchAsync([this] {
-        auto status = catalogManager()->initConfigVersion(operationContext());
+        auto status = catalogClient()->initConfigVersion(operationContext());
         ASSERT_EQ(ErrorCodes::InternalError, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -104,7 +104,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitIncompatibleVersion) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future = launchAsync([this] {
-        auto status = catalogManager()->initConfigVersion(operationContext());
+        auto status = catalogClient()->initConfigVersion(operationContext());
         ASSERT_EQ(ErrorCodes::IncompatibleShardingConfigVersion, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -127,7 +127,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitClusterMultiVersion) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future = launchAsync([this] {
-        auto status = catalogManager()->initConfigVersion(operationContext());
+        auto status = catalogClient()->initConfigVersion(operationContext());
         ASSERT_EQ(ErrorCodes::RemoteValidationError, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -158,7 +158,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitInvalidConfigVersionDoc) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future = launchAsync([this] {
-        auto status = catalogManager()->initConfigVersion(operationContext());
+        auto status = catalogClient()->initConfigVersion(operationContext());
         ASSERT_EQ(ErrorCodes::UnsupportedFormat, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -181,7 +181,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitNoVersionDocEmptyConfig) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future =
-        launchAsync([this] { ASSERT_OK(catalogManager()->initConfigVersion(operationContext())); });
+        launchAsync([this] { ASSERT_OK(catalogClient()->initConfigVersion(operationContext())); });
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
@@ -230,7 +230,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitConfigWriteError) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future = launchAsync([this] {
-        auto status = catalogManager()->initConfigVersion(operationContext());
+        auto status = catalogClient()->initConfigVersion(operationContext());
         ASSERT_EQ(ErrorCodes::ExceededTimeLimit, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -257,7 +257,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionTooOld) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future = launchAsync([this] {
-        auto status = catalogManager()->initConfigVersion(operationContext());
+        auto status = catalogClient()->initConfigVersion(operationContext());
         ASSERT_EQ(ErrorCodes::IncompatibleShardingConfigVersion, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -284,7 +284,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionDuplicateKeyNoOpAfterRetry) 
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future =
-        launchAsync([this] { ASSERT_OK(catalogManager()->initConfigVersion(operationContext())); });
+        launchAsync([this] { ASSERT_OK(catalogClient()->initConfigVersion(operationContext())); });
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
@@ -335,7 +335,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionDuplicateKeyNoConfigVersionA
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future =
-        launchAsync([this] { ASSERT_OK(catalogManager()->initConfigVersion(operationContext())); });
+        launchAsync([this] { ASSERT_OK(catalogClient()->initConfigVersion(operationContext())); });
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
@@ -406,7 +406,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionDuplicateKeyTooNewAfterRetry
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future = launchAsync([this] {
-        auto status = catalogManager()->initConfigVersion(operationContext());
+        auto status = catalogClient()->initConfigVersion(operationContext());
         ASSERT_EQ(ErrorCodes::IncompatibleShardingConfigVersion, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -460,7 +460,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionDuplicateKeyMaxRetry) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future = launchAsync([this] {
-        auto status = catalogManager()->initConfigVersion(operationContext());
+        auto status = catalogClient()->initConfigVersion(operationContext());
         ASSERT_EQ(ErrorCodes::IncompatibleShardingConfigVersion, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -495,7 +495,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionUpsertNoMatchNoOpAfterRetry)
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future =
-        launchAsync([this] { ASSERT_OK(catalogManager()->initConfigVersion(operationContext())); });
+        launchAsync([this] { ASSERT_OK(catalogClient()->initConfigVersion(operationContext())); });
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
@@ -541,7 +541,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionUpsertNoMatchNoConfigVersion
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future =
-        launchAsync([this] { ASSERT_OK(catalogManager()->initConfigVersion(operationContext())); });
+        launchAsync([this] { ASSERT_OK(catalogClient()->initConfigVersion(operationContext())); });
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 

@@ -35,8 +35,8 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
-#include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
+#include "mongo/s/catalog/replset/sharding_catalog_client_impl.h"
 #include "mongo/stdx/future.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
@@ -63,7 +63,7 @@ TEST_F(CatalogManagerReplSetAppendDbStatsTest, BasicAppendDBStats) {
     BSONArrayBuilder builder;
     auto future = launchAsync([this, &builder] {
         ASSERT_OK(
-            catalogManager()->appendInfoForConfigServerDatabases(operationContext(), &builder));
+            catalogClient()->appendInfoForConfigServerDatabases(operationContext(), &builder));
     });
 
     onCommand([](const RemoteCommandRequest& request) {
@@ -122,7 +122,7 @@ TEST_F(CatalogManagerReplSetAppendDbStatsTest, ErrorRunningListDatabases) {
     BSONArrayBuilder builder;
     auto future = launchAsync([this, &builder] {
         auto status =
-            catalogManager()->appendInfoForConfigServerDatabases(operationContext(), &builder);
+            catalogClient()->appendInfoForConfigServerDatabases(operationContext(), &builder);
         ASSERT_NOT_OK(status);
         ASSERT_EQ(ErrorCodes::AuthenticationFailed, status.code());
         ASSERT_FALSE(status.reason().empty());
@@ -141,7 +141,7 @@ TEST_F(CatalogManagerReplSetAppendDbStatsTest, MalformedListDatabasesResponse) {
     BSONArrayBuilder builder;
     auto future = launchAsync([this, &builder] {
         auto status =
-            catalogManager()->appendInfoForConfigServerDatabases(operationContext(), &builder);
+            catalogClient()->appendInfoForConfigServerDatabases(operationContext(), &builder);
         ASSERT_NOT_OK(status);
         ASSERT_EQ(ErrorCodes::NoSuchKey, status.code());
         ASSERT_FALSE(status.reason().empty());
@@ -158,7 +158,7 @@ TEST_F(CatalogManagerReplSetAppendDbStatsTest, MalformedListDatabasesEntryInResp
     BSONArrayBuilder builder;
     auto future = launchAsync([this, &builder] {
         auto status =
-            catalogManager()->appendInfoForConfigServerDatabases(operationContext(), &builder);
+            catalogClient()->appendInfoForConfigServerDatabases(operationContext(), &builder);
         ASSERT_NOT_OK(status);
         ASSERT_EQ(ErrorCodes::NoSuchKey, status.code());
         ASSERT_FALSE(status.reason().empty());

@@ -37,7 +37,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/s/catalog/catalog_cache.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_tags.h"
@@ -102,7 +102,7 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSpli
     vector<CollectionType> collections;
 
     Status collsStatus =
-        Grid::get(txn)->catalogManager(txn)->getCollections(txn, nullptr, &collections, nullptr);
+        Grid::get(txn)->catalogClient(txn)->getCollections(txn, nullptr, &collections, nullptr);
     if (!collsStatus.isOK()) {
         return collsStatus;
     }
@@ -146,7 +146,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
     vector<CollectionType> collections;
 
     Status collsStatus =
-        Grid::get(txn)->catalogManager(txn)->getCollections(txn, nullptr, &collections, nullptr);
+        Grid::get(txn)->catalogClient(txn)->getCollections(txn, nullptr, &collections, nullptr);
     if (!collsStatus.isOK()) {
         return collsStatus;
     }
@@ -195,7 +195,7 @@ BalancerChunkSelectionPolicyImpl::selectSpecificChunkToMove(OperationContext* tx
     ChunkManager* const cm = scopedCM.cm();
 
     auto tagForChunkStatus =
-        Grid::get(txn)->catalogManager(txn)->getTagForChunk(txn, nss.ns(), chunk);
+        Grid::get(txn)->catalogClient(txn)->getTagForChunk(txn, nss.ns(), chunk);
     if (!tagForChunkStatus.isOK()) {
         return tagForChunkStatus.getStatus();
     }
@@ -221,7 +221,7 @@ Status BalancerChunkSelectionPolicyImpl::checkMoveAllowed(OperationContext* txn,
                                                           const ChunkType& chunk,
                                                           const ShardId& newShardId) {
     auto tagForChunkStatus =
-        Grid::get(txn)->catalogManager(txn)->getTagForChunk(txn, chunk.getNS(), chunk);
+        Grid::get(txn)->catalogClient(txn)->getTagForChunk(txn, chunk.getNS(), chunk);
     if (!tagForChunkStatus.isOK()) {
         return tagForChunkStatus.getStatus();
     }
@@ -261,7 +261,7 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::_getSplitCandidate
 
     vector<TagsType> collectionTags;
     Status tagsStatus =
-        Grid::get(txn)->catalogManager(txn)->getTagsForCollection(txn, nss.ns(), &collectionTags);
+        Grid::get(txn)->catalogClient(txn)->getTagsForCollection(txn, nss.ns(), &collectionTags);
     if (!tagsStatus.isOK()) {
         return {tagsStatus.code(),
                 str::stream() << "Unable to load tags for collection " << nss.ns() << " due to "
@@ -311,7 +311,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::_getMigrateCandi
     DistributionStatus distStatus(shardStats, shardToChunksMap);
     {
         vector<TagsType> collectionTags;
-        Status status = Grid::get(txn)->catalogManager(txn)->getTagsForCollection(
+        Status status = Grid::get(txn)->catalogClient(txn)->getTagsForCollection(
             txn, nss.ns(), &collectionTags);
         if (!status.isOK()) {
             return status;

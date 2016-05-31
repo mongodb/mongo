@@ -43,7 +43,7 @@
 namespace mongo {
 
 class BSONObj;
-class CatalogManagerReplicaSet;
+class ShardingCatalogClientImpl;
 class DistLockManagerMock;
 class ShardRegistry;
 template <typename T>

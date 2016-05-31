@@ -40,7 +40,7 @@
 #include "mongo/db/client_basic.h"
 #include "mongo/db/commands.h"
 #include "mongo/s/catalog/catalog_cache.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
@@ -105,7 +105,7 @@ public:
             return false;
         }
 
-        Status status = grid.catalogManager(txn)->enableSharding(txn, dbname);
+        Status status = grid.catalogClient(txn)->enableSharding(txn, dbname);
         if (status.isOK()) {
             audit::logEnableSharding(ClientBasic::getCurrent(), dbname);
         }

@@ -144,7 +144,7 @@ Status runApplyOpsCmd(OperationContext* txn,
 
     BSONArray preCond = buildOpPrecond(firstChunk.getNS(), firstChunk.getShard(), currShardVersion);
 
-    return grid.catalogManager(txn)->applyChunkOpsDeprecated(
+    return grid.catalogClient(txn)->applyChunkOpsDeprecated(
         txn, updatesB.arr(), preCond, firstChunk.getNS(), newMergedVersion);
 }
 
@@ -157,7 +157,7 @@ bool mergeChunks(OperationContext* txn,
     // Get the distributed lock
     const string whyMessage = stream() << "merging chunks in " << nss.ns() << " from " << minKey
                                        << " to " << maxKey;
-    auto scopedDistLock = grid.catalogManager(txn)->distLock(
+    auto scopedDistLock = grid.catalogClient(txn)->distLock(
         txn, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
 
     if (!scopedDistLock.isOK()) {
@@ -344,7 +344,7 @@ bool mergeChunks(OperationContext* txn,
 
     BSONObj mergeLogEntry = buildMergeLogEntry(chunksToMerge, shardVersion, mergeVersion);
 
-    grid.catalogManager(txn)->logChange(txn, "merge", nss.ns(), mergeLogEntry);
+    grid.catalogClient(txn)->logChange(txn, "merge", nss.ns(), mergeLogEntry);
 
     return true;
 }

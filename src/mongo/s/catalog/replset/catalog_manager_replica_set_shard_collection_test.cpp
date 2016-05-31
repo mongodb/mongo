@@ -43,8 +43,8 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
-#include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
+#include "mongo/s/catalog/replset/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -233,7 +233,7 @@ TEST_F(ShardCollectionTest, distLockFails) {
     ShardKeyPattern keyPattern(BSON("_id" << 1));
     ASSERT_EQUALS(
         ErrorCodes::LockBusy,
-        catalogManager()->shardCollection(
+        catalogClient()->shardCollection(
             operationContext(), "test.foo", keyPattern, false, vector<BSONObj>{}, set<ShardId>{}));
 }
 
@@ -267,7 +267,7 @@ TEST_F(ShardCollectionTest, anotherMongosSharding) {
         Client::initThreadIfNotAlready();
         ASSERT_EQUALS(
             ErrorCodes::AlreadyInitialized,
-            catalogManager()->shardCollection(
+            catalogClient()->shardCollection(
                 operationContext(), ns, keyPattern, false, vector<BSONObj>{}, set<ShardId>{}));
     });
 
@@ -324,7 +324,7 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
         Client::initThreadIfNotAlready();
-        ASSERT_OK(catalogManager()->shardCollection(
+        ASSERT_OK(catalogClient()->shardCollection(
             operationContext(), ns, keyPattern, false, vector<BSONObj>{}, set<ShardId>{}));
     });
 
@@ -493,7 +493,7 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     auto future = launchAsync([&] {
         Client::initThreadIfNotAlready();
         set<ShardId> shards{shard0.getName(), shard1.getName(), shard2.getName()};
-        ASSERT_OK(catalogManager()->shardCollection(
+        ASSERT_OK(catalogClient()->shardCollection(
             operationContext(),
             ns,
             keyPattern,
@@ -644,7 +644,7 @@ TEST_F(ShardCollectionTest, withInitialData) {
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
         Client::initThreadIfNotAlready();
-        ASSERT_OK(catalogManager()->shardCollection(
+        ASSERT_OK(catalogClient()->shardCollection(
             operationContext(), ns, keyPattern, false, vector<BSONObj>{}, set<ShardId>{}));
     });
 

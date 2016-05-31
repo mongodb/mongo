@@ -43,8 +43,8 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
-#include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
+#include "mongo/s/catalog/replset/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -84,7 +84,7 @@ TEST_F(InsertRetryTest, RetryOnInterruptedAndNetworkErrorSuccess) {
                                      << "TestValue");
 
     auto future = launchAsync([&] {
-        Status status = catalogManager()->insertConfigDocument(
+        Status status = catalogClient()->insertConfigDocument(
             operationContext(), kTestNamespace.ns(), objToInsert);
         ASSERT_OK(status);
     });
@@ -113,7 +113,7 @@ TEST_F(InsertRetryTest, RetryOnNetworkErrorFails) {
                                      << "TestValue");
 
     auto future = launchAsync([&] {
-        Status status = catalogManager()->insertConfigDocument(
+        Status status = catalogClient()->insertConfigDocument(
             operationContext(), kTestNamespace.ns(), objToInsert);
         ASSERT_EQ(ErrorCodes::NetworkTimeout, status.code());
     });
@@ -145,7 +145,7 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorMatch) {
                                      << "TestValue");
 
     auto future = launchAsync([&] {
-        Status status = catalogManager()->insertConfigDocument(
+        Status status = catalogClient()->insertConfigDocument(
             operationContext(), kTestNamespace.ns(), objToInsert);
         ASSERT_OK(status);
     });
@@ -180,7 +180,7 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorNotFound) {
                                      << "TestValue");
 
     auto future = launchAsync([&] {
-        Status status = catalogManager()->insertConfigDocument(
+        Status status = catalogClient()->insertConfigDocument(
             operationContext(), kTestNamespace.ns(), objToInsert);
         ASSERT_EQ(ErrorCodes::DuplicateKey, status.code());
     });
@@ -215,7 +215,7 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorMismatch) {
                                      << "TestValue");
 
     auto future = launchAsync([&] {
-        Status status = catalogManager()->insertConfigDocument(
+        Status status = catalogClient()->insertConfigDocument(
             operationContext(), kTestNamespace.ns(), objToInsert);
         ASSERT_EQ(ErrorCodes::DuplicateKey, status.code());
     });
@@ -251,7 +251,7 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterWriteConcernFailureMatch) {
                                      << "TestValue");
 
     auto future = launchAsync([&] {
-        Status status = catalogManager()->insertConfigDocument(
+        Status status = catalogClient()->insertConfigDocument(
             operationContext(), kTestNamespace.ns(), objToInsert);
         ASSERT_OK(status);
     });
@@ -308,7 +308,7 @@ TEST_F(UpdateRetryTest, OperationInterruptedDueToPrimaryStepDown) {
                                              << "NewTestValue"));
 
     auto future = launchAsync([&] {
-        auto status = catalogManager()->updateConfigDocument(
+        auto status = catalogClient()->updateConfigDocument(
             operationContext(), kTestNamespace.ns(), objToUpdate, updateExpr, false);
         ASSERT_OK(status);
     });
@@ -355,7 +355,7 @@ TEST_F(UpdateRetryTest, WriteConcernFailure) {
                                              << "NewTestValue"));
 
     auto future = launchAsync([&] {
-        auto status = catalogManager()->updateConfigDocument(
+        auto status = catalogClient()->updateConfigDocument(
             operationContext(), kTestNamespace.ns(), objToUpdate, updateExpr, false);
         ASSERT_OK(status);
     });

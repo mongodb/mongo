@@ -39,8 +39,8 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
-#include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
+#include "mongo/s/catalog/replset/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -87,7 +87,7 @@ TEST_F(RemoveShardTest, RemoveShardAnotherShardDraining) {
 
     auto future = launchAsync([&] {
         ASSERT_EQUALS(ErrorCodes::ConflictingOperationInProgress,
-                      catalogManager()->removeShard(operationContext(), shardName));
+                      catalogClient()->removeShard(operationContext(), shardName));
     });
 
     expectCount(configHost,
@@ -103,7 +103,7 @@ TEST_F(RemoveShardTest, RemoveShardCantRemoveLastShard) {
 
     auto future = launchAsync([&] {
         ASSERT_EQUALS(ErrorCodes::IllegalOperation,
-                      catalogManager()->removeShard(operationContext(), shardName));
+                      catalogClient()->removeShard(operationContext(), shardName));
     });
 
     // Report that there are no other draining operations ongoing
@@ -127,7 +127,7 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
     getMessagingPort()->setRemote(clientHost);
 
     auto future = launchAsync([&] {
-        auto result = assertGet(catalogManager()->removeShard(operationContext(), shardName));
+        auto result = assertGet(catalogClient()->removeShard(operationContext(), shardName));
         ASSERT_EQUALS(ShardDrainingStatus::STARTED, result);
 
     });
@@ -209,7 +209,7 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemaining) {
     string shardName = "shardToRemove";
 
     auto future = launchAsync([&] {
-        auto result = assertGet(catalogManager()->removeShard(operationContext(), shardName));
+        auto result = assertGet(catalogClient()->removeShard(operationContext(), shardName));
         ASSERT_EQUALS(ShardDrainingStatus::ONGOING, result);
 
     });
@@ -249,7 +249,7 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingDatabasesRemaining) {
     string shardName = "shardToRemove";
 
     auto future = launchAsync([&] {
-        auto result = assertGet(catalogManager()->removeShard(operationContext(), shardName));
+        auto result = assertGet(catalogClient()->removeShard(operationContext(), shardName));
         ASSERT_EQUALS(ShardDrainingStatus::ONGOING, result);
 
     });
@@ -291,7 +291,7 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
     getMessagingPort()->setRemote(clientHost);
 
     auto future = launchAsync([&] {
-        auto result = assertGet(catalogManager()->removeShard(operationContext(), shardName));
+        auto result = assertGet(catalogClient()->removeShard(operationContext(), shardName));
         ASSERT_EQUALS(ShardDrainingStatus::COMPLETED, result);
 
     });

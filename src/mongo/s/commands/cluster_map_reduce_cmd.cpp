@@ -41,8 +41,8 @@
 #include "mongo/db/commands/mr.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
-#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
@@ -469,7 +469,7 @@ public:
 
                 BSONObj sortKey = BSON("_id" << 1);
                 ShardKeyPattern sortKeyPattern(sortKey);
-                Status status = grid.catalogManager(txn)->shardCollection(
+                Status status = grid.catalogClient(txn)->shardCollection(
                     txn, outputCollNss.ns(), sortKeyPattern, true, sortedSplitPts, outShardIds);
                 if (!status.isOK()) {
                     return appendCommandStatus(result, status);
@@ -484,7 +484,7 @@ public:
             map<BSONObj, int> chunkSizes;
             {
                 // Take distributed lock to prevent split / migration.
-                auto scopedDistLock = grid.catalogManager(txn)->distLock(
+                auto scopedDistLock = grid.catalogClient(txn)->distLock(
                     txn, outputCollNss.ns(), "mr-post-process", kNoDistLockTimeout);
 
                 if (!scopedDistLock.isOK()) {

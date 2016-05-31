@@ -9,9 +9,9 @@ env.SConscript(
 )
 
 env.Library(
-    target='catalog_manager_mock',
+    target='sharding_catalog_client_mock',
     source=[
-        'catalog_manager_mock.cpp',
+        'sharding_catalog_client_mock.cpp',
     ],
     LIBDEPS=[
         'dist_lock_manager_mock',

@@ -41,7 +41,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/logger/logger.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"

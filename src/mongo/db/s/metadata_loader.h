@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-class CatalogManager;
+class ShardingCatalogClient;
 class CollectionMetadata;
 class CollectionType;
 class DBClientCursor;
@@ -91,7 +91,7 @@ public:
      * @return RemoteChangeDetected if the data loaded was modified by another operation
      */
     Status makeCollectionMetadata(OperationContext* txn,
-                                  CatalogManager* catalogManager,
+                                  ShardingCatalogClient* catalogClient,
                                   const std::string& ns,
                                   const std::string& shard,
                                   const CollectionMetadata* oldMetadata,
@@ -134,7 +134,7 @@ private:
      *
      */
     Status _initCollection(OperationContext* txn,
-                           CatalogManager* catalogManager,
+                           ShardingCatalogClient* catalogClient,
                            const std::string& ns,
                            const std::string& shard,
                            CollectionMetadata* metadata) const;
@@ -153,7 +153,7 @@ private:
      * TODO: @return FailedToParse
      */
     Status initChunks(OperationContext* txn,
-                      CatalogManager* catalogManager,
+                      ShardingCatalogClient* catalogClient,
                       const std::string& ns,
                       const std::string& shard,
                       const CollectionMetadata* oldMetadata,
