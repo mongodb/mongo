@@ -38,6 +38,8 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
@@ -126,10 +128,8 @@ public:
      */
     std::unique_ptr<Locker> releaseLockState();
 
-    // --- operation level info? ---
-
     /**
-     * Raises a UserAssertion if this operation is in a killed state.
+     * Raises a UserException if this operation is in a killed state.
      */
     void checkForInterrupt();
 
@@ -137,6 +137,76 @@ public:
      * Returns Status::OK() unless this operation is in a killed state.
      */
     Status checkForInterruptNoAssert();
+
+    /**
+     * Waits for either the condition "cv" to be signaled, this operation to be interrupted, or the
+     * deadline on this operation to expire.  In the event of interruption or operation deadline
+     * expiration, raises a UserException with an error code indicating the interruption type.
+     */
+    void waitForConditionOrInterrupt(stdx::condition_variable& cv,
+                                     stdx::unique_lock<stdx::mutex>& m);
+
+    /**
+     * Waits on condition "cv" for "pred" until "pred" returns true, or this operation
+     * is interrupted or its deadline expires. Throws a DBException for interruption and
+     * deadline expiration.
+     */
+    template <typename Pred>
+    void waitForConditionOrInterrupt(stdx::condition_variable& cv,
+                                     stdx::unique_lock<stdx::mutex>& m,
+                                     Pred pred) {
+        while (!pred()) {
+            waitForConditionOrInterrupt(cv, m);
+        }
+    }
+
+    /**
+     * Same as waitForConditionOrInterrupt, except returns a Status instead of throwing
+     * a DBException to report interruption.
+     */
+    Status waitForConditionOrInterruptNoAssert(stdx::condition_variable& cv,
+                                               stdx::unique_lock<stdx::mutex>& m) noexcept;
+
+    /**
+     * Waits for condition "cv" to be signaled, or for the given "deadline" to expire, or
+     * for the operation to be interrupted, or for the operation's own deadline to expire.
+     *
+     * If the operation deadline expires or the operation is interrupted, throws a DBException.  If
+     * the given "deadline" expires, returns cv_status::timeout. Otherwise, returns
+     * cv_status::no_timeout.
+     */
+    stdx::cv_status waitForConditionOrInterruptUntil(stdx::condition_variable& cv,
+                                                     stdx::unique_lock<stdx::mutex>& m,
+                                                     Date_t deadline);
+
+    /**
+     * Waits on condition "cv" for "pred" until "pred" returns true, or the given "deadline"
+     * expires, or this operation is interrupted, or this operation's own deadline expires.
+     *
+     *
+     * If the operation deadline expires or the operation is interrupted, throws a DBException.  If
+     * the given "deadline" expires, returns cv_status::timeout. Otherwise, returns
+     * cv_status::no_timeout indicating that "pred" finally returned true.
+     */
+    template <typename Pred>
+    stdx::cv_status waitForConditionOrInterruptUntil(stdx::condition_variable& cv,
+                                                     stdx::unique_lock<stdx::mutex>& m,
+                                                     Date_t deadline,
+                                                     Pred pred) {
+        while (!pred()) {
+            if (stdx::cv_status::timeout == waitForConditionOrInterruptUntil(cv, m, deadline)) {
+                return stdx::cv_status::timeout;
+            }
+        }
+        return stdx::cv_status::no_timeout;
+    }
+
+    /**
+     * Same as waitForConditionOrInterruptUntil, except returns StatusWith<stdx::cv_status> and
+     * non-ok status indicates the error instead of a DBException.
+     */
+    StatusWith<stdx::cv_status> waitForConditionOrInterruptNoAssertUntil(
+        stdx::condition_variable& cv, stdx::unique_lock<stdx::mutex>& m, Date_t deadline) noexcept;
 
     /**
      * Delegates to CurOp, but is included here to break dependencies.
@@ -200,10 +270,11 @@ public:
      * checkForInterruptNoAssert by the thread executing the operation will start returning the
      * specified error code.
      *
-     * If multiple threads kill the same operation with different codes, only the first code will
-     * be preserved.
+     * If multiple threads kill the same operation with different codes, only the first code
+     * will be preserved.
      *
-     * May be called by any thread that has locked the Client owning this operation context.
+     * May be called by any thread that has locked the Client owning this operation context, or
+     * by the thread executing this on behalf of this OperationContext.
      */
     void markKilled(ErrorCodes::Error killCode = ErrorCodes::Interrupted);
 
@@ -272,13 +343,12 @@ public:
         return _deadline;
     }
 
-    //
-    // Legacy "max time" methods for controlling operation deadlines.
-    //
-
     /**
      * Returns the number of microseconds remaining for this operation's time limit, or the
      * special value Microseconds::max() if the operation has no time limit.
+     *
+     * This is a legacy "max time" method for controlling operation deadlines. Prefer not to use it
+     * in new code.
      */
     Microseconds getRemainingMaxTimeMicros() const;
 
@@ -311,6 +381,20 @@ private:
     // operation is not killed. If killed, it will contain a specific code. This value changes only
     // once from OK to some kill code.
     AtomicWord<ErrorCodes::Error> _killCode{ErrorCodes::OK};
+
+
+    // If non-null, _waitMutex and _waitCV are the (mutex, condition variable) pair that the
+    // operation is currently waiting on inside a call to waitForConditionOrInterrupt...().
+    // All access guarded by the Client's lock.
+    stdx::mutex* _waitMutex = nullptr;
+    stdx::condition_variable* _waitCV = nullptr;
+
+    // If _waitMutex and _waitCV are non-null, this is the number of threads in a call to markKilled
+    // actively attempting to kill the operation. If this value is non-zero, the operation is inside
+    // waitForConditionOrInterrupt...() and must stay there until _numKillers reaches 0.
+    //
+    // All access guarded by the Client's lock.
+    int _numKillers = 0;
 
     WriteConcernOptions _writeConcern;
 

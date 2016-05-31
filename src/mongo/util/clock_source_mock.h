@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -70,6 +71,29 @@ private:
     stdx::mutex _mutex;
     Date_t _now;
     std::vector<Alarm> _alarms;
+};
+
+class SharedClockSourceAdapter final : public ClockSource {
+public:
+    explicit SharedClockSourceAdapter(std::shared_ptr<ClockSource> source)
+        : _source(std::move(source)) {
+        _tracksSystemClock = _source->tracksSystemClock();
+    }
+
+    Milliseconds getPrecision() override {
+        return _source->getPrecision();
+    }
+
+    Date_t now() override {
+        return _source->now();
+    }
+
+    Status setAlarm(Date_t when, stdx::function<void()> action) override {
+        return _source->setAlarm(when, std::move(action));
+    }
+
+private:
+    std::shared_ptr<ClockSource> _source;
 };
 
 }  // namespace mongo
