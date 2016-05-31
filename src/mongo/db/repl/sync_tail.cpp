@@ -66,6 +66,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/timer_stats.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -78,24 +79,28 @@ namespace mongo {
 using std::endl;
 
 namespace repl {
+
+/**
+ * This variable determines the number of writer threads SyncTail will have. It has a default
+ * value, which varies based on architecture and can be overridden using the
+ * "replWriterThreadCount" server parameter.
+ */
+namespace {
 #if defined(MONGO_PLATFORM_64)
-int SyncTail::replWriterThreadCount = 16;
-const int replPrefetcherThreadCount = 16;
+int replWriterThreadCount = 16;
 #elif defined(MONGO_PLATFORM_32)
-int SyncTail::replWriterThreadCount = 2;
-const int replPrefetcherThreadCount = 2;
+int replWriterThreadCount = 2;
 #else
 #error need to include something that defines MONGO_PLATFORM_XX
 #endif
+}  // namespace
 
 class ExportedWriterThreadCountParameter
     : public ExportedServerParameter<int, ServerParameterType::kStartupOnly> {
 public:
     ExportedWriterThreadCountParameter()
         : ExportedServerParameter<int, ServerParameterType::kStartupOnly>(
-              ServerParameterSet::getGlobal(),
-              "replWriterThreadCount",
-              &SyncTail::replWriterThreadCount) {}
+              ServerParameterSet::getGlobal(), "replWriterThreadCount", &replWriterThreadCount) {}
 
     virtual Status validate(const int& potentialNewValue) {
         if (potentialNewValue < 1 || potentialNewValue > 256) {
@@ -277,11 +282,18 @@ void ApplyBatchFinalizerForJournal::_run() {
 }  // anonymous namespace containing ApplyBatchFinalizer definitions.
 
 SyncTail::SyncTail(BackgroundSync* q, MultiSyncApplyFunc func)
-    : _networkQueue(q),
-      _applyFunc(func),
-      _writerPool(replWriterThreadCount, "repl writer worker ") {}
+    : SyncTail(q, func, makeWriterPool()) {}
+
+SyncTail::SyncTail(BackgroundSync* q,
+                   MultiSyncApplyFunc func,
+                   std::unique_ptr<OldThreadPool> writerPool)
+    : _networkQueue(q), _applyFunc(func), _writerPool(std::move(writerPool)) {}
 
 SyncTail::~SyncTail() {}
+
+std::unique_ptr<OldThreadPool> SyncTail::makeWriterPool() {
+    return stdx::make_unique<OldThreadPool>(replWriterThreadCount, "repl writer worker ");
+}
 
 bool SyncTail::peek(BSONObj* op) {
     return _networkQueue->peek(op);
@@ -534,7 +546,7 @@ OpTime SyncTail::multiApply(OperationContext* txn, const OpQueue& ops) {
     auto applyOperation = [this](const MultiApplier::Operations& ops) { _applyFunc(ops, this); };
     auto status =
         repl::multiApply(txn,
-                         &_writerPool,
+                         _writerPool.get(),
                          MultiApplier::Operations(convertToVector.begin(), convertToVector.end()),
                          applyOperation);
     if (!status.isOK()) {
@@ -868,7 +880,7 @@ void SyncTail::setHostname(const std::string& hostname) {
 }
 
 OldThreadPool* SyncTail::getWriterPool() {
-    return &_writerPool;
+    return _writerPool.get();
 }
 
 BSONObj SyncTail::getMissingDoc(OperationContext* txn, Database* db, const BSONObj& o) {

@@ -29,6 +29,7 @@
 #pragma once
 
 #include <deque>
+#include <memory>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
@@ -84,7 +85,13 @@ public:
     using ApplyCommandInLockFn = stdx::function<Status(OperationContext*, const BSONObj&)>;
 
     SyncTail(BackgroundSync* q, MultiSyncApplyFunc func);
+    SyncTail(BackgroundSync* q, MultiSyncApplyFunc func, std::unique_ptr<OldThreadPool> writerPool);
     virtual ~SyncTail();
+
+    /**
+     * Creates thread pool for writer tasks.
+     */
+    static std::unique_ptr<OldThreadPool> makeWriterPool();
 
     /**
      * Applies the operation that is in param o.
@@ -151,13 +158,6 @@ public:
      */
     OldThreadPool* getWriterPool();
 
-    /**
-     * This variable determines the number of writer threads SyncTail will have. It has a default
-     * value, which varies based on architecture and can be overridden using the
-     * "replWriterThreadCount" server parameter.
-     */
-    static int replWriterThreadCount;
-
 protected:
     // Cap the batches using the limit on journal commits.
     // This works out to be 100 MB (64 bit) or 50 MB (32 bit)
@@ -180,7 +180,7 @@ private:
     MultiSyncApplyFunc _applyFunc;
 
     // persistent pool of worker threads for writing ops to the databases
-    OldThreadPool _writerPool;
+    std::unique_ptr<OldThreadPool> _writerPool;
 };
 
 /**
