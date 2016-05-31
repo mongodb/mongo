@@ -55,6 +55,7 @@ void MessagingPortMock::reply(Message& received, Message& response, int32_t resp
 void MessagingPortMock::reply(Message& received, Message& response) {}
 
 void MessagingPortMock::say(Message& toSend, int responseTo) {}
+void MessagingPortMock::say(const Message& toSend) {}
 
 bool MessagingPortMock::connect(SockAddr& farEnd) {
     return true;

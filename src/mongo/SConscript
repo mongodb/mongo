@@ -254,6 +254,8 @@ mongodLibDeps = [
     "db/repl/storage_interface_impl",
     "executor/network_interface_factory",
     's/commands/shared_cluster_commands',
+    "transport/transport_layer_legacy",
+    "transport/service_entry_point_utils",
     "util/clock_sources",
     "util/ntservice",
 ]
@@ -266,6 +268,7 @@ mongod = env.Program(
     source=[
         "db/db.cpp",
         "db/mongod_options_init.cpp",
+        "db/service_entry_point_mongod.cpp",
     ],
     LIBDEPS=mongodLibDeps,
 )
@@ -297,6 +300,7 @@ env.Install(
             's/client/sharding_connection_hook_for_mongos.cpp',
             's/mongos_options_init.cpp',
             's/server.cpp',
+            's/service_entry_point_mongos.cpp',
         ],
         LIBDEPS=[
             'db/conn_pool_options',
@@ -309,6 +313,8 @@ env.Install(
             's/coreshard',
             's/mongoscore',
             's/sharding_initialization',
+            'transport/service_entry_point_utils',
+            'transport/transport_layer_legacy',
             'util/clock_sources',
             'util/ntservice',
             'util/options_parser/options_parser_init',

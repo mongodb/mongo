@@ -60,6 +60,10 @@ class NetworkInterfaceMock;
 class TaskExecutor;
 }  // namespace executor
 
+namespace transport {
+class TransportLayerMock;
+}  // namepsace transport
+
 /**
  * Sets up the mocked out objects for testing the replica-set backed catalog manager and catalog
  * client.
@@ -97,7 +101,7 @@ protected:
 
     executor::TaskExecutor* executor() const;
 
-    MessagingPortMock* getMessagingPort() const;
+    transport::Session* getTransportSession() const;
 
     DistLockManagerMock* distLock() const;
 
@@ -196,6 +200,8 @@ protected:
 
     void shutdownExecutor();
 
+    void setRemote(const HostAndPort& remote);
+
     /**
      * Checks that the given command has the expected settings for read after opTime.
      */
@@ -207,7 +213,8 @@ private:
     std::unique_ptr<ServiceContext> _service;
     ServiceContext::UniqueClient _client;
     ServiceContext::UniqueOperationContext _opCtx;
-    std::unique_ptr<MessagingPortMock> _messagePort;
+    transport::TransportLayerMock* _transportLayer;
+    std::unique_ptr<transport::Session> _transportSession;
 
     RemoteCommandTargeterFactoryMock* _targeterFactory;
     RemoteCommandTargeterMock* _configTargeter;

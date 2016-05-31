@@ -51,6 +51,10 @@ class AbstractMessagingPort;
 class Collection;
 class OperationContext;
 
+namespace transport {
+class Session;
+}  // namespace transport
+
 typedef long long ConnectionId;
 
 /** the database's concept of an outside "client" */
@@ -59,16 +63,16 @@ public:
     /**
      * Creates a Client object and stores it in TLS for the current thread.
      *
-     * An unowned pointer to a AbstractMessagingPort may optionally be provided. If 'mp' is
-     * non-null, then it will be used to augment the thread name, and for reporting purposes.
+     * An unowned pointer to a transport::Session may optionally be provided. If 'session'
+     * is non-null, then it will be used to augment the thread name, and for reporting purposes.
      *
-     * If provided, 'mp' must outlive the newly-created Client object. Client::destroy() may be used
-     * to help enforce that the Client does not outlive 'mp'.
+     * If provided, 'session' must outlive the newly-created Client object. Client::destroy() may
+     * be used to help enforce that the Client does not outlive 'session.'
      */
-    static void initThread(const char* desc, AbstractMessagingPort* mp = 0);
+    static void initThread(const char* desc, transport::Session* session = nullptr);
     static void initThread(const char* desc,
                            ServiceContext* serviceContext,
-                           AbstractMessagingPort* mp);
+                           transport::Session* session);
 
     /**
      * Inits a thread if that thread has not already been init'd, setting the thread name to
@@ -159,7 +163,7 @@ public:
 
 private:
     friend class ServiceContext;
-    Client(std::string desc, ServiceContext* serviceContext, AbstractMessagingPort* p = 0);
+    Client(std::string desc, ServiceContext* serviceContext, transport::Session* session = nullptr);
 
 
     // Description for the client (e.g. conn8)

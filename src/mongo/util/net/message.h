@@ -458,11 +458,16 @@ public:
         return _buf.get();
     }
 
+    const char* buf() const {
+        return _buf.get();
+    }
+
     std::string toString() const;
 
     SharedBuffer sharedBuffer() {
         return _buf;
     }
+
     ConstSharedBuffer sharedBuffer() const {
         return _buf;
     }

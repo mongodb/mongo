@@ -51,7 +51,7 @@ public:
 protected:
     void setUp() override {
         ShardingCatalogTestFixture::setUp();
-        getMessagingPort()->setRemote(HostAndPort("FakeRemoteClient:34567"));
+        setRemote(HostAndPort("FakeRemoteClient:34567"));
         configTargeter()->setFindHostReturnValue(configHost);
         _maxCollVersion = ChunkVersion(1, 0, OID::gen());
         _loader.reset(new MetadataLoader);

@@ -46,8 +46,8 @@
 #endif
 #endif
 
+#include "mongo/bson/util/builder.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/sock.h"
 
 namespace mongo {
@@ -150,10 +150,19 @@ bool SockAddr::isLocalHost() const {
 }
 
 std::string SockAddr::toString(bool includePort) const {
-    std::string out = getAddr();
-    if (includePort && getType() != AF_UNIX && getType() != AF_UNSPEC)
-        out += mongoutils::str::stream() << ':' << getPort();
-    return out;
+    if (includePort && (getType() != AF_UNIX) && (getType() != AF_UNSPEC)) {
+        StringBuilder ss;
+
+        if (getType() == AF_INET6) {
+            ss << '[' << getAddr() << "]:" << getPort();
+        } else {
+            ss << getAddr() << ':' << getPort();
+        }
+
+        return ss.str();
+    } else {
+        return getAddr();
+    }
 }
 
 sa_family_t SockAddr::getType() const {

@@ -192,8 +192,8 @@ public:
     virtual HostAndPort getClientHostAndPort(const OperationContext* txn) = 0;
 
     /**
-     * Closes all connections except those marked with the keepOpen property, which should
-     * just be connections used for heartbeating.
+     * Closes all connections in the given TransportLayer except those marked with the
+     * keepOpen property, which should just be connections used for heartbeating.
      * This is used during stepdown, and transition out of primary.
      */
     virtual void closeConnections() = 0;

@@ -55,6 +55,7 @@ public:
     void reply(Message& received, Message& response) override;
 
     void say(Message& toSend, int responseTo = 0) override;
+    void say(const Message& toSend) override;
 
     bool connect(SockAddr& farEnd) override;
 

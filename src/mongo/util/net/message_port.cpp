@@ -63,41 +63,6 @@ using std::string;
 
 /* messagingport -------------------------------------------------------------- */
 
-class Ports {
-    std::set<MessagingPort*> ports;
-    stdx::mutex m;
-
-public:
-    Ports() : ports() {}
-    void closeAll(AbstractMessagingPort::Tag skip_mask) {
-        stdx::lock_guard<stdx::mutex> bl(m);
-        for (std::set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++) {
-            if ((*i)->getTag() & skip_mask) {
-                LOG(3) << "Skip closing connection # " << (*i)->connectionId();
-                continue;
-            }
-            LOG(3) << "Closing connection # " << (*i)->connectionId();
-            (*i)->shutdown();
-        }
-    }
-    void insert(MessagingPort* p) {
-        stdx::lock_guard<stdx::mutex> bl(m);
-        ports.insert(p);
-    }
-    void erase(MessagingPort* p) {
-        stdx::lock_guard<stdx::mutex> bl(m);
-        ports.erase(p);
-    }
-};
-
-// we "new" this so it is still be around when other automatic global vars
-// are being destructed during termination.
-Ports& ports = *(new Ports());
-
-void MessagingPort::closeSockets(AbstractMessagingPort::Tag skipMask) {
-    ports.closeAll(skipMask);
-}
-
 MessagingPort::MessagingPort(int fd, const SockAddr& remote)
     : MessagingPort(std::make_shared<Socket>(fd, remote)) {}
 
@@ -108,7 +73,6 @@ MessagingPort::MessagingPort(std::shared_ptr<Socket> sock)
     : _x509SubjectName(), _connectionId(), _tag(), _psock(std::move(sock)) {
     SockAddr sa = _psock->remoteAddr();
     _remoteParsed = HostAndPort(sa.getAddr(), sa.getPort());
-    ports.insert(this);
 }
 
 void MessagingPort::setTimeout(Milliseconds millis) {
@@ -122,7 +86,6 @@ void MessagingPort::shutdown() {
 
 MessagingPort::~MessagingPort() {
     shutdown();
-    ports.erase(this);
 }
 
 bool MessagingPort::recv(Message& m) {
@@ -216,6 +179,7 @@ bool MessagingPort::call(Message& toSend, Message& response) {
     say(toSend);
     bool success = recv(response);
     if (success) {
+        invariant(!response.empty());
         if (response.header().getResponseToMsgId() != toSend.header().getId()) {
             response.reset();
             uasserted(40134, "Response ID did not match the sent message ID.");
@@ -225,9 +189,15 @@ bool MessagingPort::call(Message& toSend, Message& response) {
 }
 
 void MessagingPort::say(Message& toSend, int responseTo) {
-    verify(!toSend.empty());
+    invariant(!toSend.empty());
     toSend.header().setId(nextMessageId());
     toSend.header().setResponseToMsgId(responseTo);
+
+    return say(const_cast<const Message&>(toSend));
+}
+
+void MessagingPort::say(const Message& toSend) {
+    invariant(!toSend.empty());
     auto buf = toSend.buf();
     if (buf) {
         send(buf, MsgData::ConstView(buf).getLen(), "say");

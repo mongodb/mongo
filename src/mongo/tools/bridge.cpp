@@ -320,17 +320,17 @@ public:
         log() << "Setting random seed: " << mongoBridgeGlobalParams.seed;
     }
 
-    void accepted(AbstractMessagingPort* mp) override final {
+    void accepted(std::unique_ptr<AbstractMessagingPort> mp) override final {
         {
             stdx::lock_guard<stdx::mutex> lk(_portsMutex);
             if (_inShutdown.load()) {
                 mp->shutdown();
                 return;
             }
-            _ports.insert(mp);
+            _ports.insert(mp.get());
         }
 
-        Forwarder f(mp, &_settingsMutex, &_settings, _seedSource.nextInt64());
+        Forwarder f(mp.release(), &_settingsMutex, &_settings, _seedSource.nextInt64());
         stdx::thread t(f);
         t.detach();
     }

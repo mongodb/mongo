@@ -69,7 +69,7 @@ public:
     }
 
     // This is not currently used for the MiniWebServer. See SERVER-24200
-    void accepted(AbstractMessagingPort* mp) override;
+    void accepted(std::unique_ptr<AbstractMessagingPort> mp) override;
 
 private:
     void _accepted(const std::shared_ptr<Socket>& psocket, long long connectionId) override;

@@ -28,40 +28,36 @@
 
 #pragma once
 
+#include <vector>
+
 #include "mongo/base/disallow_copying.h"
-#include "mongo/transport/session_id.h"
-#include "mongo/util/time_support.h"
+#include "mongo/transport/service_entry_point.h"
 
 namespace mongo {
+
 namespace transport {
+class Session;
+class TransportLayer;
+}  // namespace transport
 
 /**
- * Interface representing implementations of Ticket.
- *
- * Ticket implementations are specific to a TransportLayer implementation.
+ * The entry point from the TransportLayer into Mongos. startSession() spawns and
+ * detaches a new thread for each incoming connection (transport::Session).
  */
-class TicketImpl {
-    MONGO_DISALLOW_COPYING(TicketImpl);
+class ServiceEntryPointMongos final : public ServiceEntryPoint {
+    MONGO_DISALLOW_COPYING(ServiceEntryPointMongos);
 
 public:
-    virtual ~TicketImpl() = default;
+    ServiceEntryPointMongos(transport::TransportLayer* tl);
 
-    TicketImpl(TicketImpl&&) = default;
-    TicketImpl& operator=(TicketImpl&&) = default;
+    virtual ~ServiceEntryPointMongos() = default;
 
-    /**
-     * Return this ticket's session id.
-     */
-    virtual SessionId sessionId() const = 0;
+    void startSession(transport::Session&& session) override;
 
-    /**
-     * Return this ticket's expiration date.
-     */
-    virtual Date_t expiration() const = 0;
+private:
+    void _sessionLoop(transport::Session* session);
 
-protected:
-    TicketImpl() = default;
+    transport::TransportLayer* _tl;
 };
 
-}  // namespace transport
 }  // namespace mongo

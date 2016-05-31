@@ -204,7 +204,7 @@ void MiniWebServer::_accepted(const std::shared_ptr<Socket>& psock, long long co
     }
 }
 
-void MiniWebServer::accepted(AbstractMessagingPort* mp) {
+void MiniWebServer::accepted(std::unique_ptr<AbstractMessagingPort> mp) {
     MONGO_UNREACHABLE;
 }
 

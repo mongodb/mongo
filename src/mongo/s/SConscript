@@ -98,6 +98,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/catalog/replset/sharding_catalog_client_impl',
         '$BUILD_DIR/mongo/s/catalog/replset/sharding_catalog_manager_impl',
         '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/mongo/transport/transport_layer_mock',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         '$BUILD_DIR/mongo/util/net/message_port_mock',
         'mongoscore',

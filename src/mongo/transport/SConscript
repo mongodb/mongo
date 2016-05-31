@@ -13,13 +13,10 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target='service_entry_point_test_suite',
+    target='transport_layer_common',
     source=[
-        'service_entry_point_test_suite.cpp',
-        ## move these somewhere better:
         'session.cpp',
         'ticket.cpp',
-        'transport_layer.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/unittest/unittest',
@@ -28,10 +25,63 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='transport_layer_manager',
+    source=[
+        'transport_layer_manager.cpp',
+    ],
+    LIBDEPS=[
+        'transport_layer_common',
+    ],
+)
+
+env.Library(
+    target='transport_layer_mock',
+    source=[
+        'transport_layer_mock.cpp',
+    ],
+    LIBDEPS=[
+        'transport_layer_common',
+    ],
+)
+
+env.Library(
+    target='transport_layer_legacy',
+    source=[
+        'transport_layer_legacy.cpp',
+    ],
+    LIBDEPS=[
+        'transport_layer_common',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/stats/counters',
+    ],
+)
+
+env.Library(
+    target='service_entry_point_test_suite',
+    source=[
+        'service_entry_point_test_suite.cpp',
+    ],
+    LIBDEPS=[
+        'transport_layer_common',
+        '$BUILD_DIR/mongo/unittest/unittest',
+    ],
+)
+
+env.Library(
+    target='service_entry_point_utils',
+    source=[
+        'service_entry_point_utils.cpp',
+    ],
+    LIBDEPS=[
+        'transport_layer_common',
+    ],
+)
+
 env.CppUnitTest(
     target='service_entry_point_mock_test',
     source=[
-        'service_entry_point_mock.cpp', ## move?
+        'service_entry_point_mock.cpp',
         'service_entry_point_mock_test.cpp',
     ],
     LIBDEPS=[

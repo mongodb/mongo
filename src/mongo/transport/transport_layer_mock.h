@@ -28,39 +28,62 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
-#include "mongo/transport/session_id.h"
+#include "mongo/base/status.h"
+#include "mongo/transport/session.h"
+#include "mongo/transport/ticket.h"
+#include "mongo/transport/ticket_impl.h"
+#include "mongo/transport/transport_layer.h"
+#include "mongo/util/net/message.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace transport {
 
 /**
- * Interface representing implementations of Ticket.
- *
- * Ticket implementations are specific to a TransportLayer implementation.
+ * This TransportLayerMock is a noop TransportLayer implementation.
  */
-class TicketImpl {
-    MONGO_DISALLOW_COPYING(TicketImpl);
+class TransportLayerMock : public TransportLayer {
+    MONGO_DISALLOW_COPYING(TransportLayerMock);
 
 public:
-    virtual ~TicketImpl() = default;
+    TransportLayerMock() = default;
 
-    TicketImpl(TicketImpl&&) = default;
-    TicketImpl& operator=(TicketImpl&&) = default;
+    Ticket sourceMessage(const Session& session,
+                         Message* message,
+                         Date_t expiration = Ticket::kNoExpirationDate) override;
+    Ticket sinkMessage(const Session& session,
+                       const Message& message,
+                       Date_t expiration = Ticket::kNoExpirationDate) override;
 
+    Status wait(Ticket&& ticket) override;
+    void asyncWait(Ticket&& ticket, TicketCallback callback) override;
+
+    std::string getX509SubjectName(const Session& session) override;
+    void registerTags(const Session& session) override;
+
+    Stats sessionStats() override;
+
+    void end(const Session& session) override;
+    void endAllSessions(Session::TagMask tags = Session::kEmptyTagMask) override;
+
+    Status start() override;
+    void shutdown() override;
+
+private:
     /**
-     * Return this ticket's session id.
+     * A class for Tickets issued from the TransportLayerMock. These will
+     * route to the appropriate TransportLayer when run with wait() or
+     * asyncWait().
      */
-    virtual SessionId sessionId() const = 0;
+    class MockTicket : public TicketImpl {
+        MONGO_DISALLOW_COPYING(MockTicket);
 
-    /**
-     * Return this ticket's expiration date.
-     */
-    virtual Date_t expiration() const = 0;
+    public:
+        MockTicket() = default;
 
-protected:
-    TicketImpl() = default;
+        Session::Id sessionId() const override;
+        Date_t expiration() const override;
+    };
 };
 
 }  // namespace transport

@@ -59,6 +59,8 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/transport/session.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -726,17 +728,17 @@ public:
 
         /* we want to keep heartbeat connections open when relinquishing primary.
            tag them here. */
-        AbstractMessagingPort* mp = txn->getClient()->port();
-        unsigned originalTag = 0;
-        if (mp) {
-            originalTag = mp->getTag();
-            mp->setTag(originalTag | executor::NetworkInterface::kMessagingPortKeepOpen);
+        transport::Session::TagMask originalTag = 0;
+        transport::Session* session = txn->getClient()->session();
+        if (session) {
+            originalTag = session->getTags();
+            session->replaceTags(originalTag | transport::Session::kKeepOpen);
         }
 
         // Unset the tag on block exit
-        ON_BLOCK_EXIT([mp, originalTag]() {
-            if (mp) {
-                mp->setTag(originalTag);
+        ON_BLOCK_EXIT([session, originalTag]() {
+            if (session) {
+                session->replaceTags(originalTag);
             }
         });
 

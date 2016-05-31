@@ -34,6 +34,9 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/transport/session.h"
+#include "mongo/transport/transport_layer.h"
+#include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/system_clock_source.h"
@@ -115,7 +118,8 @@ Status validateStorageOptions(
 }
 
 ServiceContext::ServiceContext()
-    : _tickSource(stdx::make_unique<SystemTickSource>()),
+    : _transportLayerManager(stdx::make_unique<transport::TransportLayerManager>()),
+      _tickSource(stdx::make_unique<SystemTickSource>()),
       _fastClockSource(stdx::make_unique<SystemClockSource>()),
       _preciseClockSource(stdx::make_unique<SystemClockSource>()) {}
 
@@ -125,8 +129,8 @@ ServiceContext::~ServiceContext() {
 }
 
 ServiceContext::UniqueClient ServiceContext::makeClient(std::string desc,
-                                                        AbstractMessagingPort* p) {
-    std::unique_ptr<Client> client(new Client(std::move(desc), this, p));
+                                                        transport::Session* session) {
+    std::unique_ptr<Client> client(new Client(std::move(desc), this, session));
     auto observer = _clientObservers.cbegin();
     try {
         for (; observer != _clientObservers.cend(); ++observer) {
@@ -148,6 +152,14 @@ ServiceContext::UniqueClient ServiceContext::makeClient(std::string desc,
         invariant(_clients.insert(client.get()).second);
     }
     return UniqueClient(client.release());
+}
+
+transport::TransportLayer* ServiceContext::getTransportLayer() const {
+    return _transportLayerManager.get();
+}
+
+Status ServiceContext::addAndStartTransportLayer(std::unique_ptr<transport::TransportLayer> tl) {
+    return _transportLayerManager->addAndStartTransportLayer(std::move(tl));
 }
 
 TickSource* ServiceContext::getTickSource() const {

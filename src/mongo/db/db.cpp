@@ -96,6 +96,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"
 #include "mongo/db/service_context_d.h"
+#include "mongo/db/service_entry_point_mongod.h"
 #include "mongo/db/startup_warnings_mongod.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/snapshots.h"
@@ -114,6 +115,7 @@
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/transport/transport_layer_legacy.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 #include "mongo/util/concurrency/task.h"
@@ -124,7 +126,6 @@
 #include "mongo/util/log.h"
 #include "mongo/util/net/hostname_canonicalization_worker.h"
 #include "mongo/util/net/listen.h"
-#include "mongo/util/net/message_server.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/ntservice.h"
 #include "mongo/util/options_parser/startup_options.h"
@@ -168,65 +169,6 @@ ntservice::NtServiceDefaultStrings defaultServiceStrings = {
 #endif
 
 Timer startupSrandTimer;
-
-class MyMessageHandler : public MessageHandler {
-public:
-    virtual void connected(AbstractMessagingPort* p) {
-        Client::initThread("conn", p);
-    }
-
-    virtual void process(Message& m, AbstractMessagingPort* port) {
-        while (true) {
-            if (inShutdown()) {
-                log() << "got request after shutdown()" << endl;
-                break;
-            }
-
-            DbResponse dbresponse;
-            {
-                auto opCtx = getGlobalServiceContext()->makeOperationContext(&cc());
-                assembleResponse(opCtx.get(), m, dbresponse, port->remote());
-
-                // opCtx must go out of scope here so that the operation cannot show up in currentOp
-                // results after the response reaches the client
-            }
-
-            if (!dbresponse.response.empty()) {
-                port->reply(m, dbresponse.response, dbresponse.responseToMsgId);
-                if (dbresponse.exhaustNS.size() > 0) {
-                    MsgData::View header = dbresponse.response.header();
-                    QueryResult::View qr = header.view2ptr();
-                    long long cursorid = qr.getCursorId();
-                    if (cursorid) {
-                        verify(dbresponse.exhaustNS.size() && dbresponse.exhaustNS[0]);
-                        string ns = dbresponse.exhaustNS;  // before reset() free's it...
-                        m.reset();
-                        BufBuilder b(512);
-                        b.appendNum((int)0 /*size set later*/);
-                        b.appendNum(header.getId());
-                        b.appendNum(header.getResponseToMsgId());
-                        b.appendNum((int)dbGetMore);
-                        b.appendNum((int)0);
-                        b.appendStr(ns);
-                        b.appendNum((int)0);  // ntoreturn
-                        b.appendNum(cursorid);
-
-                        MsgData::View header = b.buf();
-                        header.setLen(b.len());
-                        m.setData(b.release());
-                        DEV log() << "exhaust=true sending more";
-                        continue;  // this goes back to top loop
-                    }
-                }
-            }
-            break;
-        }
-    }
-
-    virtual void close() {
-        Client::destroy();
-    }
-};
 
 static void logStartup(OperationContext* txn) {
     BSONObjBuilder toLog;
@@ -530,7 +472,7 @@ static void _initWireSpec() {
 }
 
 
-static void _initAndListen(int listenPort) {
+static ExitCode _initAndListen(int listenPort) {
     Client::initThread("initandlisten");
 
     _initWireSpec();
@@ -570,20 +512,18 @@ static void _initAndListen(int listenPort) {
 
     checked_cast<ServiceContextMongoD*>(getGlobalServiceContext())->createLockFile();
 
-    // Due to SERVER-15389, we must setupSockets first thing at startup in order to avoid
-    // obtaining too high a file descriptor for our calls to select().
-    MessageServer::Options options;
+    transport::TransportLayerLegacy::Options options;
     options.port = listenPort;
     options.ipList = serverGlobalParams.bind_ip;
 
-    auto handler = std::make_shared<MyMessageHandler>();
-    MessageServer* server = createServer(options, std::move(handler), getGlobalServiceContext());
-
-    // This is what actually creates the sockets, but does not yet listen on them because we
-    // do not want connections to just hang if recovery takes a very long time.
-    if (!server->setupSockets()) {
-        error() << "Failed to set up sockets during startup.";
-        return;
+    // Create, start, and attach the TL
+    auto transportLayer = stdx::make_unique<transport::TransportLayerLegacy>(
+        options,
+        std::make_shared<ServiceEntryPointMongod>(getGlobalServiceContext()->getTransportLayer()));
+    auto res = transportLayer->setup();
+    if (!res.isOK()) {
+        error() << "Failed to set up listener: " << res.toString();
+        return EXIT_NET_ERROR;
     }
 
     std::shared_ptr<DbWebServer> dbWebServer;
@@ -594,7 +534,7 @@ static void _initAndListen(int listenPort) {
                                           new RestAdminAccess()));
         if (!dbWebServer->setupSockets()) {
             error() << "Failed to set up sockets for HTTP interface during startup.";
-            return;
+            return EXIT_NET_ERROR;
         }
     }
 
@@ -674,7 +614,7 @@ static void _initAndListen(int listenPort) {
     }
 
     if (mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalRecoverOnly)
-        return;
+        return EXIT_NET_ERROR;
 
     if (mongodGlobalParams.scriptingEnabled) {
         ScriptEngine::setup();
@@ -799,14 +739,19 @@ static void _initAndListen(int listenPort) {
     // MessageServer::run will return when exit code closes its socket and we don't need the
     // operation context anymore
     startupOpCtx.reset();
-    server->run();
+
+    auto start = getGlobalServiceContext()->addAndStartTransportLayer(std::move(transportLayer));
+    if (!start.isOK()) {
+        error() << "Failed to start the listener: " << start.toString();
+        return EXIT_NET_ERROR;
+    }
+
+    return waitForShutdown();
 }
 
 ExitCode initAndListen(int listenPort) {
     try {
-        _initAndListen(listenPort);
-
-        return inShutdown() ? EXIT_CLEAN : EXIT_NET_ERROR;
+        return _initAndListen(listenPort);
     } catch (DBException& e) {
         log() << "exception in initAndListen: " << e.toString() << ", terminating" << endl;
         return EXIT_UNCAUGHT;
@@ -1001,7 +946,6 @@ static void reportEventToSystemImpl(const char* msg) {
 // registerShutdownTask is called below. It must not depend on the
 // prior execution of mongo initializers or the existence of threads.
 static void shutdownTask() {
-
     auto serviceContext = getGlobalServiceContext();
 
     Client::initThreadIfNotAlready();
@@ -1014,6 +958,7 @@ static void shutdownTask() {
         txn = uniqueTxn.get();
     }
 
+    getGlobalServiceContext()->getTransportLayer()->shutdown();
     log(LogComponent::kNetwork) << "shutdown: going to close listening sockets..." << endl;
     ListeningSockets::get()->closeAll();
 
@@ -1037,12 +982,6 @@ static void shutdownTask() {
     // will do it for us when the process terminates.
 
     stdx::packaged_task<void()> dryOutTask([] {
-
-        // Walk all open sockets and close them. This should unblock any that are sitting in
-        // recv. Other sockets on which there are active operations should see the inShutdown flag
-        // as true when they complete the operation.
-        Listener::closeMessagingPorts(0);
-
         // There isn't currently a way to wait on the TicketHolder to have all its tickets back,
         // unfortunately. So, busy wait in this detached thread.
         while (true) {

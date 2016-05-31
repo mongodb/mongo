@@ -28,14 +28,18 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/base/disallow_copying.h"
-#include "mongo/transport/session.h"
+#include "mongo/stdx/functional.h"
+#include "mongo/transport/session_id.h"
+#include "mongo/transport/ticket_impl.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace transport {
 
-class TicketImpl;
+class TransportLayer;
 
 /**
  * A Ticket represents some work to be done within the TransportLayer.
@@ -46,16 +50,16 @@ class Ticket {
     MONGO_DISALLOW_COPYING(Ticket);
 
 public:
-    friend class TransportLayer;
+    using TicketCallback = stdx::function<void(Status)>;
 
-    using SessionId = Session::SessionId;
+    friend class TransportLayer;
 
     /**
      * Indicates that there is no expiration time by when a ticket needs to complete.
      */
     static const Date_t kNoExpirationDate;
 
-    Ticket(std::unique_ptr<TicketImpl> ticket);
+    Ticket(TransportLayer* tl, std::unique_ptr<TicketImpl> ticket);
     ~Ticket();
 
     /**
@@ -67,20 +71,41 @@ public:
     /**
      * Return this ticket's session id.
      */
-    SessionId sessionId() const;
+    SessionId sessionId() const {
+        return _ticket->sessionId();
+    }
 
     /**
      * Return this ticket's expiration date.
      */
-    Date_t expiration() const;
+    Date_t expiration() const {
+        return _ticket->expiration();
+    }
+
+    /**
+     * Wait for this ticket to be filled.
+     *
+     * This is this-rvalue qualified because it consumes the ticket
+     */
+    Status wait() &&;
+
+    /**
+     * Asynchronously wait for this ticket to be filled.
+     *
+     * This is this-rvalue qualified because it consumes the ticket
+     */
+    void asyncWait(TicketCallback cb) &&;
 
 protected:
     /**
      * Return a non-owning pointer to the underlying TicketImpl type
      */
-    TicketImpl* impl() const;
+    TicketImpl* impl() const {
+        return _ticket.get();
+    }
 
 private:
+    TransportLayer* _tl;
     std::unique_ptr<TicketImpl> _ticket;
 };
 

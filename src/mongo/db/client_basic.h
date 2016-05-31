@@ -31,6 +31,7 @@
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/net/abstract_message_port.h"
 #include "mongo/util/net/hostandport.h"
@@ -58,11 +59,12 @@ public:
     }
 
     bool hasRemote() const {
-        return _messagingPort;
+        return _session;
     }
+
     HostAndPort getRemote() const {
-        verify(_messagingPort);
-        return _messagingPort->remote();
+        verify(_session);
+        return _session->remote();
     }
 
     /**
@@ -73,20 +75,20 @@ public:
     }
 
     /**
-     * Returns the AbstractMessagePort to which this client session is bound, if any.
+     * Returns the Session to which this client is bound, if any.
      */
-    AbstractMessagingPort* port() const {
-        return _messagingPort;
+    transport::Session* session() const {
+        return _session;
     }
 
     static ClientBasic* getCurrent();
 
 protected:
-    ClientBasic(ServiceContext* serviceContext, AbstractMessagingPort* messagingPort);
+    ClientBasic(ServiceContext* serviceContext, transport::Session* session);
     ~ClientBasic();
 
 private:
     ServiceContext* const _serviceContext;
-    AbstractMessagingPort* const _messagingPort;
+    transport::Session* const _session;
 };
 }

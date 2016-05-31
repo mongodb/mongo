@@ -29,7 +29,10 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/transport/session_id.h"
+#include "mongo/transport/ticket.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/message.h"
 
 namespace mongo {
 namespace transport {
@@ -47,7 +50,14 @@ public:
     /**
      * Type to indicate the internal id for this session.
      */
-    using SessionId = uint64_t;
+    using Id = SessionId;
+
+    /**
+     * Tags for groups of connections.
+     */
+    using TagMask = uint32_t;
+    static constexpr TagMask kEmptyTagMask = 0;
+    static constexpr TagMask kKeepOpen = 1;
 
     /**
      * Construct a new session.
@@ -68,23 +78,71 @@ public:
     /**
      * Return the id for this session.
      */
-    SessionId id() const;
+    Id id() const {
+        return _id;
+    }
 
     /**
      * Return the remote host for this session.
      */
-    const HostAndPort& remote() const;
+    const HostAndPort& remote() const {
+        return _remote;
+    }
 
     /**
      * Return the local host information for this session.
      */
-    const HostAndPort& local() const;
+    const HostAndPort& local() const {
+        return _local;
+    }
+
+    /**
+     * Return the X509 subject name for this connection (SSL only).
+     */
+    std::string getX509SubjectName() const;
+
+    /**
+     * Set this session's tags. This Session will register
+     * its new tags with its TransportLayer.
+     */
+    void replaceTags(TagMask tags);
+
+    /**
+     * Get this session's tags.
+     */
+    TagMask getTags() const {
+        return _tags;
+    }
+
+    /**
+     * Source (receive) a new Message for this Session.
+     *
+     * This method will forward to sourceMessage on this Session's transport layer.
+     */
+    Ticket sourceMessage(Message* message, Date_t expiration = Ticket::kNoExpirationDate);
+
+    /**
+     * Sink (send) a new Message for this Session. This method should be used
+     * to send replies to a given host.
+     *
+     * This method will forward to sinkMessage on this Session's transport layer.
+     */
+    Ticket sinkMessage(const Message& message, Date_t expiration = Ticket::kNoExpirationDate);
+
+    /**
+     * The TransportLayer for this Session.
+     */
+    TransportLayer* getTransportLayer() const {
+        return _tl;
+    }
 
 private:
-    SessionId _id;
+    Id _id;
 
     HostAndPort _remote;
     HostAndPort _local;
+
+    TagMask _tags;
 
     TransportLayer* _tl;
 };

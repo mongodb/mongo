@@ -28,30 +28,68 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
+#include "mongo/base/status.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/transport/session.h"
 #include "mongo/transport/ticket.h"
 #include "mongo/transport/ticket_impl.h"
-#include "mongo/transport/transport_layer.h"
+#include "mongo/transport/transport_layer_mock.h"
+#include "mongo/util/time_support.h"
+
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 namespace transport {
 
-const Date_t Ticket::kNoExpirationDate{Date_t::max()};
-
-Ticket::Ticket(TransportLayer* tl, std::unique_ptr<TicketImpl> ticket)
-    : _tl(tl), _ticket(std::move(ticket)) {}
-
-Ticket::~Ticket() = default;
-
-Ticket::Ticket(Ticket&&) = default;
-Ticket& Ticket::operator=(Ticket&&) = default;
-
-Status Ticket::wait()&& {
-    return _tl->wait(std::move(*this));
+Session::Id TransportLayerMock::MockTicket::sessionId() const {
+    return Session::Id{};
 }
 
-void Ticket::asyncWait(TicketCallback cb)&& {
-    return _tl->asyncWait(std::move(*this), std::move(cb));
+Date_t TransportLayerMock::MockTicket::expiration() const {
+    return Date_t::now();
 }
+
+Ticket TransportLayerMock::sourceMessage(const Session& session,
+                                         Message* message,
+                                         Date_t expiration) {
+    return Ticket(this, stdx::make_unique<MockTicket>());
+}
+
+Ticket TransportLayerMock::sinkMessage(const Session& session,
+                                       const Message& message,
+                                       Date_t expiration) {
+    return Ticket(this, stdx::make_unique<MockTicket>());
+}
+
+Status TransportLayerMock::wait(Ticket&& ticket) {
+    return Status::OK();
+}
+
+void TransportLayerMock::asyncWait(Ticket&& ticket, TicketCallback callback) {
+    callback(Status::OK());
+}
+
+std::string TransportLayerMock::getX509SubjectName(const Session& session) {
+    return session.getX509SubjectName();
+}
+
+TransportLayer::Stats TransportLayerMock::sessionStats() {
+    return Stats();
+}
+
+void TransportLayerMock::registerTags(const Session& session) {}
+
+void TransportLayerMock::end(const Session& session) {}
+
+void TransportLayerMock::endAllSessions(Session::TagMask tags) {}
+
+Status TransportLayerMock::start() {
+    return Status::OK();
+}
+
+void TransportLayerMock::shutdown() {}
 
 }  // namespace transport
 }  // namespace mongo

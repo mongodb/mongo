@@ -87,7 +87,7 @@ public:
         ShardingCatalogTestFixture::setUp();
         configTargeter()->setFindHostReturnValue(configHost);
         configTargeter()->setConnectionStringReturnValue(configCS);
-        getMessagingPort()->setRemote(clientHost);
+        setRemote(clientHost);
     }
 
     void expectGetDatabase(const DatabaseType& expectedDb) {

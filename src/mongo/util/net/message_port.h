@@ -66,6 +66,7 @@ public:
     bool call(Message& toSend, Message& response) override;
 
     void say(Message& toSend, int responseTo = 0) override;
+    void say(const Message& toSend) override;
 
     unsigned remotePort() const override {
         return _psock->remotePort();
@@ -142,11 +143,6 @@ private:
     long long _connectionId;
     AbstractMessagingPort::Tag _tag;
     std::shared_ptr<Socket> _psock;
-
-
-public:
-    static void closeSockets(AbstractMessagingPort::Tag skipMask = kSkipAllMask);
 };
-
 
 }  // namespace mongo

@@ -39,6 +39,12 @@
 
 namespace mongo {
 
+class OperationContext;
+
+namespace transport {
+class Session;
+}  // namespace transport
+
 /* db response format
 
    Query or GetMore: // see struct QueryResult
@@ -352,9 +358,9 @@ public:
     /**
      * Finishes the reply and sends the message out to 'destination'.
      */
-    void send(AbstractMessagingPort* destination,
+    void send(transport::Session* session,
               int queryResultFlags,
-              Message& requestMsg,  // should be const but MessagePort::reply takes non-const.
+              const Message& requestMsg,
               int nReturned,
               int startingFrom = 0,
               long long cursorId = 0);
@@ -362,14 +368,14 @@ public:
     /**
      * Similar to send() but used for replying to a command.
      */
-    void sendCommandReply(AbstractMessagingPort* destination, Message& requestMsg);
+    void sendCommandReply(transport::Session* session, const Message& requestMsg);
 
 private:
     BufBuilder _buffer;
 };
 
 void replyToQuery(int queryResultFlags,
-                  AbstractMessagingPort* p,
+                  transport::Session* session,
                   Message& requestMsg,
                   const void* data,
                   int size,
@@ -377,10 +383,9 @@ void replyToQuery(int queryResultFlags,
                   int startingFrom = 0,
                   long long cursorId = 0);
 
-
 /* object reply helper. */
 void replyToQuery(int queryResultFlags,
-                  AbstractMessagingPort* p,
+                  transport::Session* session,
                   Message& requestMsg,
                   const BSONObj& responseObj);
 

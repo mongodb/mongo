@@ -67,8 +67,8 @@ public:
 
     void setUp() override {
         ShardingTestFixture::setUp();
+        setRemote(HostAndPort("ClientHost", 12345));
 
-        getMessagingPort()->setRemote(HostAndPort("ClientHost", 12345));
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
 
         std::vector<ShardType> shards;

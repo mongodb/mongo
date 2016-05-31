@@ -95,17 +95,6 @@ env.Library(
 )
 
 env.Library(
-    target="message_server_port",
-    source=[
-        "message_server_port.cpp",
-    ],
-    LIBDEPS=[
-        'network',
-        '$BUILD_DIR/mongo/db/stats/counters',
-    ],
-)
-
-env.Library(
     target='miniwebserver',
     source=[
         'miniwebserver.cpp',

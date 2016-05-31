@@ -46,6 +46,11 @@ bool inShutdown();
 bool inShutdownStrict();
 
 /**
+ * Does not return until all shutdown tasks have run.
+ */
+ExitCode waitForShutdown();
+
+/**
  * Registers a new shutdown task to be called when shutdown or
  * shutdownNoTerminate is called. If this function is invoked after
  * shutdown or shutdownNoTerminate has been called, std::terminate is

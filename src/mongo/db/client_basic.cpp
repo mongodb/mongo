@@ -32,8 +32,8 @@
 
 namespace mongo {
 
-ClientBasic::ClientBasic(ServiceContext* serviceContext, AbstractMessagingPort* messagingPort)
-    : _serviceContext(serviceContext), _messagingPort(messagingPort) {}
+ClientBasic::ClientBasic(ServiceContext* serviceContext, transport::Session* session)
+    : _serviceContext(serviceContext), _session(session) {}
 
 ClientBasic::~ClientBasic() = default;
 

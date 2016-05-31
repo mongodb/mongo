@@ -58,8 +58,8 @@ class DropColl2ShardTest : public ShardingCatalogTestFixture {
 public:
     void setUp() override {
         ShardingCatalogTestFixture::setUp();
+        setRemote(_clientHost);
 
-        getMessagingPort()->setRemote(_clientHost);
         configTargeter()->setFindHostReturnValue(_configHost);
         configTargeter()->setConnectionStringReturnValue(_configCS);
 

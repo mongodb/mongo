@@ -50,7 +50,7 @@ class NoChunkFixture : public ShardingCatalogTestFixture {
 protected:
     void setUp() {
         ShardingCatalogTestFixture::setUp();
-        getMessagingPort()->setRemote(HostAndPort("FakeRemoteClient:34567"));
+        setRemote(HostAndPort("FakeRemoteClient:34567"));
         configTargeter()->setFindHostReturnValue(configHost);
 
         OID epoch = OID::gen();
@@ -318,7 +318,7 @@ class SingleChunkFixture : public ShardingCatalogTestFixture {
 protected:
     void setUp() {
         ShardingCatalogTestFixture::setUp();
-        getMessagingPort()->setRemote(HostAndPort("FakeRemoteClient:34567"));
+        setRemote(HostAndPort("FakeRemoteClient:34567"));
         configTargeter()->setFindHostReturnValue(configHost);
 
         OID epoch = OID::gen();
@@ -574,7 +574,7 @@ class SingleChunkMinMaxCompoundKeyFixture : public ShardingCatalogTestFixture {
 protected:
     void setUp() {
         ShardingCatalogTestFixture::setUp();
-        getMessagingPort()->setRemote(HostAndPort("FakeRemoteClient:34567"));
+        setRemote(HostAndPort("FakeRemoteClient:34567"));
         configTargeter()->setFindHostReturnValue(configHost);
 
         OID epoch = OID::gen();
@@ -642,7 +642,7 @@ class TwoChunksWithGapCompoundKeyFixture : public ShardingCatalogTestFixture {
 protected:
     void setUp() {
         ShardingCatalogTestFixture::setUp();
-        getMessagingPort()->setRemote(HostAndPort("FakeRemoteClient:34567"));
+        setRemote(HostAndPort("FakeRemoteClient:34567"));
         configTargeter()->setFindHostReturnValue(configHost);
 
         OID epoch = OID::gen();
@@ -839,7 +839,7 @@ class ThreeChunkWithRangeGapFixture : public ShardingCatalogTestFixture {
 protected:
     void setUp() {
         ShardingCatalogTestFixture::setUp();
-        getMessagingPort()->setRemote(HostAndPort("FakeRemoteClient:34567"));
+        setRemote(HostAndPort("FakeRemoteClient:34567"));
         configTargeter()->setFindHostReturnValue(configHost);
 
         OID epoch = OID::gen();

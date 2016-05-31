@@ -44,6 +44,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/mongoutils/str.h"
@@ -63,16 +64,16 @@ void Client::initThreadIfNotAlready() {
     initThreadIfNotAlready(getThreadName().c_str());
 }
 
-void Client::initThread(const char* desc, AbstractMessagingPort* mp) {
-    initThread(desc, getGlobalServiceContext(), mp);
+void Client::initThread(const char* desc, transport::Session* session) {
+    initThread(desc, getGlobalServiceContext(), session);
 }
 
-void Client::initThread(const char* desc, ServiceContext* service, AbstractMessagingPort* mp) {
+void Client::initThread(const char* desc, ServiceContext* service, transport::Session* session) {
     invariant(currentClient.getMake()->get() == nullptr);
 
     std::string fullDesc;
-    if (mp != NULL) {
-        fullDesc = str::stream() << desc << mp->connectionId();
+    if (session) {
+        fullDesc = str::stream() << desc << session->id();
     } else {
         fullDesc = desc;
     }
@@ -80,7 +81,7 @@ void Client::initThread(const char* desc, ServiceContext* service, AbstractMessa
     setThreadName(fullDesc.c_str());
 
     // Create the client obj, attach to thread
-    *currentClient.get() = service->makeClient(fullDesc, mp);
+    *currentClient.get() = service->makeClient(fullDesc, session);
 }
 
 void Client::destroy() {
@@ -98,11 +99,11 @@ int64_t generateSeed(const std::string& desc) {
 }
 }  // namespace
 
-Client::Client(std::string desc, ServiceContext* serviceContext, AbstractMessagingPort* p)
-    : ClientBasic(serviceContext, p),
+Client::Client(std::string desc, ServiceContext* serviceContext, transport::Session* session)
+    : ClientBasic(serviceContext, session),
       _desc(std::move(desc)),
       _threadId(stdx::this_thread::get_id()),
-      _connectionId(p ? p->connectionId() : 0),
+      _connectionId(session ? session->id() : 0),
       _prng(generateSeed(_desc)) {}
 
 void Client::reportState(BSONObjBuilder& builder) {

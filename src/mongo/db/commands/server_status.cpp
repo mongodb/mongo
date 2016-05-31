@@ -47,9 +47,9 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/platform/process_id.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/hostname_canonicalization_worker.h"
-#include "mongo/util/net/listen.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/ramlog.h"
@@ -228,9 +228,10 @@ public:
 
     BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const {
         BSONObjBuilder bb;
-        bb.append("current", Listener::globalTicketHolder.used());
-        bb.append("available", Listener::globalTicketHolder.available());
-        bb.append("totalCreated", Listener::globalConnectionNumber.load());
+        auto stats = txn->getServiceContext()->getTransportLayer()->sessionStats();
+        bb.append("current", static_cast<int>(stats.numOpenSessions));
+        bb.append("available", static_cast<int>(stats.numAvailableSessions));
+        bb.append("totalCreated", static_cast<int>(stats.numCreatedSessions));
         return bb.obj();
     }
 

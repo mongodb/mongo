@@ -124,7 +124,7 @@ TEST_F(RemoveShardTest, RemoveShardCantRemoveLastShard) {
 TEST_F(RemoveShardTest, RemoveShardStartDraining) {
     string shardName = "shardToRemove";
     const HostAndPort clientHost{"client1:12345"};
-    getMessagingPort()->setRemote(clientHost);
+    setRemote(clientHost);
 
     auto future = launchAsync([&] {
         auto result = assertGet(catalogClient()->removeShard(operationContext(), shardName));
@@ -288,7 +288,7 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingDatabasesRemaining) {
 TEST_F(RemoveShardTest, RemoveShardCompletion) {
     string shardName = "shardToRemove";
     const HostAndPort clientHost{"client1:12345"};
-    getMessagingPort()->setRemote(clientHost);
+    setRemote(clientHost);
 
     auto future = launchAsync([&] {
         auto result = assertGet(catalogClient()->removeShard(operationContext(), shardName));

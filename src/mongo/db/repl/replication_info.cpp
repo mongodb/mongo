@@ -234,9 +234,10 @@ public:
         // Tag connections to avoid closing them on stepdown.
         auto hangUpElement = cmdObj["hangUpOnStepDown"];
         if (!hangUpElement.eoo() && !hangUpElement.trueValue()) {
-            AbstractMessagingPort* mp = txn->getClient()->port();
-            if (mp) {
-                mp->setTag(mp->getTag() | executor::NetworkInterface::kMessagingPortKeepOpen);
+            auto session = txn->getClient()->session();
+            if (session) {
+                session->replaceTags(session->getTags() |
+                                     executor::NetworkInterface::kMessagingPortKeepOpen);
             }
         }
         appendReplicationInfo(txn, result, 0);

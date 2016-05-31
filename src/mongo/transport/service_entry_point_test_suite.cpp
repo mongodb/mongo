@@ -57,7 +57,6 @@ namespace mongo {
 using namespace transport;
 using namespace stdx::placeholders;
 
-using SessionId = Session::SessionId;
 using TicketCallback = TransportLayer::TicketCallback;
 
 namespace {
@@ -107,7 +106,7 @@ ServiceEntryPointTestSuite::MockTicket::MockTicket(const Session& session,
 ServiceEntryPointTestSuite::MockTicket::MockTicket(const Session& session, Date_t expiration)
     : _sessionId(session.id()), _expiration(expiration) {}
 
-SessionId ServiceEntryPointTestSuite::MockTicket::sessionId() const {
+Session::Id ServiceEntryPointTestSuite::MockTicket::sessionId() const {
     return _sessionId;
 }
 
@@ -140,20 +139,35 @@ Ticket ServiceEntryPointTestSuite::MockTLHarness::sinkMessage(const Session& ses
     return _sinkMessage(session, message, expiration);
 }
 
-Status ServiceEntryPointTestSuite::MockTLHarness::wait(Ticket ticket) {
+Status ServiceEntryPointTestSuite::MockTLHarness::wait(Ticket&& ticket) {
     return _wait(std::move(ticket));
 }
 
-void ServiceEntryPointTestSuite::MockTLHarness::asyncWait(Ticket ticket, TicketCallback callback) {
+void ServiceEntryPointTestSuite::MockTLHarness::asyncWait(Ticket&& ticket,
+                                                          TicketCallback callback) {
     return _asyncWait(std::move(ticket), std::move(callback));
+}
+
+std::string ServiceEntryPointTestSuite::MockTLHarness::getX509SubjectName(const Session& session) {
+    return "mock";
+}
+
+void ServiceEntryPointTestSuite::MockTLHarness::registerTags(const Session& session) {}
+
+TransportLayer::Stats ServiceEntryPointTestSuite::MockTLHarness::sessionStats() {
+    return Stats();
 }
 
 void ServiceEntryPointTestSuite::MockTLHarness::end(const Session& session) {
     return _end(session);
 }
 
-void ServiceEntryPointTestSuite::MockTLHarness::endAllSessions() {
-    return _endAllSessions();
+void ServiceEntryPointTestSuite::MockTLHarness::endAllSessions(Session::TagMask tags) {
+    return _endAllSessions(tags);
+}
+
+Status ServiceEntryPointTestSuite::MockTLHarness::start() {
+    return _start();
 }
 
 void ServiceEntryPointTestSuite::MockTLHarness::shutdown() {
@@ -180,13 +194,13 @@ Status ServiceEntryPointTestSuite::MockTLHarness::_waitOnceThenError(transport::
 Ticket ServiceEntryPointTestSuite::MockTLHarness::_defaultSource(const Session& s,
                                                                  Message* m,
                                                                  Date_t d) {
-    return Ticket(stdx::make_unique<ServiceEntryPointTestSuite::MockTicket>(s, m, d));
+    return Ticket(this, stdx::make_unique<ServiceEntryPointTestSuite::MockTicket>(s, m, d));
 }
 
 Ticket ServiceEntryPointTestSuite::MockTLHarness::_defaultSink(const Session& s,
                                                                const Message&,
                                                                Date_t d) {
-    return Ticket(stdx::make_unique<ServiceEntryPointTestSuite::MockTicket>(s, d));
+    return Ticket(this, stdx::make_unique<ServiceEntryPointTestSuite::MockTicket>(s, d));
 }
 
 Ticket ServiceEntryPointTestSuite::MockTLHarness::_sinkThenErrorOnWait(const Session& s,
@@ -308,6 +322,7 @@ void ServiceEntryPointTestSuite::interruptingSessionTest() {
     auto resumeAFuture = resumeA.get_future();
 
     stdx::promise<void> testComplete;
+
     auto testFuture = testComplete.get_future();
 
     _tl->_resetHooks();
@@ -376,10 +391,11 @@ void ServiceEntryPointTestSuite::burstStressTest(int numSessions,
                                                  Milliseconds delay) {
     AtomicWord<int> ended{0};
     stdx::promise<void> allSessionsComplete;
+
     auto allCompleteFuture = allSessionsComplete.get_future();
 
     stdx::mutex cyclesLock;
-    std::unordered_map<SessionId, int> completedCycles;
+    std::unordered_map<Session::Id, int> completedCycles;
 
     _tl->_resetHooks();
 

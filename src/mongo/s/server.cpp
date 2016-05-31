@@ -77,12 +77,14 @@
 #include "mongo/s/mongos_options.h"
 #include "mongo/s/query/cluster_cursor_cleanup_job.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/service_entry_point_mongos.h"
 #include "mongo/s/sharding_egress_metadata_hook_for_mongos.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/s/sharding_uptime_reporter.h"
 #include "mongo/s/version_mongos.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/transport/transport_layer_legacy.h"
 #include "mongo/util/admin_access.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -92,7 +94,6 @@
 #include "mongo/util/log.h"
 #include "mongo/util/net/hostname_canonicalization_worker.h"
 #include "mongo/util/net/message.h"
-#include "mongo/util/net/message_server.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/ntservice.h"
@@ -160,58 +161,6 @@ static BSONObj buildErrReply(const DBException& ex) {
     return errB.obj();
 }
 
-class ShardedMessageHandler : public MessageHandler {
-public:
-    virtual ~ShardedMessageHandler() {}
-
-    virtual void connected(AbstractMessagingPort* p) {
-        Client::initThread("conn", getGlobalServiceContext(), p);
-    }
-
-    virtual void process(Message& m, AbstractMessagingPort* p) {
-        verify(p);
-        Request r(m, p);
-        auto txn = cc().makeOperationContext();
-
-        try {
-            r.init(txn.get());
-            r.process(txn.get());
-        } catch (const AssertionException& ex) {
-            LOG(ex.isUserAssertion() ? 1 : 0) << "Assertion failed"
-                                              << " while processing "
-                                              << networkOpToString(m.operation()) << " op"
-                                              << " for " << r.getnsIfPresent() << causedBy(ex);
-
-            if (r.expectResponse()) {
-                m.header().setId(r.id());
-                replyToQuery(ResultFlag_ErrSet, p, m, buildErrReply(ex));
-            }
-
-            // We *always* populate the last error for now
-            LastError::get(cc()).setLastError(ex.getCode(), ex.what());
-        } catch (const DBException& ex) {
-            log() << "Exception thrown"
-                  << " while processing " << networkOpToString(m.operation()) << " op"
-                  << " for " << r.getnsIfPresent() << causedBy(ex);
-
-            if (r.expectResponse()) {
-                m.header().setId(r.id());
-                replyToQuery(ResultFlag_ErrSet, p, m, buildErrReply(ex));
-            }
-
-            // We *always* populate the last error for now
-            LastError::get(cc()).setLastError(ex.getCode(), ex.what());
-        }
-
-        // Release connections back to pool, if any still cached
-        ShardConnection::releaseMyConnections();
-    }
-
-    virtual void close() {
-        Client::destroy();
-    }
-};
-
 }  // namespace mongo
 
 using namespace mongo;
@@ -277,6 +226,19 @@ static ExitCode runMongosServer() {
     printShardingVersionInfo(false);
 
     _initWireSpec();
+
+    transport::TransportLayerLegacy::Options opts;
+    opts.port = serverGlobalParams.port;
+    opts.ipList = serverGlobalParams.bind_ip;
+
+    auto sep =
+        std::make_shared<ServiceEntryPointMongos>(getGlobalServiceContext()->getTransportLayer());
+
+    auto transportLayer = stdx::make_unique<transport::TransportLayerLegacy>(opts, sep);
+    auto res = transportLayer->setup();
+    if (!res.isOK()) {
+        return EXIT_NET_ERROR;
+    }
 
     // Add sharding hooks to both connection pools - ShardingConnectionHook includes auth hooks
     globalConnPool.addHook(new ShardingConnectionHookForMongos(false));
@@ -352,19 +314,13 @@ static ExitCode runMongosServer() {
 
     PeriodicTask::startRunningPeriodicTasks();
 
-    MessageServer::Options opts;
-    opts.port = serverGlobalParams.port;
-    opts.ipList = serverGlobalParams.bind_ip;
-
-    auto handler = std::make_shared<ShardedMessageHandler>();
-    MessageServer* server = createServer(opts, std::move(handler), getGlobalServiceContext());
-    if (!server->setupSockets()) {
+    auto start = getGlobalServiceContext()->addAndStartTransportLayer(std::move(transportLayer));
+    if (!start.isOK()) {
         return EXIT_NET_ERROR;
     }
-    server->run();
 
-    // MessageServer::run will return when exit code closes its socket
-    return inShutdown() ? EXIT_CLEAN : EXIT_NET_ERROR;
+    // Block until shutdown.
+    return waitForShutdown();
 }
 
 MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))

@@ -26,19 +26,38 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/transport/transport_layer.h"
+#include <vector>
+
+#include "mongo/base/disallow_copying.h"
+#include "mongo/transport/service_entry_point.h"
 
 namespace mongo {
+
 namespace transport {
-
-TransportLayer::TransportLayer() = default;
-TransportLayer::~TransportLayer() = default;
-
-TicketImpl* TransportLayer::getTicketImpl(const Ticket& ticket) {
-    return ticket.impl();
-}
-
+class Session;
+class TransportLayer;
 }  // namespace transport
+
+/**
+ * The entry point from the TransportLayer into Mongod. startSession() spawns and
+ * detaches a new thread for each incoming connection (transport::Session).
+ */
+class ServiceEntryPointMongod final : public ServiceEntryPoint {
+    MONGO_DISALLOW_COPYING(ServiceEntryPointMongod);
+
+public:
+    explicit ServiceEntryPointMongod(transport::TransportLayer* tl);
+
+    virtual ~ServiceEntryPointMongod() = default;
+
+    void startSession(transport::Session&& session) override;
+
+private:
+    void _sessionLoop(transport::Session* session);
+
+    transport::TransportLayer* _tl;
+};
+
 }  // namespace mongo

@@ -32,6 +32,7 @@
 
 #include "mongo/config.h"
 #include "mongo/logger/log_severity.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/time_support.h"
@@ -86,6 +87,11 @@ public:
      * Sends the message.
      */
     virtual void say(Message& toSend, int responseTo = 0) = 0;
+
+    /**
+     * Sends the message (does not set headers).
+     */
+    virtual void say(const Message& toSend) = 0;
 
     /**
      * Sends the data over the socket.

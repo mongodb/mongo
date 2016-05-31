@@ -56,6 +56,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/md5.hpp"
@@ -314,17 +315,17 @@ Status CmdAuthenticate::_authenticateX509(OperationContext* txn,
 
     ClientBasic* client = ClientBasic::getCurrent();
     AuthorizationSession* authorizationSession = AuthorizationSession::get(client);
-    std::string clientSubjectName = client->port()->getX509SubjectName();
+    auto clientName = client->session()->getX509SubjectName();
 
     if (!getSSLManager()->getSSLConfiguration().hasCA) {
         return Status(ErrorCodes::AuthenticationFailed,
                       "Unable to verify x.509 certificate, as no CA has been provided.");
-    } else if (user.getUser() != clientSubjectName) {
+    } else if (user.getUser() != clientName) {
         return Status(ErrorCodes::AuthenticationFailed,
                       "There is no x.509 client certificate matching the user.");
     } else {
         // Handle internal cluster member auth, only applies to server-server connections
-        if (getSSLManager()->getSSLConfiguration().isClusterMember(clientSubjectName)) {
+        if (getSSLManager()->getSSLConfiguration().isClusterMember(clientName)) {
             int clusterAuthMode = serverGlobalParams.clusterAuthMode.load();
             if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_undefined ||
                 clusterAuthMode == ServerGlobalParams::ClusterAuthMode_keyFile) {

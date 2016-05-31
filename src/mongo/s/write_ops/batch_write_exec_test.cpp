@@ -66,7 +66,7 @@ public:
 
     void setUp() override {
         ShardingTestFixture::setUp();
-        getMessagingPort()->setRemote(HostAndPort("ClientHost", 12345));
+        setRemote(HostAndPort("ClientHost", 12345));
 
         // Set up the RemoteCommandTargeter for the config shard.
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);

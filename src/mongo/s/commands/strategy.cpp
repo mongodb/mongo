@@ -176,7 +176,7 @@ void Strategy::queryOp(OperationContext* txn, Request& request) {
 
         BSONObj explainObj = explainBuilder.done();
         replyToQuery(0,  // query result flags
-                     request.p(),
+                     request.session(),
                      request.m(),
                      static_cast<const void*>(explainObj.objdata()),
                      explainObj.objsize(),
@@ -202,7 +202,7 @@ void Strategy::queryOp(OperationContext* txn, Request& request) {
         obj.appendSelfToBufBuilder(reply.bufBuilderForResults());
         numResults++;
     }
-    reply.send(request.p(),
+    reply.send(request.session(),
                0,  // query result flags
                request.m(),
                numResults,
@@ -265,7 +265,7 @@ void Strategy::clientCommandOp(OperationContext* txn, Request& request) {
                 BSONObjBuilder builder(reply.bufBuilderForResults());
                 runAgainstRegistered(txn, q.ns, cmdObj, builder, q.queryOptions);
             }
-            reply.sendCommandReply(request.p(), request.m());
+            reply.sendCommandReply(request.session(), request.m());
             return;
         } catch (const StaleConfigException& e) {
             if (loops <= 0)
@@ -288,7 +288,7 @@ void Strategy::clientCommandOp(OperationContext* txn, Request& request) {
                 BSONObjBuilder builder(reply.bufBuilderForResults());
                 Command::appendCommandStatus(builder, e.toStatus());
             }
-            reply.sendCommandReply(request.p(), request.m());
+            reply.sendCommandReply(request.session(), request.m());
             return;
         }
     }
@@ -325,7 +325,7 @@ bool Strategy::handleSpecialNamespaces(OperationContext* txn, Request& request, 
     }
 
     BSONObj x = reply.done();
-    replyToQuery(0, request.p(), request.m(), x);
+    replyToQuery(0, request.session(), request.m(), x);
     return true;
 }
 
@@ -369,7 +369,7 @@ void Strategy::getMore(OperationContext* txn, Request& request) {
     const NamespaceString nss(ns);
     auto statusGetDb = grid.catalogCache()->getDatabase(txn, nss.db().toString());
     if (statusGetDb == ErrorCodes::NamespaceNotFound) {
-        replyToQuery(ResultFlag_CursorNotFound, request.p(), request.m(), 0, 0, 0);
+        replyToQuery(ResultFlag_CursorNotFound, request.session(), request.m(), 0, 0, 0);
         return;
     }
 
@@ -384,7 +384,7 @@ void Strategy::getMore(OperationContext* txn, Request& request) {
 
     auto cursorResponse = ClusterFind::runGetMore(txn, getMoreRequest);
     if (cursorResponse == ErrorCodes::CursorNotFound) {
-        replyToQuery(ResultFlag_CursorNotFound, request.p(), request.m(), 0, 0, 0);
+        replyToQuery(ResultFlag_CursorNotFound, request.session(), request.m(), 0, 0, 0);
         return;
     }
     uassertStatusOK(cursorResponse.getStatus());
@@ -399,7 +399,7 @@ void Strategy::getMore(OperationContext* txn, Request& request) {
     }
 
     replyToQuery(0,
-                 request.p(),
+                 request.session(),
                  request.m(),
                  buffer.buf(),
                  buffer.len(),

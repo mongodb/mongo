@@ -99,7 +99,7 @@ private:
         MockTicket(MockTicket&&) = default;
         MockTicket& operator=(MockTicket&&) = default;
 
-        transport::Session::SessionId sessionId() const override;
+        transport::Session::Id sessionId() const override;
 
         Date_t expiration() const override;
 
@@ -107,7 +107,7 @@ private:
 
     private:
         boost::optional<Message*> _message;
-        SessionId _sessionId;
+        transport::Session::Id _sessionId;
         Date_t _expiration;
     };
 
@@ -127,10 +127,15 @@ private:
             const transport::Session& session,
             const Message& message,
             Date_t expiration = transport::Ticket::kNoExpirationDate) override;
-        Status wait(transport::Ticket ticket) override;
-        void asyncWait(transport::Ticket ticket, TicketCallback callback) override;
+        Status wait(transport::Ticket&& ticket) override;
+        void asyncWait(transport::Ticket&& ticket, TicketCallback callback) override;
+        std::string getX509SubjectName(const transport::Session& session) override;
+        void registerTags(const transport::Session& session) override;
+        Stats sessionStats() override;
         void end(const transport::Session& session) override;
-        void endAllSessions() override;
+        void endAllSessions(
+            transport::Session::TagMask tags = transport::Session::kEmptyTagMask) override;
+        Status start() override;
         void shutdown() override;
 
         ServiceEntryPointTestSuite::MockTicket* getMockTicket(const transport::Ticket& ticket);
@@ -143,7 +148,9 @@ private:
         stdx::function<Status(transport::Ticket)> _wait;
         stdx::function<void(transport::Ticket, TicketCallback)> _asyncWait;
         stdx::function<void(const transport::Session&)> _end;
-        stdx::function<void(void)> _endAllSessions = [] {};
+        stdx::function<void(transport::Session::TagMask tags)> _endAllSessions =
+            [](transport::Session::TagMask tags) {};
+        stdx::function<Status(void)> _start = [] { return Status::OK(); };
         stdx::function<void(void)> _shutdown = [] {};
 
         // Pre-set hook methods

@@ -28,40 +28,15 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
-#include "mongo/transport/session_id.h"
-#include "mongo/util/time_support.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
+
 namespace transport {
-
-/**
- * Interface representing implementations of Ticket.
- *
- * Ticket implementations are specific to a TransportLayer implementation.
- */
-class TicketImpl {
-    MONGO_DISALLOW_COPYING(TicketImpl);
-
-public:
-    virtual ~TicketImpl() = default;
-
-    TicketImpl(TicketImpl&&) = default;
-    TicketImpl& operator=(TicketImpl&&) = default;
-
-    /**
-     * Return this ticket's session id.
-     */
-    virtual SessionId sessionId() const = 0;
-
-    /**
-     * Return this ticket's expiration date.
-     */
-    virtual Date_t expiration() const = 0;
-
-protected:
-    TicketImpl() = default;
-};
-
+class Session;
 }  // namespace transport
+
+void launchWrappedServiceEntryWorkerThread(transport::Session&& session,
+                                           stdx::function<void(transport::Session*)> task);
+
 }  // namespace mongo

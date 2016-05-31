@@ -42,6 +42,7 @@
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/grid.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
@@ -49,8 +50,8 @@ namespace mongo {
 
 using std::string;
 
-Request::Request(Message& m, AbstractMessagingPort* p)
-    : _clientInfo(&cc()), _m(m), _d(m), _p(p), _id(_m.header().getId()), _didInit(false) {
+Request::Request(Message& m)
+    : _clientInfo(&cc()), _m(m), _d(m), _id(_m.header().getId()), _didInit(false) {
     ClusterLastErrorInfo::get(_clientInfo).newRequest();
 }
 
@@ -120,6 +121,10 @@ void Request::process(OperationContext* txn, int attempt) {
 
     LOG(3) << "Request::process end ns: " << getnsIfPresent() << " msg id: " << msgId
            << " op: " << op << " attempt: " << attempt;
+}
+
+transport::Session* Request::session() const {
+    return _clientInfo->session();
 }
 
 }  // namespace mongo

@@ -65,6 +65,8 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/transport/transport_layer.h"
+#include "mongo/transport/transport_layer_mock.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/tick_source_mock.h"
 
@@ -92,8 +94,12 @@ void ShardingTestFixture::setUp() {
     _service->setFastClockSource(stdx::make_unique<ClockSourceMock>());
     _service->setPreciseClockSource(stdx::make_unique<ClockSourceMock>());
     _service->setTickSource(stdx::make_unique<TickSourceMock>());
-    _messagePort = stdx::make_unique<MessagingPortMock>();
-    _client = _service->makeClient("ShardingTestFixture", _messagePort.get());
+    auto tlMock = stdx::make_unique<transport::TransportLayerMock>();
+    _transportLayer = tlMock.get();
+    _service->addAndStartTransportLayer(std::move(tlMock));
+    _transportSession =
+        stdx::make_unique<transport::Session>(HostAndPort{}, HostAndPort{}, _transportLayer);
+    _client = _service->makeClient("ShardingTestFixture", _transportSession.get());
     _opCtx = _client->makeOperationContext();
 
     // Set up executor pool used for most operations.
@@ -184,6 +190,7 @@ void ShardingTestFixture::tearDown() {
     grid.catalogClient(_opCtx.get())->shutDown(_opCtx.get());
     grid.clearForUnitTests();
 
+    _transportSession.reset();
     _opCtx.reset();
     _client.reset();
     _service.reset();
@@ -236,10 +243,6 @@ executor::TaskExecutor* ShardingTestFixture::executor() const {
     invariant(_executor);
 
     return _executor;
-}
-
-MessagingPortMock* ShardingTestFixture::getMessagingPort() const {
-    return _messagePort.get();
 }
 
 DistLockManagerMock* ShardingTestFixture::distLock() const {
@@ -506,6 +509,10 @@ void ShardingTestFixture::expectCount(const HostAndPort& configHost,
         Command::appendCommandStatus(responseBuilder, response.getStatus());
         return responseBuilder.obj();
     });
+}
+
+void ShardingTestFixture::setRemote(const HostAndPort& remote) {
+    *_transportSession = transport::Session{remote, HostAndPort{}, _transportLayer};
 }
 
 void ShardingTestFixture::checkReadConcern(const BSONObj& cmdObj,

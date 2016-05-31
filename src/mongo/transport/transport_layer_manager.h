@@ -26,32 +26,65 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
+#include <vector>
+
+#include "mongo/base/status.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/transport/session.h"
 #include "mongo/transport/ticket.h"
 #include "mongo/transport/ticket_impl.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/net/message.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace transport {
 
-const Date_t Ticket::kNoExpirationDate{Date_t::max()};
+/**
+ * This TransportLayerManager is a TransportLayer implementation that holds other
+ * TransportLayers. Mongod and Mongos can treat this like the "only" TransportLayer
+ * and not be concerned with which other TransportLayer implementations it holds
+ * underneath.
+ */
+class TransportLayerManager final : public TransportLayer {
+    MONGO_DISALLOW_COPYING(TransportLayerManager);
 
-Ticket::Ticket(TransportLayer* tl, std::unique_ptr<TicketImpl> ticket)
-    : _tl(tl), _ticket(std::move(ticket)) {}
+public:
+    TransportLayerManager();
 
-Ticket::~Ticket() = default;
+    Ticket sourceMessage(const Session& session,
+                         Message* message,
+                         Date_t expiration = Ticket::kNoExpirationDate) override;
+    Ticket sinkMessage(const Session& session,
+                       const Message& message,
+                       Date_t expiration = Ticket::kNoExpirationDate) override;
 
-Ticket::Ticket(Ticket&&) = default;
-Ticket& Ticket::operator=(Ticket&&) = default;
+    Status wait(Ticket&& ticket) override;
+    void asyncWait(Ticket&& ticket, TicketCallback callback) override;
 
-Status Ticket::wait()&& {
-    return _tl->wait(std::move(*this));
-}
+    std::string getX509SubjectName(const Session& session) override;
+    void registerTags(const Session& session) override;
 
-void Ticket::asyncWait(TicketCallback cb)&& {
-    return _tl->asyncWait(std::move(*this), std::move(cb));
-}
+    Stats sessionStats() override;
+
+    void end(const Session& session) override;
+    void endAllSessions(Session::TagMask tags = Session::kEmptyTagMask) override;
+
+    Status start() override;
+
+    void shutdown() override;
+
+    Status addAndStartTransportLayer(std::unique_ptr<TransportLayer> tl);
+
+private:
+    template <typename Callable>
+    void _foreach(Callable&& cb);
+
+    stdx::mutex _tlsMutex;
+    std::vector<std::unique_ptr<TransportLayer>> _tls;
+};
 
 }  // namespace transport
 }  // namespace mongo

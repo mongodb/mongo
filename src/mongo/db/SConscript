@@ -100,6 +100,7 @@ env.Library(
         "dbmessage.cpp",
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/transport/transport_layer_common',
         '$BUILD_DIR/mongo/util/net/network',
     ]
 )
@@ -402,7 +403,6 @@ env.Library(
         "$BUILD_DIR/mongo/rpc/command_reply",
         "$BUILD_DIR/mongo/rpc/command_request",
         "$BUILD_DIR/mongo/rpc/metadata",
-        "$BUILD_DIR/mongo/util/net/message_server_port",
         "$BUILD_DIR/mongo/util/net/miniwebserver",
         "$BUILD_DIR/mongo/util/processinfo",
         "$BUILD_DIR/mongo/util/signal_handlers",
@@ -473,6 +473,8 @@ env.Library(
         '$BUILD_DIR/mongo/util/decorable',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/net/hostandport',
+        '$BUILD_DIR/mongo/transport/transport_layer_common',
+        '$BUILD_DIR/mongo/transport/transport_layer_manager',
     ],
 )
 
