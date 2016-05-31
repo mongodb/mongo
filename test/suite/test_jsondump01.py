@@ -77,16 +77,22 @@ class test_jsondump01(wttest.WiredTigerTestCase, suite_subprocess):
         ('string', dict(keyfmt='S'))
     ]
     types = [
-        ('file', dict(type='file:',
-          name='file',
+        ('file', dict(uri='file:', config='', lsm=False,
           populate=simple_populate,
           populate_check=simple_populate_check_cursor)),
-        ('table-simple', dict(type='table:',
-          name='table-simple',
+        ('lsm', dict(uri='lsm:', config='', lsm=True,
           populate=simple_populate,
           populate_check=simple_populate_check_cursor)),
-        ('table-complex', dict(type='table:',
-          name='table-complex',
+        ('table-simple', dict(uri='table:', config='', lsm=False,
+          populate=simple_populate,
+          populate_check=simple_populate_check_cursor)),
+        ('table-simple-lsm', dict(uri='table:', config='type=lsm', lsm=True,
+          populate=simple_populate,
+          populate_check=simple_populate_check_cursor)),
+        ('table-complex', dict(uri='table:', config='', lsm=False,
+          populate=complex_populate,
+          populate_check=complex_populate_check_cursor)),
+        ('table-complex-lsm', dict(uri='table:', config='type=lsm', lsm=True,
           populate=complex_populate,
           populate_check=complex_populate_check_cursor))
     ]
@@ -95,9 +101,14 @@ class test_jsondump01(wttest.WiredTigerTestCase, suite_subprocess):
 
     # Dump using util, re-load using python's JSON, and do a content comparison.
     def test_jsondump_util(self):
+        # LSM and column-store isn't a valid combination.
+        if self.lsm and self.keyfmt == 'r':
+            return
+
         # Create the object.
-        uri = self.type + self.name
-        self.populate(self, uri, 'key_format=' + self.keyfmt, self.nentries)
+        uri = self.uri + self.name
+        self.populate(self, uri, self.config + ',key_format=' + self.keyfmt,
+            self.nentries)
 
         # Dump the object.
         self.runWt(['dump', '-j', uri], outfilename='jsondump.out')
@@ -125,9 +136,13 @@ class test_jsondump01(wttest.WiredTigerTestCase, suite_subprocess):
 
     # Dump using util, re-load using python's JSON, and do a content comparison.
     def test_jsonload_util(self):
+        # LSM and column-store isn't a valid combination.
+        if self.lsm and self.keyfmt == 'r':
+            return
+
         # Create the object.
-        uri = self.type + self.name
-        uri2 = self.type + self.name2
+        uri = self.uri + self.name
+        uri2 = self.uri + self.name2
         self.populate(self, uri, 'key_format=' + self.keyfmt, self.nentries)
 
         # Dump the object.

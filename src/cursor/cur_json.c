@@ -48,6 +48,10 @@ static int __json_pack_size(WT_SESSION_IMPL *, const char *, WT_CONFIG_ITEM *,
 	case 't':							\
 		WT_RET(json_uint_arg(session, &jstr, &pv.u.u));		\
 		break;							\
+	case 'u':							\
+		WT_RET(json_string_arg(session, &jstr, &pv.u.item));	\
+		pv.type = 'K';						\
+		break;							\
 	/* User format strings have already been validated. */		\
 	WT_ILLEGAL_VALUE(session);					\
 	}								\
@@ -493,7 +497,7 @@ __wt_json_token(WT_SESSION *wt_session, const char *src, int *toktype,
 				    "invalid Unicode within JSON string");
 						return (-1);
 					}
-					src += 5;
+					src += 4;
 				}
 				backslash = false;
 			}
@@ -840,20 +844,17 @@ __wt_json_strlen(const char *src, size_t srclen)
 				if (__wt_hex2byte((const u_char *)src, &lo))
 					return (-1);
 				src += 2;
-				/* RFC 3629 */
-				if (hi >= 0x8) {
-					/* 3 bytes total */
-					dstlen += 2;
-				}
-				else if (hi != 0 || lo >= 0x80) {
-					/* 2 bytes total */
-					dstlen++;
-				}
-				/* else 1 byte total */
+				if (hi != 0)
+					/*
+					 * For our dump representation,
+					 * every Unicode character on input
+					 * represents a single byte.
+					 */
+					return (-1);
 			}
-		}
+		} else
+			src++;
 		dstlen++;
-		src++;
 	}
 	if (src != srcend)
 		return (-1);   /* invalid input, e.g. final char is '\\' */
@@ -867,55 +868,58 @@ __wt_json_strlen(const char *src, size_t srclen)
  *	the result if zero padded.
  */
 int
-__wt_json_strncpy(char **pdst, size_t dstlen, const char *src, size_t srclen)
+__wt_json_strncpy(WT_SESSION *wt_session, char **pdst, size_t dstlen,
+    const char *src, size_t srclen)
 {
-	char *dst;
+	WT_SESSION_IMPL *session;
+	char ch, *dst;
 	const char *dstend, *srcend;
 	u_char hi, lo;
+
+	session = (WT_SESSION_IMPL *)wt_session;
 
 	dst = *pdst;
 	dstend = dst + dstlen;
 	srcend = src + srclen;
 	while (src < srcend && dst < dstend) {
 		/* JSON can include any UTF-8 expressed in 4 hex chars. */
-		if (*src == '\\') {
-			if (*++src == 'u') {
-				if (__wt_hex2byte((const u_char *)++src, &hi))
+		if ((ch = *src++) == '\\')
+			switch (ch = *src++) {
+			case 'u':
+				if (__wt_hex2byte((const u_char *)src, &hi))
 					return (EINVAL);
 				src += 2;
 				if (__wt_hex2byte((const u_char *)src, &lo))
 					return (EINVAL);
 				src += 2;
-				/* RFC 3629 */
-				if (hi >= 0x8) {
-					/* 3 bytes total */
-					/* byte 0: 1110HHHH */
-					/* byte 1: 10HHHHLL */
-					/* byte 2: 10LLLLLL */
-					*dst++ = (char)(0xe0 |
-					    ((hi >> 4) & 0x0f));
-					*dst++ = (char)(0x80 |
-					    ((hi << 2) & 0x3c) |
-					    ((lo >> 6) & 0x03));
-					*dst++ = (char)(0x80 | (lo & 0x3f));
-				} else if (hi != 0 || lo >= 0x80) {
-					/* 2 bytes total */
-					/* byte 0: 110HHHLL */
-					/* byte 1: 10LLLLLL */
-					*dst++ = (char)(0xc0 |
-					    (hi << 2) |
-					    ((lo >> 6) & 0x03));
-					*dst++ = (char)(0x80 | (lo & 0x3f));
-				} else
-					/* else 1 byte total */
-					/* byte 0: 0LLLLLLL */
-					*dst++ = (char)lo;
+				if (hi != 0) {
+					__wt_errx(NULL, "Unicode \"%6.6s\""
+					    " byte out of range in JSON",
+					    src - 6);
+					return (EINVAL);
+				}
+				*dst++ = (char)lo;
+				break;
+			case 'f':
+				*dst++ = '\f';
+				break;
+			case 'n':
+				*dst++ = '\n';
+				break;
+			case 'r':
+				*dst++ = '\r';
+				break;
+			case 't':
+				*dst++ = '\t';
+				break;
+			case '"':
+			case '\\':
+				*dst++ = ch;
+				break;
+			WT_ILLEGAL_VALUE(session);
 			}
-			else
-				*dst++ = *src;
-		} else
-			*dst++ = *src;
-		src++;
+		else
+			*dst++ = ch;
 	}
 	if (src != srcend)
 		return (ENOMEM);

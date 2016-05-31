@@ -7,6 +7,7 @@
  */
 
 #include "util.h"
+#include "util_dump.h"
 #include "util_load.h"
 
 /*
@@ -186,9 +187,8 @@ json_strdup(WT_SESSION *session, JSON_INPUT_STATE *ins, char **resultp)
 	}
 	*resultp = result;
 	resultcpy = result;
-	if ((ret = __wt_json_strncpy(&resultcpy, (size_t)resultlen, src,
-	    srclen))
-	    != 0) {
+	if ((ret = __wt_json_strncpy(
+	    session, &resultcpy, (size_t)resultlen, src, srclen)) != 0) {
 		ret = util_err(session, ret, NULL);
 		goto err;
 	}
@@ -344,13 +344,16 @@ json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins, uint32_t flags)
 {
 	CONFIG_LIST cl;
 	WT_DECL_RET;
-	int toktype;
 	static const char *json_markers[] = {
 	    "\"config\"", "\"colgroups\"", "\"indices\"", "\"data\"", NULL };
 	char *config, *tableuri;
+	int curversion, toktype;
+	bool hasversion;
 
 	memset(&cl, 0, sizeof(cl));
 	tableuri = NULL;
+	hasversion = false;
+
 	JSON_EXPECT(session, ins, '{');
 	while (json_peek(session, ins) == 's') {
 		JSON_EXPECT(session, ins, 's');
@@ -358,6 +361,24 @@ json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins, uint32_t flags)
 		snprintf(tableuri, ins->toklen, "%.*s",
 		    (int)(ins->toklen - 2), ins->tokstart + 1);
 		JSON_EXPECT(session, ins, ':');
+		if (!hasversion) {
+			if (strcmp(tableuri, DUMP_JSON_VERSION_MARKER) != 0) {
+				ret = util_err(session, ENOTSUP,
+				    "missing \"%s\"", DUMP_JSON_VERSION_MARKER);
+				goto err;
+			}
+			hasversion = true;
+			JSON_EXPECT(session, ins, 's');
+			if ((curversion = atoi(ins->tokstart + 1)) <= 0 ||
+			    curversion > DUMP_JSON_SUPPORTED_VERSION) {
+				ret = util_err(session, ENOTSUP,
+				    "unsupported JSON dump version \"%.*s\"",
+				    (int)(ins->toklen - 1), ins->tokstart + 1);
+				goto err;
+			}
+			JSON_EXPECT(session, ins, ',');
+			continue;
+		}
 
 		/*
 		 * Allow any ordering of 'config', 'colgroups',
