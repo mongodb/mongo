@@ -695,7 +695,7 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	 * it may not have been set.
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "memory_page_max", &cval));
-	btree->maxmempage = cval.val;
+	btree->maxmempage = (uint64_t)cval.val;
 	if (!F_ISSET(conn, WT_CONN_CACHE_POOL)) {
 		if ((cache_size = conn->cache_size) > 0)
 			btree->maxmempage =
