@@ -32,6 +32,7 @@
 
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/storage/kv/kv_catalog.h"
+#include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 
 namespace mongo {
@@ -176,6 +177,11 @@ Status KVCollectionCatalogEntry::prepareForIndexBuild(OperationContext* txn,
     MetaData md = _getMetaData(txn);
     IndexMetaData imd(spec->infoObj(), false, RecordId(), false);
     if (indexTypeSupportsPathLevelMultikeyTracking(spec->getAccessMethodName())) {
+        const auto feature =
+            KVCatalog::FeatureTracker::RepairableFeature::kPathLevelMultikeyTracking;
+        if (!_catalog->getFeatureTracker()->isRepairableFeatureInUse(txn, feature)) {
+            _catalog->getFeatureTracker()->markRepairableFeatureAsInUse(txn, feature);
+        }
         imd.multikeyPaths = MultikeyPaths{static_cast<size_t>(spec->keyPattern().nFields())};
     }
     md.indexes.push_back(imd);
