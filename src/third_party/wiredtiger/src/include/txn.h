@@ -74,7 +74,7 @@ struct __wt_txn_global {
 	volatile uint64_t current;	/* Current transaction ID. */
 
 	/* The oldest running transaction ID (may race). */
-	uint64_t last_running;
+	volatile uint64_t last_running;
 
 	/*
 	 * The oldest transaction ID that is not yet visible to some
@@ -82,8 +82,11 @@ struct __wt_txn_global {
 	 */
 	volatile uint64_t oldest_id;
 
-	/* Count of scanning threads, or -1 for exclusive access. */
-	volatile int32_t scan_count;
+	/*
+	 * Prevents the oldest ID moving forwards while threads are scanning
+	 * the global transaction state.
+	 */
+	WT_RWLOCK *scan_rwlock;
 
 	/*
 	 * Track information about the running checkpoint. The transaction

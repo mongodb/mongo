@@ -769,3 +769,10 @@ FUNC_START(__crc32_vpmsum)
 
 FUNC_END(__crc32_vpmsum)
 #endif
+
+/*
+ * Make sure the stack isn't executable with GCC (regardless of platform).
+ */
+#ifndef __clang__
+.section	.note.GNU-stack,"",@progbits
+#endif

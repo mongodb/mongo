@@ -93,7 +93,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 * transaction ID will catch up with the current ID.
 	 */
 	for (;;) {
-		__wt_txn_update_oldest(session, true);
+		WT_TRET(__wt_txn_update_oldest(session, true));
 		if (txn_global->oldest_id == txn_global->current)
 			break;
 		__wt_yield();
