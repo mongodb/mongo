@@ -543,8 +543,9 @@ TEST(CanonicalQueryTest, NormalizeWithInAndRegexPreservesTags) {
 
 TEST(CanonicalQueryTest, NormalizeWithInPreservesCollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    auto inMatchExpression = stdx::make_unique<InMatchExpression>(&collator);
     BSONObj obj = fromjson("{'': 'string'}");
+    auto inMatchExpression = stdx::make_unique<InMatchExpression>();
+    inMatchExpression->setCollator(&collator);
     inMatchExpression->addEquality(obj.firstElement());
     unique_ptr<MatchExpression> matchExpression(
         CanonicalQuery::normalizeTree(inMatchExpression.release()));

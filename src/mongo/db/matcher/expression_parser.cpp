@@ -145,12 +145,11 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
         case BSONObj::opIN: {
             if (e.type() != Array)
                 return {Status(ErrorCodes::BadValue, "$in needs an array")};
-            std::unique_ptr<InMatchExpression> temp =
-                stdx::make_unique<InMatchExpression>(collator);
+            std::unique_ptr<InMatchExpression> temp = stdx::make_unique<InMatchExpression>();
             Status s = temp->init(name);
             if (!s.isOK())
                 return s;
-            s = _parseInExpression(temp.get(), e.Obj());
+            s = _parseInExpression(temp.get(), e.Obj(), collator);
             if (!s.isOK())
                 return s;
             return {std::move(temp)};
@@ -159,12 +158,11 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
         case BSONObj::NIN: {
             if (e.type() != Array)
                 return {Status(ErrorCodes::BadValue, "$nin needs an array")};
-            std::unique_ptr<InMatchExpression> temp =
-                stdx::make_unique<InMatchExpression>(collator);
+            std::unique_ptr<InMatchExpression> temp = stdx::make_unique<InMatchExpression>();
             Status s = temp->init(name);
             if (!s.isOK())
                 return s;
-            s = _parseInExpression(temp.get(), e.Obj());
+            s = _parseInExpression(temp.get(), e.Obj(), collator);
             if (!s.isOK())
                 return s;
 
@@ -603,7 +601,9 @@ StatusWithMatchExpression MatchExpressionParser::_parseRegexDocument(const char*
 }
 
 Status MatchExpressionParser::_parseInExpression(InMatchExpression* inExpression,
-                                                 const BSONObj& theArray) {
+                                                 const BSONObj& theArray,
+                                                 const CollatorInterface* collator) {
+    inExpression->setCollator(collator);
     BSONObjIterator i(theArray);
     while (i.more()) {
         BSONElement e = i.next();

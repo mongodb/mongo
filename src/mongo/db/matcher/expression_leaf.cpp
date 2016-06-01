@@ -532,22 +532,21 @@ bool TypeMatchExpression::equivalent(const MatchExpression* other) const {
 
 // -----------
 
-InMatchExpression::InMatchExpression(const CollatorInterface* collator)
-    : LeafMatchExpression(MATCH_IN), _equalities(collator), _collator(collator) {}
-
 Status InMatchExpression::init(StringData path) {
     return setPath(path);
 }
 
 std::unique_ptr<MatchExpression> InMatchExpression::shallowClone() const {
-    auto next = stdx::make_unique<InMatchExpression>(_collator);
+    auto next = stdx::make_unique<InMatchExpression>();
     next->init(path());
+    next->setCollator(_collator);
     if (getTag()) {
         next->setTag(getTag()->clone());
     }
     next->_hasNull = _hasNull;
     next->_hasEmptyArray = _hasEmptyArray;
-    next->_equalities = _equalities;
+    next->_equalitySet = _equalitySet;
+    next->_originalEqualityVector = _originalEqualityVector;
     for (auto&& regex : _regexes) {
         std::unique_ptr<RegexMatchExpression> clonedRegex(
             static_cast<RegexMatchExpression*>(regex->shallowClone().release()));
@@ -560,7 +559,7 @@ bool InMatchExpression::matchesSingleElement(const BSONElement& e) const {
     if (_hasNull && e.eoo()) {
         return true;
     }
-    if (_equalities.find(e) != _equalities.end()) {
+    if (_equalitySet.find(e) != _equalitySet.end()) {
         return true;
     }
     for (auto&& regex : _regexes) {
@@ -575,7 +574,7 @@ void InMatchExpression::debugString(StringBuilder& debug, int level) const {
     _debugAddSpace(debug, level);
     debug << path() << " $in ";
     debug << "[ ";
-    for (auto&& equality : _equalities) {
+    for (auto&& equality : _equalitySet) {
         debug << equality.toString(false) << " ";
     }
     for (auto&& regex : _regexes) {
@@ -594,7 +593,7 @@ void InMatchExpression::debugString(StringBuilder& debug, int level) const {
 void InMatchExpression::serialize(BSONObjBuilder* out) const {
     BSONObjBuilder inBob(out->subobjStart(path()));
     BSONArrayBuilder arrBob(inBob.subarrayStart("$in"));
-    for (auto&& _equality : _equalities) {
+    for (auto&& _equality : _equalitySet) {
         arrBob.append(_equality);
     }
     for (auto&& _regex : _regexes) {
@@ -620,7 +619,7 @@ bool InMatchExpression::equivalent(const MatchExpression* other) const {
     if (_regexes.size() != realOther->_regexes.size()) {
         return false;
     }
-    for (unsigned i = 0; i < _regexes.size(); i++) {
+    for (size_t i = 0; i < _regexes.size(); ++i) {
         if (!_regexes[i]->equivalent(realOther->_regexes[i].get())) {
             return false;
         }
@@ -628,7 +627,31 @@ bool InMatchExpression::equivalent(const MatchExpression* other) const {
     if (!CollatorInterface::collatorsMatch(_collator, realOther->_collator)) {
         return false;
     }
-    return _equalities == realOther->_equalities;
+    // We use an element-wise comparison to check equivalence of '_equalitySet'.  Unfortunately, we
+    // can't use BSONElementSet::operator==(), as it does not use the comparator object the set is
+    // initialized with (and as such, it is not collation-aware).
+    if (_equalitySet.size() != realOther->_equalitySet.size()) {
+        return false;
+    }
+    auto thisEqIt = _equalitySet.begin();
+    auto otherEqIt = realOther->_equalitySet.begin();
+    for (; thisEqIt != _equalitySet.end(); ++thisEqIt, ++otherEqIt) {
+        const bool considerFieldName = false;
+        if (thisEqIt->woCompare(*otherEqIt, considerFieldName, _collator)) {
+            return false;
+        }
+    }
+    invariant(otherEqIt == realOther->_equalitySet.end());
+    return true;
+}
+
+void InMatchExpression::setCollator(const CollatorInterface* collator) {
+    _collator = collator;
+
+    // We need to re-compute '_equalitySet', since our set comparator has changed.
+    BSONElementSet equalitiesWithNewComparator(
+        _originalEqualityVector.begin(), _originalEqualityVector.end(), collator);
+    _equalitySet = std::move(equalitiesWithNewComparator);
 }
 
 Status InMatchExpression::addEquality(const BSONElement& elt) {
@@ -645,7 +668,8 @@ Status InMatchExpression::addEquality(const BSONElement& elt) {
     if (elt.type() == BSONType::Array && elt.Obj().isEmpty()) {
         _hasEmptyArray = true;
     }
-    _equalities.insert(elt);
+    _equalitySet.insert(elt);
+    _originalEqualityVector.push_back(elt);
     return Status::OK();
 }
 

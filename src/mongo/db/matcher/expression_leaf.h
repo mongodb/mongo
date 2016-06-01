@@ -313,10 +313,7 @@ public:
  */
 class InMatchExpression : public LeafMatchExpression {
 public:
-    /**
-     * 'collator' must outlive the InMatchExpression and any clones made of it.
-     */
-    InMatchExpression(const CollatorInterface* collator);
+    InMatchExpression() : LeafMatchExpression(MATCH_IN) {}
 
     Status init(StringData path);
 
@@ -330,12 +327,17 @@ public:
 
     virtual bool equivalent(const MatchExpression* other) const;
 
+    /**
+     * 'collator' must outlive the InMatchExpression and any clones made of it.
+     */
+    void setCollator(const CollatorInterface* collator);
+
     Status addEquality(const BSONElement& elt);
 
     Status addRegex(std::unique_ptr<RegexMatchExpression> expr);
 
     const BSONElementSet& getEqualities() const {
-        return _equalities;
+        return _equalitySet;
     }
 
     const std::vector<std::unique_ptr<RegexMatchExpression>>& getRegexes() const {
@@ -355,11 +357,25 @@ public:
     }
 
 private:
-    bool _hasNull = false;        // Whether or not _equalities has a jstNULL element in it.
-    bool _hasEmptyArray = false;  // Whether or not _equalities has an empty array element in it.
-    BSONElementSet _equalities;
-    std::vector<std::unique_ptr<RegexMatchExpression>> _regexes;
+    // Whether or not '_equalities' has a jstNULL element in it.
+    bool _hasNull = false;
+
+    // Whether or not '_equalities' has an empty array element in it.
+    bool _hasEmptyArray = false;
+
+    // Collator used to compare elements. By default, simple binary comparison will be used.
     const CollatorInterface* _collator = nullptr;
+
+    // Set of equality elements associated with this expression. '_collator' is used as a comparator
+    // for this set.
+    BSONElementSet _equalitySet;
+
+    // Original container of equality elements, including duplicates. Needed for re-computing
+    // '_equalitySet' in case '_collator' changes after elements have been added.
+    std::vector<BSONElement> _originalEqualityVector;
+
+    // Container of regex elements this object owns.
+    std::vector<std::unique_ptr<RegexMatchExpression>> _regexes;
 };
 
 //

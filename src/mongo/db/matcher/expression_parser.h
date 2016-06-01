@@ -129,7 +129,9 @@ private:
     StatusWithMatchExpression _parseRegexDocument(const char* name, const BSONObj& doc);
 
 
-    Status _parseInExpression(InMatchExpression* entries, const BSONObj& theArray);
+    Status _parseInExpression(InMatchExpression* entries,
+                              const BSONObj& theArray,
+                              const CollatorInterface* collator);
 
     StatusWithMatchExpression _parseType(const char* name, const BSONElement& elt);
 

@@ -1500,16 +1500,14 @@ TEST(InMatchExpression, MatchesElementSingle) {
     BSONArray operand = BSON_ARRAY(1);
     BSONObj match = BSON("a" << 1);
     BSONObj notMatch = BSON("a" << 2);
-    const CollatorInterface* collator = nullptr;
-    InMatchExpression in(collator);
+    InMatchExpression in;
     in.addEquality(operand.firstElement());
     ASSERT(in.matchesSingleElement(match["a"]));
     ASSERT(!in.matchesSingleElement(notMatch["a"]));
 }
 
 TEST(InMatchExpression, MatchesEmpty) {
-    const CollatorInterface* collator = nullptr;
-    InMatchExpression in(collator);
+    InMatchExpression in;
     in.init("a");
 
     BSONObj notMatch = BSON("a" << 2);
@@ -1520,8 +1518,7 @@ TEST(InMatchExpression, MatchesEmpty) {
 
 TEST(InMatchExpression, MatchesElementMultiple) {
     BSONObj operand = BSON_ARRAY(1 << "r" << true << 1);
-    const CollatorInterface* collator = nullptr;
-    InMatchExpression in(collator);
+    InMatchExpression in;
     in.addEquality(operand[0]);
     in.addEquality(operand[1]);
     in.addEquality(operand[2]);
@@ -1541,8 +1538,7 @@ TEST(InMatchExpression, MatchesElementMultiple) {
 
 TEST(InMatchExpression, MatchesScalar) {
     BSONObj operand = BSON_ARRAY(5);
-    const CollatorInterface* collator = nullptr;
-    InMatchExpression in(collator);
+    InMatchExpression in;
     in.init("a");
     in.addEquality(operand.firstElement());
 
@@ -1552,8 +1548,7 @@ TEST(InMatchExpression, MatchesScalar) {
 
 TEST(InMatchExpression, MatchesArrayValue) {
     BSONObj operand = BSON_ARRAY(5);
-    const CollatorInterface* collator = nullptr;
-    InMatchExpression in(collator);
+    InMatchExpression in;
     in.init("a");
     in.addEquality(operand.firstElement());
 
@@ -1565,8 +1560,7 @@ TEST(InMatchExpression, MatchesArrayValue) {
 TEST(InMatchExpression, MatchesNull) {
     BSONObj operand = BSON_ARRAY(BSONNULL);
 
-    const CollatorInterface* collator = nullptr;
-    InMatchExpression in(collator);
+    InMatchExpression in;
     in.init("a");
     in.addEquality(operand.firstElement());
 
@@ -1580,8 +1574,7 @@ TEST(InMatchExpression, MatchesNull) {
 TEST(InMatchExpression, MatchesUndefined) {
     BSONObj operand = BSON_ARRAY(BSONUndefined);
 
-    const CollatorInterface* collator = nullptr;
-    InMatchExpression in(collator);
+    InMatchExpression in;
     in.init("a");
     Status s = in.addEquality(operand.firstElement());
     ASSERT_NOT_OK(s);
@@ -1589,8 +1582,7 @@ TEST(InMatchExpression, MatchesUndefined) {
 
 TEST(InMatchExpression, MatchesMinKey) {
     BSONObj operand = BSON_ARRAY(MinKey);
-    const CollatorInterface* collator = nullptr;
-    InMatchExpression in(collator);
+    InMatchExpression in;
     in.init("a");
     in.addEquality(operand.firstElement());
 
@@ -1601,8 +1593,7 @@ TEST(InMatchExpression, MatchesMinKey) {
 
 TEST(InMatchExpression, MatchesMaxKey) {
     BSONObj operand = BSON_ARRAY(MaxKey);
-    const CollatorInterface* collator = nullptr;
-    InMatchExpression in(collator);
+    InMatchExpression in;
     in.init("a");
     in.addEquality(operand.firstElement());
 
@@ -1613,8 +1604,7 @@ TEST(InMatchExpression, MatchesMaxKey) {
 
 TEST(InMatchExpression, MatchesFullArray) {
     BSONObj operand = BSON_ARRAY(BSON_ARRAY(1 << 2) << 4 << 5);
-    const CollatorInterface* collator = nullptr;
-    InMatchExpression in(collator);
+    InMatchExpression in;
     in.init("a");
     in.addEquality(operand[0]);
     in.addEquality(operand[1]);
@@ -1628,8 +1618,7 @@ TEST(InMatchExpression, MatchesFullArray) {
 
 TEST(InMatchExpression, ElemMatchKey) {
     BSONObj operand = BSON_ARRAY(5 << 2);
-    const CollatorInterface* collator = nullptr;
-    InMatchExpression in(collator);
+    InMatchExpression in;
     in.init("a");
     in.addEquality(operand[0]);
     in.addEquality(operand[1]);
@@ -1645,28 +1634,74 @@ TEST(InMatchExpression, ElemMatchKey) {
     ASSERT_EQUALS("1", details.elemMatchKey());
 }
 
+TEST(InMatchExpression, InMatchExpressionsWithDifferentNumbersOfElementsAreUnequal) {
+    BSONObj obj = BSON(""
+                       << "string");
+    InMatchExpression eq1;
+    InMatchExpression eq2;
+    eq1.addEquality(obj.firstElement());
+    ASSERT(!eq1.equivalent(&eq2));
+}
+
 TEST(InMatchExpression, InMatchExpressionsWithUnequalCollatorsAreUnequal) {
     CollatorInterfaceMock collator1(CollatorInterfaceMock::MockType::kReverseString);
-    InMatchExpression eq1(&collator1);
+    InMatchExpression eq1;
+    eq1.setCollator(&collator1);
     CollatorInterfaceMock collator2(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    InMatchExpression eq2(&collator2);
+    InMatchExpression eq2;
+    eq2.setCollator(&collator2);
     ASSERT(!eq1.equivalent(&eq2));
 }
 
 TEST(InMatchExpression, InMatchExpressionsWithEqualCollatorsAreEqual) {
     CollatorInterfaceMock collator1(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    InMatchExpression eq1(&collator1);
+    InMatchExpression eq1;
+    eq1.setCollator(&collator1);
     CollatorInterfaceMock collator2(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    InMatchExpression eq2(&collator2);
+    InMatchExpression eq2;
+    eq2.setCollator(&collator2);
     ASSERT(eq1.equivalent(&eq2));
+}
+
+TEST(InMatchExpression, InMatchExpressionsWithCollationEquivalentElementsAreEqual) {
+    BSONObj obj1 = BSON(""
+                        << "string1");
+    BSONObj obj2 = BSON(""
+                        << "string2");
+    CollatorInterfaceMock collator1(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    InMatchExpression eq1;
+    eq1.setCollator(&collator1);
+    CollatorInterfaceMock collator2(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    InMatchExpression eq2;
+    eq2.setCollator(&collator2);
+
+    eq1.addEquality(obj1.firstElement());
+    eq2.addEquality(obj2.firstElement());
+    ASSERT(eq1.equivalent(&eq2));
+}
+
+TEST(InMatchExpression, InMatchExpressionsWithCollationNonEquivalentElementsAreUnequal) {
+    BSONObj obj1 = BSON(""
+                        << "string1");
+    BSONObj obj2 = BSON(""
+                        << "string2");
+    CollatorInterfaceMock collator1(CollatorInterfaceMock::MockType::kReverseString);
+    InMatchExpression eq1;
+    eq1.setCollator(&collator1);
+    CollatorInterfaceMock collator2(CollatorInterfaceMock::MockType::kReverseString);
+    InMatchExpression eq2;
+    eq2.setCollator(&collator2);
+
+    eq1.addEquality(obj1.firstElement());
+    eq2.addEquality(obj2.firstElement());
+    ASSERT(!eq1.equivalent(&eq2));
 }
 
 TEST(InMatchExpression, StringMatchingWithNullCollatorUsesBinaryComparison) {
     BSONArray operand = BSON_ARRAY("string");
     BSONObj notMatch = BSON("a"
                             << "string2");
-    const CollatorInterface* collator = nullptr;
-    InMatchExpression in(collator);
+    InMatchExpression in;
     in.addEquality(operand.firstElement());
     ASSERT(!in.matchesSingleElement(notMatch["a"]));
 }
@@ -1676,9 +1711,27 @@ TEST(InMatchExpression, StringMatchingRespectsCollation) {
     BSONObj match = BSON("a"
                          << "string2");
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    InMatchExpression in(&collator);
+    InMatchExpression in;
+    in.setCollator(&collator);
     in.addEquality(operand.firstElement());
     ASSERT(in.matchesSingleElement(match["a"]));
+}
+
+TEST(InMatchExpression, ChangingCollationAfterAddingEqualitiesPreservesEqualities) {
+    BSONObj obj1 = BSON(""
+                        << "string1");
+    BSONObj obj2 = BSON(""
+                        << "string2");
+    CollatorInterfaceMock collatorAlwaysEqual(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    CollatorInterfaceMock collatorReverseString(CollatorInterfaceMock::MockType::kReverseString);
+    InMatchExpression in;
+    in.setCollator(&collatorAlwaysEqual);
+    in.addEquality(obj1.firstElement());
+    in.addEquality(obj2.firstElement());
+    ASSERT(in.getEqualities().size() == 1);
+    in.setCollator(&collatorReverseString);
+    ASSERT(in.getEqualities().size() == 2);
+    ASSERT(in.getEqualities() == BSONElementSet({obj1.firstElement(), obj2.firstElement()}));
 }
 
 std::vector<uint32_t> bsonArrayToBitPositions(const BSONArray& ba) {
