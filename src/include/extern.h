@@ -297,7 +297,7 @@ extern int __wt_json_token(WT_SESSION *wt_session, const char *src, int *toktype
 extern const char *__wt_json_tokname(int toktype);
 extern int __wt_json_to_item(WT_SESSION_IMPL *session, const char *jstr, const char *format, WT_CURSOR_JSON *json, bool iskey, WT_ITEM *item);
 extern ssize_t __wt_json_strlen(const char *src, size_t srclen);
-extern int __wt_json_strncpy(char **pdst, size_t dstlen, const char *src, size_t srclen);
+extern int __wt_json_strncpy(WT_SESSION *wt_session, char **pdst, size_t dstlen, const char *src, size_t srclen);
 extern int __wt_curlog_open(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], WT_CURSOR **cursorp);
 extern int __wt_schema_create_final( WT_SESSION_IMPL *session, char *cfg_arg[], char **value_ret);
 extern int __wt_curmetadata_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp);
@@ -461,7 +461,6 @@ extern int __wt_ext_metadata_search(WT_EXTENSION_API *wt_api, WT_SESSION *wt_ses
 extern int __wt_ext_metadata_update(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, const char *key, const char *value);
 extern int __wt_metadata_get_ckptlist( WT_SESSION *session, const char *name, WT_CKPT **ckptbasep);
 extern void __wt_metadata_free_ckptlist(WT_SESSION *session, WT_CKPT *ckptbase);
-extern void __wt_metadata_init(WT_SESSION_IMPL *session);
 extern int __wt_metadata_cursor_open( WT_SESSION_IMPL *session, const char *config, WT_CURSOR **cursorp);
 extern int __wt_metadata_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp);
 extern int __wt_metadata_cursor_release(WT_SESSION_IMPL *session, WT_CURSOR **cursorp);
