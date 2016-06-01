@@ -324,9 +324,25 @@ void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
 
         BSONObj currentOpRes;
         conn->runPseudoCommand("admin", "currentOp", "$cmd.sys.inprog", {}, currentOpRes);
+        if (!currentOpRes["inprog"].isABSONObj()) {
+            // We don't have permissions (or the call didn't succeed) - go to the next connection.
+            continue;
+        }
         auto inprog = currentOpRes["inprog"].embeddedObject();
-        BSONForEach(op, inprog) {
-            if (uris.count(op["client"].String())) {
+        for (const auto op : inprog) {
+            // For sharded clusters, `client_s` is used instead and `client` is not present.
+            string client;
+            if (auto elem = op["client"]) {
+                // mongod currentOp client
+                client = elem.String();
+            } else if (auto elem = op["client_s"]) {
+                // mongos currentOp client
+                client = elem.String();
+            } else {
+                // Internal operation, like TTL index.
+                continue;
+            }
+            if (uris.count(client)) {
                 if (!withPrompt || prompter.confirm()) {
                     BSONObjBuilder cmdBob;
                     BSONObj info;
