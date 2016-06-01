@@ -51,8 +51,7 @@ public:
     void processMetadata(const rpc::ReplSetMetadata& metadata) override;
 
     bool shouldStopFetching(const HostAndPort& source,
-                            const OpTime& sourceOpTime,
-                            bool sourceHasSyncSource) override;
+                            const rpc::ReplSetMetadata& metadata) override;
 
 private:
     StatusWith<OpTime> _multiApply(OperationContext* txn,

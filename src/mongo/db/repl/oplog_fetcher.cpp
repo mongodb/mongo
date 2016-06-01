@@ -50,10 +50,8 @@ namespace {
  * Calculates await data timeout based on the current replica set configuration.
  */
 Milliseconds calculateAwaitDataTimeout(const ReplicaSetConfig& config) {
-    // Under protocol version 1, make the awaitData timeout (maxTimeMS) dependent
-    // on the election
-    // timeout. This enables the sync source to communicate liveness of the
-    // primary to secondaries.
+    // Under protocol version 1, make the awaitData timeout (maxTimeMS) dependent on the election
+    // timeout. This enables the sync source to communicate liveness of the primary to secondaries.
     // Under protocol version 0, use a default timeout of 2 seconds for awaitData.
     if (config.getProtocolVersion() == 1LL) {
         return config.getElectionTimeoutPeriod() / 2;
@@ -111,19 +109,15 @@ StatusWith<BSONObj> makeMetadataObject(bool isV1ElectionProtocol) {
 
 /**
  * Checks the first batch of results from query.
- * 'documents' are the first batch of results returned from tailing the remote
- * oplog.
- * 'lastFetched' optime and hash should be consistent with the predicate in the
- * query.
+ * 'documents' are the first batch of results returned from tailing the remote oplog.
+ * 'lastFetched' optime and hash should be consistent with the predicate in the query.
  * Returns RemoteOplogStale if the oplog query has no results.
- * Returns OplogStartMissing if we cannot find the optime of the last fetched
- * operation in
+ * Returns OplogStartMissing if we cannot find the optime of the last fetched operation in
  * the remote oplog.
  */
 Status checkRemoteOplogStart(const Fetcher::Documents& documents, OpTimeWithHash lastFetched) {
     if (documents.empty()) {
-        // The GTE query from upstream returns nothing, so we're ahead of the
-        // upstream.
+        // The GTE query from upstream returns nothing, so we're ahead of the upstream.
         return Status(ErrorCodes::RemoteOplogStale,
                       str::stream() << "We are ahead of the sync source. Our last op time fetched: "
                                     << lastFetched.opTime.toString());
@@ -176,8 +170,7 @@ StatusWith<OplogFetcher::DocumentsInfo> OplogFetcher::validateDocuments(
         info.networkDocumentBytes += doc.objsize();
         ++info.networkDocumentCount;
 
-        // If this is the first response (to the $gte query) then we already applied
-        // the first doc.
+        // If this is the first response (to the $gte query) then we already applied the first doc.
         if (first && info.networkDocumentCount == 1U) {
             continue;
         }
@@ -208,8 +201,7 @@ StatusWith<OplogFetcher::DocumentsInfo> OplogFetcher::validateDocuments(
     info.toApplyDocumentCount = documents.size();
     info.toApplyDocumentBytes = info.networkDocumentBytes;
     if (first) {
-        // The count is one less since the first document found was already applied
-        // ($gte $ts query)
+        // The count is one less since the first document found was already applied ($gte $ts query)
         // and we will not apply it again.
         --info.toApplyDocumentCount;
         auto alreadyAppliedDocument = documents.cbegin();
@@ -302,11 +294,9 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
     }
 
     const auto& queryResponse = result.getValue();
-    OpTime sourcesLastOpTime;
-    bool syncSourceHasSyncSource = false;
+    rpc::ReplSetMetadata metadata;
 
-    // Forward metadata (containing liveness information) to data replicator
-    // external state.
+    // Forward metadata (containing liveness information) to data replicator external state.
     bool receivedMetadata =
         queryResponse.otherFields.metadata.hasElement(rpc::kReplSetMetadataFieldName);
     if (receivedMetadata) {
@@ -318,10 +308,8 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
             _onShutdown(metadataResult.getStatus());
             return;
         }
-        auto metadata = metadataResult.getValue();
+        metadata = metadataResult.getValue();
         _dataReplicatorExternalState->processMetadata(metadata);
-        sourcesLastOpTime = metadata.getLastOpVisible();
-        syncSourceHasSyncSource = metadata.getSyncSourceIndex() != -1;
     }
 
     const auto& documents = queryResponse.documents;
@@ -337,8 +325,7 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
 
     auto opTimeWithHash = getLastOpTimeWithHashFetched();
 
-    // Check start of remote oplog and, if necessary, stop fetcher to execute
-    // rollback.
+    // Check start of remote oplog and, if necessary, stop fetcher to execute rollback.
     if (queryResponse.first) {
         auto status = checkRemoteOplogStart(documents, opTimeWithHash);
         if (!status.isOK()) {
@@ -347,8 +334,7 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
             return;
         }
 
-        // If this is the first batch and no rollback is needed, skip the first
-        // document.
+        // If this is the first batch and no rollback is needed, skip the first document.
         firstDocToApply++;
     }
 
@@ -373,14 +359,15 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
         _lastFetched = opTimeWithHash;
     }
 
-    if (_dataReplicatorExternalState->shouldStopFetching(
-            _fetcher.getSource(), sourcesLastOpTime, syncSourceHasSyncSource)) {
+    if (_dataReplicatorExternalState->shouldStopFetching(_fetcher.getSource(), metadata)) {
         _onShutdown(Status(ErrorCodes::InvalidSyncSource,
                            str::stream() << "sync source " << _fetcher.getSource().toString()
                                          << " (last optime: "
-                                         << sourcesLastOpTime.toString()
-                                         << "; has sync source: "
-                                         << syncSourceHasSyncSource
+                                         << metadata.getLastOpVisible().toString()
+                                         << "; sync source index: "
+                                         << metadata.getSyncSourceIndex()
+                                         << "; primary index: "
+                                         << metadata.getPrimaryIndex()
                                          << ") is no longer valid"),
                     opTimeWithHash);
         return;
@@ -406,6 +393,7 @@ void OplogFetcher::_onShutdown(Status status) {
 void OplogFetcher::_onShutdown(Status status, OpTimeWithHash opTimeWithHash) {
     _onShutdownCallbackFn(status, opTimeWithHash);
 }
+
 
 }  // namespace repl
 }  // namespace mongo

@@ -134,8 +134,8 @@ public:
     }
 
 private:
-    repl::OpTime _lastOpCommitted = repl::OpTime(Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
-    repl::OpTime _lastOpVisible = repl::OpTime(Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+    repl::OpTime _lastOpCommitted;
+    repl::OpTime _lastOpVisible;
     long long _currentTerm = -1;
     long long _configVersion = -1;
     OID _replicaSetId;

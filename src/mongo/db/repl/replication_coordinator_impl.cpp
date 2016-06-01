@@ -2901,14 +2901,10 @@ void ReplicationCoordinatorImpl::resetLastOpTimesFromOplog(OperationContext* txn
 }
 
 bool ReplicationCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentSource,
-                                                        const OpTime& syncSourceLastOpTime,
-                                                        bool syncSourceHasSyncSource) {
+                                                        const rpc::ReplSetMetadata& metadata) {
     LockGuard topoLock(_topoMutex);
-    return _topCoord->shouldChangeSyncSource(currentSource,
-                                             getMyLastAppliedOpTime(),
-                                             syncSourceLastOpTime,
-                                             syncSourceHasSyncSource,
-                                             _replExecutor.now());
+    return _topCoord->shouldChangeSyncSource(
+        currentSource, getMyLastAppliedOpTime(), metadata, _replExecutor.now());
 }
 
 SyncSourceResolverResponse ReplicationCoordinatorImpl::selectSyncSource(
