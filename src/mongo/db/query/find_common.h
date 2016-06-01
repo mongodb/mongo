@@ -32,7 +32,7 @@
 namespace mongo {
 
 class BSONObj;
-class LiteParsedQuery;
+class QueryRequest;
 
 // Enabling this fail point will cause the getMore command to busy wait after pinning the cursor,
 // until the fail point is disabled.
@@ -58,9 +58,9 @@ public:
     /**
      * Returns true if the batchSize for the initial find has been satisfied.
      *
-     * If 'pq' does not have a batchSize, the default batchSize is respected.
+     * If 'qr' does not have a batchSize, the default batchSize is respected.
      */
-    static bool enoughForFirstBatch(const LiteParsedQuery& pq, long long numDocs);
+    static bool enoughForFirstBatch(const QueryRequest& qr, long long numDocs);
 
     /**
      * Returns true if the batchSize for the getMore has been satisfied.

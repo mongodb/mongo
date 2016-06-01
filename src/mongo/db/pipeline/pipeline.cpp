@@ -89,7 +89,7 @@ intrusive_ptr<Pipeline> Pipeline::parseCommand(string& errmsg,
         }
 
         // maxTimeMS is also for the command processor.
-        if (str::equals(pFieldName, LiteParsedQuery::cmdOptionMaxTimeMS)) {
+        if (str::equals(pFieldName, QueryRequest::cmdOptionMaxTimeMS)) {
             continue;
         }
 

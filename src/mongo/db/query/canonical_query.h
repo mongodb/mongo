@@ -34,8 +34,8 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/query/parsed_projection.h"
+#include "mongo/db/query/query_request.h"
 
 namespace mongo {
 
@@ -65,7 +65,7 @@ public:
      *  CanonicalQuery.
      */
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        OperationContext* txn, std::unique_ptr<LiteParsedQuery> lpq, const ExtensionsCallback&);
+        OperationContext* txn, std::unique_ptr<QueryRequest> qr, const ExtensionsCallback&);
 
     /**
      * For testing or for internal clients to use.
@@ -91,10 +91,10 @@ public:
     static bool isSimpleIdQuery(const BSONObj& query);
 
     const NamespaceString& nss() const {
-        return _pq->nss();
+        return _qr->nss();
     }
     const std::string& ns() const {
-        return _pq->nss().ns();
+        return _qr->nss().ns();
     }
 
     //
@@ -104,10 +104,10 @@ public:
         return _root.get();
     }
     BSONObj getQueryObj() const {
-        return _pq->getFilter();
+        return _qr->getFilter();
     }
-    const LiteParsedQuery& getParsed() const {
-        return *_pq;
+    const QueryRequest& getQueryRequest() const {
+        return *_qr;
     }
     const ParsedProjection* getProj() const {
         return _proj.get();
@@ -123,13 +123,13 @@ public:
     /**
      * Validates match expression, checking for certain
      * combinations of operators in match expression and
-     * query options in LiteParsedQuery.
-     * Since 'root' is derived from 'filter' in LiteParsedQuery,
+     * query options in QueryRequest.
+     * Since 'root' is derived from 'filter' in QueryRequest,
      * 'filter' is not validated.
      *
      * TODO: Move this to query_validator.cpp
      */
-    static Status isValid(MatchExpression* root, const LiteParsedQuery& parsed);
+    static Status isValid(MatchExpression* root, const QueryRequest& parsed);
 
     /**
      * Returns the normalized version of the subtree rooted at 'root'.
@@ -172,14 +172,14 @@ private:
     // You must go through canonicalize to create a CanonicalQuery.
     CanonicalQuery() {}
 
-    Status init(std::unique_ptr<LiteParsedQuery> lpq,
+    Status init(std::unique_ptr<QueryRequest> qr,
                 const ExtensionsCallback& extensionsCallback,
                 MatchExpression* root,
                 std::unique_ptr<CollatorInterface> collator);
 
-    std::unique_ptr<LiteParsedQuery> _pq;
+    std::unique_ptr<QueryRequest> _qr;
 
-    // _root points into _pq->getFilter()
+    // _root points into _qr->getFilter()
     std::unique_ptr<MatchExpression> _root;
 
     std::unique_ptr<ParsedProjection> _proj;

@@ -31,20 +31,20 @@
 #include "mongo/db/query/find_common.h"
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/db/query/query_request.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 
 MONGO_FP_DECLARE(keepCursorPinnedDuringGetMore);
 
-bool FindCommon::enoughForFirstBatch(const LiteParsedQuery& pq, long long numDocs) {
-    if (!pq.getEffectiveBatchSize()) {
+bool FindCommon::enoughForFirstBatch(const QueryRequest& qr, long long numDocs) {
+    if (!qr.getEffectiveBatchSize()) {
         // We enforce a default batch size for the initial find if no batch size is specified.
-        return numDocs >= LiteParsedQuery::kDefaultBatchSize;
+        return numDocs >= QueryRequest::kDefaultBatchSize;
     }
 
-    return numDocs >= pq.getEffectiveBatchSize().value();
+    return numDocs >= qr.getEffectiveBatchSize().value();
 }
 
 bool FindCommon::haveSpaceForNext(const BSONObj& nextDoc, long long numDocs, int bytesBuffered) {
@@ -64,7 +64,7 @@ BSONObj FindCommon::transformSortSpec(const BSONObj& sortSpec) {
     for (BSONElement elt : sortSpec) {
         if (elt.isNumber()) {
             comparatorBob.append(elt);
-        } else if (LiteParsedQuery::isTextScoreMeta(elt)) {
+        } else if (QueryRequest::isTextScoreMeta(elt)) {
             // Sort text score decreasing by default. Field name doesn't matter but we choose
             // something that a user shouldn't ever have.
             comparatorBob.append("$metaTextScore", -1);

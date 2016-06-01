@@ -1479,7 +1479,7 @@ TEST_F(QueryPlannerTest, CompoundIndexWithEqualityPredicatesProvidesSort) {
 //
 
 TEST_F(QueryPlannerTest, SortLimit) {
-    // Negative limit indicates hard limit - see lite_parsed_query.cpp
+    // Negative limit indicates hard limit - see query_request.cpp
     runQuerySortProjSkipNToReturn(BSONObj(), fromjson("{a: 1}"), BSONObj(), 0, -3);
     assertNumSolutions(1U);
     assertSolutionExists(
@@ -4148,10 +4148,10 @@ TEST_F(QueryPlannerTest, CacheDataFromTaggedTreeFailsOnBadInput) {
     // No relevant index matching the index tag.
     relevantIndices.push_back(IndexEntry(BSON("a" << 1)));
 
-    auto lpq = stdx::make_unique<LiteParsedQuery>(NamespaceString("test.collection"));
-    lpq->setFilter(BSON("a" << 3));
+    auto qr = stdx::make_unique<QueryRequest>(NamespaceString("test.collection"));
+    qr->setFilter(BSON("a" << 3));
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(txn(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
+        CanonicalQuery::canonicalize(txn(), std::move(qr), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
     scopedCq->root()->setTag(new IndexTag(1));
@@ -4164,10 +4164,10 @@ TEST_F(QueryPlannerTest, CacheDataFromTaggedTreeFailsOnBadInput) {
 TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
     const NamespaceString nss("test.collection");
 
-    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
-    lpq->setFilter(BSON("a" << 3));
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setFilter(BSON("a" << 3));
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(txn(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
+        CanonicalQuery::canonicalize(txn(), std::move(qr), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
 
@@ -4194,10 +4194,10 @@ TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
     ASSERT_OK(s);
 
     // Regenerate canonical query in order to clear tags.
-    auto newLPQ = stdx::make_unique<LiteParsedQuery>(nss);
-    newLPQ->setFilter(BSON("a" << 3));
+    auto newQR = stdx::make_unique<QueryRequest>(nss);
+    newQR->setFilter(BSON("a" << 3));
     statusWithCQ = CanonicalQuery::canonicalize(
-        txn(), std::move(newLPQ), ExtensionsCallbackDisallowExtensions());
+        txn(), std::move(newQR), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     scopedCq = std::move(statusWithCQ.getValue());
 

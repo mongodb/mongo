@@ -359,7 +359,7 @@ if not has_option('noshell') and usemozjs:
                     'db/catalog/index_key_validate',
                     'db/index/external_key_generator',
                     'db/query/command_request_response',
-                    'db/query/lite_parsed_query',
+                    'db/query/query_request',
                     'db/server_options_core',
                     'linenoise_utf8',
                     'rpc/protocol',

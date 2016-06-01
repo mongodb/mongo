@@ -164,7 +164,7 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorMatch) {
     onFindCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(request.target, kTestHosts[1]);
         auto query =
-            assertGet(LiteParsedQuery::makeFromFindCommand(kTestNamespace, request.cmdObj, false));
+            assertGet(QueryRequest::makeFromFindCommand(kTestNamespace, request.cmdObj, false));
         ASSERT_EQ(BSON("_id" << 1), query->getFilter());
 
         return vector<BSONObj>{objToInsert};
@@ -199,7 +199,7 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorNotFound) {
     onFindCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(request.target, kTestHosts[1]);
         auto query =
-            assertGet(LiteParsedQuery::makeFromFindCommand(kTestNamespace, request.cmdObj, false));
+            assertGet(QueryRequest::makeFromFindCommand(kTestNamespace, request.cmdObj, false));
         ASSERT_EQ(BSON("_id" << 1), query->getFilter());
 
         return vector<BSONObj>();
@@ -234,7 +234,7 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorMismatch) {
     onFindCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(request.target, kTestHosts[1]);
         auto query =
-            assertGet(LiteParsedQuery::makeFromFindCommand(kTestNamespace, request.cmdObj, false));
+            assertGet(QueryRequest::makeFromFindCommand(kTestNamespace, request.cmdObj, false));
         ASSERT_EQ(BSON("_id" << 1), query->getFilter());
 
         return vector<BSONObj>{BSON("_id" << 1 << "Value"
@@ -290,7 +290,7 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterWriteConcernFailureMatch) {
     onFindCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(request.target, kTestHosts[0]);
         auto query =
-            assertGet(LiteParsedQuery::makeFromFindCommand(kTestNamespace, request.cmdObj, false));
+            assertGet(QueryRequest::makeFromFindCommand(kTestNamespace, request.cmdObj, false));
         ASSERT_EQ(BSON("_id" << 1), query->getFilter());
 
         return vector<BSONObj>{objToInsert};

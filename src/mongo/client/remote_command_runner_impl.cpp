@@ -173,7 +173,7 @@ StatusWith<RemoteCommandResponse> RemoteCommandRunnerImpl::runCommand(
         // 'commandName' will be an empty string if the command object is an empty BSON
         // document.
         StringData commandName = request.cmdObj.firstElement().fieldNameStringData();
-        const auto isFindCmd = commandName == LiteParsedQuery::kFindCommandName;
+        const auto isFindCmd = commandName == QueryRequest::kFindCommandName;
         const auto isGetMoreCmd = commandName == GetMoreRequest::kGetMoreCommandName;
         const auto isFindOrGetMoreCmd = isFindCmd || isGetMoreCmd;
 

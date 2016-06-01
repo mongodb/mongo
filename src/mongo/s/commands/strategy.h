@@ -36,9 +36,9 @@
 
 namespace mongo {
 
-class LiteParsedQuery;
 class OperationContext;
 class QueryMessage;
+class QueryRequest;
 class Request;
 
 namespace rpc {
@@ -68,7 +68,7 @@ public:
      */
     static Status explainFind(OperationContext* txn,
                               const BSONObj& findCommand,
-                              const LiteParsedQuery& lpq,
+                              const QueryRequest& qr,
                               ExplainCommon::Verbosity verbosity,
                               const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                               BSONObjBuilder* out);

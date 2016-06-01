@@ -136,18 +136,18 @@ public:
                     str::stream() << "Invalid collection name: " << nss.ns()};
         }
 
-        // Parse the command BSON to a LiteParsedQuery.
+        // Parse the command BSON to a QueryRequest.
         const bool isExplain = true;
-        auto lpqStatus = LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain);
-        if (!lpqStatus.isOK()) {
-            return lpqStatus.getStatus();
+        auto qrStatus = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
+        if (!qrStatus.isOK()) {
+            return qrStatus.getStatus();
         }
 
-        // Finish the parsing step by using the LiteParsedQuery to create a CanonicalQuery.
+        // Finish the parsing step by using the QueryRequest to create a CanonicalQuery.
 
         ExtensionsCallbackReal extensionsCallback(txn, &nss);
         auto statusWithCQ =
-            CanonicalQuery::canonicalize(txn, std::move(lpqStatus.getValue()), extensionsCallback);
+            CanonicalQuery::canonicalize(txn, std::move(qrStatus.getValue()), extensionsCallback);
         if (!statusWithCQ.isOK()) {
             return statusWithCQ.getStatus();
         }
@@ -202,17 +202,17 @@ public:
                 Status(ErrorCodes::IllegalOperation, "Cannot run find command from eval()"));
         }
 
-        // Parse the command BSON to a LiteParsedQuery.
+        // Parse the command BSON to a QueryRequest.
         const bool isExplain = false;
-        auto lpqStatus = LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain);
-        if (!lpqStatus.isOK()) {
-            return appendCommandStatus(result, lpqStatus.getStatus());
+        auto qrStatus = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
+        if (!qrStatus.isOK()) {
+            return appendCommandStatus(result, qrStatus.getStatus());
         }
 
-        auto& lpq = lpqStatus.getValue();
+        auto& qr = qrStatus.getValue();
 
         // Validate term before acquiring locks, if provided.
-        if (auto term = lpq->getReplicationTerm()) {
+        if (auto term = qr->getReplicationTerm()) {
             auto replCoord = repl::ReplicationCoordinator::get(txn);
             Status status = replCoord->updateTerm(txn, *term);
             // Note: updateTerm returns ok if term stayed the same.
@@ -230,9 +230,9 @@ public:
         const int ntoskip = -1;
         beginQueryOp(txn, nss, cmdObj, ntoreturn, ntoskip);
 
-        // Finish the parsing step by using the LiteParsedQuery to create a CanonicalQuery.
+        // Finish the parsing step by using the QueryRequest to create a CanonicalQuery.
         ExtensionsCallbackReal extensionsCallback(txn, &nss);
-        auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(lpq), extensionsCallback);
+        auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(qr), extensionsCallback);
         if (!statusWithCQ.isOK()) {
             return appendCommandStatus(result, statusWithCQ.getStatus());
         }
@@ -266,14 +266,14 @@ public:
             return true;
         }
 
-        const LiteParsedQuery& pq = exec->getCanonicalQuery()->getParsed();
+        const QueryRequest& originalQR = exec->getCanonicalQuery()->getQueryRequest();
 
         // Stream query results, adding them to a BSONArray as we go.
         CursorResponseBuilder firstBatch(/*isInitialResponse*/ true, &result);
         BSONObj obj;
         PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
         long long numResults = 0;
-        while (!FindCommon::enoughForFirstBatch(pq, numResults) &&
+        while (!FindCommon::enoughForFirstBatch(originalQR, numResults) &&
                PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
             // If we can't fit this result inside the current batch, then we stash it for later.
             if (!FindCommon::haveSpaceForNext(obj, numResults, firstBatch.bytesUsed())) {
@@ -320,8 +320,8 @@ public:
                                  exec.release(),
                                  nss.ns(),
                                  txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
-                                 pq.getOptions(),
-                                 pq.getFilter());
+                                 originalQR.getOptions(),
+                                 originalQR.getFilter());
             cursorId = cursor->cursorid();
 
             invariant(!exec);

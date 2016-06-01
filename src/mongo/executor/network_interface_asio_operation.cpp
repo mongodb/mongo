@@ -34,7 +34,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/query/getmore_request.h"
-#include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/db/query/query_request.h"
 #include "mongo/executor/async_stream_interface.h"
 #include "mongo/executor/connection_pool_asio.h"
 #include "mongo/executor/downconvert_find_and_getmore_commands.h"
@@ -200,7 +200,7 @@ Status NetworkInterfaceASIO::AsyncOp::beginCommand(const RemoteCommandRequest& r
                                                    rpc::EgressMetadataHook* metadataHook) {
     // Check if we need to downconvert find or getMore commands.
     StringData commandName = request.cmdObj.firstElement().fieldNameStringData();
-    const auto isFindCmd = commandName == LiteParsedQuery::kFindCommandName;
+    const auto isFindCmd = commandName == QueryRequest::kFindCommandName;
     const auto isGetMoreCmd = commandName == GetMoreRequest::kGetMoreCommandName;
     const auto isFindOrGetMoreCmd = isFindCmd || isGetMoreCmd;
 

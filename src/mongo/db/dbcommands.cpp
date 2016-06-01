@@ -631,12 +631,12 @@ public:
         BSONObj sort = BSON("files_id" << 1 << "n" << 1);
 
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            auto lpq = stdx::make_unique<LiteParsedQuery>(NamespaceString(ns));
-            lpq->setFilter(query);
-            lpq->setSort(sort);
+            auto qr = stdx::make_unique<QueryRequest>(NamespaceString(ns));
+            qr->setFilter(query);
+            qr->setSort(sort);
 
             auto statusWithCQ = CanonicalQuery::canonicalize(
-                txn, std::move(lpq), ExtensionsCallbackDisallowExtensions());
+                txn, std::move(qr), ExtensionsCallbackDisallowExtensions());
             if (!statusWithCQ.isOK()) {
                 uasserted(17240, "Can't canonicalize query " + query.toString());
                 return 0;
@@ -1219,10 +1219,10 @@ const std::size_t kQueryOptionMaxTimeMSField = 3;
 
 // We make an array of the fields we need so we can call getFields once. This saves repeated
 // scans over the command object.
-const std::array<StringData, 4> neededFieldNames{LiteParsedQuery::cmdOptionMaxTimeMS,
+const std::array<StringData, 4> neededFieldNames{QueryRequest::cmdOptionMaxTimeMS,
                                                  Command::kHelpFieldName,
                                                  ChunkVersion::kShardVersionField,
-                                                 LiteParsedQuery::queryOptionMaxTimeMS};
+                                                 QueryRequest::queryOptionMaxTimeMS};
 }  // namespace
 
 void appendOpTimeMetadata(OperationContext* txn,
@@ -1348,7 +1348,7 @@ void Command::execCommand(OperationContext* txn,
 
         // Handle command option maxTimeMS.
         int maxTimeMS = uassertStatusOK(
-            LiteParsedQuery::parseMaxTimeMS(extractedFields[kCmdOptionMaxTimeMSField]));
+            QueryRequest::parseMaxTimeMS(extractedFields[kCmdOptionMaxTimeMSField]));
 
         uassert(ErrorCodes::InvalidOptions,
                 "no such command option $maxTimeMs; use maxTimeMS instead",

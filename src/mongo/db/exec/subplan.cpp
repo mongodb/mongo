@@ -92,33 +92,33 @@ bool isContainedOr(const MatchExpression* expr) {
 }  // namespace
 
 bool SubplanStage::canUseSubplanning(const CanonicalQuery& query) {
-    const LiteParsedQuery& lpq = query.getParsed();
+    const QueryRequest& qr = query.getQueryRequest();
     const MatchExpression* expr = query.root();
 
     // Hint provided
-    if (!lpq.getHint().isEmpty()) {
+    if (!qr.getHint().isEmpty()) {
         return false;
     }
 
     // Min provided
     // Min queries are a special case of hinted queries.
-    if (!lpq.getMin().isEmpty()) {
+    if (!qr.getMin().isEmpty()) {
         return false;
     }
 
     // Max provided
     // Similar to min, max queries are a special case of hinted queries.
-    if (!lpq.getMax().isEmpty()) {
+    if (!qr.getMax().isEmpty()) {
         return false;
     }
 
     // Tailable cursors won't get cached, just turn into collscans.
-    if (query.getParsed().isTailable()) {
+    if (query.getQueryRequest().isTailable()) {
         return false;
     }
 
     // Snapshot is really a hint.
-    if (query.getParsed().isSnapshot()) {
+    if (query.getQueryRequest().isSnapshot()) {
         return false;
     }
 
@@ -167,7 +167,7 @@ Status SubplanStage::planSubqueries() {
     _orExpression = _query->root()->shallowClone();
     if (isContainedOr(_orExpression.get())) {
         _orExpression = rewriteToRootedOr(std::move(_orExpression));
-        invariant(CanonicalQuery::isValid(_orExpression.get(), _query->getParsed()).isOK());
+        invariant(CanonicalQuery::isValid(_orExpression.get(), _query->getQueryRequest()).isOK());
     }
 
     for (size_t i = 0; i < _plannerParams.indices.size(); ++i) {

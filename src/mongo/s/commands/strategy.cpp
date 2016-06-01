@@ -49,7 +49,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/getmore_request.h"
-#include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/db/query/query_request.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
@@ -144,8 +144,8 @@ void Strategy::queryOp(OperationContext* txn, Request& request) {
     ReadPreferenceSetting readPreference(readPreferenceOption, TagSet());
 
     BSONElement rpElem;
-    auto readPrefExtractStatus = bsonExtractTypedField(
-        q.query, LiteParsedQuery::kWrappedReadPrefField, mongo::Object, &rpElem);
+    auto readPrefExtractStatus =
+        bsonExtractTypedField(q.query, QueryRequest::kWrappedReadPrefField, mongo::Object, &rpElem);
 
     if (readPrefExtractStatus.isOK()) {
         auto parsedRps = ReadPreferenceSetting::fromBSON(rpElem.Obj());
@@ -160,9 +160,9 @@ void Strategy::queryOp(OperationContext* txn, Request& request) {
 
     // If the $explain flag was set, we must run the operation on the shards as an explain command
     // rather than a find command.
-    if (canonicalQuery.getValue()->getParsed().isExplain()) {
-        const LiteParsedQuery& lpq = canonicalQuery.getValue()->getParsed();
-        BSONObj findCommand = lpq.asFindCommand();
+    if (canonicalQuery.getValue()->getQueryRequest().isExplain()) {
+        const QueryRequest& qr = canonicalQuery.getValue()->getQueryRequest();
+        BSONObj findCommand = qr.asFindCommand();
 
         // We default to allPlansExecution verbosity.
         auto verbosity = ExplainCommon::EXEC_ALL_PLANS;
@@ -172,7 +172,7 @@ void Strategy::queryOp(OperationContext* txn, Request& request) {
 
         BSONObjBuilder explainBuilder;
         uassertStatusOK(
-            Strategy::explainFind(txn, findCommand, lpq, verbosity, metadata, &explainBuilder));
+            Strategy::explainFind(txn, findCommand, qr, verbosity, metadata, &explainBuilder));
 
         BSONObj explainObj = explainBuilder.done();
         replyToQuery(0,  // query result flags
@@ -507,7 +507,7 @@ void Strategy::writeOp(OperationContext* txn, int op, Request& request) {
 
 Status Strategy::explainFind(OperationContext* txn,
                              const BSONObj& findCommand,
-                             const LiteParsedQuery& lpq,
+                             const QueryRequest& qr,
                              ExplainCommon::Verbosity verbosity,
                              const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                              BSONObjBuilder* out) {
@@ -521,11 +521,11 @@ Status Strategy::explainFind(OperationContext* txn,
 
     std::vector<Strategy::CommandResult> shardResults;
     Strategy::commandOp(txn,
-                        lpq.nss().db().toString(),
+                        qr.nss().db().toString(),
                         explainCmdBob.obj(),
                         options,
-                        lpq.nss().toString(),
-                        lpq.getFilter(),
+                        qr.nss().toString(),
+                        qr.getFilter(),
                         &shardResults);
 
     long long millisElapsed = timer.millis();

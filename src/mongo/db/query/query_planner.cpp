@@ -232,7 +232,7 @@ QuerySolution* buildWholeIXSoln(const IndexEntry& index,
 }
 
 bool providesSort(const CanonicalQuery& query, const BSONObj& kp) {
-    return query.getParsed().getSort().isPrefixOf(kp);
+    return query.getQueryRequest().getSort().isPrefixOf(kp);
 }
 
 // static
@@ -441,7 +441,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
     }
 
     const bool canTableScan = !(params.options & QueryPlannerParams::NO_TABLE_SCAN);
-    const bool isTailable = query.getParsed().isTailable();
+    const bool isTailable = query.getQueryRequest().isTailable();
 
     // If the query requests a tailable cursor, the only solution is a collscan + filter with
     // tailable set on the collscan.  TODO: This is a policy departure.  Previously I think you
@@ -460,9 +460,10 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
     // The hint or sort can be $natural: 1.  If this happens, output a collscan. If both
     // a $natural hint and a $natural sort are specified, then the direction of the collscan
     // is determined by the sign of the sort (not the sign of the hint).
-    if (!query.getParsed().getHint().isEmpty() || !query.getParsed().getSort().isEmpty()) {
-        BSONObj hintObj = query.getParsed().getHint();
-        BSONObj sortObj = query.getParsed().getSort();
+    if (!query.getQueryRequest().getHint().isEmpty() ||
+        !query.getQueryRequest().getSort().isEmpty()) {
+        BSONObj hintObj = query.getQueryRequest().getHint();
+        BSONObj sortObj = query.getQueryRequest().getSort();
         BSONElement naturalHint = dps::extractElementAtPath(hintObj, "$natural");
         BSONElement naturalSort = dps::extractElementAtPath(sortObj, "$natural");
 
@@ -471,8 +472,8 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
         if (!naturalHint.eoo() || (!naturalSort.eoo() && hintObj.isEmpty())) {
             LOG(5) << "Forcing a table scan due to hinted $natural\n";
             // min/max are incompatible with $natural.
-            if (canTableScan && query.getParsed().getMin().isEmpty() &&
-                query.getParsed().getMax().isEmpty()) {
+            if (canTableScan && query.getQueryRequest().getMin().isEmpty() &&
+                query.getQueryRequest().getMax().isEmpty()) {
                 QuerySolution* soln = buildCollscanSoln(query, isTailable, params);
                 if (NULL != soln) {
                     out->push_back(soln);
@@ -499,7 +500,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
     // requested in the query.
     BSONObj hintIndex;
     if (!params.indexFiltersApplied) {
-        hintIndex = query.getParsed().getHint();
+        hintIndex = query.getQueryRequest().getHint();
     }
 
     // If snapshot is set, default to collscanning. If the query param SNAPSHOT_USE_ID is set,
@@ -508,7 +509,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
     //
     // Don't do this if the query is a geonear or text as as text search queries must be answered
     // using full text indices and geoNear queries must be answered using geospatial indices.
-    if (query.getParsed().isSnapshot() &&
+    if (query.getQueryRequest().isSnapshot() &&
         !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR) &&
         !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT)) {
         const bool useIXScan = params.options & QueryPlannerParams::SNAPSHOT_USE_ID;
@@ -570,9 +571,10 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
 
     // Deal with the .min() and .max() query options.  If either exist we can only use an index
     // that matches the object inside.
-    if (!query.getParsed().getMin().isEmpty() || !query.getParsed().getMax().isEmpty()) {
-        BSONObj minObj = query.getParsed().getMin();
-        BSONObj maxObj = query.getParsed().getMax();
+    if (!query.getQueryRequest().getMin().isEmpty() ||
+        !query.getQueryRequest().getMax().isEmpty()) {
+        BSONObj minObj = query.getQueryRequest().getMin();
+        BSONObj maxObj = query.getQueryRequest().getMax();
 
         // The unfinished siblings of these objects may not be proper index keys because they
         // may be empty objects or have field names. When an index is picked to use for the
@@ -672,7 +674,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
     //
     // TEXT and GEO_NEAR are special because they require the use of a text/geo index in order
     // to be evaluated correctly. Stripping these "mandatory assignments" is therefore invalid.
-    if (query.getParsed().getProj().isEmpty() &&
+    if (query.getQueryRequest().getProj().isEmpty() &&
         !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR) &&
         !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT)) {
         QueryPlannerIXSelect::stripUnneededAssignments(query.root(), relevantIndices);
@@ -816,7 +818,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
     // If a sort order is requested, there may be an index that provides it, even if that
     // index is not over any predicates in the query.
     //
-    if (!query.getParsed().getSort().isEmpty() &&
+    if (!query.getQueryRequest().getSort().isEmpty() &&
         !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR) &&
         !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT)) {
         // See if we have a sort provided from an index already.

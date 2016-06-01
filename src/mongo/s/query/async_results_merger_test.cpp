@@ -35,7 +35,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_request.h"
-#include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/db/query/query_request.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
@@ -105,17 +105,17 @@ protected:
         boost::optional<long long> getMoreBatchSize = boost::none,
         ReadPreferenceSetting readPref = ReadPreferenceSetting(ReadPreference::PrimaryOnly)) {
         const bool isExplain = true;
-        const auto lpq =
-            unittest::assertGet(LiteParsedQuery::makeFromFindCommand(_nss, findCmd, isExplain));
+        const auto qr =
+            unittest::assertGet(QueryRequest::makeFromFindCommand(_nss, findCmd, isExplain));
 
         ClusterClientCursorParams params = ClusterClientCursorParams(_nss, readPref);
-        params.sort = lpq->getSort();
-        params.limit = lpq->getLimit();
-        params.batchSize = getMoreBatchSize ? getMoreBatchSize : lpq->getBatchSize();
-        params.skip = lpq->getSkip();
-        params.isTailable = lpq->isTailable();
-        params.isAwaitData = lpq->isAwaitData();
-        params.isAllowPartialResults = lpq->isAllowPartialResults();
+        params.sort = qr->getSort();
+        params.limit = qr->getLimit();
+        params.batchSize = getMoreBatchSize ? getMoreBatchSize : qr->getBatchSize();
+        params.skip = qr->getSkip();
+        params.isTailable = qr->isTailable();
+        params.isAwaitData = qr->isAwaitData();
+        params.isAllowPartialResults = qr->isAllowPartialResults();
 
         for (const auto& shardId : shardIds) {
             params.remotes.emplace_back(shardId, findCmd);

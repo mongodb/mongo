@@ -136,7 +136,7 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
 
             batchSize = el.numberLong();
         } else if (str::equals(fieldName, kAwaitDataTimeoutField)) {
-            auto maxAwaitDataTime = LiteParsedQuery::parseMaxTimeMS(el);
+            auto maxAwaitDataTime = QueryRequest::parseMaxTimeMS(el);
             if (!maxAwaitDataTime.isOK()) {
                 return maxAwaitDataTime.getStatus();
             }

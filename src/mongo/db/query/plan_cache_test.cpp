@@ -66,10 +66,10 @@ unique_ptr<CanonicalQuery> canonicalize(const BSONObj& queryObj) {
     QueryTestServiceContext serviceContext;
     auto txn = serviceContext.makeOperationContext();
 
-    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
-    lpq->setFilter(queryObj);
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setFilter(queryObj);
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        txn.get(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
+        txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -85,12 +85,12 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     QueryTestServiceContext serviceContext;
     auto txn = serviceContext.makeOperationContext();
 
-    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
-    lpq->setFilter(fromjson(queryStr));
-    lpq->setSort(fromjson(sortStr));
-    lpq->setProj(fromjson(projStr));
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setFilter(fromjson(queryStr));
+    qr->setSort(fromjson(sortStr));
+    qr->setProj(fromjson(projStr));
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        txn.get(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
+        txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -106,21 +106,21 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     QueryTestServiceContext serviceContext;
     auto txn = serviceContext.makeOperationContext();
 
-    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
-    lpq->setFilter(fromjson(queryStr));
-    lpq->setSort(fromjson(sortStr));
-    lpq->setProj(fromjson(projStr));
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setFilter(fromjson(queryStr));
+    qr->setSort(fromjson(sortStr));
+    qr->setProj(fromjson(projStr));
     if (skip) {
-        lpq->setSkip(skip);
+        qr->setSkip(skip);
     }
     if (limit) {
-        lpq->setLimit(limit);
+        qr->setLimit(limit);
     }
-    lpq->setHint(fromjson(hintStr));
-    lpq->setMin(fromjson(minStr));
-    lpq->setMax(fromjson(maxStr));
+    qr->setHint(fromjson(hintStr));
+    qr->setMin(fromjson(minStr));
+    qr->setMax(fromjson(maxStr));
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        txn.get(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
+        txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -138,23 +138,23 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     QueryTestServiceContext serviceContext;
     auto txn = serviceContext.makeOperationContext();
 
-    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
-    lpq->setFilter(fromjson(queryStr));
-    lpq->setSort(fromjson(sortStr));
-    lpq->setProj(fromjson(projStr));
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setFilter(fromjson(queryStr));
+    qr->setSort(fromjson(sortStr));
+    qr->setProj(fromjson(projStr));
     if (skip) {
-        lpq->setSkip(skip);
+        qr->setSkip(skip);
     }
     if (limit) {
-        lpq->setLimit(limit);
+        qr->setLimit(limit);
     }
-    lpq->setHint(fromjson(hintStr));
-    lpq->setMin(fromjson(minStr));
-    lpq->setMax(fromjson(maxStr));
-    lpq->setSnapshot(snapshot);
-    lpq->setExplain(explain);
+    qr->setHint(fromjson(hintStr));
+    qr->setMin(fromjson(minStr));
+    qr->setMax(fromjson(maxStr));
+    qr->setSnapshot(snapshot);
+    qr->setExplain(explain);
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        txn.get(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
+        txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -386,8 +386,8 @@ TEST(PlanCacheTest, ShouldNotCacheQueryExplain) {
                                                false,  // snapshot
                                                true    // explain
                                                ));
-    const LiteParsedQuery& pq = cq->getParsed();
-    ASSERT_TRUE(pq.isExplain());
+    const QueryRequest& qr = cq->getQueryRequest();
+    ASSERT_TRUE(qr.isExplain());
     assertShouldNotCacheQuery(*cq);
 }
 
@@ -538,22 +538,22 @@ protected:
 
         solns.clear();
 
-        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
-        lpq->setFilter(query);
-        lpq->setSort(sort);
-        lpq->setProj(proj);
+        auto qr = stdx::make_unique<QueryRequest>(nss);
+        qr->setFilter(query);
+        qr->setSort(sort);
+        qr->setProj(proj);
         if (skip) {
-            lpq->setSkip(skip);
+            qr->setSkip(skip);
         }
         if (limit) {
-            lpq->setLimit(limit);
+            qr->setLimit(limit);
         }
-        lpq->setHint(hint);
-        lpq->setMin(minObj);
-        lpq->setMax(maxObj);
-        lpq->setSnapshot(snapshot);
+        qr->setHint(hint);
+        qr->setMin(minObj);
+        qr->setMax(maxObj);
+        qr->setSnapshot(snapshot);
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn.get(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
+            txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         Status s = QueryPlanner::plan(*statusWithCQ.getValue(), params, &solns);
         ASSERT_OK(s);
@@ -627,12 +627,12 @@ protected:
         QueryTestServiceContext serviceContext;
         auto txn = serviceContext.makeOperationContext();
 
-        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
-        lpq->setFilter(query);
-        lpq->setSort(sort);
-        lpq->setProj(proj);
+        auto qr = stdx::make_unique<QueryRequest>(nss);
+        qr->setFilter(query);
+        qr->setSort(sort);
+        qr->setProj(proj);
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn.get(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
+            txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
 

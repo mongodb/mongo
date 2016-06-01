@@ -42,7 +42,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/db/query/query_request.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -96,7 +96,7 @@ BSONObj appendMaxTimeToCmdObj(OperationContext* txn, const BSONObj& cmdObj) {
     Milliseconds maxTime = kConfigCommandTimeout;
 
     bool hasTxnMaxTime = txn->hasDeadline();
-    bool hasUserMaxTime = !cmdObj[LiteParsedQuery::cmdOptionMaxTimeMS].eoo();
+    bool hasUserMaxTime = !cmdObj[QueryRequest::cmdOptionMaxTimeMS].eoo();
 
     if (hasTxnMaxTime) {
         maxTime = std::min(maxTime, duration_cast<Milliseconds>(txn->getRemainingMaxTimeMicros()));
@@ -109,7 +109,7 @@ BSONObj appendMaxTimeToCmdObj(OperationContext* txn, const BSONObj& cmdObj) {
     }
 
     if (hasUserMaxTime) {
-        Milliseconds userMaxTime(cmdObj[LiteParsedQuery::cmdOptionMaxTimeMS].numberLong());
+        Milliseconds userMaxTime(cmdObj[QueryRequest::cmdOptionMaxTimeMS].numberLong());
         if (userMaxTime <= maxTime) {
             return cmdObj;
         }
@@ -118,7 +118,7 @@ BSONObj appendMaxTimeToCmdObj(OperationContext* txn, const BSONObj& cmdObj) {
     BSONObjBuilder updatedCmdBuilder;
     if (hasUserMaxTime) {  // Need to remove user provided maxTimeMS.
         BSONObjIterator cmdObjIter(cmdObj);
-        const char* maxTimeFieldName = LiteParsedQuery::cmdOptionMaxTimeMS;
+        const char* maxTimeFieldName = QueryRequest::cmdOptionMaxTimeMS;
         while (cmdObjIter.more()) {
             BSONElement e = cmdObjIter.next();
             if (str::equals(e.fieldName(), maxTimeFieldName)) {
@@ -130,7 +130,7 @@ BSONObj appendMaxTimeToCmdObj(OperationContext* txn, const BSONObj& cmdObj) {
         updatedCmdBuilder.appendElements(cmdObj);
     }
 
-    updatedCmdBuilder.append(LiteParsedQuery::cmdOptionMaxTimeMS,
+    updatedCmdBuilder.append(QueryRequest::cmdOptionMaxTimeMS,
                              durationCount<Milliseconds>(maxTime));
     return updatedCmdBuilder.obj();
 }
@@ -323,14 +323,14 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
             bob.done().getObjectField(repl::ReadConcernArgs::kReadConcernFieldName).getOwned();
     }
 
-    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
-    lpq->setFilter(query);
-    lpq->setSort(sort);
-    lpq->setReadConcern(readConcernObj);
-    lpq->setLimit(limit);
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setFilter(query);
+    qr->setSort(sort);
+    qr->setReadConcern(readConcernObj);
+    qr->setLimit(limit);
 
     BSONObjBuilder findCmdBuilder;
-    lpq->asFindCommand(&findCmdBuilder);
+    qr->asFindCommand(&findCmdBuilder);
 
     Microseconds maxTime = std::min(duration_cast<Microseconds>(kConfigCommandTimeout),
                                     txn->getRemainingMaxTimeMicros());
@@ -340,8 +340,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
         maxTime = Milliseconds{1};
     }
 
-    findCmdBuilder.append(LiteParsedQuery::cmdOptionMaxTimeMS,
-                          durationCount<Milliseconds>(maxTime));
+    findCmdBuilder.append(QueryRequest::cmdOptionMaxTimeMS, durationCount<Milliseconds>(maxTime));
 
     Fetcher fetcher(Grid::get(txn)->getExecutorPool()->getFixedExecutor(),
                     host.getValue(),

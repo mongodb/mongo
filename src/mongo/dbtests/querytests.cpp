@@ -43,7 +43,6 @@
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/query/find.h"
-#include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"
 #include "mongo/dbtests/dbtests.h"

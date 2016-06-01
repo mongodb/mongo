@@ -270,10 +270,10 @@ StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(OperationContext* 
     if (!isValid())
         return StatusWith<BSONObj>(BSONObj());
 
-    auto lpq = stdx::make_unique<LiteParsedQuery>(NamespaceString(""));
-    lpq->setFilter(basicQuery);
+    auto qr = stdx::make_unique<QueryRequest>(NamespaceString(""));
+    qr->setFilter(basicQuery);
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(lpq), ExtensionsCallbackNoop());
+    auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(qr), ExtensionsCallbackNoop());
     if (!statusWithCQ.isOK()) {
         return StatusWith<BSONObj>(statusWithCQ.getStatus());
     }

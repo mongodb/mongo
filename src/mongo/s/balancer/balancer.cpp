@@ -41,7 +41,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/db/query/query_request.h"
 #include "mongo/s/balancer/balancer_chunk_selection_policy_impl.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/balancer/cluster_statistics_impl.h"
@@ -164,7 +164,7 @@ void appendOperationDeadlineIfSet(OperationContext* txn, BSONObjBuilder* cmdBuil
     if (!maxTimeMsArg) {
         return;
     }
-    cmdBuilder->append(LiteParsedQuery::cmdOptionMaxTimeMS, *maxTimeMsArg);
+    cmdBuilder->append(QueryRequest::cmdOptionMaxTimeMS, *maxTimeMsArg);
 }
 
 /**

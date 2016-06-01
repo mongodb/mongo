@@ -77,11 +77,10 @@ protected:
         BSONObj cmdObj = fromjson(findCmd);
 
         bool isExplain = false;
-        auto lpq =
-            unittest::assertGet(LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain));
+        auto qr = unittest::assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain));
 
         auto cq = unittest::assertGet(
-            CanonicalQuery::canonicalize(txn(), std::move(lpq), ExtensionsCallbackNoop()));
+            CanonicalQuery::canonicalize(txn(), std::move(qr), ExtensionsCallbackNoop()));
         return cq;
     }
 
@@ -114,10 +113,10 @@ public:
             "{$or: [{a: {$geoWithin: {$centerSphere: [[0,0],10]}}},"
             "{a: {$geoWithin: {$centerSphere: [[1,1],10]}}}]}");
 
-        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
-        lpq->setFilter(query);
+        auto qr = stdx::make_unique<QueryRequest>(nss);
+        qr->setFilter(query);
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
+            txn(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -160,10 +159,10 @@ public:
 
         Collection* collection = ctx.getCollection();
 
-        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
-        lpq->setFilter(query);
+        auto qr = stdx::make_unique<QueryRequest>(nss);
+        qr->setFilter(query);
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
+            txn(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -218,10 +217,10 @@ public:
 
         Collection* collection = ctx.getCollection();
 
-        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
-        lpq->setFilter(query);
+        auto qr = stdx::make_unique<QueryRequest>(nss);
+        qr->setFilter(query);
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
+            txn(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -277,10 +276,10 @@ public:
 
         Collection* collection = ctx.getCollection();
 
-        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
-        lpq->setFilter(query);
+        auto qr = stdx::make_unique<QueryRequest>(nss);
+        qr->setFilter(query);
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
+            txn(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -533,10 +532,10 @@ public:
         insert(BSON("_id" << 3 << "a" << 1 << "c" << 3));
         insert(BSON("_id" << 4 << "a" << 1 << "c" << 4));
 
-        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
-        lpq->setFilter(query);
+        auto qr = stdx::make_unique<QueryRequest>(nss);
+        qr->setFilter(query);
         auto cq = unittest::assertGet(CanonicalQuery::canonicalize(
-            txn(), std::move(lpq), ExtensionsCallbackDisallowExtensions()));
+            txn(), std::move(qr), ExtensionsCallbackDisallowExtensions()));
 
         Collection* collection = ctx.getCollection();
 
@@ -592,11 +591,11 @@ public:
         insert(BSON("_id" << 3 << "a" << 3));
         insert(BSON("_id" << 4));
 
-        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
-        lpq->setFilter(fromjson("{$or: [{a: 1}, {a: {$ne:1}}]}"));
-        lpq->setSort(BSON("d" << 1));
+        auto qr = stdx::make_unique<QueryRequest>(nss);
+        qr->setFilter(fromjson("{$or: [{a: 1}, {a: {$ne:1}}]}"));
+        qr->setSort(BSON("d" << 1));
         auto cq = unittest::assertGet(CanonicalQuery::canonicalize(
-            txn(), std::move(lpq), ExtensionsCallbackDisallowExtensions()));
+            txn(), std::move(qr), ExtensionsCallbackDisallowExtensions()));
 
         Collection* collection = ctx.getCollection();
 

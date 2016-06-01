@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/db/query/query_request.h"
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -44,20 +44,20 @@ namespace mongo {
 using std::string;
 using std::unique_ptr;
 
-const std::string LiteParsedQuery::kUnwrappedReadPrefField("$queryOptions");
-const std::string LiteParsedQuery::kWrappedReadPrefField("$readPreference");
+const std::string QueryRequest::kUnwrappedReadPrefField("$queryOptions");
+const std::string QueryRequest::kWrappedReadPrefField("$readPreference");
 
-const char LiteParsedQuery::cmdOptionMaxTimeMS[] = "maxTimeMS";
-const char LiteParsedQuery::queryOptionMaxTimeMS[] = "$maxTimeMS";
+const char QueryRequest::cmdOptionMaxTimeMS[] = "maxTimeMS";
+const char QueryRequest::queryOptionMaxTimeMS[] = "$maxTimeMS";
 
-const string LiteParsedQuery::metaGeoNearDistance("geoNearDistance");
-const string LiteParsedQuery::metaGeoNearPoint("geoNearPoint");
-const string LiteParsedQuery::metaIndexKey("indexKey");
-const string LiteParsedQuery::metaRecordId("recordId");
-const string LiteParsedQuery::metaSortKey("sortKey");
-const string LiteParsedQuery::metaTextScore("textScore");
+const string QueryRequest::metaGeoNearDistance("geoNearDistance");
+const string QueryRequest::metaGeoNearPoint("geoNearPoint");
+const string QueryRequest::metaIndexKey("indexKey");
+const string QueryRequest::metaRecordId("recordId");
+const string QueryRequest::metaSortKey("sortKey");
+const string QueryRequest::metaTextScore("textScore");
 
-const long long LiteParsedQuery::kDefaultBatchSize = 101;
+const long long QueryRequest::kDefaultBatchSize = 101;
 
 namespace {
 
@@ -100,17 +100,17 @@ const char kOptionsField[] = "options";
 
 }  // namespace
 
-const char LiteParsedQuery::kFindCommandName[] = "find";
-const char LiteParsedQuery::kShardVersionField[] = "shardVersion";
+const char QueryRequest::kFindCommandName[] = "find";
+const char QueryRequest::kShardVersionField[] = "shardVersion";
 
-LiteParsedQuery::LiteParsedQuery(NamespaceString nss) : _nss(std::move(nss)) {}
+QueryRequest::QueryRequest(NamespaceString nss) : _nss(std::move(nss)) {}
 
 // static
-StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(NamespaceString nss,
-                                                                             const BSONObj& cmdObj,
-                                                                             bool isExplain) {
-    unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery(std::move(nss)));
-    pq->_explain = isExplain;
+StatusWith<unique_ptr<QueryRequest>> QueryRequest::makeFromFindCommand(NamespaceString nss,
+                                                                       const BSONObj& cmdObj,
+                                                                       bool isExplain) {
+    unique_ptr<QueryRequest> qr(new QueryRequest(std::move(nss)));
+    qr->_explain = isExplain;
 
     // Parse the command BSON by looping through one element at a time.
     BSONObjIterator it(cmdObj);
@@ -128,21 +128,21 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
                 return status;
             }
 
-            pq->_filter = el.Obj().getOwned();
+            qr->_filter = el.Obj().getOwned();
         } else if (str::equals(fieldName, kProjectionField)) {
             Status status = checkFieldType(el, Object);
             if (!status.isOK()) {
                 return status;
             }
 
-            pq->_proj = el.Obj().getOwned();
+            qr->_proj = el.Obj().getOwned();
         } else if (str::equals(fieldName, kSortField)) {
             Status status = checkFieldType(el, Object);
             if (!status.isOK()) {
                 return status;
             }
 
-            pq->_sort = el.Obj().getOwned();
+            qr->_sort = el.Obj().getOwned();
         } else if (str::equals(fieldName, kHintField)) {
             BSONObj hintObj;
             if (Object == el.type()) {
@@ -154,7 +154,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
                               "hint must be either a string or nested object");
             }
 
-            pq->_hint = hintObj;
+            qr->_hint = hintObj;
         } else if (str::equals(fieldName, repl::ReadConcernArgs::kReadConcernFieldName.c_str())) {
             // Read concern parsing is handled elsewhere, but we store a copy here.
             Status status = checkFieldType(el, Object);
@@ -162,7 +162,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
                 return status;
             }
 
-            pq->_readConcern = el.Obj().getOwned();
+            qr->_readConcern = el.Obj().getOwned();
         } else if (str::equals(fieldName, kCollationField)) {
             // Collation parsing is handled elsewhere, but we store a copy here.
             Status status = checkFieldType(el, Object);
@@ -170,7 +170,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
                 return status;
             }
 
-            pq->_collation = el.Obj().getOwned();
+            qr->_collation = el.Obj().getOwned();
         } else if (str::equals(fieldName, kSkipField)) {
             if (!el.isNumber()) {
                 str::stream ss;
@@ -183,7 +183,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
 
             // A skip value of 0 means that there is no skip.
             if (skip) {
-                pq->_skip = skip;
+                qr->_skip = skip;
             }
         } else if (str::equals(fieldName, kLimitField)) {
             if (!el.isNumber()) {
@@ -197,7 +197,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
 
             // A limit value of 0 means that there is no limit.
             if (limit) {
-                pq->_limit = limit;
+                qr->_limit = limit;
             }
         } else if (str::equals(fieldName, kBatchSizeField)) {
             if (!el.isNumber()) {
@@ -207,7 +207,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
                 return Status(ErrorCodes::FailedToParse, ss);
             }
 
-            pq->_batchSize = el.numberLong();
+            qr->_batchSize = el.numberLong();
         } else if (str::equals(fieldName, kNToReturnField)) {
             if (!el.isNumber()) {
                 str::stream ss;
@@ -216,21 +216,21 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
                 return Status(ErrorCodes::FailedToParse, ss);
             }
 
-            pq->_ntoreturn = el.numberLong();
+            qr->_ntoreturn = el.numberLong();
         } else if (str::equals(fieldName, kSingleBatchField)) {
             Status status = checkFieldType(el, Bool);
             if (!status.isOK()) {
                 return status;
             }
 
-            pq->_wantMore = !el.boolean();
+            qr->_wantMore = !el.boolean();
         } else if (str::equals(fieldName, kCommentField)) {
             Status status = checkFieldType(el, String);
             if (!status.isOK()) {
                 return status;
             }
 
-            pq->_comment = el.str();
+            qr->_comment = el.str();
         } else if (str::equals(fieldName, kMaxScanField)) {
             if (!el.isNumber()) {
                 str::stream ss;
@@ -239,91 +239,91 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
                 return Status(ErrorCodes::FailedToParse, ss);
             }
 
-            pq->_maxScan = el.numberInt();
+            qr->_maxScan = el.numberInt();
         } else if (str::equals(fieldName, cmdOptionMaxTimeMS)) {
             StatusWith<int> maxTimeMS = parseMaxTimeMS(el);
             if (!maxTimeMS.isOK()) {
                 return maxTimeMS.getStatus();
             }
 
-            pq->_maxTimeMS = maxTimeMS.getValue();
+            qr->_maxTimeMS = maxTimeMS.getValue();
         } else if (str::equals(fieldName, kMinField)) {
             Status status = checkFieldType(el, Object);
             if (!status.isOK()) {
                 return status;
             }
 
-            pq->_min = el.Obj().getOwned();
+            qr->_min = el.Obj().getOwned();
         } else if (str::equals(fieldName, kMaxField)) {
             Status status = checkFieldType(el, Object);
             if (!status.isOK()) {
                 return status;
             }
 
-            pq->_max = el.Obj().getOwned();
+            qr->_max = el.Obj().getOwned();
         } else if (str::equals(fieldName, kReturnKeyField)) {
             Status status = checkFieldType(el, Bool);
             if (!status.isOK()) {
                 return status;
             }
 
-            pq->_returnKey = el.boolean();
+            qr->_returnKey = el.boolean();
         } else if (str::equals(fieldName, kShowRecordIdField)) {
             Status status = checkFieldType(el, Bool);
             if (!status.isOK()) {
                 return status;
             }
 
-            pq->_showRecordId = el.boolean();
+            qr->_showRecordId = el.boolean();
         } else if (str::equals(fieldName, kSnapshotField)) {
             Status status = checkFieldType(el, Bool);
             if (!status.isOK()) {
                 return status;
             }
 
-            pq->_snapshot = el.boolean();
+            qr->_snapshot = el.boolean();
         } else if (str::equals(fieldName, kTailableField)) {
             Status status = checkFieldType(el, Bool);
             if (!status.isOK()) {
                 return status;
             }
 
-            pq->_tailable = el.boolean();
+            qr->_tailable = el.boolean();
         } else if (str::equals(fieldName, kOplogReplayField)) {
             Status status = checkFieldType(el, Bool);
             if (!status.isOK()) {
                 return status;
             }
 
-            pq->_oplogReplay = el.boolean();
+            qr->_oplogReplay = el.boolean();
         } else if (str::equals(fieldName, kNoCursorTimeoutField)) {
             Status status = checkFieldType(el, Bool);
             if (!status.isOK()) {
                 return status;
             }
 
-            pq->_noCursorTimeout = el.boolean();
+            qr->_noCursorTimeout = el.boolean();
         } else if (str::equals(fieldName, kAwaitDataField)) {
             Status status = checkFieldType(el, Bool);
             if (!status.isOK()) {
                 return status;
             }
 
-            pq->_awaitData = el.boolean();
+            qr->_awaitData = el.boolean();
         } else if (str::equals(fieldName, kPartialResultsField)) {
             Status status = checkFieldType(el, Bool);
             if (!status.isOK()) {
                 return status;
             }
 
-            pq->_allowPartialResults = el.boolean();
+            qr->_allowPartialResults = el.boolean();
         } else if (str::equals(fieldName, kOptionsField)) {
             // 3.0.x versions of the shell may generate an explain of a find command with an
             // 'options' field. We accept this only if the 'options' field is empty so that
             // the shell's explain implementation is forwards compatible.
             //
             // TODO: Remove for 3.4.
-            if (!pq->isExplain()) {
+            if (!qr->isExplain()) {
                 return Status(ErrorCodes::FailedToParse,
                               str::stream() << "Field '" << kOptionsField
                                             << "' is only allowed for explain.");
@@ -347,7 +347,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
             if (!status.isOK()) {
                 return status;
             }
-            pq->_replicationTerm = el._numberLong();
+            qr->_replicationTerm = el._numberLong();
         } else if (!str::startsWith(fieldName, '$')) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Failed to parse: " << cmdObj.toString() << ". "
@@ -357,23 +357,23 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
         }
     }
 
-    pq->addMetaProjection();
+    qr->addMetaProjection();
 
-    Status validateStatus = pq->validate();
+    Status validateStatus = qr->validate();
     if (!validateStatus.isOK()) {
         return validateStatus;
     }
 
-    return std::move(pq);
+    return std::move(qr);
 }
 
-BSONObj LiteParsedQuery::asFindCommand() const {
+BSONObj QueryRequest::asFindCommand() const {
     BSONObjBuilder bob;
     asFindCommand(&bob);
     return bob.obj();
 }
 
-void LiteParsedQuery::asFindCommand(BSONObjBuilder* cmdBuilder) const {
+void QueryRequest::asFindCommand(BSONObjBuilder* cmdBuilder) const {
     cmdBuilder->append(kFindCommandName, _nss.coll());
 
     if (!_filter.isEmpty()) {
@@ -477,25 +477,25 @@ void LiteParsedQuery::asFindCommand(BSONObjBuilder* cmdBuilder) const {
     }
 }
 
-void LiteParsedQuery::addReturnKeyMetaProj() {
+void QueryRequest::addReturnKeyMetaProj() {
     BSONObjBuilder projBob;
     projBob.appendElements(_proj);
     // We use $$ because it's never going to show up in a user's projection.
     // The exact text doesn't matter.
-    BSONObj indexKey = BSON("$$" << BSON("$meta" << LiteParsedQuery::metaIndexKey));
+    BSONObj indexKey = BSON("$$" << BSON("$meta" << QueryRequest::metaIndexKey));
     projBob.append(indexKey.firstElement());
     _proj = projBob.obj();
 }
 
-void LiteParsedQuery::addShowRecordIdMetaProj() {
+void QueryRequest::addShowRecordIdMetaProj() {
     BSONObjBuilder projBob;
     projBob.appendElements(_proj);
-    BSONObj metaRecordId = BSON("$recordId" << BSON("$meta" << LiteParsedQuery::metaRecordId));
+    BSONObj metaRecordId = BSON("$recordId" << BSON("$meta" << QueryRequest::metaRecordId));
     projBob.append(metaRecordId.firstElement());
     _proj = projBob.obj();
 }
 
-Status LiteParsedQuery::validate() const {
+Status QueryRequest::validate() const {
     // Min and Max objects must have the same fields.
     if (!_min.isEmpty() && !_max.isEmpty()) {
         if (!_min.isFieldNamePrefixOf(_max) || (_min.nFields() != _max.nFields())) {
@@ -606,7 +606,7 @@ Status LiteParsedQuery::validate() const {
 }
 
 // static
-StatusWith<int> LiteParsedQuery::parseMaxTimeMS(BSONElement maxTimeMSElt) {
+StatusWith<int> QueryRequest::parseMaxTimeMS(BSONElement maxTimeMSElt) {
     if (!maxTimeMSElt.eoo() && !maxTimeMSElt.isNumber()) {
         return StatusWith<int>(
             ErrorCodes::BadValue,
@@ -629,7 +629,7 @@ StatusWith<int> LiteParsedQuery::parseMaxTimeMS(BSONElement maxTimeMSElt) {
 }
 
 // static
-bool LiteParsedQuery::isTextScoreMeta(BSONElement elt) {
+bool QueryRequest::isTextScoreMeta(BSONElement elt) {
     // elt must be foo: {$meta: "textScore"}
     if (mongo::Object != elt.type()) {
         return false;
@@ -647,7 +647,7 @@ bool LiteParsedQuery::isTextScoreMeta(BSONElement elt) {
     if (mongo::String != metaElt.type()) {
         return false;
     }
-    if (LiteParsedQuery::metaTextScore != metaElt.valuestr()) {
+    if (QueryRequest::metaTextScore != metaElt.valuestr()) {
         return false;
     }
     // must have exactly 1 element
@@ -658,7 +658,7 @@ bool LiteParsedQuery::isTextScoreMeta(BSONElement elt) {
 }
 
 // static
-bool LiteParsedQuery::isValidSortOrder(const BSONObj& sortObj) {
+bool QueryRequest::isValidSortOrder(const BSONObj& sortObj) {
     BSONObjIterator i(sortObj);
     while (i.more()) {
         BSONElement e = i.next();
@@ -679,7 +679,7 @@ bool LiteParsedQuery::isValidSortOrder(const BSONObj& sortObj) {
 }
 
 // static
-bool LiteParsedQuery::isQueryIsolated(const BSONObj& query) {
+bool QueryRequest::isQueryIsolated(const BSONObj& query) {
     BSONObjIterator iter(query);
     while (iter.more()) {
         BSONElement elt = iter.next();
@@ -692,28 +692,27 @@ bool LiteParsedQuery::isQueryIsolated(const BSONObj& query) {
 }
 
 //
-// Old LiteParsedQuery parsing code: SOON TO BE DEPRECATED.
+// Old QueryRequest parsing code: SOON TO BE DEPRECATED.
 //
 
 // static
-StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::fromLegacyQueryMessage(
-    const QueryMessage& qm) {
-    unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery(NamespaceString(qm.ns)));
+StatusWith<unique_ptr<QueryRequest>> QueryRequest::fromLegacyQueryMessage(const QueryMessage& qm) {
+    unique_ptr<QueryRequest> qr(new QueryRequest(NamespaceString(qm.ns)));
 
-    Status status = pq->init(qm.ntoskip, qm.ntoreturn, qm.queryOptions, qm.query, qm.fields, true);
+    Status status = qr->init(qm.ntoskip, qm.ntoreturn, qm.queryOptions, qm.query, qm.fields, true);
     if (!status.isOK()) {
         return status;
     }
 
-    return std::move(pq);
+    return std::move(qr);
 }
 
-Status LiteParsedQuery::init(int ntoskip,
-                             int ntoreturn,
-                             int queryOptions,
-                             const BSONObj& queryObj,
-                             const BSONObj& proj,
-                             bool fromQueryMessage) {
+Status QueryRequest::init(int ntoskip,
+                          int ntoreturn,
+                          int queryOptions,
+                          const BSONObj& queryObj,
+                          const BSONObj& proj,
+                          bool fromQueryMessage) {
     _proj = proj.getOwned();
 
     if (ntoskip) {
@@ -760,7 +759,7 @@ Status LiteParsedQuery::init(int ntoskip,
     return validate();
 }
 
-Status LiteParsedQuery::initFullQuery(const BSONObj& top) {
+Status QueryRequest::initFullQuery(const BSONObj& top) {
     BSONObjIterator i(top);
 
     while (i.more()) {
@@ -860,7 +859,7 @@ Status LiteParsedQuery::initFullQuery(const BSONObj& top) {
     return Status::OK();
 }
 
-int LiteParsedQuery::getOptions() const {
+int QueryRequest::getOptions() const {
     int options = 0;
     if (_tailable) {
         options |= QueryOption_CursorTailable;
@@ -886,7 +885,7 @@ int LiteParsedQuery::getOptions() const {
     return options;
 }
 
-void LiteParsedQuery::initFromInt(int options) {
+void QueryRequest::initFromInt(int options) {
     _tailable = (options & QueryOption_CursorTailable) != 0;
     _slaveOk = (options & QueryOption_SlaveOk) != 0;
     _oplogReplay = (options & QueryOption_OplogReplay) != 0;
@@ -896,7 +895,7 @@ void LiteParsedQuery::initFromInt(int options) {
     _allowPartialResults = (options & QueryOption_PartialResults) != 0;
 }
 
-void LiteParsedQuery::addMetaProjection() {
+void QueryRequest::addMetaProjection() {
     // We might need to update the projection object with a $meta projection.
     if (returnKey()) {
         addReturnKeyMetaProj();
@@ -907,7 +906,7 @@ void LiteParsedQuery::addMetaProjection() {
     }
 }
 
-boost::optional<long long> LiteParsedQuery::getEffectiveBatchSize() const {
+boost::optional<long long> QueryRequest::getEffectiveBatchSize() const {
     return _batchSize ? _batchSize : _ntoreturn;
 }
 

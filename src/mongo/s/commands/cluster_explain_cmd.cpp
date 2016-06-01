@@ -31,7 +31,6 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/explain.h"
-#include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/query/cluster_find.h"
 

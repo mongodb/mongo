@@ -80,7 +80,7 @@ Status collMod(OperationContext* txn,
             // no-op
         } else if (str::startsWith(e.fieldName(), "$")) {
             // no-op ignore top-level fields prefixed with $. They are for the command processor
-        } else if (LiteParsedQuery::cmdOptionMaxTimeMS == e.fieldNameStringData()) {
+        } else if (QueryRequest::cmdOptionMaxTimeMS == e.fieldNameStringData()) {
             // no-op
         } else if (str::equals("index", e.fieldName())) {
             BSONObj indexObj = e.Obj();

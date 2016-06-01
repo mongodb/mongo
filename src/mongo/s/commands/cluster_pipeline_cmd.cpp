@@ -165,7 +165,7 @@ public:
         }
 
         const std::initializer_list<StringData> fieldsToPropagateToShards = {
-            "$queryOptions", "readConcern", LiteParsedQuery::cmdOptionMaxTimeMS,
+            "$queryOptions", "readConcern", QueryRequest::cmdOptionMaxTimeMS,
         };
         for (auto&& field : fieldsToPropagateToShards) {
             commandBuilder[field] = Value(cmdObj[field]);
@@ -225,9 +225,9 @@ public:
             mergeCmd["$queryOptions"] = Value(cmdObj["$queryOptions"]);
         }
 
-        if (cmdObj.hasField(LiteParsedQuery::cmdOptionMaxTimeMS)) {
-            mergeCmd[LiteParsedQuery::cmdOptionMaxTimeMS] =
-                Value(cmdObj[LiteParsedQuery::cmdOptionMaxTimeMS]);
+        if (cmdObj.hasField(QueryRequest::cmdOptionMaxTimeMS)) {
+            mergeCmd[QueryRequest::cmdOptionMaxTimeMS] =
+                Value(cmdObj[QueryRequest::cmdOptionMaxTimeMS]);
         }
 
         mergeCmd.setField("writeConcern", Value(cmdObj["writeConcern"]));

@@ -39,7 +39,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/db/query/query_request.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/executor/network_interface_mock.h"
@@ -283,7 +283,7 @@ void ShardingTestFixture::expectGetShards(const std::vector<ShardType>& shards) 
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.toString(), ShardType::ConfigNS);
 
-        auto queryResult = LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false);
+        auto queryResult = QueryRequest::makeFromFindCommand(nss, request.cmdObj, false);
         ASSERT_OK(queryResult.getStatus());
 
         const auto& query = queryResult.getValue();

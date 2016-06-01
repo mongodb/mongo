@@ -219,27 +219,27 @@ void QueryPlannerTest::runQueryFull(const BSONObj& query,
     solns.clear();
     cq.reset();
 
-    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
-    lpq->setFilter(query);
-    lpq->setSort(sort);
-    lpq->setProj(proj);
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setFilter(query);
+    qr->setSort(sort);
+    qr->setProj(proj);
     if (skip) {
-        lpq->setSkip(skip);
+        qr->setSkip(skip);
     }
     if (ntoreturn) {
         if (ntoreturn < 0) {
             ASSERT_NE(ntoreturn, std::numeric_limits<long long>::min());
             ntoreturn = -ntoreturn;
-            lpq->setWantMore(false);
+            qr->setWantMore(false);
         }
-        lpq->setNToReturn(ntoreturn);
+        qr->setNToReturn(ntoreturn);
     }
-    lpq->setHint(hint);
-    lpq->setMin(minObj);
-    lpq->setMax(maxObj);
-    lpq->setSnapshot(snapshot);
+    qr->setHint(hint);
+    qr->setMin(minObj);
+    qr->setMax(maxObj);
+    qr->setSnapshot(snapshot);
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(txn(), std::move(lpq), ExtensionsCallbackNoop());
+        CanonicalQuery::canonicalize(txn(), std::move(qr), ExtensionsCallbackNoop());
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
 
@@ -296,27 +296,27 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
     solns.clear();
     cq.reset();
 
-    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
-    lpq->setFilter(query);
-    lpq->setSort(sort);
-    lpq->setProj(proj);
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setFilter(query);
+    qr->setSort(sort);
+    qr->setProj(proj);
     if (skip) {
-        lpq->setSkip(skip);
+        qr->setSkip(skip);
     }
     if (ntoreturn) {
         if (ntoreturn < 0) {
             ASSERT_NE(ntoreturn, std::numeric_limits<long long>::min());
             ntoreturn = -ntoreturn;
-            lpq->setWantMore(false);
+            qr->setWantMore(false);
         }
-        lpq->setNToReturn(ntoreturn);
+        qr->setNToReturn(ntoreturn);
     }
-    lpq->setHint(hint);
-    lpq->setMin(minObj);
-    lpq->setMax(maxObj);
-    lpq->setSnapshot(snapshot);
+    qr->setHint(hint);
+    qr->setMin(minObj);
+    qr->setMax(maxObj);
+    qr->setSnapshot(snapshot);
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(txn(), std::move(lpq), ExtensionsCallbackNoop());
+        CanonicalQuery::canonicalize(txn(), std::move(qr), ExtensionsCallbackNoop());
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
 
@@ -331,11 +331,11 @@ void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
     invariant(nss.isValid());
 
     const bool isExplain = false;
-    std::unique_ptr<LiteParsedQuery> lpq(
-        assertGet(LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain)));
+    std::unique_ptr<QueryRequest> qr(
+        assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
 
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(txn(), std::move(lpq), ExtensionsCallbackNoop());
+        CanonicalQuery::canonicalize(txn(), std::move(qr), ExtensionsCallbackNoop());
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
 

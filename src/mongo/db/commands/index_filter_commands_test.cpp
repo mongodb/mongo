@@ -119,12 +119,12 @@ void addQueryShapeToPlanCache(OperationContext* txn,
                               const char* sortStr,
                               const char* projectionStr) {
     // Create canonical query.
-    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
-    lpq->setFilter(fromjson(queryStr));
-    lpq->setSort(fromjson(sortStr));
-    lpq->setProj(fromjson(projectionStr));
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setFilter(fromjson(queryStr));
+    qr->setSort(fromjson(sortStr));
+    qr->setProj(fromjson(projectionStr));
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(txn, std::move(lpq), ExtensionsCallbackDisallowExtensions());
+        CanonicalQuery::canonicalize(txn, std::move(qr), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -147,12 +147,12 @@ bool planCacheContains(const PlanCache& planCache,
     auto txn = serviceContext.makeOperationContext();
 
     // Create canonical query.
-    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
-    lpq->setFilter(fromjson(queryStr));
-    lpq->setSort(fromjson(sortStr));
-    lpq->setProj(fromjson(projectionStr));
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setFilter(fromjson(queryStr));
+    qr->setSort(fromjson(sortStr));
+    qr->setProj(fromjson(projectionStr));
     auto statusWithInputQuery = CanonicalQuery::canonicalize(
-        txn.get(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
+        txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithInputQuery.getStatus());
     unique_ptr<CanonicalQuery> inputQuery = std::move(statusWithInputQuery.getValue());
 
@@ -167,12 +167,12 @@ bool planCacheContains(const PlanCache& planCache,
         // Canonicalizing query shape in cache entry to get cache key.
         // Alternatively, we could add key to PlanCacheEntry but that would be used in one place
         // only.
-        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
-        lpq->setFilter(entry->query);
-        lpq->setSort(entry->sort);
-        lpq->setProj(entry->projection);
+        auto qr = stdx::make_unique<QueryRequest>(nss);
+        qr->setFilter(entry->query);
+        qr->setSort(entry->sort);
+        qr->setProj(entry->projection);
         auto statusWithCurrentQuery = CanonicalQuery::canonicalize(
-            txn.get(), std::move(lpq), ExtensionsCallbackDisallowExtensions());
+            txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCurrentQuery.getStatus());
         unique_ptr<CanonicalQuery> currentQuery = std::move(statusWithCurrentQuery.getValue());
 

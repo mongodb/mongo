@@ -227,10 +227,10 @@ void IDHackStage::doInvalidate(OperationContext* txn, const RecordId& dl, Invali
 
 // static
 bool IDHackStage::supportsQuery(const CanonicalQuery& query) {
-    return !query.getParsed().showRecordId() && query.getParsed().getHint().isEmpty() &&
-        query.getParsed().getCollation().isEmpty() && !query.getParsed().getSkip() &&
-        CanonicalQuery::isSimpleIdQuery(query.getParsed().getFilter()) &&
-        !query.getParsed().isTailable();
+    return !query.getQueryRequest().showRecordId() && query.getQueryRequest().getHint().isEmpty() &&
+        query.getQueryRequest().getCollation().isEmpty() && !query.getQueryRequest().getSkip() &&
+        CanonicalQuery::isSimpleIdQuery(query.getQueryRequest().getFilter()) &&
+        !query.getQueryRequest().isTailable();
 }
 
 unique_ptr<PlanStageStats> IDHackStage::getStats() {

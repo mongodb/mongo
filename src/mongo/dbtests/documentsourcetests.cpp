@@ -96,12 +96,12 @@ protected:
 
         OldClientWriteContext ctx(&_opCtx, nss.ns());
 
-        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+        auto qr = stdx::make_unique<QueryRequest>(nss);
         if (hint) {
-            lpq->setHint(*hint);
+            qr->setHint(*hint);
         }
         auto cq = uassertStatusOK(CanonicalQuery::canonicalize(
-            &_opCtx, std::move(lpq), ExtensionsCallbackDisallowExtensions()));
+            &_opCtx, std::move(qr), ExtensionsCallbackDisallowExtensions()));
 
         _exec = uassertStatusOK(
             getExecutor(&_opCtx, ctx.getCollection(), std::move(cq), PlanExecutor::YIELD_MANUAL));

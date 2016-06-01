@@ -279,8 +279,8 @@ Status prepareExecution(OperationContext* opCtx,
                 *rootOut = new SortKeyGeneratorStage(opCtx,
                                                      *rootOut,
                                                      ws,
-                                                     canonicalQuery->getParsed().getSort(),
-                                                     canonicalQuery->getParsed().getFilter(),
+                                                     canonicalQuery->getQueryRequest().getSort(),
+                                                     canonicalQuery->getQueryRequest().getFilter(),
                                                      canonicalQuery->getCollator());
             }
 
@@ -301,7 +301,7 @@ Status prepareExecution(OperationContext* opCtx,
     }
 
     // Tailable: If the query requests tailable the collection must be capped.
-    if (canonicalQuery->getParsed().isTailable()) {
+    if (canonicalQuery->getQueryRequest().isTailable()) {
         if (!collection->isCapped()) {
             return Status(ErrorCodes::BadValue,
                           "error processing query: " + canonicalQuery->toString() +
@@ -560,7 +560,7 @@ StatusWith<unique_ptr<PlanExecutor>> getOplogStartHack(OperationContext* txn,
     params.collection = collection;
     params.start = *startLoc;
     params.direction = CollectionScanParams::FORWARD;
-    params.tailable = cq->getParsed().isTailable();
+    params.tailable = cq->getQueryRequest().isTailable();
 
     unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
     unique_ptr<CollectionScan> cs = make_unique<CollectionScan>(txn, params, ws.get(), cq->root());
@@ -576,7 +576,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorFind(OperationContext* txn,
                                                      const NamespaceString& nss,
                                                      unique_ptr<CanonicalQuery> canonicalQuery,
                                                      PlanExecutor::YieldPolicy yieldPolicy) {
-    if (NULL != collection && canonicalQuery->getParsed().isOplogReplay()) {
+    if (NULL != collection && canonicalQuery->getQueryRequest().isOplogReplay()) {
         return getOplogStartHack(txn, collection, std::move(canonicalQuery));
     }
 
@@ -940,13 +940,13 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorGroup(OperationContext* txn,
     }
 
     const NamespaceString nss(request.ns);
-    auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
-    lpq->setFilter(request.query);
-    lpq->setExplain(request.explain);
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setFilter(request.query);
+    qr->setExplain(request.explain);
 
     const ExtensionsCallbackReal extensionsCallback(txn, &nss);
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(lpq), extensionsCallback);
+    auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(qr), extensionsCallback);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }
@@ -1163,15 +1163,15 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* txn,
                                                       PlanExecutor::YieldPolicy yieldPolicy) {
     unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
 
-    auto lpq = stdx::make_unique<LiteParsedQuery>(request.getNs());
-    lpq->setFilter(request.getQuery());
-    lpq->setCollation(request.getCollation());
-    lpq->setHint(request.getHint());
-    lpq->setExplain(explain);
+    auto qr = stdx::make_unique<QueryRequest>(request.getNs());
+    qr->setFilter(request.getQuery());
+    qr->setCollation(request.getCollation());
+    qr->setHint(request.getHint());
+    qr->setExplain(explain);
 
     auto cq = CanonicalQuery::canonicalize(
         txn,
-        std::move(lpq),
+        std::move(qr),
         collection
             ? static_cast<const ExtensionsCallback&>(ExtensionsCallbackReal(txn, &collection->ns()))
             : static_cast<const ExtensionsCallback&>(ExtensionsCallbackNoop()));
@@ -1338,11 +1338,11 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
     // If there are no suitable indices for the distinct hack bail out now into regular planning
     // with no projection.
     if (plannerParams.indices.empty()) {
-        auto lpq = stdx::make_unique<LiteParsedQuery>(collection->ns());
-        lpq->setFilter(query);
-        lpq->setExplain(isExplain);
+        auto qr = stdx::make_unique<QueryRequest>(collection->ns());
+        qr->setFilter(query);
+        qr->setExplain(isExplain);
 
-        auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(lpq), extensionsCallback);
+        auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(qr), extensionsCallback);
         if (!statusWithCQ.isOK()) {
             return statusWithCQ.getStatus();
         }
@@ -1359,12 +1359,12 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
     // (ie _id:1 being implied by default).
     BSONObj projection = getDistinctProjection(field);
 
-    auto lpq = stdx::make_unique<LiteParsedQuery>(collection->ns());
-    lpq->setFilter(query);
-    lpq->setExplain(isExplain);
-    lpq->setProj(projection);
+    auto qr = stdx::make_unique<QueryRequest>(collection->ns());
+    qr->setFilter(query);
+    qr->setExplain(isExplain);
+    qr->setProj(projection);
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(lpq), extensionsCallback);
+    auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(qr), extensionsCallback);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }
@@ -1450,12 +1450,11 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
     }
 
     // We drop the projection from the 'cq'.  Unfortunately this is not trivial.
-    auto lpqNoProjection = stdx::make_unique<LiteParsedQuery>(collection->ns());
-    lpqNoProjection->setFilter(query);
-    lpqNoProjection->setExplain(isExplain);
+    auto qrNoProjection = stdx::make_unique<QueryRequest>(collection->ns());
+    qrNoProjection->setFilter(query);
+    qrNoProjection->setExplain(isExplain);
 
-    statusWithCQ =
-        CanonicalQuery::canonicalize(txn, std::move(lpqNoProjection), extensionsCallback);
+    statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(qrNoProjection), extensionsCallback);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }

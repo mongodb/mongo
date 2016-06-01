@@ -94,7 +94,7 @@ BSONObj fixForShards(const BSONObj& orig,
         if (fn == bypassDocumentValidationCommandOption() || fn == "map" || fn == "mapreduce" ||
             fn == "mapReduce" || fn == "mapparams" || fn == "reduce" || fn == "query" ||
             fn == "sort" || fn == "scope" || fn == "verbose" || fn == "$queryOptions" ||
-            fn == "readConcern" || fn == LiteParsedQuery::cmdOptionMaxTimeMS) {
+            fn == "readConcern" || fn == QueryRequest::cmdOptionMaxTimeMS) {
             b.append(e);
         } else if (fn == "out" || fn == "finalize" || fn == "writeConcern") {
             // We don't want to copy these
@@ -406,7 +406,7 @@ public:
         BSONObj aggCounts = aggCountsB.done();
         finalCmd.append("counts", aggCounts);
 
-        if (auto elem = cmdObj[LiteParsedQuery::cmdOptionMaxTimeMS])
+        if (auto elem = cmdObj[QueryRequest::cmdOptionMaxTimeMS])
             finalCmd.append(elem);
         if (auto elem = cmdObj[bypassDocumentValidationCommandOption()])
             finalCmd.append(elem);

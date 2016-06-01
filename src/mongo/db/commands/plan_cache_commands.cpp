@@ -209,12 +209,12 @@ StatusWith<unique_ptr<CanonicalQuery>> PlanCacheCommand::canonicalize(OperationC
 
     // Create canonical query
     const NamespaceString nss(ns);
-    auto lpq = stdx::make_unique<LiteParsedQuery>(std::move(nss));
-    lpq->setFilter(queryObj);
-    lpq->setSort(sortObj);
-    lpq->setProj(projObj);
+    auto qr = stdx::make_unique<QueryRequest>(std::move(nss));
+    qr->setFilter(queryObj);
+    qr->setSort(sortObj);
+    qr->setProj(projObj);
     const ExtensionsCallbackReal extensionsCallback(txn, &nss);
-    auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(lpq), extensionsCallback);
+    auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(qr), extensionsCallback);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }
@@ -314,8 +314,8 @@ Status PlanCacheClear::clear(OperationContext* txn,
         if (!planCache->contains(*cq)) {
             // Log if asked to clear non-existent query shape.
             LOG(1) << ns << ": query shape doesn't exist in PlanCache - "
-                   << cq->getQueryObj().toString() << "(sort: " << cq->getParsed().getSort()
-                   << "; projection: " << cq->getParsed().getProj() << ")";
+                   << cq->getQueryObj().toString() << "(sort: " << cq->getQueryRequest().getSort()
+                   << "; projection: " << cq->getQueryRequest().getProj() << ")";
             return Status::OK();
         }
 
@@ -325,8 +325,8 @@ Status PlanCacheClear::clear(OperationContext* txn,
         }
 
         LOG(1) << ns << ": removed plan cache entry - " << cq->getQueryObj().toString()
-               << "(sort: " << cq->getParsed().getSort()
-               << "; projection: " << cq->getParsed().getProj() << ")";
+               << "(sort: " << cq->getQueryRequest().getSort()
+               << "; projection: " << cq->getQueryRequest().getProj() << ")";
 
         return Status::OK();
     }

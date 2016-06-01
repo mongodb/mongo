@@ -77,11 +77,11 @@ Status ParsedDelete::parseQueryToCQ() {
 
     // The projection needs to be applied after the delete operation, so we do not specify a
     // projection during canonicalization.
-    auto lpq = stdx::make_unique<LiteParsedQuery>(_request->getNamespaceString());
-    lpq->setFilter(_request->getQuery());
-    lpq->setSort(_request->getSort());
-    lpq->setCollation(_request->getCollation());
-    lpq->setExplain(_request->isExplain());
+    auto qr = stdx::make_unique<QueryRequest>(_request->getNamespaceString());
+    qr->setFilter(_request->getQuery());
+    qr->setSort(_request->getSort());
+    qr->setCollation(_request->getCollation());
+    qr->setExplain(_request->isExplain());
 
     // Limit should only used for the findAndModify command when a sort is specified. If a sort
     // is requested, we want to use a top-k sort for efficiency reasons, so should pass the
@@ -90,10 +90,10 @@ Status ParsedDelete::parseQueryToCQ() {
     // has not actually deleted a document. This behavior is fine for findAndModify, but should
     // not apply to deletes in general.
     if (!_request->isMulti() && !_request->getSort().isEmpty()) {
-        lpq->setLimit(1);
+        qr->setLimit(1);
     }
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(_txn, std::move(lpq), extensionsCallback);
+    auto statusWithCQ = CanonicalQuery::canonicalize(_txn, std::move(qr), extensionsCallback);
 
     if (statusWithCQ.isOK()) {
         _canonicalQuery = std::move(statusWithCQ.getValue());
@@ -118,7 +118,7 @@ PlanExecutor::YieldPolicy ParsedDelete::yieldPolicy() const {
 
 bool ParsedDelete::isIsolated() const {
     return _canonicalQuery.get() ? _canonicalQuery->isIsolated()
-                                 : LiteParsedQuery::isQueryIsolated(_request->getQuery());
+                                 : QueryRequest::isQueryIsolated(_request->getQuery());
 }
 
 bool ParsedDelete::hasParsedQuery() const {

@@ -102,10 +102,10 @@ public:
         unique_ptr<WorkingSet> ws(new WorkingSet());
 
         // Canonicalize the query.
-        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
-        lpq->setFilter(filterObj);
+        auto qr = stdx::make_unique<QueryRequest>(nss);
+        qr->setFilter(filterObj);
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            &_txn, std::move(lpq), ExtensionsCallbackDisallowExtensions());
+            &_txn, std::move(qr), ExtensionsCallbackDisallowExtensions());
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         verify(NULL != cq.get());
@@ -149,9 +149,9 @@ public:
         IndexScan* ix = new IndexScan(&_txn, ixparams, ws.get(), NULL);
         unique_ptr<PlanStage> root(new FetchStage(&_txn, ws.get(), ix, NULL, coll));
 
-        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+        auto qr = stdx::make_unique<QueryRequest>(nss);
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            &_txn, std::move(lpq), ExtensionsCallbackDisallowExtensions());
+            &_txn, std::move(qr), ExtensionsCallbackDisallowExtensions());
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         verify(NULL != cq.get());

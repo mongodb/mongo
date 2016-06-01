@@ -134,10 +134,10 @@ RecordId Helpers::findOne(OperationContext* txn,
 
     const ExtensionsCallbackReal extensionsCallback(txn, &collection->ns());
 
-    auto lpq = stdx::make_unique<LiteParsedQuery>(collection->ns());
-    lpq->setFilter(query);
+    auto qr = stdx::make_unique<QueryRequest>(collection->ns());
+    qr->setFilter(query);
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(lpq), extensionsCallback);
+    auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(qr), extensionsCallback);
     massert(17244, "Could not canonicalize " + query.toString(), statusWithCQ.isOK());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 

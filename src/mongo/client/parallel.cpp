@@ -40,7 +40,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/db/query/query_request.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
@@ -172,7 +172,7 @@ void ParallelSortClusteredCursor::_finishCons() {
     BSONObjIterator sortKeyIt(_sortKey);
     while (sortKeyIt.more()) {
         BSONElement e = sortKeyIt.next();
-        if (LiteParsedQuery::isTextScoreMeta(e)) {
+        if (QueryRequest::isTextScoreMeta(e)) {
             textMetaSortKeyFields.insert(e.fieldName());
             transformedSortKeyBuilder.append(e.fieldName(), -1);
         } else {
@@ -196,7 +196,7 @@ void ParallelSortClusteredCursor::_finishCons() {
 
                 string fieldName = e.fieldName();
 
-                if (LiteParsedQuery::isTextScoreMeta(e)) {
+                if (QueryRequest::isTextScoreMeta(e)) {
                     textMetaSortKeyFields.erase(fieldName);
                 } else {
                     // exact field

@@ -124,11 +124,12 @@ QuerySolutionNode* QueryPlannerAccess::makeCollectionScan(const CanonicalQuery& 
     csn->name = query.ns();
     csn->filter = query.root()->shallowClone();
     csn->tailable = tailable;
-    csn->maxScan = query.getParsed().getMaxScan();
+    csn->maxScan = query.getQueryRequest().getMaxScan();
 
     // If the hint is {$natural: +-1} this changes the direction of the collection scan.
-    if (!query.getParsed().getHint().isEmpty()) {
-        BSONElement natural = dps::extractElementAtPath(query.getParsed().getHint(), "$natural");
+    if (!query.getQueryRequest().getHint().isEmpty()) {
+        BSONElement natural =
+            dps::extractElementAtPath(query.getQueryRequest().getHint(), "$natural");
         if (!natural.eoo()) {
             csn->direction = natural.numberInt() >= 0 ? 1 : -1;
         }
@@ -136,7 +137,7 @@ QuerySolutionNode* QueryPlannerAccess::makeCollectionScan(const CanonicalQuery& 
 
     // The sort can specify $natural as well. The sort direction should override the hint
     // direction if both are specified.
-    const BSONObj& sortObj = query.getParsed().getSort();
+    const BSONObj& sortObj = query.getQueryRequest().getSort();
     if (!sortObj.isEmpty()) {
         BSONElement natural = dps::extractElementAtPath(sortObj, "$natural");
         if (!natural.eoo()) {
@@ -209,8 +210,8 @@ QuerySolutionNode* QueryPlannerAccess::makeLeafNode(
         isn->indexKeyPattern = index.keyPattern;
         isn->indexIsMultiKey = index.multikey;
         isn->bounds.fields.resize(index.keyPattern.nFields());
-        isn->maxScan = query.getParsed().getMaxScan();
-        isn->addKeyMetadata = query.getParsed().returnKey();
+        isn->maxScan = query.getQueryRequest().getMaxScan();
+        isn->addKeyMetadata = query.getQueryRequest().returnKey();
 
         // Get the ixtag->pos-th element of the index key pattern.
         // TODO: cache this instead/with ixtag->pos?
@@ -984,7 +985,7 @@ QuerySolutionNode* QueryPlannerAccess::buildIndexedAnd(const CanonicalQuery& que
             for (size_t i = 0; i < ahn->children.size(); ++i) {
                 ahn->children[i]->computeProperties();
                 const BSONObjSet& sorts = ahn->children[i]->getSort();
-                if (sorts.end() != sorts.find(query.getParsed().getSort())) {
+                if (sorts.end() != sorts.find(query.getQueryRequest().getSort())) {
                     std::swap(ahn->children[i], ahn->children.back());
                     break;
                 }
@@ -1085,8 +1086,8 @@ QuerySolutionNode* QueryPlannerAccess::buildIndexedOr(const CanonicalQuery& quer
     } else {
         bool shouldMergeSort = false;
 
-        if (!query.getParsed().getSort().isEmpty()) {
-            const BSONObj& desiredSort = query.getParsed().getSort();
+        if (!query.getQueryRequest().getSort().isEmpty()) {
+            const BSONObj& desiredSort = query.getQueryRequest().getSort();
 
             // If there exists a sort order that is present in each child, we can merge them and
             // maintain that sort order / those sort orders.
@@ -1117,7 +1118,7 @@ QuerySolutionNode* QueryPlannerAccess::buildIndexedOr(const CanonicalQuery& quer
 
         if (shouldMergeSort) {
             MergeSortNode* msn = new MergeSortNode();
-            msn->sort = query.getParsed().getSort();
+            msn->sort = query.getQueryRequest().getSort();
             msn->children.swap(ixscanNodes);
             orResult = msn;
         } else {
@@ -1246,8 +1247,8 @@ QuerySolutionNode* QueryPlannerAccess::scanWholeIndex(const IndexEntry& index,
     unique_ptr<IndexScanNode> isn = make_unique<IndexScanNode>();
     isn->indexKeyPattern = index.keyPattern;
     isn->indexIsMultiKey = index.multikey;
-    isn->maxScan = query.getParsed().getMaxScan();
-    isn->addKeyMetadata = query.getParsed().returnKey();
+    isn->maxScan = query.getQueryRequest().getMaxScan();
+    isn->addKeyMetadata = query.getQueryRequest().returnKey();
 
     IndexBoundsBuilder::allValuesBounds(index.keyPattern, &isn->bounds);
 
@@ -1383,8 +1384,8 @@ QuerySolutionNode* QueryPlannerAccess::makeIndexScan(const IndexEntry& index,
     isn->indexKeyPattern = index.keyPattern;
     isn->indexIsMultiKey = index.multikey;
     isn->direction = 1;
-    isn->maxScan = query.getParsed().getMaxScan();
-    isn->addKeyMetadata = query.getParsed().returnKey();
+    isn->maxScan = query.getQueryRequest().getMaxScan();
+    isn->addKeyMetadata = query.getQueryRequest().returnKey();
     isn->bounds.isSimpleRange = true;
     isn->bounds.startKey = startKey;
     isn->bounds.endKey = endKey;

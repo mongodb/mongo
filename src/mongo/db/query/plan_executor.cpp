@@ -177,7 +177,7 @@ PlanExecutor::PlanExecutor(OperationContext* opCtx,
         _ns = _collection->ns().ns();
     } else {
         invariant(NULL != _cq.get());
-        _ns = _cq->getParsed().ns();
+        _ns = _cq->getQueryRequest().ns();
     }
 }
 

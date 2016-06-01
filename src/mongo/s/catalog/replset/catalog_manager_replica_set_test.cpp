@@ -35,7 +35,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/db/query/query_request.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
@@ -99,30 +99,30 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionExisting) {
             catalogManager()->getCollection(operationContext(), expectedColl.getNs().ns()));
     });
 
-    onFindWithMetadataCommand([this, &expectedColl, newOpTime](
-        const RemoteCommandRequest& request) {
+    onFindWithMetadataCommand(
+        [this, &expectedColl, newOpTime](const RemoteCommandRequest& request) {
 
-        ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
+            ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
 
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.ns(), CollectionType::ConfigNS);
+            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+            ASSERT_EQ(nss.ns(), CollectionType::ConfigNS);
 
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+            auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
-        // Ensure the query is correct
-        ASSERT_EQ(query->ns(), CollectionType::ConfigNS);
-        ASSERT_EQ(query->getFilter(), BSON(CollectionType::fullNs(expectedColl.getNs().ns())));
-        ASSERT_EQ(query->getSort(), BSONObj());
-        ASSERT_EQ(query->getLimit().get(), 1);
+            // Ensure the query is correct
+            ASSERT_EQ(query->ns(), CollectionType::ConfigNS);
+            ASSERT_EQ(query->getFilter(), BSON(CollectionType::fullNs(expectedColl.getNs().ns())));
+            ASSERT_EQ(query->getSort(), BSONObj());
+            ASSERT_EQ(query->getLimit().get(), 1);
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+            checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
-        ReplSetMetadata metadata(10, OpTime(), newOpTime, 100, OID(), 30, -1);
-        BSONObjBuilder builder;
-        metadata.writeToMetadata(&builder);
+            ReplSetMetadata metadata(10, OpTime(), newOpTime, 100, OID(), 30, -1);
+            BSONObjBuilder builder;
+            metadata.writeToMetadata(&builder);
 
-        return std::make_tuple(vector<BSONObj>{expectedColl.toBSON()}, builder.obj());
-    });
+            return std::make_tuple(vector<BSONObj>{expectedColl.toBSON()}, builder.obj());
+        });
 
     // Now wait for the getCollection call to return
     const auto collOpTimePair = future.timed_get(kFutureTimeout);
@@ -170,7 +170,7 @@ TEST_F(CatalogManagerReplSetTest, GetDatabaseExisting) {
 
         ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
 
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
         ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
         ASSERT_EQ(query->getFilter(), BSON(DatabaseType::name(expectedDb.getName())));
@@ -399,7 +399,7 @@ TEST_F(CatalogManagerReplSetTest, GetAllShardsValid) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.ns(), ShardType::ConfigNS);
 
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
         ASSERT_EQ(query->ns(), ShardType::ConfigNS);
         ASSERT_EQ(query->getFilter(), BSONObj());
@@ -494,7 +494,7 @@ TEST_F(CatalogManagerReplSetTest, GetChunksForNSWithSortAndLimit) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.ns(), ChunkType::ConfigNS);
 
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
         ASSERT_EQ(query->ns(), ChunkType::ConfigNS);
         ASSERT_EQ(query->getFilter(), chunksQuery);
@@ -541,7 +541,7 @@ TEST_F(CatalogManagerReplSetTest, GetChunksForNSNoSortNoLimit) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.ns(), ChunkType::ConfigNS);
 
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
         ASSERT_EQ(query->ns(), ChunkType::ConfigNS);
         ASSERT_EQ(query->getFilter(), chunksQuery);
@@ -883,28 +883,28 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionsValidResultsNoDb) {
         return collections;
     });
 
-    onFindWithMetadataCommand([this, coll1, coll2, coll3, newOpTime](
-        const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
+    onFindWithMetadataCommand(
+        [this, coll1, coll2, coll3, newOpTime](const RemoteCommandRequest& request) {
+            ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
 
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.ns(), CollectionType::ConfigNS);
+            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+            ASSERT_EQ(nss.ns(), CollectionType::ConfigNS);
 
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+            auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
-        ASSERT_EQ(query->ns(), CollectionType::ConfigNS);
-        ASSERT_EQ(query->getFilter(), BSONObj());
-        ASSERT_EQ(query->getSort(), BSONObj());
+            ASSERT_EQ(query->ns(), CollectionType::ConfigNS);
+            ASSERT_EQ(query->getFilter(), BSONObj());
+            ASSERT_EQ(query->getSort(), BSONObj());
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+            checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
-        ReplSetMetadata metadata(10, OpTime(), newOpTime, 100, OID(), 30, -1);
-        BSONObjBuilder builder;
-        metadata.writeToMetadata(&builder);
+            ReplSetMetadata metadata(10, OpTime(), newOpTime, 100, OID(), 30, -1);
+            BSONObjBuilder builder;
+            metadata.writeToMetadata(&builder);
 
-        return std::make_tuple(vector<BSONObj>{coll1.toBSON(), coll2.toBSON(), coll3.toBSON()},
-                               builder.obj());
-    });
+            return std::make_tuple(vector<BSONObj>{coll1.toBSON(), coll2.toBSON(), coll3.toBSON()},
+                                   builder.obj());
+        });
 
     const auto& actualColls = future.timed_get(kFutureTimeout);
     ASSERT_EQ(3U, actualColls.size());
@@ -947,7 +947,7 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionsValidResultsWithDb) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.ns(), CollectionType::ConfigNS);
 
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
         ASSERT_EQ(query->ns(), CollectionType::ConfigNS);
         {
@@ -995,7 +995,7 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionsInvalidCollectionType) {
 
         ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
 
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
         ASSERT_EQ(query->ns(), CollectionType::ConfigNS);
         {
@@ -1041,7 +1041,7 @@ TEST_F(CatalogManagerReplSetTest, GetDatabasesForShardValid) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.ns(), DatabaseType::ConfigNS);
 
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
         ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
         ASSERT_EQ(query->getFilter(), BSON(DatabaseType::primary(dbt1.getPrimary())));
@@ -1115,7 +1115,7 @@ TEST_F(CatalogManagerReplSetTest, GetTagsForCollection) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.ns(), TagsType::ConfigNS);
 
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
         ASSERT_EQ(query->ns(), TagsType::ConfigNS);
         ASSERT_EQ(query->getFilter(), BSON(TagsType::ns("TestDB.TestColl")));
@@ -1201,7 +1201,7 @@ TEST_F(CatalogManagerReplSetTest, GetTagForChunkOneTagFound) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.ns(), TagsType::ConfigNS);
 
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
         ASSERT_EQ(query->ns(), TagsType::ConfigNS);
         ASSERT_EQ(query->getFilter(),
@@ -1246,7 +1246,7 @@ TEST_F(CatalogManagerReplSetTest, GetTagForChunkNoTagFound) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.ns(), TagsType::ConfigNS);
 
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
         ASSERT_EQ(query->ns(), TagsType::ConfigNS);
         ASSERT_EQ(query->getFilter(),
@@ -1288,7 +1288,7 @@ TEST_F(CatalogManagerReplSetTest, GetTagForChunkInvalidTagDoc) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.ns(), TagsType::ConfigNS);
 
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
         ASSERT_EQ(query->ns(), TagsType::ConfigNS);
         ASSERT_EQ(query->getFilter(),
@@ -1517,7 +1517,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseSuccess) {
         ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
 
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
         ASSERT_EQ(ShardType::ConfigNS, query->ns());
         ASSERT_EQ(BSONObj(), query->getFilter());
@@ -1679,7 +1679,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseDBExists) {
         ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
 
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
         BSONObjBuilder queryBuilder;
         queryBuilder.appendRegex(
@@ -1718,7 +1718,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseDBExistsDifferentCase) {
         ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
 
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
         BSONObjBuilder queryBuilder;
         queryBuilder.appendRegex(
@@ -1765,7 +1765,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseNoShards) {
     onFindCommand([this](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
         ASSERT_EQ(ShardType::ConfigNS, query->ns());
         ASSERT_EQ(BSONObj(), query->getFilter());
@@ -1804,7 +1804,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseDuplicateKeyOnInsert) {
         ASSERT_EQUALS(configHost, request.target);
         ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
         ASSERT_EQ(ShardType::ConfigNS, query->ns());
         ASSERT_EQ(BSONObj(), query->getFilter());
@@ -1959,7 +1959,7 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingNoDBExists) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(DatabaseType::ConfigNS, nss.toString());
 
-        auto queryResult = LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false);
+        auto queryResult = QueryRequest::makeFromFindCommand(nss, request.cmdObj, false);
         ASSERT_OK(queryResult.getStatus());
 
         const auto& query = queryResult.getValue();

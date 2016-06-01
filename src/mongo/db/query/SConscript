@@ -82,7 +82,7 @@ env.Library(
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/util/fail_point",
         "collation/collator_icu",
-        "lite_parsed_query",
+        "query_request",
     ],
 )
 
@@ -138,7 +138,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/rpc/command_status',
-        'lite_parsed_query',
+        'query_request',
     ]
 )
 
@@ -174,9 +174,9 @@ env.Library(
 )
 
 env.Library(
-    target="lite_parsed_query",
+    target="query_request",
     source=[
-        "lite_parsed_query.cpp"
+        "query_request.cpp"
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
@@ -262,12 +262,12 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target="lite_parsed_query_test",
+    target="query_request_test",
     source=[
-        "lite_parsed_query_test.cpp"
+        "query_request_test.cpp"
     ],
     LIBDEPS=[
-        "lite_parsed_query",
+        "query_request",
     ],
 )
 

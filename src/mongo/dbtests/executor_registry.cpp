@@ -77,9 +77,9 @@ public:
         unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, params, ws.get(), NULL));
 
         // Create a plan executor to hold it
-        auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
+        auto qr = stdx::make_unique<QueryRequest>(nss);
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            &_opCtx, std::move(lpq), ExtensionsCallbackDisallowExtensions());
+            &_opCtx, std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 

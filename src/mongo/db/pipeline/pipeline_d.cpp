@@ -209,17 +209,17 @@ StatusWith<std::unique_ptr<PlanExecutor>> attemptToGetExecutor(
     BSONObj projectionObj,
     BSONObj sortObj,
     const size_t plannerOpts) {
-    auto lpq = stdx::make_unique<LiteParsedQuery>(pExpCtx->ns);
-    lpq->setFilter(queryObj);
-    lpq->setProj(projectionObj);
-    lpq->setSort(sortObj);
+    auto qr = stdx::make_unique<QueryRequest>(pExpCtx->ns);
+    qr->setFilter(queryObj);
+    qr->setProj(projectionObj);
+    qr->setSort(sortObj);
     if (pExpCtx->collator) {
-        lpq->setCollation(CollationSerializer::specToBSON(pExpCtx->collator->getSpec()));
+        qr->setCollation(CollationSerializer::specToBSON(pExpCtx->collator->getSpec()));
     }
 
     const ExtensionsCallbackReal extensionsCallback(pExpCtx->opCtx, &pExpCtx->ns);
 
-    auto cq = CanonicalQuery::canonicalize(txn, std::move(lpq), extensionsCallback);
+    auto cq = CanonicalQuery::canonicalize(txn, std::move(qr), extensionsCallback);
 
     if (!cq.isOK()) {
         // Return an error instead of uasserting, since there are cases where the combination of

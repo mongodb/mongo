@@ -98,8 +98,7 @@ public:
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(DatabaseType::ConfigNS, nss.ns());
 
-            auto query =
-                assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+            auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
             ASSERT_EQ(DatabaseType::ConfigNS, query->ns());
             ASSERT_EQ(BSON(DatabaseType::name(expectedDb.getName())), query->getFilter());
@@ -163,8 +162,7 @@ public:
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.ns(), ChunkType::ConfigNS);
 
-            auto query =
-                assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+            auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
             BSONObj expectedQuery =
                 BSON(ChunkType::ns(ns) << ChunkType::DEPRECATED_lastmod << GTE << Timestamp());
             BSONObj expectedSort = BSON(ChunkType::DEPRECATED_lastmod() << 1);

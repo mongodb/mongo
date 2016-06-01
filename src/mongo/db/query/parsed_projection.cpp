@@ -28,7 +28,7 @@
 
 #include "mongo/db/query/parsed_projection.h"
 
-#include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/db/query/query_request.h"
 
 namespace mongo {
 
@@ -149,28 +149,28 @@ Status ParsedProjection::make(const BSONObj& spec,
                     return Status(ErrorCodes::BadValue, "unexpected argument to $meta in proj");
                 }
 
-                if (e2.valuestr() != LiteParsedQuery::metaTextScore &&
-                    e2.valuestr() != LiteParsedQuery::metaRecordId &&
-                    e2.valuestr() != LiteParsedQuery::metaIndexKey &&
-                    e2.valuestr() != LiteParsedQuery::metaGeoNearDistance &&
-                    e2.valuestr() != LiteParsedQuery::metaGeoNearPoint &&
-                    e2.valuestr() != LiteParsedQuery::metaSortKey) {
+                if (e2.valuestr() != QueryRequest::metaTextScore &&
+                    e2.valuestr() != QueryRequest::metaRecordId &&
+                    e2.valuestr() != QueryRequest::metaIndexKey &&
+                    e2.valuestr() != QueryRequest::metaGeoNearDistance &&
+                    e2.valuestr() != QueryRequest::metaGeoNearPoint &&
+                    e2.valuestr() != QueryRequest::metaSortKey) {
                     return Status(ErrorCodes::BadValue, "unsupported $meta operator: " + e2.str());
                 }
 
                 // This clobbers everything else.
-                if (e2.valuestr() == LiteParsedQuery::metaIndexKey) {
+                if (e2.valuestr() == QueryRequest::metaIndexKey) {
                     hasIndexKeyProjection = true;
-                } else if (e2.valuestr() == LiteParsedQuery::metaGeoNearDistance) {
+                } else if (e2.valuestr() == QueryRequest::metaGeoNearDistance) {
                     wantGeoNearDistance = true;
-                } else if (e2.valuestr() == LiteParsedQuery::metaGeoNearPoint) {
+                } else if (e2.valuestr() == QueryRequest::metaGeoNearPoint) {
                     wantGeoNearPoint = true;
-                } else if (e2.valuestr() == LiteParsedQuery::metaSortKey) {
+                } else if (e2.valuestr() == QueryRequest::metaSortKey) {
                     wantSortKey = true;
                 }
 
                 // Of the $meta projections, only sortKey can be covered.
-                if (e2.valuestr() != LiteParsedQuery::metaSortKey) {
+                if (e2.valuestr() != QueryRequest::metaSortKey) {
                     requiresDocument = true;
                 }
                 pp->_metaFields.push_back(elem.fieldNameStringData());
@@ -255,7 +255,7 @@ Status ParsedProjection::make(const BSONObj& spec,
     // expression to know which array element was matched.
     pp->_requiresMatchDetails = arrayOpType == ARRAY_OP_POSITIONAL;
 
-    // Save the raw spec.  It should be owned by the LiteParsedQuery.
+    // Save the raw spec.  It should be owned by the QueryRequest.
     verify(spec.isOwned());
     pp->_source = spec;
     pp->_returnKey = hasIndexKeyProjection;

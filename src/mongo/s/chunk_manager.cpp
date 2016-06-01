@@ -483,10 +483,10 @@ shared_ptr<Chunk> ChunkManager::findIntersectingChunk(OperationContext* txn,
 void ChunkManager::getShardIdsForQuery(OperationContext* txn,
                                        const BSONObj& query,
                                        set<ShardId>* shardIds) const {
-    auto lpq = stdx::make_unique<LiteParsedQuery>(NamespaceString(_ns));
-    lpq->setFilter(query);
+    auto qr = stdx::make_unique<QueryRequest>(NamespaceString(_ns));
+    qr->setFilter(query);
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(lpq), ExtensionsCallbackNoop());
+    auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(qr), ExtensionsCallbackNoop());
 
     uassertStatusOK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());

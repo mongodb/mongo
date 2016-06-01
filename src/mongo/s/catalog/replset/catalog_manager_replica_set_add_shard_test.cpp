@@ -35,7 +35,7 @@
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/db/query/query_request.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
@@ -189,7 +189,7 @@ protected:
                 ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
 
                 auto query =
-                    assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+                    assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
                 ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
                 ASSERT_EQ(query->getFilter(), BSON(DatabaseType::name(dbname)));
@@ -338,7 +338,7 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
         ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.toString(), ShardType::ConfigNS);
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
         ASSERT_EQ(query->ns(), ShardType::ConfigNS);
 

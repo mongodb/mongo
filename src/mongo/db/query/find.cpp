@@ -88,12 +88,12 @@ bool shouldSaveCursor(OperationContext* txn,
         return false;
     }
 
-    const LiteParsedQuery& pq = exec->getCanonicalQuery()->getParsed();
-    if (!pq.wantMore() && !pq.isTailable()) {
+    const QueryRequest& qr = exec->getCanonicalQuery()->getQueryRequest();
+    if (!qr.wantMore() && !qr.isTailable()) {
         return false;
     }
 
-    if (pq.getNToReturn().value_or(0) == 1) {
+    if (qr.getNToReturn().value_or(0) == 1) {
         return false;
     }
 
@@ -103,7 +103,7 @@ bool shouldSaveCursor(OperationContext* txn,
     // SERVER-13955: we should be able to create a tailable cursor that waits on
     // an empty collection. Right now we do not keep a cursor if the collection
     // has zero records.
-    if (pq.isTailable()) {
+    if (qr.isTailable()) {
         return collection && collection->numRecords(txn) != 0U;
     }
 
@@ -524,11 +524,11 @@ std::string runQuery(OperationContext* txn,
     std::unique_ptr<PlanExecutor> exec = uassertStatusOK(
         getExecutorFind(txn, collection, nss, std::move(cq), PlanExecutor::YIELD_AUTO));
 
-    const LiteParsedQuery& pq = exec->getCanonicalQuery()->getParsed();
+    const QueryRequest& qr = exec->getCanonicalQuery()->getQueryRequest();
 
     // If it's actually an explain, do the explain and return rather than falling through
     // to the normal query execution loop.
-    if (pq.isExplain()) {
+    if (qr.isExplain()) {
         BufBuilder bb;
         bb.skip(sizeof(QueryResult::Value));
 
@@ -554,16 +554,16 @@ std::string runQuery(OperationContext* txn,
     }
 
     // Handle query option $maxTimeMS (not used with commands).
-    if (pq.getMaxTimeMS() > 0) {
+    if (qr.getMaxTimeMS() > 0) {
         uassert(40116,
                 "Illegal attempt to set operation deadline within DBDirectClient",
                 !txn->getClient()->isInDirectClient());
-        txn->setDeadlineAfterNowBy(Milliseconds{pq.getMaxTimeMS()});
+        txn->setDeadlineAfterNowBy(Milliseconds{qr.getMaxTimeMS()});
     }
     txn->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
 
     // uassert if we are not on a primary, and not a secondary with SlaveOk query parameter set.
-    bool slaveOK = pq.isSlaveOk() || pq.hasReadPref();
+    bool slaveOK = qr.isSlaveOk() || qr.hasReadPref();
     Status serveReadsStatus =
         repl::getGlobalReplicationCoordinator()->checkCanServeReadsFor(txn, nss, slaveOK);
     uassertStatusOK(serveReadsStatus);
@@ -604,16 +604,16 @@ std::string runQuery(OperationContext* txn,
         ++numResults;
 
         // Possibly note slave's position in the oplog.
-        if (pq.isOplogReplay()) {
+        if (qr.isOplogReplay()) {
             BSONElement e = obj["ts"];
             if (Date == e.type() || bsonTimestamp == e.type()) {
                 slaveReadTill = e.timestamp();
             }
         }
 
-        if (FindCommon::enoughForFirstBatch(pq, numResults)) {
-            LOG(5) << "Enough for first batch, wantMore=" << pq.wantMore()
-                   << " ntoreturn=" << pq.getNToReturn().value_or(0) << " numResults=" << numResults
+        if (FindCommon::enoughForFirstBatch(qr, numResults)) {
+            LOG(5) << "Enough for first batch, wantMore=" << qr.wantMore()
+                   << " ntoreturn=" << qr.getNToReturn().value_or(0) << " numResults=" << numResults
                    << endl;
             break;
         }
@@ -655,20 +655,20 @@ std::string runQuery(OperationContext* txn,
                              exec.release(),
                              nss.ns(),
                              txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
-                             pq.getOptions(),
-                             pq.getFilter());
+                             qr.getOptions(),
+                             qr.getFilter());
         ccId = cc->cursorid();
 
         LOG(5) << "caching executor with cursorid " << ccId << " after returning " << numResults
                << " results" << endl;
 
         // TODO document
-        if (pq.isOplogReplay() && !slaveReadTill.isNull()) {
+        if (qr.isOplogReplay() && !slaveReadTill.isNull()) {
             cc->slaveReadTill(slaveReadTill);
         }
 
         // TODO document
-        if (pq.isExhaust()) {
+        if (qr.isExhaust()) {
             curOp.debug().exhaust = true;
         }
 
@@ -689,12 +689,12 @@ std::string runQuery(OperationContext* txn,
     bb.decouple();
 
     // Fill out the output buffer's header.
-    QueryResult::View qr = result.header().view2ptr();
-    qr.setCursorId(ccId);
-    qr.setResultFlagsToOk();
-    qr.msgdata().setOperation(opReply);
-    qr.setStartingFrom(0);
-    qr.setNReturned(numResults);
+    QueryResult::View queryResultView = result.header().view2ptr();
+    queryResultView.setCursorId(ccId);
+    queryResultView.setResultFlagsToOk();
+    queryResultView.msgdata().setOperation(opReply);
+    queryResultView.setStartingFrom(0);
+    queryResultView.setNReturned(numResults);
 
     // curOp.debug().exhaust is set above.
     return curOp.debug().exhaust ? nss.ns() : "";

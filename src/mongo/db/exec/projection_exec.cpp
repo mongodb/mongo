@@ -32,7 +32,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/db/query/query_request.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -138,18 +138,18 @@ ProjectionExec::ProjectionExec(const BSONObj& spec,
                 add(e.fieldName(), true);
             } else if (mongoutils::str::equals(e2.fieldName(), "$meta")) {
                 verify(String == e2.type());
-                if (e2.valuestr() == LiteParsedQuery::metaTextScore) {
+                if (e2.valuestr() == QueryRequest::metaTextScore) {
                     _meta[e.fieldName()] = META_TEXT_SCORE;
-                } else if (e2.valuestr() == LiteParsedQuery::metaSortKey) {
+                } else if (e2.valuestr() == QueryRequest::metaSortKey) {
                     _sortKeyMetaFields.push_back(e.fieldName());
                     _meta[_sortKeyMetaFields.back()] = META_SORT_KEY;
-                } else if (e2.valuestr() == LiteParsedQuery::metaRecordId) {
+                } else if (e2.valuestr() == QueryRequest::metaRecordId) {
                     _meta[e.fieldName()] = META_RECORDID;
-                } else if (e2.valuestr() == LiteParsedQuery::metaGeoNearPoint) {
+                } else if (e2.valuestr() == QueryRequest::metaGeoNearPoint) {
                     _meta[e.fieldName()] = META_GEONEAR_POINT;
-                } else if (e2.valuestr() == LiteParsedQuery::metaGeoNearDistance) {
+                } else if (e2.valuestr() == QueryRequest::metaGeoNearDistance) {
                     _meta[e.fieldName()] = META_GEONEAR_DIST;
-                } else if (e2.valuestr() == LiteParsedQuery::metaIndexKey) {
+                } else if (e2.valuestr() == QueryRequest::metaIndexKey) {
                     _hasReturnKey = true;
                 } else {
                     // This shouldn't happen, should be caught by parsing.

@@ -119,10 +119,10 @@ std::vector<AllowedIndexEntry*> QuerySettings::getAllAllowedIndices() const {
 void QuerySettings::setAllowedIndices(const CanonicalQuery& canonicalQuery,
                                       const PlanCacheKey& key,
                                       const std::vector<BSONObj>& indexes) {
-    const LiteParsedQuery& lpq = canonicalQuery.getParsed();
-    const BSONObj& query = lpq.getFilter();
-    const BSONObj& sort = lpq.getSort();
-    const BSONObj& projection = lpq.getProj();
+    const QueryRequest& qr = canonicalQuery.getQueryRequest();
+    const BSONObj& query = qr.getFilter();
+    const BSONObj& sort = qr.getSort();
+    const BSONObj& projection = qr.getProj();
     AllowedIndexEntry* entry = new AllowedIndexEntry(query, sort, projection, indexes);
 
     stdx::lock_guard<stdx::mutex> cacheLock(_mutex);

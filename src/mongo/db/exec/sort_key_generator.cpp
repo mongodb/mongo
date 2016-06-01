@@ -74,7 +74,7 @@ SortKeyGenerator::SortKeyGenerator(OperationContext* txn,
         if (elt.isNumber()) {
             // Btree key.  elt (should be) foo: 1 or foo: -1.
             btreeBob.append(elt);
-        } else if (LiteParsedQuery::isTextScoreMeta(elt)) {
+        } else if (QueryRequest::isTextScoreMeta(elt)) {
             _sortHasMeta = true;
         } else {
             // Sort spec. should have been validated before here.
@@ -139,7 +139,7 @@ Status SortKeyGenerator::getSortKey(const WorkingSetMember& member, BSONObj* obj
         if (elt.isNumber()) {
             // Merge btree key elt.
             mergedKeyBob.append(sortKeyIt.next());
-        } else if (LiteParsedQuery::isTextScoreMeta(elt)) {
+        } else if (QueryRequest::isTextScoreMeta(elt)) {
             // Add text score metadata
             double score = 0.0;
             if (member.hasComputed(WSM_COMPUTED_TEXT_SCORE)) {
@@ -245,14 +245,14 @@ void SortKeyGenerator::getBoundsForSort(OperationContext* txn,
                          _collator);
     params.indices.push_back(sortOrder);
 
-    auto lpq = stdx::make_unique<LiteParsedQuery>(NamespaceString("fake.ns"));
-    lpq->setFilter(queryObj);
+    auto qr = stdx::make_unique<QueryRequest>(NamespaceString("fake.ns"));
+    qr->setFilter(queryObj);
     if (_collator) {
-        lpq->setCollation(CollationSerializer::specToBSON(_collator->getSpec()));
+        qr->setCollation(CollationSerializer::specToBSON(_collator->getSpec()));
     }
 
     auto statusWithQueryForSort =
-        CanonicalQuery::canonicalize(txn, std::move(lpq), ExtensionsCallbackNoop());
+        CanonicalQuery::canonicalize(txn, std::move(qr), ExtensionsCallbackNoop());
     verify(statusWithQueryForSort.isOK());
     std::unique_ptr<CanonicalQuery> queryForSort = std::move(statusWithQueryForSort.getValue());
 

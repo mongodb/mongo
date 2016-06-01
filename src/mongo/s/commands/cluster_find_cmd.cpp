@@ -111,15 +111,15 @@ public:
                     str::stream() << "Invalid collection name: " << nss.ns()};
         }
 
-        // Parse the command BSON to a LiteParsedQuery.
+        // Parse the command BSON to a QueryRequest.
         bool isExplain = true;
-        auto lpq = LiteParsedQuery::makeFromFindCommand(std::move(nss), cmdObj, isExplain);
-        if (!lpq.isOK()) {
-            return lpq.getStatus();
+        auto qr = QueryRequest::makeFromFindCommand(std::move(nss), cmdObj, isExplain);
+        if (!qr.isOK()) {
+            return qr.getStatus();
         }
 
         return Strategy::explainFind(
-            txn, cmdObj, *lpq.getValue(), verbosity, serverSelectionMetadata, out);
+            txn, cmdObj, *qr.getValue(), verbosity, serverSelectionMetadata, out);
     }
 
     bool run(OperationContext* txn,
@@ -139,13 +139,13 @@ public:
         }
 
         const bool isExplain = false;
-        auto lpq = LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain);
-        if (!lpq.isOK()) {
-            return appendCommandStatus(result, lpq.getStatus());
+        auto qr = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
+        if (!qr.isOK()) {
+            return appendCommandStatus(result, qr.getStatus());
         }
 
         auto cq =
-            CanonicalQuery::canonicalize(txn, std::move(lpq.getValue()), ExtensionsCallbackNoop());
+            CanonicalQuery::canonicalize(txn, std::move(qr.getValue()), ExtensionsCallbackNoop());
         if (!cq.isOK()) {
             return appendCommandStatus(result, cq.getStatus());
         }

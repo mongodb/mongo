@@ -45,15 +45,15 @@ class StatusWith;
  * Parses the QueryMessage or find command received from the user and makes the various fields
  * more easily accessible.
  */
-class LiteParsedQuery {
+class QueryRequest {
 public:
     static const char kFindCommandName[];
     static const char kShardVersionField[];
 
-    LiteParsedQuery(NamespaceString nss);
+    QueryRequest(NamespaceString nss);
 
     /**
-     * Returns a non-OK status if any property of the LPQ has a bad value (e.g. a negative skip
+     * Returns a non-OK status if any property of the QR has a bad value (e.g. a negative skip
      * value) or if there is a bad combination of options (e.g. awaitData is illegal without
      * tailable).
      */
@@ -63,15 +63,15 @@ public:
      * Parses a find command object, 'cmdObj'. Caller must indicate whether or not this lite
      * parsed query is an explained query or not via 'isExplain'.
      *
-     * Returns a heap allocated LiteParsedQuery on success or an error if 'cmdObj' is not well
+     * Returns a heap allocated QueryRequest on success or an error if 'cmdObj' is not well
      * formed.
      */
-    static StatusWith<std::unique_ptr<LiteParsedQuery>> makeFromFindCommand(NamespaceString nss,
-                                                                            const BSONObj& cmdObj,
-                                                                            bool isExplain);
+    static StatusWith<std::unique_ptr<QueryRequest>> makeFromFindCommand(NamespaceString nss,
+                                                                         const BSONObj& cmdObj,
+                                                                         bool isExplain);
 
     /**
-     * Converts this LPQ into a find command.
+     * Converts this QR into a find command.
      */
     BSONObj asFindCommand() const;
     void asFindCommand(BSONObjBuilder* cmdBuilder) const;
@@ -382,11 +382,10 @@ public:
     //
 
     /**
-     * Parse the provided QueryMessage and return a heap constructed LiteParsedQuery, which
+     * Parse the provided QueryMessage and return a heap constructed QueryRequest, which
      * represents it or an error.
      */
-    static StatusWith<std::unique_ptr<LiteParsedQuery>> fromLegacyQueryMessage(
-        const QueryMessage& qm);
+    static StatusWith<std::unique_ptr<QueryRequest>> fromLegacyQueryMessage(const QueryMessage& qm);
 
 private:
     Status init(int ntoskip,
@@ -449,7 +448,7 @@ private:
     boost::optional<long long> _batchSize;
 
     // Set only when parsed from an OP_QUERY find message. The value is computed by driver or shell
-    // and is set to be a min of batchSize and limit provided by user. LPQ can have set either
+    // and is set to be a min of batchSize and limit provided by user. QR can have set either
     // ntoreturn or batchSize / limit.
     boost::optional<long long> _ntoreturn;
 

@@ -336,8 +336,8 @@ void CachedPlanStage::updatePlanCache() {
         LOG(5) << _canonicalQuery->ns()
                << ": Failed to update cache with feedback: " << fbs.toString() << " - "
                << "(query: " << _canonicalQuery->getQueryObj()
-               << "; sort: " << _canonicalQuery->getParsed().getSort()
-               << "; projection: " << _canonicalQuery->getParsed().getProj()
+               << "; sort: " << _canonicalQuery->getQueryRequest().getSort()
+               << "; projection: " << _canonicalQuery->getQueryRequest().getProj()
                << ") is no longer in plan cache.";
     }
 }
