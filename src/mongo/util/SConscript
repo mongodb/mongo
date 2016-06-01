@@ -69,6 +69,29 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target='summation',
+    source=[
+        'summation.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/foundation',
+    ],
+)
+
+env.CppUnitTest(
+    target='summation_test',
+    source=[
+        'summation_test.cpp',
+    ],
+    LIBDEPS=[
+        'summation',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/third_party/shim_boost',
+    ],
+)
+
+env.Library(
     target='progress_meter',
     source=[
         'progress_meter.cpp',
