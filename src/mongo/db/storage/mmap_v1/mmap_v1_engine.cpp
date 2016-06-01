@@ -227,8 +227,13 @@ void clearTmpFiles() {
 }  // namespace
 
 MMAPV1Engine::MMAPV1Engine(const StorageEngineLockFile* lockFile, ClockSource* cs)
+    : MMAPV1Engine(lockFile, cs, stdx::make_unique<MmapV1ExtentManager::Factory>()) {}
+
+MMAPV1Engine::MMAPV1Engine(const StorageEngineLockFile* lockFile,
+                           ClockSource* cs,
+                           std::unique_ptr<ExtentManager::Factory> extentManagerFactory)
     : _recordAccessTracker(cs),
-      _extentManagerFactory(stdx::make_unique<MmapV1ExtentManager::Factory>()),
+      _extentManagerFactory(std::move(extentManagerFactory)),
       _clock(cs),
       _startMs(_clock->now().toMillisSinceEpoch()) {
     // TODO check non-journal subdirs if using directory-per-db

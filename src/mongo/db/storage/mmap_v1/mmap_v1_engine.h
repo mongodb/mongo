@@ -46,6 +46,10 @@ class MMAPV1DatabaseCatalogEntry;
 class MMAPV1Engine : public StorageEngine {
 public:
     MMAPV1Engine(const StorageEngineLockFile* lockFile, ClockSource* cs);
+
+    MMAPV1Engine(const StorageEngineLockFile* lockFile,
+                 ClockSource* cs,
+                 std::unique_ptr<ExtentManager::Factory> extentManagerFactory);
     virtual ~MMAPV1Engine();
 
     void finishInit();
