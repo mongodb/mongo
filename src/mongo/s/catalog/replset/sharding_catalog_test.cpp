@@ -43,8 +43,8 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
-#include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
 #include "mongo/s/catalog/replset/sharding_catalog_client_impl.h"
+#include "mongo/s/catalog/replset/sharding_catalog_test_fixture.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
@@ -72,7 +72,7 @@ using std::string;
 using std::vector;
 using unittest::assertGet;
 
-using CatalogManagerReplSetTest = CatalogManagerReplSetTestFixture;
+using ShardingCatalogClientTest = ShardingCatalogTestFixture;
 
 const int kMaxCommandRetry = 3;
 
@@ -83,7 +83,7 @@ const BSONObj kReplSecondaryOkMetadata{[] {
     return o.obj();
 }()};
 
-TEST_F(CatalogManagerReplSetTest, GetCollectionExisting) {
+TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     CollectionType expectedColl;
@@ -130,7 +130,7 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionExisting) {
     ASSERT_EQ(expectedColl.toBSON(), collOpTimePair.value.toBSON());
 }
 
-TEST_F(CatalogManagerReplSetTest, GetCollectionNotExisting) {
+TEST_F(ShardingCatalogClientTest, GetCollectionNotExisting) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
@@ -144,13 +144,13 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionNotExisting) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, GetDatabaseInvalidName) {
+TEST_F(ShardingCatalogClientTest, GetDatabaseInvalidName) {
     auto status = catalogClient()->getDatabase(operationContext(), "b.c").getStatus();
     ASSERT_EQ(ErrorCodes::InvalidNamespace, status.code());
     ASSERT_FALSE(status.reason().empty());
 }
 
-TEST_F(CatalogManagerReplSetTest, GetDatabaseExisting) {
+TEST_F(ShardingCatalogClientTest, GetDatabaseExisting) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     DatabaseType expectedDb;
@@ -191,7 +191,7 @@ TEST_F(CatalogManagerReplSetTest, GetDatabaseExisting) {
     ASSERT_EQ(expectedDb.toBSON(), dbOpTimePair.value.toBSON());
 }
 
-TEST_F(CatalogManagerReplSetTest, GetDatabaseStaleSecondaryRetrySuccess) {
+TEST_F(ShardingCatalogClientTest, GetDatabaseStaleSecondaryRetrySuccess) {
     HostAndPort firstHost{"TestHost1"};
     HostAndPort secondHost{"TestHost2"};
     configTargeter()->setFindHostReturnValue(firstHost);
@@ -222,7 +222,7 @@ TEST_F(CatalogManagerReplSetTest, GetDatabaseStaleSecondaryRetrySuccess) {
     ASSERT_EQ(expectedDb.toBSON(), dbOpTimePair.value.toBSON());
 }
 
-TEST_F(CatalogManagerReplSetTest, GetDatabaseStaleSecondaryRetryNoPrimary) {
+TEST_F(ShardingCatalogClientTest, GetDatabaseStaleSecondaryRetryNoPrimary) {
     HostAndPort testHost{"TestHost1"};
     configTargeter()->setFindHostReturnValue(testHost);
 
@@ -242,7 +242,7 @@ TEST_F(CatalogManagerReplSetTest, GetDatabaseStaleSecondaryRetryNoPrimary) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, GetDatabaseNotExisting) {
+TEST_F(ShardingCatalogClientTest, GetDatabaseNotExisting) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
@@ -256,7 +256,7 @@ TEST_F(CatalogManagerReplSetTest, GetDatabaseNotExisting) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, UpdateCollection) {
+TEST_F(ShardingCatalogClientTest, UpdateCollection) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     CollectionType collection;
@@ -278,7 +278,7 @@ TEST_F(CatalogManagerReplSetTest, UpdateCollection) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, UpdateCollectionNotMaster) {
+TEST_F(ShardingCatalogClientTest, UpdateCollectionNotMaster) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     CollectionType collection;
@@ -309,7 +309,7 @@ TEST_F(CatalogManagerReplSetTest, UpdateCollectionNotMaster) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, UpdateCollectionNotMasterFromTargeter) {
+TEST_F(ShardingCatalogClientTest, UpdateCollectionNotMasterFromTargeter) {
     configTargeter()->setFindHostReturnValue(Status(ErrorCodes::NotMaster, "not master"));
 
     CollectionType collection;
@@ -329,7 +329,7 @@ TEST_F(CatalogManagerReplSetTest, UpdateCollectionNotMasterFromTargeter) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, UpdateCollectionNotMasterRetrySuccess) {
+TEST_F(ShardingCatalogClientTest, UpdateCollectionNotMasterRetrySuccess) {
     HostAndPort host1("TestHost1");
     HostAndPort host2("TestHost2");
     configTargeter()->setFindHostReturnValue(host1);
@@ -367,7 +367,7 @@ TEST_F(CatalogManagerReplSetTest, UpdateCollectionNotMasterRetrySuccess) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, GetAllShardsValid) {
+TEST_F(ShardingCatalogClientTest, GetAllShardsValid) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     ShardType s1;
@@ -419,7 +419,7 @@ TEST_F(CatalogManagerReplSetTest, GetAllShardsValid) {
     }
 }
 
-TEST_F(CatalogManagerReplSetTest, GetAllShardsWithInvalidShard) {
+TEST_F(ShardingCatalogClientTest, GetAllShardsWithInvalidShard) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
@@ -443,7 +443,7 @@ TEST_F(CatalogManagerReplSetTest, GetAllShardsWithInvalidShard) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, GetChunksForNSWithSortAndLimit) {
+TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     OID oid = OID::gen();
@@ -515,7 +515,7 @@ TEST_F(CatalogManagerReplSetTest, GetChunksForNSWithSortAndLimit) {
     ASSERT_EQ(chunkB.toBSON(), chunks[1].toBSON());
 }
 
-TEST_F(CatalogManagerReplSetTest, GetChunksForNSNoSortNoLimit) {
+TEST_F(ShardingCatalogClientTest, GetChunksForNSNoSortNoLimit) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     ChunkVersion queryChunkVersion({1, 2, OID::gen()});
@@ -556,7 +556,7 @@ TEST_F(CatalogManagerReplSetTest, GetChunksForNSNoSortNoLimit) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, GetChunksForNSInvalidChunk) {
+TEST_F(ShardingCatalogClientTest, GetChunksForNSInvalidChunk) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     ChunkVersion queryChunkVersion({1, 2, OID::gen()});
@@ -596,7 +596,7 @@ TEST_F(CatalogManagerReplSetTest, GetChunksForNSInvalidChunk) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, RunUserManagementReadCommand) {
+TEST_F(ShardingCatalogClientTest, RunUserManagementReadCommand) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
@@ -623,7 +623,7 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementReadCommand) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, RunUserManagementReadCommandUnsatisfiedReadPref) {
+TEST_F(ShardingCatalogClientTest, RunUserManagementReadCommandUnsatisfiedReadPref) {
     configTargeter()->setFindHostReturnValue(
         Status(ErrorCodes::FailedToSatisfyReadPreference, "no nodes up"));
 
@@ -636,7 +636,7 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementReadCommandUnsatisfiedReadPre
     ASSERT_EQUALS(ErrorCodes::FailedToSatisfyReadPreference, commandStatus);
 }
 
-TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandSuccess) {
+TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandSuccess) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
@@ -679,7 +679,7 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandSuccess) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandInvalidWriteConcern) {
+TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandInvalidWriteConcern) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     BSONObjBuilder responseBuilder;
@@ -698,7 +698,7 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandInvalidWriteConce
     ASSERT_STRING_CONTAINS(commandStatus.reason(), "Invalid replication write concern");
 }
 
-TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandRewriteWriteConcern) {
+TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandRewriteWriteConcern) {
     // Tests that if you send a w:1 write concern it gets replaced with w:majority
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
@@ -754,7 +754,7 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandRewriteWriteConce
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandNotMaster) {
+TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotMaster) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
@@ -784,7 +784,7 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandNotMaster) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandNotMasterRetrySuccess) {
+TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotMasterRetrySuccess) {
     HostAndPort host1("TestHost1");
     HostAndPort host2("TestHost2");
 
@@ -840,7 +840,7 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandNotMasterRetrySuc
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, GetCollectionsValidResultsNoDb) {
+TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     CollectionType coll1;
@@ -912,7 +912,7 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionsValidResultsNoDb) {
     ASSERT_EQ(coll3.toBSON(), actualColls[2].toBSON());
 }
 
-TEST_F(CatalogManagerReplSetTest, GetCollectionsValidResultsWithDb) {
+TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsWithDb) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     CollectionType coll1;
@@ -966,7 +966,7 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionsValidResultsWithDb) {
     ASSERT_EQ(coll2.toBSON(), actualColls[1].toBSON());
 }
 
-TEST_F(CatalogManagerReplSetTest, GetCollectionsInvalidCollectionType) {
+TEST_F(ShardingCatalogClientTest, GetCollectionsInvalidCollectionType) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
@@ -1014,7 +1014,7 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionsInvalidCollectionType) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, GetDatabasesForShardValid) {
+TEST_F(ShardingCatalogClientTest, GetDatabasesForShardValid) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     DatabaseType dbt1;
@@ -1057,7 +1057,7 @@ TEST_F(CatalogManagerReplSetTest, GetDatabasesForShardValid) {
     ASSERT_EQ(dbt2.getName(), actualDbNames[1]);
 }
 
-TEST_F(CatalogManagerReplSetTest, GetDatabasesForShardInvalidDoc) {
+TEST_F(ShardingCatalogClientTest, GetDatabasesForShardInvalidDoc) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
@@ -1083,7 +1083,7 @@ TEST_F(CatalogManagerReplSetTest, GetDatabasesForShardInvalidDoc) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, GetTagsForCollection) {
+TEST_F(ShardingCatalogClientTest, GetTagsForCollection) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     TagsType tagA;
@@ -1130,7 +1130,7 @@ TEST_F(CatalogManagerReplSetTest, GetTagsForCollection) {
     ASSERT_EQ(tagB.toBSON(), tags[1].toBSON());
 }
 
-TEST_F(CatalogManagerReplSetTest, GetTagsForCollectionNoTags) {
+TEST_F(ShardingCatalogClientTest, GetTagsForCollectionNoTags) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
@@ -1148,7 +1148,7 @@ TEST_F(CatalogManagerReplSetTest, GetTagsForCollectionNoTags) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, GetTagsForCollectionInvalidTag) {
+TEST_F(ShardingCatalogClientTest, GetTagsForCollectionInvalidTag) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
@@ -1179,7 +1179,7 @@ TEST_F(CatalogManagerReplSetTest, GetTagsForCollectionInvalidTag) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, GetTagForChunkOneTagFound) {
+TEST_F(ShardingCatalogClientTest, GetTagForChunkOneTagFound) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     ChunkType chunk;
@@ -1224,7 +1224,7 @@ TEST_F(CatalogManagerReplSetTest, GetTagForChunkOneTagFound) {
     ASSERT_EQ("tag", tagStr);
 }
 
-TEST_F(CatalogManagerReplSetTest, GetTagForChunkNoTagFound) {
+TEST_F(ShardingCatalogClientTest, GetTagForChunkNoTagFound) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     ChunkType chunk;
@@ -1263,7 +1263,7 @@ TEST_F(CatalogManagerReplSetTest, GetTagForChunkNoTagFound) {
     ASSERT_EQ("", tagStr);  // empty string returned when tag document not found
 }
 
-TEST_F(CatalogManagerReplSetTest, GetTagForChunkInvalidTagDoc) {
+TEST_F(ShardingCatalogClientTest, GetTagForChunkInvalidTagDoc) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     ChunkType chunk;
@@ -1306,7 +1306,7 @@ TEST_F(CatalogManagerReplSetTest, GetTagForChunkInvalidTagDoc) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, UpdateDatabase) {
+TEST_F(ShardingCatalogClientTest, UpdateDatabase) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     DatabaseType dbt;
@@ -1348,7 +1348,7 @@ TEST_F(CatalogManagerReplSetTest, UpdateDatabase) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, UpdateDatabaseExceededTimeLimit) {
+TEST_F(ShardingCatalogClientTest, UpdateDatabaseExceededTimeLimit) {
     HostAndPort host1("TestHost1");
     configTargeter()->setFindHostReturnValue(host1);
 
@@ -1377,7 +1377,7 @@ TEST_F(CatalogManagerReplSetTest, UpdateDatabaseExceededTimeLimit) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, ApplyChunkOpsDeprecatedSuccessful) {
+TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedSuccessful) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     BSONArray updateOps = BSON_ARRAY(BSON("update1"
@@ -1416,7 +1416,7 @@ TEST_F(CatalogManagerReplSetTest, ApplyChunkOpsDeprecatedSuccessful) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, ApplyChunkOpsDeprecatedSuccessfulWithCheck) {
+TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedSuccessfulWithCheck) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     BSONArray updateOps = BSON_ARRAY(BSON("update1"
@@ -1458,7 +1458,7 @@ TEST_F(CatalogManagerReplSetTest, ApplyChunkOpsDeprecatedSuccessfulWithCheck) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, ApplyChunkOpsDeprecatedFailedWithCheck) {
+TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedFailedWithCheck) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     BSONArray updateOps = BSON_ARRAY(BSON("update1"
@@ -1491,7 +1491,7 @@ TEST_F(CatalogManagerReplSetTest, ApplyChunkOpsDeprecatedFailedWithCheck) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, createDatabaseSuccess) {
+TEST_F(ShardingCatalogClientTest, createDatabaseSuccess) {
     const string dbname = "databaseToCreate";
     const HostAndPort configHost("TestHost1");
     configTargeter()->setFindHostReturnValue(configHost);
@@ -1636,7 +1636,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseSuccess) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, createDatabaseDistLockHeld) {
+TEST_F(ShardingCatalogClientTest, createDatabaseDistLockHeld) {
     const string dbname = "databaseToCreate";
 
 
@@ -1656,7 +1656,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseDistLockHeld) {
     ASSERT_EQUALS(ErrorCodes::LockBusy, status);
 }
 
-TEST_F(CatalogManagerReplSetTest, createDatabaseDBExists) {
+TEST_F(ShardingCatalogClientTest, createDatabaseDBExists) {
     const string dbname = "databaseToCreate";
 
 
@@ -1694,7 +1694,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseDBExists) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, createDatabaseDBExistsDifferentCase) {
+TEST_F(ShardingCatalogClientTest, createDatabaseDBExistsDifferentCase) {
     const string dbname = "databaseToCreate";
     const string dbnameDiffCase = "databasetocreate";
 
@@ -1733,7 +1733,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseDBExistsDifferentCase) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, createDatabaseNoShards) {
+TEST_F(ShardingCatalogClientTest, createDatabaseNoShards) {
     const string dbname = "databaseToCreate";
 
 
@@ -1779,7 +1779,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseNoShards) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, createDatabaseDuplicateKeyOnInsert) {
+TEST_F(ShardingCatalogClientTest, createDatabaseDuplicateKeyOnInsert) {
     const string dbname = "databaseToCreate";
     const HostAndPort configHost("TestHost1");
     configTargeter()->setFindHostReturnValue(configHost);
@@ -1926,7 +1926,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseDuplicateKeyOnInsert) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, EnableShardingNoDBExists) {
+TEST_F(ShardingCatalogClientTest, EnableShardingNoDBExists) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     vector<ShardType> shards;
@@ -2022,7 +2022,7 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingNoDBExists) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, EnableShardingLockBusy) {
+TEST_F(ShardingCatalogClientTest, EnableShardingLockBusy) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     distLock()->expectLock([](StringData, StringData, Milliseconds, Milliseconds) {},
@@ -2032,7 +2032,7 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingLockBusy) {
     ASSERT_EQ(ErrorCodes::LockBusy, status.code());
 }
 
-TEST_F(CatalogManagerReplSetTest, EnableShardingDBExistsWithDifferentCase) {
+TEST_F(ShardingCatalogClientTest, EnableShardingDBExistsWithDifferentCase) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     vector<ShardType> shards;
@@ -2059,7 +2059,7 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingDBExistsWithDifferentCase) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, EnableShardingDBExists) {
+TEST_F(ShardingCatalogClientTest, EnableShardingDBExists) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     vector<ShardType> shards;
@@ -2115,7 +2115,7 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingDBExists) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, EnableShardingFailsWhenTheDatabaseIsAlreadySharded) {
+TEST_F(ShardingCatalogClientTest, EnableShardingFailsWhenTheDatabaseIsAlreadySharded) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     vector<ShardType> shards;
@@ -2141,7 +2141,7 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingFailsWhenTheDatabaseIsAlreadySha
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, EnableShardingDBExistsInvalidFormat) {
+TEST_F(ShardingCatalogClientTest, EnableShardingDBExistsInvalidFormat) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     vector<ShardType> shards;
@@ -2168,7 +2168,7 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingDBExistsInvalidFormat) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, EnableShardingNoDBExistsNoShards) {
+TEST_F(ShardingCatalogClientTest, EnableShardingNoDBExistsNoShards) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     distLock()->expectLock([](StringData, StringData, Milliseconds, Milliseconds) {}, Status::OK());
@@ -2188,7 +2188,7 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingNoDBExistsNoShards) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, BasicReadAfterOpTime) {
+TEST_F(ShardingCatalogClientTest, BasicReadAfterOpTime) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     OpTime lastOpTime;
@@ -2223,7 +2223,7 @@ TEST_F(CatalogManagerReplSetTest, BasicReadAfterOpTime) {
     }
 }
 
-TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeShouldNotGoBack) {
+TEST_F(ShardingCatalogClientTest, ReadAfterOpTimeShouldNotGoBack) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     // Initialize the internal config OpTime
@@ -2306,7 +2306,7 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeShouldNotGoBack) {
     future3.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeFindThenCmd) {
+TEST_F(ShardingCatalogClientTest, ReadAfterOpTimeFindThenCmd) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future1 = launchAsync([this] {
@@ -2360,7 +2360,7 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeFindThenCmd) {
     future2.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeCmdThenFind) {
+TEST_F(ShardingCatalogClientTest, ReadAfterOpTimeCmdThenFind) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     // Initialize the internal config OpTime
@@ -2416,7 +2416,7 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeCmdThenFind) {
     future2.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, RetryOnReadCommandNetworkErrorFailsAtMaxRetry) {
+TEST_F(ShardingCatalogClientTest, RetryOnReadCommandNetworkErrorFailsAtMaxRetry) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future1 = launchAsync([this] {
@@ -2437,7 +2437,7 @@ TEST_F(CatalogManagerReplSetTest, RetryOnReadCommandNetworkErrorFailsAtMaxRetry)
     future1.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, RetryOnReadCommandNetworkErrorSucceedsAtMaxRetry) {
+TEST_F(ShardingCatalogClientTest, RetryOnReadCommandNetworkErrorSucceedsAtMaxRetry) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     BSONObj expectedResult = BSON("ok" << 1 << "yes"
@@ -2463,7 +2463,7 @@ TEST_F(CatalogManagerReplSetTest, RetryOnReadCommandNetworkErrorSucceedsAtMaxRet
     future1.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, RetryOnFindCommandNetworkErrorFailsAtMaxRetry) {
+TEST_F(ShardingCatalogClientTest, RetryOnFindCommandNetworkErrorFailsAtMaxRetry) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
@@ -2480,7 +2480,7 @@ TEST_F(CatalogManagerReplSetTest, RetryOnFindCommandNetworkErrorFailsAtMaxRetry)
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, RetryOnFindCommandNetworkErrorSucceedsAtMaxRetry) {
+TEST_F(ShardingCatalogClientTest, RetryOnFindCommandNetworkErrorSucceedsAtMaxRetry) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync(

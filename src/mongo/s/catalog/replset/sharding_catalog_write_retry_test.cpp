@@ -43,8 +43,8 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
-#include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
 #include "mongo/s/catalog/replset/sharding_catalog_client_impl.h"
+#include "mongo/s/catalog/replset/sharding_catalog_test_fixture.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -70,8 +70,8 @@ using std::string;
 using std::vector;
 using unittest::assertGet;
 
-using InsertRetryTest = CatalogManagerReplSetTestFixture;
-using UpdateRetryTest = CatalogManagerReplSetTestFixture;
+using InsertRetryTest = ShardingCatalogTestFixture;
+using UpdateRetryTest = ShardingCatalogTestFixture;
 
 const NamespaceString kTestNamespace("config.TestColl");
 const HostAndPort kTestHosts[] = {

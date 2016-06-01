@@ -29,7 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
-#include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
+#include "mongo/s/catalog/replset/sharding_catalog_test_fixture.h"
 
 namespace mongo {
 
@@ -37,13 +37,13 @@ using executor::RemoteCommandRequest;
 
 using std::string;
 
-const string CatalogManagerReplSetTestFixture::CONFIG_HOST_PORT{"$dummy_config:27017"};
+const string ShardingCatalogTestFixture::CONFIG_HOST_PORT{"$dummy_config:27017"};
 
-CatalogManagerReplSetTestFixture::CatalogManagerReplSetTestFixture() = default;
+ShardingCatalogTestFixture::ShardingCatalogTestFixture() = default;
 
-CatalogManagerReplSetTestFixture::~CatalogManagerReplSetTestFixture() = default;
+ShardingCatalogTestFixture::~ShardingCatalogTestFixture() = default;
 
-void CatalogManagerReplSetTestFixture::expectFindOnConfigSendErrorCode(ErrorCodes::Error code) {
+void ShardingCatalogTestFixture::expectFindOnConfigSendErrorCode(ErrorCodes::Error code) {
     onCommand([&, code](const RemoteCommandRequest& request) {
         ASSERT_EQ(request.target, HostAndPort(CONFIG_HOST_PORT));
         ASSERT_EQ(request.dbname, "config");
@@ -53,8 +53,7 @@ void CatalogManagerReplSetTestFixture::expectFindOnConfigSendErrorCode(ErrorCode
     });
 }
 
-void CatalogManagerReplSetTestFixture::expectFindOnConfigSendBSONObjVector(
-    std::vector<BSONObj> obj) {
+void ShardingCatalogTestFixture::expectFindOnConfigSendBSONObjVector(std::vector<BSONObj> obj) {
     onFindCommand([&, obj](const RemoteCommandRequest& request) {
         ASSERT_EQ(request.target, HostAndPort(CONFIG_HOST_PORT));
         ASSERT_EQ(request.dbname, "config");

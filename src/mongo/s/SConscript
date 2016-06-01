@@ -175,7 +175,7 @@ env.CppUnitTest(
         'chunk_manager_tests.cpp'
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture',
+        '$BUILD_DIR/mongo/s/catalog/replset/sharding_catalog_test_fixture',
         'coreshard',
     ]
 )

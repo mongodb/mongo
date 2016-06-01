@@ -36,8 +36,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
 #include "mongo/s/catalog/replset/sharding_catalog_client_impl.h"
+#include "mongo/s/catalog/replset/sharding_catalog_test_fixture.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -58,7 +58,7 @@ using unittest::assertGet;
 const Seconds kFutureTimeout{5};
 const HostAndPort configHost{"TestHost1"};
 
-class InfoLoggingTest : public CatalogManagerReplSetTestFixture {
+class InfoLoggingTest : public ShardingCatalogTestFixture {
 public:
     enum CollType { ActionLog, ChangeLog };
 
@@ -66,7 +66,7 @@ public:
         : _configCollType(configCollType), _cappedSize(cappedSize) {}
 
     void setUp() override {
-        CatalogManagerReplSetTestFixture::setUp();
+        ShardingCatalogTestFixture::setUp();
 
         configTargeter()->setFindHostReturnValue(configHost);
     }

@@ -78,9 +78,9 @@ env.Library(
 )
 
 env.Library(
-    target='catalog_manager_replica_set_test_fixture',
+    target='sharding_catalog_test_fixture',
     source=[
-        'catalog_manager_replica_set_test_fixture.cpp',
+        'sharding_catalog_test_fixture.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/sharding_test_fixture',
@@ -88,20 +88,20 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='catalog_manager_replica_set_test',
+    target='sharding_catalog_test',
     source=[
-        'catalog_manager_replica_set_add_shard_test.cpp',
-        'catalog_manager_replica_set_append_db_stats_test.cpp',
-        'catalog_manager_replica_set_drop_coll_test.cpp',
-        'catalog_manager_replica_set_log_change_test.cpp',
-        'catalog_manager_replica_set_remove_shard_test.cpp',
-        'catalog_manager_replica_set_shard_collection_test.cpp',
-        'catalog_manager_replica_set_test.cpp',
-        'catalog_manager_replica_set_upgrade_test.cpp',
-        'catalog_manager_replica_set_write_retry_test.cpp',
+        'sharding_catalog_add_shard_test.cpp',
+        'sharding_catalog_append_db_stats_test.cpp',
+        'sharding_catalog_drop_coll_test.cpp',
+        'sharding_catalog_log_change_test.cpp',
+        'sharding_catalog_remove_shard_test.cpp',
+        'sharding_catalog_shard_collection_test.cpp',
+        'sharding_catalog_test.cpp',
+        'sharding_catalog_upgrade_test.cpp',
+        'sharding_catalog_write_retry_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/sharding_test_fixture',
-        '$BUILD_DIR/mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture',
+        '$BUILD_DIR/mongo/s/catalog/replset/sharding_catalog_test_fixture',
     ]
 )

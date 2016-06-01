@@ -35,12 +35,13 @@
 namespace mongo {
 
 /**
- * Sets up the mocked out objects for testing the replica-set backed catalog manager.
+ * Sets up the mocked out objects for testing the replica-set backed ShardingCatalogManager and
+ * ShardingCatalogClient.
  */
-class CatalogManagerReplSetTestFixture : public ShardingTestFixture {
+class ShardingCatalogTestFixture : public ShardingTestFixture {
 public:
-    CatalogManagerReplSetTestFixture();
-    ~CatalogManagerReplSetTestFixture();
+    ShardingCatalogTestFixture();
+    ~ShardingCatalogTestFixture();
 
 protected:
     static const std::string CONFIG_HOST_PORT;

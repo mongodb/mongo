@@ -31,7 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
+#include "mongo/s/catalog/replset/sharding_catalog_test_fixture.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -64,10 +64,10 @@ static int rand(int max = -1) {
     return max > 0 ? r % max : r;
 }
 
-class ChunkManagerFixture : public CatalogManagerReplSetTestFixture {
+class ChunkManagerFixture : public ShardingCatalogTestFixture {
 public:
     void setUp() override {
-        CatalogManagerReplSetTestFixture::setUp();
+        ShardingCatalogTestFixture::setUp();
         getMessagingPort()->setRemote(HostAndPort("FakeRemoteClient:34567"));
         configTargeter()->setFindHostReturnValue(configHost);
     }

@@ -36,8 +36,8 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog/config_server_version.h"
-#include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
 #include "mongo/s/catalog/replset/sharding_catalog_client_impl.h"
+#include "mongo/s/catalog/replset/sharding_catalog_test_fixture.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/batched_update_request.h"
@@ -50,8 +50,6 @@ using executor::RemoteCommandResponse;
 using std::string;
 using std::vector;
 
-using CatalogManagerReplSetTest = CatalogManagerReplSetTestFixture;
-
 const BSONObj kReplSecondaryOkMetadata{[] {
     BSONObjBuilder o;
     o.appendElements(rpc::ServerSelectionMetadata(true, boost::none).toBSON());
@@ -59,7 +57,7 @@ const BSONObj kReplSecondaryOkMetadata{[] {
     return o.obj();
 }()};
 
-TEST_F(CatalogManagerReplSetTestFixture, UpgradeNotNeeded) {
+TEST_F(ShardingCatalogTestFixture, UpgradeNotNeeded) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future =
@@ -88,7 +86,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNotNeeded) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTestFixture, InitTargetError) {
+TEST_F(ShardingCatalogTestFixture, InitTargetError) {
     configTargeter()->setFindHostReturnValue({ErrorCodes::InternalError, "Bad test network"});
 
     auto future = launchAsync([this] {
@@ -100,7 +98,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitTargetError) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTestFixture, InitIncompatibleVersion) {
+TEST_F(ShardingCatalogTestFixture, InitIncompatibleVersion) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future = launchAsync([this] {
@@ -123,7 +121,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitIncompatibleVersion) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTestFixture, InitClusterMultiVersion) {
+TEST_F(ShardingCatalogTestFixture, InitClusterMultiVersion) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future = launchAsync([this] {
@@ -154,7 +152,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitClusterMultiVersion) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTestFixture, InitInvalidConfigVersionDoc) {
+TEST_F(ShardingCatalogTestFixture, InitInvalidConfigVersionDoc) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future = launchAsync([this] {
@@ -177,7 +175,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitInvalidConfigVersionDoc) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTestFixture, InitNoVersionDocEmptyConfig) {
+TEST_F(ShardingCatalogTestFixture, InitNoVersionDocEmptyConfig) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future =
@@ -226,7 +224,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitNoVersionDocEmptyConfig) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTestFixture, InitConfigWriteError) {
+TEST_F(ShardingCatalogTestFixture, InitConfigWriteError) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future = launchAsync([this] {
@@ -253,7 +251,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitConfigWriteError) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTestFixture, InitVersionTooOld) {
+TEST_F(ShardingCatalogTestFixture, InitVersionTooOld) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future = launchAsync([this] {
@@ -280,7 +278,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionTooOld) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTestFixture, InitVersionDuplicateKeyNoOpAfterRetry) {
+TEST_F(ShardingCatalogTestFixture, InitVersionDuplicateKeyNoOpAfterRetry) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future =
@@ -331,7 +329,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionDuplicateKeyNoOpAfterRetry) 
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTestFixture, InitVersionDuplicateKeyNoConfigVersionAfterRetry) {
+TEST_F(ShardingCatalogTestFixture, InitVersionDuplicateKeyNoConfigVersionAfterRetry) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future =
@@ -402,7 +400,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionDuplicateKeyNoConfigVersionA
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTestFixture, InitVersionDuplicateKeyTooNewAfterRetry) {
+TEST_F(ShardingCatalogTestFixture, InitVersionDuplicateKeyTooNewAfterRetry) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future = launchAsync([this] {
@@ -456,7 +454,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionDuplicateKeyTooNewAfterRetry
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTestFixture, InitVersionDuplicateKeyMaxRetry) {
+TEST_F(ShardingCatalogTestFixture, InitVersionDuplicateKeyMaxRetry) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future = launchAsync([this] {
@@ -491,7 +489,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionDuplicateKeyMaxRetry) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTestFixture, InitVersionUpsertNoMatchNoOpAfterRetry) {
+TEST_F(ShardingCatalogTestFixture, InitVersionUpsertNoMatchNoOpAfterRetry) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future =
@@ -537,7 +535,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionUpsertNoMatchNoOpAfterRetry)
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTestFixture, InitVersionUpsertNoMatchNoConfigVersionAfterRetry) {
+TEST_F(ShardingCatalogTestFixture, InitVersionUpsertNoMatchNoConfigVersionAfterRetry) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future =

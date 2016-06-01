@@ -35,8 +35,8 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
-#include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
 #include "mongo/s/catalog/replset/sharding_catalog_client_impl.h"
+#include "mongo/s/catalog/replset/sharding_catalog_test_fixture.h"
 #include "mongo/stdx/future.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
@@ -48,7 +48,7 @@ using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 
-using CatalogManagerReplSetAppendDbStatsTest = CatalogManagerReplSetTestFixture;
+using ShardingCatalogClientAppendDbStatsTest = ShardingCatalogTestFixture;
 
 const BSONObj kReplSecondaryOkMetadata{[] {
     BSONObjBuilder o;
@@ -57,7 +57,7 @@ const BSONObj kReplSecondaryOkMetadata{[] {
     return o.obj();
 }()};
 
-TEST_F(CatalogManagerReplSetAppendDbStatsTest, BasicAppendDBStats) {
+TEST_F(ShardingCatalogClientAppendDbStatsTest, BasicAppendDBStats) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     BSONArrayBuilder builder;
@@ -116,7 +116,7 @@ TEST_F(CatalogManagerReplSetAppendDbStatsTest, BasicAppendDBStats) {
     ASSERT_TRUE(localIter == dbMap.end());
 }
 
-TEST_F(CatalogManagerReplSetAppendDbStatsTest, ErrorRunningListDatabases) {
+TEST_F(ShardingCatalogClientAppendDbStatsTest, ErrorRunningListDatabases) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     BSONArrayBuilder builder;
@@ -135,7 +135,7 @@ TEST_F(CatalogManagerReplSetAppendDbStatsTest, ErrorRunningListDatabases) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetAppendDbStatsTest, MalformedListDatabasesResponse) {
+TEST_F(ShardingCatalogClientAppendDbStatsTest, MalformedListDatabasesResponse) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     BSONArrayBuilder builder;
@@ -152,7 +152,7 @@ TEST_F(CatalogManagerReplSetAppendDbStatsTest, MalformedListDatabasesResponse) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetAppendDbStatsTest, MalformedListDatabasesEntryInResponse) {
+TEST_F(ShardingCatalogClientAppendDbStatsTest, MalformedListDatabasesEntryInResponse) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     BSONArrayBuilder builder;

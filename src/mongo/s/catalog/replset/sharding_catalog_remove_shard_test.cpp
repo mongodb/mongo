@@ -39,8 +39,8 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
-#include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
 #include "mongo/s/catalog/replset/sharding_catalog_client_impl.h"
+#include "mongo/s/catalog/replset/sharding_catalog_test_fixture.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -71,10 +71,10 @@ const BSONObj kReplSecondaryOkMetadata{[] {
     return o.obj();
 }()};
 
-class RemoveShardTest : public CatalogManagerReplSetTestFixture {
+class RemoveShardTest : public ShardingCatalogTestFixture {
 public:
     void setUp() override {
-        CatalogManagerReplSetTestFixture::setUp();
+        ShardingCatalogTestFixture::setUp();
         configTargeter()->setFindHostReturnValue(configHost);
     }
 
