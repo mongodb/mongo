@@ -101,14 +101,14 @@ void NOINLINE_DECL AlignedBuilder::growReallocate(unsigned oldLen) {
 
     // Warn for unexpectedly large buffer
     if (_len > kWarnSize) {
-        log() << "warning: large amount of uncommitted data (" << _len << ") bytes";
+        warning() << "large amount of uncommitted data (" << _len << " bytes)";
     }
 
     // Check validity of requested size
     invariant(_len > oldSize);
     if (_len > kMaxSize) {
-        log() << "error writing journal: too much uncommitted data (" << _len << ") bytes)";
-        log() << "shutting down immediately to avoid corruption";
+        error() << "error writing journal: too much uncommitted data (" << _len << " bytes)";
+        error() << "shutting down immediately to avoid corruption";
         fassert(28614, _len <= kMaxSize);
     }
 
