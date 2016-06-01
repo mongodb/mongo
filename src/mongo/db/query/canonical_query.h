@@ -116,6 +116,15 @@ public:
         return _collator.get();
     }
 
+    /**
+     * Sets this CanonicalQuery's collator, and sets the collator on this CanonicalQuery's match
+     * expression tree.
+     *
+     * This setter can be used to override the collator that was created from the query request
+     * during CanonicalQuery construction.
+     */
+    void setCollator(std::unique_ptr<CollatorInterface> collator);
+
     // Debugging
     std::string toString() const;
     std::string toStringShort() const;

@@ -33,6 +33,8 @@
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/query_test_service_context.h"
@@ -633,6 +635,39 @@ TEST(CanonicalQueryTest, CanonicalQueryFromBaseQueryWithCollation) {
     ASSERT(baseCq->getCollator());
     ASSERT(childCq->getCollator());
     ASSERT_TRUE(*(childCq->getCollator()) == *(baseCq->getCollator()));
+}
+
+TEST(CanonicalQueryTest, SettingCollatorUpdatesCollatorAndMatchExpression) {
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
+
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setFilter(fromjson("{a: 'foo', b: {$in: ['bar', 'baz']}}"));
+    auto cq = assertGet(CanonicalQuery::canonicalize(
+        txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions()));
+    ASSERT_EQUALS(2U, cq->root()->numChildren());
+    auto firstChild = cq->root()->getChild(0);
+    auto secondChild = cq->root()->getChild(1);
+    auto equalityExpr = static_cast<EqualityMatchExpression*>(
+        firstChild->matchType() == MatchExpression::EQ ? firstChild : secondChild);
+    auto inExpr = static_cast<InMatchExpression*>(
+        firstChild->matchType() == MatchExpression::MATCH_IN ? firstChild : secondChild);
+    ASSERT_EQUALS(MatchExpression::EQ, equalityExpr->matchType());
+    ASSERT_EQUALS(MatchExpression::MATCH_IN, inExpr->matchType());
+
+    ASSERT(!cq->getCollator());
+    ASSERT(!equalityExpr->getCollator());
+    ASSERT(!inExpr->getCollator());
+
+    unique_ptr<CollatorInterface> collator =
+        assertGet(CollatorFactoryInterface::get(txn->getServiceContext())
+                      ->makeFromBSON(BSON("locale"
+                                          << "reverse")));
+    cq->setCollator(std::move(collator));
+
+    ASSERT(cq->getCollator());
+    ASSERT_EQUALS(equalityExpr->getCollator(), cq->getCollator());
+    ASSERT_EQUALS(inExpr->getCollator(), cq->getCollator());
 }
 
 }  // namespace

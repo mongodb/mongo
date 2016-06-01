@@ -263,6 +263,13 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
     plannerParams.options = plannerOptions;
     fillOutPlannerParams(opCtx, collection, canonicalQuery.get(), &plannerParams);
 
+    // If the canonical query does not have a user-specified collation, set it from the collection
+    // default.
+    if (canonicalQuery->getQueryRequest().getCollation().isEmpty() &&
+        collection->getDefaultCollator()) {
+        canonicalQuery->setCollator(collection->getDefaultCollator()->clone());
+    }
+
     const IndexDescriptor* descriptor = collection->getIndexCatalog()->findIdIndex(opCtx);
 
     // If we have an _id index we can use an idhack plan.
@@ -509,6 +516,12 @@ StatusWith<unique_ptr<PlanExecutor>> getOplogStartHack(OperationContext* txn,
     if (!collection->isCapped()) {
         return Status(ErrorCodes::BadValue,
                       "OplogReplay cursor requested on non-capped collection");
+    }
+
+    // If the canonical query does not have a user-specified collation, set it from the collection
+    // default.
+    if (cq->getQueryRequest().getCollation().isEmpty() && collection->getDefaultCollator()) {
+        cq->setCollator(collection->getDefaultCollator()->clone());
     }
 
     // A query can only do oplog start finding if it has a top-level $gt or $gte predicate over

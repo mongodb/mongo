@@ -75,7 +75,7 @@ Status ParsedUpdate::parseRequest() {
 Status ParsedUpdate::parseQuery() {
     dassert(!_canonicalQuery.get());
 
-    // TODO SERVER-23611: Create decision logic for idhack when the query has no collation, but
+    // TODO SERVER-23924: Create decision logic for idhack when the query has no collation, but
     // there may be a collection default collation.
     if (!_driver.needMatchDetails() && _request->getCollation().isEmpty() &&
         CanonicalQuery::isSimpleIdQuery(_request->getQuery())) {
