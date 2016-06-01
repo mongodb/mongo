@@ -253,4 +253,32 @@ TEST_F(QueryPlannerTest, QueryForNestedObjectWithNullCollatorCanUseIndexWithColl
     assertSolutionExists("{fetch: {filter: null, node: {ixscan: {pattern: {a: 1}}}}}");
 }
 
+TEST_F(QueryPlannerTest, CannotUseIndexWithNonMatchingCollatorForSort) {
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    addIndex(fromjson("{a: 1}"), &indexCollator);
+
+    runQueryAsCommand(fromjson("{find: 'testns', filter: {b: 1}, sort: {a: 1}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen:"
+        "{node: {cscan: {dir: 1, filter: {b: 1}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CanUseIndexWithMatchingCollatorForSort) {
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    addIndex(fromjson("{a: 1}"), &indexCollator);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1}, sort: {a: 1}, collation: {locale: 'reverse'}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen:"
+        "{node: {cscan: {dir: 1, filter: {b: 1}, collation: {locale: 'reverse'}}}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {b: 1}, collation: {locale: 'reverse'}, node: {ixscan: {pattern: {a: "
+        "1}}}}}");
+}
+
 }  // namespace
