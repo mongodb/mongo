@@ -51,6 +51,7 @@
 #include "mongo/s/catalog/replset/dist_lock_catalog_impl.h"
 #include "mongo/s/catalog/replset/replset_dist_lock_manager.h"
 #include "mongo/s/catalog/replset/sharding_catalog_client_impl.h"
+#include "mongo/s/catalog/replset/sharding_catalog_manager_impl.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/sharding_network_connection_hook.h"
@@ -94,10 +95,7 @@ std::unique_ptr<ShardingCatalogClient> makeCatalogClient(ServiceContext* service
                                                   ReplSetDistLockManager::kDistLockPingInterval,
                                                   ReplSetDistLockManager::kDistLockExpirationTime);
 
-    return stdx::make_unique<ShardingCatalogClientImpl>(
-        std::move(distLockManager),
-        makeTaskExecutor(
-            executor::makeNetworkInterface("NetworkInterfaceASIO-AddShard-TaskExecutor")));
+    return stdx::make_unique<ShardingCatalogClientImpl>(std::move(distLockManager));
 }
 
 std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(
@@ -130,7 +128,8 @@ std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(
 
 Status initializeGlobalShardingState(const ConnectionString& configCS,
                                      std::unique_ptr<ShardFactory> shardFactory,
-                                     rpc::ShardingEgressMetadataHookBuilder hookBuilder) {
+                                     rpc::ShardingEgressMetadataHookBuilder hookBuilder,
+                                     ShardingCatalogManagerBuilder catalogManagerBuilder) {
     if (configCS.type() == ConnectionString::INVALID) {
         return {ErrorCodes::BadValue, "Unrecognized connection string."};
     }
@@ -150,8 +149,15 @@ Status initializeGlobalShardingState(const ConnectionString& configCS,
                                            HostAndPort(getHostName(), serverGlobalParams.port));
 
     auto rawCatalogClient = catalogClient.get();
+
+    std::unique_ptr<ShardingCatalogManager> catalogManager = catalogManagerBuilder(
+        rawCatalogClient,
+        makeTaskExecutor(executor::makeNetworkInterface("AddShard-TaskExecutor")));
+    auto rawCatalogManager = catalogManager.get();
+
     grid.init(
         std::move(catalogClient),
+        std::move(catalogManager),
         stdx::make_unique<CatalogCache>(),
         std::move(shardRegistry),
         stdx::make_unique<ClusterCursorManager>(getGlobalServiceContext()->getPreciseClockSource()),
@@ -162,6 +168,14 @@ Status initializeGlobalShardingState(const ConnectionString& configCS,
     auto status = rawCatalogClient->startup();
     if (!status.isOK()) {
         return status;
+    }
+
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        // Only config servers get a ShardingCatalogManager.
+        status = rawCatalogManager->startup();
+        if (!status.isOK()) {
+            return status;
+        }
     }
 
     return Status::OK();

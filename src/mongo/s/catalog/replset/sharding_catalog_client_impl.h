@@ -49,8 +49,7 @@ class TaskExecutor;
  */
 class ShardingCatalogClientImpl final : public ShardingCatalogClient {
 public:
-    ShardingCatalogClientImpl(std::unique_ptr<DistLockManager> distLockManager,
-                              std::unique_ptr<executor::TaskExecutor> addShardExecutor);
+    explicit ShardingCatalogClientImpl(std::unique_ptr<DistLockManager> distLockManager);
     virtual ~ShardingCatalogClientImpl();
 
     /**
@@ -62,11 +61,6 @@ public:
     void shutDown(OperationContext* txn) override;
 
     Status enableSharding(OperationContext* txn, const std::string& dbName) override;
-
-    StatusWith<std::string> addShard(OperationContext* txn,
-                                     const std::string* shardProposedName,
-                                     const ConnectionString& shardConnectionString,
-                                     const long long maxSize) override;
 
     Status updateDatabase(OperationContext* txn,
                           const std::string& dbName,
@@ -182,8 +176,6 @@ public:
     Status appendInfoForConfigServerDatabases(OperationContext* txn,
                                               BSONArrayBuilder* builder) override;
 
-    void appendConnectionStats(executor::ConnectionPoolStats* stats) override;
-
     /**
      * Runs a read command against the config server with majority read concern.
      */
@@ -213,42 +205,6 @@ private:
     Status _checkDbDoesNotExist(OperationContext* txn, const std::string& dbName, DatabaseType* db);
 
     /**
-     * Generates a unique name to be given to a newly added shard.
-     */
-    StatusWith<std::string> _generateNewShardName(OperationContext* txn);
-
-    /**
-     * Validates that the specified connection string can serve as a shard server. In particular,
-     * this function checks that the shard can be contacted, that it is not already member of
-     * another sharded cluster and etc.
-     *
-     * @param shardRegistry Shard registry to use for getting a targeter to the shard-to-be.
-     * @param connectionString Connection string to be attempted as a shard host.
-     * @param shardProposedName Optional proposed name for the shard. Can be omitted in which case
-     *      a unique name for the shard will be generated from the shard's connection string. If it
-     *      is not omitted, the value cannot be the empty string.
-     *
-     * On success returns a partially initialized ShardType object corresponding to the requested
-     * shard. It will have the hostName field set and optionally the name, if the name could be
-     * generated from either the proposed name or the connection string set name. The returned
-     * shard's name should be checked and if empty, one should be generated using some uniform
-     * algorithm.
-     */
-    StatusWith<ShardType> _validateHostAsShard(OperationContext* txn,
-                                               ShardRegistry* shardRegistry,
-                                               const ConnectionString& connectionString,
-                                               const std::string* shardProposedName);
-
-    /**
-     * Runs the listDatabases command on the specified host and returns the names of all databases
-     * it returns excluding those named local and admin, since they serve administrative purpose.
-     */
-    StatusWith<std::vector<std::string>> _getDBNamesListFromShard(
-        OperationContext* txn,
-        ShardRegistry* shardRegistry,
-        const ConnectionString& connectionString);
-
-    /**
      * Creates the specified collection name in the config database.
      */
     Status _createCappedConfigCollection(OperationContext* txn,
@@ -271,15 +227,6 @@ private:
     StatusWith<long long> _runCountCommandOnConfig(OperationContext* txn,
                                                    const NamespaceString& ns,
                                                    BSONObj query);
-
-    /**
-     * Runs a command against a "shard" that is not yet in the cluster and thus not present in the
-     * ShardRegistry.
-     */
-    StatusWith<Shard::CommandResponse> _runCommandForAddShard(OperationContext* txn,
-                                                              RemoteCommandTargeter* targeter,
-                                                              const std::string& dbName,
-                                                              const BSONObj& cmdObj);
 
     StatusWith<repl::OpTimeWith<std::vector<BSONObj>>> _exhaustiveFindOnConfig(
         OperationContext* txn,
@@ -336,11 +283,6 @@ private:
 
     // Distributed lock manager singleton.
     std::unique_ptr<DistLockManager> _distLockManager;  // (R)
-
-    // Executor specifically used for sending commands to servers that are in the process of being
-    // added as shards.  Does not have any connection hook set on it, thus it can be used to talk
-    // to servers that are not yet in the ShardRegistry.
-    std::unique_ptr<executor::TaskExecutor> _executorForAddShard;  // (R)
 
     // True if shutDown() has been called. False, otherwise.
     bool _inShutdown = false;  // (M)

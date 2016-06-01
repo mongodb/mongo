@@ -26,47 +26,35 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include <cstdint>
-#include <memory>
+#include "mongo/s/catalog/sharding_catalog_manager_mock.h"
 
-#include "mongo/stdx/functional.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 
 namespace mongo {
 
-namespace executor {
-class TaskExecutor;
-}  // namespace executor
+using std::string;
 
-class ConnectionString;
-class OperationContext;
-class ShardFactory;
-class Status;
-class ShardingCatalogClient;
-class ShardingCatalogManager;
-using ShardingCatalogManagerBuilder = stdx::function<std::unique_ptr<ShardingCatalogManager>(
-    ShardingCatalogClient*, std::unique_ptr<executor::TaskExecutor>)>;
+ShardingCatalogManagerMock::ShardingCatalogManagerMock() = default;
 
-namespace rpc {
-class ShardingEgressMetadataHook;
-using ShardingEgressMetadataHookBuilder =
-    stdx::function<std::unique_ptr<ShardingEgressMetadataHook>()>;
-}  // namespace rpc
+ShardingCatalogManagerMock::~ShardingCatalogManagerMock() = default;
 
-/**
- * Takes in the connection string for reaching the config servers and initializes the global
- * ShardingCatalogClient, ShardingCatalogManager, ShardRegistry, and Grid objects.
- */
-Status initializeGlobalShardingState(const ConnectionString& configCS,
-                                     std::unique_ptr<ShardFactory> shardFactory,
-                                     rpc::ShardingEgressMetadataHookBuilder hookBuilder,
-                                     ShardingCatalogManagerBuilder catalogManagerBuilder);
+Status ShardingCatalogManagerMock::startup() {
+    return {ErrorCodes::InternalError, "Method not implemented"};
+}
 
-/**
- * Tries to contact the config server and reload the shard registry until it succeeds or
- * is interrupted.
- */
-Status reloadShardRegistryUntilSuccess(OperationContext* txn);
+void ShardingCatalogManagerMock::shutDown(OperationContext* txn) {}
+
+StatusWith<string> ShardingCatalogManagerMock::addShard(
+    OperationContext* txn,
+    const std::string* shardProposedName,
+    const ConnectionString& shardConnectionString,
+    const long long maxSize) {
+    return {ErrorCodes::InternalError, "Method not implemented"};
+}
+
+void ShardingCatalogManagerMock::appendConnectionStats(executor::ConnectionPoolStats* stats) {}
 
 }  // namespace mongo

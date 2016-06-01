@@ -38,6 +38,7 @@ namespace mongo {
 class BalancerConfiguration;
 class CatalogCache;
 class ShardingCatalogClient;
+class ShardingCatalogManager;
 class ClusterCursorManager;
 class OperationContext;
 class ShardRegistry;
@@ -69,6 +70,7 @@ public:
      *       state using clearForUnitTests.
      */
     void init(std::unique_ptr<ShardingCatalogClient> catalogClient,
+              std::unique_ptr<ShardingCatalogManager> catalogManager,
               std::unique_ptr<CatalogCache> catalogCache,
               std::unique_ptr<ShardRegistry> shardRegistry,
               std::unique_ptr<ClusterCursorManager> cursorManager,
@@ -96,6 +98,14 @@ public:
      */
     ShardingCatalogClient* catalogClient(OperationContext* txn) {
         return _catalogClient.get();
+    }
+
+    /**
+     * Returns a pointer to a ShardingCatalogManager to use for manipulating catalog data stored on
+     * the config servers.
+     */
+    ShardingCatalogManager* catalogManager() {
+        return _catalogManager.get();
     }
 
     CatalogCache* catalogCache() const {
@@ -149,6 +159,7 @@ public:
 
 private:
     std::unique_ptr<ShardingCatalogClient> _catalogClient;
+    std::unique_ptr<ShardingCatalogManager> _catalogManager;
     std::unique_ptr<CatalogCache> _catalogCache;
     std::unique_ptr<ShardRegistry> _shardRegistry;
     std::unique_ptr<ClusterCursorManager> _cursorManager;

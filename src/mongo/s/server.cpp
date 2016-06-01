@@ -63,6 +63,7 @@
 #include "mongo/s/balancer/balancer.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/s/catalog/type_locks.h"
@@ -300,9 +301,12 @@ static Status initializeSharding(OperationContext* txn) {
     auto shardFactory =
         stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
-    Status status =
-        initializeGlobalShardingState(mongosGlobalParams.configdbs, std::move(shardFactory), []() {
-            return stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>();
+    Status status = initializeGlobalShardingState(
+        mongosGlobalParams.configdbs,
+        std::move(shardFactory),
+        []() { return stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>(); },
+        [](ShardingCatalogClient* catalogClient, std::unique_ptr<executor::TaskExecutor> executor) {
+            return nullptr;  // Only config servers get a real ShardingCatalogManager.
         });
 
     if (!status.isOK()) {

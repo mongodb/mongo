@@ -52,6 +52,7 @@
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/dist_lock_catalog_mock.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/client/shard_factory.h"
@@ -165,6 +166,7 @@ protected:
 
         auto shardRegistry = stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS);
         grid.init(nullptr,
+                  nullptr,
                   nullptr,
                   std::move(shardRegistry),
                   nullptr,

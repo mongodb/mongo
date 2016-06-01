@@ -41,6 +41,8 @@ class BSONObj;
 class CatalogCache;
 class ShardingCatalogClient;
 class ShardingCatalogClientImpl;
+class ShardingCatalogManager;
+class ShardingCatalogManagerImpl;
 struct ChunkVersion;
 class CollectionType;
 class DistLockManagerMock;
@@ -77,6 +79,8 @@ protected:
     }
 
     ShardingCatalogClient* catalogClient() const;
+
+    ShardingCatalogManager* catalogManager() const;
 
     /**
      * Prefer catalogClient() method over this as much as possible.
@@ -215,6 +219,7 @@ private:
     std::unique_ptr<executor::NetworkTestEnv> _addShardNetworkTestEnv;
     DistLockManagerMock* _distLockManager = nullptr;
     ShardingCatalogClientImpl* _catalogClient = nullptr;
+    ShardingCatalogManagerImpl* _catalogManager = nullptr;
 };
 
 }  // namespace mongo

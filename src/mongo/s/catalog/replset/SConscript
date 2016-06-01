@@ -51,7 +51,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/executor/network_test_env',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_mock',
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_mock',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/mongoscore',
         '$BUILD_DIR/mongo/s/sharding_test_fixture',
@@ -69,6 +69,22 @@ env.Library(
         '$BUILD_DIR/mongo/db/s/type_shard_identity',
         '$BUILD_DIR/mongo/executor/network_interface',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager',
+        '$BUILD_DIR/mongo/s/client/sharding_client',
+    ],
+    LIBDEPS_TAGS=[
+        # Depends on coreshard, but that would be circular
+        'incomplete',
+    ],
+)
+
+env.Library(
+    target='sharding_catalog_manager_impl',
+    source=[
+        'sharding_catalog_manager_impl.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/repl/read_concern_args',
+        '$BUILD_DIR/mongo/executor/network_interface',
         '$BUILD_DIR/mongo/s/client/sharding_client',
     ],
     LIBDEPS_TAGS=[

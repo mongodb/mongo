@@ -40,8 +40,8 @@
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
-#include "mongo/s/catalog/replset/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/replset/sharding_catalog_test_fixture.h"
+#include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -300,10 +300,10 @@ TEST_F(AddShardTest, Standalone) {
 
     auto future = launchAsync([this, expectedShardName] {
         auto shardName = assertGet(
-            catalogClient()->addShard(operationContext(),
-                                      &expectedShardName,
-                                      assertGet(ConnectionString::parse("StandaloneHost:12345")),
-                                      100));
+            catalogManager()->addShard(operationContext(),
+                                       &expectedShardName,
+                                       assertGet(ConnectionString::parse("StandaloneHost:12345")),
+                                       100));
         ASSERT_EQUALS(expectedShardName, shardName);
     });
 
@@ -381,10 +381,10 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
 
     auto future = launchAsync([this, expectedShardName, shardTarget] {
         auto shardName = assertGet(
-            catalogClient()->addShard(operationContext(),
-                                      nullptr,
-                                      assertGet(ConnectionString::parse(shardTarget.toString())),
-                                      100));
+            catalogManager()->addShard(operationContext(),
+                                       nullptr,
+                                       assertGet(ConnectionString::parse(shardTarget.toString())),
+                                       100));
         ASSERT_EQUALS(expectedShardName, shardName);
     });
 
@@ -478,7 +478,7 @@ TEST_F(AddShardTest, AddSCCCConnectionStringAsShard) {
 
     auto future = launchAsync([this, invalidConn] {
         const std::string shardName("StandaloneShard");
-        auto status = catalogClient()->addShard(operationContext(), &shardName, invalidConn, 100);
+        auto status = catalogManager()->addShard(operationContext(), &shardName, invalidConn, 100);
         ASSERT_EQUALS(ErrorCodes::BadValue, status);
         ASSERT_STRING_CONTAINS(status.getStatus().reason(), "Invalid connection string");
     });
@@ -493,10 +493,10 @@ TEST_F(AddShardTest, EmptyShardName) {
 
     auto future = launchAsync([this, expectedShardName] {
         auto status =
-            catalogClient()->addShard(operationContext(),
-                                      &expectedShardName,
-                                      assertGet(ConnectionString::parse("StandaloneHost:12345")),
-                                      100);
+            catalogManager()->addShard(operationContext(),
+                                       &expectedShardName,
+                                       assertGet(ConnectionString::parse("StandaloneHost:12345")),
+                                       100);
         ASSERT_EQUALS(ErrorCodes::BadValue, status);
         ASSERT_EQUALS("shard name cannot be empty", status.getStatus().reason());
     });
@@ -517,10 +517,10 @@ TEST_F(AddShardTest, UnreachableHost) {
 
     auto future = launchAsync([this, expectedShardName] {
         auto status =
-            catalogClient()->addShard(operationContext(),
-                                      &expectedShardName,
-                                      assertGet(ConnectionString::parse("StandaloneHost:12345")),
-                                      100);
+            catalogManager()->addShard(operationContext(),
+                                       &expectedShardName,
+                                       assertGet(ConnectionString::parse("StandaloneHost:12345")),
+                                       100);
         ASSERT_EQUALS(ErrorCodes::HostUnreachable, status);
         ASSERT_EQUALS("host unreachable", status.getStatus().reason());
     });
@@ -544,10 +544,10 @@ TEST_F(AddShardTest, AddMongosAsShard) {
 
     auto future = launchAsync([this, expectedShardName] {
         auto status =
-            catalogClient()->addShard(operationContext(),
-                                      &expectedShardName,
-                                      assertGet(ConnectionString::parse("StandaloneHost:12345")),
-                                      100);
+            catalogManager()->addShard(operationContext(),
+                                       &expectedShardName,
+                                       assertGet(ConnectionString::parse("StandaloneHost:12345")),
+                                       100);
         ASSERT_EQUALS(ErrorCodes::RPCProtocolNegotiationFailed, status);
     });
 
@@ -571,10 +571,10 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
 
     auto future = launchAsync([this, expectedShardName, shardTarget] {
         auto status =
-            catalogClient()->addShard(operationContext(),
-                                      &expectedShardName,
-                                      assertGet(ConnectionString::parse(shardTarget.toString())),
-                                      100);
+            catalogManager()->addShard(operationContext(),
+                                       &expectedShardName,
+                                       assertGet(ConnectionString::parse(shardTarget.toString())),
+                                       100);
         ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
         ASSERT_STRING_CONTAINS(status.getStatus().reason(),
                                "is already a member of the existing shard");
@@ -603,7 +603,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
 
     auto future = launchAsync([this, expectedShardName, connString] {
         auto status =
-            catalogClient()->addShard(operationContext(), &expectedShardName, connString, 100);
+            catalogManager()->addShard(operationContext(), &expectedShardName, connString, 100);
         ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
         ASSERT_STRING_CONTAINS(status.getStatus().reason(),
                                "is already a member of the existing shard");
@@ -630,10 +630,10 @@ TEST_F(AddShardTest, AddReplicaSetShardAsStandalone) {
 
     auto future = launchAsync([this, expectedShardName, shardTarget] {
         auto status =
-            catalogClient()->addShard(operationContext(),
-                                      &expectedShardName,
-                                      assertGet(ConnectionString::parse(shardTarget.toString())),
-                                      100);
+            catalogManager()->addShard(operationContext(),
+                                       &expectedShardName,
+                                       assertGet(ConnectionString::parse(shardTarget.toString())),
+                                       100);
         ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
         ASSERT_STRING_CONTAINS(status.getStatus().reason(), "use replica set url format");
     });
@@ -660,7 +660,7 @@ TEST_F(AddShardTest, AddStandaloneHostShardAsReplicaSet) {
 
     auto future = launchAsync([this, expectedShardName, connString] {
         auto status =
-            catalogClient()->addShard(operationContext(), &expectedShardName, connString, 100);
+            catalogManager()->addShard(operationContext(), &expectedShardName, connString, 100);
         ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
         ASSERT_STRING_CONTAINS(status.getStatus().reason(), "host did not return a set name");
     });
@@ -686,7 +686,7 @@ TEST_F(AddShardTest, ReplicaSetMistmatchedReplicaSetName) {
 
     auto future = launchAsync([this, expectedShardName, connString] {
         auto status =
-            catalogClient()->addShard(operationContext(), &expectedShardName, connString, 100);
+            catalogManager()->addShard(operationContext(), &expectedShardName, connString, 100);
         ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
         ASSERT_STRING_CONTAINS(status.getStatus().reason(), "does not match the actual set name");
     });
@@ -713,7 +713,7 @@ TEST_F(AddShardTest, ShardIsCSRSConfigServer) {
 
     auto future = launchAsync([this, expectedShardName, connString] {
         auto status =
-            catalogClient()->addShard(operationContext(), &expectedShardName, connString, 100);
+            catalogManager()->addShard(operationContext(), &expectedShardName, connString, 100);
         ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
         ASSERT_STRING_CONTAINS(status.getStatus().reason(),
                                "as a shard since it is a config server");
@@ -743,7 +743,7 @@ TEST_F(AddShardTest, ReplicaSetMissingHostsProvidedInSeedList) {
 
     auto future = launchAsync([this, expectedShardName, connString] {
         auto status =
-            catalogClient()->addShard(operationContext(), &expectedShardName, connString, 100);
+            catalogManager()->addShard(operationContext(), &expectedShardName, connString, 100);
         ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
         ASSERT_STRING_CONTAINS(status.getStatus().reason(),
                                "host2:12345 does not belong to replica set");
@@ -775,7 +775,7 @@ TEST_F(AddShardTest, ShardNameIsConfig) {
 
     auto future = launchAsync([this, expectedShardName, connString] {
         auto status =
-            catalogClient()->addShard(operationContext(), &expectedShardName, connString, 100);
+            catalogManager()->addShard(operationContext(), &expectedShardName, connString, 100);
         ASSERT_EQUALS(ErrorCodes::BadValue, status);
         ASSERT_EQUALS(status.getStatus().reason(),
                       "use of shard replica set with name 'config' is not allowed");
@@ -807,7 +807,7 @@ TEST_F(AddShardTest, ShardContainsExistingDatabase) {
 
     auto future = launchAsync([this, expectedShardName, connString] {
         auto status =
-            catalogClient()->addShard(operationContext(), &expectedShardName, connString, 100);
+            catalogManager()->addShard(operationContext(), &expectedShardName, connString, 100);
         ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
         ASSERT_STRING_CONTAINS(
             status.getStatus().reason(),
@@ -851,7 +851,7 @@ TEST_F(AddShardTest, ReAddExistingShard) {
 
     auto future = launchAsync([this, expectedShardName, connString] {
         auto status =
-            catalogClient()->addShard(operationContext(), &expectedShardName, connString, 100);
+            catalogManager()->addShard(operationContext(), &expectedShardName, connString, 100);
         ASSERT_OK(status);
     });
 
@@ -918,7 +918,7 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
 
     auto future = launchAsync([this, expectedShardName, connString] {
         auto status =
-            catalogClient()->addShard(operationContext(), &expectedShardName, connString, 100);
+            catalogManager()->addShard(operationContext(), &expectedShardName, connString, 100);
         ASSERT_OK(status);
         auto shardName = status.getValue();
         ASSERT_EQUALS(expectedShardName, shardName);
@@ -979,7 +979,7 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
 
     auto future = launchAsync([this, expectedShardName, connString] {
         auto status =
-            catalogClient()->addShard(operationContext(), &expectedShardName, connString, 100);
+            catalogManager()->addShard(operationContext(), &expectedShardName, connString, 100);
         ASSERT_OK(status);
         auto shardName = status.getValue();
         ASSERT_EQUALS(expectedShardName, shardName);
@@ -1064,7 +1064,7 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
 
     auto future = launchAsync([this, expectedShardName, seedString] {
         auto status =
-            catalogClient()->addShard(operationContext(), &expectedShardName, seedString, 100);
+            catalogManager()->addShard(operationContext(), &expectedShardName, seedString, 100);
         ASSERT_OK(status);
         auto shardName = status.getValue();
         ASSERT_EQUALS(expectedShardName, shardName);

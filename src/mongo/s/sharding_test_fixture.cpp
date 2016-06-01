@@ -51,6 +51,7 @@
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/replset/sharding_catalog_client_impl.h"
+#include "mongo/s/catalog/replset/sharding_catalog_manager_impl.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -122,10 +123,14 @@ void ShardingTestFixture::setUp() {
     auto uniqueDistLockManager = stdx::make_unique<DistLockManagerMock>();
     _distLockManager = uniqueDistLockManager.get();
     std::unique_ptr<ShardingCatalogClientImpl> catalogClient(
-        stdx::make_unique<ShardingCatalogClientImpl>(std::move(uniqueDistLockManager),
-                                                     std::move(specialExec)));
+        stdx::make_unique<ShardingCatalogClientImpl>(std::move(uniqueDistLockManager)));
     _catalogClient = catalogClient.get();
     catalogClient->startup();
+
+    std::unique_ptr<ShardingCatalogManagerImpl> catalogManager(
+        stdx::make_unique<ShardingCatalogManagerImpl>(_catalogClient, std::move(specialExec)));
+    _catalogManager = catalogManager.get();
+    catalogManager->startup();
 
     ConnectionString configCS = ConnectionString::forReplicaSet(
         "configRS", {HostAndPort{"TestHost1"}, HostAndPort{"TestHost2"}});
@@ -171,6 +176,7 @@ void ShardingTestFixture::setUp() {
     // For now initialize the global grid object. All sharding objects will be accessible from there
     // until we get rid of it.
     grid.init(std::move(catalogClient),
+              std::move(catalogManager),
               stdx::make_unique<CatalogCache>(),
               std::move(shardRegistry),
               stdx::make_unique<ClusterCursorManager>(_service->getPreciseClockSource()),
@@ -181,6 +187,7 @@ void ShardingTestFixture::setUp() {
 
 void ShardingTestFixture::tearDown() {
     grid.getExecutorPool()->shutdownAndJoin();
+    grid.catalogManager()->shutDown(_opCtx.get());
     grid.catalogClient(_opCtx.get())->shutDown(_opCtx.get());
     grid.clearForUnitTests();
 
@@ -198,6 +205,10 @@ void ShardingTestFixture::shutdownExecutor() {
 
 ShardingCatalogClient* ShardingTestFixture::catalogClient() const {
     return grid.catalogClient(_opCtx.get());
+}
+
+ShardingCatalogManager* ShardingTestFixture::catalogManager() const {
+    return grid.catalogManager();
 }
 
 ShardingCatalogClientImpl* ShardingTestFixture::getCatalogClient() const {

@@ -54,11 +54,6 @@ public:
                            const std::vector<BSONObj>& initPoints,
                            const std::set<ShardId>& initShardIds) override;
 
-    StatusWith<std::string> addShard(OperationContext* txn,
-                                     const std::string* shardProposedName,
-                                     const ConnectionString& shardConnectionString,
-                                     const long long maxSize) override;
-
     StatusWith<ShardDrainingStatus> removeShard(OperationContext* txn,
                                                 const std::string& name) override;
 
@@ -165,8 +160,6 @@ public:
 
     Status appendInfoForConfigServerDatabases(OperationContext* txn,
                                               BSONArrayBuilder* builder) override;
-
-    void appendConnectionStats(executor::ConnectionPoolStats* stats) override;
 
 private:
     std::unique_ptr<DistLockManagerMock> _mockDistLockMgr;

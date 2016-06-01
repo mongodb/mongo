@@ -95,7 +95,7 @@ public:
 
     /**
      * Performs implementation-specific startup tasks. Must be run after the catalog client
-     * has been installed into the global 'grid' object. Implementation do not need to guarantee
+     * has been installed into the global 'grid' object. Implementations do not need to guarantee
      * thread safety so callers should employ proper synchronization when calling this method.
      */
     virtual Status startup() = 0;
@@ -138,24 +138,6 @@ public:
                                    bool unique,
                                    const std::vector<BSONObj>& initPoints,
                                    const std::set<ShardId>& initShardIds) = 0;
-
-    /**
-     *
-     * Adds a new shard. It expects a standalone mongod process or replica set to be running
-     * on the provided address.
-     *
-     * @param  shardProposedName is an optional string with the proposed name of the shard.
-     *         If it is nullptr, a name will be automatically generated; if not nullptr, it cannot
-     *         contain the empty string.
-     * @param  shardConnectionString is the connection string of the shard being added.
-     * @param  maxSize is the optional space quota in bytes. Zeros means there's
-     *         no limitation to space usage.
-     * @return either an !OK status or the name of the newly added shard.
-     */
-    virtual StatusWith<std::string> addShard(OperationContext* txn,
-                                             const std::string* shardProposedName,
-                                             const ConnectionString& shardConnectionString,
-                                             const long long maxSize) = 0;
 
     /**
      * Tries to remove a shard. To completely remove a shard from a sharded cluster,
@@ -439,11 +421,6 @@ public:
      */
     virtual Status appendInfoForConfigServerDatabases(OperationContext* txn,
                                                       BSONArrayBuilder* builder) = 0;
-
-    /**
-     * Append information about the connection pools owned by the CatalogClient.
-     */
-    virtual void appendConnectionStats(executor::ConnectionPoolStats* stats) = 0;
 
 
     virtual StatusWith<DistLockManager::ScopedDistLock> distLock(

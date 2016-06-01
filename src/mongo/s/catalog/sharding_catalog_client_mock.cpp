@@ -67,14 +67,6 @@ Status ShardingCatalogClientMock::shardCollection(OperationContext* txn,
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-StatusWith<string> ShardingCatalogClientMock::addShard(
-    OperationContext* txn,
-    const std::string* shardProposedName,
-    const ConnectionString& shardConnectionString,
-    const long long maxSize) {
-    return {ErrorCodes::InternalError, "Method not implemented"};
-}
-
 StatusWith<ShardDrainingStatus> ShardingCatalogClientMock::removeShard(OperationContext* txn,
                                                                        const string& name) {
     return ShardDrainingStatus::COMPLETED;
@@ -232,7 +224,5 @@ Status ShardingCatalogClientMock::appendInfoForConfigServerDatabases(OperationCo
                                                                      BSONArrayBuilder* builder) {
     return Status::OK();
 }
-
-void ShardingCatalogClientMock::appendConnectionStats(executor::ConnectionPoolStats* stats) {}
 
 }  // namespace mongo
