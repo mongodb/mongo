@@ -314,7 +314,7 @@ __wt_json_close(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
  *	Can be called with null buf for sizing.
  */
 size_t
-__wt_json_unpack_char(u_char ch, u_char *buf, size_t bufsz, bool force_unicode)
+__wt_json_unpack_char(char ch, u_char *buf, size_t bufsz, bool force_unicode)
 {
 	char abbrev;
 
