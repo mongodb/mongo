@@ -429,11 +429,6 @@ functions:
 
           git clone git@github.com:10gen/jstestfuzz.git
 
-          if [ "Windows_NT" != "$OS" ]; then
-            ${python|python} jstestfuzz/etc/download_nodejs.py
-            ${decompress} node.tar.gz > /dev/null
-          fi
-
           cp mongodb*/bin/mongod .
     - command: shell.exec
       params:
@@ -459,8 +454,7 @@ functions:
             export APPDATA=${workdir}/npm-app-data
             export PATH="$PATH:/cygdrive/c/Program Files (x86)/nodejs" # Windows location
           else
-            export PATH="$PATH:/opt/node/bin" # OS X location
-            export PATH="$PATH:${workdir}/src/node-v0.12.7-linux-x64/bin" # Linux location
+            export PATH="$PATH:/opt/node/bin"
           fi
 
           npm start -- --jsTestsDir ../jstests
@@ -2560,12 +2554,25 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
+  # Use rhel55-test hosts because the rhel55 hosts don't have Node.js installed, which is a requirement for the fuzzer suites.
   - name: jstestfuzz
+    distros:
+    - rhel55-test
   - name: jstestfuzz_WT
+    distros:
+    - rhel55-test
   - name: jstestfuzz_replication
+    distros:
+    - rhel55-test
   - name: jstestfuzz_replication_WT
+    distros:
+    - rhel55-test
   - name: jstestfuzz_sharded
+    distros:
+    - rhel55-test
   - name: jstestfuzz_sharded_WT
+    distros:
+    - rhel55-test
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -2792,12 +2799,25 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_rs
+  # Use rhel55-test hosts because the rhel55 hosts don't have Node.js installed, which is a requirement for the fuzzer suites.
   - name: jstestfuzz
+    distros:
+    - rhel55-test
   - name: jstestfuzz_WT
+    distros:
+    - rhel55-test
   - name: jstestfuzz_replication
+    distros:
+    - rhel55-test
   - name: jstestfuzz_replication_WT
+    distros:
+    - rhel55-test
   - name: jstestfuzz_sharded
+    distros:
+    - rhel55-test
   - name: jstestfuzz_sharded_WT
+    distros:
+    - rhel55-test
   - name: mmap
   - name: mongosTest
   - name: noPassthrough
@@ -2852,9 +2872,16 @@ buildvariants:
   - name: jsCore_compatibility_WT
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs_WT
+  # Use rhel55-test hosts because the rhel55 hosts don't have Node.js installed, which is a requirement for the fuzzer suites.
   - name: jstestfuzz_WT
+    distros:
+    - rhel55-test
   - name: jstestfuzz_replication_WT
+    distros:
+    - rhel55-test
   - name: jstestfuzz_sharded_WT
+    distros:
+    - rhel55-test
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod_WT
   - name: bulk_gle_passthrough_WT
@@ -4485,12 +4512,25 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
+  # Use rhel55-test hosts because the rhel55 hosts don't have Node.js installed, which is a requirement for the fuzzer suites.
   - name: jstestfuzz
+    distros:
+    - rhel55-test
   - name: jstestfuzz_WT
+    distros:
+    - rhel55-test
   - name: jstestfuzz_replication
+    distros:
+    - rhel55-test
   - name: jstestfuzz_replication_WT
+    distros:
+    - rhel55-test
   - name: jstestfuzz_sharded
+    distros:
+    - rhel55-test
   - name: jstestfuzz_sharded_WT
+    distros:
+    - rhel55-test
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -6045,9 +6085,16 @@ buildvariants:
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_rs
   # Disabled due to SERVER-21965
+  # Use rhel55-test hosts because the rhel55 hosts don't have Node.js installed, which is a requirement for the fuzzer suites.
   # - name: jstestfuzz_WT
+  #   distros:
+  #   - rhel55-test
   # - name: jstestfuzz_replication_WT
+  #   distros:
+  #   - rhel55-test
   # - name: jstestfuzz_sharded_WT
+  #   distros:
+  #   - rhel55-test
   - name: mongosTest
   - name: noPassthrough
   - name: noPassthroughWithMongod
