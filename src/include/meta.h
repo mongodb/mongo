@@ -34,8 +34,7 @@
  * when diagnostic is enabled.
  */
 #define	WT_IS_METADATA(session, dh)					\
-	((dh)->name_hash == S2C(session)->meta_uri_hash &&		\
-	strcmp((dh)->name, WT_METAFILE_URI) == 0)
+	F_ISSET((dh), WT_DHANDLE_IS_METADATA)
 #define	WT_METAFILE_ID		0			/* Metadata file ID */
 
 #define	WT_METADATA_VERSION	"WiredTiger version"	/* Version keys */

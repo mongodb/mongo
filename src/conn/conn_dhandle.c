@@ -39,6 +39,9 @@ __conn_dhandle_alloc(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
+	uint64_t bucket;
+
+	*dhandlep = NULL;
 
 	WT_RET(__wt_calloc_one(session, &dhandle));
 
@@ -56,6 +59,16 @@ __conn_dhandle_alloc(WT_SESSION_IMPL *session,
 	    session, &dhandle->close_lock, "data handle close"));
 
 	__wt_stat_dsrc_init(dhandle);
+
+	if (strcmp(uri, WT_METAFILE_URI) == 0)
+		F_SET(dhandle, WT_DHANDLE_IS_METADATA);
+
+	/*
+	 * Prepend the handle to the connection list, assuming we're likely to
+	 * need new files again soon, until they are cached by all sessions.
+	 */
+	bucket = dhandle->name_hash % WT_HASH_ARRAY_SIZE;
+	WT_CONN_DHANDLE_INSERT(S2C(session), dhandle, bucket);
 
 	*dhandlep = dhandle;
 	return (0);
@@ -105,14 +118,6 @@ __wt_conn_dhandle_find(
 		}
 
 	WT_RET(__conn_dhandle_alloc(session, uri, checkpoint, &dhandle));
-
-	/*
-	 * Prepend the handle to the connection list, assuming we're likely to
-	 * need new files again soon, until they are cached by all sessions.
-	 * Find the right hash bucket to insert into as well.
-	 */
-	bucket = dhandle->name_hash % WT_HASH_ARRAY_SIZE;
-	WT_CONN_DHANDLE_INSERT(conn, dhandle, bucket);
 
 	session->dhandle = dhandle;
 	return (0);
