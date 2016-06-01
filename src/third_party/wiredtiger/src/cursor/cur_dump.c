@@ -155,7 +155,9 @@ __curdump_set_key(WT_CURSOR *cursor, ...)
 	WT_SESSION_IMPL *session;
 	uint64_t recno;
 	va_list ap;
+	const uint8_t *up;
 	const char *p;
+	bool json;
 
 	cdump = (WT_CURSOR_DUMP *)cursor;
 	child = cdump->child;
@@ -168,16 +170,23 @@ __curdump_set_key(WT_CURSOR *cursor, ...)
 		p = va_arg(ap, const char *);
 	va_end(ap);
 
+	json = F_ISSET(cursor, WT_CURSTD_DUMP_JSON);
+	if (json)
+		WT_ERR(__wt_json_to_item(session, p, cursor->key_format,
+		    (WT_CURSOR_JSON *)cursor->json_private, true,
+		    &cursor->key));
+
 	if (WT_CURSOR_RECNO(cursor) && !F_ISSET(cursor, WT_CURSTD_RAW)) {
-		WT_ERR(str2recno(session, p, &recno));
+		if (json) {
+			up = (const uint8_t *)cursor->key.data;
+			WT_ERR(__wt_vunpack_uint(&up, cursor->key.size,
+			    &recno));
+		} else
+			WT_ERR(str2recno(session, p, &recno));
 
 		child->set_key(child, recno);
 	} else {
-		if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON))
-			WT_ERR(__wt_json_to_item(session, p, cursor->key_format,
-			    (WT_CURSOR_JSON *)cursor->json_private, true,
-			    &cursor->key));
-		else
+		if (!json)
 			WT_ERR(__dump_to_raw(session, p, &cursor->key,
 			    F_ISSET(cursor, WT_CURSTD_DUMP_HEX)));
 
