@@ -71,7 +71,8 @@ public:
                                 const ChunkRange& range,
                                 int64_t maxChunkSizeBytes,
                                 const MigrationSecondaryThrottleOptions& secondaryThrottle,
-                                bool waitForDelete);
+                                bool waitForDelete,
+                                bool takeDistLock);
 
     const NamespaceString& getNss() const {
         return _nss;
@@ -109,6 +110,10 @@ public:
         return _waitForDelete;
     }
 
+    bool getTakeDistLock() const {
+        return _takeDistLock;
+    }
+
 private:
     MoveChunkRequest(NamespaceString nss,
                      ChunkRange range,
@@ -141,6 +146,9 @@ private:
     // Whether to block and wait for the range deleter to cleanup the orphaned documents at the end
     // of move.
     bool _waitForDelete;
+
+    // Whether to take the distributed lock for the collection or not.
+    bool _takeDistLock;
 };
 
 }  // namespace mongo

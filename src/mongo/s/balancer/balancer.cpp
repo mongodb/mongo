@@ -197,7 +197,9 @@ Status executeSingleMigration(OperationContext* txn,
         ChunkRange(c->getMin(), c->getMax()),
         maxChunkSizeBytes,
         secondaryThrottle,
-        waitForDelete);
+        waitForDelete,
+        false);  // takeDistLock flag.
+
     appendOperationDeadlineIfSet(txn, &builder);
 
     BSONObj cmdObj = builder.obj();
@@ -209,11 +211,62 @@ Status executeSingleMigration(OperationContext* txn,
         status = {ErrorCodes::ShardNotFound,
                   str::stream() << "shard " << migrateInfo.from << " not found"};
     } else {
-        auto cmdStatus = shard->runCommand(txn,
-                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                           "admin",
-                                           cmdObj,
-                                           Shard::RetryPolicy::kNotIdempotent);
+        const std::string whyMessage(
+            str::stream() << "migrating chunk " << ChunkRange(c->getMin(), c->getMax()).toString()
+                          << " in "
+                          << nss.ns());
+        StatusWith<Shard::CommandResponse> cmdStatus{ErrorCodes::InternalError, "Uninitialized"};
+
+        // Send the first moveChunk command with the balancer holding the distlock.
+        {
+            StatusWith<DistLockManager::ScopedDistLock> distLockStatus =
+                grid.catalogManager(txn)->distLock(txn, nss.ns(), whyMessage);
+            if (!distLockStatus.isOK()) {
+                const std::string msg = str::stream()
+                    << "Could not acquire collection lock for " << nss.ns() << " to migrate chunk ["
+                    << c->getMin() << "," << c->getMax() << ") due to "
+                    << distLockStatus.getStatus().toString();
+                warning() << msg;
+                return {distLockStatus.getStatus().code(), msg};
+            }
+
+            cmdStatus = shard->runCommand(txn,
+                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                          "admin",
+                                          cmdObj,
+                                          Shard::RetryPolicy::kNotIdempotent);
+        }
+
+        if (cmdStatus == ErrorCodes::LockBusy) {
+            // The moveChunk source shard attempted to take the distlock despite being told not to
+            // do so. The shard is likely v3.2 or earlier, which always expects to take the
+            // distlock. Reattempt the moveChunk without the balancer holding the distlock so that
+            // the shard can successfully acquire it.
+            BSONObjBuilder builder;
+            MoveChunkRequest::appendAsCommand(
+                &builder,
+                nss,
+                cm->getVersion(),
+                Grid::get(txn)->shardRegistry()->getConfigServerConnectionString(),
+                migrateInfo.from,
+                migrateInfo.to,
+                ChunkRange(c->getMin(), c->getMax()),
+                maxChunkSizeBytes,
+                secondaryThrottle,
+                waitForDelete,
+                true);  // takeDistLock flag.
+
+            appendOperationDeadlineIfSet(txn, &builder);
+
+            BSONObj cmdObj = builder.obj();
+
+            cmdStatus = shard->runCommand(txn,
+                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                          "admin",
+                                          cmdObj,
+                                          Shard::RetryPolicy::kNotIdempotent);
+        }
+
         if (!cmdStatus.isOK()) {
             status = std::move(cmdStatus.getStatus());
         } else {

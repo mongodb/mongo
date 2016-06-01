@@ -42,6 +42,7 @@ const char kFromShardId[] = "fromShard";
 const char kToShardId[] = "toShard";
 const char kMaxChunkSizeBytes[] = "maxChunkSizeBytes";
 const char kWaitForDelete[] = "waitForDelete";
+const char kTakeDistLock[] = "takeDistLock";
 
 }  // namespace
 
@@ -116,6 +117,14 @@ StatusWith<MoveChunkRequest> MoveChunkRequest::createFromCommand(NamespaceString
         request._maxChunkSizeBytes = static_cast<int64_t>(maxChunkSizeBytes);
     }
 
+    {
+        Status status =
+            bsonExtractBooleanFieldWithDefault(obj, kTakeDistLock, true, &request._takeDistLock);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
     return request;
 }
 
@@ -128,7 +137,8 @@ void MoveChunkRequest::appendAsCommand(BSONObjBuilder* builder,
                                        const ChunkRange& range,
                                        int64_t maxChunkSizeBytes,
                                        const MigrationSecondaryThrottleOptions& secondaryThrottle,
-                                       bool waitForDelete) {
+                                       bool waitForDelete,
+                                       bool takeDistLock) {
     invariant(builder->asTempObj().isEmpty());
     invariant(nss.isValid());
 
@@ -141,6 +151,7 @@ void MoveChunkRequest::appendAsCommand(BSONObjBuilder* builder,
     builder->append(kMaxChunkSizeBytes, static_cast<long long>(maxChunkSizeBytes));
     secondaryThrottle.append(builder);
     builder->append(kWaitForDelete, waitForDelete);
+    builder->append(kTakeDistLock, takeDistLock);
 }
 
 }  // namespace mongo

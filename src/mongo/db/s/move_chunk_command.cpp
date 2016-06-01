@@ -64,14 +64,18 @@ class ScopedSetInMigration {
 
 public:
     /**
-     * Registers a new migration with the global sharding state and acquires distributed lock on the
-     * collection so other shards cannot do migrations. If a migration is already active it will
+     * Registers a new migration with the global sharding state. Also acquires the distributed lock
+     * on the collection, unless signalled not to do so in the MoveChunkRequest, so that other
+     * shards cannot begin migrations on the collection. If a migration is already active it will
      * throw a user assertion with a ConflictingOperationInProgress code. Otherwise it may throw any
      * other error due to distributed lock acquisition failure.
      */
     ScopedSetInMigration(OperationContext* txn, MoveChunkRequest args)
-        : _scopedRegisterMigration(txn, args.getNss()),
-          _collectionDistLock(_acquireDistLock(txn, args)) {}
+        : _scopedRegisterMigration(txn, args.getNss()) {
+        if (args.getTakeDistLock()) {
+            _collectionDistLock = DistLockManager::ScopedDistLock(_acquireDistLock(txn, args));
+        }
+    }
 
     ~ScopedSetInMigration() = default;
 
@@ -80,12 +84,13 @@ public:
      * held.
      */
     Status checkDistLock() {
-        return _collectionDistLock.checkStatus();
+        invariant(_collectionDistLock);
+        return _collectionDistLock->checkStatus();
     }
 
 private:
     /**
-     * Acquires a distributed lock for the specified colleciton or throws if lock cannot be
+     * Acquires a distributed lock for the specified collection or throws if lock cannot be
      * acquired.
      */
     DistLockManager::ScopedDistLock _acquireDistLock(OperationContext* txn,
@@ -112,8 +117,8 @@ private:
     ShardingState::ScopedRegisterMigration _scopedRegisterMigration;
 
     // Handle for the the distributed lock, which protects other migrations from happening on the
-    // same collection
-    DistLockManager::ScopedDistLock _collectionDistLock;
+    // same collection.
+    boost::optional<DistLockManager::ScopedDistLock> _collectionDistLock;
 };
 
 /**
@@ -242,15 +247,18 @@ public:
             moveTimingHelper.done(4);
             MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep4);
 
-            // Ensure distributed lock is still held
-            Status checkDistLockStatus = scopedInMigration.checkDistLock();
-            if (!checkDistLockStatus.isOK()) {
-                const string msg = str::stream() << "not entering migrate critical section due to "
-                                                 << checkDistLockStatus.toString();
-                warning() << msg;
-                migrationSourceManager.cleanupOnError(txn);
+            // Ensure the distributed lock is still held if this shard owns it.
+            if (moveChunkRequest.getTakeDistLock()) {
+                Status checkDistLockStatus = scopedInMigration.checkDistLock();
+                if (!checkDistLockStatus.isOK()) {
+                    const string msg = str::stream()
+                        << "not entering migrate critical section due to "
+                        << checkDistLockStatus.toString();
+                    warning() << msg;
+                    migrationSourceManager.cleanupOnError(txn);
 
-                uasserted(checkDistLockStatus.code(), msg);
+                    uasserted(checkDistLockStatus.code(), msg);
+                }
             }
 
             uassertStatusOKWithWarning(migrationSourceManager.enterCriticalSection(txn));

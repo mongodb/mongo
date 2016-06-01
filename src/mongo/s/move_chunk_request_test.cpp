@@ -50,6 +50,7 @@ TEST(MoveChunkRequest, CreateAsCommandComplete) {
         ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
         1024,
         MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
+        true,
         true);
 
     BSONObj cmdObj = builder.obj();
@@ -66,6 +67,7 @@ TEST(MoveChunkRequest, CreateAsCommandComplete) {
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kOff,
               request.getSecondaryThrottle().getSecondaryThrottle());
     ASSERT_EQ(true, request.getWaitForDelete());
+    ASSERT_EQ(true, request.getTakeDistLock());
 }
 
 }  // namespace
