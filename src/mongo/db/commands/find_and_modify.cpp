@@ -143,6 +143,7 @@ void makeUpdateRequest(const FindAndModifyRequest& args,
     requestOut->setProj(args.getFields());
     requestOut->setUpdates(args.getUpdateObj());
     requestOut->setSort(args.getSort());
+    requestOut->setCollation(args.getCollation());
     requestOut->setUpsert(args.isUpsert());
     requestOut->setReturnDocs(args.shouldReturnNew() ? UpdateRequest::RETURN_NEW
                                                      : UpdateRequest::RETURN_OLD);
@@ -156,6 +157,7 @@ void makeDeleteRequest(const FindAndModifyRequest& args, bool explain, DeleteReq
     requestOut->setQuery(args.getQuery());
     requestOut->setProj(args.getFields());
     requestOut->setSort(args.getSort());
+    requestOut->setCollation(args.getCollation());
     requestOut->setMulti(false);
     requestOut->setYieldPolicy(PlanExecutor::YIELD_AUTO);
     requestOut->setReturnDeleted(true);  // Always return the old value.

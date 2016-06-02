@@ -942,6 +942,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorGroup(OperationContext* txn,
     const NamespaceString nss(request.ns);
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(request.query);
+    qr->setCollation(request.collation);
     qr->setExplain(request.explain);
 
     const ExtensionsCallbackReal extensionsCallback(txn, &nss);

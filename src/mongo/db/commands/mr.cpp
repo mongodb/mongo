@@ -1447,6 +1447,7 @@ public:
                 auto qr = stdx::make_unique<QueryRequest>(nss);
                 qr->setFilter(config.filter);
                 qr->setSort(config.sort);
+                qr->setCollation(config.collation);
 
                 const ExtensionsCallbackReal extensionsCallback(txn, &nss);
 
