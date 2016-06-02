@@ -1123,27 +1123,30 @@ void multiSyncApply(const std::vector<OplogEntry>& ops, SyncTail*) {
 // This free function is used by the initial sync writer threads to apply each op
 void multiInitialSyncApply(const std::vector<OplogEntry>& ops, SyncTail* st) {
     initializeWriterThread();
+    auto txn = cc().makeOperationContext();
+    fassertNoTrace(15915, multiInitialSyncApply_noAbort(txn.get(), ops, st));
+}
 
-    const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-    OperationContext& txn = *txnPtr;
-    txn.setReplicatedWrites(false);
-    DisableDocumentValidation validationDisabler(&txn);
+Status multiInitialSyncApply_noAbort(OperationContext* txn,
+                                     const std::vector<OplogEntry>& ops,
+                                     SyncTail* st) {
+    txn->setReplicatedWrites(false);
+    DisableDocumentValidation validationDisabler(txn);
 
     // allow us to get through the magic barrier
-    txn.lockState()->setIsBatchWriter(true);
+    txn->lockState()->setIsBatchWriter(true);
 
     bool convertUpdatesToUpserts = false;
 
     for (std::vector<OplogEntry>::const_iterator it = ops.begin(); it != ops.end(); ++it) {
         try {
-            const Status s = SyncTail::syncApply(&txn, it->raw, convertUpdatesToUpserts);
+            const Status s = SyncTail::syncApply(txn, it->raw, convertUpdatesToUpserts);
             if (!s.isOK()) {
-                if (st->shouldRetry(&txn, it->raw)) {
-                    const Status s2 = SyncTail::syncApply(&txn, it->raw, convertUpdatesToUpserts);
+                if (st->shouldRetry(txn, it->raw)) {
+                    const Status s2 = SyncTail::syncApply(txn, it->raw, convertUpdatesToUpserts);
                     if (!s2.isOK()) {
-                        severe() << "Error applying operation (" << it->raw.toString()
-                                 << "): " << s2;
-                        fassertFailedNoTrace(15915);
+                        severe() << "Error applying operation (" << it->raw << "): " << s2;
+                        return s2;
                     }
                 }
 
@@ -1152,16 +1155,17 @@ void multiInitialSyncApply(const std::vector<OplogEntry>& ops, SyncTail* st) {
                 // subsequently got deleted and no longer exists on the Sync Target at all
             }
         } catch (const DBException& e) {
-            severe() << "writer worker caught exception: " << causedBy(e)
-                     << " on: " << it->raw.toString();
+            severe() << "writer worker caught exception: " << causedBy(e) << " on: " << it->raw;
 
             if (inShutdown()) {
-                return;
+                return {ErrorCodes::InterruptedAtShutdown, e.toString()};
             }
 
-            fassertFailedNoTrace(16361);
+            return e.toStatus();
         }
     }
+
+    return Status::OK();
 }
 
 StatusWith<OpTime> multiApply(OperationContext* txn,

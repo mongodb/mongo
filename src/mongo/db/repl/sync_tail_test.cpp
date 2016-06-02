@@ -43,6 +43,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -75,6 +76,27 @@ private:
     void tearDown() override;
 };
 
+/**
+ * Testing-only SyncTail that returns user-provided "document" for getMissingDoc().
+ */
+class SyncTailWithLocalDocumentFetcher : public SyncTail {
+public:
+    SyncTailWithLocalDocumentFetcher(const BSONObj& document);
+    BSONObj getMissingDoc(OperationContext* txn, Database* db, const BSONObj& o) override;
+
+private:
+    BSONObj _document;
+};
+
+/**
+ * Testing-only SyncTail that checks the operation context in shouldRetry().
+ */
+class SyncTailWithOperationContextChecker : public SyncTail {
+public:
+    SyncTailWithOperationContextChecker();
+    bool shouldRetry(OperationContext* txn, const BSONObj& o) override;
+};
+
 void SyncTailTest::setUp() {
     ServiceContextMongoDTest::setUp();
     ReplSettings replSettings;
@@ -100,13 +122,32 @@ void SyncTailTest::setUp() {
 }
 
 void SyncTailTest::tearDown() {
-    {
+    if (_txn) {
         Lock::GlobalWrite globalLock(_txn->lockState());
         BSONObjBuilder unused;
         invariant(mongo::dbHolder().closeAll(_txn.get(), unused, false));
     }
     _txn.reset();
     _storageInterface = nullptr;
+}
+
+SyncTailWithLocalDocumentFetcher::SyncTailWithLocalDocumentFetcher(const BSONObj& document)
+    : SyncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr), _document(document) {}
+
+BSONObj SyncTailWithLocalDocumentFetcher::getMissingDoc(OperationContext*,
+                                                        Database*,
+                                                        const BSONObj&) {
+    return _document;
+}
+
+SyncTailWithOperationContextChecker::SyncTailWithOperationContextChecker()
+    : SyncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr) {}
+
+bool SyncTailWithOperationContextChecker::shouldRetry(OperationContext* txn, const BSONObj&) {
+    ASSERT_FALSE(txn->writesAreReplicated());
+    ASSERT_TRUE(txn->lockState()->isBatchWriter());
+    ASSERT_TRUE(documentValidationDisabled(txn));
+    return false;
 }
 
 /**
@@ -166,6 +207,23 @@ OplogEntry makeInsertDocumentOplogEntry(OpTime opTime,
     bob.append("op", "i");
     bob.append("ns", nss.ns());
     bob.append("o", documentToInsert);
+    return OplogEntry(bob.obj());
+}
+
+/**
+ * Creates an update oplog entry with given optime and namespace.
+ */
+OplogEntry makeUpdateDocumentOplogEntry(OpTime opTime,
+                                        const NamespaceString& nss,
+                                        const BSONObj& documentToUpdate,
+                                        const BSONObj& updatedDocument) {
+    BSONObjBuilder bob;
+    bob.appendElements(opTime.toBSON());
+    bob.append("h", 1LL);
+    bob.append("op", "u");
+    bob.append("ns", nss.ns());
+    bob.append("o2", documentToUpdate);
+    bob.append("o", updatedDocument);
     return OplogEntry(bob.obj());
 }
 
@@ -520,6 +578,71 @@ TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceH
     ASSERT_EQUALS(2U, operationsWritternToOplog.size());
     ASSERT_EQUALS(op1, operationsWritternToOplog[0]);
     ASSERT_EQUALS(op2, operationsWritternToOplog[1]);
+}
+
+TEST_F(SyncTailTest, MultiInitialSyncApplyDisablesDocumentValidationWhileApplyingOperations) {
+    SyncTailWithOperationContextChecker syncTail;
+    NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    ASSERT_TRUE(_txn->writesAreReplicated());
+    ASSERT_FALSE(documentValidationDisabled(_txn.get()));
+    ASSERT_FALSE(_txn->lockState()->isBatchWriter());
+    auto op = makeUpdateDocumentOplogEntry(
+        {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), BSON("_id" << 0 << "x" << 2));
+    ASSERT_OK(multiInitialSyncApply_noAbort(_txn.get(), {op}, &syncTail));
+}
+
+TEST_F(SyncTailTest,
+       MultiInitialSyncApplyDoesNotRetryFailedUpdateIfDocumentIsMissingFromSyncSource) {
+    BSONObj emptyDoc;
+    SyncTailWithLocalDocumentFetcher syncTail(emptyDoc);
+    NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    auto op = makeUpdateDocumentOplogEntry(
+        {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), BSON("_id" << 0 << "x" << 2));
+    ASSERT_OK(multiInitialSyncApply_noAbort(_txn.get(), {op}, &syncTail));
+
+    // Since the missing document is not found on the sync source, the collection referenced by
+    // the failed operation should not be automatically created.
+    ASSERT_FALSE(AutoGetCollectionForRead(_txn.get(), nss).getCollection());
+}
+
+TEST_F(SyncTailTest, MultiInitialSyncApplyRetriesFailedUpdateIfDocumentIsAvailableFromSyncSource) {
+    SyncTailWithLocalDocumentFetcher syncTail(BSON("_id" << 0 << "x" << 1));
+    NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    auto updatedDocument = BSON("_id" << 0 << "x" << 2);
+    auto op = makeUpdateDocumentOplogEntry(
+        {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), updatedDocument);
+    ASSERT_OK(multiInitialSyncApply_noAbort(_txn.get(), {op}, &syncTail));
+
+    // The collection referenced by "ns" in the failed operation is automatically created to hold
+    // the missing document fetched from the sync source. We verify the contents of the collection
+    // with the OplogInterfaceLocal class.
+    OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
+    auto iter = collectionReader.makeIterator();
+    ASSERT_EQUALS(updatedDocument, unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+}
+
+TEST_F(SyncTailTest, MultiInitialSyncApplyPassesThroughSyncApplyErrorAfterFailingToRetryBadOp) {
+    SyncTailWithLocalDocumentFetcher syncTail(BSON("_id" << 0 << "x" << 1));
+    NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    auto updatedDocument = BSON("_id" << 0 << "x" << 2);
+    OplogEntry op(BSON("op"
+                       << "x"
+                       << "ns"
+                       << nss.ns()));
+    ASSERT_EQUALS(ErrorCodes::BadValue, multiInitialSyncApply_noAbort(_txn.get(), {op}, &syncTail));
+}
+
+TEST_F(SyncTailTest, MultiInitialSyncApplyPassesThroughShouldSyncTailRetryError) {
+    SyncTail syncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr);
+    NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    auto updatedDocument = BSON("_id" << 0 << "x" << 2);
+    auto op = makeUpdateDocumentOplogEntry(
+        {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), BSON("_id" << 0 << "x" << 2));
+    ASSERT_THROWS_CODE(
+        syncTail.shouldRetry(_txn.get(), op.raw), mongo::UserException, ErrorCodes::FailedToParse);
+    ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                  multiInitialSyncApply_noAbort(_txn.get(), {op}, &syncTail));
 }
 
 }  // namespace

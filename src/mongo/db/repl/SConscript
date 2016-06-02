@@ -271,6 +271,7 @@ env.CppUnitTest(
         'sync_tail_test.cpp',
     ],
     LIBDEPS=[
+        'oplog_interface_local',
         'replmocks',
         'sync_tail',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',

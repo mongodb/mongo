@@ -202,5 +202,13 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
 void multiSyncApply(const std::vector<OplogEntry>& ops, SyncTail* st);
 void multiInitialSyncApply(const std::vector<OplogEntry>& ops, SyncTail* st);
 
+/**
+ * Testing-only version of multiInitialSyncApply that accepts an external operation context and
+ * returns an error instead of aborting.
+ */
+Status multiInitialSyncApply_noAbort(OperationContext* txn,
+                                     const std::vector<OplogEntry>& ops,
+                                     SyncTail* st);
+
 }  // namespace repl
 }  // namespace mongo
