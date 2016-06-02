@@ -36,6 +36,7 @@
 #include "mongo/unittest/unittest.h"
 #include <sstream>
 
+namespace mongo {
 namespace {
 
 using mongo::BSONElement;
@@ -71,6 +72,14 @@ void assertBSONTypeEquals(BSONType actual, BSONType expected, T value, int i) {
         const string msg = ss.str();
         FAIL(msg);
     }
+}
+
+TEST(BSONObjBuilder, AppendInt64T) {
+    auto obj = BSON("a" << int64_t{5} << "b" << int64_t{1ll << 40});
+    ASSERT_EQ(obj["a"].type(), NumberLong);
+    ASSERT_EQ(obj["b"].type(), NumberLong);
+    ASSERT_EQ(obj["a"].Long(), 5);
+    ASSERT_EQ(obj["b"].Long(), 1ll << 40);
 }
 
 /**
@@ -323,3 +332,4 @@ TEST(BSONObjBuilderTest, ResetToEmptyForNestedBuilderOnlyResetsInnerObj) {
 }
 
 }  // unnamed namespace
+}  // namespace mongo

@@ -30,6 +30,7 @@
 #pragma once
 
 #include <cfloat>
+#include <cstdint>
 #include <sstream>
 #include <stdio.h>
 #include <string.h>
@@ -41,6 +42,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/inline_decls.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/stdx/type_traits.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
 
@@ -209,6 +211,14 @@ public:
         static_assert(sizeof(long long) == 8, "sizeof(long long) == 8");
         appendNumImpl(j);
     }
+
+    template <typename Int64_t,
+              typename = stdx::enable_if_t<std::is_same<Int64_t, int64_t>::value &&
+                                           !std::is_same<int64_t, long long>::value>>
+    void appendNum(Int64_t j) {
+        appendNumImpl(j);
+    }
+
     void appendNum(unsigned long long j) {
         appendNumImpl(j);
     }

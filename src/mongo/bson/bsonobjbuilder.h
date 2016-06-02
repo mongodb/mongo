@@ -35,6 +35,7 @@
 #pragma once
 
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <map>
 
@@ -45,6 +46,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/stdx/type_traits.h"
 #include "mongo/util/itoa.h"
 
 namespace mongo {
@@ -264,6 +266,19 @@ public:
 
     /** Append a NumberLong */
     BSONObjBuilder& append(StringData fieldName, long long n) {
+        _b.appendNum((char)NumberLong);
+        _b.appendStr(fieldName);
+        _b.appendNum(n);
+        return *this;
+    }
+
+    /**
+     * Append a NumberLong (if int64_t isn't the same as long long)
+     */
+    template <typename Int64_t,
+              typename = stdx::enable_if_t<std::is_same<Int64_t, int64_t>::value &&
+                                           !std::is_same<int64_t, long long>::value>>
+    BSONObjBuilder& append(StringData fieldName, Int64_t n) {
         _b.appendNum((char)NumberLong);
         _b.appendStr(fieldName);
         _b.appendNum(n);
