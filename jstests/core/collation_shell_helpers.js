@@ -41,6 +41,14 @@
     assert.commandFailed(
         db.createCollection("collation_shell_helpers", {collation: {locale: "en", strength: 99}}));
 
+    // Ensure we can create a collection with the "simple" collation as the collection default.
+    assert.commandWorked(
+        db.createCollection("collation_shell_helpers", {collation: {locale: "simple"}}));
+    var collectionInfos = db.getCollectionInfos({name: "collation_shell_helpers"});
+    assert.eq(collectionInfos.length, 1);
+    assert.eq(collectionInfos[0].options.collation, {locale: "simple"});
+    coll.drop();
+
     // Ensure that we populate all collation-related fields when we create a collection with a valid
     // collation.
     assert.commandWorked(
@@ -151,6 +159,9 @@
         normalization: false,
         backwards: true
     });
+
+    assert.commandWorked(coll.createIndexes([{e: 1}], {collation: {locale: "simple"}}));
+    assertIndexHasCollation({e: 1}, {locale: "simple"});
 
     // TODO SERVER-23791: Test that queries with matching collations can use these indices, and that
     // the indices contain collator-generated comparison keys rather than the verbatim indexed

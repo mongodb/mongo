@@ -630,8 +630,16 @@ Status userCreateNS(OperationContext* txn,
             return collator.getStatus();
         }
 
-        collectionOptions.collation =
-            CollationSerializer::specToBSON(collator.getValue()->getSpec());
+        // If the collator factory returned a non-null collator, set the collation option to the
+        // result of serializing the collator's spec back into BSON. We do this in order to fill in
+        // all options that the user omitted.
+        //
+        // If the collator factory returned a null collator (representing the "simple" collation),
+        // we can't use the collation serializer. In this case, we simply set the collation option
+        // to the original user BSON.
+        collectionOptions.collation = collator.getValue()
+            ? CollationSerializer::specToBSON(collator.getValue()->getSpec())
+            : collectionOptions.collation;
     }
 
     status =
