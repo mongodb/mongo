@@ -693,7 +693,7 @@ TEST_F(ExpressionCeilTest, LongArg) {
                     Value(numeric_limits<long long>::max()));
 }
 
-TEST_F(ExpressionCeilTest, FloatArg) {
+TEST_F(ExpressionCeilTest, DoubleArg) {
     assertEvaluates(Value(2.0), Value(2.0));
     assertEvaluates(Value(-2.0), Value(-2.0));
     assertEvaluates(Value(0.9), Value(1.0));
@@ -707,6 +707,20 @@ TEST_F(ExpressionCeilTest, FloatArg) {
     assertEvaluates(Value(largerThanLong), Value(largerThanLong));
     double smallerThanLong = numeric_limits<long long>::min() * 2.0;
     assertEvaluates(Value(smallerThanLong), Value(smallerThanLong));
+}
+
+TEST_F(ExpressionCeilTest, DecimalArg) {
+    assertEvaluates(Value(Decimal128("2")), Value(Decimal128("2.0")));
+    assertEvaluates(Value(Decimal128("-2")), Value(Decimal128("-2.0")));
+    assertEvaluates(Value(Decimal128("0.9")), Value(Decimal128("1.0")));
+    assertEvaluates(Value(Decimal128("0.1")), Value(Decimal128("1.0")));
+    assertEvaluates(Value(Decimal128("-1.2")), Value(Decimal128("-1.0")));
+    assertEvaluates(Value(Decimal128("-1.7")), Value(Decimal128("-1.0")));
+    assertEvaluates(Value(Decimal128("1234567889.000000000000000000000001")),
+                    Value(Decimal128("1234567890")));
+    assertEvaluates(Value(Decimal128("-99999999999999999999999999999.99")),
+                    Value(Decimal128("-99999999999999999999999999999.00")));
+    assertEvaluates(Value(Decimal128("3.4E-6000")), Value(Decimal128("1")));
 }
 
 TEST_F(ExpressionCeilTest, NullArg) {
@@ -737,7 +751,7 @@ TEST_F(ExpressionFloorTest, LongArg) {
                     Value(numeric_limits<long long>::max()));
 }
 
-TEST_F(ExpressionFloorTest, FloatArg) {
+TEST_F(ExpressionFloorTest, DoubleArg) {
     assertEvaluates(Value(2.0), Value(2.0));
     assertEvaluates(Value(-2.0), Value(-2.0));
     assertEvaluates(Value(0.9), Value(0.0));
@@ -751,6 +765,20 @@ TEST_F(ExpressionFloorTest, FloatArg) {
     assertEvaluates(Value(largerThanLong), Value(largerThanLong));
     double smallerThanLong = numeric_limits<long long>::min() * 2.0;
     assertEvaluates(Value(smallerThanLong), Value(smallerThanLong));
+}
+
+TEST_F(ExpressionFloorTest, DecimalArg) {
+    assertEvaluates(Value(Decimal128("2")), Value(Decimal128("2.0")));
+    assertEvaluates(Value(Decimal128("-2")), Value(Decimal128("-2.0")));
+    assertEvaluates(Value(Decimal128("0.9")), Value(Decimal128("0.0")));
+    assertEvaluates(Value(Decimal128("0.1")), Value(Decimal128("0.0")));
+    assertEvaluates(Value(Decimal128("-1.2")), Value(Decimal128("-2.0")));
+    assertEvaluates(Value(Decimal128("-1.7")), Value(Decimal128("-2.0")));
+    assertEvaluates(Value(Decimal128("1234567890.000000000000000000000001")),
+                    Value(Decimal128("1234567890")));
+    assertEvaluates(Value(Decimal128("-99999999999999999999999999999.99")),
+                    Value(Decimal128("-100000000000000000000000000000")));
+    assertEvaluates(Value(Decimal128("3.4E-6000")), Value(Decimal128("0")));
 }
 
 TEST_F(ExpressionFloorTest, NullArg) {
@@ -838,7 +866,7 @@ TEST_F(ExpressionTruncTest, LongArg) {
                     Value(numeric_limits<long long>::max()));
 }
 
-TEST_F(ExpressionTruncTest, FloatArg) {
+TEST_F(ExpressionTruncTest, DoubleArg) {
     assertEvaluates(Value(2.0), Value(2.0));
     assertEvaluates(Value(-2.0), Value(-2.0));
     assertEvaluates(Value(0.9), Value(0.0));
@@ -852,6 +880,20 @@ TEST_F(ExpressionTruncTest, FloatArg) {
     assertEvaluates(Value(largerThanLong), Value(largerThanLong));
     double smallerThanLong = numeric_limits<long long>::min() * 2.0;
     assertEvaluates(Value(smallerThanLong), Value(smallerThanLong));
+}
+
+TEST_F(ExpressionTruncTest, DecimalArg) {
+    assertEvaluates(Value(Decimal128("2")), Value(Decimal128("2.0")));
+    assertEvaluates(Value(Decimal128("-2")), Value(Decimal128("-2.0")));
+    assertEvaluates(Value(Decimal128("0.9")), Value(Decimal128("0.0")));
+    assertEvaluates(Value(Decimal128("0.1")), Value(Decimal128("0.0")));
+    assertEvaluates(Value(Decimal128("-1.2")), Value(Decimal128("-1.0")));
+    assertEvaluates(Value(Decimal128("-1.7")), Value(Decimal128("-1.0")));
+    assertEvaluates(Value(Decimal128("123456789.9999999999999999999999999")),
+                    Value(Decimal128("123456789")));
+    assertEvaluates(Value(Decimal128("-99999999999999999999999999999.99")),
+                    Value(Decimal128("-99999999999999999999999999999.00")));
+    assertEvaluates(Value(Decimal128("3.4E-6000")), Value(Decimal128("0")));
 }
 
 TEST_F(ExpressionTruncTest, NullArg) {
@@ -1038,8 +1080,8 @@ class IntLong : public TwoOperandBase {
     }
 };
 
-/** Adding an int and a long overflows. */
-class IntLongOverflow : public TwoOperandBase {
+/** Adding an int and a long produces a double. */
+class IntLongOverflowToDouble : public TwoOperandBase {
     BSONObj operand1() {
         return BSON("" << numeric_limits<int>::max());
     }
@@ -1047,11 +1089,10 @@ class IntLongOverflow : public TwoOperandBase {
         return BSON("" << numeric_limits<long long>::max());
     }
     BSONObj expectedResult() {
-        // Aggregation currently treats signed integers as overflowing like unsigned integers do.
+        // When the result cannot be represented in a NumberLong, a NumberDouble is returned.
         const auto im = numeric_limits<int>::max();
         const auto llm = numeric_limits<long long>::max();
-        const auto result = static_cast<long long>(static_cast<unsigned int>(im) +
-                                                   static_cast<unsigned long long>(llm));
+        double result = static_cast<double>(im) + static_cast<double>(llm);
         return BSON("" << result);
     }
 };
@@ -4896,7 +4937,7 @@ public:
         add<Add::IntInt>();
         add<Add::IntIntNoOverflow>();
         add<Add::IntLong>();
-        add<Add::IntLongOverflow>();
+        add<Add::IntLongOverflowToDouble>();
         add<Add::IntDouble>();
         add<Add::IntDate>();
         add<Add::LongDouble>();

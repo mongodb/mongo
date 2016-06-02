@@ -971,8 +971,6 @@ BSONType Value::getWidestNumeric(BSONType lType, BSONType rType) {
     return Undefined;
 }
 
-// TODO: Add Decimal128 support to Value::integral()
-// SERVER-19735
 bool Value::integral() const {
     switch (getType()) {
         case NumberInt:
@@ -984,6 +982,13 @@ bool Value::integral() const {
             return (_storage.doubleValue <= numeric_limits<int>::max() &&
                     _storage.doubleValue >= numeric_limits<int>::min() &&
                     _storage.doubleValue == static_cast<int>(_storage.doubleValue));
+        case NumberDecimal: {
+            // If we are able to convert the decimal to an int32_t without an rounding errors,
+            // then it is integral.
+            uint32_t signalingFlags = Decimal128::kNoFlag;
+            (void)_storage.getDecimal().toInt(&signalingFlags);
+            return signalingFlags == Decimal128::kNoFlag;
+        }
         default:
             return false;
     }

@@ -91,6 +91,7 @@ env.Library(
         ],
     LIBDEPS=[
         'document_value',
+        '$BUILD_DIR/mongo/util/summation',
         'expression',
         'field_path',
     ]

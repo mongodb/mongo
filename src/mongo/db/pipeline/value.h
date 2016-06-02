@@ -119,11 +119,9 @@ public:
     }
 
     /// true if type represents a number
-    // TODO: Add _storage.type == NumberDecimal
-    // SERVER-19735
     bool numeric() const {
         return _storage.type == NumberDouble || _storage.type == NumberLong ||
-            _storage.type == NumberInt;
+            _storage.type == NumberInt || _storage.type == NumberDecimal;
     }
 
     /**

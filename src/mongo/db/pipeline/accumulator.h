@@ -38,6 +38,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/util/summation.h"
 
 namespace mongo {
 /**
@@ -194,9 +195,9 @@ public:
     }
 
 private:
-    BSONType totalType;
-    long long longTotal;
-    double doubleTotal;
+    BSONType totalType = NumberInt;
+    DoubleDoubleSummation nonDecimalTotal;
+    Decimal128 decimalTotal;
 };
 
 
@@ -268,7 +269,15 @@ public:
     static boost::intrusive_ptr<Accumulator> create();
 
 private:
-    double _total;
+    /**
+     * The total of all values is partitioned between those that are decimals, and those that are
+     * not decimals, so the decimal total needs to add the non-decimal.
+     */
+    Decimal128 _getDecimalTotal() const;
+
+    bool _isDecimal;
+    DoubleDoubleSummation _nonDecimalTotal;
+    Decimal128 _decimalTotal;
     long long _count;
 };
 

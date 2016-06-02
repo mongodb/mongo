@@ -19,13 +19,6 @@ src:src/third_party/zlib-*/*
 # which trips up UBSAN.
 src:src/mongo/db/storage/mmap_v1/*
 
-# See SERVER-23713. The pipeline arith expressions and accumulators need
-# to be re-written to avoid undefined behavior.
-fun:_ZNK5mongo13ExpressionAdd16evaluateInternalEPNS_9VariablesE
-fun:_ZNK5mongo18ExpressionMultiply16evaluateInternalEPNS_9VariablesE
-fun:_ZN5mongo14AccumulatorSum15processInternalERKNS_5ValueEb
-fun:_ZNK5mongo5Value12coerceToLongEv
-
 # Blacklisting these functions due to a bug in libstdc++:
 # http://stackoverflow.com/questions/30122500/is-this-code-really-undefined-as-clang-seems-to-indicate
 fun:_ZStaNRSt13_Ios_FmtflagsS_
