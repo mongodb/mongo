@@ -6,6 +6,7 @@ from __future__ import absolute_import
 
 import copy
 import os.path
+import socket
 import time
 
 import pymongo
@@ -221,12 +222,16 @@ class ShardedClusterFixture(interface.Fixture):
         mongos_logger = logging.loggers.new_logger(logger_name, parent=self.logger)
 
         mongos_options = copy.deepcopy(self.mongos_options)
+        configdb_hostname = socket.gethostname()
+
         if self.separate_configsvr:
             configdb_replset = ShardedClusterFixture._CONFIGSVR_REPLSET_NAME
             configdb_port = self.configsvr.port
-            mongos_options["configdb"] = "%s/localhost:%d" % (configdb_replset, configdb_port)
+            mongos_options["configdb"] = "%s/%s:%d" % (configdb_replset,
+                                                       configdb_hostname,
+                                                       configdb_port)
         else:
-            mongos_options["configdb"] = "localhost:%d" % (self.shards[0].port)
+            mongos_options["configdb"] = "%s:%d" % (configdb_hostname, self.shards[0].port)
 
         return _MongoSFixture(mongos_logger,
                               self.job_num,
@@ -242,8 +247,9 @@ class ShardedClusterFixture(interface.Fixture):
         for more details.
         """
 
-        self.logger.info("Adding localhost:%d as a shard...", shard.port)
-        client.admin.command({"addShard": "localhost:%d" % (shard.port)})
+        hostname = socket.gethostname()
+        self.logger.info("Adding %s:%d as a shard..." % (hostname, shard.port))
+        client.admin.command({"addShard": "%s:%d" % (hostname, shard.port)})
 
 
 class _MongoSFixture(interface.Fixture):
