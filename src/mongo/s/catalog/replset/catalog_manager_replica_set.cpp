@@ -488,9 +488,8 @@ StatusWith<string> CatalogManagerReplicaSet::addShard(OperationContext* txn,
     if (shardType.getName().empty()) {
         StatusWith<string> result = _generateNewShardName(txn);
         if (!result.isOK()) {
-            return Status(ErrorCodes::OperationFailed, "error generating new shard name");
+            return result.getStatus();
         }
-
         shardType.setName(result.getValue());
     }
 
