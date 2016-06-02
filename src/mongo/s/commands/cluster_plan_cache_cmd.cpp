@@ -61,13 +61,16 @@ public:
         return true;
     }
 
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
     void help(stringstream& ss) const {
         ss << _helpText;
+    }
+
+    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
+        return parseNsCollectionRequired(dbname, cmdObj).ns();
     }
 
     Status checkAuthForCommand(ClientBasic* client,
@@ -114,8 +117,7 @@ bool ClusterPlanCacheCmd::run(OperationContext* txn,
                               int options,
                               std::string& errMsg,
                               BSONObjBuilder& result) {
-    const std::string fullns = parseNs(dbName, cmdObj);
-    NamespaceString nss(fullns);
+    const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
 
     // Dispatch command to all the shards.
     // Targeted shard commands are generally data-dependent but plan cache

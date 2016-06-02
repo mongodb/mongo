@@ -68,12 +68,12 @@ class Command {
 protected:
     // The type of the first field in 'cmdObj' must be mongo::String. The first field is
     // interpreted as a collection name.
-    std::string parseNsFullyQualified(const std::string& dbname, const BSONObj& cmdObj) const;
+    static std::string parseNsFullyQualified(const std::string& dbname, const BSONObj& cmdObj);
 
     // The type of the first field in 'cmdObj' must be mongo::String or Symbol.
     // The first field is interpreted as a collection name.
-    NamespaceString parseNsCollectionRequired(const std::string& dbname,
-                                              const BSONObj& cmdObj) const;
+    static NamespaceString parseNsCollectionRequired(const std::string& dbname,
+                                                     const BSONObj& cmdObj);
 
 public:
     typedef StringMap<Command*> CommandMap;

@@ -75,31 +75,33 @@ ExportedServerParameter<bool, ServerParameterType::kStartupOnly> testCommandsPar
 
 Command::~Command() = default;
 
-string Command::parseNsFullyQualified(const string& dbname, const BSONObj& cmdObj) const {
+string Command::parseNsFullyQualified(const string& dbname, const BSONObj& cmdObj) {
     BSONElement first = cmdObj.firstElement();
-    uassert(17005,
-            mongoutils::str::stream() << "Main argument to " << first.fieldNameStringData()
-                                      << " must be a fully qualified namespace string.  Found: "
-                                      << first.toString(false),
-            first.type() == mongo::String &&
-                NamespaceString::validCollectionComponent(first.valuestr()));
-    return first.String();
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "collection name has invalid type " << typeName(first.type()),
+            first.canonicalType() == canonicalizeBSONType(mongo::String));
+    const NamespaceString nss(first.valueStringData());
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
+            nss.isValid());
+    return nss.ns();
 }
 
-NamespaceString Command::parseNsCollectionRequired(const string& dbname,
-                                                   const BSONObj& cmdObj) const {
+NamespaceString Command::parseNsCollectionRequired(const string& dbname, const BSONObj& cmdObj) {
     // Accepts both BSON String and Symbol for collection name per SERVER-16260
     // TODO(kangas) remove Symbol support in MongoDB 3.0 after Ruby driver audit
     BSONElement first = cmdObj.firstElement();
-    uassert(40072,
+    uassert(ErrorCodes::BadValue,
             str::stream() << "collection name has invalid type " << typeName(first.type()),
             first.canonicalType() == canonicalizeBSONType(mongo::String));
-    NamespaceString nss(dbname, first.valuestr());
-    uassert(ErrorCodes::InvalidNamespace, "Not a valid namespace", nss.isValid());
+    const NamespaceString nss(dbname, first.valueStringData());
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
+            nss.isValid());
     return nss;
 }
 
-/*virtual*/ string Command::parseNs(const string& dbname, const BSONObj& cmdObj) const {
+string Command::parseNs(const string& dbname, const BSONObj& cmdObj) const {
     BSONElement first = cmdObj.firstElement();
     if (first.type() != mongo::String)
         return dbname;
