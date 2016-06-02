@@ -129,7 +129,7 @@ void ReplicaSetMonitorManager::removeAllMonitors() {
         LOG(1) << "Shutting down task executor used for monitoring replica sets";
         _taskExecutor->shutdown();
         _taskExecutor->join();
-        _taskExecutor.release();
+        _taskExecutor.reset();
     }
 }
 
