@@ -49,7 +49,7 @@ functions:
           cd ./clusters/${cluster}
           # stage aws credential for terraform
           cp ../../terraform/* . #I think this should be done in DSI, since it's pulling down terraform. Or we should pull down terraform in this script
-         ../../bin/make_terraform_env.sh ${terraform_key} ${terraform_secret} https://s3.amazonaws.com/mciuploads/longevity/${build_variant}/${revision}/mongodb-${build_id}.tar.gz
+          ../../bin/make_terraform_env.sh ${terraform_key} ${terraform_secret} https://s3.amazonaws.com/mciuploads/longevity/${build_variant}/${revision}/mongodb-${build_id}.tar.gz
           # generate aws private key file
           echo "${ec2_pem}" > ../../keys/aws.pem
           chmod 400 ../../keys/aws.pem
