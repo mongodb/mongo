@@ -7,6 +7,7 @@ from __future__ import absolute_import
 import os
 import os.path
 import shutil
+import socket
 import time
 
 import pymongo
@@ -148,4 +149,4 @@ class MongoDFixture(interface.Fixture):
         if self.mongod is None:
             raise ValueError("Must call setup() before calling get_connection_string()")
 
-        return "localhost:%d" % self.port
+        return "%s:%d" % (socket.gethostname(), self.port)

@@ -5,6 +5,7 @@ Master/slave fixture for executing JSTests against.
 from __future__ import absolute_import
 
 import os.path
+import socket
 
 import pymongo
 
@@ -209,6 +210,6 @@ class MasterSlaveFixture(interface.ReplFixture):
         mongod_options = self.mongod_options.copy()
         mongod_options.update(self.slave_options)
         mongod_options["slave"] = ""
-        mongod_options["source"] = "localhost:%d" % (self.port)
+        mongod_options["source"] = "%s:%d" % (socket.gethostname(), self.port)
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "slave")
         return self._new_mongod(mongod_logger, mongod_options)
