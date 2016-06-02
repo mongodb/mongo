@@ -102,10 +102,13 @@ __wt_posix_map_preload(WT_FILE_HANDLE *fh,
 	 * size, so we will be conservative.
 	 */
 	length &= ~(size_t)(conn->page_size - 1);
-
-	if (length <= (size_t)conn->page_size ||
-	    (ret = posix_madvise(blk, length, POSIX_MADV_WILLNEED)) == 0)
+	if (length <= (size_t)conn->page_size)
 		return (0);
+
+	WT_SYSCALL_RETRY(posix_madvise(blk, length, POSIX_MADV_WILLNEED), ret);
+	if (ret == 0)
+		return (0);
+
 	WT_RET_MSG(session, ret,
 	    "%s: memory-map preload: posix_madvise: POSIX_MADV_WILLNEED",
 	    fh->name);
@@ -135,8 +138,10 @@ __wt_posix_map_discard(WT_FILE_HANDLE *fh,
 	blk = (void *)((uintptr_t)map & ~(uintptr_t)(conn->page_size - 1));
 	length += WT_PTRDIFF(map, blk);
 
-	if ((ret = posix_madvise(blk, length, POSIX_MADV_DONTNEED)) == 0)
+	WT_SYSCALL_RETRY(posix_madvise(blk, length, POSIX_MADV_DONTNEED), ret);
+	if (ret == 0)
 		return (0);
+
 	WT_RET_MSG(session, ret,
 	    "%s: memory-map discard: posix_madvise: POSIX_MADV_DONTNEED",
 	    fh->name);
