@@ -60,11 +60,6 @@ enum class BSONVersion { kV1_0, kV1_1, kLatest = kV1_1 };
 extern bool enableBSON1_1;
 
 /**
-    For use by mongo shell, which does not use server parameters.
-*/
-void enableLatestBSONVersion();
-
-/**
     the complete list of valid BSON types
     see also bsonspec.org
 */

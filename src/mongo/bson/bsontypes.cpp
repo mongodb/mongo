@@ -34,17 +34,13 @@
 
 namespace mongo {
 
-bool enableBSON1_1 = false;
+bool enableBSON1_1 = true;
 
 const char kMaxKeyData[] = {7, 0, 0, 0, static_cast<char>(MaxKey), 0, 0};
 const BSONObj kMaxBSONKey(kMaxKeyData);
 
 const char kMinKeyData[] = {7, 0, 0, 0, static_cast<char>(MinKey), 0, 0};
 const BSONObj kMinBSONKey(kMinKeyData);
-
-void enableLatestBSONVersion() {
-    enableBSON1_1 = true;
-}
 
 /* take a BSONType and return the name of that type as a char* */
 const char* typeName(BSONType type) {
