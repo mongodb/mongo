@@ -3757,6 +3757,7 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     exe: ".exe"
+    platform_decompress: unzip
     gorootvars: GOARCH=386
     push_path: win32
     push_bucket: downloads.mongodb.org
