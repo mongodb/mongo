@@ -98,6 +98,7 @@ __posix_map_preload_madvise(
 	if (size <= (size_t)conn->page_size ||
 	    (ret = posix_madvise(blk, size, POSIX_MADV_WILLNEED)) == 0)
 		return (0);
+
 	WT_RET_MSG(session, ret,
 	    "%s: memory-map preload: posix_madvise: POSIX_MADV_WILLNEED",
 	    fh->name);
@@ -145,6 +146,7 @@ __posix_map_discard_madvise(
 
 	if ((ret = posix_madvise(blk, size, POSIX_MADV_DONTNEED)) == 0)
 		return (0);
+
 	WT_RET_MSG(session, ret,
 	    "%s: memory-map discard: posix_madvise: POSIX_MADV_DONTNEED",
 	    fh->name);

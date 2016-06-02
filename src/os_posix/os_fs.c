@@ -52,7 +52,7 @@ __posix_sync(WT_SESSION_IMPL *session,
 	 * "This is currently implemented on HFS, MS-DOS (FAT), and Universal
 	 * Disk Format (UDF) file systems."
 	 */
-	WT_SYSCALL_RETRY(fcntl(fd, F_FULLFSYNC, 0), ret);
+	WT_SYSCALL_RETRY(fcntl(fd, F_FULLFSYNC, 0) == -1 ? -1 : 0, ret);
 	if (ret == 0)
 		return (0);
 	/*
@@ -107,7 +107,7 @@ __posix_directory_sync(WT_SESSION_IMPL *session, const char *path)
 	}
 
 	WT_SYSCALL_RETRY((
-	    (fd = open(path, O_RDONLY, 0444)) == -1 ? 1 : 0), ret);
+	    (fd = open(path, O_RDONLY, 0444)) == -1 ? -1 : 0), ret);
 	if (ret != 0)
 		WT_ERR_MSG(session, ret, "%s: directory-sync: open", path);
 
@@ -172,14 +172,19 @@ __posix_file_remove(WT_SESSION_IMPL *session, const char *name)
 #endif
 
 	WT_RET(__wt_filename(session, name, &path));
-	name = path;
 
-	WT_SYSCALL_RETRY(remove(name), ret);
-	if (ret != 0)
-		__wt_err(session, ret, "%s: file-remove: remove", name);
-
+	/*
+	 * ISO C doesn't require remove return -1 on failure or set errno (note
+	 * POSIX 1003.1 extends C with those requirements). Regardless, use the
+	 * unlink system call, instead of remove, to simplify error handling;
+	 * where we're not doing any special checking for standards compliance,
+	 * using unlink may be marginally safer.
+	 */
+	WT_SYSCALL_RETRY(unlink(path), ret);
 	__wt_free(session, path);
-	return (ret);
+	if (ret == 0)
+		return (0);
+	WT_RET_MSG(session, ret, "%s: file-remove: unlink", name);
 }
 
 /*
@@ -203,18 +208,22 @@ __posix_file_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
 
 	from_path = to_path = NULL;
 	WT_ERR(__wt_filename(session, from, &from_path));
-	from = from_path;
 	WT_ERR(__wt_filename(session, to, &to_path));
-	to = to_path;
 
-	WT_SYSCALL_RETRY(rename(from, to), ret);
-	if (ret != 0)
-		__wt_err(session, ret,
-		    "%s to %s: file-rename: rename", from, to);
+	/*
+	 * ISO C doesn't require rename return -1 on failure or set errno (note
+	 * POSIX 1003.1 extends C with those requirements). Be cautious, force
+	 * any non-zero return to -1 so we'll check errno. We can still end up
+	 * with the wrong errno (if errno is garbage), or the generic WT_ERROR
+	 * return (if errno is 0), but we've done the best we can.
+	 */
+	WT_SYSCALL_RETRY(rename(from_path, to_path) != 0 ? -1 : 0, ret);
 
 err:	__wt_free(session, from_path);
 	__wt_free(session, to_path);
-	return (ret);
+	if (ret == 0)
+		return (0);
+	WT_RET_MSG(session, ret, "%s to %s: file-rename: rename", from, to);
 }
 
 /*
@@ -360,7 +369,7 @@ __posix_handle_lock(WT_SESSION_IMPL *session, WT_FH *fh, bool lock)
 	fl.l_type = lock ? F_WRLCK : F_UNLCK;
 	fl.l_whence = SEEK_SET;
 
-	WT_SYSCALL_RETRY(fcntl(fh->fd, F_SETLK, &fl), ret);
+	WT_SYSCALL_RETRY(fcntl(fh->fd, F_SETLK, &fl) == -1 ? -1 : 0, ret);
 	if (ret == 0)
 		return (0);
 	WT_RET_MSG(session, ret, "%s: handle-lock: fcntl", fh->name);
@@ -560,7 +569,7 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 		f |= O_CLOEXEC;
 #endif
 		WT_SYSCALL_RETRY((
-		    (fd = open(name, f, 0444)) == -1 ? 1 : 0), ret);
+		    (fd = open(name, f, 0444)) == -1 ? -1 : 0), ret);
 		if (ret != 0)
 			WT_ERR_MSG(session, ret, "%s: handle-open: open", name);
 		WT_ERR(__posix_handle_open_cloexec(session, fd, name));
@@ -622,7 +631,7 @@ __posix_handle_open(WT_SESSION_IMPL *session,
 #endif
 	}
 
-	WT_SYSCALL_RETRY(((fd = open(name, f, mode)) == -1 ? 1 : 0), ret);
+	WT_SYSCALL_RETRY(((fd = open(name, f, mode)) == -1 ? -1 : 0), ret);
 	if (ret != 0)
 		WT_ERR_MSG(session, ret,
 		    direct_io ?
