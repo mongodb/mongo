@@ -58,8 +58,10 @@ private:
      * This function ignores the 'multikeyPaths' pointer because text indexes don't support tracking
      * path-level multikey information.
      *
-     * TODO SERVER-23114: Return prefixes of the indexed fields that cause the index to be multikey
-     * as a result of inserting 'keys'.
+     * If the 'multikeyPaths' pointer is non-null, then it must point to an empty vector. This
+     * function resizes 'multikeyPaths' to have the same number of elements as the index key pattern
+     * and fills each element with the prefixes of the indexed field that would cause this index to
+     * be multikey as a result of inserting 'keys'.
      */
     void getKeys(const BSONObj& obj, BSONObjSet* keys, MultikeyPaths* multikeyPaths) const final;
 

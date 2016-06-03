@@ -64,7 +64,11 @@ void getKeysForUpgradeChecking(const BSONObj& infoObj, const BSONObj& doc, BSONO
         // generated will be wrong.
         CollatorInterface* collator = nullptr;
         ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
-        ExpressionKeysPrivate::getS2Keys(doc, keyPattern, params, keys);
+
+        // There's no need to compute the prefixes of the indexed fields that cause the index to be
+        // multikey when checking if any index key is too large.
+        MultikeyPaths* multikeyPaths = nullptr;
+        ExpressionKeysPrivate::getS2Keys(doc, keyPattern, params, keys, multikeyPaths);
     } else if (IndexNames::TEXT == type) {
         fts::FTSSpec spec(infoObj);
         ExpressionKeysPrivate::getFTSKeys(doc, spec, keys);

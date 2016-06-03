@@ -82,25 +82,31 @@ BSONElement extractElementAtPathOrArrayAlongPath(const BSONObj& obj, const char*
  * The 'path' can be specified using a dotted notation in order to traverse through embedded objects
  * and array elements.
  *
+ * This function fills 'arrayComponents' with the positions (starting at 0) of 'path' corresponding
+ * to array values with multiple elements.
+ *
  * Some examples:
  *
  *   Consider the document {a: [{b: 1}, {b: 2}]} and the path "a.b". The elements {b: 1} and {b: 2}
- *   would be added to the set.
+ *   would be added to the set. 'arrayComponents' would be set as std::set<size_t>{0U}.
  *
  *   Consider the document {a: [{b: [1, 2]}, {b: [2, 3]}]} and the path "a.b". The elements {b: 1},
- *   {b: 2}, and {b: 3} would be added to the set if 'expandArrayOnTrailingField' is true. The
- *   elements {b: [1, 2]} and {b: [2, 3]} would be added to the set if 'expandArrayOnTrailingField'
- *   is false.
+ *   {b: 2}, and {b: 3} would be added to the set and 'arrayComponents' would be set as
+ *   std::set<size_t>{0U, 1U} if 'expandArrayOnTrailingField' is true. The elements {b: [1, 2]} and
+ *   {b: [2, 3]} would be added to the set and 'arrayComponents' would be set as
+ *   std::set<size_t>{0U} if 'expandArrayOnTrailingField' is false.
  */
 void extractAllElementsAlongPath(const BSONObj& obj,
                                  StringData path,
                                  BSONElementSet& elements,
-                                 bool expandArrayOnTrailingField = true);
+                                 bool expandArrayOnTrailingField = true,
+                                 std::set<std::size_t>* arrayComponents = nullptr);
 
 void extractAllElementsAlongPath(const BSONObj& obj,
                                  StringData path,
                                  BSONElementMSet& elements,
-                                 bool expandArrayOnTrailingField = true);
+                                 bool expandArrayOnTrailingField = true,
+                                 std::set<std::size_t>* arrayComponents = nullptr);
 
 /**
  * Returns an owned BSONObj with elements in the same order as they appear in the 'pattern' object

@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <set>
 #include <vector>
 
 #include "mongo/bson/bsonelement.h"
@@ -139,14 +140,42 @@ void assertBSONElementSetsAreEqual(const std::vector<BSONObj>& expectedObjs,
     }
 }
 
+void dumpArrayComponents(const std::set<size_t>& arrayComponents, StringBuilder* sb) {
+    *sb << "[ ";
+    bool firstIteration = true;
+    for (const auto pos : arrayComponents) {
+        if (!firstIteration) {
+            *sb << ", ";
+        }
+        *sb << pos;
+        firstIteration = false;
+    }
+    *sb << " ]";
+}
+
+void assertArrayComponentsAreEqual(const std::set<size_t>& expectedArrayComponents,
+                                   const std::set<size_t>& actualArrayComponents) {
+    if (expectedArrayComponents != actualArrayComponents) {
+        StringBuilder sb;
+        sb << "Expected: ";
+        dumpArrayComponents(expectedArrayComponents, &sb);
+        sb << ", Actual: ";
+        dumpArrayComponents(actualArrayComponents, &sb);
+        FAIL(sb.str());
+    }
+}
+
 TEST(ExtractAllElementsAlongPath, NestedObjectWithScalarValue) {
     BSONObj obj = BSON("a" << BSON("b" << 1));
 
     BSONElementSet actualElements;
     const bool expandArrayOnTrailingField = true;
-    dps::extractAllElementsAlongPath(obj, "a.b", actualElements, expandArrayOnTrailingField);
+    std::set<size_t> actualArrayComponents;
+    dps::extractAllElementsAlongPath(
+        obj, "a.b", actualElements, expandArrayOnTrailingField, &actualArrayComponents);
 
     assertBSONElementSetsAreEqual({BSON("" << 1)}, actualElements);
+    assertArrayComponentsAreEqual(std::set<size_t>{}, actualArrayComponents);
 }
 
 TEST(ExtractAllElementsAlongPath, NestedObjectWithEmptyArrayValue) {
@@ -154,9 +183,12 @@ TEST(ExtractAllElementsAlongPath, NestedObjectWithEmptyArrayValue) {
 
     BSONElementSet actualElements;
     const bool expandArrayOnTrailingField = true;
-    dps::extractAllElementsAlongPath(obj, "a.b", actualElements, expandArrayOnTrailingField);
+    std::set<size_t> actualArrayComponents;
+    dps::extractAllElementsAlongPath(
+        obj, "a.b", actualElements, expandArrayOnTrailingField, &actualArrayComponents);
 
     assertBSONElementSetsAreEqual(std::vector<BSONObj>{}, actualElements);
+    assertArrayComponentsAreEqual(std::set<size_t>{}, actualArrayComponents);
 }
 
 TEST(ExtractAllElementsAlongPath, NestedObjectWithSingletonArrayValue) {
@@ -164,9 +196,12 @@ TEST(ExtractAllElementsAlongPath, NestedObjectWithSingletonArrayValue) {
 
     BSONElementSet actualElements;
     const bool expandArrayOnTrailingField = true;
-    dps::extractAllElementsAlongPath(obj, "a.b", actualElements, expandArrayOnTrailingField);
+    std::set<size_t> actualArrayComponents;
+    dps::extractAllElementsAlongPath(
+        obj, "a.b", actualElements, expandArrayOnTrailingField, &actualArrayComponents);
 
     assertBSONElementSetsAreEqual({BSON("" << 1)}, actualElements);
+    assertArrayComponentsAreEqual(std::set<size_t>{}, actualArrayComponents);
 }
 
 TEST(ExtractAllElementsAlongPath, NestedObjectWithArrayValue) {
@@ -174,9 +209,12 @@ TEST(ExtractAllElementsAlongPath, NestedObjectWithArrayValue) {
 
     BSONElementSet actualElements;
     const bool expandArrayOnTrailingField = true;
-    dps::extractAllElementsAlongPath(obj, "a.b", actualElements, expandArrayOnTrailingField);
+    std::set<size_t> actualArrayComponents;
+    dps::extractAllElementsAlongPath(
+        obj, "a.b", actualElements, expandArrayOnTrailingField, &actualArrayComponents);
 
     assertBSONElementSetsAreEqual({BSON("" << 1), BSON("" << 2), BSON("" << 3)}, actualElements);
+    assertArrayComponentsAreEqual({1U}, actualArrayComponents);
 }
 
 TEST(ExtractAllElementsAlongPath, ObjectWithArrayOfSubobjectsWithScalarValue) {
@@ -184,9 +222,12 @@ TEST(ExtractAllElementsAlongPath, ObjectWithArrayOfSubobjectsWithScalarValue) {
 
     BSONElementSet actualElements;
     const bool expandArrayOnTrailingField = true;
-    dps::extractAllElementsAlongPath(obj, "a.b", actualElements, expandArrayOnTrailingField);
+    std::set<size_t> actualArrayComponents;
+    dps::extractAllElementsAlongPath(
+        obj, "a.b", actualElements, expandArrayOnTrailingField, &actualArrayComponents);
 
     assertBSONElementSetsAreEqual({BSON("" << 1), BSON("" << 2), BSON("" << 3)}, actualElements);
+    assertArrayComponentsAreEqual({0U}, actualArrayComponents);
 }
 
 TEST(ExtractAllElementsAlongPath, ObjectWithArrayOfSubobjectsWithArrayValues) {
@@ -196,9 +237,12 @@ TEST(ExtractAllElementsAlongPath, ObjectWithArrayOfSubobjectsWithArrayValues) {
 
     BSONElementSet actualElements;
     const bool expandArrayOnTrailingField = true;
-    dps::extractAllElementsAlongPath(obj, "a.b", actualElements, expandArrayOnTrailingField);
+    std::set<size_t> actualArrayComponents;
+    dps::extractAllElementsAlongPath(
+        obj, "a.b", actualElements, expandArrayOnTrailingField, &actualArrayComponents);
 
     assertBSONElementSetsAreEqual({BSON("" << 1), BSON("" << 2), BSON("" << 3)}, actualElements);
+    assertArrayComponentsAreEqual({0U, 1U}, actualArrayComponents);
 }
 
 TEST(ExtractAllElementsAlongPath,
@@ -208,11 +252,14 @@ TEST(ExtractAllElementsAlongPath,
 
     BSONElementSet actualElements;
     const bool expandArrayOnTrailingField = false;
-    dps::extractAllElementsAlongPath(obj, "a.b", actualElements, expandArrayOnTrailingField);
+    std::set<size_t> actualArrayComponents;
+    dps::extractAllElementsAlongPath(
+        obj, "a.b", actualElements, expandArrayOnTrailingField, &actualArrayComponents);
 
     assertBSONElementSetsAreEqual(
         {BSON("" << BSON_ARRAY(1)), BSON("" << BSON_ARRAY(2)), BSON("" << BSON_ARRAY(3))},
         actualElements);
+    assertArrayComponentsAreEqual({0U}, actualArrayComponents);
 }
 
 }  // namespace

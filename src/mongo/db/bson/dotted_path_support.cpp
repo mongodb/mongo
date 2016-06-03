@@ -50,7 +50,9 @@ template <typename BSONElementColl>
 void _extractAllElementsAlongPath(const BSONObj& obj,
                                   StringData path,
                                   BSONElementColl& elements,
-                                  bool expandArrayOnTrailingField) {
+                                  bool expandArrayOnTrailingField,
+                                  size_t depth,
+                                  std::set<size_t>* arrayComponents) {
     BSONElement e = obj.getField(path);
 
     if (e.eoo()) {
@@ -62,8 +64,12 @@ void _extractAllElementsAlongPath(const BSONObj& obj,
             BSONElement e = obj.getField(left);
 
             if (e.type() == Object) {
-                _extractAllElementsAlongPath(
-                    e.embeddedObject(), next, elements, expandArrayOnTrailingField);
+                _extractAllElementsAlongPath(e.embeddedObject(),
+                                             next,
+                                             elements,
+                                             expandArrayOnTrailingField,
+                                             depth + 1,
+                                             arrayComponents);
             } else if (e.type() == Array) {
                 bool allDigits = false;
                 if (next.size() > 0 && std::isdigit(next[0])) {
@@ -73,15 +79,28 @@ void _extractAllElementsAlongPath(const BSONObj& obj,
                     allDigits = temp == next.size() || next[temp] == '.';
                 }
                 if (allDigits) {
-                    _extractAllElementsAlongPath(
-                        e.embeddedObject(), next, elements, expandArrayOnTrailingField);
+                    _extractAllElementsAlongPath(e.embeddedObject(),
+                                                 next,
+                                                 elements,
+                                                 expandArrayOnTrailingField,
+                                                 depth + 1,
+                                                 arrayComponents);
                 } else {
+                    size_t nArrElems = 0;
                     BSONObjIterator i(e.embeddedObject());
                     while (i.more()) {
                         BSONElement e2 = i.next();
                         if (e2.type() == Object || e2.type() == Array)
-                            _extractAllElementsAlongPath(
-                                e2.embeddedObject(), next, elements, expandArrayOnTrailingField);
+                            _extractAllElementsAlongPath(e2.embeddedObject(),
+                                                         next,
+                                                         elements,
+                                                         expandArrayOnTrailingField,
+                                                         depth + 1,
+                                                         arrayComponents);
+                        ++nArrElems;
+                    }
+                    if (arrayComponents && nArrElems > 1) {
+                        arrayComponents->insert(depth);
                     }
                 }
             } else {
@@ -90,9 +109,15 @@ void _extractAllElementsAlongPath(const BSONObj& obj,
         }
     } else {
         if (e.type() == Array && expandArrayOnTrailingField) {
+            size_t nArrElems = 0;
             BSONObjIterator i(e.embeddedObject());
-            while (i.more())
+            while (i.more()) {
                 elements.insert(i.next());
+                ++nArrElems;
+            }
+            if (arrayComponents && nArrElems > 1) {
+                arrayComponents->insert(depth);
+            }
         } else {
             elements.insert(e);
         }
@@ -142,15 +167,21 @@ BSONElement extractElementAtPathOrArrayAlongPath(const BSONObj& obj, const char*
 void extractAllElementsAlongPath(const BSONObj& obj,
                                  StringData path,
                                  BSONElementSet& elements,
-                                 bool expandArrayOnTrailingField) {
-    _extractAllElementsAlongPath(obj, path, elements, expandArrayOnTrailingField);
+                                 bool expandArrayOnTrailingField,
+                                 std::set<size_t>* arrayComponents) {
+    const size_t initialDepth = 0;
+    _extractAllElementsAlongPath(
+        obj, path, elements, expandArrayOnTrailingField, initialDepth, arrayComponents);
 }
 
 void extractAllElementsAlongPath(const BSONObj& obj,
                                  StringData path,
                                  BSONElementMSet& elements,
-                                 bool expandArrayOnTrailingField) {
-    _extractAllElementsAlongPath(obj, path, elements, expandArrayOnTrailingField);
+                                 bool expandArrayOnTrailingField,
+                                 std::set<size_t>* arrayComponents) {
+    const size_t initialDepth = 0;
+    _extractAllElementsAlongPath(
+        obj, path, elements, expandArrayOnTrailingField, initialDepth, arrayComponents);
 }
 
 BSONObj extractElementsBasedOnTemplate(const BSONObj& obj,
