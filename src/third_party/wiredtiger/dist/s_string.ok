@@ -442,6 +442,7 @@ bzDecompressInit
 bzalloc
 bzfree
 bzip
+call's
 calloc
 cas
 catfmt

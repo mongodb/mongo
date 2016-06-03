@@ -1090,6 +1090,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	logcount = 0;
 	lastlog = 0;
 	firstlog = UINT32_MAX;
+	F_SET(log, WT_LOG_NOT_VERIFIED);
 
 	/*
 	 * Open up a file handle to the log directory if we haven't.
@@ -1744,6 +1745,22 @@ advance:
 		    &rd_lsn, WT_LOG_FILENAME, 0));
 
 err:	WT_STAT_FAST_CONN_INCR(session, log_scans);
+	/*
+	 * If the first attempt to read a log record results in
+	 * an error recovery is likely going to fail.  Try to provide
+	 * a helpful failure message.
+	 */
+	if (ret != 0 && F_ISSET(log, WT_LOG_NOT_VERIFIED)) {
+		__wt_errx(session,
+		    "WiredTiger is unable to read the recovery log.");
+		__wt_errx(session, "This may be due to the log"
+		    " files being encrypted, being from an older"
+		    " version or due to corruption on disk");
+		__wt_errx(session, "You should confirm that you have"
+		    " opened the database with the correct options including"
+		    " all encryption and compression options");
+	}
+	F_CLR(log, WT_LOG_NOT_VERIFIED);
 
 	WT_TRET(__wt_fs_directory_list_free(session, &logfiles, logcount));
 

@@ -96,8 +96,10 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		 * snapshot now.
 		 *
 		 * All changes committed up to this point should be included.
-		 * We don't update the snapshot in between pages because (a)
-		 * the metadata shouldn't be that big, and (b) if we do ever
+		 * We don't update the snapshot in between pages because the
+		 * metadata shouldn't have many pages.  Instead, read-committed
+		 * isolation ensures that all metadata updates completed before
+		 * the checkpoint are included.
 		 */
 		if (txn->isolation == WT_ISO_READ_COMMITTED)
 			WT_ERR(__wt_txn_get_snapshot(session));
