@@ -66,7 +66,7 @@ __json_unpack_put(WT_SESSION_IMPL *session, void *voidpv,
     u_char *buf, size_t bufsz, WT_CONFIG_ITEM *name)
 {
 	WT_PACK_VALUE *pv;
-	const char *p, *end;
+	const u_char *p, *end;
 	size_t s, n;
 
 	pv = (WT_PACK_VALUE *)voidpv;
@@ -86,7 +86,7 @@ __json_unpack_put(WT_SESSION_IMPL *session, void *voidpv,
 	case 'S':
 		/* Account for '"' quote in front and back. */
 		s += 2;
-		p = (const char *)pv->u.s;
+		p = (const u_char *)pv->u.s;
 		if (bufsz > 0) {
 			*buf++ = '"';
 			bufsz--;
@@ -122,7 +122,7 @@ __json_unpack_put(WT_SESSION_IMPL *session, void *voidpv,
 	case 'U':
 	case 'u':
 		s += 2;
-		p = (const char *)pv->u.item.data;
+		p = (const u_char *)pv->u.item.data;
 		end = p + pv->u.item.size;
 		if (bufsz > 0) {
 			*buf++ = '"';
@@ -314,14 +314,14 @@ __wt_json_close(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
  *	Can be called with null buf for sizing.
  */
 size_t
-__wt_json_unpack_char(char ch, u_char *buf, size_t bufsz, bool force_unicode)
+__wt_json_unpack_char(u_char ch, u_char *buf, size_t bufsz, bool force_unicode)
 {
-	char abbrev;
+	u_char abbrev;
 
 	if (!force_unicode) {
 		if (isprint(ch) && ch != '\\' && ch != '"') {
 			if (bufsz >= 1)
-				*buf = (u_char)ch;
+				*buf = ch;
 			return (1);
 		} else {
 			abbrev = '\0';
@@ -346,7 +346,7 @@ __wt_json_unpack_char(char ch, u_char *buf, size_t bufsz, bool force_unicode)
 			if (abbrev != '\0') {
 				if (bufsz >= 2) {
 					*buf++ = '\\';
-					*buf = (u_char)abbrev;
+					*buf = abbrev;
 				}
 				return (2);
 			}
