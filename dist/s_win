@@ -39,42 +39,7 @@ win_export()
 	     (echo "Building $f" && rm -f $f && cp $t $f)
 }
 
-win_filelist()
-{
-	f='../build_win/filelist.win'
-
-	# Discard POSIX-only and PPC-only files, add in Windows-only files.
-	(
-	sed \
-	    -e '/\/os_posix\//d' \
-	    -e '/src\/checksum\/power8\/crc32.S/d' \
-	    -e '/src\/checksum\/power8\/crc32_wrapper.c/d'
-
-	echo 'src/os_win/os_dir.c'
-	echo 'src/os_win/os_dlopen.c'
-	echo 'src/os_win/os_errno.c'
-	echo 'src/os_win/os_fs.c'
-	echo 'src/os_win/os_getenv.c'
-	echo 'src/os_win/os_map.c'
-	echo 'src/os_win/os_mtx_cond.c'
-	echo 'src/os_win/os_once.c'
-	echo 'src/os_win/os_pagesize.c'
-	echo 'src/os_win/os_path.c'
-	echo 'src/os_win/os_priv.c'
-	echo 'src/os_win/os_setvbuf.c'
-	echo 'src/os_win/os_sleep.c'
-	echo 'src/os_win/os_snprintf.c'
-	echo 'src/os_win/os_thread.c'
-	echo 'src/os_win/os_time.c'
-	echo 'src/os_win/os_vsnprintf.c'
-	echo 'src/os_win/os_yield.c') < filelist | sort > $t
-
-	cmp $t $f > /dev/null 2>&1 ||
-	     (echo "Building $f" && rm -f $f && cp $t $f)
-}
-
 win_config
 win_export
-win_filelist
 
 exit 0
