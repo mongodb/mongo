@@ -1332,8 +1332,12 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
                                                          PlanExecutor::YieldPolicy yieldPolicy) {
     if (!collection) {
         // Treat collections that do not exist as empty collections.
-        return PlanExecutor::make(
-            txn, make_unique<WorkingSet>(), make_unique<EOFStage>(txn), ns, yieldPolicy);
+        return PlanExecutor::make(txn,
+                                  make_unique<WorkingSet>(),
+                                  make_unique<EOFStage>(txn),
+                                  parsedDistinct->releaseQuery(),
+                                  collection,
+                                  yieldPolicy);
     }
 
     // TODO: check for idhack here?
@@ -1396,6 +1400,12 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
     }
 
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+
+    // If the canonical query does not have a user-specified collation, set it from the collection
+    // default.
+    if (cq->getQueryRequest().getCollation().isEmpty() && collection->getDefaultCollator()) {
+        cq->setCollator(collection->getDefaultCollator()->clone());
+    }
 
     // If there's no query, we can just distinct-scan one of the indices.
     // Not every index in plannerParams.indices may be suitable. Refer to

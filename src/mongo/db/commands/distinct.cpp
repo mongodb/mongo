@@ -205,8 +205,6 @@ public:
             return appendCommandStatus(result, parsedDistinct.getStatus());
         }
 
-        auto collator = parsedDistinct.getValue().getQuery()->getCollator();
-
         AutoGetCollectionForRead ctx(txn, ns);
 
         Collection* collection = ctx.getCollection();
@@ -230,7 +228,7 @@ public:
         char* start = bb.buf();
 
         BSONArrayBuilder arr(bb);
-        BSONElementSet values(collator);
+        BSONElementSet values(executor.getValue()->getCanonicalQuery()->getCollator());
 
         BSONObj obj;
         PlanExecutor::ExecState state;
