@@ -663,6 +663,20 @@ TEST(ExpressionAlgoIsSubsetOf, CollationAwareStringComparison) {
     ASSERT_FALSE(expression::isSubsetOf(lhsLT.get(), rhsLT.get()));
 }
 
+TEST(ExpressionAlgoIsSubsetOf, NonMatchingCollationsStringComparison) {
+    CollatorInterfaceMock collatorAlwaysEqual(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    CollatorInterfaceMock collatorReverseString(CollatorInterfaceMock::MockType::kReverseString);
+    ParsedMatchExpression lhs("{a: {$gt: 'abc'}}", &collatorAlwaysEqual);
+    ParsedMatchExpression rhs("{a: {$gt: 'cba'}}", &collatorReverseString);
+
+    ASSERT_FALSE(expression::isSubsetOf(lhs.get(), rhs.get()));
+
+    ParsedMatchExpression lhsLT("{a: {$lt: 'abc'}}", &collatorAlwaysEqual);
+    ParsedMatchExpression rhsLT("{a: {$lt: 'cba'}}", &collatorReverseString);
+
+    ASSERT_FALSE(expression::isSubsetOf(lhsLT.get(), rhsLT.get()));
+}
+
 TEST(ExpressionAlgoIsSubsetOf, CollationAwareStringComparisonIn) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     ParsedMatchExpression lhsAllGTcba("{a: {$in: ['abc', 'cbc']}}", &collator);

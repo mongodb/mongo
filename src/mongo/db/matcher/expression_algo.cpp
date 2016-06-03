@@ -95,14 +95,16 @@ bool _isSubsetOf(const ComparisonMatchExpression* lhs, const ComparisonMatchExpr
         return false;
     }
 
-    // Either collator may be used by compareElementValues() here. If lhs (the query) contains
-    // string comparison, then _isSubsetOf will only be called if lhs and rhs have the same
-    // collator. Otherwise, the collator will not be used by compareElementValues().
     if (!CollatorInterface::collatorsMatch(lhs->getCollator(), rhs->getCollator())) {
         // TODO SERVER-23172: Check that lhsData does not contain string comparison in nested
         // objects or arrays.
-        invariant(lhsData.type() != BSONType::String);
+        if (lhsData.type() == BSONType::String) {
+            return false;
+        }
     }
+
+    // Either collator may be used by compareElementValues() here, since either the collators are
+    // the same or lhsData does not contain string comparison.
     int cmp = compareElementValues(lhsData, rhsData, rhs->getCollator());
 
     // Check whether the two expressions are equivalent.
