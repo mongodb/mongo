@@ -39,6 +39,7 @@
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
@@ -58,6 +59,8 @@ using std::set;
 using std::string;
 using std::stringstream;
 using std::vector;
+
+namespace dps = ::mongo::dotted_path_support;
 
 LabeledLevel pc("pcursor", 2);
 
@@ -1288,7 +1291,7 @@ BSONObj ParallelSortClusteredCursor::next() {
         }
 
         // Otherwise compare the result to the current best result
-        int comp = best.woSortOrder(me, _sortKey, true);
+        int comp = dps::compareObjectsAccordingToSort(best, me, _sortKey, true);
         if (comp < 0)
             continue;
 

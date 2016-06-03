@@ -35,6 +35,7 @@
 #include "third_party/s2/s2regionintersection.h"
 
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/working_set_computed_data.h"
@@ -53,6 +54,8 @@ namespace mongo {
 
 using std::abs;
 using std::unique_ptr;
+
+namespace dps = ::mongo::dotted_path_support;
 
 //
 // Shared GeoNear search functionality
@@ -100,7 +103,7 @@ static void extractGeometries(const BSONObj& doc,
     BSONElementSet geomElements;
     // NOTE: Annoyingly, we cannot just expand arrays b/c single 2d points are arrays, we need
     // to manually expand all results to check if they are geometries
-    doc.getFieldsDotted(path, geomElements, false /* expand arrays */);
+    dps::extractAllElementsAlongPath(doc, path, geomElements, false /* expand arrays */);
 
     for (BSONElementSet::iterator it = geomElements.begin(); it != geomElements.end(); ++it) {
         const BSONElement& el = *it;

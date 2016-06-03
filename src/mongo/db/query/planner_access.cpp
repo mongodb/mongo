@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_text.h"
@@ -51,6 +52,8 @@
 namespace {
 
 using namespace mongo;
+
+namespace dps = ::mongo::dotted_path_support;
 
 /**
  * Text node functors.
@@ -125,7 +128,7 @@ QuerySolutionNode* QueryPlannerAccess::makeCollectionScan(const CanonicalQuery& 
 
     // If the hint is {$natural: +-1} this changes the direction of the collection scan.
     if (!query.getParsed().getHint().isEmpty()) {
-        BSONElement natural = query.getParsed().getHint().getFieldDotted("$natural");
+        BSONElement natural = dps::extractElementAtPath(query.getParsed().getHint(), "$natural");
         if (!natural.eoo()) {
             csn->direction = natural.numberInt() >= 0 ? 1 : -1;
         }
@@ -135,7 +138,7 @@ QuerySolutionNode* QueryPlannerAccess::makeCollectionScan(const CanonicalQuery& 
     // direction if both are specified.
     const BSONObj& sortObj = query.getParsed().getSort();
     if (!sortObj.isEmpty()) {
-        BSONElement natural = sortObj.getFieldDotted("$natural");
+        BSONElement natural = dps::extractElementAtPath(sortObj, "$natural");
         if (!natural.eoo()) {
             csn->direction = natural.numberInt() >= 0 ? 1 : -1;
         }

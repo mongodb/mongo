@@ -37,6 +37,7 @@
 #include <iostream>
 
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/storage/mmap_v1/btree/key.h"
@@ -55,6 +56,8 @@ using std::numeric_limits;
 using std::string;
 using std::stringstream;
 using std::vector;
+
+namespace dps = ::mongo::dotted_path_support;
 
 typedef std::map<std::string, BSONElement> BSONMap;
 BSONMap bson2map(const BSONObj& obj) {
@@ -377,14 +380,6 @@ public:
     }
 };
 
-class WoSortOrder : public Base {
-public:
-    void run() {
-        ASSERT(BSON("a" << 1).woSortOrder(BSON("a" << 2), BSON("b" << 1 << "a" << 1)) < 0);
-        ASSERT(fromjson("{a:null}").woSortOrder(BSON("b" << 1), BSON("a" << 1)) == 0);
-    }
-};
-
 class MultiKeySortOrder : public Base {
 public:
     void run() {
@@ -435,13 +430,13 @@ public:
 
         BSONObj key = BSON("x" << 1 << "y" << 1);
 
-        ASSERT(BSON("x"
-                    << "c")
-                   .woSortOrder(BSON("x"
-                                     << "b"
-                                     << "y"
-                                     << "h"),
-                                key) > 0);
+        ASSERT(dps::compareObjectsAccordingToSort(BSON("x"
+                                                       << "c"),
+                                                  BSON("x"
+                                                       << "b"
+                                                       << "y"
+                                                       << "h"),
+                                                  key) > 0);
         ASSERT(BSON("x"
                     << "b"
                     << "y"
@@ -452,13 +447,13 @@ public:
 
         key = BSON("" << 1 << "" << 1);
 
-        ASSERT(BSON(""
-                    << "c")
-                   .woSortOrder(BSON(""
-                                     << "b"
-                                     << ""
-                                     << "h"),
-                                key) > 0);
+        ASSERT(dps::compareObjectsAccordingToSort(BSON(""
+                                                       << "c"),
+                                                  BSON(""
+                                                       << "b"
+                                                       << ""
+                                                       << "h"),
+                                                  key) > 0);
         ASSERT(BSON(""
                     << "b"
                     << ""
@@ -493,16 +488,18 @@ public:
             b.appendNull("");
             BSONObj o = b.obj();
             keyTest(o);
-            ASSERT(o.woSortOrder(BSON(""
-                                      << "b"
-                                      << ""
-                                      << "h"),
-                                 key) > 0);
-            ASSERT(BSON(""
-                        << "b"
-                        << ""
-                        << "h")
-                       .woSortOrder(o, key) < 0);
+            ASSERT(dps::compareObjectsAccordingToSort(o,
+                                                      BSON(""
+                                                           << "b"
+                                                           << ""
+                                                           << "h"),
+                                                      key) > 0);
+            ASSERT(dps::compareObjectsAccordingToSort(BSON(""
+                                                           << "b"
+                                                           << ""
+                                                           << "h"),
+                                                      o,
+                                                      key) < 0);
         }
 
         ASSERT(BSON(""
@@ -983,29 +980,6 @@ public:
             b.appendAs(foo.firstElement(), "bar");
         }
         ASSERT_EQUALS(BSON("bar" << 1), b.done());
-    }
-};
-
-class GetField {
-public:
-    void run() {
-        BSONObj o = BSON("a" << 1 << "b" << BSON("a" << 2) << "c"
-                             << BSON_ARRAY(BSON("a" << 3) << BSON("a" << 4)));
-        ASSERT_EQUALS(1, o.getFieldDotted("a").numberInt());
-        ASSERT_EQUALS(2, o.getFieldDotted("b.a").numberInt());
-        ASSERT_EQUALS(3, o.getFieldDotted("c.0.a").numberInt());
-        ASSERT_EQUALS(4, o.getFieldDotted("c.1.a").numberInt());
-        ASSERT(o.getFieldDotted("x").eoo());
-        ASSERT(o.getFieldDotted("a.x").eoo());
-        ASSERT(o.getFieldDotted("x.y").eoo());
-        ASSERT(o.getFieldDotted("").eoo());
-        ASSERT(o.getFieldDotted(".").eoo());
-        ASSERT(o.getFieldDotted("..").eoo());
-        ASSERT(o.getFieldDotted("...").eoo());
-        ASSERT(o.getFieldDotted("a.").eoo());
-        ASSERT(o.getFieldDotted(".a").eoo());
-        ASSERT(o.getFieldDotted("b.a.").eoo());
-        keyTest(o);
     }
 };
 
@@ -1766,18 +1740,6 @@ public:
     }
 };
 
-class ExtractFieldsTest {
-public:
-    void run() {
-        BSONObj x = BSON("a" << 10 << "b" << 11);
-        verify(BSON("a" << 10).woCompare(x.extractFields(BSON("a" << 1))) == 0);
-        verify(BSON("b" << 11).woCompare(x.extractFields(BSON("b" << 1))) == 0);
-        verify(x.woCompare(x.extractFields(BSON("a" << 1 << "b" << 1))) == 0);
-
-        verify((string) "a" == x.extractFields(BSON("a" << 1 << "c" << 1)).firstElementFieldName());
-    }
-};
-
 class ComparatorTest {
 public:
     BSONObj one(string s) {
@@ -2364,7 +2326,6 @@ public:
         add<BSONObjTests::WoCompareEmbeddedArray>();
         add<BSONObjTests::WoCompareOrdered>();
         add<BSONObjTests::WoCompareDifferentLength>();
-        add<BSONObjTests::WoSortOrder>();
         add<BSONObjTests::IsPrefixOf>();
         add<BSONObjTests::MultiKeySortOrder>();
         add<BSONObjTests::Nan>();
@@ -2374,7 +2335,6 @@ public:
         add<BSONObjTests::ToStringArray>();
         add<BSONObjTests::ToStringNumber>();
         add<BSONObjTests::AppendAs>();
-        add<BSONObjTests::GetField>();
         add<BSONObjTests::ToStringRecursionDepth>();
         add<BSONObjTests::StringWithNull>();
 
@@ -2428,7 +2388,6 @@ public:
         add<MinMaxKeyBuilder>();
         add<MinMaxElementTest>();
         add<ComparatorTest>();
-        add<ExtractFieldsTest>();
         add<CompatBSON>();
         add<CompareDottedFieldNamesTest>();
         add<CompareDottedArrayFieldNamesTest>();

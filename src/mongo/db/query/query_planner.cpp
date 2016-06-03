@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "mongo/client/dbclientinterface.h"  // For QueryOption_foobar
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_text.h"
@@ -52,6 +53,8 @@ namespace mongo {
 
 using std::unique_ptr;
 using std::numeric_limits;
+
+namespace dps = ::mongo::dotted_path_support;
 
 // Copied verbatim from db/index.h
 static bool isIdIndex(const BSONObj& pattern) {
@@ -460,8 +463,8 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
     if (!query.getParsed().getHint().isEmpty() || !query.getParsed().getSort().isEmpty()) {
         BSONObj hintObj = query.getParsed().getHint();
         BSONObj sortObj = query.getParsed().getSort();
-        BSONElement naturalHint = hintObj.getFieldDotted("$natural");
-        BSONElement naturalSort = sortObj.getFieldDotted("$natural");
+        BSONElement naturalHint = dps::extractElementAtPath(hintObj, "$natural");
+        BSONElement naturalSort = dps::extractElementAtPath(sortObj, "$natural");
 
         // A hint overrides a $natural sort. This means that we don't force a table
         // scan if there is a $natural sort with a non-$natural hint.

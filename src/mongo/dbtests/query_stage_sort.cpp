@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
@@ -52,6 +53,8 @@ namespace QueryStageSortTests {
 using std::set;
 using std::unique_ptr;
 using stdx::make_unique;
+
+namespace dps = ::mongo::dotted_path_support;
 
 class QueryStageSortTestBase {
 public:
@@ -180,7 +183,7 @@ public:
         BSONObj current;
         PlanExecutor::ExecState state;
         while (PlanExecutor::ADVANCED == (state = exec->getNext(&current, NULL))) {
-            int cmp = sgn(current.woSortOrder(last, params.pattern));
+            int cmp = sgn(dps::compareObjectsAccordingToSort(current, last, params.pattern));
             // The next object should be equal to the previous or oriented according to the sort
             // pattern.
             ASSERT(cmp == 0 || cmp == 1);

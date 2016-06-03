@@ -10,6 +10,7 @@ env.Library(
     ],
     LIBDEPS = [
         "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/bson/dotted_path_support",
         "$BUILD_DIR/mongo/db/service_context",
     ],
 )
@@ -83,6 +84,7 @@ env.Library(
         "scoped_timer",
         "working_set",
         "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/bson/dotted_path_support",
         "$BUILD_DIR/mongo/db/concurrency/write_conflict_exception",
         "$BUILD_DIR/mongo/db/commands",
         "$BUILD_DIR/mongo/db/curop",

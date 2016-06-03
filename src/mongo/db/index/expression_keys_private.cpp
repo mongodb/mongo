@@ -32,6 +32,7 @@
 
 #include <utility>
 
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/fts/fts_index_format.h"
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/geometry_container.h"
@@ -50,6 +51,8 @@
 namespace {
 
 using namespace mongo;
+
+namespace dps = ::mongo::dotted_path_support;
 
 //
 // Helper functions for getHaystackKeys
@@ -220,7 +223,7 @@ void ExpressionKeysPrivate::get2DKeys(const BSONObj& obj,
 
     // Get all the nested location fields, but don't return individual elements from
     // the last array, if it exists.
-    obj.getFieldsDotted(params.geo.c_str(), bSet, false);
+    dps::extractAllElementsAlongPath(obj, params.geo.c_str(), bSet, false);
 
     if (bSet.empty())
         return;
@@ -289,7 +292,7 @@ void ExpressionKeysPrivate::get2DKeys(const BSONObj& obj,
                  ++i) {
                 // Get *all* fields for the index key
                 BSONElementSet eSet;
-                obj.getFieldsDotted(i->first, eSet);
+                dps::extractAllElementsAlongPath(obj, i->first, eSet);
 
                 if (eSet.size() == 0)
                     b.appendNull("");
@@ -329,7 +332,7 @@ void ExpressionKeysPrivate::getHashKeys(const BSONObj& obj,
                                         const CollatorInterface* collator,
                                         BSONObjSet* keys) {
     const char* cstr = hashedField.c_str();
-    BSONElement fieldVal = obj.getFieldDottedOrArray(cstr);
+    BSONElement fieldVal = dps::extractElementAtPath(obj, cstr);
 
     // Convert strings to comparison keys.
     BSONObj fieldValObj;
@@ -365,7 +368,7 @@ void ExpressionKeysPrivate::getHaystackKeys(const BSONObj& obj,
                                             const std::vector<std::string>& otherFields,
                                             double bucketSize,
                                             BSONObjSet* keys) {
-    BSONElement loc = obj.getFieldDotted(geoField);
+    BSONElement loc = dps::extractElementAtPath(obj, geoField);
 
     if (loc.eoo()) {
         return;
@@ -390,9 +393,8 @@ void ExpressionKeysPrivate::getHaystackKeys(const BSONObj& obj,
 
     BSONElementSet all;
 
-    // This is getFieldsDotted (plural not singular) since the object we're indexing
-    // may be an array.
-    obj.getFieldsDotted(otherFields[0], all);
+    // The object we're indexing may be an array.
+    dps::extractAllElementsAlongPath(obj, otherFields[0], all);
 
     if (all.size() == 0) {
         // We're indexing a document that doesn't have the secondary non-geo field present.
@@ -444,7 +446,7 @@ void ExpressionKeysPrivate::getS2Keys(const BSONObj& obj,
         // the value of the field, or they're transformed if the field is geo.
         BSONElementSet fieldElements;
         // false means Don't expand the last array, duh.
-        obj.getFieldsDotted(e.fieldName(), fieldElements, false);
+        dps::extractAllElementsAlongPath(obj, e.fieldName(), fieldElements, false);
 
         BSONObjSet keysForThisField;
         if (IndexNames::GEO_2DSPHERE == e.valuestr()) {

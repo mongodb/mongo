@@ -37,6 +37,7 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
@@ -60,6 +61,8 @@ namespace mongo {
 using std::unique_ptr;
 using std::string;
 using std::stringstream;
+
+namespace dps = ::mongo::dotted_path_support;
 
 namespace {
 
@@ -223,7 +226,7 @@ public:
             // available to us without this.  If a collection scan is providing the data, we may
             // have to expand an array.
             BSONElementSet elts;
-            obj.getFieldsDotted(key, elts);
+            dps::extractAllElementsAlongPath(obj, key, elts);
 
             for (BSONElementSet::iterator it = elts.begin(); it != elts.end(); ++it) {
                 BSONElement elt = *it;

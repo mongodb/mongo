@@ -33,6 +33,7 @@
 #include <third_party/murmurhash3/MurmurHash3.h>
 
 #include "mongo/base/init.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/fts/fts_index_format.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/util/hex.h"
@@ -45,6 +46,8 @@ namespace fts {
 
 using std::string;
 using std::vector;
+
+namespace dps = ::mongo::dotted_path_support;
 
 namespace {
 BSONObj nullObj;
@@ -115,7 +118,7 @@ void FTSIndexFormat::getKeys(const FTSSpec& spec, const BSONObj& obj, BSONObjSet
 
     // compute the non FTS key elements
     for (unsigned i = 0; i < spec.numExtraBefore(); i++) {
-        BSONElement e = obj.getFieldDotted(spec.extraBefore(i));
+        BSONElement e = dps::extractElementAtPath(obj, spec.extraBefore(i));
         if (e.eoo())
             e = nullElt;
         uassert(16675, "cannot have a multi-key as a prefix to a text index", e.type() != Array);
@@ -123,7 +126,7 @@ void FTSIndexFormat::getKeys(const FTSSpec& spec, const BSONObj& obj, BSONObjSet
         extraSize += e.size();
     }
     for (unsigned i = 0; i < spec.numExtraAfter(); i++) {
-        BSONElement e = obj.getFieldDotted(spec.extraAfter(i));
+        BSONElement e = dps::extractElementAtPath(obj, spec.extraAfter(i));
         if (e.eoo())
             e = nullElt;
         extrasAfter.push_back(e);

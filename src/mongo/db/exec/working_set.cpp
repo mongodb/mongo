@@ -28,6 +28,7 @@
 
 #include "mongo/db/exec/working_set.h"
 
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/record_fetcher.h"
@@ -35,6 +36,8 @@
 namespace mongo {
 
 using std::string;
+
+namespace dps = ::mongo::dotted_path_support;
 
 WorkingSet::MemberHolder::MemberHolder() : member(NULL) {}
 WorkingSet::MemberHolder::~MemberHolder() {}
@@ -205,7 +208,7 @@ bool WorkingSetMember::hasFetcher() const {
 bool WorkingSetMember::getFieldDotted(const string& field, BSONElement* out) const {
     // If our state is such that we have an object, use it.
     if (hasObj()) {
-        *out = obj.value().getFieldDotted(field);
+        *out = dps::extractElementAtPath(obj.value(), field);
         return true;
     }
 

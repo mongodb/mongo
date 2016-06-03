@@ -33,6 +33,7 @@
 #include "mongo/db/exec/update.h"
 
 #include "mongo/bson/mutable/algorithm.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -54,6 +55,7 @@ using std::vector;
 using stdx::make_unique;
 
 namespace mb = mutablebson;
+namespace dps = ::mongo::dotted_path_support;
 
 namespace {
 
@@ -351,7 +353,7 @@ inline Status validate(const BSONObj& original,
             }
         } else {
             // Find the potentially affected field in the original document.
-            const BSONElement oldElem = original.getFieldDotted(current.dottedField());
+            const BSONElement oldElem = dps::extractElementAtPath(original, current.dottedField());
             const BSONElement oldIdElem = original.getField(idFieldName);
 
             // Ensure no arrays since neither _id nor shard keys can be in an array, or one.

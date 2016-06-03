@@ -35,6 +35,7 @@
 
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbdirectclient.h"
@@ -50,6 +51,8 @@ using std::numeric_limits;
 using std::string;
 using std::stringstream;
 using std::vector;
+
+namespace dps = ::mongo::dotted_path_support;
 
 class ClientBase {
 public:
@@ -1391,8 +1394,8 @@ struct ProjectKeyCmp {
     ProjectKeyCmp(BSONObj pattern) : sortPattern(pattern) {}
 
     int operator()(const BSONObj& left, const BSONObj& right) const {
-        BSONObj keyLeft = left.extractFields(sortPattern, true);
-        BSONObj keyRight = right.extractFields(sortPattern, true);
+        BSONObj keyLeft = dps::extractElementsBasedOnTemplate(left, sortPattern, true);
+        BSONObj keyRight = dps::extractElementsBasedOnTemplate(right, sortPattern, true);
         return keyLeft.woCompare(keyRight, sortPattern) < 0;
     }
 };

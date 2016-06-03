@@ -31,6 +31,7 @@
 #include "mongo/db/exec/group.h"
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/exec/scoped_timer.h"
@@ -42,6 +43,8 @@ namespace mongo {
 using std::unique_ptr;
 using std::vector;
 using stdx::make_unique;
+
+namespace dps = ::mongo::dotted_path_support;
 
 namespace {
 
@@ -64,7 +67,7 @@ Status getKey(
         *key = s->getObject("__returnValue");
         return Status::OK();
     }
-    *key = obj.extractFields(keyPattern, true).getOwned();
+    *key = dps::extractElementsBasedOnTemplate(obj, keyPattern, true).getOwned();
     return Status::OK();
 }
 

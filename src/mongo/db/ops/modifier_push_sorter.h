@@ -30,6 +30,7 @@
 
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
@@ -46,6 +47,7 @@ struct PatternElementCmp {
         : sortPattern(pattern), useWholeValue(pattern.hasField("")) {}
 
     bool operator()(const mutablebson::Element& lhs, const mutablebson::Element& rhs) const {
+        namespace dps = ::mongo::dotted_path_support;
         if (useWholeValue) {
             const int comparedValue = lhs.compareWithElement(rhs, false);
 
@@ -59,8 +61,8 @@ struct PatternElementCmp {
             BSONObj rhsObj =
                 rhs.getType() == Object ? rhs.getValueObject() : rhs.getValue().wrap("");
 
-            BSONObj lhsKey = lhsObj.extractFields(sortPattern, true);
-            BSONObj rhsKey = rhsObj.extractFields(sortPattern, true);
+            BSONObj lhsKey = dps::extractElementsBasedOnTemplate(lhsObj, sortPattern, true);
+            BSONObj rhsKey = dps::extractElementsBasedOnTemplate(rhsObj, sortPattern, true);
 
             return lhsKey.woCompare(rhsKey, sortPattern) < 0;
         }

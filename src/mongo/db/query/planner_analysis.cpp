@@ -33,6 +33,7 @@
 #include <set>
 #include <vector>
 
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/jsobj.h"
@@ -47,6 +48,8 @@ using std::unique_ptr;
 using std::endl;
 using std::string;
 using std::vector;
+
+namespace dps = ::mongo::dotted_path_support;
 
 //
 // Helpers for bounds explosion AKA quick-and-dirty SERVER-1205.
@@ -472,7 +475,7 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
 
     // If the sort is $natural, we ignore it, assuming that the caller has detected that and
     // outputted a collscan to satisfy the desired order.
-    BSONElement natural = sortObj.getFieldDotted("$natural");
+    BSONElement natural = dps::extractElementAtPath(sortObj, "$natural");
     if (!natural.eoo()) {
         return solnRoot;
     }

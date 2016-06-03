@@ -111,6 +111,7 @@ dbtest = env.Program(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/auth/authmocks",
+        "$BUILD_DIR/mongo/db/bson/dotted_path_support",
         "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
         "$BUILD_DIR/mongo/db/query/query",
         "$BUILD_DIR/mongo/db/query/query_test_service_context",

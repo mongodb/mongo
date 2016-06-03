@@ -39,6 +39,7 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/bson/ordering.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/ops/log_builder.h"
@@ -64,6 +65,8 @@ using mongo::mutablebson::Document;
 using mongo::mutablebson::Element;
 using std::sort;
 using std::vector;
+
+namespace dps = ::mongo::dotted_path_support;
 
 void combineVec(const vector<int>& origVec,
                 const vector<int>& modVec,
@@ -113,8 +116,8 @@ struct ProjectKeyCmp {
         if (useWholeValue) {
             ret = left.woCompare(right, Ordering::make(sortPattern), false);
         } else {
-            BSONObj lhsKey = left.extractFields(sortPattern, true);
-            BSONObj rhsKey = right.extractFields(sortPattern, true);
+            BSONObj lhsKey = dps::extractElementsBasedOnTemplate(left, sortPattern, true);
+            BSONObj rhsKey = dps::extractElementsBasedOnTemplate(right, sortPattern, true);
             ret = lhsKey.woCompare(rhsKey, sortPattern);
         }
         return ret < 0;

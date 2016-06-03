@@ -30,10 +30,13 @@
 
 #include <vector>
 
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/db/record_id.h"
 
 namespace mongo {
+
+namespace dps = ::mongo::dotted_path_support;
 
 class GeoHaystackSearchHopper {
 public:
@@ -63,7 +66,7 @@ public:
     void consider(const RecordId& loc) {
         if (limitReached())
             return;
-        Point p(_collection->docFor(_txn, loc).value().getFieldDotted(_geoField));
+        Point p(dps::extractElementAtPath(_collection->docFor(_txn, loc).value(), _geoField));
         if (distance(_near, p) > _maxDistance)
             return;
         _locs.push_back(loc);

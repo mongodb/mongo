@@ -217,24 +217,6 @@ public:
     /** adds the field names to the fields set.  does NOT clear it (appends). */
     int getFieldNames(std::set<std::string>& fields) const;
 
-    /** @return the specified element.  element.eoo() will be true if not found.
-        @param name field to find. supports dot (".") notation to reach into embedded objects.
-         for example "x.y" means "in the nested object in field x, retrieve field y"
-    */
-    BSONElement getFieldDotted(StringData name) const;
-
-    /** Like getFieldDotted(), but expands arrays and returns all matching objects.
-     *  Turning off expandLastArray allows you to retrieve nested array objects instead of
-     *  their contents.
-     */
-    void getFieldsDotted(StringData name, BSONElementSet& ret, bool expandLastArray = true) const;
-    void getFieldsDotted(StringData name, BSONElementMSet& ret, bool expandLastArray = true) const;
-
-    /** Like getFieldDotted(), but returns first array encountered while traversing the
-        dotted fields of name.  The name variable is updated to represent field
-        names with respect to the returned element. */
-    BSONElement getFieldDottedOrArray(const char*& name) const;
-
     /** Get the field of the specified name. eoo() is true on the returned
         element if not found.
     */
@@ -308,13 +290,6 @@ public:
      *
     */
     BSONObj extractFieldsUnDotted(const BSONObj& pattern) const;
-
-    /** extract items from object which match a pattern object.
-        e.g., if pattern is { x : 1, y : 1 }, builds an object with
-        x and y elements of this object, if they are present.
-       returns elements with original field names
-    */
-    BSONObj extractFields(const BSONObj& pattern, bool fillWithNull = false) const;
 
     BSONObj filterFieldsUndotted(const BSONObj& filter, bool inFilter) const;
 
@@ -429,11 +404,6 @@ public:
     bool operator>=(const BSONObj& other) const {
         return woCompare(other) >= 0;
     }
-
-    /**
-     * @param useDotted whether to treat sort key fields as possibly dotted and expand into them
-     */
-    int woSortOrder(const BSONObj& r, const BSONObj& sortKey, bool useDotted = false) const;
 
     bool equal(const BSONObj& r) const;
 

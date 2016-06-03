@@ -7,6 +7,7 @@ Import("wiredtiger")
 env.SConscript(
     dirs=[
         'auth',
+        'bson',
         'catalog',
         'commands',
         'concurrency',
@@ -694,6 +695,7 @@ serveronlyEnv = env.Clone()
 serveronlyEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
 serveronlyLibdeps = [
     "$BUILD_DIR/mongo/client/parallel",
+    "$BUILD_DIR/mongo/db/bson/dotted_path_support",
     "$BUILD_DIR/mongo/executor/network_interface_factory",
     "$BUILD_DIR/mongo/s/catalog/replset/catalog_manager_replica_set",
     "$BUILD_DIR/mongo/s/client/sharding_connection_hook",

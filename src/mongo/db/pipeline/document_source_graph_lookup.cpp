@@ -31,6 +31,7 @@
 #include "document_source.h"
 
 #include "mongo/base/init.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression.h"
@@ -42,6 +43,8 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 using std::unique_ptr;
+
+namespace dps = ::mongo::dotted_path_support;
 
 REGISTER_DOCUMENT_SOURCE(graphLookup, DocumentSourceGraphLookUp::createFromBson);
 
@@ -220,7 +223,7 @@ bool DocumentSourceGraphLookUp::addToVisitedAndFrontier(BSONObj result, long lon
     // array, we treat it as connecting to multiple values, so we must add each element to
     // '_frontier'.
     BSONElementSet recurseOnValues;
-    result.getFieldsDotted(_connectFromField.getPath(false), recurseOnValues);
+    dps::extractAllElementsAlongPath(result, _connectFromField.getPath(false), recurseOnValues);
 
     for (auto&& elem : recurseOnValues) {
         Value recurseOn = Value(elem);
@@ -243,7 +246,7 @@ bool DocumentSourceGraphLookUp::addToVisitedAndFrontier(BSONObj result, long lon
 void DocumentSourceGraphLookUp::addToCache(const BSONObj& result,
                                            const unordered_set<Value, Value::Hash>& queried) {
     BSONElementSet cacheByValues;
-    result.getFieldsDotted(_connectToField.getPath(false), cacheByValues);
+    dps::extractAllElementsAlongPath(result, _connectToField.getPath(false), cacheByValues);
 
     for (auto&& elem : cacheByValues) {
         Value cacheBy(elem);

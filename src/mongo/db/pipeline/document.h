@@ -99,7 +99,7 @@ public:
         return storage().getField(pos).val;
     }
 
-    /** Similar to BSONObj::getFieldDotted, but using FieldPath rather than a dotted string.
+    /** Similar to extractAllElementsAlongPath(), but using FieldPath rather than a dotted string.
      *  If you pass a non-NULL positions vector, you get back a path suitable
      *  to pass to MutableDocument::setNestedField.
      *

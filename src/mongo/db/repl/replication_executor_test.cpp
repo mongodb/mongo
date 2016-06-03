@@ -31,6 +31,7 @@
 #include <map>
 
 #include "mongo/base/init.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_executor.h"
@@ -52,6 +53,8 @@ namespace {
 
 using executor::NetworkInterfaceMock;
 using unittest::assertGet;
+
+namespace dps = ::mongo::dotted_path_support;
 
 const int64_t prngSeed = 1;
 
@@ -175,12 +178,14 @@ TEST_F(ReplicationExecutorTest, CancelBeforeRunningFutureWork) {
         });
     ASSERT_OK(cbhWithStatus.getStatus());
 
-    ASSERT_EQUALS(1, executor.getDiagnosticBSON().getFieldDotted("queues.sleepers").Int());
-    ASSERT_EQUALS(0, executor.getDiagnosticBSON().getFieldDotted("queues.ready").Int());
+    ASSERT_EQUALS(1,
+                  dps::extractElementAtPath(executor.getDiagnosticBSON(), "queues.sleepers").Int());
+    ASSERT_EQUALS(0, dps::extractElementAtPath(executor.getDiagnosticBSON(), "queues.ready").Int());
     executor.cancel(cbhWithStatus.getValue());
 
-    ASSERT_EQUALS(0, executor.getDiagnosticBSON().getFieldDotted("queues.sleepers").Int());
-    ASSERT_EQUALS(1, executor.getDiagnosticBSON().getFieldDotted("queues.ready").Int());
+    ASSERT_EQUALS(0,
+                  dps::extractElementAtPath(executor.getDiagnosticBSON(), "queues.sleepers").Int());
+    ASSERT_EQUALS(1, dps::extractElementAtPath(executor.getDiagnosticBSON(), "queues.ready").Int());
 }
 
 // Equivalent to EventChainAndWaitingTest::onGo
@@ -199,7 +204,7 @@ TEST_F(ReplicationExecutorTest, ScheduleCallbackOnFutureEvent) {
 
     // Wait for a future event.
     executor.onEvent(ping, fn);
-    ASSERT_EQUALS(0, executor.getDiagnosticBSON().getFieldDotted("queues.ready").Int());
+    ASSERT_EQUALS(0, dps::extractElementAtPath(executor.getDiagnosticBSON(), "queues.ready").Int());
     executor.signalEvent(ping);
     executor.waitForEvent(pong);
 }

@@ -92,6 +92,7 @@ env.Library(
         'unset_sharding_command.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
         '$BUILD_DIR/mongo/s/serveronly',

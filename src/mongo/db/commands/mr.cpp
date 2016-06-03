@@ -37,6 +37,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/parallel.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -90,6 +91,8 @@ using std::string;
 using std::stringstream;
 using std::unique_ptr;
 using std::vector;
+
+namespace dps = ::mongo::dotted_path_support;
 
 namespace mr {
 
@@ -1090,7 +1093,7 @@ void State::finalReduce(OperationContext* txn, CurOp* curOp, ProgressMeterHolder
         o = o.getOwned();  // we will be accessing outside of the lock
         pm.hit();
 
-        if (o.woSortOrder(prev, sortKey) == 0) {
+        if (dps::compareObjectsAccordingToSort(o, prev, sortKey) == 0) {
             // object is same as previous, add to array
             all.push_back(o);
             if (pm->hits() % 100 == 0) {
@@ -1799,7 +1802,7 @@ public:
                         continue;
                     }
 
-                    if (t.woSortOrder(*(values.begin()), sortKey) == 0) {
+                    if (dps::compareObjectsAccordingToSort(t, *(values.begin()), sortKey) == 0) {
                         values.push_back(t);
                         continue;
                     }

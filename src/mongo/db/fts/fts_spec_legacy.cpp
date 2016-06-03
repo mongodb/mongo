@@ -28,6 +28,7 @@
 
 #include "mongo/db/fts/fts_spec.h"
 
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stringutils.h"
 
@@ -43,6 +44,8 @@ namespace fts {
 using std::map;
 using std::string;
 using namespace mongoutils;
+
+namespace dps = ::mongo::dotted_path_support;
 
 namespace {
 void _addFTSStuff(BSONObjBuilder* b) {
@@ -170,7 +173,7 @@ void FTSSpec::_scoreDocumentV1(const BSONObj& obj, TermFrequencyMap* term_freqs)
     for (Weights::const_iterator i = _weights.begin(); i != _weights.end(); i++) {
         const char* leftOverName = i->first.c_str();
         // name of field
-        BSONElement e = obj.getFieldDottedOrArray(leftOverName);
+        BSONElement e = dps::extractElementAtPath(obj, leftOverName);
         // weight associated to name of field
         double weight = i->second;
 
@@ -181,7 +184,7 @@ void FTSSpec::_scoreDocumentV1(const BSONObj& obj, TermFrequencyMap* term_freqs)
             while (j.more()) {
                 BSONElement x = j.next();
                 if (leftOverName[0] && x.isABSONObj())
-                    x = x.Obj().getFieldDotted(leftOverName);
+                    x = dps::extractElementAtPath(x.Obj(), leftOverName);
                 if (x.type() == String)
                     _scoreStringV1(tools, x.valuestr(), term_freqs, weight);
             }

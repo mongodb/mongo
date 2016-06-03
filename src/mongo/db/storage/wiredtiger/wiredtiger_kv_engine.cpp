@@ -43,6 +43,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
@@ -77,6 +78,8 @@ namespace mongo {
 
 using std::set;
 using std::string;
+
+namespace dps = ::mongo::dotted_path_support;
 
 class WiredTigerKVEngine::WiredTigerJournalFlusher : public BackgroundJob {
 public:
@@ -509,8 +512,9 @@ Status WiredTigerKVEngine::createSortedDataInterface(OperationContext* opCtx,
 
         if (!collOptions.indexOptionDefaults["storageEngine"].eoo()) {
             BSONObj storageEngineOptions = collOptions.indexOptionDefaults["storageEngine"].Obj();
-            collIndexOptions = storageEngineOptions.getFieldDotted(_canonicalName + ".configString")
-                                   .valuestrsafe();
+            collIndexOptions =
+                dps::extractElementAtPath(storageEngineOptions, _canonicalName + ".configString")
+                    .valuestrsafe();
         }
     }
 

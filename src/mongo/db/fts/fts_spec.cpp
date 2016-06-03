@@ -31,6 +31,7 @@
 
 #include "mongo/db/fts/fts_spec.h"
 
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/fts/fts_element_iterator.h"
 #include "mongo/db/fts/fts_tokenizer.h"
@@ -45,6 +46,7 @@ namespace fts {
 using std::map;
 using std::string;
 using namespace mongoutils;
+namespace dps = ::mongo::dotted_path_support;
 
 const double DEFAULT_WEIGHT = 1;
 const double MAX_WEIGHT = 1000000000;
@@ -242,7 +244,7 @@ Status FTSSpec::getIndexPrefix(const BSONObj& query, BSONObj* out) const {
 
     BSONObjBuilder b;
     for (unsigned i = 0; i < numExtraBefore(); i++) {
-        BSONElement e = query.getFieldDotted(extraBefore(i));
+        BSONElement e = dps::extractElementAtPath(query, extraBefore(i));
         if (e.eoo())
             return Status(ErrorCodes::BadValue,
                           str::stream() << "need have an equality filter on: " << extraBefore(i));

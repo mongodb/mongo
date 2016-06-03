@@ -39,6 +39,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
@@ -59,6 +60,8 @@ using std::set;
 using std::string;
 using std::stringstream;
 using std::vector;
+
+namespace dps = ::mongo::dotted_path_support;
 
 namespace {
 
@@ -269,8 +272,8 @@ public:
             // to be removed at the end. If a key appears more times than entries allowed on a
             // chunk, we issue a warning and split on the following key.
             set<BSONObj> tooFrequentKeys;
-            splitKeys.push_back(
-                prettyKey(idx->keyPattern(), currKey.getOwned()).extractFields(keyPattern));
+            splitKeys.push_back(dps::extractElementsBasedOnTemplate(
+                prettyKey(idx->keyPattern(), currKey.getOwned()), keyPattern));
 
             exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
             while (1) {
@@ -278,8 +281,8 @@ public:
                     currCount++;
 
                     if (currCount > keyCount && !forceMedianSplit) {
-                        currKey = prettyKey(idx->keyPattern(), currKey.getOwned())
-                                      .extractFields(keyPattern);
+                        currKey = dps::extractElementsBasedOnTemplate(
+                            prettyKey(idx->keyPattern(), currKey.getOwned()), keyPattern);
                         // Do not use this split key if it is the same used in the previous split
                         // point.
                         if (currKey.woCompare(splitKeys.back()) == 0) {

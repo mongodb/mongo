@@ -34,6 +34,7 @@
 
 
 #include "mongo/base/status.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/index/expression_keys_private.h"
@@ -46,6 +47,8 @@
 namespace mongo {
 
 using std::unique_ptr;
+
+namespace dps = ::mongo::dotted_path_support;
 
 HaystackAccessMethod::HaystackAccessMethod(IndexCatalogEntry* btreeState,
                                            SortedDataInterface* btree)
@@ -95,7 +98,7 @@ void HaystackAccessMethod::searchCommand(OperationContext* txn,
 
             for (unsigned i = 0; i < _otherFields.size(); i++) {
                 // See if the non-geo field we're indexing on is in the provided search term.
-                BSONElement e = search.getFieldDotted(_otherFields[i]);
+                BSONElement e = dps::extractElementAtPath(search, _otherFields[i]);
                 if (e.eoo())
                     bb.appendNull("");
                 else

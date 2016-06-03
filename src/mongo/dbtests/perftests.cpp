@@ -47,6 +47,7 @@
 #include <mutex>
 
 #include "mongo/config.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbdirectclient.h"
@@ -74,6 +75,8 @@ using std::setprecision;
 using std::setw;
 using std::string;
 using std::vector;
+
+namespace dps = ::mongo::dotted_path_support;
 
 const bool profiling = false;
 
@@ -199,7 +202,8 @@ public:
                             cout << "stats " << setw(42) << right << "new/old:" << ' ' << setw(9);
                             cout << fixed << setprecision(2) << rps / lastrps;
                             if (needver) {
-                                cout << "         " << o.getFieldDotted("info.git").toString();
+                                cout << "         "
+                                     << dps::extractElementAtPath(o, "info.git").toString();
                             }
                             cout << '\n';
                         }

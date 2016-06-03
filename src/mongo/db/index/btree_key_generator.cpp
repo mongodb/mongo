@@ -31,12 +31,15 @@
 #include <boost/optional.hpp>
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+namespace dps = ::mongo::dotted_path_support;
 
 // SortStage checks for this error code in order to informatively error when we try to sort keys
 // with parallel arrays.
@@ -114,7 +117,7 @@ void BtreeKeyGeneratorV0::getKeysImpl(std::vector<const char*> fieldNames,
         if (*fieldNames[i] == '\0')
             continue;
 
-        BSONElement e = obj.getFieldDottedOrArray(fieldNames[i]);
+        BSONElement e = dps::extractElementAtPathOrArrayAlongPath(obj, fieldNames[i]);
 
         if (e.eoo()) {
             e = nullElt;  // no matching field
@@ -251,7 +254,7 @@ BSONElement BtreeKeyGeneratorV1::extractNextElement(const BSONObj& obj,
 
     *arrayNestedArray = false;
     if (haveObjField) {
-        return obj.getFieldDottedOrArray(*field);
+        return dps::extractElementAtPathOrArrayAlongPath(obj, *field);
     } else if (positionalInfo.hasPositionallyIndexedElt()) {
         if (arrField.type() == Array) {
             *arrayNestedArray = true;
@@ -436,10 +439,10 @@ void BtreeKeyGeneratorV1::getKeysImplWithArray(
                 continue;
             }
 
-            // The earlier call to BSONObj::getFieldDottedOrArray(fieldNames[i]) modified
-            // fieldNames[i] to refer to the suffix of the path immediately following the 'arrElt'
-            // array value. If we haven't reached the end of this indexed field yet, then we must
-            // have traversed through 'arrElt'.
+            // The earlier call to dps::extractElementAtPathOrArrayAlongPath(..., fieldNames[i])
+            // modified fieldNames[i] to refer to the suffix of the path immediately following the
+            // 'arrElt' array value. If we haven't reached the end of this indexed field yet, then
+            // we must have traversed through 'arrElt'.
             invariant(fieldIsArray);
 
             StringData part = fieldNames[i];
@@ -479,8 +482,8 @@ void BtreeKeyGeneratorV1::getKeysImplWithArray(
             // multikey.
             subPositionalInfo[i].arrayObj = arrObj;
             subPositionalInfo[i].remainingPath = fieldNames[i];
-            subPositionalInfo[i].dottedElt =
-                arrObj.getFieldDottedOrArray(subPositionalInfo[i].remainingPath);
+            subPositionalInfo[i].dottedElt = dps::extractElementAtPathOrArrayAlongPath(
+                arrObj, subPositionalInfo[i].remainingPath);
         }
 
         // Generate a key for each element of the indexed array.
