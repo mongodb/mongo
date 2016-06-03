@@ -130,14 +130,27 @@ env.Alias('generated-sources', "wiredtiger.h")
 #
 # WiredTiger library
 #
-filelistfile = "build_win/filelist.win" if env.TargetOSIs('windows') else 'dist/filelist'
+# Map WiredTiger build conditions: any conditions that appear in WiredTiger's
+# dist/filelist must appear here, and if the value is true, those files will be
+# included.
+#
+condition_map = {
+    'POSIX_HOST' : not env.TargetOSIs('windows'),
+    'POWERPC_HOST' : env['TARGET_ARCH'] == 'ppc64le',
+    'WINDOWS_HOST' : env.TargetOSIs('windows'),
+}
 
-wtsources = []
+def filtered_filelist(f):
+    for line in f:
+        file_cond = line.split()
+        if line.startswith("#") or len(file_cond) == 0:
+            continue
+        if len(file_cond) == 1 or condition_map[file_cond[1]]:
+            yield file_cond[0]
 
+filelistfile = 'dist/filelist'
 with open(File(filelistfile).srcnode().abspath) as filelist:
-    wtsources = [line.strip()
-                 for line in filelist
-                 if not line.startswith("#") and len(line.strip()) >= 1]
+    wtsources = list(filtered_filelist(filelist))
 
 if useZlib:
     env.Append(CPPDEFINES=['HAVE_BUILTIN_EXTENSION_ZLIB'])
