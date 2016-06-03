@@ -42,8 +42,7 @@ using std::string;
 namespace {
 
 bool indexTypeSupportsPathLevelMultikeyTracking(StringData accessMethod) {
-    // TODO SERVER-23906: Enable path-level multikey tracking for new 2dsphere indexes.
-    return accessMethod == IndexNames::BTREE;
+    return accessMethod == IndexNames::BTREE || accessMethod == IndexNames::GEO_2DSPHERE;
 }
 
 }  // namespace

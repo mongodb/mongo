@@ -259,12 +259,22 @@ DEATH_TEST_F(KVCollectionCatalogEntryTest,
     collEntry->setIndexIsMultikey(opCtx.get(), indexName, {std::set<size_t>{}, std::set<size_t>{}});
 }
 
+TEST_F(KVCollectionCatalogEntryTest, PathLevelMultikeyTrackingIsSupportedBy2dsphereIndexes) {
+    std::string indexType = IndexNames::GEO_2DSPHERE;
+    std::string indexName = createIndex(BSON("a" << indexType << "b" << 1), indexType);
+    CollectionCatalogEntry* collEntry = getCollectionCatalogEntry();
+
+    auto opCtx = newOperationContext();
+    {
+        MultikeyPaths multikeyPaths;
+        ASSERT(!collEntry->isIndexMultikey(opCtx.get(), indexName, &multikeyPaths));
+        assertMultikeyPathsAreEqual(multikeyPaths, {std::set<size_t>{}, std::set<size_t>{}});
+    }
+}
+
 TEST_F(KVCollectionCatalogEntryTest, PathLevelMultikeyTrackingIsNotSupportedByAllIndexTypes) {
-    std::string indexTypes[] = {IndexNames::GEO_2D,
-                                IndexNames::GEO_HAYSTACK,
-                                IndexNames::GEO_2DSPHERE,
-                                IndexNames::TEXT,
-                                IndexNames::HASHED};
+    std::string indexTypes[] = {
+        IndexNames::GEO_2D, IndexNames::GEO_HAYSTACK, IndexNames::TEXT, IndexNames::HASHED};
 
     for (auto&& indexType : indexTypes) {
         std::string indexName = createIndex(BSON("a" << indexType << "b" << 1), indexType);
