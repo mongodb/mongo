@@ -240,12 +240,26 @@ wtheader = env.Substfile(
 #
 # WiredTiger library
 #
-filelistfile = r'build_win\filelist.win'
-filelist = open(filelistfile)
-wtsources = [line.strip()
-             for line in filelist
-             if not line.startswith("#") and len(line) > 1]
-filelist.close()
+# Map WiredTiger build conditions: any conditions that appear in WiredTiger's
+# dist/filelist must appear here, and if the value is true, those files will be
+# included.
+#
+condition_map = {
+    'POSIX_HOST' : env['PLATFORM'] == 'posix',
+    'POWERPC_HOST' : False,
+    'WINDOWS_HOST' : env['PLATFORM'] == 'win32',
+}
+
+def filtered_filelist(f):
+    for line in f:
+        file_cond = line.split()
+        if line.startswith("#") or len(file_cond) == 0:
+            continue
+        if len(file_cond) == 1 or condition_map[file_cond[1]]:
+            yield file_cond[0]
+
+filelistfile = r'dist/filelist'
+wtsources = list(filtered_filelist(open(filelistfile)))
 
 if useZlib:
     wtsources.append("ext/compressors/zlib/zlib_compress.c")

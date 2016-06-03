@@ -47,7 +47,7 @@ EOF
 # signatures are on multiple lines, that is, #ifdef'd function signatures. Since
 # the OS directories are the only places with repeated names, and they have no
 # #ifdef'd signatures, we do it this way.
-l=`sed -e '/^[a-z]/!d' -e '/src\/os/d' filelist`
+l=`sed -e '/^[a-z]/!d' -e '/src\/os/d' -e 's/[	 ].*$//' filelist`
 for i in $l; do
 	proto ../$i
 done

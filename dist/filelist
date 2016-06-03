@@ -48,8 +48,8 @@ src/btree/row_modify.c
 src/btree/row_srch.c
 src/cache/cache_las.c
 src/checksum/checksum.c
-src/checksum/power8/crc32.S
-src/checksum/power8/crc32_wrapper.c
+src/checksum/power8/crc32.S		POWERPC_HOST
+src/checksum/power8/crc32_wrapper.c	POWERPC_HOST
 src/config/config.c
 src/config/config_api.c
 src/config/config_check.c
@@ -113,23 +113,41 @@ src/os_common/os_fstream.c
 src/os_common/os_fstream_stdio.c
 src/os_common/os_getopt.c
 src/os_common/os_strtouq.c
-src/os_posix/os_dir.c
-src/os_posix/os_dlopen.c
-src/os_posix/os_errno.c
-src/os_posix/os_fallocate.c
-src/os_posix/os_fs.c
-src/os_posix/os_getenv.c
-src/os_posix/os_map.c
-src/os_posix/os_mtx_cond.c
-src/os_posix/os_once.c
-src/os_posix/os_pagesize.c
-src/os_posix/os_path.c
-src/os_posix/os_priv.c
-src/os_posix/os_setvbuf.c
-src/os_posix/os_sleep.c
-src/os_posix/os_thread.c
-src/os_posix/os_time.c
-src/os_posix/os_yield.c
+src/os_posix/os_dir.c			POSIX_HOST
+src/os_posix/os_dlopen.c		POSIX_HOST
+src/os_posix/os_errno.c			POSIX_HOST
+src/os_posix/os_fallocate.c		POSIX_HOST
+src/os_posix/os_fs.c			POSIX_HOST
+src/os_posix/os_getenv.c		POSIX_HOST
+src/os_posix/os_map.c			POSIX_HOST
+src/os_posix/os_mtx_cond.c		POSIX_HOST
+src/os_posix/os_once.c			POSIX_HOST
+src/os_posix/os_pagesize.c		POSIX_HOST
+src/os_posix/os_path.c			POSIX_HOST
+src/os_posix/os_priv.c			POSIX_HOST
+src/os_posix/os_setvbuf.c		POSIX_HOST
+src/os_posix/os_sleep.c			POSIX_HOST
+src/os_posix/os_thread.c		POSIX_HOST
+src/os_posix/os_time.c			POSIX_HOST
+src/os_posix/os_yield.c			POSIX_HOST
+src/os_win/os_dir.c			WINDOWS_HOST
+src/os_win/os_dlopen.c			WINDOWS_HOST
+src/os_win/os_errno.c			WINDOWS_HOST
+src/os_win/os_fs.c			WINDOWS_HOST
+src/os_win/os_getenv.c			WINDOWS_HOST
+src/os_win/os_map.c			WINDOWS_HOST
+src/os_win/os_mtx_cond.c		WINDOWS_HOST
+src/os_win/os_once.c			WINDOWS_HOST
+src/os_win/os_pagesize.c		WINDOWS_HOST
+src/os_win/os_path.c			WINDOWS_HOST
+src/os_win/os_priv.c			WINDOWS_HOST
+src/os_win/os_setvbuf.c			WINDOWS_HOST
+src/os_win/os_sleep.c			WINDOWS_HOST
+src/os_win/os_snprintf.c		WINDOWS_HOST
+src/os_win/os_thread.c			WINDOWS_HOST
+src/os_win/os_time.c			WINDOWS_HOST
+src/os_win/os_vsnprintf.c		WINDOWS_HOST
+src/os_win/os_yield.c			WINDOWS_HOST
 src/packing/pack_api.c
 src/packing/pack_impl.c
 src/packing/pack_stream.c

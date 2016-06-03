@@ -169,11 +169,6 @@ __win_file_lock(
 	 * WiredTiger requires this function be able to acquire locks past
 	 * the end of file.
 	 *
-	 * Note we're using fcntl(2) locking: all fcntl locks associated with a
-	 * file for a given process are removed when any file descriptor for the
-	 * file is closed by the process, even if a lock was never requested for
-	 * that file descriptor.
-	 *
 	 * http://msdn.microsoft.com/
 	 *    en-us/library/windows/desktop/aa365202%28v=vs.85%29.aspx
 	 *
