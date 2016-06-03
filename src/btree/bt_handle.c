@@ -689,10 +689,9 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 		    "size (%" PRIu32 "B)", btree->allocsize);
 
 	/*
-	 * Don't let pages grow larger than a quarter of the cache, with too-
-	 * small caches, we can end up in a situation where nothing can be
-	 * evicted.  Take care getting the cache size: with a shared cache,
-	 * it may not have been set.
+	 * Don't let pages grow large compared to the cache size or we can end
+	 * up in a situation where nothing can be evicted.  Take care getting
+	 * the cache size: with a shared cache, it may not have been set.
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "memory_page_max", &cval));
 	btree->maxmempage = (uint64_t)cval.val;
