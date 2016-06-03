@@ -117,6 +117,7 @@ FNV
 FORALL
 FOREACH
 FULLFSYNC
+FindClose
 FindFirstFile
 Fixup
 Fk
@@ -471,6 +472,7 @@ ckptfrag
 ckptlist
 cksum
 cloexec
+closedir
 clsm
 cmd
 cmp

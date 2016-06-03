@@ -24,6 +24,7 @@ __wt_win_directory_list(WT_FILE_SYSTEM *file_system,
 	WT_SESSION_IMPL *session;
 	size_t dirallocsz, pathlen;
 	uint32_t count;
+	int tret;
 	char *dir_copy, **entries;
 
 	WT_UNUSED(file_system);
@@ -74,7 +75,14 @@ __wt_win_directory_list(WT_FILE_SYSTEM *file_system,
 	*countp = count;
 
 err:	if (findhandle != INVALID_HANDLE_VALUE)
-		(void)FindClose(findhandle);
+		if (FindClose(findhandle) == 0) {
+			tret = __wt_getlasterror();
+			__wt_err(session, tret,
+			    "%s: directory-list: FindClose", pathbuf->data);
+			if (ret == 0)
+				ret = tret;
+		}
+
 	__wt_free(session, dir_copy);
 	__wt_scr_free(session, &pathbuf);
 
