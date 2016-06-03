@@ -203,6 +203,17 @@ void multiSyncApply(const std::vector<OplogEntry>& ops, SyncTail* st);
 void multiInitialSyncApply(const std::vector<OplogEntry>& ops, SyncTail* st);
 
 /**
+ * Testing-only version of multiSyncApply that returns an error instead of aborting.
+ * Accepts an external operation context and a function with the same argument list as
+ * SyncTail::syncApply.
+ */
+using SyncApplyFn =
+    stdx::function<Status(OperationContext* txn, const BSONObj& o, bool convertUpdateToUpsert)>;
+Status multiSyncApply_noAbort(OperationContext* txn,
+                              const std::vector<OplogEntry>& ops,
+                              SyncApplyFn syncApply);
+
+/**
  * Testing-only version of multiInitialSyncApply that accepts an external operation context and
  * returns an error instead of aborting.
  */
