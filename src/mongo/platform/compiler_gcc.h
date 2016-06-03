@@ -35,9 +35,17 @@
 #pragma once
 
 
+#ifdef __clang__
+// Our minimum clang version (3.4) doesn't support the "cold" attribute. We could try to use it with
+// clang versions that support the attribute, but since Apple uses weird version numbers on clang
+// and the main goal with the attribute is to improve our production builds with gcc, it didn't seem
+// worth it.
+#define MONGO_COMPILER_COLD_FUNCTION
+#define MONGO_COMPILER_NORETURN __attribute__((__noreturn__))
+#else
 #define MONGO_COMPILER_COLD_FUNCTION __attribute__((__cold__))
-
 #define MONGO_COMPILER_NORETURN __attribute__((__noreturn__, __cold__))
+#endif
 
 #define MONGO_COMPILER_VARIABLE_UNUSED __attribute__((__unused__))
 
