@@ -108,7 +108,7 @@ public:
                 b.append("sizeOnDisk", static_cast<double>(size));
                 totalSize += size;
 
-                b.appendBool("empty", size == 0);
+                b.appendBool("empty", entry->isEmpty());
             }
 
             dbInfos.push_back(b.obj());
