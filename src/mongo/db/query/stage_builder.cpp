@@ -92,11 +92,7 @@ PlanStage* buildStages(OperationContext* txn,
 
         params.descriptor =
             collection->getIndexCatalog()->findIndexByKeyPattern(txn, ixn->indexKeyPattern);
-        if (params.descriptor == NULL) {
-            warning() << "Can't find index " << ixn->indexKeyPattern.toString() << "in namespace "
-                      << collection->ns() << endl;
-            return NULL;
-        }
+        invariant(params.descriptor);
 
         params.bounds = ixn->bounds;
         params.direction = ixn->direction;
@@ -228,12 +224,7 @@ PlanStage* buildStages(OperationContext* txn,
 
         IndexDescriptor* twoDIndex =
             collection->getIndexCatalog()->findIndexByKeyPattern(txn, node->indexKeyPattern);
-
-        if (twoDIndex == NULL) {
-            warning() << "Can't find 2D index " << node->indexKeyPattern.toString()
-                      << "in namespace " << collection->ns() << endl;
-            return NULL;
-        }
+        invariant(twoDIndex);
 
         GeoNear2DStage* nearStage = new GeoNear2DStage(params, txn, ws, collection, twoDIndex);
 
@@ -250,12 +241,7 @@ PlanStage* buildStages(OperationContext* txn,
 
         IndexDescriptor* s2Index =
             collection->getIndexCatalog()->findIndexByKeyPattern(txn, node->indexKeyPattern);
-
-        if (s2Index == NULL) {
-            warning() << "Can't find 2DSphere index " << node->indexKeyPattern.toString()
-                      << "in namespace " << collection->ns() << endl;
-            return NULL;
-        }
+        invariant(s2Index);
 
         return new GeoNear2DSphereStage(params, txn, ws, collection, s2Index);
     } else if (STAGE_TEXT == root->getType()) {
@@ -306,6 +292,7 @@ PlanStage* buildStages(OperationContext* txn,
 
         params.descriptor =
             collection->getIndexCatalog()->findIndexByKeyPattern(txn, dn->indexKeyPattern);
+        invariant(params.descriptor);
         params.direction = dn->direction;
         params.bounds = dn->bounds;
         params.fieldNo = dn->fieldNo;
@@ -322,6 +309,7 @@ PlanStage* buildStages(OperationContext* txn,
 
         params.descriptor =
             collection->getIndexCatalog()->findIndexByKeyPattern(txn, csn->indexKeyPattern);
+        invariant(params.descriptor);
         params.startKey = csn->startKey;
         params.startKeyInclusive = csn->startKeyInclusive;
         params.endKey = csn->endKey;
