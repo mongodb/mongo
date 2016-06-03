@@ -563,11 +563,12 @@ __wt_conn_dhandle_discard_single(
 	 * handle list lock.
 	 */
 	if (!F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST))
-		F_SET(S2C(session)->cache, WT_CACHE_CLEAR_WALKS);
+		F_SET(S2C(session)->cache, WT_CACHE_PASS_INTERRUPT);
 
 	/* Try to remove the handle, protected by the data handle lock. */
 	WT_WITH_HANDLE_LIST_LOCK(session,
 	    tret = __conn_dhandle_remove(session, final));
+	F_CLR(S2C(session)->cache, WT_CACHE_PASS_INTERRUPT);
 	WT_TRET(tret);
 
 	/*

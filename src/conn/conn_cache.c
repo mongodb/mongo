@@ -158,9 +158,14 @@ __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
 	    false, 10000, WT_MILLION, &cache->evict_cond));
 	WT_ERR(__wt_cond_alloc(session,
 	    "eviction waiters", false, &cache->evict_waiter_cond));
+	WT_ERR(__wt_spin_init(session, &cache->evict_pass_lock, "evict pass"));
 	WT_ERR(__wt_spin_init(session,
 	    &cache->evict_queue_lock, "cache eviction queue"));
 	WT_ERR(__wt_spin_init(session, &cache->evict_walk_lock, "cache walk"));
+	if ((ret = __wt_open_internal_session(conn, "evict pass",
+	    false, WT_SESSION_NO_DATA_HANDLES, &cache->walk_session)) != 0)
+		WT_ERR_MSG(NULL, ret,
+		    "Failed to create session for eviction walks");
 
 	/* Allocate the LRU eviction queue. */
 	cache->evict_slots = WT_EVICT_WALK_BASE + WT_EVICT_WALK_INCR;
@@ -235,6 +240,7 @@ __wt_cache_destroy(WT_SESSION_IMPL *session)
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	WT_SESSION *wt_session;
 	int i;
 
 	conn = S2C(session);
@@ -261,8 +267,12 @@ __wt_cache_destroy(WT_SESSION_IMPL *session)
 
 	WT_TRET(__wt_cond_auto_destroy(session, &cache->evict_cond));
 	WT_TRET(__wt_cond_destroy(session, &cache->evict_waiter_cond));
+	__wt_spin_destroy(session, &cache->evict_pass_lock);
 	__wt_spin_destroy(session, &cache->evict_queue_lock);
 	__wt_spin_destroy(session, &cache->evict_walk_lock);
+	wt_session = &cache->walk_session->iface;
+	if (wt_session != NULL)
+		WT_TRET(wt_session->close(wt_session, NULL));
 
 	for (i = 0; i < WT_EVICT_QUEUE_MAX; ++i) {
 		__wt_spin_destroy(session, &cache->evict_queues[i].evict_lock);

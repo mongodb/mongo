@@ -9,15 +9,15 @@
 #include "wt_internal.h"
 
 static int  __evict_clear_all_walks(WT_SESSION_IMPL *);
-static int  __evict_clear_walks(WT_SESSION_IMPL *);
+static int  __evict_helper(WT_SESSION_IMPL *);
 static int  WT_CDECL __evict_lru_cmp(const void *, const void *);
 static int  __evict_lru_pages(WT_SESSION_IMPL *, bool);
 static int  __evict_lru_walk(WT_SESSION_IMPL *);
 static int  __evict_page(WT_SESSION_IMPL *, bool);
 static int  __evict_pass(WT_SESSION_IMPL *);
+static int  __evict_server(WT_SESSION_IMPL *, bool *);
 static int  __evict_walk(WT_SESSION_IMPL *, uint32_t);
 static int  __evict_walk_file(WT_SESSION_IMPL *, uint32_t, u_int *);
-static WT_THREAD_RET __evict_worker(void *);
 
 /*
  * __evict_read_gen --
@@ -170,102 +170,139 @@ __wt_evict_server_wake(WT_SESSION_IMPL *session)
 }
 
 /*
- * __evict_server --
- *	Thread to evict pages from the cache.
+ * __evict_thread_run --
+ *	General wrapper for any eviction thread.
  */
 static WT_THREAD_RET
-__evict_server(void *arg)
+__evict_thread_run(void *arg)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-#ifdef HAVE_DIAGNOSTIC
-	struct timespec now, stuck_ts;
-#endif
-	uint64_t pages_evicted = 0;
-	u_int spins;
+	bool did_work;
 
 	session = arg;
 	conn = S2C(session);
 	cache = conn->cache;
 
 #ifdef HAVE_DIAGNOSTIC
-	WT_ERR(__wt_epoch(session, &stuck_ts));		/* -Wuninitialized */
+	if (session == conn->evict_session)
+		WT_ERR(__wt_epoch(
+		    session, &cache->stuck_ts));	/* -Wuninitialized */
 #endif
 	while (F_ISSET(conn, WT_CONN_EVICTION_RUN)) {
-		/* Evict pages from the cache as needed. */
-		WT_ERR(__evict_pass(session));
-
-		if (!F_ISSET(conn, WT_CONN_EVICTION_RUN))
-			break;
-
-		/*
-		 * Clear the walks so we don't pin pages while asleep,
-		 * otherwise we can block applications evicting large pages.
-		 */
-		if (!F_ISSET(cache, WT_CACHE_STUCK)) {
-			for (spins = 0; (ret = __wt_spin_trylock(
-			    session, &conn->dhandle_lock)) == EBUSY &&
-			    !F_ISSET(cache, WT_CACHE_CLEAR_WALKS);
-			    spins++) {
-				if (spins < WT_THOUSAND)
-					__wt_yield();
-				else
-					__wt_sleep(0, WT_THOUSAND);
-			}
+		if (conn->evict_tid_set &&
+		    __wt_spin_trylock(session, &cache->evict_pass_lock) == 0) {
 			/*
-			 * If we gave up acquiring the lock, that indicates a
-			 * session is waiting for us to clear walks.  Do that
-			 * as part of a normal pass (without the handle list
-			 * lock) to avoid deadlock.
+			 * Cannot use WT_WITH_PASS_LOCK because this is a try
+			 * lock.  Fix when that is supported.
 			 */
-			if (ret == EBUSY)
-				continue;
+			F_SET(session, WT_SESSION_LOCKED_PASS);
+			ret = __evict_server(session, &did_work);
+			F_CLR(session, WT_SESSION_LOCKED_PASS);
+			__wt_spin_unlock(session, &cache->evict_pass_lock);
 			WT_ERR(ret);
-			ret = __evict_clear_all_walks(session);
-			__wt_spin_unlock(session, &conn->dhandle_lock);
-			WT_ERR(ret);
-
-			/* Next time we wake up, reverse the sweep direction. */
-			cache->flags ^= WT_CACHE_WALK_REVERSE;
-			pages_evicted = 0;
-		} else if (pages_evicted != cache->pages_evict) {
-			pages_evicted = cache->pages_evict;
-#ifdef HAVE_DIAGNOSTIC
-			WT_ERR(__wt_epoch(session, &stuck_ts));
-		} else {
-			/* After being stuck for 5 minutes, give up. */
-			WT_ERR(__wt_epoch(session, &now));
-			if (WT_TIMEDIFF_SEC(now, stuck_ts) > 300) {
-				__wt_err(session, ETIMEDOUT,
-				    "Cache stuck for too long, giving up");
-				(void)__wt_cache_dump(session, NULL);
-				WT_ERR(ETIMEDOUT);
-			}
-#endif
-		}
-
-		WT_ERR(__wt_verbose(session, WT_VERB_EVICTSERVER, "sleeping"));
-		/* Don't rely on signals: check periodically. */
-		WT_ERR(__wt_cond_auto_wait(
-		    session, cache->evict_cond, pages_evicted != 0));
-		WT_ERR(__wt_verbose(session, WT_VERB_EVICTSERVER, "waking"));
+			WT_ERR(__wt_verbose(
+			    session, WT_VERB_EVICTSERVER, "sleeping"));
+			/* Don't rely on signals: check periodically. */
+			WT_ERR(__wt_cond_auto_wait(
+			    session, cache->evict_cond, did_work));
+			WT_ERR(__wt_verbose(
+			    session, WT_VERB_EVICTSERVER, "waking"));
+		} else
+			WT_ERR(__evict_helper(session));
 	}
 
-	/*
-	 * The eviction server is shutting down: in case any trees are still
-	 * open, clear all walks now so that they can be closed.
-	 */
-	WT_ERR(__evict_clear_all_walks(session));
-
+	if (session == conn->evict_session)
+		/*
+		 * The eviction server is shutting down: in case any trees are
+		 * still open, clear all walks now so that they can be closed.
+		 */
+		WT_ERR(__evict_clear_all_walks(session));
 	WT_ERR(__wt_verbose(
-	    session, WT_VERB_EVICTSERVER, "cache eviction server exiting"));
+	    session, WT_VERB_EVICTSERVER, "cache eviction thread exiting"));
 
 	if (0) {
-err:		WT_PANIC_MSG(session, ret, "cache eviction server error");
+err:		WT_PANIC_MSG(session, ret, "cache eviction thread error");
 	}
 	return (WT_THREAD_RET_VALUE);
+}
+
+/*
+ * __evict_server --
+ *	Thread to evict pages from the cache.
+ */
+static int
+__evict_server(WT_SESSION_IMPL *session, bool *did_work)
+{
+	WT_CACHE *cache;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+#ifdef HAVE_DIAGNOSTIC
+	struct timespec now;
+#endif
+	uint64_t pages_evicted;
+	u_int spins;
+
+	conn = S2C(session);
+	cache = conn->cache;
+	WT_ASSERT(session, did_work != NULL);
+	*did_work = false;
+	pages_evicted = 0;
+
+	/* Evict pages from the cache as needed. */
+	WT_RET(__evict_pass(session));
+
+	if (!F_ISSET(conn, WT_CONN_EVICTION_RUN))
+		return (0);
+
+	/*
+	 * Clear the walks so we don't pin pages while asleep,
+	 * otherwise we can block applications evicting large pages.
+	 */
+	if (!F_ISSET(cache, WT_CACHE_STUCK)) {
+		for (spins = 0; (ret = __wt_spin_trylock(
+		    session, &conn->dhandle_lock)) == EBUSY &&
+		    !F_ISSET(cache, WT_CACHE_PASS_INTERRUPT); spins++) {
+			if (spins < WT_THOUSAND)
+				__wt_yield();
+			else
+				__wt_sleep(0, WT_THOUSAND);
+		}
+		/*
+		 * If we gave up acquiring the lock, that indicates a
+		 * session is waiting for us to clear walks.  Do that
+		 * as part of a normal pass (without the handle list
+		 * lock) to avoid deadlock.
+		 */
+		if (ret == EBUSY)
+			return (0);
+		WT_RET(ret);
+		ret = __evict_clear_all_walks(session);
+		__wt_spin_unlock(session, &conn->dhandle_lock);
+		WT_RET(ret);
+
+		/* Next time we wake up, reverse the sweep direction. */
+		cache->flags ^= WT_CACHE_WALK_REVERSE;
+		pages_evicted = 0;
+	} else if (pages_evicted != cache->pages_evict) {
+		pages_evicted = cache->pages_evict;
+#ifdef HAVE_DIAGNOSTIC
+		WT_RET(__wt_epoch(session, &cache->stuck_ts));
+	} else {
+		/* After being stuck for 5 minutes, give up. */
+		WT_RET(__wt_epoch(session, &now));
+		if (WT_TIMEDIFF_SEC(now, cache->stuck_ts) > 300) {
+			__wt_err(session, ETIMEDOUT,
+			    "Cache stuck for too long, giving up");
+			(void)__wt_cache_dump(session, NULL);
+			WT_RET(ETIMEDOUT);
+		}
+#endif
+	}
+	*did_work = pages_evicted != 0;
+	return (0);
 }
 
 /*
@@ -315,7 +352,8 @@ __evict_workers_resize(WT_SESSION_IMPL *session)
 			++conn->evict_workers;
 			F_SET(&workers[i], WT_EVICT_WORKER_RUN);
 			WT_ERR(__wt_thread_create(workers[i].session,
-			    &workers[i].tid, __evict_worker, &workers[i]));
+			    &workers[i].tid, __evict_thread_run,
+			    &workers[i].session));
 		}
 	}
 
@@ -369,7 +407,7 @@ __wt_evict_create(WT_SESSION_IMPL *session)
 	 * the worker's sessions are created.
 	 */
 	WT_RET(__wt_thread_create(
-	    session, &conn->evict_tid, __evict_server, session));
+	    session, &conn->evict_tid, __evict_thread_run, session));
 	conn->evict_tid_set = true;
 
 	return (0);
@@ -439,39 +477,22 @@ __wt_evict_destroy(WT_SESSION_IMPL *session)
 }
 
 /*
- * __evict_worker --
+ * __evict_helper --
  *	Thread to help evict pages from the cache.
  */
-static WT_THREAD_RET
-__evict_worker(void *arg)
+static int
+__evict_helper(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
-	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_EVICT_WORKER *worker;
-	WT_SESSION_IMPL *session;
 
-	worker = arg;
-	session = worker->session;
-	conn = S2C(session);
-	cache = conn->cache;
-
-	while (F_ISSET(conn, WT_CONN_EVICTION_RUN) &&
-	    F_ISSET(worker, WT_EVICT_WORKER_RUN)) {
-		/* Don't spin in a busy loop if there is no work to do */
-		if ((ret = __evict_lru_pages(session, false)) == WT_NOTFOUND)
-			WT_ERR(__wt_cond_wait(
-			    session, cache->evict_waiter_cond, 10000));
-		else
-			WT_ERR(ret);
-	}
-	WT_ERR(__wt_verbose(
-	    session, WT_VERB_EVICTSERVER, "cache eviction worker exiting"));
-
-	if (0) {
-err:		WT_PANIC_MSG(session, ret, "cache eviction worker error");
-	}
-	return (WT_THREAD_RET_VALUE);
+	cache = S2C(session)->cache;
+	if ((ret = __evict_lru_pages(session, false)) == WT_NOTFOUND)
+		WT_RET(__wt_cond_wait(
+		    session, cache->evict_waiter_cond, 10000));
+	else
+		WT_RET(ret);
+	return (0);
 }
 
 /*
@@ -579,12 +600,8 @@ __evict_pass(WT_SESSION_IMPL *session)
 		 * If there is a request to clear eviction walks, do that now,
 		 * before checking if the cache is full.
 		 */
-		if (F_ISSET(cache, WT_CACHE_CLEAR_WALKS)) {
-			F_CLR(cache, WT_CACHE_CLEAR_WALKS);
-			WT_RET(__evict_clear_walks(session));
-			WT_RET(__wt_cond_signal(
-			    session, cache->evict_waiter_cond));
-		}
+		if (F_ISSET(cache, WT_CACHE_PASS_INTERRUPT))
+			break;
 
 		/*
 		 * Increment the shared read generation. Do this occasionally
@@ -630,7 +647,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 			worker = &conn->evict_workctx[conn->evict_workers++];
 			F_SET(worker, WT_EVICT_WORKER_RUN);
 			WT_RET(__wt_thread_create(session,
-			    &worker->tid, __evict_worker, worker));
+			    &worker->tid, __evict_thread_run, worker->session));
 		}
 
 		WT_RET(__wt_verbose(session, WT_VERB_EVICTSERVER,
@@ -648,7 +665,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 		 */
 		if (pages_evicted == cache->pages_evict) {
 			WT_STAT_FAST_CONN_INCR(session,
-					       cache_eviction_server_slept);
+			    cache_eviction_server_slept);
 			/*
 			 * Back off if we aren't making progress: walks hold
 			 * the handle list lock, which blocks other operations
@@ -689,6 +706,7 @@ __evict_clear_walk(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
+	WT_DECL_RET;
 	WT_REF *ref;
 
 	btree = S2BT(session);
@@ -705,30 +723,9 @@ __evict_clear_walk(WT_SESSION_IMPL *session)
 	 * assert we never try to evict the current eviction walk point).
 	 */
 	btree->evict_ref = NULL;
-	return (__wt_page_release(session, ref, WT_READ_NO_EVICT));
-}
-
-/*
- * __evict_clear_walks --
- *	Clear the eviction walk points for any file a session is waiting on.
- */
-static int
-__evict_clear_walks(WT_SESSION_IMPL *session)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
-	WT_SESSION_IMPL *s;
-	u_int i, session_cnt;
-
-	conn = S2C(session);
-
-	WT_ORDERED_READ(session_cnt, conn->session_cnt);
-	for (s = conn->sessions, i = 0; i < session_cnt; ++s, ++i) {
-		if (!s->active || !F_ISSET(s, WT_SESSION_CLEAR_EVICT_WALK))
-			continue;
-		WT_WITH_DHANDLE(
-		    session, s->dhandle, WT_TRET(__evict_clear_walk(session)));
-	}
+	WT_WITH_DHANDLE(cache->walk_session, session->dhandle,
+	    (ret = __wt_page_release(cache->walk_session,
+	    ref, WT_READ_NO_EVICT)));
 	return (ret);
 }
 
@@ -749,39 +746,6 @@ __evict_clear_all_walks(WT_SESSION_IMPL *session)
 		if (WT_PREFIX_MATCH(dhandle->name, "file:"))
 			WT_WITH_DHANDLE(session,
 			    dhandle, WT_TRET(__evict_clear_walk(session)));
-	return (ret);
-}
-
-/*
- * __evict_request_clear_walk --
- *	Request that the eviction server clear the tree's current eviction
- *	point.
- */
-static int
-__evict_request_clear_walk(WT_SESSION_IMPL *session)
-{
-	WT_BTREE *btree;
-	WT_CACHE *cache;
-	WT_DECL_RET;
-
-	btree = S2BT(session);
-	cache = S2C(session)->cache;
-
-	F_SET(session, WT_SESSION_CLEAR_EVICT_WALK);
-
-	while (ret == 0 && (btree->evict_ref != NULL ||
-	    cache->evict_file_next == session->dhandle)) {
-		F_SET(cache, WT_CACHE_CLEAR_WALKS);
-		ret = __wt_cond_wait(
-		    session, cache->evict_waiter_cond, 100000);
-	}
-
-	F_CLR(session, WT_SESSION_CLEAR_EVICT_WALK);
-
-	/* An error is unexpected - flag the failure. */
-	if (ret != 0)
-		__wt_err(session, ret, "Failed to clear eviction walk point");
-
 	return (ret);
 }
 
@@ -822,10 +786,14 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
 	 * this point.
 	 */
 	F_SET(btree, WT_BTREE_NO_EVICTION);
+	F_SET(cache, WT_CACHE_PASS_INTERRUPT);
 	WT_FULL_BARRIER();
 
 	/* Clear any existing LRU eviction walk for the file. */
-	WT_ERR(__evict_request_clear_walk(session));
+	WT_WITH_PASS_LOCK(session, ret,
+	    ret = __evict_clear_walk(session));
+	F_CLR(cache, WT_CACHE_PASS_INTERRUPT);
+	WT_ERR(ret);
 
 	/*
 	 * The eviction candidate list might reference pages from the file,
@@ -949,7 +917,7 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 	queue_index = cache->evict_queue_fill++ % WT_EVICT_QUEUE_MAX;
 	evict_queue = &cache->evict_queues[queue_index];
 	/* Get some more pages to consider for eviction. */
-	if ((ret = __evict_walk(session, queue_index)) != 0)
+	if ((ret = __evict_walk(cache->walk_session, queue_index)) != 0)
 		return (ret == EBUSY ? 0 : ret);
 
 	/* Sort the list into LRU order and restart. */
@@ -1063,8 +1031,8 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 	__wt_spin_unlock(session, &cache->evict_queue_lock);
 
 	/*
-	 * The eviction server thread doesn't do any actual eviction if there
-	 * are multiple eviction workers running.
+	 * Signal any application or helper threads that may be waiting
+	 * to help with eviction.
 	 */
 	WT_RET(__wt_cond_signal(session, cache->evict_waiter_cond));
 
@@ -1108,7 +1076,7 @@ retry:	while (slot < max_entries && ret == 0) {
 		 * If another thread is waiting on the eviction server to clear
 		 * the walk point in a tree, give up.
 		 */
-		if (F_ISSET(cache, WT_CACHE_CLEAR_WALKS))
+		if (F_ISSET(cache, WT_CACHE_PASS_INTERRUPT))
 			break;
 
 		/*
@@ -1118,7 +1086,7 @@ retry:	while (slot < max_entries && ret == 0) {
 		if (!dhandle_locked) {
 			for (spins = 0; (ret = __wt_spin_trylock(
 			    session, &conn->dhandle_lock)) == EBUSY &&
-			    !F_ISSET(cache, WT_CACHE_CLEAR_WALKS);
+			    !F_ISSET(cache, WT_CACHE_PASS_INTERRUPT);
 			    spins++) {
 				if (spins < WT_THOUSAND)
 					__wt_yield();
@@ -1244,7 +1212,7 @@ retry:	while (slot < max_entries && ret == 0) {
 	 * Try two passes through all the files, give up when we have some
 	 * candidates and we aren't finding more.
 	 */
-	if (!F_ISSET(cache, WT_CACHE_CLEAR_WALKS) && ret == 0 &&
+	if (!F_ISSET(cache, WT_CACHE_PASS_INTERRUPT) && ret == 0 &&
 	    slot < max_entries && (retries < 2 ||
 	    (retries < 10 &&
 	    !FLD_ISSET(cache->state, WT_EVICT_PASS_WOULD_BLOCK) &&

@@ -104,12 +104,12 @@ flags = {
     ],
     'session' : [
         'SESSION_CAN_WAIT',
-        'SESSION_CLEAR_EVICT_WALK',
         'SESSION_INTERNAL',
         'SESSION_LOCK_NO_WAIT',
         'SESSION_LOCKED_CHECKPOINT',
         'SESSION_LOCKED_HANDLE_LIST',
         'SESSION_LOCKED_METADATA',
+        'SESSION_LOCKED_PASS',
         'SESSION_LOCKED_SCHEMA',
         'SESSION_LOCKED_SLOT',
         'SESSION_LOCKED_TABLE',
