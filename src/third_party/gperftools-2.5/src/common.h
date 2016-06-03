@@ -85,10 +85,10 @@ static const size_t kBaseClasses = 9;
 // These two factors cause a bounded increase in memory use.
 #if defined(TCMALLOC_32K_PAGES)
 static const size_t kPageShift  = 15;
-static const size_t kNumClasses = kBaseClasses + 69;
+static const size_t kNumClasses = kBaseClasses + 38;
 #elif defined(TCMALLOC_64K_PAGES)
 static const size_t kPageShift  = 16;
-static const size_t kNumClasses = kBaseClasses + 32;
+static const size_t kNumClasses = kBaseClasses + 42;
 #else
 static const size_t kPageShift  = 12;
 static const size_t kNumClasses = kBaseClasses + 33;
@@ -97,7 +97,13 @@ static const size_t kNumClasses = kBaseClasses + 33;
 static const size_t kMaxThreadCacheSize = 4 << 20;
 
 static const size_t kPageSize   = 1 << kPageShift;
+#if defined(TCMALLOC_32K_PAGES)
+static const size_t kMaxSize    = 32 * 1024;
+#elif defined(TCMALLOC_64K_PAGES)
+static const size_t kMaxSize    = 64 * 1024;
+#else
 static const size_t kMaxSize    = 16 * 1024;
+#endif
 static const size_t kAlignment  = 8;
 static const size_t kLargeSizeClass = 0;
 // For all span-lengths < kMaxPages we keep an exact-size list.
