@@ -347,7 +347,9 @@ sh.disableBalancing = function(coll) {
     }
 
     return assert.writeOK(dbase.getSisterDB("config").collections.update(
-        {_id: coll + ""}, {$set: {"noBalance": true}}, {writeConcern: {w: 'majority'}}));
+        {_id: coll + ""},
+        {$set: {"noBalance": true}},
+        {writeConcern: {w: 'majority', wtimeout: 60000}}));
 };
 
 sh.enableBalancing = function(coll) {
@@ -362,7 +364,9 @@ sh.enableBalancing = function(coll) {
     }
 
     return assert.writeOK(dbase.getSisterDB("config").collections.update(
-        {_id: coll + ""}, {$set: {"noBalance": false}}, {writeConcern: {w: 'majority'}}));
+        {_id: coll + ""},
+        {$set: {"noBalance": false}},
+        {writeConcern: {w: 'majority', wtimeout: 60000}}));
 };
 
 /*
@@ -418,7 +422,7 @@ sh.addShardTag = function(shard, tag) {
         throw Error("can't find a shard with name: " + shard);
     }
     return assert.writeOK(config.shards.update(
-        {_id: shard}, {$addToSet: {tags: tag}}, {writeConcern: {w: 'majority'}}));
+        {_id: shard}, {$addToSet: {tags: tag}}, {writeConcern: {w: 'majority', wtimeout: 60000}}));
 };
 
 sh.removeShardTag = function(shard, tag) {
@@ -426,8 +430,8 @@ sh.removeShardTag = function(shard, tag) {
     if (config.shards.findOne({_id: shard}) == null) {
         throw Error("can't find a shard with name: " + shard);
     }
-    return assert.writeOK(
-        config.shards.update({_id: shard}, {$pull: {tags: tag}}, {writeConcern: {w: 'majority'}}));
+    return assert.writeOK(config.shards.update(
+        {_id: shard}, {$pull: {tags: tag}}, {writeConcern: {w: 'majority', wtimeout: 60000}}));
 };
 
 sh.addTagRange = function(ns, min, max, tag) {
@@ -439,7 +443,7 @@ sh.addTagRange = function(ns, min, max, tag) {
     return assert.writeOK(
         config.tags.update({_id: {ns: ns, min: min}},
                            {_id: {ns: ns, min: min}, ns: ns, min: min, max: max, tag: tag},
-                           {upsert: true, writeConcern: {w: 'majority'}}));
+                           {upsert: true, writeConcern: {w: 'majority', wtimeout: 60000}}));
 };
 
 sh.removeTagRange = function(ns, min, max, tag) {
@@ -455,7 +459,7 @@ sh.removeTagRange = function(ns, min, max, tag) {
     // max and tag criteria not really needed, but including them avoids potentially unexpected
     // behavior.
     return assert.writeOK(config.tags.remove({_id: {ns: ns, min: min}, max: max, tag: tag},
-                                             {writeConcern: {w: 'majority'}}));
+                                             {writeConcern: {w: 'majority', wtimeout: 60000}}));
 };
 
 sh.getBalancerLockDetails = function(configDB) {
