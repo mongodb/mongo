@@ -214,9 +214,17 @@ StatusWith<std::unique_ptr<PlanExecutor>> attemptToGetExecutor(
     qr->setFilter(queryObj);
     qr->setProj(projectionObj);
     qr->setSort(sortObj);
-    if (pExpCtx->collator) {
-        qr->setCollation(CollationSerializer::specToBSON(pExpCtx->collator->getSpec()));
-    }
+
+    // If the pipeline has a non-null collator, set the collation option to the result of
+    // serializing the collator's spec back into BSON. We do this in order to fill in all options
+    // that the user omitted.
+    //
+    // If pipeline has a null collator (representing the "simple" collation), we can't use the
+    // collation serializer. In this case, we simply set the collation option to the original user
+    // BSON.
+    qr->setCollation(pExpCtx->collator
+                         ? CollationSerializer::specToBSON(pExpCtx->collator->getSpec())
+                         : pExpCtx->collation);
 
     const ExtensionsCallbackReal extensionsCallback(pExpCtx->opCtx, &pExpCtx->ns);
 

@@ -113,6 +113,7 @@ intrusive_ptr<Pipeline> Pipeline::parseCommand(string& errmsg,
                     str::stream() << collationName << " must be an object, not a "
                                   << typeName(cmdElement.type()),
                     cmdElement.type() == BSONType::Object);
+            pCtx->collation = cmdElement.Obj().getOwned();
             auto statusWithCollator =
                 CollatorFactoryInterface::get(pCtx->opCtx->getServiceContext())
                     ->makeFromBSON(cmdElement.Obj());
@@ -309,6 +310,13 @@ void Pipeline::reattachToOperationContext(OperationContext* opCtx) {
     for (auto* source : sourcesNeedingMongod) {
         source->setOperationContext(opCtx);
     }
+}
+
+void Pipeline::setCollator(std::unique_ptr<CollatorInterface> collator) {
+    pCtx->collator = std::move(collator);
+
+    // TODO SERVER-23349: If the pipeline has any DocumentSourceMatch sources, ask them to
+    // re-parse their predicates.
 }
 
 intrusive_ptr<Pipeline> Pipeline::splitForSharded() {

@@ -41,6 +41,7 @@ namespace mongo {
 class BSONObj;
 class BSONObjBuilder;
 class ClientBasic;
+class CollatorInterface;
 class Command;
 struct DepsTracker;
 class DocumentSource;
@@ -97,6 +98,15 @@ public:
      * any storage-engine state of the DocumentSourceCursor that may be present in 'sources'.
      */
     void reattachToOperationContext(OperationContext* opCtx);
+
+    /**
+     * Sets the collator on this Pipeline. parseCommand() will return a Pipeline with its collator
+     * already set from the parsed request (if applicable), but this setter method can be used to
+     * later override the Pipeline's original collator.
+     *
+     * The Pipeline's collator can be retrieved with getContext()->collator.
+     */
+    void setCollator(std::unique_ptr<CollatorInterface> collator);
 
     /**
       Split the current Pipeline into a Pipeline for each shard, and

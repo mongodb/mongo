@@ -233,6 +233,13 @@ public:
 
             Collection* collection = ctx.getCollection();
 
+            // If the pipeline does not have a user-specified collation, set it from the
+            // collection default.
+            if (pPipeline->getContext()->collation.isEmpty() && collection &&
+                collection->getDefaultCollator()) {
+                pPipeline->setCollator(collection->getDefaultCollator()->clone());
+            }
+
             // This does mongod-specific stuff like creating the input PlanExecutor and adding
             // it to the front of the pipeline if needed.
             std::shared_ptr<PlanExecutor> input =

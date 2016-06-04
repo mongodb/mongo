@@ -61,7 +61,15 @@ public:
     std::string tempDir;  // Defaults to empty to prevent external sorting in mongos.
 
     OperationContext* opCtx;
+
+    // Collation requested by the user for this pipeline. Empty if the user did not request a
+    // collation.
+    BSONObj collation;
+
+    // Collator used to compare elements. 'collator' is initialized from 'collation', except in the
+    // case where 'collation' is empty and there is a collection default collation.
     std::unique_ptr<CollatorInterface> collator;
+
     static const int kInterruptCheckPeriod = 128;
     int interruptCounter = kInterruptCheckPeriod;  // when 0, check interruptStatus
 };
