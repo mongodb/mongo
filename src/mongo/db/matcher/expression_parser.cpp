@@ -67,9 +67,11 @@ namespace mongo {
 using std::string;
 using stdx::make_unique;
 
-StatusWithMatchExpression MatchExpressionParser::_parseComparison(const char* name,
-                                                                  ComparisonMatchExpression* cmp,
-                                                                  const BSONElement& e) {
+StatusWithMatchExpression MatchExpressionParser::_parseComparison(
+    const char* name,
+    ComparisonMatchExpression* cmp,
+    const BSONElement& e,
+    const CollatorInterface* collator) {
     std::unique_ptr<ComparisonMatchExpression> temp(cmp);
 
     // Non-equality comparison match expressions cannot have
@@ -83,6 +85,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseComparison(const char* na
     Status s = temp->init(name, e);
     if (!s.isOK())
         return s;
+    temp->setCollator(collator);
 
     return {std::move(temp)};
 }
@@ -96,7 +99,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
     // TODO: these should move to getGtLtOp, or its replacement
 
     if (mongoutils::str::equals("$eq", e.fieldName()))
-        return _parseComparison(name, new EqualityMatchExpression(collator), e);
+        return _parseComparison(name, new EqualityMatchExpression(), e, collator);
 
     if (mongoutils::str::equals("$not", e.fieldName())) {
         return _parseNot(name, e, collator, level);
@@ -113,13 +116,13 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
             return {Status(ErrorCodes::BadValue,
                            mongoutils::str::stream() << "unknown operator: " << e.fieldName())};
         case BSONObj::LT:
-            return _parseComparison(name, new LTMatchExpression(collator), e);
+            return _parseComparison(name, new LTMatchExpression(), e, collator);
         case BSONObj::LTE:
-            return _parseComparison(name, new LTEMatchExpression(collator), e);
+            return _parseComparison(name, new LTEMatchExpression(), e, collator);
         case BSONObj::GT:
-            return _parseComparison(name, new GTMatchExpression(collator), e);
+            return _parseComparison(name, new GTMatchExpression(), e, collator);
         case BSONObj::GTE:
-            return _parseComparison(name, new GTEMatchExpression(collator), e);
+            return _parseComparison(name, new GTEMatchExpression(), e, collator);
         case BSONObj::NE: {
             if (RegEx == e.type()) {
                 // Just because $ne can be rewritten as the negation of an
@@ -127,7 +130,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
                 return {Status(ErrorCodes::BadValue, "Can't have regex as arg to $ne.")};
             }
             StatusWithMatchExpression s =
-                _parseComparison(name, new EqualityMatchExpression(collator), e);
+                _parseComparison(name, new EqualityMatchExpression(), e, collator);
             if (!s.isOK())
                 return s;
             std::unique_ptr<NotMatchExpression> n = stdx::make_unique<NotMatchExpression>();
@@ -137,7 +140,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
             return {std::move(n)};
         }
         case BSONObj::Equality:
-            return _parseComparison(name, new EqualityMatchExpression(collator), e);
+            return _parseComparison(name, new EqualityMatchExpression(), e, collator);
 
         case BSONObj::opIN: {
             if (e.type() != Array)
@@ -350,13 +353,13 @@ StatusWithMatchExpression MatchExpressionParser::_parse(const BSONObj& obj,
             } else if (mongoutils::str::equals("ref", rest) ||
                        mongoutils::str::equals("id", rest) || mongoutils::str::equals("db", rest)) {
                 // DBRef fields.
-                // 'id' is collation-aware. 'ref' and 'db' are compared using binary comparison.
                 std::unique_ptr<ComparisonMatchExpression> eq =
-                    stdx::make_unique<EqualityMatchExpression>(str::equals("id", rest) ? collator
-                                                                                       : nullptr);
+                    stdx::make_unique<EqualityMatchExpression>();
                 Status s = eq->init(e.fieldName(), e);
                 if (!s.isOK())
                     return s;
+                // 'id' is collation-aware. 'ref' and 'db' are compared using binary comparison.
+                eq->setCollator(str::equals("id", rest) ? collator : nullptr);
 
                 root->add(eq.release());
             } else {
@@ -384,10 +387,11 @@ StatusWithMatchExpression MatchExpressionParser::_parse(const BSONObj& obj,
         }
 
         std::unique_ptr<ComparisonMatchExpression> eq =
-            stdx::make_unique<EqualityMatchExpression>(collator);
+            stdx::make_unique<EqualityMatchExpression>();
         Status s = eq->init(e.fieldName(), e);
         if (!s.isOK())
             return s;
+        eq->setCollator(collator);
 
         root->add(eq.release());
     }
@@ -806,10 +810,11 @@ StatusWithMatchExpression MatchExpressionParser::_parseAll(const char* name,
             return {Status(ErrorCodes::BadValue, "no $ expressions in $all")};
         } else {
             std::unique_ptr<EqualityMatchExpression> x =
-                stdx::make_unique<EqualityMatchExpression>(collator);
+                stdx::make_unique<EqualityMatchExpression>();
             Status s = x->init(name, e);
             if (!s.isOK())
                 return s;
+            x->setCollator(collator);
             myAnd->add(x.release());
         }
     }

@@ -48,7 +48,6 @@ public:
     /**
      * caller has to maintain ownership obj
      * the tree has views (BSONElement) into obj
-     * 'collator' must outlive the returned MatchExpression and any clones made of it.
      */
     static StatusWithMatchExpression parse(const BSONObj& obj,
                                            const ExtensionsCallback& extensionsCallback,
@@ -120,7 +119,8 @@ private:
 
     StatusWithMatchExpression _parseComparison(const char* name,
                                                ComparisonMatchExpression* cmp,
-                                               const BSONElement& e);
+                                               const BSONElement& e,
+                                               const CollatorInterface* collator);
 
     StatusWithMatchExpression _parseMOD(const char* name, const BSONElement& e);
 

@@ -84,11 +84,7 @@ private:
  */
 class ComparisonMatchExpression : public LeafMatchExpression {
 public:
-    /**
-     * 'collator' must outlive the ComparisonMatchExpression and any clones made of it.
-     */
-    ComparisonMatchExpression(MatchType type, const CollatorInterface* collator)
-        : LeafMatchExpression(type), _collator(collator) {}
+    ComparisonMatchExpression(MatchType type) : LeafMatchExpression(type) {}
 
     Status init(StringData path, const BSONElement& rhs);
 
@@ -101,6 +97,13 @@ public:
     }
 
     virtual void debugString(StringBuilder& debug, int level = 0) const;
+
+    /**
+     * 'collator' must outlive the ComparisonMatchExpression and any clones made of it.
+     */
+    void setCollator(const CollatorInterface* collator) {
+        _collator = collator;
+    }
 
     virtual void serialize(BSONObjBuilder* out) const;
 
@@ -116,7 +119,9 @@ public:
 
 protected:
     BSONElement _rhs;
-    const CollatorInterface* _collator;
+
+    // Collator used to compare elements. By default, simple binary comparison will be used.
+    const CollatorInterface* _collator = nullptr;
 };
 
 //
@@ -125,75 +130,70 @@ protected:
 
 class EqualityMatchExpression : public ComparisonMatchExpression {
 public:
-    EqualityMatchExpression(const CollatorInterface* collator)
-        : ComparisonMatchExpression(EQ, collator) {}
+    EqualityMatchExpression() : ComparisonMatchExpression(EQ) {}
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
-        std::unique_ptr<ComparisonMatchExpression> e =
-            stdx::make_unique<EqualityMatchExpression>(_collator);
+        std::unique_ptr<ComparisonMatchExpression> e = stdx::make_unique<EqualityMatchExpression>();
         e->init(path(), _rhs);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
+        e->setCollator(_collator);
         return std::move(e);
     }
 };
 
 class LTEMatchExpression : public ComparisonMatchExpression {
 public:
-    LTEMatchExpression(const CollatorInterface* collator)
-        : ComparisonMatchExpression(LTE, collator) {}
+    LTEMatchExpression() : ComparisonMatchExpression(LTE) {}
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
-        std::unique_ptr<ComparisonMatchExpression> e =
-            stdx::make_unique<LTEMatchExpression>(_collator);
+        std::unique_ptr<ComparisonMatchExpression> e = stdx::make_unique<LTEMatchExpression>();
         e->init(path(), _rhs);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
+        e->setCollator(_collator);
         return std::move(e);
     }
 };
 
 class LTMatchExpression : public ComparisonMatchExpression {
 public:
-    LTMatchExpression(const CollatorInterface* collator)
-        : ComparisonMatchExpression(LT, collator) {}
+    LTMatchExpression() : ComparisonMatchExpression(LT) {}
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
-        std::unique_ptr<ComparisonMatchExpression> e =
-            stdx::make_unique<LTMatchExpression>(_collator);
+        std::unique_ptr<ComparisonMatchExpression> e = stdx::make_unique<LTMatchExpression>();
         e->init(path(), _rhs);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
+        e->setCollator(_collator);
         return std::move(e);
     }
 };
 
 class GTMatchExpression : public ComparisonMatchExpression {
 public:
-    GTMatchExpression(const CollatorInterface* collator)
-        : ComparisonMatchExpression(GT, collator) {}
+    GTMatchExpression() : ComparisonMatchExpression(GT) {}
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
-        std::unique_ptr<ComparisonMatchExpression> e =
-            stdx::make_unique<GTMatchExpression>(_collator);
+        std::unique_ptr<ComparisonMatchExpression> e = stdx::make_unique<GTMatchExpression>();
         e->init(path(), _rhs);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
+        e->setCollator(_collator);
         return std::move(e);
     }
 };
 
 class GTEMatchExpression : public ComparisonMatchExpression {
 public:
-    GTEMatchExpression(const CollatorInterface* collator)
-        : ComparisonMatchExpression(GTE, collator) {}
+    GTEMatchExpression() : ComparisonMatchExpression(GTE) {}
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
-        std::unique_ptr<ComparisonMatchExpression> e =
-            stdx::make_unique<GTEMatchExpression>(_collator);
+        std::unique_ptr<ComparisonMatchExpression> e = stdx::make_unique<GTEMatchExpression>();
         e->init(path(), _rhs);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
+        e->setCollator(_collator);
         return std::move(e);
     }
 };

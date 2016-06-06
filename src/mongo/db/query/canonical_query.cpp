@@ -332,8 +332,9 @@ MatchExpression* CanonicalQuery::normalizeTree(MatchExpression* root) {
 
         // IN of 1 equality is the equality.
         if (in->getEqualities().size() == 1 && in->getRegexes().empty()) {
-            auto eq = stdx::make_unique<EqualityMatchExpression>(in->getCollator());
+            auto eq = stdx::make_unique<EqualityMatchExpression>();
             eq->init(in->path(), *(in->getEqualities().begin()));
+            eq->setCollator(in->getCollator());
             if (in->getTag()) {
                 eq->setTag(in->getTag()->clone());
             }

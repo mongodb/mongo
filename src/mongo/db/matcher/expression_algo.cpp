@@ -166,8 +166,9 @@ bool _isSubsetOf(const MatchExpression* lhs, const ComparisonMatchExpression* rh
         }
         for (BSONElement elem : ime->getEqualities()) {
             // Each element in the $in-array represents an equality predicate.
-            EqualityMatchExpression equality(ime->getCollator());
+            EqualityMatchExpression equality;
             equality.init(lhs->path(), elem);
+            equality.setCollator(ime->getCollator());
             if (!_isSubsetOf(&equality, rhs)) {
                 return false;
             }
