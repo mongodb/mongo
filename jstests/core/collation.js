@@ -29,20 +29,16 @@
     //
 
     // Attempting to create a collection with an invalid collation should fail.
-    assert.commandFailed(
-        db.createCollection("collation", {collation: "not an object"}));
+    assert.commandFailed(db.createCollection("collation", {collation: "not an object"}));
     assert.commandFailed(db.createCollection("collation", {collation: {}}));
     assert.commandFailed(db.createCollection("collation", {collation: {blah: 1}}));
-    assert.commandFailed(
-        db.createCollection("collation", {collation: {locale: "en", blah: 1}}));
-    assert.commandFailed(
-        db.createCollection("collation", {collation: {locale: "xx"}}));
+    assert.commandFailed(db.createCollection("collation", {collation: {locale: "en", blah: 1}}));
+    assert.commandFailed(db.createCollection("collation", {collation: {locale: "xx"}}));
     assert.commandFailed(
         db.createCollection("collation", {collation: {locale: "en", strength: 99}}));
 
     // Ensure we can create a collection with the "simple" collation as the collection default.
-    assert.commandWorked(
-        db.createCollection("collation", {collation: {locale: "simple"}}));
+    assert.commandWorked(db.createCollection("collation", {collation: {locale: "simple"}}));
     var collectionInfos = db.getCollectionInfos({name: "collation"});
     assert.eq(collectionInfos.length, 1);
     assert.eq(collectionInfos[0].options.collation, {locale: "simple"});
@@ -50,8 +46,7 @@
 
     // Ensure that we populate all collation-related fields when we create a collection with a valid
     // collation.
-    assert.commandWorked(
-        db.createCollection("collation", {collation: {locale: "fr_CA"}}));
+    assert.commandWorked(db.createCollection("collation", {collation: {locale: "fr_CA"}}));
     var collectionInfos = db.getCollectionInfos({name: "collation"});
     assert.eq(collectionInfos.length, 1);
     assert.eq(collectionInfos[0].options.collation, {
