@@ -35,6 +35,7 @@
 
 #include "mongo/config.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/net/abstract_message_port.h"
 #include "mongo/util/net/asio_ssl_context.h"
 #include "mongo/util/net/message.h"
@@ -129,6 +130,7 @@ private:
     asio::io_service _service;
 
     AtomicBool _inShutdown;
+    stdx::mutex _opInProgress;
 
     asio::system_timer _timer;
     uint64_t _creationTime;

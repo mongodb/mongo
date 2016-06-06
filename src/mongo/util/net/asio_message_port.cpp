@@ -114,8 +114,7 @@ void ASIOMessagingPort::closeSockets(AbstractMessagingPort::Tag skipMask) {
 }
 
 ASIOMessagingPort::ASIOMessagingPort(int fd, SockAddr farEnd)
-    : _service(),
-      _inShutdown(0),
+    : _service(1),
       _timer(_service),
       _creationTime(curTimeMicros64()),
       _timeout(),
@@ -153,8 +152,7 @@ ASIOMessagingPort::ASIOMessagingPort(int fd, SockAddr farEnd)
 }
 
 ASIOMessagingPort::ASIOMessagingPort(Milliseconds timeout, logger::LogSeverity logLevel)
-    : _service(),
-      _inShutdown(0),
+    : _service(1),
       _timer(_service),
       _creationTime(curTimeMicros64()),
       _timeout(timeout),
@@ -203,6 +201,10 @@ void ASIOMessagingPort::setTimeout(Milliseconds millis) {
 void ASIOMessagingPort::shutdown() {
     if (!_inShutdown.swap(true)) {
         if (_getSocket().native_handle() >= 0) {
+            _getSocket().cancel();
+
+            stdx::lock_guard<stdx::mutex> opInProgressGuard(_opInProgress);
+
             _getSocket().close();
             _awaitingHandshake = true;
             _isEncrypted = false;
@@ -216,6 +218,8 @@ asio::error_code ASIOMessagingPort::_read(char* buf, std::size_t size) {
         _timer.expires_from_now(decltype(_timer)::duration(
             durationCount<Duration<decltype(_timer)::duration::period>>(*_timeout)));
     }
+
+    stdx::lock_guard<stdx::mutex> opInProgressGuard(_opInProgress);
     asio::error_code ec = asio::error::would_block;
     if (!_isEncrypted) {
         asio::async_read(_getSocket(),
@@ -238,6 +242,7 @@ asio::error_code ASIOMessagingPort::_read(char* buf, std::size_t size) {
     do {
         _service.run_one();
     } while (ec == asio::error::would_block);
+
     if (!ec) {
         _bytesIn += size;
     }
@@ -249,6 +254,8 @@ asio::error_code ASIOMessagingPort::_write(const char* buf, std::size_t size) {
         _timer.expires_from_now(decltype(_timer)::duration(
             durationCount<Duration<decltype(_timer)::duration::period>>(*_timeout)));
     }
+
+    stdx::lock_guard<stdx::mutex> opInProgressGuard(_opInProgress);
     asio::error_code ec = asio::error::would_block;
     if (!_isEncrypted) {
         asio::async_write(_getSocket(),
@@ -271,6 +278,7 @@ asio::error_code ASIOMessagingPort::_write(const char* buf, std::size_t size) {
     do {
         _service.run_one();
     } while (ec == asio::error::would_block);
+
     if (!ec) {
         _bytesOut += size;
     }
@@ -429,7 +437,6 @@ unsigned ASIOMessagingPort::remotePort() const {
     return _remote.port();
 }
 
-
 HostAndPort ASIOMessagingPort::remote() const {
     return _remote;
 }
@@ -486,6 +493,7 @@ bool ASIOMessagingPort::connect(SockAddr& farEnd) {
     asio::ip::tcp::resolver resolver(_service);
     asio::error_code ec = asio::error::would_block;
 
+    stdx::lock_guard<stdx::mutex> opInProgressGuard(_opInProgress);
     if (farEnd.getType() == AF_UNIX) {
 #ifndef _WIN32
         asio::local::stream_protocol::endpoint endPoint(farEnd.getAddr());
