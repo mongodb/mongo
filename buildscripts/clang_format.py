@@ -218,10 +218,18 @@ class ClangFormat(object):
                         break
 
         # If Windows, try to grab it from Program Files
+        # Check both native Program Files and WOW64 version
         if sys.platform == "win32":
-            win32bin = os.path.join(os.environ["ProgramFiles(x86)"], "LLVM\\bin\\clang-format.exe")
-            if os.path.exists(win32bin):
-                self.path = win32bin
+            programfiles = [
+                os.environ["ProgramFiles"],
+                os.environ["ProgramFiles(x86)"],
+                ]
+
+            for programfile in programfiles:
+                win32bin = os.path.join(programfile, "LLVM\\bin\\clang-format.exe")
+                if os.path.exists(win32bin):
+                    self.path = win32bin
+                    break
 
         # Have not found it yet, download it from the web
         if self.path is None:
