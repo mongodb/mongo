@@ -119,8 +119,8 @@ public:
           _ownedBuffer(std::move(ownedBuffer)) {}
 
     /** Move construct a BSONObj */
-    BSONObj(BSONObj&& other)
-        : _objdata(std::move(other._objdata)), _ownedBuffer(std::move(other._ownedBuffer)) {
+    BSONObj(BSONObj&& other) noexcept : _objdata(std::move(other._objdata)),
+                                        _ownedBuffer(std::move(other._ownedBuffer)) {
         other._objdata = BSONObj()._objdata;  // To return to an empty state.
         dassert(!other.isOwned());
     }
@@ -134,13 +134,13 @@ public:
     /** Provide assignment semantics. We use the value taking form so that we can use copy
      *  and swap, and consume both lvalue and rvalue references.
      */
-    BSONObj& operator=(BSONObj otherCopy) {
+    BSONObj& operator=(BSONObj otherCopy) noexcept {
         this->swap(otherCopy);
         return *this;
     }
 
     /** Swap this BSONObj with 'other' */
-    void swap(BSONObj& other) {
+    void swap(BSONObj& other) noexcept {
         using std::swap;
         swap(_objdata, other._objdata);
         swap(_ownedBuffer, other._ownedBuffer);
@@ -595,7 +595,7 @@ std::ostream& operator<<(std::ostream& s, const BSONElement& e);
 StringBuilder& operator<<(StringBuilder& s, const BSONObj& o);
 StringBuilder& operator<<(StringBuilder& s, const BSONElement& e);
 
-inline void swap(BSONObj& l, BSONObj& r) {
+inline void swap(BSONObj& l, BSONObj& r) noexcept {
     l.swap(r);
 }
 
