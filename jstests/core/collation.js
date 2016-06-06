@@ -4,7 +4,7 @@
 
     load("jstests/libs/analyze_plan.js");
 
-    var coll = db.collation_shell_helpers;
+    var coll = db.collation;
     coll.drop();
 
     var explainRes;
@@ -30,20 +30,20 @@
 
     // Attempting to create a collection with an invalid collation should fail.
     assert.commandFailed(
-        db.createCollection("collation_shell_helpers", {collation: "not an object"}));
-    assert.commandFailed(db.createCollection("collation_shell_helpers", {collation: {}}));
-    assert.commandFailed(db.createCollection("collation_shell_helpers", {collation: {blah: 1}}));
+        db.createCollection("collation", {collation: "not an object"}));
+    assert.commandFailed(db.createCollection("collation", {collation: {}}));
+    assert.commandFailed(db.createCollection("collation", {collation: {blah: 1}}));
     assert.commandFailed(
-        db.createCollection("collation_shell_helpers", {collation: {locale: "en", blah: 1}}));
+        db.createCollection("collation", {collation: {locale: "en", blah: 1}}));
     assert.commandFailed(
-        db.createCollection("collation_shell_helpers", {collation: {locale: "xx"}}));
+        db.createCollection("collation", {collation: {locale: "xx"}}));
     assert.commandFailed(
-        db.createCollection("collation_shell_helpers", {collation: {locale: "en", strength: 99}}));
+        db.createCollection("collation", {collation: {locale: "en", strength: 99}}));
 
     // Ensure we can create a collection with the "simple" collation as the collection default.
     assert.commandWorked(
-        db.createCollection("collation_shell_helpers", {collation: {locale: "simple"}}));
-    var collectionInfos = db.getCollectionInfos({name: "collation_shell_helpers"});
+        db.createCollection("collation", {collation: {locale: "simple"}}));
+    var collectionInfos = db.getCollectionInfos({name: "collation"});
     assert.eq(collectionInfos.length, 1);
     assert.eq(collectionInfos[0].options.collation, {locale: "simple"});
     coll.drop();
@@ -51,8 +51,8 @@
     // Ensure that we populate all collation-related fields when we create a collection with a valid
     // collation.
     assert.commandWorked(
-        db.createCollection("collation_shell_helpers", {collation: {locale: "fr_CA"}}));
-    var collectionInfos = db.getCollectionInfos({name: "collation_shell_helpers"});
+        db.createCollection("collation", {collation: {locale: "fr_CA"}}));
+    var collectionInfos = db.getCollectionInfos({name: "collation"});
     assert.eq(collectionInfos.length, 1);
     assert.eq(collectionInfos[0].options.collation, {
         locale: "fr_CA",
