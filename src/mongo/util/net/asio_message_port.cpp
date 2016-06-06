@@ -303,8 +303,8 @@ bool ASIOMessagingPort::recv(Message& m) {
         if (getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->shouldFail()) {
             throw SocketException(SocketException::RECV_ERROR, "fail point set");
         }
-        MsgData::View md = reinterpret_cast<char*>(mongoMalloc(kInitialMessageSize));
-        ScopeGuard guard = MakeGuard([&md]() { free(md.view2ptr()); });
+        SharedBuffer buf = SharedBuffer::allocate(kInitialMessageSize);
+        MsgData::View md = buf.get();
 
         asio::error_code ec = _read(md.view2ptr(), kHeaderLen);
         if (ec) {
@@ -378,7 +378,8 @@ bool ASIOMessagingPort::recv(Message& m) {
         }
 
         if (msgLen > kInitialMessageSize) {
-            md = reinterpret_cast<char*>(mongoRealloc(md.view2ptr(), msgLen));
+            buf.realloc(msgLen);
+            md = buf.get();
         }
 
         ec = _read(md.data(), msgLen - kHeaderLen);
@@ -386,8 +387,7 @@ bool ASIOMessagingPort::recv(Message& m) {
             throw asio::system_error(ec);
         }
 
-        guard.Dismiss();
-        m.setData(md.view2ptr(), true);
+        m.setData(std::move(buf));
         return true;
 
     } catch (const asio::system_error& e) {
@@ -428,8 +428,6 @@ void ASIOMessagingPort::say(Message& toSend, int responseTo) {
     auto buf = toSend.buf();
     if (buf) {
         send(buf, MsgData::ConstView(buf).getLen(), nullptr);
-    } else {
-        send(toSend.dataBuffers(), nullptr);
     }
 }
 

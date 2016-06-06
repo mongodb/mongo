@@ -202,7 +202,7 @@ public:
                         string ns = dbresponse.exhaustNS;  // before reset() free's it...
                         m.reset();
                         BufBuilder b(512);
-                        b.appendNum((int)0 /*size set later in appendData()*/);
+                        b.appendNum((int)0 /*size set later*/);
                         b.appendNum(header.getId());
                         b.appendNum(header.getResponseToMsgId());
                         b.appendNum((int)dbGetMore);
@@ -210,8 +210,10 @@ public:
                         b.appendStr(ns);
                         b.appendNum((int)0);  // ntoreturn
                         b.appendNum(cursorid);
-                        m.appendData(b.buf(), b.len());
-                        b.decouple();
+
+                        MsgData::View header = b.buf();
+                        header.setLen(b.len());
+                        m.setData(b.release());
                         DEV log() << "exhaust=true sending more";
                         continue;  // this goes back to top loop
                     }

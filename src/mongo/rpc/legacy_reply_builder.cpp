@@ -158,8 +158,7 @@ Message LegacyReplyBuilder::done() {
     qr.setStartingFrom(0);
     qr.setNReturned(1);
 
-    _message.setData(qr.view2ptr(), true);
-    _builder.decouple();
+    _message.setData(_builder.release());
 
     _state = State::kDone;
     return std::move(_message);

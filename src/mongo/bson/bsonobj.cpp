@@ -76,9 +76,9 @@ void BSONObj::_assertInvalid() const {
 }
 
 BSONObj BSONObj::copy() const {
-    char* storage = static_cast<char*>(mongoMalloc(sizeof(Holder) + objsize()));
-    memcpy(storage + sizeof(Holder), objdata(), objsize());
-    return BSONObj::takeOwnership(storage);
+    auto storage = SharedBuffer::allocate(objsize());
+    memcpy(storage.get(), objdata(), objsize());
+    return BSONObj(std::move(storage));
 }
 
 BSONObj BSONObj::getOwned() const {

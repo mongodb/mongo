@@ -174,7 +174,6 @@ void generateLegacyQueryErrorResponse(const AssertionException* exception,
 
     // TODO: call replyToQuery() from here instead of this!!! see dbmessage.h
     QueryResult::View msgdata = bb.buf();
-    bb.decouple();
     QueryResult::View qr = msgdata;
     qr.setResultFlags(ResultFlag_ErrSet);
     if (scex)
@@ -184,7 +183,7 @@ void generateLegacyQueryErrorResponse(const AssertionException* exception,
     qr.setCursorId(0);
     qr.setStartingFrom(0);
     qr.setNReturned(1);
-    response->setData(msgdata.view2ptr(), true);
+    response->setData(bb.release());
 }
 
 /**
@@ -469,7 +468,6 @@ bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, 
     }
 
     bool exhaust = false;
-    QueryResult::View msgdata = 0;
     bool isCursorAuthorized = false;
 
     try {
@@ -487,7 +485,7 @@ bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, 
             sleepmillis(0);
         }
 
-        msgdata = getMore(txn, ns, ntoreturn, cursorid, &exhaust, &isCursorAuthorized);
+        dbresponse.response = getMore(txn, ns, ntoreturn, cursorid, &exhaust, &isCursorAuthorized);
     } catch (AssertionException& e) {
         if (isCursorAuthorized) {
             // If a cursor with id 'cursorid' was authorized, it may have been advanced
@@ -510,9 +508,9 @@ bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, 
         return false;
     }
 
-    dbresponse.response.setData(msgdata.view2ptr(), true);
     curop.debug().responseLength = dbresponse.response.header().dataLen();
-    curop.debug().nreturned = msgdata.getNReturned();
+    auto queryResult = QueryResult::ConstView(dbresponse.response.buf());
+    curop.debug().nreturned = queryResult.getNReturned();
 
     dbresponse.responseToMsgId = m.header().getId();
 

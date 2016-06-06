@@ -32,9 +32,13 @@
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/allocator.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
+/**
+ * A mutable, ref-counted buffer.
+ */
 class SharedBuffer {
 public:
     SharedBuffer() = default;
@@ -44,30 +48,39 @@ public:
     }
 
     static SharedBuffer allocate(size_t bytes) {
-        return takeOwnership(static_cast<char*>(mongoMalloc(sizeof(Holder) + bytes)));
+        return takeOwnership(mongoMalloc(sizeof(Holder) + bytes));
     }
 
     /**
-     * Given a pointer to a region of un-owned data, prefixed by sufficient space for a
-     * SharedBuffer::Holder object, return an SharedBuffer that owns the
-     * memory.
+     * Resizes the buffer, copying the current contents.
      *
-     * This class will call free(holderPrefixedData), so it must have been allocated in a way
-     * that makes that valid.
+     * Like ::realloc() this can be called on a null SharedBuffer.
+     *
+     * This method is illegal to call if any other SharedBuffer instances share this buffer since
+     * they wouldn't be updated and would still try to delete the original buffer.
      */
-    static SharedBuffer takeOwnership(char* holderPrefixedData) {
-        // Initialize the refcount to 1 so we don't need to increment it in the constructor
-        // (see private Holder* constructor below).
-        //
-        // TODO: Should dassert alignment of holderPrefixedData
-        // here if possible.
-        return SharedBuffer(new (holderPrefixedData) Holder(1U));
+    void realloc(size_t size) {
+        invariant(!_holder || !_holder->isShared());
+
+        const size_t realSize = size + sizeof(Holder);
+        void* newPtr = mongoRealloc(_holder.get(), realSize);
+
+        // Get newPtr into _holder with a ref-count of 1 without touching the current pointee of
+        // _holder which is now invalid.
+        auto tmp = SharedBuffer::takeOwnership(newPtr);
+        _holder.detach();
+        _holder = std::move(tmp._holder);
     }
 
     char* get() const {
         return _holder ? _holder->data() : NULL;
     }
 
+    explicit operator bool() const {
+        return bool(_holder);
+    }
+
+private:
     class Holder {
     public:
         explicit Holder(AtomicUInt32::WordType initial = AtomicUInt32::WordType())
@@ -95,20 +108,67 @@ public:
             return reinterpret_cast<const char*>(this + 1);
         }
 
-    private:
+        bool isShared() const {
+            return _refCount.load() > 1;
+        }
+
         AtomicUInt32 _refCount;
     };
 
-private:
     explicit SharedBuffer(Holder* holder) : _holder(holder, /*add_ref=*/false) {
         // NOTE: The 'false' above is because we have already initialized the Holder with a
-        // refcount of '1' in takeOwnership above. This avoids an atomic increment.
+        // refcount of '1' in takeOwnership below. This avoids an atomic increment.
+    }
+
+    /**
+     * Given a pointer to a region of un-owned data, prefixed by sufficient space for a
+     * SharedBuffer::Holder object, return an SharedBuffer that owns the memory.
+     *
+     * This class will call free(holderPrefixedData), so it must have been allocated in a way
+     * that makes that valid.
+     */
+    static SharedBuffer takeOwnership(void* holderPrefixedData) {
+        // Initialize the refcount to 1 so we don't need to increment it in the constructor
+        // (see private Holder* constructor above).
+        //
+        // TODO: Should dassert alignment of holderPrefixedData here if possible.
+        return SharedBuffer(new (holderPrefixedData) Holder(1U));
     }
 
     boost::intrusive_ptr<Holder> _holder;
 };
 
 inline void swap(SharedBuffer& one, SharedBuffer& two) {
+    one.swap(two);
+}
+
+/**
+ * A constant view into a ref-counted buffer.
+ *
+ * Use SharedBuffer to allocate since allocating a const buffer is useless.
+ */
+class ConstSharedBuffer {
+public:
+    ConstSharedBuffer() = default;
+    /*implicit*/ ConstSharedBuffer(SharedBuffer source) : _buffer(std::move(source)) {}
+
+    void swap(ConstSharedBuffer& other) {
+        _buffer.swap(other._buffer);
+    }
+
+    const char* get() const {
+        return _buffer.get();
+    }
+
+    explicit operator bool() const {
+        return bool(_buffer);
+    }
+
+private:
+    SharedBuffer _buffer;
+};
+
+inline void swap(ConstSharedBuffer& one, ConstSharedBuffer& two) {
     one.swap(two);
 }
 }

@@ -114,8 +114,7 @@ Message LegacyRequestBuilder::done() {
     MsgData::View msg = _builder.buf();
     msg.setLen(_builder.len());
     msg.setOperation(dbQuery);
-    _builder.decouple();                     // release ownership from BufBuilder
-    _message.setData(msg.view2ptr(), true);  // transfer ownership to Message
+    _message.setData(_builder.release());
     _state = State::kDone;
     return std::move(_message);
 }

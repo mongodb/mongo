@@ -184,17 +184,14 @@ bool MessagingPort::recv(Message& m) {
         _psock->setHandshakeReceived();
         int z = (len + 1023) & 0xfffffc00;
         verify(z >= len);
-        MsgData::View md = reinterpret_cast<char*>(mongoMalloc(z));
-        ScopeGuard guard = MakeGuard(free, md.view2ptr());
-        verify(md.view2ptr());
-
+        auto buf = SharedBuffer::allocate(z);
+        MsgData::View md = buf.get();
         memcpy(md.view2ptr(), &header, headerLen);
         int left = len - headerLen;
 
         _psock->recv(md.data(), left);
 
-        guard.Dismiss();
-        m.setData(md.view2ptr(), true);
+        m.setData(std::move(buf));
         return true;
 
     } catch (const SocketException& e) {
@@ -234,8 +231,6 @@ void MessagingPort::say(Message& toSend, int responseTo) {
     auto buf = toSend.buf();
     if (buf) {
         send(buf, MsgData::ConstView(buf).getLen(), "say");
-    } else {
-        send(toSend.dataBuffers(), "say");
     }
 }
 

@@ -129,16 +129,16 @@ template StringBuilderImpl<StackAllocator>& operator<<(StringBuilderImpl<StackAl
 template StringBuilderImpl<StackAllocator>& operator<<(StringBuilderImpl<StackAllocator>&, Seconds);
 template StringBuilderImpl<StackAllocator>& operator<<(StringBuilderImpl<StackAllocator>&, Minutes);
 template StringBuilderImpl<StackAllocator>& operator<<(StringBuilderImpl<StackAllocator>&, Hours);
-template StringBuilderImpl<TrivialAllocator>& operator<<(StringBuilderImpl<TrivialAllocator>&,
-                                                         Nanoseconds);
-template StringBuilderImpl<TrivialAllocator>& operator<<(StringBuilderImpl<TrivialAllocator>&,
-                                                         Microseconds);
-template StringBuilderImpl<TrivialAllocator>& operator<<(StringBuilderImpl<TrivialAllocator>&,
-                                                         Milliseconds);
-template StringBuilderImpl<TrivialAllocator>& operator<<(StringBuilderImpl<TrivialAllocator>&,
-                                                         Seconds);
-template StringBuilderImpl<TrivialAllocator>& operator<<(StringBuilderImpl<TrivialAllocator>&,
-                                                         Minutes);
-template StringBuilderImpl<TrivialAllocator>& operator<<(StringBuilderImpl<TrivialAllocator>&,
-                                                         Hours);
+template StringBuilderImpl<SharedBufferAllocator>& operator<<(
+    StringBuilderImpl<SharedBufferAllocator>&, Nanoseconds);
+template StringBuilderImpl<SharedBufferAllocator>& operator<<(
+    StringBuilderImpl<SharedBufferAllocator>&, Microseconds);
+template StringBuilderImpl<SharedBufferAllocator>& operator<<(
+    StringBuilderImpl<SharedBufferAllocator>&, Milliseconds);
+template StringBuilderImpl<SharedBufferAllocator>& operator<<(
+    StringBuilderImpl<SharedBufferAllocator>&, Seconds);
+template StringBuilderImpl<SharedBufferAllocator>& operator<<(
+    StringBuilderImpl<SharedBufferAllocator>&, Minutes);
+template StringBuilderImpl<SharedBufferAllocator>& operator<<(
+    StringBuilderImpl<SharedBufferAllocator>&, Hours);
 }  // namespace mongo

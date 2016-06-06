@@ -30,7 +30,6 @@
 #pragma once
 
 #include <cstdint>
-#include <vector>
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
@@ -399,31 +398,13 @@ inline int ConstView::dataLen() const {
 }  // namespace MsgData
 
 class Message {
-    MONGO_DISALLOW_COPYING(Message);
-
 public:
-    using MsgVec = std::vector<std::pair<char*, int>>;
-
-    // we assume here that a vector with initial size 0 does no allocation (0 is the default, but
-    // wanted to make it explicit).
     Message() = default;
-
-    Message(void* data, bool freeIt) : _buf(reinterpret_cast<char*>(data)), _freeIt(freeIt) {}
-
-    Message(Message&& r) : _buf(r._buf), _data(std::move(r._data)), _freeIt(r._freeIt) {
-        r._buf = nullptr;
-        r._freeIt = false;
-    }
-
-    ~Message() {
-        reset();
-    }
-
-    SockAddr _from;
+    explicit Message(SharedBuffer data) : _buf(std::move(data)) {}
 
     MsgData::View header() const {
         verify(!empty());
-        return _buf ? _buf : _data[0].first;
+        return _buf.get();
     }
 
     NetworkOp operation() const {
@@ -436,110 +417,28 @@ public:
     }
 
     bool empty() const {
-        return !_buf && _data.empty();
+        return !_buf;
     }
 
     int size() const {
-        int res = 0;
         if (_buf) {
-            res = MsgData::ConstView(_buf).getLen();
-        } else {
-            for (MsgVec::const_iterator it = _data.begin(); it != _data.end(); ++it) {
-                res += it->second;
-            }
+            return MsgData::ConstView(_buf.get()).getLen();
         }
-        return res;
+        return 0;
     }
 
     int dataSize() const {
         return size() - sizeof(MSGHEADER::Value);
     }
 
-    // concat multiple buffers - noop if <2 buffers already, otherwise can be expensive copy
-    // can get rid of this if we make response handling smarter
-    void concat() {
-        if (_buf || empty()) {
-            return;
-        }
-
-        verify(_freeIt);
-        int totalSize = 0;
-        for (std::vector<std::pair<char*, int>>::const_iterator i = _data.begin(); i != _data.end();
-             ++i) {
-            totalSize += i->second;
-        }
-        char* buf = (char*)mongoMalloc(totalSize);
-        char* p = buf;
-        for (std::vector<std::pair<char*, int>>::const_iterator i = _data.begin(); i != _data.end();
-             ++i) {
-            memcpy(p, i->first, i->second);
-            p += i->second;
-        }
-        reset();
-        _setData(buf, true);
-    }
-
-    Message& operator=(Message&& r) {
-        // This implementation was originally written using an auto_ptr-style fake move. When
-        // converting to a real move assignment, checking for self-assignment was the simplest way
-        // to ensure correctness.
-        if (&r == this)
-            return *this;
-
-        if (!empty()) {
-            reset();
-        }
-
-        _buf = r._buf;
-        _data = std::move(r._data);
-        _freeIt = r._freeIt;
-
-        r._buf = nullptr;
-        r._freeIt = false;
-        return *this;
-    }
-
     void reset() {
-        if (_freeIt) {
-            if (_buf) {
-                std::free(_buf);
-            }
-            for (std::vector<std::pair<char*, int>>::const_iterator i = _data.begin();
-                 i != _data.end();
-                 ++i) {
-                std::free(i->first);
-            }
-        }
-        _buf = nullptr;
-        _data.clear();
-        _freeIt = false;
-    }
-
-    // use to add a buffer
-    // assumes message will free everything
-    void appendData(char* d, int size) {
-        if (size <= 0) {
-            return;
-        }
-        if (empty()) {
-            MsgData::View md = d;
-            md.setLen(size);  // can be updated later if more buffers added
-            _setData(md.view2ptr(), true);
-            return;
-        }
-        verify(_freeIt);
-        if (_buf) {
-            _data.push_back(std::make_pair(_buf, MsgData::ConstView(_buf).getLen()));
-            _buf = 0;
-        }
-        _data.push_back(std::make_pair(d, size));
-        header().setLen(header().getLen() + size);
+        _buf = {};
     }
 
     // use to set first buffer if empty
-    void setData(char* d, bool freeIt) {
+    void setData(SharedBuffer buf) {
         verify(empty());
-        _setData(d, freeIt);
+        _buf = std::move(buf);
     }
     void setData(int operation, const char* msgtxt) {
         setData(operation, msgtxt, strlen(msgtxt) + 1);
@@ -547,39 +446,29 @@ public:
     void setData(int operation, const char* msgdata, size_t len) {
         verify(empty());
         size_t dataLen = len + sizeof(MsgData::Value) - 4;
-        MsgData::View d = reinterpret_cast<char*>(mongoMalloc(dataLen));
+        _buf = SharedBuffer::allocate(dataLen);
+        MsgData::View d = _buf.get();
         if (len)
             memcpy(d.data(), msgdata, len);
         d.setLen(dataLen);
         d.setOperation(operation);
-        _setData(d.view2ptr(), true);
-    }
-
-    bool doIFreeIt() {
-        return _freeIt;
     }
 
     char* buf() {
-        return _buf;
-    }
-
-    const MsgVec& dataBuffers() const {
-        return _data;
+        return _buf.get();
     }
 
     std::string toString() const;
 
-private:
-    void _setData(char* d, bool freeIt) {
-        _freeIt = freeIt;
-        _buf = d;
+    SharedBuffer sharedBuffer() {
+        return _buf;
     }
-    // if just one buffer, keep it in _buf, otherwise keep a sequence of buffers in _data
-    char* _buf{nullptr};
-    // byte buffer(s) - the first must contain at least a full MsgData unless using _buf for storage
-    // instead
-    MsgVec _data{};
-    bool _freeIt{false};
+    ConstSharedBuffer sharedBuffer() const {
+        return _buf;
+    }
+
+private:
+    SharedBuffer _buf;
 };
 
 

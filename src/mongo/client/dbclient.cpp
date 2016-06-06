@@ -712,7 +712,7 @@ void DBClientInterface::findN(vector<BSONObj>& out,
     for (int i = 0; i < nToReturn; i++) {
         if (!c->more())
             break;
-        out.push_back(c->nextSafe().copy());
+        out.push_back(c->nextSafeOwned());
     }
 }
 

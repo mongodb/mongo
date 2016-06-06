@@ -115,7 +115,7 @@ void asyncRecvMessageBody(AsyncStreamInterface& stream,
 
     int z = (len + 1023) & 0xfffffc00;
     invariant(z >= len);
-    m->setData(reinterpret_cast<char*>(mongoMalloc(z)), true);
+    m->setData(SharedBuffer::allocate(z));
     MsgData::View mdView = m->buf();
 
     // copy header data into master buffer

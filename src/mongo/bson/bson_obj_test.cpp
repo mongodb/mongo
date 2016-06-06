@@ -540,5 +540,19 @@ TEST(BSONObj, getFieldsWithDuplicates) {
     ASSERT_EQUALS(fields[1].str(), "3");
 }
 
+TEST(BSONObj, ShareOwnershipWith) {
+    BSONObj obj;
+    {
+        BSONObj tmp = BSON("sub" << BSON("a" << 1));
+        obj = tmp["sub"].Obj();
+        obj.shareOwnershipWith(tmp);
+        ASSERT(obj.isOwned());
+    }
+
+    // Now that tmp is out of scope, if obj didn't retain ownership, it would be accessing free'd
+    // memory which should error on ASAN and debug builds.
+    ASSERT(obj.isOwned());
+    ASSERT_EQ(obj, BSON("a" << 1));
+}
 
 }  // unnamed namespace

@@ -166,10 +166,14 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
                                   << elt};
         }
 
-        batch.push_back(elt.Obj().getOwned());
+        batch.push_back(elt.Obj());
     }
 
-    return {{NamespaceString(fullns), cursorId, batch}};
+    for (auto& doc : batch) {
+        doc.shareOwnershipWith(cmdResponse);
+    }
+
+    return {{NamespaceString(fullns), cursorId, std::move(batch)}};
 }
 
 void CursorResponse::addToBSON(CursorResponse::ResponseType responseType,

@@ -280,7 +280,8 @@ void AsyncMockStreamFactory::MockStream::simulateServer(
         WriteEvent write{this};
 
         std::vector<uint8_t> messageData = popWrite();
-        Message msg(messageData.data(), false);
+        Message msg(SharedBuffer::allocate(messageData.size()));
+        memcpy(msg.buf(), messageData.data(), messageData.size());
 
         auto parsedRequest = rpc::makeRequest(&msg);
         ASSERT(parsedRequest->getProtocol() == proto);

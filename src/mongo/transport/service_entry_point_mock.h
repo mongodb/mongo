@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <vector>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"

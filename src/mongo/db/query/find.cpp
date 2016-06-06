@@ -223,12 +223,12 @@ void generateBatch(int ntoreturn,
 /**
  * Called by db/instance.cpp.  This is the getMore entry point.
  */
-QueryResult::View getMore(OperationContext* txn,
-                          const char* ns,
-                          int ntoreturn,
-                          long long cursorid,
-                          bool* exhaust,
-                          bool* isCursorAuthorized) {
+Message getMore(OperationContext* txn,
+                const char* ns,
+                int ntoreturn,
+                long long cursorid,
+                bool* exhaust,
+                bool* isCursorAuthorized) {
     invariant(ntoreturn >= 0);
 
     CurOp& curOp = *CurOp::get(txn);
@@ -485,9 +485,8 @@ QueryResult::View getMore(OperationContext* txn,
     qr.setCursorId(cursorid);
     qr.setStartingFrom(startingResult);
     qr.setNReturned(numResults);
-    bb.decouple();
     LOG(5) << "getMore returned " << numResults << " results\n";
-    return qr;
+    return Message(bb.release());
 }
 
 std::string runQuery(OperationContext* txn,
@@ -543,7 +542,6 @@ std::string runQuery(OperationContext* txn,
 
         // Set query result fields.
         QueryResult::View qr = bb.buf();
-        bb.decouple();
         qr.setResultFlagsToOk();
         qr.msgdata().setLen(bb.len());
         curOp.debug().responseLength = bb.len();
@@ -551,7 +549,7 @@ std::string runQuery(OperationContext* txn,
         qr.setCursorId(0);
         qr.setStartingFrom(0);
         qr.setNReturned(1);
-        result.setData(qr.view2ptr(), true);
+        result.setData(bb.release());
         return "";
     }
 
@@ -686,17 +684,17 @@ std::string runQuery(OperationContext* txn,
         endQueryOp(txn, collection, *exec, numResults, ccId);
     }
 
-    // Add the results from the query into the output buffer.
-    result.appendData(bb.buf(), bb.len());
-    bb.decouple();
-
     // Fill out the output buffer's header.
-    QueryResult::View queryResultView = result.header().view2ptr();
+    QueryResult::View queryResultView = bb.buf();
     queryResultView.setCursorId(ccId);
     queryResultView.setResultFlagsToOk();
+    queryResultView.msgdata().setLen(bb.len());
     queryResultView.msgdata().setOperation(opReply);
     queryResultView.setStartingFrom(0);
     queryResultView.setNReturned(numResults);
+
+    // Add the results from the query into the output buffer.
+    result.setData(bb.release());
 
     // curOp.debug().exhaust is set above.
     return curOp.debug().exhaust ? nss.ns() : "";

@@ -469,8 +469,8 @@ public:
             // Get the appropriate message id
             WriteEvent write{stream};
             std::vector<uint8_t> messageData = stream->popWrite();
-            Message msg(messageData.data(), false);
-            messageId = msg.header().getId();
+            messageId =
+                MsgData::ConstView(reinterpret_cast<const char*>(messageData.data())).getId();
         }
 
         // Build a mock reply message
