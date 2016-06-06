@@ -72,7 +72,8 @@ TEST(Protocol, parseProtocolSetFromIsMasterReply) {
     {
         // MongoDB 3.2 (mongod)
         auto mongod32 =
-            BSON("maxWireVersion" << static_cast<int>(WireVersion::FIND_COMMAND) << "minWireVersion"
+            BSON("maxWireVersion" << static_cast<int>(WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN)
+                                  << "minWireVersion"
                                   << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE));
 
         ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(mongod32)), supports::kAll);
@@ -80,7 +81,8 @@ TEST(Protocol, parseProtocolSetFromIsMasterReply) {
     {
         // MongoDB 3.2 (mongos)
         auto mongos32 =
-            BSON("maxWireVersion" << static_cast<int>(WireVersion::FIND_COMMAND) << "minWireVersion"
+            BSON("maxWireVersion" << static_cast<int>(WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN)
+                                  << "minWireVersion"
                                   << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE)
                                   << "msg"
                                   << "isdbgrid");

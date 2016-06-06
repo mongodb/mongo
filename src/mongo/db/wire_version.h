@@ -58,6 +58,9 @@ enum WireVersion {
 
     // Support find and getMore commands, as well as OP_COMMAND in mongod (but not mongos).
     FIND_COMMAND = 4,
+
+    // Supports all write commands take a write concern.
+    COMMANDS_ACCEPT_WRITE_CONCERN = 5,
 };
 
 struct WireSpec {

@@ -518,10 +518,10 @@ static void _initWireSpec() {
     WireSpec& spec = WireSpec::instance();
     // accept from any version
     spec.minWireVersionIncoming = RELEASE_2_4_AND_BEFORE;
-    spec.maxWireVersionIncoming = FIND_COMMAND;
+    spec.maxWireVersionIncoming = COMMANDS_ACCEPT_WRITE_CONCERN;
     // connect to any version
     spec.minWireVersionOutgoing = RELEASE_2_4_AND_BEFORE;
-    spec.maxWireVersionOutgoing = FIND_COMMAND;
+    spec.maxWireVersionOutgoing = COMMANDS_ACCEPT_WRITE_CONCERN;
 }
 
 

@@ -327,10 +327,10 @@ static void _initWireSpec() {
     WireSpec& spec = WireSpec::instance();
     // accept from any version
     spec.minWireVersionIncoming = RELEASE_2_4_AND_BEFORE;
-    spec.maxWireVersionIncoming = FIND_COMMAND;
-    // connect to version supporting Find Command only
-    spec.minWireVersionOutgoing = FIND_COMMAND;
-    spec.maxWireVersionOutgoing = FIND_COMMAND;
+    spec.maxWireVersionIncoming = COMMANDS_ACCEPT_WRITE_CONCERN;
+    // connect to version supporting Write Concern only
+    spec.minWireVersionOutgoing = COMMANDS_ACCEPT_WRITE_CONCERN;
+    spec.maxWireVersionOutgoing = COMMANDS_ACCEPT_WRITE_CONCERN;
 }
 
 static ExitCode runMongosServer() {
