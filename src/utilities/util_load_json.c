@@ -427,6 +427,9 @@ json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins, uint32_t flags)
 				    flags)) != 0)
 					goto err;
 				config_list_free(&cl);
+				free(ins->kvraw);
+				ins->kvraw = NULL;
+				config_list_free(&cl);
 				break;
 			}
 			else
@@ -544,15 +547,14 @@ json_skip(WT_SESSION *session, JSON_INPUT_STATE *ins, const char **matches)
 	const char *hit;
 	const char **match;
 
-	if (ins->kvraw != NULL)
-		return (1);
-
+	WT_ASSERT((WT_SESSION_IMPL *)session, ins->kvraw == NULL);
 	hit = NULL;
 	while (!ins->ateof) {
 		for (match = matches; *match != NULL; match++)
 			if ((hit = strstr(ins->p, *match)) != NULL)
 				goto out;
-		if (util_read_line(session, &ins->line, true, &ins->ateof)) {
+		if (util_read_line(session, &ins->line, true, &ins->ateof)
+		    != 0) {
 			ins->toktype = -1;
 			return (1);
 		}
