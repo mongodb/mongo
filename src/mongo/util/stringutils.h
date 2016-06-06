@@ -61,6 +61,22 @@ inline std::string tolowerString(StringData input) {
     return copy;
 }
 
+inline std::string toAsciiLowerCase(StringData input) {
+    size_t sz = input.size();
+    std::unique_ptr<char[]> line(new char[sz + 1]);
+    char* res = line.get();
+    for (size_t i = 0; i < sz; i++) {
+        char c = input[i];
+        if (c >= 'A' && c <= 'Z') {
+            res[i] = c + 32;
+        } else {
+            res[i] = c;
+        }
+    }
+    res[sz] = 0;
+    return res;
+}
+
 /** Functor for combining lexical and numeric comparisons. */
 class LexNumCmp {
 public:

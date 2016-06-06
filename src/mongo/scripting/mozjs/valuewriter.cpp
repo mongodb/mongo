@@ -195,7 +195,7 @@ int64_t ValueWriter::toInt64() {
 }
 
 Decimal128 ValueWriter::toDecimal128() {
-    std::uint32_t signalingFlag = 0;
+    std::uint32_t signalingFlags = 0;
     if (_value.isNumber()) {
         return Decimal128(toNumber(), Decimal128::kRoundTo15Digits);
     }
@@ -210,17 +210,20 @@ Decimal128 ValueWriter::toDecimal128() {
 
     if (_value.isString()) {
         std::string input = toString();
-        Decimal128 decimal = Decimal128(input, &signalingFlag);
+        Decimal128 decimal = Decimal128(input, &signalingFlags);
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "Input is not a valid Decimal128 value.",
+                !Decimal128::hasFlag(signalingFlags, Decimal128::SignalingFlag::kInvalid));
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "Input out of range of Decimal128 value (inexact).",
+                !Decimal128::hasFlag(signalingFlags, Decimal128::SignalingFlag::kInexact));
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "Input out of range of Decimal128 value (underflow).",
+                !Decimal128::hasFlag(signalingFlags, Decimal128::SignalingFlag::kUnderflow));
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "Input out of range of Decimal128 value (overflow).",
+                !Decimal128::hasFlag(signalingFlags, Decimal128::SignalingFlag::kOverflow));
 
-        // All strings other than NaN are invalid
-        if (decimal.isNaN() && input != "NaN" && input != "+NaN" && input != "-NaN") {
-            uasserted(ErrorCodes::BadValue,
-                      str::stream() << "Input is not a valid Decimal128 value.");
-        }
-        if (Decimal128::hasFlag(signalingFlag, Decimal128::SignalingFlag::kInexact)) {
-            uasserted(ErrorCodes::BadValue,
-                      str::stream() << "Input out of range of a Decimal128 value.");
-        }
         return decimal;
     }
     uasserted(ErrorCodes::BadValue, str::stream() << "Unable to write Decimal128 value.");

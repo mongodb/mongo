@@ -25,10 +25,12 @@
  *    then also delete it in the license file.
  */
 
+
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/basic.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -44,6 +46,101 @@
 
 #include "mongo/config.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/stringutils.h"
+
+namespace {
+void validateInputString(mongo::StringData input, std::uint32_t* signalingFlags) {
+    // Input must be of these forms:
+    // * Valid decimal (standard or scientific notation):
+    //      /[-+]?\d*(.\d+)?([e][+\-]?\d+)?/
+    // * NaN: /[-+]?[[Nn][Aa][Nn]]/
+    // * Infinity: /[+\-]?(inf|infinity)
+
+    bool isSigned = input[0] == '-' || input[0] == '+';
+
+    // Check for NaN and Infinity
+    size_t start = (isSigned) ? 1 : 0;
+    mongo::StringData noSign = input.substr(start);
+    bool isNanOrInf = noSign == "nan" || noSign == "inf" || noSign == "infinity";
+    if (isNanOrInf)
+        return;
+
+    // Input starting with non digit
+    if (!std::isdigit(noSign[0])) {
+        if (noSign[0] != '.') {
+            *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
+            return;
+        } else if (noSign.size() == 1) {
+            *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
+            return;
+        }
+    }
+    bool isZero = true;
+    bool hasCoefficient = false;
+
+    // Check coefficient, i.e. the part before the e
+    int dotCount = 0;
+    size_t i = 0;
+    for (/*i = 0*/; i < noSign.size(); i++) {
+        char c = noSign[i];
+        if (c == '.') {
+            dotCount++;
+            if (dotCount > 1) {
+                *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
+                return;
+            }
+        } else if (!std::isdigit(c)) {
+            break;
+        } else {
+            hasCoefficient = true;
+            if (c != '0') {
+                isZero = false;
+            }
+        }
+    }
+
+    if (isZero) {
+        // Override inexact/overflow flag set by the intel library
+        *signalingFlags = mongo::Decimal128::SignalingFlag::kNoFlag;
+    }
+
+    // Input is valid if we've parsed the entire string
+    if (i == noSign.size()) {
+        return;
+    }
+
+    // String with empty coefficient and non-empty exponent
+    if (!hasCoefficient) {
+        *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
+        return;
+    }
+
+    // Check exponent
+    mongo::StringData exponent = noSign.substr(i);
+
+    if (exponent[0] != 'e' || exponent.size() < 2) {
+        *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
+        return;
+    }
+    if (exponent[1] == '-' || exponent[1] == '+') {
+        exponent = exponent.substr(2);
+        if (exponent.size() == 0) {
+            *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
+            return;
+        }
+    } else {
+        exponent = exponent.substr(1);
+    }
+
+    for (size_t j = 0; j < exponent.size(); j++) {
+        char c = exponent[j];
+        if (!std::isdigit(c)) {
+            *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
+            return;
+        }
+    }
+}
+}  // namespace
 
 namespace mongo {
 
@@ -254,14 +351,16 @@ Decimal128::Decimal128(std::string stringValue, RoundingMode roundMode) {
     *this = Decimal128(stringValue, &throwAwayFlag, roundMode);
 }
 
+
 Decimal128::Decimal128(std::string stringValue,
                        std::uint32_t* signalingFlags,
                        RoundingMode roundMode) {
-    std::unique_ptr<char[]> charInput(new char[stringValue.size() + 1]);
-    std::copy(stringValue.begin(), stringValue.end(), charInput.get());
-    charInput[stringValue.size()] = '\0';
+    std::string lower = toAsciiLowerCase(stringValue);
     BID_UINT128 dec128;
-    dec128 = bid128_from_string(charInput.get(), roundMode, signalingFlags);
+    // The intel library function requires a char * while c_str() returns a const char*.
+    // We're using const_cast here since the library function should not modify the input.
+    dec128 = bid128_from_string(const_cast<char*>(lower.c_str()), roundMode, signalingFlags);
+    validateInputString(StringData(lower), signalingFlags);
     _value = libraryTypeToValue(dec128);
 }
 
