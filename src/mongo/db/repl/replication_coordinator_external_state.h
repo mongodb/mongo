@@ -193,25 +193,19 @@ public:
     virtual void killAllUserOperations(OperationContext* txn) = 0;
 
     /**
-     * Clears all cached sharding metadata on this server.  This is called after stepDown to
-     * ensure that if the node becomes primary again in the future it will reload an up-to-date
-     * version of the sharding data.
+     * Resets any active sharding metadata on this server and stops any sharding-related threads
+     * (such as the balancer). It is called after stepDown to ensure that if the node becomes
+     * primary again in the future it will recover its state from a clean slate.
      */
-    virtual void clearShardingState() = 0;
+    virtual void shardingOnStepDownHook() = 0;
 
     /**
-     * Called when the instance transitions to primary in order to notify a potentially sharded
-     * host to recover its sharding state.
+     * Called when the instance transitions to primary in order to notify a potentially sharded host
+     * to perform respective state changes, such as starting the balancer, etc.
      *
      * Throws on errors.
      */
-    virtual void recoverShardingState(OperationContext* txn) = 0;
-
-    /**
-     * Called when the instance transitions to primary in order to update the config server
-     * connection string of the shard identity document.
-     */
-    virtual void updateShardIdentityConfigString(OperationContext* txn) = 0;
+    virtual void shardingOnDrainingStateHook(OperationContext* txn) = 0;
 
     /**
      * Notifies the bgsync and syncSourceFeedback threads to choose a new sync source.

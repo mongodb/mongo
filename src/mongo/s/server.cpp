@@ -32,6 +32,8 @@
 
 #include "mongo/s/server.h"
 
+#include <boost/optional.hpp>
+
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
@@ -83,6 +85,7 @@
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/sharding_egress_metadata_hook_for_mongos.h"
 #include "mongo/s/sharding_initialization.h"
+#include "mongo/s/sharding_uptime_reporter.h"
 #include "mongo/s/version_mongos.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
@@ -117,6 +120,12 @@ using std::string;
 using std::vector;
 
 using logger::LogComponent;
+
+namespace {
+
+boost::optional<ShardingUptimeReporter> shardingUptimeReporter;
+
+}  // namespace
 
 #if defined(_WIN32)
 ntservice::NtServiceDefaultStrings defaultServiceStrings = {
@@ -400,7 +409,13 @@ static ExitCode runMongosServer() {
         return EXIT_SHARDING_ERROR;
     }
 
-    Balancer::get(opCtx.get())->start(opCtx.get());
+    // Construct the sharding uptime reporter after the startup parameters have been parsed in order
+    // to ensure that it picks up the server port instead of reporting the default value.
+    shardingUptimeReporter.emplace();
+    shardingUptimeReporter->startPeriodicThread();
+
+    Balancer::create(getGlobalServiceContext());
+
     clusterCursorCleanupJob.go();
 
     UserCacheInvalidator cacheInvalidatorThread(getGlobalAuthorizationManager());

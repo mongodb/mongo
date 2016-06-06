@@ -648,8 +648,7 @@ var ShardingTest = function(params) {
         timeout = timeout || 60000;
 
         try {
-            assert.writeOK(sh.setBalancerState(false));
-            sh.waitForBalancer(false, timeout, interval);
+            sh.stopBalancer(timeout, interval);
         } finally {
             db = oldDB;
         }
@@ -665,8 +664,7 @@ var ShardingTest = function(params) {
         timeout = timeout || 60000;
 
         try {
-            assert.writeOK(sh.setBalancerState(true));
-            sh.waitForBalancer(true, timeout, interval);
+            sh.startBalancer(timeout, interval);
         } finally {
             db = oldDB;
         }

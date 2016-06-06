@@ -76,9 +76,8 @@ public:
     virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
     virtual void closeConnections();
     virtual void killAllUserOperations(OperationContext* txn);
-    virtual void clearShardingState();
-    virtual void recoverShardingState(OperationContext* txn);
-    virtual void updateShardIdentityConfigString(OperationContext* txn) override;
+    virtual void shardingOnStepDownHook();
+    virtual void shardingOnDrainingStateHook(OperationContext* txn);
     virtual void signalApplierToChooseNewSyncSource();
     virtual void signalApplierToCancelFetcher();
     virtual void dropAllTempCollections(OperationContext* txn);

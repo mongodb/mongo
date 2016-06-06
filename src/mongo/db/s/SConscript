@@ -83,6 +83,8 @@ env.Library(
         'check_sharding_index_command.cpp',
         'cleanup_orphaned_cmd.cpp',
         'config/configsvr_add_shard_command.cpp',
+        'config/configsvr_control_balancer_command.cpp',
+        'config/configsvr_move_chunk_command.cpp',
         'get_shard_version_command.cpp',
         'merge_chunks_command.cpp',
         'migration_chunk_cloner_source_legacy_commands.cpp',

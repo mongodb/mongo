@@ -42,6 +42,17 @@ sh._pchunk = function(chunk) {
     return "[" + tojson(chunk.min) + " -> " + tojson(chunk.max) + "]";
 };
 
+/**
+ * Internal method to write the balancer state to the config.settings collection. Should not be used
+ * directly, instead go through the start/stopBalancer calls and the controlBalancer command.
+ */
+sh._writeBalancerStateDeprecated = function(onOrNot) {
+    return assert.writeOK(
+        sh._getConfigDB().settings.update({_id: 'balancer'},
+                                          {$set: {stopped: onOrNot ? false : true}},
+                                          {upsert: true, writeConcern: {w: 'majority'}}));
+};
+
 sh.help = function() {
     print("\tsh.addShard( host )                       server:port OR setname/server:port");
     print("\tsh.enableSharding(dbname)                 enables sharding on the database dbname");
@@ -53,10 +64,7 @@ sh.help = function() {
         "\tsh.splitAt(fullName,middle)               splits the chunk that middle is in at middle");
     print(
         "\tsh.moveChunk(fullName,find,to)            move the chunk where 'find' is to 'to' (name of shard)");
-
-    print(
-        "\tsh.setBalancerState( <bool on or not> )   turns the balancer on or off true=on, false=off");
-    print("\tsh.getBalancerState()                     return true if enabled");
+    print("\tsh.getBalancerState()                      returns whether the balancer is enabled");
     print(
         "\tsh.isBalancerRunning()                    return true if the balancer has work in progress on any mongos");
 
@@ -114,11 +122,12 @@ sh.moveChunk = function(fullName, find, to) {
     return sh._adminCommand({moveChunk: fullName, find: find, to: to});
 };
 
-sh.setBalancerState = function(onOrNot) {
-    return assert.writeOK(
-        sh._getConfigDB().settings.update({_id: 'balancer'},
-                                          {$set: {stopped: onOrNot ? false : true}},
-                                          {upsert: true, writeConcern: {w: 'majority'}}));
+sh.setBalancerState = function(isOn) {
+    if (isOn) {
+        return sh.startBalancer();
+    } else {
+        return sh.stopBalancer();
+    }
 };
 
 sh.getBalancerState = function(configDB) {
@@ -153,19 +162,33 @@ sh.getBalancerHost = function(configDB) {
     return x.process.match(/[^:]+:[^:]+/)[0];
 };
 
-sh.stopBalancer = function(timeout, interval) {
-    var res = sh.setBalancerState(false);
-    sh.waitForBalancer(false, timeout, interval);
-    return res;
+sh.stopBalancer = function(timeoutMs, interval) {
+    timeoutMs = timeoutMs || 60000;
+
+    var result = db.adminCommand({controlBalancer: 'stop', maxTimeMS: timeoutMs});
+    if (result.code === ErrorCodes.CommandNotFound) {
+        // For backwards compatibility, use the legacy balancer stop method
+        result = sh._writeBalancerStateDeprecated(false);
+        sh.waitForBalancer(false, timeoutMs, interval);
+        return result;
+    }
+
+    return assert.commandWorked(result);
 };
 
-sh.startBalancer = function(timeout, interval) {
-    var res = sh.setBalancerState(true);
-    sh.waitForBalancer(true, timeout, interval);
-    return res;
+sh.startBalancer = function(timeoutMs, interval) {
+    var result = db.adminCommand({controlBalancer: 'start', maxTimeMS: timeoutMs});
+    if (result.code === ErrorCodes.CommandNotFound) {
+        // For backwards compatibility, use the legacy balancer start method
+        result = sh._writeBalancerStateDeprecated(true);
+        sh.waitForBalancer(true, timeoutMs, interval);
+        return result;
+    }
+
+    return assert.commandWorked(result);
 };
 
-sh.waitForDLock = function(lockId, onOrNot, timeout, interval) {
+sh._waitForDLock = function(lockId, onOrNot, timeout, interval) {
     // Wait for balancer to be on or off
     // Can also wait for particular balancer state
     var state = onOrNot;
@@ -201,7 +224,6 @@ sh.waitForDLock = function(lockId, onOrNot, timeout, interval) {
 };
 
 sh.waitForPingChange = function(activePings, timeout, interval) {
-
     var isPingChanged = function(activePing) {
         var newPing = sh._getConfigDB().mongos.findOne({_id: activePing._id});
         return !newPing || newPing.ping + "" != activePing.ping + "";
@@ -240,7 +262,7 @@ sh.waitForBalancer = function(onOrNot, timeout, interval) {
     // If we're waiting for the balancer to turn on or switch state or go to a particular state
     if (onOrNot) {
         // Just wait for the balancer lock to change, can't ensure we'll ever see it actually locked
-        sh.waitForDLock("balancer", undefined, timeout, interval);
+        sh._waitForDLock("balancer", undefined, timeout, interval);
     } else {
         // Otherwise we need to wait until we're sure balancing stops
         var activePings = [];
@@ -260,7 +282,7 @@ sh.waitForBalancer = function(onOrNot, timeout, interval) {
         // Wait for the balancer lock to become inactive. We can guess this is stale after 15 mins,
         // but need to double-check manually.
         try {
-            sh.waitForDLock("balancer", false, 15 * 60 * 1000);
+            sh._waitForDLock("balancer", false, 15 * 60 * 1000);
         } catch (e) {
             print(
                 "Balancer still may be active, you must manually verify this is not the case using the config.changelog collection.");

@@ -28,8 +28,11 @@
 
 #pragma once
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/s/balancer/balancer_chunk_selection_policy.h"
 #include "mongo/s/sharding_uptime_reporter.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 
 namespace mongo {
@@ -38,8 +41,8 @@ class ChunkType;
 class ClusterStatistics;
 class MigrationSecondaryThrottleOptions;
 class OperationContext;
-template <typename T>
-class StatusWith;
+class ServiceContext;
+class Status;
 
 /**
  * The balancer is a background task that tries to keep the number of chunks across all
@@ -52,20 +55,46 @@ class StatusWith;
  * loaded shards. It would issue a request for a chunk migration per round, if it found so.
  */
 class Balancer {
+    MONGO_DISALLOW_COPYING(Balancer);
+
 public:
     Balancer();
     ~Balancer();
 
     /**
+     * Instantiates an instance of the balancer and installs it on the specified service context.
+     * This method is not thread-safe and must be called only once when the service is starting.
+     */
+    static void create(ServiceContext* serviceContext);
+
+    /**
      * Retrieves the per-service instance of the Balancer.
      */
+    static Balancer* get(ServiceContext* serviceContext);
     static Balancer* get(OperationContext* operationContext);
 
     /**
-     * Starts the main balancer loop and returns immediately without waiting for initialization.
-     * This method may only be called once for the lifetime of the balancer.
+     * Starts the main balancer thread and returns immediately. If the thread was successfully
+     * started (or if it was already running), returns an OK status. Otherwise, an error is
+     * returned.
+     *
+     * Known errors include:
+     *  ConflictingOperationInProgress - if the balancer is being shut down
      */
-    void start(OperationContext* txn);
+    Status startThread(OperationContext* txn);
+
+    /**
+     * If the main balancer thread is running, requests it to stop and returns immediately without
+     * waiting for it to terminate. The join method must be called afterwards in order to wait for
+     * the thread to complete.
+     */
+    void stopThread();
+
+    /**
+     * Must always be called after stop has been called and only then. Ensures that the balancer
+     * thread has terminated.
+     */
+    void joinThread();
 
     /**
      * Blocking call, which requests the balancer to move a single chunk to a more appropriate
@@ -92,16 +121,37 @@ public:
 
 private:
     /**
+     * Possible runtime states of the balancer. The comments indicate the allowed next state.
+     */
+    enum State {
+        kStopped,   // kRunning
+        kRunning,   // kStopping
+        kStopping,  // kStopped
+    };
+
+    /**
      * The main balancer loop, which runs in a separate thread.
      */
     void _mainThread();
 
     /**
-     * Checks that the balancer can connect to all servers it needs to do its job.
-     *
-     * @return true if balancing can be started
-     *
-     * This method throws on a network exception
+     * Checks whether the balancer main thread has been requested to stop.
+     */
+    bool _stopRequested();
+
+    /**
+     * Signals the beginning of a balancing round.
+     */
+    void _beginRound(OperationContext* txn);
+
+    /**
+     * Blocks the caller for the specified timeout or until the balancer condition variable is
+     * signaled, whichever comes first.
+     */
+    void _endRound(OperationContext* txn, Seconds waitTimeout);
+
+    /**
+     * Ensures that the balancer can connect to all shards and that they are consistent.
      */
     bool _init(OperationContext* txn);
 
@@ -131,10 +181,15 @@ private:
                     bool waitForDelete);
 
     // The uptime reporter associated with this instance
-    const ShardingUptimeReporter _stardingUptimeReporter;
+    const ShardingUptimeReporter _shardingUptimeReporter;
 
     // The main balancer thread
     stdx::thread _thread;
+
+    // Utilities to stop the balancer
+    stdx::mutex _mutex;
+    stdx::condition_variable _condVar;
+    State _state{kStopped};
 
     // Number of moved chunks in last round
     int _balancedLastTime;

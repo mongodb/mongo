@@ -197,12 +197,9 @@ void ReplicationCoordinatorExternalStateMock::closeConnections() {
 
 void ReplicationCoordinatorExternalStateMock::killAllUserOperations(OperationContext* txn) {}
 
-void ReplicationCoordinatorExternalStateMock::clearShardingState() {}
+void ReplicationCoordinatorExternalStateMock::shardingOnStepDownHook() {}
 
-void ReplicationCoordinatorExternalStateMock::recoverShardingState(OperationContext* txn) {}
-
-void ReplicationCoordinatorExternalStateMock::updateShardIdentityConfigString(
-    OperationContext* txn) {}
+void ReplicationCoordinatorExternalStateMock::shardingOnDrainingStateHook(OperationContext* txn) {}
 
 void ReplicationCoordinatorExternalStateMock::signalApplierToChooseNewSyncSource() {}
 

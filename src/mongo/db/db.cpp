@@ -107,6 +107,7 @@
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/platform/process_id.h"
+#include "mongo/s/balancer/balancer.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/memory.h"
@@ -768,6 +769,7 @@ static void _initAndListen(int listenPort) {
             }
         } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             uassertStatusOK(initializeGlobalShardingStateForMongod(ConnectionString::forLocal()));
+            Balancer::create(startupOpCtx->getServiceContext());
         }
 
         logStartup(startupOpCtx.get());

@@ -23,6 +23,7 @@ load("./jstests/multiVersion/libs/verify_versions.js");
     };
 
     var st = new ShardingTest(options);
+    st.stopBalancer();
 
     assert.binVersion(st.shard0, "last-stable");
     assert.binVersion(st.shard1, "last-stable");
@@ -103,5 +104,4 @@ load("./jstests/multiVersion/libs/verify_versions.js");
                   "Latest -> last-stable mongod version migration failure.");
 
     st.stop();
-
 })();

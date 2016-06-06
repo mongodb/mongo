@@ -28,19 +28,6 @@
 
     st.restartMongos(0);
 
-    var coll = st.s0.getDB('test').user;
-
-    var verifyInsert = function() {
-        var beforeCount = coll.find().count();
-        coll.insert({x: 1});
-        var afterCount = coll.find().count();
-
-        assert.eq(beforeCount + 1, afterCount);
-    };
-
-    jsTest.log('Insert to a downed replSet');
-    assert.throws(verifyInsert);
-
     replTest.startSet({oplogSize: 10});
     replTest.initiate();
     replTest.awaitSecondaryNodes();
@@ -48,8 +35,7 @@
     // Verify that the replSetMonitor can reach the restarted set
     ReplSetTest.awaitRSClientHosts(st.s0, replTest.nodes, {ok: true});
 
-    jsTest.log('Insert to an online replSet');
-    verifyInsert();
+    assert.writeOK(st.s0.getDB('test').user.insert({x: 1}));
 
     st.stop();
 })();

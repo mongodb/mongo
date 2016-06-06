@@ -32,7 +32,6 @@
 
 #include "mongo/db/repl/replication_coordinator_external_state_impl.h"
 
-#include <sstream>
 #include <string>
 
 #include "mongo/base/init.h"
@@ -67,6 +66,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/s/balancer/balancer.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/functional.h"
@@ -408,11 +408,15 @@ void ReplicationCoordinatorExternalStateImpl::killAllUserOperations(OperationCon
     environment->killAllUserOperations(txn, ErrorCodes::InterruptedDueToReplStateChange);
 }
 
-void ReplicationCoordinatorExternalStateImpl::clearShardingState() {
+void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        Balancer::get(getGlobalServiceContext())->stopThread();
+    }
+
     ShardingState::get(getGlobalServiceContext())->clearCollectionMetadata();
 }
 
-void ReplicationCoordinatorExternalStateImpl::recoverShardingState(OperationContext* txn) {
+void ReplicationCoordinatorExternalStateImpl::shardingOnDrainingStateHook(OperationContext* txn) {
     auto status = ShardingStateRecovery::recover(txn);
 
     if (status == ErrorCodes::ShutdownInProgress) {
@@ -425,14 +429,15 @@ void ReplicationCoordinatorExternalStateImpl::recoverShardingState(OperationCont
         fassertFailedWithStatus(40107, status);
     }
 
-    // There is a slight chance that some stale metadata might have been loaded before the latest
-    // optime has been recovered, so throw out everything that we have up to now
-    ShardingState::get(txn)->clearCollectionMetadata();
-}
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        // If this is a config server node becoming a primary, start the balancer
+        auto balancer = Balancer::get(txn);
 
-void ReplicationCoordinatorExternalStateImpl::updateShardIdentityConfigString(
-    OperationContext* txn) {
-    if (ShardingState::get(txn)->enabled()) {
+        // We need to join the balancer here, because it might have been running at a previous time
+        // when this node was a primary.
+        balancer->joinThread();
+        balancer->startThread(txn);
+    } else if (ShardingState::get(txn)->enabled()) {
         const auto configsvrConnStr =
             Grid::get(txn)->shardRegistry()->getConfigShard()->getConnString();
         auto status = ShardingState::get(txn)->updateShardIdentityConfigString(
@@ -442,6 +447,10 @@ void ReplicationCoordinatorExternalStateImpl::updateShardIdentityConfigString(
                       << configsvrConnStr << causedBy(status);
         }
     }
+
+    // There is a slight chance that some stale metadata might have been loaded before the latest
+    // optime has been recovered, so throw out everything that we have up to now
+    ShardingState::get(txn)->clearCollectionMetadata();
 }
 
 void ReplicationCoordinatorExternalStateImpl::signalApplierToChooseNewSyncSource() {

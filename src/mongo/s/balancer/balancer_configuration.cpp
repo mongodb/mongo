@@ -49,6 +49,8 @@ const char kStopped[] = "stopped";
 const char kActiveWindow[] = "activeWindow";
 const char kWaitForDelete[] = "_waitForDelete";
 
+const NamespaceString kSettingsNamespace("config", "settings");
+
 }  // namespace
 
 const char BalancerSettingsType::kKey[] = "balancer";
@@ -61,6 +63,28 @@ BalancerConfiguration::BalancerConfiguration()
       _maxChunkSizeBytes(ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes) {}
 
 BalancerConfiguration::~BalancerConfiguration() = default;
+
+Status BalancerConfiguration::setBalancerActive(OperationContext* txn, bool active) {
+    auto updateStatus = Grid::get(txn)->catalogClient(txn)->updateConfigDocument(
+        txn,
+        kSettingsNamespace.ns(),
+        BSON("_id" << BalancerSettingsType::kKey),
+        BSON("$set" << BSON(kStopped << !active)),
+        true);
+
+    Status refreshStatus = refreshAndCheck(txn);
+    if (!refreshStatus.isOK()) {
+        return refreshStatus;
+    }
+
+    if (!updateStatus.isOK() && (isBalancerActive() != active)) {
+        return {updateStatus.getStatus().code(),
+                str::stream() << "Failed to update balancer configuration due to "
+                              << updateStatus.getStatus().reason()};
+    }
+
+    return Status::OK();
+}
 
 bool BalancerConfiguration::isBalancerActive() const {
     stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);

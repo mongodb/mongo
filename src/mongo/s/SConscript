@@ -50,6 +50,7 @@ env.Library(
         'request_types/add_shard_to_zone_request_type.cpp',
         'request_types/assign_key_range_to_zone_request_type.cpp',
         'request_types/balance_chunk_request_type.cpp',
+        'request_types/control_balancer_request_type.cpp',
         'request_types/remove_shard_from_zone_request_type.cpp',
         'chunk_diff.cpp',
         'chunk_version.cpp',
@@ -188,6 +189,7 @@ env.CppUnitTest('request_types_test',
         'request_types/add_shard_to_zone_request_test.cpp',
         'request_types/assign_key_range_to_zone_request_test.cpp',
         'request_types/balance_chunk_request_test.cpp',
+        'request_types/control_balancer_request_test.cpp',
         'request_types/remove_shard_from_zone_request_test.cpp',
     ],
     LIBDEPS=[
@@ -200,7 +202,6 @@ env.CppUnitTest('request_types_test',
 env.Library(
     target='coreshard',
     source=[
-        # This is only here temporarily for auto-split logic in chunk.cpp.
         'balancer/balancer.cpp',
         'balancer/balancer_chunk_selection_policy.cpp',
         'balancer/balancer_chunk_selection_policy_impl.cpp',
@@ -212,6 +213,7 @@ env.Library(
         'chunk.cpp',
         'chunk_manager.cpp',
         'config.cpp',
+        'config_server_client.cpp',
         'grid.cpp',
         'shard_util.cpp',
         'sharding_egress_metadata_hook.cpp',
@@ -278,10 +280,10 @@ env.CppUnitTest(
         'balancer/cluster_statistics_test.cpp',
     ],
     LIBDEPS=[
-        'coreshard',
-        'sharding_test_fixture',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
+        'coreshard',
+        'sharding_test_fixture',
     ]
 )
 

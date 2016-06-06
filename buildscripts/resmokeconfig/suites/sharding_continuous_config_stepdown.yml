@@ -26,7 +26,6 @@ selector:
     - jstests/sharding/diffservers1.js
     - jstests/sharding/disable_autosplit.js
     - jstests/sharding/drop_sharded_db.js
-    - jstests/sharding/fair_balancer_round.js
     - jstests/sharding/findandmodify1.js
     - jstests/sharding/findandmodify2.js
     - jstests/sharding/geo_shardedgeonear.js

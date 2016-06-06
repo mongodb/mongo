@@ -740,8 +740,6 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
     }
     lk.unlock();
 
-    _externalState->recoverShardingState(txn);
-
     ScopedTransaction transaction(txn, MODE_X);
     Lock::GlobalWrite globalWriteLock(txn->lockState());
 
@@ -754,7 +752,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
     _drainFinishedCond.notify_all();
     lk.unlock();
 
-    _externalState->updateShardIdentityConfigString(txn);
+    _externalState->shardingOnDrainingStateHook(txn);
     _externalState->dropAllTempCollections(txn);
 
     // This is done for compatibility with PV0 replicas wrt how "n" ops are processed.
@@ -2541,7 +2539,7 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
             break;
         case kActionCloseAllConnections:
             _externalState->closeConnections();
-            _externalState->clearShardingState();
+            _externalState->shardingOnStepDownHook();
             break;
         case kActionWinElection: {
             stdx::unique_lock<stdx::mutex> lk(_mutex);

@@ -595,6 +595,19 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "controlBalancer",
+          command: {controlBalancer: "x"},
+          skipStandalone: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                privileges:
+                    [{resource: {db: 'config', collection: 'settings'}, actions: ['update']}],
+                expectFail: true  // 'x' is not a vaild parameter
+              },
+          ]
+        },
+        {
           testname: "count",
           command: {count: "x"},
           testcases: [
@@ -2494,7 +2507,15 @@ var authCommandsLib = {
           testcases: [
               {runOnDb: adminDbName, roles: {__system: 1}, expectFail: true},
           ]
-        }
+        },
+        {
+          testname: "_configsvrControlBalancer",
+          command: {_configsvrControlBalancer: "x"},
+          skipSharded: true,
+          testcases: [
+              {runOnDb: adminDbName, roles: {__system: 1}, expectFail: true},
+          ]
+        },
     ],
 
     /************* SHARED TEST LOGIC ****************/

@@ -96,7 +96,6 @@ public:
         return _waitForDelete;
     }
 
-
 private:
     BalancerSettingsType();
 
@@ -163,6 +162,11 @@ public:
      */
     BalancerConfiguration();
     ~BalancerConfiguration();
+
+    /**
+     * Synchronous method, which writes the balancer active state to the configuration data.
+     */
+    Status setBalancerActive(OperationContext* txn, bool active);
 
     /**
      * Returns whether balancing is allowed based on both the enabled state of the balancer and the
