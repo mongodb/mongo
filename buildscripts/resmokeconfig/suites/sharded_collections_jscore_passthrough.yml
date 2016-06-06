@@ -11,7 +11,7 @@ selector:
     - jstests/core/capped*.js  # capped collections.
     - jstests/core/check_shard_index.js  # checkShardingIndex.
     # TODO SERVER-23473: remove once all relevant mongos commands support the collation param.
-    - jstests/core/collation_shell_helpers.js
+    - jstests/core/collation.js
     - jstests/core/collection_truncate.js  # emptycapped.
     - jstests/core/compact_keeps_indexes.js  # compact.
     - jstests/core/capped_update.js  # uses godinsert and can't run under replication.
