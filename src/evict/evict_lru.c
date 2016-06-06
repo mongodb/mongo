@@ -196,10 +196,14 @@ __evict_thread_run(void *arg)
 		    __wt_spin_trylock(session, &cache->evict_pass_lock) == 0) {
 			/*
 			 * Cannot use WT_WITH_PASS_LOCK because this is a try
-			 * lock.  Fix when that is supported.
+			 * lock.  Fix when that is supported.  We set the flag
+			 * on both sessions because we may call clear_walk when
+			 * we are walking with the walk session, locked.
 			 */
 			F_SET(session, WT_SESSION_LOCKED_PASS);
+			F_SET(cache->walk_session, WT_SESSION_LOCKED_PASS);
 			ret = __evict_server(session, &did_work);
+			F_CLR(cache->walk_session, WT_SESSION_LOCKED_PASS);
 			F_CLR(session, WT_SESSION_LOCKED_PASS);
 			__wt_spin_unlock(session, &cache->evict_pass_lock);
 			WT_ERR(ret);
@@ -214,12 +218,15 @@ __evict_thread_run(void *arg)
 			WT_ERR(__evict_helper(session));
 	}
 
-	if (session == conn->evict_session)
+	if (session == conn->evict_session) {
 		/*
 		 * The eviction server is shutting down: in case any trees are
 		 * still open, clear all walks now so that they can be closed.
 		 */
-		WT_ERR(__evict_clear_all_walks(session));
+		WT_WITH_PASS_LOCK(session, ret,
+		    ret = __evict_clear_all_walks(session));
+		WT_ERR(ret);
+	}
 	WT_ERR(__wt_verbose(
 	    session, WT_VERB_EVICTSERVER, "cache eviction thread exiting"));
 
@@ -712,6 +719,7 @@ __evict_clear_walk(WT_SESSION_IMPL *session)
 	btree = S2BT(session);
 	cache = S2C(session)->cache;
 
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_PASS));
 	if (session->dhandle == cache->evict_file_next)
 		cache->evict_file_next = NULL;
 
