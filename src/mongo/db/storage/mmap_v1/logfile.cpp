@@ -263,7 +263,7 @@ void LogFile::synchronousAppend(const void* b, size_t len) {
     }
 
 #ifdef POSIX_FADV_DONTNEED
-    if (!_direct)
+    if (!_direct && pos >= 0)  // current position cannot be negative
         posix_fadvise(_fd, pos, len, POSIX_FADV_DONTNEED);
 #endif
 }
