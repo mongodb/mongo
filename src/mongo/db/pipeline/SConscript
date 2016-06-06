@@ -73,6 +73,7 @@ env.Library(
     LIBDEPS=[
         'dependencies',
         'document_value',
+        '$BUILD_DIR/mongo/util/summation',
     ]
 )
 
