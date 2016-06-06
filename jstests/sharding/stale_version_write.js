@@ -1,37 +1,37 @@
 // Tests whether a reset sharding version triggers errors
+(function() {
+    'use strict';
 
-jsTest.log("Starting sharded cluster...");
+    var st = new ShardingTest({shards: 1, mongos: 2});
 
-var st = new ShardingTest({shards: 1, mongos: 2, verbose: 2});
+    var mongosA = st.s0;
+    var mongosB = st.s1;
 
-st.stopBalancer();
+    jsTest.log("Adding new collections...");
 
-var mongosA = st.s0;
-var mongosB = st.s1;
+    var collA = mongosA.getCollection(jsTestName() + ".coll");
+    assert.writeOK(collA.insert({hello: "world"}));
 
-jsTest.log("Adding new collections...");
+    var collB = mongosB.getCollection("" + collA);
+    assert.writeOK(collB.insert({hello: "world"}));
 
-var collA = mongosA.getCollection(jsTestName() + ".coll");
-assert.writeOK(collA.insert({hello: "world"}));
+    jsTest.log("Enabling sharding...");
 
-var collB = mongosB.getCollection("" + collA);
-assert.writeOK(collB.insert({hello: "world"}));
+    assert.commandWorked(mongosA.getDB("admin").adminCommand({enableSharding: "" + collA.getDB()}));
+    assert.commandWorked(
+        mongosA.getDB("admin").adminCommand({shardCollection: "" + collA, key: {_id: 1}}));
 
-jsTest.log("Enabling sharding...");
+    // MongoD doesn't know about the config shard version *until* MongoS tells it
+    collA.findOne();
 
-printjson(mongosA.getDB("admin").runCommand({enableSharding: "" + collA.getDB()}));
-printjson(mongosA.getDB("admin").runCommand({shardCollection: "" + collA, key: {_id: 1}}));
+    jsTest.log("Trigger shard version mismatch...");
 
-// MongoD doesn't know about the config shard version *until* MongoS tells it
-collA.findOne();
+    assert.writeOK(collB.insert({goodbye: "world"}));
 
-jsTest.log("Trigger shard version mismatch...");
+    print("Inserted...");
 
-assert.writeOK(collB.insert({goodbye: "world"}));
+    assert.eq(3, collA.find().itcount());
+    assert.eq(3, collB.find().itcount());
 
-print("Inserted...");
-
-assert.eq(3, collA.find().itcount());
-assert.eq(3, collB.find().itcount());
-
-st.stop();
+    st.stop();
+})();

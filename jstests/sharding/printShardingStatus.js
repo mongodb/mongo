@@ -3,6 +3,7 @@
 // headings and the names of sharded collections and their shard keys.
 
 (function() {
+    'use strict';
 
     var st = new ShardingTest({shards: 1, mongos: 2, config: 1, other: {smallfiles: true}});
 
@@ -230,5 +231,4 @@
     assert(mongos.getDB("test").dropDatabase());
 
     st.stop();
-
 })();

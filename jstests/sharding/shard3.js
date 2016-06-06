@@ -1,5 +1,4 @@
 (function() {
-
     // Include helpers for analyzing explain output.
     load("jstests/libs/analyze_plan.js");
 
@@ -17,11 +16,14 @@
     }
 
     assert(sh.getBalancerState(), "A1");
-    sh.setBalancerState(false);
+
+    sh.stopBalancer();
     assert(!sh.getBalancerState(), "A2");
-    sh.setBalancerState(true);
+
+    sh.startBalancer();
     assert(sh.getBalancerState(), "A3");
-    sh.setBalancerState(false);
+
+    sh.stopBalancer();
     assert(!sh.getBalancerState(), "A4");
 
     s.config.databases.find().forEach(printjson);

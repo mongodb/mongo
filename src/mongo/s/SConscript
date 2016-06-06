@@ -81,9 +81,9 @@ env.Library(
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
         '$BUILD_DIR/mongo/s/catalog/replset/catalog_manager_replica_set',
         '$BUILD_DIR/mongo/s/coreshard',
-        '$BUILD_DIR/mongo/s/mongoscore',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         '$BUILD_DIR/mongo/util/net/message_port_mock',
+        'mongoscore',
     ],
     LIBDEPS_TAGS=[
         # Depends on coreshard, but that would be circular

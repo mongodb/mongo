@@ -9,7 +9,6 @@
 
     // Create a cluster with 2 shards.
     var st = new ShardingTest({shards: 2});
-    st.stopBalancer();
 
     var testDB = st.s.getDB('test');
     var shardKey = {a: 1};
@@ -84,4 +83,5 @@
     assert.commandWorked(res);
     assertExplainResult(res, 'executionStats', 'executionStages', 'shard0001', 'DELETE');
 
+    st.stop();
 })();

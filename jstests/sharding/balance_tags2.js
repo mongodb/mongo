@@ -1,27 +1,26 @@
 // Test balancing all chunks to one shard by tagging the full shard-key range on that collection
-var s = new ShardingTest(
-    {name: "balance_tags2", shards: 3, mongos: 1, other: {chunkSize: 1, enableBalancer: true}});
+var s = new ShardingTest({shards: 3, mongos: 1, other: {chunkSize: 1, enableBalancer: true}});
 
-s.adminCommand({enablesharding: "test"});
+assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
 s.ensurePrimaryShard('test', 'shard0001');
 
 var db = s.getDB("test");
 
 var bulk = db.foo.initializeUnorderedBulkOp();
-for (i = 0; i < 21; i++) {
+for (var i = 0; i < 21; i++) {
     bulk.insert({_id: i, x: i});
 }
 assert.writeOK(bulk.execute());
 
-sh.shardCollection("test.foo", {_id: 1});
+assert.commandWorked(s.s0.adminCommand({shardCollection: "test.foo", key: {_id: 1}}));
 
-sh.stopBalancer();
+s.stopBalancer();
 
-for (i = 0; i < 20; i++) {
+for (var i = 0; i < 20; i++) {
     sh.splitAt("test.foo", {_id: i});
 }
 
-sh.startBalancer();
+s.startBalancer();
 
 s.printShardingStatus(true);
 

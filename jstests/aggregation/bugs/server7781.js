@@ -1,5 +1,6 @@
 // SERVER-7781 $geoNear pipeline stage
 (function() {
+    'use strict';
 
     load('jstests/libs/geo_near_random.js');
     load('jstests/aggregation/extras/utils.js');
@@ -56,10 +57,12 @@
                 shards.push(shard._id);
             });
 
-            db.adminCommand({shardCollection: db[coll].getFullName(), key: {rand: 1}});
+            assert.commandWorked(
+                db.adminCommand({shardCollection: db[coll].getFullName(), key: {rand: 1}}));
             for (var i = 1; i < 10; i++) {
                 // split at 0.1, 0.2, ... 0.9
-                db.adminCommand({split: db[coll].getFullName(), middle: {rand: i / 10}});
+                assert.commandWorked(
+                    db.adminCommand({split: db[coll].getFullName(), middle: {rand: i / 10}}));
                 db.adminCommand({
                     moveChunk: db[coll].getFullName(),
                     find: {rand: i / 10},
@@ -84,8 +87,8 @@
 
         // test with defaults
         var queryPoint = pointMaker.mkPt(0.25);  // stick to center of map
-        geoCmd = {geoNear: coll, near: queryPoint, includeLocs: true, spherical: true};
-        aggCmd = {
+        var geoCmd = {geoNear: coll, near: queryPoint, includeLocs: true, spherical: true};
+        var aggCmd = {
             $geoNear: {
                 near: queryPoint,
                 includeLocs: 'stats.loc',
@@ -126,7 +129,7 @@
         geoCmd.num = 40;
         geoCmd.near = queryPoint;
         aggCmd.$geoNear.near = queryPoint;
-        aggArr = [aggCmd, {$limit: 50}, {$limit: 60}, {$limit: 40}];
+        var aggArr = [aggCmd, {$limit: 50}, {$limit: 60}, {$limit: 40}];
         checkOutput(db.runCommand(geoCmd), db[coll].aggregate(aggArr), 40);
 
         // Test $geoNear with an initial batchSize of 0. Regression test for SERVER-20935.
@@ -149,13 +152,11 @@
     test(db, false, '2dsphere');
 
     var sharded = new ShardingTest({shards: 3, mongos: 1});
-    sharded.stopBalancer();
-    sharded.adminCommand({enablesharding: "test"});
+    assert.commandWorked(sharded.s0.adminCommand({enablesharding: "test"}));
     sharded.ensurePrimaryShard('test', 'shard0001');
 
     test(sharded.getDB('test'), true, '2d');
     test(sharded.getDB('test'), true, '2dsphere');
 
     sharded.stop();
-
 })();

@@ -1,13 +1,10 @@
 // Tests whether the noBalance flag disables balancing for collections
 
-var st = new ShardingTest({shards: 2, mongos: 1, verbose: 1});
+var st = new ShardingTest({shards: 2, mongos: 1});
 
 // First, test that shell helpers require an argument
 assert.throws(sh.disableBalancing, [], "sh.disableBalancing requires a collection");
 assert.throws(sh.enableBalancing, [], "sh.enableBalancing requires a collection");
-
-// Initially stop balancing
-st.stopBalancer();
 
 var shardAName = st._shardNames[0];
 var shardBName = st._shardNames[1];
@@ -70,10 +67,11 @@ jsTest.log("Chunks for " + collB + " are balanced.");
 
 // Re-disable balancing for collB
 sh.disableBalancing(collB);
+
 // Wait for the balancer to fully finish the last migration and write the changelog
 // MUST set db var here, ugly but necessary
 db = st.s0.getDB("config");
-sh.waitForBalancer(true);
+st.waitForBalancerRound();
 
 // Make sure auto-migrates on insert don't move chunks
 var lastMigration = sh._lastMigration(collB);
