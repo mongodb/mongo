@@ -129,10 +129,24 @@ protected:
     }
 
     /**
-     * Returns a Client object for use in this test.
+     * Makes a new OperationContext on the default Client for this test.
      */
     ServiceContext::UniqueOperationContext makeOperationContext() {
         return _client->makeOperationContext();
+    }
+
+    /**
+     * Returns the ServiceContext for this test.
+     */
+    ServiceContext* getServiceContext() {
+        return getGlobalServiceContext();
+    }
+
+    /**
+     * Returns the default Client for this test.
+     */
+    Client* getClient() {
+        return _client.get();
     }
 
     /**
