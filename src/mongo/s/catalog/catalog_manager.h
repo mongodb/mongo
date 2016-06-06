@@ -451,9 +451,6 @@ public:
      */
     virtual bool isMetadataConsistentFromLastCheck(OperationContext* txn) = 0;
 
-protected:
-    CatalogManager() = default;
-
     /**
      * Obtains a reference to the distributed lock manager instance to use for synchronizing
      * system-wide changes.
@@ -462,6 +459,9 @@ protected:
      * be cached.
      */
     virtual DistLockManager* getDistLockManager() = 0;
+
+protected:
+    CatalogManager() = default;
 };
 
 }  // namespace mongo
