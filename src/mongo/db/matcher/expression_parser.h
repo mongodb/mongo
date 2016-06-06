@@ -54,13 +54,12 @@ public:
                                            const ExtensionsCallback& extensionsCallback,
                                            const CollatorInterface* collator) {
         // The 0 initializes the match expression tree depth.
-        return MatchExpressionParser(&extensionsCallback, collator)._parse(obj, 0);
+        return MatchExpressionParser(&extensionsCallback)._parse(obj, collator, 0);
     }
 
 private:
-    MatchExpressionParser(const ExtensionsCallback* extensionsCallback,
-                          const CollatorInterface* collator)
-        : _extensionsCallback(extensionsCallback), _collator(collator) {}
+    MatchExpressionParser(const ExtensionsCallback* extensionsCallback)
+        : _extensionsCallback(extensionsCallback) {}
 
     /**
      * 5 = false
@@ -85,18 +84,27 @@ private:
     /**
      * Parse 'obj' and return either a MatchExpression or an error.
      *
+     * 'collator' is the collator that constructed collation-aware MatchExpressions will use.  It
+     * must outlive the returned MatchExpression and any clones made of it.
+     *
      * 'level' tracks the current depth of the tree across recursive calls to this
      * function. Used in order to apply special logic at the top-level and to return an
      * error if the tree exceeds the maximum allowed depth.
      */
-    StatusWithMatchExpression _parse(const BSONObj& obj, int level);
+    StatusWithMatchExpression _parse(const BSONObj& obj,
+                                     const CollatorInterface* collator,
+                                     int level);
 
     /**
      * parses a field in a sub expression
      * if the query is { x : { $gt : 5, $lt : 8 } }
      * e is { $gt : 5, $lt : 8 }
      */
-    Status _parseSub(const char* name, const BSONObj& obj, AndMatchExpression* root, int level);
+    Status _parseSub(const char* name,
+                     const BSONObj& obj,
+                     AndMatchExpression* root,
+                     const CollatorInterface* collator,
+                     int level);
 
     /**
      * parses a single field in a sub expression
@@ -107,6 +115,7 @@ private:
                                              const AndMatchExpression* andSoFar,
                                              const char* name,
                                              const BSONElement& e,
+                                             const CollatorInterface* collator,
                                              int level);
 
     StatusWithMatchExpression _parseComparison(const char* name,
@@ -126,15 +135,27 @@ private:
 
     // arrays
 
-    StatusWithMatchExpression _parseElemMatch(const char* name, const BSONElement& e, int level);
+    StatusWithMatchExpression _parseElemMatch(const char* name,
+                                              const BSONElement& e,
+                                              const CollatorInterface* collator,
+                                              int level);
 
-    StatusWithMatchExpression _parseAll(const char* name, const BSONElement& e, int level);
+    StatusWithMatchExpression _parseAll(const char* name,
+                                        const BSONElement& e,
+                                        const CollatorInterface* collator,
+                                        int level);
 
     // tree
 
-    Status _parseTreeList(const BSONObj& arr, ListOfMatchExpression* out, int level);
+    Status _parseTreeList(const BSONObj& arr,
+                          ListOfMatchExpression* out,
+                          const CollatorInterface* collator,
+                          int level);
 
-    StatusWithMatchExpression _parseNot(const char* name, const BSONElement& e, int level);
+    StatusWithMatchExpression _parseNot(const char* name,
+                                        const BSONElement& e,
+                                        const CollatorInterface* collator,
+                                        int level);
 
     /**
      * Parses 'e' into a BitTestMatchExpression.
@@ -153,10 +174,6 @@ private:
     // Performs parsing for the match extensions. We do not own this pointer - it has to live
     // as long as the parser is active.
     const ExtensionsCallback* _extensionsCallback;
-
-    // Collator that constructed collation-aware MatchExpressions will use.
-    // We do not own this pointer - it has to live as long as the parser is active.
-    const CollatorInterface* _collator;
 };
 
 typedef stdx::function<StatusWithMatchExpression(

@@ -45,6 +45,7 @@ const int MatchExpressionParser::kMaximumTreeDepth = 100;
 
 Status MatchExpressionParser::_parseTreeList(const BSONObj& arr,
                                              ListOfMatchExpression* out,
+                                             const CollatorInterface* collator,
                                              int level) {
     if (arr.isEmpty())
         return Status(ErrorCodes::BadValue, "$and/$or/$nor must be a nonempty array");
@@ -56,7 +57,7 @@ Status MatchExpressionParser::_parseTreeList(const BSONObj& arr,
         if (e.type() != Object)
             return Status(ErrorCodes::BadValue, "$or/$and/$nor entries need to be full objects");
 
-        StatusWithMatchExpression sub = _parse(e.Obj(), level);
+        StatusWithMatchExpression sub = _parse(e.Obj(), collator, level);
         if (!sub.isOK())
             return sub.getStatus();
 
@@ -67,6 +68,7 @@ Status MatchExpressionParser::_parseTreeList(const BSONObj& arr,
 
 StatusWithMatchExpression MatchExpressionParser::_parseNot(const char* name,
                                                            const BSONElement& e,
+                                                           const CollatorInterface* collator,
                                                            int level) {
     if (e.type() == RegEx) {
         StatusWithMatchExpression s = _parseRegexElement(name, e);
@@ -87,7 +89,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseNot(const char* name,
         return StatusWithMatchExpression(ErrorCodes::BadValue, "$not cannot be empty");
 
     std::unique_ptr<AndMatchExpression> theAnd = stdx::make_unique<AndMatchExpression>();
-    Status s = _parseSub(name, notObject, theAnd.get(), level);
+    Status s = _parseSub(name, notObject, theAnd.get(), collator, level);
     if (!s.isOK())
         return StatusWithMatchExpression(s);
 
