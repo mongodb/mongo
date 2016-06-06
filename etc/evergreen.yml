@@ -565,6 +565,14 @@ pre:
         set -o verbose
 
         rm -rf src /data/db/* mongo-coredumps.tgz
+  - command: shell.exec
+    params:
+      system_log: true
+      script: |
+        set -o errexit
+        set -o verbose
+
+        ulimit -a
 
 post:
   - command: attach.results
