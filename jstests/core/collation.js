@@ -198,21 +198,34 @@
     }
 
     //
-    // Test helpers for operations that accept a collation.
+    // Collation tests for aggregation.
     //
 
+    // Collection does not exist.
+    coll.drop();
+    assert.eq(0, coll.aggregate([], {collation: {locale: "fr"}}).itcount());
+
+    // Collection exists.
     coll.drop();
     assert.writeOK(coll.insert({_id: 1, str: "foo"}));
     assert.writeOK(coll.insert({_id: 2, str: "bar"}));
-
-    // Aggregation.
     assert.eq(0, coll.aggregate([{$match: {str: "FOO"}}]).itcount());
     assert.eq(1,
               coll.aggregate([{$match: {str: "FOO"}}], {collation: {locale: "en_US", strength: 2}})
                   .itcount());
     assert.commandWorked(coll.explain().aggregate([], {collation: {locale: "fr"}}));
 
-    // Count command.
+    //
+    // Collation tests for count.
+    //
+
+    // Collection does not exist.
+    assert.eq(0, coll.find({str: "FOO"}).collation({locale: "en_US"}).count());
+
+    // Collection exists.
+    coll.drop();
+    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+    assert.writeOK(coll.insert({_id: 2, str: "bar"}));
     assert.eq(0, coll.find({str: "FOO"}).count());
     assert.eq(0, coll.find({str: "FOO"}).collation({locale: "en_US"}).count());
     assert.eq(1, coll.find({str: "FOO"}).collation({locale: "en_US", strength: 2}).count());
@@ -236,12 +249,18 @@
     assert.neq(null, planStage);
     assert.eq(1, planStage.advanced);
 
-    // Distinct.
+    //
+    // Collation tests for distinct.
+    //
+
+    // Collection does not exist.
+    coll.drop();
+    assert.eq(0, coll.distinct("str", {}, {collation: {locale: "en_US", strength: 2}}).length);
+
+    // Collection exists, no indexes.
     coll.drop();
     assert.writeOK(coll.insert({_id: 1, str: "foo"}));
     assert.writeOK(coll.insert({_id: 2, str: "FOO"}));
-
-    // Without an index.
     var res = coll.distinct("str", {}, {collation: {locale: "en_US", strength: 2}});
     assert.eq(1, res.length);
     assert.eq("foo", res[0].toLowerCase());
@@ -249,7 +268,7 @@
     assert.eq(
         2, coll.distinct("_id", {str: "foo"}, {collation: {locale: "en_US", strength: 2}}).length);
 
-    // With an index.
+    // Collection exists, indexes exist.
     coll.createIndex({str: 1}, {collation: {locale: "en_US", strength: 2}});
     res = coll.distinct("str", {}, {collation: {locale: "en_US", strength: 2}});
     assert.eq(1, res.length);
@@ -258,12 +277,19 @@
 
     assert.commandWorked(coll.explain().distinct("str", {}, {collation: {locale: "fr"}}));
 
-    // Find command.
-    coll.drop();
-    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-    assert.writeOK(coll.insert({_id: 2, str: "bar"}));
+    //
+    // Collation tests for find.
+    //
+
     if (db.getMongo().useReadCommands()) {
+        // Collection does not exist.
+        coll.drop();
+        assert.eq(0, coll.find({_id: "FOO"}).collation({locale: "en_US"}).itcount());
+
         // On _id field.
+        coll.drop();
+        assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+        assert.writeOK(coll.insert({_id: 2, str: "bar"}));
         assert.writeOK(coll.insert({_id: "foo"}));
         assert.eq(0, coll.find({_id: "FOO"}).itcount());
         assert.eq(0, coll.find({_id: "FOO"}).collation({locale: "en_US"}).itcount());
@@ -306,23 +332,38 @@
                       .itcount());
         assert.writeOK(coll.remove({_id: 3}));
         assert.commandWorked(coll.dropIndexes());
+
+        explainRes =
+            coll.explain("executionStats").find({str: "FOO"}).collation({locale: "en_US"}).finish();
+        assert.commandWorked(explainRes);
+        assert.eq(0, explainRes.executionStats.nReturned);
+        explainRes = coll.explain("executionStats")
+                         .find({str: "FOO"})
+                         .collation({locale: "en_US", strength: 2})
+                         .finish();
+        assert.commandWorked(explainRes);
+        assert.eq(1, explainRes.executionStats.nReturned);
     } else {
+        coll.drop();
+        assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+        assert.writeOK(coll.insert({_id: 2, str: "bar"}));
         assert.throws(function() {
             coll.find().collation({locale: "fr"}).itcount();
         });
     }
 
-    // Explain of find always uses the find command, so this will succeed regardless of readMode.
-    explainRes =
-        coll.explain("executionStats").find({str: "FOO"}).collation({locale: "en_US"}).finish();
-    assert.commandWorked(explainRes);
-    assert.eq(0, explainRes.executionStats.nReturned);
-    explainRes = coll.explain("executionStats")
-                     .find({str: "FOO"})
-                     .collation({locale: "en_US", strength: 2})
-                     .finish();
-    assert.commandWorked(explainRes);
-    assert.eq(1, explainRes.executionStats.nReturned);
+    //
+    // Collation tests for findAndModify.
+    //
+
+    // Collection does not exist.
+    coll.drop();
+    assert.eq(null, coll.findAndModify({
+        query: {str: "bar"},
+        update: {$set: {str: "baz"}},
+        new: true,
+        collation: {locale: "fr"}
+    }));
 
     // Update via findAndModify.
     coll.drop();
@@ -362,7 +403,22 @@
     assert.neq(null, planStage);
     assert.eq(1, planStage.nWouldDelete);
 
-    // Group.
+    //
+    // Collation tests for group.
+    //
+
+    // Collection does not exist.
+    coll.drop();
+    assert.eq([], coll.group({
+        key: {str: 1},
+        initial: {count: 0},
+        reduce: function(curr, result) {
+            result.count += 1;
+        },
+        collation: {locale: "fr"}
+    }));
+
+    // Collection exists.
     coll.drop();
     assert.writeOK(coll.insert({_id: 1, str: "foo"}));
     assert.writeOK(coll.insert({_id: 2, str: "bar"}));
@@ -389,7 +445,27 @@
     assert.neq(null, planStage);
     assert.eq(planStage.nGroups, 1);
 
-    // mapReduce.
+    //
+    // Collation tests for mapReduce.
+    //
+
+    // Collection does not exist.
+    coll.drop();
+    assert.throws(function() {
+        coll.mapReduce(
+            function() {
+                emit(this.str, 1);
+            },
+            function(key, values) {
+                return Array.sum(values);
+            },
+            {out: {inline: 1}, collation: {locale: "fr"}});
+    });
+
+    // Collection exists.
+    coll.drop();
+    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+    assert.writeOK(coll.insert({_id: 2, str: "bar"}));
     var mapReduceOut = coll.mapReduce(
         function() {
             emit(this.str, 1);
@@ -401,11 +477,19 @@
     assert.commandWorked(mapReduceOut);
     assert.eq(mapReduceOut.results.length, 1);
 
-    // Remove.
-    coll.drop();
-    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-    assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+    //
+    // Collation tests for remove.
+    //
+
     if (db.getMongo().writeMode() === "commands") {
+        // Collection does not exist.
+        coll.drop();
+        assert.writeOK(coll.remove({str: "foo"}, {justOne: true, collation: {locale: "fr"}}));
+
+        // Collection exists.
+        coll.drop();
+        assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+        assert.writeOK(coll.insert({_id: 2, str: "foo"}));
         explainRes = coll.explain("executionStats").remove({str: "FOO"}, {
             justOne: true,
             collation: {locale: "en_US", strength: 2}
@@ -420,6 +504,9 @@
         assert.writeOK(writeRes);
         assert.eq(1, writeRes.nRemoved);
     } else {
+        coll.drop();
+        assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+        assert.writeOK(coll.insert({_id: 2, str: "foo"}));
         assert.throws(function() {
             coll.remove({str: "FOO"}, {justOne: true, collation: {locale: "en_US", strength: 2}});
         });
@@ -429,11 +516,20 @@
         });
     }
 
-    // Update.
-    coll.drop();
-    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
-    assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+    //
+    // Collation tests for update.
+    //
+
     if (db.getMongo().writeMode() === "commands") {
+        // Collection does not exist.
+        coll.drop();
+        assert.writeOK(coll.update(
+            {str: "foo"}, {$set: {other: 99}}, {multi: true, collation: {locale: "fr"}}));
+
+        // Collection exists.
+        coll.drop();
+        assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+        assert.writeOK(coll.insert({_id: 2, str: "foo"}));
         explainRes = coll.explain("executionStats").update({str: "FOO"}, {$set: {other: 99}}, {
             multi: true,
             collation: {locale: "en_US", strength: 2}
@@ -448,6 +544,9 @@
                                    {multi: true, collation: {locale: "en_US", strength: 2}});
         assert.eq(2, writeRes.nModified);
     } else {
+        coll.drop();
+        assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+        assert.writeOK(coll.insert({_id: 2, str: "foo"}));
         assert.throws(function() {
             coll.update({str: "FOO"},
                         {$set: {other: 99}},
@@ -460,11 +559,23 @@
         });
     }
 
-    // geoNear.
+    //
+    // Collation tests for geoNear.
+    //
+
+    // Collection does not exist.
+    coll.drop();
+    assert.commandFailed(db.runCommand({
+        geoNear: coll.getName(),
+        near: {type: "Point", coordinates: [0, 0]},
+        spherical: true,
+        query: {str: "ABC"},
+        collation: {locale: "en_US", strength: 2}
+    }));
+
+    // Collection exists, string field not indexed.
     coll.drop();
     assert.writeOK(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
-
-    // String field not indexed.
     assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
     assert.eq(0,
               assert
@@ -557,13 +668,24 @@
                   }))
                   .results.length);
 
-    coll.drop();
+    //
+    // Collation tests for find with $nearSphere.
+    //
 
-    // $nearSphere.
     if (db.getMongo().useReadCommands()) {
-        assert.writeOK(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
+        // Collection does not exist.
+        coll.drop();
+        assert.eq(0,
+                  coll.find({
+                          str: "ABC",
+                          geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}
+                      })
+                      .collation({locale: "en_US", strength: 2})
+                      .itcount());
 
-        // String field not indexed.
+        // Collection exists, string field not indexed.
+        coll.drop();
+        assert.writeOK(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
         assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
         assert.eq(0,
                   coll.find({
