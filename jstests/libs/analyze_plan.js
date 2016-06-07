@@ -26,7 +26,11 @@ function getPlanStages(root, stage) {
 
     if ("shards" in root) {
         for (var i = 0; i < root.shards.length; i++) {
-            results = results.concat(getPlanStages(root.shards[i].winningPlan, stage));
+            if ("winningPlan" in root.shards[i]) {
+                results = results.concat(getPlanStages(root.shards[i].winningPlan, stage));
+            } else {
+                results = results.concat(getPlanStages(root.shards[i].executionStages, stage));
+            }
         }
     }
 

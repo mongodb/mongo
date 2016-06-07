@@ -1,5 +1,7 @@
 // Test running explains on count commands.
 
+load("jstests/libs/analyze_plan.js");
+
 var collName = "jstests_explain_count";
 var t = db[collName];
 t.drop();
@@ -24,6 +26,20 @@ function checkCountExplain(explain, nCounted) {
         assert.eq(execStages.stage, "COUNT", "root stage is not COUNT");
         assert.eq(execStages.nCounted, nCounted, "wrong count result");
     }
+}
+
+/**
+ * Given an explain output from a COUNT_SCAN stage, check that a indexBounds field is present.
+ */
+function checkCountScanIndexExplain(explain, startKey, endKey, startInclusive, endInclusive) {
+    var countStage = getPlanStage(explain.executionStats.executionStages, "COUNT_SCAN");
+
+    assert.eq(countStage.stage, "COUNT_SCAN");
+    assert("indexBounds" in countStage);
+    assert.eq(bsonWoCompare(countStage.indexBounds.startKey, startKey), 0);
+    assert.eq(bsonWoCompare(countStage.indexBounds.endKey, endKey), 0);
+    assert.eq(countStage.indexBounds.startKeyInclusive, startInclusive);
+    assert.eq(countStage.indexBounds.endKeyInclusive, endInclusive);
 }
 
 // Collection does not exist.
@@ -90,18 +106,21 @@ checkCountExplain(explain, 3);
 assert.eq(10, db.runCommand({count: collName, query: {a: 1}}).n);
 explain = db.runCommand({explain: {count: collName, query: {a: 1}}, verbosity: "executionStats"});
 checkCountExplain(explain, 10);
+checkCountScanIndexExplain(explain, {a: 1}, {a: 1}, true, true);
 
 // With a query and skip.
 assert.eq(7, db.runCommand({count: collName, query: {a: 1}, skip: 3}).n);
 explain = db.runCommand(
     {explain: {count: collName, query: {a: 1}, skip: 3}, verbosity: "executionStats"});
 checkCountExplain(explain, 7);
+checkCountScanIndexExplain(explain, {a: 1}, {a: 1}, true, true);
 
 // With a query and limit.
 assert.eq(3, db.runCommand({count: collName, query: {a: 1}, limit: 3}).n);
 explain = db.runCommand(
     {explain: {count: collName, query: {a: 1}, limit: 3}, verbosity: "executionStats"});
 checkCountExplain(explain, 3);
+checkCountScanIndexExplain(explain, {a: 1}, {a: 1}, true, true);
 
 // Insert one more doc for the last few tests.
 t.insert({a: 2});
@@ -111,9 +130,11 @@ assert.eq(0, db.runCommand({count: collName, query: {a: 2}, skip: 2}).n);
 explain = db.runCommand(
     {explain: {count: collName, query: {a: 2}, skip: 2}, verbosity: "executionStats"});
 checkCountExplain(explain, 0);
+checkCountScanIndexExplain(explain, {a: 2}, {a: 2}, true, true);
 
 // Case where we have a limit, but we don't hit it.
 assert.eq(1, db.runCommand({count: collName, query: {a: 2}, limit: 2}).n);
 explain = db.runCommand(
     {explain: {count: collName, query: {a: 2}, limit: 2}, verbosity: "executionStats"});
 checkCountExplain(explain, 1);
+checkCountScanIndexExplain(explain, {a: 2}, {a: 2}, true, true);

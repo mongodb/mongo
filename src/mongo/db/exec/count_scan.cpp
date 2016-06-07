@@ -35,6 +35,32 @@
 
 namespace mongo {
 
+namespace {
+/**
+ * This function replaces field names in *replace* with those from the object
+ * *fieldNames*, preserving field ordering.  Both objects must have the same
+ * number of fields.
+ *
+ * Example:
+ *
+ *     replaceBSONKeyNames({ 'a': 1, 'b' : 1 }, { '': 'foo', '', 'bar' }) =>
+ *
+ *         { 'a' : 'foo' }, { 'b' : 'bar' }
+ */
+BSONObj replaceBSONFieldNames(const BSONObj& replace, const BSONObj& fieldNames) {
+    invariant(replace.nFields() == fieldNames.nFields());
+
+    BSONObjBuilder bob;
+    BSONObjIterator iter = fieldNames.begin();
+
+    for (const BSONElement& el : replace) {
+        bob.appendAs(el, (*iter++).fieldNameStringData());
+    }
+
+    return bob.obj();
+}
+}
+
 using std::unique_ptr;
 using std::vector;
 using stdx::make_unique;
@@ -160,6 +186,12 @@ unique_ptr<PlanStageStats> CountScan::getStats() {
 
     unique_ptr<CountScanStats> countStats = make_unique<CountScanStats>(_specificStats);
     countStats->keyPattern = _specificStats.keyPattern.getOwned();
+
+    countStats->startKey = replaceBSONFieldNames(_params.startKey, countStats->keyPattern);
+    countStats->startKeyInclusive = _params.startKeyInclusive;
+    countStats->endKey = replaceBSONFieldNames(_params.endKey, countStats->keyPattern);
+    countStats->endKeyInclusive = _params.endKeyInclusive;
+
     ret->specific = std::move(countStats);
 
     return ret;

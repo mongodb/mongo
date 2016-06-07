@@ -239,12 +239,23 @@ struct CountScanStats : public SpecificStats {
         CountScanStats* specific = new CountScanStats(*this);
         // BSON objects have to be explicitly copied.
         specific->keyPattern = keyPattern.getOwned();
+        specific->startKey = startKey.getOwned();
+        specific->endKey = endKey.getOwned();
         return specific;
     }
 
     std::string indexName;
 
     BSONObj keyPattern;
+
+    // The starting/ending key(s) of the index scan.
+    // startKey and endKey contain the fields of keyPattern, with values
+    // that match the corresponding index bounds.
+    BSONObj startKey;
+    BSONObj endKey;
+    // Whether or not those keys are inclusive or exclusive bounds.
+    bool startKeyInclusive;
+    bool endKeyInclusive;
 
     int indexVersion;
 

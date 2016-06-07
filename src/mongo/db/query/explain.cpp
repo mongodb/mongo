@@ -327,6 +327,13 @@ void Explain::statsToBSON(const PlanStageStats& stats,
         bob->appendBool("isSparse", spec->isSparse);
         bob->appendBool("isPartial", spec->isPartial);
         bob->append("indexVersion", spec->indexVersion);
+
+        BSONObjBuilder indexBoundsBob;
+        indexBoundsBob.append("startKey", spec->startKey);
+        indexBoundsBob.append("startKeyInclusive", spec->startKeyInclusive);
+        indexBoundsBob.append("endKey", spec->endKey);
+        indexBoundsBob.append("endKeyInclusive", spec->endKeyInclusive);
+        bob->append("indexBounds", indexBoundsBob.obj());
     } else if (STAGE_DELETE == stats.stageType) {
         DeleteStats* spec = static_cast<DeleteStats*>(stats.specific.get());
 
