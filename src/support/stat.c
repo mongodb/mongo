@@ -1139,9 +1139,11 @@ __wt_stat_connection_aggregate(
 }
 
 static const char * const __stats_join_desc[] = {
-	": accesses",
-	": actual count of items",
+	": accesses to the main table",
 	": bloom filter false positives",
+	": checks that conditions of membership are satisfied",
+	": items inserted into a bloom filter",
+	": items iterated",
 };
 
 int
@@ -1161,9 +1163,11 @@ __wt_stat_join_init_single(WT_JOIN_STATS *stats)
 void
 __wt_stat_join_clear_single(WT_JOIN_STATS *stats)
 {
-	stats->accesses = 0;
-	stats->actual_count = 0;
+	stats->main_access = 0;
 	stats->bloom_false_positive = 0;
+	stats->membership_check = 0;
+	stats->bloom_insert = 0;
+	stats->iterated = 0;
 }
 
 void
@@ -1179,7 +1183,9 @@ void
 __wt_stat_join_aggregate(
     WT_JOIN_STATS **from, WT_JOIN_STATS *to)
 {
-	to->accesses += WT_STAT_READ(from, accesses);
-	to->actual_count += WT_STAT_READ(from, actual_count);
+	to->main_access += WT_STAT_READ(from, main_access);
 	to->bloom_false_positive += WT_STAT_READ(from, bloom_false_positive);
+	to->membership_check += WT_STAT_READ(from, membership_check);
+	to->bloom_insert += WT_STAT_READ(from, bloom_insert);
+	to->iterated += WT_STAT_READ(from, iterated);
 }

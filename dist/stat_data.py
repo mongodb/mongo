@@ -480,9 +480,11 @@ dsrc_stats = sorted(dsrc_stats, key=attrgetter('desc'))
 # Cursor Join statistics
 ##########################################
 join_stats = [
-    JoinStat('accesses', 'accesses'),
-    JoinStat('actual_count', 'actual count of items'),
     JoinStat('bloom_false_positive', 'bloom filter false positives'),
+    JoinStat('bloom_insert', 'items inserted into a bloom filter'),
+    JoinStat('iterated', 'items iterated'),
+    JoinStat('main_access', 'accesses to the main table'),
+    JoinStat('membership_check', 'checks that conditions of membership are satisfied'),
 ]
 
 join_stats = sorted(join_stats, key=attrgetter('desc'))
