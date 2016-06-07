@@ -18,7 +18,14 @@ function testGridFS(name) {
     var rawmd5 = md5sumFile(filename);
 
     // upload file (currently calls filemd5 internally)
-    runMongoProgram("mongofiles", "--port", mongos.port, "put", filename, '--db', name);
+    var exitCode = MongoRunner.runMongoTool("mongofiles",
+                                            {
+                                              port: mongos.port,
+                                              db: name,
+                                            },
+                                            "put",
+                                            filename);
+    assert.eq(0, exitCode, "mongofiles failed to upload '" + filename + "' into a sharded cluster");
 
     assert.eq(d.fs.files.count(), 1);
     var fileObj = d.fs.files.findOne();

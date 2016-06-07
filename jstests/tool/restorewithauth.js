@@ -39,7 +39,13 @@ assert.eq(foo.baz.getIndexes().length, 1);
 // get data dump
 var dumpdir = MongoRunner.dataDir + "/restorewithauth-dump1/";
 resetDbpath(dumpdir);
-x = runMongoProgram("mongodump", "--db", "foo", "-h", "127.0.0.1:" + conn.port, "--out", dumpdir);
+
+var exitCode = MongoRunner.runMongoTool("mongodump", {
+    db: "foo",
+    host: "127.0.0.1:" + conn.port,
+    out: dumpdir,
+});
+assert.eq(0, exitCode, "mongodump failed to dump data from mongod without auth enabled");
 
 // now drop the db
 foo.dropDatabase();
@@ -63,7 +69,14 @@ assert.eq(-1, collNames.indexOf("bar"), "bar collection already exists");
 assert.eq(-1, collNames.indexOf("baz"), "baz collection already exists");
 
 // now try to restore dump
-x = runMongoProgram("mongorestore", "-h", "127.0.0.1:" + conn.port, "--dir", dumpdir, "-vvvvv");
+exitCode = MongoRunner.runMongoTool("mongorestore", {
+    host: "127.0.0.1:" + conn.port,
+    dir: dumpdir,
+    verbose: 5,
+});
+assert.neq(0,
+           exitCode,
+           "mongorestore shouldn't have been able to restore data to mongod with auth enabled");
 
 // make sure that the collection isn't restored
 collNames = foo.getCollectionNames();
@@ -71,19 +84,16 @@ assert.eq(-1, collNames.indexOf("bar"), "bar collection was restored");
 assert.eq(-1, collNames.indexOf("baz"), "baz collection was restored");
 
 // now try to restore dump with correct credentials
-x = runMongoProgram("mongorestore",
-                    "-h",
-                    "127.0.0.1:" + conn.port,
-                    "-d",
-                    "foo",
-                    "--authenticationDatabase=admin",
-                    "-u",
-                    "admin",
-                    "-p",
-                    "admin",
-                    "--dir",
-                    dumpdir + "foo/",
-                    "-vvvvv");
+exitCode = MongoRunner.runMongoTool("mongorestore", {
+    host: "127.0.0.1:" + conn.port,
+    db: "foo",
+    authenticationDatabase: "admin",
+    username: "admin",
+    password: "admin",
+    dir: dumpdir + "foo/",
+    verbose: 5,
+});
+assert.eq(0, exitCode, "mongorestore failed to restore data to mongod with auth enabled");
 
 // make sure that the collection was restored
 collNames = foo.getCollectionNames();
@@ -99,18 +109,15 @@ foo.dropDatabase();
 foo.createUser({user: 'user', pwd: 'password', roles: jsTest.basicUserRoles});
 
 // now try to restore dump with foo database credentials
-x = runMongoProgram("mongorestore",
-                    "-h",
-                    "127.0.0.1:" + conn.port,
-                    "-d",
-                    "foo",
-                    "-u",
-                    "user",
-                    "-p",
-                    "password",
-                    "--dir",
-                    dumpdir + "foo/",
-                    "-vvvvv");
+exitCode = MongoRunner.runMongoTool("mongorestore", {
+    host: "127.0.0.1:" + conn.port,
+    db: "foo",
+    username: "user",
+    password: "password",
+    dir: dumpdir + "foo/",
+    verbose: 5,
+});
+assert.eq(0, exitCode, "mongorestore failed to restore the 'foo' database");
 
 // make sure that the collection was restored
 collNames = foo.getCollectionNames();

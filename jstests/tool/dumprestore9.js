@@ -53,7 +53,11 @@ if (0) {
 
         dumpdir = MongoRunner.dataDir + "/dumprestore9-dump1/";
         resetDbpath(dumpdir);
-        runMongoProgram("mongodump", "--host", s._mongos[0].host, "--out", dumpdir);
+        var exitCode = MongoRunner.runMongoTool("mongodump", {
+            host: s.s0.host,
+            out: dumpdir,
+        });
+        assert.eq(0, exitCode, "mongodump failed to dump data through one of the mongos processes");
 
         step("Shutting down cluster");
 
@@ -69,12 +73,14 @@ if (0) {
 
         step("Restore data and config");
 
-        runMongoProgram("mongorestore",
-                        dumpdir,
-                        "--host",
-                        s._mongos[1].host,
-                        "--restoreShardingConfig",
-                        "--forceConfigRestore");
+        exitCode = MongoRunner.runMongoTool("mongorestore", {
+            dir: dumpdir,
+            host: s.s1.host,
+            restoreShardingConfig: "",
+            forceConfigRestore: "",
+        });
+        assert.eq(
+            0, exitCode, "mongorestore failed to restore data through the other mongos process");
 
         config = s.getDB("config");
         assert(config.databases.findOne({_id: 'aaa'}).partitioned,

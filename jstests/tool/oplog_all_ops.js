@@ -44,7 +44,11 @@ repl2.initiate();
 repl2.awaitSecondaryNodes();
 
 var srcConn = repl1.getPrimary();
-runMongoProgram('mongooplog', '--from', repl1.getPrimary().host, '--host', repl2.getPrimary().host);
+var exitCode = MongoRunner.runMongoTool('mongooplog', {
+    from: repl1.getPrimary().host,
+    host: repl2.getPrimary().host,
+});
+assert.eq(0, exitCode, 'mongooplog failed to poll operations from rs1 and apply them to rs2');
 
 var repl1Hash = testDB.runCommand({dbhash: 1});
 

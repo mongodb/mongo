@@ -22,9 +22,20 @@ c = m.getDB(baseName).getCollection(baseName);
 c.save({a: 1});
 assert(c.findOne());
 
-runMongoProgram("mongodump", "--host", "127.0.0.1:" + m.port, "--out", externalPath);
+var exitCode = MongoRunner.runMongoTool("mongodump", {
+    host: "127.0.0.1:" + m.port,
+    out: externalPath,
+});
+assert.eq(0, exitCode, "mongodump failed to dump data from mongod");
+
 c.drop();
-runMongoProgram("mongorestore", "--host", "127.0.0.1:" + m.port, "--dir", externalPath);
+
+exitCode = MongoRunner.runMongoTool("mongorestore", {
+    host: "127.0.0.1:" + m.port,
+    dir: externalPath,
+});
+assert.eq(0, exitCode, "mongorestore failed to restore data to mongod");
+
 assert.soon("c.findOne()", "mongodump then restore has no data w/sleep");
 assert(c.findOne(), "mongodump then restore has no data");
 assert.eq(1, c.findOne().a, "mongodump then restore has no broken data");
@@ -32,26 +43,28 @@ assert.eq(1, c.findOne().a, "mongodump then restore has no broken data");
 resetDbpath(externalPath);
 
 assert.eq(-1, fileSize(), "mongoexport prep invalid");
-runMongoProgram("mongoexport",
-                "--host",
-                "127.0.0.1:" + m.port,
-                "-d",
-                baseName,
-                "-c",
-                baseName,
-                "--out",
-                externalFile);
+
+exitCode = MongoRunner.runMongoTool("mongoexport", {
+    host: "127.0.0.1:" + m.port,
+    db: baseName,
+    collection: baseName,
+    out: externalFile,
+});
+assert.eq(
+    0, exitCode, "mongoexport failed to export collection '" + c.getFullName() + "' from mongod");
+
 assert.lt(10, fileSize(), "file size changed");
 
 c.drop();
-runMongoProgram("mongoimport",
-                "--host",
-                "127.0.0.1:" + m.port,
-                "-d",
-                baseName,
-                "-c",
-                baseName,
-                "--file",
-                externalFile);
+
+exitCode = MongoRunner.runMongoTool("mongoimport", {
+    host: "127.0.0.1:" + m.port,
+    db: baseName,
+    collection: baseName,
+    file: externalFile,
+});
+assert.eq(
+    0, exitCode, "mongoimport failed to import collection '" + c.getFullName() + "' into mongod");
+
 assert.soon("c.findOne()", "mongo import json A");
 assert(c.findOne() && 1 == c.findOne().a, "mongo import json B");

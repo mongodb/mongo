@@ -280,18 +280,14 @@
     assert.commandWorked(res);
 
     // Check that dump doesn't get stuck with auth
-    var x = runMongoProgram("mongodump",
-                            "--host",
-                            s.s.host,
-                            "-d",
-                            testUser.db,
-                            "-u",
-                            testUser.username,
-                            "-p",
-                            testUser.password,
-                            "--authenticationMechanism",
-                            "SCRAM-SHA-1");
-    print("result: " + x);
+    var exitCode = MongoRunner.runMongoTool("mongodump", {
+        host: s.s.host,
+        db: testUser.db,
+        username: testUser.username,
+        password: testUser.password,
+        authenticationMechanism: "SCRAM-SHA-1",
+    });
+    assert.eq(0, exitCode, "mongodump failed to run with authentication enabled");
 
     // Test read only users
     print("starting read only tests");

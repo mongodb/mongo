@@ -30,20 +30,17 @@ assert.eq(t.count(), 100, "testcol should have documents");
 db.createUser({user: "backup", pwd: "password", roles: ["backup"]});
 
 // Backup the database with the backup user
-x = runMongoProgram("mongodump",
-                    "--db",
-                    dbName,
-                    "--out",
-                    dumpDir,
-                    "--authenticationDatabase=admin",
-                    "-u",
-                    "backup",
-                    "-p",
-                    "password",
-                    "-h",
-                    "127.0.0.1:" + m.port);
-assert.eq(x, 0, "mongodump should succeed with authentication");
+var exitCode = MongoRunner.runMongoTool("mongodump", {
+    db: dbName,
+    out: dumpDir,
+    authenticationDatabase: "admin",
+    username: "backup",
+    password: "password",
+    host: "127.0.0.1:" + m.port,
+});
+assert.eq(exitCode, 0, "mongodump should succeed with authentication");
 
 // Assert that a BSON document for admin.system.profile has been produced
-x = runMongoProgram("bsondump", dumpDir + "/" + dbName + "/" + profileName + ".bson");
-assert.eq(x, 0, "bsondump should succeed parsing the profile data");
+exitCode =
+    MongoRunner.runMongoTool("bsondump", {}, dumpDir + "/" + dbName + "/" + profileName + ".bson");
+assert.eq(exitCode, 0, "bsondump should succeed parsing the profile data");

@@ -46,24 +46,30 @@ var master = replTest.getPrimary();
 step("try mongodump with $timestamp");
 
 var data = MongoRunner.dataDir + "/dumprestore7-dump1/";
-var query = "{\"ts\":{\"$gt\":{\"$timestamp\":{\"t\":" + time.ts.t + ",\"i\":" + time.ts.i + "}}}}";
+var query = {ts: {$gt: {$timestamp: {t: time.ts.t, i: time.ts.i}}}};
 
-MongoRunner.runMongoTool("mongodump", {
-    "host": "127.0.0.1:" + replTest.ports[0],
-    "db": "local",
-    "collection": "oplog.rs",
-    "query": query,
-    "out": data
+var exitCode = MongoRunner.runMongoTool("mongodump", {
+    host: "127.0.0.1:" + replTest.ports[0],
+    db: "local",
+    collection: "oplog.rs",
+    query: tojson(query),
+    out: data,
 });
+assert.eq(0, exitCode, "monogdump failed to dump the oplog");
 
 step("try mongorestore from $timestamp");
 
-runMongoProgram(
-    "mongorestore", "--host", "127.0.0.1:" + conn.port, "--dir", data, "--writeConcern", 1);
+exitCode = MongoRunner.runMongoTool("mongorestore", {
+    host: "127.0.0.1:" + conn.port,
+    dir: data,
+    writeConcern: 1,
+});
+assert.eq(0, exitCode, "mongorestore failed to restore the oplog");
+
 var x = 9;
 x = conn.getDB("local").getCollection("oplog.rs").count();
 
-assert.eq(x, 20, "mongorestore should only have the latter 20 entries");
+assert.eq(x, 20, "mongorestore should only have inserted the latter 20 entries");
 
 step("stopSet");
 replTest.stopSet();
