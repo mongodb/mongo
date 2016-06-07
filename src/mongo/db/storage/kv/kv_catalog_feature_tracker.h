@@ -60,7 +60,10 @@ public:
      * The next feature added to this enumeration should use the current value of 'kNextFeatureBit',
      * and 'kNextFeatureBit' should be changed to the next largest power of two.
      */
-    enum class NonRepairableFeature : std::uint64_t { kNextFeatureBit = 1 << 0 };
+    enum class NonRepairableFeature : std::uint64_t {
+        kCollation = 1 << 0,
+        kNextFeatureBit = 1 << 1
+    };
 
     using NonRepairableFeatureMask = std::underlying_type<NonRepairableFeature>::type;
 

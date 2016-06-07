@@ -194,6 +194,29 @@ Status KVStorageEngine::requireDataFileCompatibilityWithPriorRelease(OperationCo
         }
     }
 
+    // If the collation feature is marked in use, we traverse the catalog to see if it actually has
+    // any collation-related metadata. The bit may have been set as in use but subsequently all
+    // indices or collections with collations were dropped in preparation for downgrade.
+    if (_catalog->getFeatureTracker()->isNonRepairableFeatureInUse(
+            opCtx, NonRepairableFeature::kCollation)) {
+        bool hasCollationMetadata = false;
+        {
+            stdx::lock_guard<stdx::mutex> lk(_dbsLock);
+            for (auto&& db : _dbs) {
+                const bool thisCollectionHasCollationMetadata =
+                    db.second->hasCollationMetadata(opCtx);
+                hasCollationMetadata = hasCollationMetadata || thisCollectionHasCollationMetadata;
+            }
+        }
+
+        if (!hasCollationMetadata) {
+            WriteUnitOfWork wuow(opCtx);
+            _catalog->getFeatureTracker()->markNonRepairableFeatureAsNotInUse(
+                opCtx, NonRepairableFeature::kCollation);
+            wuow.commit();
+        }
+    }
+
     auto status = _catalog->getFeatureTracker()->hasNoFeaturesMarkedAsInUse(opCtx);
     if (!status.isOK()) {
         return status;

@@ -56,6 +56,8 @@ public:
 
     void removePathLevelMultikeyInfoFromAllIndexes(OperationContext* txn) final;
 
+    bool hasCollationMetadata(OperationContext* txn) const;
+
     void setIndexHead(OperationContext* txn, StringData indexName, const RecordId& newHead) final;
 
     Status removeIndex(OperationContext* txn, StringData indexName) final;

@@ -66,6 +66,14 @@ public:
      */
     void removePathLevelMultikeyInfoFromAllCollections(OperationContext* opCtx);
 
+    /**
+     * Examines metadata for each collection and each index, and returns true if any
+     * collation-related metadata is found.
+     *
+     * This function is used to support downgrading from 3.4.
+     */
+    bool hasCollationMetadata(OperationContext* opCtx) const;
+
     virtual Status currentFilesCompatible(OperationContext* opCtx) const;
 
     virtual void getCollectionNamespaces(std::list<std::string>* out) const;

@@ -176,6 +176,18 @@ void KVDatabaseCatalogEntry::removePathLevelMultikeyInfoFromAllCollections(
     }
 }
 
+bool KVDatabaseCatalogEntry::hasCollationMetadata(OperationContext* opCtx) const {
+    for (auto&& collection : _collections) {
+        log() << "Checking collection '" << collection.first << "' for collation metadata...";
+        if (collection.second->hasCollationMetadata(opCtx)) {
+            return true;
+        }
+        log() << "Done checking collection '" << collection.first << "' for collation metadata";
+    }
+
+    return false;
+}
+
 Status KVDatabaseCatalogEntry::currentFilesCompatible(OperationContext* opCtx) const {
     // Delegate to the FeatureTracker as to whether the data files are compatible or not.
     return _engine->getCatalog()->getFeatureTracker()->isCompatibleWithCurrentCode(opCtx);

@@ -114,6 +114,24 @@ void KVCollectionCatalogEntry::removePathLevelMultikeyInfoFromAllIndexes(Operati
     }
 }
 
+bool KVCollectionCatalogEntry::hasCollationMetadata(OperationContext* txn) const {
+    MetaData md = _getMetaData(txn);
+    if (!md.options.collation.isEmpty()) {
+        log() << "Collection " << md.ns << " has a default collation: " << md.options.collation;
+        return true;
+    }
+
+    bool indexWithCollationFound = false;
+    for (auto&& imd : md.indexes) {
+        if (imd.spec["collation"]) {
+            log() << "Collection " << md.ns << " has an index with a collation: " << imd.spec;
+            indexWithCollationFound = true;
+        }
+    }
+
+    return indexWithCollationFound;
+}
+
 void KVCollectionCatalogEntry::setIndexHead(OperationContext* txn,
                                             StringData indexName,
                                             const RecordId& newHead) {

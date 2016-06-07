@@ -105,5 +105,10 @@ struct CollectionOptions {
     BSONObj validator;
     std::string validationAction;
     std::string validationLevel;
+
+    // Collation information produced on a newer version, which supports the collation feature. We
+    // do the work to parse this information to ensure that we properly recognize when collation
+    // metadata is in the catalog, and downgrade must fail.
+    BSONObj collation;
 };
 }
