@@ -1320,12 +1320,13 @@ StatusWith<BSONObj> IndexCatalog::_fixIndexSpec(OperationContext* txn,
         // all options that the user omitted.
         //
         // If the collator factory returned a null collator (representing the "simple" collation),
-        // we can't use the collation serializer. In this case, we simply set the collation option
-        // to the original user BSON.
-        b.append("collation",
-                 collator.getValue()
-                     ? CollationSerializer::specToBSON(collator.getValue()->getSpec())
-                     : collationElt.Obj());
+        // we can't use the collation serializer. In this case, we simply omit the "collation" from
+        // the index spec. This ensures that indices with the simple collation built on versions
+        // which do not support the collation feature have the same format for representing the
+        // simple collation as indices built on this version.
+        if (collator.getValue()) {
+            b.append("collation", CollationSerializer::specToBSON(collator.getValue()->getSpec()));
+        }
     } else if (collection->getDefaultCollator()) {
         // The user did not specify an explicit collation for this index and the collection has a
         // default collator. In this case, the index inherits the collection default.

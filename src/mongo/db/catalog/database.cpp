@@ -635,11 +635,13 @@ Status userCreateNS(OperationContext* txn,
         // all options that the user omitted.
         //
         // If the collator factory returned a null collator (representing the "simple" collation),
-        // we can't use the collation serializer. In this case, we simply set the collation option
-        // to the original user BSON.
+        // we can't use the collation serializer. In this case, we simply unset the "collation" from
+        // the collection options. This ensures that collections created on versions which do not
+        // support the collation feature have the same format for representing the simple collation
+        // as collections created on this version.
         collectionOptions.collation = collator.getValue()
             ? CollationSerializer::specToBSON(collator.getValue()->getSpec())
-            : collectionOptions.collation;
+            : BSONObj();
     }
 
     status =

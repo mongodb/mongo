@@ -19,7 +19,17 @@
                 foundIndex = true;
                 // We assume that the key pattern is unique, even though indices with different
                 // collations but the same key pattern are allowed.
-                assert.eq(indexSpecs[i].collation, collation);
+                if (collation.locale === "simple") {
+                    // The simple collation is not explicitly stored in the catalog, so we expect
+                    // the "collation" field to be absent.
+                    assert(!indexSpecs[i].hasOwnProperty("collation"),
+                           "Expected the simple collation in: " + tojson(indexSpecs[i]));
+                } else {
+                    assert.eq(indexSpecs[i].collation,
+                              collation,
+                              "Expected collation " + tojson(collation) + " in: " +
+                                  tojson(indexSpecs[i]));
+                }
             }
         }
         assert(foundIndex, "index with key pattern " + tojson(keyPattern) + " not found");
@@ -48,7 +58,7 @@
     assert.commandWorked(db.createCollection("collation", {collation: {locale: "simple"}}));
     var collectionInfos = db.getCollectionInfos({name: "collation"});
     assert.eq(collectionInfos.length, 1);
-    assert.eq(collectionInfos[0].options.collation, {locale: "simple"});
+    assert(!collectionInfos[0].options.hasOwnProperty("collation"));
     coll.drop();
 
     // Ensure that we populate all collation-related fields when we create a collection with a valid

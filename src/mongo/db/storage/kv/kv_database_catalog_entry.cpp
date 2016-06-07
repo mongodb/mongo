@@ -220,6 +220,15 @@ Status KVDatabaseCatalogEntry::createCollection(OperationContext* txn,
     RecordStore* rs = _engine->getEngine()->getRecordStore(txn, ns, ident, options);
     invariant(rs);
 
+    // Mark collation feature as in use if the collection has a non-simple default collation.
+    if (!options.collation.isEmpty()) {
+        const auto feature = KVCatalog::FeatureTracker::NonRepairableFeature::kCollation;
+        if (_engine->getCatalog()->getFeatureTracker()->isNonRepairableFeatureInUse(txn, feature)) {
+            _engine->getCatalog()->getFeatureTracker()->markNonRepairableFeatureAsInUse(txn,
+                                                                                        feature);
+        }
+    }
+
     txn->recoveryUnit()->registerChange(new AddCollectionChange(txn, this, ns, ident, true));
     _collections[ns.toString()] =
         new KVCollectionCatalogEntry(_engine->getEngine(), _engine->getCatalog(), ns, ident, rs);

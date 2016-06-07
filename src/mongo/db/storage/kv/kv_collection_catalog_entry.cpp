@@ -183,6 +183,15 @@ Status KVCollectionCatalogEntry::prepareForIndexBuild(OperationContext* txn,
         }
         imd.multikeyPaths = MultikeyPaths{static_cast<size_t>(spec->keyPattern().nFields())};
     }
+
+    // Mark collation feature as in use if the index has a non-simple collation.
+    if (imd.spec["collation"]) {
+        const auto feature = KVCatalog::FeatureTracker::NonRepairableFeature::kCollation;
+        if (!_catalog->getFeatureTracker()->isNonRepairableFeatureInUse(txn, feature)) {
+            _catalog->getFeatureTracker()->markNonRepairableFeatureAsInUse(txn, feature);
+        }
+    }
+
     md.indexes.push_back(imd);
     _catalog->putMetaData(txn, ns().toString(), md);
 
