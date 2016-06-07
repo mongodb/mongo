@@ -50,6 +50,9 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
+#define Q(x) #x
+#define QUOTE(x) Q(x)
+
 /**
  * Fail unconditionally, reporting the given message.
  */
@@ -231,6 +234,39 @@
     void _TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)::_doTest()
 
 /**
+ * Construct a single benchmark named BENCHMARK_NAME that has access to a common class (a "fixture")
+ * named "FIXTURE_NAME".
+ *
+ * Usage:
+ *
+ * class FixtureClass : public mongo::unittest::Benchmark {
+ * protected:
+ *   int myVar;
+ *   void setUp() { myVar = 10; }
+ * };
+ *
+ * BENCHMARK(FixtureClass, TestThatUsesFixture) {
+ *     myVar += 1;
+ * }
+ */
+#define BENCHMARK(FIXTURE_NAME, BENCHMARK_NAME, ITERATIONS, FILE)                              \
+    class _TEST_TYPE_NAME(FIXTURE_NAME, BENCHMARK_NAME) : public FIXTURE_NAME {                \
+    private:                                                                                   \
+        NOINLINE_DECL virtual void _doTest();                                                  \
+        int numIterations() {                                                                  \
+            return ITERATIONS;                                                                 \
+        }                                                                                      \
+        std::string testName() {                                                               \
+            return QUOTE(BENCHMARK_NAME);                                                      \
+        }                                                                                      \
+        static const RegistrationAgent<_TEST_TYPE_NAME(FIXTURE_NAME, BENCHMARK_NAME)> _agent;  \
+    };                                                                                         \
+    const ::mongo::unittest::Test::RegistrationAgent<_TEST_TYPE_NAME(FIXTURE_NAME,             \
+                                                                     BENCHMARK_NAME)>          \
+        _TEST_TYPE_NAME(FIXTURE_NAME, BENCHMARK_NAME)::_agent(#FIXTURE_NAME, #BENCHMARK_NAME); \
+    void _TEST_TYPE_NAME(FIXTURE_NAME, BENCHMARK_NAME)::_doTest()
+
+/**
  * Macro to construct a type name for a test, from its "CASE_NAME" and "TEST_NAME".
  * Do not use directly in test code.
  */
@@ -239,6 +275,13 @@
 namespace mongo {
 
 namespace unittest {
+
+typedef struct benchmark_stats {
+    std::string name;
+    std::vector<int> error_values;
+    float ops_per_sec;
+    std::vector<float> ops_per_sec_vals;
+} BenchmarkStats;
 
 class Result;
 
@@ -368,6 +411,42 @@ private:
     logger::MessageLogDomain::AppenderAutoPtr _captureAppender;
 };
 
+class Benchmark : public Test {
+protected:
+    int trial_num = 0;
+
+public:
+    /**
+     * Called to prepare the benchmark for execution
+     */
+    virtual void run();
+
+    /**
+     * Called on the benchmark object before running the test.
+     */
+    virtual void setUp();
+
+    /**
+     * Called on the benchmark object after running the test.
+     */
+    virtual void tearDown();
+
+    /**
+     * The benchmark itself.
+     */
+    virtual void _doTest() = 0;
+
+    /**
+     * The number of times to run the benchmark
+     */
+    virtual int numIterations() = 0;
+
+    /**
+     * The name of the benchmark
+     */
+    virtual std::string testName() = 0;
+};
+
 /**
  * Representation of a collection of tests.
  *
@@ -405,6 +484,10 @@ public:
     static int run(const std::vector<std::string>& suites,
                    const std::string& filter,
                    int runsPerTest);
+
+    static int benchmarkRun(const std::vector<std::string>& suites,
+                            const std::string& filter,
+                            int runsPerTest);
 
     /**
      * Get a suite with the given name, creating it if necessary.

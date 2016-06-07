@@ -32,11 +32,13 @@
 
 #include "mongo/unittest/unittest.h"
 
-#include <iostream>
+//#include <fstream>
 #include <map>
+#include <stdio.h>
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/init.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logger/console_appender.h"
 #include "mongo/logger/log_manager.h"
 #include "mongo/logger/logger.h"
@@ -45,18 +47,26 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/unittest/benchmark_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/print.h"
 #include "mongo/util/timer.h"
+
+#define RUNS 5
 
 namespace mongo {
 
 using std::shared_ptr;
 using std::string;
 
+BenchmarkGlobalParams benchmarkGlobalParams;
+
 namespace unittest {
 
 namespace {
+
+static std::vector<BenchmarkStats> statsList;
 
 bool stringContains(const std::string& haystack, const std::string& needle) {
     return haystack.find(needle) != std::string::npos;
@@ -158,6 +168,56 @@ void Test::run() {
 
 void Test::setUp() {}
 void Test::tearDown() {}
+
+//
+void Benchmark::run() {
+
+    BenchmarkStats stats = BenchmarkStats();
+    stats.name = testName();
+
+    float totalOpsPerSec = 0;
+
+    for (int r = 0; r < RUNS; r++) {
+
+        setUp();
+
+        Date_t start_time = Date_t::now();
+        // An uncaught exception does not prevent the tear down from running. But
+        // such an event still constitutes an error. To test this behavior we use a
+        // special exception here that when thrown does trigger the tear down but is
+        // not considered an error.
+        try {
+            for (trial_num = 0; trial_num < numIterations(); trial_num++) {
+                _doTest();
+            }
+        } catch (FixtureExceptionForTesting&) {
+            tearDown();
+            return;
+        } catch (TestAssertionFailureException&) {
+            tearDown();
+            throw;
+        }
+
+        Milliseconds elapsed_time = Date_t::now() - start_time;
+        // Do I leave this line or nah?
+        // std::cout << "** ELAPSED_TIME -- " << elapsed_time << " **" << std::endl;
+
+        float opsPerSec = 1.0 * numIterations() / elapsed_time.count();
+        stats.ops_per_sec_vals.push_back(opsPerSec);
+        totalOpsPerSec += opsPerSec;
+
+        stats.error_values.push_back(0);
+    }
+
+    stats.ops_per_sec = totalOpsPerSec / RUNS;
+
+    statsList.push_back(stats);
+
+    tearDown();
+}
+
+void Benchmark::setUp() {}
+void Benchmark::tearDown() {}
 
 namespace {
 class StringVectorAppender : public logger::MessageLogDomain::EventAppender {
@@ -296,6 +356,7 @@ Result* Suite::run(const std::string& filter, int runsPerTest) {
 }
 
 int Suite::run(const std::vector<std::string>& suites, const std::string& filter, int runsPerTest) {
+
     if (_allSuites().empty()) {
         log() << "error: no suites registered.";
         return EXIT_FAILURE;
@@ -381,6 +442,150 @@ int Suite::run(const std::vector<std::string>& suites, const std::string& filter
               << " suites failed";
     } else {
         log() << "SUCCESS - All tests in all suites passed";
+    }
+
+    return rc;
+}
+
+// Custom version of the original Suite::run, but specifically for running benchmark scripts. The
+// main difference is that this version will collect statistics on the benchmark execution and then
+// write it to the desired output.
+int Suite::benchmarkRun(const std::vector<std::string>& suites,
+                        const std::string& filter,
+                        int runsPerTest) {
+
+    if (_allSuites().empty()) {
+        log() << "error: no suites registered.";
+        return EXIT_FAILURE;
+    }
+
+    for (unsigned int i = 0; i < suites.size(); i++) {
+        if (_allSuites().count(suites[i]) == 0) {
+            log() << "invalid test suite [" << suites[i] << "], use --list to see valid names"
+                  << std::endl;
+            return EXIT_FAILURE;
+        }
+    }
+
+    std::vector<std::string> torun(suites);
+
+    if (torun.empty()) {
+        for (SuiteMap::const_iterator i = _allSuites().begin(); i != _allSuites().end(); ++i) {
+            torun.push_back(i->first);
+        }
+    }
+
+    std::vector<Result*> results;
+
+    for (std::vector<std::string>::iterator i = torun.begin(); i != torun.end(); i++) {
+
+        std::string name = *i;
+        std::shared_ptr<Suite>& s = _allSuites()[name];
+        fassert(40143, s != NULL);
+
+        log() << "going to run suite: " << name << std::endl;
+        results.push_back(s->run(filter, runsPerTest));
+    }
+
+    log() << "**************************************************" << std::endl;
+
+    int rc = 0;
+
+    int tests = 0;
+    int asserts = 0;
+    int millis = 0;
+
+    Result totals("TOTALS");
+    std::vector<std::string> failedSuites;
+
+    Result::cur = NULL;
+    for (std::vector<Result*>::iterator i = results.begin(); i != results.end(); i++) {
+        Result* r = *i;
+        log() << r->toString();
+        if (abs(r->rc()) > abs(rc))
+            rc = r->rc();
+
+        tests += r->_tests;
+        if (!r->_fails.empty()) {
+            failedSuites.push_back(r->toString());
+            for (std::vector<std::string>::const_iterator j = r->_fails.begin();
+                 j != r->_fails.end();
+                 j++) {
+                const std::string& s = (*j);
+                totals._fails.push_back(r->_name + "/" + s);
+            }
+        }
+        asserts += r->_asserts;
+        millis += r->_millis;
+
+        delete r;
+    }
+
+    totals._tests = tests;
+    totals._asserts = asserts;
+    totals._millis = millis;
+
+    log() << totals.toString();  // includes endl
+
+    // summary
+    if (!totals._fails.empty()) {
+        log() << "Failing tests:" << std::endl;
+        for (std::vector<std::string>::const_iterator i = totals._fails.begin();
+             i != totals._fails.end();
+             i++) {
+            const std::string& s = (*i);
+            log() << "\t " << s << " Failed";
+        }
+        log() << "FAILURE - " << totals._fails.size() << " tests in " << failedSuites.size()
+              << " suites failed";
+    } else {
+        log() << "SUCCESS - All tests in all suites passed";
+    }
+
+    // Start building the JSON output using BSONObjBuilder
+    BSONObjBuilder b;
+
+    // TODO: Get the start and end time
+    b.append("start", "PLACEHOLDER");
+    b.append("end", "PLACEHOLDER");
+
+    // No errors
+    BSONArrayBuilder errorsList(b.subarrayStart("errors"));
+    errorsList.doneFast();
+
+    BSONArrayBuilder resultsList(b.subarrayStart("results"));
+    // Construct the results list by pulling the data from the static BenchmarkStats struct
+    for (BenchmarkStats stat : statsList) {
+        BSONObjBuilder statObj;
+        statObj.append("name", stat.name);
+        BSONObjBuilder benchResults(statObj.subobjStart("results"));
+
+        BSONObjBuilder one(benchResults.subobjStart("1"));
+        one.append("ops_per_sec", stat.ops_per_sec);
+        one.append("ops_per_sec_values", stat.ops_per_sec_vals);
+        one.append("error_values", stat.error_values);
+        one.doneFast();
+
+        benchResults.doneFast();
+
+        resultsList.append(statObj.done());
+    }
+    resultsList.doneFast();
+
+    // write to outFile or cout
+    std::string json = b.done().jsonString();
+    if (benchmarkGlobalParams.outFileName == "") {
+        std::cout << json << std::endl;
+    } else {
+        std::ofstream outFile;
+        outFile.open(benchmarkGlobalParams.outFileName, std::ofstream::out | std::ofstream::trunc);
+        if (outFile.is_open())
+            outFile << json << std::endl;
+        else {
+            std::cerr << "Unable to open '" << benchmarkGlobalParams.outFileName
+                      << "'. Defaulting to cout" << std::endl;
+            std::cout << json << std::endl;
+        }
     }
 
     return rc;

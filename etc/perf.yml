@@ -51,6 +51,13 @@ functions:
         remote_file: perf/${version_id}/${revision}/mongo-${version_id}
         bucket: mciuploads
         local_file: src/mongo
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: perf/${version_id}/${revision}/benchmark_test-${version_id}
+        bucket: mciuploads
+        local_file: src/benchmark_test
     - command: shell.exec
       params:
         working_dir: src
@@ -164,6 +171,19 @@ functions:
         name: "perf"
         file: "src/perf/perf.json"
 
+  ## Runs the benchmarks and output to perf.json in order to display the results on Mongo Perf
+  "run benchmarks" :
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          chmod +x benchmark_test
+          ./benchmark_test --outputFile perf.json
+    - command: "json.send"
+      params:
+        name: "perf"
+        file: "src/perf.json"
+
 tasks:
 - name: compile
   commands:
@@ -181,6 +201,7 @@ tasks:
           set -o verbose
           ${scons|scons} ${compile_flags|} mongo
           ${scons|scons} ${compile_flags|} mongod
+          ${scons|scons} ${compile_flags|} build/benchmarks/benchmark_test
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -201,6 +222,16 @@ tasks:
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
         display_name: mongo
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/build/benchmarks/benchmark_test
+        remote_file: perf/${version_id}/${revision}/benchmark_test-${version_id}
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/octet-stream}
+        display_name: benchmark_test
 - name: query
   depends_on:
   - variant: linux-wt-standalone
@@ -641,6 +672,14 @@ tasks:
         variant1 : "linux-mmap-standalone"
         variant2 : "linux-mmap-repl"
     - func: "analyze"
+- name: benchmark
+  depends_on:
+  - variant: linux-wt-standalone
+    name: compile
+  commands:
+    # Commands to run to get the thing going
+    - func: "start server"
+    - func: "run benchmarks"
 
 buildvariants:
 - name: linux-wt-standalone
@@ -665,6 +704,7 @@ buildvariants:
   - name: geo
   - name: misc
   - name: singleThreaded
+  - name: benchmark
 
 - name: linux-mmap-standalone
   display_name: Standalone Linux MMAPv1

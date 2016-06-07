@@ -148,3 +148,20 @@ env.CppUnitTest(
     ],
     NO_CRUTCH = True,
 )
+
+# env.CppUnitTest(
+#     target = "benchmark_test",
+#     source = [
+#         "benchmark_test.cpp"
+#     ],
+#     LIBDEPS = [],
+# )
+
+
+env.CppBenchmark(
+    target = "benchmark_test",
+    source = [
+        "benchmark_test.cpp"
+    ],
+    LIBDEPS = [],
+)

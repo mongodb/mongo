@@ -337,3 +337,30 @@ env.Library(
         'task_executor_interface',
     ],
 )
+
+
+# env.CppBenchmark(
+#     target = "benchmark_test",
+#     source = [
+#         "benchmark_test.cpp"
+#     ],
+#     LIBDEPS = [],
+# )
+
+
+# env.CppBenchmark(
+#     target='benchmark_test',
+#     source=[
+#         'benchmark_test.cpp',
+#     ],
+#     LIBDEPS=[
+        #'$BUILD_DIR/mongo/base/data_range.h',
+        #'$BUILD_DIR/mongo/bson/bson_validate.h',
+        #'$BUILD_DIR/mongo/db/json.h',
+        #'$BUILD_DIR/mongo/util/allocator.h',
+        #'$BUILD_DIR/mongo/util/hex.h',
+        #'$BUILD_DIR/mongo/util/log.h',
+        #'$BUILD_DIR/mongo/util/mongoutils/str.h',
+        #'$BUILD_DIR/mongo/util/stringutils.h',
+#     ],
+# )

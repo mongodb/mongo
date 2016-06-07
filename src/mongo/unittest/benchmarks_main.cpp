@@ -27,19 +27,46 @@
  *    then also delete it in the license file.
  */
 
+#include <cstdio>
 #include <string>
 #include <vector>
 
 #include "mongo/base/initializer.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/print.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 
+#include "mongo/base/initializer_context.h"
+#include "mongo/base/status.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
 
+#include "mongo/unittest/benchmark_options.h"
+
+namespace mongo {
+
+MONGO_MODULE_STARTUP_OPTIONS_REGISTER(BenchmarksOptions)(InitializerContext* context) {
+    moe::OptionSection benchmarkOptions("Benchmark Options");
+    benchmarkOptions.addOptionChaining(
+        "benchmark.outputFile", "outputFile", moe::String, "File to output to. Defaults to stdout");
+    return moe::startupOptions.addSection(benchmarkOptions);
+}
+
+MONGO_STARTUP_OPTIONS_STORE(BenchmarksOptions)(InitializerContext* context) {
+    const moe::Environment& params = moe::startupOptionsParsed;
+    if (params.count("benchmark.outputFile")) {
+        benchmarkGlobalParams.outFileName = params["benchmark.outputFile"].as<std::string>();
+    } else {
+        benchmarkGlobalParams.outFileName = "";
+    }
+    return Status::OK();
+}
+
+}  // namespace mongo
+
 int main(int argc, char** argv, char** envp) {
-    ::mongo::clearSignalMask();
-    ::mongo::setupSynchronousSignalHandlers();
-    ::mongo::runGlobalInitializersOrDie(argc, argv, envp);
-    return ::mongo::unittest::Suite::run(std::vector<std::string>(), "", 1);
+    mongo::clearSignalMask();
+    mongo::setupSynchronousSignalHandlers();
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
+    return mongo::unittest::Suite::benchmarkRun(std::vector<std::string>(), "", 1);
 }

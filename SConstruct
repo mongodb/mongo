@@ -562,6 +562,7 @@ def variable_tools_converter(val):
         "jsheader",
         "mergelib",
         "mongo_integrationtest",
+        "mongo_microbenchmarks",
         "mongo_unittest",
         "textfile",
     ]
@@ -835,6 +836,8 @@ envDict = dict(BUILD_ROOT=buildDir,
                UNITTEST_LIST='$BUILD_ROOT/unittests.txt',
                INTEGRATION_TEST_ALIAS='integration_tests',
                INTEGRATION_TEST_LIST='$BUILD_ROOT/integration_tests.txt',
+               BENCHMARK_ALIAS='benchmarks',
+               BENCHMARK_LIST='$BUILD_ROOT/benchmarks.txt',
                CONFIGUREDIR=sconsDataDir.Dir('sconf_temp'),
                CONFIGURELOG=sconsDataDir.File('config.log'),
                INSTALL_DIR=installDir,
@@ -2842,7 +2845,7 @@ env.Alias("distsrc", "distsrc-tgz")
 
 env.SConscript('src/SConscript', variant_dir='$BUILD_DIR', duplicate=False)
 
-env.Alias('all', ['core', 'tools', 'dbtest', 'unittests', 'integration_tests'])
+env.Alias('all', ['core', 'tools', 'dbtest', 'unittests', 'integration_tests', 'benchmarks'])
 
 # Substitute environment variables in any build targets so that we can
 # say, for instance:
