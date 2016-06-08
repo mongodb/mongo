@@ -145,7 +145,8 @@ protected:
     class UniqueBulkBuilder;
 
     const Ordering _ordering;
-    const KeyString::Version _keyStringVersion;
+    // The keystring version is effectively const after the WiredTigerIndex instance is constructed.
+    KeyString::Version _keyStringVersion;
     std::string _uri;
     uint64_t _tableId;
     std::string _collectionNamespace;

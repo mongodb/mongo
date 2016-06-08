@@ -189,10 +189,10 @@ StatusWith<BSONObj> WiredTigerUtil::getApplicationMetadata(OperationContext* opC
     return StatusWith<BSONObj>(bob.obj());
 }
 
-Status WiredTigerUtil::checkApplicationMetadataFormatVersion(OperationContext* opCtx,
-                                                             StringData uri,
-                                                             int64_t minimumVersion,
-                                                             int64_t maximumVersion) {
+StatusWith<int64_t> WiredTigerUtil::checkApplicationMetadataFormatVersion(OperationContext* opCtx,
+                                                                          StringData uri,
+                                                                          int64_t minimumVersion,
+                                                                          int64_t maximumVersion) {
     StatusWith<std::string> result = getMetadata(opCtx, uri);
     if (result.getStatus().code() == ErrorCodes::NoSuchKey) {
         return result.getStatus();
@@ -241,7 +241,7 @@ Status WiredTigerUtil::checkApplicationMetadataFormatVersion(OperationContext* o
            << " uri: " << uri << " ok range " << minimumVersion << " -> " << maximumVersion
            << " current: " << version;
 
-    return Status::OK();
+    return version;
 }
 
 // static

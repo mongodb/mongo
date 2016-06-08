@@ -131,12 +131,12 @@ public:
     /**
      * Validates formatVersion in application metadata for 'uri'.
      * Version must be numeric and be in the range [minimumVersion, maximumVersion].
-     * URI is used in error messages only.
+     * URI is used in error messages only. Returns actual version.
      */
-    static Status checkApplicationMetadataFormatVersion(OperationContext* opCtx,
-                                                        StringData uri,
-                                                        int64_t minimumVersion,
-                                                        int64_t maximumVersion);
+    static StatusWith<int64_t> checkApplicationMetadataFormatVersion(OperationContext* opCtx,
+                                                                     StringData uri,
+                                                                     int64_t minimumVersion,
+                                                                     int64_t maximumVersion);
 
     /**
      * Validates the 'configString' specified as a collection or index creation option.

@@ -814,7 +814,8 @@ WiredTigerRecordStore::WiredTigerRecordStore(OperationContext* ctx,
       _sizeStorerCounter(0),
       _shuttingDown(false) {
     Status versionStatus = WiredTigerUtil::checkApplicationMetadataFormatVersion(
-        ctx, uri, kMinimumRecordStoreVersion, kMaximumRecordStoreVersion);
+                               ctx, uri, kMinimumRecordStoreVersion, kMaximumRecordStoreVersion)
+                               .getStatus();
     if (!versionStatus.isOK()) {
         if (versionStatus.code() == ErrorCodes::FailedToParse) {
             uasserted(28548, versionStatus.reason());

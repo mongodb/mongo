@@ -231,8 +231,10 @@ TEST_F(WiredTigerUtilMetadataTest, CheckApplicationMetadataFormatVersionString) 
 
 TEST_F(WiredTigerUtilMetadataTest, CheckApplicationMetadataFormatVersionNumber) {
     createSession("app_metadata=(formatVersion=2)");
-    ASSERT_OK(WiredTigerUtil::checkApplicationMetadataFormatVersion(
-        getOperationContext(), getURI(), 2, 3));
+    ASSERT_EQUALS(
+        WiredTigerUtil::checkApplicationMetadataFormatVersion(getOperationContext(), getURI(), 2, 3)
+            .getValue(),
+        2);
     ASSERT_NOT_OK(WiredTigerUtil::checkApplicationMetadataFormatVersion(
         getOperationContext(), getURI(), 1, 1));
     ASSERT_NOT_OK(WiredTigerUtil::checkApplicationMetadataFormatVersion(
@@ -241,8 +243,9 @@ TEST_F(WiredTigerUtilMetadataTest, CheckApplicationMetadataFormatVersionNumber) 
 
 TEST_F(WiredTigerUtilMetadataTest, CheckApplicationMetadataFormatInvalidURI) {
     createSession("\"");
-    Status result = WiredTigerUtil::checkApplicationMetadataFormatVersion(
-        getOperationContext(), getURI(), 0, 3);
+    Status result =
+        WiredTigerUtil::checkApplicationMetadataFormatVersion(getOperationContext(), getURI(), 0, 3)
+            .getStatus();
     ASSERT_NOT_OK(result);
     ASSERT_EQUALS(ErrorCodes::FailedToParse, result.code());
 }

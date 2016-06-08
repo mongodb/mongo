@@ -82,8 +82,9 @@ static const int TempKeyMaxSize = 1024;  // this goes away with SERVER-3372
 
 static const WiredTigerItem emptyItem(NULL, 0);
 
+// Keystring format 7 was used in 3.3.6 - 3.3.8 development releases.
 static const int kKeyStringV0Version = 6;
-static const int kKeyStringV1Version = 7;
+static const int kKeyStringV1Version = 8;
 static const int kMinimumIndexVersion = kKeyStringV0Version;
 static const int kMaximumIndexVersion = kKeyStringV1Version;
 
@@ -216,16 +217,15 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
                                  const std::string& uri,
                                  const IndexDescriptor* desc)
     : _ordering(Ordering::make(desc->keyPattern())),
-      _keyStringVersion(desc->version() < kKeyStringV1Version ? KeyString::Version::V0
-                                                              : KeyString::Version::V1),
       _uri(uri),
       _tableId(WiredTigerSession::genTableId()),
       _collectionNamespace(desc->parentNS()),
       _indexName(desc->indexName()) {
-    Status versionStatus = WiredTigerUtil::checkApplicationMetadataFormatVersion(
+    auto version = WiredTigerUtil::checkApplicationMetadataFormatVersion(
         ctx, uri, kMinimumIndexVersion, kMaximumIndexVersion);
-    if (!versionStatus.isOK()) {
+    if (!version.isOK()) {
         str::stream ss;
+        Status versionStatus = version.getStatus();
         ss << versionStatus.reason() << " Index: {name: " << desc->indexName()
            << ", ns: " << desc->parentNS() << "} - version too new for this mongod."
            << " See http://dochub.mongodb.org/core/3.4-index-downgrade for detailed"
@@ -234,6 +234,8 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
             ErrorCodes::UnsupportedFormat, ss.ss.str(), versionStatus.location());
         fassertFailedWithStatusNoTrace(28579, indexVersionStatus);
     }
+    _keyStringVersion =
+        version.getValue() == kKeyStringV1Version ? KeyString::Version::V1 : KeyString::Version::V0;
 }
 
 Status WiredTigerIndex::insert(OperationContext* txn,
