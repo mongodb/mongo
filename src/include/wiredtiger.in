@@ -1848,7 +1848,7 @@ struct __wt_connection {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the path to a directory into
 	 * which the log files are written.  If the value is not an absolute
 	 * path name\, the files are created relative to the database home., a
-	 * string; default empty.}
+	 * string; default \c ".".}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;prealloc,
 	 * pre-allocate log files., a boolean flag; default \c true.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;recover, run recovery or error if
@@ -2344,7 +2344,7 @@ struct __wt_connection {
  * integer between 100KB and 2GB; default \c 100MB.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the path to a directory into which the
  * log files are written.  If the value is not an absolute path name\, the files
- * are created relative to the database home., a string; default empty.}
+ * are created relative to the database home., a string; default \c ".".}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;prealloc, pre-allocate log files., a boolean
  * flag; default \c true.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;recover, run recovery
