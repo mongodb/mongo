@@ -28,8 +28,17 @@
         clusterId: ObjectId()
     };
 
+    // Simulate the upsert that is performed by a config server on addShard.
+    var shardIdentityQuery = {
+        _id: shardIdentityDoc._id,
+        shardName: shardIdentityDoc.shardName,
+        clusterId: shardIdentityDoc.clusterId
+    };
+    var shardIdentityUpdate = {
+        $set: {configsvrConnectionString: shardIdentityDoc.configsvrConnectionString}
+    };
     assert.writeOK(priConn.getDB('admin').system.version.update(
-        {_id: 'shardIdentity'}, shardIdentityDoc, {upsert: true, writeConcern: {w: 2}}));
+        shardIdentityQuery, shardIdentityUpdate, {upsert: true, writeConcern: {w: 2}}));
 
     var secConn = replTest.getSecondary();
     secConn.setSlaveOk(true);

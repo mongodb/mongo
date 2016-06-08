@@ -60,8 +60,17 @@
             return mongodConn;
         };
 
+        // Simulate the upsert that is performed by a config server on addShard.
+        var shardIdentityQuery = {
+            _id: shardIdentityDoc._id,
+            shardName: shardIdentityDoc.shardName,
+            clusterId: shardIdentityDoc.clusterId,
+        };
+        var shardIdentityUpdate = {
+            $set: {configsvrConnectionString: shardIdentityDoc.configsvrConnectionString}
+        };
         assert.writeOK(mongodConn.getDB('admin').system.version.update(
-            {_id: 'shardIdentity'}, shardIdentityDoc, true));
+            shardIdentityQuery, shardIdentityUpdate, {upsert: true}));
 
         var res = mongodConn.getDB('admin').runCommand({shardingState: 1});
 
