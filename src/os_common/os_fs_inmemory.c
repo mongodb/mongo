@@ -80,22 +80,6 @@ __im_handle_remove(WT_SESSION_IMPL *session,
 }
 
 /*
- * __im_handle_size --
- *	Return the handle's data size.
- */
-static void
-__im_handle_size(WT_FILE_HANDLE_INMEM *im_fh, wt_off_t *sizep)
-{
-	/*
-	 * XXX
-	 * This function exists as a place for this comment. MongoDB assumes
-	 * any file with content will have a non-zero size. In memory tables
-	 * generally are zero-sized, make MongoDB happy.
-	 */
-	*sizep = im_fh->buf.size == 0 ? 1024 : (wt_off_t)im_fh->buf.size;
-}
-
-/*
  * __im_fs_directory_list --
  *	Return the directory contents.
  */
@@ -284,7 +268,7 @@ __im_fs_size(WT_FILE_SYSTEM *file_system,
 	if ((im_fh = __im_handle_search(file_system, name)) == NULL)
 		ret = ENOENT;
 	else
-		__im_handle_size(im_fh, sizep);
+		*sizep = (wt_off_t)im_fh->buf.size;
 
 	__wt_spin_unlock(session, &im_fs->lock);
 
@@ -370,7 +354,7 @@ __im_file_size(
 
 	__wt_spin_lock(session, &im_fs->lock);
 
-	__im_handle_size(im_fh, sizep);
+	*sizep = (wt_off_t)im_fh->buf.size;
 
 	__wt_spin_unlock(session, &im_fs->lock);
 
