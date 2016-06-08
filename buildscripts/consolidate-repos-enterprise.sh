@@ -41,6 +41,21 @@ then
   ln -s 5 "$repodir/yum/redhat/5Server"
 fi
 
+if [ ! -e "$repodir/yum/redhat/7Workstation" ]
+then
+  ln -s 7 "$repodir/yum/redhat/7Workstation"
+fi
+
+if [ ! -e "$repodir/yum/redhat/6Workstation" ]
+then
+  ln -s 6 "$repodir/yum/redhat/6Workstation"
+fi
+
+if [ ! -e "$repodir/yum/redhat/5Workstation" ]
+then
+  ln -s 5 "$repodir/yum/redhat/5Workstation"
+fi
+
 echo "Scanning and copying package files from $source_dir"
 echo ". = skipping existing file, @ = copying file"
 for package in $(find "$source_dir" -not \( -path "$repodir" -prune \) -and \( -name \*.rpm -o -name \*.deb -o -name Release \))
