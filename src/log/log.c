@@ -95,9 +95,11 @@ __wt_log_background(WT_SESSION_IMPL *session, WT_LSN *lsn)
 int
 __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 {
+	struct timespec fsync_start, fsync_stop;
 	WT_DECL_RET;
 	WT_FH *log_fh;
 	WT_LOG *log;
+	uint64_t fsync_duration_usecs;
 
 	log = S2C(session)->log;
 
@@ -124,9 +126,14 @@ __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 		    "log_force_sync: sync directory %s to LSN %" PRIu32
 		    "/%" PRIu32,
 		    log->log_dir_fh->name, min_lsn->l.file, min_lsn->l.offset));
+		WT_ERR(__wt_epoch(session, &fsync_start));
 		WT_ERR(__wt_fsync(session, log->log_dir_fh, true));
+		WT_ERR(__wt_epoch(session, &fsync_stop));
+		fsync_duration_usecs = WT_TIMEDIFF_US(fsync_stop, fsync_start);
 		log->sync_dir_lsn = *min_lsn;
 		WT_STAT_FAST_CONN_INCR(session, log_sync_dir);
+		WT_STAT_FAST_CONN_INCRV(session,
+		    log_sync_dir_duration, fsync_duration_usecs);
 	}
 	/*
 	 * Sync the log file if needed.
@@ -143,9 +150,14 @@ __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 		WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 		    "log_force_sync: sync %s to LSN %" PRIu32 "/%" PRIu32,
 		    log_fh->name, min_lsn->l.file, min_lsn->l.offset));
+		WT_ERR(__wt_epoch(session, &fsync_start));
 		WT_ERR(__wt_fsync(session, log_fh, true));
+		WT_ERR(__wt_epoch(session, &fsync_stop));
+		fsync_duration_usecs = WT_TIMEDIFF_US(fsync_stop, fsync_start);
 		log->sync_lsn = *min_lsn;
 		WT_STAT_FAST_CONN_INCR(session, log_sync);
+		WT_STAT_FAST_CONN_INCRV(session,
+		    log_sync_duration, fsync_duration_usecs);
 		WT_ERR(__wt_close(session, &log_fh));
 		WT_ERR(__wt_cond_signal(session, log->log_sync_cond));
 	}
@@ -1272,11 +1284,13 @@ err:	__wt_free(session, buf);
 int
 __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 {
+	struct timespec fsync_start, fsync_stop;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_LSN sync_lsn;
 	int64_t release_buffered, release_bytes;
+	uint64_t fsync_duration_usecs;
 	int yield_count;
 	bool locked;
 
@@ -1406,9 +1420,15 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 			    "/%" PRIu32,
 			    log->log_dir_fh->name,
 			    sync_lsn.l.file, sync_lsn.l.offset));
+			WT_ERR(__wt_epoch(session, &fsync_start));
 			WT_ERR(__wt_fsync(session, log->log_dir_fh, true));
+			WT_ERR(__wt_epoch(session, &fsync_stop));
+			fsync_duration_usecs =
+			    WT_TIMEDIFF_US(fsync_stop, fsync_start);
 			log->sync_dir_lsn = sync_lsn;
 			WT_STAT_FAST_CONN_INCR(session, log_sync_dir);
+			WT_STAT_FAST_CONN_INCRV(session,
+			    log_sync_dir_duration, fsync_duration_usecs);
 		}
 
 		/*
@@ -1422,7 +1442,13 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 			    log->log_fh->name,
 			    sync_lsn.l.file, sync_lsn.l.offset));
 			WT_STAT_FAST_CONN_INCR(session, log_sync);
+			WT_ERR(__wt_epoch(session, &fsync_start));
 			WT_ERR(__wt_fsync(session, log->log_fh, true));
+			WT_ERR(__wt_epoch(session, &fsync_stop));
+			fsync_duration_usecs =
+			    WT_TIMEDIFF_US(fsync_stop, fsync_start);
+			WT_STAT_FAST_CONN_INCRV(session,
+			    log_sync_duration, fsync_duration_usecs);
 			log->sync_lsn = sync_lsn;
 			WT_ERR(__wt_cond_signal(session, log->log_sync_cond));
 		}

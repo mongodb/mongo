@@ -646,7 +646,9 @@ static const char * const __stats_connection_desc[] = {
 	"log: log server thread advances write LSN",
 	"log: log server thread write LSN walk skipped",
 	"log: log sync operations",
+	"log: log sync time duration (usecs)",
 	"log: log sync_dir operations",
+	"log: log sync_dir time duration (usecs)",
 	"log: log write operations",
 	"log: logging bytes consolidated",
 	"log: maximum log file size",
@@ -684,6 +686,10 @@ static const char * const __stats_connection_desc[] = {
 	"transaction: transaction checkpoint total time (msecs)",
 	"transaction: transaction checkpoints",
 	"transaction: transaction failures due to cache overflow",
+	"transaction: transaction fsync calls for checkpoint after allocating the transaction ID",
+	"transaction: transaction fsync calls for checkpoint before allocating the transaction ID",
+	"transaction: transaction fsync duration for checkpoint after allocating the transaction ID",
+	"transaction: transaction fsync duration for checkpoint before allocating the transaction ID",
 	"transaction: transaction range of IDs currently pinned",
 	"transaction: transaction range of IDs currently pinned by a checkpoint",
 	"transaction: transaction range of IDs currently pinned by named snapshots",
@@ -852,7 +858,9 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->log_write_lsn = 0;
 	stats->log_write_lsn_skip = 0;
 	stats->log_sync = 0;
+	stats->log_sync_duration = 0;
 	stats->log_sync_dir = 0;
+	stats->log_sync_dir_duration = 0;
 	stats->log_writes = 0;
 	stats->log_slot_consolidated = 0;
 		/* not clearing log_max_filesize */
@@ -890,6 +898,10 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 		/* not clearing txn_checkpoint_time_total */
 	stats->txn_checkpoint = 0;
 	stats->txn_fail_cache = 0;
+	stats->txn_fsync_post = 0;
+	stats->txn_fsync_pre = 0;
+	stats->txn_fsync_post_duration = 0;
+	stats->txn_fsync_pre_duration = 0;
 		/* not clearing txn_pinned_range */
 		/* not clearing txn_pinned_checkpoint_range */
 		/* not clearing txn_pinned_snapshot_range */
@@ -1078,7 +1090,10 @@ __wt_stat_connection_aggregate(
 	to->log_write_lsn += WT_STAT_READ(from, log_write_lsn);
 	to->log_write_lsn_skip += WT_STAT_READ(from, log_write_lsn_skip);
 	to->log_sync += WT_STAT_READ(from, log_sync);
+	to->log_sync_duration += WT_STAT_READ(from, log_sync_duration);
 	to->log_sync_dir += WT_STAT_READ(from, log_sync_dir);
+	to->log_sync_dir_duration +=
+	    WT_STAT_READ(from, log_sync_dir_duration);
 	to->log_writes += WT_STAT_READ(from, log_writes);
 	to->log_slot_consolidated +=
 	    WT_STAT_READ(from, log_slot_consolidated);
@@ -1128,6 +1143,12 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, txn_checkpoint_time_total);
 	to->txn_checkpoint += WT_STAT_READ(from, txn_checkpoint);
 	to->txn_fail_cache += WT_STAT_READ(from, txn_fail_cache);
+	to->txn_fsync_post += WT_STAT_READ(from, txn_fsync_post);
+	to->txn_fsync_pre += WT_STAT_READ(from, txn_fsync_pre);
+	to->txn_fsync_post_duration +=
+	    WT_STAT_READ(from, txn_fsync_post_duration);
+	to->txn_fsync_pre_duration +=
+	    WT_STAT_READ(from, txn_fsync_pre_duration);
 	to->txn_pinned_range += WT_STAT_READ(from, txn_pinned_range);
 	to->txn_pinned_checkpoint_range +=
 	    WT_STAT_READ(from, txn_pinned_checkpoint_range);
