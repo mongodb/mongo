@@ -447,12 +447,12 @@ __log_prealloc(WT_SESSION_IMPL *session, WT_FH *fh)
 	 * writes happening concurrently, so there are no locking issues.
 	 */
 	if ((ret = __wt_fallocate(
-	    session, fh, WT_LOG_FIRST_RECORD, conn->log_file_max)) == 0)
+	    session, fh, WT_LOG_FIRST_RECORD,
+	    conn->log_file_max - WT_LOG_FIRST_RECORD)) == 0)
 		return (0);
 	WT_RET_ERROR_OK(ret, ENOTSUP);
 
-	return (__wt_ftruncate(
-	    session, fh, WT_LOG_FIRST_RECORD + conn->log_file_max));
+	return (__wt_ftruncate(session, fh, conn->log_file_max));
 }
 
 /*
@@ -1029,7 +1029,6 @@ __wt_log_allocfile(
 	 */
 	WT_ERR(__log_openfile(session, true, &log_fh, WT_LOG_TMPNAME, tmp_id));
 	WT_ERR(__log_file_header(session, log_fh, NULL, true));
-	WT_ERR(__wt_ftruncate(session, log_fh, WT_LOG_FIRST_RECORD));
 	WT_ERR(__log_prealloc(session, log_fh));
 	WT_ERR(__wt_fsync(session, log_fh, true));
 	WT_ERR(__wt_close(session, &log_fh));
