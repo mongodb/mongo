@@ -46,6 +46,7 @@ env.Library(
 env.Library(
     target='sharding',
     source=[
+        'active_migrations_registry.cpp',
         'chunk_move_write_concern_options.cpp',
         'collection_sharding_state.cpp',
         'metadata_manager.cpp',
@@ -149,6 +150,7 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='sharding_state_test',
     source=[
+        'active_migrations_registry_test.cpp',
         'sharding_state_test.cpp',
     ],
     LIBDEPS=[

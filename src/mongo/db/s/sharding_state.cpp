@@ -868,9 +868,12 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
     return Status::OK();
 }
 
+StatusWith<ScopedRegisterMigration> ShardingState::registerMigration(const MoveChunkRequest& args) {
+    return _activeMigrationsRegistry.registerMigration(args);
+}
+
 boost::optional<NamespaceString> ShardingState::getActiveMigrationNss() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _activeMigrationNss;
+    return _activeMigrationsRegistry.getActiveMigrationNss();
 }
 
 void ShardingState::appendInfo(OperationContext* txn, BSONObjBuilder& builder) {
@@ -922,36 +925,6 @@ shared_ptr<CollectionMetadata> ShardingState::getCollectionMetadata(const string
     } else {
         return it->second->getMetadata();
     }
-}
-
-Status ShardingState::_registerMigration(NamespaceString nss) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    if (_activeMigrationNss) {
-        return {
-            ErrorCodes::ConflictingOperationInProgress,
-            str::stream()
-                << "Unable start new migration, because there is already an active migration for "
-                << _activeMigrationNss->ns()};
-    }
-
-    _activeMigrationNss = std::move(nss);
-    return Status::OK();
-}
-
-void ShardingState::_clearMigration() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    invariant(_activeMigrationNss);
-    _activeMigrationNss.reset();
-}
-
-ShardingState::ScopedRegisterMigration::ScopedRegisterMigration(OperationContext* txn,
-                                                                NamespaceString nss)
-    : _txn(txn) {
-    uassertStatusOK(ShardingState::get(_txn)->_registerMigration(std::move(nss)));
-}
-
-ShardingState::ScopedRegisterMigration::~ScopedRegisterMigration() {
-    ShardingState::get(_txn)->_clearMigration();
 }
 
 Status ShardingState::updateShardIdentityConfigString(OperationContext* txn,

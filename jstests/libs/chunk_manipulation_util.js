@@ -101,8 +101,8 @@ function configureMoveChunkFailPoint(shardConnection, stepNumber, mode) {
                    migrateStepNames.done,
                    "incorrect stepNumber",
                    true);
-    var admin = shardConnection.getDB('admin');
-    admin.runCommand({configureFailPoint: 'moveChunkHangAtStep' + stepNumber, mode: mode});
+    assert.commandWorked(shardConnection.adminCommand(
+        {configureFailPoint: 'moveChunkHangAtStep' + stepNumber, mode: mode}));
 }
 
 //

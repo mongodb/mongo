@@ -35,6 +35,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
@@ -67,26 +68,6 @@ class ShardingState {
     MONGO_DISALLOW_COPYING(ShardingState);
 
 public:
-    /**
-     * RAII object, which will register an active migration with the global sharding state so that
-     * no subsequent migrations may start until the previous one has completed.
-     */
-    class ScopedRegisterMigration {
-        MONGO_DISALLOW_COPYING(ScopedRegisterMigration);
-
-    public:
-        /**
-         * Registers a new migration with the global sharding state. If a migration is already
-         * active it will throw a user assertion with a ConflictingOperationInProgress code.
-         */
-        ScopedRegisterMigration(OperationContext* txn, NamespaceString nss);
-        ~ScopedRegisterMigration();
-
-    private:
-        // The operation context under which we are running. Must remain the same.
-        OperationContext* const _txn;
-    };
-
     using GlobalInitFunc = stdx::function<Status(const ConnectionString&)>;
 
     ShardingState();
@@ -234,6 +215,16 @@ public:
     void resetMetadata(const std::string& ns);
 
     /**
+     * Registers an active move chunk request with the specified arguments in order to ensure that
+     * there is a single active move chunk operation running per shard.
+     *
+     * If there aren't any migrations running on this shard, returns a ScopedRegisterMigration
+     * object, which will unregister it when it goes out of scope. Othwerwise returns
+     * ConflictingOperationInProgress.
+     */
+    StatusWith<ScopedRegisterMigration> registerMigration(const MoveChunkRequest& args);
+
+    /**
      * If a migration has been previously registered through a call to registerMigration returns
      * that namespace. Otherwise returns boost::none.
      *
@@ -324,22 +315,11 @@ private:
                             bool useRequestedVersion,
                             ChunkVersion* latestShardVersion);
 
-    /**
-     * Registers a namespace with ongoing migration. This is what ensures that there is a single
-     * migration active per shard.
-     *
-     * Returns OK if there is no active migration and ConflictingOperationInProgress otherwise.
-     */
-    Status _registerMigration(NamespaceString nss);
-
-    /**
-     * Unregisters a previously registered namespace with ongoing migration. Must only be called if
-     * a previous call to registerMigration has succeeded.
-     */
-    void _clearMigration();
-
     // Manages the state of the migration recipient shard
     MigrationDestinationManager _migrationDestManager;
+
+    // Tracks the active move chunk operations running on this shard
+    ActiveMigrationsRegistry _activeMigrationsRegistry;
 
     // Protects state below
     stdx::mutex _mutex;
@@ -358,12 +338,6 @@ private:
 
     // Protects from hitting the config server from too many threads at once
     TicketHolder _configServerTickets;
-
-    // If there is an active migration going on, this field contains the namespace which is being
-    // migrated. The need for this is due to the fact that _initialClone/_transferMods do not carry
-    // any namespace with them. This value can be read using only the global sharding state mutex
-    // (_mutex), but to be set requires both collection lock and the mutex.
-    boost::optional<NamespaceString> _activeMigrationNss;
 
     // Cache of collection metadata on this shard. It is not safe to look-up values from this map
     // without holding some form of collection lock. It is only safe to add/remove values when

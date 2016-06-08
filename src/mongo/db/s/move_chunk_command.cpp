@@ -56,70 +56,27 @@ using std::string;
 namespace {
 
 /**
- * RAII object, which will register an active migration with the global sharding state so that no
- * subsequent migrations may start until the previous one has completed.
+ * Acquires a distributed lock for the specified collection or throws if lock cannot be acquired.
  */
-class ScopedSetInMigration {
-    MONGO_DISALLOW_COPYING(ScopedSetInMigration);
-
-public:
-    /**
-     * Registers a new migration with the global sharding state. Also acquires the distributed lock
-     * on the collection, unless signalled not to do so in the MoveChunkRequest, so that other
-     * shards cannot begin migrations on the collection. If a migration is already active it will
-     * throw a user assertion with a ConflictingOperationInProgress code. Otherwise it may throw any
-     * other error due to distributed lock acquisition failure.
-     */
-    ScopedSetInMigration(OperationContext* txn, MoveChunkRequest args)
-        : _scopedRegisterMigration(txn, args.getNss()) {
-        if (args.getTakeDistLock()) {
-            _collectionDistLock = DistLockManager::ScopedDistLock(_acquireDistLock(txn, args));
-        }
+DistLockManager::ScopedDistLock acquireCollectionDistLock(OperationContext* txn,
+                                                          const MoveChunkRequest& args) {
+    const string whyMessage(str::stream()
+                            << "migrating chunk "
+                            << ChunkRange(args.getMinKey(), args.getMaxKey()).toString()
+                            << " in "
+                            << args.getNss().ns());
+    auto distLockStatus = grid.catalogManager(txn)->distLock(txn, args.getNss().ns(), whyMessage);
+    if (!distLockStatus.isOK()) {
+        const string msg = str::stream()
+            << "Could not acquire collection lock for " << args.getNss().ns()
+            << " to migrate chunk [" << args.getMinKey() << "," << args.getMaxKey() << ") due to "
+            << distLockStatus.getStatus().toString();
+        warning() << msg;
+        uasserted(distLockStatus.getStatus().code(), msg);
     }
 
-    ~ScopedSetInMigration() = default;
-
-    /**
-     * Blocking call, which polls the state of the distributed lock and ensures that it is still
-     * held.
-     */
-    Status checkDistLock() {
-        invariant(_collectionDistLock);
-        return _collectionDistLock->checkStatus();
-    }
-
-private:
-    /**
-     * Acquires a distributed lock for the specified collection or throws if lock cannot be
-     * acquired.
-     */
-    DistLockManager::ScopedDistLock _acquireDistLock(OperationContext* txn,
-                                                     const MoveChunkRequest& args) {
-        const std::string whyMessage(
-            str::stream() << "migrating chunk [" << args.getMinKey() << ", " << args.getMaxKey()
-                          << ") in "
-                          << args.getNss().ns());
-        auto distLockStatus =
-            grid.catalogManager(txn)->distLock(txn, args.getNss().ns(), whyMessage);
-        if (!distLockStatus.isOK()) {
-            const std::string msg = str::stream()
-                << "Could not acquire collection lock for " << args.getNss().ns()
-                << " to migrate chunk [" << args.getMinKey() << "," << args.getMaxKey()
-                << ") due to " << distLockStatus.getStatus().toString();
-            warning() << msg;
-            uasserted(distLockStatus.getStatus().code(), msg);
-        }
-
-        return std::move(distLockStatus.getValue());
-    }
-
-    // The scoped migration registration
-    ShardingState::ScopedRegisterMigration _scopedRegisterMigration;
-
-    // Handle for the the distributed lock, which protects other migrations from happening on the
-    // same collection.
-    boost::optional<DistLockManager::ScopedDistLock> _collectionDistLock;
-};
+    return std::move(distLockStatus.getValue());
+}
 
 /**
  * If the specified status is not OK logs a warning and throws a DBException corresponding to the
@@ -156,12 +113,12 @@ public:
         return true;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
 
     Status checkAuthForCommand(ClientBasic* client,
-                               const std::string& dbname,
+                               const string& dbname,
                                const BSONObj& cmdObj) override {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                 ResourcePattern::forClusterResource(), ActionType::internal)) {
@@ -170,7 +127,7 @@ public:
         return Status::OK();
     }
 
-    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
+    string parseNs(const string& dbname, const BSONObj& cmdObj) const override {
         return parseNsFullyQualified(dbname, cmdObj);
     }
 
@@ -178,13 +135,10 @@ public:
              const string& dbname,
              BSONObj& cmdObj,
              int options,
-             std::string& errmsg,
+             string& errmsg,
              BSONObjBuilder& result) override {
-        const NamespaceString nss = NamespaceString(parseNs(dbname, cmdObj));
-        uassert(ErrorCodes::InvalidNamespace, "need to specify a valid namespace", nss.isValid());
-
-        MoveChunkRequest moveChunkRequest =
-            uassertStatusOK(MoveChunkRequest::createFromCommand(nss, cmdObj));
+        const MoveChunkRequest moveChunkRequest = uassertStatusOK(
+            MoveChunkRequest::createFromCommand(NamespaceString(parseNs(dbname, cmdObj)), cmdObj));
 
         ShardingState* const shardingState = ShardingState::get(txn);
 
@@ -195,17 +149,29 @@ public:
 
         shardingState->setShardName(moveChunkRequest.getFromShardId());
 
-        const auto writeConcernForRangeDeleter =
-            uassertStatusOK(ChunkMoveWriteConcernOptions::getEffectiveWriteConcern(
-                txn, moveChunkRequest.getSecondaryThrottle()));
-
         // Make sure we're as up-to-date as possible with shard information. This catches the case
         // where we might have changed a shard's host by removing/adding a shard with the same name.
         grid.shardRegistry()->reload(txn);
 
+        // Check if there is an existing migration running
+        auto scopedRegisterMigration =
+            uassertStatusOK(shardingState->registerMigration(moveChunkRequest));
+
+        return _runImpl(txn, moveChunkRequest, errmsg, result);
+    }
+
+private:
+    static bool _runImpl(OperationContext* txn,
+                         const MoveChunkRequest& moveChunkRequest,
+                         string& errmsg,
+                         BSONObjBuilder& result) {
+        const auto writeConcernForRangeDeleter =
+            uassertStatusOK(ChunkMoveWriteConcernOptions::getEffectiveWriteConcern(
+                txn, moveChunkRequest.getSecondaryThrottle()));
+
         MoveTimingHelper moveTimingHelper(txn,
                                           "from",
-                                          nss.ns(),
+                                          moveChunkRequest.getNss().ns(),
                                           moveChunkRequest.getMinKey(),
                                           moveChunkRequest.getMaxKey(),
                                           6,  // Total number of steps
@@ -216,7 +182,11 @@ public:
         moveTimingHelper.done(1);
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep1);
 
-        ScopedSetInMigration scopedInMigration(txn, moveChunkRequest);
+        // Acquire the collection distributed lock if necessary
+        boost::optional<DistLockManager::ScopedDistLock> scopedCollectionDistLock;
+        if (moveChunkRequest.getTakeDistLock()) {
+            scopedCollectionDistLock = acquireCollectionDistLock(txn, moveChunkRequest);
+        }
 
         BSONObj shardKeyPattern;
 
@@ -249,15 +219,14 @@ public:
 
             // Ensure the distributed lock is still held if this shard owns it.
             if (moveChunkRequest.getTakeDistLock()) {
-                Status checkDistLockStatus = scopedInMigration.checkDistLock();
+                Status checkDistLockStatus = scopedCollectionDistLock->checkStatus();
                 if (!checkDistLockStatus.isOK()) {
-                    const string msg = str::stream()
-                        << "not entering migrate critical section due to "
-                        << checkDistLockStatus.toString();
-                    warning() << msg;
                     migrationSourceManager.cleanupOnError(txn);
 
-                    uasserted(checkDistLockStatus.code(), msg);
+                    uassertStatusOKWithWarning(
+                        {checkDistLockStatus.code(),
+                         str::stream() << "not entering migrate critical section due to "
+                                       << checkDistLockStatus.toString()});
                 }
             }
 
