@@ -26,9 +26,10 @@ stop_word_languages = [
     'turkish',
 ]
 
-env.Command( [ "stop_words_list.h", "stop_words_list.cpp"],
+generateStopWordsList = env.Command( [ "stop_words_list.h", "stop_words_list.cpp"],
              [ "generate_stop_words.py"] + [ 'stop_words_%s.txt' % x for x in stop_word_languages ],
              "$PYTHON $SOURCES $TARGETS" )
+env.Alias('generated-sources', generateStopWordsList)
 
 baseEnv=env.Clone()
 baseEnv.InjectThirdPartyIncludePaths(libraries=['stemmer'])
