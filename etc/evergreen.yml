@@ -375,7 +375,7 @@ functions:
           for i in $(seq 1 $numVms)
           do
             hostn=n$i
-            sudo cp -f mongo-binaries.tgz /var/lib/lxc/$hostn/rootfs/root/
+            scp mongo-binaries.tgz root@$hostn:
           done
 
   "run jepsen test" :
@@ -411,6 +411,25 @@ functions:
           fi
           # Create report.json
           echo "{\"failures\": $failures, \"results\": [{\"status\": $status, \"exit_code\": $exit_code, \"test_file\": \"${task_name}\", \"start\": $start_time, \"end\": $end_time, \"elapsed\": $elapsed_secs}]}" > ../../report.json
+    - command: shell.exec
+      params:
+        working_dir: src/jepsen/mongodb
+        script: |
+          # Copy mongod.log from each LXC host for archive purposes
+          numVms=5
+          for i in $(seq 1 $numVms)
+          do
+            hostn=n$i
+            mongod_log=store/latest/mongod-$hostn.log
+            scp root@$hostn:mongod.log $mongod_log
+            if [ -f $mongod_log ]; then
+              echo "Copied mongod.log from $hostn to $mongod_log"
+            else
+              echo "Failed to copy mongod.log from $hostn"
+            fi
+          done
+          # Always exit without an error so the archive steps will run.
+          exit 0
     - command: archive.targz_pack
       params:
         target: "src/jepsen-results.tgz"
