@@ -22,6 +22,21 @@
 stepback: true
 command_type: system
 
+# Files that match an ignore-list pattern will not trigger a build, if they're the only modified
+# files in the patch.
+ignore:
+  - ".*"
+  - "!.clang-format"
+  - "!.eslintrc.yml"
+  - "*.md"
+  - "*.rst"
+  - "*.txt"
+  - "/distsrc/**"
+  - "/docs/**"
+  - "/etc/*.yml"
+  - "!/etc/evergreen.yml"
+  - "README"
+
 ## Some variables for convenience:
 variables:
 
