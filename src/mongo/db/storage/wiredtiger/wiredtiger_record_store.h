@@ -40,7 +40,6 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/fail_point_service.h"
 
 /**

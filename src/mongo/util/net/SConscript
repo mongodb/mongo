@@ -46,6 +46,7 @@ networkEnv.Library(
         "ssl_expiration.cpp",
         "ssl_manager.cpp",
         "ssl_options.cpp",
+        "thread_idle_callback.cpp",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/server_options_core',
@@ -77,7 +78,6 @@ env.CppUnitTest(
         'sock_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/concurrency/synchronization',
         'network',
     ],
 )

@@ -144,7 +144,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/platform/platform',
-        '$BUILD_DIR/mongo/util/concurrency/synchronization',
         '$BUILD_DIR/third_party/shim_allocator',
         '$BUILD_DIR/third_party/shim_boost',
         '$BUILD_DIR/third_party/shim_tz',
@@ -256,7 +255,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "background_job",
-        "concurrency/synchronization",
     ],
 )
 

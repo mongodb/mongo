@@ -38,9 +38,9 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/listen.h"
+#include "mongo/util/net/thread_idle_callback.h"
 
 namespace mongo {
 

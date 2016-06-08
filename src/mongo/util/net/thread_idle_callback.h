@@ -1,6 +1,5 @@
-// synchronization.cpp
-
-/*    Copyright 2010 10gen Inc.
+/**
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -27,54 +26,28 @@
  *    then also delete it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
-
-#include "synchronization.h"
-
-#include <boost/date_time/posix_time/posix_time.hpp>
-
-#include "mongo/util/log.h"
+#pragma once
 
 namespace mongo {
 
-namespace {
-ThreadIdleCallback threadIdleCallback;
-}  // namespace
+/**
+ * Type of callback functions that can be invoked when markThreadIdle() runs. These functions *must
+ * not throw*.
+ */
+typedef void (*ThreadIdleCallback)();
 
-void registerThreadIdleCallback(ThreadIdleCallback callback) {
-    invariant(!threadIdleCallback);
-    threadIdleCallback = callback;
-}
+/**
+ * Informs the registered listener that this thread believes it may go idle for an extended period.
+ * The caller should avoid calling markThreadIdle at a high rate, as it can both be moderately
+ * costly itself and in terms of distributed overhead for subsequent malloc/free calls.
+ */
+void markThreadIdle();
 
-void markThreadIdle() {
-    if (!threadIdleCallback) {
-        return;
-    }
-    try {
-        threadIdleCallback();
-    } catch (...) {
-        severe() << "Exception escaped from threadIdleCallback";
-        fassertFailedNoTrace(28603);
-    }
-}
-
-Notification::Notification() {
-    lookFor = 1;
-    cur = 0;
-}
-
-void Notification::waitToBeNotified() {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
-    while (lookFor != cur)
-        _condition.wait(lock);
-    lookFor++;
-}
-
-void Notification::notifyOne() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    verify(cur != lookFor);
-    cur++;
-    _condition.notify_one();
-}
+/**
+ * Allows for registering callbacks for when threads go idle and become active. This is used by
+ * TCMalloc to return freed memory to its central freelist at appropriate points, so it won't happen
+ * during critical sections while holding locks. Calling this is not thread-safe.
+ */
+void registerThreadIdleCallback(ThreadIdleCallback callback);
 
 }  // namespace mongo

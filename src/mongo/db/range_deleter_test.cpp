@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include <string>
 
 #include "mongo/db/field_parser.h"
@@ -96,13 +98,13 @@ TEST(QueuedDelete, ShouldWaitCursor) {
 
     env->addCursorId(ns, 345);
 
-    Notification notifyDone;
+    Notification<void> doneSignal;
     RangeDeleterOptions deleterOptions(
         KeyRange(ns, BSON("x" << 0), BSON("x" << 10), BSON("x" << 1)));
     deleterOptions.waitForOpenCursors = true;
 
     ASSERT_TRUE(
-        deleter.queueDelete(noTxn, deleterOptions, &notifyDone, NULL /* errMsg not needed */));
+        deleter.queueDelete(noTxn, deleterOptions, &doneSignal, NULL /* errMsg not needed */));
 
     env->waitForNthGetCursor(1u);
 
@@ -113,7 +115,7 @@ TEST(QueuedDelete, ShouldWaitCursor) {
     env->addCursorId(ns, 200);
     env->removeCursorId(ns, 345);
 
-    notifyDone.waitToBeNotified();
+    doneSignal.get(noTxn);
 
     ASSERT_TRUE(env->deleteOccured());
     const DeletedRange deletedChunk(env->getLastDelete());
@@ -141,12 +143,12 @@ TEST(QueuedDelete, StopWhileWaitingCursor) {
 
     env->addCursorId(ns, 345);
 
-    Notification notifyDone;
+    Notification<void> doneSignal;
     RangeDeleterOptions deleterOptions(
         KeyRange(ns, BSON("x" << 0), BSON("x" << 10), BSON("x" << 1)));
     deleterOptions.waitForOpenCursors = true;
     ASSERT_TRUE(
-        deleter.queueDelete(noTxn, deleterOptions, &notifyDone, NULL /* errMsg not needed */));
+        deleter.queueDelete(noTxn, deleterOptions, &doneSignal, NULL /* errMsg not needed */));
 
 
     env->waitForNthGetCursor(1u);
@@ -279,31 +281,31 @@ TEST(MixedDeletes, MultipleDeletes) {
     env->addCursorId(blockedNS, 345);
     env->pauseDeletes();
 
-    Notification notifyDone1;
+    Notification<void> doneSignal1;
     RangeDeleterOptions deleterOption1(
         KeyRange(ns, BSON("x" << 10), BSON("x" << 20), BSON("x" << 1)));
     deleterOption1.waitForOpenCursors = true;
     ASSERT_TRUE(
-        deleter.queueDelete(noTxn, deleterOption1, &notifyDone1, NULL /* don't care errMsg */));
+        deleter.queueDelete(noTxn, deleterOption1, &doneSignal1, NULL /* don't care errMsg */));
 
     env->waitForNthPausedDelete(1u);
 
     // Make sure that the delete is already in progress before proceeding.
     ASSERT_EQUALS(1U, deleter.getDeletesInProgress());
 
-    Notification notifyDone2;
+    Notification<void> doneSignal2;
     RangeDeleterOptions deleterOption2(
         KeyRange(blockedNS, BSON("x" << 20), BSON("x" << 30), BSON("x" << 1)));
     deleterOption2.waitForOpenCursors = true;
     ASSERT_TRUE(
-        deleter.queueDelete(noTxn, deleterOption2, &notifyDone2, NULL /* don't care errMsg */));
+        deleter.queueDelete(noTxn, deleterOption2, &doneSignal2, NULL /* don't care errMsg */));
 
-    Notification notifyDone3;
+    Notification<void> doneSignal3;
     RangeDeleterOptions deleterOption3(
         KeyRange(ns, BSON("x" << 30), BSON("x" << 40), BSON("x" << 1)));
     deleterOption3.waitForOpenCursors = true;
     ASSERT_TRUE(
-        deleter.queueDelete(noTxn, deleterOption3, &notifyDone3, NULL /* don't care errMsg */));
+        deleter.queueDelete(noTxn, deleterOption3, &doneSignal3, NULL /* don't care errMsg */));
 
     // Now, the setup is:
     // { x: 10 } => { x: 20 } in progress.
@@ -317,7 +319,7 @@ TEST(MixedDeletes, MultipleDeletes) {
 
     // Let the first delete proceed.
     env->resumeOneDelete();
-    notifyDone1.waitToBeNotified();
+    doneSignal1.get(noTxn);
 
     ASSERT_TRUE(env->deleteOccured());
 
@@ -332,7 +334,7 @@ TEST(MixedDeletes, MultipleDeletes) {
 
     // Let the second delete proceed.
     env->resumeOneDelete();
-    notifyDone3.waitToBeNotified();
+    doneSignal3.get(noTxn);
 
     DeletedRange deleted2(env->getLastDelete());
 
@@ -347,7 +349,7 @@ TEST(MixedDeletes, MultipleDeletes) {
     env->removeCursorId(blockedNS, 345);
     // Let the last delete proceed.
     env->resumeOneDelete();
-    notifyDone2.waitToBeNotified();
+    doneSignal2.get(noTxn);
 
     DeletedRange deleted3(env->getLastDelete());
 

@@ -310,7 +310,7 @@ Status ShardingState::onStaleShardVersion(OperationContext* txn,
 
     // Ensure any ongoing migrations have completed
     auto& oss = OperationShardingState::get(txn);
-    oss.waitForMigrationCriticalSection(txn);
+    oss.waitForMigrationCriticalSectionSignal(txn);
 
     ChunkVersion collectionShardVersion;
 

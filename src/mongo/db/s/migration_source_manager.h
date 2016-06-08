@@ -28,14 +28,12 @@
 
 #pragma once
 
-#include <list>
-#include <set>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/s/move_chunk_request.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/stdx/condition_variable.h"
+#include "mongo/util/concurrency/notification.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -73,8 +71,6 @@ class MigrationSourceManager {
     MONGO_DISALLOW_COPYING(MigrationSourceManager);
 
 public:
-    class CriticalSectionState;
-
     /**
      * Instantiates a new migration source manager with the specified migration parameters. Must be
      * called with the distributed lock acquired in advance (not asserted).
@@ -174,8 +170,8 @@ public:
      *
      * Must be called with some form of lock on the collection namespace.
      */
-    std::shared_ptr<CriticalSectionState> getMigrationCriticalSection() const {
-        return _critSec;
+    std::shared_ptr<Notification<void>> getMigrationCriticalSectionSignal() const {
+        return _critSecSignal;
     }
 
 private:
@@ -212,39 +208,7 @@ private:
     // Whether the source manager is in a critical section. Tracked as a shared pointer so that
     // callers don't have to hold collection lock in order to wait on it. Available after the
     // critical section stage has completed.
-    std::shared_ptr<CriticalSectionState> _critSec;
-};
-
-/**
- * This object is instantiated once the migration logic enters critical section. It contains all
- * the state which is associated with being in a critical section, such as the bumped metadata
- * version (which has not yet been reflected on the config server).
- */
-class MigrationSourceManager::CriticalSectionState {
-    MONGO_DISALLOW_COPYING(CriticalSectionState);
-
-public:
-    CriticalSectionState();
-
-    /**
-     * Blocks until the critical section completes. Returns true if the wait succeeded and the
-     * critical section is no longer active, or false if the waitTimeout was exceeded.
-     */
-    bool waitUntilOutOfCriticalSection(Microseconds waitTimeout);
-
-    /**
-     * To be called when the critical section has completed. Signals any threads sitting blocked in
-     * waitUntilOutOfCriticalSection. Must only be used once for the lifetime of this object.
-     */
-    void exitCriticalSection();
-
-private:
-    // Only moves from true to false once. Happens under the critical section mutex and the critical
-    // section will be signalled.
-    bool _inCriticalSection{true};
-
-    stdx::mutex _criticalSectionMutex;
-    stdx::condition_variable _criticalSectionCV;
+    std::shared_ptr<Notification<void>> _critSecSignal;
 };
 
 }  // namespace mongo

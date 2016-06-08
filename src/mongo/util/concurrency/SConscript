@@ -38,16 +38,6 @@ env.Library('ticketholder',
                      '$BUILD_DIR/third_party/shim_boost'])
 
 env.Library(
-    target='synchronization',
-    source=[
-        'synchronization.cpp'
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.Library(
     target='spin_lock',
     source=[
         "spin_lock.cpp",

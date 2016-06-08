@@ -39,7 +39,6 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -203,7 +202,7 @@ void RangeDeleter::stopWorkers() {
 
 bool RangeDeleter::queueDelete(OperationContext* txn,
                                const RangeDeleterOptions& options,
-                               Notification* notifyDone,
+                               Notification<void>* doneSignal,
                                std::string* errMsg) {
     string dummy;
     if (errMsg == NULL)
@@ -214,7 +213,7 @@ bool RangeDeleter::queueDelete(OperationContext* txn,
     const BSONObj& max(options.range.maxKey);
 
     unique_ptr<RangeDeleteEntry> toDelete(new RangeDeleteEntry(options));
-    toDelete->notifyDone = notifyDone;
+    toDelete->doneSignal = doneSignal;
 
     {
         stdx::lock_guard<stdx::mutex> sl(_queueMutex);
@@ -507,8 +506,8 @@ void RangeDeleter::doWork() {
             deletePtrElement(&_deleteSet, &setEntry);
             _deletesInProgress--;
 
-            if (nextTask->notifyDone) {
-                nextTask->notifyDone->notifyOne();
+            if (nextTask->doneSignal) {
+                nextTask->doneSignal->set();
             }
         }
 
@@ -563,7 +562,7 @@ void RangeDeleter::recordDelStats(DeleteJobStats* newStat) {
 }
 
 RangeDeleteEntry::RangeDeleteEntry(const RangeDeleterOptions& options)
-    : options(options), notifyDone(NULL) {}
+    : options(options), doneSignal(nullptr) {}
 
 BSONObj RangeDeleteEntry::toBSON() const {
     BSONObjBuilder builder;

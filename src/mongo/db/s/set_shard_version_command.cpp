@@ -245,12 +245,12 @@ public:
                 if (requestedVersion < collectionShardVersion &&
                     requestedVersion.epoch() == collectionShardVersion.epoch()) {
                     if (css->getMigrationSourceManager()) {
-                        auto critSec =
-                            css->getMigrationSourceManager()->getMigrationCriticalSection();
-                        if (critSec) {
+                        auto critSecSignal =
+                            css->getMigrationSourceManager()->getMigrationCriticalSectionSignal();
+                        if (critSecSignal) {
                             autoColl.reset();
                             log() << "waiting till out of critical section";
-                            critSec->waitUntilOutOfCriticalSection(Seconds(10));
+                            critSecSignal->waitFor(txn, Seconds(10));
                         }
                     }
 
@@ -267,12 +267,12 @@ public:
                     // Needed b/c when the last chunk is moved off a shard, the version gets reset
                     // to zero, which should require a reload.
                     if (css->getMigrationSourceManager()) {
-                        auto critSec =
-                            css->getMigrationSourceManager()->getMigrationCriticalSection();
-                        if (critSec) {
+                        auto critSecSignal =
+                            css->getMigrationSourceManager()->getMigrationCriticalSectionSignal();
+                        if (critSecSignal) {
                             autoColl.reset();
                             log() << "waiting till out of critical section";
-                            critSec->waitUntilOutOfCriticalSection(Seconds(10));
+                            critSecSignal->waitFor(txn, Seconds(10));
                         }
                     }
 

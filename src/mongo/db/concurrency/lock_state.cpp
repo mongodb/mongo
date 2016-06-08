@@ -38,7 +38,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/background.h"
-#include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"

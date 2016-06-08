@@ -39,7 +39,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/concurrency/synchronization.h"
+#include "mongo/util/concurrency/notification.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/net/socket_exception.h"
 
@@ -59,16 +59,16 @@ SocketPair socketPair(const int type, const int protocol = 0);
 
 #if defined(_WIN32)
 namespace detail {
-void awaitAccept(SOCKET* acceptSock, SOCKET listenSock, Notification& notify) {
+void awaitAccept(SOCKET* acceptSock, SOCKET listenSock, Notification<void>& notify) {
     *acceptSock = INVALID_SOCKET;
     const SOCKET result = ::accept(listenSock, NULL, 0);
     if (result != INVALID_SOCKET) {
         *acceptSock = result;
     }
-    notify.notifyOne();
+    notify.set();
 }
 
-void awaitConnect(SOCKET* connectSock, const struct addrinfo& where, Notification& notify) {
+void awaitConnect(SOCKET* connectSock, const struct addrinfo& where, Notification<void>& notify) {
     *connectSock = INVALID_SOCKET;
     SOCKET newSock = ::socket(where.ai_family, where.ai_socktype, where.ai_protocol);
     if (newSock != INVALID_SOCKET) {
@@ -77,7 +77,7 @@ void awaitConnect(SOCKET* connectSock, const struct addrinfo& where, Notificatio
             *connectSock = newSock;
         }
     }
-    notify.notifyOne();
+    notify.set();
 }
 }  // namespace detail
 
@@ -144,17 +144,17 @@ SocketPair socketPair(const int type, const int protocol) {
     // I'd prefer to avoid trying to do this non-blocking on Windows. Just spin up some
     // threads to do the connect and acccept.
 
-    Notification accepted;
+    Notification<void> accepted;
     SOCKET acceptSock = INVALID_SOCKET;
     stdx::thread acceptor(
         stdx::bind(&detail::awaitAccept, &acceptSock, listenSock, stdx::ref(accepted)));
 
-    Notification connected;
+    Notification<void> connected;
     SOCKET connectSock = INVALID_SOCKET;
     stdx::thread connector(
         stdx::bind(&detail::awaitConnect, &connectSock, *connectRes, stdx::ref(connected)));
 
-    connected.waitToBeNotified();
+    connected.get();
     connector.join();
     if (connectSock == INVALID_SOCKET) {
         closesocket(listenSock);
@@ -165,7 +165,7 @@ SocketPair socketPair(const int type, const int protocol) {
         return SocketPair();
     }
 
-    accepted.waitToBeNotified();
+    accepted.get();
     acceptor.join();
     if (acceptSock == INVALID_SOCKET) {
         closesocket(listenSock);

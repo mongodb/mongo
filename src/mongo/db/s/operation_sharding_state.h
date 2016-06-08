@@ -99,15 +99,14 @@ public:
      * Returns true if the call actually waited because of migration critical section (regardless if
      * whether it timed out or not), false if there was no active migration critical section.
      */
-    bool waitForMigrationCriticalSection(OperationContext* txn);
+    bool waitForMigrationCriticalSectionSignal(OperationContext* txn);
 
     /**
      * Setting this value indicates that when the version check failed, there was an active
      * migration for the namespace and that it would be prudent to wait for the critical section to
      * complete before retrying so the router doesn't make wasteful requests.
      */
-    void setMigrationCriticalSection(
-        std::shared_ptr<MigrationSourceManager::CriticalSectionState> critSec);
+    void setMigrationCriticalSectionSignal(std::shared_ptr<Notification<void>> critSecSignal);
 
 private:
     /**
@@ -122,7 +121,7 @@ private:
 
     // This value will only be non-null if version check during the operation execution failed due
     // to stale version and there was a migration for that namespace, which was in critical section.
-    std::shared_ptr<MigrationSourceManager::CriticalSectionState> _migrationCriticalSection;
+    std::shared_ptr<Notification<void>> _migrationCriticalSectionSignal;
 };
 
 /**

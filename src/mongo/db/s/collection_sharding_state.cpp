@@ -242,13 +242,13 @@ bool CollectionShardingState::_checkShardVersionOk(OperationContext* txn,
     // Set this for error messaging purposes before potentially returning false.
     *actualShardVersion = (_metadata ? _metadata->getShardVersion() : ChunkVersion::UNSHARDED());
 
-    if (_sourceMgr && _sourceMgr->getMigrationCriticalSection()) {
+    if (_sourceMgr && _sourceMgr->getMigrationCriticalSectionSignal()) {
         *errmsg = str::stream() << "migration commit in progress for " << _nss.ns();
 
         // Set migration critical section on operation sharding state: operation will wait for the
         // migration to finish before returning failure and retrying.
-        OperationShardingState::get(txn).setMigrationCriticalSection(
-            _sourceMgr->getMigrationCriticalSection());
+        OperationShardingState::get(txn).setMigrationCriticalSectionSignal(
+            _sourceMgr->getMigrationCriticalSectionSignal());
         return false;
     }
 

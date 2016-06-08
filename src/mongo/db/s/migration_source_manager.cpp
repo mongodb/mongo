@@ -253,7 +253,7 @@ Status MigrationSourceManager::enterCriticalSection(OperationContext* txn) {
 
         // IMPORTANT: After this line, the critical section is in place and needs to be rolled back
         // if anything fails, which would prevent commit to the config servers.
-        _critSec = std::make_shared<CriticalSectionState>();
+        _critSecSignal = std::make_shared<Notification<void>>();
     }
 
     log() << "Successfully entered critical section.";
@@ -527,8 +527,7 @@ void MigrationSourceManager::_cleanup(OperationContext* txn) {
 
         // Leave the critical section.
         if (_state == kCriticalSection) {
-            _critSec->exitCriticalSection();
-            _critSec.reset();
+            _critSecSignal->set();
         }
     }
 
@@ -544,29 +543,6 @@ void MigrationSourceManager::_cleanup(OperationContext* txn) {
     }
 
     _state = kDone;
-}
-
-MigrationSourceManager::CriticalSectionState::CriticalSectionState() = default;
-
-bool MigrationSourceManager::CriticalSectionState::waitUntilOutOfCriticalSection(
-    Microseconds waitTimeout) {
-    const auto waitDeadline = Date_t::now() + waitTimeout;
-
-    stdx::unique_lock<stdx::mutex> sl(_criticalSectionMutex);
-    while (_inCriticalSection) {
-        if (stdx::cv_status::timeout ==
-            _criticalSectionCV.wait_until(sl, waitDeadline.toSystemTimePoint())) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-void MigrationSourceManager::CriticalSectionState::exitCriticalSection() {
-    stdx::unique_lock<stdx::mutex> sl(_criticalSectionMutex);
-    _inCriticalSection = false;
-    _criticalSectionCV.notify_all();
 }
 
 }  // namespace mongo
