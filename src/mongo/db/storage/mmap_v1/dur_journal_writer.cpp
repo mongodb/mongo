@@ -109,8 +109,8 @@ private:
 // JournalWriter
 //
 
-JournalWriter::JournalWriter(NotifyAll* commitNotify,
-                             NotifyAll* applyToDataFilesNotify,
+JournalWriter::JournalWriter(CommitNotifier* commitNotify,
+                             CommitNotifier* applyToDataFilesNotify,
                              size_t numBuffers)
     : _commitNotify(commitNotify),
       _applyToDataFilesNotify(applyToDataFilesNotify),
@@ -180,7 +180,7 @@ JournalWriter::Buffer* JournalWriter::newBuffer() {
     return buffer;
 }
 
-void JournalWriter::writeBuffer(Buffer* buffer, NotifyAll::When commitNumber) {
+void JournalWriter::writeBuffer(Buffer* buffer, CommitNotifier::When commitNumber) {
     invariant(buffer->_commitNumber == 0);
     invariant((commitNumber > _lastCommitNumber) || (buffer->_isShutdown && (commitNumber == 0)));
 

@@ -1,6 +1,5 @@
-// synchronization.cpp
-
-/*    Copyright 2010 10gen Inc.
+/**
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -27,54 +26,47 @@
  *    then also delete it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#include "mongo/platform/basic.h"
 
-#include "synchronization.h"
+#include "mongo/db/storage/mmap_v1/commit_notifier.h"
 
-#include <boost/date_time/posix_time/posix_time.hpp>
-
-#include "mongo/util/log.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-namespace {
-ThreadIdleCallback threadIdleCallback;
-}  // namespace
+CommitNotifier::CommitNotifier() = default;
 
-void registerThreadIdleCallback(ThreadIdleCallback callback) {
-    invariant(!threadIdleCallback);
-    threadIdleCallback = callback;
+CommitNotifier::~CommitNotifier() {
+    invariant(!_nWaiting);
 }
 
-void markThreadIdle() {
-    if (!threadIdleCallback) {
-        return;
-    }
-    try {
-        threadIdleCallback();
-    } catch (...) {
-        severe() << "Exception escaped from threadIdleCallback";
-        fassertFailedNoTrace(28603);
-    }
-}
-
-Notification::Notification() {
-    lookFor = 1;
-    cur = 0;
-}
-
-void Notification::waitToBeNotified() {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
-    while (lookFor != cur)
-        _condition.wait(lock);
-    lookFor++;
-}
-
-void Notification::notifyOne() {
+CommitNotifier::When CommitNotifier::now() {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    verify(cur != lookFor);
-    cur++;
-    _condition.notify_one();
+    return ++_lastReturned;
+}
+
+void CommitNotifier::waitFor(When e) {
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    ++_nWaiting;
+    while (_lastDone < e) {
+        _condition.wait(lock);
+    }
+}
+
+void CommitNotifier::awaitBeyondNow() {
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    ++_nWaiting;
+    When e = ++_lastReturned;
+    while (_lastDone <= e) {
+        _condition.wait(lock);
+    }
+}
+
+void CommitNotifier::notifyAll(When e) {
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    _lastDone = e;
+    _nWaiting = 0;
+    _condition.notify_all();
 }
 
 }  // namespace mongo

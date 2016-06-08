@@ -83,6 +83,7 @@
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/aligned_builder.h"
+#include "mongo/db/storage/mmap_v1/commit_notifier.h"
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
 #include "mongo/db/storage/mmap_v1/dur_journal_writer.h"
@@ -95,7 +96,6 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/clock_source.h"
-#include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
@@ -122,12 +122,12 @@ stdx::condition_variable flushRequested;
 // This is waited on for getlasterror acknowledgements. It means that data has been written to
 // the journal, but not necessarily applied to the shared view, so it is all right to
 // acknowledge the user operation, but NOT all right to delete the journal files for example.
-NotifyAll commitNotify;
+CommitNotifier commitNotify;
 
 // This is waited on for complete flush. It means that data has been both written to journal
 // and applied to the shared view, so it is allowed to delete the journal files. Used for
 // fsync:true, close DB, shutdown acknowledgements.
-NotifyAll applyToDataFilesNotify;
+CommitNotifier applyToDataFilesNotify;
 
 // When set, the flush thread will exit
 AtomicUInt32 shutdownRequested(0);
@@ -519,7 +519,7 @@ DurableInterface::~DurableInterface() {}
 //
 
 bool DurableImpl::commitNow(OperationContext* txn) {
-    NotifyAll::When when = commitNotify.now();
+    CommitNotifier::When when = commitNotify.now();
 
     AutoYieldFlushLockForMMAPV1Commit flushLockYield(txn->lockState());
 
@@ -590,7 +590,7 @@ void DurableImpl::closingFileNotification() {
 }
 
 void DurableImpl::commitAndStopDurThread() {
-    NotifyAll::When when = commitNotify.now();
+    CommitNotifier::When when = commitNotify.now();
 
     // There is always just one waiting anyways
     flushRequested.notify_one();
@@ -731,7 +731,7 @@ static void durThread(ClockSource* cs, int64_t serverStartMs) {
 
             // We need to snapshot the commitNumber after the flush lock has been obtained,
             // because at this point we know that we have a stable snapshot of the data.
-            const NotifyAll::When commitNumber(commitNotify.now());
+            const CommitNotifier::When commitNumber(commitNotify.now());
 
             LOG(4) << "Processing commit number " << commitNumber;
 

@@ -1,6 +1,5 @@
-// synchronization.cpp
-
-/*    Copyright 2010 10gen Inc.
+/**
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -27,54 +26,58 @@
  *    then also delete it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#pragma once
 
-#include "synchronization.h"
-
-#include <boost/date_time/posix_time/posix_time.hpp>
-
-#include "mongo/util/log.h"
+#include "mongo/base/disallow_copying.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
-namespace {
-ThreadIdleCallback threadIdleCallback;
-}  // namespace
+/**
+ * Establishes a synchronization point between threads. N threads are waits and one is notifier.
+ */
+class CommitNotifier {
+    MONGO_DISALLOW_COPYING(CommitNotifier);
 
-void registerThreadIdleCallback(ThreadIdleCallback callback) {
-    invariant(!threadIdleCallback);
-    threadIdleCallback = callback;
-}
+public:
+    typedef unsigned long long When;
 
-void markThreadIdle() {
-    if (!threadIdleCallback) {
-        return;
+    CommitNotifier();
+    ~CommitNotifier();
+
+    When now();
+
+    /**
+     * Awaits the next notifyAll() call by another thread. notifications that precede this call are
+     * ignored -- we are looking for a fresh event.
+     */
+    void waitFor(When e);
+
+    /**
+     * A bit faster than waitFor(now()).
+     */
+    void awaitBeyondNow();
+
+    /**
+     * May be called multiple times. Notifies all waiters.
+     */
+    void notifyAll(When e);
+
+    /**
+     * Returns how many threads are blocked in the waitFor/awaitBeyondNow calls.
+     */
+    unsigned nWaiting() const {
+        return _nWaiting;
     }
-    try {
-        threadIdleCallback();
-    } catch (...) {
-        severe() << "Exception escaped from threadIdleCallback";
-        fassertFailedNoTrace(28603);
-    }
-}
 
-Notification::Notification() {
-    lookFor = 1;
-    cur = 0;
-}
+private:
+    stdx::mutex _mutex;
+    stdx::condition_variable _condition;
 
-void Notification::waitToBeNotified() {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
-    while (lookFor != cur)
-        _condition.wait(lock);
-    lookFor++;
-}
-
-void Notification::notifyOne() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    verify(cur != lookFor);
-    cur++;
-    _condition.notify_one();
-}
+    When _lastDone{0};
+    When _lastReturned{0};
+    unsigned _nWaiting{0};
+};
 
 }  // namespace mongo

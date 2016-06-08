@@ -85,41 +85,4 @@ private:
     stdx::condition_variable _condition;  // cond over _notified being true
 };
 
-/** establishes a synchronization point between threads. N threads are waits and one is notifier.
-    threadsafe.
-*/
-class NotifyAll {
-    MONGO_DISALLOW_COPYING(NotifyAll);
-
-public:
-    NotifyAll();
-
-    typedef unsigned long long When;
-
-    When now();
-
-    /** awaits the next notifyAll() call by another thread. notifications that precede this
-        call are ignored -- we are looking for a fresh event.
-    */
-    void waitFor(When);
-
-    /** a bit faster than waitFor( now() ) */
-    void awaitBeyondNow();
-
-    /** may be called multiple times. notifies all waiters */
-    void notifyAll(When);
-
-    /** indicates how many threads are waiting for a notify. */
-    unsigned nWaiting() const {
-        return _nWaiting;
-    }
-
-private:
-    stdx::mutex _mutex;
-    stdx::condition_variable _condition;
-    When _lastDone;
-    When _lastReturned;
-    unsigned _nWaiting;
-};
-
 }  // namespace mongo
