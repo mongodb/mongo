@@ -106,9 +106,9 @@ bdb_insert(
 	DBC *dbc;
 
 	key.data = (void *)key_data;
-	key.size = (uint32_t)key_size;
+	key.size = (u_int32_t)key_size;
 	value.data = (void *)value_data;
-	value.size = (uint32_t)value_size;
+	value.size = (u_int32_t)value_size;
 
 	dbc = g.dbc;
 
@@ -147,7 +147,7 @@ bdb_read(uint64_t keyno, void *valuep, size_t *valuesizep, int *notfoundp)
 
 	key_gen(&keyitem, keyno);
 	key.data = (void *)keyitem.data;
-	key.size = keyitem.size;
+	key.size = (u_int32_t)keyitem.size;
 
 	*notfoundp = 0;
 	if ((ret = dbc->get(dbc, &key, &value, DB_SET)) != 0) {
@@ -169,9 +169,9 @@ bdb_update(const void *arg_key, size_t arg_key_size,
 	int ret;
 
 	key.data = (void *)arg_key;
-	key.size = (uint32_t)arg_key_size;
+	key.size = (u_int32_t)arg_key_size;
 	value.data = (void *)arg_value;
-	value.size = (uint32_t)arg_value_size;
+	value.size = (u_int32_t)arg_value_size;
 
 	if ((ret = dbc->put(dbc, &key, &value, DB_KEYFIRST)) != 0)
 		testutil_die(ret, "dbc.put: DB_KEYFIRST: {%.*s}{%.*s}",
@@ -188,10 +188,10 @@ bdb_remove(uint64_t keyno, int *notfoundp)
 
 	key_gen(&keyitem, keyno);
 	key.data = (void *)keyitem.data;
-	key.size = keyitem.size;
+	key.size = (u_int32_t)keyitem.size;
 
 	bdb_read(keyno, &value.data, &size, notfoundp);
-	value.size = (uint32_t)size;
+	value.size = (u_int32_t)size;
 	if (*notfoundp)
 		return;
 
