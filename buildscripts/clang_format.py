@@ -309,7 +309,16 @@ class ClangFormat(object):
             return True
 
         # Update the file with clang-format
-        return not subprocess.call([self.path, "--style=file", "-i", file_name])
+        formatted = not subprocess.call([self.path, "--style=file", "-i", file_name])
+
+        # Version 3.8 generates files like foo.cpp~RF83372177.TMP when it formats foo.cpp
+        # on Windows, we must clean these up
+        if sys.platform == "win32":
+            glob_pattern = file_name + "*.TMP"
+            for fglob in glob.glob(glob_pattern):
+                os.unlink(fglob)
+
+        return formatted
 
 
 def parallel_process(items, func):

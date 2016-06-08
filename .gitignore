@@ -35,6 +35,7 @@
 *.gch
 *.*sdf
 *.psess
+*.tmp
 *#
 .#*
 
