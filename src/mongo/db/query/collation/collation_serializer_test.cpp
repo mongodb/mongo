@@ -41,6 +41,7 @@ using namespace mongo;
 TEST(CollationSerializerTest, ToBSONCorrectlySerializesDefaults) {
     CollationSpec collationSpec;
     collationSpec.localeID = "myLocale";
+    collationSpec.version = "myVersion";
 
     BSONObj expectedObj = BSON("locale"
                                << "myLocale"
@@ -59,7 +60,9 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesDefaults) {
                                << "normalization"
                                << false
                                << "backwards"
-                               << false);
+                               << false
+                               << "version"
+                               << "myVersion");
 
     ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
@@ -67,6 +70,7 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesDefaults) {
 TEST(CollationSerializerTest, ToBSONCorrectlySerializesCaseFirstUpper) {
     CollationSpec collationSpec;
     collationSpec.localeID = "myLocale";
+    collationSpec.version = "myVersion";
     collationSpec.caseFirst = CollationSpec::CaseFirstType::kUpper;
 
     BSONObj expectedObj = BSON("locale"
@@ -86,7 +90,9 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesCaseFirstUpper) {
                                << "normalization"
                                << false
                                << "backwards"
-                               << false);
+                               << false
+                               << "version"
+                               << "myVersion");
 
     ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
@@ -94,6 +100,7 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesCaseFirstUpper) {
 TEST(CollationSerializerTest, ToBSONCorrectlySerializesCaseFirstLower) {
     CollationSpec collationSpec;
     collationSpec.localeID = "myLocale";
+    collationSpec.version = "myVersion";
     collationSpec.caseFirst = CollationSpec::CaseFirstType::kLower;
 
     BSONObj expectedObj = BSON("locale"
@@ -113,7 +120,9 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesCaseFirstLower) {
                                << "normalization"
                                << false
                                << "backwards"
-                               << false);
+                               << false
+                               << "version"
+                               << "myVersion");
 
     ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
@@ -121,6 +130,7 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesCaseFirstLower) {
 TEST(CollationSerializerTest, ToBSONCorrectlySerializesPrimaryStrength) {
     CollationSpec collationSpec;
     collationSpec.localeID = "myLocale";
+    collationSpec.version = "myVersion";
     collationSpec.strength = CollationSpec::StrengthType::kPrimary;
 
     BSONObj expectedObj = BSON("locale"
@@ -140,7 +150,9 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesPrimaryStrength) {
                                << "normalization"
                                << false
                                << "backwards"
-                               << false);
+                               << false
+                               << "version"
+                               << "myVersion");
 
     ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
@@ -148,6 +160,7 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesPrimaryStrength) {
 TEST(CollationSerializerTest, ToBSONCorrectlySerializesSecondaryStrength) {
     CollationSpec collationSpec;
     collationSpec.localeID = "myLocale";
+    collationSpec.version = "myVersion";
     collationSpec.strength = CollationSpec::StrengthType::kSecondary;
 
     BSONObj expectedObj = BSON("locale"
@@ -167,7 +180,9 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesSecondaryStrength) {
                                << "normalization"
                                << false
                                << "backwards"
-                               << false);
+                               << false
+                               << "version"
+                               << "myVersion");
 
     ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
@@ -175,6 +190,7 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesSecondaryStrength) {
 TEST(CollationSerializerTest, ToBSONCorrectlySerializesQuaternaryStrength) {
     CollationSpec collationSpec;
     collationSpec.localeID = "myLocale";
+    collationSpec.version = "myVersion";
     collationSpec.strength = CollationSpec::StrengthType::kQuaternary;
 
     BSONObj expectedObj = BSON("locale"
@@ -194,7 +210,9 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesQuaternaryStrength) {
                                << "normalization"
                                << false
                                << "backwards"
-                               << false);
+                               << false
+                               << "version"
+                               << "myVersion");
 
     ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
@@ -202,6 +220,7 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesQuaternaryStrength) {
 TEST(CollationSerializerTest, ToBSONCorrectlySerializesIdenticalStrength) {
     CollationSpec collationSpec;
     collationSpec.localeID = "myLocale";
+    collationSpec.version = "myVersion";
     collationSpec.strength = CollationSpec::StrengthType::kIdentical;
 
     BSONObj expectedObj = BSON("locale"
@@ -221,7 +240,9 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesIdenticalStrength) {
                                << "normalization"
                                << false
                                << "backwards"
-                               << false);
+                               << false
+                               << "version"
+                               << "myVersion");
 
     ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
@@ -229,6 +250,7 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesIdenticalStrength) {
 TEST(CollationSerializerTest, ToBSONCorrectlySerializesAlternateShifted) {
     CollationSpec collationSpec;
     collationSpec.localeID = "myLocale";
+    collationSpec.version = "myVersion";
     collationSpec.alternate = CollationSpec::AlternateType::kShifted;
 
     BSONObj expectedObj = BSON("locale"
@@ -248,7 +270,9 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesAlternateShifted) {
                                << "normalization"
                                << false
                                << "backwards"
-                               << false);
+                               << false
+                               << "version"
+                               << "myVersion");
 
     ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
@@ -256,6 +280,7 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesAlternateShifted) {
 TEST(CollationSerializerTest, ToBSONCorrectlySerializesMaxVariableSpace) {
     CollationSpec collationSpec;
     collationSpec.localeID = "myLocale";
+    collationSpec.version = "myVersion";
     collationSpec.maxVariable = CollationSpec::MaxVariableType::kSpace;
 
     BSONObj expectedObj = BSON("locale"
@@ -275,7 +300,9 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesMaxVariableSpace) {
                                << "normalization"
                                << false
                                << "backwards"
-                               << false);
+                               << false
+                               << "version"
+                               << "myVersion");
 
     ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }

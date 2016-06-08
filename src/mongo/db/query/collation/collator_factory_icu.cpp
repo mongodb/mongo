@@ -33,6 +33,7 @@
 #include <unicode/coll.h>
 #include <unicode/errorcode.h>
 #include <unicode/ucol.h>
+#include <unicode/uvernum.h>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/bson_extract.h"
@@ -562,6 +563,32 @@ StatusWith<CollationSpec> parseToCollationSpec(const BSONObj& spec,
                                   << ". Collation spec: "
                                   << spec};
         }
+    }
+
+    // Populate the spec with the ICU version information.
+    parsedSpec.version = U_ICU_VERSION;
+
+    // Parse the version string, if present in the spec. If the version string does not match the
+    // ICU version currently in use we must return an "IncompatibleCollationVersion" error.
+    std::string specVersionStr;
+    parseStatus = bsonExtractStringField(spec, CollationSpec::kVersionField, &specVersionStr);
+    if (parseStatus == ErrorCodes::NoSuchKey) {
+        // The BSON spec does not have any particular version. We've already populated it with the
+        // ICU version string above.
+        invariant(!parsedSpec.version.empty());
+    } else if (!parseStatus.isOK()) {
+        return parseStatus;
+    } else {
+        if (specVersionStr != parsedSpec.version) {
+            return {ErrorCodes::IncompatibleCollationVersion,
+                    str::stream() << "Requested collation version " << specVersionStr
+                                  << " but the only available collator version was "
+                                  << parsedSpec.version
+                                  << ". Requested collation spec: "
+                                  << spec};
+        }
+
+        ++parsedFields;
     }
 
     // Check for unknown fields.

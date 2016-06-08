@@ -83,6 +83,7 @@ BSONObj CollationSerializer::specToBSON(const CollationSpec& spec) {
 
     builder.append(CollationSpec::kNormalizationField, spec.normalization);
     builder.append(CollationSpec::kBackwardsField, spec.backwards);
+    builder.append(CollationSpec::kVersionField, spec.version);
     return builder.obj();
 }
 

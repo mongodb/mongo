@@ -37,6 +37,12 @@
     assert.commandFailed(
         db.createCollection("collation", {collation: {locale: "en", strength: 99}}));
 
+    // Attempting to create a collection whose collation version does not match the collator version
+    // produced by ICU should result in failure with a special error code.
+    assert.commandFailedWithCode(
+        db.createCollection("collation", {collation: {locale: "en", version: "unknownVersion"}}),
+        ErrorCodes.IncompatibleCollationVersion);
+
     // Ensure we can create a collection with the "simple" collation as the collection default.
     assert.commandWorked(db.createCollection("collation", {collation: {locale: "simple"}}));
     var collectionInfos = db.getCollectionInfos({name: "collation"});
@@ -58,7 +64,8 @@
         alternate: "non-ignorable",
         maxVariable: "punct",
         normalization: false,
-        backwards: true
+        backwards: true,
+        version: "57.1",
     });
 
     // Ensure that an index with no collation inherits the collection-default collation.
@@ -72,7 +79,8 @@
         alternate: "non-ignorable",
         maxVariable: "punct",
         normalization: false,
-        backwards: true
+        backwards: true,
+        version: "57.1",
     });
 
     // Ensure that an index which specifies an overriding collation does not use the collection
@@ -87,7 +95,8 @@
         alternate: "non-ignorable",
         maxVariable: "punct",
         normalization: false,
-        backwards: false
+        backwards: false,
+        version: "57.1",
     });
 
     coll.drop();
@@ -104,6 +113,12 @@
     assert.commandFailed(coll.ensureIndex({a: 1}, {collation: {locale: "xx"}}));
     assert.commandFailed(coll.ensureIndex({a: 1}, {collation: {locale: "en", strength: 99}}));
 
+    // Attempting to create an index whose collation version does not match the collator version
+    // produced by ICU should result in failure with a special error code.
+    assert.commandFailedWithCode(
+        coll.ensureIndex({a: 1}, {collation: {locale: "en", version: "unknownVersion"}}),
+        ErrorCodes.IncompatibleCollationVersion);
+
     assert.commandWorked(coll.ensureIndex({a: 1}, {collation: {locale: "en_US"}}));
     assertIndexHasCollation({a: 1}, {
         locale: "en_US",
@@ -114,7 +129,8 @@
         alternate: "non-ignorable",
         maxVariable: "punct",
         normalization: false,
-        backwards: false
+        backwards: false,
+        version: "57.1",
     });
 
     assert.commandWorked(coll.createIndex({b: 1}, {collation: {locale: "en_US"}}));
@@ -127,7 +143,8 @@
         alternate: "non-ignorable",
         maxVariable: "punct",
         normalization: false,
-        backwards: false
+        backwards: false,
+        version: "57.1",
     });
 
     assert.commandWorked(coll.createIndexes([{c: 1}, {d: 1}], {collation: {locale: "fr_CA"}}));
@@ -140,7 +157,8 @@
         alternate: "non-ignorable",
         maxVariable: "punct",
         normalization: false,
-        backwards: true
+        backwards: true,
+        version: "57.1",
     });
     assertIndexHasCollation({d: 1}, {
         locale: "fr_CA",
@@ -151,7 +169,8 @@
         alternate: "non-ignorable",
         maxVariable: "punct",
         normalization: false,
-        backwards: true
+        backwards: true,
+        version: "57.1",
     });
 
     assert.commandWorked(coll.createIndexes([{e: 1}], {collation: {locale: "simple"}}));

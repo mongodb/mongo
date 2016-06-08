@@ -159,4 +159,11 @@ TEST(CollatorInterfaceMockSelfTest, WoCompareNumbersWithMockCollator) {
     ASSERT_LT(left.woCompare(right, BSONObj(), true, &collator), 0);
     ASSERT_GT(right.woCompare(left, BSONObj(), true, &collator), 0);
 }
+
+TEST(CollatorInterfaceMockSelfTest, MockCollatorReportsMockVersionString) {
+    CollatorInterfaceMock reverseCollator(CollatorInterfaceMock::MockType::kReverseString);
+    CollatorInterfaceMock alwaysEqualCollator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    ASSERT_EQ(reverseCollator.getSpec().version, "mock_version");
+    ASSERT_EQ(alwaysEqualCollator.getSpec().version, "mock_version");
+}
 };

@@ -94,15 +94,30 @@ Status checkValidatorForBannedExpressions(const BSONObj& validator) {
 }
 
 // Uses the collator factory to convert the BSON representation of a collator to a
-// CollatorInterface. Returns null if the BSONObj is empty. Returns a non-OK status if the collation
-// fails to parse.
-StatusWith<std::unique_ptr<CollatorInterface>> parseCollation(OperationContext* txn,
-                                                              BSONObj collationSpec) {
+// CollatorInterface. Returns null if the BSONObj is empty. We expect the stored collation to be
+// valid, since it gets validated on collection create.
+std::unique_ptr<CollatorInterface> parseCollation(OperationContext* txn,
+                                                  const NamespaceString& nss,
+                                                  BSONObj collationSpec) {
     if (collationSpec.isEmpty()) {
         return {nullptr};
     }
 
-    return CollatorFactoryInterface::get(txn->getServiceContext())->makeFromBSON(collationSpec);
+    auto collator =
+        CollatorFactoryInterface::get(txn->getServiceContext())->makeFromBSON(collationSpec);
+
+    // If the collection's default collator has a version not currently supported by our ICU
+    // integration, shut down the server. Errors other than IncompatibleCollationVersion should not
+    // be possible, so these are an invariant rather than fassert.
+    if (collator == ErrorCodes::IncompatibleCollationVersion) {
+        log() << "Collection " << nss
+              << " has a default collation which is incompatible with this version: "
+              << collationSpec;
+        fassertFailedNoTrace(40144);
+    }
+    invariantOK(collator.getStatus());
+
+    return std::move(collator.getValue());
 }
 }
 
@@ -198,8 +213,7 @@ Collection::Collection(OperationContext* txn,
       _needCappedLock(supportsDocLocking() && _recordStore->isCapped() && _ns.db() != "local"),
       _infoCache(this),
       _indexCatalog(this),
-      _collator(
-          uassertStatusOK(parseCollation(txn, _details->getCollectionOptions(txn).collation))),
+      _collator(parseCollation(txn, _ns, _details->getCollectionOptions(txn).collation)),
       _validatorDoc(_details->getCollectionOptions(txn).validator.getOwned()),
       _validator(uassertStatusOK(parseValidator(_validatorDoc))),
       _validationAction(uassertStatusOK(

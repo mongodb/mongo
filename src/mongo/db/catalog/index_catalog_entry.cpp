@@ -100,7 +100,10 @@ IndexCatalogEntry::IndexCatalogEntry(OperationContext* txn,
         BSONObj collation = collationElement.Obj();
         auto statusWithCollator =
             CollatorFactoryInterface::get(txn->getServiceContext())->makeFromBSON(collation);
+
+        // Index spec should have already been validated.
         invariantOK(statusWithCollator.getStatus());
+
         _collator = std::move(statusWithCollator.getValue());
     }
 

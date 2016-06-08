@@ -151,6 +151,19 @@ TEST(CollationSpecTest, SpecsWithNonEqualBackwardsValuesAreNotEqual) {
     ASSERT_TRUE(collationSpec1 != collationSpec2);
 }
 
+TEST(CollationSpecTest, SpecsWithNonEqualVersionValuesAreNotEqual) {
+    CollationSpec collationSpec1;
+    collationSpec1.localeID = "fr";
+    collationSpec1.version = "version1";
+
+    CollationSpec collationSpec2;
+    collationSpec2.localeID = "fr";
+    collationSpec2.version = "version2";
+
+    ASSERT_FALSE(collationSpec1 == collationSpec2);
+    ASSERT_TRUE(collationSpec1 != collationSpec2);
+}
+
 TEST(CollationSpecTest, EqualSpecs) {
     CollationSpec collationSpec1;
     collationSpec1.localeID = "fr";

@@ -53,7 +53,8 @@ std::string mockTypeToString(CollatorInterfaceMock::MockType type) {
 }  // namespace
 
 CollatorInterfaceMock::CollatorInterfaceMock(MockType mockType)
-    : CollatorInterface(CollationSpec(mockTypeToString(mockType))), _mockType(mockType) {}
+    : CollatorInterface(CollationSpec(mockTypeToString(mockType), "mock_version")),
+      _mockType(mockType) {}
 
 std::unique_ptr<CollatorInterface> CollatorInterfaceMock::clone() const {
     auto clone = stdx::make_unique<CollatorInterfaceMock>(_mockType);

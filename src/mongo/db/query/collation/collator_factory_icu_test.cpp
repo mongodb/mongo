@@ -822,6 +822,44 @@ TEST(CollatorFactoryICUTest, NonBoolBackwardsFieldFailsToParse) {
     ASSERT_EQ(collator.getStatus(), ErrorCodes::TypeMismatch);
 }
 
+TEST(CollatorFactoryICUTest, VersionFieldParsesSuccessfully) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"
+                                              << "version"
+                                              << "57.1"));
+    ASSERT_OK(collator.getStatus());
+    ASSERT_EQ("57.1", collator.getValue()->getSpec().version);
+}
+
+TEST(CollatorFactoryICUTest, VersionFieldPopulatedWhenOmitted) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"));
+    ASSERT_OK(collator.getStatus());
+    ASSERT_EQ("57.1", collator.getValue()->getSpec().version);
+}
+
+TEST(CollatorFactoryICUTest, NonStringVersionFieldFailsToParse) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"
+                                              << "version"
+                                              << 3));
+    ASSERT_NOT_OK(collator.getStatus());
+    ASSERT_EQ(collator.getStatus(), ErrorCodes::TypeMismatch);
+}
+
+TEST(CollatorFactoryICUTest, UnknownCollatorVersionResultsInIncompatibleCollationVersionError) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"
+                                              << "version"
+                                              << "unknownVersion"));
+    ASSERT_NOT_OK(collator.getStatus());
+    ASSERT_EQ(collator.getStatus(), ErrorCodes::IncompatibleCollationVersion);
+}
+
 TEST(CollatorFactoryICUTest, FactoryMadeCollatorComparesStringsCorrectlyEnUS) {
     CollatorFactoryICU factory;
     auto collator = factory.makeFromBSON(BSON("locale"

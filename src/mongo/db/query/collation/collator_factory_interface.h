@@ -69,6 +69,9 @@ public:
      *
      * Returns a non-OK status if 'spec' is invalid or otherwise cannot be converted into a
      * collator.
+     *
+     * Returns ErrorCodes::IncompatibleCollationVersion if the collator version does not match the
+     * version requested in 'spec'.
      */
     virtual StatusWith<std::unique_ptr<CollatorInterface>> makeFromBSON(const BSONObj& spec) = 0;
 };
