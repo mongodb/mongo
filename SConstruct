@@ -834,8 +834,8 @@ envDict = dict(BUILD_ROOT=buildDir,
                UNITTEST_LIST='$BUILD_ROOT/unittests.txt',
                INTEGRATION_TEST_ALIAS='integration_tests',
                INTEGRATION_TEST_LIST='$BUILD_ROOT/integration_tests.txt',
-               CONFIGUREDIR=sconsDataDir.Dir('sconf_temp'),
-               CONFIGURELOG=sconsDataDir.File('config.log'),
+               CONFIGUREDIR='$BUILD_ROOT/scons/$VARIANT_DIR/sconf_temp',
+               CONFIGURELOG='$BUILD_ROOT/scons/config.log',
                INSTALL_DIR=installDir,
                CONFIG_HEADER_DEFINES={},
                LIBDEPS_TAG_EXPANSIONS=[],
@@ -2586,6 +2586,12 @@ def doConfigure(myenv):
     return conf.Finish()
 
 env = doConfigure( env )
+
+# If the flags in the environment are configured for -gsplit-dwarf,
+# inject the necessary emitter.
+split_dwarf = Tool('split_dwarf')
+if split_dwarf.exists(env):
+    split_dwarf(env)
 
 # Load the compilation_db tool. We want to do this after configure so we don't end up with
 # compilation database entries for the configure tests, which is weird.
