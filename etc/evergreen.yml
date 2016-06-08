@@ -75,6 +75,11 @@ variables:
     vars:
       <<: *jepsen_config_vars
 
+- &jstestfuzz_config_vars
+  resmoke_args: --help # resmoke_args needs to be overridden to specify one of the jstestfuzz suites
+  should_shuffle: false
+  continue_on_failure: false
+
 - &run_jstestfuzz_tests
   func: "run tests"
   # Terminate the function when there has been no output to stdout for 30 minutes. E.g. when something is stuck in an infinite loop.
@@ -83,9 +88,7 @@ variables:
   # Note that timeout_secs is different from exec_timeout_secs, which applies to a task and times out regardless of whether output has been written to stdout.
   timeout_secs: 1800
   vars:
-    resmoke_args: --help # resmoke_args needs to be overridden to specify one of the jstestfuzz suites
-    should_shuffle: false
-    continue_on_failure: false
+    <<: *jstestfuzz_config_vars
 
 # Used for tests that invoke 'resmoke.py --suites=jstestfuzz*'.
 - &jstestfuzz_template
@@ -538,7 +541,7 @@ functions:
             export PATH="$PATH:/opt/node/bin"
           fi
 
-          npm start -- --jsTestsDir ../jstests
+          npm start -- --jsTestsDir ../jstests ${jstestfuzz_vars}
     - command: archive.targz_pack
       params:
         target: "jstests.tgz"
@@ -1025,9 +1028,8 @@ tasks:
   - func: "run jstestfuzz"
   - <<: *run_jstestfuzz_tests
     vars:
+      <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz --storageEngine=mmapv1
-      should_shuffle: false
-      continue_on_failure: false
 
 ## jstestfuzz WT ##
 - <<: *jstestfuzz_template
@@ -1037,9 +1039,21 @@ tasks:
   - func: "run jstestfuzz"
   - <<: *run_jstestfuzz_tests
     vars:
+      <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz --storageEngine=wiredTiger
-      should_shuffle: false
-      continue_on_failure: false
+
+## jstestfuzz concurrent WT ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_concurrent_WT
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --numGeneratedFiles 75
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=jstestfuzz --storageEngine=wiredTiger --numClientsPerFixture=10
 
 ## jstestfuzz replica set mmapv1 ##
 - <<: *jstestfuzz_template
@@ -1049,9 +1063,8 @@ tasks:
   - func: "run jstestfuzz"
   - <<: *run_jstestfuzz_tests
     vars:
+      <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz_replication --storageEngine=mmapv1
-      should_shuffle: false
-      continue_on_failure: false
 
 ## jstestfuzz replica set WT ##
 - <<: *jstestfuzz_template
@@ -1061,9 +1074,8 @@ tasks:
   - func: "run jstestfuzz"
   - <<: *run_jstestfuzz_tests
     vars:
+      <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz_replication --storageEngine=wiredTiger
-      should_shuffle: false
-      continue_on_failure: false
 
 ## jstestfuzz sharded cluster mmapv1 ##
 - <<: *jstestfuzz_template
@@ -1073,9 +1085,8 @@ tasks:
   - func: "run jstestfuzz"
   - <<: *run_jstestfuzz_tests
     vars:
+      <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz_sharded --storageEngine=mmapv1
-      should_shuffle: false
-      continue_on_failure: false
 
 ## jstestfuzz sharded cluster WT ##
 - <<: *jstestfuzz_template
@@ -1085,9 +1096,8 @@ tasks:
   - func: "run jstestfuzz"
   - <<: *run_jstestfuzz_tests
     vars:
+      <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz_sharded --storageEngine=wiredTiger
-      should_shuffle: false
-      continue_on_failure: false
 
 ## unit tests ##
 - <<: *task_template
@@ -3967,6 +3977,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded

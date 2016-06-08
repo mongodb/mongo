@@ -35,6 +35,7 @@ DEST_TO_CONFIG = {
     "mongos_executable": "mongos",
     "mongos_parameters": "mongosSetParameters",
     "no_journal": "nojournal",
+    "num_clients_per_fixture": "numClientsPerFixture",
     "prealloc_journal": "preallocJournal",
     "repeat": "repeat",
     "report_file": "reportFile",
@@ -159,6 +160,9 @@ def parse_command_line():
     parser.add_option("--nopreallocj", action="store_const", const="off", dest="prealloc_journal",
                       help="Disable preallocation of journal files for all mongod processes.")
 
+    parser.add_option("--numClientsPerFixture", type="int", dest="num_clients_per_fixture",
+                      help="Number of clients running tests per fixture")
+
     parser.add_option("--preallocJournal", type="choice", action="store", dest="prealloc_journal",
                       choices=("on", "off"), metavar="ON|OFF",
                       help=("Enable or disable preallocation of journal files for all mongod"
@@ -247,6 +251,7 @@ def update_config_vars(values):
     _config.MONGOS_SET_PARAMETERS = config.pop("mongosSetParameters")
     _config.NO_JOURNAL = config.pop("nojournal")
     _config.NO_PREALLOC_JOURNAL = config.pop("preallocJournal") == "off"
+    _config.NUM_CLIENTS_PER_FIXTURE = config.pop("numClientsPerFixture")
     _config.RANDOM_SEED = config.pop("seed")
     _config.REPEAT = config.pop("repeat")
     _config.REPORT_FILE = config.pop("reportFile")
