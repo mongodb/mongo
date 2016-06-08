@@ -109,10 +109,7 @@ typedef struct {
 extern void (*custom_die)(void);
 
 void testutil_die(int, const char *, ...)
-#if defined(__GNUC__)
-__attribute__((__noreturn__))
-#endif
-;
+    WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 
 void *dcalloc(size_t, size_t);
 void *dmalloc(size_t);

@@ -343,6 +343,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, bool force)
 	if (WT_TXNID_LT(txn_global->last_running, last_running)) {
 		txn_global->last_running = last_running;
 
+#ifdef HAVE_VERBOSE
 		/* Output a verbose message about long-running transactions,
 		 * but only when some progress is being made. */
 		if (WT_VERBOSE_ISSET(session, WT_VERB_TRANSACTION) &&
@@ -355,6 +356,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, bool force)
 			    oldest_session->lastop,
 			    oldest_session->txn.snap_min));
 		}
+#endif
 	}
 
 done:	WT_TRET(__wt_writeunlock(session, txn_global->scan_rwlock));

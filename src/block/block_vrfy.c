@@ -20,8 +20,10 @@ static int __verify_set_file_size(WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *);
 /* The bit list ignores the first block: convert to/from a frag/offset. */
 #define	WT_wt_off_TO_FRAG(block, off)					\
 	((off) / (block)->allocsize - 1)
+#ifdef HAVE_VERBOSE
 #define	WT_FRAG_TO_OFF(block, frag)					\
 	(((wt_off_t)(frag + 1)) * (block)->allocsize)
+#endif
 
 /*
  * __wt_block_verify_start --
@@ -443,6 +445,7 @@ __verify_filefrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 			__bit_set(block->fragfile, last);
 		}
 
+#ifdef HAVE_VERBOSE
 		if (!WT_VERBOSE_ISSET(session, WT_VERB_VERIFY))
 			continue;
 
@@ -450,6 +453,7 @@ __verify_filefrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		    "file range %" PRIuMAX "-%" PRIuMAX " never verified",
 		    (uintmax_t)WT_FRAG_TO_OFF(block, first),
 		    (uintmax_t)WT_FRAG_TO_OFF(block, last));
+#endif
 	}
 	if (count == 0)
 		return (0);
@@ -534,6 +538,7 @@ __verify_ckptfrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 			__bit_clear(block->fragckpt, last);
 		}
 
+#ifdef HAVE_VERBOSE
 		if (!WT_VERBOSE_ISSET(session, WT_VERB_VERIFY))
 			continue;
 
@@ -541,6 +546,7 @@ __verify_ckptfrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		    "checkpoint range %" PRIuMAX "-%" PRIuMAX " never verified",
 		    (uintmax_t)WT_FRAG_TO_OFF(block, first),
 		    (uintmax_t)WT_FRAG_TO_OFF(block, last));
+#endif
 	}
 
 	if (count == 0)

@@ -43,6 +43,8 @@ static const char * const uri = "table:main";
 #define	ENV_CONFIG_REC "log=(recover=on)"
 #define	MAX_VAL	4096
 
+static void usage(void)
+    WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void
 usage(void)
 {
@@ -54,6 +56,8 @@ usage(void)
  * Child process creates the database and table, and then writes data into
  * the table until it is killed by the parent.
  */
+static void fill_db(void)
+    WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void
 fill_db(void)
 {

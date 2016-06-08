@@ -598,7 +598,14 @@ extern int __wt_msg(WT_SESSION_IMPL *session, const char *fmt, ...) WT_GCC_FUNC_
 extern int __wt_ext_msg_printf( WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, const char *fmt, ...) WT_GCC_FUNC_DECL_ATTRIBUTE((format (printf, 3, 4)));
 extern const char *__wt_ext_strerror(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, int error);
 extern int __wt_progress(WT_SESSION_IMPL *session, const char *s, uint64_t v);
-extern void __wt_assert(WT_SESSION_IMPL *session, int error, const char *file_name, int line_number, const char *fmt, ...) WT_GCC_FUNC_DECL_ATTRIBUTE((format (printf, 5, 6)));
+extern void
+__wt_assert(WT_SESSION_IMPL *session,
+ int error, const char *file_name, int line_number, const char *fmt, ...)
+ WT_GCC_FUNC_DECL_ATTRIBUTE((format (printf, 5, 6)))
+#ifdef HAVE_DIAGNOSTIC
+ WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn))
+#endif
+;
 extern int __wt_panic(WT_SESSION_IMPL *session);
 extern int __wt_illegal_value(WT_SESSION_IMPL *session, const char *name);
 extern int __wt_object_unsupported(WT_SESSION_IMPL *session, const char *uri);

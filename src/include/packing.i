@@ -540,7 +540,7 @@ __unpack_read(WT_SESSION_IMPL *session,
 		break;
 	case 'R':
 		WT_SIZE_CHECK_UNPACK(sizeof(uint64_t), maxlen);
-		pv->u.u = *(uint64_t *)*pp;
+		pv->u.u = *(const uint64_t *)*pp;
 		*pp += sizeof(uint64_t);
 		break;
 	default:

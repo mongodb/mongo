@@ -469,6 +469,9 @@ void
 __wt_assert(WT_SESSION_IMPL *session,
     int error, const char *file_name, int line_number, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 5, 6)))
+#ifdef HAVE_DIAGNOSTIC
+    WT_GCC_FUNC_ATTRIBUTE((noreturn))
+#endif
 {
 	va_list ap;
 
@@ -493,7 +496,10 @@ __wt_panic(WT_SESSION_IMPL *session)
 	F_SET(S2C(session), WT_CONN_PANIC);
 	__wt_err(session, WT_PANIC, "the process must exit and restart");
 
-#if !defined(HAVE_DIAGNOSTIC)
+#if defined(HAVE_DIAGNOSTIC)
+	__wt_abort(session);			/* Drop core if testing. */
+	/* NOTREACHED */
+#else
 	/*
 	 * Chaos reigns within.
 	 * Reflect, repent, and reboot.
@@ -501,9 +507,6 @@ __wt_panic(WT_SESSION_IMPL *session)
 	 */
 	return (WT_PANIC);
 #endif
-
-	__wt_abort(session);			/* Drop core if testing. */
-	/* NOTREACHED */
 }
 
 /*
@@ -517,12 +520,12 @@ __wt_illegal_value(WT_SESSION_IMPL *session, const char *name)
 	    name == NULL ? "" : name, name == NULL ? "" : ": ",
 	    "encountered an illegal file format or internal value");
 
-#if !defined(HAVE_DIAGNOSTIC)
-	return (__wt_panic(session));
-#endif
-
+#if defined(HAVE_DIAGNOSTIC)
 	__wt_abort(session);			/* Drop core if testing. */
 	/* NOTREACHED */
+#else
+	return (__wt_panic(session));
+#endif
 }
 
 /*

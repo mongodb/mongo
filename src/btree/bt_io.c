@@ -343,6 +343,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	 * Checksum the data if the buffer isn't compressed or checksums are
 	 * configured.
 	 */
+	data_cksum = true;		/* -Werror=maybe-uninitialized */
 	switch (btree->checksum) {
 	case CKSUM_ON:
 		data_cksum = true;
@@ -351,7 +352,6 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		data_cksum = false;
 		break;
 	case CKSUM_UNCOMPRESSED:
-	default:
 		data_cksum = !compressed;
 		break;
 	}

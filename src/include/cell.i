@@ -183,9 +183,9 @@ __wt_cell_pack_addr(WT_CELL *cell, u_int cell_type, uint64_t recno, size_t size)
 	p = cell->__chunk + 1;
 
 	if (recno == WT_RECNO_OOB)
-		cell->__chunk[0] = cell_type;		/* Type */
+		cell->__chunk[0] = (uint8_t)cell_type;	/* Type */
 	else {
-		cell->__chunk[0] = cell_type | WT_CELL_64V;
+		cell->__chunk[0] = (uint8_t)(cell_type | WT_CELL_64V);
 		(void)__wt_vpack_uint(&p, 0, recno);	/* Record number */
 	}
 	(void)__wt_vpack_uint(&p, 0, (uint64_t)size);	/* Length */
@@ -207,8 +207,8 @@ __wt_cell_pack_data(WT_CELL *cell, uint64_t rle, size_t size)
 	 */
 	if (rle < 2 && size <= WT_CELL_SHORT_MAX) {
 		byte = (uint8_t)size;			/* Type + length */
-		cell->__chunk[0] =
-		    (byte << WT_CELL_SHORT_SHIFT) | WT_CELL_VALUE_SHORT;
+		cell->__chunk[0] = (uint8_t)
+		    ((byte << WT_CELL_SHORT_SHIFT) | WT_CELL_VALUE_SHORT);
 		return (1);
 	}
 
@@ -331,8 +331,8 @@ __wt_cell_pack_int_key(WT_CELL *cell, size_t size)
 	/* Short keys have 6 bits of data length in the descriptor byte. */
 	if (size <= WT_CELL_SHORT_MAX) {
 		byte = (uint8_t)size;
-		cell->__chunk[0] =
-		    (byte << WT_CELL_SHORT_SHIFT) | WT_CELL_KEY_SHORT;
+		cell->__chunk[0] = (uint8_t)
+		    ((byte << WT_CELL_SHORT_SHIFT) | WT_CELL_KEY_SHORT);
 		return (1);
 	}
 
@@ -358,14 +358,14 @@ __wt_cell_pack_leaf_key(WT_CELL *cell, uint8_t prefix, size_t size)
 	if (size <= WT_CELL_SHORT_MAX) {
 		if (prefix == 0) {
 			byte = (uint8_t)size;		/* Type + length */
-			cell->__chunk[0] =
-			    (byte << WT_CELL_SHORT_SHIFT) | WT_CELL_KEY_SHORT;
+			cell->__chunk[0] = (uint8_t)
+			    ((byte << WT_CELL_SHORT_SHIFT) | WT_CELL_KEY_SHORT);
 			return (1);
 		} else {
 			byte = (uint8_t)size;		/* Type + length */
-			cell->__chunk[0] =
-			    (byte << WT_CELL_SHORT_SHIFT) |
-			    WT_CELL_KEY_SHORT_PFX;
+			cell->__chunk[0] = (uint8_t)
+			    ((byte << WT_CELL_SHORT_SHIFT) |
+			    WT_CELL_KEY_SHORT_PFX);
 			cell->__chunk[1] = prefix;	/* Prefix */
 			return (2);
 		}
@@ -585,8 +585,8 @@ restart:
 	WT_CELL_LEN_CHK(cell, 0);
 	unpack->cell = cell;
 	unpack->v = 0;
-	unpack->raw = __wt_cell_type_raw(cell);
-	unpack->type = __wt_cell_type(cell);
+	unpack->raw = (uint8_t)__wt_cell_type_raw(cell);
+	unpack->type = (uint8_t)__wt_cell_type(cell);
 	unpack->ovfl = 0;
 
 	/*
