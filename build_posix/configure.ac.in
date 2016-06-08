@@ -39,7 +39,7 @@ if test "$wt_cv_enable_strict" = "yes"; then
 	case "$wt_cv_cc_version" in
 	*clang*)
 		AM_CLANG_WARNINGS;;
-	*gcc*)
+	*gcc*|*GCC*)
 		AM_GCC_WARNINGS;;
 	*)
 		AC_MSG_ERROR(
