@@ -1245,7 +1245,7 @@ void appendOpTimeMetadata(OperationContext* txn,
         // TODO: refactor out of here as part of SERVER-18236
         if (isShardingAware || isConfig) {
             rpc::ShardingMetadata(lastOpTimeFromClient, replCoord->getElectionId())
-                .writeToMetadata(metadataBob, request.getProtocol());
+                .writeToMetadata(metadataBob);
         }
     }
 
