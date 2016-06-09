@@ -46,6 +46,10 @@ env.Library(
         'catalog/type_mongos.cpp',
         'catalog/type_shard.cpp',
         'catalog/type_tags.cpp',
+        'request_types/add_shard_request_type.cpp',
+        'request_types/add_shard_to_zone_request_type.cpp',
+        'request_types/balance_chunk_request_type.cpp',
+        'request_types/remove_shard_from_zone_request_type.cpp',
         'chunk_diff.cpp',
         'chunk_version.cpp',
         'migration_secondary_throttle_options.cpp',
@@ -166,30 +170,15 @@ env.CppUnitTest(
     ]
 )
 
-env.Library(
-    target='request_types',
-    source=[
-        'request_types/add_shard_request_type.cpp',
-        'request_types/add_shard_to_zone_request_type.cpp',
-        'request_types/remove_shard_from_zone_request_type.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/client/connection_string',
-        '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/db/service_context',
-    ],
-)
-
 env.CppUnitTest('request_types_test',
     source=[
         'request_types/add_shard_request_test.cpp',
         'request_types/add_shard_to_zone_request_test.cpp',
+        'request_types/balance_chunk_request_test.cpp',
         'request_types/remove_shard_from_zone_request_test.cpp',
     ],
     LIBDEPS=[
-        'request_types',
+        'common',
     ],
 )
 
@@ -222,7 +211,6 @@ env.Library(
         'catalog/replset/catalog_manager_replica_set',
         'client/sharding_client',
         'common',
-        'request_types',
     ],
     LIBDEPS_TAGS=[
         'incomplete',
