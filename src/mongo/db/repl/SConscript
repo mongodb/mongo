@@ -133,6 +133,15 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target='oplog_buffer_blocking_queue',
+    source=[
+        'oplog_buffer_blocking_queue.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)
+
+env.Library(
     target='oplog_interface_local',
     source=[
         'oplog_interface_local.cpp',
