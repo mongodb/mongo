@@ -37,6 +37,14 @@ __wt_block_verify_start(WT_SESSION_IMPL *session,
 	WT_CONFIG_ITEM cval;
 	wt_off_t size;
 
+	/* Configuration: strict behavior on any error. */
+	WT_RET(__wt_config_gets(session, cfg, "strict", &cval));
+	block->verify_strict = cval.val != 0;
+
+	/* Configuration: dump the file's layout. */
+	WT_RET(__wt_config_gets(session, cfg, "dump_layout", &cval));
+	block->verify_layout = cval.val != 0;
+
 	/*
 	 * Find the last checkpoint in the list: if there are none, or the only
 	 * checkpoint we have is fake, there's no work to do.  Don't complain,
@@ -107,9 +115,6 @@ __wt_block_verify_start(WT_SESSION_IMPL *session,
 	 */
 	WT_RET(__verify_last_avail(session, block, ckpt));
 
-	/* Configuration: strict behavior on any error. */
-	WT_RET(__wt_config_gets(session, cfg, "strict", &cval));
-	block->verify_strict = cval.val != 0;
 	return (0);
 }
 
@@ -154,10 +159,22 @@ __verify_set_file_size(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt)
 {
 	WT_BLOCK_CKPT *ci, _ci;
 	WT_DECL_RET;
+	WT_DECL_ITEM(tmp);
 
 	ci = &_ci;
 	WT_RET(__wt_block_ckpt_init(session, ci, ckpt->name));
 	WT_ERR(__wt_block_buffer_to_ckpt(session, block, ckpt->raw.data, ci));
+
+	if (block->verify_layout) {
+		WT_ERR(__wt_scr_alloc(session, 0, &tmp));
+		WT_ERR(__wt_msg(session, "%s: physical size %s", block->name,
+		    __wt_buf_set_size(
+		    session, (uint64_t)block->size, true, tmp)));
+		WT_ERR(
+		    __wt_msg(session, "%s: correcting to %s checkpoint size %s",
+		    block->name, ckpt->name, __wt_buf_set_size(
+		    session, (uint64_t)ci->file_size, true, tmp)));
+	}
 
 	/*
 	 * Verify is read-only. Set the block's file size information as if we
@@ -167,6 +184,7 @@ __verify_set_file_size(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt)
 	block->size = block->extend_size = ci->file_size;
 
 err:	__wt_block_ckpt_destroy(session, ci);
+	__wt_scr_free(session, &tmp);
 	return (ret);
 }
 
@@ -255,9 +273,9 @@ __wt_verify_ckpt_load(
 	}
 
 	/*
-	 * We don't need to list of blocks on a checkpoint's avail list, but we
-	 * read it to ensure it wasn't corrupted.  We could confirm correctness
-	 * of intermediate avail lists (that is, if they're logically the result
+	 * We don't need the blocks on a checkpoint's avail list, but we read it
+	 * to ensure it wasn't corrupted.  We could confirm correctness of the
+	 * intermediate avail lists (that is, if they're logically the result
 	 * of the allocations and discards to this point). We don't because the
 	 * only avail list ever used is the one for the last checkpoint, which
 	 * is separately verified by checking it against all of the blocks found

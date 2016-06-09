@@ -87,6 +87,7 @@ Decrement
 Decrypt
 DeleteFileA
 EAGAIN
+EB
 EBUSY
 EEXIST
 EINTR

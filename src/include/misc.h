@@ -12,6 +12,8 @@
  */
 #define	WT_UNUSED(var)		(void)(var)
 
+#define	WT_DIVIDER	"=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+
 /* Basic constants. */
 #define	WT_THOUSAND	(1000)
 #define	WT_MILLION	(1000000)

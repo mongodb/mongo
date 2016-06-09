@@ -959,16 +959,17 @@ methods = {
         Display the contents of on-disk blocks as they are verified,
         using the application's message handler, intended for debugging''',
         type='boolean'),
+    Config('dump_layout', 'false', r'''
+        Display the layout of the files as they are verified, using the
+        application's message handler, intended for debugging; requires
+        optional support from the block manager''',
+        type='boolean'),
     Config('dump_offsets', '', r'''
         Display the contents of specific on-disk blocks,
         using the application's message handler, intended for debugging''',
         type='list'),
     Config('dump_pages', 'false', r'''
         Display the contents of in-memory pages as they are verified,
-        using the application's message handler, intended for debugging''',
-        type='boolean'),
-    Config('dump_shape', 'false', r'''
-        Display the shape of the tree after verification,
         using the application's message handler, intended for debugging''',
         type='boolean'),
     Config('strict', 'false', r'''

@@ -1466,14 +1466,15 @@ struct __wt_session {
 	 * @config{dump_blocks, Display the contents of on-disk blocks as they
 	 * are verified\, using the application's message handler\, intended for
 	 * debugging., a boolean flag; default \c false.}
+	 * @config{dump_layout, Display the layout of the files as they are
+	 * verified\, using the application's message handler\, intended for
+	 * debugging; requires optional support from the block manager., a
+	 * boolean flag; default \c false.}
 	 * @config{dump_offsets, Display the contents of specific on-disk
 	 * blocks\, using the application's message handler\, intended for
 	 * debugging., a list of strings; default empty.}
 	 * @config{dump_pages, Display the contents of in-memory pages as they
 	 * are verified\, using the application's message handler\, intended for
-	 * debugging., a boolean flag; default \c false.}
-	 * @config{dump_shape, Display the shape of the tree after
-	 * verification\, using the application's message handler\, intended for
 	 * debugging., a boolean flag; default \c false.}
 	 * @config{strict, Treat any verification problem as an error; by
 	 * default\, verify will warn\, but not fail\, in the case of errors

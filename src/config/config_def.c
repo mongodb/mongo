@@ -380,9 +380,9 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_transaction_sync[] = {
 static const WT_CONFIG_CHECK confchk_WT_SESSION_verify[] = {
 	{ "dump_address", "boolean", NULL, NULL, NULL, 0 },
 	{ "dump_blocks", "boolean", NULL, NULL, NULL, 0 },
+	{ "dump_layout", "boolean", NULL, NULL, NULL, 0 },
 	{ "dump_offsets", "list", NULL, NULL, NULL, 0 },
 	{ "dump_pages", "boolean", NULL, NULL, NULL, 0 },
-	{ "dump_shape", "boolean", NULL, NULL, NULL, 0 },
 	{ "strict", "boolean", NULL, NULL, NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
@@ -1102,8 +1102,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  NULL, 0
 	},
 	{ "WT_SESSION.verify",
-	  "dump_address=0,dump_blocks=0,dump_offsets=,dump_pages=0,"
-	  "dump_shape=0,strict=0",
+	  "dump_address=0,dump_blocks=0,dump_layout=0,dump_offsets=,"
+	  "dump_pages=0,strict=0",
 	  confchk_WT_SESSION_verify, 6
 	},
 	{ "colgroup.meta",

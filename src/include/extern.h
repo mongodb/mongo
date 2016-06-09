@@ -144,7 +144,6 @@ extern const char *__wt_page_type_string(u_int type);
 extern const char *__wt_cell_type_string(uint8_t type);
 extern const char *__wt_page_addr_string(WT_SESSION_IMPL *session, WT_REF *ref, WT_ITEM *buf);
 extern const char *__wt_addr_string(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size, WT_ITEM *buf);
-extern const char *__wt_buf_set_printable( WT_SESSION_IMPL *session, const void *p, size_t size, WT_ITEM *buf);
 extern int __wt_ovfl_read(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack, WT_ITEM *store);
 extern int __wt_ovfl_cache(WT_SESSION_IMPL *session, WT_PAGE *page, void *cookie, WT_CELL_UNPACK *vpack);
 extern int __wt_ovfl_discard(WT_SESSION_IMPL *session, WT_CELL *cell);
@@ -654,6 +653,8 @@ extern uint32_t __wt_random(WT_RAND_STATE volatile *rnd_state);
 extern int __wt_buf_grow_worker(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size);
 extern int __wt_buf_fmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...) WT_GCC_FUNC_DECL_ATTRIBUTE((format (printf, 3, 4)));
 extern int __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...) WT_GCC_FUNC_DECL_ATTRIBUTE((format (printf, 3, 4)));
+extern const char *__wt_buf_set_printable( WT_SESSION_IMPL *session, const void *p, size_t size, WT_ITEM *buf);
+extern const char *__wt_buf_set_size( WT_SESSION_IMPL *session, uint64_t size, bool exact, WT_ITEM *buf);
 extern int
 __wt_scr_alloc_func(WT_SESSION_IMPL *session, size_t size, WT_ITEM **scratchp
 #ifdef HAVE_DIAGNOSTIC
