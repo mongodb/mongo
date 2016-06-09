@@ -108,11 +108,16 @@ var ReplSetTest = function(opts) {
     function _callIsMaster() {
         _clearLiveNodes();
 
+        var twoPrimaries = false;
         self.nodes.forEach(function(node) {
             try {
                 var n = node.getDB('admin').runCommand({ismaster: 1});
                 if (n.ismaster == true) {
-                    self.liveNodes.master = node;
+                    if (self.liveNodes.master) {
+                        twoPrimaries = true;
+                    } else {
+                        self.liveNodes.master = node;
+                    }
                 } else {
                     node.setSlaveOk();
                     self.liveNodes.slaves.push(node);
@@ -121,6 +126,9 @@ var ReplSetTest = function(opts) {
                 print("ReplSetTest Could not call ismaster on node " + node + ": " + tojson(err));
             }
         });
+        if (twoPrimaries) {
+            return false;
+        }
 
         return self.liveNodes.master || false;
     }
