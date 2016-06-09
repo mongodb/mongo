@@ -40,6 +40,10 @@ def removeIfPresent(lst, item):
 for to_remove in ['-Werror', '-Wall', '-W']:
     removeIfPresent(env['CCFLAGS'], to_remove)
 
+# Suppress sign-compare warnings.
+if env.ToolchainIs('clang', 'GCC'):
+    env.Append(CCFLAGS=['-Wno-sign-compare'])
+
 i18nEnv = env.Clone()
 i18nEnv.Append(
     CPPDEFINES=[
