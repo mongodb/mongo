@@ -910,6 +910,7 @@ env.Library(
         'collection_cloner',
         'database_cloner',
         'multiapplier',
+        'oplog_buffer_blocking_queue',
         'oplog_fetcher',
         'optime',
         'reporter',

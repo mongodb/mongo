@@ -42,6 +42,7 @@
 #include "mongo/db/repl/collection_cloner.h"
 #include "mongo/db/repl/database_cloner.h"
 #include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/oplog_buffer_blocking_queue.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/rollback_checker.h"
@@ -69,14 +70,6 @@ namespace repl {
 MONGO_FP_DECLARE(failInitialSyncWithBadHost);
 
 namespace {
-
-// Limit buffer to 256MB
-const size_t kOplogBufferSize = 256 * 1024 * 1024;
-
-size_t getSize(const BSONObj& o) {
-    // SERVER-9808 Avoid Fortify complaint about implicit signed->unsigned conversion
-    return static_cast<size_t>(o.objsize());
-}
 
 Timestamp findCommonPoint(HostAndPort host, Timestamp start) {
     // TODO: walk back in the oplog looking for a known/shared optime.
@@ -428,7 +421,7 @@ DataReplicator::DataReplicator(
       _reporterPaused(false),
       _applierActive(false),
       _applierPaused(false),
-      _oplogBuffer(kOplogBufferSize, &getSize) {
+      _oplogBuffer(stdx::make_unique<OplogBufferBlockingQueue>()) {
     uassert(ErrorCodes::BadValue, "invalid rollback function", _opts.rollbackFn);
     uassert(ErrorCodes::BadValue,
             "invalid replSetUpdatePosition command object creation function",
@@ -441,7 +434,7 @@ DataReplicator::DataReplicator(
 }
 
 DataReplicator::~DataReplicator() {
-    DESTRUCTOR_GUARD(_cancelAllHandles_inlock(); _oplogBuffer.clear(); _waitOnAll_inlock(););
+    DESTRUCTOR_GUARD(_cancelAllHandles_inlock(); _oplogBuffer->clear(); _waitOnAll_inlock(););
 }
 
 Status DataReplicator::start() {
@@ -455,6 +448,7 @@ Status DataReplicator::start() {
     _applierPaused = false;
     _fetcherPaused = false;
     _reporterPaused = false;
+    _oplogBuffer->startup();
     _doNextActions_Steady_inlock();
     return Status::OK();
 }
@@ -497,7 +491,7 @@ Timestamp DataReplicator::getLastTimestampApplied() const {
 
 size_t DataReplicator::getOplogBufferCount() const {
     // Oplog buffer is internally synchronized.
-    return _oplogBuffer.count();
+    return _oplogBuffer->getCount();
 }
 
 std::string DataReplicator::getDiagnosticString() const {
@@ -505,7 +499,7 @@ std::string DataReplicator::getDiagnosticString() const {
     str::stream out;
     out << "DataReplicator -"
         << " opts: " << _opts.toString() << " oplogFetcher: " << _fetcher->toString()
-        << " opsBuffered: " << _oplogBuffer.size() << " state: " << toString(_state);
+        << " opsBuffered: " << _oplogBuffer->getSize() << " state: " << toString(_state);
     switch (_state) {
         case DataReplicatorState::InitialSync:
             out << " opsAppied: " << _initialSyncState->appliedOps
@@ -575,7 +569,7 @@ TimestampStatus DataReplicator::flushAndPause() {
 void DataReplicator::_resetState_inlock(Timestamp lastAppliedOpTime) {
     invariant(!_anyActiveHandles_inlock());
     _lastTimestampApplied = _lastTimestampFetched = lastAppliedOpTime;
-    _oplogBuffer.clear();
+    _oplogBuffer->clear();
 }
 
 void DataReplicator::slavesHaveProgressed() {
@@ -944,7 +938,7 @@ void DataReplicator::_doNextActions_Steady_inlock() {
     }
 
     // Check if no active apply and ops to apply
-    if (!_applierActive && _oplogBuffer.size()) {
+    if (!_applierActive && _oplogBuffer->getSize()) {
         _scheduleApplyBatch_inlock();
     }
 
@@ -971,7 +965,7 @@ StatusWith<Operations> DataReplicator::_getNextApplierBatch_inlock() {
     //      * only OplogEntries from before the slaveDelay point
     //      * a single command OplogEntry (including index builds, which appear to be inserts)
     //          * consequently, commands bound the previous batch to be in a batch of their own
-    while (_oplogBuffer.peek(op)) {
+    while (_oplogBuffer->peek(&op)) {
         auto entry = OplogEntry(op);
 
         // Check for ops that must be processed one at a time.
@@ -982,7 +976,7 @@ StatusWith<Operations> DataReplicator::_getNextApplierBatch_inlock() {
             if (ops.empty()) {
                 // Apply commands one-at-a-time.
                 ops.push_back(std::move(entry));
-                _oplogBuffer.tryPop(op);
+                _oplogBuffer->tryPop(&op);
                 invariant(entry == OplogEntry(op));
             }
 
@@ -1023,7 +1017,7 @@ StatusWith<Operations> DataReplicator::_getNextApplierBatch_inlock() {
         // Add op to buffer.
         ops.push_back(entry);
         totalBytes += entry.raw.objsize();
-        _oplogBuffer.tryPop(op);
+        _oplogBuffer->tryPop(&op);
         invariant(entry == OplogEntry(op));
     }
     return ops;
@@ -1295,7 +1289,8 @@ Status DataReplicator::scheduleShutdown() {
         invariant(!_onShutdown.isValid());
         _onShutdown = eventStatus.getValue();
         _cancelAllHandles_inlock();
-        _oplogBuffer.clear();
+        _oplogBuffer->clear();
+        _oplogBuffer->shutdown();
     }
 
     // Schedule _doNextActions in case nothing is active to trigger the _onShutdown event.
@@ -1340,14 +1335,14 @@ void DataReplicator::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
 
     // Wait for enough space.
     // Gets unblocked on shutdown.
-    _oplogBuffer.waitForSpace(info.toApplyDocumentBytes);
+    _oplogBuffer->waitForSpace(info.toApplyDocumentBytes);
 
     OCCASIONALLY {
-        LOG(2) << "bgsync buffer has " << _oplogBuffer.size() << " bytes";
+        LOG(2) << "bgsync buffer has " << _oplogBuffer->getSize() << " bytes";
     }
 
     // Buffer docs for later application.
-    _oplogBuffer.pushAllNonBlocking(begin, end);
+    fassert(40143, _oplogBuffer->pushAllNonBlocking(begin, end));
 
     _lastTimestampFetched = info.lastDocument.opTime.getTimestamp();
 

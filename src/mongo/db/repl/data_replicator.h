@@ -41,6 +41,7 @@
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/database_cloner.h"
 #include "mongo/db/repl/multiapplier.h"
+#include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_executor.h"
@@ -325,10 +326,10 @@ private:
     bool _applierPaused;                     // (X)
     std::unique_ptr<MultiApplier> _applier;  // (M)
 
-    HostAndPort _syncSource;              // (M)
-    Timestamp _lastTimestampFetched;      // (MX)
-    Timestamp _lastTimestampApplied;      // (MX)
-    BlockingQueue<BSONObj> _oplogBuffer;  // (M)
+    HostAndPort _syncSource;                    // (M)
+    Timestamp _lastTimestampFetched;            // (MX)
+    Timestamp _lastTimestampApplied;            // (MX)
+    std::unique_ptr<OplogBuffer> _oplogBuffer;  // (M)
 
     // Shutdown
     Event _onShutdown;  // (M)
