@@ -586,6 +586,25 @@ functions:
 pre:
   - command: shell.track
   - func: "kill processes"
+  - command: expansions.update
+    params:
+       updates:
+       - key: set_sudo
+         value: |
+          set -o | grep errexit | grep on
+          errexit_on=$?
+          # Set errexit "off".
+          set +o errexit
+          sudo=
+          # Use sudo, if it is supported.
+          sudo date > /dev/null 2>&1
+          if [ $? -eq 0 ]; then
+            sudo=sudo
+          fi
+          # Set errexit "on", if previously enabled.
+          if [ $errexit_on -eq 0 ]; then
+            set -o errexit
+          fi
   - command: shell.exec
     params:
       script: |
@@ -601,6 +620,14 @@ pre:
         set -o verbose
 
         ulimit -a
+        # Clear the dmesg ring buffer. The "post" phase will check dmesg for OOM messages.
+        ${set_sudo}
+        $sudo dmesg --clear > /dev/null 2>&1
+        if [ $? -eq 0 ]; then
+          echo "Cleared the dmesg ring buffer"
+        else
+          echo "Could not clear the dmesg ring buffer"
+        fi
 
 post:
   - command: attach.results
@@ -624,6 +651,30 @@ post:
       content_type: ${content_type|application/x-gzip}
       display_name: Core Dumps - Execution ${execution}
       optional: true
+  - command: shell.exec
+    params:
+      system_log: true
+      working_dir: src # Temporary files created in src will be cleaned up in "pre".
+      script: |
+        ${set_sudo}
+        # Use dmesg -T option, if supported, to display timestamps.
+        dmesg=dmesg
+        dmesg -T > /dev/null 2>&1
+        if [ $? -eq 0 ]; then
+          dmesg="dmesg -T"
+        fi
+        $sudo $dmesg 2> /dev/null > dmesg.txt
+        if [ $? -ne 0 ]; then
+          echo "Cannot check for OOM (Out of memory) killed processes on this platform"
+          exit 0
+        fi
+        egrep -i '(Out of memory|OOM[- ]killer|Killed process)' dmesg.txt > oom.txt
+        if [ -s oom.txt ]; then
+          echo "OOM (Out of memory) killed processes detected"
+          cat oom.txt
+        else
+          echo "No OOM (Out of memory) killed processes detected"
+        fi
   - command: shell.cleanup
 
 timeout:
