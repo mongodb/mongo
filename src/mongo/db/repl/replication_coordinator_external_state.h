@@ -99,6 +99,8 @@ public:
      */
     virtual void startSteadyStateReplication() = 0;
 
+    virtual void runOnInitialSyncThread(stdx::function<void(OperationContext* txn)> run) = 0;
+
     /**
      * Starts the Master/Slave threads and sets up logOp
      */

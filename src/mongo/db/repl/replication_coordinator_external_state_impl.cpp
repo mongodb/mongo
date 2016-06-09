@@ -149,6 +149,17 @@ void ReplicationCoordinatorExternalStateImpl::startInitialSync(OnInitialSyncFini
     }});
 }
 
+void ReplicationCoordinatorExternalStateImpl::runOnInitialSyncThread(
+    stdx::function<void(OperationContext* txn)> run) {
+    _initialSyncThread.reset(new stdx::thread{[run, this]() {
+        Client::initThreadIfNotAlready("initial sync");
+        auto txn = cc().makeOperationContext();
+        invariant(txn);
+        invariant(txn->getClient());
+        run(txn.get());
+    }});
+}
+
 void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication() {
     if (!_producerThread) {
         log() << "Starting replication fetcher thread";

@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
@@ -37,6 +39,7 @@
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
 #include "mongo/db/storage/snapshot_name.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/sequence_util.h"
 
@@ -57,6 +60,11 @@ ReplicationCoordinatorExternalStateMock::ReplicationCoordinatorExternalStateMock
       _threadsStarted(false) {}
 
 ReplicationCoordinatorExternalStateMock::~ReplicationCoordinatorExternalStateMock() {}
+
+void ReplicationCoordinatorExternalStateMock::runOnInitialSyncThread(
+    stdx::function<void(OperationContext* txn)> run) {
+    log() << "not running initial sync during test.";
+}
 
 void ReplicationCoordinatorExternalStateMock::startThreads(const ReplSettings& settings) {
     _threadsStarted = true;

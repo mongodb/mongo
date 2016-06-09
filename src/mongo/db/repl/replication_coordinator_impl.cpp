@@ -499,8 +499,13 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn) {
 
     // Do initial sync.
     if (_externalState->shouldUseDataReplicatorInitialSync()) {
-        // TODO: make this async with callback.
-        _dr.initialSync(txn);
+        _externalState->runOnInitialSyncThread([this](OperationContext* txn) {
+            const auto status = _dr.initialSync(txn);
+            fassertStatusOK(40088, status);
+            _setMyLastAppliedOpTime_inlock({status.getValue(), -1}, false);
+            _externalState->startSteadyStateReplication();
+
+        });
     } else {
         _externalState->startInitialSync([this]() {
             stdx::lock_guard<stdx::mutex> lk(_mutex);
