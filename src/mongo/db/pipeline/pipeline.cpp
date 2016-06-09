@@ -59,6 +59,9 @@ namespace dps = ::mongo::dotted_path_support;
 
 Pipeline::Pipeline(const intrusive_ptr<ExpressionContext>& pTheCtx) : pCtx(pTheCtx) {}
 
+Pipeline::Pipeline(SourceContainer stages, const intrusive_ptr<ExpressionContext>& expCtx)
+    : _sources(stages), pCtx(expCtx) {}
+
 StatusWith<intrusive_ptr<Pipeline>> Pipeline::parse(
     const std::vector<BSONObj>& rawPipeline, const intrusive_ptr<ExpressionContext>& expCtx) {
     intrusive_ptr<Pipeline> pipeline(new Pipeline(expCtx));
@@ -73,9 +76,18 @@ StatusWith<intrusive_ptr<Pipeline>> Pipeline::parse(
     if (!status.isOK()) {
         return status;
     }
+    pipeline->stitch();
+    return pipeline;
+}
 
-    pipeline->optimizePipeline();
-
+StatusWith<intrusive_ptr<Pipeline>> Pipeline::create(
+    SourceContainer stages, const intrusive_ptr<ExpressionContext>& expCtx) {
+    intrusive_ptr<Pipeline> pipeline(new Pipeline(stages, expCtx));
+    auto status = pipeline->ensureAllStagesAreInLegalPositions();
+    if (!status.isOK()) {
+        return status;
+    }
+    pipeline->stitch();
     return pipeline;
 }
 
@@ -391,6 +403,9 @@ vector<Value> Pipeline::writeExplainOps() const {
 }
 
 void Pipeline::addInitialSource(intrusive_ptr<DocumentSource> source) {
+    if (!_sources.empty()) {
+        _sources.front()->setSource(source.get());
+    }
     _sources.push_front(source);
 }
 

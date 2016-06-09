@@ -9,6 +9,7 @@ env.Library(
     LIBDEPS=[
         'aggregation_request',
         'document_source',
+        'document_source_facet',
         'expression_context',
         'pipeline',
     ]
@@ -215,6 +216,40 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
         '$BUILD_DIR/mongo/db/storage/storage_options',
     ]
+)
+
+env.Library(
+    target='document_source_facet',
+    source=[
+        'document_source_facet.cpp',
+        'tee_buffer.cpp',
+        'document_source_tee_consumer.cpp',
+    ],
+    LIBDEPS=[
+        'document_source',
+        'pipeline',
+    ]
+)
+
+env.CppUnitTest(
+    target='document_source_facet_test',
+    source='document_source_facet_test.cpp',
+    LIBDEPS=[
+        'document_source_facet',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+    ],
+)
+
+env.CppUnitTest(
+    target='tee_buffer_test',
+    source='tee_buffer_test.cpp',
+    LIBDEPS=[
+        'document_source_facet',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+    ],
 )
 
 env.CppUnitTest(

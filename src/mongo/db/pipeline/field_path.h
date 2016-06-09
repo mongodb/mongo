@@ -94,10 +94,10 @@ public:
      */
     FieldPath tail() const;
 
-private:
     /** Uassert if a field name does not pass validation. */
     static void uassertValidFieldName(const std::string& fieldName);
 
+private:
     /**
      * Push a new field name to the back of the vector of names comprising the field path.
      * Uassert if 'fieldName' does not pass validation.

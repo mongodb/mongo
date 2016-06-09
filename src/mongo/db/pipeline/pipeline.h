@@ -58,11 +58,21 @@ public:
 
     /**
      * Parses a Pipeline from a BSONElement representing a list of DocumentSources. Returns a non-OK
-     * status if it failed to parse.
+     * status if it failed to parse. The returned pipeline is not optimized, but the caller may
+     * convert it to an optimized pipeline by calling optimizePipeline().
      */
     static StatusWith<boost::intrusive_ptr<Pipeline>> parse(
         const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    /**
+     * Creates a Pipeline from an existing SourceContainer.
+     *
+     * Returns a non-OK status if any stage is in an invalid position. For example, if an $out stage
+     * is present but is not the last stage.
+     */
+    static StatusWith<boost::intrusive_ptr<Pipeline>> create(
+        SourceContainer sources, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
      * Helper to implement Command::checkAuthForCommand.
@@ -172,6 +182,9 @@ public:
      */
     DepsTracker getDependencies(const BSONObj& initialQuery) const;
 
+    const SourceContainer& getSources() {
+        return _sources;
+    }
 
     /*
       PipelineD is a "sister" class that has additional functionality
@@ -198,6 +211,7 @@ private:
     friend class Optimizations::Sharded;
 
     Pipeline(const boost::intrusive_ptr<ExpressionContext>& pCtx);
+    Pipeline(SourceContainer stages, const boost::intrusive_ptr<ExpressionContext>& pCtx);
 
     /**
      * Stitch together the source pointers by calling setSource() for each source in '_sources'.

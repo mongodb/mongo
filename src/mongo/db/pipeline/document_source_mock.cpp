@@ -38,6 +38,10 @@ using boost::intrusive_ptr;
 DocumentSourceMock::DocumentSourceMock(std::deque<Document> docs)
     : DocumentSource(NULL), queue(std::move(docs)) {}
 
+DocumentSourceMock::DocumentSourceMock(std::deque<Document> docs,
+                                       const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    : DocumentSource(expCtx), queue(std::move(docs)) {}
+
 const char* DocumentSourceMock::getSourceName() const {
     return "mock";
 }
@@ -47,7 +51,7 @@ Value DocumentSourceMock::serialize(bool explain) const {
 }
 
 void DocumentSourceMock::dispose() {
-    disposed = true;
+    isDisposed = true;
 }
 
 intrusive_ptr<DocumentSourceMock> DocumentSourceMock::create(std::deque<Document> docs) {
@@ -77,7 +81,8 @@ intrusive_ptr<DocumentSourceMock> DocumentSourceMock::create(
 }
 
 boost::optional<Document> DocumentSourceMock::getNext() {
-    invariant(!disposed);
+    invariant(!isDisposed);
+    invariant(!isDetachedFromOpCtx);
 
     if (queue.empty()) {
         return {};

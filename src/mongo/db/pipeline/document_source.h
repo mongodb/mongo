@@ -360,11 +360,17 @@ public:
     DocumentSourceNeedsMongod(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(expCtx) {}
 
-    virtual void injectMongodInterface(std::shared_ptr<MongodInterface> mongod) {
+    void injectMongodInterface(std::shared_ptr<MongodInterface> mongod) {
         _mongod = mongod;
+        doInjectMongodInterface(mongod);
     }
 
-    void detachFromOperationContext() final {
+    /**
+     * Derived classes may override this method to register custom inject functionality.
+     */
+    virtual void doInjectMongodInterface(std::shared_ptr<MongodInterface> mongod) {}
+
+    void detachFromOperationContext() override {
         invariant(_mongod);
         _mongod->setOperationContext(nullptr);
         doDetachFromOperationContext();
@@ -871,6 +877,8 @@ private:
 class DocumentSourceMock : public DocumentSource {
 public:
     DocumentSourceMock(std::deque<Document> docs);
+    DocumentSourceMock(std::deque<Document> docs,
+                       const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     boost::optional<Document> getNext() override;
     const char* getSourceName() const override;
@@ -892,9 +900,24 @@ public:
     static boost::intrusive_ptr<DocumentSourceMock> create(
         const std::initializer_list<const char*>& jsons);
 
+    void reattachToOperationContext(OperationContext* opCtx) {
+        isDetachedFromOpCtx = false;
+    }
+
+    void detachFromOperationContext() {
+        isDetachedFromOpCtx = true;
+    }
+
+    boost::intrusive_ptr<DocumentSource> optimize() override {
+        isOptimized = true;
+        return this;
+    }
+
     // Return documents from front of queue.
     std::deque<Document> queue;
-    bool disposed = false;
+    bool isDisposed = false;
+    bool isDetachedFromOpCtx = false;
+    bool isOptimized = false;
 
     BSONObjSet sorts;
 };

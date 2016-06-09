@@ -127,11 +127,12 @@ public:
         mergeCtx->inRouter = true;
         // explicitly *not* setting mergeCtx->tempDir
 
-        // Parse the pipeline specification.
+        // Parse and optimize the pipeline specification.
         auto pipeline = Pipeline::parse(request.getValue().getPipeline(), mergeCtx);
         if (!pipeline.isOK()) {
             return appendCommandStatus(result, pipeline.getStatus());
         }
+        pipeline.getValue()->optimizePipeline();
 
         for (auto&& ns : pipeline.getValue()->getInvolvedCollections()) {
             uassert(

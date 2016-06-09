@@ -186,6 +186,7 @@ boost::intrusive_ptr<Pipeline> reparsePipeline(
         fassertFailedWithStatusNoTrace(40175, reparsedPipeline.getStatus());
     }
 
+    reparsedPipeline.getValue()->optimizePipeline();
     return reparsedPipeline.getValue();
 }
 
@@ -261,6 +262,7 @@ public:
             return appendCommandStatus(result, statusWithPipeline.getStatus());
         }
         auto pipeline = std::move(statusWithPipeline.getValue());
+        pipeline->optimizePipeline();
 
         if (kDebugBuild && !expCtx->isExplain && !expCtx->inShard) {
             // Make sure all operations round-trip through Pipeline::serialize() correctly by

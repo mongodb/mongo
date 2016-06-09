@@ -89,6 +89,7 @@ public:
         AggregationRequest request(NamespaceString("a.collection"), rawPipeline);
         intrusive_ptr<ExpressionContext> ctx = new ExpressionContext(&_opCtx, request);
         auto outputPipe = uassertStatusOK(Pipeline::parse(request.getPipeline(), ctx));
+        outputPipe->optimizePipeline();
 
         ASSERT_EQUALS(Value(outputPipe->writeExplainOps()), Value(outputPipeExpected["pipeline"]));
         ASSERT_EQUALS(Value(outputPipe->serialize()), Value(serializePipeExpected["pipeline"]));
@@ -735,6 +736,7 @@ public:
         AggregationRequest request(NamespaceString("a.collection"), rawPipeline);
         intrusive_ptr<ExpressionContext> ctx = new ExpressionContext(&_opCtx, request);
         mergePipe = uassertStatusOK(Pipeline::parse(request.getPipeline(), ctx));
+        mergePipe->optimizePipeline();
 
         shardPipe = mergePipe->splitForSharded();
         ASSERT(shardPipe != nullptr);
