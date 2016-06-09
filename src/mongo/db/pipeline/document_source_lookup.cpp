@@ -49,7 +49,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
                                            std::string localField,
                                            std::string foreignField,
                                            const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx),
+    : DocumentSourceNeedsMongod(pExpCtx),
       _fromNs(std::move(fromNs)),
       _as(std::move(as)),
       _localField(std::move(localField)),

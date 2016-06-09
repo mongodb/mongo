@@ -223,7 +223,7 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options) {
 }
 
 DocumentSourceGeoNear::DocumentSourceGeoNear(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx),
+    : DocumentSourceNeedsMongod(pExpCtx),
       coordsIsArray(false),
       limit(DocumentSourceGeoNear::kDefaultLimit),
       maxDistance(-1.0),

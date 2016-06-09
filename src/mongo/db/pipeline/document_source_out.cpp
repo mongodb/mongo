@@ -171,7 +171,7 @@ boost::optional<Document> DocumentSourceOut::getNext() {
 
 DocumentSourceOut::DocumentSourceOut(const NamespaceString& outputNs,
                                      const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx),
+    : DocumentSourceNeedsMongod(pExpCtx),
       _done(false),
       _tempNs("")  // filled in by prepTempCollection
       ,

@@ -308,8 +308,8 @@ bool Pipeline::aggSupportsWriteConcern(const BSONObj& cmd) {
 void Pipeline::detachFromOperationContext() {
     pCtx->opCtx = nullptr;
 
-    for (auto* source : sourcesNeedingMongod) {
-        source->setOperationContext(nullptr);
+    for (auto&& source : sources) {
+        source->detachFromOperationContext();
     }
 }
 
@@ -317,8 +317,8 @@ void Pipeline::reattachToOperationContext(OperationContext* opCtx) {
     invariant(pCtx->opCtx == nullptr);
     pCtx->opCtx = opCtx;
 
-    for (auto* source : sourcesNeedingMongod) {
-        source->setOperationContext(opCtx);
+    for (auto&& source : sources) {
+        source->reattachToOperationContext(opCtx);
     }
 }
 
@@ -492,14 +492,6 @@ void Pipeline::stitch() {
         intrusive_ptr<DocumentSource> pTemp(*iter);
         pTemp->setSource(prevSource);
         prevSource = pTemp.get();
-    }
-
-    // Cache the document sources that have a MongodInterface to avoid the cost of a dynamic cast
-    // when updating the OperationContext of their DBDirectClients while executing the pipeline.
-    for (auto&& source : sources) {
-        if (auto* needsMongod = dynamic_cast<DocumentSourceNeedsMongod*>(source.get())) {
-            sourcesNeedingMongod.push_back(needsMongod);
-        }
     }
 }
 

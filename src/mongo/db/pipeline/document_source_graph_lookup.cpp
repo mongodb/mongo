@@ -405,7 +405,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
     boost::optional<FieldPath> depthField,
     boost::optional<long long> maxDepth,
     const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSource(expCtx),
+    : DocumentSourceNeedsMongod(expCtx),
       _from(std::move(from)),
       _as(std::move(as)),
       _connectFromField(std::move(connectFromField)),

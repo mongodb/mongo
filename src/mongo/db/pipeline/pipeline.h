@@ -45,7 +45,6 @@ class CollatorInterface;
 class Command;
 struct DepsTracker;
 class DocumentSource;
-class DocumentSourceNeedsMongod;
 struct ExpressionContext;
 class OperationContext;
 class Privilege;
@@ -232,10 +231,6 @@ private:
 
     SourceContainer sources;
     bool explain;
-
-    // Cache of the document sources for which dynamic_cast<DocumentSourceNeedsMongod*>() returns a
-    // non-null pointer.
-    std::vector<DocumentSourceNeedsMongod*> sourcesNeedingMongod;
 
     boost::intrusive_ptr<ExpressionContext> pCtx;
 };

@@ -64,7 +64,7 @@ boost::optional<Document> DocumentSourceIndexStats::getNext() {
 }
 
 DocumentSourceIndexStats::DocumentSourceIndexStats(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx),
+    : DocumentSourceNeedsMongod(pExpCtx),
       _processName(str::stream() << getHostNameCached() << ":" << serverGlobalParams.port) {}
 
 intrusive_ptr<DocumentSource> DocumentSourceIndexStats::createFromBson(

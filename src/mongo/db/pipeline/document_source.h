@@ -225,6 +225,10 @@ public:
      */
     virtual void addInvolvedCollections(std::vector<NamespaceString>* collections) const {}
 
+    virtual void detachFromOperationContext() {}
+
+    virtual void reattachToOperationContext(OperationContext* opCtx) {}
+
     /**
      * Create a DocumentSource pipeline stage from 'stageObj'.
      */
@@ -308,7 +312,7 @@ protected:
  *  It causes a MongodInterface to be injected when in a mongod and prevents mongos from
  *  merging pipelines containing this stage.
  */
-class DocumentSourceNeedsMongod {
+class DocumentSourceNeedsMongod : public DocumentSource {
 public:
     // Wraps mongod-specific functions to allow linking into mongos.
     class MongodInterface {
@@ -348,14 +352,34 @@ public:
         // Add new methods as needed.
     };
 
-    void injectMongodInterface(std::shared_ptr<MongodInterface> mongod) {
+    DocumentSourceNeedsMongod(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSource(expCtx) {}
+
+    virtual void injectMongodInterface(std::shared_ptr<MongodInterface> mongod) {
         _mongod = mongod;
     }
 
-    void setOperationContext(OperationContext* opCtx) {
+    void detachFromOperationContext() final {
+        invariant(_mongod);
+        _mongod->setOperationContext(nullptr);
+        doDetachFromOperationContext();
+    }
+
+    /**
+     * Derived classes may override this method to register custom detach functionality.
+     */
+    virtual void doDetachFromOperationContext() {}
+
+    void reattachToOperationContext(OperationContext* opCtx) final {
         invariant(_mongod);
         _mongod->setOperationContext(opCtx);
+        doReattachToOperationContext(opCtx);
     }
+
+    /**
+     * Derived classes may override this method to register custom reattach functionality.
+     */
+    virtual void doReattachToOperationContext(OperationContext* opCtx) {}
 
 protected:
     // It is invalid to delete through a DocumentSourceNeedsMongod-typed pointer.
@@ -631,7 +655,7 @@ private:
  * Provides a document source interface to retrieve index statistics for a given namespace.
  * Each document returned represents a single index and mongod instance.
  */
-class DocumentSourceIndexStats final : public DocumentSource, public DocumentSourceNeedsMongod {
+class DocumentSourceIndexStats final : public DocumentSourceNeedsMongod {
 public:
     // virtuals from DocumentSource
     boost::optional<Document> getNext() final;
@@ -870,9 +894,7 @@ public:
     BSONObjSet sorts;
 };
 
-class DocumentSourceOut final : public DocumentSource,
-                                public SplittableDocumentSource,
-                                public DocumentSourceNeedsMongod {
+class DocumentSourceOut final : public DocumentSourceNeedsMongod, public SplittableDocumentSource {
 public:
     // virtuals from DocumentSource
     ~DocumentSourceOut() final;
@@ -1427,9 +1449,7 @@ private:
     std::unique_ptr<Unwinder> _unwinder;
 };
 
-class DocumentSourceGeoNear : public DocumentSource,
-                              public SplittableDocumentSource,
-                              public DocumentSourceNeedsMongod {
+class DocumentSourceGeoNear : public DocumentSourceNeedsMongod, public SplittableDocumentSource {
 public:
     static const long long kDefaultLimit;
 
@@ -1500,9 +1520,8 @@ private:
  * Queries separate collection for equality matches with documents in the pipeline collection.
  * Adds matching documents to a new array field in the input document.
  */
-class DocumentSourceLookUp final : public DocumentSource,
-                                   public SplittableDocumentSource,
-                                   public DocumentSourceNeedsMongod {
+class DocumentSourceLookUp final : public DocumentSourceNeedsMongod,
+                                   public SplittableDocumentSource {
 public:
     boost::optional<Document> getNext() final;
     const char* getSourceName() const final;
@@ -1577,7 +1596,7 @@ private:
     boost::optional<Document> _input;
 };
 
-class DocumentSourceGraphLookUp final : public DocumentSource, public DocumentSourceNeedsMongod {
+class DocumentSourceGraphLookUp final : public DocumentSourceNeedsMongod {
 public:
     boost::optional<Document> getNext() final;
     const char* getSourceName() const final;
