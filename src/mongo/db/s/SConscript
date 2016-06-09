@@ -47,6 +47,7 @@ env.Library(
     source=[
         'chunk_move_write_concern_options.cpp',
         'collection_sharding_state.cpp',
+        'metadata_manager.cpp',
         'migration_chunk_cloner_source.cpp',
         'migration_chunk_cloner_source_legacy.cpp',
         'migration_destination_manager.cpp',
