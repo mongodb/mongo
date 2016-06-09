@@ -11,6 +11,7 @@ from __future__ import print_function, absolute_import
 
 import Queue
 import difflib
+import glob
 import itertools
 import os
 import re
