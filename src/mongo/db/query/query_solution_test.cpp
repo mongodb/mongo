@@ -28,7 +28,10 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/stdx/memory.h"
@@ -247,6 +250,327 @@ TEST(QuerySolutionTest, IntervalListSomePoints) {
     ASSERT(node.getSort().count(BSON("c" << 1 << "d" << 1 << "e" << 1)));
     ASSERT(node.getSort().count(BSON("c" << 1 << "d" << 1)));
     ASSERT(node.getSort().count(BSON("c" << 1)));
+}
+
+TEST(QuerySolutionTest, GetFieldsWithStringBoundsIdentifiesFieldsContainingStrings) {
+    IndexBounds bounds;
+    BSONObj keyPattern = BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1 << "e" << 1);
+
+    OrderedIntervalList oilA{};
+    oilA.name = "a";
+    oilA.intervals.push_back(
+        IndexBoundsBuilder::makeRangeInterval(BSON("" << 1 << "" << 1), true, true));
+    bounds.fields.push_back(oilA);
+
+    OrderedIntervalList oilB{};
+    oilB.name = "b";
+    oilB.intervals.push_back(
+        IndexBoundsBuilder::makeRangeInterval(BSON("" << false << "" << true), true, true));
+    bounds.fields.push_back(oilB);
+
+    OrderedIntervalList oilC{};
+    oilC.name = "c";
+    oilC.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(BSON(""
+                                                                        << "a"
+                                                                        << ""
+                                                                        << "b"),
+                                                                   true,
+                                                                   true));
+    bounds.fields.push_back(oilC);
+
+    OrderedIntervalList oilD{};
+    oilD.name = "d";
+    oilD.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << BSON("foo" << 1) << "" << BSON("foo" << 2)), true, true));
+    bounds.fields.push_back(oilD);
+
+    OrderedIntervalList oilE{};
+    oilE.name = "e";
+    oilE.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << BSON_ARRAY(1 << 2 << 3) << "" << BSON_ARRAY(2 << 3 << 4)), true, true));
+    bounds.fields.push_back(oilE);
+
+    auto fields = IndexScanNode::getFieldsWithStringBounds(bounds, keyPattern);
+    ASSERT_EQUALS(fields.size(), 3U);
+    ASSERT_FALSE(fields.count("a"));
+    ASSERT_FALSE(fields.count("b"));
+    ASSERT_TRUE(fields.count("c"));
+    ASSERT_TRUE(fields.count("d"));
+    ASSERT_TRUE(fields.count("e"));
+}
+
+TEST(QuerySolutionTest, GetFieldsWithStringBoundsIdentifiesStringsFromNonPointBounds) {
+    IndexBounds bounds;
+    BSONObj keyPattern = BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1 << "e" << 1);
+    bounds.isSimpleRange = true;
+    bounds.startKey = BSON("a" << 1 << "b" << 2 << "c" << 3 << "d" << 4 << "e" << 5);
+    bounds.endKey = BSON("a" << 1 << "b" << 2 << "c" << 3 << "d" << 5 << "e" << 5);
+    bounds.endKeyInclusive = true;
+
+    auto fields = IndexScanNode::getFieldsWithStringBounds(bounds, keyPattern);
+    ASSERT_EQUALS(fields.size(), 1U);
+    ASSERT_FALSE(fields.count("a"));
+    ASSERT_FALSE(fields.count("b"));
+    ASSERT_FALSE(fields.count("c"));
+    ASSERT_FALSE(fields.count("d"));
+    ASSERT_TRUE(fields.count("e"));
+}
+
+TEST(QuerySolutionTest, GetFieldsWithStringBoundsIdentifiesStringsFromStringTypePointBounds) {
+    IndexBounds bounds;
+    BSONObj keyPattern = BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1 << "e" << 1);
+    bounds.isSimpleRange = true;
+    bounds.startKey = fromjson("{'a': 1, 'b': 'a', 'c': 3, 'd': 4, 'e': 5}");
+    bounds.endKey = bounds.startKey;
+    bounds.endKeyInclusive = true;
+
+    auto fields = IndexScanNode::getFieldsWithStringBounds(bounds, keyPattern);
+    ASSERT_EQUALS(fields.size(), 4U);
+    ASSERT_FALSE(fields.count("a"));
+    ASSERT_TRUE(fields.count("b"));
+    ASSERT_TRUE(fields.count("c"));
+    ASSERT_TRUE(fields.count("d"));
+    ASSERT_TRUE(fields.count("e"));
+}
+
+TEST(QuerySolutionTest, GetFieldsWithStringBoundsIdentifiesStringsFromArrayTypeBounds) {
+    IndexBounds bounds;
+    BSONObj keyPattern = BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1 << "e" << 1);
+    bounds.isSimpleRange = true;
+    bounds.startKey = fromjson("{'a': 1, 'b': [1,2], 'c': 3, 'd': 4, 'e': 5}");
+    bounds.endKey = bounds.startKey;
+    bounds.endKeyInclusive = true;
+
+    auto fields = IndexScanNode::getFieldsWithStringBounds(bounds, keyPattern);
+    ASSERT_EQUALS(fields.size(), 4U);
+    ASSERT_FALSE(fields.count("a"));
+    ASSERT_TRUE(fields.count("b"));
+    ASSERT_TRUE(fields.count("c"));
+    ASSERT_TRUE(fields.count("d"));
+    ASSERT_TRUE(fields.count("e"));
+}
+
+TEST(QuerySolutionTest, GetFieldsWithStringBoundsIdentifiesStringsFromObjectTypeBounds) {
+    IndexBounds bounds;
+    BSONObj keyPattern = BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1 << "e" << 1);
+    bounds.isSimpleRange = true;
+    bounds.startKey = fromjson("{'a': 1, 'b': {'foo': 2}, 'c': 3, 'd': 4, 'e': 5}");
+    bounds.endKey = bounds.startKey;
+    bounds.endKeyInclusive = true;
+
+    auto fields = IndexScanNode::getFieldsWithStringBounds(bounds, keyPattern);
+    ASSERT_EQUALS(fields.size(), 4U);
+    ASSERT_FALSE(fields.count("a"));
+    ASSERT_TRUE(fields.count("b"));
+    ASSERT_TRUE(fields.count("c"));
+    ASSERT_TRUE(fields.count("d"));
+    ASSERT_TRUE(fields.count("e"));
+}
+
+TEST(QuerySolutionTest, IndexScanNodeRemovesNonMatchingCollatedFieldsFromSortsOnSimpleBounds) {
+    IndexScanNode node{};
+    CollatorInterfaceMock queryCollator(CollatorInterfaceMock::MockType::kReverseString);
+
+    node.indexKeyPattern = BSON("a" << 1 << "b" << 1);
+    node.queryCollator = &queryCollator;
+
+    node.bounds.isSimpleRange = true;
+    node.bounds.startKey = BSON("a" << 1 << "b" << 1);
+    node.bounds.endKey = BSON("a" << 2 << "b" << 1);
+    node.bounds.endKeyInclusive = true;
+
+    node.computeProperties();
+
+    BSONObjSet sorts = node.getSort();
+    ASSERT_EQUALS(sorts.size(), 1U);
+    ASSERT_TRUE(sorts.count(BSON("a" << 1)));
+}
+
+TEST(QuerySolutionTest, IndexScanNodeGetFieldsWithStringBoundsCorrectlyHandlesEndKeyInclusive) {
+    IndexScanNode node{};
+    CollatorInterfaceMock queryCollator(CollatorInterfaceMock::MockType::kReverseString);
+
+    node.indexKeyPattern = BSON("a" << 1 << "b" << 1);
+    node.queryCollator = &queryCollator;
+
+    node.bounds.isSimpleRange = true;
+    node.bounds.startKey = BSON("a" << 1 << "b" << 1);
+    node.bounds.endKey = BSON("a" << 1 << "b"
+                                  << "");
+    node.bounds.endKeyInclusive = false;
+
+    node.computeProperties();
+
+    BSONObjSet sorts = node.getSort();
+    ASSERT_EQUALS(sorts.size(), 3U);
+    ASSERT_TRUE(sorts.count(BSON("a" << 1)));
+    ASSERT_TRUE(sorts.count(BSON("a" << 1 << "b" << 1)));
+    ASSERT_TRUE(sorts.count(BSON("b" << 1)));
+
+    node.bounds.endKeyInclusive = true;
+
+    node.computeProperties();
+
+    sorts = node.getSort();
+    ASSERT_EQUALS(sorts.size(), 1U);
+    ASSERT_TRUE(sorts.count(BSON("a" << 1)));
+}
+
+// Index: {a: 1}
+// Bounds: [MINKEY, MAXKEY]
+TEST(QuerySolutionTest, IndexScanNodeRemovesCollatedFieldsFromSortsIfCollationDifferent) {
+    IndexScanNode node{};
+    CollatorInterfaceMock queryCollator(CollatorInterfaceMock::MockType::kReverseString);
+
+    node.indexKeyPattern = BSON("a" << 1);
+    node.queryCollator = &queryCollator;
+
+    OrderedIntervalList oilA{};
+    oilA.name = "a";
+    oilA.intervals.push_back(
+        IndexBoundsBuilder::makeRangeInterval(BSON("" << MINKEY << "" << MAXKEY), true, true));
+    node.bounds.fields.push_back(oilA);
+
+    node.computeProperties();
+
+    BSONObjSet sorts = node.getSort();
+    ASSERT_EQUALS(sorts.size(), 0U);
+}
+
+TEST(QuerySolutionTest, IndexScanNodeDoesNotRemoveCollatedFieldsFromSortsIfCollationMatches) {
+    IndexScanNode node{};
+    CollatorInterfaceMock queryCollator(CollatorInterfaceMock::MockType::kReverseString);
+
+    node.indexKeyPattern = BSON("a" << 1);
+
+    OrderedIntervalList oilA{};
+    oilA.name = "a";
+    oilA.intervals.push_back(
+        IndexBoundsBuilder::makeRangeInterval(BSON("" << MINKEY << "" << MAXKEY), true, true));
+    node.bounds.fields.push_back(oilA);
+
+    node.computeProperties();
+
+    BSONObjSet sorts = node.getSort();
+    ASSERT_EQUALS(sorts.size(), 1U);
+    ASSERT_TRUE(sorts.count(BSON("a" << 1)));
+}
+
+// Index: {a: 1, b: 1, c: 1, d: 1, e: 1}
+// Intervals: a: [1,1], b: [1,1], c: [MinKey, MaxKey], d: [1,2], e: [1,2]
+TEST(QuerySolutionTest, CompoundIndexWithNonMatchingCollationFiltersAllSortsWithCollatedField) {
+    IndexScanNode node{};
+    CollatorInterfaceMock queryCollator(CollatorInterfaceMock::MockType::kReverseString);
+    node.queryCollator = &queryCollator;
+
+    node.indexKeyPattern = BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1 << "e" << 1);
+
+    OrderedIntervalList a{};
+    a.name = "a";
+    a.intervals.push_back(IndexBoundsBuilder::makePointInterval(BSON("" << 1)));
+    node.bounds.fields.push_back(a);
+
+    OrderedIntervalList b{};
+    b.name = "b";
+    b.intervals.push_back(IndexBoundsBuilder::makePointInterval(BSON("" << 1)));
+    node.bounds.fields.push_back(b);
+
+    OrderedIntervalList c{};
+    c.name = "c";
+    c.intervals.push_back(
+        IndexBoundsBuilder::makeRangeInterval(BSON("" << MINKEY << "" << MAXKEY), true, true));
+    node.bounds.fields.push_back(c);
+
+    OrderedIntervalList d{};
+    d.name = "d";
+    d.intervals.push_back(
+        IndexBoundsBuilder::makeRangeInterval(BSON("" << 1 << "" << 2), true, true));
+    node.bounds.fields.push_back(d);
+
+    OrderedIntervalList e{};
+    e.name = "e";
+    e.intervals.push_back(
+        IndexBoundsBuilder::makeRangeInterval(BSON("" << 1 << "" << 2), true, true));
+    node.bounds.fields.push_back(e);
+
+    node.computeProperties();
+
+    // Expected sort orders
+    ASSERT_EQUALS(node.getSort().size(), 2U);
+    ASSERT(node.getSort().count(BSON("a" << 1 << "b" << 1)));
+    ASSERT(node.getSort().count(BSON("a" << 1)));
+}
+
+// Index: {a : 1}
+// Bounds: [{}, {}]
+TEST(QuerySolutionTest, IndexScanNodeWithNonMatchingCollationFiltersObjectField) {
+    IndexScanNode node{};
+    CollatorInterfaceMock queryCollator(CollatorInterfaceMock::MockType::kReverseString);
+
+    node.indexKeyPattern = BSON("a" << 1);
+    node.queryCollator = &queryCollator;
+
+    OrderedIntervalList oilA{};
+    oilA.name = "a";
+    oilA.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << BSON("foo" << 1) << "" << BSON("foo" << 2)), true, true));
+    node.bounds.fields.push_back(oilA);
+
+    node.computeProperties();
+
+    BSONObjSet sorts = node.getSort();
+    ASSERT_EQUALS(sorts.size(), 0U);
+}
+
+// Index: {a : 1}
+// Bounds: [[], []]
+TEST(QuerySolutionTest, IndexScanNodeWithNonMatchingCollationFiltersArrayField) {
+    IndexScanNode node{};
+    CollatorInterfaceMock queryCollator(CollatorInterfaceMock::MockType::kReverseString);
+
+    node.indexKeyPattern = BSON("a" << 1);
+    node.queryCollator = &queryCollator;
+
+    OrderedIntervalList oilA{};
+    oilA.name = "a";
+    oilA.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << BSON_ARRAY(1) << "" << BSON_ARRAY(2)), true, true));
+    node.bounds.fields.push_back(oilA);
+
+    node.computeProperties();
+
+    BSONObjSet sorts = node.getSort();
+    ASSERT_EQUALS(sorts.size(), 0U);
+}
+
+TEST(QuerySolutionTest, WithNonMatchingCollatorAndNoEqualityPrefixSortsAreNotDuplicated) {
+    IndexScanNode node{};
+    CollatorInterfaceMock queryCollator(CollatorInterfaceMock::MockType::kReverseString);
+    node.queryCollator = &queryCollator;
+
+    node.indexKeyPattern = BSON("a" << 1 << "b" << 1);
+
+    OrderedIntervalList oilA{};
+    oilA.name = "a";
+    oilA.intervals.push_back(
+        IndexBoundsBuilder::makeRangeInterval(BSON("" << 1 << "" << 2), true, true));
+    node.bounds.fields.push_back(oilA);
+
+    OrderedIntervalList oilB{};
+    oilB.name = "b";
+    oilB.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(BSON(""
+                                                                        << "a"
+                                                                        << ""
+                                                                        << "b"),
+                                                                   true,
+                                                                   true));
+    node.bounds.fields.push_back(oilB);
+
+    node.computeProperties();
+
+    // Expected sort orders
+    ASSERT_EQUALS(node.getSort().size(), 1U);
+    ASSERT(node.getSort().count(BSON("a" << 1)));
 }
 
 std::unique_ptr<ParsedProjection> createParsedProjection(const BSONObj& query,

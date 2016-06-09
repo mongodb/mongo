@@ -281,4 +281,83 @@ TEST_F(QueryPlannerTest, CanUseIndexWithMatchingCollatorForSort) {
         "1}}}}}");
 }
 
+TEST_F(QueryPlannerTest, IndexWithNonMatchingCollatorCausesInMemorySort) {
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    addIndex(fromjson("{a: 1}"), &indexCollator);
+
+    runQueryAsCommand(fromjson("{find: 'testns', filter: {a: {'$exists': true}}, sort: {a: 1}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen:"
+        "{node: {fetch: {node : {ixscan: {pattern: {a: 1}}}}}}}}}");
+    assertSolutionExists(
+        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen:"
+        "{node: {cscan: {dir: 1, filter: {a: {'$exists': true}}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, IndexWithMatchingCollatorDoesNotCauseInMemorySort) {
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    addIndex(fromjson("{a: 1}"), &indexCollator);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {a: {'$exists': true}}, sort: {a: 1},"
+                 "collation: {locale: 'reverse'}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{fetch: {node : {ixscan: {pattern: {a: 1}}}}}");
+    assertSolutionExists(
+        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen:"
+        "{node: {cscan: {dir: 1, filter: {a: {'$exists': true}}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CompoundIndexWithNonMatchingCollatorCausesInMemorySort) {
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    addIndex(fromjson("{a: 1, b: 1, c: 1, d: 1}"), &indexCollator);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {a: 1, b: 2, c: {a: 1}},"
+                 "sort: {a: 1, b: 1, c: 1}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{sort: {pattern: {a: 1, b: 1, c: 1}, limit: 0, node: {sortKeyGen:"
+        "{node: {fetch: {node: {ixscan: {pattern: {a: 1, b: 1, c: 1, d: 1}}}}}}}}}");
+    assertSolutionExists(
+        "{sort: {pattern: {a: 1, b: 1, c: 1}, limit: 0, node: {sortKeyGen:"
+        "{node: {cscan: {dir: 1, filter: {a: 1, b: 2, c: {a: 1}}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CompoundIndexWithNonMatchingPrefixedCollatorDoesNotCauseInMemorySort) {
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    addIndex(fromjson("{a: 1, b: 1, c: 1, d: 1}"), &indexCollator);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {a: 1, b: 2, c: {a: 1 } },"
+                 "sort: {a: 1, b: 1 }}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{fetch: {node : {ixscan: {pattern: {a: 1, b: 1, c: 1, d: 1}}}}}");
+    assertSolutionExists(
+        "{sort: {pattern: {a: 1, b: 1}, limit: 0, node: {sortKeyGen:"
+        "{node: {cscan: {dir: 1, filter : {a: 1, b: 2, c: {a: 1}}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, EqualityToArrayWithNonMatchingCollatorCausesInMemorySort) {
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    addIndex(fromjson("{a: 1}"), &indexCollator);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {a: [1]},"
+                 "sort: {a: 1}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen:"
+        "{node: {fetch: {node : {ixscan: {pattern: {a: 1}}}}}}}}}");
+    assertSolutionExists(
+        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen:"
+        "{node: {cscan: {dir: 1, filter: {a: [1]}}}}}}}");
+}
+
 }  // namespace

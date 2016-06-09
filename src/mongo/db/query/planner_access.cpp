@@ -212,6 +212,8 @@ QuerySolutionNode* QueryPlannerAccess::makeLeafNode(
         isn->bounds.fields.resize(index.keyPattern.nFields());
         isn->maxScan = query.getQueryRequest().getMaxScan();
         isn->addKeyMetadata = query.getQueryRequest().returnKey();
+        isn->indexCollator = index.collator;
+        isn->queryCollator = query.getCollator();
 
         // Get the ixtag->pos-th element of the index key pattern.
         // TODO: cache this instead/with ixtag->pos?
@@ -1249,6 +1251,8 @@ QuerySolutionNode* QueryPlannerAccess::scanWholeIndex(const IndexEntry& index,
     isn->indexIsMultiKey = index.multikey;
     isn->maxScan = query.getQueryRequest().getMaxScan();
     isn->addKeyMetadata = query.getQueryRequest().returnKey();
+    isn->indexCollator = index.collator;
+    isn->queryCollator = query.getCollator();
 
     IndexBoundsBuilder::allValuesBounds(index.keyPattern, &isn->bounds);
 
@@ -1390,6 +1394,8 @@ QuerySolutionNode* QueryPlannerAccess::makeIndexScan(const IndexEntry& index,
     isn->bounds.startKey = startKey;
     isn->bounds.endKey = endKey;
     isn->bounds.endKeyInclusive = false;
+    isn->indexCollator = index.collator;
+    isn->queryCollator = query.getCollator();
 
     unique_ptr<MatchExpression> filter = query.root()->shallowClone();
 

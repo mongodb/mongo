@@ -457,6 +457,52 @@
                       .itcount());
         assert.writeOK(coll.remove({_id: 3}));
         assert.commandWorked(coll.dropIndexes());
+
+        // Queries that use a index with a non-matching collation should add a sort
+        // stage if needed.
+        coll.drop();
+        assert.writeOK(coll.insert([{a: "A"}, {a: "B"}, {a: "b"}, {a: "a"}]));
+
+        // Ensure results from an index that doesn't match the query collation are sorted to match
+        // the requested collation.
+        assert.commandWorked(coll.ensureIndex({a: 1}));
+        var res = coll.find({a: {'$exists': true}}, {_id: 0})
+                      .collation({locale: "en_US", strength: 3})
+                      .sort({a: 1});
+        assert.eq(res.toArray(), [{a: "a"}, {a: "A"}, {a: "b"}, {a: "B"}]);
+
+        // Ensure results from index with min/max query are sorted to match requested collation.
+        coll.drop();
+        assert.commandWorked(coll.ensureIndex({a: 1, b: 1}));
+        assert.writeOK(coll.insert(
+            [{a: 1, b: 1}, {a: 1, b: 2}, {a: 1, b: "A"}, {a: 1, b: "a"}, {a: 2, b: 2}]));
+        var expected = [{a: 1, b: 1}, {a: 1, b: 2}, {a: 1, b: "a"}, {a: 1, b: "A"}, {a: 2, b: 2}];
+        res = coll.find({}, {_id: 0})
+                  .hint({a: 1, b: 1})
+                  .min({a: 1, b: 1})
+                  .max({a: 2, b: 3})
+                  .collation({locale: "en_US", strength: 3})
+                  .sort({a: 1, b: 1});
+        assert.eq(res.toArray(), expected);
+        res = coll.find({}, {_id: 0})
+                  .hint({a: 1, b: 1})
+                  .min({a: 1, b: 1})
+                  .collation({locale: "en_US", strength: 3})
+                  .sort({a: 1, b: 1});
+        assert.eq(res.toArray(), expected);
+        res = coll.find({}, {_id: 0})
+                  .hint({a: 1, b: 1})
+                  .max({a: 2, b: 3})
+                  .collation({locale: "en_US", strength: 3})
+                  .sort({a: 1, b: 1});
+        assert.eq(res.toArray(), expected);
+        res = coll.find({}, {_id: 0})
+                  .hint({a: 1, b: 1})
+                  .min({a: 1, b: "A"})
+                  .max({a: 2, b: 1})
+                  .collation({locale: "en_US", strength: 3})
+                  .sort({a: 1, b: 1});
+        assert.eq(res.toArray(), [{a: 1, b: "a"}, {a: 1, b: "A"}]);
     }
 
     // Find should return correct results when no collation specified and collection has a default

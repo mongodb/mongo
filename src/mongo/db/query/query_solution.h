@@ -457,6 +457,14 @@ struct IndexScanNode : public QuerySolutionNode {
 
     bool operator==(const IndexScanNode& other) const;
 
+    /**
+     * This function extracts a list of field names from 'indexKeyPattern' whose corresponding index
+     * bounds in 'bounds' can contain strings.  This is the case if there are intervals containing
+     * String, Object, or Array values.
+     */
+    static std::set<StringData> getFieldsWithStringBounds(const IndexBounds& bounds,
+                                                          const BSONObj& indexKeyPattern);
+
     BSONObjSet _sorts;
 
     BSONObj indexKeyPattern;
@@ -470,11 +478,10 @@ struct IndexScanNode : public QuerySolutionNode {
     // If there's a 'returnKey' projection we add key metadata.
     bool addKeyMetadata;
 
-    // BIG NOTE:
-    // If you use simple bounds, we'll use whatever index access method the keypattern implies.
-    // If you use the complex bounds, we force Btree access.
-    // The complex bounds require Btree access.
     IndexBounds bounds;
+
+    const CollatorInterface* indexCollator;
+    const CollatorInterface* queryCollator;
 };
 
 struct ProjectionNode : public QuerySolutionNode {
