@@ -142,6 +142,33 @@ env.Library(
 )
 
 env.Library(
+    target='oplog_buffer_collection',
+    source=[
+        'oplog_buffer_collection.cpp',
+    ],
+    LIBDEPS=[
+        'storage_interface',
+        '$BUILD_DIR/mongo/db/serveronly', # Remove after migrating to storage interface.
+        '$BUILD_DIR/mongo/db/service_context',
+    ],
+)
+
+env.CppUnitTest(
+    target='oplog_buffer_collection_test',
+    source=[
+        'oplog_buffer_collection_test.cpp',
+    ],
+    LIBDEPS=[
+        'oplog_buffer_collection',
+        'oplog_interface_local',
+        'replmocks',
+        'storage_interface_impl',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+    ],
+    NO_CRUTCH = True,
+)
+
+env.Library(
     target='oplog_interface_local',
     source=[
         'oplog_interface_local.cpp',
