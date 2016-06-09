@@ -252,7 +252,7 @@ public:
                       txn, std::move(ws), std::move(proxy), collection, PlanExecutor::YIELD_MANUAL);
             invariant(statusWithPlanExecutor.isOK());
             exec = std::move(statusWithPlanExecutor.getValue());
-            
+
             {
                 auto planSummary = Explain::getPlanSummary(exec.get());
                 stdx::lock_guard<Client>(*txn->getClient());
