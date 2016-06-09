@@ -63,6 +63,7 @@ public:
      * added to the "executionStats" section of the explain.
      */
     static void explainStages(PlanExecutor* exec,
+                              const Collection* collection,
                               ExplainCommon::Verbosity verbosity,
                               BSONObjBuilder* out);
 
@@ -138,11 +139,13 @@ private:
      * This is a helper for generating explain BSON. It is used by explainStages(...).
      *
      * @param exec -- the stage tree for the operation being explained.
+     * @param collection -- the collection used in the operation.
      * @param winnerStats -- the stats tree for the winning plan.
      * @param rejectedStats -- an array of stats trees, one per rejected plan
      */
     static void generatePlannerInfo(
         PlanExecutor* exec,
+        const Collection* collection,
         PlanStageStats* winnerStats,
         const std::vector<std::unique_ptr<PlanStageStats>>& rejectedStats,
         BSONObjBuilder* out);

@@ -279,7 +279,7 @@ public:
                 return statusWithPlanExecutor.getStatus();
             }
             const std::unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
-            Explain::explainStages(exec.get(), verbosity, out);
+            Explain::explainStages(exec.get(), collection, verbosity, out);
         } else {
             UpdateRequest request(nsString);
             UpdateLifecycleImpl updateLifecycle(nsString);
@@ -310,7 +310,7 @@ public:
                 return statusWithPlanExecutor.getStatus();
             }
             const std::unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
-            Explain::explainStages(exec.get(), verbosity, out);
+            Explain::explainStages(exec.get(), collection, verbosity, out);
         }
 
         return Status::OK();

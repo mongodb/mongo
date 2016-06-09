@@ -142,7 +142,7 @@ public:
                                                                  false,  // endKeyInclusive
                                                                  PlanExecutor::YIELD_MANUAL,
                                                                  InternalPlanner::FORWARD));
-        exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
+        exec->setYieldPolicy(PlanExecutor::YIELD_AUTO, collection);
 
         // Find the 'missingField' value used to represent a missing document field in a key of
         // this index.

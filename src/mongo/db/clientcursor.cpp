@@ -91,9 +91,6 @@ ClientCursor::ClientCursor(CursorManager* cursorManager,
     _exec.reset(exec);
     _query = query;
     _queryOptions = qopts;
-    if (exec->collection()) {
-        invariant(cursorManager == exec->collection()->getCursorManager());
-    }
     init();
 }
 

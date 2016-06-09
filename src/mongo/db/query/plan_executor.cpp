@@ -144,7 +144,7 @@ StatusWith<unique_ptr<PlanExecutor>> PlanExecutor::make(OperationContext* txn,
         txn, std::move(ws), std::move(rt), std::move(qs), std::move(cq), collection, ns));
 
     // Perform plan selection, if necessary.
-    Status status = exec->pickBestPlan(yieldPolicy);
+    Status status = exec->pickBestPlan(yieldPolicy, collection);
     if (!status.isOK()) {
         return status;
     }
@@ -160,32 +160,31 @@ PlanExecutor::PlanExecutor(OperationContext* opCtx,
                            const Collection* collection,
                            const string& ns)
     : _opCtx(opCtx),
-      _collection(collection),
       _cq(std::move(cq)),
       _workingSet(std::move(ws)),
       _qs(std::move(qs)),
       _root(std::move(rt)),
       _ns(ns),
       _yieldPolicy(new PlanYieldPolicy(this, YIELD_MANUAL)) {
-    // We may still need to initialize _ns from either _collection or _cq.
+    // We may still need to initialize _ns from either collection or _cq.
     if (!_ns.empty()) {
         // We already have an _ns set, so there's nothing more to do.
         return;
     }
 
-    if (NULL != _collection) {
-        _ns = _collection->ns().ns();
+    if (collection) {
+        _ns = collection->ns().ns();
     } else {
-        invariant(NULL != _cq.get());
+        invariant(_cq);
         _ns = _cq->getQueryRequest().ns();
     }
 }
 
-Status PlanExecutor::pickBestPlan(YieldPolicy policy) {
+Status PlanExecutor::pickBestPlan(YieldPolicy policy, const Collection* collection) {
     invariant(_currentState == kUsable);
     // For YIELD_AUTO, this will both set an auto yield policy on the PlanExecutor and
     // register it to receive notifications.
-    this->setYieldPolicy(policy);
+    this->setYieldPolicy(policy, collection);
 
     // First check if we need to do subplanning.
     PlanStage* foundStage = getStageByType(_root.get(), STAGE_SUBPLAN);
@@ -247,10 +246,6 @@ unique_ptr<PlanStageStats> PlanExecutor::getStats() const {
     return _root->getStats();
 }
 
-const Collection* PlanExecutor::collection() const {
-    return _collection;
-}
-
 BSONObjSet PlanExecutor::getOutputSorts() const {
     if (_qs && _qs->root) {
         _qs->root->computeProperties();
@@ -302,7 +297,7 @@ bool PlanExecutor::restoreState() {
             throw;
 
         // Handles retries by calling restoreStateWithoutRetrying() in a loop.
-        return _yieldPolicy->yield(NULL);
+        return _yieldPolicy->yield();
     }
 }
 
@@ -472,8 +467,7 @@ PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, 
                     throw WriteConflictException();
                 CurOp::get(_opCtx)->debug().writeConflicts++;
                 writeConflictsInARow++;
-                WriteConflictException::logAndBackoff(
-                    writeConflictsInARow, "plan execution", _collection->ns().ns());
+                WriteConflictException::logAndBackoff(writeConflictsInARow, "plan execution", _ns);
 
             } else {
                 WorkingSetMember* member = _workingSet->get(id);
@@ -509,8 +503,12 @@ bool PlanExecutor::isEOF() {
     return killed() || (_stash.empty() && _root->isEOF());
 }
 
-void PlanExecutor::registerExec() {
-    _safety.reset(new ScopedExecutorRegistration(this));
+void PlanExecutor::registerExec(const Collection* collection) {
+    // There's no need to register a PlanExecutor for which the underlying collection
+    // doesn't exist.
+    if (collection) {
+        _safety.reset(new ScopedExecutorRegistration(this, collection));
+    }
 }
 
 void PlanExecutor::deregisterExec() {
@@ -519,7 +517,6 @@ void PlanExecutor::deregisterExec() {
 
 void PlanExecutor::kill(string reason) {
     _killReason = std::move(reason);
-    _collection = NULL;
 
     // XXX: PlanExecutor is designed to wrap a single execution tree. In the case of
     // aggregation queries, PlanExecutor wraps a proxy stage responsible for pulling results
@@ -568,7 +565,15 @@ const string& PlanExecutor::ns() {
     return _ns;
 }
 
-void PlanExecutor::setYieldPolicy(YieldPolicy policy, bool registerExecutor) {
+void PlanExecutor::setYieldPolicy(YieldPolicy policy,
+                                  const Collection* collection,
+                                  bool registerExecutor) {
+    if (!collection) {
+        // If the collection doesn't exist, then there's no need to yield at all.
+        invariant(!_yieldPolicy->allowedToYield());
+        return;
+    }
+
     _yieldPolicy->setPolicy(policy);
     if (PlanExecutor::YIELD_AUTO == policy) {
         // Runners that yield automatically generally need to be registered so that
@@ -577,7 +582,7 @@ void PlanExecutor::setYieldPolicy(YieldPolicy policy, bool registerExecutor) {
         // by ClientCursor instead of being registered here. This is unneeded if we only do
         // partial "yields" for WriteConflict retrying.
         if (registerExecutor) {
-            this->registerExec();
+            this->registerExec(collection);
         }
     }
 }
@@ -590,19 +595,21 @@ void PlanExecutor::enqueue(const BSONObj& obj) {
 // ScopedExecutorRegistration
 //
 
-PlanExecutor::ScopedExecutorRegistration::ScopedExecutorRegistration(PlanExecutor* exec)
-    : _exec(exec) {
-    // Collection can be null for an EOFStage plan, or other places where registration
-    // is not needed.
-    if (_exec->collection()) {
-        _exec->collection()->getCursorManager()->registerExecutor(exec);
-    }
+// PlanExecutor::ScopedExecutorRegistration
+PlanExecutor::ScopedExecutorRegistration::ScopedExecutorRegistration(PlanExecutor* exec,
+                                                                     const Collection* collection)
+    : _exec(exec), _collection(collection) {
+    invariant(_collection);
+    _collection->getCursorManager()->registerExecutor(_exec);
 }
 
 PlanExecutor::ScopedExecutorRegistration::~ScopedExecutorRegistration() {
-    if (_exec->collection()) {
-        _exec->collection()->getCursorManager()->deregisterExecutor(_exec);
+    if (_exec->killed()) {
+        // If the plan executor has been killed, then it's possible that the collection
+        // no longer exists.
+        return;
     }
+    _collection->getCursorManager()->deregisterExecutor(_exec);
 }
 
 }  // namespace mongo

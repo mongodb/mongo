@@ -661,7 +661,7 @@ public:
 
             unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
             // Process notifications when the lock is released/reacquired in the loop below
-            exec->registerExec();
+            exec->registerExec(coll);
 
             BSONObj obj;
             PlanExecutor::ExecState state;

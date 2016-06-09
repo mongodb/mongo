@@ -195,7 +195,9 @@ Value DocumentSourceCursor::serialize(bool explain) const {
         massert(17392, "No _exec. Were we disposed before explained?", _exec);
 
         _exec->restoreState();
-        Explain::explainStages(_exec.get(), ExplainCommon::QUERY_PLANNER, &explainBuilder);
+        Explain::explainStages(
+            _exec.get(), autoColl.getCollection(), ExplainCommon::QUERY_PLANNER, &explainBuilder);
+
         _exec->saveState();
     }
 

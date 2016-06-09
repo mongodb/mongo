@@ -132,7 +132,7 @@ private:
 
         unique_ptr<PlanExecutor> planExecutor = std::move(statusWithPlanExecutor.getValue());
 
-        Explain::explainStages(planExecutor.get(), verbosity, out);
+        Explain::explainStages(planExecutor.get(), coll, verbosity, out);
         return Status::OK();
     }
 

@@ -275,7 +275,7 @@ public:
             splitKeys.push_back(dps::extractElementsBasedOnTemplate(
                 prettyKey(idx->keyPattern(), currKey.getOwned()), keyPattern));
 
-            exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
+            exec->setYieldPolicy(PlanExecutor::YIELD_AUTO, collection);
             while (1) {
                 while (PlanExecutor::ADVANCED == state) {
                     currCount++;
@@ -337,7 +337,7 @@ public:
                                                   PlanExecutor::YIELD_MANUAL,
                                                   InternalPlanner::FORWARD);
 
-                exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
+                exec->setYieldPolicy(PlanExecutor::YIELD_AUTO, collection);
                 state = exec->getNext(&currKey, NULL);
             }
 

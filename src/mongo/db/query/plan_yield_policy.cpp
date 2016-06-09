@@ -97,11 +97,6 @@ bool PlanYieldPolicy::yield(RecordFetcher* fetcher) {
                 opCtx->checkForInterrupt();
             }
 
-            // No need to yield if the collection is NULL.
-            if (NULL == _planYielding->collection()) {
-                return true;
-            }
-
             try {
                 _planYielding->saveState();
             } catch (const WriteConflictException& wce) {
@@ -120,7 +115,7 @@ bool PlanYieldPolicy::yield(RecordFetcher* fetcher) {
         } catch (const WriteConflictException& wce) {
             CurOp::get(opCtx)->debug().writeConflicts++;
             WriteConflictException::logAndBackoff(
-                attempt, "plan execution restoreState", _planYielding->collection()->ns().ns());
+                attempt, "plan execution restoreState", _planYielding->ns());
             // retry
         }
     }

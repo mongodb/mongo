@@ -252,7 +252,7 @@ public:
                       txn, std::move(ws), std::move(proxy), collection, PlanExecutor::YIELD_MANUAL);
             invariant(statusWithPlanExecutor.isOK());
             exec = std::move(statusWithPlanExecutor.getValue());
-
+            
             {
                 auto planSummary = Explain::getPlanSummary(exec.get());
                 stdx::lock_guard<Client>(*txn->getClient());
@@ -263,13 +263,6 @@ public:
                 PlanSummaryStats stats;
                 Explain::getSummaryStats(*exec, &stats);
                 collection->infoCache()->notifyOfQuery(txn, stats.indexesUsed);
-            }
-
-            if (!collection && input) {
-                // If we don't have a collection, we won't be able to register any executors, so
-                // make sure that the input PlanExecutor (likely wrapping an EOFStage) doesn't
-                // need to be registered.
-                invariant(!input->collection());
             }
 
             if (collection) {
@@ -291,7 +284,7 @@ public:
             //   collection lock later when cleaning up our ClientCursorPin.
             // - In the case where we don't have a collection: our PlanExecutor won't be
             //   registered, so it will be safe to clean it up outside the lock.
-            invariant(NULL == exec.get() || NULL == exec->collection());
+            invariant(!exec || !collection);
         }
 
         try {

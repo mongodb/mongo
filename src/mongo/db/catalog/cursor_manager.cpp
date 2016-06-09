@@ -332,7 +332,6 @@ void CursorManager::invalidateAll(bool collectionGoingAway, const std::string& r
         // we kill the executor, but it deletes itself
         PlanExecutor* exec = *it;
         exec->kill(reason);
-        invariant(exec->collection() == NULL);
     }
     _nonCachedExecutors.clear();
 
@@ -342,8 +341,6 @@ void CursorManager::invalidateAll(bool collectionGoingAway, const std::string& r
             ClientCursor* cc = i->second;
 
             cc->kill();
-
-            invariant(cc->getExecutor() == NULL || cc->getExecutor()->collection() == NULL);
 
             // If the CC is pinned, somebody is actively using it and we do not delete it.
             // Instead we notify the holder that we killed it.  The holder will then delete the

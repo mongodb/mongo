@@ -247,9 +247,9 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(std::set<RecordId>* dupsO
         _txn, _collection->ns().ns(), _collection, PlanExecutor::YIELD_MANUAL));
     if (_buildInBackground) {
         invariant(_allowInterruption);
-        exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
+        exec->setYieldPolicy(PlanExecutor::YIELD_AUTO, _collection);
     } else {
-        exec->setYieldPolicy(PlanExecutor::WRITE_CONFLICT_RETRY_ONLY);
+        exec->setYieldPolicy(PlanExecutor::WRITE_CONFLICT_RETRY_ONLY, _collection);
     }
 
     Snapshotted<BSONObj> objToIndex;

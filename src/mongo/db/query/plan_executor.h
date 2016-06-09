@@ -201,11 +201,6 @@ public:
     CanonicalQuery* getCanonicalQuery() const;
 
     /**
-     * The collection in which this executor is working.
-     */
-    const Collection* collection() const;
-
-    /**
      * Return the NS that the query is running over.
      */
     const std::string& ns();
@@ -287,6 +282,7 @@ public:
      * If a YIELD_AUTO policy is set, then this method may yield.
      */
     ExecState getNextSnapshotted(Snapshotted<BSONObj>* objOut, RecordId* dlOut);
+
     ExecState getNext(BSONObj* objOut, RecordId* dlOut);
 
     /**
@@ -315,7 +311,7 @@ public:
      *
      * Deregistration happens automatically when this plan executor is destroyed.
      */
-    void registerExec();
+    void registerExec(const Collection* collection);
 
     /**
      * Unregister this PlanExecutor. Normally you want the PlanExecutor to be registered
@@ -353,7 +349,9 @@ public:
      * register (or not) here, rather than require all users to have yet another RAII object.
      * Only cursor-creating things like find.cpp set registerExecutor to false.
      */
-    void setYieldPolicy(YieldPolicy policy, bool registerExecutor = true);
+    void setYieldPolicy(YieldPolicy policy,
+                        const Collection* collection,
+                        bool registerExecutor = true);
 
     /**
      * Stash the BSONObj so that it gets returned from the PlanExecutor on a later call to
@@ -390,10 +388,11 @@ private:
      * by virtue of being cached, so this exception-proofing is not required.
      */
     struct ScopedExecutorRegistration {
-        ScopedExecutorRegistration(PlanExecutor* exec);
+        ScopedExecutorRegistration(PlanExecutor* exec, const Collection* collection);
         ~ScopedExecutorRegistration();
 
         PlanExecutor* const _exec;
+        const Collection* const _collection;
     };
 
     /**
@@ -430,7 +429,7 @@ private:
      *
      * If a YIELD_AUTO policy is set then locks are yielded during plan selection.
      */
-    Status pickBestPlan(YieldPolicy policy);
+    Status pickBestPlan(YieldPolicy policy, const Collection* collection);
 
     bool killed() {
         return static_cast<bool>(_killReason);
@@ -440,24 +439,22 @@ private:
     // locks.
     OperationContext* _opCtx;
 
-    // Collection over which this plan executor runs. Used to resolve record ids retrieved by
-    // the plan stages. The collection must not be destroyed while there are active plans.
-    const Collection* _collection;
-
     std::unique_ptr<CanonicalQuery> _cq;
     std::unique_ptr<WorkingSet> _workingSet;
     std::unique_ptr<QuerySolution> _qs;
     std::unique_ptr<PlanStage> _root;
+
+    // If _killReason has a value, then we have been killed and the value represents the reason
+    // for the kill.
+    // The ScopedExecutorRegistration skips dereigstering the plan executor when the plan executor
+    // has been killed, so _killReason must outlive _safety.
+    boost::optional<std::string> _killReason;
 
     // Deregisters this executor when it is destroyed.
     std::unique_ptr<ScopedExecutorRegistration> _safety;
 
     // What namespace are we operating over?
     std::string _ns;
-
-    // If _killReason has a value, then we have been killed and the value represents the reason
-    // for the kill.
-    boost::optional<std::string> _killReason;
 
     // This is used to handle automatic yielding when allowed by the YieldPolicy. Never NULL.
     // TODO make this a non-pointer member. This requires some header shuffling so that this

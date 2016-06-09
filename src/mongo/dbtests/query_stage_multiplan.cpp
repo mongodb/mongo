@@ -355,7 +355,8 @@ public:
         ASSERT_EQ(root->bestPlanIdx(), 0);
 
         BSONObjBuilder bob;
-        Explain::explainStages(exec.get(), ExplainCommon::EXEC_ALL_PLANS, &bob);
+        Explain::explainStages(
+            exec.get(), ctx.getCollection(), ExplainCommon::EXEC_ALL_PLANS, &bob);
         BSONObj explained = bob.done();
 
         ASSERT_EQ(explained["executionStats"]["nReturned"].Int(), nDocs);

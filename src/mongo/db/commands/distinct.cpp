@@ -185,7 +185,7 @@ public:
             return executor.getStatus();
         }
 
-        Explain::explainStages(executor.getValue().get(), verbosity, out);
+        Explain::explainStages(executor.getValue().get(), collection, verbosity, out);
         return Status::OK();
     }
 

@@ -374,7 +374,7 @@ long long Helpers::removeRange(OperationContext* txn,
                                            PlanExecutor::YIELD_MANUAL,
                                            InternalPlanner::FORWARD,
                                            InternalPlanner::IXSCAN_FETCH));
-            exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
+            exec->setYieldPolicy(PlanExecutor::YIELD_AUTO, collection);
 
             RecordId rloc;
             BSONObj obj;

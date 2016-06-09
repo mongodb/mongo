@@ -137,7 +137,7 @@ Status cloneCollectionAsCapped(OperationContext* txn,
     std::unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
         txn, fromNs, fromCollection, PlanExecutor::YIELD_MANUAL, InternalPlanner::FORWARD));
 
-    exec->setYieldPolicy(PlanExecutor::WRITE_CONFLICT_RETRY_ONLY);
+    exec->setYieldPolicy(PlanExecutor::WRITE_CONFLICT_RETRY_ONLY, fromCollection);
 
     Snapshotted<BSONObj> objToClone;
     RecordId loc;
