@@ -233,29 +233,20 @@ functions:
   "build new tools" :
     command: shell.exec
     params:
-      working_dir: src
+      working_dir: src/mongo-tools
       script: |
         set -o verbose
         set -o errexit
-
-        # create the target directory for the binaries
-        mkdir -p src/mongo-tools
-
-        # clone into a different path so the binaries and package directory
-        # names do not conflict
-        ${gitvars} git clone https://github.com/mongodb/mongo-tools.git src/mongo-tools-repo
-        cd src/mongo-tools-repo
 
         # make sure newlines in the scripts are handled correctly by windows
         if [ "Windows_NT" = "$OS" ]; then
             set -o igncr
         fi;
 
-        git checkout v3.2
         . ./${set_tools_gopath|set_gopath.sh}
 
         for i in bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop mongooplog; do
-             ${gorootvars} go build -ldflags "-X github.com/mongodb/mongo-tools/common/options.Gitspec $(git rev-parse HEAD) -X github.com/mongodb/mongo-tools/common/options.VersionStr $(git --git-dir ../../.git describe)" ${tooltags|} -o "../mongo-tools/$i${exe|}" $i/main/$i.go
+             ${gorootvars} go build -ldflags "-X github.com/mongodb/mongo-tools/common/options.Gitspec $(git rev-parse HEAD) -X github.com/mongodb/mongo-tools/common/options.VersionStr $(git --git-dir ../.git describe)" ${tooltags|} -o "../src/mongo-tools/$i${exe|}" $i/main/$i.go
              echo $i;
         done
 
@@ -465,6 +456,7 @@ tasks:
         directory: src
         revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
           enterprise: ${enterprise_rev}
+          mongo-tools: ${mongo-tools_rev}
           rocksdb: ${rocksdb_rev}
     - command: git.apply_patch
       params:
@@ -484,7 +476,7 @@ tasks:
           rm -rf ${install_directory|/data/mongo-install-directory}
           ${scons|scons} ${compile_flags|} --use-new-tools all dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|}
 
-          ${gitvars} git describe | ${python|python} buildscripts/generate_compile_expansions.py | tee compile_expansions.yml
+          git describe | ${python|python} buildscripts/generate_compile_expansions.py | tee compile_expansions.yml
 
           mv mongodb-src-*.${ext|tgz} distsrc.${ext|tgz}
           mv mongodb-*-debugsymbols.${ext|tgz} mongo-debugsymbols.tgz || true
@@ -599,6 +591,7 @@ tasks:
         directory: src
         revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
           enterprise: ${enterprise_rev}
+          mongo-tools: ${mongo-tools_rev}
           rocksdb: ${rocksdb_rev}
     - command: git.apply_patch
       params:
@@ -2271,6 +2264,11 @@ modules:
   prefix: src/mongo/db/modules
   branch: v3.2
 
+- name: mongo-tools
+  repo: git@github.com:mongodb/mongo-tools.git
+  prefix: .
+  branch: v3.2
+
 - name: rocksdb
   repo: git@github.com:mongodb-partners/mongo-rocks.git
   prefix: src/mongo/db/modules
@@ -2288,13 +2286,13 @@ buildvariants:
 
 - name: linux-64
   display_name: Linux
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - rhel55
   - rhel55-test
   batchtime: 1440 # 1 day
   expansions:
-    gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -2407,12 +2405,12 @@ buildvariants:
 - name: linux-64-repeated-execution
   stepback: false
   display_name: ~ Linux Repeated Execution
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - rhel55-test
   batchtime: 1440 # 1 day
   expansions:
-    gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
@@ -2439,13 +2437,13 @@ buildvariants:
 
 - name: linux-64-debug
   display_name: Linux DEBUG
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - rhel55
   - rhel55-test
   batchtime: 1440 # 1 day
   expansions:
-    gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -2552,13 +2550,13 @@ buildvariants:
 
 - name: linux-64-duroff
   display_name: Linux (No Journal)
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - rhel55
   - rhel55-test
   batchtime: 1440 # 1 day
   expansions:
-    gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -2620,12 +2618,13 @@ buildvariants:
 - name: linux-64-lsm
   stepback: false
   display_name: Linux LSM
+  modules:
+  - mongo-tools
   run_on:
   - rhel55
   - rhel55-test
   batchtime: 1440 # 1 day
   expansions:
-    gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
@@ -2674,7 +2673,8 @@ buildvariants:
 
 - name: ubuntu1204
   display_name: SSL Ubuntu 12.04
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - ubuntu1204-test
   batchtime: 1440 # 1 day
@@ -2784,7 +2784,8 @@ buildvariants:
 
 - name: ubuntu1404
   display_name: SSL Ubuntu 14.04
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - ubuntu1404-test
   batchtime: 1440 # 1 day
@@ -2895,7 +2896,8 @@ buildvariants:
 
 - name: ubuntu1604
   display_name: SSL Ubuntu 16.04
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - ubuntu1604-test
   batchtime: 1440 # 1 day
@@ -3008,6 +3010,7 @@ buildvariants:
   display_name: Enterprise Amazon Linux
   modules:
   - enterprise
+  - mongo-tools
   run_on:
   - linux-64-amzn-test
   expansions:
@@ -3082,7 +3085,8 @@ buildvariants:
 
 - name: amazon
   display_name: SSL Amazon Linux
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - linux-64-amzn-test
   batchtime: 1440 # 1 day
@@ -3195,12 +3199,12 @@ buildvariants:
 
 - name: linux-32
   display_name: Linux 32-bit
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - rhel55-32
   batchtime: 1440 # 1 day
   expansions:
-    gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH GOARCH=386 GOOS=linux
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -3225,12 +3229,12 @@ buildvariants:
 
 - name: linux-64-decimal
   display_name: Linux (Decimal Enabled)
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - rhel55
   batchtime: 1440 # 1 day
   expansions:
-    gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -3255,7 +3259,8 @@ buildvariants:
 
 - name: windows-64
   display_name: Windows Vista
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - windows-64-vs2013-test
   batchtime: 1440 # 1 day
@@ -3356,7 +3361,8 @@ buildvariants:
 
 - name: windows-64-2k8
   display_name: Windows 2008R2
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - windows-64-vs2013-test
   batchtime: 1440 # 1 day
@@ -3461,7 +3467,8 @@ buildvariants:
 
 - name: windows-64-2k8-debug
   display_name: Windows 2008R2 DEBUG
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - windows-64-vs2013-test
   expansions:
@@ -3561,6 +3568,7 @@ buildvariants:
   display_name: Enterprise Windows
   modules:
   - enterprise
+  - mongo-tools
   run_on:
   - windows-64-vs2013-test
   expansions:
@@ -3618,6 +3626,7 @@ buildvariants:
   display_name: Enterprise Windows (inMemory)
   modules:
   - enterprise
+  - mongo-tools
   run_on:
   - windows-64-vs2013-test
   batchtime: 1440 # 1 day
@@ -3670,7 +3679,8 @@ buildvariants:
 
 - name: windows-64-2k8-ssl
   display_name: SSL Windows 2008R2
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - windows-64-vs2013-test
   batchtime: 1440 # 1 day
@@ -3763,7 +3773,8 @@ buildvariants:
 
 - name: windows-32
   display_name: Windows 32-bit
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - windows-32
   batchtime: 1440 # 1 day
@@ -3801,7 +3812,8 @@ buildvariants:
 
 - name: osx-107
   display_name: OS X 10.7
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - osx-1010
   batchtime: 1440 # 1 day
@@ -3890,7 +3902,8 @@ buildvariants:
 
 - name: osx-107-ssl
   display_name: SSL OS X 10.7
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - osx-1010
   batchtime: 1440 # 1 day
@@ -3980,7 +3993,8 @@ buildvariants:
 
 - name: osx-107-debug
   display_name: OS X 10.7 DEBUG
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - osx-1010
   expansions:
@@ -4021,6 +4035,7 @@ buildvariants:
   display_name: Enterprise OS X 10.7
   modules:
   - enterprise
+  - mongo-tools
   run_on:
   - osx-1010
   batchtime: 1440 # 1 day
@@ -4064,11 +4079,11 @@ buildvariants:
   display_name: Enterprise RHEL 5.7
   modules:
   - enterprise
+  - mongo-tools
   run_on:
   - rhel55-test
   batchtime: 1440 # 1 day
   expansions:
-    gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
     tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl) -L/usr/lib64/sasl2" -tags 'sasl ssl'
     push_path: linux
@@ -4114,6 +4129,7 @@ buildvariants:
   display_name: Enterprise RHEL 6.2
   modules:
   - enterprise
+  - mongo-tools
   run_on:
   - rhel62-test
   expansions:
@@ -4258,6 +4274,7 @@ buildvariants:
   display_name: Enterprise RHEL 7.0
   modules:
   - enterprise
+  - mongo-tools
   run_on:
   - rhel70
   batchtime: 1440 # 1 day
@@ -4305,6 +4322,7 @@ buildvariants:
   display_name: Enterprise RHEL 7.1 PPC64LE
   modules:
   - enterprise
+  - mongo-tools
   run_on:
   - rhel71-power8-build
   - rhel71-power8-test
@@ -4441,13 +4459,13 @@ buildvariants:
 
 - name: rhel55
   display_name: SSL RHEL 5.5
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - rhel55
   - rhel55-test
   batchtime: 1440 # 1 day
   expansions:
-    gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
     tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl)" -tags 'ssl'
     push_path: linux
@@ -4554,7 +4572,8 @@ buildvariants:
 
 - name: rhel62
   display_name: SSL RHEL 6.2
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - rhel62-test
   batchtime: 1440 # 1 day
@@ -4663,7 +4682,8 @@ buildvariants:
 
 - name: rhel70
   display_name: SSL RHEL 7.0
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - rhel70
   batchtime: 1440 # 1 day
@@ -4780,6 +4800,7 @@ buildvariants:
   display_name: Enterprise Ubuntu 12.04
   modules:
   - enterprise
+  - mongo-tools
   run_on:
   - ubuntu1204-test
   batchtime: 1440 # 1 day
@@ -4829,6 +4850,7 @@ buildvariants:
   display_name: Enterprise Ubuntu 14.04
   modules:
   - enterprise
+  - mongo-tools
   run_on:
   - ubuntu1404-test
   batchtime: 1440 # 1 day
@@ -4878,6 +4900,7 @@ buildvariants:
   display_name: Enterprise Ubuntu 16.04
   modules:
   - enterprise
+  - mongo-tools
   run_on:
   - ubuntu1604-test
   batchtime: 1440 # 1 day
@@ -4933,6 +4956,7 @@ buildvariants:
   display_name: Enterprise SLES 12
   modules:
   - enterprise
+  - mongo-tools
   run_on:
   - suse12-test
   batchtime: 1440 # 1 day
@@ -4980,7 +5004,8 @@ buildvariants:
 
 - name: suse12
   display_name: SSL SUSE 12
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - suse12-test
   batchtime: 1440 # 1 day
@@ -5093,6 +5118,7 @@ buildvariants:
   display_name: Enterprise SLES 11
   modules:
   - enterprise
+  - mongo-tools
   run_on:
   - suse11-test
   batchtime: 1440 # 1 day
@@ -5140,7 +5166,8 @@ buildvariants:
 
 - name: suse11
   display_name: SSL SUSE 11
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - suse11-test
   batchtime: 1440 # 1 day
@@ -5255,7 +5282,8 @@ buildvariants:
 
 - name: solaris-64-bit
   display_name: Solaris
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - solaris
   expansions:
@@ -5341,6 +5369,7 @@ buildvariants:
   display_name: Enterprise Debian 7.1
   modules:
   - enterprise
+  - mongo-tools
   run_on:
   - debian71-test
   batchtime: 1440 # 1 day
@@ -5390,6 +5419,7 @@ buildvariants:
   display_name: Enterprise Debian 8.1
   modules:
   - enterprise
+  - mongo-tools
   run_on:
   - debian81-test
   batchtime: 1440 # 1 day
@@ -5438,7 +5468,8 @@ buildvariants:
 
 - name: debian71
   display_name: SSL Debian 7.1
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - debian71-test
   batchtime: 1440 # 1 day
@@ -5553,7 +5584,8 @@ buildvariants:
 
 - name: debian81
   display_name: SSL Debian 8.1
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - debian81-test
   batchtime: 1440 # 1 day
@@ -5674,6 +5706,7 @@ buildvariants:
   display_name: Enterprise RHEL 6.2 (inMemory)
   modules:
   - enterprise
+  - mongo-tools
   run_on:
   - rhel62-test
   batchtime: 1440 # 1 day
@@ -5759,13 +5792,13 @@ buildvariants:
 
 - name: linux-64-ephemeralForTest
   display_name: Linux (ephemeralForTest)
-  modules: ~
+  modules:
+  - mongo-tools
   run_on:
   - rhel55
   - rhel55-test
   batchtime: 1440 # 1 day
   expansions:
-    gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
     test_flags: --storageEngine=ephemeralForTest --excludeWithAnyTags=requires_persistence,requires_fsync,SERVER-21420,SERVER-21658
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
@@ -5838,6 +5871,7 @@ buildvariants:
   display_name: Ubuntu 14.04 (RocksDB)
   modules:
   - rocksdb
+  - mongo-tools
   run_on:
   - ubuntu1404-test
   batchtime: 1440 # 1 day
@@ -5903,6 +5937,7 @@ buildvariants:
   display_name: ~ ASAN Enterprise SSL Ubuntu 14.10 DEBUG
   modules:
   - enterprise
+  - mongo-tools
   run_on:
   - ubuntu1410-build
   stepback: false
@@ -6028,6 +6063,8 @@ buildvariants:
 
 - name: ubuntu1410-asan
   display_name: ~ ASAN SSL Ubuntu 14.10
+  modules:
+  - mongo-tools
   run_on:
   - ubuntu1410-build
   stepback: false
@@ -6049,6 +6086,8 @@ buildvariants:
 
 - name: ubuntu1410-fast-clang
   display_name: ~ Clang/libc++ SSL Ubuntu 14.10
+  modules:
+  - mongo-tools
   run_on:
   - ubuntu1410-test
   stepback: false
