@@ -1329,9 +1329,15 @@ void Command::execCommand(OperationContext* txn,
                 replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
                 !replCoord->canAcceptWritesForDatabase(dbname) &&
                 !replCoord->getMemberState().secondary()) {
-                uasserted(ErrorCodes::NotMasterOrSecondary, "node is recovering");
+
+                if (replCoord->getMemberState().recovering()) {
+                    uasserted(ErrorCodes::NotMasterOrSecondary, "node is recovering");
+                }
+                invariant(replCoord->getMemberState().primary());
+                uasserted(ErrorCodes::NotMasterOrSecondary, "node is in drain mode");
             }
         }
+
 
         if (command->adminOnly()) {
             LOG(2) << "command: " << request.getCommandName();
