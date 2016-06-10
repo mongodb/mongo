@@ -476,7 +476,7 @@ add_option('modules',
 
 add_option('runtime-hardening',
     choices=["on", "off"],
-    default="off",
+    default="on",
     help="Enable runtime hardening features (e.g. stack smash protection)",
     type='choice',
 )
