@@ -64,7 +64,7 @@
                 }
             }
             return false;
-        }, 'Did not see a log entry containing the following message: ' + msg, 10000, 1000);
+        }, 'Did not see a log entry containing the following message: ' + msg, 60000, 1000);
     };
     var msgB = "replica set IDs do not match, ours: " + configB.settings.replicaSetId +
         "; remote node's: " + configA.settings.replicaSetId;

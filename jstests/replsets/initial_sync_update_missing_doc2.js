@@ -45,7 +45,7 @@
                 }
             }
             return false;
-        }, 'Did not see a log entry containing the following message: ' + msg, 10000, 1000);
+        }, 'Did not see a log entry containing the following message: ' + msg, 60000, 1000);
     };
     checkLog(secondary, 'initial sync - initialSyncHangBeforeCopyingDatabases fail point enabled');
 
