@@ -430,9 +430,9 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
 	WT_ERR(__wt_epoch(session, &fsync_stop));
 	fsync_duration_usecs = WT_TIMEDIFF_US(fsync_stop, fsync_start);
-	WT_STAT_FAST_CONN_INCR(session, txn_fsync_pre);
+	WT_STAT_FAST_CONN_INCR(session, txn_checkpoint_fsync_pre);
 	WT_STAT_FAST_CONN_INCRV(session,
-	    txn_fsync_pre_duration, fsync_duration_usecs);
+	    txn_checkpoint_fsync_pre_duration, fsync_duration_usecs);
 
 	/* Tell logging that we are about to start a database checkpoint. */
 	if (full && logging)
@@ -535,9 +535,9 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
 	WT_ERR(__wt_epoch(session, &fsync_stop));
 	fsync_duration_usecs = WT_TIMEDIFF_US(fsync_stop, fsync_start);
-	WT_STAT_FAST_CONN_INCR(session, txn_fsync_post);
+	WT_STAT_FAST_CONN_INCR(session, txn_checkpoint_fsync_post);
 	WT_STAT_FAST_CONN_INCRV(session,
-	    txn_fsync_post_duration, fsync_duration_usecs);
+	    txn_checkpoint_fsync_post_duration, fsync_duration_usecs);
 
 	WT_ERR(__checkpoint_verbose_track(session,
 	    "sync completed", &verb_timer));

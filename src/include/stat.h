@@ -399,10 +399,10 @@ struct __wt_connection_stats {
 	int64_t txn_checkpoint_time_total;
 	int64_t txn_checkpoint;
 	int64_t txn_fail_cache;
-	int64_t txn_fsync_post;
-	int64_t txn_fsync_pre;
-	int64_t txn_fsync_post_duration;
-	int64_t txn_fsync_pre_duration;
+	int64_t txn_checkpoint_fsync_post;
+	int64_t txn_checkpoint_fsync_pre;
+	int64_t txn_checkpoint_fsync_post_duration;
+	int64_t txn_checkpoint_fsync_pre_duration;
 	int64_t txn_pinned_range;
 	int64_t txn_pinned_checkpoint_range;
 	int64_t txn_pinned_snapshot_range;
