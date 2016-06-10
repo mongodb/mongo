@@ -260,6 +260,7 @@ public:
     BSONObjBuilder& append(StringData fieldName, Decimal128 n) {
         _b.appendNum(static_cast<char>(NumberDecimal));
         _b.appendStr(fieldName);
+        // Make sure we write data in a Little Endian conforming manner
         _b.appendNum(n);
         return *this;
     }

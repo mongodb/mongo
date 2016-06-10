@@ -304,7 +304,9 @@ public:
 
     /** Return decimal128 value for this field. MUST be NumberDecimal type. */
     Decimal128 _numberDecimal() const {
-        return Decimal128(ConstDataView(value()).read<LittleEndian<Decimal128::Value>>());
+        uint64_t low = ConstDataView(value()).read<LittleEndian<long long>>();
+        uint64_t high = ConstDataView(value() + sizeof(long long)).read<LittleEndian<long long>>();
+        return Decimal128(Decimal128::Value({low, high}));
     }
 
     /** Return long long value for this field. MUST be NumberLong type. */

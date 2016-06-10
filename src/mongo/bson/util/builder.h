@@ -212,6 +212,15 @@ public:
         appendNumImpl(j);
     }
 
+    void appendNum(Decimal128 j) {
+        BOOST_STATIC_ASSERT(sizeof(Decimal128::Value) == 16);
+        Decimal128::Value value = j.getValue();
+        long long low = value.low64;
+        long long high = value.high64;
+        appendNumImpl(low);
+        appendNumImpl(high);
+    }
+
     template <typename Int64_t,
               typename = stdx::enable_if_t<std::is_same<Int64_t, int64_t>::value &&
                                            !std::is_same<int64_t, long long>::value>>
@@ -221,10 +230,6 @@ public:
 
     void appendNum(unsigned long long j) {
         appendNumImpl(j);
-    }
-    void appendNum(Decimal128 j) {
-        BOOST_STATIC_ASSERT(sizeof(Decimal128::Value) == 16);
-        appendNumImpl(j.getValue());
     }
 
     void appendBuf(const void* src, size_t len) {
