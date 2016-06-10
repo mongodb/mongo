@@ -32,12 +32,10 @@
 
 #include <vector>
 
-#include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/query_request.h"
-#include "mongo/db/s/type_shard_identity.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
@@ -77,16 +75,7 @@ protected:
         CatalogManagerReplSetTestFixture::setUp();
 
         getMessagingPort()->setRemote(HostAndPort("FakeRemoteClient:34567"));
-
-        configTargeter()->setConnectionStringReturnValue(_configConnStr);
-
-        _configHost = _configConnStr.getServers().front();
-        configTargeter()->setFindHostReturnValue(_configHost);
-
-        // TODO SERVER-23096: Change this to OID::gen() once clusterId is loaded from the config
-        // servers into the ShardRegistry instead of created by the ShardRegistry within each
-        // process.
-        _clusterId = OID();
+        configTargeter()->setFindHostReturnValue(configHost);
     }
 
     /**
@@ -138,77 +127,12 @@ protected:
     }
 
     /**
-     * Waits for a request for the shardIdentity document to be upserted into a shard from the
-     * config server on addShard.
-     */
-    void expectShardIdentityUpsert(const HostAndPort& expectedHost,
-                                   const std::string& expectedShardName) {
-
-        ShardIdentityType expectedShardIdentity;
-        expectedShardIdentity.setShardName(expectedShardName);
-        expectedShardIdentity.setClusterId(_clusterId);
-        expectedShardIdentity.setConfigsvrConnString(_configConnStr);
-        invariant(expectedShardIdentity.validate().isOK());
-
-        auto updateRequest = expectedShardIdentity.createUpsertForAddShard();
-        expectUpdates(expectedHost,
-                      NamespaceString(NamespaceString::kConfigCollectionNamespace),
-                      updateRequest.get());
-    }
-
-    /**
-     * Waits for a set of batched updates and ensures that the host, namespace, and updates exactly
-     * match what's expected. Responds with a success status.
-     */
-    void expectUpdates(const HostAndPort& expectedHost,
-                       const NamespaceString& expectedNss,
-                       BatchedUpdateRequest* expectedBatchedUpdates) {
-        onCommandForAddShard([&](const RemoteCommandRequest& request) {
-
-            ASSERT_EQUALS(expectedHost, request.target);
-
-            // Check that the db name in the request matches the expected db name.
-            ASSERT_EQUALS(expectedNss.db(), request.dbname);
-
-            BatchedUpdateRequest actualBatchedUpdates;
-            std::string errmsg;
-            ASSERT_TRUE(actualBatchedUpdates.parseBSON(request.dbname, request.cmdObj, &errmsg));
-
-            // Check that the db and collection names in the BatchedUpdateRequest match the
-            // expected.
-            ASSERT_EQUALS(expectedNss, actualBatchedUpdates.getNS());
-
-            auto expectedUpdates = expectedBatchedUpdates->getUpdates();
-            auto actualUpdates = actualBatchedUpdates.getUpdates();
-
-            ASSERT_EQUALS(expectedUpdates.size(), actualUpdates.size());
-
-            auto itExpected = expectedUpdates.begin();
-            auto itActual = actualUpdates.begin();
-
-            for (; itActual != actualUpdates.end(); itActual++, itExpected++) {
-                ASSERT_EQ((*itExpected)->getUpsert(), (*itActual)->getUpsert());
-                ASSERT_EQ((*itExpected)->getMulti(), (*itActual)->getMulti());
-                ASSERT_EQ((*itExpected)->getQuery(), (*itActual)->getQuery());
-                ASSERT_EQ((*itExpected)->getUpdateExpr(), (*itActual)->getUpdateExpr());
-            }
-
-            BatchedCommandResponse response;
-            response.setOk(true);
-            response.setNModified(1);
-
-            return response.toBSON();
-        });
-    }
-
-
-    /**
      * Wait for a single update request and ensure that the items being updated exactly match the
      * expected items. Responds with a success status.
      */
     void expectDatabaseUpdate(const DatabaseType& dbtExpected) {
         onCommand([this, &dbtExpected](const RemoteCommandRequest& request) {
-            ASSERT_EQ(request.target, _configHost);
+            ASSERT_EQ(request.target, configHost);
             ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
             BatchedUpdateRequest actualBatchedUpdate;
@@ -238,10 +162,10 @@ protected:
      */
     void expectAddShardChangeLog(const std::string& shardName, const std::string& shardHost) {
         // Expect the change log collection to be created
-        expectChangeLogCreate(_configHost, BSON("ok" << 1));
+        expectChangeLogCreate(configHost, BSON("ok" << 1));
 
         // Expect the change log operation
-        expectChangeLogInsert(_configHost,
+        expectChangeLogInsert(configHost,
                               network()->now(),
                               "addShard",
                               "",
@@ -253,7 +177,7 @@ protected:
             // Do it twice when there is no response set because getDatabase retries if it can't
             // find a database
             onFindCommand([&](const RemoteCommandRequest& request) {
-                ASSERT_EQ(request.target, _configHost);
+                ASSERT_EQ(request.target, configHost);
                 if (i == 0) {
                     ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
                 } else if (i == 1) {
@@ -281,11 +205,7 @@ protected:
         }
     }
 
-    const ConnectionString _configConnStr{ConnectionString::forReplicaSet(
-        "configRS",
-        {HostAndPort("host1:23456"), HostAndPort("host2:23456"), HostAndPort("host3:23456")})};
-    HostAndPort _configHost;
-    OID _clusterId;
+    const HostAndPort configHost{HostAndPort("ConfigHost:23456")};
 };
 
 TEST_F(AddShardTest, Standalone) {
@@ -330,10 +250,7 @@ TEST_F(AddShardTest, Standalone) {
     expectGetDatabase("TestDB1", boost::none);
     expectGetDatabase("TestDB2", boost::none);
 
-    // The shardIdentity doc inserted into the config.version collection on the shard.
-    expectShardIdentityUpsert(shardTarget, expectedShardName);
-
-    // The shard doc inserted into the config.shards collection on the config server.
+    // The new shard is being inserted
     ShardType expectedShard;
     expectedShard.setName(expectedShardName);
     expectedShard.setHost("StandaloneHost:12345");
@@ -430,10 +347,7 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
         return vector<BSONObj>{existingShard.toBSON()};
     });
 
-    // The shardIdentity doc inserted into the config.version collection on the shard.
-    expectShardIdentityUpsert(shardTarget, expectedShardName);
-
-    // The shard doc inserted into the config.shards collection on the config server.
+    // The new shard is being inserted
     ShardType expectedShard;
     expectedShard.setName(expectedShardName);
     expectedShard.setHost(shardTarget.toString());
@@ -870,10 +784,6 @@ TEST_F(AddShardTest, ReAddExistingShard) {
 
     expectGetDatabase("shardDB", boost::none);
 
-    // The shardIdentity doc inserted into the config.version collection on the shard.
-    expectShardIdentityUpsert(shardTarget, expectedShardName);
-
-    // The shard doc inserted into the config.shards collection on the config server.
     ShardType newShard;
     newShard.setName(expectedShardName);
     newShard.setMaxSizeMB(100);
@@ -939,10 +849,6 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
 
     expectGetDatabase("shardDB", boost::none);
 
-    // The shardIdentity doc inserted into the config.version collection on the shard.
-    expectShardIdentityUpsert(shardTarget, expectedShardName);
-
-    // The shard doc inserted into the config.shards collection on the config server.
     ShardType newShard;
     newShard.setName(expectedShardName);
     newShard.setMaxSizeMB(100);
@@ -1000,10 +906,6 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
 
     expectGetDatabase("shardDB", boost::none);
 
-    // The shardIdentity doc inserted into the config.version collection on the shard.
-    expectShardIdentityUpsert(shardTarget, expectedShardName);
-
-    // The shard doc inserted into the config.shards collection on the config server.
     ShardType newShard;
     newShard.setName(expectedShardName);
     newShard.setMaxSizeMB(100);
@@ -1020,7 +922,7 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
     // Ensure that even if upserting the database discovered on the shard fails, the addShard
     // operation succeeds.
     onCommand([this, &shardDB](const RemoteCommandRequest& request) {
-        ASSERT_EQ(request.target, _configHost);
+        ASSERT_EQ(request.target, configHost);
         ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
         BatchedUpdateRequest actualBatchedUpdate;
@@ -1081,10 +983,6 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
 
     expectListDatabases(shardTarget, {});
 
-    // The shardIdentity doc inserted into the config.version collection on the shard.
-    expectShardIdentityUpsert(shardTarget, expectedShardName);
-
-    // The shard doc inserted into the config.shards collection on the config server.
     ShardType newShard;
     newShard.setName(expectedShardName);
     newShard.setMaxSizeMB(100);

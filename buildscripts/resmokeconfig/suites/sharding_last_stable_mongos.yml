@@ -7,9 +7,7 @@ selector:
     - jstests/sharding/error_propagation.js
     # New features for v3.4
     - jstests/sharding/shard_aware_init.js
-    - jstests/sharding/shard_aware_on_add_shard.js
     - jstests/sharding/shard_aware_primary_failover.js
-    - jstests/sharding/shard_identity_config_update.js
     # v3.4 changes $in shard key extraction.
     - jstests/sharding/upsert_sharded.js
     - jstests/sharding/update_sharded.js

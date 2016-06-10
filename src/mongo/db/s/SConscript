@@ -64,7 +64,6 @@ env.Library(
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/s/sharding_initialization',
-        '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
         'metadata',
         'migration_types',
         'type_shard_identity',
@@ -124,7 +123,6 @@ env.CppUnitTest(
         'type_shard_identity_test.cpp'
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
         'type_shard_identity',
     ]
 )

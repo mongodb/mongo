@@ -49,7 +49,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/s/type_shard_identity.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -198,10 +197,9 @@ StatusWith<ShardType> CatalogManagerReplicaSet::_validateHostAsShard(
 
     // Check for mongos and older version mongod connections, and whether the hosts
     // can be found for the user specified replset.
-    auto swCommandResponse =
-        _runCommandForAddShard(txn, targeter.get(), "admin", BSON("isMaster" << 1));
-    if (!swCommandResponse.isOK()) {
-        if (swCommandResponse.getStatus() == ErrorCodes::RPCProtocolNegotiationFailed) {
+    auto cmdStatus = _runCommandForAddShard(txn, targeter.get(), "admin", BSON("isMaster" << 1));
+    if (!cmdStatus.isOK()) {
+        if (cmdStatus == ErrorCodes::RPCProtocolNegotiationFailed) {
             // Mongos to mongos commands are no longer supported in the wire protocol
             // (because mongos does not support OP_COMMAND), similarly for a new mongos
             // and an old mongod. So the call will fail in such cases.
@@ -213,19 +211,18 @@ StatusWith<ShardType> CatalogManagerReplicaSet::_validateHostAsShard(
                                   << " likely because it contains a node that is a mongos or an old"
                                   << " version of mongod."};
         } else {
-            return swCommandResponse.getStatus();
+            return cmdStatus.getStatus();
         }
     }
 
     // Check for a command response error
-    auto resIsMasterStatus = std::move(swCommandResponse.getValue().commandStatus);
+    BSONObj resIsMaster = cmdStatus.getValue();
+    Status resIsMasterStatus = getStatusFromCommandResult(resIsMaster);
     if (!resIsMasterStatus.isOK()) {
         return {resIsMasterStatus.code(),
                 str::stream() << "Error running isMaster against " << shardConn->toString() << ": "
                               << causedBy(resIsMasterStatus)};
     }
-
-    auto resIsMaster = std::move(swCommandResponse.getValue().response);
 
     // Check whether there is a master. If there isn't, the replica set may not have been
     // initiated. If the connection is a standalone, it will return true for isMaster.
@@ -353,18 +350,18 @@ StatusWith<std::vector<std::string>> CatalogManagerReplicaSet::_getDBNamesListFr
         shardRegistry->createConnection(connectionString).release()};
     invariant(shardConn);
 
-    auto swCommandResponse = _runCommandForAddShard(
+    auto cmdStatus = _runCommandForAddShard(
         txn, shardConn->getTargeter().get(), "admin", BSON("listDatabases" << 1));
-    if (!swCommandResponse.isOK()) {
-        return swCommandResponse.getStatus();
-    }
-
-    auto cmdStatus = std::move(swCommandResponse.getValue().commandStatus);
     if (!cmdStatus.isOK()) {
-        return cmdStatus;
+        return cmdStatus.getStatus();
     }
 
-    auto cmdResult = std::move(swCommandResponse.getValue().response);
+    const BSONObj& cmdResult = cmdStatus.getValue();
+
+    Status cmdResultStatus = getStatusFromCommandResult(cmdResult);
+    if (!cmdResultStatus.isOK()) {
+        return cmdResultStatus;
+    }
 
     vector<string> dbNames;
 
@@ -411,7 +408,7 @@ void CatalogManagerReplicaSet::shutDown(OperationContext* txn) {
     _executorForAddShard->join();
 }
 
-StatusWith<Shard::CommandResponse> CatalogManagerReplicaSet::_runCommandForAddShard(
+StatusWith<BSONObj> CatalogManagerReplicaSet::_runCommandForAddShard(
     OperationContext* txn,
     RemoteCommandTargeter* targeter,
     const std::string& dbName,
@@ -424,12 +421,12 @@ StatusWith<Shard::CommandResponse> CatalogManagerReplicaSet::_runCommandForAddSh
 
     executor::RemoteCommandRequest request(
         host.getValue(), dbName, cmdObj, rpc::makeEmptyMetadata(), Seconds(30));
-    StatusWith<executor::RemoteCommandResponse> swResponse =
+    StatusWith<executor::RemoteCommandResponse> responseStatus =
         Status(ErrorCodes::InternalError, "Internal error running command");
 
     auto callStatus = _executorForAddShard->scheduleRemoteCommand(
-        request, [&swResponse](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
-            swResponse = args.response;
+        request, [&responseStatus](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
+            responseStatus = args.response;
         });
     if (!callStatus.isOK()) {
         return callStatus.getStatus();
@@ -438,22 +435,11 @@ StatusWith<Shard::CommandResponse> CatalogManagerReplicaSet::_runCommandForAddSh
     // Block until the command is carried out
     _executorForAddShard->wait(callStatus.getValue());
 
-    if (!swResponse.isOK()) {
-        if (swResponse.getStatus().compareCode(ErrorCodes::ExceededTimeLimit)) {
-            LOG(0) << "Operation for addShard timed out with status " << swResponse.getStatus();
-        }
-        return swResponse.getStatus();
+    if (!responseStatus.isOK()) {
+        return responseStatus.getStatus();
     }
 
-    BSONObj responseObj = swResponse.getValue().data.getOwned();
-    BSONObj responseMetadata = swResponse.getValue().metadata.getOwned();
-    Status commandStatus = getStatusFromCommandResult(responseObj);
-    Status writeConcernStatus = getWriteConcernStatusFromCommandResult(responseObj);
-
-    return Shard::CommandResponse(std::move(responseObj),
-                                  std::move(responseMetadata),
-                                  std::move(commandStatus),
-                                  std::move(writeConcernStatus));
+    return responseStatus.getValue().data.getOwned();
 }
 
 StatusWith<string> CatalogManagerReplicaSet::addShard(OperationContext* txn,
@@ -511,44 +497,7 @@ StatusWith<string> CatalogManagerReplicaSet::addShard(OperationContext* txn,
         shardType.setMaxSizeMB(maxSize);
     }
 
-    ShardIdentityType shardIdentity;
-    shardIdentity.setConfigsvrConnString(
-        Grid::get(txn)->shardRegistry()->getConfigServerConnectionString());
-    shardIdentity.setShardName(shardType.getName());
-    shardIdentity.setClusterId(Grid::get(txn)->shardRegistry()->getClusterId());
-    auto validateStatus = shardIdentity.validate();
-    if (!validateStatus.isOK()) {
-        return validateStatus;
-    }
-
-    log() << "going to insert shardIdentity document into shard: " << shardIdentity.toString();
-
-    auto updateRequest = shardIdentity.createUpsertForAddShard();
-    BatchedCommandRequest commandRequest(updateRequest.release());
-    commandRequest.setNS(NamespaceString::kConfigCollectionNamespace);
-    commandRequest.setWriteConcern(kMajorityWriteConcern.toBSON());
-
-    const std::shared_ptr<Shard> shardConn{
-        Grid::get(txn)->shardRegistry()->createConnection(shardConnectionString)};
-    invariant(shardConn);
-    auto targeter = shardConn->getTargeter();
-
-    auto swCommandResponse =
-        _runCommandForAddShard(txn, targeter.get(), "admin", commandRequest.toBSON());
-
-    if (!swCommandResponse.isOK()) {
-        return swCommandResponse.getStatus();
-    }
-
-    auto commandResponse = std::move(swCommandResponse.getValue());
-
-    BatchedCommandResponse batchResponse;
-    auto batchResponseStatus = _processBatchWriteResponse(commandResponse, &batchResponse);
-    if (!batchResponseStatus.isOK()) {
-        return batchResponseStatus;
-    }
-
-    log() << "going to insert new entry for shard into config.shards: " << shardType.toString();
+    log() << "going to add shard: " << shardType.toString();
 
     Status result = insertConfigDocument(txn, ShardType::ConfigNS, shardType.toBSON());
     if (!result.isOK()) {

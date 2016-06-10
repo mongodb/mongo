@@ -11,10 +11,9 @@
     /**
      * Restarts the mongod backing the specified shard instance, without restarting the mongobridge.
      */
-    function restartShard(shard, waitForConnect) {
+    function restartShard(shard) {
         MongoRunner.stopMongod(shard);
         shard.restart = true;
-        shard.waitForConnect = waitForConnect;
         MongoRunner.runMongod(shard);
     }
 
@@ -51,7 +50,7 @@
     });
 
     jsTestLog("Restarting a shard while there are no config servers up");
-    restartShard(st.shard1, false);
+    restartShard(st.shard1);
 
     jsTestLog("Queries should fail because the shard can't initialize sharding state");
     var error = assert.throws(function() {
@@ -68,8 +67,8 @@
 
     // TODO: SERVER-23192 - restart all shards and mongos because their replica set monitor has
     // deemed the CSRS config server set as unusable.
-    restartShard(st.shard0, true);
-    restartShard(st.shard1, true);
+    restartShard(st.shard0);
+    restartShard(st.shard1);
     st.restartMongos(0);
 
     jsTestLog("Queries against the original mongos should work again");

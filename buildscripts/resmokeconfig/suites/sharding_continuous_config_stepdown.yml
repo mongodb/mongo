@@ -96,6 +96,7 @@ selector:
     - jstests/sharding/startup_with_all_configs_down.js
     - jstests/sharding/lagged_config_secondary.js
     - jstests/sharding/autodiscover_config_rs_from_secondary.js
+    - jstests/sharding/sharding_state_after_stepdown.js
     - jstests/sharding/rs_stepdown_and_pooling.js
     - jstests/sharding/mongos_no_replica_set_refresh.js
     - jstests/sharding/primary_config_server_blackholed_from_mongos.js
