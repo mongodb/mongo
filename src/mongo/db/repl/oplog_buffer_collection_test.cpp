@@ -28,10 +28,14 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_buffer_collection.h"
+#include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -52,8 +56,11 @@ protected:
 protected:
     ServiceContext::UniqueOperationContext makeOperationContext() const;
 
+    ServiceContext::UniqueOperationContext _txn;
+
 private:
     void setUp() override;
+    void tearDown() override;
 };
 
 void OplogBufferCollectionTest::setUp() {
@@ -72,6 +79,14 @@ void OplogBufferCollectionTest::setUp() {
                                 stdx::make_unique<ReplicationCoordinatorMock>(replSettings));
 
     StorageInterface::set(serviceContext, stdx::make_unique<StorageInterfaceImpl>());
+
+    _txn = makeOperationContext();
+}
+
+void OplogBufferCollectionTest::tearDown() {
+    _txn.reset();
+
+    ServiceContextMongoDTest::tearDown();
 }
 
 ServiceContext::UniqueOperationContext OplogBufferCollectionTest::makeOperationContext() const {
@@ -105,10 +120,10 @@ TEST_F(OplogBufferCollectionTest, StartupCreatesCollection) {
     OplogBufferCollection oplogBuffer(nss);
 
     // Collection should not exist until startup() is called.
-    ASSERT_FALSE(AutoGetCollectionForRead(makeOperationContext().get(), nss).getCollection());
+    ASSERT_FALSE(AutoGetCollectionForRead(_txn.get(), nss).getCollection());
 
-    oplogBuffer.startup();
-    ASSERT_TRUE(AutoGetCollectionForRead(makeOperationContext().get(), nss).getCollection());
+    oplogBuffer.startup(_txn.get());
+    ASSERT_TRUE(AutoGetCollectionForRead(_txn.get(), nss).getCollection());
 }
 
 }  // namespace

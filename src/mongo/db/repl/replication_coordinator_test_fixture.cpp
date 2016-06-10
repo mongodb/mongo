@@ -83,7 +83,8 @@ void ReplCoordTest::tearDown() {
         _externalState->setStoreLocalConfigDocumentToHang(false);
     }
     if (_callShutdown) {
-        shutdown();
+        auto txn = makeOperationContext();
+        shutdown(txn.get());
     }
 }
 
@@ -267,8 +268,6 @@ void ReplCoordTest::simulateSuccessfulDryRun() {
 }
 
 void ReplCoordTest::simulateSuccessfulV1Election() {
-    const auto txnPtr = makeOperationContext();
-    auto& txn = *txnPtr;
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
     NetworkInterfaceMock* net = getNet();
 
@@ -323,7 +322,10 @@ void ReplCoordTest::simulateSuccessfulV1Election() {
     replCoord->fillIsMasterForReplSet(&imResponse);
     ASSERT_FALSE(imResponse.isMaster()) << imResponse.toBSON().toString();
     ASSERT_TRUE(imResponse.isSecondary()) << imResponse.toBSON().toString();
-    replCoord->signalDrainComplete(&txn);
+    {
+        auto txn = makeOperationContext();
+        replCoord->signalDrainComplete(txn.get());
+    }
     replCoord->fillIsMasterForReplSet(&imResponse);
     ASSERT_TRUE(imResponse.isMaster()) << imResponse.toBSON().toString();
     ASSERT_FALSE(imResponse.isSecondary()) << imResponse.toBSON().toString();
@@ -332,8 +334,6 @@ void ReplCoordTest::simulateSuccessfulV1Election() {
 }
 
 void ReplCoordTest::simulateSuccessfulElection() {
-    const auto txnPtr = makeOperationContext();
-    auto& txn = *txnPtr;
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
     NetworkInterfaceMock* net = getNet();
     ReplicaSetConfig rsConfig = replCoord->getReplicaSetConfig_forTest();
@@ -384,7 +384,10 @@ void ReplCoordTest::simulateSuccessfulElection() {
     replCoord->fillIsMasterForReplSet(&imResponse);
     ASSERT_FALSE(imResponse.isMaster()) << imResponse.toBSON().toString();
     ASSERT_TRUE(imResponse.isSecondary()) << imResponse.toBSON().toString();
-    replCoord->signalDrainComplete(&txn);
+    {
+        auto txn = makeOperationContext();
+        replCoord->signalDrainComplete(txn.get());
+    }
     replCoord->fillIsMasterForReplSet(&imResponse);
     ASSERT_TRUE(imResponse.isMaster()) << imResponse.toBSON().toString();
     ASSERT_FALSE(imResponse.isSecondary()) << imResponse.toBSON().toString();
@@ -392,10 +395,10 @@ void ReplCoordTest::simulateSuccessfulElection() {
     ASSERT(replCoord->getMemberState().primary()) << replCoord->getMemberState().toString();
 }
 
-void ReplCoordTest::shutdown() {
+void ReplCoordTest::shutdown(OperationContext* txn) {
     invariant(_callShutdown);
     _net->exitNetwork();
-    _repl->shutdown();
+    _repl->shutdown(txn);
     _callShutdown = false;
 }
 

@@ -68,7 +68,7 @@ public:
     // stop syncing (when this node becomes a primary, e.g.)
     void stop();
 
-    void shutdown();
+    void shutdown(OperationContext* txn);
 
     bool isStopped() const;
 
@@ -86,16 +86,16 @@ public:
 
     // Interface implementation
 
-    bool peek(BSONObj* op);
-    void consume();
+    bool peek(OperationContext* txn, BSONObj* op);
+    void consume(OperationContext* txn);
     void clearSyncTarget();
-    void waitForMore();
+    void waitForMore(OperationContext* txn);
 
     // For monitoring
     BSONObj getCounters();
 
     // Clears any fetched and buffered oplog entries.
-    void clearBuffer();
+    void clearBuffer(OperationContext* txn);
 
     /**
      * Cancel existing find/getMore commands on the sync source's oplog collection.
@@ -112,7 +112,7 @@ public:
     bool shouldStopFetching() const;
 
     // Testing related stuff
-    void pushTestOpToBuffer(const BSONObj& op);
+    void pushTestOpToBuffer(OperationContext* txn, const BSONObj& op);
 
 private:
     // Production thread
@@ -126,7 +126,7 @@ private:
      *
      * NOTE: Used after rollback and during draining to transition to Primary role;
      */
-    void _signalNoNewDataForApplier();
+    void _signalNoNewDataForApplier(OperationContext* txn);
 
     /**
      * Record metrics.

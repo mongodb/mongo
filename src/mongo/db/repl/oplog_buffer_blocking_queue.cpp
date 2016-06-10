@@ -47,31 +47,32 @@ size_t getDocumentSize(const BSONObj& o) {
 
 OplogBufferBlockingQueue::OplogBufferBlockingQueue() : _queue(kOplogBufferSize, &getDocumentSize) {}
 
-void OplogBufferBlockingQueue::startup() {}
+void OplogBufferBlockingQueue::startup(OperationContext*) {}
 
-void OplogBufferBlockingQueue::shutdown() {
-    clear();
+void OplogBufferBlockingQueue::shutdown(OperationContext* txn) {
+    clear(txn);
 }
 
-void OplogBufferBlockingQueue::pushEvenIfFull(const Value& value) {
+void OplogBufferBlockingQueue::pushEvenIfFull(OperationContext*, const Value& value) {
     _queue.pushEvenIfFull(value);
 }
 
-void OplogBufferBlockingQueue::push(const Value& value) {
+void OplogBufferBlockingQueue::push(OperationContext*, const Value& value) {
     _queue.push(value);
 }
 
-bool OplogBufferBlockingQueue::pushAllNonBlocking(Batch::const_iterator begin,
+bool OplogBufferBlockingQueue::pushAllNonBlocking(OperationContext*,
+                                                  Batch::const_iterator begin,
                                                   Batch::const_iterator end) {
     _queue.pushAllNonBlocking(begin, end);
     return true;
 }
 
-void OplogBufferBlockingQueue::waitForSpace(std::size_t size) {
+void OplogBufferBlockingQueue::waitForSpace(OperationContext*, std::size_t size) {
     _queue.waitForSpace(size);
 }
 
-bool OplogBufferBlockingQueue::isEmpty() const {
+bool OplogBufferBlockingQueue::isEmpty(OperationContext*) const {
     return _queue.empty();
 }
 
@@ -79,35 +80,36 @@ std::size_t OplogBufferBlockingQueue::getMaxSize() const {
     return kOplogBufferSize;
 }
 
-std::size_t OplogBufferBlockingQueue::getSize() const {
+std::size_t OplogBufferBlockingQueue::getSize(OperationContext*) const {
     return _queue.size();
 }
 
-std::size_t OplogBufferBlockingQueue::getCount() const {
+std::size_t OplogBufferBlockingQueue::getCount(OperationContext*) const {
     return _queue.count();
 }
 
-void OplogBufferBlockingQueue::clear() {
+void OplogBufferBlockingQueue::clear(OperationContext*) {
     _queue.clear();
 }
 
-bool OplogBufferBlockingQueue::tryPop(Value* value) {
+bool OplogBufferBlockingQueue::tryPop(OperationContext*, Value* value) {
     return _queue.tryPop(*value);
 }
 
-OplogBuffer::Value OplogBufferBlockingQueue::blockingPop() {
+OplogBuffer::Value OplogBufferBlockingQueue::blockingPop(OperationContext*) {
     return _queue.blockingPop();
 }
 
-bool OplogBufferBlockingQueue::blockingPeek(Value* value, Seconds waitDuration) {
+bool OplogBufferBlockingQueue::blockingPeek(OperationContext*, Value* value, Seconds waitDuration) {
     return _queue.blockingPeek(*value, static_cast<int>(durationCount<Seconds>(waitDuration)));
 }
 
-bool OplogBufferBlockingQueue::peek(Value* value) {
+bool OplogBufferBlockingQueue::peek(OperationContext*, Value* value) {
     return _queue.peek(*value);
 }
 
-boost::optional<OplogBuffer::Value> OplogBufferBlockingQueue::lastObjectPushed() const {
+boost::optional<OplogBuffer::Value> OplogBufferBlockingQueue::lastObjectPushed(
+    OperationContext*) const {
     return _queue.lastObjectPushed();
 }
 

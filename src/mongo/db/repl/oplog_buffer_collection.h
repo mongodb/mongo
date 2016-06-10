@@ -54,22 +54,24 @@ public:
      */
     NamespaceString getNamespace() const;
 
-    void startup() override;
-    void shutdown() override;
-    void pushEvenIfFull(const Value& value) override;
-    void push(const Value& value) override;
-    bool pushAllNonBlocking(Batch::const_iterator begin, Batch::const_iterator end) override;
-    void waitForSpace(std::size_t size) override;
-    bool isEmpty() const override;
+    void startup(OperationContext* txn) override;
+    void shutdown(OperationContext* txn) override;
+    void pushEvenIfFull(OperationContext* txn, const Value& value) override;
+    void push(OperationContext* txn, const Value& value) override;
+    bool pushAllNonBlocking(OperationContext* txn,
+                            Batch::const_iterator begin,
+                            Batch::const_iterator end) override;
+    void waitForSpace(OperationContext* txn, std::size_t size) override;
+    bool isEmpty(OperationContext* txn) const override;
     std::size_t getMaxSize() const override;
-    std::size_t getSize() const override;
-    std::size_t getCount() const override;
-    void clear() override;
-    bool tryPop(Value* value) override;
-    Value blockingPop() override;
-    bool blockingPeek(Value* value, Seconds waitDuration) override;
-    bool peek(Value* value) override;
-    boost::optional<Value> lastObjectPushed() const override;
+    std::size_t getSize(OperationContext* txn) const override;
+    std::size_t getCount(OperationContext* txn) const override;
+    void clear(OperationContext* txn) override;
+    bool tryPop(OperationContext* txn, Value* value) override;
+    Value blockingPop(OperationContext* txn) override;
+    bool blockingPeek(OperationContext* txn, Value* value, Seconds waitDuration) override;
+    bool peek(OperationContext* txn, Value* value) override;
+    boost::optional<Value> lastObjectPushed(OperationContext* txn) const override;
 
 private:
     const NamespaceString _nss;

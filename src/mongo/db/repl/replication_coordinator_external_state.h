@@ -103,7 +103,7 @@ public:
      * Performs any necessary external state specific shutdown tasks, such as cleaning up
      * the threads it started.
      */
-    virtual void shutdown() = 0;
+    virtual void shutdown(OperationContext* txn) = 0;
 
     /**
      * Creates the oplog, writes the first entry and stores the replica set config document.

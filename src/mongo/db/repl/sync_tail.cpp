@@ -295,8 +295,8 @@ std::unique_ptr<OldThreadPool> SyncTail::makeWriterPool() {
     return stdx::make_unique<OldThreadPool>(replWriterThreadCount, "repl writer worker ");
 }
 
-bool SyncTail::peek(BSONObj* op) {
-    return _networkQueue->peek(op);
+bool SyncTail::peek(OperationContext* txn, BSONObj* op) {
+    return _networkQueue->peek(txn, op);
 }
 
 // static
@@ -821,13 +821,13 @@ void SyncTail::oplogApplication() {
 bool SyncTail::tryPopAndWaitForMore(OperationContext* txn, SyncTail::OpQueue* ops) {
     BSONObj op;
     // Check to see if there are ops waiting in the bgsync queue
-    bool peek_success = peek(&op);
+    bool peek_success = peek(txn, &op);
 
     if (!peek_success) {
         // if we don't have anything in the queue, wait a bit for something to appear
         if (ops->empty()) {
             // block up to 1 second
-            _networkQueue->waitForMore();
+            _networkQueue->waitForMore(txn);
             return false;
         }
 
@@ -846,7 +846,7 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* txn, SyncTail::OpQueue* op
         if (ops->empty()) {
             // apply commands one-at-a-time
             ops->push_back(std::move(entry));
-            _networkQueue->consume();
+            _networkQueue->consume(txn);
         }
 
         // otherwise, apply what we have so far and come back for the command
@@ -869,7 +869,7 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* txn, SyncTail::OpQueue* op
 
     // Copy the op to the deque and remove it from the bgsync queue.
     ops->push_back(std::move(entry));
-    _networkQueue->consume();
+    _networkQueue->consume(txn);
 
     // Go back for more ops
     return false;

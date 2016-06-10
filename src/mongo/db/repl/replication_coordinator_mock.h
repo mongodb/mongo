@@ -54,7 +54,7 @@ public:
 
     virtual void startup(OperationContext* txn);
 
-    virtual void shutdown();
+    virtual void shutdown(OperationContext* txn);
 
     virtual ReplicationExecutor* getExecutor() override {
         return nullptr;

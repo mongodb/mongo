@@ -96,7 +96,7 @@ void truncateAndResetOplog(OperationContext* txn,
     // because the bgsync thread, while running, may update the blacklist.
     replCoord->resetMyLastOpTimes();
     bgsync->stop();
-    bgsync->clearBuffer();
+    bgsync->clearBuffer(txn);
 
     replCoord->clearSyncSourceBlacklist();
 
@@ -214,7 +214,7 @@ bool _initialSyncClone(OperationContext* txn,
  * @param r      the oplog reader.
  * @return if applying the oplog succeeded.
  */
-bool _initialSyncApplyOplog(OperationContext* ctx,
+bool _initialSyncApplyOplog(OperationContext* txn,
                             repl::InitialSync* syncer,
                             OplogReader* r,
                             BackgroundSync* bgsync) {
@@ -224,9 +224,11 @@ bool _initialSyncApplyOplog(OperationContext* ctx,
     // If the fail point is set, exit failing.
     if (MONGO_FAIL_POINT(failInitSyncWithBufferedEntriesLeft)) {
         log() << "adding fake oplog entry to buffer.";
-        bgsync->pushTestOpToBuffer(BSON(
-            "ts" << startOpTime.getTimestamp() << "t" << startOpTime.getTerm() << "v" << 1 << "op"
-                 << "n"));
+        bgsync->pushTestOpToBuffer(
+            txn,
+            BSON("ts" << startOpTime.getTimestamp() << "t" << startOpTime.getTerm() << "v" << 1
+                      << "op"
+                      << "n"));
         return false;
     }
 
@@ -267,7 +269,7 @@ bool _initialSyncApplyOplog(OperationContext* ctx,
     // apply till stopOpTime
     try {
         LOG(2) << "Applying oplog entries from " << startOpTime << " until " << stopOpTime;
-        syncer->oplogApplication(ctx, stopOpTime);
+        syncer->oplogApplication(txn, stopOpTime);
 
         if (inShutdown()) {
             return false;

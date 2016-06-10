@@ -110,7 +110,7 @@ public:
 
     virtual void startup(OperationContext* txn) override;
 
-    virtual void shutdown() override;
+    virtual void shutdown(OperationContext* txn) override;
 
     virtual ReplicationExecutor* getExecutor() override {
         return &_replExecutor;

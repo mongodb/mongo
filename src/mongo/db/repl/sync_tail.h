@@ -108,7 +108,7 @@ public:
     static Status syncApply(OperationContext* txn, const BSONObj& o, bool convertUpdateToUpsert);
 
     void oplogApplication();
-    bool peek(BSONObj* obj);
+    bool peek(OperationContext* txn, BSONObj* obj);
 
     class OpQueue {
     public:

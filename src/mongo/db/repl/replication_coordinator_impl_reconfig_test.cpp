@@ -401,7 +401,7 @@ TEST_F(ReplCoordTest,
                   getReplCoord()->processReplSetReconfig(txn.get(), args, &result));
     ASSERT_TRUE(result.obj().isEmpty());
 
-    shutdown();
+    shutdown(txn.get());
     reconfigThread.join();
 }
 
@@ -438,7 +438,7 @@ TEST_F(ReplCoordTest, NodeReturnsConfigurationInProgressWhenReceivingAReconfigWh
                   getReplCoord()->processReplSetReconfig(txn.get(), args, &result));
     ASSERT_TRUE(result.obj().isEmpty());
 
-    shutdown();
+    shutdown(txn.get());
     initateThread.join();
 }
 
@@ -609,7 +609,7 @@ TEST_F(ReplCoordTest, NodeDoesNotAcceptHeartbeatReconfigWhileInTheMidstOfReconfi
     stopCapturingLogMessages();
     ASSERT_EQUALS(
         1, countLogLinesContaining("because already in the midst of a configuration process"));
-    shutdown();
+    shutdown(txn.get());
     reconfigThread.join();
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Log());
 }

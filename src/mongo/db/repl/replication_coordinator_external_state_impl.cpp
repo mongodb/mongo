@@ -180,7 +180,7 @@ void ReplicationCoordinatorExternalStateImpl::startMasterSlave(OperationContext*
     repl::startMasterSlave(txn);
 }
 
-void ReplicationCoordinatorExternalStateImpl::shutdown() {
+void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* txn) {
     stdx::lock_guard<stdx::mutex> lk(_threadMutex);
     if (_startedThreads) {
         log() << "Stopping replication applier threads";
@@ -193,7 +193,7 @@ void ReplicationCoordinatorExternalStateImpl::shutdown() {
         }
 
         if (_producerThread) {
-            _bgSync->shutdown();
+            _bgSync->shutdown(txn);
             _producerThread->join();
         }
         if (_snapshotThread)

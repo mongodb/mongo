@@ -451,7 +451,7 @@ Status DataReplicator::start() {
     _fetcherPaused = false;
     _reporterPaused = false;
     _oplogBuffer = _dataReplicatorExternalState->makeSteadyStateOplogBuffer();
-    _oplogBuffer->startup();
+    _oplogBuffer->startup(nullptr);
     _doNextActions_Steady_inlock();
     return Status::OK();
 }
@@ -494,7 +494,7 @@ Timestamp DataReplicator::getLastTimestampApplied() const {
 
 size_t DataReplicator::getOplogBufferCount() const {
     // Oplog buffer is internally synchronized.
-    return _oplogBuffer->getCount();
+    return _oplogBuffer->getCount(nullptr);
 }
 
 std::string DataReplicator::getDiagnosticString() const {
@@ -502,7 +502,7 @@ std::string DataReplicator::getDiagnosticString() const {
     str::stream out;
     out << "DataReplicator -"
         << " opts: " << _opts.toString() << " oplogFetcher: " << _fetcher->toString()
-        << " opsBuffered: " << _oplogBuffer->getSize() << " state: " << toString(_state);
+        << " opsBuffered: " << _oplogBuffer->getSize(nullptr) << " state: " << toString(_state);
     switch (_state) {
         case DataReplicatorState::InitialSync:
             out << " opsAppied: " << _initialSyncState->appliedOps
@@ -572,7 +572,7 @@ TimestampStatus DataReplicator::flushAndPause() {
 void DataReplicator::_resetState_inlock(Timestamp lastAppliedOpTime) {
     invariant(!_anyActiveHandles_inlock());
     _lastTimestampApplied = _lastTimestampFetched = lastAppliedOpTime;
-    _oplogBuffer->clear();
+    _oplogBuffer->clear(nullptr);
 }
 
 void DataReplicator::slavesHaveProgressed() {
@@ -632,9 +632,9 @@ TimestampStatus DataReplicator::initialSync(OperationContext* txn) {
     _applierPaused = true;
 
     _oplogBuffer = _dataReplicatorExternalState->makeInitialSyncOplogBuffer();
-    _oplogBuffer->startup();
+    _oplogBuffer->startup(nullptr);
     ON_BLOCK_EXIT([this]() {
-        _oplogBuffer->shutdown();
+        _oplogBuffer->shutdown(nullptr);
         _oplogBuffer.reset();
     });
 
@@ -948,7 +948,7 @@ void DataReplicator::_doNextActions_Steady_inlock() {
     }
 
     // Check if no active apply and ops to apply
-    if (!_applierActive && _oplogBuffer->getSize()) {
+    if (!_applierActive && _oplogBuffer->getSize(nullptr)) {
         _scheduleApplyBatch_inlock();
     }
 
@@ -975,7 +975,8 @@ StatusWith<Operations> DataReplicator::_getNextApplierBatch_inlock() {
     //      * only OplogEntries from before the slaveDelay point
     //      * a single command OplogEntry (including index builds, which appear to be inserts)
     //          * consequently, commands bound the previous batch to be in a batch of their own
-    while (_oplogBuffer->peek(&op)) {
+    OperationContext* txn = nullptr;
+    while (_oplogBuffer->peek(txn, &op)) {
         auto entry = OplogEntry(op);
 
         // Check for ops that must be processed one at a time.
@@ -986,7 +987,7 @@ StatusWith<Operations> DataReplicator::_getNextApplierBatch_inlock() {
             if (ops.empty()) {
                 // Apply commands one-at-a-time.
                 ops.push_back(std::move(entry));
-                _oplogBuffer->tryPop(&op);
+                _oplogBuffer->tryPop(txn, &op);
                 invariant(entry == OplogEntry(op));
             }
 
@@ -1027,7 +1028,7 @@ StatusWith<Operations> DataReplicator::_getNextApplierBatch_inlock() {
         // Add op to buffer.
         ops.push_back(entry);
         totalBytes += entry.raw.objsize();
-        _oplogBuffer->tryPop(&op);
+        _oplogBuffer->tryPop(txn, &op);
         invariant(entry == OplogEntry(op));
     }
     return ops;
@@ -1299,7 +1300,7 @@ Status DataReplicator::scheduleShutdown() {
         invariant(!_onShutdown.isValid());
         _onShutdown = eventStatus.getValue();
         _cancelAllHandles_inlock();
-        _oplogBuffer->shutdown();
+        _oplogBuffer->shutdown(nullptr);
         _oplogBuffer.reset();
     }
 
@@ -1345,14 +1346,14 @@ void DataReplicator::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
 
     // Wait for enough space.
     // Gets unblocked on shutdown.
-    _oplogBuffer->waitForSpace(info.toApplyDocumentBytes);
+    _oplogBuffer->waitForSpace(nullptr, info.toApplyDocumentBytes);
 
     OCCASIONALLY {
-        LOG(2) << "bgsync buffer has " << _oplogBuffer->getSize() << " bytes";
+        LOG(2) << "bgsync buffer has " << _oplogBuffer->getSize(nullptr) << " bytes";
     }
 
     // Buffer docs for later application.
-    fassert(40143, _oplogBuffer->pushAllNonBlocking(begin, end));
+    fassert(40143, _oplogBuffer->pushAllNonBlocking(nullptr, begin, end));
 
     _lastTimestampFetched = info.lastDocument.opTime.getTimestamp();
 

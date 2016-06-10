@@ -37,6 +37,9 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+
+class OperationContext;
+
 namespace repl {
 
 /**
@@ -67,7 +70,7 @@ public:
      * create backing storage, etc). This method may be called at most once for the lifetime of an
      * oplog buffer.
      */
-    virtual void startup() = 0;
+    virtual void startup(OperationContext* txn) = 0;
 
     /**
      * Signals to the oplog buffer that it should shut down. This method may block. After
@@ -76,7 +79,7 @@ public:
      * It is legal to call this method multiple times, but it should only be called after startup
      * has been called.
      */
-    virtual void shutdown() = 0;
+    virtual void shutdown(OperationContext* txn) = 0;
 
     /**
      * Pushes operation into oplog buffer, ignoring any size constraints. Does not block.
@@ -84,31 +87,33 @@ public:
      * the limit returned by getMaxSize() but should not otherwise adversely affect normal
      * functionality such as pushing and popping operations from the oplog buffer.
      */
-    virtual void pushEvenIfFull(const Value& value) = 0;
+    virtual void pushEvenIfFull(OperationContext* txn, const Value& value) = 0;
 
     /**
      * Pushes operation into oplog buffer.
      * If there are size constraints on the oplog buffer, this may block until sufficient space
      * is made available (by popping) to complete this operation.
      */
-    virtual void push(const Value& value) = 0;
+    virtual void push(OperationContext* txn, const Value& value) = 0;
 
     /**
      * Pushes operations in the iterator range [begin, end) into the oplog buffer without blocking.
      *
      * Returns false if there is insufficient space to complete this operation successfully.
      */
-    virtual bool pushAllNonBlocking(Batch::const_iterator begin, Batch::const_iterator end) = 0;
+    virtual bool pushAllNonBlocking(OperationContext* txn,
+                                    Batch::const_iterator begin,
+                                    Batch::const_iterator end) = 0;
 
     /**
      * Returns when enough space is available.
      */
-    virtual void waitForSpace(std::size_t size) = 0;
+    virtual void waitForSpace(OperationContext* txn, std::size_t size) = 0;
 
     /**
      * Returns true if oplog buffer is empty.
      */
-    virtual bool isEmpty() const = 0;
+    virtual bool isEmpty(OperationContext* txn) const = 0;
 
     /**
      * Maximum size of all oplog entries that can be stored in this oplog buffer as measured by the
@@ -122,47 +127,47 @@ public:
      * Total size of all oplog entries in this oplog buffer as measured by the BSONObj::objsize()
      * function.
      */
-    virtual std::size_t getSize() const = 0;
+    virtual std::size_t getSize(OperationContext* txn) const = 0;
 
     /**
      * Returns the number/count of items in the oplog buffer.
      */
-    virtual std::size_t getCount() const = 0;
+    virtual std::size_t getCount(OperationContext* txn) const = 0;
 
     /**
      * Clears oplog buffer.
      */
-    virtual void clear() = 0;
+    virtual void clear(OperationContext* txn) = 0;
 
     /**
      * Returns false if oplog buffer is empty. "value" is left unchanged.
      * Otherwise, removes last item (saves in "value") from the oplog buffer and returns true.
      */
-    virtual bool tryPop(Value* value) = 0;
+    virtual bool tryPop(OperationContext* txn, Value* value) = 0;
 
     /**
      * Pops the last operation in the oplog buffer.
      * If the oplog buffer is empty, waits until an operation is pushed.
      */
-    virtual Value blockingPop() = 0;
+    virtual Value blockingPop(OperationContext* txn) = 0;
 
     /**
      * Waits "waitDuration" for an operation to be pushed into the oplog buffer.
      * Returns false if oplog buffer is still empty after "waitDuration".
      * Otherwise, returns true and sets "value" to last item in oplog buffer.
      */
-    virtual bool blockingPeek(Value* value, Seconds waitDuration) = 0;
+    virtual bool blockingPeek(OperationContext* txn, Value* value, Seconds waitDuration) = 0;
 
     /**
      * Returns false if oplog buffer is empty.
      * Otherwise, returns true and sets "value" to last item in oplog buffer.
      */
-    virtual bool peek(Value* value) = 0;
+    virtual bool peek(OperationContext* txn, Value* value) = 0;
 
     /**
      * Returns the item most recently added to the oplog buffer or nothing if the buffer is empty.
      */
-    virtual boost::optional<Value> lastObjectPushed() const = 0;
+    virtual boost::optional<Value> lastObjectPushed(OperationContext* txn) const = 0;
 };
 
 }  // namespace repl

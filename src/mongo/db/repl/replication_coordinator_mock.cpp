@@ -53,7 +53,7 @@ void ReplicationCoordinatorMock::startup(OperationContext* txn) {
     // TODO
 }
 
-void ReplicationCoordinatorMock::shutdown() {
+void ReplicationCoordinatorMock::shutdown(OperationContext*) {
     // TODO
 }
 

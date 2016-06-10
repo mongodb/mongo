@@ -545,7 +545,7 @@ void ReplicationCoordinatorImpl::startup(OperationContext* txn) {
     }
 }
 
-void ReplicationCoordinatorImpl::shutdown() {
+void ReplicationCoordinatorImpl::shutdown(OperationContext* txn) {
     // Shutdown must:
     // * prevent new threads from blocking in awaitReplication
     // * wake up all existing threads blocking in awaitReplication
@@ -578,7 +578,7 @@ void ReplicationCoordinatorImpl::shutdown() {
     // joining the replication executor is blocking so it must be run outside of the mutex
     _replExecutor.shutdown();
     _replExecutor.join();
-    _externalState->shutdown();
+    _externalState->shutdown(txn);
 }
 
 const ReplSettings& ReplicationCoordinatorImpl::getSettings() const {

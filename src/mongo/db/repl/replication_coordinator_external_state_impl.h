@@ -60,7 +60,7 @@ public:
     virtual void startSteadyStateReplication() override;
 
     virtual void startMasterSlave(OperationContext* txn);
-    virtual void shutdown();
+    virtual void shutdown(OperationContext* txn);
     virtual Status initializeReplSetStorage(OperationContext* txn, const BSONObj& config);
     virtual void logTransitionToPrimaryToOplog(OperationContext* txn);
     virtual void forwardSlaveProgress();

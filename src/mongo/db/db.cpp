@@ -1004,8 +1004,6 @@ static void shutdownTask() {
 
     getGlobalServiceContext()->setKillAllOperations();
 
-    repl::getGlobalReplicationCoordinator()->shutdown();
-
     Client& client = cc();
     ServiceContext::UniqueOperationContext uniqueTxn;
     OperationContext* txn = client.getOperationContext();
@@ -1013,6 +1011,8 @@ static void shutdownTask() {
         uniqueTxn = client.makeOperationContext();
         txn = uniqueTxn.get();
     }
+
+    repl::ReplicationCoordinator::get(txn)->shutdown(txn);
 
     ShardingState::get(txn)->shutDown(txn);
 

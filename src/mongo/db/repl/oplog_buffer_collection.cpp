@@ -45,14 +45,6 @@ namespace {
 
 const char kDefaultOplogCollectionNamespace[] = "local.oplog.initialSyncTempBuffer";
 
-/**
- * Creates an operation context for the current oplog buffer operation.
- * Crashes if there is already an existing operation context registered with the current client.
- */
-ServiceContext::UniqueOperationContext makeOperationContext() {
-    return cc().makeOperationContext();
-}
-
 }  // namespace
 
 NamespaceString OplogBufferCollection::getDefaultNamespace() {
@@ -67,10 +59,7 @@ NamespaceString OplogBufferCollection::getNamespace() const {
     return _nss;
 }
 
-void OplogBufferCollection::startup() {
-    auto txnPtr = makeOperationContext();
-    auto txn = txnPtr.get();
-
+void OplogBufferCollection::startup(OperationContext* txn) {
     // TODO: use storage interface to create collection.
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         AutoGetOrCreateDb databaseWriteGuard(txn, _nss.db(), MODE_X);
@@ -84,20 +73,21 @@ void OplogBufferCollection::startup() {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "OplogBufferCollection::startup", _nss.ns());
 }
 
-void OplogBufferCollection::shutdown() {}
+void OplogBufferCollection::shutdown(OperationContext* txn) {}
 
-void OplogBufferCollection::pushEvenIfFull(const Value& value) {}
+void OplogBufferCollection::pushEvenIfFull(OperationContext* txn, const Value& value) {}
 
-void OplogBufferCollection::push(const Value& value) {}
+void OplogBufferCollection::push(OperationContext* txn, const Value& value) {}
 
-bool OplogBufferCollection::pushAllNonBlocking(Batch::const_iterator begin,
+bool OplogBufferCollection::pushAllNonBlocking(OperationContext* txn,
+                                               Batch::const_iterator begin,
                                                Batch::const_iterator end) {
     return false;
 }
 
-void OplogBufferCollection::waitForSpace(std::size_t size) {}
+void OplogBufferCollection::waitForSpace(OperationContext* txn, std::size_t size) {}
 
-bool OplogBufferCollection::isEmpty() const {
+bool OplogBufferCollection::isEmpty(OperationContext* txn) const {
     return true;
 }
 
@@ -105,33 +95,36 @@ std::size_t OplogBufferCollection::getMaxSize() const {
     return 0;
 }
 
-std::size_t OplogBufferCollection::getSize() const {
+std::size_t OplogBufferCollection::getSize(OperationContext* txn) const {
     return 0;
 }
 
-std::size_t OplogBufferCollection::getCount() const {
+std::size_t OplogBufferCollection::getCount(OperationContext* txn) const {
     return 0;
 }
 
-void OplogBufferCollection::clear() {}
+void OplogBufferCollection::clear(OperationContext* txn) {}
 
-bool OplogBufferCollection::tryPop(Value* value) {
+bool OplogBufferCollection::tryPop(OperationContext* txn, Value* value) {
     return false;
 }
 
-OplogBuffer::Value OplogBufferCollection::blockingPop() {
+OplogBuffer::Value OplogBufferCollection::blockingPop(OperationContext* txn) {
     return {};
 }
 
-bool OplogBufferCollection::blockingPeek(Value* value, Seconds waitDuration) {
+bool OplogBufferCollection::blockingPeek(OperationContext* txn,
+                                         Value* value,
+                                         Seconds waitDuration) {
     return false;
 }
 
-bool OplogBufferCollection::peek(Value* value) {
+bool OplogBufferCollection::peek(OperationContext* txn, Value* value) {
     return false;
 }
 
-boost::optional<OplogBuffer::Value> OplogBufferCollection::lastObjectPushed() const {
+boost::optional<OplogBuffer::Value> OplogBufferCollection::lastObjectPushed(
+    OperationContext* txn) const {
     return {};
 }
 

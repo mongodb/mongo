@@ -113,6 +113,9 @@ bool DataReplicatorExternalStateBackgroundSync::shouldStopFetching(
 std::unique_ptr<ThreadPool> makeThreadPool() {
     ThreadPool::Options threadPoolOptions;
     threadPoolOptions.poolName = "rsBackgroundSync";
+    threadPoolOptions.onCreateThread = [](const std::string& threadName) {
+        Client::initThread(threadName.c_str());
+    };
     return stdx::make_unique<ThreadPool>(threadPoolOptions);
 }
 
@@ -163,12 +166,12 @@ BackgroundSync::BackgroundSync(std::unique_ptr<OplogBuffer> oplogBuffer)
     bufferMaxSizeGauge.increment(_oplogBuffer->getMaxSize() - bufferMaxSizeGauge.get());
 }
 
-void BackgroundSync::shutdown() {
+void BackgroundSync::shutdown(OperationContext* txn) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     // Clear the buffer in case the producerThread is waiting in push() due to a full queue.
     invariant(inShutdown());
-    clearBuffer();
+    clearBuffer(txn);
     _stopped = true;
 
     if (_oplogFetcher) {
@@ -181,12 +184,18 @@ void BackgroundSync::producerThread(
     Client::initThread("rsBackgroundSync");
     AuthorizationSession::get(cc())->grantInternalAuthorization();
 
-    _oplogBuffer->startup();
+    {
+        auto txn = cc().makeOperationContext();
+        _oplogBuffer->startup(txn.get());
+    }
+
     _threadPoolTaskExecutor.startup();
     ON_BLOCK_EXIT([this]() {
         _threadPoolTaskExecutor.shutdown();
         _threadPoolTaskExecutor.join();
-        _oplogBuffer->shutdown();
+
+        auto txn = cc().makeOperationContext();
+        _oplogBuffer->shutdown(txn.get());
     });
 
     while (!inShutdown()) {
@@ -205,13 +214,13 @@ void BackgroundSync::producerThread(
     stop();
 }
 
-void BackgroundSync::_signalNoNewDataForApplier() {
+void BackgroundSync::_signalNoNewDataForApplier(OperationContext* txn) {
     // Signal to consumers that we have entered the stopped state
     // if the signal isn't already in the queue.
-    const boost::optional<BSONObj> lastObjectPushed = _oplogBuffer->lastObjectPushed();
+    const boost::optional<BSONObj> lastObjectPushed = _oplogBuffer->lastObjectPushed(txn);
     if (!lastObjectPushed || !lastObjectPushed->isEmpty()) {
         const BSONObj sentinelDoc;
-        _oplogBuffer->pushEvenIfFull(sentinelDoc);
+        _oplogBuffer->pushEvenIfFull(txn, sentinelDoc);
         bufferCountGauge.increment();
         bufferSizeGauge.increment(sentinelDoc.objsize());
     }
@@ -226,7 +235,8 @@ void BackgroundSync::_producerThread(
             stop();
         }
         if (_replCoord->isWaitingForApplierToDrain()) {
-            _signalNoNewDataForApplier();
+            auto txn = cc().makeOperationContext();
+            _signalNoNewDataForApplier(txn.get());
         }
         sleepsecs(1);
         return;
@@ -246,13 +256,12 @@ void BackgroundSync::_producerThread(
     }
     // we want to start when we're no longer primary
     // start() also loads _lastOpTimeFetched, which we know is set from the "if"
-    const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-    OperationContext& txn = *txnPtr;
+    auto txn = cc().makeOperationContext();
     if (isStopped()) {
-        start(&txn);
+        start(txn.get());
     }
 
-    _produce(&txn, replicationCoordinatorExternalState);
+    _produce(txn.get(), replicationCoordinatorExternalState);
 }
 
 void BackgroundSync::_produce(
@@ -484,6 +493,8 @@ void BackgroundSync::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
                                        Fetcher::Documents::const_iterator end,
                                        const OplogFetcher::DocumentsInfo& info,
                                        Milliseconds getMoreElapsed) {
+    auto txn = cc().makeOperationContext();
+
     // If this is the first batch of operations returned from the query, "toApplyDocumentCount" will
     // be one fewer than "networkDocumentCount" because the first document (which was applied
     // previously) is skipped.
@@ -493,14 +504,14 @@ void BackgroundSync::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
     }
 
     // Wait for enough space.
-    _oplogBuffer->waitForSpace(info.toApplyDocumentBytes);
+    _oplogBuffer->waitForSpace(txn.get(), info.toApplyDocumentBytes);
 
     OCCASIONALLY {
-        LOG(2) << "bgsync buffer has " << _oplogBuffer->getSize() << " bytes";
+        LOG(2) << "bgsync buffer has " << _oplogBuffer->getSize(txn.get()) << " bytes";
     }
 
     // Buffer docs for later application.
-    _oplogBuffer->pushAllNonBlocking(begin, end);
+    _oplogBuffer->pushAllNonBlocking(txn.get(), begin, end);
 
     // Update last fetched info.
     {
@@ -513,21 +524,21 @@ void BackgroundSync::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
     _recordStats(info, getMoreElapsed);
 }
 
-bool BackgroundSync::peek(BSONObj* op) {
-    return _oplogBuffer->peek(op);
+bool BackgroundSync::peek(OperationContext* txn, BSONObj* op) {
+    return _oplogBuffer->peek(txn, op);
 }
 
-void BackgroundSync::waitForMore() {
+void BackgroundSync::waitForMore(OperationContext* txn) {
     BSONObj op;
     // Block for one second before timing out.
     // Ignore the value of the op we peeked at.
-    _oplogBuffer->blockingPeek(&op, Seconds(1));
+    _oplogBuffer->blockingPeek(txn, &op, Seconds(1));
 }
 
-void BackgroundSync::consume() {
+void BackgroundSync::consume(OperationContext* txn) {
     // this is just to get the op off the queue, it's been peeked at
     // and queued for application already
-    BSONObj op = _oplogBuffer->blockingPop();
+    BSONObj op = _oplogBuffer->blockingPop(txn);
     bufferCountGauge.decrement(1);
     bufferSizeGauge.decrement(getSize(op));
 }
@@ -543,11 +554,11 @@ void BackgroundSync::_rollback(OperationContext* txn,
                                _replCoord);
     if (status.isOK()) {
         // When the syncTail thread sees there is no new data by adding something to the buffer.
-        _signalNoNewDataForApplier();
+        _signalNoNewDataForApplier(txn);
         // Wait until the buffer is empty.
         // This is an indication that syncTail has removed the sentinal marker from the buffer
         // and reset its local lastAppliedOpTime via the replCoord.
-        while (!_oplogBuffer->isEmpty()) {
+        while (!_oplogBuffer->isEmpty(txn)) {
             sleepmillis(10);
             if (inShutdown()) {
                 return;
@@ -603,7 +614,7 @@ void BackgroundSync::stop() {
 }
 
 void BackgroundSync::start(OperationContext* txn) {
-    massert(16235, "going to start syncing, but buffer is not empty", _oplogBuffer->isEmpty());
+    massert(16235, "going to start syncing, but buffer is not empty", _oplogBuffer->isEmpty(txn));
 
     long long lastFetchedHash = _readLastAppliedHash(txn);
     stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -621,8 +632,8 @@ bool BackgroundSync::isStopped() const {
     return _stopped;
 }
 
-void BackgroundSync::clearBuffer() {
-    _oplogBuffer->clear();
+void BackgroundSync::clearBuffer(OperationContext* txn) {
+    _oplogBuffer->clear(txn);
     const auto count = bufferCountGauge.get();
     bufferCountGauge.decrement(count);
     const auto size = bufferSizeGauge.get();
@@ -690,8 +701,8 @@ bool BackgroundSync::shouldStopFetching() const {
     return false;
 }
 
-void BackgroundSync::pushTestOpToBuffer(const BSONObj& op) {
-    _oplogBuffer->push(op);
+void BackgroundSync::pushTestOpToBuffer(OperationContext* txn, const BSONObj& op) {
+    _oplogBuffer->push(txn, op);
     bufferCountGauge.increment();
     bufferSizeGauge.increment(op.objsize());
 }
