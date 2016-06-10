@@ -125,6 +125,12 @@ public:
     void append(BSONObjBuilder* builder) const;
     BSONObj toBSON() const;
 
+    /**
+     * Returns true if the options match exactly.
+     */
+    bool operator==(const MigrationSecondaryThrottleOptions& other) const;
+    bool operator!=(const MigrationSecondaryThrottleOptions& other) const;
+
 private:
     MigrationSecondaryThrottleOptions(SecondaryThrottleOption secondaryThrottle,
                                       boost::optional<BSONObj> writeConcernBSON);

@@ -182,5 +182,23 @@ TEST(MigrationSecondaryThrottleOptions, ParseFailsNotSpecifiedInCommandBSONWrite
     ASSERT_EQ(ErrorCodes::UnsupportedFormat, status.getStatus().code());
 }
 
+TEST(MigrationSecondaryThrottleOptions, EqualityOperatorSameValue) {
+    auto value1 = MigrationSecondaryThrottleOptions::createWithWriteConcern(
+        WriteConcernOptions("majority", WriteConcernOptions::SyncMode::JOURNAL, 30000));
+    auto value2 = MigrationSecondaryThrottleOptions::createWithWriteConcern(
+        WriteConcernOptions("majority", WriteConcernOptions::SyncMode::JOURNAL, 30000));
+
+    ASSERT(value1 == value2);
+}
+
+TEST(MigrationSecondaryThrottleOptions, EqualityOperatorDifferentValues) {
+    auto value1 = MigrationSecondaryThrottleOptions::createWithWriteConcern(
+        WriteConcernOptions("majority", WriteConcernOptions::SyncMode::JOURNAL, 30000));
+    auto value2 = MigrationSecondaryThrottleOptions::createWithWriteConcern(
+        WriteConcernOptions("majority", WriteConcernOptions::SyncMode::JOURNAL, 60000));
+
+    ASSERT(!(value1 == value2));
+}
+
 }  // namespace
 }  // namespace mongo

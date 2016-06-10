@@ -164,8 +164,7 @@ void ConnectionString::_finishInit() {
     _string = ss.str();
 }
 
-// TODO: SERVER-23014
-bool ConnectionString::sameLogicalEndpoint(const ConnectionString& other) const {
+bool ConnectionString::operator==(const ConnectionString& other) const {
     if (_type != other._type) {
         return false;
     }
@@ -176,7 +175,7 @@ bool ConnectionString::sameLogicalEndpoint(const ConnectionString& other) const 
         case MASTER:
             return _servers[0] == other._servers[0];
         case SET:
-            return _setName == other._setName;
+            return _setName == other._setName && _servers == other._servers;
         case CUSTOM:
             return _string == other._string;
         case LOCAL:
@@ -184,6 +183,10 @@ bool ConnectionString::sameLogicalEndpoint(const ConnectionString& other) const 
     }
 
     MONGO_UNREACHABLE;
+}
+
+bool ConnectionString::operator!=(const ConnectionString& other) const {
+    return !(*this == other);
 }
 
 StatusWith<ConnectionString> ConnectionString::parse(const std::string& url) {

@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/s/move_chunk_request.h"
 #include "mongo/unittest/unittest.h"
 
@@ -42,7 +43,7 @@ TEST(MoveChunkRequest, CreateAsCommandComplete) {
     BSONObjBuilder builder;
     MoveChunkRequest::appendAsCommand(
         &builder,
-        NamespaceString("TestDB.TestColl"),
+        NamespaceString("TestDB", "TestColl"),
         ChunkVersion(2, 3, OID::gen()),
         assertGet(ConnectionString::parse("TestConfigRS/CS1:12345,CS2:12345,CS3:12345")),
         "shard0001",
@@ -68,6 +69,70 @@ TEST(MoveChunkRequest, CreateAsCommandComplete) {
               request.getSecondaryThrottle().getSecondaryThrottle());
     ASSERT_EQ(true, request.getWaitForDelete());
     ASSERT_EQ(true, request.getTakeDistLock());
+}
+
+TEST(MoveChunkRequest, EqualityOperatorSameValue) {
+    BSONObjBuilder builder;
+    MoveChunkRequest::appendAsCommand(
+        &builder,
+        NamespaceString("TestDB", "TestColl"),
+        ChunkVersion(2, 3, OID::gen()),
+        assertGet(ConnectionString::parse("TestConfigRS/CS1:12345,CS2:12345,CS3:12345")),
+        "shard0001",
+        "shard0002",
+        ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
+        1024,
+        MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
+        true,
+        true);
+
+    BSONObj obj = builder.obj();
+
+    auto value1 =
+        assertGet(MoveChunkRequest::createFromCommand(NamespaceString("TestDB", "TestColl"), obj));
+    auto value2 =
+        assertGet(MoveChunkRequest::createFromCommand(NamespaceString("TestDB", "TestColl"), obj));
+
+    ASSERT(value1 == value2);
+    ASSERT_FALSE(value1 != value2);
+}
+
+TEST(MoveChunkRequest, EqualityOperatorDifferentValues) {
+    BSONObjBuilder builder1;
+    MoveChunkRequest::appendAsCommand(
+        &builder1,
+        NamespaceString("TestDB", "TestColl"),
+        ChunkVersion(2, 3, OID::gen()),
+        assertGet(ConnectionString::parse("TestConfigRS/CS1:12345,CS2:12345,CS3:12345")),
+        "shard0001",
+        "shard0002",
+        ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
+        1024,
+        MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
+        true,
+        true);
+
+    auto value1 = assertGet(
+        MoveChunkRequest::createFromCommand(NamespaceString("TestDB", "TestColl"), builder1.obj()));
+
+    BSONObjBuilder builder2;
+    MoveChunkRequest::appendAsCommand(
+        &builder2,
+        NamespaceString("TestDB", "TestColl"),
+        ChunkVersion(2, 3, OID::gen()),
+        assertGet(ConnectionString::parse("TestConfigRS/CS1:12345,CS2:12345,CS3:12345")),
+        "shard0001",
+        "shard0002",
+        ChunkRange(BSON("Key" << 100), BSON("Key" << 200)),  // Different key ranges
+        1024,
+        MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
+        true,
+        true);
+    auto value2 = assertGet(
+        MoveChunkRequest::createFromCommand(NamespaceString("TestDB", "TestColl"), builder2.obj()));
+
+    ASSERT_FALSE(value1 == value2);
+    ASSERT(value1 != value2);
 }
 
 }  // namespace

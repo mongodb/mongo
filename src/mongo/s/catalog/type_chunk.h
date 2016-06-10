@@ -74,6 +74,13 @@ public:
 
     std::string toString() const;
 
+    /**
+     * Returns true if two chunk ranges match exactly in terms of the min and max keys (including
+     * element order within the keys).
+     */
+    bool operator==(const ChunkRange& other) const;
+    bool operator!=(const ChunkRange& other) const;
+
 private:
     BSONObj _minKey;
     BSONObj _maxKey;

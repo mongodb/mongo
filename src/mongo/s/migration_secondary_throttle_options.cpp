@@ -172,4 +172,14 @@ BSONObj MigrationSecondaryThrottleOptions::toBSON() const {
     return builder.obj();
 }
 
+bool MigrationSecondaryThrottleOptions::operator==(
+    const MigrationSecondaryThrottleOptions& other) const {
+    return toBSON().woCompare(other.toBSON()) == 0;
+}
+
+bool MigrationSecondaryThrottleOptions::operator!=(
+    const MigrationSecondaryThrottleOptions& other) const {
+    return !(*this == other);
+}
+
 }  // namespace mongo

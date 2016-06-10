@@ -110,12 +110,11 @@ public:
     }
 
     /**
-     * This returns true if this and other point to the same logical entity.
-     * For single nodes, thats the same address.
-     * For replica sets, thats just the same replica set name.
-     * For pair (deprecated) or sync cluster connections, that's the same hosts in any ordering.
+     * Returns true if two connection strings match in terms of their type and the exact order of
+     * their hosts.
      */
-    bool sameLogicalEndpoint(const ConnectionString& other) const;
+    bool operator==(const ConnectionString& other) const;
+    bool operator!=(const ConnectionString& other) const;
 
     DBClientBase* connect(std::string& errmsg, double socketTimeout = 0) const;
 
@@ -164,7 +163,6 @@ private:
      * Creates a connection string with the specified type. Used for creating LOCAL strings.
      */
     explicit ConnectionString(ConnectionType connType);
-
 
     void _fillServers(std::string s);
     void _finishInit();

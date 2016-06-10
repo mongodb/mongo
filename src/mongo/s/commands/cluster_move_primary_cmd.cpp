@@ -142,7 +142,7 @@ public:
         shared_ptr<Shard> fromShard = grid.shardRegistry()->getShard(txn, config->getPrimaryId());
         invariant(fromShard);
 
-        if (fromShard->getConnString().sameLogicalEndpoint(toShard->getConnString())) {
+        if (fromShard->getId() == toShard->getId()) {
             errmsg = "it is already the primary";
             return false;
         }

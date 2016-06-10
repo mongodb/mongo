@@ -105,6 +105,14 @@ std::string ChunkRange::toString() const {
     return str::stream() << "[" << _minKey << ", " << _maxKey << ")";
 }
 
+bool ChunkRange::operator==(const ChunkRange& other) const {
+    return _minKey.woCompare(other._minKey) == 0 && _maxKey.woCompare(other._maxKey) == 0;
+}
+
+bool ChunkRange::operator!=(const ChunkRange& other) const {
+    return !(*this == other);
+}
+
 StatusWith<ChunkType> ChunkType::fromBSON(const BSONObj& source) {
     ChunkType chunk;
 

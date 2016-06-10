@@ -154,4 +154,31 @@ void MoveChunkRequest::appendAsCommand(BSONObjBuilder* builder,
     builder->append(kTakeDistLock, takeDistLock);
 }
 
+bool MoveChunkRequest::operator==(const MoveChunkRequest& other) const {
+    if (_nss != other._nss)
+        return false;
+    if (_configServerCS != other._configServerCS)
+        return false;
+    if (_fromShardId != other._fromShardId)
+        return false;
+    if (_toShardId != other._toShardId)
+        return false;
+    if (_range != other._range)
+        return false;
+    if (_maxChunkSizeBytes != other._maxChunkSizeBytes)
+        return false;
+    if (_secondaryThrottle != other._secondaryThrottle)
+        return false;
+    if (_waitForDelete != other._waitForDelete)
+        return false;
+    if (_takeDistLock != other._takeDistLock)
+        return false;
+
+    return true;
+}
+
+bool MoveChunkRequest::operator!=(const MoveChunkRequest& other) const {
+    return !(*this == other);
+}
+
 }  // namespace mongo

@@ -108,7 +108,6 @@ env.CppUnitTest(
         'catalog/type_mongos_test.cpp',
         'catalog/type_shard_test.cpp',
         'catalog/type_tags_test.cpp',
-        'chunk_diff_test.cpp',
         'chunk_version_test.cpp',
         'migration_secondary_throttle_options_test.cpp',
         'move_chunk_request_test.cpp',
@@ -117,6 +116,17 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        'common',
+    ]
+)
+
+# This test is very slow in debug mode, so it is put in a separate binary by itself
+env.CppUnitTest(
+    target='chunk_diff_test',
+    source=[
+        'chunk_diff_test.cpp',
+    ],
+    LIBDEPS=[
         'common',
     ]
 )

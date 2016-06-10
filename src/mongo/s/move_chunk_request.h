@@ -114,6 +114,13 @@ public:
         return _takeDistLock;
     }
 
+    /**
+     * Returns true if the requests match exactly in terms of the field values and the order of
+     * elements within the BSON-typed fields.
+     */
+    bool operator==(const MoveChunkRequest& other) const;
+    bool operator!=(const MoveChunkRequest& other) const;
+
 private:
     MoveChunkRequest(NamespaceString nss,
                      ChunkRange range,
