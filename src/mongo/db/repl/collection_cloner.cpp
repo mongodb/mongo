@@ -32,6 +32,7 @@
 
 #include "mongo/db/repl/collection_cloner.h"
 
+#include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -48,6 +49,10 @@ namespace {
 using LockGuard = stdx::lock_guard<stdx::mutex>;
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
+// The number of retries for the listIndexes commands.
+const size_t numListIndexesRetries = 1;
+// The number of retries for the find command, which gets the data.
+const size_t numFindRetries = 3;
 }  // namespace
 
 CollectionCloner::CollectionCloner(ReplicationExecutor* executor,
@@ -72,7 +77,13 @@ CollectionCloner::CollectionCloner(ReplicationExecutor* executor,
                                      this,
                                      stdx::placeholders::_1,
                                      stdx::placeholders::_2,
-                                     stdx::placeholders::_3)),
+                                     stdx::placeholders::_3),
+                          rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+                          RemoteCommandRequest::kNoTimeout,
+                          RemoteCommandRetryScheduler::makeRetryPolicy(
+                              numListIndexesRetries,
+                              executor::RemoteCommandRequest::kNoTimeout,
+                              RemoteCommandRetryScheduler::kAllRetriableErrors)),
       _findFetcher(_executor,
                    _source,
                    _sourceNss.db().toString(),
@@ -81,7 +92,14 @@ CollectionCloner::CollectionCloner(ReplicationExecutor* executor,
                               this,
                               stdx::placeholders::_1,
                               stdx::placeholders::_2,
-                              stdx::placeholders::_3)),
+                              stdx::placeholders::_3),
+                   rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+                   RemoteCommandRequest::kNoTimeout,
+                   RemoteCommandRetryScheduler::makeRetryPolicy(
+                       numFindRetries,
+                       executor::RemoteCommandRequest::kNoTimeout,
+                       RemoteCommandRetryScheduler::kAllRetriableErrors)),
+
       _indexSpecs(),
       _documents(),
       _dbWorkCallbackHandle(),

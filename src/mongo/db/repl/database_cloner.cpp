@@ -36,6 +36,7 @@
 #include <iterator>
 #include <set>
 
+#include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
@@ -55,6 +56,9 @@ using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
 const char* kNameFieldName = "name";
 const char* kOptionsFieldName = "options";
+
+// The number of retries for the listCollections commands.
+const int numListCollectionsRetries = 1;
 
 /**
  * Default listCollections predicate.
@@ -102,7 +106,12 @@ DatabaseCloner::DatabaseCloner(ReplicationExecutor* executor,
                                          stdx::placeholders::_1,
                                          stdx::placeholders::_2,
                                          stdx::placeholders::_3),
-                              rpc::ServerSelectionMetadata(true, boost::none).toBSON()),
+                              rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+                              RemoteCommandRequest::kNoTimeout,
+                              RemoteCommandRetryScheduler::makeRetryPolicy(
+                                  numListCollectionsRetries,
+                                  executor::RemoteCommandRequest::kNoTimeout,
+                                  RemoteCommandRetryScheduler::kAllRetriableErrors)),
       _scheduleDbWorkFn([this](const ReplicationExecutor::CallbackFn& work) {
           return _executor->scheduleDBWork(work);
       }),

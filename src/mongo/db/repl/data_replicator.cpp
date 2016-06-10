@@ -36,6 +36,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/client/fetcher.h"
+#include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
@@ -94,6 +95,9 @@ using Operations = MultiApplier::Operations;
 using QueryResponseStatus = StatusWith<Fetcher::QueryResponse>;
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
 using LockGuard = stdx::lock_guard<stdx::mutex>;
+
+// The number of retries for the find command.
+const size_t numFindRetries = 3;
 
 ServiceContext::UniqueOperationContext makeOpCtx() {
     return cc().makeOperationContext();
@@ -760,7 +764,13 @@ void DataReplicator::_onDataClonerFinish(const Status& status) {
         _syncSource,
         _opts.remoteOplogNS.db().toString(),
         query,
-        stdx::bind(&DataReplicator::_onApplierReadyStart, this, stdx::placeholders::_1));
+        stdx::bind(&DataReplicator::_onApplierReadyStart, this, stdx::placeholders::_1),
+        rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+        RemoteCommandRequest::kNoTimeout,
+        RemoteCommandRetryScheduler::makeRetryPolicy(
+            numFindRetries,
+            executor::RemoteCommandRequest::kNoTimeout,
+            RemoteCommandRetryScheduler::kAllRetriableErrors));
     Status scheduleStatus = _lastOplogEntryFetcher->schedule();
     if (!scheduleStatus.isOK()) {
         _initialSyncState->status = scheduleStatus;
