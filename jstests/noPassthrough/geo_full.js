@@ -109,9 +109,27 @@ var randDataType = function() {
 function deg2rad(arg) { return arg * Math.PI / 180.0; }
 function rad2deg(arg) { return arg * 180.0 / Math.PI; }
 
-function computexscandist(y, maxDistDegrees) {
-    return maxDistDegrees / Math.min(Math.cos(deg2rad(Math.min(89.0, y + maxDistDegrees))),
-                                     Math.cos(deg2rad(Math.max(-89.0, y - maxDistDegrees))));
+function computexscandist(latDegrees, maxDistDegrees) {
+    // See s2cap.cc
+    //
+    // Compute the range of longitudes covered by the cap.  We use the law
+    // of sines for spherical triangles.  Consider the triangle ABC where
+    // A is the north pole, B is the center of the cap, and C is the point
+    // of tangency between the cap boundary and a line of longitude.  Then
+    // C is a right angle, and letting a,b,c denote the sides opposite A,B,C,
+    // we have sin(a)/sin(A) = sin(c)/sin(C), or sin(A) = sin(a)/sin(c).
+    // Here "a" is the cap angle, and "c" is the colatitude (90 degrees
+    // minus the latitude).  This formula also works for negative latitudes.
+    //
+    // Angle A is the difference of longitudes of B and C.
+    var sin_c = Math.cos(deg2rad(latDegrees));
+    var sin_a = Math.sin(deg2rad(maxDistDegrees));
+    if (sin_a > sin_c) {
+        // Double floating number error, return invalid distance
+        return 180;
+    }
+    var angleA = Math.asin(sin_a / sin_c);
+    return rad2deg(angleA);
 }
 
 function errorMarginForPoint(env) {
@@ -124,12 +142,13 @@ function errorMarginForPoint(env) {
 
 function pointIsOK(startPoint, radius, env) {
     var error = errorMarginForPoint(env);
-    yscandist = rad2deg(radius) + error;
-    xscandist = computexscandist(startPoint[1], yscandist);
-    return (startPoint[0] + xscandist < 180)
-           && (startPoint[0] - xscandist > -180)
-           && (startPoint[1] + yscandist < 90)
-           && (startPoint[1] - yscandist > -90);
+    var distDegrees = rad2deg(radius) + error;
+    // Cap should not include the South/North Pole.
+    if ((startPoint[1] + distDegrees > 90) || (startPoint[1] - distDegrees < -90)) {
+        return false;
+    }
+    var xscandist = computexscandist(startPoint[1], distDegrees);
+    return (startPoint[0] + xscandist < 180) && (startPoint[0] - xscandist > -180);
 }
 
 var randQuery = function( env ) {
