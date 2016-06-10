@@ -46,16 +46,6 @@
 
     placeCheck(2);
 
-    // NOTE: at this point we have 2 shard on 1 server
-
-    // Test move to the same shard
-    assert.commandFailed(s.s0.adminCommand({
-        movechunk: "test.foo",
-        find: {num: 1},
-        to: primary.getMongo().name,
-        _waitForDelete: true
-    }));
-
     // Test move shard to unexisting shard
     assert.commandFailedWithCode(
         s.s0.adminCommand(

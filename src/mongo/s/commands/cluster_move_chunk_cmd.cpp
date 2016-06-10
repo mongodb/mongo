@@ -107,9 +107,6 @@ public:
         Timer t;
 
         const NamespaceString nss(parseNs(dbname, cmdObj));
-        uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << nss.ns() << " is not a valid namespace",
-                nss.isValid());
 
         std::shared_ptr<DBConfig> config;
 
@@ -132,7 +129,7 @@ public:
             }
         }
 
-        string toString = cmdObj["to"].valuestrsafe();
+        const string toString = cmdObj["to"].valuestrsafe();
         if (!toString.size()) {
             errmsg = "you have to specify where you want to move the chunk";
             return false;
@@ -182,7 +179,6 @@ public:
             }
 
             chunk = info->findIntersectingChunk(txn, shardKey);
-            verify(chunk.get());
         } else {
             // Bounds
             if (!info->getShardKeyPattern().isShardKey(bounds[0].Obj()) ||
@@ -198,29 +194,19 @@ public:
             BSONObj maxKey = info->getShardKeyPattern().normalizeShardKey(bounds[1].Obj());
 
             chunk = info->findIntersectingChunk(txn, minKey);
-            verify(chunk.get());
 
             if (chunk->getMin().woCompare(minKey) != 0 || chunk->getMax().woCompare(maxKey) != 0) {
                 errmsg = str::stream() << "no chunk found with the shard key bounds "
-                                       << "[" << minKey << "," << maxKey << ")";
+                                       << ChunkRange(minKey, maxKey).toString();
                 return false;
             }
         }
 
-        {
-            const auto from = grid.shardRegistry()->getShard(txn, chunk->getShardId());
-            if (from->getId() == to->getId()) {
-                errmsg = "that chunk is already on that shard";
-                return false;
-            }
-        }
+        const auto from = grid.shardRegistry()->getShard(txn, chunk->getShardId());
+        if (from->getId() != to->getId()) {
+            const auto secondaryThrottle =
+                uassertStatusOK(MigrationSecondaryThrottleOptions::createFromCommand(cmdObj));
 
-        const auto secondaryThrottle =
-            uassertStatusOK(MigrationSecondaryThrottleOptions::createFromCommand(cmdObj));
-
-        log() << "CMD: movechunk: " << cmdObj;
-
-        {
             ChunkType chunkType;
             chunkType.setNS(nss.ns());
             chunkType.setMin(chunk->getMin());

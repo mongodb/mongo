@@ -32,7 +32,9 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/s/move_chunk_request.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/notification.h"
 
 namespace mongo {
 
@@ -53,12 +55,15 @@ public:
     ~ActiveMigrationsRegistry();
 
     /**
-     * Registers an active move chunk request with the specified arguments in order to ensure that
-     * there is a single active move chunk operation running per shard.
+     * If there are no migrations running on this shard, registers an active migration with the
+     * specified arguments and returns a ScopedRegisterMigration, which must be signaled by the
+     * caller before it goes out of scope.
      *
-     * If there aren't any migrations running on this shard, returns a ScopedRegisterMigration
-     * object, which will unregister it when it goes out of scope. Othwerwise returns
-     * ConflictingOperationInProgress.
+     * If there is an active migration already running on this shard and it has the exact same
+     * arguments, returns a ScopedRegisterMigration, which can be used to join the already running
+     * migration.
+     *
+     * Othwerwise returns a ConflictingOperationInProgress error.
      */
     StatusWith<ScopedRegisterMigration> registerMigration(const MoveChunkRequest& args);
 
@@ -71,6 +76,18 @@ public:
 private:
     friend class ScopedRegisterMigration;
 
+    // Describes the state of a currently active moveChunk operation
+    struct ActiveMoveChunkState {
+        ActiveMoveChunkState(MoveChunkRequest inArgs)
+            : args(std::move(inArgs)), notification(std::make_shared<Notification<Status>>()) {}
+
+        // Exact arguments of the currently active operation
+        MoveChunkRequest args;
+
+        // Notification event, which will be signaled when the currently active operation completes
+        std::shared_ptr<Notification<Status>> notification;
+    };
+
     /**
      * Unregisters a previously registered namespace with ongoing migration. Must only be called if
      * a previous call to registerMigration has succeeded.
@@ -82,26 +99,56 @@ private:
 
     // If there is an active moveChunk operation going on, this field contains the request, which
     // initiated it
-    boost::optional<MoveChunkRequest> _activeMoveChunkRequest;
+    boost::optional<ActiveMoveChunkState> _activeMoveChunkState;
 };
 
 /**
- * RAII object, which when it goes out of scope will unregister a previously started active
- * migration from the registry it is associated with.
+ * Object of this class is returned from the registerMigration call of the active migrations
+ * registry. It can exist in two modes - 'unregister' and 'join'. See the comments for
+ * registerMigration method for more details.
  */
 class ScopedRegisterMigration {
     MONGO_DISALLOW_COPYING(ScopedRegisterMigration);
 
 public:
-    ScopedRegisterMigration(ActiveMigrationsRegistry* registry);
+    ScopedRegisterMigration(ActiveMigrationsRegistry* registry,
+                            bool forUnregister,
+                            std::shared_ptr<Notification<Status>> completionNotification);
     ~ScopedRegisterMigration();
 
     ScopedRegisterMigration(ScopedRegisterMigration&&);
     ScopedRegisterMigration& operator=(ScopedRegisterMigration&&);
 
+    /**
+     * Returns true if the migration object is in the 'unregister' mode, which means that the holder
+     * must execute the moveChunk command and complete with a status.
+     */
+    bool mustExecute() const {
+        return _forUnregister;
+    }
+
+    /**
+     * Must only be called if the object is in the 'unregister' mode. Signals any callers, which
+     * might be blocked in waitForCompletion.
+     */
+    void complete(Status status);
+
+    /**
+     * Must only be called if the object is in the 'join' mode. Blocks until the main executor of
+     * the moveChunk command calls complete.
+     */
+    Status waitForCompletion(OperationContext* txn);
+
 private:
     // Registry from which to unregister the migration. Not owned.
     ActiveMigrationsRegistry* _registry;
+
+    // Whether this is a newly started migration (in which case the destructor must unregister) or
+    // joining an existing one (in which case the caller must wait for completion).
+    bool _forUnregister;
+
+    // This is the future, which will be signaled at the end of a migration
+    std::shared_ptr<Notification<Status>> _completionNotification;
 };
 
 }  // namespace mongo

@@ -73,9 +73,11 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* txn, MoveChunkR
 
     const auto& oss = OperationShardingState::get(txn);
     if (!oss.hasShardVersion()) {
-        uasserted(ErrorCodes::InvalidOptions, "shard version is missing");
+        uasserted(ErrorCodes::InvalidOptions, "collection version is missing");
     }
 
+    // Even though the moveChunk command transmits a value in the operation's shardVersion field,
+    // this value does not actually contain the shard version, but the global collection version.
     const ChunkVersion expectedCollectionVersion = oss.getShardVersion(_args.getNss());
 
     log() << "Starting chunk migration for [" << _args.getMinKey() << ", " << _args.getMaxKey()
@@ -90,7 +92,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* txn, MoveChunkR
         shardingState->refreshMetadataNow(txn, _args.getNss().ns(), &shardVersion);
     if (!refreshStatus.isOK()) {
         uasserted(refreshStatus.code(),
-                  str::stream() << "moveChunk cannot start migrate of chunk "
+                  str::stream() << "cannot start migrate of chunk "
                                 << "["
                                 << _args.getMinKey()
                                 << ","
@@ -103,30 +105,13 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* txn, MoveChunkR
         // If the major version is zero, this means we do not have any chunks locally to migrate in
         // the first place
         uasserted(ErrorCodes::IncompatibleShardingMetadata,
-                  str::stream() << "moveChunk cannot start migrate of chunk "
+                  str::stream() << "cannot start migrate of chunk "
                                 << "["
                                 << _args.getMinKey()
                                 << ","
                                 << _args.getMaxKey()
                                 << ")"
                                 << " with zero shard version");
-    }
-
-    if (expectedCollectionVersion.epoch() != shardVersion.epoch()) {
-        throw SendStaleConfigException(_args.getNss().ns(),
-                                       str::stream() << "moveChunk cannot move chunk "
-                                                     << "["
-                                                     << _args.getMinKey()
-                                                     << ","
-                                                     << _args.getMaxKey()
-                                                     << "), "
-                                                     << "collection may have been dropped. "
-                                                     << "current epoch: "
-                                                     << shardVersion.epoch()
-                                                     << ", cmd epoch: "
-                                                     << expectedCollectionVersion.epoch(),
-                                       expectedCollectionVersion,
-                                       shardVersion);
     }
 
     // Snapshot the committed metadata from the time the migration starts
@@ -138,30 +123,55 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* txn, MoveChunkR
         _committedMetadata = css->getMetadata();
     }
 
+    const ChunkVersion collectionVersion = _committedMetadata->getCollVersion();
+
+    if (expectedCollectionVersion.epoch() != collectionVersion.epoch()) {
+        throw SendStaleConfigException(
+            _args.getNss().ns(),
+            str::stream() << "cannot move chunk "
+                          << ChunkRange(_args.getMinKey(), _args.getMaxKey()).toString()
+                          << " because collection may have been dropped. "
+                          << "current epoch: "
+                          << collectionVersion.epoch()
+                          << ", cmd epoch: "
+                          << expectedCollectionVersion.epoch(),
+            expectedCollectionVersion,
+            collectionVersion);
+    } else if (!expectedCollectionVersion.isStrictlyEqualTo(collectionVersion)) {
+        throw SendStaleConfigException(
+            _args.getNss().ns(),
+            str::stream() << "cannot move chunk "
+                          << ChunkRange(_args.getMinKey(), _args.getMaxKey()).toString()
+                          << " because collection versions don't match",
+            expectedCollectionVersion,
+            collectionVersion);
+    }
+
     // With nonzero shard version, we must have a coll version >= our shard version
-    invariant(_committedMetadata->getCollVersion() >= shardVersion);
+    invariant(collectionVersion >= shardVersion);
 
     // With nonzero shard version, we must have a shard key
     invariant(!_committedMetadata->getKeyPattern().isEmpty());
 
     ChunkType origChunk;
-
-    if (!_committedMetadata->getNextChunk(_args.getMinKey(), &origChunk) ||
-        origChunk.getMin().woCompare(_args.getMinKey()) ||
-        origChunk.getMax().woCompare(_args.getMaxKey())) {
-        // Our boundaries are different from those passed in
-        throw SendStaleConfigException(_args.getNss().ns(),
-                                       str::stream()
-                                           << "moveChunk cannot find chunk "
-                                           << "["
-                                           << _args.getMinKey()
-                                           << ","
-                                           << _args.getMaxKey()
-                                           << ")"
-                                           << " to migrate, the chunk boundaries may be stale",
-                                       expectedCollectionVersion,
-                                       shardVersion);
+    if (!_committedMetadata->getNextChunk(_args.getMinKey(), &origChunk)) {
+        // If this assertion is hit, it means that whoever called the shard moveChunk command
+        // (mongos or the CSRS balancer) did not check whether the chunk actually belongs to this
+        // shard. It is a benign error and does not indicate data corruption.
+        uasserted(40145,
+                  str::stream() << "Chunk with bounds "
+                                << ChunkRange(_args.getMinKey(), _args.getMaxKey()).toString()
+                                << " is not owned by this shard.");
     }
+
+    uassert(40146,
+            str::stream() << "Unable to find chunk with the exact bounds "
+                          << ChunkRange(_args.getMinKey(), _args.getMaxKey()).toString()
+                          << " at collection version "
+                          << collectionVersion.toString()
+                          << ". This indicates corrupted metadata.",
+            origChunk.getMin().woCompare(_args.getMinKey()) == 0 &&
+                origChunk.getMax().woCompare(_args.getMaxKey()) == 0);
 }
 
 MigrationSourceManager::~MigrationSourceManager() {

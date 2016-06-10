@@ -42,13 +42,6 @@
         assert.commandFailed(mongos.adminCommand(
             {moveChunk: ns, find: {_id: 1}, bounds: [aChunk.min, aChunk.max], to: shard1}));
 
-        // Using find on collections with hash shard keys should not crash
-        assert.commandFailed(mongos.adminCommand({moveChunk: ns, find: {_id: 1}, to: shard1}));
-
-        // Fail if chunk is already at shard
-        assert.commandFailed(
-            mongos.adminCommand({moveChunk: ns, bounds: [aChunk.min, aChunk.max], to: shard0}));
-
         assert.commandWorked(
             mongos.adminCommand({moveChunk: ns, bounds: [aChunk.min, aChunk.max], to: shard1}));
 
@@ -76,7 +69,6 @@
         assert.commandFailed(mongos.adminCommand({moveChunk: ns, find: keyDoc, to: 'WrongShard'}));
 
         // Fail if chunk is already at shard
-        assert.commandFailed(mongos.adminCommand({moveChunk: ns, find: keyDoc, to: shard1}));
         assert.eq(shard1, mongos.getDB('config').chunks.findOne({_id: chunkId}).shard);
 
         mongos.getDB(kDbName).foo.drop();

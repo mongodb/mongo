@@ -45,11 +45,11 @@
     replTest.initiate();
     replTest.awaitSecondaryNodes();
 
+    // Verify that the replSetMonitor can reach the restarted set
+    ReplSetTest.awaitRSClientHosts(st.s0, replTest.nodes, {ok: true});
+
     jsTest.log('Insert to an online replSet');
     verifyInsert();
-
-    // Verify that the replSetMonitor can reach the restarted set.
-    ReplSetTest.awaitRSClientHosts(st.s0, replTest.nodes, {ok: true});
 
     st.stop();
 })();

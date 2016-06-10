@@ -46,6 +46,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
 #include "mongo/s/move_chunk_request.h"
+#include "mongo/util/concurrency/notification.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
@@ -153,29 +154,58 @@ public:
         // where we might have changed a shard's host by removing/adding a shard with the same name.
         grid.shardRegistry()->reload(txn);
 
-        // Check if there is an existing migration running
         auto scopedRegisterMigration =
             uassertStatusOK(shardingState->registerMigration(moveChunkRequest));
 
-        return _runImpl(txn, moveChunkRequest, errmsg, result);
+        Status status = {ErrorCodes::InternalError, "Uninitialized value"};
+
+        // Check if there is an existing migration running and if so, join it
+        if (scopedRegisterMigration.mustExecute()) {
+            try {
+                _runImpl(txn, moveChunkRequest);
+                status = Status::OK();
+            } catch (const DBException& e) {
+                status = e.toStatus();
+            } catch (const std::exception& e) {
+                scopedRegisterMigration.complete(
+                    {ErrorCodes::InternalError,
+                     str::stream() << "Severe error occurred while running moveChunk command: "
+                                   << e.what()});
+                throw;
+            }
+
+            scopedRegisterMigration.complete(status);
+        } else {
+            status = scopedRegisterMigration.waitForCompletion(txn);
+        }
+
+        if (status == ErrorCodes::ChunkTooBig) {
+            // This code is for compatibility with pre-3.2 balancer, which does not recognize the
+            // ChunkTooBig error code and instead uses the "chunkTooBig" field in the response.
+            // TODO: Remove after 3.4 is released.
+            errmsg = status.reason();
+            result.appendBool("chunkTooBig", true);
+            return false;
+        }
+
+        uassertStatusOK(status);
+        return true;
     }
 
 private:
-    static bool _runImpl(OperationContext* txn,
-                         const MoveChunkRequest& moveChunkRequest,
-                         string& errmsg,
-                         BSONObjBuilder& result) {
+    static void _runImpl(OperationContext* txn, const MoveChunkRequest& moveChunkRequest) {
         const auto writeConcernForRangeDeleter =
             uassertStatusOK(ChunkMoveWriteConcernOptions::getEffectiveWriteConcern(
                 txn, moveChunkRequest.getSecondaryThrottle()));
 
+        string unusedErrMsg;
         MoveTimingHelper moveTimingHelper(txn,
                                           "from",
                                           moveChunkRequest.getNss().ns(),
                                           moveChunkRequest.getMinKey(),
                                           moveChunkRequest.getMaxKey(),
                                           6,  // Total number of steps
-                                          &errmsg,
+                                          &unusedErrMsg,
                                           moveChunkRequest.getToShardId(),
                                           moveChunkRequest.getFromShardId());
 
@@ -199,17 +229,7 @@ private:
             moveTimingHelper.done(2);
             MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep2);
 
-            Status startCloneStatus = migrationSourceManager.startClone(txn);
-            if (startCloneStatus == ErrorCodes::ChunkTooBig) {
-                // TODO: This is for compatibility with pre-3.2 balancer, which does not recognize
-                // the ChunkTooBig error code and instead uses the "chunkTooBig" field in the
-                // response. Remove after 3.4 is released.
-                errmsg = startCloneStatus.reason();
-                result.appendBool("chunkTooBig", true);
-                return false;
-            }
-
-            uassertStatusOKWithWarning(startCloneStatus);
+            uassertStatusOKWithWarning(migrationSourceManager.startClone(txn));
             moveTimingHelper.done(3);
             MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep3);
 
@@ -271,8 +291,6 @@ private:
 
         moveTimingHelper.done(6);
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep6);
-
-        return true;
     }
 
 } moveChunkCmd;

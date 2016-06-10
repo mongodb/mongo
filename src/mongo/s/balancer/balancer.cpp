@@ -264,7 +264,7 @@ Status executeSingleMigration(OperationContext* txn,
                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                           "admin",
                                           cmdObj,
-                                          Shard::RetryPolicy::kNotIdempotent);
+                                          Shard::RetryPolicy::kIdempotent);
         }
 
         if (!cmdStatus.isOK()) {

@@ -215,12 +215,14 @@ public:
     void resetMetadata(const std::string& ns);
 
     /**
-     * Registers an active move chunk request with the specified arguments in order to ensure that
-     * there is a single active move chunk operation running per shard.
+     * If there are no migrations running on this shard, registers an active migration with the
+     * specified arguments and returns a ScopedRegisterMigration, which must be signaled by the
+     * caller before it goes out of scope.
      *
-     * If there aren't any migrations running on this shard, returns a ScopedRegisterMigration
-     * object, which will unregister it when it goes out of scope. Othwerwise returns
-     * ConflictingOperationInProgress.
+     * If there is an active migration already running on this shard and it has the exact same
+     * arguments, returns a ScopedRegisterMigration, which can be used to join the existing one.
+     *
+     * Othwerwise returns a ConflictingOperationInProgress error.
      */
     StatusWith<ScopedRegisterMigration> registerMigration(const MoveChunkRequest& args);
 

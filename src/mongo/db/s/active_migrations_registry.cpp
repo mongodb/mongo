@@ -38,28 +38,31 @@ namespace mongo {
 ActiveMigrationsRegistry::ActiveMigrationsRegistry() = default;
 
 ActiveMigrationsRegistry::~ActiveMigrationsRegistry() {
-    invariant(!_activeMoveChunkRequest);
+    invariant(!_activeMoveChunkState);
 }
 
 StatusWith<ScopedRegisterMigration> ActiveMigrationsRegistry::registerMigration(
     const MoveChunkRequest& args) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    if (_activeMoveChunkRequest) {
-        return {
-            ErrorCodes::ConflictingOperationInProgress,
-            str::stream()
-                << "Unable start new migration, because there is already an active migration for "
-                << _activeMoveChunkRequest->getNss().ns()};
+    if (!_activeMoveChunkState) {
+        _activeMoveChunkState.emplace(args);
+        return {ScopedRegisterMigration(this, true, _activeMoveChunkState->notification)};
     }
 
-    _activeMoveChunkRequest = std::move(args);
-    return {ScopedRegisterMigration(this)};
+    if (_activeMoveChunkState->args == args) {
+        return {ScopedRegisterMigration(nullptr, false, _activeMoveChunkState->notification)};
+    }
+
+    return {ErrorCodes::ConflictingOperationInProgress,
+            str::stream()
+                << "Unable start new migration, because there is already an active migration for "
+                << _activeMoveChunkState->args.getNss().ns()};
 }
 
 boost::optional<NamespaceString> ActiveMigrationsRegistry::getActiveMigrationNss() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    if (_activeMoveChunkRequest) {
-        return _activeMoveChunkRequest->getNss();
+    if (_activeMoveChunkState) {
+        return _activeMoveChunkState->args.getNss();
     }
 
     return boost::none;
@@ -67,15 +70,22 @@ boost::optional<NamespaceString> ActiveMigrationsRegistry::getActiveMigrationNss
 
 void ActiveMigrationsRegistry::_clearMigration() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    invariant(_activeMoveChunkRequest);
-    _activeMoveChunkRequest.reset();
+    invariant(_activeMoveChunkState);
+    _activeMoveChunkState.reset();
 }
 
-ScopedRegisterMigration::ScopedRegisterMigration(ActiveMigrationsRegistry* registry)
-    : _registry(registry) {}
+ScopedRegisterMigration::ScopedRegisterMigration(
+    ActiveMigrationsRegistry* registry,
+    bool forUnregister,
+    std::shared_ptr<Notification<Status>> completionNotification)
+    : _registry(registry),
+      _forUnregister(forUnregister),
+      _completionNotification(std::move(completionNotification)) {}
 
 ScopedRegisterMigration::~ScopedRegisterMigration() {
-    if (_registry) {
+    if (_registry && _forUnregister) {
+        // If this is a newly started migration the caller must always signal on completion
+        invariant(*_completionNotification);
         _registry->_clearMigration();
     }
 }
@@ -86,8 +96,20 @@ ScopedRegisterMigration::ScopedRegisterMigration(ScopedRegisterMigration&& other
 
 ScopedRegisterMigration& ScopedRegisterMigration::operator=(ScopedRegisterMigration&& other) {
     _registry = other._registry;
+    _forUnregister = other._forUnregister;
+    _completionNotification = std::move(other._completionNotification);
     other._registry = nullptr;
     return *this;
+}
+
+void ScopedRegisterMigration::complete(Status status) {
+    invariant(_forUnregister);
+    _completionNotification->set(status);
+}
+
+Status ScopedRegisterMigration::waitForCompletion(OperationContext* txn) {
+    invariant(!_forUnregister);
+    return _completionNotification->get(txn);
 }
 
 }  // namespace mongo
