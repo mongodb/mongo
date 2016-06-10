@@ -15,7 +15,6 @@
     assert(NUM_SHARDS >= 3);
 
     var st = new ShardingTest({shards: NUM_SHARDS});
-    var shardNames = st.getShardNames();
     var s = st.s;
     var testDb = st.getDB('test');
 
@@ -59,19 +58,19 @@
     validate(true);
 
     // 3. Sharded collection with chunks on two shards.
-    st.ensurePrimaryShard('test', shardNames[0]);
+    st.ensurePrimaryShard('test', st.shard0.shardName);
     assert.commandWorked(s.adminCommand({split: 'test.test', middle: {_id: 1}}));
     assert.commandWorked(
-        testDb.adminCommand({moveChunk: 'test.test', find: {_id: 1}, to: shardNames[1]}));
+        testDb.adminCommand({moveChunk: 'test.test', find: {_id: 1}, to: st.shard1.shardName}));
     // We move the dummy database to NUM_SHARDS shards so that testDb will exist on all NUM_SHARDS
     // shards but the testDb.test collection will only exist on the first two shards. Prior to
     // SERVER-22588, this scenario would cause validation to fail.
     assert.commandWorked(s.adminCommand({split: 'test.dummy', middle: {_id: 1}}));
     assert.commandWorked(s.adminCommand({split: 'test.dummy', middle: {_id: 2}}));
     assert.commandWorked(
-        testDb.adminCommand({moveChunk: 'test.dummy', find: {_id: 1}, to: shardNames[1]}));
+        testDb.adminCommand({moveChunk: 'test.dummy', find: {_id: 1}, to: st.shard1.shardName}));
     assert.commandWorked(
-        testDb.adminCommand({moveChunk: 'test.dummy', find: {_id: 2}, to: shardNames[2]}));
+        testDb.adminCommand({moveChunk: 'test.dummy', find: {_id: 2}, to: st.shard2.shardName}));
     assert.eq(st.onNumShards('test'), 2);
     assert.eq(st.onNumShards('dummy'), NUM_SHARDS);
     validate(true);

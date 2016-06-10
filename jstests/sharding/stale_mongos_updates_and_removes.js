@@ -16,7 +16,7 @@
 // (used for testing *multi* removes to a *specific* shard key).
 var resetCollection = function() {
     assert(staleMongos.getCollection(collNS).drop());
-    st.ensurePrimaryShard(dbName, st._shardNames[0]);
+    st.ensurePrimaryShard(dbName, st.shard0.shardName);
     assert.commandWorked(staleMongos.adminCommand({shardCollection: collNS, key: {x: 1}}));
     for (var i = 0; i < numShardKeys; i++) {
         assert.writeOK(staleMongos.getCollection(collNS).insert({x: i, fieldToUpdate: 0}));
@@ -44,16 +44,16 @@ var makeStaleMongosTargetMultipleShards = function() {
     // Make sure staleMongos sees all data on first shard.
     var chunk =
         staleMongos.getCollection("config.chunks").findOne({min: {x: MinKey}, max: {x: MaxKey}});
-    assert(chunk.shard === st._shardNames[0]);
+    assert(chunk.shard === st.shard0.shardName);
 
     // Make sure staleMongos sees two chunks on two different shards.
     assert.commandWorked(staleMongos.adminCommand({split: collNS, middle: {x: splitPoint}}));
     assert.commandWorked(staleMongos.adminCommand(
-        {moveChunk: collNS, find: {x: 0}, to: st._shardNames[1], _waitForDelete: true}));
+        {moveChunk: collNS, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}));
 
     // Use freshMongos to consolidate the chunks on one shard.
     assert.commandWorked(freshMongos.adminCommand(
-        {moveChunk: collNS, find: {x: 0}, to: st._shardNames[0], _waitForDelete: true}));
+        {moveChunk: collNS, find: {x: 0}, to: st.shard0.shardName, _waitForDelete: true}));
 };
 
 // Create a new sharded collection and move a chunk from one shard to another. In the end,
@@ -68,11 +68,11 @@ var makeStaleMongosTargetSingleShard = function() {
     // Make sure staleMongos sees all data on first shard.
     var chunk =
         staleMongos.getCollection("config.chunks").findOne({min: {x: MinKey}, max: {x: MaxKey}});
-    assert(chunk.shard === st._shardNames[0]);
+    assert(chunk.shard === st.shard0.shardName);
 
     // Use freshMongos to move chunk to another shard.
     assert.commandWorked(freshMongos.adminCommand(
-        {moveChunk: collNS, find: {x: 0}, to: st._shardNames[1], _waitForDelete: true}));
+        {moveChunk: collNS, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}));
 };
 
 var checkAllRemoveQueries = function(makeMongosStaleFunc) {
