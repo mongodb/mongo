@@ -421,6 +421,10 @@ void addClusterMonitorPrivileges(PrivilegeVector* privileges) {
                   ActionType::find));
     Privilege::addPrivilegeToPrivilegeVector(
         privileges,
+        Privilege(ResourcePattern::forExactNamespace(NamespaceString("local.sources")),
+                  ActionType::find));
+    Privilege::addPrivilegeToPrivilegeVector(
+        privileges,
         Privilege(ResourcePattern::forCollectionName("system.profile"), ActionType::find));
 }
 
