@@ -528,7 +528,7 @@ functions:
     params:
       silent: true
       script: |
-        process_kill_list="(mongo|bsondump|python|lldb|_test$|^cl\.exe$|_test\.exe$)"
+        process_kill_list="(^cl\.exe$|bsondump|java|lein|lldb|mongo|python|_test$|_test\.exe$)"
         # Exclude Evergreen agent processes
         process_exclude_list="(main)"
 
