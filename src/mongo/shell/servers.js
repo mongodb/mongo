@@ -720,6 +720,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
     MongoRunner.StopError.prototype.constructor = MongoRunner.StopError;
 
     // Constants for exit codes of MongoDB processes
+    MongoRunner.EXIT_ABORT = -6;
     MongoRunner.EXIT_CLEAN = 0;
     MongoRunner.EXIT_BADOPTIONS = 2;
     MongoRunner.EXIT_REPLICATION_ERROR = 3;

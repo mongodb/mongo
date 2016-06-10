@@ -30,17 +30,67 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
 namespace repl {
 
+struct CollectionMockStats {
+    bool initCalled = false;
+    int insertCount = 0;
+    bool commitCalled = false;
+};
+
+class CollectionBulkLoaderMock : public CollectionBulkLoader {
+    MONGO_DISALLOW_COPYING(CollectionBulkLoaderMock);
+
+public:
+    CollectionBulkLoaderMock(CollectionMockStats* collStats) : stats(collStats){};
+    virtual ~CollectionBulkLoaderMock() = default;
+    virtual Status init(OperationContext* txn,
+                        Collection* coll,
+                        const std::vector<BSONObj>& secondaryIndexSpecs) override;
+
+    virtual Status insertDocuments(const std::vector<BSONObj>::const_iterator begin,
+                                   const std::vector<BSONObj>::const_iterator end) override;
+    virtual Status commit() override;
+
+    std::string toString() const override {
+        return toBSON().toString();
+    };
+    BSONObj toBSON() const override {
+        return BSONObj();
+    };
+
+    CollectionMockStats* stats;
+
+    // Override functions.
+    stdx::function<Status(const std::vector<BSONObj>::const_iterator begin,
+                          const std::vector<BSONObj>::const_iterator end)>
+        insertDocsFn = [](const std::vector<BSONObj>::const_iterator,
+                          const std::vector<BSONObj>::const_iterator) { return Status::OK(); };
+    stdx::function<Status()> abortFn = []() { return Status::OK(); };
+    stdx::function<Status()> commitFn = []() { return Status::OK(); };
+    stdx::function<Status(
+        OperationContext* txn, Collection* coll, const std::vector<BSONObj>& secondaryIndexSpecs)>
+        initFn = [](OperationContext*, Collection*, const std::vector<BSONObj>&) {
+            return Status::OK();
+        };
+};
+
 class StorageInterfaceMock : public StorageInterface {
     MONGO_DISALLOW_COPYING(StorageInterfaceMock);
 
 public:
     StorageInterfaceMock() = default;
+
+    void startup() override;
+    void shutdown() override;
 
     bool getInitialSyncFlag(OperationContext* txn) const override;
     void setInitialSyncFlag(OperationContext* txn) override;
@@ -52,12 +102,75 @@ public:
                      const DurableRequirement durReq) override;
     void setMinValid(OperationContext* txn, const BatchBoundaries& boundaries) override;
 
-
     StatusWith<OpTime> writeOpsToOplog(OperationContext* txn,
                                        const NamespaceString& nss,
                                        const MultiApplier::Operations& operations) override;
 
     MultiApplier::Operations getOperationsWrittenToOplog() const;
+
+    StatusWith<std::unique_ptr<CollectionBulkLoader>> createCollectionForBulkLoading(
+        const NamespaceString& nss,
+        const CollectionOptions& options,
+        const BSONObj idIndexSpec,
+        const std::vector<BSONObj>& secondaryIndexSpecs) override {
+        return createCollectionFn(nss, options, idIndexSpec, secondaryIndexSpecs);
+    };
+
+    Status insertDocument(OperationContext* txn,
+                          const NamespaceString& nss,
+                          const BSONObj& doc) override {
+        return insertDocumentFn(txn, nss, doc);
+    };
+
+    StatusWith<OpTime> insertOplogDocuments(OperationContext* txn,
+                                            const NamespaceString& nss,
+                                            const std::vector<BSONObj>& ops) override {
+        return insertOplogDocumentsFn(txn, nss, ops);
+    }
+
+    Status dropReplicatedDatabases(OperationContext* txn) override {
+        return dropUserDBsFn(txn);
+    };
+
+    Status createOplog(OperationContext* txn, const NamespaceString& nss) override {
+        return createOplogFn(txn, nss);
+    };
+
+    Status dropCollection(OperationContext* txn, const NamespaceString& nss) override {
+        return dropCollFn(txn, nss);
+    };
+
+    Status isAdminDbValid(OperationContext* txn) override {
+        return Status::OK();
+    };
+
+
+    // Testing functions.
+    CreateCollectionFn createCollectionFn = [](const NamespaceString& nss,
+                                               const CollectionOptions& options,
+                                               const BSONObj idIndexSpec,
+                                               const std::vector<BSONObj>& secondaryIndexSpecs)
+        -> StatusWith<std::unique_ptr<CollectionBulkLoader>> {
+            return Status{ErrorCodes::IllegalOperation, "CreateCollectionFn not implemented."};
+        };
+    InsertDocumentFn insertDocumentFn =
+        [](OperationContext* txn, const NamespaceString& nss, const BSONObj& doc) {
+            return Status{ErrorCodes::IllegalOperation, "InsertDocumentFn not implemented."};
+        };
+    InsertOplogDocumentsFn insertOplogDocumentsFn =
+        [](OperationContext* txn, const NamespaceString& nss, const std::vector<BSONObj>& ops) {
+            return StatusWith<OpTime>(
+                Status{ErrorCodes::IllegalOperation, "InsertOplogDocumentsFn not implemented."});
+        };
+    DropUserDatabasesFn dropUserDBsFn = [](OperationContext* txn) {
+        return Status{ErrorCodes::IllegalOperation, "DropUserDatabasesFn not implemented."};
+    };
+    CreateOplogFn createOplogFn = [](OperationContext* txn, const NamespaceString& nss) {
+        return Status{ErrorCodes::IllegalOperation, "CreateOplogFn not implemented."};
+    };
+    DropCollectionFn dropCollFn = [](OperationContext* txn, const NamespaceString& nss) {
+        return Status{ErrorCodes::IllegalOperation, "DropCollectionFn not implemented."};
+    };
 
 private:
     mutable stdx::mutex _initialSyncFlagMutex;

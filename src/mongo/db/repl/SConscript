@@ -67,6 +67,7 @@ env.Library(
     target='storage_interface_impl',
     source=[
         'storage_interface_impl.cpp',
+        'collection_bulk_loader_impl.cpp',
     ],
     LIBDEPS=[
         'storage_interface',

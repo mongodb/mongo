@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2014 MongoDB Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,27 +26,42 @@
  *    it in the license file.
  */
 
+
 #pragma once
 
-#include "mongo/base/status.h"
+#include <string>
 
 namespace mongo {
+
+class Collection;
 class OperationContext;
-class Database;
 
 namespace repl {
-class BackgroundSync;
 
 /**
- * Begins an initial sync of a node.  This drops all data, chooses a sync source,
- * and runs the cloner from that sync source.  The node's state is not changed.
+ * Used on a local Collection to create and bulk build indexes.
  */
-void syncDoInitialSync(BackgroundSync* bgsync);
+class CollectionBulkLoader {
+public:
+    virtual ~CollectionBulkLoader() = default;
 
-/**
- * Checks that the "admin" database contains a supported version of the auth data schema.
- */
-Status checkAdminDatabase(OperationContext* txn, Database* adminDb);
+    virtual Status init(OperationContext* txn,
+                        Collection* coll,
+                        const std::vector<BSONObj>& indexSpecs) = 0;
+    /**
+     * Inserts the documents into the collection record store, and indexes them with the
+     * MultiIndexBlock on the side.
+     */
+    virtual Status insertDocuments(const std::vector<BSONObj>::const_iterator begin,
+                                   const std::vector<BSONObj>::const_iterator end) = 0;
+    /**
+     * Called when inserts are done and indexes can be committed.
+     */
+    virtual Status commit() = 0;
+
+    virtual std::string toString() const = 0;
+    virtual BSONObj toBSON() const = 0;
+};
 
 }  // namespace repl
 }  // namespace mongo

@@ -181,6 +181,7 @@ Status renameCollection(OperationContext* txn,
 
     MultiIndexBlock indexer(txn, targetColl);
     indexer.allowInterruption();
+    std::vector<MultiIndexBlock*> indexers{&indexer};
 
     // Copy the index descriptions from the source collection, adjusting the ns field.
     {
@@ -211,7 +212,7 @@ Status renameCollection(OperationContext* txn,
             // No logOp necessary because the entire renameCollection command is one logOp.
             bool shouldReplicateWrites = txn->writesAreReplicated();
             txn->setReplicatedWrites(false);
-            Status status = targetColl->insertDocument(txn, obj, &indexer, true);
+            Status status = targetColl->insertDocument(txn, obj, indexers, true);
             txn->setReplicatedWrites(shouldReplicateWrites);
             if (!status.isOK())
                 return status;

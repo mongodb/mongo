@@ -403,12 +403,13 @@ Status MMAPV1Engine::repairDatabase(OperationContext* txn,
                 }
             }
 
+            std::vector<MultiIndexBlock*> indexers{&indexer};
             auto cursor = originalCollection->getCursor(txn);
             while (auto record = cursor->next()) {
                 BSONObj doc = record->data.releaseToBson();
 
                 WriteUnitOfWork wunit(txn);
-                Status status = tempCollection->insertDocument(txn, doc, &indexer, false);
+                Status status = tempCollection->insertDocument(txn, doc, indexers, false);
                 if (!status.isOK())
                     return status;
 

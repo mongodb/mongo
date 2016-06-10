@@ -51,6 +51,8 @@ namespace repl {
 
 namespace {
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
+using LockGuard = stdx::lock_guard<stdx::mutex>;
+
 
 /**
  * Runs a single task runner task.
@@ -209,5 +211,43 @@ TaskRunner::Task TaskRunner::_waitForNextTask() {
     return task;
 }
 
+Status TaskRunner::runSynchronousTask(SynchronousTask func, TaskRunner::NextAction nextAction) {
+    // Setup cond_var for signaling when done.
+    bool done = false;
+    stdx::mutex mutex;
+    stdx::condition_variable waitTillDoneCond;
+
+    Status returnStatus{Status::OK()};
+    this->schedule([&](OperationContext* txn, const Status taskStatus) {
+        if (!taskStatus.isOK()) {
+            returnStatus = taskStatus;
+        } else {
+            // Run supplied function.
+            try {
+                log() << "starting to run synchronous task on runner.";
+                returnStatus = func(txn);
+                log() << "done running the synchronous task.";
+            } catch (...) {
+                returnStatus = exceptionToStatus();
+                error() << "Exception thrown in runSynchronousTask: " << returnStatus;
+            }
+        }
+
+        // Signal done.
+        LockGuard lk2{mutex};
+        done = true;
+        waitTillDoneCond.notify_all();
+
+        // return nextAction based on status from supplied function.
+        if (returnStatus.isOK()) {
+            return nextAction;
+        }
+        return TaskRunner::NextAction::kCancel;
+    });
+
+    UniqueLock lk{mutex};
+    waitTillDoneCond.wait(lk, [&done] { return done; });
+    return returnStatus;
+}
 }  // namespace repl
 }  // namespace mongo

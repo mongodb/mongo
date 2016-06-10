@@ -25,14 +25,21 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
+#include <numeric>
 
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/storage_interface_mock.h"
 
+#include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
+
 namespace mongo {
 namespace repl {
-
+void StorageInterfaceMock::startup() {}
+void StorageInterfaceMock::shutdown() {}
 bool StorageInterfaceMock::getInitialSyncFlag(OperationContext* txn) const {
     stdx::lock_guard<stdx::mutex> lock(_initialSyncFlagMutex);
     return _initialSyncFlag;
@@ -79,6 +86,32 @@ MultiApplier::Operations StorageInterfaceMock::getOperationsWrittenToOplog() con
     stdx::lock_guard<stdx::mutex> lock(_operationsWrittenToOplogMutex);
     return _operationsWrittenToOplog;
 }
+
+Status CollectionBulkLoaderMock::init(OperationContext* txn,
+                                      Collection* coll,
+                                      const std::vector<BSONObj>& secondaryIndexSpecs) {
+    LOG(1) << "CollectionBulkLoaderMock::init called";
+    stats->initCalled = true;
+    return initFn(txn, coll, secondaryIndexSpecs);
+};
+
+Status CollectionBulkLoaderMock::insertDocuments(const std::vector<BSONObj>::const_iterator begin,
+                                                 const std::vector<BSONObj>::const_iterator end) {
+    LOG(1) << "CollectionBulkLoaderMock::insertDocuments called";
+    const auto status = insertDocsFn(begin, end);
+
+    // Only count if it succeeds.
+    if (status.isOK()) {
+        stats->insertCount += std::distance(begin, end);
+    }
+    return status;
+};
+
+Status CollectionBulkLoaderMock::commit() {
+    LOG(1) << "CollectionBulkLoaderMock::commit called";
+    stats->commitCalled = true;
+    return commitFn();
+};
 
 }  // namespace repl
 }  // namespace mongo

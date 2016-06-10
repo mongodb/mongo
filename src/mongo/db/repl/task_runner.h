@@ -59,6 +59,16 @@ public:
     };
 
     using Task = stdx::function<NextAction(OperationContext*, const Status&)>;
+    using SynchronousTask = stdx::function<Status(OperationContext* txn)>;
+
+    /**
+     * Returns the Status from the supplied function after running it..
+     *
+     * Note: TaskRunner::NextAction controls when the operation context and thread will be released.
+     */
+    Status runSynchronousTask(
+        SynchronousTask func,
+        TaskRunner::NextAction nextAction = TaskRunner::NextAction::kKeepOperationContext);
 
     /**
      * Creates a Task returning kCancel. This is useful in shutting down the task runner after

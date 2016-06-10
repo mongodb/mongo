@@ -30,8 +30,15 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/index_create.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/task_runner.h"
+#include "mongo/util/concurrency/old_thread_pool.h"
 
 namespace mongo {
 namespace repl {
@@ -46,6 +53,10 @@ public:
 
     StorageInterfaceImpl();
     explicit StorageInterfaceImpl(const NamespaceString& minValidNss);
+    virtual ~StorageInterfaceImpl();
+
+    void startup() override;
+    void shutdown() override;
 
     /**
      * Returns namespace of collection containing the minvalid boundaries and initial sync flag.
@@ -70,8 +81,42 @@ public:
                                        const NamespaceString& nss,
                                        const MultiApplier::Operations& operations) override;
 
+    /**
+     *  Allocates a new TaskRunner for use by the passed in collection.
+     */
+    StatusWith<std::unique_ptr<CollectionBulkLoader>> createCollectionForBulkLoading(
+        const NamespaceString& nss,
+        const CollectionOptions& options,
+        const BSONObj idIndexSpec,
+        const std::vector<BSONObj>& secondaryIndexSpecs) override;
+
+    Status insertDocument(OperationContext* txn,
+                          const NamespaceString& nss,
+                          const BSONObj& doc) override;
+
+    StatusWith<OpTime> insertOplogDocuments(OperationContext* txn,
+                                            const NamespaceString& nss,
+                                            const std::vector<BSONObj>& ops) override;
+
+    Status dropReplicatedDatabases(OperationContext* txn) override;
+
+    Status createOplog(OperationContext* txn, const NamespaceString& nss) override;
+
+    Status dropCollection(OperationContext* txn, const NamespaceString& nss) override;
+
+    Status isAdminDbValid(OperationContext* txn) override;
+
 private:
-    NamespaceString _minValidNss;
+    // One thread per collection/TaskRunner
+    std::unique_ptr<OldThreadPool> _bulkLoaderThreads;
+    const NamespaceString _minValidNss;
+
+    // This mutex protects _runners vector.
+    stdx::mutex _runnersMutex;
+
+    // Each runner services a single collection and holds on to the OperationContext (and thread)
+    // until it is done with the collection (CollectionBulkLoaderImpl::commit/abort is called).
+    std::vector<std::pair<const NamespaceString&, std::unique_ptr<TaskRunner>>> _runners;
 };
 
 }  // namespace repl
