@@ -8,6 +8,7 @@
     coll.drop();
 
     var explainRes;
+    var writeRes;
     var planStage;
 
     var assertIndexHasCollation = function(keyPattern, collation) {
@@ -220,11 +221,12 @@
     // Collation tests for aggregation.
     //
 
-    // Collection does not exist.
+    // Aggregation should return correct results when collation specified and collection does not
+    // exist.
     coll.drop();
     assert.eq(0, coll.aggregate([], {collation: {locale: "fr"}}).itcount());
 
-    // Collection exists.
+    // Aggregation should return correct results when collation specified and collection does exist.
     coll.drop();
     assert.writeOK(coll.insert({_id: 1, str: "foo"}));
     assert.writeOK(coll.insert({_id: 2, str: "bar"}));
@@ -232,16 +234,52 @@
     assert.eq(1,
               coll.aggregate([{$match: {str: "FOO"}}], {collation: {locale: "en_US", strength: 2}})
                   .itcount());
+
+    // Aggregation should return correct results when no collation specified and collection has a
+    // default collation.
+    coll.drop();
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+    assert.writeOK(coll.insert({str: "foo"}));
+    assert.eq(1, coll.aggregate([{$match: {str: "FOO"}}]).itcount());
+
+    // Aggregation should return correct results when "simple" collation specified and collection
+    // has a default collation.
+    coll.drop();
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+    assert.writeOK(coll.insert({str: "foo"}));
+    assert.eq(0,
+              coll.aggregate([{$match: {str: "FOO"}}], {collation: {locale: "simple"}}).itcount());
+
+    // Aggregation should select compatible index when no collation specified and collection has a
+    // default collation.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
+    assert.commandWorked(coll.ensureIndex({a: 1}, {collation: {locale: "en_US"}}));
+    var explain = coll.explain("queryPlanner").aggregate([{$match: {a: "foo"}}]).stages[0].$cursor;
+    assert(isIxscan(explain.queryPlanner.winningPlan));
+
+    // Aggregation should not use index when no collation specified and collection default
+    // collation is incompatible with index collation.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
+    assert.commandWorked(coll.ensureIndex({a: 1}, {collation: {locale: "simple"}}));
+    var explain = coll.explain("queryPlanner").aggregate([{$match: {a: "foo"}}]).stages[0].$cursor;
+    assert(isCollscan(explain.queryPlanner.winningPlan));
+
+    // Explain of aggregation with collation should succeed.
     assert.commandWorked(coll.explain().aggregate([], {collation: {locale: "fr"}}));
 
     //
     // Collation tests for count.
     //
 
-    // Collection does not exist.
+    // Count should return correct results when collation specified and collection does not exist.
+    coll.drop();
     assert.eq(0, coll.find({str: "FOO"}).collation({locale: "en_US"}).count());
 
-    // Collection exists.
+    // Count should return correct results when collation specified and collection does exist.
     coll.drop();
     assert.writeOK(coll.insert({_id: 1, str: "foo"}));
     assert.writeOK(coll.insert({_id: 2, str: "bar"}));
@@ -252,13 +290,32 @@
     assert.eq(0, coll.count({str: "FOO"}, {collation: {locale: "en_US"}}));
     assert.eq(1, coll.count({str: "FOO"}, {collation: {locale: "en_US", strength: 2}}));
 
+    // Count should return correct results when no collation specified and collection has a default
+    // collation.
+    coll.drop();
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+    assert.writeOK(coll.insert({str: "foo"}));
+    assert.eq(1, coll.find({str: "FOO"}).count());
+
+    // Count should return correct results when "simple" collation specified and collection has a
+    // default collation.
+    coll.drop();
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+    assert.writeOK(coll.insert({str: "foo"}));
+    assert.eq(0, coll.find({str: "FOO"}).collation({locale: "simple"}).count());
+
+    // Count should return correct results when collation specified and when run with explain.
+    coll.drop();
+    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+    assert.writeOK(coll.insert({_id: 2, str: "bar"}));
     explainRes =
         coll.explain("executionStats").find({str: "FOO"}).collation({locale: "en_US"}).count();
     assert.commandWorked(explainRes);
     planStage = getPlanStage(explainRes.executionStats.executionStages, "COLLSCAN");
     assert.neq(null, planStage);
     assert.eq(0, planStage.advanced);
-
     explainRes = coll.explain("executionStats")
                      .find({str: "FOO"})
                      .collation({locale: "en_US", strength: 2})
@@ -272,11 +329,12 @@
     // Collation tests for distinct.
     //
 
-    // Collection does not exist.
+    // Distinct should return correct results when collation specified and collection does not
+    // exist.
     coll.drop();
     assert.eq(0, coll.distinct("str", {}, {collation: {locale: "en_US", strength: 2}}).length);
 
-    // Collection exists, no indexes.
+    // Distinct should return correct results when collation specified and no indexes exist.
     coll.drop();
     assert.writeOK(coll.insert({_id: 1, str: "foo"}));
     assert.writeOK(coll.insert({_id: 2, str: "FOO"}));
@@ -287,13 +345,50 @@
     assert.eq(
         2, coll.distinct("_id", {str: "foo"}, {collation: {locale: "en_US", strength: 2}}).length);
 
-    // Collection exists, indexes exist.
+    // Distinct should return correct results when collation specified and compatible index exists.
     coll.createIndex({str: 1}, {collation: {locale: "en_US", strength: 2}});
     res = coll.distinct("str", {}, {collation: {locale: "en_US", strength: 2}});
     assert.eq(1, res.length);
     assert.eq("foo", res[0].toLowerCase());
     assert.eq(2, coll.distinct("str", {}, {collation: {locale: "en_US", strength: 3}}).length);
 
+    // Distinct should return correct results when no collation specified and collection has a
+    // default collation.
+    coll.drop();
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+    assert.writeOK(coll.insert({str: "foo"}));
+    assert.writeOK(coll.insert({str: "FOO"}));
+    assert.eq(1, coll.distinct("str").length);
+    assert.eq(2, coll.distinct("_id", {str: "foo"}).length);
+
+    // Distinct should return correct results when "simple" collation specified and collection has a
+    // default collation.
+    coll.drop();
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+    assert.writeOK(coll.insert({str: "foo"}));
+    assert.writeOK(coll.insert({str: "FOO"}));
+    assert.eq(2, coll.distinct("str", {}, {collation: {locale: "simple"}}).length);
+    assert.eq(1, coll.distinct("_id", {str: "foo"}, {collation: {locale: "simple"}}).length);
+
+    // Distinct should select compatible index when no collation specified and collection has a
+    // default collation.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
+    assert.commandWorked(coll.ensureIndex({a: 1}, {collation: {locale: "en_US"}}));
+    var explain = coll.explain("queryPlanner").distinct("a");
+    assert(planHasStage(explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
+
+    // Distinct should not use index when no collation specified and collection default collation is
+    // incompatible with index collation.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
+    assert.commandWorked(coll.ensureIndex({a: 1}, {collation: {locale: "simple"}}));
+    var explain = coll.explain("queryPlanner").distinct("a");
+    assert(isCollscan(explain.queryPlanner.winningPlan));
+
+    // Explain of distinct with collation should succeed.
     assert.commandWorked(coll.explain().distinct("str", {}, {collation: {locale: "fr"}}));
 
     //
@@ -301,11 +396,12 @@
     //
 
     if (db.getMongo().useReadCommands()) {
-        // Collection does not exist.
+        // Find should return correct results when collation specified and collection does not
+        // exist.
         coll.drop();
         assert.eq(0, coll.find({_id: "FOO"}).collation({locale: "en_US"}).itcount());
 
-        // On _id field.
+        // Find should return correct results when collation specified and filter is a match on _id.
         coll.drop();
         assert.writeOK(coll.insert({_id: 1, str: "foo"}));
         assert.writeOK(coll.insert({_id: 2, str: "bar"}));
@@ -315,12 +411,12 @@
         assert.eq(1, coll.find({_id: "FOO"}).collation({locale: "en_US", strength: 2}).itcount());
         assert.writeOK(coll.remove({_id: "foo"}));
 
-        // Without an index.
+        // Find should return correct results when collation specified and no indexes exist.
         assert.eq(0, coll.find({str: "FOO"}).itcount());
         assert.eq(0, coll.find({str: "FOO"}).collation({locale: "en_US"}).itcount());
         assert.eq(1, coll.find({str: "FOO"}).collation({locale: "en_US", strength: 2}).itcount());
 
-        // With an index.
+        // Find should return correct results when collation specified and compatible index exists.
         assert.commandWorked(
             coll.ensureIndex({str: 1}, {collation: {locale: "en_US", strength: 2}}));
         assert.eq(0, coll.find({str: "FOO"}).hint({str: 1}).itcount());
@@ -332,8 +428,8 @@
                       .itcount());
         assert.commandWorked(coll.dropIndexes());
 
-        // With a partial index. {_id: 1, str: "foo"} will be indexed even though "foo" > "FOO",
-        // since the collation is case-insensitive.
+        // Find should return correct results when collation specified and compatible partial index
+        // exists.
         assert.commandWorked(coll.ensureIndex({str: 1}, {
             partialFilterExpression: {str: {$lte: "FOO"}},
             collation: {locale: "en_US", strength: 2}
@@ -351,18 +447,119 @@
                       .itcount());
         assert.writeOK(coll.remove({_id: 3}));
         assert.commandWorked(coll.dropIndexes());
+    }
 
-        explainRes =
-            coll.explain("executionStats").find({str: "FOO"}).collation({locale: "en_US"}).finish();
-        assert.commandWorked(explainRes);
-        assert.eq(0, explainRes.executionStats.nReturned);
-        explainRes = coll.explain("executionStats")
-                         .find({str: "FOO"})
-                         .collation({locale: "en_US", strength: 2})
-                         .finish();
-        assert.commandWorked(explainRes);
-        assert.eq(1, explainRes.executionStats.nReturned);
-    } else {
+    // Find should return correct results when no collation specified and collection has a default
+    // collation.
+    coll.drop();
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+    assert.writeOK(coll.insert({str: "foo"}));
+    assert.writeOK(coll.insert({str: "FOO"}));
+    assert.writeOK(coll.insert({str: "bar"}));
+    assert.eq(3, coll.find({str: {$in: ["foo", "bar"]}}).itcount());
+    assert.eq(2, coll.find({str: "foo"}).itcount());
+    assert.eq([{str: "bar"}, {str: "foo"}, {str: "FOO"}],
+              coll.find({}, {_id: 0, str: 1}).sort({str: 1}).toArray());
+
+    // Find with oplog replay should return correct results when no collation specified and
+    // collection has a default collation.
+    coll.drop();
+    assert.commandWorked(db.createCollection(
+        coll.getName(),
+        {collation: {locale: "en_US", strength: 2}, capped: true, size: 16 * 1024}));
+    assert.writeOK(coll.insert({str: "FOO", ts: Timestamp(1000, 0)}));
+    assert.writeOK(coll.insert({str: "FOO", ts: Timestamp(1000, 1)}));
+    assert.writeOK(coll.insert({str: "FOO", ts: Timestamp(1000, 2)}));
+    assert.eq(2,
+              coll.find({str: "foo", ts: {$gte: Timestamp(1000, 1)}})
+                  .addOption(DBQuery.Option.oplogReplay)
+                  .itcount());
+
+    if (db.getMongo().useReadCommands()) {
+        // Find should return correct results when "simple" collation specified and collection has a
+        // default collation.
+        coll.drop();
+        assert.commandWorked(
+            db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+        assert.writeOK(coll.insert({str: "foo"}));
+        assert.writeOK(coll.insert({str: "FOO"}));
+        assert.writeOK(coll.insert({str: "bar"}));
+        assert.eq(2,
+                  coll.find({str: {$in: ["foo", "bar"]}}).collation({locale: "simple"}).itcount());
+        assert.eq(1, coll.find({str: "foo"}).collation({locale: "simple"}).itcount());
+        assert.eq(
+            [{str: "FOO"}, {str: "bar"}, {str: "foo"}],
+            coll.find({}, {_id: 0, str: 1}).sort({str: 1}).collation({locale: "simple"}).toArray());
+
+        // Find with oplog replay should return correct results when "simple" collation specified
+        // and collection has a default collation.
+        coll.drop();
+        assert.commandWorked(db.createCollection(
+            coll.getName(),
+            {collation: {locale: "en_US", strength: 2}, capped: true, size: 16 * 1024}));
+        const t0 = Timestamp(1000, 0);
+        const t1 = Timestamp(1000, 1);
+        const t2 = Timestamp(1000, 2);
+        assert.writeOK(coll.insert({str: "FOO", ts: Timestamp(1000, 0)}));
+        assert.writeOK(coll.insert({str: "FOO", ts: Timestamp(1000, 1)}));
+        assert.writeOK(coll.insert({str: "FOO", ts: Timestamp(1000, 2)}));
+        assert.eq(0,
+                  coll.find({str: "foo", ts: {$gte: Timestamp(1000, 1)}})
+                      .addOption(DBQuery.Option.oplogReplay)
+                      .collation({locale: "simple"})
+                      .itcount());
+    }
+
+    // Find should select compatible index when no collation specified and collection has a default
+    // collation.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
+    assert.commandWorked(coll.ensureIndex({a: 1}, {collation: {locale: "en_US"}}));
+    var explain = coll.find({a: "foo"}).explain("queryPlanner");
+    assert(isIxscan(explain.queryPlanner.winningPlan));
+
+    // Find should select compatible index when no collation specified and collection default
+    // collation is "simple".
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "simple"}}));
+    assert.commandWorked(coll.ensureIndex({a: 1}, {collation: {locale: "simple"}}));
+    var explain = coll.find({a: "foo"}).explain("queryPlanner");
+    assert(isIxscan(explain.queryPlanner.winningPlan));
+
+    // Find should not use index when no collation specified, index collation is "simple", and
+    // collection has a non-"simple" default collation.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
+    assert.commandWorked(coll.ensureIndex({a: 1}, {collation: {locale: "simple"}}));
+    var explain = coll.find({a: "foo"}).explain("queryPlanner");
+    assert(isCollscan(explain.queryPlanner.winningPlan));
+
+    // Find should select compatible index when "simple" collation specified and collection has a
+    // non-"simple" default collation.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
+    assert.commandWorked(coll.ensureIndex({a: 1}, {collation: {locale: "simple"}}));
+    var explain = coll.find({a: "foo"}).collation({locale: "simple"}).explain("queryPlanner");
+    assert(isIxscan(explain.queryPlanner.winningPlan));
+
+    // Find should return correct results when collation specified and run with explain.
+    coll.drop();
+    assert.writeOK(coll.insert({str: "foo"}));
+    explainRes =
+        coll.explain("executionStats").find({str: "FOO"}).collation({locale: "en_US"}).finish();
+    assert.commandWorked(explainRes);
+    assert.eq(0, explainRes.executionStats.nReturned);
+    explainRes = coll.explain("executionStats")
+                     .find({str: "FOO"})
+                     .collation({locale: "en_US", strength: 2})
+                     .finish();
+    assert.commandWorked(explainRes);
+    assert.eq(1, explainRes.executionStats.nReturned);
+
+    if (!db.getMongo().useReadCommands()) {
+        // find() shell helper should error if a collation is specified and the shell is not using
+        // read commands.
         coll.drop();
         assert.writeOK(coll.insert({_id: 1, str: "foo"}));
         assert.writeOK(coll.insert({_id: 2, str: "bar"}));
@@ -375,7 +572,8 @@
     // Collation tests for findAndModify.
     //
 
-    // Collection does not exist.
+    // findAndModify should return correct results when collation specified and collection does not
+    // exist.
     coll.drop();
     assert.eq(null, coll.findAndModify({
         query: {str: "bar"},
@@ -384,7 +582,7 @@
         collation: {locale: "fr"}
     }));
 
-    // Update via findAndModify.
+    // Update-findAndModify should return correct results when collation specified.
     coll.drop();
     assert.writeOK(coll.insert({_id: 1, str: "foo"}));
     assert.writeOK(coll.insert({_id: 2, str: "bar"}));
@@ -394,6 +592,8 @@
         new: true,
         collation: {locale: "en_US", strength: 2}
     }));
+
+    // Explain of update-findAndModify should return correct results when collation specified.
     explainRes = coll.explain("executionStats").findAndModify({
         query: {str: "BAR"},
         update: {$set: {str: "baz"}},
@@ -405,13 +605,15 @@
     assert.neq(null, planStage);
     assert.eq(1, planStage.nWouldModify);
 
-    // Delete via findAndModify.
+    // Delete-findAndModify should return correct results when collation specified.
     coll.drop();
     assert.writeOK(coll.insert({_id: 1, str: "foo"}));
     assert.writeOK(coll.insert({_id: 2, str: "bar"}));
     assert.eq({_id: 1, str: "foo"},
               coll.findAndModify(
                   {query: {str: "FOO"}, remove: true, collation: {locale: "en_US", strength: 2}}));
+
+    // Explain of delete-findAndModify should return correct results when collation specified.
     explainRes = coll.explain("executionStats").findAndModify({
         query: {str: "BAR"},
         remove: true,
@@ -422,11 +624,34 @@
     assert.neq(null, planStage);
     assert.eq(1, planStage.nWouldDelete);
 
+    // findAndModify should return correct results when no collation specified and collection has a
+    // default collation.
+    coll.drop();
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+    assert.eq({_id: 1, str: "foo"},
+              coll.findAndModify({query: {str: "FOO"}, update: {$set: {x: 1}}}));
+    assert.eq({_id: 1, str: "foo", x: 1}, coll.findAndModify({query: {str: "FOO"}, remove: true}));
+
+    // findAndModify should return correct results when "simple" collation specified and collection
+    // has a default collation.
+    coll.drop();
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+    assert.eq(null,
+              coll.findAndModify(
+                  {query: {str: "FOO"}, update: {$set: {x: 1}}, collation: {locale: "simple"}}));
+    assert.eq(
+        null,
+        coll.findAndModify({query: {str: "FOO"}, remove: true, collation: {locale: "simple"}}));
+
     //
     // Collation tests for group.
     //
 
-    // Collection does not exist.
+    // Group should return correct results when collation specified and collection does not exist.
     coll.drop();
     assert.eq([], coll.group({
         key: {str: 1},
@@ -437,7 +662,7 @@
         collation: {locale: "fr"}
     }));
 
-    // Collection exists.
+    // Group should return correct results when collation specified and no indexes exist.
     coll.drop();
     assert.writeOK(coll.insert({_id: 1, str: "foo"}));
     assert.writeOK(coll.insert({_id: 2, str: "bar"}));
@@ -450,6 +675,42 @@
         },
         collation: {locale: "en_US", strength: 2}
     }));
+
+    // Group should return correct results when no collation specified and collection has a default
+    // collation.
+    coll.drop();
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+    assert.eq([{str: "foo", count: 1}], coll.group({
+        cond: {str: "FOO"},
+        key: {str: 1},
+        initial: {count: 0},
+        reduce: function(curr, result) {
+            result.count += 1;
+        }
+    }));
+
+    // Group should return correct results when "simple" collation specified and collection has a
+    // default collation.
+    coll.drop();
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+    assert.eq([], coll.group({
+        cond: {str: "FOO"},
+        key: {str: 1},
+        initial: {count: 0},
+        reduce: function(curr, result) {
+            result.count += 1;
+        },
+        collation: {locale: "simple"}
+    }));
+
+    // Explain of group should return correct results when collation specified.
+    coll.drop();
+    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+    assert.writeOK(coll.insert({_id: 2, str: "bar"}));
     explainRes = coll.explain("executionStats").group({
         cond: {str: "FOO"},
         key: {str: 1},
@@ -468,7 +729,8 @@
     // Collation tests for mapReduce.
     //
 
-    // Collection does not exist.
+    // mapReduce should return "collection doesn't exist" error when collation specified and
+    // collection does not exist.
     coll.drop();
     assert.throws(function() {
         coll.mapReduce(
@@ -481,7 +743,7 @@
             {out: {inline: 1}, collation: {locale: "fr"}});
     });
 
-    // Collection exists.
+    // mapReduce should return correct results when collation specified and no indexes exist.
     coll.drop();
     assert.writeOK(coll.insert({_id: 1, str: "foo"}));
     assert.writeOK(coll.insert({_id: 2, str: "bar"}));
@@ -496,16 +758,59 @@
     assert.commandWorked(mapReduceOut);
     assert.eq(mapReduceOut.results.length, 1);
 
+    // mapReduce should return correct results when no collation specified and collection has a
+    // default collation.
+    coll.drop();
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+    var mapReduceOut = coll.mapReduce(
+        function() {
+            emit(this.str, 1);
+        },
+        function(key, values) {
+            return Array.sum(values);
+        },
+        {out: {inline: 1}, query: {str: "FOO"}});
+    assert.commandWorked(mapReduceOut);
+    assert.eq(mapReduceOut.results.length, 1);
+
+    // mapReduce should return correct results when "simple" collation specified and collection has
+    // a default collation.
+    coll.drop();
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+    var mapReduceOut = coll.mapReduce(
+        function() {
+            emit(this.str, 1);
+        },
+        function(key, values) {
+            return Array.sum(values);
+        },
+        {out: {inline: 1}, query: {str: "FOO"}, collation: {locale: "simple"}});
+    assert.commandWorked(mapReduceOut);
+    assert.eq(mapReduceOut.results.length, 0);
+
     //
     // Collation tests for remove.
     //
 
     if (db.getMongo().writeMode() === "commands") {
-        // Collection does not exist.
+        // Remove should succeed when collation specified and collection does not exist.
         coll.drop();
         assert.writeOK(coll.remove({str: "foo"}, {justOne: true, collation: {locale: "fr"}}));
 
-        // Collection exists.
+        // Remove should return correct results when collation specified.
+        coll.drop();
+        assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+        assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+        writeRes =
+            coll.remove({str: "FOO"}, {justOne: true, collation: {locale: "en_US", strength: 2}});
+        assert.writeOK(writeRes);
+        assert.eq(1, writeRes.nRemoved);
+
+        // Explain of remove should return correct results when collation specified.
         coll.drop();
         assert.writeOK(coll.insert({_id: 1, str: "foo"}));
         assert.writeOK(coll.insert({_id: 2, str: "foo"}));
@@ -517,12 +822,33 @@
         planStage = getPlanStage(explainRes.executionStats.executionStages, "DELETE");
         assert.neq(null, planStage);
         assert.eq(1, planStage.nWouldDelete);
+    }
 
-        var writeRes =
-            coll.remove({str: "FOO"}, {justOne: true, collation: {locale: "en_US", strength: 2}});
+    // Remove should return correct results when no collation specified and collection has a default
+    // collation.
+    coll.drop();
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+    writeRes = coll.remove({str: "FOO"}, {justOne: true});
+    assert.writeOK(writeRes);
+    assert.eq(1, writeRes.nRemoved);
+
+    if (db.getMongo().writeMode() === "commands") {
+        // Remove should return correct results when "simple" collation specified and collection has
+        // a default collation.
+        coll.drop();
+        assert.commandWorked(
+            db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+        assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+        writeRes = coll.remove({str: "FOO"}, {justOne: true, collation: {locale: "simple"}});
         assert.writeOK(writeRes);
-        assert.eq(1, writeRes.nRemoved);
-    } else {
+        assert.eq(0, writeRes.nRemoved);
+    }
+
+    if (db.getMongo().writeMode() !== "commands") {
+        // remove() shell helper should error if a collation is specified and the shell is not using
+        // write commands.
         coll.drop();
         assert.writeOK(coll.insert({_id: 1, str: "foo"}));
         assert.writeOK(coll.insert({_id: 2, str: "foo"}));
@@ -540,12 +866,21 @@
     //
 
     if (db.getMongo().writeMode() === "commands") {
-        // Collection does not exist.
+        // Update should succeed when collation specified and collection does not exist.
         coll.drop();
         assert.writeOK(coll.update(
             {str: "foo"}, {$set: {other: 99}}, {multi: true, collation: {locale: "fr"}}));
 
-        // Collection exists.
+        // Update should return correct results when collation specified.
+        coll.drop();
+        assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+        assert.writeOK(coll.insert({_id: 2, str: "foo"}));
+        writeRes = coll.update({str: "FOO"},
+                               {$set: {other: 99}},
+                               {multi: true, collation: {locale: "en_US", strength: 2}});
+        assert.eq(2, writeRes.nModified);
+
+        // Explain of update should return correct results when collation specified.
         coll.drop();
         assert.writeOK(coll.insert({_id: 1, str: "foo"}));
         assert.writeOK(coll.insert({_id: 2, str: "foo"}));
@@ -557,12 +892,33 @@
         planStage = getPlanStage(explainRes.executionStats.executionStages, "UPDATE");
         assert.neq(null, planStage);
         assert.eq(2, planStage.nWouldModify);
+    }
 
-        var writeRes = coll.update({str: "FOO"},
-                                   {$set: {other: 99}},
-                                   {multi: true, collation: {locale: "en_US", strength: 2}});
-        assert.eq(2, writeRes.nModified);
-    } else {
+    // Update should return correct results when no collation specified and collection has a default
+    // collation.
+    coll.drop();
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+    writeRes = coll.update({str: "FOO"}, {$set: {other: 99}});
+    assert.writeOK(writeRes);
+    assert.eq(1, writeRes.nMatched);
+
+    if (db.getMongo().writeMode() === "commands") {
+        // Update should return correct results when "simple" collation specified and collection has
+        // a default collation.
+        coll.drop();
+        assert.commandWorked(
+            db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+        assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+        writeRes = coll.update({str: "FOO"}, {$set: {other: 99}}, {collation: {locale: "simple"}});
+        assert.writeOK(writeRes);
+        assert.eq(0, writeRes.nModified);
+    }
+
+    if (db.getMongo().writeMode() !== "commands") {
+        // update() shell helper should error if a collation is specified and the shell is not using
+        // write commands.
         coll.drop();
         assert.writeOK(coll.insert({_id: 1, str: "foo"}));
         assert.writeOK(coll.insert({_id: 2, str: "foo"}));
@@ -582,7 +938,8 @@
     // Collation tests for geoNear.
     //
 
-    // Collection does not exist.
+    // geoNear should return "collection doesn't exist" error when collation specified and
+    // collection does not exist.
     coll.drop();
     assert.commandFailed(db.runCommand({
         geoNear: coll.getName(),
@@ -592,7 +949,8 @@
         collation: {locale: "en_US", strength: 2}
     }));
 
-    // Collection exists, string field not indexed.
+    // geoNear should return correct results when collation specified and string predicate not
+    // indexed.
     coll.drop();
     assert.writeOK(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
     assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
@@ -616,7 +974,8 @@
                   }))
                   .results.length);
 
-    // String field indexed without collation.
+    // geoNear should return correct results when no collation specified and string predicate
+    // indexed.
     assert.commandWorked(coll.dropIndexes());
     assert.commandWorked(coll.ensureIndex({geo: "2dsphere", str: 1}));
     assert.eq(0,
@@ -639,7 +998,8 @@
                   }))
                   .results.length);
 
-    // String field indexed with non-matching collation.
+    // geoNear should return correct results when collation specified and collation on index is
+    // incompatible with string predicate.
     assert.commandWorked(coll.dropIndexes());
     assert.commandWorked(
         coll.ensureIndex({geo: "2dsphere", str: 1}, {collation: {locale: "en_US", strength: 3}}));
@@ -663,7 +1023,8 @@
                   }))
                   .results.length);
 
-    // String field indexed with matching collation.
+    // geoNear should return correct results when collation specified and collation on index is
+    // compatible with string predicate.
     assert.commandWorked(coll.dropIndexes());
     assert.commandWorked(
         coll.ensureIndex({geo: "2dsphere", str: 1}, {collation: {locale: "en_US", strength: 2}}));
@@ -687,12 +1048,48 @@
                   }))
                   .results.length);
 
+    // geoNear should return correct results when no collation specified and collection has a
+    // default collation.
+    coll.drop();
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+    assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
+    assert.writeOK(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
+    assert.eq(1,
+              assert
+                  .commandWorked(db.runCommand({
+                      geoNear: coll.getName(),
+                      near: {type: "Point", coordinates: [0, 0]},
+                      spherical: true,
+                      query: {str: "ABC"}
+                  }))
+                  .results.length);
+
+    // geoNear should return correct results when "simple" collation specified and collection has
+    // a default collation.
+    coll.drop();
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
+    assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
+    assert.writeOK(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
+    assert.eq(0,
+              assert
+                  .commandWorked(db.runCommand({
+                      geoNear: coll.getName(),
+                      near: {type: "Point", coordinates: [0, 0]},
+                      spherical: true,
+                      query: {str: "ABC"},
+                      collation: {locale: "simple"}
+                  }))
+                  .results.length);
+
     //
     // Collation tests for find with $nearSphere.
     //
 
     if (db.getMongo().useReadCommands()) {
-        // Collection does not exist.
+        // Find with $nearSphere should return correct results when collation specified and
+        // collection does not exist.
         coll.drop();
         assert.eq(0,
                   coll.find({
@@ -702,7 +1099,8 @@
                       .collation({locale: "en_US", strength: 2})
                       .itcount());
 
-        // Collection exists, string field not indexed.
+        // Find with $nearSphere should return correct results when collation specified and string
+        // predicate not indexed.
         coll.drop();
         assert.writeOK(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
         assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
@@ -720,7 +1118,8 @@
                       .collation({locale: "en_US", strength: 2})
                       .itcount());
 
-        // String field indexed without collation.
+        // Find with $nearSphere should return correct results when no collation specified and
+        // string predicate indexed.
         assert.commandWorked(coll.dropIndexes());
         assert.commandWorked(coll.ensureIndex({geo: "2dsphere", str: 1}));
         assert.eq(0,
@@ -737,7 +1136,8 @@
                       .collation({locale: "en_US", strength: 2})
                       .itcount());
 
-        // String field indexed with non-matching collation.
+        // Find with $nearSphere should return correct results when collation specified and
+        // collation on index is incompatible with string predicate.
         assert.commandWorked(coll.dropIndexes());
         assert.commandWorked(coll.ensureIndex({geo: "2dsphere", str: 1},
                                               {collation: {locale: "en_US", strength: 3}}));
@@ -755,7 +1155,8 @@
                       .collation({locale: "en_US", strength: 2})
                       .itcount());
 
-        // String field indexed with matching collation.
+        // Find with $nearSphere should return correct results when collation specified and
+        // collation on index is compatible with string predicate.
         assert.commandWorked(coll.dropIndexes());
         assert.commandWorked(coll.ensureIndex({geo: "2dsphere", str: 1},
                                               {collation: {locale: "en_US", strength: 2}}));
@@ -772,8 +1173,6 @@
                       })
                       .collation({locale: "en_US", strength: 2})
                       .itcount());
-
-        coll.drop();
     }
 
     //
@@ -798,8 +1197,6 @@
             bulk.find({str: "FOO"}).collation({locale: "en_US", strength: 2});
         });
     } else {
-        var writeRes;
-
         // update().
         coll.drop();
         assert.writeOK(coll.insert({_id: 1, str: "foo"}));
