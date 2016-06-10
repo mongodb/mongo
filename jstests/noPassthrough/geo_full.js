@@ -145,8 +145,11 @@ function errorMarginForPoint(env) {
 function pointIsOK(startPoint, radius, env) {
     var error = errorMarginForPoint(env);
     var distDegrees = rad2deg(radius) + error;
-    // Cap should not include the South/North Pole.
-    if ((startPoint[1] + distDegrees > 90) || (startPoint[1] - distDegrees < -90)) {
+    // TODO SERVER-24440: Points close to the north and south poles may fail to be returned by
+    // $nearSphere queries answered using a "2d" index. We have empirically found that points with
+    // latitudes between 89 and 90 degrees are potentially affected by this issue, so we
+    // additionally reject any coordinates with a latitude that falls within that range.
+    if ((startPoint[1] + distDegrees > 89) || (startPoint[1] - distDegrees < -89)) {
         return false;
     }
     var xscandist = computexscandist(startPoint[1], distDegrees);
