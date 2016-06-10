@@ -947,6 +947,10 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                         argArray.push(...['--storageEngine', jsTest.options().storageEngine]);
                     }
                 }
+                if (jsTest.options().storageEngineCacheSizeGB) {
+                    argArray.push(
+                        ...['--wiredTigerCacheSizeGB', jsTest.options().storageEngineCacheSizeGB]);
+                }
                 if (jsTest.options().wiredTigerEngineConfigString) {
                     argArray.push(...['--wiredTigerEngineConfigString',
                                       jsTest.options().wiredTigerEngineConfigString]);

@@ -352,6 +352,11 @@ functions:
           extra_args="$extra_args --continueOnFailure"
         fi
 
+        # Default storageEngineCacheSizeGB to 1. Override on individual test config if needed.
+        if [[ "${resmoke_args}" = *storageEngine=wiredTiger* ]] && [[ "${resmoke_args}" != *storageEngineCacheSizeGB* ]]; then
+          extra_args="$extra_args --storageEngineCacheSizeGB=1"
+        fi
+
         ${path_prefix} ${san_symbolizer} ${san_options} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json
 
   "do jepsen setup" :

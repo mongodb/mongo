@@ -43,6 +43,7 @@ DEST_TO_CONFIG = {
     "shell_write_mode": "shellWriteMode",
     "shuffle": "shuffle",
     "storage_engine": "storageEngine",
+    "storage_engine_cache_size": "storageEngineCacheSizeGB",
     "wt_coll_config": "wiredTigerCollectionConfigString",
     "wt_engine_config": "wiredTigerEngineConfigString",
     "wt_index_config": "wiredTigerIndexConfigString"
@@ -187,6 +188,10 @@ def parse_command_line():
     parser.add_option("--storageEngine", dest="storage_engine", metavar="ENGINE",
                       help="The storage engine used by dbtests and jstests.")
 
+    parser.add_option("--storageEngineCacheSizeGB", dest="storage_engine_cache_size",
+                      metavar="CONFIG", help="Set the storage engine cache size configuration"
+                      " setting for all mongod's.")
+
     parser.add_option("--wiredTigerCollectionConfigString", dest="wt_coll_config", metavar="CONFIG",
                       help="Set the WiredTiger collection configuration setting for all mongod's.")
 
@@ -249,6 +254,7 @@ def update_config_vars(values):
     _config.SHELL_WRITE_MODE = config.pop("shellWriteMode")
     _config.SHUFFLE = config.pop("shuffle")
     _config.STORAGE_ENGINE = config.pop("storageEngine")
+    _config.STORAGE_ENGINE_CACHE_SIZE = config.pop("storageEngineCacheSizeGB")
     _config.WT_COLL_CONFIG = config.pop("wiredTigerCollectionConfigString")
     _config.WT_ENGINE_CONFIG = config.pop("wiredTigerEngineConfigString")
     _config.WT_INDEX_CONFIG = config.pop("wiredTigerIndexConfigString")
