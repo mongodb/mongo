@@ -1,18 +1,18 @@
 (function() {
+    'use strict';
 
-    var s = new ShardingTest({name: "shard_with_special_db_names", shards: 2, mongos: 2});
+    var s = new ShardingTest({shards: 2, mongos: 2});
     var specialDB = "[a-z]+";
     var specialNS = specialDB + ".special";
 
-    s.adminCommand({enablesharding: "test"});
+    assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
     s.ensurePrimaryShard('test', 'shard0001');
-    s.adminCommand({shardcollection: "test.data", key: {num: 1}});
+    assert.commandWorked(s.s0.adminCommand({shardcollection: "test.data", key: {num: 1}}));
 
-    // Test that the database will not complain "cannot have 2 database names that
-    // differs on case"
-    s.adminCommand({enablesharding: specialDB});
+    // Test that the database will not complain "cannot have 2 database names that differs on case"
+    assert.commandWorked(s.s0.adminCommand({enablesharding: specialDB}));
     s.ensurePrimaryShard(specialDB, 'shard0000');
-    s.adminCommand({shardcollection: specialNS, key: {num: 1}});
+    assert.commandWorked(s.s0.adminCommand({shardcollection: specialNS, key: {num: 1}}));
 
     var exists = s.getDB("config").collections.find({_id: specialNS}).count();
     assert.eq(exists, 1);
@@ -25,4 +25,5 @@
     assert.eq(cursor.count(), 1);
     assert(cursor.next()["dropped"]);
 
+    s.stop();
 })();
