@@ -177,12 +177,13 @@ MONGO_COMPILER_NORETURN void verifyFailed(const char* expr, const char* file, un
 MONGO_COMPILER_NORETURN void invariantOKFailed(const char* expr,
                                                const Status& status,
                                                const char* file,
-                                               unsigned line);
+                                               unsigned line) noexcept;
 void wasserted(const char* expr, const char* file, unsigned line);
-MONGO_COMPILER_NORETURN void fassertFailed(int msgid);
-MONGO_COMPILER_NORETURN void fassertFailedNoTrace(int msgid);
-MONGO_COMPILER_NORETURN void fassertFailedWithStatus(int msgid, const Status& status);
-MONGO_COMPILER_NORETURN void fassertFailedWithStatusNoTrace(int msgid, const Status& status);
+MONGO_COMPILER_NORETURN void fassertFailed(int msgid) noexcept;
+MONGO_COMPILER_NORETURN void fassertFailedNoTrace(int msgid) noexcept;
+MONGO_COMPILER_NORETURN void fassertFailedWithStatus(int msgid, const Status& status) noexcept;
+MONGO_COMPILER_NORETURN void fassertFailedWithStatusNoTrace(int msgid,
+                                                            const Status& status) noexcept;
 
 /** a "user assertion".  throws UserAssertion.  logs.  typically used for errors that a user
     could cause, such as duplicate key, disk full, etc.
@@ -352,7 +353,7 @@ std::string demangleName(const std::type_info& typeinfo);
  *       }
  *   }
  */
-Status exceptionToStatus();
+Status exceptionToStatus() noexcept;
 
 }  // namespace mongo
 

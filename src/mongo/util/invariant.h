@@ -42,7 +42,9 @@ namespace mongo {
 #error "Include assert_util.h instead of invariant.h."
 #endif
 
-MONGO_COMPILER_NORETURN void invariantFailed(const char* expr, const char* file, unsigned line);
+MONGO_COMPILER_NORETURN void invariantFailed(const char* expr,
+                                             const char* file,
+                                             unsigned line) noexcept;
 
 #define MONGO_invariant(_Expression)                                    \
     do {                                                                \
