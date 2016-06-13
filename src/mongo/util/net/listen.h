@@ -45,11 +45,21 @@ namespace mongo {
 
 const int DEFAULT_MAX_CONN = 1000000;
 
+class ServiceContext;
+
 class Listener {
     MONGO_DISALLOW_COPYING(Listener);
 
 public:
-    Listener(const std::string& name, const std::string& ip, int port, bool logConnect = true);
+    /** Obtain the Listener for a provided ServiceContext. */
+    static Listener* get(ServiceContext* context);
+
+    Listener(const std::string& name,
+             const std::string& ip,
+             int port,
+             ServiceContext* ctx,
+             bool setAsServiceCtxDecoration,
+             bool logConnect = true);
 
     virtual ~Listener();
 
@@ -61,45 +71,11 @@ public:
     const int _port;
 
     /**
-     * @return a rough estimate of elapsed time since the server started
-       todo:
-       1) consider adding some sort of relaxedLoad semantic to the reading here of
-          _elapsedTime
-       2) curTimeMillis() implementations have gotten faster. consider eliminating
-          this code?  would have to measure it first.  if eliminated be careful if
-          syscall used isn't skewable.  Note also if #2 is done, listen() doesn't
-          then have to keep waking up and maybe that helps on a developer's laptop
-          battery usage...
-     */
-    long long getMyElapsedTimeMillis() const {
-        return _elapsedTime;
-    }
-
-    /**
      * Allocate sockets for the listener and set _setupSocketsSuccessful to true
      * iff the process was successful.
      * Returns _setupSocketsSuccessful.
      */
     bool setupSockets();
-
-    void setAsTimeTracker() {
-        _timeTracker = this;
-    }
-
-    // TODO(spencer): Remove this and get the global Listener via the
-    // globalEnvironmentExperiment
-    static const Listener* getTimeTracker() {
-        return _timeTracker;
-    }
-
-    static long long getElapsedTimeMillis() {
-        if (_timeTracker)
-            return _timeTracker->getMyElapsedTimeMillis();
-
-        // should this assert or throw?  seems like callers may not expect to get zero back,
-        // certainly not forever.
-        return 0;
-    }
 
     /**
      * Blocks until initAndListen has been called on this instance and gotten far enough that
@@ -114,12 +90,13 @@ private:
     std::string _ip;
     bool _setupSocketsSuccessful;
     bool _logConnect;
-    long long _elapsedTime;
     mutable stdx::mutex _readyMutex;                   // Protects _ready
     mutable stdx::condition_variable _readyCondition;  // Used to wait for changes to _ready
     // Boolean that indicates whether this Listener is ready to accept incoming network requests
     bool _ready;
 
+    ServiceContext* _ctx;
+    bool _setAsServiceCtxDecoration;
 
     virtual void _accepted(const std::shared_ptr<Socket>& psocket, long long connectionId);
 
@@ -128,8 +105,6 @@ private:
 #endif
 
     void _logListen(int port, bool ssl);
-
-    static const Listener* _timeTracker;
 
     virtual bool useUnixSockets() const {
         return false;

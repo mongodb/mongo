@@ -30,6 +30,7 @@
 
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/scopeguard.h"
@@ -51,7 +52,7 @@ TEST(IsSelf, DetectsSameHostIPv4) {
     // Fastpath should agree with the result of getBoundAddrs
     // since it uses it...
     for (std::vector<string>::const_iterator it = addrs.begin(); it != addrs.end(); ++it) {
-        ASSERT(isSelf(HostAndPort(*it, serverGlobalParams.port)));
+        ASSERT(isSelf(HostAndPort(*it, serverGlobalParams.port), getGlobalServiceContext()));
     }
 #else
     ASSERT(true);
@@ -68,7 +69,7 @@ TEST(IsSelf, DetectsSameHostIPv6) {
     // Fastpath should agree with the result of getBoundAddrs
     // since it uses it...
     for (std::vector<string>::const_iterator it = addrs.begin(); it != addrs.end(); ++it) {
-        ASSERT(isSelf(HostAndPort(*it, serverGlobalParams.port)));
+        ASSERT(isSelf(HostAndPort(*it, serverGlobalParams.port), getGlobalServiceContext()));
     }
 #else
     ASSERT(true);

@@ -51,8 +51,8 @@ class OpObserver;
 /**
  * Classes that implement this interface can receive notification on killOp.
  *
- * See GlobalEnvironmentExperiment::registerKillOpListener() for more information, including
- * limitations on the lifetime of registered listeners.
+ * See registerKillOpListener() for more information,
+ * including limitations on the lifetime of registered listeners.
  */
 class KillOpListenerInterface {
 public:

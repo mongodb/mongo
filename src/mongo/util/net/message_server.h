@@ -38,6 +38,8 @@
 
 namespace mongo {
 
+class ServiceContext;
+
 class MessageHandler {
 public:
     virtual ~MessageHandler() {}
@@ -71,11 +73,11 @@ public:
 
     virtual ~MessageServer() {}
     virtual void run() = 0;
-    virtual void setAsTimeTracker() = 0;
     virtual bool setupSockets() = 0;
 };
 
 // TODO use a factory here to decide between port and asio variations
 MessageServer* createServer(const MessageServer::Options& opts,
-                            std::shared_ptr<MessageHandler> handler);
+                            std::shared_ptr<MessageHandler> handler,
+                            ServiceContext* ctx);
 }

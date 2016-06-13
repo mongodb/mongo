@@ -38,9 +38,11 @@
 
 namespace mongo {
 
+class ServiceContext;
+
 class MiniWebServer : public Listener {
 public:
-    MiniWebServer(const std::string& name, const std::string& ip, int _port);
+    MiniWebServer(const std::string& name, const std::string& ip, int _port, ServiceContext* ctx);
     virtual ~MiniWebServer() {}
 
     virtual void doRequest(const char* rq,  // the full request

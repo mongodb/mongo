@@ -34,6 +34,7 @@
 
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -48,12 +49,13 @@ namespace {
  * "newConfig".
  */
 StatusWith<int> findSelfInConfig(ReplicationCoordinatorExternalState* externalState,
-                                 const ReplicaSetConfig& newConfig) {
+                                 const ReplicaSetConfig& newConfig,
+                                 ServiceContext* ctx) {
     std::vector<ReplicaSetConfig::MemberIterator> meConfigs;
     for (ReplicaSetConfig::MemberIterator iter = newConfig.membersBegin();
          iter != newConfig.membersEnd();
          ++iter) {
-        if (externalState->isSelf(iter->getHostAndPort())) {
+        if (externalState->isSelf(iter->getHostAndPort(), ctx)) {
             meConfigs.push_back(iter);
         }
     }
@@ -108,8 +110,9 @@ Status checkElectable(const ReplicaSetConfig& newConfig, int configIndex) {
  * reconfig or initiate commands.
  */
 StatusWith<int> findSelfInConfigIfElectable(ReplicationCoordinatorExternalState* externalState,
-                                            const ReplicaSetConfig& newConfig) {
-    StatusWith<int> result = findSelfInConfig(externalState, newConfig);
+                                            const ReplicaSetConfig& newConfig,
+                                            ServiceContext* ctx) {
+    StatusWith<int> result = findSelfInConfig(externalState, newConfig, ctx);
     if (result.isOK()) {
         Status status = checkElectable(newConfig, result.getValue());
         if (!status.isOK()) {
@@ -237,7 +240,8 @@ Status validateOldAndNewConfigsCompatible(const ReplicaSetConfig& oldConfig,
 
 StatusWith<int> validateConfigForStartUp(ReplicationCoordinatorExternalState* externalState,
                                          const ReplicaSetConfig& oldConfig,
-                                         const ReplicaSetConfig& newConfig) {
+                                         const ReplicaSetConfig& newConfig,
+                                         ServiceContext* ctx) {
     Status status = newConfig.validate();
     if (!status.isOK()) {
         return StatusWith<int>(status);
@@ -248,11 +252,12 @@ StatusWith<int> validateConfigForStartUp(ReplicationCoordinatorExternalState* ex
             return StatusWith<int>(status);
         }
     }
-    return findSelfInConfig(externalState, newConfig);
+    return findSelfInConfig(externalState, newConfig, ctx);
 }
 
 StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* externalState,
-                                          const ReplicaSetConfig& newConfig) {
+                                          const ReplicaSetConfig& newConfig,
+                                          ServiceContext* ctx) {
     Status status = newConfig.validate();
     if (!status.isOK()) {
         return StatusWith<int>(status);
@@ -263,12 +268,13 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
                                              << " have version 1, but found "
                                              << newConfig.getConfigVersion());
     }
-    return findSelfInConfigIfElectable(externalState, newConfig);
+    return findSelfInConfigIfElectable(externalState, newConfig, ctx);
 }
 
 StatusWith<int> validateConfigForReconfig(ReplicationCoordinatorExternalState* externalState,
                                           const ReplicaSetConfig& oldConfig,
                                           const ReplicaSetConfig& newConfig,
+                                          ServiceContext* ctx,
                                           bool force) {
     Status status = newConfig.validate();
     if (!status.isOK()) {
@@ -281,20 +287,22 @@ StatusWith<int> validateConfigForReconfig(ReplicationCoordinatorExternalState* e
     }
 
     if (force) {
-        return findSelfInConfig(externalState, newConfig);
+        return findSelfInConfig(externalState, newConfig, ctx);
     }
 
-    return findSelfInConfigIfElectable(externalState, newConfig);
+    return findSelfInConfigIfElectable(externalState, newConfig, ctx);
 }
 
 StatusWith<int> validateConfigForHeartbeatReconfig(
-    ReplicationCoordinatorExternalState* externalState, const ReplicaSetConfig& newConfig) {
+    ReplicationCoordinatorExternalState* externalState,
+    const ReplicaSetConfig& newConfig,
+    ServiceContext* ctx) {
     Status status = newConfig.validate();
     if (!status.isOK()) {
         return StatusWith<int>(status);
     }
 
-    return findSelfInConfig(externalState, newConfig);
+    return findSelfInConfig(externalState, newConfig, ctx);
 }
 
 }  // namespace repl

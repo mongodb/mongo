@@ -309,7 +309,7 @@ void parseReplSetSeedList(ReplicationCoordinatorExternalState* externalState,
         uassert(13096, "bad --replSet command line config string - dups?", seedSet.count(m) == 0);
         seedSet.insert(m);
         // uassert(13101, "can't use localhost in replset host list", !m.isLocalHost());
-        if (externalState->isSelf(m)) {
+        if (externalState->isSelf(m, getGlobalServiceContext())) {
             LOG(1) << "ignoring seed " << m.toString() << " (=self)";
         } else {
             seeds->push_back(m);

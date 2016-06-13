@@ -85,8 +85,10 @@ public:
      * @param opts
      * @param handler the handler to use.
      */
-    PortMessageServer(const MessageServer::Options& opts, std::shared_ptr<MessageHandler> handler)
-        : Listener("", opts.ipList, opts.port), _handler(std::move(handler)) {}
+    PortMessageServer(const MessageServer::Options& opts,
+                      std::shared_ptr<MessageHandler> handler,
+                      ServiceContext* ctx)
+        : Listener("", opts.ipList, opts.port, ctx, true), _handler(std::move(handler)) {}
 
     virtual void accepted(AbstractMessagingPort* mp) {
         ScopeGuard sleepAfterClosingPort = MakeGuard(sleepmillis, 2);
@@ -145,10 +147,6 @@ public:
             Listener::globalTicketHolder.release();
             log() << "failed to create thread after accepting new connection, closing connection";
         }
-    }
-
-    virtual void setAsTimeTracker() {
-        Listener::setAsTimeTracker();
     }
 
     virtual bool setupSockets() {
@@ -238,8 +236,9 @@ private:
 
 
 MessageServer* createServer(const MessageServer::Options& opts,
-                            std::shared_ptr<MessageHandler> handler) {
-    return new PortMessageServer(opts, std::move(handler));
+                            std::shared_ptr<MessageHandler> handler,
+                            ServiceContext* ctx) {
+    return new PortMessageServer(opts, std::move(handler), ctx);
 }
 
 }  // namespace mongo

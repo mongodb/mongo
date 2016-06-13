@@ -42,6 +42,8 @@
 #include "mongo/util/concurrency/old_thread_pool.h"
 
 namespace mongo {
+class ServiceContext;
+
 namespace repl {
 
 class SnapshotThread;
@@ -63,7 +65,7 @@ public:
     virtual void logTransitionToPrimaryToOplog(OperationContext* txn);
     virtual void forwardSlaveProgress();
     virtual OID ensureMe(OperationContext* txn);
-    virtual bool isSelf(const HostAndPort& host);
+    virtual bool isSelf(const HostAndPort& host, ServiceContext* ctx);
     virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn);
     virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);
     virtual StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* txn);

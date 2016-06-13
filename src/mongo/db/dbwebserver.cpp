@@ -361,8 +361,8 @@ MONGO_INITIALIZER(WebStatusLogPlugin)(InitializerContext*) {
 }  // namespace
 
 
-DbWebServer::DbWebServer(const string& ip, int port, AdminAccess* webUsers)
-    : MiniWebServer("admin web console", ip, port), _webUsers(webUsers) {
+DbWebServer::DbWebServer(const string& ip, int port, ServiceContext* ctx, AdminAccess* webUsers)
+    : MiniWebServer("admin web console", ip, port, ctx), _webUsers(webUsers) {
     WebStatusPlugin::initAll();
 }
 

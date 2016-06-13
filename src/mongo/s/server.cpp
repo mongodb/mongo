@@ -378,8 +378,10 @@ static ExitCode runMongosServer() {
 #endif
 
     if (serverGlobalParams.isHttpInterfaceEnabled) {
-        std::shared_ptr<DbWebServer> dbWebServer(new DbWebServer(
-            serverGlobalParams.bind_ip, serverGlobalParams.port + 1000, new NoAdminAccess()));
+        std::shared_ptr<DbWebServer> dbWebServer(new DbWebServer(serverGlobalParams.bind_ip,
+                                                                 serverGlobalParams.port + 1000,
+                                                                 getGlobalServiceContext(),
+                                                                 new NoAdminAccess()));
         dbWebServer->setupSockets();
 
         stdx::thread web(stdx::bind(&webServerListenThread, dbWebServer));
@@ -410,8 +412,7 @@ static ExitCode runMongosServer() {
     opts.ipList = serverGlobalParams.bind_ip;
 
     auto handler = std::make_shared<ShardedMessageHandler>();
-    MessageServer* server = createServer(opts, std::move(handler));
-    server->setAsTimeTracker();
+    MessageServer* server = createServer(opts, std::move(handler), getGlobalServiceContext());
     if (!server->setupSockets()) {
         return EXIT_NET_ERROR;
     }

@@ -36,6 +36,7 @@
 #include <pcrecpp.h>
 
 #include "mongo/config.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
@@ -48,8 +49,8 @@ using std::endl;
 using std::stringstream;
 using std::vector;
 
-MiniWebServer::MiniWebServer(const string& name, const string& ip, int port)
-    : Listener(name, ip, port, false) {}
+MiniWebServer::MiniWebServer(const string& name, const string& ip, int port, ServiceContext* ctx)
+    : Listener(name, ip, port, ctx, false, false) {}
 
 string MiniWebServer::parseURL(const char* buf) {
     const char* urlStart = strchr(buf, ' ');

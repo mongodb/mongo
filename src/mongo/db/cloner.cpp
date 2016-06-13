@@ -522,7 +522,7 @@ Status Cloner::copyDb(OperationContext* txn,
     std::vector<HostAndPort> csServers = cs.getServers();
     for (std::vector<HostAndPort>::const_iterator iter = csServers.begin(); iter != csServers.end();
          ++iter) {
-        if (!repl::isSelf(*iter))
+        if (!repl::isSelf(*iter, txn->getServiceContext()))
             continue;
 
         masterSameProcess = true;

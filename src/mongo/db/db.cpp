@@ -565,8 +565,7 @@ static void _initAndListen(int listenPort) {
     options.ipList = serverGlobalParams.bind_ip;
 
     auto handler = std::make_shared<MyMessageHandler>();
-    MessageServer* server = createServer(options, std::move(handler));
-    server->setAsTimeTracker();
+    MessageServer* server = createServer(options, std::move(handler), getGlobalServiceContext());
 
     // This is what actually creates the sockets, but does not yet listen on them because we
     // do not want connections to just hang if recovery takes a very long time.
@@ -577,8 +576,10 @@ static void _initAndListen(int listenPort) {
 
     std::shared_ptr<DbWebServer> dbWebServer;
     if (serverGlobalParams.isHttpInterfaceEnabled) {
-        dbWebServer.reset(new DbWebServer(
-            serverGlobalParams.bind_ip, serverGlobalParams.port + 1000, new RestAdminAccess()));
+        dbWebServer.reset(new DbWebServer(serverGlobalParams.bind_ip,
+                                          serverGlobalParams.port + 1000,
+                                          getGlobalServiceContext(),
+                                          new RestAdminAccess()));
         if (!dbWebServer->setupSockets()) {
             error() << "Failed to set up sockets for HTTP interface during startup.";
             return;

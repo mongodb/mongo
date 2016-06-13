@@ -35,6 +35,7 @@
 
 namespace mongo {
 struct HostAndPort;
+class ServiceContext;
 
 namespace repl {
 
@@ -47,7 +48,7 @@ extern OID instanceId;
 /**
  * Returns true if "hostAndPort" identifies this instance.
  */
-bool isSelf(const HostAndPort& hostAndPort);
+bool isSelf(const HostAndPort& hostAndPort, ServiceContext* ctx);
 
 /**
  * Returns all the IP addresses bound to the network interfaces of this machine.

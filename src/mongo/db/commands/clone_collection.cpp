@@ -122,7 +122,7 @@ public:
 
         {
             HostAndPort h(fromhost);
-            if (repl::isSelf(h)) {
+            if (repl::isSelf(h, txn->getServiceContext())) {
                 errmsg = "can't cloneCollection from self";
                 return false;
             }

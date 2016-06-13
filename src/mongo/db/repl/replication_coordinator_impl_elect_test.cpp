@@ -534,7 +534,6 @@ TEST_F(ReplCoordElectTest, StepsDownRemoteIfNodeHasHigherPriorityThanCurrentPrim
 
 TEST_F(ReplCoordElectTest, NodeCancelsElectionUponReceivingANewConfigDuringFreshnessCheckingPhase) {
     // Start up and become electable.
-    OperationContextNoop txn;
     assertStartSuccess(BSON("_id"
                             << "mySet"
                             << "version"
@@ -583,7 +582,8 @@ TEST_F(ReplCoordElectTest, NodeCancelsElectionUponReceivingANewConfigDuringFresh
         true};
 
     BSONObjBuilder result;
-    ASSERT_OK(getReplCoord()->processReplSetReconfig(&txn, config, &result));
+    const auto txn = makeOperationContext();
+    ASSERT_OK(getReplCoord()->processReplSetReconfig(txn.get(), config, &result));
     // Wait until election cancels.
     net->enterNetwork();
     net->runReadyNetworkOperations();
@@ -593,7 +593,6 @@ TEST_F(ReplCoordElectTest, NodeCancelsElectionUponReceivingANewConfigDuringFresh
 
 TEST_F(ReplCoordElectTest, NodeCancelsElectionUponReceivingANewConfigDuringElectionPhase) {
     // Start up and become electable.
-    OperationContextNoop txn;
     assertStartSuccess(BSON("_id"
                             << "mySet"
                             << "version"
@@ -629,7 +628,8 @@ TEST_F(ReplCoordElectTest, NodeCancelsElectionUponReceivingANewConfigDuringElect
         true};
 
     BSONObjBuilder result;
-    ASSERT_OK(getReplCoord()->processReplSetReconfig(&txn, config, &result));
+    const auto txn = makeOperationContext();
+    ASSERT_OK(getReplCoord()->processReplSetReconfig(txn.get(), config, &result));
     // Wait until election cancels.
     getNet()->enterNetwork();
     getNet()->runReadyNetworkOperations();

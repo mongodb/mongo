@@ -43,6 +43,7 @@ namespace mongo {
 class BSONObj;
 class OID;
 class OperationContext;
+class ServiceContext;
 class SnapshotName;
 class Status;
 struct HostAndPort;
@@ -131,7 +132,7 @@ public:
     /**
      * Returns true if "host" is one of the network identities of this node.
      */
-    virtual bool isSelf(const HostAndPort& host) = 0;
+    virtual bool isSelf(const HostAndPort& host, ServiceContext* ctx) = 0;
 
     /**
      * Gets the replica set config document from local storage, or returns an error.

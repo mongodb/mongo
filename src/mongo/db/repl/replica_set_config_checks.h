@@ -31,6 +31,9 @@
 #include "mongo/base/status_with.h"
 
 namespace mongo {
+
+class ServiceContext;
+
 namespace repl {
 
 class ReplicationCoordinatorExternalState;
@@ -48,7 +51,8 @@ class ReplicaSetConfig;
  */
 StatusWith<int> validateConfigForStartUp(ReplicationCoordinatorExternalState* externalState,
                                          const ReplicaSetConfig& oldConfig,
-                                         const ReplicaSetConfig& newConfig);
+                                         const ReplicaSetConfig& newConfig,
+                                         ServiceContext* ctx);
 
 /**
  * Validates that "newConfig" is a legal initial configuration that can be
@@ -58,7 +62,8 @@ StatusWith<int> validateConfigForStartUp(ReplicationCoordinatorExternalState* ex
  * on success, and an indicative error on failure.
  */
 StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* externalState,
-                                          const ReplicaSetConfig& newConfig);
+                                          const ReplicaSetConfig& newConfig,
+                                          ServiceContext* ctx);
 
 /**
  * Validates that "newConfig" is a legal successor configuration to "oldConfig" that can be
@@ -73,6 +78,7 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
 StatusWith<int> validateConfigForReconfig(ReplicationCoordinatorExternalState* externalState,
                                           const ReplicaSetConfig& oldConfig,
                                           const ReplicaSetConfig& newConfig,
+                                          ServiceContext* ctx,
                                           bool force);
 
 /**
@@ -84,6 +90,8 @@ StatusWith<int> validateConfigForReconfig(ReplicationCoordinatorExternalState* e
  * Otherwise, returns some other error status.
  */
 StatusWith<int> validateConfigForHeartbeatReconfig(
-    ReplicationCoordinatorExternalState* externalState, const ReplicaSetConfig& newConfig);
+    ReplicationCoordinatorExternalState* externalState,
+    const ReplicaSetConfig& newConfig,
+    ServiceContext* ctx);
 }  // namespace repl
 }  // namespace mongo

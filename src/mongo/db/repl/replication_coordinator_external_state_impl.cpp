@@ -361,8 +361,8 @@ StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::loadLastOpTime(Opera
     }
 }
 
-bool ReplicationCoordinatorExternalStateImpl::isSelf(const HostAndPort& host) {
-    return repl::isSelf(host);
+bool ReplicationCoordinatorExternalStateImpl::isSelf(const HostAndPort& host, ServiceContext* ctx) {
+    return repl::isSelf(host, ctx);
 }
 
 HostAndPort ReplicationCoordinatorExternalStateImpl::getClientHostAndPort(

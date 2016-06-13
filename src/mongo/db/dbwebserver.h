@@ -43,7 +43,7 @@ namespace mongo {
 class AdminAccess;
 class DbWebServer;
 class OperationContext;
-
+class ServiceContext;
 
 class Prioritizable {
 public:
@@ -120,7 +120,7 @@ private:
 
 class DbWebServer : public MiniWebServer {
 public:
-    DbWebServer(const std::string& ip, int port, AdminAccess* webUsers);
+    DbWebServer(const std::string& ip, int port, ServiceContext* ctx, AdminAccess* webUsers);
 
 private:
     virtual void doRequest(const char* rq,

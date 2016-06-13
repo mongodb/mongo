@@ -315,7 +315,7 @@ private:
 class BridgeListener final : public Listener {
 public:
     BridgeListener()
-        : Listener("bridge", "", mongoBridgeGlobalParams.port),
+        : Listener("bridge", "", mongoBridgeGlobalParams.port, getGlobalServiceContext(), false),
           _seedSource(mongoBridgeGlobalParams.seed) {
         log() << "Setting random seed: " << mongoBridgeGlobalParams.seed;
     }

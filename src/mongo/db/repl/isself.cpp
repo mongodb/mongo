@@ -44,7 +44,9 @@
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/listen.h"
 #include "mongo/util/scopeguard.h"
 
 #if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__sun) || \
@@ -154,7 +156,7 @@ std::vector<std::string> getAddrsForHost(const std::string& iporhost,
 
 }  // namespace
 
-bool isSelf(const HostAndPort& hostAndPort) {
+bool isSelf(const HostAndPort& hostAndPort, ServiceContext* const ctx) {
     // Fastpath: check if the host&port in question is bound to one
     // of the interfaces on this machine.
     // No need for ip match if the ports do not match
@@ -182,11 +184,11 @@ bool isSelf(const HostAndPort& hostAndPort) {
         }
     }
 
-    // Ensure that the server is up and ready to accept incoming network requests.
-    const Listener* listener = Listener::getTimeTracker();
+    const auto listener = Listener::get(ctx);
     if (!listener) {
         return false;
     }
+    // Ensure that the server is up and ready to accept incoming network requests.
     listener->waitUntilListening();
 
     try {

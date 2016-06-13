@@ -34,6 +34,7 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/global_conn_pool.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/reply_builder_interface.h"
@@ -141,7 +142,7 @@ public:
         MessageServer::Options options;
         options.port = _port;
 
-        _server.reset(createServer(options, std::move(messsageHandler)));
+        _server.reset(createServer(options, std::move(messsageHandler), getGlobalServiceContext()));
         _serverThread = stdx::thread(runServer, _server.get());
     }
 

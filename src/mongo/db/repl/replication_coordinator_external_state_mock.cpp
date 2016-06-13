@@ -76,7 +76,8 @@ OID ReplicationCoordinatorExternalStateMock::ensureMe(OperationContext*) {
     return OID::gen();
 }
 
-bool ReplicationCoordinatorExternalStateMock::isSelf(const HostAndPort& host) {
+bool ReplicationCoordinatorExternalStateMock::isSelf(const HostAndPort& host,
+                                                     ServiceContext* const ctx) {
     return sequenceContains(_selfHosts, host);
 }
 

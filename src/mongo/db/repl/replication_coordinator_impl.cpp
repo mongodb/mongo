@@ -408,8 +408,8 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
 
     LockGuard topoLock(_topoMutex);
 
-    StatusWith<int> myIndex =
-        validateConfigForStartUp(_externalState.get(), _rsConfig, localConfig);
+    StatusWith<int> myIndex = validateConfigForStartUp(
+        _externalState.get(), _rsConfig, localConfig, getGlobalServiceContext());
     if (!myIndex.isOK()) {
         if (myIndex.getStatus() == ErrorCodes::NodeNotFound ||
             myIndex.getStatus() == ErrorCodes::DuplicateKey) {
@@ -2225,8 +2225,8 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* txn,
         return Status(ErrorCodes::InvalidReplicaSetConfig, errmsg);
     }
 
-    StatusWith<int> myIndex =
-        validateConfigForReconfig(_externalState.get(), oldConfig, newConfig, args.force);
+    StatusWith<int> myIndex = validateConfigForReconfig(
+        _externalState.get(), oldConfig, newConfig, txn->getServiceContext(), args.force);
     if (!myIndex.isOK()) {
         error() << "replSetReconfig got " << myIndex.getStatus() << " while validating "
                 << newConfigObj;
@@ -2365,7 +2365,8 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
         return Status(ErrorCodes::InvalidReplicaSetConfig, errmsg);
     }
 
-    StatusWith<int> myIndex = validateConfigForInitiate(_externalState.get(), newConfig);
+    StatusWith<int> myIndex =
+        validateConfigForInitiate(_externalState.get(), newConfig, txn->getServiceContext());
     if (!myIndex.isOK()) {
         error() << "replSet initiate got " << myIndex.getStatus() << " while validating "
                 << configObj;

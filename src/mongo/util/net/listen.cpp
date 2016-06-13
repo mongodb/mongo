@@ -38,6 +38,7 @@
 #include "mongo/base/status.h"
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -78,14 +79,16 @@
 
 namespace mongo {
 
+namespace {
+const auto getListener = ServiceContext::declareDecoration<Listener*>();
+}  // namespace
+
 using std::shared_ptr;
 using std::endl;
 using std::string;
 using std::vector;
 
 // ----- Listener -------
-
-const Listener* Listener::_timeTracker;
 
 vector<SockAddr> ipToAddrs(const char* ips, int port, bool useUnixSockets) {
     vector<SockAddr> out;
@@ -124,22 +127,39 @@ vector<SockAddr> ipToAddrs(const char* ips, int port, bool useUnixSockets) {
     return out;
 }
 
-Listener::Listener(const string& name, const string& ip, int port, bool logConnect)
+Listener* Listener::get(ServiceContext* ctx) {
+    return getListener(ctx);
+}
+
+Listener::Listener(const string& name,
+                   const string& ip,
+                   int port,
+                   ServiceContext* ctx,
+                   bool setAsServiceCtxDecoration,
+                   bool logConnect)
     : _port(port),
       _name(name),
       _ip(ip),
       _setupSocketsSuccessful(false),
       _logConnect(logConnect),
-      _elapsedTime(0),
-      _ready(false) {
+      _ready(false),
+      _ctx(ctx),
+      _setAsServiceCtxDecoration(setAsServiceCtxDecoration) {
 #ifdef MONGO_CONFIG_SSL
     _ssl = getSSLManager();
 #endif
+    if (setAsServiceCtxDecoration) {
+        auto& listener = getListener(ctx);
+        invariant(!listener);
+        listener = this;
+    }
 }
 
 Listener::~Listener() {
-    if (_timeTracker == this)
-        _timeTracker = 0;
+    if (_setAsServiceCtxDecoration) {
+        auto& listener = getListener(_ctx);
+        listener = nullptr;
+    }
 }
 
 bool Listener::setupSockets() {
@@ -269,19 +289,12 @@ void Listener::initAndListen() {
         }
 
         maxSelectTime.tv_sec = 0;
-        maxSelectTime.tv_usec = 10000;
-        const int ret = select(maxfd + 1, fds, NULL, NULL, &maxSelectTime);
+        maxSelectTime.tv_usec = 250000;
+        const int ret = select(maxfd + 1, fds, nullptr, nullptr, &maxSelectTime);
 
         if (ret == 0) {
-#if defined(__linux__)
-            _elapsedTime += (10000 - maxSelectTime.tv_usec) / 1000;
-#else
-            _elapsedTime += 10;
-#endif
             continue;
-        }
-
-        if (ret < 0) {
+        } else if (ret < 0) {
             int x = errno;
 #ifdef EINTR
             if (x == EINTR) {
@@ -293,12 +306,6 @@ void Listener::initAndListen() {
                 log() << "select() failure: ret=" << ret << " " << errnoWithDescription(x) << endl;
             return;
         }
-
-#if defined(__linux__)
-        _elapsedTime += std::max(ret, (int)((10000 - maxSelectTime.tv_usec) / 1000));
-#else
-        _elapsedTime += ret;  // assume 1ms to grab connection. very rough
-#endif
 
         for (vector<SOCKET>::iterator it = _socks.begin(), end = _socks.end(); it != end; ++it) {
             if (!(FD_ISSET(*it, fds)))
@@ -473,20 +480,17 @@ void Listener::initAndListen() {
         DWORD result = WSAWaitForMultipleEvents(_socks.size(),
                                                 events.get(),
                                                 FALSE,   // don't wait for all the events
-                                                10,      // timeout, in ms
+                                                250,     // timeout, in ms
                                                 FALSE);  // do not allow I/O interruptions
-        if (result == WSA_WAIT_FAILED) {
+
+        if (result == WSA_WAIT_TIMEOUT) {
+            continue;
+        } else if (result == WSA_WAIT_FAILED) {
             const int mongo_errno = WSAGetLastError();
             error() << "Windows WSAWaitForMultipleEvents returned "
                     << errnoWithDescription(mongo_errno) << endl;
             fassertFailed(16723);
         }
-
-        if (result == WSA_WAIT_TIMEOUT) {
-            _elapsedTime += 10;
-            continue;
-        }
-        _elapsedTime += 1;  // assume 1ms to grab connection. very rough
 
         // Determine which socket is ready
         DWORD eventIndex = result - WSA_WAIT_EVENT_0;

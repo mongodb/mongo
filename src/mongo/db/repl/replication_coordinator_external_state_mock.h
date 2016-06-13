@@ -43,6 +43,9 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
+
+class ServiceContext;
+
 namespace repl {
 
 class ReplicationCoordinatorExternalStateMock : public ReplicationCoordinatorExternalState {
@@ -62,7 +65,7 @@ public:
     virtual void logTransitionToPrimaryToOplog(OperationContext* txn);
     virtual void forwardSlaveProgress();
     virtual OID ensureMe(OperationContext*);
-    virtual bool isSelf(const HostAndPort& host);
+    virtual bool isSelf(const HostAndPort& host, ServiceContext* ctx);
     virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
     virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn);
     virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);

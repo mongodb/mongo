@@ -45,6 +45,7 @@
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/vote_requester.h"
+#include "mongo/db/service_context.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/functional.h"
@@ -415,8 +416,8 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
 
     stdx::unique_lock<stdx::mutex> lk(_mutex, stdx::defer_lock);
 
-    const StatusWith<int> myIndex =
-        validateConfigForHeartbeatReconfig(_externalState.get(), newConfig);
+    const StatusWith<int> myIndex = validateConfigForHeartbeatReconfig(
+        _externalState.get(), newConfig, getGlobalServiceContext());
 
     if (myIndex.getStatus() == ErrorCodes::NodeNotFound) {
         lk.lock();
