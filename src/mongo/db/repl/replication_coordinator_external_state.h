@@ -295,6 +295,11 @@ public:
     virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer() const = 0;
 
     /**
+     * Creates an oplog buffer suitable for steady state replication.
+     */
+    virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer() const = 0;
+
+    /**
      * Returns true if the user specified to use the data replicator for initial sync.
      */
     virtual bool shouldUseDataReplicatorInitialSync() const = 0;

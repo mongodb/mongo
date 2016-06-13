@@ -253,6 +253,11 @@ std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateMock::makeInitia
     return stdx::make_unique<OplogBufferBlockingQueue>();
 }
 
+std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateMock::makeSteadyStateOplogBuffer()
+    const {
+    return stdx::make_unique<OplogBufferBlockingQueue>();
+}
+
 bool ReplicationCoordinatorExternalStateMock::shouldUseDataReplicatorInitialSync() const {
     return true;
 }

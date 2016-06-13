@@ -55,6 +55,8 @@ public:
 
     std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer() const override;
 
+    std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer() const override;
+
 private:
     StatusWith<OpTime> _multiApply(OperationContext* txn,
                                    const MultiApplier::Operations& ops,

@@ -52,6 +52,8 @@ public:
 
     std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer() const override;
 
+    std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer() const override;
+
     // Returned by getCurrentTermAndLastCommittedOpTime.
     long long currentTerm = OpTime::kUninitializedTerm;
     OpTime lastCommittedOpTime;

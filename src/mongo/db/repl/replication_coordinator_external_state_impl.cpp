@@ -544,6 +544,11 @@ std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeInitia
     }
 }
 
+std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeSteadyStateOplogBuffer()
+    const {
+    return stdx::make_unique<OplogBufferBlockingQueue>();
+}
+
 bool ReplicationCoordinatorExternalStateImpl::shouldUseDataReplicatorInitialSync() const {
     return useDataReplicatorInitialSync;
 }
