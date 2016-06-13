@@ -134,7 +134,7 @@ void ReplicationCoordinatorExternalStateImpl::startInitialSync(OnInitialSyncFini
         log() << "Starting replication fetcher thread";
 
         // Start bgsync.
-        _bgSync.reset(new BackgroundSync());
+        _bgSync.reset(new BackgroundSync(makeSteadyStateOplogBuffer()));
         invariant(!_producerThread);  // The producer thread should not be init'd before this.
         _producerThread.reset(
             new stdx::thread(stdx::bind(&BackgroundSync::producerThread, _bgSync.get(), this)));
@@ -147,7 +147,7 @@ void ReplicationCoordinatorExternalStateImpl::startInitialSync(OnInitialSyncFini
 void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication() {
     if (!_producerThread) {
         log() << "Starting replication fetcher thread";
-        _bgSync.reset(new BackgroundSync());
+        _bgSync.reset(new BackgroundSync(makeSteadyStateOplogBuffer()));
         _producerThread.reset(
             new stdx::thread(stdx::bind(&BackgroundSync::producerThread, _bgSync.get(), this)));
     }

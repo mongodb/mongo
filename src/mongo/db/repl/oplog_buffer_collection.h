@@ -56,13 +56,20 @@ public:
 
     void startup() override;
     void shutdown() override;
+    void pushEvenIfFull(const Value& value) override;
+    void push(const Value& value) override;
     bool pushAllNonBlocking(Batch::const_iterator begin, Batch::const_iterator end) override;
     void waitForSpace(std::size_t size) override;
+    bool isEmpty() const override;
+    std::size_t getMaxSize() const override;
     std::size_t getSize() const override;
     std::size_t getCount() const override;
     void clear() override;
     bool tryPop(Value* value) override;
+    Value blockingPop() override;
+    bool blockingPeek(Value* value, Seconds waitDuration) override;
     bool peek(Value* value) override;
+    boost::optional<Value> lastObjectPushed() const override;
 
 private:
     const NamespaceString _nss;

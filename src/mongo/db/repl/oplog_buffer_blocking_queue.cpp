@@ -53,6 +53,14 @@ void OplogBufferBlockingQueue::shutdown() {
     clear();
 }
 
+void OplogBufferBlockingQueue::pushEvenIfFull(const Value& value) {
+    _queue.pushEvenIfFull(value);
+}
+
+void OplogBufferBlockingQueue::push(const Value& value) {
+    _queue.push(value);
+}
+
 bool OplogBufferBlockingQueue::pushAllNonBlocking(Batch::const_iterator begin,
                                                   Batch::const_iterator end) {
     _queue.pushAllNonBlocking(begin, end);
@@ -61,6 +69,14 @@ bool OplogBufferBlockingQueue::pushAllNonBlocking(Batch::const_iterator begin,
 
 void OplogBufferBlockingQueue::waitForSpace(std::size_t size) {
     _queue.waitForSpace(size);
+}
+
+bool OplogBufferBlockingQueue::isEmpty() const {
+    return _queue.empty();
+}
+
+std::size_t OplogBufferBlockingQueue::getMaxSize() const {
+    return kOplogBufferSize;
 }
 
 std::size_t OplogBufferBlockingQueue::getSize() const {
@@ -79,8 +95,20 @@ bool OplogBufferBlockingQueue::tryPop(Value* value) {
     return _queue.tryPop(*value);
 }
 
+OplogBuffer::Value OplogBufferBlockingQueue::blockingPop() {
+    return _queue.blockingPop();
+}
+
+bool OplogBufferBlockingQueue::blockingPeek(Value* value, Seconds waitDuration) {
+    return _queue.blockingPeek(*value, static_cast<int>(durationCount<Seconds>(waitDuration)));
+}
+
 bool OplogBufferBlockingQueue::peek(Value* value) {
     return _queue.peek(*value);
+}
+
+boost::optional<OplogBuffer::Value> OplogBufferBlockingQueue::lastObjectPushed() const {
+    return _queue.lastObjectPushed();
 }
 
 }  // namespace repl

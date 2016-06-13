@@ -34,6 +34,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
+#include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/sync_source_resolver.h"
@@ -42,7 +43,6 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
-#include "mongo/util/queue.h"
 
 namespace mongo {
 
@@ -62,7 +62,7 @@ class ReplicationCoordinatorExternalState;
  */
 class BackgroundSync {
 public:
-    BackgroundSync();
+    BackgroundSync(std::unique_ptr<OplogBuffer> oplogBuffer);
     MONGO_DISALLOW_COPYING(BackgroundSync);
 
     // stop syncing (when this node becomes a primary, e.g.)
@@ -156,7 +156,7 @@ private:
     long long _readLastAppliedHash(OperationContext* txn);
 
     // Production thread
-    BlockingQueue<BSONObj> _buffer;
+    std::unique_ptr<OplogBuffer> _oplogBuffer;
 
     // Task executor used to run find/getMore commands on sync source.
     executor::ThreadPoolTaskExecutor _threadPoolTaskExecutor;

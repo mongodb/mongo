@@ -28,11 +28,13 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <cstddef>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace repl {
@@ -77,6 +79,21 @@ public:
     virtual void shutdown() = 0;
 
     /**
+     * Pushes operation into oplog buffer, ignoring any size constraints. Does not block.
+     * If the oplog buffer is already full, this will cause the size of the oplog buffer to exceed
+     * the limit returned by getMaxSize() but should not otherwise adversely affect normal
+     * functionality such as pushing and popping operations from the oplog buffer.
+     */
+    virtual void pushEvenIfFull(const Value& value) = 0;
+
+    /**
+     * Pushes operation into oplog buffer.
+     * If there are size constraints on the oplog buffer, this may block until sufficient space
+     * is made available (by popping) to complete this operation.
+     */
+    virtual void push(const Value& value) = 0;
+
+    /**
      * Pushes operations in the iterator range [begin, end) into the oplog buffer without blocking.
      *
      * Returns false if there is insufficient space to complete this operation successfully.
@@ -89,7 +106,20 @@ public:
     virtual void waitForSpace(std::size_t size) = 0;
 
     /**
-     * Total size of all oplog entries in this oplog buffer as measured by the BSONObj::size()
+     * Returns true if oplog buffer is empty.
+     */
+    virtual bool isEmpty() const = 0;
+
+    /**
+     * Maximum size of all oplog entries that can be stored in this oplog buffer as measured by the
+     * BSONObj::objsize() function.
+     *
+     * Returns 0 if this oplog buffer has no size constraints.
+     */
+    virtual std::size_t getMaxSize() const = 0;
+
+    /**
+     * Total size of all oplog entries in this oplog buffer as measured by the BSONObj::objsize()
      * function.
      */
     virtual std::size_t getSize() const = 0;
@@ -111,10 +141,28 @@ public:
     virtual bool tryPop(Value* value) = 0;
 
     /**
+     * Pops the last operation in the oplog buffer.
+     * If the oplog buffer is empty, waits until an operation is pushed.
+     */
+    virtual Value blockingPop() = 0;
+
+    /**
+     * Waits "waitDuration" for an operation to be pushed into the oplog buffer.
+     * Returns false if oplog buffer is still empty after "waitDuration".
+     * Otherwise, returns true and sets "value" to last item in oplog buffer.
+     */
+    virtual bool blockingPeek(Value* value, Seconds waitDuration) = 0;
+
+    /**
      * Returns false if oplog buffer is empty.
      * Otherwise, returns true and sets "value" to last item in oplog buffer.
      */
     virtual bool peek(Value* value) = 0;
+
+    /**
+     * Returns the item most recently added to the oplog buffer or nothing if the buffer is empty.
+     */
+    virtual boost::optional<Value> lastObjectPushed() const = 0;
 };
 
 }  // namespace repl

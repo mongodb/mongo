@@ -86,12 +86,24 @@ void OplogBufferCollection::startup() {
 
 void OplogBufferCollection::shutdown() {}
 
+void OplogBufferCollection::pushEvenIfFull(const Value& value) {}
+
+void OplogBufferCollection::push(const Value& value) {}
+
 bool OplogBufferCollection::pushAllNonBlocking(Batch::const_iterator begin,
                                                Batch::const_iterator end) {
     return false;
 }
 
 void OplogBufferCollection::waitForSpace(std::size_t size) {}
+
+bool OplogBufferCollection::isEmpty() const {
+    return true;
+}
+
+std::size_t OplogBufferCollection::getMaxSize() const {
+    return 0;
+}
 
 std::size_t OplogBufferCollection::getSize() const {
     return 0;
@@ -107,8 +119,20 @@ bool OplogBufferCollection::tryPop(Value* value) {
     return false;
 }
 
+OplogBuffer::Value OplogBufferCollection::blockingPop() {
+    return {};
+}
+
+bool OplogBufferCollection::blockingPeek(Value* value, Seconds waitDuration) {
+    return false;
+}
+
 bool OplogBufferCollection::peek(Value* value) {
     return false;
+}
+
+boost::optional<OplogBuffer::Value> OplogBufferCollection::lastObjectPushed() const {
+    return {};
 }
 
 }  // namespace repl
