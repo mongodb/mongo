@@ -5419,14 +5419,13 @@ buildvariants:
   - name: jsCore_auth
   - name: jstestfuzz
   - name: jstestfuzz_WT
-  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
-  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: replicasets_auth
   - name: sasl
   - name: sharding_auth
+  - name: sharding_csrs_upgrade_auth_WT
   - name: snmp
   - name: snmp_WT
   - name: ssl
@@ -5610,9 +5609,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
-  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
-  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -5646,6 +5643,9 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_csrs_upgrade
+  - name: sharding_csrs_upgrade_WT
+  - name: sharding_csrs_upgrade_auth_WT
   - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
