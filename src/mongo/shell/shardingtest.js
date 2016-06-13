@@ -1,6 +1,9 @@
 /**
- * Starts up a sharded cluster with the given specifications. The cluster
- * will be fully operational after the execution of this constructor function.
+ * Starts up a sharded cluster with the given specifications. The cluster will be fully operational
+ * after the execution of this constructor function.
+ *
+ * In addition to its own methods, ShardingTest inherits all the functions from the 'sh' utility
+ * with the db set as the first mongos instance in the test (i.e. s0).
  *
  * @param {Object} params Contains the key-value pairs for the cluster
  *   configuration. Accepted keys are:
@@ -162,6 +165,62 @@ var ShardingTest = function(params) {
             else
                 return false;
         }
+    }
+
+    /**
+     * Extends the ShardingTest class with the methods exposed by the sh utility class.
+     */
+    function _extendWithShMethods() {
+        Object.keys(sh).forEach(function(fn) {
+            if (typeof sh[fn] !== 'function') {
+                return;
+            }
+
+            assert.eq(undefined,
+                      self[fn],
+                      'ShardingTest contains a method ' + fn +
+                          ' which duplicates a method with the same name on sh. ' +
+                          'Please select a different function name.');
+
+            self[fn] = function() {
+                if (typeof db == "undefined") {
+                    db = undefined;
+                }
+
+                var oldDb = db;
+                db = self.getDB('test');
+
+                try {
+                    sh[fn].apply(sh, arguments);
+                } finally {
+                    db = oldDb;
+                }
+            };
+        });
+    }
+
+    /**
+     * Configures the cluster based on the specified parameters (balancer state, etc).
+     */
+    function _configureCluster() {
+        // Disable the balancer unless it is explicitly turned on
+        if (!otherParams.enableBalancer) {
+            self.stopBalancer();
+        }
+
+        // Lower the mongos replica set monitor's threshold for deeming RS shard hosts as
+        // inaccessible in order to speed up tests, which shutdown entire shards and check for
+        // errors. This attempt is best-effort and failure should not have effect on the actual
+        // test execution, just the execution time.
+        self._mongos.forEach(function(mongos) {
+            var res = mongos.adminCommand({setParameter: 1, replMonitorMaxFailedChecks: 2});
+
+            // For tests, which use x509 certificate for authentication, the command above will not
+            // work due to authorization error.
+            if (res.code != ErrorCodes.Unauthorized) {
+                assert.commandWorked(res);
+            }
+        });
     }
 
     function connectionURLTheSame(a, b) {
@@ -636,38 +695,6 @@ var ShardingTest = function(params) {
 
         printjson(result);
         assert(result.ok);
-    };
-
-    this.stopBalancer = function(timeout, interval) {
-        if (typeof db == "undefined") {
-            db = undefined;
-        }
-
-        var oldDB = db;
-        db = this.config;
-        timeout = timeout || 60000;
-
-        try {
-            sh.stopBalancer(timeout, interval);
-        } finally {
-            db = oldDB;
-        }
-    };
-
-    this.startBalancer = function(timeout, interval) {
-        if (typeof db == "undefined") {
-            db = undefined;
-        }
-
-        var oldDB = db;
-        db = this.config;
-        timeout = timeout || 60000;
-
-        try {
-            sh.startBalancer(timeout, interval);
-        } finally {
-            db = oldDB;
-        }
     };
 
     /*
@@ -1305,34 +1332,14 @@ var ShardingTest = function(params) {
         this["s" + i] = this._mongos[i];
     }
 
-    // If auth is enabled for the test, login the mongos connections as system in order to
-    // configure the instances and then log them out again.
+    _extendWithShMethods();
 
-    function configureCluster() {
-        // Disable the balancer unless it is explicitly turned on
-        if (!otherParams.enableBalancer) {
-            self.stopBalancer();
-        }
-
-        // Lower the mongos replica set monitor's threshold for deeming RS shard hosts as
-        // inaccessible in order to speed up tests, which shutdown entire shards and check for
-        // errors. This attempt is best-effort and failure should not have effect on the actual
-        // test execution, just the execution time.
-        self._mongos.forEach(function(mongos) {
-            var res = mongos.adminCommand({setParameter: 1, replMonitorMaxFailedChecks: 2});
-
-            // For tests, which use x509 certificate for authentication, the command above will not
-            // work due to authorization error.
-            if (res.code != ErrorCodes.Unauthorized) {
-                assert.commandWorked(res);
-            }
-        });
-    }
-
+    // If auth is enabled for the test, login the mongos connections as system in order to configure
+    // the instances and then log them out again.
     if (keyFile) {
-        authutil.asCluster(this._mongos, keyFile, configureCluster);
+        authutil.asCluster(this._mongos, keyFile, _configureCluster);
     } else {
-        configureCluster();
+        _configureCluster();
     }
 
     try {
