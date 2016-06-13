@@ -2486,6 +2486,14 @@ var authCommandsLib = {
               {runOnDb: firstDbName, roles: roles_all, privileges: []},
               {runOnDb: secondDbName, roles: roles_all, privileges: []}
           ]
+        },
+        {
+          testname: "_configsvrAddShard",
+          command: {_configsvrAddShard: "x"},
+          skipSharded: true,
+          testcases: [
+              {runOnDb: adminDbName, roles: {__system: 1}, expectFail: true},
+          ]
         }
     ],
 
