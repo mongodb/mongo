@@ -109,6 +109,33 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='config_server_test_fixture',
+    source=[
+        'config_server_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/client/remote_command_targeter_mock',
+        '$BUILD_DIR/mongo/executor/network_test_env',
+        '$BUILD_DIR/mongo/executor/task_executor_pool',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
+        '$BUILD_DIR/mongo/rpc/metadata',
+        '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
+        '$BUILD_DIR/mongo/s/catalog/replset/sharding_catalog_client_impl',
+        '$BUILD_DIR/mongo/s/catalog/replset/sharding_catalog_manager_impl',
+        '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/mongo/s/serveronly',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
+        '$BUILD_DIR/mongo/util/net/message_port_mock',
+        'sharding_egress_metadata_hook_for_mongos',
+    ],
+    LIBDEPS_TAGS=[
+        # Depends on coreshard, but that would be circular
+        'incomplete',
+    ],
+)
+
 env.CppUnitTest(
     target='shard_id_test',
     source=[
