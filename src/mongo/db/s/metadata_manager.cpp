@@ -31,18 +31,75 @@
 #include "mongo/db/s/metadata_manager.h"
 
 #include "mongo/db/s/collection_metadata.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
-MetadataManager::MetadataManager(std::unique_ptr<CollectionMetadata> initialMetadata)
-    : _activeMetadata(std::move(initialMetadata)) {}
+MetadataManager::MetadataManager() = default;
 
-std::shared_ptr<CollectionMetadata> MetadataManager::getActiveMetadata() {
-    return _activeMetadata;
+ScopedCollectionMetadata MetadataManager::getActiveMetadata() {
+    invariant(_activeMetadataTracker);
+    return ScopedCollectionMetadata(this, _activeMetadataTracker.get());
 }
 
-void MetadataManager::setActiveMetadata(std::shared_ptr<CollectionMetadata> newMetadata) {
-    _activeMetadata = std::move(newMetadata);
+void MetadataManager::setActiveMetadata(std::unique_ptr<CollectionMetadata> newMetadata) {
+    if (_activeMetadataTracker && _activeMetadataTracker->usageCounter > 0) {
+        _metadataInUse.push_front(std::move(_activeMetadataTracker));
+    }
+    _activeMetadataTracker = stdx::make_unique<CollectionMetadataTracker>(std::move(newMetadata));
+}
+
+void MetadataManager::_removeMetadata(CollectionMetadataTracker* metadataTracker) {
+    invariant(metadataTracker->usageCounter == 0);
+    auto i = _metadataInUse.begin();
+    auto e = _metadataInUse.end();
+    while (i != e) {
+        if (metadataTracker == i->get()) {
+            _metadataInUse.erase(i);
+            return;
+        }
+        i++;
+    }
+}
+
+MetadataManager::CollectionMetadataTracker::CollectionMetadataTracker(
+    std::unique_ptr<CollectionMetadata> m)
+    : metadata(std::move(m)), usageCounter(0){};
+
+ScopedCollectionMetadata::ScopedCollectionMetadata(
+    MetadataManager* manager, MetadataManager::CollectionMetadataTracker* tracker)
+    : _manager(manager), _tracker(tracker) {
+    _tracker->usageCounter++;
+}
+
+ScopedCollectionMetadata::~ScopedCollectionMetadata() {
+    invariant(_tracker->usageCounter > 0);
+    if (--_tracker->usageCounter == 0) {
+        _manager->_removeMetadata(_tracker);
+    }
+}
+
+CollectionMetadata* ScopedCollectionMetadata::operator->() {
+    return _tracker->metadata.get();
+}
+
+CollectionMetadata* ScopedCollectionMetadata::getMetadata() {
+    return _tracker->metadata.get();
+}
+
+ScopedCollectionMetadata::ScopedCollectionMetadata(ScopedCollectionMetadata&& other) {
+    *this = std::move(other);
+}
+
+ScopedCollectionMetadata& ScopedCollectionMetadata::operator=(ScopedCollectionMetadata&& other) {
+    if (this != &other) {
+        _manager = other._manager;
+        _tracker = other._tracker;
+        other._manager = nullptr;
+        other._tracker = nullptr;
+    }
+
+    return *this;
 }
 
 }  // namespace mongo
