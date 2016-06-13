@@ -124,6 +124,7 @@ private:
     void _setTimerCallback();
     asio::error_code _read(char* buf, std::size_t size);
     asio::error_code _write(const char* buf, std::size_t size);
+    asio::error_code _handshake(bool isServer, const char* buf = nullptr, std::size_t size = 0);
     const asio::generic::stream_protocol::socket& _getSocket() const;
     asio::generic::stream_protocol::socket& _getSocket();
 

@@ -146,6 +146,7 @@ ASIOMessagingPort::ASIOMessagingPort(int fd, SockAddr farEnd)
             fd) {
 #endif  // MONGO_CONFIG_SSL
     asioPorts.insert(this);
+    _getSocket().non_blocking(true);
     _remote = HostAndPort(farEnd.getAddr(), farEnd.getPort());
     _timer.expires_at(decltype(_timer)::time_point::max());
     _setTimerCallback();
@@ -214,29 +215,50 @@ void ASIOMessagingPort::shutdown() {
 
 asio::error_code ASIOMessagingPort::_read(char* buf, std::size_t size) {
     invariant(buf);
+
+    stdx::lock_guard<stdx::mutex> opInProgressGuard(_opInProgress);
+
+    // Try to do optimistic reads.
+    asio::error_code ec;
+    std::size_t bytesRead;
+    if (!_isEncrypted) {
+        bytesRead = asio::read(_getSocket(), asio::buffer(buf, size), ec);
+    }
+#ifdef MONGO_CONFIG_SSL
+    else {
+        bytesRead = asio::read(_sslSock, asio::buffer(buf, size), ec);
+    }
+#endif
+    if (!ec && bytesRead == size) {
+        _bytesIn += size;
+    }
+    if (ec != asio::error::would_block) {
+        return ec;
+    }
+
+    // Fall back to async with timer if the operation would block.
     if (_timeout) {
         _timer.expires_from_now(decltype(_timer)::duration(
             durationCount<Duration<decltype(_timer)::duration::period>>(*_timeout)));
     }
-
-    stdx::lock_guard<stdx::mutex> opInProgressGuard(_opInProgress);
-    asio::error_code ec = asio::error::would_block;
     if (!_isEncrypted) {
-        asio::async_read(_getSocket(),
-                         asio::buffer(buf, size),
-                         [&ec, size](const asio::error_code& err, std::size_t size_read) {
-                             invariant(err || size == size_read);
-                             ec = err;
-                         });
+        asio::async_read(
+            _getSocket(),
+            asio::buffer(buf + bytesRead, size - bytesRead),
+            [&ec, size, bytesRead](const asio::error_code& err, std::size_t size_read) {
+                invariant(err || (size - bytesRead) == size_read);
+                ec = err;
+            });
     }
 #ifdef MONGO_CONFIG_SSL
     else {
-        asio::async_read(_sslSock,
-                         asio::buffer(buf, size),
-                         [&ec, size](const asio::error_code& err, std::size_t size_read) {
-                             invariant(err || size == size_read);
-                             ec = err;
-                         });
+        asio::async_read(
+            _sslSock,
+            asio::buffer(buf + bytesRead, size - bytesRead),
+            [&ec, size, bytesRead](const asio::error_code& err, std::size_t size_read) {
+                invariant(err || (size - bytesRead) == size_read);
+                ec = err;
+            });
     }
 #endif  // MONGO_CONFIG_SSL
     do {
@@ -250,29 +272,52 @@ asio::error_code ASIOMessagingPort::_read(char* buf, std::size_t size) {
 }
 
 asio::error_code ASIOMessagingPort::_write(const char* buf, std::size_t size) {
+    invariant(buf);
+
+    stdx::lock_guard<stdx::mutex> opInProgressGuard(_opInProgress);
+
+    // Try to do optimistic writes.
+    asio::error_code ec;
+    std::size_t bytesWritten;
+    if (!_isEncrypted) {
+        bytesWritten = asio::write(_getSocket(), asio::buffer(buf, size), ec);
+    }
+#ifdef MONGO_CONFIG_SSL
+    else {
+        bytesWritten = asio::write(_sslSock, asio::buffer(buf, size), ec);
+    }
+#endif
+    if (!ec && bytesWritten == size) {
+        _bytesOut += size;
+    }
+    if (ec != asio::error::would_block) {
+        return ec;
+    }
+
+    // Fall back to async with timer if the operation would block.
     if (_timeout) {
         _timer.expires_from_now(decltype(_timer)::duration(
             durationCount<Duration<decltype(_timer)::duration::period>>(*_timeout)));
     }
 
-    stdx::lock_guard<stdx::mutex> opInProgressGuard(_opInProgress);
-    asio::error_code ec = asio::error::would_block;
     if (!_isEncrypted) {
-        asio::async_write(_getSocket(),
-                          asio::buffer(buf, size),
-                          [&ec, &size](const asio::error_code& err, std::size_t size_written) {
-                              invariant(err || size == size_written);
-                              ec = err;
-                          });
+        asio::async_write(
+            _getSocket(),
+            asio::buffer(buf + bytesWritten, size - bytesWritten),
+            [&ec, size, bytesWritten](const asio::error_code& err, std::size_t size_written) {
+                invariant(err || (size - bytesWritten) == size_written);
+                ec = err;
+            });
     }
 #ifdef MONGO_CONFIG_SSL
     else {
-        asio::async_write(_sslSock,
-                          asio::buffer(buf, size),
-                          [&ec, &size](const asio::error_code& err, std::size_t size_written) {
-                              invariant(err || size == size_written);
-                              ec = err;
-                          });
+        asio::async_write(
+            _sslSock,
+            asio::buffer(buf + bytesWritten, size - bytesWritten),
+            [&ec, size, bytesWritten](const asio::error_code& err, std::size_t size_written) {
+                invariant(err || (size - bytesWritten) == size_written);
+                ec = err;
+            });
     }
 #endif  // MONGO_CONFIG_SSL
     do {
@@ -283,6 +328,36 @@ asio::error_code ASIOMessagingPort::_write(const char* buf, std::size_t size) {
         _bytesOut += size;
     }
     return ec;
+}
+
+asio::error_code ASIOMessagingPort::_handshake(bool isServer, const char* buf, std::size_t size) {
+#ifdef MONGO_CONFIG_SSL
+    auto handshakeType = isServer ? decltype(_sslSock)::server : decltype(_sslSock)::client;
+
+    stdx::lock_guard<stdx::mutex> opInProgressGuard(_opInProgress);
+
+    if (_timeout) {
+        _timer.expires_from_now(decltype(_timer)::duration(
+            durationCount<Duration<decltype(_timer)::duration::period>>(*_timeout)));
+    }
+
+    asio::error_code ec = asio::error::would_block;
+    if (buf) {
+        _sslSock.async_handshake(handshakeType,
+                                 asio::buffer(buf, size),
+                                 [&ec](const asio::error_code& err, std::size_t) { ec = err; });
+    } else {
+        _sslSock.async_handshake(handshakeType, [&ec](const asio::error_code& err) { ec = err; });
+    }
+
+    do {
+        _service.run_one();
+    } while (ec == asio::error::would_block);
+
+    return ec;
+#else
+    return asio::error::operation_not_supported;
+#endif
 }
 
 const asio::generic::stream_protocol::socket& ASIOMessagingPort::_getSocket() const {
@@ -343,9 +418,11 @@ bool ASIOMessagingPort::recv(Message& m) {
                 uassert(40131,
                         "SSL handshake received but server is started without SSL support",
                         sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled);
-                // `_sslSock.handshake()` throws on failure.
-                _sslSock.handshake(decltype(_sslSock)::server,
-                                   asio::buffer(md.view2ptr(), kHeaderLen));
+
+                auto ec = _handshake(true, md.view2ptr(), kHeaderLen);
+                if (ec) {
+                    throw asio::system_error(ec);
+                }
 
                 auto swPeerSubjectName =
                     getSSLManager()->parseAndValidatePeerCertificate(_sslSock.native_handle(), "");
@@ -534,6 +611,7 @@ bool ASIOMessagingPort::connect(SockAddr& farEnd) {
 
     _creationTime = curTimeMicros64();
     _awaitingHandshake = false;
+    _getSocket().non_blocking(true);
     if (farEnd.getType() != AF_UNIX) {
         _getSocket().set_option(asio::ip::tcp::no_delay(true));
     }
@@ -543,8 +621,7 @@ bool ASIOMessagingPort::connect(SockAddr& farEnd) {
 
 bool ASIOMessagingPort::secure(SSLManagerInterface* ssl, const std::string& remoteHost) {
 #ifdef MONGO_CONFIG_SSL
-    asio::error_code ec;
-    _sslSock.handshake(decltype(_sslSock)::client, ec);
+    auto ec = _handshake(false);
     if (ec) {
         return false;
     }
