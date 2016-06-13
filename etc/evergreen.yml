@@ -34,7 +34,7 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      remote_file: ${build_variant}/${build_id}.tgz
+      remote_file: mongodb-mongo-v2.6/${build_variant}/${revision}/artifacts/${build_id}.tgz
       bucket: mciuploads
       extract_to: src
   "get buildnumber":
@@ -135,7 +135,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: target.tgz
-        remote_file: ${build_variant}/${build_id}.tgz
+        remote_file: mongodb-mongo-v2.6/${build_variant}/${revision}/artifacts/${build_id}.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: application/tar
