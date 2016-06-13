@@ -490,11 +490,16 @@ Status parseCreateOrUpdateRoleCommands(const BSONObj& cmdObj,
         return status;
     }
 
+    // Parse role name
     std::string roleName;
     status = bsonExtractStringField(cmdObj, cmdName, &roleName);
     if (!status.isOK()) {
         return status;
     }
+    if (roleName.find('\0') != std::string::npos) {
+        return Status(ErrorCodes::BadValue, "Role name cannot contain NULL characters");
+    }
+
     parsedArgs->roleName = RoleName(roleName, dbname);
 
     // Parse privileges
