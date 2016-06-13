@@ -276,10 +276,10 @@ private:
      * Runs a command against a "shard" that is not yet in the cluster and thus not present in the
      * ShardRegistry.
      */
-    StatusWith<BSONObj> _runCommandForAddShard(OperationContext* txn,
-                                               RemoteCommandTargeter* targeter,
-                                               const std::string& dbName,
-                                               const BSONObj& cmdObj);
+    StatusWith<Shard::CommandResponse> _runCommandForAddShard(OperationContext* txn,
+                                                              RemoteCommandTargeter* targeter,
+                                                              const std::string& dbName,
+                                                              const BSONObj& cmdObj);
 
     StatusWith<repl::OpTimeWith<std::vector<BSONObj>>> _exhaustiveFindOnConfig(
         OperationContext* txn,

@@ -10,22 +10,7 @@
 
     var st = new ShardingTest({shards: {rs0: {nodes: 2}}});
 
-    // TODO: remove crutch once all node shard aware is complete.
-    var setupShardIdentity = function(conn, configConnStr) {
-        var shardIdentityDoc = {
-            _id: 'shardIdentity',
-            configsvrConnectionString: configConnStr,
-            shardName: 'newShard',
-            clusterId: ObjectId()
-        };
-
-        var res = conn.getDB('admin').system.version.update(
-            {_id: 'shardIdentity'}, shardIdentityDoc, true);
-        assert.eq(1, res.nUpserted);
-    };
-
     var shardPri = st.rs0.getPrimary();
-    setupShardIdentity(st.rs0.getPrimary(), st.configRS.getURL());
 
     // Note: Adding new replica set member by hand because of SERVER-24011.
 
