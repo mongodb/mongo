@@ -42,7 +42,7 @@
 #include "mongo/db/repl/collection_cloner.h"
 #include "mongo/db/repl/database_cloner.h"
 #include "mongo/db/repl/member_state.h"
-#include "mongo/db/repl/oplog_buffer_blocking_queue.h"
+#include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/rollback_checker.h"
@@ -420,8 +420,7 @@ DataReplicator::DataReplicator(
       _fetcherPaused(false),
       _reporterPaused(false),
       _applierActive(false),
-      _applierPaused(false),
-      _oplogBuffer(stdx::make_unique<OplogBufferBlockingQueue>()) {
+      _applierPaused(false) {
     uassert(ErrorCodes::BadValue, "invalid rollback function", _opts.rollbackFn);
     uassert(ErrorCodes::BadValue,
             "invalid replSetUpdatePosition command object creation function",
@@ -434,7 +433,10 @@ DataReplicator::DataReplicator(
 }
 
 DataReplicator::~DataReplicator() {
-    DESTRUCTOR_GUARD(_cancelAllHandles_inlock(); _oplogBuffer->clear(); _waitOnAll_inlock(););
+    DESTRUCTOR_GUARD({
+        _cancelAllHandles_inlock();
+        _waitOnAll_inlock();
+    });
 }
 
 Status DataReplicator::start() {
@@ -448,6 +450,7 @@ Status DataReplicator::start() {
     _applierPaused = false;
     _fetcherPaused = false;
     _reporterPaused = false;
+    _oplogBuffer = _dataReplicatorExternalState->makeSteadyStateOplogBuffer();
     _oplogBuffer->startup();
     _doNextActions_Steady_inlock();
     return Status::OK();
@@ -627,6 +630,13 @@ TimestampStatus DataReplicator::initialSync(OperationContext* txn) {
     }
     _reporterPaused = true;
     _applierPaused = true;
+
+    _oplogBuffer = _dataReplicatorExternalState->makeInitialSyncOplogBuffer();
+    _oplogBuffer->startup();
+    ON_BLOCK_EXIT([this]() {
+        _oplogBuffer->shutdown();
+        _oplogBuffer.reset();
+    });
 
     StorageInterface::get(txn)->setInitialSyncFlag(txn);
 
@@ -1289,8 +1299,8 @@ Status DataReplicator::scheduleShutdown() {
         invariant(!_onShutdown.isValid());
         _onShutdown = eventStatus.getValue();
         _cancelAllHandles_inlock();
-        _oplogBuffer->clear();
         _oplogBuffer->shutdown();
+        _oplogBuffer.reset();
     }
 
     // Schedule _doNextActions in case nothing is active to trigger the _onShutdown event.

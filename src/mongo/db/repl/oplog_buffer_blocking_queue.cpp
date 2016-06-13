@@ -49,7 +49,9 @@ OplogBufferBlockingQueue::OplogBufferBlockingQueue() : _queue(kOplogBufferSize, 
 
 void OplogBufferBlockingQueue::startup() {}
 
-void OplogBufferBlockingQueue::shutdown() {}
+void OplogBufferBlockingQueue::shutdown() {
+    clear();
+}
 
 bool OplogBufferBlockingQueue::pushAllNonBlocking(Batch::const_iterator begin,
                                                   Batch::const_iterator end) {
