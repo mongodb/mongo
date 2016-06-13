@@ -100,7 +100,14 @@ class TestCase(unittest.TestCase):
         Runs the specified process.
         """
 
-        self.logger.info("Starting %s...\n%s", self.shortDescription(), process.as_command())
+        if config.INTERNAL_EXECUTOR_NAME is not None:
+            self.logger.info("Starting %s under executor %s...\n%s",
+                    self.shortDescription(),
+                    config.INTERNAL_EXECUTOR_NAME,
+                    process.as_command())
+        else:
+            self.logger.info("Starting %s...\n%s", self.shortDescription(), process.as_command())
+
         process.start()
         self.logger.info("%s started with pid %s.", self.shortDescription(), process.pid)
 

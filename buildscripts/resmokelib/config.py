@@ -185,3 +185,7 @@ DEFAULT_INTEGRATION_TEST_LIST = "build/integration_tests.txt"
 EXTERNAL_SUITE_SELECTORS = [DEFAULT_UNIT_TEST_LIST,
                             DEFAULT_INTEGRATION_TEST_LIST,
                             DEFAULT_DBTEST_EXECUTABLE]
+
+# This is used internally to store the executor name that is passed on the command line.
+# Specifically it's used to record in the logs which executor a test is being run under.
+INTERNAL_EXECUTOR_NAME = None

@@ -45,6 +45,8 @@ variables:
   name: template
   depends_on:
   - name: compile
+  requires:
+  - name: burn_in_tests_WT
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -350,7 +352,8 @@ functions:
           extra_args="$extra_args --storageEngineCacheSizeGB=1"
         fi
 
-        ${path_prefix} ${san_symbolizer} ${san_options} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json
+        ${resmoke_wrapper} ${path_prefix} ${san_symbolizer} ${san_options} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json
+
 
   "do jepsen setup" :
     - command: shell.exec
@@ -762,6 +765,9 @@ tasks:
             ${strip_command|/usr/bin/strip} mongobridge
           fi
 
+          # Capture a list of new and modified tests.
+          ${python|python} buildscripts/burn_in_tests.py --reportFile=jstests/new_tests.json --noExec
+
           # On windows we need to make sure the paths in unittests.txt are compatible with cygwin tar
           sed 's|\\|/|g' build/unittests.txt > build/unittests-tarlist.txt
           ${tar|tar} -czvf mongodb-unittests.tgz -T build/unittests-tarlist.txt build/unittests.txt
@@ -872,6 +878,22 @@ tasks:
           set -o errexit
           set -o verbose
           ${scons|scons} ${compile_flags|} lint
+
+- <<: *task_template
+  name: burn_in_tests_WT
+  depends_on:
+  - name: compile
+  commands:
+  - func: "do setup"
+  - func: "do multiversion setup"
+  - func: "run tests"
+    vars:
+      burn_msg: This task is currently only configured for patch builds.
+      burn_patch_check: if [ "${is_patch}" != "true" ]; then echo ${burn_msg}; exit 0; fi;
+      path_prefix: PATH=$PATH:/data/multiversion
+      resmoke_wrapper: ${burn_patch_check} ${python|python} buildscripts/burn_in_tests.py --testListFile=jstests/new_tests.json
+      resmoke_args: --repeat=2
+      run_multiple_jobs: true
 
 ## jepsen WT ##
 - <<: *run_jepsen_template
@@ -4423,6 +4445,7 @@ buildvariants:
     distros:
     - rhel62-large
   - name: lint
+  - name: burn_in_tests_WT
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_WT_ese

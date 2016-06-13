@@ -295,6 +295,8 @@ def get_suites(values, args):
     if (values.suite_files is None and not args) or (values.suite_files is not None and args):
         raise optparse.OptionValueError("Must specify either --suites or a list of tests")
 
+    _config.INTERNAL_EXECUTOR_NAME = values.executor_file
+
     # If there are no suites specified, but there are args, assume they are jstests.
     if args:
         # Do not change the execution order of the jstests passed as args, unless a tag option is
