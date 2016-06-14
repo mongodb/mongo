@@ -38,11 +38,15 @@ def mongod_program(logger, executable=None, process_kwargs=None, **kwargs):
         "nojournal": config.NO_JOURNAL,
         "nopreallocj": config.NO_PREALLOC_JOURNAL,
         "storageEngine": config.STORAGE_ENGINE,
-        "wiredTigerCacheSizeGB": config.STORAGE_ENGINE_CACHE_SIZE,
         "wiredTigerCollectionConfigString": config.WT_COLL_CONFIG,
         "wiredTigerEngineConfigString": config.WT_ENGINE_CONFIG,
         "wiredTigerIndexConfigString": config.WT_INDEX_CONFIG,
     }
+
+    if config.STORAGE_ENGINE == "rocksdb":
+        shortcut_opts["rocksdbCacheSizeGB"] = config.STORAGE_ENGINE_CACHE_SIZE
+    elif config.STORAGE_ENGINE == "wiredTiger" or config.STORAGE_ENGINE is None:
+        shortcut_opts["wiredTigerCacheSizeGB"] = config.STORAGE_ENGINE_CACHE_SIZE
 
     # These options are just flags, so they should not take a value.
     opts_without_vals = ("nojournal", "nopreallocj")

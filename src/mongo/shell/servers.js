@@ -920,8 +920,17 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                     }
                 }
                 if (jsTest.options().storageEngineCacheSizeGB) {
-                    argArray.push(
-                        ...['--wiredTigerCacheSizeGB', jsTest.options().storageEngineCacheSizeGB]);
+                    if (jsTest.options().storageEngine === "rocksdb") {
+                        argArray.push(
+                            ...
+                            ['--rocksdbCacheSizeGB', jsTest.options().storageEngineCacheSizeGB]);
+                    } else if (jsTest.options().storageEngine === "wiredTiger" ||
+                               !jsTest.options().storageEngine) {
+                        argArray.push(...[
+                            '--wiredTigerCacheSizeGB',
+                            jsTest.options().storageEngineCacheSizeGB
+                        ]);
+                    }
                 }
                 if (jsTest.options().wiredTigerEngineConfigString) {
                     argArray.push(...[
