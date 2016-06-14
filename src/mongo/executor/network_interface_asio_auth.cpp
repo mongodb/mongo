@@ -61,6 +61,7 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
 
     BSONObjBuilder bob;
     bob.append("isMaster", 1);
+    bob.append("hangUpOnStepDown", false);
 
     if (Command::testCommandsEnabled) {
         // Only include the host:port of this process in the isMaster command request if test
