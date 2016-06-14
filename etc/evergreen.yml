@@ -353,7 +353,8 @@ functions:
         fi
 
         # Default storageEngineCacheSizeGB to 1. Override on individual test config if needed.
-        if [[ "${resmoke_args}" = *storageEngine=wiredTiger* ]] && [[ "${resmoke_args}" != *storageEngineCacheSizeGB* ]]; then
+        # resmoke will assign to the appropriate parameter on storage engines that support it.
+        if [[ "${resmoke_args}" != *storageEngineCacheSizeGB* ]]; then
           extra_args="$extra_args --storageEngineCacheSizeGB=1"
         fi
 
