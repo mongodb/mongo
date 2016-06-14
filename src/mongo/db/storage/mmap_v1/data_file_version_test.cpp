@@ -62,6 +62,16 @@ TEST(DataFileVersionTest, CanSetMayHave30Freelist) {
     ASSERT_TRUE(version.mayHave30Freelist());
 }
 
+TEST(DataFileVersionTest, CanSetMayHaveCollationMetadata) {
+    auto version = DataFileVersion::defaultForNewFiles();
+    ASSERT_OK(version.isCompatibleWithCurrentCode());
+
+    ASSERT_FALSE(version.getMayHaveCollationMetadata());
+    version.setMayHaveCollationMetadata();
+    ASSERT_TRUE(version.getMayHaveCollationMetadata());
+    ASSERT_OK(version.isCompatibleWithCurrentCode());
+}
+
 TEST(DataFileVersionTest, MustUpgradeWhenMajorVersionIsUnsupported) {
     const uint32_t major = 5;
     const uint32_t minor = 6;

@@ -82,6 +82,10 @@ public:
     virtual bool isOlderThan24(OperationContext* opCtx) const;
     virtual void markIndexSafe24AndUp(OperationContext* opCtx);
 
+    // Records in the data file version bits that an index or collection may have an associated
+    // collation.
+    void markCollationFeatureAsInUse(OperationContext* opCtx);
+
     virtual Status currentFilesCompatible(OperationContext* opCtx) const;
 
     virtual void appendExtraStats(OperationContext* opCtx, BSONObjBuilder* out, double scale) const;

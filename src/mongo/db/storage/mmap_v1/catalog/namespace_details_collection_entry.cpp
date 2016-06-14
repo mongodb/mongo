@@ -37,6 +37,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details_rsv1_metadata.h"
+#include "mongo/db/storage/mmap_v1/data_file.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/util/log.h"
@@ -290,6 +291,11 @@ Status NamespaceDetailsCollectionCatalogEntry::prepareForIndexBuild(OperationCon
     _db->createNamespaceForIndex(txn, desc->indexNamespace());
 
     // TODO SERVER-22727: Create an entry for path-level multikey info when creating the new index.
+
+    // Mark the collation feature as in use if the index has a non-simple collation.
+    if (spec["collation"]) {
+        _db->markCollationFeatureAsInUse(txn);
+    }
 
     return Status::OK();
 }

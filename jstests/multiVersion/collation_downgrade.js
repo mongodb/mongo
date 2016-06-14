@@ -21,12 +21,6 @@
         storageEngine: jsTest.options().storageEngine || "wiredTiger",
     };
 
-    // TODO SERVER-23761: also prevent users from downgrading on MMAP.
-    if (defaultOptions.storageEngine === "mmapv1") {
-        print("Skipping test on mmapv1 storage engine");
-        return;
-    }
-
     // Whenever we start "latest", we use the "enableBSON1_1" server parameter to force indices
     // created with the wiredTiger storage engine to use KeyString V0. Otherwise, downgrade will
     // fail due to creating KeyString V1 indices rather than exercising the code which prevents

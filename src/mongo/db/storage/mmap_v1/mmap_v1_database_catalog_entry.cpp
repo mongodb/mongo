@@ -439,6 +439,20 @@ void MMAPV1DatabaseCatalogEntry::markIndexSafe24AndUp(OperationContext* opCtx) {
     _extentManager->setFileFormat(opCtx, version);
 }
 
+void MMAPV1DatabaseCatalogEntry::markCollationFeatureAsInUse(OperationContext* opCtx) {
+    if (_extentManager->numFiles() == 0)
+        return;
+
+    DataFileVersion version = _extentManager->getFileFormat(opCtx);
+    fassert(40150, version.isCompatibleWithCurrentCode());
+
+    if (version.getMayHaveCollationMetadata())
+        return;
+
+    version.setMayHaveCollationMetadata();
+    _extentManager->setFileFormat(opCtx, version);
+}
+
 Status MMAPV1DatabaseCatalogEntry::currentFilesCompatible(OperationContext* opCtx) const {
     if (_extentManager->numFiles() == 0)
         return Status::OK();
@@ -660,6 +674,10 @@ Status MMAPV1DatabaseCatalogEntry::createCollection(OperationContext* txn,
         } else {
             rs->increaseStorageSize(txn, _extentManager->initialSize(128), false);
         }
+    }
+
+    if (!options.collation.isEmpty()) {
+        markCollationFeatureAsInUse(txn);
     }
 
     return Status::OK();
