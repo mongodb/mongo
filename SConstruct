@@ -739,8 +739,15 @@ variables_only_env = Environment(
 
 # don't run configure if user calls --help
 if GetOption('help'):
-    Help('\nThe following variables may also be set like scons VARIABLE=value\n', append=True);
-    Help(env_vars.GenerateHelpText(variables_only_env), append=True);
+    try:
+        Help('\nThe following variables may also be set like scons VARIABLE=value\n', append=True)
+        Help(env_vars.GenerateHelpText(variables_only_env), append=True)
+    except TypeError:
+        # The append=true kwarg is only supported in scons>=2.4. Without it, calls to Help() clobber
+        # the automatically generated options help, which we don't want. Users on older scons
+        # versions will need to use --variables-help to learn about which variables we support.
+        pass
+
     Return()
 
 if ('CC' in variables_only_env) != ('CXX' in variables_only_env):
