@@ -681,19 +681,19 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
         }
     }
 
+    unique_ptr<Scope> scope{globalScriptEngine->newScopeForCurrentThread()};
+    verify(scope.get());
+
     while (!shouldStop()) {
-        for (auto op : _config->ops) {
+        for (const auto& op : _config->ops) {
             if (shouldStop())
                 break;
             auto& stats = shouldCollectStats() ? _stats : _statsBlackHole;
 
-            unique_ptr<Scope> scope;
             ScriptingFunction scopeFunc = 0;
             BSONObj scopeObj;
             if (op.useCheck) {
                 auto check = op.check;
-                scope = globalScriptEngine->getPooledScope(NULL, op.ns, "benchrun");
-                verify(scope.get());
 
                 if (check.type() == CodeWScope) {
                     scopeFunc = scope->createFunction(check.codeWScopeCode());
