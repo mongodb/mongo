@@ -425,12 +425,16 @@ functions:
           for i in $(seq 1 $numVms)
           do
             hostn=n$i
+            if [ ! -d store/latest ]; then
+              echo "Creating the store/latest directory, which was not created by Jepsen"
+              mkdir -p store/latest
+            fi
             mongod_log=store/latest/mongod-$hostn.log
             scp root@$hostn:mongod.log $mongod_log
             if [ -f $mongod_log ]; then
               echo "Copied mongod.log from $hostn to $mongod_log"
             else
-              echo "Failed to copy mongod.log from $hostn"
+              echo "Failed to copy mongod.log from $hostn to $mongod_log"
             fi
           done
           # Always exit without an error so the archive steps will run.
