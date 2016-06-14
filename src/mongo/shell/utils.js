@@ -245,7 +245,7 @@ jsTest.authenticate = function(conn) {
 };
 
 jsTest.authenticateNodes = function(nodes) {
-    assert.soon(function() {
+    assert.soonNoExcept(function() {
         for (var i = 0; i < nodes.length; i++) {
             // Don't try to authenticate to arbiters
             res = nodes[i].getDB("admin").runCommand({replSetGetStatus: 1});

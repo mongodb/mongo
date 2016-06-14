@@ -179,6 +179,26 @@ assert.soon = function(f, msg, timeout /*ms*/, interval) {
     }
 };
 
+/**
+ * Wraps assert.soon to try...catch any function passed in.
+ */
+assert.soonNoExcept = function(func, msg, timeout /*ms*/) {
+    /**
+     * Surrounds a function call by a try...catch to convert any exception to a print statement
+     * and return false.
+     */
+    function _convertExceptionToReturnStatus(func) {
+        try {
+            return func();
+        } catch (e) {
+            print("caught exception " + e);
+            return false;
+        }
+    }
+
+    assert.soon((() => _convertExceptionToReturnStatus(func)), msg, timeout);
+};
+
 assert.time = function(f, msg, timeout /*ms*/) {
     if (assert._debug && msg)
         print("in assert for: " + msg);

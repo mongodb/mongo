@@ -259,29 +259,6 @@ var ReplSetTest = function(opts) {
     }
 
     /**
-     * Surrounds a function call by a try...catch to convert any exception to a print statement
-     * and return false.
-     */
-    function _convertExceptionToReturnStatus(func, msg) {
-        try {
-            return func();
-        } catch (e) {
-            if (msg) {
-                print(msg);
-            }
-            print("ReplSetTest caught exception " + e);
-            return false;
-        }
-    }
-
-    /**
-     * Wraps assert.soon to try...catch any function passed in.
-     */
-    function _assertSoonNoExcept(func, msg, timeout) {
-        assert.soon((() => _convertExceptionToReturnStatus(func)), msg, timeout);
-    }
-
-    /**
      * Returns the optime for the specified host by issuing replSetGetStatus.
      */
     function _getLastOpTime(conn) {
@@ -472,7 +449,7 @@ var ReplSetTest = function(opts) {
     this.awaitSecondaryNodes = function(timeout) {
         timeout = timeout || 60000;
 
-        _assertSoonNoExcept(function() {
+        assert.soonNoExcept(function() {
             // Reload who the current slaves are
             self.getPrimary(timeout);
 
@@ -496,7 +473,7 @@ var ReplSetTest = function(opts) {
     this.awaitNodesAgreeOnPrimary = function(timeout) {
         timeout = timeout || 60000;
 
-        _assertSoonNoExcept(function() {
+        assert.soonNoExcept(function() {
             var primary = -1;
 
             for (var i = 0; i < self.nodes.length; i++) {
@@ -537,7 +514,7 @@ var ReplSetTest = function(opts) {
         timeout = timeout || 60000;
         var primary = null;
 
-        _assertSoonNoExcept(function() {
+        assert.soonNoExcept(function() {
             primary = _callIsMaster();
             return primary;
         }, "Finding primary", timeout);
@@ -549,7 +526,7 @@ var ReplSetTest = function(opts) {
         msg = msg || "Timed out waiting for there to be no primary in replset: " + this.name;
         timeout = timeout || 30000;
 
-        _assertSoonNoExcept(function() {
+        assert.soonNoExcept(function() {
             return _callIsMaster() == false;
         }, msg, timeout);
     };
@@ -686,7 +663,7 @@ var ReplSetTest = function(opts) {
         print("Waiting for op with OpTime " + tojson(masterOpTime) +
               " to be committed on all secondaries");
 
-        _assertSoonNoExcept(function() {
+        assert.soonNoExcept(function() {
             for (var i = 0; i < rst.nodes.length; i++) {
                 var node = rst.nodes[i];
 
@@ -718,7 +695,7 @@ var ReplSetTest = function(opts) {
         // Blocking call, which will wait for the last optime written on the master to be available
         var awaitLastOpTimeWrittenFn = function() {
             var master = self.getPrimary();
-            _assertSoonNoExcept(function() {
+            assert.soonNoExcept(function() {
                 try {
                     masterLatestOpTime = _getLastOpTimeTimestamp(master);
                 } catch (e) {
@@ -755,7 +732,7 @@ var ReplSetTest = function(opts) {
               ", is " + tojson(masterLatestOpTime) + ", last oplog entry is " +
               tojsononeline(masterOpTime));
 
-        _assertSoonNoExcept(function() {
+        assert.soonNoExcept(function() {
             try {
                 print("ReplSetTest awaitReplication: checking secondaries against timestamp " +
                       tojson(masterLatestOpTime));
@@ -1173,7 +1150,7 @@ var ReplSetTest = function(opts) {
      */
     this.waitForMaster = function(timeout) {
         var master;
-        _assertSoonNoExcept(function() {
+        assert.soonNoExcept(function() {
             return (master = self.getPrimary());
         }, "waiting for master", timeout);
 
