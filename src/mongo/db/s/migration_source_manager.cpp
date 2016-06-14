@@ -80,8 +80,9 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* txn, MoveChunkR
     // this value does not actually contain the shard version, but the global collection version.
     const ChunkVersion expectedCollectionVersion = oss.getShardVersion(_args.getNss());
 
-    log() << "Starting chunk migration for [" << _args.getMinKey() << ", " << _args.getMaxKey()
-          << ") with expected collection version " << expectedCollectionVersion;
+    log() << "Starting chunk migration for "
+          << ChunkRange(_args.getMinKey(), _args.getMaxKey()).toString()
+          << " with expected collection version " << expectedCollectionVersion;
 
     // Now that the collection is locked, snapshot the metadata and fetch the latest versions
     ShardingState* const shardingState = ShardingState::get(txn);
@@ -93,11 +94,8 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* txn, MoveChunkR
     if (!refreshStatus.isOK()) {
         uasserted(refreshStatus.code(),
                   str::stream() << "cannot start migrate of chunk "
-                                << "["
-                                << _args.getMinKey()
-                                << ","
-                                << _args.getMaxKey()
-                                << ") due to "
+                                << ChunkRange(_args.getMinKey(), _args.getMaxKey()).toString()
+                                << " due to "
                                 << refreshStatus.toString());
     }
 
@@ -106,11 +104,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* txn, MoveChunkR
         // the first place
         uasserted(ErrorCodes::IncompatibleShardingMetadata,
                   str::stream() << "cannot start migrate of chunk "
-                                << "["
-                                << _args.getMinKey()
-                                << ","
-                                << _args.getMaxKey()
-                                << ")"
+                                << ChunkRange(_args.getMinKey(), _args.getMaxKey()).toString()
                                 << " with zero shard version");
     }
 
@@ -135,14 +129,6 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* txn, MoveChunkR
                           << collectionVersion.epoch()
                           << ", cmd epoch: "
                           << expectedCollectionVersion.epoch(),
-            expectedCollectionVersion,
-            collectionVersion);
-    } else if (!expectedCollectionVersion.isStrictlyEqualTo(collectionVersion)) {
-        throw SendStaleConfigException(
-            _args.getNss().ns(),
-            str::stream() << "cannot move chunk "
-                          << ChunkRange(_args.getMinKey(), _args.getMaxKey()).toString()
-                          << " because collection versions don't match",
             expectedCollectionVersion,
             collectionVersion);
     }

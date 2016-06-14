@@ -213,15 +213,15 @@ private:
         moveTimingHelper.done(1);
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep1);
 
-        // Acquire the collection distributed lock if necessary
-        boost::optional<DistLockManager::ScopedDistLock> scopedCollectionDistLock;
-        if (moveChunkRequest.getTakeDistLock()) {
-            scopedCollectionDistLock = acquireCollectionDistLock(txn, moveChunkRequest);
-        }
-
         BSONObj shardKeyPattern;
 
         {
+            // Acquire the collection distributed lock if necessary
+            boost::optional<DistLockManager::ScopedDistLock> scopedCollectionDistLock;
+            if (moveChunkRequest.getTakeDistLock()) {
+                scopedCollectionDistLock = acquireCollectionDistLock(txn, moveChunkRequest);
+            }
+
             MigrationSourceManager migrationSourceManager(txn, moveChunkRequest);
 
             shardKeyPattern =
