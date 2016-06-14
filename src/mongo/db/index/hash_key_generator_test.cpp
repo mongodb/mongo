@@ -97,16 +97,16 @@ TEST(HashKeyGeneratorTest, CollationDoesNotAffectNonStringFields) {
     ASSERT(assertKeysetsEqual(expectedKeys, actualKeys));
 }
 
-// TODO SERVER-23172: remove test.
-TEST(HashKeyGeneratorTest, CollationDoesNotAffectStringsInEmbeddedDocuments) {
+TEST(HashKeyGeneratorTest, CollatorAppliedBeforeHashingNestedObject) {
     BSONObj obj = fromjson("{a: {b: 'string'}}");
+    BSONObj backwardsObj = fromjson("{a: {b: 'gnirts'}}");
     BSONObjSet actualKeys;
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     ExpressionKeysPrivate::getHashKeys(
         obj, "a", kHashSeed, kHashVersion, false, &collator, &actualKeys);
 
     BSONObjSet expectedKeys;
-    expectedKeys.insert(makeHashKey(obj["a"]));
+    expectedKeys.insert(makeHashKey(backwardsObj["a"]));
 
     ASSERT(assertKeysetsEqual(expectedKeys, actualKeys));
 }

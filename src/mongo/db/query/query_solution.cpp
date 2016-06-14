@@ -33,6 +33,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/query_planner_common.h"
@@ -40,13 +41,6 @@
 namespace mongo {
 
 namespace {
-
-// This function returns true if the BSONElement el can contain a string.  That is, el.type() is in
-// String, Array, or Object.
-inline bool elementCanContainString(const BSONElement& el) {
-    BSONType type = el.type();
-    return type == BSONType::String || type == BSONType::Array || type == BSONType::Object;
-}
 
 // Create an ordred interval list which represents the bounds for all BSON elements of type String,
 // Object, or Array.
@@ -593,7 +587,7 @@ std::set<StringData> IndexScanNode::getFieldsWithStringBounds(const IndexBounds&
         while (keyPatternIterator.more() && startKeyIterator.more() && endKeyIterator.more()) {
             BSONElement startKey = startKeyIterator.next();
             BSONElement endKey = endKeyIterator.next();
-            if (startKey != endKey || elementCanContainString(startKey)) {
+            if (startKey != endKey || CollationIndexKey::isCollatableType(startKey.type())) {
                 if (!rangeCanContainString(
                         startKey, endKey, (startKeyIterator.more() || bounds.endKeyInclusive))) {
                     // If the first non-point range cannot contain strings, we don't need to

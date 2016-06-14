@@ -31,6 +31,7 @@
 #include "mongo/db/query/collation/collation_index_key.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
 
@@ -38,24 +39,38 @@ namespace {
 
 using namespace mongo;
 
-TEST(CollationIndexKeyTest, ShouldUseCollationKeyFalseWithNullCollator) {
+TEST(CollationIndexKeyTest, ShouldUseCollationIndexKeyFalseWithNullCollator) {
     BSONObj obj = BSON("foo"
                        << "string");
     ASSERT_FALSE(CollationIndexKey::shouldUseCollationIndexKey(obj.firstElement(), nullptr));
 }
 
-TEST(CollationIndexKeyTest, ShouldUseCollationKeyFalseWithNonStringElement) {
+TEST(CollationIndexKeyTest, ShouldUseCollationIndexKeyTrueWithObjectElement) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     BSONObj obj = BSON("foo" << BSON("bar"
                                      << "string"));
-    ASSERT_FALSE(CollationIndexKey::shouldUseCollationIndexKey(obj.firstElement(), &collator));
+    ASSERT_TRUE(CollationIndexKey::shouldUseCollationIndexKey(obj.firstElement(), &collator));
 }
 
-TEST(CollationIndexKeyTest, ShouldUseCollationKeyTrueWithStringElement) {
+TEST(CollationIndexKeyTest, ShouldUseCollationIndexKeyTrueWithArrayElement) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    BSONObj obj = BSON("foo" << BSON_ARRAY("one"
+                                           << "two"));
+    ASSERT_TRUE(CollationIndexKey::shouldUseCollationIndexKey(obj.firstElement(), &collator));
+}
+
+TEST(CollationIndexKeyTest, ShouldUseCollationIndexKeyTrueWithStringElement) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     BSONObj obj = BSON("foo"
                        << "string");
     ASSERT_TRUE(CollationIndexKey::shouldUseCollationIndexKey(obj.firstElement(), &collator));
+}
+
+TEST(CollationIndexKeyTest, CollationAwareAppendCorrectlyAppendsElementWithNullCollator) {
+    BSONObj dataObj = BSON("test" << 1);
+    BSONObjBuilder out;
+    CollationIndexKey::collationAwareIndexKeyAppend(dataObj.firstElement(), nullptr, &out);
+    ASSERT_EQ(out.obj(), BSON("" << 1));
 }
 
 TEST(CollationIndexKeyTest, CollationAwareAppendReversesStringWithReverseMockCollator) {
@@ -97,6 +112,46 @@ TEST(CollationIndexKeyTest, CollationAwareAppendCorrectlySerializesWithEmbeddedN
     BSONObjBuilder out;
     CollationIndexKey::collationAwareIndexKeyAppend(dataObj.firstElement(), &collator, &out);
     ASSERT_EQ(out.obj(), expectedObj);
+}
+
+TEST(CollationIndexKeyTest, CollationAwareAppendCorrectlyReversesSimpleEmbeddedObject) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    BSONObj dataObj = BSON("" << BSON("a"
+                                      << "!foo"));
+    BSONObj expected = BSON("" << BSON("a"
+                                       << "oof!"));
+
+    BSONObjBuilder out;
+    CollationIndexKey::collationAwareIndexKeyAppend(dataObj.firstElement(), &collator, &out);
+    ASSERT_EQ(out.obj(), expected);
+}
+
+TEST(CollationIndexKeyTest, CollationAwareAppendCorrectlyReversesSimpleEmbeddedArray) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    BSONObj dataObj = BSON("" << BSON_ARRAY("foo"
+                                            << "bar"));
+    BSONObj expected = BSON("" << BSON_ARRAY("oof"
+                                             << "rab"));
+
+    BSONObjBuilder out;
+    CollationIndexKey::collationAwareIndexKeyAppend(dataObj.firstElement(), &collator, &out);
+    ASSERT_EQ(out.obj(), expected);
+}
+
+TEST(CollationIndexKeyTest, CollationAwareAppendCorrectlyReversesComplexNesting) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    BSONObj dataObj = fromjson(
+        "{ '' : [{'a': 'ha', 'b': 2},"
+        "'bar',"
+        "{'c': 2, 'd': 'ah', 'e': 'abc', 'f': ['cba', 'xyz']}]})");
+    BSONObj expected = fromjson(
+        "{ '' : [{'a': 'ah', 'b': 2},"
+        "'rab',"
+        "{'c': 2, 'd': 'ha', 'e': 'cba', 'f': ['abc', 'zyx']}]})");
+
+    BSONObjBuilder out;
+    CollationIndexKey::collationAwareIndexKeyAppend(dataObj.firstElement(), &collator, &out);
+    ASSERT_EQ(out.obj(), expected);
 }
 
 }  // namespace

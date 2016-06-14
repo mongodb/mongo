@@ -168,16 +168,9 @@ bool QueryPlannerIXSelect::compatible(const BSONElement& elt,
                                       const IndexEntry& index,
                                       MatchExpression* node,
                                       const CollatorInterface* collator) {
-    // Nested object or array comparisons require the query collator to be null.
-    // TODO SERVER-23172: remove this check.
-    if (collator != nullptr &&
-        (boundsGeneratingNodeContainsComparisonToType(node, BSONType::Object) ||
-         boundsGeneratingNodeContainsComparisonToType(node, BSONType::Array))) {
-        return false;
-    }
-
-    // String comparisons require the collators to match.
-    if (boundsGeneratingNodeContainsComparisonToType(node, BSONType::String) &&
+    if ((boundsGeneratingNodeContainsComparisonToType(node, BSONType::String) ||
+         boundsGeneratingNodeContainsComparisonToType(node, BSONType::Array) ||
+         boundsGeneratingNodeContainsComparisonToType(node, BSONType::Object)) &&
         !CollatorInterface::collatorsMatch(collator, index.collator)) {
         return false;
     }

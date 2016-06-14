@@ -692,13 +692,14 @@ TEST(ExpressionAlgoIsSubsetOf, CollationAwareStringComparisonIn) {
     ASSERT_FALSE(expression::isSubsetOf(lhsSomeGTcba.get(), rhsLT.get()));
 }
 
+// TODO SERVER-24674: isSubsetOf should return true after exploring nested objects.
 TEST(ExpressionAlgoIsSubsetOf, NonMatchingCollationsNoStringComparisonLHS) {
     CollatorInterfaceMock collatorAlwaysEqual(CollatorInterfaceMock::MockType::kAlwaysEqual);
     CollatorInterfaceMock collatorReverseString(CollatorInterfaceMock::MockType::kReverseString);
     ParsedMatchExpression lhs("{a: {b: 1}}", &collatorAlwaysEqual);
     ParsedMatchExpression rhs("{a: {$lt: {b: 'abc'}}}", &collatorReverseString);
 
-    ASSERT_TRUE(expression::isSubsetOf(lhs.get(), rhs.get()));
+    ASSERT_FALSE(expression::isSubsetOf(lhs.get(), rhs.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, NonMatchingCollationsNoStringComparison) {
