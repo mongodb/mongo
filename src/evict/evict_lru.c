@@ -273,7 +273,7 @@ __evict_server(WT_SESSION_IMPL *session, bool *did_work)
 	if (!F_ISSET(cache, WT_CACHE_STUCK)) {
 		for (spins = 0; (ret = __wt_spin_trylock(
 		    session, &conn->dhandle_lock)) == EBUSY &&
-		    !F_ISSET(cache, WT_CACHE_PASS_INTERRUPT); spins++) {
+		    cache->pass_intr == 0; spins++) {
 			if (spins < WT_THOUSAND)
 				__wt_yield();
 			else
@@ -610,7 +610,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 		 * If there is a request to clear eviction walks, do that now,
 		 * before checking if the cache is full.
 		 */
-		if (F_ISSET(cache, WT_CACHE_PASS_INTERRUPT))
+		if (cache->pass_intr != 0)
 			break;
 
 		/*
@@ -797,13 +797,13 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
 	 * this point.
 	 */
 	F_SET(btree, WT_BTREE_NO_EVICTION);
-	F_SET(cache, WT_CACHE_PASS_INTERRUPT);
+	(void)__wt_atomic_add32(&cache->pass_intr, 1);
 	WT_FULL_BARRIER();
 
 	/* Clear any existing LRU eviction walk for the file. */
 	WT_WITH_PASS_LOCK(session, ret,
 	    ret = __evict_clear_walk(session));
-	F_CLR(cache, WT_CACHE_PASS_INTERRUPT);
+	(void)__wt_atomic_sub32(&cache->pass_intr, 1);
 	WT_ERR(ret);
 
 	/*
@@ -1087,7 +1087,7 @@ retry:	while (slot < max_entries && ret == 0) {
 		 * If another thread is waiting on the eviction server to clear
 		 * the walk point in a tree, give up.
 		 */
-		if (F_ISSET(cache, WT_CACHE_PASS_INTERRUPT))
+		if (cache->pass_intr != 0)
 			break;
 
 		/*
@@ -1097,7 +1097,7 @@ retry:	while (slot < max_entries && ret == 0) {
 		if (!dhandle_locked) {
 			for (spins = 0; (ret = __wt_spin_trylock(
 			    session, &conn->dhandle_lock)) == EBUSY &&
-			    !F_ISSET(cache, WT_CACHE_PASS_INTERRUPT);
+			    cache->pass_intr == 0;
 			    spins++) {
 				if (spins < WT_THOUSAND)
 					__wt_yield();
@@ -1223,7 +1223,7 @@ retry:	while (slot < max_entries && ret == 0) {
 	 * Try two passes through all the files, give up when we have some
 	 * candidates and we aren't finding more.
 	 */
-	if (!F_ISSET(cache, WT_CACHE_PASS_INTERRUPT) && ret == 0 &&
+	if (cache->pass_intr == 0 && ret == 0 &&
 	    slot < max_entries && (retries < 2 ||
 	    (retries < 10 &&
 	    !FLD_ISSET(cache->state, WT_EVICT_PASS_WOULD_BLOCK) &&

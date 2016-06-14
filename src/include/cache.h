@@ -149,16 +149,19 @@ struct __wt_cache {
 #define	WT_EVICT_PASS_DIRTY		0x04
 #define	WT_EVICT_PASS_WOULD_BLOCK	0x08
 	uint32_t state;
+	/*
+	 * Pass interrupt counter.
+	 */
+	uint32_t pass_intr;		/* Interrupt eviction pass. */
 
 	/*
 	 * Flags.
 	 */
-#define	WT_CACHE_PASS_INTERRUPT	0x01	/* Stop eviction walks */
-#define	WT_CACHE_POOL_MANAGER	0x02	/* The active cache pool manager */
-#define	WT_CACHE_POOL_RUN	0x04	/* Cache pool thread running */
-#define	WT_CACHE_STUCK		0x08	/* Eviction server is stuck */
-#define	WT_CACHE_WALK_REVERSE	0x10	/* Scan backwards for candidates */
-#define	WT_CACHE_WOULD_BLOCK	0x20	/* Pages that would block apps */
+#define	WT_CACHE_POOL_MANAGER	0x01	/* The active cache pool manager */
+#define	WT_CACHE_POOL_RUN	0x02	/* Cache pool thread running */
+#define	WT_CACHE_STUCK		0x04	/* Eviction server is stuck */
+#define	WT_CACHE_WALK_REVERSE	0x08	/* Scan backwards for candidates */
+#define	WT_CACHE_WOULD_BLOCK	0x10	/* Pages that would block apps */
 	uint32_t flags;
 };
 
