@@ -30,11 +30,12 @@
 
 #include <string>
 
+#include "mongo/bson/bsonobj.h"
+
 namespace mongo {
 
 /**
- * A CollationSpec is a parsed representation of a user-provided collation BSONObj. Can be
- * re-serialized to BSON using CollationSerializer.
+ * A CollationSpec is a parsed representation of a user-provided collation BSONObj.
  */
 struct CollationSpec {
     // Controls whether uppercase sorts before lowercase or vice versa.
@@ -123,6 +124,11 @@ struct CollationSpec {
      */
     CollationSpec(std::string locale, std::string version)
         : localeID(std::move(locale)), version(std::move(version)) {}
+
+    /**
+     * Serializes this CollationSpec to its BSON format.
+     */
+    BSONObj toBSON() const;
 
     // A string such as "en_US", identifying the language, country, or other attributes of the
     // locale for this collation.

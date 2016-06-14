@@ -9,9 +9,11 @@ env = env.Clone()
 env.Library(
     target="collator_interface",
     source=[
+        "collation_index_key.cpp",
         "collation_spec.cpp",
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
     ],
 )
 
@@ -26,34 +28,11 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target="collation_serializer",
-    source=[
-        "collation_serializer.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "collator_interface",
-    ],
-)
-
-env.CppUnitTest(
-    target="collation_serializer_test",
-    source=[
-        "collation_serializer_test.cpp",
-    ],
-    LIBDEPS=[
-        "collation_serializer",
-        "collator_interface_mock",
-    ],
-)
-
-env.Library(
     target="collator_interface_mock",
     source=[
         "collator_interface_mock.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
         "collator_interface",
     ],
 )
@@ -68,24 +47,13 @@ env.CppUnitTest(
     ],
 )
 
-env.Library(
-    target="collation_index_key",
-    source=[
-        "collation_index_key.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "collator_interface",
-    ],
-)
-
 env.CppUnitTest(
     target="collation_index_key_test",
     source=[
         "collation_index_key_test.cpp",
     ],
     LIBDEPS=[
-        "collation_index_key",
+        "collator_interface",
         "collator_interface_mock",
     ],
 )
@@ -96,7 +64,6 @@ env.Library(
         "collator_factory_interface.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/service_context",
         "collator_interface",
     ],

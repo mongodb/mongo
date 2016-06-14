@@ -40,7 +40,6 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/query/collation/collation_serializer.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/stdx/memory.h"
@@ -248,7 +247,7 @@ void SortKeyGenerator::getBoundsForSort(OperationContext* txn,
     auto qr = stdx::make_unique<QueryRequest>(NamespaceString("fake.ns"));
     qr->setFilter(queryObj);
     if (_collator) {
-        qr->setCollation(CollationSerializer::specToBSON(_collator->getSpec()));
+        qr->setCollation(_collator->getSpec().toBSON());
     }
 
     auto statusWithQueryForSort =

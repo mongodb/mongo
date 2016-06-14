@@ -52,7 +52,6 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/op_observer.h"
-#include "mongo/db/query/collation/collation_serializer.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -635,13 +634,11 @@ Status userCreateNS(OperationContext* txn,
         // all options that the user omitted.
         //
         // If the collator factory returned a null collator (representing the "simple" collation),
-        // we can't use the collation serializer. In this case, we simply unset the "collation" from
-        // the collection options. This ensures that collections created on versions which do not
-        // support the collation feature have the same format for representing the simple collation
-        // as collections created on this version.
-        collectionOptions.collation = collator.getValue()
-            ? CollationSerializer::specToBSON(collator.getValue()->getSpec())
-            : BSONObj();
+        // we simply unset the "collation" from the collection options. This ensures that
+        // collections created on versions which do not support the collation feature have the same
+        // format for representing the simple collation as collections created on this version.
+        collectionOptions.collation =
+            collator.getValue() ? collator.getValue()->getSpec().toBSON() : BSONObj();
     }
 
     status =

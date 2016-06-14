@@ -45,7 +45,6 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/collation/collation_serializer.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/util/mongoutils/str.h"
@@ -466,8 +465,7 @@ Document Pipeline::serialize() const {
     }
 
     if (pCtx->collator.get()) {
-        serialized.setField(collationName,
-                            Value(CollationSerializer::specToBSON(pCtx->collator->getSpec())));
+        serialized.setField(collationName, Value(pCtx->collator->getSpec().toBSON()));
     }
 
     return serialized.freeze();

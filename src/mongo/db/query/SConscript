@@ -35,7 +35,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/matcher/expression_algo",
         "$BUILD_DIR/mongo/db/matcher/expressions",
         "$BUILD_DIR/mongo/db/server_parameters",
-        "collation/collation_serializer",
+        "collation/collator_interface",
         "collation/collator_factory_interface",
         "command_request_response",
         "index_bounds",
@@ -117,7 +117,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/matcher/expressions_geo",
         "$BUILD_DIR/mongo/db/mongohasher",
         "$BUILD_DIR/mongo/db/server_parameters",
-        "collation/collation_index_key",
+        "collation/collator_interface",
     ],
 )
 

@@ -57,7 +57,6 @@
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/delete.h"
-#include "mongo/db/query/collation/collation_serializer.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -1320,18 +1319,16 @@ StatusWith<BSONObj> IndexCatalog::_fixIndexSpec(OperationContext* txn,
         // all options that the user omitted.
         //
         // If the collator factory returned a null collator (representing the "simple" collation),
-        // we can't use the collation serializer. In this case, we simply omit the "collation" from
-        // the index spec. This ensures that indices with the simple collation built on versions
-        // which do not support the collation feature have the same format for representing the
-        // simple collation as indices built on this version.
+        // we simply omit the "collation" from the index spec. This ensures that indices with the
+        // simple collation built on versions which do not support the collation feature have the
+        // same format for representing the simple collation as indices built on this version.
         if (collator.getValue()) {
-            b.append("collation", CollationSerializer::specToBSON(collator.getValue()->getSpec()));
+            b.append("collation", collator.getValue()->getSpec().toBSON());
         }
     } else if (collection->getDefaultCollator()) {
         // The user did not specify an explicit collation for this index and the collection has a
         // default collator. In this case, the index inherits the collection default.
-        b.append("collation",
-                 CollationSerializer::specToBSON(collection->getDefaultCollator()->getSpec()));
+        b.append("collation", collection->getDefaultCollator()->getSpec().toBSON());
     }
 
     {

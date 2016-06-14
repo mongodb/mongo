@@ -30,6 +30,9 @@
 
 #include "mongo/db/query/collation/collation_spec.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
 
 const char* CollationSpec::kLocaleField = "locale";
@@ -50,5 +53,55 @@ const char* CollationSpec::kAlternateNonIgnorable = "non-ignorable";
 const char* CollationSpec::kAlternateShifted = "shifted";
 const char* CollationSpec::kMaxVariablePunct = "punct";
 const char* CollationSpec::kMaxVariableSpace = "space";
+
+BSONObj CollationSpec::toBSON() const {
+    BSONObjBuilder builder;
+    builder.append(CollationSpec::kLocaleField, localeID);
+    builder.append(CollationSpec::kCaseLevelField, caseLevel);
+
+    switch (caseFirst) {
+        case CollationSpec::CaseFirstType::kUpper:
+            builder.append(CollationSpec::kCaseFirstField, CollationSpec::kCaseFirstUpper);
+            break;
+        case CollationSpec::CaseFirstType::kLower:
+            builder.append(CollationSpec::kCaseFirstField, CollationSpec::kCaseFirstLower);
+            break;
+        case CollationSpec::CaseFirstType::kOff:
+            builder.append(CollationSpec::kCaseFirstField, CollationSpec::kCaseFirstOff);
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+
+    builder.append(CollationSpec::kStrengthField, static_cast<int>(strength));
+    builder.append(CollationSpec::kNumericOrderingField, numericOrdering);
+
+    switch (alternate) {
+        case CollationSpec::AlternateType::kNonIgnorable:
+            builder.append(CollationSpec::kAlternateField, CollationSpec::kAlternateNonIgnorable);
+            break;
+        case CollationSpec::AlternateType::kShifted:
+            builder.append(CollationSpec::kAlternateField, CollationSpec::kAlternateShifted);
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+
+    switch (maxVariable) {
+        case CollationSpec::MaxVariableType::kPunct:
+            builder.append(CollationSpec::kMaxVariableField, CollationSpec::kMaxVariablePunct);
+            break;
+        case CollationSpec::MaxVariableType::kSpace:
+            builder.append(CollationSpec::kMaxVariableField, CollationSpec::kMaxVariableSpace);
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+
+    builder.append(CollationSpec::kNormalizationField, normalization);
+    builder.append(CollationSpec::kBackwardsField, backwards);
+    builder.append(CollationSpec::kVersionField, version);
+    return builder.obj();
+}
 
 }  // namespace mongo
