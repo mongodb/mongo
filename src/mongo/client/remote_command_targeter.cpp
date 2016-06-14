@@ -37,7 +37,7 @@ namespace {
 // This value is used if the operation doesn't have a user-specified max wait time. It should be
 // closer to (preferably higher than) the replication electionTimeoutMillis in order to ensure that
 // lack of primary due to replication election does not cause findHost failures.
-const Seconds kDefaultFindHostMaxWaitTime(11);
+const Seconds kDefaultFindHostMaxWaitTime(20);
 
 // When calculating the findHost max wait time and the operation has a user-specified max wait time,
 // pessimistially assume that the findHost would take this much time so that when it returns, there
