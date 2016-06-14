@@ -148,8 +148,11 @@ env.Library(
     ],
     LIBDEPS=[
         'storage_interface',
-        '$BUILD_DIR/mongo/db/serveronly', # Remove after migrating to storage interface.
         '$BUILD_DIR/mongo/db/service_context',
+    ],
+    LIBDEPS_TAGS=[
+        # Depends on files like db_raii.cpp from serverOnlyFiles
+        'incomplete',
     ],
 )
 
@@ -567,6 +570,7 @@ env.Library(
         'storage_interface_mock.cpp',
     ],
     LIBDEPS=[
+        'oplog_buffer_blocking_queue',
         'repl_coordinator_interface',
         'repl_settings',
         'replica_set_messages',
@@ -921,6 +925,7 @@ env.Library(
         'data_replicator_external_state_mock.cpp',
     ],
     LIBDEPS=[
+        'oplog_buffer_blocking_queue',
         'oplog_entry',
         'optime',
         '$BUILD_DIR/mongo/util/net/hostandport',

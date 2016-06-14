@@ -71,6 +71,10 @@ bool DataReplicatorExternalStateImpl::shouldStopFetching(const HostAndPort& sour
     return false;
 }
 
+std::unique_ptr<OplogBuffer> DataReplicatorExternalStateImpl::makeInitialSyncOplogBuffer() const {
+    return _replicationCoordinatorExternalState->makeInitialSyncOplogBuffer();
+}
+
 StatusWith<OpTime> DataReplicatorExternalStateImpl::_multiApply(
     OperationContext* txn,
     const MultiApplier::Operations& ops,

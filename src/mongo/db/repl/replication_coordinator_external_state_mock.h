@@ -95,6 +95,8 @@ public:
     virtual void multiSyncApply(const MultiApplier::Operations& ops) override;
     virtual void multiInitialSyncApply(const MultiApplier::Operations& ops,
                                        const HostAndPort& source) override;
+    virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer() const override;
+    virtual bool shouldUseDataReplicatorInitialSync() const override;
 
     /**
      * Adds "host" to the list of hosts that this mock will match when responding to "isSelf"

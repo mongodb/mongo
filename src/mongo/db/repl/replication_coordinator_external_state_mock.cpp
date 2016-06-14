@@ -34,7 +34,9 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/oplog_buffer_blocking_queue.h"
 #include "mongo/db/storage/snapshot_name.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/sequence_util.h"
 
@@ -245,6 +247,15 @@ void ReplicationCoordinatorExternalStateMock::multiSyncApply(const MultiApplier:
 
 void ReplicationCoordinatorExternalStateMock::multiInitialSyncApply(
     const MultiApplier::Operations& ops, const HostAndPort& source) {}
+
+std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateMock::makeInitialSyncOplogBuffer()
+    const {
+    return stdx::make_unique<OplogBufferBlockingQueue>();
+}
+
+bool ReplicationCoordinatorExternalStateMock::shouldUseDataReplicatorInitialSync() const {
+    return true;
+}
 
 void ReplicationCoordinatorExternalStateMock::setIsReadCommittedEnabled(bool val) {
     _isReadCommittedSupported = val;

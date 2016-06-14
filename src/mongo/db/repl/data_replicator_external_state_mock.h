@@ -50,6 +50,8 @@ public:
     bool shouldStopFetching(const HostAndPort& source,
                             const rpc::ReplSetMetadata& metadata) override;
 
+    std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer() const override;
+
     // Returned by getCurrentTermAndLastCommittedOpTime.
     long long currentTerm = OpTime::kUninitializedTerm;
     OpTime lastCommittedOpTime;

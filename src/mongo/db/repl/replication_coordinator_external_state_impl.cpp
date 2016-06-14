@@ -35,6 +35,7 @@
 #include <sstream>
 #include <string>
 
+#include "mongo/base/init.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/catalog/database.h"
@@ -51,6 +52,8 @@
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_buffer_blocking_queue.h"
+#include "mongo/db/repl/oplog_buffer_collection.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/rs_initialsync.h"
@@ -88,10 +91,36 @@ const char meCollectionName[] = "local.me";
 const char meDatabaseName[] = "local";
 const char tsFieldName[] = "ts";
 
+const char kCollectionOplogBufferName[] = "collection";
+const char kBlockingQueueOplogBufferName[] = "inMemoryBlockingQueue";
+
 // Set this to true to force background creation of snapshots even if --enableMajorityReadConcern
 // isn't specified. This can be used for A-B benchmarking to find how much overhead
 // repl::SnapshotThread introduces.
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableReplSnapshotThread, bool, false);
+
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(useDataReplicatorInitialSync, bool, false);
+
+// Set this to specify whether to use a collection to buffer the oplog on the destination server
+// during initial sync to prevent rolling over the oplog.
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(initialSyncOplogBuffer,
+                                      std::string,
+                                      kBlockingQueueOplogBufferName);
+
+MONGO_INITIALIZER(initialSyncOplogBuffer)(InitializerContext*) {
+    if ((initialSyncOplogBuffer != kCollectionOplogBufferName) &&
+        (initialSyncOplogBuffer != kBlockingQueueOplogBufferName)) {
+        return Status(ErrorCodes::BadValue,
+                      "unsupported initial sync oplog buffer option: " + initialSyncOplogBuffer);
+    }
+    if (!useDataReplicatorInitialSync && (initialSyncOplogBuffer == kCollectionOplogBufferName)) {
+        return Status(ErrorCodes::BadValue,
+                      "cannot use collection oplog buffer without --setParameter "
+                      "useDataReplicatorInitialSync=true");
+    }
+
+    return Status::OK();
+}
 
 }  // namespace
 
@@ -506,6 +535,18 @@ void ReplicationCoordinatorExternalStateImpl::multiInitialSyncApply(
     repl::multiInitialSyncApply(ops, &syncTail);
 }
 
+std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeInitialSyncOplogBuffer()
+    const {
+    if (initialSyncOplogBuffer == kCollectionOplogBufferName) {
+        return stdx::make_unique<OplogBufferCollection>();
+    } else {
+        return stdx::make_unique<OplogBufferBlockingQueue>();
+    }
+}
+
+bool ReplicationCoordinatorExternalStateImpl::shouldUseDataReplicatorInitialSync() const {
+    return useDataReplicatorInitialSync;
+}
 
 JournalListener::Token ReplicationCoordinatorExternalStateImpl::getToken() {
     return repl::getGlobalReplicationCoordinator()->getMyLastAppliedOpTime();

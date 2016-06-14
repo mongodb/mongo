@@ -30,6 +30,9 @@
 
 #include "mongo/db/repl/data_replicator_external_state_mock.h"
 
+#include "mongo/db/repl/oplog_buffer_blocking_queue.h"
+#include "mongo/stdx/memory.h"
+
 namespace mongo {
 namespace repl {
 
@@ -52,6 +55,10 @@ bool DataReplicatorExternalStateMock::shouldStopFetching(const HostAndPort& sour
     syncSourceLastOpTime = metadata.getLastOpVisible();
     syncSourceHasSyncSource = metadata.getSyncSourceIndex() != -1;
     return shouldStopFetchingResult;
+}
+
+std::unique_ptr<OplogBuffer> DataReplicatorExternalStateMock::makeInitialSyncOplogBuffer() const {
+    return stdx::make_unique<OplogBufferBlockingQueue>();
 }
 
 StatusWith<OpTime> DataReplicatorExternalStateMock::_multiApply(

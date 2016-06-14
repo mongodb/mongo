@@ -30,6 +30,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/repl/multiapplier.h"
+#include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -78,6 +79,11 @@ public:
      */
     virtual bool shouldStopFetching(const HostAndPort& source,
                                     const rpc::ReplSetMetadata& metadata) = 0;
+
+    /**
+     * This function creates an oplog buffer of the type specified at server startup.
+     */
+    virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer() const = 0;
 
 private:
     /**

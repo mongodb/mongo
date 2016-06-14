@@ -34,6 +34,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/multiapplier.h"
+#include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/time_support.h"
@@ -287,6 +288,16 @@ public:
      */
     virtual void multiInitialSyncApply(const MultiApplier::Operations& ops,
                                        const HostAndPort& source) = 0;
+
+    /**
+     * This function creates an oplog buffer of the type specified at server startup.
+     */
+    virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer() const = 0;
+
+    /**
+     * Returns true if the user specified to use the data replicator for initial sync.
+     */
+    virtual bool shouldUseDataReplicatorInitialSync() const = 0;
 };
 
 }  // namespace repl
