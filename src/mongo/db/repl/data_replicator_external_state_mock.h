@@ -74,12 +74,12 @@ public:
 
 private:
     StatusWith<OpTime> _multiApply(OperationContext* txn,
-                                   const MultiApplier::Operations& ops,
+                                   MultiApplier::Operations ops,
                                    MultiApplier::ApplyOperationFn applyOperation) override;
 
-    void _multiSyncApply(const MultiApplier::Operations& ops) override;
+    void _multiSyncApply(MultiApplier::OperationPtrs* ops) override;
 
-    void _multiInitialSyncApply(const MultiApplier::Operations& ops,
+    void _multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
                                 const HostAndPort& source) override;
 };
 

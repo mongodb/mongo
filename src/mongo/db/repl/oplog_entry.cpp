@@ -39,7 +39,11 @@ namespace repl {
 
 const int OplogEntry::kOplogVersion = 2;
 
-OplogEntry::OplogEntry(const BSONObj& rawInput) : raw(rawInput.getOwned()) {
+OplogEntry::OplogEntry(BSONObj rawInput) : raw(std::move(rawInput)) {
+    if (MONGO_unlikely(!raw.isOwned())) {
+        raw = raw.copy();
+    }
+
     for (auto elem : raw) {
         const auto name = elem.fieldNameStringData();
         if (name == "ns") {
@@ -106,12 +110,6 @@ StringData OplogEntry::getCollectionName() const {
 
 std::string OplogEntry::toString() const {
     return raw.toString();
-}
-
-OplogEntry OplogEntry::getOwned() const {
-    OplogEntry copy(*this);
-    copy.raw = copy.raw.getOwned();
-    return copy;
 }
 
 std::ostream& operator<<(std::ostream& s, const OplogEntry& o) {

@@ -549,18 +549,18 @@ bool ReplicationCoordinatorExternalStateImpl::isReadCommittedSupportedByStorageE
 
 StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::multiApply(
     OperationContext* txn,
-    const MultiApplier::Operations& ops,
+    MultiApplier::Operations ops,
     MultiApplier::ApplyOperationFn applyOperation) {
-    return repl::multiApply(txn, _writerPool.get(), ops, applyOperation);
+    return repl::multiApply(txn, _writerPool.get(), std::move(ops), applyOperation);
 }
 
-void ReplicationCoordinatorExternalStateImpl::multiSyncApply(const MultiApplier::Operations& ops) {
+void ReplicationCoordinatorExternalStateImpl::multiSyncApply(MultiApplier::OperationPtrs* ops) {
     // SyncTail* argument is not used by repl::multiSyncApply().
     repl::multiSyncApply(ops, nullptr);
 }
 
 void ReplicationCoordinatorExternalStateImpl::multiInitialSyncApply(
-    const MultiApplier::Operations& ops, const HostAndPort& source) {
+    MultiApplier::OperationPtrs* ops, const HostAndPort& source) {
 
     // repl::multiInitialSyncApply uses SyncTail::shouldRetry() (and implicitly getMissingDoc())
     // to fetch missing documents during initial sync. Therefore, it is fine to construct SyncTail

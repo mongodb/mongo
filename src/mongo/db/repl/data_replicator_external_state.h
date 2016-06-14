@@ -100,7 +100,7 @@ private:
      * Used exclusively by the DataReplicator to construct a MultiApplier.
      */
     virtual StatusWith<OpTime> _multiApply(OperationContext* txn,
-                                           const MultiApplier::Operations& ops,
+                                           MultiApplier::Operations ops,
                                            MultiApplier::ApplyOperationFn applyOperation) = 0;
 
     /**
@@ -108,7 +108,7 @@ private:
      *
      * Used exclusively by the DataReplicator to construct a MultiApplier.
      */
-    virtual void _multiSyncApply(const MultiApplier::Operations& ops) = 0;
+    virtual void _multiSyncApply(MultiApplier::OperationPtrs* ops) = 0;
 
     /**
      * Used by _multiApply() to write operations to database during initial sync.
@@ -116,7 +116,7 @@ private:
      *
      * Used exclusively by the DataReplicator to construct a MultiApplier.
      */
-    virtual void _multiInitialSyncApply(const MultiApplier::Operations& ops,
+    virtual void _multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
                                         const HostAndPort& source) = 0;
 
     // Provides DataReplicator with access to _multiApply, _multiSyncApply and

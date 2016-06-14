@@ -83,16 +83,16 @@ std::unique_ptr<OplogBuffer> DataReplicatorExternalStateImpl::makeSteadyStateOpl
 
 StatusWith<OpTime> DataReplicatorExternalStateImpl::_multiApply(
     OperationContext* txn,
-    const MultiApplier::Operations& ops,
+    MultiApplier::Operations ops,
     MultiApplier::ApplyOperationFn applyOperation) {
-    return _replicationCoordinatorExternalState->multiApply(txn, ops, applyOperation);
+    return _replicationCoordinatorExternalState->multiApply(txn, std::move(ops), applyOperation);
 }
 
-void DataReplicatorExternalStateImpl::_multiSyncApply(const MultiApplier::Operations& ops) {
+void DataReplicatorExternalStateImpl::_multiSyncApply(MultiApplier::OperationPtrs* ops) {
     _replicationCoordinatorExternalState->multiSyncApply(ops);
 }
 
-void DataReplicatorExternalStateImpl::_multiInitialSyncApply(const MultiApplier::Operations& ops,
+void DataReplicatorExternalStateImpl::_multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
                                                              const HostAndPort& source) {
     _replicationCoordinatorExternalState->multiInitialSyncApply(ops, source);
 }

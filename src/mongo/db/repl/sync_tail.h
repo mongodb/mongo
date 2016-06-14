@@ -54,8 +54,7 @@ class OpTime;
  */
 class SyncTail {
 public:
-    using MultiSyncApplyFunc =
-        stdx::function<void(const std::vector<OplogEntry>& ops, SyncTail* st)>;
+    using MultiSyncApplyFunc = stdx::function<void(MultiApplier::OperationPtrs* ops, SyncTail* st)>;
 
     /**
      * Type of function to increment "repl.apply.ops" server status metric.
@@ -112,29 +111,46 @@ public:
 
     class OpQueue {
     public:
-        OpQueue() : _size(0) {}
-        size_t getSize() const {
-            return _size;
-        }
-        const std::deque<OplogEntry>& getDeque() const {
-            return _deque;
-        }
-        void push_back(OplogEntry&& op) {
-            _size += op.raw.objsize();
-            _deque.push_back(std::move(op));
-        }
-        bool empty() const {
-            return _deque.empty();
+        OpQueue() : _bytes(0) {
+            _batch.reserve(replBatchLimitOperations);
         }
 
+        size_t getBytes() const {
+            return _bytes;
+        }
+        size_t getCount() const {
+            return _batch.size();
+        }
+        bool empty() const {
+            return _batch.empty();
+        }
         const OplogEntry& back() const {
-            invariant(!_deque.empty());
-            return _deque.back();
+            invariant(!_batch.empty());
+            return _batch.back();
+        }
+        const std::vector<OplogEntry>& getBatch() const {
+            return _batch;
+        }
+
+        void emplace_back(BSONObj obj) {
+            _bytes += obj.objsize();
+            _batch.emplace_back(std::move(obj));
+        }
+        void pop_back() {
+            _bytes -= back().raw.objsize();
+            _batch.pop_back();
+        }
+
+        /**
+         * Leaves this object in an unspecified state. Only assignment and destruction are valid.
+         */
+        std::vector<OplogEntry> releaseBatch() {
+            return std::move(_batch);
         }
 
     private:
-        std::deque<OplogEntry> _deque;
-        size_t _size;
+        std::vector<OplogEntry> _batch;
+        size_t _bytes;
     };
 
     // returns true if we should continue waiting for BSONObjs, false if we should
@@ -167,7 +183,7 @@ protected:
 
     // Apply a batch of operations, using multiple threads.
     // Returns the last OpTime applied during the apply batch, ops.end["ts"] basically.
-    OpTime multiApply(OperationContext* txn, const OpQueue& ops);
+    OpTime multiApply(OperationContext* txn, MultiApplier::Operations ops);
 
 private:
     class OpQueueBatcher;
@@ -195,12 +211,15 @@ private:
  */
 StatusWith<OpTime> multiApply(OperationContext* txn,
                               OldThreadPool* workerPool,
-                              const MultiApplier::Operations& ops,
+                              MultiApplier::Operations ops,
                               MultiApplier::ApplyOperationFn applyOperation);
 
 // These free functions are used by the thread pool workers to write ops to the db.
-void multiSyncApply(const std::vector<OplogEntry>& ops, SyncTail* st);
-void multiInitialSyncApply(const std::vector<OplogEntry>& ops, SyncTail* st);
+// They consume the passed in OperationPtrs and callers should not make any assumptions about the
+// state of the container after calling. However, these functions cannot modify the pointed-to
+// operations because the OperationPtrs container contains const pointers.
+void multiSyncApply(MultiApplier::OperationPtrs* ops, SyncTail* st);
+void multiInitialSyncApply(MultiApplier::OperationPtrs* ops, SyncTail* st);
 
 /**
  * Testing-only version of multiSyncApply that returns an error instead of aborting.
@@ -210,7 +229,7 @@ void multiInitialSyncApply(const std::vector<OplogEntry>& ops, SyncTail* st);
 using SyncApplyFn =
     stdx::function<Status(OperationContext* txn, const BSONObj& o, bool convertUpdateToUpsert)>;
 Status multiSyncApply_noAbort(OperationContext* txn,
-                              const std::vector<OplogEntry>& ops,
+                              MultiApplier::OperationPtrs* ops,
                               SyncApplyFn syncApply);
 
 /**
@@ -218,7 +237,7 @@ Status multiSyncApply_noAbort(OperationContext* txn,
  * returns an error instead of aborting.
  */
 Status multiInitialSyncApply_noAbort(OperationContext* txn,
-                                     const std::vector<OplogEntry>& ops,
+                                     MultiApplier::OperationPtrs* ops,
                                      SyncTail* st);
 
 }  // namespace repl

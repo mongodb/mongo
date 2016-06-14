@@ -69,14 +69,14 @@ std::unique_ptr<OplogBuffer> DataReplicatorExternalStateMock::makeSteadyStateOpl
 
 StatusWith<OpTime> DataReplicatorExternalStateMock::_multiApply(
     OperationContext* txn,
-    const MultiApplier::Operations& ops,
+    MultiApplier::Operations ops,
     MultiApplier::ApplyOperationFn applyOperation) {
-    return multiApplyFn(txn, ops, applyOperation);
+    return multiApplyFn(txn, std::move(ops), applyOperation);
 }
 
-void DataReplicatorExternalStateMock::_multiSyncApply(const MultiApplier::Operations& ops) {}
+void DataReplicatorExternalStateMock::_multiSyncApply(MultiApplier::OperationPtrs* ops) {}
 
-void DataReplicatorExternalStateMock::_multiInitialSyncApply(const MultiApplier::Operations& ops,
+void DataReplicatorExternalStateMock::_multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
                                                              const HostAndPort& source) {}
 
 }  // namespace repl

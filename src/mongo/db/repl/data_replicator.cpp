@@ -981,7 +981,7 @@ StatusWith<Operations> DataReplicator::_getNextApplierBatch_inlock() {
     //          * consequently, commands bound the previous batch to be in a batch of their own
     auto txn = makeOpCtx();
     while (_oplogBuffer->peek(txn.get(), &op)) {
-        auto entry = OplogEntry(op);
+        auto entry = OplogEntry(std::move(op));
 
         // Check for ops that must be processed one at a time.
         if (entry.isCommand() ||
@@ -991,12 +991,12 @@ StatusWith<Operations> DataReplicator::_getNextApplierBatch_inlock() {
             if (ops.empty()) {
                 // Apply commands one-at-a-time.
                 ops.push_back(std::move(entry));
-                _oplogBuffer->tryPop(txn.get(), &op);
-                invariant(entry == OplogEntry(op));
+                invariant(_oplogBuffer->tryPop(txn.get(), &op));
+                dassert(ops.back().raw == op);
             }
 
             // Otherwise, apply what we have so far and come back for the command.
-            return ops;
+            return std::move(ops);
         }
 
         // Check for oplog version change. If it is absent, its value is one.
@@ -1010,10 +1010,10 @@ StatusWith<Operations> DataReplicator::_getNextApplierBatch_inlock() {
 
         // Apply replication batch limits.
         if (ops.size() >= _opts.replBatchLimitOperations) {
-            return ops;
+            return std::move(ops);
         }
         if (totalBytes + entry.raw.objsize() > _opts.replBatchLimitBytes) {
-            return ops;
+            return std::move(ops);
         }
 
         // Check slaveDelay boundary.
@@ -1025,17 +1025,17 @@ StatusWith<Operations> DataReplicator::_getNextApplierBatch_inlock() {
             // make this thread sleep longer when handleSlaveDelay is called
             // and apply ops much sooner than we like.
             if (opTimestampSecs > slaveDelayBoundary) {
-                return ops;
+                return std::move(ops);
             }
         }
 
         // Add op to buffer.
-        ops.push_back(entry);
-        totalBytes += entry.raw.objsize();
-        _oplogBuffer->tryPop(txn.get(), &op);
-        invariant(entry == OplogEntry(op));
+        ops.push_back(std::move(entry));
+        totalBytes += ops.back().raw.objsize();
+        invariant(_oplogBuffer->tryPop(txn.get(), &op));
+        dassert(ops.back().raw == op);
     }
-    return ops;
+    return std::move(ops);
 }
 
 void DataReplicator::_onApplyBatchFinish(const CallbackArgs& cbData,
@@ -1158,7 +1158,7 @@ Status DataReplicator::_scheduleApplyBatch_inlock() {
         if (!batchStatus.isOK()) {
             return batchStatus.getStatus();
         }
-        const Operations ops = batchStatus.getValue();
+        const Operations& ops = batchStatus.getValue();
         if (ops.empty()) {
             _applierActive = false;
             auto status = _exec->scheduleWorkAt(_exec->now() + Seconds(1),

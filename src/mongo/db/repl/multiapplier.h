@@ -58,6 +58,8 @@ public:
      */
     using Operations = std::vector<OplogEntry>;
 
+    using OperationPtrs = std::vector<const OplogEntry*>;
+
     /**
      * Callback function to report final status of applying operations along with
      * list of operations (if applicable) that were not successfully applied.
@@ -71,10 +73,10 @@ public:
      * would have the same outcome as calling SyncTail::syncApply() ('convertUpdatesToUpserts'
      * value will be embedded in the function implementation).
      */
-    using ApplyOperationFn = stdx::function<void(const Operations&)>;
+    using ApplyOperationFn = stdx::function<void(OperationPtrs*)>;
 
     using MultiApplyFn = stdx::function<StatusWith<OpTime>(
-        OperationContext*, const MultiApplier::Operations&, MultiApplier::ApplyOperationFn)>;
+        OperationContext*, MultiApplier::Operations, MultiApplier::ApplyOperationFn)>;
 
     /**
      * Creates MultiApplier in inactive state.

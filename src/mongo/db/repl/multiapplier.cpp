@@ -146,6 +146,8 @@ void MultiApplier::_callback(const ReplicationExecutor::CallbackArgs& cbd) {
 
     invariant(!_operations.empty());
     try {
+        // TODO restructure to support moving _operations into this call. Can't do it today since
+        // _finishCallback gets _operations on failure.
         applyStatus = _multiApply(cbd.txn, _operations, _applyOperation);
     } catch (...) {
         applyStatus = exceptionToStatus();

@@ -275,19 +275,19 @@ public:
      * "applyOperation" function.
      */
     virtual StatusWith<OpTime> multiApply(OperationContext* txn,
-                                          const MultiApplier::Operations& ops,
+                                          MultiApplier::Operations ops,
                                           MultiApplier::ApplyOperationFn applyOperation) = 0;
 
     /**
      * Used by multiApply() to writes operations to database during steady state replication.
      */
-    virtual void multiSyncApply(const MultiApplier::Operations& ops) = 0;
+    virtual void multiSyncApply(MultiApplier::OperationPtrs* ops) = 0;
 
     /**
      * Used by multiApply() to writes operations to database during initial sync.
      * Fetches missing documents from "source".
      */
-    virtual void multiInitialSyncApply(const MultiApplier::Operations& ops,
+    virtual void multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
                                        const HostAndPort& source) = 0;
 
     /**

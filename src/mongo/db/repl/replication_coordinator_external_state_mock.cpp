@@ -247,14 +247,14 @@ bool ReplicationCoordinatorExternalStateMock::isReadCommittedSupportedByStorageE
 }
 
 StatusWith<OpTime> ReplicationCoordinatorExternalStateMock::multiApply(
-    OperationContext*, const MultiApplier::Operations&, MultiApplier::ApplyOperationFn) {
+    OperationContext*, MultiApplier::Operations, MultiApplier::ApplyOperationFn) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-void ReplicationCoordinatorExternalStateMock::multiSyncApply(const MultiApplier::Operations& ops) {}
+void ReplicationCoordinatorExternalStateMock::multiSyncApply(MultiApplier::OperationPtrs* ops) {}
 
 void ReplicationCoordinatorExternalStateMock::multiInitialSyncApply(
-    const MultiApplier::Operations& ops, const HostAndPort& source) {}
+    MultiApplier::OperationPtrs* ops, const HostAndPort& source) {}
 
 std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateMock::makeInitialSyncOplogBuffer(
     OperationContext* txn) const {

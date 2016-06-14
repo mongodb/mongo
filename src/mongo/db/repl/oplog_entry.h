@@ -48,7 +48,7 @@ struct OplogEntry {
     // Current oplog version, should be the value of the v field in all oplog entries.
     static const int kOplogVersion;
 
-    explicit OplogEntry(const BSONObj& raw);
+    explicit OplogEntry(BSONObj raw);
 
     // This member is not parsed from the BSON and is instead populated by fillWriterVectors.
     bool isForCappedCollection = false;
@@ -62,11 +62,6 @@ struct OplogEntry {
     Seconds getTimestampSecs() const;
     StringData getCollectionName() const;
     std::string toString() const;
-
-    /**
-     *  Returns a copy of this oplog entry with its own copy of "raw".
-     */
-    OplogEntry getOwned() const;
 
     BSONObj raw;  // Owned.
 
