@@ -192,7 +192,8 @@ void WriteConcernResult::appendTo(const WriteConcernOptions& writeConcern,
             result->appendNumber("waited", syncMillis);
         }
 
-        dassert(result->asTempObj()["fsyncFiles"].numberInt() > 0 ||
+        // For ephemeral storage engines, 0 files may be fsynced.
+        dassert(result->asTempObj()["fsyncFiles"].numberLong() >= 0 ||
                 !result->asTempObj()["waited"].eoo());
     }
 }
