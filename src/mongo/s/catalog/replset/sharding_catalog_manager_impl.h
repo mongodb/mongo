@@ -74,12 +74,11 @@ private:
     StatusWith<std::string> _generateNewShardName(OperationContext* txn);
 
     /**
-     * Validates that the specified connection string can serve as a shard server. In particular,
-     * this function checks that the shard can be contacted, that it is not already member of
-     * another sharded cluster and etc.
+     * Validates that the specified endpoint can serve as a shard server. In particular, this
+     * this function checks that the shard can be contacted and that it is not already member of
+     * another sharded cluster.
      *
-     * @param shardRegistry Shard registry to use for getting a targeter to the shard-to-be.
-     * @param connectionString Connection string to be attempted as a shard host.
+     * @param targeter For sending requests to the shard-to-be.
      * @param shardProposedName Optional proposed name for the shard. Can be omitted in which case
      *      a unique name for the shard will be generated from the shard's connection string. If it
      *      is not omitted, the value cannot be the empty string.
@@ -91,18 +90,16 @@ private:
      * algorithm.
      */
     StatusWith<ShardType> _validateHostAsShard(OperationContext* txn,
-                                               ShardRegistry* shardRegistry,
-                                               const ConnectionString& connectionString,
-                                               const std::string* shardProposedName);
+                                               std::shared_ptr<RemoteCommandTargeter> targeter,
+                                               const std::string* shardProposedName,
+                                               const ConnectionString& connectionString);
 
     /**
      * Runs the listDatabases command on the specified host and returns the names of all databases
      * it returns excluding those named local and admin, since they serve administrative purpose.
      */
     StatusWith<std::vector<std::string>> _getDBNamesListFromShard(
-        OperationContext* txn,
-        ShardRegistry* shardRegistry,
-        const ConnectionString& connectionString);
+        OperationContext* txn, std::shared_ptr<RemoteCommandTargeter> targeter);
 
     /**
      * Runs a command against a "shard" that is not yet in the cluster and thus not present in the

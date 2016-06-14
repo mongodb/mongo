@@ -194,27 +194,14 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManagerImpl::_runCommandForAdd
 
 StatusWith<ShardType> ShardingCatalogManagerImpl::_validateHostAsShard(
     OperationContext* txn,
-    ShardRegistry* shardRegistry,
-    const ConnectionString& connectionString,
-    const std::string* shardProposedName) {
-    if (connectionString.type() == ConnectionString::INVALID) {
-        return {ErrorCodes::BadValue, "Invalid connection string"};
-    }
-
-    if (shardProposedName && shardProposedName->empty()) {
-        return {ErrorCodes::BadValue, "shard name cannot be empty"};
-    }
-
-    // TODO: Don't create a detached Shard object, create a detached RemoteCommandTargeter instead.
-    const std::shared_ptr<Shard> shardConn{shardRegistry->createConnection(connectionString)};
-    invariant(shardConn);
-    auto targeter = shardConn->getTargeter();
-
+    std::shared_ptr<RemoteCommandTargeter> targeter,
+    const std::string* shardProposedName,
+    const ConnectionString& connectionString) {
     // Check whether any host in the connection is already part of the cluster.
-    shardRegistry->reload(txn);
+    Grid::get(txn)->shardRegistry()->reload(txn);
     for (const auto& hostAndPort : connectionString.getServers()) {
         std::shared_ptr<Shard> shard;
-        shard = shardRegistry->getShardNoReload(hostAndPort.toString());
+        shard = Grid::get(txn)->shardRegistry()->getShardNoReload(hostAndPort.toString());
         if (shard) {
             return {ErrorCodes::OperationFailed,
                     str::stream() << "'" << hostAndPort.toString() << "' "
@@ -238,7 +225,7 @@ StatusWith<ShardType> ShardingCatalogManagerImpl::_validateHostAsShard(
             // TODO: If/When mongos ever supports opCommands, this logic will break because
             // cmdStatus will be OK.
             return {ErrorCodes::RPCProtocolNegotiationFailed,
-                    str::stream() << shardConn->toString()
+                    str::stream() << targeter->connectionString().toString()
                                   << " does not recognize the RPC protocol being used. This is"
                                   << " likely because it contains a node that is a mongos or an old"
                                   << " version of mongod."};
@@ -251,7 +238,9 @@ StatusWith<ShardType> ShardingCatalogManagerImpl::_validateHostAsShard(
     auto resIsMasterStatus = std::move(swCommandResponse.getValue().commandStatus);
     if (!resIsMasterStatus.isOK()) {
         return {resIsMasterStatus.code(),
-                str::stream() << "Error running isMaster against " << shardConn->toString() << ": "
+                str::stream() << "Error running isMaster against "
+                              << targeter->connectionString().toString()
+                              << ": "
                               << causedBy(resIsMasterStatus)};
     }
 
@@ -367,7 +356,7 @@ StatusWith<ShardType> ShardingCatalogManagerImpl::_validateHostAsShard(
 
     // Retrieve the most up to date connection string that we know from the replica set monitor (if
     // this is a replica set shard, otherwise it will be the same value as connectionString).
-    ConnectionString actualShardConnStr = shardConn->getTargeter()->connectionString();
+    ConnectionString actualShardConnStr = targeter->connectionString();
 
     ShardType shard;
     shard.setName(actualShardName);
@@ -377,14 +366,10 @@ StatusWith<ShardType> ShardingCatalogManagerImpl::_validateHostAsShard(
 }
 
 StatusWith<std::vector<std::string>> ShardingCatalogManagerImpl::_getDBNamesListFromShard(
-    OperationContext* txn, ShardRegistry* shardRegistry, const ConnectionString& connectionString) {
-    // TODO: Don't create a detached Shard object, create a detached RemoteCommandTargeter instead.
-    const std::shared_ptr<Shard> shardConn{
-        shardRegistry->createConnection(connectionString).release()};
-    invariant(shardConn);
+    OperationContext* txn, std::shared_ptr<RemoteCommandTargeter> targeter) {
 
-    auto swCommandResponse = _runCommandForAddShard(
-        txn, shardConn->getTargeter().get(), "admin", BSON("listDatabases" << 1));
+    auto swCommandResponse =
+        _runCommandForAddShard(txn, targeter.get(), "admin", BSON("listDatabases" << 1));
     if (!swCommandResponse.isOK()) {
         return swCommandResponse.getStatus();
     }
@@ -453,9 +438,23 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
     const std::string* shardProposedName,
     const ConnectionString& shardConnectionString,
     const long long maxSize) {
+    if (shardConnectionString.type() == ConnectionString::INVALID) {
+        return {ErrorCodes::BadValue, "Invalid connection string"};
+    }
+
+    if (shardProposedName && shardProposedName->empty()) {
+        return {ErrorCodes::BadValue, "shard name cannot be empty"};
+    }
+
+    // TODO: Don't create a detached Shard object, create a detached RemoteCommandTargeter instead.
+    const std::shared_ptr<Shard> shard{
+        Grid::get(txn)->shardRegistry()->createConnection(shardConnectionString)};
+    invariant(shard);
+    auto targeter = shard->getTargeter();
+
     // Validate the specified connection string may serve as shard at all
     auto shardStatus =
-        _validateHostAsShard(txn, grid.shardRegistry(), shardConnectionString, shardProposedName);
+        _validateHostAsShard(txn, targeter, shardProposedName, shardConnectionString);
     if (!shardStatus.isOK()) {
         // TODO: This is a workaround for the case were we could have some bad shard being
         // requested to be added and we put that bad connection string on the global replica set
@@ -467,7 +466,7 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
 
     ShardType& shardType = shardStatus.getValue();
 
-    auto dbNamesStatus = _getDBNamesListFromShard(txn, grid.shardRegistry(), shardConnectionString);
+    auto dbNamesStatus = _getDBNamesListFromShard(txn, targeter);
     if (!dbNamesStatus.isOK()) {
         return dbNamesStatus.getStatus();
     }
@@ -520,11 +519,6 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
     BatchedCommandRequest commandRequest(updateRequest.release());
     commandRequest.setNS(NamespaceString::kConfigCollectionNamespace);
     commandRequest.setWriteConcern(kMajorityWriteConcern.toBSON());
-
-    const std::shared_ptr<Shard> shardConn{
-        Grid::get(txn)->shardRegistry()->createConnection(shardConnectionString)};
-    invariant(shardConn);
-    auto targeter = shardConn->getTargeter();
 
     auto swCommandResponse =
         _runCommandForAddShard(txn, targeter.get(), "admin", commandRequest.toBSON());
