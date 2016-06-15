@@ -54,6 +54,7 @@ variables:
       max_jobs: 0  # If set in combination with run_multiple_jobs, will cap the number of jobs used.
 
 - &jepsen_config_vars
+  hang_analyzer_processes: "java"
   jepsen_protocol_version: --protocol-version 1
   jepsen_read_concern: ""
   jepsen_read_with_find_and_modify: ""
@@ -683,8 +684,10 @@ timeout:
     params:
       working_dir: src
       script: |
-        echo "Calling the hang analyzer..."
-        PATH=/opt/mongodbtoolchain/bin:$PATH python buildscripts/hang_analyzer.py
+        set -o verbose
+        hang_analyzer_option="-p ${hang_analyzer_processes|dbtest,java,mongo,mongod,mongos,python,_test}"
+        echo "Calling the hang analyzer: python buildscripts/hang_analyzer.py $hang_analyzer_option"
+        PATH=/opt/mongodbtoolchain/bin:$PATH python buildscripts/hang_analyzer.py $hang_analyzer_option
 
 #######################################
 #               Tasks                 #
@@ -879,6 +882,7 @@ tasks:
   - func: "run jepsen test"
     vars:
       <<: *jepsen_config_vars
+      hang_analyzer_processes: "java"
       jepsen_read_with_find_and_modify: --read-with-find-and-modify
       jepsen_storage_engine: --storage-engine wiredTiger
 
@@ -890,6 +894,7 @@ tasks:
   - func: "run jepsen test"
     vars:
       <<: *jepsen_config_vars
+      hang_analyzer_processes: "java"
       jepsen_read_with_find_and_modify: --read-with-find-and-modify
       jepsen_storage_engine: --storage-engine wiredTiger
       jepsen_time_limit: --time-limit 150
@@ -902,6 +907,7 @@ tasks:
   - func: "run jepsen test"
     vars:
       <<: *jepsen_config_vars
+      hang_analyzer_processes: "java"
       jepsen_read_with_find_and_modify: --read-with-find-and-modify
       jepsen_storage_engine: --storage-engine wiredTiger
       jepsen_time_limit: --time-limit 600
