@@ -24,6 +24,8 @@ selector:
     - jstests/sharding/shard_collection_verify_initial_chunks.js
     # TODO: Enable when SERVER-22672 is complete
     - jstests/sharding/printShardingStatus.js
+    # TODO: Change in error reporting, enable when 3.4 becomes 'last-stable'.
+    - jstests/sharding/map_reduce_validation.js
 
 executor:
   js_test:

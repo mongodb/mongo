@@ -195,6 +195,7 @@ public:
         bool shardedOutput = false;
         NamespaceString outputCollNss;
         bool customOutDB = false;
+        bool inlineOutput = false;
 
         string outDB = dbname;
 
@@ -205,6 +206,7 @@ public:
             shardedOutput = customOut.getBoolField("sharded");
 
             if (customOut.hasField("inline")) {
+                inlineOutput = true;
                 uassert(ErrorCodes::InvalidOptions,
                         "cannot specify inline and sharded output at the same time",
                         !shardedOutput);
@@ -241,6 +243,14 @@ public:
             confOut = scopedDb.getSharedDbReference();
         } else {
             confOut = confIn;
+        }
+
+        if (confOut->getPrimaryId() == "config" && !inlineOutput) {
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::CommandNotSupported,
+                       str::stream() << "Can not execute mapReduce with output database " << outDB
+                                     << " which lives on config servers"));
         }
 
         const bool shardedInput =

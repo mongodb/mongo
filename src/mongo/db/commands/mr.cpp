@@ -1670,12 +1670,12 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        if (!grid.shardRegistry()) {
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             return appendCommandStatus(
                 result,
                 Status(ErrorCodes::CommandNotSupported,
-                       str::stream() << "Can not execute mapReduce with output database "
-                                     << dbname));
+                       str::stream() << "Can not execute mapReduce with output database " << dbname
+                                     << " which lives on config servers"));
         }
 
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
