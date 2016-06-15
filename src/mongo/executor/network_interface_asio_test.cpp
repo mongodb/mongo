@@ -533,6 +533,46 @@ public:
     }
 };
 
+TEST_F(NetworkInterfaceASIOConnectionHookTest, InvalidIsMaster) {
+    auto validationFailedStatus =
+        Status(ErrorCodes::InterruptedDueToReplStateChange, "operation was interrupted");
+
+    start(makeTestHook(
+        [&](const HostAndPort& remoteHost, const RemoteCommandResponse& isMasterReply) {
+            return Status(ErrorCodes::UnknownError, "unused");
+        },
+        [&](const HostAndPort& remoteHost)
+            -> StatusWith<boost::optional<RemoteCommandRequest>> { return {boost::none}; },
+        [&](const HostAndPort& remoteHost, RemoteCommandResponse&& response) {
+            return Status::OK();
+        }));
+
+    auto deferred = startCommand(makeCallbackHandle(),
+                                 {testHost,
+                                  "blah",
+                                  BSON("foo"
+                                       << "bar")});
+
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+
+    ConnectEvent{stream}.skip();
+
+    // simulate isMaster reply.
+    stream->simulateServer(rpc::Protocol::kOpQuery,
+                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               RemoteCommandResponse response;
+                               response.data = BSON("ok" << 0.0 << "errmsg"
+                                                         << "operation was interrupted"
+                                                         << "code" << 11602);
+                               return response;
+                           });
+
+    // we should stop here.
+    auto& res = deferred.get();
+
+    ASSERT(res == validationFailedStatus);
+}
+
 TEST_F(NetworkInterfaceASIOConnectionHookTest, ValidateHostInvalid) {
     bool validateCalled = false;
     bool hostCorrect = false;
