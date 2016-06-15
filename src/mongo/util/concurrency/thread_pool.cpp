@@ -218,8 +218,9 @@ ThreadPool::Stats ThreadPool::getStats() const {
 }
 
 void ThreadPool::_workerThreadBody(ThreadPool* pool, const std::string& threadName) {
-    std::string poolName = pool->_options.poolName;
     setThreadName(threadName);
+    pool->_options.onCreateThread(threadName);
+    const auto poolName = pool->_options.poolName;
     LOG(1) << "starting thread in pool " << poolName;
     try {
         pool->_consumeTasks();

@@ -30,6 +30,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'thread_pool',
         'thread_pool_test_fixture',
+        '$BUILD_DIR/mongo/unittest/concurrency',
     ])
 
 env.Library('ticketholder',

@@ -36,6 +36,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -236,6 +237,28 @@ DEATH_TEST(ThreadPoolTest,
     pool.reset();
     lk.unlock();
     t.join();
+}
+
+TEST_F(ThreadPoolTest, ThreadPoolRunsOnCreateThreadFunctionBeforeConsumingTasks) {
+    bool onCreateThreadCalled = false;
+    std::string taskThreadName;
+    ThreadPool::Options options;
+    options.threadNamePrefix = "mythread";
+    options.maxThreads = 1U;
+    options.onCreateThread = [&onCreateThreadCalled,
+                              &taskThreadName](const std::string& threadName) {
+        onCreateThreadCalled = true;
+        taskThreadName = threadName;
+    };
+
+    auto& pool = makePool(options);
+    pool.startup();
+    unittest::Barrier barrier(2U);
+    ASSERT_OK(pool.schedule([&barrier] { barrier.countDownAndWait(); }));
+    barrier.countDownAndWait();
+
+    ASSERT_TRUE(onCreateThreadCalled);
+    ASSERT_EQUALS(options.threadNamePrefix + "0", taskThreadName);
 }
 
 }  // namespace
