@@ -33,18 +33,19 @@ env.Append(CPPDEFINES=["HAVE_VERBOSE"])
 
 conf = Configure(env)
 if conf.CheckFunc("fallocate"):
-        env.Append(CPPDEFINES=[
-                "HAVE_FALLOCATE"
+    conf.env.Append(CPPDEFINES=[
+        "HAVE_FALLOCATE"
     ])
 if conf.CheckFunc("sync_file_range"):
-        env.Append(CPPDEFINES=[
-                "HAVE_SYNC_FILE_RANGE"
+    conf.env.Append(CPPDEFINES=[
+        "HAVE_SYNC_FILE_RANGE"
     ])
 
 if conf.CheckCHeader('x86intrin.h'):
-        env.Append(CPPDEFINES=[
-            "HAVE_X86INTRIN_H"
+    conf.env.Append(CPPDEFINES=[
+        "HAVE_X86INTRIN_H"
     ])
+env = conf.Finish();
 
 if env.TargetOSIs('windows'):
     env.Append(CPPPATH=["build_win"])
