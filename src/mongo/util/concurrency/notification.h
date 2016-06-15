@@ -28,9 +28,8 @@
 
 #pragma once
 
-#include "boost/optional.hpp"
+#include <boost/optional.hpp>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
@@ -46,18 +45,7 @@ class OperationContext;
  */
 template <class T>
 class Notification {
-    MONGO_DISALLOW_COPYING(Notification);
-
 public:
-    /**
-     * Constructs a default notification in the unset state.
-     */
-    Notification() = default;
-
-    // Allow std::move semantics for notifications
-    Notification(Notification&&) = default;
-    Notification& operator=(Notification&&) = default;
-
     /**
      * Returns true if the notification has been set (i.e., the call to get/waitFor would not
      * block).
@@ -121,13 +109,7 @@ private:
 
 template <>
 class Notification<void> {
-    MONGO_DISALLOW_COPYING(Notification);
-
 public:
-    Notification() = default;
-    Notification(Notification&&) = default;
-    Notification& operator=(Notification&&) = default;
-
     explicit operator bool() const {
         return _notification.operator bool();
     }
