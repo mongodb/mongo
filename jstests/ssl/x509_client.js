@@ -102,7 +102,7 @@ var st = new ShardingTest({
     shards: 1,
     mongos: 1,
     other: {
-        extraOptions: {"keyFile": "jstests/libs/key1"},
+        keyFile: 'jstests/libs/key1',
         configOptions: x509_options,
         mongosOptions: x509_options,
         shardOptions: x509_options,

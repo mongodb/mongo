@@ -11,7 +11,6 @@
  *   {
  *     name {string}: name for this test
  *     verbose {number}: the verbosity for the mongos
- *     keyFile {string}: the location of the keyFile
  *     chunkSize {number}: the chunk size to use as configuration for the cluster
  *     nopreallocj {boolean|number}:
  *
@@ -57,6 +56,7 @@
  *       nopreallocj: same as above
  *       rs: same as above
  *       chunkSize: same as above
+ *       keyFile {string}: the location of the keyFile
  *
  *       shardOptions {Object}: same as the shards property above.
  *          Can be used to specify options that are common all shards.
@@ -271,18 +271,11 @@ var ShardingTest = function(params) {
 
     // ShardingTest API
 
-    this.getRSEntry = function(setName) {
-        for (var i = 0; i < this._rs.length; i++)
-            if (this._rs[i].setName == setName)
-                return this._rs[i];
-        throw Error("can't find rs: " + setName);
-    };
-
     this.getDB = function(name) {
         return this.s.getDB(name);
     };
 
-    /*
+    /**
      * Finds the _id of the primary shard for database 'dbname', e.g., 'test-rs0'
      */
     this.getPrimaryShardIdForDatabase = function(dbname) {
@@ -319,7 +312,7 @@ var ShardingTest = function(params) {
         return names;
     };
 
-    /*
+    /**
      * Find the connection to the primary shard for database 'dbname'.
      */
     this.getPrimaryShard = function(dbname) {
@@ -349,7 +342,7 @@ var ShardingTest = function(params) {
         return x;
     };
 
-    /*
+    /**
      * Find a different shard connection than the one given.
      */
     this.getOther = function(one) {
@@ -383,16 +376,6 @@ var ShardingTest = function(params) {
             if (this._connections[i] == one)
                 return this._connections[(i + 1) % this._connections.length];
         }
-    };
-
-    this.getFirstOther = function(one) {
-        for (var i = 0; i < this._connections.length; i++) {
-            if (this._connections[i] != one) {
-                return this._connections[i];
-            }
-        }
-
-        throw Error("impossible");
     };
 
     this.stop = function(opts) {
@@ -627,14 +610,6 @@ var ShardingTest = function(params) {
         }, "no balance happened", timeToWait);
     };
 
-    this.getShardNames = function() {
-        var shards = [];
-        this.s.getCollection("config.shards").find().forEach(function(shardDoc) {
-            shards.push(shardDoc._id);
-        });
-        return shards;
-    };
-
     this.getShard = function(coll, query, includeEmpty) {
         var shards = this.getShardsForQuery(coll, query, includeEmpty);
         assert.eq(shards.length, 1);
@@ -732,7 +707,7 @@ var ShardingTest = function(params) {
         assert(result.ok);
     };
 
-    /*
+    /**
      * Returns true after the balancer has completed a balancing round.
      *
      * Checks that three pings were sent to config.mongos. The balancer writes a ping
@@ -767,18 +742,6 @@ var ShardingTest = function(params) {
             db = oldDB;
             return false;
         }
-    };
-
-    this.isAnyBalanceInFlight = function() {
-        if (this.config.locks.find({_id: {$ne: "balancer"}, state: 2}).count() > 0)
-            return true;
-
-        var allCurrent = this.s.getDB("admin").currentOp().inprog;
-        for (var i = 0; i < allCurrent.length; i++) {
-            if (allCurrent[i].desc && allCurrent[i].desc.indexOf("cleanupOldData") == 0)
-                return true;
-        }
-        return false;
     };
 
     /**
@@ -1067,12 +1030,11 @@ var ShardingTest = function(params) {
         numConfigs = tempCount;
     }
 
-    otherParams.extraOptions = otherParams.extraOptions || {};
     otherParams.useHostname = otherParams.useHostname == undefined ? true : otherParams.useHostname;
     otherParams.useBridge = otherParams.useBridge || false;
     otherParams.bridgeOptions = otherParams.bridgeOptions || {};
 
-    var keyFile = otherParams.keyFile || otherParams.extraOptions.keyFile;
+    var keyFile = otherParams.keyFile;
     var hostName = getHostName();
 
     this._testName = testName;
@@ -1327,7 +1289,6 @@ var ShardingTest = function(params) {
         }
 
         options = Object.merge(options, otherParams.mongosOptions);
-        options = Object.merge(options, otherParams.extraOptions);
         options = Object.merge(options, otherParams["s" + i]);
 
         options.port = options.port || allocatePort();

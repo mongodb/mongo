@@ -20,13 +20,6 @@ removeShard = function(st, replTest) {
     };
     assert.soon(checkRemoveShard, "failed to remove shard", 5 * 60000);
 
-    // Need to wait for migration to be over... only works for inline deletes
-    checkNSLock = function() {
-        printjson(st.s.getDB("config").locks.find().toArray());
-        return !st.isAnyBalanceInFlight();
-    };
-    assert.soon(checkNSLock, "migrations did not end?");
-
     sleep(2000);
 
     var directdb = replTest.getPrimary().getDB("admin");

@@ -37,7 +37,7 @@
         name: "auth",
         mongos: 1,
         shards: 0,
-        other: {extraOptions: {"keyFile": "jstests/libs/key1"}, chunkSize: 1},
+        other: {keyFile: "jstests/libs/key1", chunkSize: 1},
     });
 
     if (s.getDB('admin').runCommand('buildInfo').bits < 64) {

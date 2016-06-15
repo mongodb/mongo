@@ -23,9 +23,6 @@ selector:
     - jstests/sharding/shard_collection_verify_initial_chunks.js
     # TODO: Enable when SERVER-22672 is complete
     - jstests/sharding/printShardingStatus.js
-    # TODO: Enable whan SERVER-XXXXX is complete
-    - jstests/sharding/*auth*
-    - jstests/sharding/*Auth*
 
 executor:
   js_test:
