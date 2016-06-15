@@ -112,6 +112,9 @@ selector:
     - jstests/sharding/commands_that_write_accept_wc_configRS.js
     - jstests/sharding/commands_that_write_accept_wc_shards.js
     - jstests/sharding/move_chunk_wc.js
+    # Test never completes because the CSRS balancer gets restarted too many times
+    - jstests/sharding/jumbo1.js
+
 executor:
   js_test:
     config:
