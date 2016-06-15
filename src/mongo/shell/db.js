@@ -1183,7 +1183,7 @@ var DB;
     /////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    var _defaultWriteConcern = {w: 'majority', wtimeout: 30 * 1000};
+    var _defaultWriteConcern = {w: 'majority', wtimeout: 60 * 1000};
 
     function getUserObjString(userObj) {
         var pwd = userObj.pwd;
