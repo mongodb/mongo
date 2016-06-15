@@ -812,6 +812,12 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress) {
         return swIsMasterReply.getStatus();
     }
 
+    // Ensure that the isMaster response is "ok:1".
+    auto isMasterStatus = getStatusFromCommandResult(swIsMasterReply.getValue().data);
+    if (!isMasterStatus.isOK()) {
+        return isMasterStatus;
+    }
+
     auto swProtocolSet = rpc::parseProtocolSetFromIsMasterReply(swIsMasterReply.getValue().data);
     if (!swProtocolSet.isOK()) {
         return swProtocolSet.getStatus();
