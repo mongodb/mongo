@@ -8,6 +8,14 @@ functions:
     command: git.get_project
     params:
       directory: wiredtiger
+  "fetch artifacts" : &fetch_artifacts
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${build_id}.tgz
+        bucket: build_external
+        extract_to: wiredtiger
 
 pre:
   - command: shell.exec
@@ -21,7 +29,9 @@ post:
         rm -rf "wiredtiger"
 
 tasks:
+## Base compile task on posix flavours
   - name: compile-posix
+    depends_on: []
     commands:
       - func: "fetch source"
       - command: git.apply_patch
@@ -29,17 +39,45 @@ tasks:
           directory: wiredtiger
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ./build_posix/reconf
-            ${configure_env_vars|} ./configure --enable-diagnostic --enable-python --enable-zlib
+            ./reconf
+            ${configure_env_vars|} ../configure --enable-diagnostic --enable-python --enable-zlib --enable-strict
             ${make_command|make} ${smp_command|}
             ${make_command|make} check
+      - command: archive.targz_pack
+        params:
+          target: "wiredtiger.tgz"
+          source_dir: "wiredtiger"
+          include:
+             - "./**"
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          aws_key: ${aws_key}
+          local_file: wiredtiger.tgz
+          bucket: build_external
+          permissions: public-read
+          content_type: application/tar
+          display_name: Artifacts
+          remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${build_id}.tgz
 
-            ${test_env_vars|} python ./test/suite/run.py -v 2
+  - name: unit-test
+    depends_on:
+    - name: compile-posix
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix"
+          script: |
+            set -o errexit
+            set -o verbose
+            ${test_env_vars|} python ../test/suite/run.py -v 2 ${smp_command|}
+
   - name: compile-windows
     commands:
       - func: "fetch source"
@@ -95,11 +133,13 @@ buildvariants:
   run_on:
   - ubuntu1404-test
   expansions:
-    test_env_vars: LD_LIBRARY_PATH=.libs
-    smp_command: -j$(grep -c ^processor /proc/cpuinfo)
+    # It's ugly, but we need the absolute path here, not the relative
+    test_env_vars: LD_LIBRARY_PATH=`pwd`/.libs
+    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     configure_env_vars: CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
   tasks:
     - name: compile-posix
+    - name: unit-test
 
 - name: solaris
   display_name: Solaris
@@ -107,18 +147,19 @@ buildvariants:
   - solaris
   expansions:
     make_command: PATH=/opt/mongodbtoolchain/bin:$PATH gmake
-    test_env_vars: LD_LIBRARY_PATH=.libs
-    smp_command: -j$(kstat cpu | sort -u | grep -c "^module")
+    test_env_vars: LD_LIBRARY_PATH=`pwd`/.libs
+    smp_command: -j $(kstat cpu | sort -u | grep -c "^module")
     configure_env_vars: PATH=/opt/mongodbtoolchain/bin:$PATH CFLAGS="-m64"
   tasks:
     - name: compile-posix
+    - name: unit-test
 
 - name: windows-64
   display_name: Windows 64-bit
   run_on:
   - windows-64-vs2013-test
   expansions:
-    smp_command: -j$(grep -c ^processor /proc/cpuinfo)
+    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
   tasks:
     - name: compile-windows
     - name: compile-windows-alt
@@ -129,9 +170,10 @@ buildvariants:
   run_on:
   - osx-1010
   expansions:
-    smp_command: -j$(sysctl -n hw.logicalcpu)
+    smp_command: -j $(sysctl -n hw.logicalcpu)
     configure_env_vars: PATH=/opt/local/bin:$PATH
     make_command: PATH=/opt/local/bin:$PATH ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future make
-    test_env_vars: DYLD_LIBRARY_PATH=.libs
+    test_env_vars: DYLD_LIBRARY_PATH=`pwd`/.libs
   tasks:
     - name: compile-posix
+    - name: unit-test

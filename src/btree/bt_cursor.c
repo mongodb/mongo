@@ -1024,6 +1024,7 @@ __wt_btcur_equals(WT_CURSOR_BTREE *a_arg, WT_CURSOR_BTREE *b_arg, int *equalp)
 
 	a = (WT_CURSOR *)a_arg;
 	b = (WT_CURSOR *)b_arg;
+	cmp = 0;
 	session = (WT_SESSION_IMPL *)a->session;
 
 	/* Confirm both cursors reference the same object. */
