@@ -367,4 +367,20 @@ void MMAPV1Engine::cleanShutdown() {
 void MMAPV1Engine::setJournalListener(JournalListener* jl) {
     dur::setJournalListener(jl);
 }
+
+Status MMAPV1Engine::requireDataFileCompatibilityWithPriorRelease(OperationContext* opCtx) {
+    Status status = Status::OK();
+    {
+        stdx::lock_guard<stdx::mutex> lk(_entryMapMutex);
+        for (auto db : _entryMap) {
+            Status dbStatus = db.second->requireDataFileCompatibilityWithPriorRelease(opCtx);
+            if (!dbStatus.isOK()) {
+                status = dbStatus;
+            }
+        }
+    }
+
+    return status;
 }
+
+}  // namespace mongo

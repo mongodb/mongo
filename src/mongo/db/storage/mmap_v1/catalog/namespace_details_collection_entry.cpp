@@ -404,4 +404,32 @@ void NamespaceDetailsCollectionCatalogEntry::setNamespacesRecordId(OperationCont
         _namespacesRecordId = newId;
     }
 }
+
+bool NamespaceDetailsCollectionCatalogEntry::hasCollationMetadata(OperationContext* txn,
+                                                                  const std::string& ns) const {
+    // Check for a collection default collation.
+    CollectionOptions options = _db->getCollectionOptions(txn, _namespacesRecordId);
+    if (!options.collation.isEmpty()) {
+        log() << "Collection '" << ns << "' has a default collation: " << options.collation;
+        return true;
+    }
+
+    // Examine indexes for collation metadata.
+    bool indexWithCollationFound = false;
+
+    const bool includeBackgroundInprog = true;
+    NamespaceDetails::IndexIterator ii = _details->ii(includeBackgroundInprog);
+    while (ii.more()) {
+        const IndexDetails& indexDetails = ii.next();
+        const BSONObj infoObj =
+            _indexRecordStore->dataFor(txn, indexDetails.info.toRecordId()).toBson();
+        if (infoObj["collation"]) {
+            log() << "Collection '" << ns << "' has an index with a collation: " << infoObj;
+            indexWithCollationFound = true;
+        }
+    }
+
+    return indexWithCollationFound;
 }
+
+}  // namespace mongo

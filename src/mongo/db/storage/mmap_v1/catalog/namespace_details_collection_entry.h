@@ -113,6 +113,14 @@ public:
      */
     void setNamespacesRecordId(OperationContext* txn, RecordId newId);
 
+    /**
+     * Examines metadata for each collection and each index, and returns true if any
+     * collation-related metadata is found.
+     *
+     * This function is used to support downgrading from 3.4.
+     */
+    bool hasCollationMetadata(OperationContext* txn, const std::string& ns) const;
+
 private:
     NamespaceDetails* _details;
     RecordStore* _namespacesRecordStore;

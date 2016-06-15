@@ -128,6 +128,14 @@ public:
      */
     void createNamespaceForIndex(OperationContext* txn, StringData name);
 
+    /**
+     * Ensures data files are compatible, in case we are downgrading from a newer version. Returns
+     * ErrorCodes::MustUpgrade if an incompatibility is detected.
+     *
+     * See StorageEngine::requireDataFileCompatibilityWithPriorRelease() for more details.
+     */
+    Status requireDataFileCompatibilityWithPriorRelease(OperationContext* txn);
+
 private:
     class EntryInsertion;
     class EntryRemoval;

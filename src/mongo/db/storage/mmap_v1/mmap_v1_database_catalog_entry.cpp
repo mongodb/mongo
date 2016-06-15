@@ -826,4 +826,46 @@ CollectionOptions MMAPV1DatabaseCatalogEntry::getCollectionOptions(OperationCont
     }
     return options;
 }
+
+Status MMAPV1DatabaseCatalogEntry::requireDataFileCompatibilityWithPriorRelease(
+    OperationContext* txn) {
+    if (_extentManager.numFiles() == 0) {
+        return Status::OK();
+    }
+
+    // Determine whether collation metadata is present in the catalog.
+    DataFileVersion version = _extentManager.getFileFormat(txn);
+    if (!version.getMayHaveCollationMetadata()) {
+        // Since the feature bit isn't set, we can be sure that the collation feature is not in use.
+        return Status::OK();
+    }
+
+    std::list<std::string> collectionNamespaces;
+    getCollectionNamespaces(&collectionNamespaces);
+
+    bool hasCollationMetadata = false;
+    for (auto&& collectionNamespace : collectionNamespaces) {
+        log() << "Checking collection '" << collectionNamespace << "' for collation metadata...";
+        if (_collections[collectionNamespace]->catalogEntry->hasCollationMetadata(
+                txn, collectionNamespace)) {
+            hasCollationMetadata = true;
+        }
+        log() << "Done checking collection '" << collectionNamespace << "' for collation metadata";
+    }
+
+    if (hasCollationMetadata) {
+        return {ErrorCodes::MustUpgrade,
+                "The data files use the collation feature, "
+                "which is not supported by this version of mongod"};
+    }
+
+    // Clear the collation feature bit.
+    version.clearMayHaveCollationMetadata();
+    WriteUnitOfWork wunit(txn);
+    _extentManager.setFileFormat(txn, version);
+    wunit.commit();
+
+    return Status::OK();
+}
+
 }  // namespace mongo

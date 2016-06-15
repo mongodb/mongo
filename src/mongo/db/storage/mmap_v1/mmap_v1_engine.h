@@ -79,6 +79,8 @@ public:
         return Status(ErrorCodes::InternalError, "MMAPv1 doesn't support repairRecordStore");
     }
 
+    virtual Status requireDataFileCompatibilityWithPriorRelease(OperationContext* opCtx);
+
     // MMAPv1 specific (non-virtual)
     Status repairDatabase(OperationContext* txn,
                           const std::string& dbName,
