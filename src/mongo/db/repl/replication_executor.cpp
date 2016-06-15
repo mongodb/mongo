@@ -34,6 +34,7 @@
 
 #include <limits>
 
+#include "mongo/db/client.h"
 #include "mongo/db/repl/database_task.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/util/assert_util.h"
@@ -44,7 +45,11 @@ namespace mongo {
 namespace repl {
 
 namespace {
+
+const char kReplicationExecutorThreadName[] = "ReplicationExecutor";
+
 stdx::function<void()> makeNoExcept(const stdx::function<void()>& fn);
+
 }  // namespace
 
 using executor::NetworkInterface;
@@ -125,7 +130,8 @@ Date_t ReplicationExecutor::now() {
 }
 
 void ReplicationExecutor::run() {
-    setThreadName("ReplicationExecutor");
+    setThreadName(kReplicationExecutorThreadName);
+    Client::initThread(kReplicationExecutorThreadName);
     _networkInterface->startup();
     _dblockWorkers.startThreads();
     std::pair<WorkItem, CallbackHandle> work;

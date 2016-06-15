@@ -32,6 +32,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_executor.h"
@@ -86,7 +87,8 @@ TEST_F(ReplicationExecutorTest, ScheduleDBWorkAndExclusiveWorkConcurrently) {
                   .scheduleWorkWithGlobalExclusiveLock(
                       [&](const CallbackData& cbData) { barrier.countDownAndWait(); })
                   .getStatus());
-    executor.run();
+    executor.startup();
+    executor.join();
     ASSERT_OK(status1);
     ASSERT(txn);
 }
@@ -112,7 +114,8 @@ TEST_F(ReplicationExecutorTest, ScheduleDBWorkWithCollectionLock) {
                       nss,
                       MODE_X)
                   .getStatus());
-    executor.run();
+    executor.startup();
+    executor.join();
     ASSERT_OK(status1);
     ASSERT(txn);
     ASSERT_TRUE(collectionIsLocked);
@@ -133,7 +136,8 @@ TEST_F(ReplicationExecutorTest, ScheduleExclusiveLockOperation) {
                           cbData.executor->shutdown();
                   })
                   .getStatus());
-    executor.run();
+    executor.startup();
+    executor.join();
     ASSERT_OK(status1);
     ASSERT(txn);
     ASSERT_TRUE(lockIsW);
@@ -161,7 +165,8 @@ TEST_F(ReplicationExecutorTest, ShutdownBeforeRunningSecondExclusiveLockOperatio
                           cbData.executor->shutdown();
                   })
                   .getStatus());
-    executor.run();
+    executor.startup();
+    executor.join();
     ASSERT_OK(status1);
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, status2.code());
 }
@@ -266,6 +271,25 @@ TEST_F(ReplicationExecutorTest, ScheduleCallbackAtAFutureTime) {
     executor.waitForEvent(finishEvent);
 }
 
+TEST_F(ReplicationExecutorTest, CallbacksAreInvokedOnClientThreads) {
+    launchExecutorThread();
+    getNet()->exitNetwork();
+
+    ReplicationExecutor& executor = getReplExecutor();
+    auto status = getDetectableErrorStatus();
+    bool haveClientInCallback = false;
+    auto fn = [&haveClientInCallback, &status](const ReplicationExecutor::CallbackArgs& cbData) {
+        status = cbData.status;
+        haveClientInCallback = haveClient();
+    };
+
+    ASSERT_NOT_OK(status);
+    auto cb = unittest::assertGet(executor.scheduleWork(fn));
+    executor.wait(cb);
+
+    ASSERT_OK(status);
+    ASSERT_TRUE(haveClientInCallback);
+}
 
 }  // namespace
 }  // namespace repl
