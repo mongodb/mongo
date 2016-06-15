@@ -55,30 +55,30 @@ sh._writeBalancerStateDeprecated = function(onOrNot) {
 
 sh.help = function() {
     print("\tsh.addShard( host )                       server:port OR setname/server:port");
-    print("\tsh.enableSharding(dbname)                 enables sharding on the database dbname");
-    print("\tsh.shardCollection(fullName,key,unique)   shards the collection");
-
+    print("\tsh.addShardTag(shard,tag)                 adds the tag to the shard");
     print(
-        "\tsh.splitFind(fullName,find)               splits the chunk that find is in at the median");
+        "\tsh.addTagRange(fullName,min,max,tag)      tags the specified range of the given collection");
+    print("\tsh.disableBalancing(coll)                 disable balancing on one collection");
+    print("\tsh.enableBalancing(coll)                  re-enable balancing on one collection");
+    print("\tsh.enableSharding(dbname)                 enables sharding on the database dbname");
+    print("\tsh.getBalancerState()                     returns whether the balancer is enabled");
+    print(
+        "\tsh.isBalancerRunning()                    return true if the balancer has work in progress on any mongos");
+    print(
+        "\tsh.moveChunk(fullName,find,to)            move the chunk where 'find' is to 'to' (name of shard)");
+    print("\tsh.removeShardTag(shard,tag)              removes the tag from the shard");
+    print(
+        "\tsh.removeTagRange(fullName,min,max,tag)   removes the tagged range of the given collection");
+    print("\tsh.shardCollection(fullName,key,unique)   shards the collection");
     print(
         "\tsh.splitAt(fullName,middle)               splits the chunk that middle is in at middle");
     print(
-        "\tsh.moveChunk(fullName,find,to)            move the chunk where 'find' is to 'to' (name of shard)");
-    print("\tsh.getBalancerState()                      returns whether the balancer is enabled");
+        "\tsh.splitFind(fullName,find)               splits the chunk that find is in at the median");
     print(
-        "\tsh.isBalancerRunning()                    return true if the balancer has work in progress on any mongos");
-
-    print("\tsh.disableBalancing(coll)                 disable balancing on one collection");
-    print("\tsh.enableBalancing(coll)                  re-enable balancing on one collection");
-
-    print("\tsh.addShardTag(shard,tag)                 adds the tag to the shard");
-    print("\tsh.removeShardTag(shard,tag)              removes the tag from the shard");
-    print(
-        "\tsh.addTagRange(fullName,min,max,tag)      tags the specified range of the given collection");
-    print(
-        "\tsh.removeTagRange(fullName,min,max,tag)   removes the tagged range of the given collection");
-
+        "\tsh.startBalancer()                        starts the balancer so chunks are balanced automatically");
     print("\tsh.status()                               prints a general overview of the cluster");
+    print(
+        "\tsh.stopBalancer()                         stops the balancer so chunks are not balanced automatically");
 };
 
 sh.status = function(verbose, configDB) {
