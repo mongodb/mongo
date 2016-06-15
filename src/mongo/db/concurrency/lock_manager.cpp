@@ -756,6 +756,7 @@ void LockManager::_onLockModeChanged(LockHead* lock, bool checkConflictQueue) {
 
     LockRequest* iterNext = NULL;
 
+    bool newlyCompatibleFirst = false;  // Set on enabling compatibleFirst mode.
     for (LockRequest* iter = lock->conflictList._front; (iter != NULL) && checkConflictQueue;
          iter = iterNext) {
         invariant(iter->status == LockRequest::STATUS_WAITING);
@@ -767,11 +768,11 @@ void LockManager::_onLockModeChanged(LockHead* lock, bool checkConflictQueue) {
         if (conflicts(iter->mode, lock->grantedModes)) {
             // If iter doesn't have a previous pointer, this means that it is at the front of the
             // queue. If we continue scanning the queue beyond this point, we will starve it by
-            // granting more and more requests.
-            if (!iter->prev) {
+            // granting more and more requests. However, if we newly transition to compatibleFirst
+            // mode, grant any waiting compatible requests.
+            if (!iter->prev && !newlyCompatibleFirst) {
                 break;
             }
-
             continue;
         }
 
@@ -784,7 +785,7 @@ void LockManager::_onLockModeChanged(LockHead* lock, bool checkConflictQueue) {
         lock->decConflictModeCount(iter->mode);
 
         if (iter->compatibleFirst) {
-            lock->compatibleFirstCount++;
+            newlyCompatibleFirst |= (lock->compatibleFirstCount++ == 0);
         }
 
         iter->notify->notify(lock->resourceId, LOCK_OK);
