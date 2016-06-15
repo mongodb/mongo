@@ -743,6 +743,48 @@ TEST(LockManager, CompatibleFirstImmediateGrant) {
     ASSERT(lockMgr.unlock(&requestX));
 }
 
+TEST(LockManager, CompatibleFirstGrantAlreadyQueued) {
+    LockManager lockMgr;
+    const ResourceId resId(RESOURCE_GLOBAL, 0);
+
+    // This tests the following behavior:
+    //   Lock held in X, queue: S IX IS, where S is compatibleFirst.
+    //   Once X unlocks both the S and IS requests should proceed.
+
+    MMAPV1LockerImpl locker1;
+    LockRequestCombo request1(&locker1);
+
+    MMAPV1LockerImpl locker2;
+    LockRequestCombo request2(&locker2);
+    request2.compatibleFirst = true;
+
+    MMAPV1LockerImpl locker3;
+    LockRequestCombo request3(&locker3);
+
+    MMAPV1LockerImpl locker4;
+    LockRequestCombo request4(&locker4);
+
+    // Hold the lock in X and establish the S IX IS queue.
+    ASSERT(LOCK_OK == lockMgr.lock(resId, &request1, MODE_X));
+    ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request2, MODE_S));
+    ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request3, MODE_IX));
+    ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request4, MODE_IS));
+
+    // Now unlock, so all readers should be able to proceed, while the IX remains queued.
+    ASSERT(lockMgr.unlock(&request1));
+    ASSERT(request2.lastResult == LOCK_OK);
+    ASSERT(request3.lastResult == LOCK_INVALID);
+    ASSERT(request4.lastResult == LOCK_OK);
+
+    // Now unlock the S lock, and the IX succeeds as well.
+    ASSERT(lockMgr.unlock(&request2));
+    ASSERT(request3.lastResult == LOCK_OK);
+
+    // Unlock remaining
+    ASSERT(lockMgr.unlock(&request4));
+    ASSERT(lockMgr.unlock(&request3));
+}
+
 TEST(LockManager, CompatibleFirstDelayedGrant) {
     LockManager lockMgr;
     const ResourceId resId(RESOURCE_GLOBAL, 0);
