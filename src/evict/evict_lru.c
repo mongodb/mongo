@@ -1706,8 +1706,9 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 		}
 
 		/* See if eviction is still needed. */
-		if (!__wt_eviction_needed(session, NULL) ||
-		    cache->pages_evict > init_evict_count + max_pages_evicted)
+		if (!__wt_eviction_needed(session, &pct_full) ||
+		    (pct_full < 100 &&
+		    cache->pages_evict > init_evict_count + max_pages_evicted))
 			return (0);
 
 		/* Evict a page. */
