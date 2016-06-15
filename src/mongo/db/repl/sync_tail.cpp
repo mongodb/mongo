@@ -633,22 +633,23 @@ private:
         Client::initThread("ReplBatcher");
         const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
         OperationContext& txn = *txnPtr;
-        auto replCoord = ReplicationCoordinator::get(&txn);
+        const auto replCoord = ReplicationCoordinator::get(&txn);
+        const auto fastClockSource = txn.getServiceContext()->getFastClockSource();
 
         while (!_inShutdown.load()) {
-            Timer batchTimer;
+            const auto batchStartTime = fastClockSource->now();
 
             OpQueue ops;
             // tryPopAndWaitForMore returns true when we need to end a batch early
-            while (!_syncTail->tryPopAndWaitForMore(&txn, &ops) &&
-                   (ops.getBytes() < replBatchLimitBytes) && !_inShutdown.load()) {
-                int now = batchTimer.seconds();
-
-                // apply replication batch limits
+            while (!_syncTail->tryPopAndWaitForMore(&txn, &ops) && !_inShutdown.load()) {
                 if (!ops.empty()) {
-                    if (now > replBatchLimitSeconds)
+                    // apply replication batch limits
+                    const auto batchDuration = fastClockSource->now() - batchStartTime;
+                    if (durationCount<Seconds>(batchDuration) >= replBatchLimitSeconds)
                         break;
-                    if (ops.getCount() > replBatchLimitOperations)
+                    if (ops.getCount() >= replBatchLimitOperations)
+                        break;
+                    if (ops.getBytes() >= replBatchLimitBytes)
                         break;
                 }
 

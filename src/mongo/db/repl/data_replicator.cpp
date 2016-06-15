@@ -1012,7 +1012,7 @@ StatusWith<Operations> DataReplicator::_getNextApplierBatch_inlock() {
         if (ops.size() >= _opts.replBatchLimitOperations) {
             return std::move(ops);
         }
-        if (totalBytes + entry.raw.objsize() > _opts.replBatchLimitBytes) {
+        if (totalBytes + entry.raw.objsize() >= _opts.replBatchLimitBytes) {
             return std::move(ops);
         }
 
