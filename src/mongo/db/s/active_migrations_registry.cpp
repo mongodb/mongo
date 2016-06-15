@@ -95,10 +95,13 @@ ScopedRegisterMigration::ScopedRegisterMigration(ScopedRegisterMigration&& other
 }
 
 ScopedRegisterMigration& ScopedRegisterMigration::operator=(ScopedRegisterMigration&& other) {
-    _registry = other._registry;
-    _forUnregister = other._forUnregister;
-    _completionNotification = std::move(other._completionNotification);
-    other._registry = nullptr;
+    if (&other != this) {
+        _registry = other._registry;
+        _forUnregister = other._forUnregister;
+        _completionNotification = std::move(other._completionNotification);
+        other._registry = nullptr;
+    }
+
     return *this;
 }
 
