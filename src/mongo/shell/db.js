@@ -1202,7 +1202,7 @@ var DB;
 
     var _defaultWriteConcern = {
         w: 'majority',
-        wtimeout: 30 * 1000
+        wtimeout: 60 * 1000
     };
 
     function getUserObjString(userObj) {
