@@ -67,7 +67,7 @@ protected:
         // can't load metadata
         ChunkType chunkType;
         chunkType.setNS(NamespaceString{"test.foo"}.ns());
-        chunkType.setShard("shard0001");
+        chunkType.setShard(ShardId("shard0001"));
         chunkType.setMin(BSON("a" << MINKEY));
         chunkType.setMax(BSON("a" << MAXKEY));
         chunkType.setVersion(ChunkVersion(1, 0, epoch));

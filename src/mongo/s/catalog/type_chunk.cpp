@@ -195,7 +195,7 @@ Status ChunkType::validate() const {
         return Status(ErrorCodes::NoSuchKey, str::stream() << "missing version field");
     }
 
-    if (!_shard.is_initialized() || _shard->empty()) {
+    if (!_shard.is_initialized() || !_shard->isValid()) {
         return Status(ErrorCodes::NoSuchKey,
                       str::stream() << "missing " << shard.name() << " field");
     }
@@ -237,7 +237,7 @@ BSONObj ChunkType::toBSON() const {
     if (_max)
         builder.append(max.name(), getMax());
     if (_shard)
-        builder.append(shard.name(), getShard());
+        builder.append(shard.name(), getShard().toString());
     if (_version)
         _version->appendForChunk(&builder);
     if (_jumbo)
@@ -276,8 +276,8 @@ void ChunkType::setVersion(const ChunkVersion& version) {
     _version = version;
 }
 
-void ChunkType::setShard(const std::string& shard) {
-    invariant(!shard.empty());
+void ChunkType::setShard(const ShardId& shard) {
+    invariant(shard.isValid());
     _shard = shard;
 }
 

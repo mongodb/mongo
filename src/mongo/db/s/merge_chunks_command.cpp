@@ -55,7 +55,7 @@ using std::vector;
 namespace {
 
 BSONArray buildOpPrecond(const string& ns,
-                         const string& shardName,
+                         const ShardId& shardName,
                          const ChunkVersion& shardVersion) {
     BSONArrayBuilder preCond;
     BSONObjBuilder condB;

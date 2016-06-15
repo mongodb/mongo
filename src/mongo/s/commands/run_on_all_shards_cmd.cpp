@@ -119,7 +119,7 @@ bool RunOnAllShardsCommand::run(OperationContext* txn,
         if (res->join(txn)) {
             // success :)
             BSONObj result = res->result();
-            results.emplace_back(*shardIdsIt, result);
+            results.emplace_back(shardIdsIt->toString(), result);
             subobj.append(res->getServer(), result);
 
             if (!hasWCError) {
@@ -146,7 +146,7 @@ bool RunOnAllShardsCommand::run(OperationContext* txn,
             BSONElement errmsgObj = result["errmsg"];
             if (errmsgObj.eoo() || errmsgObj.String().empty()) {
                 // it was fixed!
-                results.emplace_back(*shardIdsIt, result);
+                results.emplace_back(shardIdsIt->toString(), result);
                 subobj.append(res->getServer(), result);
                 continue;
             }
@@ -168,7 +168,7 @@ bool RunOnAllShardsCommand::run(OperationContext* txn,
         } else if (commonErrCode != errCode) {
             commonErrCode = 0;
         }
-        results.emplace_back(*shardIdsIt, result);
+        results.emplace_back(shardIdsIt->toString(), result);
         subobj.append(res->getServer(), result);
     }
 

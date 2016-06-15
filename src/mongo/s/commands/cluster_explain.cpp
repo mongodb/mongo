@@ -218,7 +218,7 @@ void ClusterExplain::buildPlannerInfo(OperationContext* txn,
         BSONObj queryPlanner = shardResults[i].result["queryPlanner"].Obj();
         BSONObj serverInfo = shardResults[i].result["serverInfo"].Obj();
 
-        singleShardBob.append("shardName", shardResults[i].shardTargetId);
+        singleShardBob.append("shardName", shardResults[i].shardTargetId.toString());
         {
             const auto shard = grid.shardRegistry()->getShard(txn, shardResults[i].shardTargetId);
             singleShardBob.append("connectionString", shard->getConnString().toString());
@@ -291,7 +291,7 @@ void ClusterExplain::buildExecStats(const vector<Strategy::CommandResult>& shard
         BSONObj execStats = shardResults[i].result["executionStats"].Obj();
         BSONObj execStages = execStats["executionStages"].Obj();
 
-        singleShardBob.append("shardName", shardResults[i].shardTargetId);
+        singleShardBob.append("shardName", shardResults[i].shardTargetId.toString());
 
         // Append error-related fields, if present.
         if (!execStats["executionSuccess"].eoo()) {
@@ -323,7 +323,7 @@ void ClusterExplain::buildExecStats(const vector<Strategy::CommandResult>& shard
     for (size_t i = 0; i < shardResults.size(); i++) {
         BSONObjBuilder singleShardBob(execShardsBuilder.subobjStart());
 
-        singleShardBob.append("shardName", shardResults[i].shardTargetId);
+        singleShardBob.append("shardName", shardResults[i].shardTargetId.toString());
 
         BSONObj execStats = shardResults[i].result["executionStats"].Obj();
         vector<BSONElement> allPlans = execStats["allPlansExecution"].Array();

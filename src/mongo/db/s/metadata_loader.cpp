@@ -60,7 +60,7 @@ namespace {
  */
 class SCMConfigDiffTracker : public ConfigDiffTracker<BSONObj> {
 public:
-    SCMConfigDiffTracker(const string& currShard) : _currShard(currShard) {}
+    SCMConfigDiffTracker(const ShardId& currShard) : _currShard(currShard) {}
 
     virtual bool isTracked(const ChunkType& chunk) const {
         return chunk.getShard() == _currShard;
@@ -70,7 +70,7 @@ public:
         return make_pair(chunk.getMin(), chunk.getMax());
     }
 
-    virtual string shardFor(OperationContext* txn, const string& name) const {
+    virtual ShardId shardFor(OperationContext* txn, const ShardId& name) const {
         return name;
     }
 
@@ -79,7 +79,7 @@ public:
     }
 
 private:
-    const string _currShard;
+    const ShardId _currShard;
 };
 
 }  // namespace
@@ -137,7 +137,7 @@ Status MetadataLoader::initChunks(OperationContext* txn,
                                   const string& shard,
                                   const CollectionMetadata* oldMetadata,
                                   CollectionMetadata* metadata) const {
-    map<string, ChunkVersion> versionMap;
+    map<ShardId, ChunkVersion> versionMap;  // TODO: use .h defined type
 
     // Preserve the epoch
     versionMap[shard] = metadata->_shardVersion;

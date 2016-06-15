@@ -64,7 +64,7 @@ bool ClusterStatistics::ShardStatistics::isSizeMaxed() const {
 
 BSONObj ClusterStatistics::ShardStatistics::toBSON() const {
     BSONObjBuilder builder;
-    builder.append("id", shardId);
+    builder.append("id", shardId.toString());
     builder.append("maxSizeMB", static_cast<long long>(maxSizeMB));
     builder.append("currSizeMB", static_cast<long long>(currSizeMB));
     builder.append("draining", isDraining);

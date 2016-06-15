@@ -345,7 +345,7 @@ TEST_F(AddShardTest, Standalone) {
     {
         DatabaseType dbTestDB1;
         dbTestDB1.setName("TestDB1");
-        dbTestDB1.setPrimary("StandaloneShard");
+        dbTestDB1.setPrimary(ShardId("StandaloneShard"));
         dbTestDB1.setSharded(false);
 
         expectDatabaseUpdate(dbTestDB1);
@@ -354,7 +354,7 @@ TEST_F(AddShardTest, Standalone) {
     {
         DatabaseType dbTestDB2;
         dbTestDB2.setName("TestDB2");
-        dbTestDB2.setPrimary("StandaloneShard");
+        dbTestDB2.setPrimary(ShardId("StandaloneShard"));
         dbTestDB2.setSharded(false);
 
         expectDatabaseUpdate(dbTestDB2);
@@ -445,7 +445,7 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
     {
         DatabaseType dbTestDB1;
         dbTestDB1.setName("TestDB1");
-        dbTestDB1.setPrimary("shard0006");
+        dbTestDB1.setPrimary(ShardId("shard0006"));
         dbTestDB1.setSharded(false);
 
         expectDatabaseUpdate(dbTestDB1);
@@ -454,7 +454,7 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
     {
         DatabaseType dbTestDB2;
         dbTestDB2.setName("TestDB2");
-        dbTestDB2.setPrimary("shard0006");
+        dbTestDB2.setPrimary(ShardId("shard0006"));
         dbTestDB2.setSharded(false);
 
         expectDatabaseUpdate(dbTestDB2);
@@ -829,7 +829,7 @@ TEST_F(AddShardTest, ShardContainsExistingDatabase) {
 
     DatabaseType existing;
     existing.setName("existing");
-    existing.setPrimary("existingShard");
+    existing.setPrimary(ShardId("existingShard"));
     expectGetDatabase("existing", existing);
 
     future.timed_get(kFutureTimeout);
@@ -953,7 +953,7 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
     // Add the existing database from the newly added shard
     DatabaseType shardDB;
     shardDB.setName("shardDB");
-    shardDB.setPrimary(expectedShardName);
+    shardDB.setPrimary(ShardId(expectedShardName));
     shardDB.setSharded(false);
 
     expectDatabaseUpdate(shardDB);
@@ -1014,7 +1014,7 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
     // Add the existing database from the newly added shard
     DatabaseType shardDB;
     shardDB.setName("shardDB");
-    shardDB.setPrimary(expectedShardName);
+    shardDB.setPrimary(ShardId(expectedShardName));
     shardDB.setSharded(false);
 
     // Ensure that even if upserting the database discovered on the shard fails, the addShard

@@ -317,7 +317,7 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
         n.append(ChunkType::ns(), _args.getNss().ns());
         n.append(ChunkType::min(), _args.getMinKey());
         n.append(ChunkType::max(), _args.getMaxKey());
-        n.append(ChunkType::shard(), _args.getToShardId());
+        n.append(ChunkType::shard(), _args.getToShardId().toString());
         n.done();
 
         BSONObjBuilder q(op.subobjStart("o2"));
@@ -357,7 +357,7 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
         n.append(ChunkType::ns(), _args.getNss().ns());
         n.append(ChunkType::min(), bumpMin);
         n.append(ChunkType::max(), bumpMax);
-        n.append(ChunkType::shard(), _args.getFromShardId());
+        n.append(ChunkType::shard(), _args.getFromShardId().toString());
         n.done();
 
         BSONObjBuilder q(op.subobjStart("o2"));

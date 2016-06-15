@@ -210,7 +210,7 @@ BalancerChunkSelectionPolicyImpl::selectSpecificChunkToMove(OperationContext* tx
 
     DistributionStatus distStatus(shardStatsStatus.getValue(), shardToChunksMap);
     const ShardId newShardId(distStatus.getBestReceieverShard(tagForChunkStatus.getValue()));
-    if (newShardId.empty() || newShardId == chunk.getShard()) {
+    if (!newShardId.isValid() || newShardId == chunk.getShard()) {
         return boost::optional<MigrateInfo>();
     }
 

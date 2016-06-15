@@ -138,7 +138,7 @@ protected:
             ASSERT(version.epoch() == epoch);
 
             // Check chunk's shard id.
-            ASSERT(chunk[ChunkType::shard()].String() == _shardId);
+            ASSERT(chunk[ChunkType::shard()].String() == _shardId.toString());
 
             return RemoteCommandResponse(BSON("ok" << 1), BSONObj(), Milliseconds(1));
         });

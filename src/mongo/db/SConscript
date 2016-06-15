@@ -700,6 +700,7 @@ serveronlyLibdeps = [
     "$BUILD_DIR/mongo/s/catalog/replset/sharding_catalog_manager_impl",
     "$BUILD_DIR/mongo/s/client/sharding_connection_hook",
     "$BUILD_DIR/mongo/s/coreshard",
+    "$BUILD_DIR/mongo/s/shard_id",
     "$BUILD_DIR/mongo/s/serveronly",
     "$BUILD_DIR/mongo/scripting/scripting_server",
     "$BUILD_DIR/mongo/util/clock_sources",

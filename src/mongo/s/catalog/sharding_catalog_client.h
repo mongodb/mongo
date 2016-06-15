@@ -148,7 +148,7 @@ public:
      * the current draining status. See ShardDrainingStatus enum definition for more details.
      */
     virtual StatusWith<ShardDrainingStatus> removeShard(OperationContext* txn,
-                                                        const std::string& name) = 0;
+                                                        const ShardId& name) = 0;
 
     /**
      * Updates or creates the metadata for a given database.
@@ -222,7 +222,7 @@ public:
      * Returns a !OK status if an error occurs.
      */
     virtual Status getDatabasesForShard(OperationContext* txn,
-                                        const std::string& shardName,
+                                        const ShardId& shardId,
                                         std::vector<std::string>* dbs) = 0;
 
     /**

@@ -170,7 +170,8 @@ MigrationChunkClonerSourceLegacy::MigrationChunkClonerSourceLegacy(MoveChunkRequ
                                                                    const BSONObj& shardKeyPattern)
     : _args(std::move(request)),
       _shardKeyPattern(shardKeyPattern),
-      _sessionId(MigrationSessionId::generate(_args.getFromShardId(), _args.getToShardId())) {}
+      _sessionId(MigrationSessionId::generate(_args.getFromShardId().toString(),
+                                              _args.getToShardId().toString())) {}
 
 MigrationChunkClonerSourceLegacy::~MigrationChunkClonerSourceLegacy() {
     invariant(!_deleteNotifyExec);

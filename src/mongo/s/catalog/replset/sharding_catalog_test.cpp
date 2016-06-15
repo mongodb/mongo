@@ -155,7 +155,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseExisting) {
 
     DatabaseType expectedDb;
     expectedDb.setName("bigdata");
-    expectedDb.setPrimary("shard0000");
+    expectedDb.setPrimary(ShardId("shard0000"));
     expectedDb.setSharded(true);
 
     const OpTime newOpTime(Timestamp(7, 6), 5);
@@ -198,7 +198,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseStaleSecondaryRetrySuccess) {
 
     DatabaseType expectedDb;
     expectedDb.setName("bigdata");
-    expectedDb.setPrimary("shard0000");
+    expectedDb.setPrimary(ShardId("shard0000"));
     expectedDb.setSharded(true);
 
     auto future = launchAsync([this, &expectedDb] {
@@ -453,14 +453,14 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
     chunkA.setMin(BSON("a" << 1));
     chunkA.setMax(BSON("a" << 100));
     chunkA.setVersion({1, 2, oid});
-    chunkA.setShard("shard0000");
+    chunkA.setShard(ShardId("shard0000"));
 
     ChunkType chunkB;
     chunkB.setNS("TestDB.TestColl");
     chunkB.setMin(BSON("a" << 100));
     chunkB.setMax(BSON("a" << 200));
     chunkB.setVersion({3, 4, oid});
-    chunkB.setShard("shard0001");
+    chunkB.setShard(ShardId("shard0001"));
 
     ChunkVersion queryChunkVersion({1, 2, oid});
 
@@ -581,7 +581,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSInvalidChunk) {
         chunkA.setMin(BSON("a" << 1));
         chunkA.setMax(BSON("a" << 100));
         chunkA.setVersion({1, 2, OID::gen()});
-        chunkA.setShard("shard0000");
+        chunkA.setShard(ShardId("shard0000"));
 
         ChunkType chunkB;
         chunkB.setNS("TestDB.TestColl");
@@ -1019,16 +1019,16 @@ TEST_F(ShardingCatalogClientTest, GetDatabasesForShardValid) {
 
     DatabaseType dbt1;
     dbt1.setName("db1");
-    dbt1.setPrimary("shard0000");
+    dbt1.setPrimary(ShardId("shard0000"));
 
     DatabaseType dbt2;
     dbt2.setName("db2");
-    dbt2.setPrimary("shard0000");
+    dbt2.setPrimary(ShardId("shard0000"));
 
     auto future = launchAsync([this] {
         vector<string> dbs;
         const auto status =
-            catalogClient()->getDatabasesForShard(operationContext(), "shard0000", &dbs);
+            catalogClient()->getDatabasesForShard(operationContext(), ShardId("shard0000"), &dbs);
 
         ASSERT_OK(status);
         return dbs;
@@ -1043,7 +1043,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabasesForShardValid) {
         auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
         ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
-        ASSERT_EQ(query->getFilter(), BSON(DatabaseType::primary(dbt1.getPrimary())));
+        ASSERT_EQ(query->getFilter(), BSON(DatabaseType::primary(dbt1.getPrimary().toString())));
         ASSERT_EQ(query->getSort(), BSONObj());
 
         checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
@@ -1063,7 +1063,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabasesForShardInvalidDoc) {
     auto future = launchAsync([this] {
         vector<string> dbs;
         const auto status =
-            catalogClient()->getDatabasesForShard(operationContext(), "shard0000", &dbs);
+            catalogClient()->getDatabasesForShard(operationContext(), ShardId("shard0000"), &dbs);
 
         ASSERT_EQ(ErrorCodes::TypeMismatch, status);
         ASSERT_EQ(0U, dbs.size());
@@ -1072,7 +1072,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabasesForShardInvalidDoc) {
     onFindCommand([](const RemoteCommandRequest& request) {
         DatabaseType dbt1;
         dbt1.setName("db1");
-        dbt1.setPrimary("shard0000");
+        dbt1.setPrimary(ShardId("shard0000"));
 
         return vector<BSONObj>{
             dbt1.toBSON(),
@@ -1187,7 +1187,7 @@ TEST_F(ShardingCatalogClientTest, GetTagForChunkOneTagFound) {
     chunk.setMin(BSON("a" << 1));
     chunk.setMax(BSON("a" << 100));
     chunk.setVersion({1, 2, OID::gen()});
-    chunk.setShard("shard0000");
+    chunk.setShard(ShardId("shard0000"));
     ASSERT_OK(chunk.validate());
 
     auto future = launchAsync([this, chunk] {
@@ -1232,7 +1232,7 @@ TEST_F(ShardingCatalogClientTest, GetTagForChunkNoTagFound) {
     chunk.setMin(BSON("a" << 1));
     chunk.setMax(BSON("a" << 100));
     chunk.setVersion({1, 2, OID::gen()});
-    chunk.setShard("shard0000");
+    chunk.setShard(ShardId("shard0000"));
     ASSERT_OK(chunk.validate());
 
     auto future = launchAsync([this, chunk] {
@@ -1271,7 +1271,7 @@ TEST_F(ShardingCatalogClientTest, GetTagForChunkInvalidTagDoc) {
     chunk.setMin(BSON("a" << 1));
     chunk.setMax(BSON("a" << 100));
     chunk.setVersion({1, 2, OID::gen()});
-    chunk.setShard("shard0000");
+    chunk.setShard(ShardId("shard0000"));
     ASSERT_OK(chunk.validate());
 
     auto future = launchAsync([this, chunk] {
@@ -1311,7 +1311,7 @@ TEST_F(ShardingCatalogClientTest, UpdateDatabase) {
 
     DatabaseType dbt;
     dbt.setName("test");
-    dbt.setPrimary("shard0000");
+    dbt.setPrimary(ShardId("shard0000"));
     dbt.setSharded(true);
 
     auto future = launchAsync([this, dbt] {
@@ -1354,7 +1354,7 @@ TEST_F(ShardingCatalogClientTest, UpdateDatabaseExceededTimeLimit) {
 
     DatabaseType dbt;
     dbt.setName("test");
-    dbt.setPrimary("shard0001");
+    dbt.setPrimary(ShardId("shard0001"));
     dbt.setSharded(false);
 
     auto future = launchAsync([this, dbt] {
@@ -1450,7 +1450,7 @@ TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedSuccessfulWithCheck) {
         chunk.setMin(BSON("a" << 1));
         chunk.setMax(BSON("a" << 100));
         chunk.setVersion({1, 2, oid});
-        chunk.setShard("shard0000");
+        chunk.setShard(ShardId("shard0000"));
         return vector<BSONObj>{chunk.toBSON()};
     });
 
@@ -1621,7 +1621,8 @@ TEST_F(ShardingCatalogClientTest, createDatabaseSuccess) {
 
         DatabaseType expectedDb;
         expectedDb.setName(dbname);
-        expectedDb.setPrimary(s1.getName());  // This is the one we reported with the smallest size
+        expectedDb.setPrimary(
+            ShardId(s1.getName()));  // This is the one we reported with the smallest size
         expectedDb.setSharded(false);
 
         ASSERT_EQUALS(expectedDb.toBSON(), insert);
@@ -1910,7 +1911,8 @@ TEST_F(ShardingCatalogClientTest, createDatabaseDuplicateKeyOnInsert) {
 
         DatabaseType expectedDb;
         expectedDb.setName(dbname);
-        expectedDb.setPrimary(s1.getName());  // This is the one we reported with the smallest size
+        expectedDb.setPrimary(
+            ShardId(s1.getName()));  // This is the one we reported with the smallest size
         expectedDb.setSharded(false);
 
         ASSERT_EQUALS(expectedDb.toBSON(), insert);
@@ -1937,7 +1939,7 @@ TEST_F(ShardingCatalogClientTest, EnableShardingNoDBExists) {
     setupShards(vector<ShardType>{shard});
 
     auto shardTargeter = RemoteCommandTargeterMock::get(
-        shardRegistry()->getShard(operationContext(), "shard0")->getTargeter());
+        shardRegistry()->getShard(operationContext(), ShardId("shard0"))->getTargeter());
     shardTargeter->setFindHostReturnValue(HostAndPort("shard0:12"));
 
     distLock()->expectLock(
@@ -2327,7 +2329,7 @@ TEST_F(ShardingCatalogClientTest, ReadAfterOpTimeFindThenCmd) {
 
             DatabaseType dbType;
             dbType.setName("TestDB");
-            dbType.setPrimary("TestShard");
+            dbType.setPrimary(ShardId("TestShard"));
             dbType.setSharded("true");
 
             return std::make_tuple(vector<BSONObj>{dbType.toBSON()}, builder.obj());
@@ -2407,7 +2409,7 @@ TEST_F(ShardingCatalogClientTest, ReadAfterOpTimeCmdThenFind) {
 
         DatabaseType dbType;
         dbType.setName("TestDB");
-        dbType.setPrimary("TestShard");
+        dbType.setPrimary(ShardId("TestShard"));
         dbType.setSharded("true");
 
         return vector<BSONObj>{dbType.toBSON()};
@@ -2495,7 +2497,7 @@ TEST_F(ShardingCatalogClientTest, RetryOnFindCommandNetworkErrorSucceedsAtMaxRet
     onFindCommand([](const RemoteCommandRequest& request) {
         DatabaseType dbType;
         dbType.setName("TestDB");
-        dbType.setPrimary("TestShard");
+        dbType.setPrimary(ShardId("TestShard"));
         dbType.setSharded("true");
 
         return vector<BSONObj>{dbType.toBSON()};

@@ -78,7 +78,7 @@ void ShardLocal::updateReplSetMonitor(const HostAndPort& remoteHost,
 }
 
 std::string ShardLocal::toString() const {
-    return getId() + ":<local>";
+    return getId().toString() + ":<local>";
 }
 
 bool ShardLocal::isRetriableError(ErrorCodes::Error code, RetryPolicy options) {

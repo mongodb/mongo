@@ -33,6 +33,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/s/shard_id.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -51,7 +52,7 @@ TEST(StartChunkCloneRequest, CreateAsCommandComplete) {
         sessionId,
         assertGet(ConnectionString::parse("TestConfigRS/CS1:12345,CS2:12345,CS3:12345")),
         assertGet(ConnectionString::parse("TestDonorRS/Donor1:12345,Donor2:12345,Donor3:12345")),
-        "shard0002",
+        ShardId("shard0002"),
         BSON("Key" << -100),
         BSON("Key" << 100),
         BSON("Key" << 1),

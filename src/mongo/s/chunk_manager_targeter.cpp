@@ -188,21 +188,22 @@ ChunkVersion getShardVersion(StringData shardName,
  */
 CompareResult compareAllShardVersions(const ChunkManager* cachedChunkManager,
                                       const Shard* cachedPrimary,
-                                      const map<string, ChunkVersion>& remoteShardVersions) {
+                                      const map<ShardId, ChunkVersion>& remoteShardVersions) {
     CompareResult finalResult = CompareResult_GTE;
 
-    for (map<string, ChunkVersion>::const_iterator it = remoteShardVersions.begin();
+    for (map<ShardId, ChunkVersion>::const_iterator it = remoteShardVersions.begin();
          it != remoteShardVersions.end();
          ++it) {
         // Get the remote and cached version for the next shard
-        const string& shardName = it->first;
+        const ShardId& shardName = it->first;
         const ChunkVersion& remoteShardVersion = it->second;
 
         ChunkVersion cachedShardVersion;
 
         try {
             // Throws b/c shard constructor throws
-            cachedShardVersion = getShardVersion(shardName, cachedChunkManager, cachedPrimary);
+            cachedShardVersion =
+                getShardVersion(shardName.toString(), cachedChunkManager, cachedPrimary);
         } catch (const DBException& ex) {
             warning() << "could not lookup shard " << shardName
                       << " in local cache, shard metadata may have changed"
@@ -576,7 +577,8 @@ void ChunkManagerTargeter::noteStaleResponse(const ShardEndpoint& endpoint,
     if (staleInfo["vWanted"].eoo()) {
         // If we don't have a vWanted sent, assume the version is higher than our current
         // version.
-        remoteShardVersion = getShardVersion(endpoint.shardName, _manager.get(), _primary.get());
+        remoteShardVersion =
+            getShardVersion(endpoint.shardName.toString(), _manager.get(), _primary.get());
         remoteShardVersion.incMajor();
     } else {
         remoteShardVersion = ChunkVersion::fromBSON(staleInfo, "vWanted");
@@ -584,7 +586,7 @@ void ChunkManagerTargeter::noteStaleResponse(const ShardEndpoint& endpoint,
 
     ShardVersionMap::iterator it = _remoteShardVersions.find(endpoint.shardName);
     if (it == _remoteShardVersions.end()) {
-        _remoteShardVersions.insert(make_pair(endpoint.shardName, remoteShardVersion));
+        _remoteShardVersions.insert(std::make_pair(endpoint.shardName, remoteShardVersion));
     } else {
         ChunkVersion& previouslyNotedVersion = it->second;
         if (previouslyNotedVersion.hasEqualEpoch(remoteShardVersion)) {

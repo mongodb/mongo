@@ -88,7 +88,7 @@ protected:
         // Infer namespace, shard, epoch, keypattern from first chunk
         const ChunkType* firstChunk = *(chunks.vector().begin());
         const string ns = firstChunk->getNS();
-        const string shardName = firstChunk->getShard();
+        const string shardName = firstChunk->getShard().toString();
         const OID epoch = firstChunk->getVersion().epoch();
 
         CollectionType coll;
@@ -276,7 +276,7 @@ TEST_F(MetadataLoaderFixture, CheckNumChunk) {
     // can't load metadata
     ChunkType chunkType;
     chunkType.setNS("test.foo");
-    chunkType.setShard("shard0001");
+    chunkType.setShard(ShardId("shard0001"));
     chunkType.setMin(BSON("a" << MINKEY));
     chunkType.setMax(BSON("a" << MAXKEY));
     chunkType.setVersion(ChunkVersion(1, 0, epoch));
@@ -424,7 +424,7 @@ TEST_F(MetadataLoaderFixture, NoChunks) {
 TEST_F(MetadataLoaderFixture, PromotePendingNA) {
     unique_ptr<ChunkType> chunk(new ChunkType());
     chunk->setNS("foo.bar");
-    chunk->setShard("shard0000");
+    chunk->setShard(ShardId("shard0000"));
     chunk->setMin(BSON("x" << MINKEY));
     chunk->setMax(BSON("x" << 0));
     chunk->setVersion(ChunkVersion(1, 0, OID::gen()));
@@ -459,7 +459,7 @@ TEST_F(MetadataLoaderFixture, PromotePendingNAVersion) {
 
     unique_ptr<ChunkType> chunk(new ChunkType());
     chunk->setNS("foo.bar");
-    chunk->setShard("shard0000");
+    chunk->setShard(ShardId("shard0000"));
     chunk->setMin(BSON("x" << MINKEY));
     chunk->setMax(BSON("x" << 0));
     chunk->setVersion(ChunkVersion(1, 1, epoch));
@@ -500,7 +500,7 @@ TEST_F(MetadataLoaderFixture, PromotePendingGoodOverlap) {
 
     unique_ptr<ChunkType> chunk(new ChunkType());
     chunk->setNS("foo.bar");
-    chunk->setShard("shard0000");
+    chunk->setShard(ShardId("shard0000"));
     chunk->setMin(BSON("x" << MINKEY));
     chunk->setMax(BSON("x" << 0));
     chunk->setVersion(ChunkVersion(1, 0, epoch));
@@ -508,14 +508,14 @@ TEST_F(MetadataLoaderFixture, PromotePendingGoodOverlap) {
 
     chunk.reset(new ChunkType());
     chunk->setNS("foo.bar");
-    chunk->setShard("shard0000");
+    chunk->setShard(ShardId("shard0000"));
     chunk->setMin(BSON("x" << 10));
     chunk->setMax(BSON("x" << 20));
     chunks.mutableVector().push_back(chunk.release());
 
     chunk.reset(new ChunkType());
     chunk->setNS("foo.bar");
-    chunk->setShard("shard0000");
+    chunk->setShard(ShardId("shard0000"));
     chunk->setMin(BSON("x" << 30));
     chunk->setMax(BSON("x" << MAXKEY));
     chunks.mutableVector().push_back(chunk.release());
@@ -531,7 +531,7 @@ TEST_F(MetadataLoaderFixture, PromotePendingGoodOverlap) {
 
     chunk.reset(new ChunkType());
     chunk->setNS("foo.bar");
-    chunk->setShard("shard0000");
+    chunk->setShard(ShardId("shard0000"));
     chunk->setMin(BSON("x" << 0));
     chunk->setMax(BSON("x" << 10));
     chunk->setVersion(ChunkVersion(1, 0, epoch));
@@ -580,7 +580,7 @@ TEST_F(MetadataLoaderFixture, PromotePendingBadOverlap) {
 
     unique_ptr<ChunkType> chunk(new ChunkType());
     chunk->setNS("foo.bar");
-    chunk->setShard("shard0000");
+    chunk->setShard(ShardId("shard0000"));
     chunk->setMin(BSON("x" << MINKEY));
     chunk->setMax(BSON("x" << 0));
     chunk->setVersion(ChunkVersion(1, 0, epoch));
@@ -598,7 +598,7 @@ TEST_F(MetadataLoaderFixture, PromotePendingBadOverlap) {
 
     chunk.reset(new ChunkType());
     chunk->setNS("foo.bar");
-    chunk->setShard("shard0000");
+    chunk->setShard(ShardId("shard0000"));
     chunk->setMin(BSON("x" << 15));
     chunk->setMax(BSON("x" << MAXKEY));
     chunk->setVersion(ChunkVersion(1, 0, epoch));

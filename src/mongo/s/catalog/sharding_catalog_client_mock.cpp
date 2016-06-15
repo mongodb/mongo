@@ -68,7 +68,7 @@ Status ShardingCatalogClientMock::shardCollection(OperationContext* txn,
 }
 
 StatusWith<ShardDrainingStatus> ShardingCatalogClientMock::removeShard(OperationContext* txn,
-                                                                       const string& name) {
+                                                                       const ShardId& name) {
     return ShardDrainingStatus::COMPLETED;
 }
 
@@ -106,7 +106,7 @@ Status ShardingCatalogClientMock::dropCollection(OperationContext* txn, const Na
 }
 
 Status ShardingCatalogClientMock::getDatabasesForShard(OperationContext* txn,
-                                                       const string& shardName,
+                                                       const ShardId& shardName,
                                                        vector<string>* dbs) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }

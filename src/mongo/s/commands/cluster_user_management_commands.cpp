@@ -846,7 +846,7 @@ Status runUpgradeOnAllShards(OperationContext* txn,
     // Upgrade each shard in turn, stopping on first failure.
     auto shardRegistry = grid.shardRegistry();
     shardRegistry->reload(txn);
-    vector<string> shardIds;
+    vector<ShardId> shardIds;
     shardRegistry->getAllShardIds(&shardIds);
 
     bool hasWCError = false;

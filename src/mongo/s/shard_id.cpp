@@ -26,26 +26,63 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/balancer/cluster_statistics.h"
-#include "mongo/unittest/unittest.h"
+#include <functional>
+#include <string.h>
+
+#include "mongo/base/status_with.h"
+#include "mongo/s/shard_id.h"
 
 namespace mongo {
-namespace {
 
-using ShardStatistics = ClusterStatistics::ShardStatistics;
+using std::string;
+using std::ostream;
 
-const auto emptyTagSet = std::set<std::string>();
-
-TEST(ShardStatistics, SizeMaxedTest) {
-    ASSERT(
-        !ShardStatistics(ShardId("TestShardId"), 0, 0, false, emptyTagSet, "3.2.0").isSizeMaxed());
-    ASSERT(!ShardStatistics(ShardId("TestShardId"), 100LL, 80LL, false, emptyTagSet, "3.2.0")
-                .isSizeMaxed());
-    ASSERT(ShardStatistics(ShardId("TestShardId"), 100LL, 110LL, false, emptyTagSet, "3.2.0")
-               .isSizeMaxed());
+bool ShardId::operator==(const ShardId& other) const {
+    return (this->_shardId == other._shardId);
 }
 
-}  // namespace
+bool ShardId::operator!=(const ShardId& other) const {
+    return !(*this == other);
+}
+
+bool ShardId::operator==(const string& other) const {
+    return (this->_shardId == other);
+}
+
+bool ShardId::operator!=(const string& other) const {
+    return !(*this == other);
+}
+
+ShardId::operator StringData() {
+    return StringData(_shardId.data(), _shardId.size());
+}
+
+const string& ShardId::toString() const {
+    return _shardId;
+}
+
+bool ShardId::isValid() const {
+    return !_shardId.empty();
+}
+
+ostream& operator<<(ostream& os, const ShardId& shardId) {
+    os << shardId._shardId;
+    return os;
+}
+
+bool ShardId::operator<(const ShardId& other) const {
+    return _shardId < other._shardId;
+}
+
+int ShardId::compare(const ShardId& other) const {
+    return _shardId.compare(other._shardId);
+}
+
+std::size_t ShardId::Hasher::operator()(const ShardId& shardId) const {
+    return std::hash<std::string>()(shardId._shardId);
+}
 }  // namespace mongo

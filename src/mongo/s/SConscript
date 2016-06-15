@@ -33,6 +33,16 @@ env.Library(
 
 # Functionality shared between mongod and mongos
 env.Library(
+    target='shard_id',
+    source=[
+        'shard_id.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ]
+)
+
+env.Library(
     target='common',
     source=[
         'catalog/mongo_version_range.cpp',
@@ -60,6 +70,7 @@ env.Library(
         'shard_key_pattern.cpp',
     ],
     LIBDEPS=[
+        'shard_id',
         '$BUILD_DIR/mongo/client/connection_string',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/matcher/expressions',
@@ -99,6 +110,16 @@ env.Library(
 )
 
 env.CppUnitTest(
+    target='shard_id_test',
+    source=[
+        'shard_id_test.cpp',
+    ],
+    LIBDEPS=[
+        'common',
+    ]
+)
+
+env.CppUnitTest(
     target='sharding_common_test',
     source=[
         'catalog/type_changelog_test.cpp',
@@ -116,6 +137,7 @@ env.CppUnitTest(
         'move_chunk_request_test.cpp',
         'set_shard_version_request_test.cpp',
         'shard_key_pattern_test.cpp',
+#        'shard_id_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/query_test_service_context',

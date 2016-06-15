@@ -101,7 +101,7 @@ public:
             uassertStatusOK(response.commandStatus);
             BSONObj x = std::move(response.response);
 
-            sub.append(s->getId(), x);
+            sub.append(s->getId().toString(), x);
 
             if (!x["ok"].trueValue()) {
                 ok = false;

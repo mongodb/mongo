@@ -421,7 +421,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
           << " for collection " << ns << " from " << fromShard << " at epoch " << epoch.toString();
 
     string errmsg;
-    MoveTimingHelper timing(txn, "to", ns, min, max, 6 /* steps */, &errmsg, "", "");
+    MoveTimingHelper timing(txn, "to", ns, min, max, 6 /* steps */, &errmsg, ShardId(), ShardId());
 
     ScopedDbConnection conn(fromShard);
 

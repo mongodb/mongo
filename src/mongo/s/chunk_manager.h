@@ -57,7 +57,7 @@ typedef std::map<BSONObj, std::shared_ptr<Chunk>, BSONObjCmp> ChunkMap;
 
 class ChunkManager {
 public:
-    typedef std::map<std::string, ChunkVersion> ShardVersionMap;
+    typedef std::map<ShardId, ChunkVersion> ShardVersionMap;
 
     // Loads a new chunk manager from a collection document
     explicit ChunkManager(const CollectionType& coll);
@@ -164,11 +164,11 @@ public:
     /**
      * Returns true if, for this shard, the chunks are identical in both chunk managers
      */
-    bool compatibleWith(const ChunkManager& other, const std::string& shard) const;
+    bool compatibleWith(const ChunkManager& other, const ShardId& shard) const;
 
     std::string toString() const;
 
-    ChunkVersion getVersion(const std::string& shardName) const;
+    ChunkVersion getVersion(const ShardId& shardName) const;
     ChunkVersion getVersion() const;
 
     void _printChunks() const;

@@ -270,7 +270,7 @@ private:
             auto shard = grid.shardRegistry()->getShard(txn, endpoint->shardName);
             if (!shard) {
                 return Status(ErrorCodes::ShardNotFound,
-                              "Could not find shard with id " + endpoint->shardName);
+                              "Could not find shard with id " + endpoint->shardName.toString());
             }
             auto swHostAndPort = shard->getTargeter()->findHost(readPref);
             if (!swHostAndPort.isOK()) {

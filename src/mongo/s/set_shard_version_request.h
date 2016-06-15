@@ -34,6 +34,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/shard_id.h"
 
 namespace mongo {
 
@@ -55,7 +56,7 @@ public:
      * are marked as sharded.
      */
     static SetShardVersionRequest makeForInit(const ConnectionString& configServer,
-                                              const std::string& shardName,
+                                              const ShardId& shardName,
                                               const ConnectionString& shardConnectionString);
 
     /**
@@ -68,7 +69,7 @@ public:
      */
     static SetShardVersionRequest makeForInitNoPersist(
         const ConnectionString& configServer,
-        const std::string& shardName,
+        const ShardId& shardName,
         const ConnectionString& shardConnectionString);
 
     /**
@@ -81,7 +82,7 @@ public:
      * are marked as sharded.
      */
     static SetShardVersionRequest makeForVersioning(const ConnectionString& configServer,
-                                                    const std::string& shardName,
+                                                    const ShardId& shardName,
                                                     const ConnectionString& shard,
                                                     const NamespaceString& nss,
                                                     const ChunkVersion& nssVersion,
@@ -96,7 +97,7 @@ public:
      * marked as sharded.
      */
     static SetShardVersionRequest makeForVersioningNoPersist(const ConnectionString& configServer,
-                                                             const std::string& shardName,
+                                                             const ShardId& shardName,
                                                              const ConnectionString& shard,
                                                              const NamespaceString& nss,
                                                              const ChunkVersion& nssVersion,
@@ -134,7 +135,7 @@ public:
         return _configServer;
     }
 
-    const std::string& getShardName() const {
+    const ShardId& getShardName() const {
         return _shardName;
     }
 
@@ -164,11 +165,11 @@ public:
 
 private:
     SetShardVersionRequest(ConnectionString configServer,
-                           std::string shardName,
+                           ShardId shardName,
                            ConnectionString shardConnectionString);
 
     SetShardVersionRequest(ConnectionString configServer,
-                           std::string shardName,
+                           ShardId shardName,
                            ConnectionString shardConnectionString,
                            NamespaceString nss,
                            ChunkVersion version,
@@ -182,7 +183,7 @@ private:
 
     ConnectionString _configServer;
 
-    std::string _shardName;
+    ShardId _shardName;
     ConnectionString _shardCS;
 
     // These values are only set if _init is false

@@ -258,7 +258,7 @@ TEST(SetShardVersionRequest, ParseFullNSContainsDBOnly) {
 
 TEST(SetShardVersionRequest, ToSSVCommandInit) {
     SetShardVersionRequest ssv =
-        SetShardVersionRequest::makeForInit(configCS, "TestShard", shardCS);
+        SetShardVersionRequest::makeForInit(configCS, ShardId("TestShard"), shardCS);
 
     ASSERT(ssv.isInit());
     ASSERT(ssv.isAuthoritative());
@@ -286,7 +286,7 @@ TEST(SetShardVersionRequest, ToSSVCommandInit) {
 
 TEST(SetShardVersionRequest, ToSSVCommandInitNoConnectionVersioning) {
     SetShardVersionRequest ssv =
-        SetShardVersionRequest::makeForInitNoPersist(configCS, "TestShard", shardCS);
+        SetShardVersionRequest::makeForInitNoPersist(configCS, ShardId("TestShard"), shardCS);
 
     ASSERT(ssv.isInit());
     ASSERT(ssv.isAuthoritative());
@@ -318,7 +318,7 @@ TEST(SetShardVersionRequest, ToSSVCommandFull) {
     const ChunkVersion chunkVersion(1, 2, OID::gen());
 
     SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioning(
-        configCS, "TestShard", shardCS, NamespaceString("db.coll"), chunkVersion, false);
+        configCS, ShardId("TestShard"), shardCS, NamespaceString("db.coll"), chunkVersion, false);
 
     ASSERT(!ssv.isInit());
     ASSERT(!ssv.isAuthoritative());
@@ -353,7 +353,7 @@ TEST(SetShardVersionRequest, ToSSVCommandFullAuthoritative) {
     const ChunkVersion chunkVersion(1, 2, OID::gen());
 
     SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioning(
-        configCS, "TestShard", shardCS, NamespaceString("db.coll"), chunkVersion, true);
+        configCS, ShardId("TestShard"), shardCS, NamespaceString("db.coll"), chunkVersion, true);
 
     ASSERT(!ssv.isInit());
     ASSERT(ssv.isAuthoritative());
@@ -388,7 +388,7 @@ TEST(SetShardVersionRequest, ToSSVCommandFullNoConnectionVersioning) {
     const ChunkVersion chunkVersion(1, 2, OID::gen());
 
     SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioningNoPersist(
-        configCS, "TestShard", shardCS, NamespaceString("db.coll"), chunkVersion, true);
+        configCS, ShardId("TestShard"), shardCS, NamespaceString("db.coll"), chunkVersion, true);
 
     ASSERT(!ssv.isInit());
     ASSERT(ssv.isAuthoritative());

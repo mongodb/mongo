@@ -33,6 +33,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/shard_id.h"
 
 namespace mongo {
 
@@ -158,10 +159,10 @@ public:
     }
     void setVersion(const ChunkVersion& version);
 
-    const std::string& getShard() const {
+    const ShardId& getShard() const {
         return _shard.get();
     }
-    void setShard(const std::string& shard);
+    void setShard(const ShardId& shard);
 
     bool getJumbo() const {
         return _jumbo.get_value_or(false);
@@ -180,7 +181,7 @@ private:
     // (M)  version of this chunk
     boost::optional<ChunkVersion> _version;
     // (M)  shard this chunk lives in
-    boost::optional<std::string> _shard;
+    boost::optional<ShardId> _shard;
     // (O)  too big to move?
     boost::optional<bool> _jumbo;
 };

@@ -68,7 +68,7 @@ public:
         return make_pair(chunk.getMin(), chunk.getMax());
     }
 
-    virtual ShardId shardFor(OperationContext* txn, const string& name) const {
+    virtual ShardId shardFor(OperationContext* txn, const ShardId& name) const {
         return name;
     }
 };
@@ -105,7 +105,7 @@ void convertBSONArrayToChunkTypes(const vector<BSONObj>& chunksArray,
 class ChunkDiffUnitTest : public mongo::unittest::Test {
 protected:
     typedef map<BSONObj, BSONObj, BSONObjCmp> RangeMap;
-    typedef map<string, ChunkVersion> VersionMap;
+    typedef map<ShardId, ChunkVersion> VersionMap;
 
     ChunkDiffUnitTest() = default;
     ~ChunkDiffUnitTest() = default;

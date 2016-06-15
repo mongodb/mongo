@@ -31,6 +31,7 @@
 #include <string>
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/s/shard_id.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -47,8 +48,8 @@ public:
                      const BSONObj& max,
                      int totalNumSteps,
                      std::string* cmdErrmsg,
-                     const std::string& toShard,
-                     const std::string& fromShard);
+                     const ShardId& toShard,
+                     const ShardId& fromShard);
     ~MoveTimingHelper();
 
     void done(int step);
@@ -60,8 +61,8 @@ private:
     OperationContext* const _txn;
     const std::string _where;
     const std::string _ns;
-    const std::string _to;
-    const std::string _from;
+    const ShardId _to;
+    const ShardId _from;
     const int _totalNumSteps;
     const std::string* _cmdErrmsg;
 

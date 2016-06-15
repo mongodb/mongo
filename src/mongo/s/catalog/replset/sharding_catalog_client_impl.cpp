@@ -471,7 +471,7 @@ Status ShardingCatalogClientImpl::shardCollection(OperationContext* txn,
         {
             BSONArrayBuilder initialShards(collectionDetail.subarrayStart("initShards"));
             for (const ShardId& shardId : initShardIds) {
-                initialShards.append(shardId);
+                initialShards.append(shardId.toString());
             }
         }
 
@@ -527,8 +527,9 @@ Status ShardingCatalogClientImpl::shardCollection(OperationContext* txn,
 }
 
 StatusWith<ShardDrainingStatus> ShardingCatalogClientImpl::removeShard(OperationContext* txn,
-                                                                       const std::string& name) {
+                                                                       const ShardId& shardId) {
     // Check preconditions for removing the shard
+    string name = shardId.toString();
     auto countStatus = _runCountCommandOnConfig(
         txn,
         NamespaceString(ShardType::ConfigNS),
@@ -634,7 +635,7 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::getDatabas
         DatabaseType dbt;
         dbt.setName(dbName);
         dbt.setSharded(false);
-        dbt.setPrimary("config");
+        dbt.setPrimary(ShardId("config"));
 
         return repl::OpTimeWith<DatabaseType>(dbt);
     }
@@ -936,12 +937,12 @@ StatusWith<BSONObj> ShardingCatalogClientImpl::getGlobalSettings(OperationContex
 }
 
 Status ShardingCatalogClientImpl::getDatabasesForShard(OperationContext* txn,
-                                                       const string& shardName,
+                                                       const ShardId& shardId,
                                                        vector<string>* dbs) {
     auto findStatus = _exhaustiveFindOnConfig(txn,
                                               kConfigReadSelector,
                                               NamespaceString(DatabaseType::ConfigNS),
-                                              BSON(DatabaseType::primary(shardName)),
+                                              BSON(DatabaseType::primary(shardId.toString())),
                                               BSONObj(),
                                               boost::none);  // no limit
     if (!findStatus.isOK()) {

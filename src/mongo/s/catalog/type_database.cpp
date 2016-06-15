@@ -86,7 +86,7 @@ Status DatabaseType::validate() const {
         return Status(ErrorCodes::NoSuchKey, "missing name");
     }
 
-    if (!_primary.is_initialized() || _primary->empty()) {
+    if (!_primary.is_initialized() || !_primary->isValid()) {
         return Status(ErrorCodes::NoSuchKey, "missing primary");
     }
 
@@ -100,7 +100,7 @@ Status DatabaseType::validate() const {
 BSONObj DatabaseType::toBSON() const {
     BSONObjBuilder builder;
     builder.append(name.name(), _name.get_value_or(""));
-    builder.append(primary.name(), _primary.get_value_or(""));
+    builder.append(primary.name(), _primary.get_value_or(ShardId()).toString());
     builder.append(sharded.name(), _sharded.get_value_or(false));
 
     return builder.obj();
@@ -115,8 +115,8 @@ void DatabaseType::setName(const std::string& name) {
     _name = name;
 }
 
-void DatabaseType::setPrimary(const std::string& primary) {
-    invariant(!primary.empty());
+void DatabaseType::setPrimary(const ShardId& primary) {
+    invariant(primary.isValid());
     _primary = primary;
 }
 

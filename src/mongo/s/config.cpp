@@ -579,14 +579,14 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
         ScopedDbConnection conn(shard->getConnString(), 30.0);
         BSONObj res;
         if (!conn->dropDatabase(_name, txn->getWriteConcern(), &res)) {
-            errmsg = res.toString() + " at " + _primaryId;
+            errmsg = res.toString() + " at " + _primaryId.toString();
             return 0;
         }
         conn.done();
         if (auto wcErrorElem = res["writeConcernError"]) {
             auto wcError = wcErrorElem.Obj();
             if (auto errMsgElem = wcError["errmsg"]) {
-                errmsg = errMsgElem.str() + " at " + _primaryId;
+                errmsg = errMsgElem.str() + " at " + _primaryId.toString();
                 return false;
             }
         }
@@ -602,14 +602,14 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
         ScopedDbConnection conn(shard->getConnString(), 30.0);
         BSONObj res;
         if (!conn->dropDatabase(_name, txn->getWriteConcern(), &res)) {
-            errmsg = res.toString() + " at " + shardId;
+            errmsg = res.toString() + " at " + shardId.toString();
             return 0;
         }
         conn.done();
         if (auto wcErrorElem = res["writeConcernError"]) {
             auto wcError = wcErrorElem.Obj();
             if (auto errMsgElem = wcError["errmsg"]) {
-                errmsg = errMsgElem.str() + " at " + shardId;
+                errmsg = errMsgElem.str() + " at " + shardId.toString();
                 return false;
             }
         }
@@ -724,7 +724,7 @@ void ConfigServer::replicaSetChangeConfigServerUpdateHook(const string& setName,
         auto status = grid.catalogClient(txn.get())->updateConfigDocument(
             txn.get(),
             ShardType::ConfigNS,
-            BSON(ShardType::name(s->getId())),
+            BSON(ShardType::name(s->getId().toString())),
             BSON("$set" << BSON(ShardType::host(newConnectionString))),
             false);
         if (!status.isOK()) {

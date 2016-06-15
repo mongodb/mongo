@@ -126,7 +126,7 @@ public:
 
             // Append shard result as a sub object.
             // Name the field after the shard.
-            result.append(cmdResult.shardTargetId, cmdResult.result);
+            result.append(cmdResult.shardTargetId.toString(), cmdResult.result);
         }
 
         return clusterCmdResult;

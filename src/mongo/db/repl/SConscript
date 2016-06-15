@@ -138,6 +138,7 @@ env.Library(
         'oplog_buffer_blocking_queue.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
     ],
 )
 

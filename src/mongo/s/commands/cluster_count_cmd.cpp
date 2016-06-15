@@ -162,16 +162,16 @@ public:
         for (vector<Strategy::CommandResult>::const_iterator iter = countResult.begin();
              iter != countResult.end();
              ++iter) {
-            const string& shardName = iter->shardTargetId;
+            const ShardId& shardName = iter->shardTargetId;
 
             if (iter->result["ok"].trueValue()) {
                 long long shardCount = iter->result["n"].numberLong();
 
-                shardSubTotal.appendNumber(shardName, shardCount);
+                shardSubTotal.appendNumber(shardName.toString(), shardCount);
                 total += shardCount;
             } else {
                 shardSubTotal.doneFast();
-                errmsg = "failed on : " + shardName;
+                errmsg = "failed on : " + shardName.toString();
                 result.append("cause", iter->result);
 
                 // Add "code" to the top-level response, if the failure of the sharded command

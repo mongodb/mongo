@@ -97,8 +97,8 @@ public:
         return make_pair(chunk.getMax(), c);
     }
 
-    string shardFor(OperationContext* txn, const string& hostName) const final {
-        const auto shard = grid.shardRegistry()->getShard(txn, hostName);
+    ShardId shardFor(OperationContext* txn, const ShardId& shardId) const final {
+        const auto shard = grid.shardRegistry()->getShard(txn, shardId);
         return shard->getId();
     }
 
@@ -674,13 +674,13 @@ IndexBounds ChunkManager::collapseQuerySolution(const QuerySolutionNode* node) {
     return bounds;
 }
 
-bool ChunkManager::compatibleWith(const ChunkManager& other, const string& shardName) const {
+bool ChunkManager::compatibleWith(const ChunkManager& other, const ShardId& shardName) const {
     // Return true if the shard version is the same in the two chunk managers
     // TODO: This doesn't need to be so strong, just major vs
     return other.getVersion(shardName).equals(getVersion(shardName));
 }
 
-ChunkVersion ChunkManager::getVersion(const std::string& shardName) const {
+ChunkVersion ChunkManager::getVersion(const ShardId& shardName) const {
     ShardVersionMap::const_iterator i = _shardVersions.find(shardName);
     if (i == _shardVersions.end()) {
         // Shards without explicitly tracked shard versions (meaning they have

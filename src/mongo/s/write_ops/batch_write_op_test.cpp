@@ -137,7 +137,7 @@ TEST(WriteOpTests, SingleOp) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpoint("shard", ChunkVersion::IGNORED());
+    ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterFullRange(nss, endpoint, &targeter);
 
@@ -177,7 +177,7 @@ TEST(WriteOpTests, SingleError) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpoint("shard", ChunkVersion::IGNORED());
+    ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterFullRange(nss, endpoint, &targeter);
 
@@ -223,7 +223,7 @@ TEST(WriteOpTests, SingleTargetError) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpoint("shard", ChunkVersion::IGNORED());
+    ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterHalfRange(nss, endpoint, &targeter);
 
@@ -266,7 +266,7 @@ TEST(WriteOpTests, SingleWriteConcernErrorOrdered) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpoint("shard", ChunkVersion::IGNORED());
+    ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterFullRange(nss, endpoint, &targeter);
 
@@ -316,7 +316,7 @@ TEST(WriteOpTests, SingleStaleError) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpoint("shard", ChunkVersion::IGNORED());
+    ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterFullRange(nss, endpoint, &targeter);
 
@@ -383,7 +383,7 @@ TEST(WriteOpTests, MultiOpSameShardOrdered) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpoint("shard", ChunkVersion::IGNORED());
+    ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterFullRange(nss, endpoint, &targeter);
 
@@ -427,7 +427,7 @@ TEST(WriteOpTests, MultiOpSameShardUnordered) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpoint("shard", ChunkVersion::IGNORED());
+    ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterFullRange(nss, endpoint, &targeter);
 
@@ -472,8 +472,8 @@ TEST(WriteOpTests, MultiOpTwoShardsOrdered) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpointA("shardA", ChunkVersion::IGNORED());
-    ShardEndpoint endpointB("shardB", ChunkVersion::IGNORED());
+    ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
+    ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
@@ -531,8 +531,8 @@ TEST(WriteOpTests, MultiOpTwoShardsUnordered) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpointA("shardA", ChunkVersion::IGNORED());
-    ShardEndpoint endpointB("shardB", ChunkVersion::IGNORED());
+    ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
+    ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
@@ -583,8 +583,8 @@ TEST(WriteOpTests, MultiOpTwoShardsEachOrdered) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpointA("shardA", ChunkVersion::IGNORED());
-    ShardEndpoint endpointB("shardB", ChunkVersion::IGNORED());
+    ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
+    ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
@@ -654,8 +654,8 @@ TEST(WriteOpTests, MultiOpTwoShardsEachUnordered) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpointA("shardA", ChunkVersion::IGNORED());
-    ShardEndpoint endpointB("shardB", ChunkVersion::IGNORED());
+    ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
+    ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
@@ -710,8 +710,8 @@ TEST(WriteOpTests, MultiOpOneOrTwoShardsOrdered) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpointA("shardA", ChunkVersion::IGNORED());
-    ShardEndpoint endpointB("shardB", ChunkVersion::IGNORED());
+    ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
+    ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
@@ -822,8 +822,8 @@ TEST(WriteOpTests, MultiOpOneOrTwoShardsUnordered) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpointA("shardA", ChunkVersion::IGNORED());
-    ShardEndpoint endpointB("shardB", ChunkVersion::IGNORED());
+    ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
+    ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
@@ -884,8 +884,8 @@ TEST(WriteOpTests, MultiOpSingleShardErrorUnordered) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpointA("shardA", ChunkVersion::IGNORED());
-    ShardEndpoint endpointB("shardB", ChunkVersion::IGNORED());
+    ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
+    ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
@@ -948,8 +948,8 @@ TEST(WriteOpTests, MultiOpTwoShardErrorsUnordered) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpointA("shardA", ChunkVersion::IGNORED());
-    ShardEndpoint endpointB("shardB", ChunkVersion::IGNORED());
+    ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
+    ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
@@ -1015,8 +1015,8 @@ TEST(WriteOpTests, MultiOpPartialSingleShardErrorUnordered) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpointA("shardA", ChunkVersion::IGNORED());
-    ShardEndpoint endpointB("shardB", ChunkVersion::IGNORED());
+    ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
+    ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
@@ -1082,8 +1082,8 @@ TEST(WriteOpTests, MultiOpPartialSingleShardErrorOrdered) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpointA("shardA", ChunkVersion::IGNORED());
-    ShardEndpoint endpointB("shardB", ChunkVersion::IGNORED());
+    ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
+    ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
@@ -1153,7 +1153,7 @@ TEST(WriteOpTests, MultiOpErrorAndWriteConcernErrorUnordered) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpoint("shard", ChunkVersion::IGNORED());
+    ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterFullRange(nss, endpoint, &targeter);
 
@@ -1197,8 +1197,8 @@ TEST(WriteOpTests, SingleOpErrorAndWriteConcernErrorOrdered) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpointA("shardA", ChunkVersion::IGNORED());
-    ShardEndpoint endpointB("shardB", ChunkVersion::IGNORED());
+    ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
+    ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
@@ -1248,7 +1248,7 @@ TEST(WriteOpTests, MultiOpFailedTargetOrdered) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpoint("shard", ChunkVersion::IGNORED());
+    ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterHalfRange(nss, endpoint, &targeter);
 
@@ -1311,7 +1311,7 @@ TEST(WriteOpTests, MultiOpFailedTargetUnordered) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpoint("shard", ChunkVersion::IGNORED());
+    ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterHalfRange(nss, endpoint, &targeter);
 
@@ -1368,8 +1368,8 @@ TEST(WriteOpTests, MultiOpFailedBatchOrdered) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpointA("shardA", ChunkVersion::IGNORED());
-    ShardEndpoint endpointB("shardB", ChunkVersion::IGNORED());
+    ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
+    ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
@@ -1421,8 +1421,8 @@ TEST(WriteOpTests, MultiOpFailedBatchUnordered) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpointA("shardA", ChunkVersion::IGNORED());
-    ShardEndpoint endpointB("shardB", ChunkVersion::IGNORED());
+    ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
+    ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
@@ -1474,8 +1474,8 @@ TEST(WriteOpTests, MultiOpAbortOrdered) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpointA("shardA", ChunkVersion::IGNORED());
-    ShardEndpoint endpointB("shardB", ChunkVersion::IGNORED());
+    ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
+    ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
@@ -1524,8 +1524,8 @@ TEST(WriteOpTests, MultiOpAbortUnordered) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpointA("shardA", ChunkVersion::IGNORED());
-    ShardEndpoint endpointB("shardB", ChunkVersion::IGNORED());
+    ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
+    ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
@@ -1565,8 +1565,8 @@ TEST(WriteOpTests, MultiOpTwoWCErrors) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpointA("shardA", ChunkVersion::IGNORED());
-    ShardEndpoint endpointB("shardB", ChunkVersion::IGNORED());
+    ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion::IGNORED());
+    ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterSplitRange(nss, endpointA, endpointB, &targeter);
 
@@ -1617,7 +1617,7 @@ TEST(WriteOpLimitTests, OneBigDoc) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpoint("shard", ChunkVersion::IGNORED());
+    ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterFullRange(nss, endpoint, &targeter);
 
@@ -1652,7 +1652,7 @@ TEST(WriteOpLimitTests, OneBigOneSmall) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpoint("shard", ChunkVersion::IGNORED());
+    ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterFullRange(nss, endpoint, &targeter);
 
@@ -1699,7 +1699,7 @@ TEST(WriteOpLimitTests, TooManyOps) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpoint("shard", ChunkVersion::IGNORED());
+    ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterFullRange(nss, endpoint, &targeter);
 
@@ -1745,7 +1745,7 @@ TEST(WriteOpLimitTests, UpdateOverheadIncluded) {
 
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpoint("shard", ChunkVersion::IGNORED());
+    ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
     MockNSTargeter targeter;
     initTargeterFullRange(nss, endpoint, &targeter);
 

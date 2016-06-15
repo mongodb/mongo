@@ -600,7 +600,7 @@ bool Balancer::_checkOIDs(OperationContext* txn) {
     shardingContext->shardRegistry()->getAllShardIds(&all);
 
     // map of OID machine ID => shardId
-    map<int, string> oids;
+    map<int, ShardId> oids;
 
     for (const ShardId& shardId : all) {
         const auto s = shardingContext->shardRegistry()->getShard(txn, shardId);

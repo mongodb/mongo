@@ -141,7 +141,7 @@ bool ClusterPlanCacheCmd::run(OperationContext* txn,
 
         // Append shard result as a sub object.
         // Name the field after the shard.
-        string shardName = cmdResult.shardTargetId;
+        string shardName = cmdResult.shardTargetId.toString();
         result.append(shardName, cmdResult.result);
     }
 

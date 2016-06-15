@@ -115,7 +115,7 @@ private:
 
     // Protects the lookup maps below.
     mutable stdx::mutex _mutex;
-    using ShardMap = std::unordered_map<ShardId, std::shared_ptr<Shard>>;
+    using ShardMap = std::unordered_map<ShardId, std::shared_ptr<Shard>, ShardId::Hasher>;
 
     // Map of both shardName -> Shard and hostName -> Shard
     ShardMap _lookup;

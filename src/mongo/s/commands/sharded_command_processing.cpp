@@ -31,10 +31,11 @@
 #include "mongo/s/commands/sharded_command_processing.h"
 
 #include "mongo/rpc/write_concern_error_detail.h"
+#include "mongo/s/shard_id.h"
 
 namespace mongo {
 
-void appendWriteConcernErrorToCmdResponse(const std::string& shardID,
+void appendWriteConcernErrorToCmdResponse(const ShardId& shardId,
                                           const BSONElement& wcErrorElem,
                                           BSONObjBuilder& responseBuilder) {
     WriteConcernErrorDetail wcError;
@@ -44,7 +45,7 @@ void appendWriteConcernErrorToCmdResponse(const std::string& shardID,
         wcError.setErrMessage("Failed to parse writeConcernError: " + wcErrorObj.toString() +
                               ", Received error: " + errMsg);
     }
-    wcError.setErrMessage(wcError.getErrMessage() + " at " + shardID);
+    wcError.setErrMessage(wcError.getErrMessage() + " at " + shardId.toString());
     responseBuilder.append("writeConcernError", wcError.toBSON());
 }
 }  // namespace mongo

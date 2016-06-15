@@ -119,7 +119,7 @@ shared_ptr<Shard> ShardRegistry::getConfigShard() const {
 }
 
 unique_ptr<Shard> ShardRegistry::createConnection(const ConnectionString& connStr) const {
-    return _shardFactory->createUniqueShard("<unnamed>", connStr);
+    return _shardFactory->createUniqueShard(ShardId("<unnamed>"), connStr);
 }
 
 shared_ptr<Shard> ShardRegistry::lookupRSName(const string& name) const {
@@ -127,7 +127,7 @@ shared_ptr<Shard> ShardRegistry::lookupRSName(const string& name) const {
 }
 
 void ShardRegistry::getAllShardIds(vector<ShardId>* all) const {
-    std::set<string> seen;
+    std::set<ShardId> seen;
     _data.getAllShardIds(seen);
     all->assign(seen.begin(), seen.end());
 }
@@ -146,7 +146,7 @@ void ShardRegistry::updateReplSetHosts(const ConnectionString& newConnString) {
 void ShardRegistry::startup() {
     stdx::unique_lock<stdx::mutex> reloadLock(_reloadMutex);
     invariant(_initConfigServerCS.isValid());
-    auto configShard = _shardFactory->createShard("config", _initConfigServerCS);
+    auto configShard = _shardFactory->createShard(ShardId("config"), _initConfigServerCS);
     _data.addConfigShard(configShard);
     // set to invalid so it cant be started more than once.
     _initConfigServerCS = ConnectionString();
@@ -302,11 +302,11 @@ void ShardRegistryData::toBSON(BSONObjBuilder* result) const {
     }
 }
 
-void ShardRegistryData::getAllShardIds(std::set<string>& seen) const {
+void ShardRegistryData::getAllShardIds(std::set<ShardId>& seen) const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     for (auto i = _lookup.begin(); i != _lookup.end(); ++i) {
         const auto& s = i->second;
-        if (s->getId() == "config") {
+        if (s->getId().toString() == "config") {
             continue;
         }
         seen.insert(s->getId());
@@ -377,8 +377,8 @@ void ShardRegistryData::_addShard_inlock(const std::shared_ptr<Shard>& shard) {
         // CUSTOM connection strings (ie "$dummy:10000) become DBDirectClient connections which
         // always return "localhost" as their response to getServerAddress().  This is just for
         // making dbtest work.
-        _lookup["localhost"] = shard;
-        _hostLookup[HostAndPort{"localhost"}] = shard;
+        _lookup[ShardId("localhost")] = shard;
+        _hostLookup[HostAndPort("localhost")] = shard;
     }
 
     // TODO: The only reason to have the shard host names in the lookup table is for the

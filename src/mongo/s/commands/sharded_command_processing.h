@@ -34,10 +34,12 @@
 
 namespace mongo {
 
+class ShardId;
+
 /**
  * This function appends the provided writeConcernError BSONElement to the sharded response.
  */
-void appendWriteConcernErrorToCmdResponse(const std::string& shardID,
+void appendWriteConcernErrorToCmdResponse(const ShardId& shardID,
                                           const BSONElement& wcErrorElem,
                                           BSONObjBuilder& responseBuilder);
 }  // namespace mongo

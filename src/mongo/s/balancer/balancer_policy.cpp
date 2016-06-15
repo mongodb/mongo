@@ -118,8 +118,8 @@ Status DistributionStatus::isShardSuitableReceiver(const ClusterStatistics::Shar
     return Status::OK();
 }
 
-string DistributionStatus::getBestReceieverShard(const string& tag) const {
-    string best;
+ShardId DistributionStatus::getBestReceieverShard(const string& tag) const {
+    ShardId best;
     unsigned minChunks = numeric_limits<unsigned>::max();
 
     for (const auto& stat : _shardInfo) {
@@ -143,8 +143,8 @@ string DistributionStatus::getBestReceieverShard(const string& tag) const {
     return best;
 }
 
-string DistributionStatus::getMostOverloadedShard(const string& tag) const {
-    string worst;
+ShardId DistributionStatus::getMostOverloadedShard(const string& tag) const {
+    ShardId worst;
     unsigned maxChunks = 0;
 
     for (const auto& stat : _shardInfo) {
@@ -274,7 +274,7 @@ MigrateInfo* BalancerPolicy::balance(const string& ns,
                 string tag = distribution.getTagForChunk(chunkToMove);
                 const ShardId to = distribution.getBestReceieverShard(tag);
 
-                if (to.size() == 0) {
+                if (!to.isValid()) {
                     warning() << "want to move chunk: " << chunkToMove << "(" << tag << ") "
                               << "from " << stat.shardId << " but can't find anywhere to put it";
                     continue;
@@ -313,7 +313,7 @@ MigrateInfo* BalancerPolicy::balance(const string& ns,
                 }
 
                 const ShardId to = distribution.getBestReceieverShard(tag);
-                if (to.size() == 0) {
+                if (!to.isValid()) {
                     log() << "no where to put it :(";
                     continue;
                 }
@@ -349,15 +349,15 @@ MigrateInfo* BalancerPolicy::balance(const string& ns,
         string tag = tags[i];
 
         const ShardId from = distribution.getMostOverloadedShard(tag);
-        if (from.size() == 0)
+        if (!from.isValid())
             continue;
 
         unsigned max = distribution.numberOfChunksInShardWithTag(from, tag);
         if (max == 0)
             continue;
 
-        string to = distribution.getBestReceieverShard(tag);
-        if (to.size() == 0) {
+        ShardId to = distribution.getBestReceieverShard(tag);
+        if (!to.isValid()) {
             log() << "no available shards to take chunks for tag [" << tag << "]";
             return NULL;
         }

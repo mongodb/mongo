@@ -127,7 +127,7 @@ BSONObj BalanceChunkRequest::serializeToMoveCommandForConfig(
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append(kConfigSvrMoveChunk, 1);
     cmdBuilder.appendElements(chunk.toBSON());
-    cmdBuilder.append(kToShardId, newShardId);
+    cmdBuilder.append(kToShardId, newShardId.toString());
     cmdBuilder.append(kMaxChunkSizeBytes, static_cast<long long>(maxChunkSizeBytes));
     {
         BSONObjBuilder secondaryThrottleBuilder(cmdBuilder.subobjStart(kSecondaryThrottle));

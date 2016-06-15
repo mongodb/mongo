@@ -95,7 +95,7 @@ public:
                            const std::set<ShardId>& initShardsIds) override;
 
     StatusWith<ShardDrainingStatus> removeShard(OperationContext* txn,
-                                                const std::string& name) override;
+                                                const ShardId& name) override;
 
     StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(OperationContext* txn,
                                                            const std::string& dbName) override;
@@ -111,7 +111,7 @@ public:
     Status dropCollection(OperationContext* txn, const NamespaceString& ns) override;
 
     Status getDatabasesForShard(OperationContext* txn,
-                                const std::string& shardName,
+                                const ShardId& shardName,
                                 std::vector<std::string>* dbs) override;
 
     Status getChunks(OperationContext* txn,

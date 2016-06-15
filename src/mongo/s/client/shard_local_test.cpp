@@ -76,7 +76,7 @@ void ShardLocalTest::setUp() {
     ServiceContextMongoDTest::setUp();
     Client::initThreadIfNotAlready();
     _txn = getGlobalServiceContext()->makeOperationContext(&cc());
-    _shardLocal = stdx::make_unique<ShardLocal>("shardOrConfig");
+    _shardLocal = stdx::make_unique<ShardLocal>(ShardId("shardOrConfig"));
     const repl::ReplSettings replSettings = {};
     repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
 }

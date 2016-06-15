@@ -40,7 +40,7 @@ namespace mongo {
 class BSONObjBuilder;
 template <typename T>
 class StatusWith;
-
+class ShardId;
 /**
  * Parses the arguments for a start chunk clone operation.
  */
@@ -62,7 +62,7 @@ public:
                                 const MigrationSessionId& sessionId,
                                 const ConnectionString& configServerConnectionString,
                                 const ConnectionString& fromShardConnectionString,
-                                const std::string& toShardId,
+                                const ShardId& toShardId,
                                 const BSONObj& chunkMinKey,
                                 const BSONObj& chunkMaxKey,
                                 const BSONObj& shardKeyPattern,

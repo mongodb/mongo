@@ -87,7 +87,7 @@ public:
                      BSONObjBuilder& result) {
         const string target = cmdObj.firstElement().valuestrsafe();
 
-        const auto s = grid.shardRegistry()->getShard(txn, target);
+        const auto s = grid.shardRegistry()->getShard(txn, ShardId(target));
         if (!s) {
             string msg(str::stream() << "Could not drop shard '" << target
                                      << "' because it does not exist");
@@ -131,17 +131,18 @@ public:
             case ShardDrainingStatus::STARTED:
                 result.append("msg", "draining started successfully");
                 result.append("state", "started");
-                result.append("shard", s->getId());
+                result.append("shard", s->getId().toString());
                 result.appendElements(dbInfo);
                 break;
             case ShardDrainingStatus::ONGOING: {
                 vector<ChunkType> chunks;
-                Status status = catalogClient->getChunks(txn,
-                                                         BSON(ChunkType::shard(s->getId())),
-                                                         BSONObj(),
-                                                         boost::none,  // return all
-                                                         &chunks,
-                                                         nullptr);
+                Status status =
+                    catalogClient->getChunks(txn,
+                                             BSON(ChunkType::shard(s->getId().toString())),
+                                             BSONObj(),
+                                             boost::none,  // return all
+                                             &chunks,
+                                             nullptr);
                 if (!status.isOK()) {
                     return appendCommandStatus(result, status);
                 }
@@ -161,7 +162,7 @@ public:
             case ShardDrainingStatus::COMPLETED:
                 result.append("msg", "removeshard completed successfully");
                 result.append("state", "completed");
-                result.append("shard", s->getId());
+                result.append("shard", s->getId().toString());
         }
 
         return true;

@@ -85,7 +85,7 @@ private:
 
 TEST_F(ShardRegistryDataTest, AddConfigShard) {
     ConnectionString configCS("rs/dummy1:1234,dummy2:2345,dummy3:3456", ConnectionString::SET);
-    auto configShard = shardFactory()->createShard("config", configCS);
+    auto configShard = shardFactory()->createShard(ShardId("config"), configCS);
 
     ShardRegistryData data;
     data.addConfigShard(configShard);

@@ -95,13 +95,13 @@ public:
      * @param forTag "" if you don't care, or a tag
      * @return shard best suited to receive a chunk
      */
-    std::string getBestReceieverShard(const std::string& tag) const;
+    ShardId getBestReceieverShard(const std::string& tag) const;
 
     /**
      * @return the shard with the most chunks
      *         based on # of chunks with the given tag
      */
-    std::string getMostOverloadedShard(const std::string& forTag) const;
+    ShardId getMostOverloadedShard(const std::string& forTag) const;
 
 
     // ---- basic accessors, counters, etc...

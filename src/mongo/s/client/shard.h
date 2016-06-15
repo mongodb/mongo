@@ -33,13 +33,12 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/s/shard_id.h"
 
 namespace mongo {
 
 class OperationContext;
 class RemoteCommandTargeter;
-
-using ShardId = std::string;
 
 /**
  * Presents an interface for talking to shards, regardless of whether that shard is remote or is

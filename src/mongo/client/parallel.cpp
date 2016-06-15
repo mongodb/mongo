@@ -678,7 +678,7 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
         } catch (SocketException& e) {
             warning() << "socket exception when initializing on " << shardId
                       << ", current connection state is " << mdata.toBSON() << causedBy(e);
-            e._shard = shardId;
+            e._shard = shardId.toString();
             mdata.errored = true;
             if (returnPartial) {
                 mdata.cleanup(true);
@@ -688,7 +688,7 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
         } catch (DBException& e) {
             warning() << "db exception when initializing on " << shardId
                       << ", current connection state is " << mdata.toBSON() << causedBy(e);
-            e._shard = shardId;
+            e._shard = shardId.toString();
             mdata.errored = true;
             if (returnPartial && e.getCode() == 15925 /* From above! */) {
                 mdata.cleanup(true);

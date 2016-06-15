@@ -110,7 +110,7 @@ private:
         RefreshType_ReloadDatabase
     };
 
-    typedef std::map<std::string, ChunkVersion> ShardVersionMap;
+    typedef std::map<ShardId, ChunkVersion> ShardVersionMap;
 
 
     /**

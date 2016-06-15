@@ -130,7 +130,7 @@ public:
                     bb.reset(new BSONObjBuilder());
                 }
 
-                bb->appendNumber(s->getId(), size);
+                bb->appendNumber(s->getId().toString(), size);
             }
         }
 

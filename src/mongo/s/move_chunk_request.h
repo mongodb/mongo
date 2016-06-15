@@ -66,8 +66,8 @@ public:
                                 const NamespaceString& nss,
                                 const ChunkVersion& shardVersion,
                                 const ConnectionString& configServerConnectionString,
-                                const std::string& fromShardId,
-                                const std::string& toShardId,
+                                const ShardId& fromShardId,
+                                const ShardId& toShardId,
                                 const ChunkRange& range,
                                 int64_t maxChunkSizeBytes,
                                 const MigrationSecondaryThrottleOptions& secondaryThrottle,
@@ -82,11 +82,11 @@ public:
         return _configServerCS;
     }
 
-    const std::string& getFromShardId() const {
+    const ShardId& getFromShardId() const {
         return _fromShardId;
     }
 
-    const std::string& getToShardId() const {
+    const ShardId& getToShardId() const {
         return _toShardId;
     }
 
@@ -135,10 +135,10 @@ private:
     ConnectionString _configServerCS;
 
     // The source shard id
-    std::string _fromShardId;
+    ShardId _fromShardId;
 
     // The recipient shard id
-    std::string _toShardId;
+    ShardId _toShardId;
 
     // Range of chunk chunk being moved
     ChunkRange _range;

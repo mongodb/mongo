@@ -128,7 +128,7 @@ protected:
     virtual std::pair<BSONObj, ValType> rangeFor(OperationContext* txn,
                                                  const ChunkType& chunk) const = 0;
 
-    virtual ShardId shardFor(OperationContext* txn, const std::string& name) const = 0;
+    virtual ShardId shardFor(OperationContext* txn, const ShardId& name) const = 0;
 
 private:
     void _assertAttached() const;

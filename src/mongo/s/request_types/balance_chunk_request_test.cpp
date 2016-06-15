@@ -60,7 +60,7 @@ TEST(BalanceChunkRequest, ParseFromConfigCommandNoSecondaryThrottle) {
     ASSERT_EQ("TestDB.TestColl", chunk.getNS());
     ASSERT_EQ(BSON("a" << -100LL), chunk.getMin());
     ASSERT_EQ(BSON("a" << 100LL), chunk.getMax());
-    ASSERT_EQ("TestShard0000", chunk.getShard());
+    ASSERT_EQ(ShardId("TestShard0000"), chunk.getShard());
     ASSERT_EQ(version, chunk.getVersion());
 
     const auto& secondaryThrottle = request.getSecondaryThrottle();
@@ -90,7 +90,7 @@ TEST(BalanceChunkRequest, ParseFromConfigCommandWithSecondaryThrottle) {
     ASSERT_EQ("TestDB.TestColl", chunk.getNS());
     ASSERT_EQ(BSON("a" << -100LL), chunk.getMin());
     ASSERT_EQ(BSON("a" << 100LL), chunk.getMax());
-    ASSERT_EQ("TestShard0000", chunk.getShard());
+    ASSERT_EQ(ShardId("TestShard0000"), chunk.getShard());
     ASSERT_EQ(version, chunk.getVersion());
 
     const auto& secondaryThrottle = request.getSecondaryThrottle();

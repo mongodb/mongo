@@ -177,7 +177,7 @@ void ShardRemote::updateReplSetMonitor(const HostAndPort& remoteHost,
 }
 
 std::string ShardRemote::toString() const {
-    return getId() + ":" + _originalConnString.toString();
+    return getId().toString() + ":" + _originalConnString.toString();
 }
 
 const BSONObj& ShardRemote::_getMetadataForCommand(const ReadPreferenceSetting& readPref) {

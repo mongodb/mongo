@@ -33,6 +33,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/s/shard_id.h"
 
 namespace mongo {
 namespace {
@@ -160,7 +161,7 @@ void StartChunkCloneRequest::appendAsCommand(
     const MigrationSessionId& sessionId,
     const ConnectionString& configServerConnectionString,
     const ConnectionString& fromShardConnectionString,
-    const std::string& toShardId,
+    const ShardId& toShardId,
     const BSONObj& chunkMinKey,
     const BSONObj& chunkMaxKey,
     const BSONObj& shardKeyPattern,
@@ -173,7 +174,7 @@ void StartChunkCloneRequest::appendAsCommand(
     sessionId.append(builder);
     builder->append(kConfigServerConnectionString, configServerConnectionString.toString());
     builder->append(kFromShardConnectionString, fromShardConnectionString.toString());
-    builder->append(kToShardId, toShardId);
+    builder->append(kToShardId, toShardId.toString());
     builder->append(kChunkMinKey, chunkMinKey);
     builder->append(kChunkMaxKey, chunkMaxKey);
     builder->append(kShardKeyPattern, shardKeyPattern);

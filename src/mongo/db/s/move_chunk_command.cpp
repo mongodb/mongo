@@ -149,7 +149,7 @@ public:
                 txn, moveChunkRequest.getConfigServerCS().toString());
         }
 
-        shardingState->setShardName(moveChunkRequest.getFromShardId());
+        shardingState->setShardName(moveChunkRequest.getFromShardId().toString());
 
         // Make sure we're as up-to-date as possible with shard information. This catches the case
         // where we might have changed a shard's host by removing/adding a shard with the same name.

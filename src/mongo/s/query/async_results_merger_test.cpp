@@ -55,7 +55,8 @@ using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 
 const HostAndPort kTestConfigShardHost = HostAndPort("FakeConfigHost", 12345);
-const std::vector<std::string> kTestShardIds = {"FakeShard1", "FakeShard2", "FakeShard3"};
+const std::vector<ShardId> kTestShardIds = {
+    ShardId("FakeShard1"), ShardId("FakeShard2"), ShardId("FakeShard3")};
 const std::vector<HostAndPort> kTestShardHosts = {HostAndPort("FakeShard1Host", 12345),
                                                   HostAndPort("FakeShard2Host", 12345),
                                                   HostAndPort("FakeShard3Host", 12345)};
@@ -74,7 +75,7 @@ public:
 
         for (size_t i = 0; i < kTestShardIds.size(); i++) {
             ShardType shardType;
-            shardType.setName(kTestShardIds[i]);
+            shardType.setName(kTestShardIds[i].toString());
             shardType.setHost(kTestShardHosts[i].toString());
 
             shards.push_back(shardType);
