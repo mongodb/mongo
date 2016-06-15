@@ -30,7 +30,6 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/s/balancer/balancer_chunk_selection_policy.h"
-#include "mongo/s/sharding_uptime_reporter.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -119,15 +118,24 @@ public:
                            const MigrationSecondaryThrottleOptions& secondaryThrottle,
                            bool waitForDelete);
 
+    /**
+     * Appends the runtime state of the balancer instance to the specified builder.
+     */
+    void report(BSONObjBuilder* builder);
+
 private:
     /**
      * Possible runtime states of the balancer. The comments indicate the allowed next state.
      */
     enum State {
-        kStopped,   // kRunning
-        kRunning,   // kStopping
-        kStopping,  // kStopped
+        kStopped,     // kRunning
+        kRunning,     // kStopping
+        kStopping,    // kStopped
+        kStateCount,  // Never reached
     };
+
+    // String representation of the balancer states for reporting purposes
+    static const char* kStateNames[kStateCount];
 
     /**
      * The main balancer loop, which runs in a separate thread.
@@ -180,9 +188,6 @@ private:
                     const MigrationSecondaryThrottleOptions& secondaryThrottle,
                     bool waitForDelete);
 
-    // The uptime reporter associated with this instance
-    const ShardingUptimeReporter _shardingUptimeReporter;
-
     // The main balancer thread
     stdx::thread _thread;
 
@@ -190,6 +195,11 @@ private:
     stdx::mutex _mutex;
     stdx::condition_variable _condVar;
     State _state{kStopped};
+
+    // Counts the number of balancing rounds done by this instance, since the balancer was first
+    // activated
+    bool _inBalancerRound{false};
+    int64_t _numBalancerRounds{0};
 
     // Number of moved chunks in last round
     int _balancedLastTime;

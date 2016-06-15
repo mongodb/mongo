@@ -349,7 +349,6 @@ env.Library(
 env.Library(
     target='serveronly',
     source=[
-        'd_sharding_server_status.cpp',
         'd_state.cpp',
         'sharding_egress_metadata_hook_for_mongod.cpp',
     ],

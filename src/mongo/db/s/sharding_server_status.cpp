@@ -31,45 +31,56 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/server_options.h"
+#include "mongo/s/balancer/balancer.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {
-
 namespace {
+
+const char kBalancer[] = "balancer";
 
 class ShardingServerStatus : public ServerStatusSection {
 public:
-    ShardingServerStatus();
+    ShardingServerStatus() : ServerStatusSection("sharding") {}
 
-    bool includeByDefault() const final;
+    bool includeByDefault() const final {
+        return true;
+    }
 
-    BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const final;
-};
+    BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const final {
+        BSONObjBuilder result;
+
+        _reportShardingState(txn, &result);
+        _reportBalancer(txn, &result);
+
+        return result.obj();
+    }
+
+private:
+    static void _reportShardingState(OperationContext* txn, BSONObjBuilder* builder) {
+        ShardingState* const shardingState = ShardingState::get(txn);
+
+        if (shardingState->enabled() &&
+            serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+            builder->append("configsvrConnectionString",
+                            shardingState->getConfigServer(txn).toString());
+
+            Grid::get(txn)->configOpTime().append(builder, "lastSeenConfigServerOpTime");
+        }
+    }
+
+    static void _reportBalancer(OperationContext* txn, BSONObjBuilder* builder) {
+        Balancer* const balancer = Balancer::get(txn);
+        if (balancer) {
+            BSONObjBuilder balancer(builder->subobjStart(kBalancer));
+            Balancer::get(txn)->report(&balancer);
+            balancer.doneFast();
+        }
+    }
+
+} shardingServerStatus;
 
 }  // namespace
-
-ShardingServerStatus shardingServerStatus;
-
-ShardingServerStatus::ShardingServerStatus() : ServerStatusSection("sharding") {}
-
-bool ShardingServerStatus::includeByDefault() const {
-    return true;
-}
-
-// This implementation runs on mongoD.
-BSONObj ShardingServerStatus::generateSection(OperationContext* txn,
-                                              const BSONElement& configElement) const {
-    ShardingState* shardingState = ShardingState::get(txn);
-    if (!shardingState->enabled()) {
-        return BSONObj();
-    }
-    BSONObjBuilder result;
-    result.append("configsvrConnectionString", shardingState->getConfigServer(txn).toString());
-
-    grid.configOpTime().append(&result, "lastSeenConfigServerOpTime");
-
-    return result.obj();
-}
-
 }  // namespace mongo

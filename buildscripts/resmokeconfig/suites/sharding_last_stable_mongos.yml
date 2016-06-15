@@ -22,7 +22,6 @@ selector:
     # NumInitialChunks verification changed. See SERVER-23327.
     - jstests/sharding/shard_collection_verify_initial_chunks.js
     # TODO: Enable when SERVER-22672 is complete
-    - jstests/sharding/balancer_window.js
     - jstests/sharding/printShardingStatus.js
     # TODO: Enable whan SERVER-XXXXX is complete
     - jstests/sharding/*auth*

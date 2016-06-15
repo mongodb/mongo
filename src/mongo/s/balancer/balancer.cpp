@@ -35,6 +35,7 @@
 #include <string>
 
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
@@ -297,11 +298,17 @@ MONGO_FP_DECLARE(skipBalanceRound);
 
 }  // namespace
 
+const char* Balancer::kStateNames[kStateCount] = {"stopped", "running", "stopping"};
+
 Balancer::Balancer()
     : _balancedLastTime(0),
       _chunkSelectionPolicy(stdx::make_unique<BalancerChunkSelectionPolicyImpl>(
           stdx::make_unique<ClusterStatisticsImpl>())),
-      _clusterStats(stdx::make_unique<ClusterStatisticsImpl>()) {}
+      _clusterStats(stdx::make_unique<ClusterStatisticsImpl>()) {
+
+    static_assert((sizeof(kStateNames) / sizeof(kStateNames[0])) == kStateCount,
+                  "(sizeof(kStateNames) / sizeof(kStateNames[0])) == kStateCount");
+}
 
 Balancer::~Balancer() {
     // The balancer thread must have been stopped
@@ -335,9 +342,9 @@ Status Balancer::startThread(OperationContext* txn) {
         // Intentional fall through
         case kRunning:
             return Status::OK();
+        default:
+            MONGO_UNREACHABLE;
     }
-
-    MONGO_UNREACHABLE;
 }
 
 void Balancer::stopThread() {
@@ -410,6 +417,13 @@ Status Balancer::moveSingleChunk(OperationContext* txn,
                                   waitForDelete);
 }
 
+void Balancer::report(BSONObjBuilder* builder) {
+    stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
+    builder->append("state", kStateNames[_state]);
+    builder->append("inBalancerRound", _inBalancerRound);
+    builder->append("numBalancerRounds", _numBalancerRounds);
+}
+
 void Balancer::_mainThread() {
     Client::initThread("Balancer");
 
@@ -457,7 +471,7 @@ void Balancer::_mainThread() {
         scopedBalancerLock = std::move(scopedDistLock.getValue());
     }
 
-    log() << "CSRS balancer started with instance id " << _shardingUptimeReporter.getInstanceId();
+    log() << "CSRS balancer started with instance id " << csrsBalancerLockSessionID;
 
     // Main balancer loop
     Seconds balanceRoundInterval(kBalanceRoundDefaultInterval);
@@ -558,15 +572,17 @@ bool Balancer::_stopRequested() {
 }
 
 void Balancer::_beginRound(OperationContext* txn) {
-    _shardingUptimeReporter.reportStatus(txn, true);
-
     // Use fresh shard state and balancer settings
     Grid::get(txn)->shardRegistry()->reload(txn);
+
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    _inBalancerRound = true;
 }
 
 void Balancer::_endRound(OperationContext* txn, Seconds waitTimeout) {
-    _shardingUptimeReporter.reportStatus(txn, false);
     stdx::unique_lock<stdx::mutex> lock(_mutex);
+    _inBalancerRound = false;
+    _numBalancerRounds++;
     _condVar.wait_for(lock, waitTimeout.toSystemDuration());
 }
 

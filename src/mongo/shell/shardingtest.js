@@ -578,9 +578,44 @@ var ShardingTest = function(params) {
     };
 
     /**
-     * Waits up to one minute for the difference in chunks between the most loaded shard and least
-     * loaded shard to be 0 or 1, indicating that the collection is well balanced. This should only
-     * be called after creating a big enough chunk difference to trigger balancing.
+     * Waits up to the specified timeout (with a default of 60s) for the balancer to execute one
+     * round.
+     */
+    this.awaitBalancerRound = function(timeoutMs) {
+        timeoutMs = timeoutMs || 60000;
+
+        // Get the balancer section from the server status of the config server primary
+        function getBalancerStatus() {
+            var csrsPrimary = self.configRS.getPrimary();
+            var serverStatus = csrsPrimary.adminCommand({serverStatus: 1, sharding: 1});
+            if (!serverStatus) {
+                throw Error('Unable to run serverStatus on "' + csrsPrimary + '"');
+            }
+
+            var balancerStatus = serverStatus.sharding.balancer;
+            if (!balancerStatus) {
+                throw Error('Host "' + csrsPrimary + '" does not have the balancer component');
+            }
+
+            if (balancerStatus.state !== 'running') {
+                throw Error('Balancer is stopped');
+            }
+
+            return balancerStatus;
+        }
+
+        var initialStatus = getBalancerStatus();
+        var currentStatus;
+        assert.soon(function() {
+            currentStatus = getBalancerStatus();
+            return (currentStatus.numBalancerRounds - initialStatus.numBalancerRounds) != 0;
+        }, 'Latest balancer status' + currentStatus, timeoutMs);
+    };
+
+    /**
+     * Waits up to one minute for the difference in chunks between the most loaded shard and
+     * least loaded shard to be 0 or 1, indicating that the collection is well balanced. This should
+     * only be called after creating a big enough chunk difference to trigger balancing.
      */
     this.awaitBalance = function(collName, dbName, timeToWait) {
         timeToWait = timeToWait || 60000;

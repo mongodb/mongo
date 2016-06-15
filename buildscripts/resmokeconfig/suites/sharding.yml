@@ -4,7 +4,6 @@ selector:
     - jstests/sharding/*.js
     exclude_files:
     # TODO: Enable when SERVER-22672 is complete
-    - jstests/sharding/balancer_window.js
     - jstests/sharding/printShardingStatus.js
 
 executor:
