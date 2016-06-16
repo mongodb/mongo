@@ -498,7 +498,7 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn) {
     }
 
     // Do initial sync.
-    if (false) {
+    if (_externalState->shouldUseDataReplicatorInitialSync()) {
         // TODO: make this async with callback.
         _dr.initialSync(txn);
     } else {
