@@ -44,12 +44,12 @@ const ServiceContext::Decoration<DBDirectClientFactory> forService =
 }  // namespace
 
 DBDirectClientFactory& DBDirectClientFactory::get(ServiceContext* context) {
-    fassert(40147, context);
+    fassert(40151, context);
     return forService(context);
 }
 
 DBDirectClientFactory& DBDirectClientFactory::get(OperationContext* txn) {
-    fassert(40148, txn);
+    fassert(40152, txn);
     return get(txn->getServiceContext());
 }
 
@@ -58,7 +58,7 @@ void DBDirectClientFactory::registerImplementation(Impl implementation) {
 }
 
 auto DBDirectClientFactory::create(OperationContext* txn) -> Result {
-    uassert(40149, "Cannot create a direct client in this context", _implementation);
+    uassert(40153, "Cannot create a direct client in this context", _implementation);
     return _implementation(txn);
 }
 
