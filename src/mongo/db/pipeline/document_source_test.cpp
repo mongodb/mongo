@@ -3417,6 +3417,102 @@ public:
 };
 }
 
+namespace DocumentSourceSortByCount {
+using mongo::DocumentSourceSortByCount;
+using mongo::DocumentSourceGroup;
+using mongo::DocumentSourceSort;
+using std::vector;
+using boost::intrusive_ptr;
+
+/**
+ * Fixture to test that $sortByCount returns a DocumentSourceGroup and DocumentSourceSort.
+ */
+class SortByCountReturnsGroupAndSort : public Mock::Base, public unittest::Test {
+public:
+    void testCreateFromBsonResult(BSONObj sortByCountSpec, Value expectedGroupExplain) {
+        vector<intrusive_ptr<DocumentSource>> result =
+            DocumentSourceSortByCount::createFromBson(sortByCountSpec.firstElement(), ctx());
+
+        ASSERT_EQUALS(result.size(), 2UL);
+
+        const auto* groupStage = dynamic_cast<DocumentSourceGroup*>(result[0].get());
+        ASSERT(groupStage);
+
+        const auto* sortStage = dynamic_cast<DocumentSourceSort*>(result[1].get());
+        ASSERT(sortStage);
+
+        // Serialize the DocumentSourceGroup and DocumentSourceSort from $sortByCount so that we can
+        // check the explain output to make sure $group and $sort have the correct fields.
+        const bool explain = true;
+        vector<Value> explainedStages;
+        groupStage->serializeToArray(explainedStages, explain);
+        sortStage->serializeToArray(explainedStages, explain);
+        ASSERT_EQUALS(explainedStages.size(), 2UL);
+
+        auto groupExplain = explainedStages[0];
+        ASSERT_EQ(groupExplain["$group"], expectedGroupExplain);
+
+        auto sortExplain = explainedStages[1];
+        auto expectedSortExplain = Value{Document{{"sortKey", Document{{"count", -1}}}}};
+        ASSERT_EQ(sortExplain["$sort"], expectedSortExplain);
+    }
+};
+
+TEST_F(SortByCountReturnsGroupAndSort, ExpressionFieldPathSpec) {
+    BSONObj spec = BSON("$sortByCount"
+                        << "$x");
+    Value expectedGroupExplain =
+        Value{Document{{"_id", "$x"}, {"count", Document{{"$sum", Document{{"$const", 1}}}}}}};
+    testCreateFromBsonResult(spec, expectedGroupExplain);
+}
+
+TEST_F(SortByCountReturnsGroupAndSort, ExpressionInObjectSpec) {
+    BSONObj spec = BSON("$sortByCount" << BSON("$floor"
+                                               << "$x"));
+    Value expectedGroupExplain =
+        Value{Document{{"_id", Document{{"$floor", Value{BSON_ARRAY("$x")}}}},
+                       {"count", Document{{"$sum", Document{{"$const", 1}}}}}}};
+    testCreateFromBsonResult(spec, expectedGroupExplain);
+
+    spec = BSON("$sortByCount" << BSON("$eq" << BSON_ARRAY("$x" << 15)));
+    expectedGroupExplain =
+        Value{Document{{"_id", Document{{"$eq", Value{BSON_ARRAY("$x" << BSON("$const" << 15))}}}},
+                       {"count", Document{{"$sum", Document{{"$const", 1}}}}}}};
+    testCreateFromBsonResult(spec, expectedGroupExplain);
+}
+
+/**
+ * Fixture to test error cases of the $sortByCount stage.
+ */
+class InvalidSortByCountSpec : public Mock::Base, public unittest::Test {
+public:
+    vector<intrusive_ptr<DocumentSource>> createSortByCount(BSONObj sortByCountSpec) {
+        auto specElem = sortByCountSpec.firstElement();
+        return DocumentSourceSortByCount::createFromBson(specElem, ctx());
+    }
+};
+
+TEST_F(InvalidSortByCountSpec, NonObjectNonStringSpec) {
+    BSONObj spec = BSON("$sortByCount" << 1);
+    ASSERT_THROWS_CODE(createSortByCount(spec), UserException, 40149);
+
+    spec = BSON("$sortByCount" << BSONNULL);
+    ASSERT_THROWS_CODE(createSortByCount(spec), UserException, 40149);
+}
+
+TEST_F(InvalidSortByCountSpec, NonExpressionInObjectSpec) {
+    BSONObj spec = BSON("$sortByCount" << BSON("field1"
+                                               << "$x"));
+    ASSERT_THROWS_CODE(createSortByCount(spec), UserException, 40147);
+}
+
+TEST_F(InvalidSortByCountSpec, NonFieldPathStringSpec) {
+    BSONObj spec = BSON("$sortByCount"
+                        << "test");
+    ASSERT_THROWS_CODE(createSortByCount(spec), UserException, 40148);
+}
+}  // namespace DocumentSourceSortByCount
+
 class All : public Suite {
 public:
     All() : Suite("documentsource") {}

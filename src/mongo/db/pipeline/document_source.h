@@ -73,17 +73,36 @@ class RecordCursor;
  *
  * As an example, if your document source looks like {"$foo": <args>}, with a parsing function
  * 'createFromBson', you would add this line:
- * REGISTER_EXPRESSION(foo, DocumentSourceFoo::createFromBson);
+ * REGISTER_DOCUMENT_SOURCE(foo, DocumentSourceFoo::createFromBson);
  */
-#define REGISTER_DOCUMENT_SOURCE(key, parser)                               \
-    MONGO_INITIALIZER(addToDocSourceParserMap_##key)(InitializerContext*) { \
-        DocumentSource::registerParser("$" #key, (parser));                 \
-        return Status::OK();                                                \
+#define REGISTER_DOCUMENT_SOURCE(key, parser)                                                      \
+    MONGO_INITIALIZER(addToDocSourceParserMap_##key)(InitializerContext*) {                        \
+        auto parserWrapper = [](BSONElement stageSpec,                                             \
+                                const boost::intrusive_ptr<ExpressionContext>& expCtx) {           \
+            return std::vector<boost::intrusive_ptr<DocumentSource>>{(parser)(stageSpec, expCtx)}; \
+        };                                                                                         \
+        DocumentSource::registerParser("$" #key, parserWrapper);                                   \
+        return Status::OK();                                                                       \
     }
+
+/**
+ * Registers an alias to have the name 'key'. When a stage with name '$key' is found,
+ * 'parser' will be called to construct a vector of DocumentSources.
+ *
+ * As an example, if your document source looks like {"$foo": <args>}, with a parsing function
+ * 'createFromBson', you would add this line:
+ * REGISTER_DOCUMENT_SOURCE_ALIAS(foo, DocumentSourceFoo::createFromBson);
+ */
+#define REGISTER_DOCUMENT_SOURCE_ALIAS(key, parser)                              \
+    MONGO_INITIALIZER(addAliasToDocSourceParserMap_##key)(InitializerContext*) { \
+        DocumentSource::registerParser("$" #key, (parser));                      \
+        return Status::OK();                                                     \
+    }
+
 
 class DocumentSource : public IntrusiveCounterUnsigned {
 public:
-    using Parser = stdx::function<boost::intrusive_ptr<DocumentSource>(
+    using Parser = stdx::function<std::vector<boost::intrusive_ptr<DocumentSource>>(
         BSONElement, const boost::intrusive_ptr<ExpressionContext>&)>;
 
     virtual ~DocumentSource() {}
@@ -209,7 +228,7 @@ public:
     /**
      * Create a DocumentSource pipeline stage from 'stageObj'.
      */
-    static boost::intrusive_ptr<DocumentSource> parse(
+    static std::vector<boost::intrusive_ptr<DocumentSource>> parse(
         const boost::intrusive_ptr<ExpressionContext> expCtx, BSONObj stageObj);
 
     /**
@@ -1690,5 +1709,14 @@ private:
     // If we absorbed a $unwind that specified 'includeArrayIndex', this is used to populate that
     // field, tracking how many results we've returned so far for the current input document.
     long long _outputIndex;
+};
+
+class DocumentSourceSortByCount final {
+public:
+    static std::vector<boost::intrusive_ptr<DocumentSource>> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+private:
+    DocumentSourceSortByCount() = default;
 };
 }
