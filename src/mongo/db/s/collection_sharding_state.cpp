@@ -44,19 +44,24 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/server_options.h"
+#include "mongo/s/catalog/sharding_catalog_manager.h"
+#include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
 
 namespace mongo {
 
 namespace {
 
+using std::string;
+
 /**
  * Used to perform shard identity initialization once it is certain that the document is committed.
  */
-class ShardIdentityLopOpHandler final : public RecoveryUnit::Change {
+class ShardIdentityLogOpHandler final : public RecoveryUnit::Change {
 public:
-    ShardIdentityLopOpHandler(OperationContext* txn, ShardIdentityType shardIdentity)
+    ShardIdentityLogOpHandler(OperationContext* txn, ShardIdentityType shardIdentity)
         : _txn(txn), _shardIdentity(std::move(shardIdentity)) {}
 
     void commit() override {
@@ -72,9 +77,32 @@ private:
     const ShardIdentityType _shardIdentity;
 };
 
-}  // unnamed namespace
+/**
+ * Used by the config server for backwards compatibility with 3.2 mongos to upsert a shardIdentity
+ * document (and thereby perform shard aware initialization) on a newly added shard.
+ */
+class LegacyAddShardLogOpHandler final : public RecoveryUnit::Change {
+public:
+    LegacyAddShardLogOpHandler(OperationContext* txn, ShardType shardType)
+        : _txn(txn), _shardType(std::move(shardType)) {}
 
-using std::string;
+    void commit() override {
+        // Only the primary should complete the addShard process by upserting the shardIdentity on
+        // the new shard.
+        if (repl::getGlobalReplicationCoordinator()->getMemberState().primary()) {
+            uassertStatusOK(
+                Grid::get(_txn)->catalogManager()->upsertShardIdentityOnShard(_txn, _shardType));
+        }
+    }
+
+    void rollback() override {}
+
+private:
+    OperationContext* _txn;
+    const ShardType _shardType;
+};
+
+}  // unnamed namespace
 
 CollectionShardingState::CollectionShardingState(
     NamespaceString nss, std::unique_ptr<CollectionMetadata> initialMetadata)
@@ -166,8 +194,20 @@ void CollectionShardingState::onInsertOp(OperationContext* txn, const BSONObj& i
                 auto shardIdentityDoc = uassertStatusOK(ShardIdentityType::fromBSON(insertedDoc));
                 uassertStatusOK(shardIdentityDoc.validate());
                 txn->recoveryUnit()->registerChange(
-                    new ShardIdentityLopOpHandler(txn, std::move(shardIdentityDoc)));
+                    new ShardIdentityLogOpHandler(txn, std::move(shardIdentityDoc)));
             }
+        }
+    }
+
+    // For backwards compatibility with 3.2 mongos, perform share aware initialization on a newly
+    // added shard on inserts to config.shards missing the "state" field. (On addShard, a 3.2
+    // mongos performs the insert into config.shards without a "state" field.)
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+        _nss == ShardType::ConfigNS) {
+        if (insertedDoc[ShardType::state.name()].eoo()) {
+            const auto shardType = uassertStatusOK(ShardType::fromBSON(insertedDoc));
+            txn->recoveryUnit()->registerChange(
+                new LegacyAddShardLogOpHandler(txn, std::move(shardType)));
         }
     }
 

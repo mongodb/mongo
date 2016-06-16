@@ -40,13 +40,9 @@ namespace mongo {
 
 const std::string ShardIdentityType::IdName("shardIdentity");
 
-namespace {
-
-const BSONField<std::string> configsvrConnString("configsvrConnectionString");
-const BSONField<std::string> shardName("shardName");
-const BSONField<OID> clusterId("clusterId");
-
-}  // unnamed namespace
+const BSONField<std::string> ShardIdentityType::configsvrConnString("configsvrConnectionString");
+const BSONField<std::string> ShardIdentityType::shardName("shardName");
+const BSONField<OID> ShardIdentityType::clusterId("clusterId");
 
 StatusWith<ShardIdentityType> ShardIdentityType::fromBSON(const BSONObj& source) {
     if (!source.hasField("_id")) {
@@ -204,31 +200,6 @@ const OID& ShardIdentityType::getClusterId() const {
 
 void ShardIdentityType::setClusterId(OID clusterId) {
     _clusterId = std::move(clusterId);
-}
-
-std::unique_ptr<BatchedUpdateRequest> ShardIdentityType::createUpsertForAddShard() const {
-    invariant(validate().isOK());
-
-    std::unique_ptr<BatchedUpdateDocument> updateDoc(new BatchedUpdateDocument());
-
-    BSONObjBuilder query;
-    query.append("_id", "shardIdentity");
-    query.append("shardName", getShardName());
-    query.append("clusterId", getClusterId());
-    updateDoc->setQuery(query.obj());
-
-    BSONObjBuilder update;
-    BSONObjBuilder setConfigBuilder(update.subobjStart("$set"));
-    setConfigBuilder.append(configsvrConnString(), getConfigsvrConnString().toString());
-    setConfigBuilder.doneFast();
-    updateDoc->setUpdateExpr(update.obj());
-
-    updateDoc->setUpsert(true);
-
-    std::unique_ptr<BatchedUpdateRequest> updateRequest(new BatchedUpdateRequest());
-    updateRequest->addToUpdates(updateDoc.release());
-
-    return updateRequest;
 }
 
 BSONObj ShardIdentityType::createConfigServerUpdateObject(const std::string& newConnString) {

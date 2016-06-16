@@ -384,7 +384,7 @@ public:
      * Directly inserts a document in the specified namespace on the config server. The document
      * must have an _id index. Must only be used for insertions in the 'config' database.
      *
-     * NOTE: Should not be used in new code. Instead add a new metadata operation to the interface.
+     * NOTE: Should not be used in new code outside the ShardingCatalogManager.
      */
     virtual Status insertConfigDocument(OperationContext* txn,
                                         const std::string& ns,
@@ -403,7 +403,7 @@ public:
      * was upserted or it existed and any of the fields changed) and false otherwise (basically
      * returns whether the update command's response update.n value is > 0).
      *
-     * NOTE: Should not be used in new code. Instead add a new metadata operation to the interface.
+     * NOTE: Should not be used in new code outside the ShardingCatalogManager.
      */
     virtual StatusWith<bool> updateConfigDocument(OperationContext* txn,
                                                   const std::string& ns,
@@ -416,7 +416,7 @@ public:
      * Removes documents matching a particular query predicate from the specified namespace on the
      * config server. Must only be used for deletions from the 'config' database.
      *
-     * NOTE: Should not be used in new code. Instead add a new metadata operation to the interface.
+     * NOTE: Should not be used in new code outside the ShardingCatalogManager.
      */
     virtual Status removeConfigDocuments(OperationContext* txn,
                                          const std::string& ns,

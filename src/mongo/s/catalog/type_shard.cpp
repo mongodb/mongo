@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -46,7 +47,7 @@ const BSONField<std::string> ShardType::host("host");
 const BSONField<bool> ShardType::draining("draining");
 const BSONField<long long> ShardType::maxSizeMB("maxSize");
 const BSONField<BSONArray> ShardType::tags("tags");
-
+const BSONField<ShardType::ShardState> ShardType::state("state");
 
 StatusWith<ShardType> ShardType::fromBSON(const BSONObj& source) {
     ShardType shard;
@@ -112,6 +113,27 @@ StatusWith<ShardType> ShardType::fromBSON(const BSONObj& source) {
         }
     }
 
+    {
+        long long shardState;
+        Status status = bsonExtractIntegerField(source, state.name(), &shardState);
+        if (status.isOK()) {
+            // Make sure the state field falls within the valid range of ShardState values.
+            if (!(shardState >= static_cast<std::underlying_type<ShardState>::type>(
+                                    ShardState::kNotShardAware) &&
+                  shardState <= static_cast<std::underlying_type<ShardState>::type>(
+                                    ShardState::kShardAware))) {
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "Invalid shard state value: " << shardState);
+            } else {
+                shard._state = static_cast<ShardState>(shardState);
+            }
+        } else if (status == ErrorCodes::NoSuchKey) {
+            // state field can be mssing in which case it is presumed kNotShardAware
+        } else {
+            return status;
+        }
+    }
+
     return shard;
 }
 
@@ -146,6 +168,8 @@ BSONObj ShardType::toBSON() const {
         builder.append(maxSizeMB(), getMaxSizeMB());
     if (_tags)
         builder.append(tags(), getTags());
+    if (_state)
+        builder.append(state(), static_cast<std::underlying_type<ShardState>::type>(getState()));
 
     return builder.obj();
 }
@@ -175,6 +199,10 @@ void ShardType::setMaxSizeMB(const long long maxSizeMB) {
 void ShardType::setTags(const std::vector<std::string>& tags) {
     invariant(tags.size() > 0);
     _tags = tags;
+}
+void ShardType::setState(const ShardState state) {
+    invariant(!_state.is_initialized());
+    _state = state;
 }
 
 }  // namespace mongo
