@@ -4440,6 +4440,8 @@ buildvariants:
     packager_distro: rhel62
   tasks:
   - name: compile
+    requires:
+    - name: burn_in_tests_WT
     distros:
     - rhel62-large
   - name: lint
