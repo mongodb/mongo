@@ -162,6 +162,16 @@ env.Library(
 )
 
 env.CppUnitTest(
+    target='clock_source_mock_test',
+    source=[
+        'clock_source_mock_test.cpp',
+    ],
+    LIBDEPS=[
+        'clock_source_mock',
+    ],
+)
+
+env.CppUnitTest(
     target='text_test',
     source=[
         'text_test.cpp'

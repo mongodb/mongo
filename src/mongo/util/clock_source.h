@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/stdx/functional.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -50,6 +51,28 @@ public:
      * Returns the current wall clock time, as defined by this source.
      */
     virtual Date_t now() = 0;
+
+    /**
+     * Schedules "action" to run sometime after this clock source reaches "when".
+     *
+     * Returns InternalError if this clock source does not implement setAlarm. May also
+     * return ShutdownInProgress during shutdown. Other errors are also allowed.
+     */
+    virtual Status setAlarm(Date_t when, stdx::function<void()> action) {
+        return {ErrorCodes::InternalError, "This clock source does not implement setAlarm."};
+    }
+
+    /**
+     * Returns true if this clock source (loosely) tracks the OS clock used for things
+     * like condition_variable::wait_until. Virtualized clocks used for testing return
+     * false here, and should provide an implementation for setAlarm, above.
+     */
+    bool tracksSystemClock() const {
+        return _tracksSystemClock;
+    }
+
+protected:
+    bool _tracksSystemClock = true;
 };
 
 }  // namespace mongo

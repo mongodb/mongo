@@ -28,6 +28,10 @@
 
 #pragma once
 
+#include <utility>
+#include <vector>
+
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/time_support.h"
 
@@ -41,10 +45,13 @@ public:
     /**
      * Constructs a ClockSourceMock with the current time set to the Unix epoch.
      */
-    ClockSourceMock() = default;
+    ClockSourceMock() {
+        _tracksSystemClock = false;
+    }
 
     Milliseconds getPrecision() override;
-    Date_t now() final;
+    Date_t now() override;
+    Status setAlarm(Date_t when, stdx::function<void()> action) override;
 
     /**
      * Advances the current time by the given value.
@@ -57,7 +64,12 @@ public:
     void reset(Date_t newNow);
 
 private:
+    using Alarm = std::pair<Date_t, stdx::function<void()>>;
+    void _processAlarms(stdx::unique_lock<stdx::mutex> lk);
+
+    stdx::mutex _mutex;
     Date_t _now;
+    std::vector<Alarm> _alarms;
 };
 
 }  // namespace mongo
