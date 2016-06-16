@@ -87,7 +87,7 @@ bool OplogBufferCollection::pushAllNonBlocking(OperationContext* txn,
 
 void OplogBufferCollection::waitForSpace(OperationContext* txn, std::size_t size) {}
 
-bool OplogBufferCollection::isEmpty(OperationContext* txn) const {
+bool OplogBufferCollection::isEmpty() const {
     return true;
 }
 
@@ -95,11 +95,11 @@ std::size_t OplogBufferCollection::getMaxSize() const {
     return 0;
 }
 
-std::size_t OplogBufferCollection::getSize(OperationContext* txn) const {
+std::size_t OplogBufferCollection::getSize() const {
     return 0;
 }
 
-std::size_t OplogBufferCollection::getCount(OperationContext* txn) const {
+std::size_t OplogBufferCollection::getCount() const {
     return 0;
 }
 

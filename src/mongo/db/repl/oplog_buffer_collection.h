@@ -62,10 +62,10 @@ public:
                             Batch::const_iterator begin,
                             Batch::const_iterator end) override;
     void waitForSpace(OperationContext* txn, std::size_t size) override;
-    bool isEmpty(OperationContext* txn) const override;
+    bool isEmpty() const override;
     std::size_t getMaxSize() const override;
-    std::size_t getSize(OperationContext* txn) const override;
-    std::size_t getCount(OperationContext* txn) const override;
+    std::size_t getSize() const override;
+    std::size_t getCount() const override;
     void clear(OperationContext* txn) override;
     bool tryPop(OperationContext* txn, Value* value) override;
     Value blockingPop(OperationContext* txn) override;

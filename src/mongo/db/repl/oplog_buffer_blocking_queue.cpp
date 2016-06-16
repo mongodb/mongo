@@ -72,7 +72,7 @@ void OplogBufferBlockingQueue::waitForSpace(OperationContext*, std::size_t size)
     _queue.waitForSpace(size);
 }
 
-bool OplogBufferBlockingQueue::isEmpty(OperationContext*) const {
+bool OplogBufferBlockingQueue::isEmpty() const {
     return _queue.empty();
 }
 
@@ -80,11 +80,11 @@ std::size_t OplogBufferBlockingQueue::getMaxSize() const {
     return kOplogBufferSize;
 }
 
-std::size_t OplogBufferBlockingQueue::getSize(OperationContext*) const {
+std::size_t OplogBufferBlockingQueue::getSize() const {
     return _queue.size();
 }
 
-std::size_t OplogBufferBlockingQueue::getCount(OperationContext*) const {
+std::size_t OplogBufferBlockingQueue::getCount() const {
     return _queue.count();
 }
 

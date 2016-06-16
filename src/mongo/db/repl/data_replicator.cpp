@@ -494,7 +494,7 @@ Timestamp DataReplicator::getLastTimestampApplied() const {
 
 size_t DataReplicator::getOplogBufferCount() const {
     // Oplog buffer is internally synchronized.
-    return _oplogBuffer->getCount(nullptr);
+    return _oplogBuffer->getCount();
 }
 
 std::string DataReplicator::getDiagnosticString() const {
@@ -502,7 +502,7 @@ std::string DataReplicator::getDiagnosticString() const {
     str::stream out;
     out << "DataReplicator -"
         << " opts: " << _opts.toString() << " oplogFetcher: " << _fetcher->toString()
-        << " opsBuffered: " << _oplogBuffer->getSize(nullptr) << " state: " << toString(_state);
+        << " opsBuffered: " << _oplogBuffer->getSize() << " state: " << toString(_state);
     switch (_state) {
         case DataReplicatorState::InitialSync:
             out << " opsAppied: " << _initialSyncState->appliedOps
@@ -948,7 +948,7 @@ void DataReplicator::_doNextActions_Steady_inlock() {
     }
 
     // Check if no active apply and ops to apply
-    if (!_applierActive && _oplogBuffer->getSize(nullptr)) {
+    if (!_applierActive && _oplogBuffer->getSize()) {
         _scheduleApplyBatch_inlock();
     }
 
@@ -1349,7 +1349,7 @@ void DataReplicator::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
     _oplogBuffer->waitForSpace(nullptr, info.toApplyDocumentBytes);
 
     OCCASIONALLY {
-        LOG(2) << "bgsync buffer has " << _oplogBuffer->getSize(nullptr) << " bytes";
+        LOG(2) << "bgsync buffer has " << _oplogBuffer->getSize() << " bytes";
     }
 
     // Buffer docs for later application.

@@ -507,7 +507,7 @@ void BackgroundSync::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
     _oplogBuffer->waitForSpace(txn.get(), info.toApplyDocumentBytes);
 
     OCCASIONALLY {
-        LOG(2) << "bgsync buffer has " << _oplogBuffer->getSize(txn.get()) << " bytes";
+        LOG(2) << "bgsync buffer has " << _oplogBuffer->getSize() << " bytes";
     }
 
     // Buffer docs for later application.
@@ -558,7 +558,7 @@ void BackgroundSync::_rollback(OperationContext* txn,
         // Wait until the buffer is empty.
         // This is an indication that syncTail has removed the sentinal marker from the buffer
         // and reset its local lastAppliedOpTime via the replCoord.
-        while (!_oplogBuffer->isEmpty(txn)) {
+        while (!_oplogBuffer->isEmpty()) {
             sleepmillis(10);
             if (inShutdown()) {
                 return;
@@ -614,7 +614,7 @@ void BackgroundSync::stop() {
 }
 
 void BackgroundSync::start(OperationContext* txn) {
-    massert(16235, "going to start syncing, but buffer is not empty", _oplogBuffer->isEmpty(txn));
+    massert(16235, "going to start syncing, but buffer is not empty", _oplogBuffer->isEmpty());
 
     long long lastFetchedHash = _readLastAppliedHash(txn);
     stdx::lock_guard<stdx::mutex> lk(_mutex);

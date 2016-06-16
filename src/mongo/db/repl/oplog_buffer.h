@@ -113,7 +113,7 @@ public:
     /**
      * Returns true if oplog buffer is empty.
      */
-    virtual bool isEmpty(OperationContext* txn) const = 0;
+    virtual bool isEmpty() const = 0;
 
     /**
      * Maximum size of all oplog entries that can be stored in this oplog buffer as measured by the
@@ -127,12 +127,12 @@ public:
      * Total size of all oplog entries in this oplog buffer as measured by the BSONObj::objsize()
      * function.
      */
-    virtual std::size_t getSize(OperationContext* txn) const = 0;
+    virtual std::size_t getSize() const = 0;
 
     /**
      * Returns the number/count of items in the oplog buffer.
      */
-    virtual std::size_t getCount(OperationContext* txn) const = 0;
+    virtual std::size_t getCount() const = 0;
 
     /**
      * Clears oplog buffer.
