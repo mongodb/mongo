@@ -45,8 +45,6 @@ variables:
   name: template
   depends_on:
   - name: compile
-  requires:
-  - name: burn_in_tests_WT
   commands:
   - func: "do setup"
   - func: "run tests"
