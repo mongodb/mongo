@@ -194,8 +194,6 @@ public:
             BSON("clone" << fromShard->getConnString().toString() << "collsToIgnore" << barr.arr()
                          << bypassDocumentValidationCommandOption()
                          << true
-                         << "_checkForCatalogChange"
-                         << true
                          << "writeConcern"
                          << txn->getWriteConcern().toBSON()),
             cloneRes);

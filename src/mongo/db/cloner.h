@@ -114,11 +114,6 @@ private:
  *  snapshot    - use snapshot mode for copying collections.  note this should not be used
  *                when it isn't required, as it will be slower.  for example,
  *                repairDatabase need not use it.
- *  checkForCatalogChange - Internal option set for clone commands initiated by a mongos that are
- *                holding a distributed lock (such as movePrimary).  Indicates that we need to
- *                be periodically checking to see if the catalog manager has swapped and fail
- *                if it has so that we don't block the mongos that initiated the command.
- *                TODO: This can be removed now - it was only used during 3.0->3.2 upgrade.
  *  createCollections - When 'true', will fetch a list of collections from the remote and create
  *                them.  When 'false', assumes collections have already been created ahead of time.
  */
@@ -132,7 +127,6 @@ struct CloneOptions {
 
     bool syncData = true;
     bool syncIndexes = true;
-    bool checkForCatalogChange = false;
     bool createCollections = true;
 };
 
