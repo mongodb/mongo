@@ -1051,6 +1051,8 @@ var ShardingTest = function(params) {
             rsDefaults = Object.merge(rsDefaults, otherParams.rsOptions);
             rsDefaults = Object.merge(rsDefaults, otherParams["rs" + i]);
             rsDefaults.nodes = rsDefaults.nodes || otherParams.numReplicas;
+            var rsSettings = rsDefaults.settings;
+            delete rsDefaults.settings;
 
             var numReplicas = rsDefaults.nodes || 3;
             delete rsDefaults.nodes;
@@ -1068,7 +1070,8 @@ var ShardingTest = function(params) {
                 bridgeOptions: otherParams.bridgeOptions,
                 keyFile: keyFile,
                 protocolVersion: protocolVersion,
-                shardSvr: true
+                shardSvr: true,
+                settings: rsSettings
             });
 
             this._rs[i] = {
