@@ -254,15 +254,20 @@ private:
     std::unique_ptr<DataReplicator> _dr;
 };
 
+ServiceContext::UniqueOperationContext makeOpCtx() {
+    return cc().makeOperationContext();
+}
+
 TEST_F(DataReplicatorTest, CreateDestroy) {}
 
 TEST_F(DataReplicatorTest, StartOk) {
-    ASSERT_EQ(getDR().start().code(), ErrorCodes::OK);
+    ASSERT_OK(getDR().start(makeOpCtx().get()));
 }
 
 TEST_F(DataReplicatorTest, CannotInitialSyncAfterStart) {
-    ASSERT_EQ(getDR().start().code(), ErrorCodes::OK);
-    ASSERT_EQ(getDR().initialSync(nullptr), ErrorCodes::AlreadyInitialized);
+    auto txn = makeOpCtx();
+    ASSERT_OK(getDR().start(txn.get()));
+    ASSERT_EQ(ErrorCodes::AlreadyInitialized, getDR().initialSync(txn.get()));
 }
 
 // Used to run a Initial Sync in a separate thread, to avoid blocking test execution.
@@ -500,8 +505,8 @@ TEST_F(InitialSyncTest, Complete) {
         };
 
     // Initial sync flag should not be set before starting.
-    ASSERT_FALSE(StorageInterface::get(getGlobalServiceContext())
-                     ->getInitialSyncFlag(cc().makeOperationContext().get()));
+    auto txn = makeOpCtx();
+    ASSERT_FALSE(StorageInterface::get(getGlobalServiceContext())->getInitialSyncFlag(txn.get()));
 
     startSync();
 
@@ -510,8 +515,7 @@ TEST_F(InitialSyncTest, Complete) {
     playResponses(false);
 
     // Initial sync flag should be set.
-    ASSERT_TRUE(StorageInterface::get(getGlobalServiceContext())
-                    ->getInitialSyncFlag(cc().makeOperationContext().get()));
+    ASSERT_TRUE(StorageInterface::get(getGlobalServiceContext())->getInitialSyncFlag(txn.get()));
 
     // Play rest of the responses after checking initial sync flag.
     setResponses({responses.begin() + 1, responses.end()});
@@ -520,8 +524,7 @@ TEST_F(InitialSyncTest, Complete) {
     verifySync();
 
     // Initial sync flag should not be set after completion.
-    ASSERT_FALSE(StorageInterface::get(getGlobalServiceContext())
-                     ->getInitialSyncFlag(cc().makeOperationContext().get()));
+    ASSERT_FALSE(StorageInterface::get(getGlobalServiceContext())->getInitialSyncFlag(txn.get()));
 }
 
 TEST_F(InitialSyncTest, MissingDocOnMultiApplyCompletes) {
@@ -736,7 +739,7 @@ protected:
         _memberState = MemberState::RS_UNKNOWN;
         auto net = getNet();
         net->enterNetwork();
-        ASSERT_OK(dr.start());
+        ASSERT_OK(dr.start(makeOpCtx().get()));
     }
 
     void _testOplogFetcherFailed(const BSONObj& oplogFetcherResponse,
@@ -747,17 +750,16 @@ protected:
                                  const MemberState& expectedFinalState,
                                  const DataReplicatorState& expectedDataReplicatorState,
                                  int expectedNextSourceNum) {
-        stdx::mutex mutex;
         OperationContext* rollbackTxn = nullptr;
         HostAndPort rollbackSource;
-        unittest::Barrier barrier(2U);
+        DataReplicatorState stateDuringRollback = DataReplicatorState::Uninitialized;
+        // Rollback happens on network thread now instead of DB worker thread previously.
         _rollbackFn = [&](OperationContext* txn,
                           const OpTime& lastOpTimeWritten,
                           const HostAndPort& syncSource) -> Status {
-            stdx::lock_guard<stdx::mutex> lock(mutex);
             rollbackTxn = txn;
             rollbackSource = syncSource;
-            barrier.countDownAndWait();
+            stateDuringRollback = getDR().getState();
             return rollbackStatus;
         };
 
@@ -769,17 +771,11 @@ protected:
         net->runReadyNetworkOperations();
 
         // Replicator state should be ROLLBACK before rollback function returns.
-        DataReplicator& dr = getDR();
-        ASSERT_EQUALS(toString(DataReplicatorState::Rollback), toString(dr.getState()));
+        ASSERT_EQUALS(toString(DataReplicatorState::Rollback), toString(stateDuringRollback));
+        ASSERT_TRUE(rollbackTxn);
+        ASSERT_EQUALS(expectedRollbackSource, rollbackSource);
 
-        // Wait for rollback function to be called.
-        barrier.countDownAndWait();
-        {
-            stdx::lock_guard<stdx::mutex> lock(mutex);
-            ASSERT_TRUE(rollbackTxn);
-            ASSERT_EQUALS(expectedRollbackSource, rollbackSource);
-        }
-
+        auto&& dr = getDR();
         dr.waitForState(expectedDataReplicatorState);
 
         // Wait for data replicator to request a new sync source if rollback is expected to fail.
@@ -801,9 +797,10 @@ protected:
 TEST_F(SteadyStateTest, StartWhenInSteadyState) {
     DataReplicator& dr = getDR();
     ASSERT_EQUALS(toString(DataReplicatorState::Uninitialized), toString(dr.getState()));
-    ASSERT_OK(dr.start());
+    auto txn = makeOpCtx();
+    ASSERT_OK(dr.start(txn.get()));
     ASSERT_EQUALS(toString(DataReplicatorState::Steady), toString(dr.getState()));
-    ASSERT_EQUALS(ErrorCodes::IllegalOperation, dr.start().code());
+    ASSERT_EQUALS(ErrorCodes::IllegalOperation, dr.start(txn.get()));
 }
 
 TEST_F(SteadyStateTest, ShutdownAfterStart) {
@@ -811,11 +808,12 @@ TEST_F(SteadyStateTest, ShutdownAfterStart) {
     ASSERT_EQUALS(toString(DataReplicatorState::Uninitialized), toString(dr.getState()));
     auto net = getNet();
     net->enterNetwork();
-    ASSERT_OK(dr.start());
+    auto txn = makeOpCtx();
+    ASSERT_OK(dr.start(txn.get()));
     ASSERT_TRUE(net->hasReadyRequests());
     getReplExecutor().shutdown();
     ASSERT_EQUALS(toString(DataReplicatorState::Steady), toString(dr.getState()));
-    ASSERT_EQUALS(ErrorCodes::IllegalOperation, dr.start().code());
+    ASSERT_EQUALS(ErrorCodes::IllegalOperation, dr.start(txn.get()));
 }
 
 TEST_F(SteadyStateTest, RequestShutdownAfterStart) {
@@ -823,14 +821,15 @@ TEST_F(SteadyStateTest, RequestShutdownAfterStart) {
     ASSERT_EQUALS(toString(DataReplicatorState::Uninitialized), toString(dr.getState()));
     auto net = getNet();
     net->enterNetwork();
-    ASSERT_OK(dr.start());
+    auto txn = makeOpCtx();
+    ASSERT_OK(dr.start(txn.get()));
     ASSERT_TRUE(net->hasReadyRequests());
     ASSERT_EQUALS(toString(DataReplicatorState::Steady), toString(dr.getState()));
     // Simulating an invalid remote oplog query response. This will invalidate the existing
     // sync source but that's fine because we're not testing oplog processing.
     scheduleNetworkResponse(BSON("ok" << 0));
     net->runReadyNetworkOperations();
-    ASSERT_OK(dr.scheduleShutdown());
+    ASSERT_OK(dr.scheduleShutdown(txn.get()));
     net->exitNetwork();  // runs work item scheduled in 'scheduleShutdown()).
     dr.waitForShutdown();
     ASSERT_EQUALS(toString(DataReplicatorState::Uninitialized), toString(dr.getState()));
@@ -863,7 +862,7 @@ TEST_F(SteadyStateTest, ScheduleNextActionFailsAfterChoosingEmptySyncSource) {
     ASSERT_EQUALS(toString(DataReplicatorState::Uninitialized), toString(dr.getState()));
     auto net = getNet();
     net->enterNetwork();
-    ASSERT_OK(dr.start());
+    ASSERT_OK(dr.start(makeOpCtx().get()));
     ASSERT_EQUALS(HostAndPort(), dr.getSyncSource());
     ASSERT_EQUALS(toString(DataReplicatorState::Uninitialized), toString(dr.getState()));
 }
@@ -877,7 +876,7 @@ TEST_F(SteadyStateTest, ChooseNewSyncSourceAfterFailedNetworkRequest) {
     ASSERT_EQUALS(toString(DataReplicatorState::Uninitialized), toString(dr.getState()));
     auto net = getNet();
     net->enterNetwork();
-    ASSERT_OK(dr.start());
+    ASSERT_OK(dr.start(makeOpCtx().get()));
     ASSERT_TRUE(net->hasReadyRequests());
     ASSERT_EQUALS(toString(DataReplicatorState::Steady), toString(dr.getState()));
     // Simulating an invalid remote oplog query response to cause the data replicator to
@@ -1044,7 +1043,7 @@ TEST_F(SteadyStateTest, PauseDataReplicator) {
     auto net = getNet();
     net->enterNetwork();
 
-    ASSERT_OK(dr.start());
+    ASSERT_OK(dr.start(makeOpCtx().get()));
 
     ASSERT_TRUE(net->hasReadyRequests());
     {
@@ -1140,7 +1139,7 @@ TEST_F(SteadyStateTest, ApplyOneOperation) {
     net->enterNetwork();
 
     auto& dr = getDR();
-    ASSERT_OK(dr.start());
+    ASSERT_OK(dr.start(makeOpCtx().get()));
 
     ASSERT_TRUE(net->hasReadyRequests());
     {

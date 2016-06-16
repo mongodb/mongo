@@ -169,13 +169,13 @@ public:
 
     virtual ~DataReplicator();
 
-    Status start();
-    Status shutdown();
+    Status start(OperationContext* txn);
+    Status shutdown(OperationContext* txn);
 
     /**
      * Cancels outstanding work and begins shutting down.
      */
-    Status scheduleShutdown();
+    Status scheduleShutdown(OperationContext* txn);
 
     /**
      * Waits for data replicator to finish shutting down.
@@ -221,7 +221,7 @@ public:
 
     // For testing only
 
-    void _resetState_inlock(Timestamp lastAppliedOpTime);
+    void _resetState_inlock(OperationContext* txn, Timestamp lastAppliedOpTime);
     void _setInitialSyncStorageInterface(CollectionCloner::StorageInterface* si);
 
 private:
@@ -281,7 +281,7 @@ private:
     void _waitOnAll_inlock();
     bool _anyActiveHandles_inlock() const;
 
-    Status _shutdown();
+    Status _shutdown(OperationContext* txn);
     void _changeStateIfNeeded();
 
     // Set during construction
