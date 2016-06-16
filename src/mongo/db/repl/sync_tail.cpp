@@ -638,6 +638,7 @@ private:
 
         while (!_inShutdown.load()) {
             const auto batchStartTime = fastClockSource->now();
+            const int slaveDelaySecs = durationCount<Seconds>(replCoord->getSlaveDelaySecs());
 
             OpQueue ops;
             // tryPopAndWaitForMore returns true when we need to end a batch early
@@ -653,10 +654,8 @@ private:
                         break;
                 }
 
-                const int slaveDelaySecs = durationCount<Seconds>(replCoord->getSlaveDelaySecs());
                 if (!ops.empty() && slaveDelaySecs > 0) {
-                    const BSONObj lastOp = ops.back().raw;
-                    const unsigned int opTimestampSecs = lastOp["ts"].timestamp().getSecs();
+                    const unsigned int opTimestampSecs = ops.back().ts.timestamp().getSecs();
 
                     // Stop the batch as the lastOp is too new to be applied. If we continue
                     // on, we can get ops that are way ahead of the delay and this will
