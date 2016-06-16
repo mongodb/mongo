@@ -26,6 +26,8 @@
  * it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
 #include "mongo/platform/basic.h"
 
 #include <vector>
@@ -54,6 +56,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -299,6 +302,21 @@ public:
             bool keepCursor = false;
 
             const bool isCursorCommand = !cmdObj["cursor"].eoo();
+
+            // Use of the aggregate command without specifying to use a cursor is deprecated.
+            // Applications should migrate to using cursors. Cursors are strictly more useful than
+            // outputting the results as a single document, since results that fit inside a single
+            // BSONObj will also fit inside a single batch.
+            //
+            // We occasionally log a deprecation warning.
+            if (!isCursorCommand) {
+                RARELY {
+                    warning()
+                        << "Use of the aggregate command without the 'cursor' "
+                           "option is deprecated. See "
+                           "http://dochub.mongodb.org/core/aggregate-without-cursor-deprecation.";
+                }
+            }
 
             // If both explain and cursor are specified, explain wins.
             if (pPipeline->isExplain()) {
