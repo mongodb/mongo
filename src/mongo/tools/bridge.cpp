@@ -59,7 +59,6 @@
 #include "mongo/util/net/message.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers.h"
-#include "mongo/util/static_observer.h"
 #include "mongo/util/text.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
@@ -384,7 +383,6 @@ MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
 }  // namespace
 
 int bridgeMain(int argc, char** argv, char** envp) {
-    static StaticObserver staticObserver;
 
     registerShutdownTask([&] {
         // NOTE: This function may be called at any time. It must not

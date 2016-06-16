@@ -362,7 +362,6 @@ public:
      * mongo initializers:
      *
      *     int myMain(int argc, char** argv, char** envp) {
-     *         static StaticObserver StaticObserver;
      *         Command::testCommandsEnabled = true;
      *         ...
      *         runGlobalInitializersOrDie(argc, argv, envp);

@@ -101,7 +101,6 @@
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers.h"
 #include "mongo/util/stacktrace.h"
-#include "mongo/util/static_observer.h"
 #include "mongo/util/stringutils.h"
 #include "mongo/util/system_clock_source.h"
 #include "mongo/util/system_tick_source.h"
@@ -449,7 +448,7 @@ MONGO_INITIALIZER_GENERAL(setSSLManagerType, MONGO_NO_PREREQUISITES, ("SSLManage
 
 int mongoSMain(int argc, char* argv[], char** envp) {
     mongo::setMongos();
-    static StaticObserver staticObserver;
+
     if (argc < 1)
         return EXIT_FAILURE;
 

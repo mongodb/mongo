@@ -119,7 +119,6 @@ baseSource=[
     'util/stacktrace.cpp',
     'util/stacktrace_${TARGET_OS_FAMILY}.cpp',
     'util/startup_test.cpp',
-    'util/static_observer.cpp',
     'util/stringutils.cpp',
     'util/system_clock_source.cpp',
     'util/system_tick_source.cpp',

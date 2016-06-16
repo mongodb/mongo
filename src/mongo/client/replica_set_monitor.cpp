@@ -47,12 +47,10 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/background.h"
-#include "mongo/util/concurrency/mutex.h"  // for StaticObserver
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
-#include "mongo/util/static_observer.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/timer.h"
 
@@ -94,8 +92,6 @@ const Milliseconds kFindHostMaxBackOffTime(500);
 // TODO: Move to ReplicaSetMonitorManager
 ReplicaSetMonitor::ConfigChangeHook asyncConfigChangeHook;
 ReplicaSetMonitor::ConfigChangeHook syncConfigChangeHook;
-
-StaticObserver staticObserver;
 
 //
 // Helpers for stl algorithms
