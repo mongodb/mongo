@@ -306,6 +306,13 @@ var ReplSetTest = function(opts) {
             {ts: Timestamp(0, 0), t: NumberLong(0)};
     }
 
+    function _isEarlierTimestamp(ts1, ts2) {
+        if (ts1.getTime() == ts2.getTime()) {
+            return ts1.getInc() < ts2.getInc();
+        }
+        return ts1.getTime() < ts2.getTime();
+    }
+
     function _isEarlierOpTime(ot1, ot2) {
         // Make sure both optimes have a timestamp and a term.
         ot1 = ot1.t ? ot1 : {ts: ot1, t: NumberLong(-1)};
@@ -319,7 +326,7 @@ var ReplSetTest = function(opts) {
         }
 
         // Otherwise, choose the optime with the lower timestamp.
-        return ot1.ts < ot2.ts;
+        return _isEarlierTimestamp(ot1.ts, ot2.ts);
     }
 
     /**
