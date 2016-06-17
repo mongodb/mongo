@@ -17,6 +17,10 @@ allocation is attempted. See the WiredTiger POSIX file system
 implementation for an example of how the fallocate method might be
 changed after initialization.
 
+WT_FILE_SYSTEM and WT_FILE_HANDLE methods are expected to return POSIX
+1003.1 standard error codes on failure. Additionally, they may return
+::WT_PANIC in order to shut down the system.
+
 WT_FILE_SYSTEM and WT_FILE_HANDLE methods which fail but not fatally
 (for example, a WT_FILE_HANDLE::truncate method call which fails because
 the file is currently mapped into memory), should return EBUSY.
