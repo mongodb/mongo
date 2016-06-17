@@ -1445,33 +1445,30 @@ bool Command::run(OperationContext* txn,
     const std::string db = request.getDatabase().toString();
 
     BSONObjBuilder inPlaceReplyBob(replyBuilder->getInPlaceReplyBuilder(bytesToReserve));
+    auto readConcernArgsStatus = extractReadConcern(txn, cmd, supportsReadConcern());
 
-    {
-        auto readConcernArgsStatus = extractReadConcern(txn, cmd, supportsReadConcern());
-        if (!readConcernArgsStatus.isOK()) {
-            auto result = appendCommandStatus(inPlaceReplyBob, readConcernArgsStatus.getStatus());
-            inPlaceReplyBob.doneFast();
-            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
-            return result;
-        }
-
-        Status rcStatus = waitForReadConcern(txn, readConcernArgsStatus.getValue());
-        if (!rcStatus.isOK()) {
-            if (rcStatus == ErrorCodes::ExceededTimeLimit) {
-                const int debugLevel =
-                    serverGlobalParams.clusterRole == ClusterRole::ConfigServer ? 0 : 2;
-                LOG(debugLevel) << "Command on database " << db
-                                << " timed out waiting for read concern to be satisfied. Command: "
-                                << getRedactedCopyForLogging(request.getCommandArgs());
-            }
-
-            auto result = appendCommandStatus(inPlaceReplyBob, rcStatus);
-            inPlaceReplyBob.doneFast();
-            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
-            return result;
-        }
+    if (!readConcernArgsStatus.isOK()) {
+        auto result = appendCommandStatus(inPlaceReplyBob, readConcernArgsStatus.getStatus());
+        inPlaceReplyBob.doneFast();
+        replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+        return result;
     }
 
+    Status rcStatus = waitForReadConcern(txn, readConcernArgsStatus.getValue());
+    if (!rcStatus.isOK()) {
+        if (rcStatus == ErrorCodes::ExceededTimeLimit) {
+            const int debugLevel =
+                serverGlobalParams.clusterRole == ClusterRole::ConfigServer ? 0 : 2;
+            LOG(debugLevel) << "Command on database " << db
+                            << " timed out waiting for read concern to be satisfied. Command: "
+                            << getRedactedCopyForLogging(request.getCommandArgs());
+        }
+
+        auto result = appendCommandStatus(inPlaceReplyBob, rcStatus);
+        inPlaceReplyBob.doneFast();
+        replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+        return result;
+    }
     auto wcResult = extractWriteConcern(txn, cmd, db, supportsWriteConcern(cmd));
     if (!wcResult.isOK()) {
         auto result = appendCommandStatus(inPlaceReplyBob, wcResult.getStatus());
@@ -1479,7 +1476,6 @@ bool Command::run(OperationContext* txn,
         replyBuilder->setMetadata(rpc::makeEmptyMetadata());
         return result;
     }
-
     std::string errmsg;
     bool result;
     if (!supportsWriteConcern(cmd)) {
@@ -1511,6 +1507,23 @@ bool Command::run(OperationContext* txn,
             inPlaceReplyBob.resetToEmpty();
             appendCommandStatus(inPlaceReplyBob, waitForWCStatus);
             inPlaceReplyBob.appendElementsUnique(temp);
+        }
+    }
+
+    // When a linearizable read command is passed in, check to make sure we're reading
+    // from the primary.
+    if (supportsReadConcern() && (readConcernArgsStatus.getValue().getLevel() ==
+                                  repl::ReadConcernLevel::kLinearizableReadConcern) &&
+        (request.getCommandName() != "getMore")) {
+
+        auto linearizableReadStatus = waitForLinearizableReadConcern(txn);
+
+        if (!linearizableReadStatus.isOK()) {
+            inPlaceReplyBob.resetToEmpty();
+            auto result = appendCommandStatus(inPlaceReplyBob, linearizableReadStatus);
+            inPlaceReplyBob.doneFast();
+            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+            return result;
         }
     }
 

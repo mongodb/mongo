@@ -35,9 +35,12 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
@@ -76,6 +79,16 @@ StatusWith<repl::ReadConcernArgs> extractReadConcern(OperationContext* txn,
 
 Status waitForReadConcern(OperationContext* txn, const repl::ReadConcernArgs& readConcernArgs) {
     repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(txn);
+
+    if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern) {
+        if (!readConcernArgs.getOpTime().isNull())
+            return {ErrorCodes::FailedToParse,
+                    "afterOpTime not compatible with linearizable read concern"};
+
+        if (!replCoord->getMemberState().primary())
+            return {ErrorCodes::NotMaster,
+                    "cannot satisfy linearizable read concern on non-primary node"};
+    }
 
     // Skip waiting for the OpTime when testing snapshot behavior
     if (!testingSnapshotBehaviorInIsolation && !readConcernArgs.isEmpty()) {
@@ -117,17 +130,40 @@ Status waitForReadConcern(OperationContext* txn, const repl::ReadConcernArgs& re
         LOG(debugLevel) << "Using 'committed' snapshot: " << CurOp::get(txn)->query();
     }
 
-    if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern) {
-        if (!readConcernArgs.getOpTime().isNull())
-            return {ErrorCodes::FailedToParse,
-                    "afterOpTime not compatible with linearizable read concern"};
-
-        if (!replCoord->getMemberState().primary())
-            return {ErrorCodes::NotMaster,
-                    "cannot satisfy linearizable read concern on non-primary node"};
-    }
-
     return Status::OK();
+}
+
+Status waitForLinearizableReadConcern(OperationContext* txn) {
+
+    repl::ReplicationCoordinator* replCoord =
+        repl::ReplicationCoordinator::get(txn->getClient()->getServiceContext());
+
+    {
+        ScopedTransaction transaction(txn, MODE_IX);
+        Lock::DBLock lk(txn->lockState(), "local", MODE_IX);
+        Lock::CollectionLock lock(txn->lockState(), "local.oplog.rs", MODE_IX);
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+
+            WriteUnitOfWork uow(txn);
+            txn->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
+                txn,
+                BSON("msg"
+                     << "linearizable read"));
+            uow.commit();
+        }
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
+            txn, "waitForLinearizableReadConcern", "local.rs.oplog");
+    }
+    WriteConcernOptions wc = WriteConcernOptions(
+        WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, 0);
+
+    repl::OpTime lastOpApplied = repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
+    auto awaitReplResult = replCoord->awaitReplication(txn, lastOpApplied, wc);
+    if (awaitReplResult.status == ErrorCodes::WriteConcernFailed) {
+        return Status(ErrorCodes::LinearizableReadConcernError,
+                      "Failed to confirm that read was linearizable.");
+    }
+    return awaitReplResult.status;
 }
 
 }  // namespace mongo

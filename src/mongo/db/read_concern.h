@@ -35,10 +35,10 @@ class OperationContext;
 class Status;
 template <typename T>
 class StatusWith;
-
 namespace repl {
 class ReadConcernArgs;
 }
+
 
 /**
  * Given the specified command and whether it supports read concern, returns an effective read
@@ -54,5 +54,11 @@ StatusWith<repl::ReadConcernArgs> extractReadConcern(OperationContext* txn,
  * perform the wait.
  */
 Status waitForReadConcern(OperationContext* txn, const repl::ReadConcernArgs& readConcernArgs);
+
+/*
+ * Given a linearizable read command, confirm that
+ * current primary is still the true primary of the replica set.
+ */
+Status waitForLinearizableReadConcern(OperationContext* txn);
 
 }  // namespace mongo
