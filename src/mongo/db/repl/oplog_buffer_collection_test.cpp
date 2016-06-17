@@ -169,6 +169,8 @@ TEST_F(OplogBufferCollectionTest, addIdToDocumentChangesTimestampToId) {
     ASSERT_EQUALS(expectedOp, OplogBufferCollection::addIdToDocument(originalOp));
 }
 
+#if 0
+
 TEST_F(OplogBufferCollectionTest, PushOneDocumentWithPushAllNonBlockingAddsDocument) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(nss);
@@ -393,5 +395,6 @@ TEST_F(OplogBufferCollectionTest, ClearClearsCollection) {
     ASSERT_FALSE(oplogBuffer.tryPop(_txn.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
 }
+#endif
 
 }  // namespace
