@@ -35,7 +35,10 @@ static char home[512];			/* Program working dir */
 static const char *progname;		/* Program name */
 static const char * const uri = "table:main";
 
-#define	NTHREADS	5
+#define	MAX_TH	12
+#define	MIN_TH	5
+#define	MAX_TIME	40
+#define	MIN_TIME	10
 #define	RECORDS_FILE	"records-%u"
 
 #define	ENV_CONFIG						\
@@ -147,6 +150,7 @@ fill_db(uint32_t nth)
 	if ((ret = session->close(session, NULL)) != 0)
 		testutil_die(ret, "WT_SESSION:close");
 
+	printf("Create %" PRIu32 " writer threads\n", nth);
 	for (i = 0; i < nth; ++i) {
 		td[i].conn = conn;
 		td[i].start = (UINT64_MAX / nth) * i;
@@ -188,6 +192,7 @@ main(int argc, char *argv[])
 	uint32_t absent, count, i, nth, timeout;
 	int ch, status, ret;
 	pid_t pid;
+	bool rand_th, rand_time;
 	const char *working_dir;
 	char fname[64], kname[64];
 
@@ -196,18 +201,22 @@ main(int argc, char *argv[])
 	else
 		++progname;
 
-	working_dir = "WT_TEST.random-abort-many";
-	timeout = 10;
-	nth = NTHREADS;
+	nth = MIN_TH;
+	rand_th = rand_time = true;
+	timeout = MIN_TIME;
+	working_dir = "WT_TEST.random-abort";
+
 	while ((ch = __wt_getopt(progname, argc, argv, "h:T:t:")) != EOF)
 		switch (ch) {
 		case 'h':
 			working_dir = __wt_optarg;
 			break;
 		case 'T':
+			rand_th = false;
 			nth = (uint32_t)atoi(__wt_optarg);
 			break;
 		case 't':
+			rand_time = false;
 			timeout = (uint32_t)atoi(__wt_optarg);
 			break;
 		default:
@@ -221,6 +230,19 @@ main(int argc, char *argv[])
 	testutil_work_dir_from_path(home, 512, working_dir);
 	testutil_make_work_dir(home);
 
+	__wt_random_init_seed(NULL, &rnd);
+	if (rand_time) {
+		timeout = __wt_random(&rnd) % MAX_TIME;
+		if (timeout < MIN_TIME)
+			timeout = MIN_TIME;
+	}
+	if (rand_th) {
+		nth = __wt_random(&rnd) % MAX_TH;
+		if (nth < MIN_TH)
+			nth = MIN_TH;
+	}
+	printf("Parent: Create %u threads; sleep %" PRIu32 " seconds\n",
+	    nth, timeout);
 	/*
 	 * Fork a child to insert as many items.  We will then randomly
 	 * kill the child, run recovery and make sure all items we wrote
@@ -235,9 +257,7 @@ main(int argc, char *argv[])
 	}
 
 	/* parent */
-	__wt_random_init(&rnd);
 	/* Sleep for the configured amount of time before killing the child. */
-	printf("Parent: sleep %" PRIu32 " seconds, then kill child\n", timeout);
 	sleep(timeout);
 
 	/*
@@ -268,8 +288,10 @@ main(int argc, char *argv[])
 	absent = count = 0;
 	for (i = 0; i < nth; ++i) {
 		snprintf(fname, sizeof(fname), RECORDS_FILE, i);
-		if ((fp = fopen(fname, "r")) == NULL)
+		if ((fp = fopen(fname, "r")) == NULL) {
+			fprintf(stderr, "Failed to open %s. i %u\n", fname, i);
 			testutil_die(errno, "fopen");
+		}
 
 		/*
 		 * For every key in the saved file, verify that the key exists
