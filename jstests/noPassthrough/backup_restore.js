@@ -68,6 +68,7 @@
             "    'auth_create_role.js'," + "    'auth_create_user.js'," +
             "    'auth_drop_role.js'," + "    'auth_drop_user.js'," +
             "    'reindex_background.js'," + "    'yield_sort.js'," +
+            "    'create_index_background.js'," +
             "].map(function(file) { return dir + '/' + file; });" + "Random.setRandomSeed();" +
             // run indefinitely
             "while (true) {" + "   try {" +
