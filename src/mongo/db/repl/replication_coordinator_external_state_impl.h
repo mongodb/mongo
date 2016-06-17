@@ -97,7 +97,8 @@ public:
     virtual void multiSyncApply(const MultiApplier::Operations& ops) override;
     virtual void multiInitialSyncApply(const MultiApplier::Operations& ops,
                                        const HostAndPort& source) override;
-    virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer() const override;
+    virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(
+        OperationContext* txn) const override;
     virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer() const override;
     virtual bool shouldUseDataReplicatorInitialSync() const override;
 

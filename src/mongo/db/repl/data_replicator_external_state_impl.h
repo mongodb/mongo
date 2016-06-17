@@ -53,7 +53,7 @@ public:
     bool shouldStopFetching(const HostAndPort& source,
                             const rpc::ReplSetMetadata& metadata) override;
 
-    std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer() const override;
+    std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(OperationContext* txn) const override;
 
     std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer() const override;
 

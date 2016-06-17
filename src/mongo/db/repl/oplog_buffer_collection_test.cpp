@@ -57,6 +57,7 @@ protected:
 protected:
     ServiceContext::UniqueOperationContext makeOperationContext() const;
 
+    StorageInterface* _storageInterface = nullptr;
     ServiceContext::UniqueOperationContext _txn;
 
 private:
@@ -79,13 +80,17 @@ void OplogBufferCollectionTest::setUp() {
     ReplicationCoordinator::set(serviceContext,
                                 stdx::make_unique<ReplicationCoordinatorMock>(replSettings));
 
-    StorageInterface::set(serviceContext, stdx::make_unique<StorageInterfaceImpl>());
+    auto storageInterface = stdx::make_unique<StorageInterfaceImpl>();
+    _storageInterface = storageInterface.get();
+    StorageInterface::set(serviceContext, std::move(storageInterface));
 
     _txn = makeOperationContext();
 }
 
 void OplogBufferCollectionTest::tearDown() {
     _txn.reset();
+
+    _storageInterface = nullptr;
 
     ServiceContextMongoDTest::tearDown();
 }
@@ -122,17 +127,17 @@ BSONObj makeOplogEntry(int t) {
 
 TEST_F(OplogBufferCollectionTest, DefaultNamespace) {
     ASSERT_EQUALS(OplogBufferCollection::getDefaultNamespace(),
-                  OplogBufferCollection().getNamespace());
+                  OplogBufferCollection(_storageInterface).getNamespace());
 }
 
 TEST_F(OplogBufferCollectionTest, GetNamespace) {
     auto nss = makeNamespace(_agent);
-    ASSERT_EQUALS(nss, OplogBufferCollection(nss).getNamespace());
+    ASSERT_EQUALS(nss, OplogBufferCollection(_storageInterface, nss).getNamespace());
 }
 
 TEST_F(OplogBufferCollectionTest, StartupCreatesCollection) {
     auto nss = makeNamespace(_agent);
-    OplogBufferCollection oplogBuffer(nss);
+    OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     // Collection should not exist until startup() is called.
     ASSERT_FALSE(AutoGetCollectionForRead(_txn.get(), nss).getCollection());
@@ -143,7 +148,7 @@ TEST_F(OplogBufferCollectionTest, StartupCreatesCollection) {
 
 TEST_F(OplogBufferCollectionTest, ShutdownDropsCollection) {
     auto nss = makeNamespace(_agent);
-    OplogBufferCollection oplogBuffer(nss);
+    OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_txn.get());
     ASSERT_TRUE(AutoGetCollectionForRead(_txn.get(), nss).getCollection());
@@ -153,7 +158,7 @@ TEST_F(OplogBufferCollectionTest, ShutdownDropsCollection) {
 
 TEST_F(OplogBufferCollectionTest, extractEmbeddedOplogDocumentChangesIdToTimestamp) {
     auto nss = makeNamespace(_agent);
-    OplogBufferCollection oplogBuffer(nss);
+    OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     const BSONObj expectedOp = makeOplogEntry(1);
     BSONObj originalOp = BSON("_id" << Timestamp(1, 1) << "entry" << expectedOp);
@@ -162,7 +167,7 @@ TEST_F(OplogBufferCollectionTest, extractEmbeddedOplogDocumentChangesIdToTimesta
 
 TEST_F(OplogBufferCollectionTest, addIdToDocumentChangesTimestampToId) {
     auto nss = makeNamespace(_agent);
-    OplogBufferCollection oplogBuffer(nss);
+    OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     const BSONObj originalOp = makeOplogEntry(1);
     BSONObj expectedOp = BSON("_id" << Timestamp(1, 1) << "entry" << originalOp);
@@ -173,7 +178,7 @@ TEST_F(OplogBufferCollectionTest, addIdToDocumentChangesTimestampToId) {
 
 TEST_F(OplogBufferCollectionTest, PushOneDocumentWithPushAllNonBlockingAddsDocument) {
     auto nss = makeNamespace(_agent);
-    OplogBufferCollection oplogBuffer(nss);
+    OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_txn.get());
     const std::vector<BSONObj> oplog = {makeOplogEntry(1)};
@@ -193,7 +198,7 @@ TEST_F(OplogBufferCollectionTest, PushOneDocumentWithPushAllNonBlockingAddsDocum
 
 TEST_F(OplogBufferCollectionTest, PushOneDocumentWithPushAddsDocument) {
     auto nss = makeNamespace(_agent);
-    OplogBufferCollection oplogBuffer(nss);
+    OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_txn.get());
     BSONObj oplog = makeOplogEntry(1);
@@ -213,7 +218,7 @@ TEST_F(OplogBufferCollectionTest, PushOneDocumentWithPushAddsDocument) {
 
 TEST_F(OplogBufferCollectionTest, PushOneDocumentWithPushEvenIfFullAddsDocument) {
     auto nss = makeNamespace(_agent);
-    OplogBufferCollection oplogBuffer(nss);
+    OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_txn.get());
     BSONObj oplog = makeOplogEntry(1);
@@ -233,7 +238,7 @@ TEST_F(OplogBufferCollectionTest, PushOneDocumentWithPushEvenIfFullAddsDocument)
 
 TEST_F(OplogBufferCollectionTest, PeekDoesNotRemoveDocument) {
     auto nss = makeNamespace(_agent);
-    OplogBufferCollection oplogBuffer(nss);
+    OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_txn.get());
     BSONObj oplog = makeOplogEntry(1);
@@ -258,7 +263,7 @@ TEST_F(OplogBufferCollectionTest, PeekDoesNotRemoveDocument) {
 
 TEST_F(OplogBufferCollectionTest, PopRemovesDocument) {
     auto nss = makeNamespace(_agent);
-    OplogBufferCollection oplogBuffer(nss);
+    OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_txn.get());
     BSONObj oplog = makeOplogEntry(1);
@@ -280,7 +285,7 @@ TEST_F(OplogBufferCollectionTest, PopRemovesDocument) {
 
 TEST_F(OplogBufferCollectionTest, PopAndPeekReturnDocumentsInOrder) {
     auto nss = makeNamespace(_agent);
-    OplogBufferCollection oplogBuffer(nss);
+    OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_txn.get());
     const std::vector<BSONObj> oplog = {
@@ -333,7 +338,7 @@ TEST_F(OplogBufferCollectionTest, PopAndPeekReturnDocumentsInOrder) {
 
 TEST_F(OplogBufferCollectionTest, LastObjectPushedReturnsNewestOplogEntry) {
     auto nss = makeNamespace(_agent);
-    OplogBufferCollection oplogBuffer(nss);
+    OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_txn.get());
     const std::vector<BSONObj> oplog = {
@@ -350,7 +355,7 @@ TEST_F(OplogBufferCollectionTest, LastObjectPushedReturnsNewestOplogEntry) {
 
 TEST_F(OplogBufferCollectionTest, LastObjectPushedReturnsNoneWithNoEntries) {
     auto nss = makeNamespace(_agent);
-    OplogBufferCollection oplogBuffer(nss);
+    OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_txn.get());
 
@@ -360,7 +365,7 @@ TEST_F(OplogBufferCollectionTest, LastObjectPushedReturnsNoneWithNoEntries) {
 
 TEST_F(OplogBufferCollectionTest, IsEmptyReturnsTrueWhenEmptyAndFalseWhenNot) {
     auto nss = makeNamespace(_agent);
-    OplogBufferCollection oplogBuffer(nss);
+    OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_txn.get());
     BSONObj oplog = makeOplogEntry(1);
@@ -371,7 +376,7 @@ TEST_F(OplogBufferCollectionTest, IsEmptyReturnsTrueWhenEmptyAndFalseWhenNot) {
 
 TEST_F(OplogBufferCollectionTest, ClearClearsCollection) {
     auto nss = makeNamespace(_agent);
-    OplogBufferCollection oplogBuffer(nss);
+    OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_txn.get());
     BSONObj oplog = makeOplogEntry(1);

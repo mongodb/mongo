@@ -71,8 +71,9 @@ bool DataReplicatorExternalStateImpl::shouldStopFetching(const HostAndPort& sour
     return false;
 }
 
-std::unique_ptr<OplogBuffer> DataReplicatorExternalStateImpl::makeInitialSyncOplogBuffer() const {
-    return _replicationCoordinatorExternalState->makeInitialSyncOplogBuffer();
+std::unique_ptr<OplogBuffer> DataReplicatorExternalStateImpl::makeInitialSyncOplogBuffer(
+    OperationContext* txn) const {
+    return _replicationCoordinatorExternalState->makeInitialSyncOplogBuffer(txn);
 }
 
 std::unique_ptr<OplogBuffer> DataReplicatorExternalStateImpl::makeSteadyStateOplogBuffer() const {

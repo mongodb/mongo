@@ -65,14 +65,6 @@ void createOplog(OperationContext* txn, const std::string& oplogCollectionName, 
  */
 void createOplog(OperationContext* txn);
 
-// This function writes ops into the replica-set oplog;
-// used internally by replication secondaries after they have applied ops.
-// Updates the global optime.
-// Returns the optime for the last op inserted.
-OpTime writeOpsToOplog(OperationContext* txn,
-                       const std::string& oplogName,
-                       const std::vector<BSONObj>& ops);
-
 extern std::string rsOplogName;
 extern std::string masterSlaveOplogName;
 

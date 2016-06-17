@@ -631,7 +631,7 @@ TimestampStatus DataReplicator::initialSync(OperationContext* txn) {
     _reporterPaused = true;
     _applierPaused = true;
 
-    _oplogBuffer = _dataReplicatorExternalState->makeInitialSyncOplogBuffer();
+    _oplogBuffer = _dataReplicatorExternalState->makeInitialSyncOplogBuffer(txn);
     _oplogBuffer->startup(nullptr);
     ON_BLOCK_EXIT([this]() {
         _oplogBuffer->shutdown(nullptr);

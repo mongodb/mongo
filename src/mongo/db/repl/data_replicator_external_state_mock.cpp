@@ -57,7 +57,8 @@ bool DataReplicatorExternalStateMock::shouldStopFetching(const HostAndPort& sour
     return shouldStopFetchingResult;
 }
 
-std::unique_ptr<OplogBuffer> DataReplicatorExternalStateMock::makeInitialSyncOplogBuffer() const {
+std::unique_ptr<OplogBuffer> DataReplicatorExternalStateMock::makeInitialSyncOplogBuffer(
+    OperationContext* txn) const {
     return stdx::make_unique<OplogBufferBlockingQueue>();
 }
 

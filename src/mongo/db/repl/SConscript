@@ -71,6 +71,8 @@ env.Library(
     ],
     LIBDEPS=[
         'storage_interface',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/query/internal_plans',
         '$BUILD_DIR/mongo/db/serveronly', # For OperationContextImpl
     ],
 )
@@ -149,11 +151,8 @@ env.Library(
     ],
     LIBDEPS=[
         'storage_interface',
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/service_context',
-    ],
-    LIBDEPS_TAGS=[
-        # Depends on files like db_raii.cpp from serverOnlyFiles
-        'incomplete',
     ],
 )
 

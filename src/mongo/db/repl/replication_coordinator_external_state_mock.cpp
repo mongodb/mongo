@@ -256,8 +256,8 @@ void ReplicationCoordinatorExternalStateMock::multiSyncApply(const MultiApplier:
 void ReplicationCoordinatorExternalStateMock::multiInitialSyncApply(
     const MultiApplier::Operations& ops, const HostAndPort& source) {}
 
-std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateMock::makeInitialSyncOplogBuffer()
-    const {
+std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateMock::makeInitialSyncOplogBuffer(
+    OperationContext* txn) const {
     return stdx::make_unique<OplogBufferBlockingQueue>();
 }
 

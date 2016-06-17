@@ -33,6 +33,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 
 #include <algorithm>
+#include <utility>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -48,8 +49,11 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/exec/delete.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/collection_bulk_loader_impl.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -245,24 +249,10 @@ StatusWith<OpTime> StorageInterfaceImpl::writeOpsToOplog(
     auto toBSON = [](const OplogEntry& entry) { return entry.raw; };
     std::transform(operations.begin(), operations.end(), ops.begin(), toBSON);
 
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        AutoGetCollection collectionWriteGuard(txn, nss, MODE_X);
-        auto collection = collectionWriteGuard.getCollection();
-        if (!collection) {
-            return {ErrorCodes::NamespaceNotFound,
-                    str::stream() << "unable to write operations to oplog at " << nss.ns()
-                                  << ": collection not found. Did you drop it?"};
-        }
-
-        WriteUnitOfWork wunit(txn);
-        OpDebug* const nullOpDebug = nullptr;
-        auto status = collection->insertDocuments(txn, ops.begin(), ops.end(), nullOpDebug, false);
-        if (!status.isOK()) {
-            return status;
-        }
-        wunit.commit();
+    auto status = insertDocuments(txn, nss, ops);
+    if (!status.isOK()) {
+        return status;
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "writeOpsToOplog", nss.ns());
 
     return operations.back().getOpTime();
 }
@@ -345,47 +335,33 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
 Status StorageInterfaceImpl::insertDocument(OperationContext* txn,
                                             const NamespaceString& nss,
                                             const BSONObj& doc) {
-    ScopedTransaction transaction(txn, MODE_IX);
-    AutoGetOrCreateDb autoDB(txn, nss.db(), MODE_IX);
-    AutoGetCollection autoColl(txn, nss, MODE_IX);
-    if (!autoColl.getCollection()) {
-        return {ErrorCodes::NamespaceNotFound,
-                "The collection must exist before inserting documents."};
-    }
-    WriteUnitOfWork wunit(txn);
-    const auto status =
-        autoColl.getCollection()->insertDocument(txn, doc, nullptr /** OpDebug **/, false, false);
-    if (status.isOK()) {
-        wunit.commit();
-    }
-    return status;
+    return insertDocuments(txn, nss, {doc});
 }
 
-StatusWith<OpTime> StorageInterfaceImpl::insertOplogDocuments(OperationContext* txn,
-                                                              const NamespaceString& nss,
-                                                              const std::vector<BSONObj>& ops) {
+Status StorageInterfaceImpl::insertDocuments(OperationContext* txn,
+                                             const NamespaceString& nss,
+                                             const std::vector<BSONObj>& docs) {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(txn, MODE_IX);
-        AutoGetOrCreateDb autoDB(txn, nss.db(), MODE_IX);
         AutoGetCollection autoColl(txn, nss, MODE_IX);
-        if (!autoColl.getCollection()) {
-            return {
-                ErrorCodes::NamespaceNotFound,
-                str::stream() << "The oplog collection must exist before inserting documents, ns:"
-                              << nss.ns()};
-        }
-        if (!autoColl.getCollection()->isCapped()) {
+        auto collection = autoColl.getCollection();
+        if (!collection) {
             return {ErrorCodes::NamespaceNotFound,
-                    str::stream() << "The oplog collection must be capped, ns:" << nss.ns()};
+                    str::stream() << "The collection must exist before inserting documents, ns:"
+                                  << nss.ns()};
         }
 
         WriteUnitOfWork wunit(txn);
-        const auto lastOpTime = repl::writeOpsToOplog(txn, nss.ns(), ops);
+        OpDebug* const nullOpDebug = nullptr;
+        auto status =
+            collection->insertDocuments(txn, docs.begin(), docs.end(), nullOpDebug, false);
+        if (!status.isOK()) {
+            return status;
+        }
         wunit.commit();
-        return lastOpTime;
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-        txn, "StorageInterfaceImpl::insertOplogDocuments", nss.ns());
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "StorageInterfaceImpl::insertDocuments", nss.ns());
+
+    return Status::OK();
 }
 
 Status StorageInterfaceImpl::dropReplicatedDatabases(OperationContext* txn) {
@@ -395,6 +371,26 @@ Status StorageInterfaceImpl::dropReplicatedDatabases(OperationContext* txn) {
 
 Status StorageInterfaceImpl::createOplog(OperationContext* txn, const NamespaceString& nss) {
     mongo::repl::createOplog(txn, nss.ns(), true);
+    return Status::OK();
+}
+
+Status StorageInterfaceImpl::createCollection(OperationContext* txn,
+                                              const NamespaceString& nss,
+                                              const CollectionOptions& options) {
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        AutoGetOrCreateDb databaseWriteGuard(txn, nss.db(), MODE_X);
+        auto db = databaseWriteGuard.getDb();
+        invariant(db);
+        if (db->getCollection(nss)) {
+            return {ErrorCodes::NamespaceExists,
+                    str::stream() << "Collection " << nss.ns() << " already exists."};
+        }
+        WriteUnitOfWork wuow(txn);
+        auto coll = db->createCollection(txn, nss.ns(), options);
+        invariant(coll);
+        wuow.commit();
+    }
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "StorageInterfaceImpl::createCollection", nss.ns());
     return Status::OK();
 }
 
@@ -410,6 +406,114 @@ Status StorageInterfaceImpl::dropCollection(OperationContext* txn, const Namespa
         return status;
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "StorageInterfaceImpl::dropCollection", nss.ns());
+}
+
+namespace {
+
+/**
+ * Returns DeleteStageParams for deleteOne with fetch.
+ */
+DeleteStageParams makeDeleteStageParamsForDeleteOne() {
+    DeleteStageParams deleteStageParams;
+    invariant(!deleteStageParams.isMulti);
+    deleteStageParams.returnDeleted = true;
+    return deleteStageParams;
+}
+
+/**
+ * Shared implementation between findOne and deleteOne.
+ */
+enum class FindDeleteMode { kFind, kDelete };
+StatusWith<BSONObj> _findOrDeleteOne(OperationContext* txn,
+                                     const NamespaceString& nss,
+                                     const BSONObj& indexKeyPattern,
+                                     StorageInterface::ScanDirection scanDirection,
+                                     FindDeleteMode mode) {
+    auto isFind = mode == FindDeleteMode::kFind;
+    auto opStr = isFind ? "StorageInterfaceImpl::findOne" : "StorageInterfaceImpl::deleteOne";
+
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        auto collectionAccessMode = isFind ? MODE_IS : MODE_IX;
+        AutoGetCollection collectionGuard(txn, nss, collectionAccessMode);
+        auto collection = collectionGuard.getCollection();
+        if (!collection) {
+            return {ErrorCodes::NamespaceNotFound,
+                    str::stream() << "Collection not found, ns:" << nss.ns()};
+        }
+        auto indexCatalog = collection->getIndexCatalog();
+        invariant(indexCatalog);
+        bool includeUnfinishedIndexes = false;
+        auto indexDescriptor =
+            indexCatalog->findIndexByKeyPattern(txn, indexKeyPattern, includeUnfinishedIndexes);
+        if (!indexDescriptor) {
+            return {ErrorCodes::IndexNotFound,
+                    str::stream() << "Index not found, ns:" << nss.ns() << ", index: "
+                                  << indexKeyPattern};
+        }
+        if (indexDescriptor->isPartial()) {
+            return {ErrorCodes::IndexOptionsConflict,
+                    str::stream() << "Partial index is not allowed for this operation, ns:"
+                                  << nss.ns()
+                                  << ", index: "
+                                  << indexKeyPattern};
+        }
+
+        KeyPattern keyPattern(indexKeyPattern);
+        auto minKey = Helpers::toKeyFormat(keyPattern.extendRangeBound({}, false));
+        auto maxKey = Helpers::toKeyFormat(keyPattern.extendRangeBound({}, true));
+        auto isForward = scanDirection == StorageInterface::ScanDirection::kForward;
+        auto bounds = isForward ? std::make_pair(minKey, maxKey) : std::make_pair(maxKey, minKey);
+        bool endKeyInclusive = false;
+        auto direction = isForward ? InternalPlanner::FORWARD : InternalPlanner::BACKWARD;
+
+        std::unique_ptr<PlanExecutor> planExecutor = isFind
+            ? InternalPlanner::indexScan(txn,
+                                         collection,
+                                         indexDescriptor,
+                                         bounds.first,
+                                         bounds.second,
+                                         endKeyInclusive,
+                                         PlanExecutor::YIELD_MANUAL,
+                                         direction,
+                                         InternalPlanner::IXSCAN_FETCH)
+            : InternalPlanner::deleteWithIndexScan(txn,
+                                                   collection,
+                                                   makeDeleteStageParamsForDeleteOne(),
+                                                   indexDescriptor,
+                                                   bounds.first,
+                                                   bounds.second,
+                                                   endKeyInclusive,
+                                                   PlanExecutor::YIELD_MANUAL,
+                                                   direction);
+
+        BSONObj doc;
+        auto state = planExecutor->getNext(&doc, nullptr);
+        if (PlanExecutor::IS_EOF == state) {
+            return {ErrorCodes::NoSuchKey,
+                    str::stream() << "Collection is empty, ns: " << nss.ns() << ", index: "
+                                  << indexKeyPattern};
+        }
+        invariant(PlanExecutor::ADVANCED == state);
+        return doc;
+    }
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, opStr, nss.ns());
+    MONGO_UNREACHABLE;
+}
+
+}  // namespace
+
+StatusWith<BSONObj> StorageInterfaceImpl::findOne(OperationContext* txn,
+                                                  const NamespaceString& nss,
+                                                  const BSONObj& indexKeyPattern,
+                                                  ScanDirection scanDirection) {
+    return _findOrDeleteOne(txn, nss, indexKeyPattern, scanDirection, FindDeleteMode::kFind);
+}
+
+StatusWith<BSONObj> StorageInterfaceImpl::deleteOne(OperationContext* txn,
+                                                    const NamespaceString& nss,
+                                                    const BSONObj& indexKeyPattern,
+                                                    ScanDirection scanDirection) {
+    return _findOrDeleteOne(txn, nss, indexKeyPattern, scanDirection, FindDeleteMode::kDelete);
 }
 
 Status StorageInterfaceImpl::isAdminDbValid(OperationContext* txn) {

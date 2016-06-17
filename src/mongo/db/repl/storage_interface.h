@@ -100,22 +100,6 @@ class StorageInterface {
     MONGO_DISALLOW_COPYING(StorageInterface);
 
 public:
-    // Used for testing.
-
-    using CreateCollectionFn = stdx::function<StatusWith<std::unique_ptr<CollectionBulkLoader>>(
-        const NamespaceString& nss,
-        const CollectionOptions& options,
-        const BSONObj idIndexSpec,
-        const std::vector<BSONObj>& secondaryIndexSpecs)>;
-    using InsertDocumentFn = stdx::function<Status(
-        OperationContext* txn, const NamespaceString& nss, const BSONObj& doc)>;
-    using InsertOplogDocumentsFn = stdx::function<StatusWith<OpTime>(
-        OperationContext* txn, const NamespaceString& nss, const std::vector<BSONObj>& ops)>;
-    using DropUserDatabasesFn = stdx::function<Status(OperationContext* txn)>;
-    using CreateOplogFn = stdx::function<Status(OperationContext* txn, const NamespaceString& nss)>;
-    using DropCollectionFn =
-        stdx::function<Status(OperationContext* txn, const NamespaceString& nss)>;
-
     // Operation Context binding.
     static StorageInterface* get(ServiceContext* service);
     static StorageInterface* get(ServiceContext& service);
@@ -209,15 +193,23 @@ public:
                                   const BSONObj& doc) = 0;
 
     /**
-     * Inserts the given documents into the oplog, returning the last written OpTime.
+     * Inserts the given documents into the collection.
      */
-    virtual StatusWith<OpTime> insertOplogDocuments(OperationContext* txn,
-                                                    const NamespaceString& nss,
-                                                    const std::vector<BSONObj>& ops) = 0;
+    virtual Status insertDocuments(OperationContext* txn,
+                                   const NamespaceString& nss,
+                                   const std::vector<BSONObj>& docs) = 0;
+
     /**
      * Creates the initial oplog, errors if it exists.
      */
     virtual Status createOplog(OperationContext* txn, const NamespaceString& nss) = 0;
+
+    /**
+     * Creates a collection.
+     */
+    virtual Status createCollection(OperationContext* txn,
+                                    const NamespaceString& nss,
+                                    const CollectionOptions& options) = 0;
 
     /**
      * Drops a collection, like the oplog.
@@ -233,6 +225,28 @@ public:
      * Validates that the admin database is valid during initial sync.
      */
     virtual Status isAdminDbValid(OperationContext* txn) = 0;
+
+    /**
+     * Finds the first document returned by an index scan on the collection in the requested
+     * direction.
+     */
+    enum class ScanDirection {
+        kForward = 1,
+        kBackward = -1,
+    };
+    virtual StatusWith<BSONObj> findOne(OperationContext* txn,
+                                        const NamespaceString& nss,
+                                        const BSONObj& indexKeyPattern,
+                                        ScanDirection scanDirection) = 0;
+
+    /**
+     * Deletes the first document returned by an index scan on the collection in the requested
+     * direction. Returns deleted document on success.
+     */
+    virtual StatusWith<BSONObj> deleteOne(OperationContext* txn,
+                                          const NamespaceString& nss,
+                                          const BSONObj& indexKeyPattern,
+                                          ScanDirection scanDirection) = 0;
 };
 
 }  // namespace repl

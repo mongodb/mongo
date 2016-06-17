@@ -83,7 +83,8 @@ public:
     /**
      * This function creates an oplog buffer of the type specified at server startup.
      */
-    virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer() const = 0;
+    virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(
+        OperationContext* txn) const = 0;
 
     /**
      * Creates an oplog buffer suitable for steady state replication.

@@ -36,6 +36,8 @@
 namespace mongo {
 namespace repl {
 
+class StorageInterface;
+
 /**
  * Oplog buffer backed by a temporary collection. This collection is created in startup() and
  * removed in shutdown(). The documents will be popped and peeked in timestamp order.
@@ -59,8 +61,8 @@ public:
      */
     static BSONObj addIdToDocument(const BSONObj& orig);
 
-    OplogBufferCollection();
-    OplogBufferCollection(const NamespaceString& nss);
+    explicit OplogBufferCollection(StorageInterface* storageInterface);
+    OplogBufferCollection(StorageInterface* storageInterface, const NamespaceString& nss);
 
     /**
      * Returns the namespace string of the collection used by this oplog buffer.
@@ -104,6 +106,9 @@ private:
      * or peeking fails this returns false.
      */
     bool _peekOneSide(OperationContext* txn, Value* value, bool front) const;
+
+    // Storage interface used to perform storage engine level functions on the collection.
+    StorageInterface* _storageInterface;
 
     // The namespace for the oplog buffer collection.
     const NamespaceString _nss;

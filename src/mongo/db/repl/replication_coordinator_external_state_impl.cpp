@@ -566,10 +566,10 @@ void ReplicationCoordinatorExternalStateImpl::multiInitialSyncApply(
     repl::multiInitialSyncApply(ops, &syncTail);
 }
 
-std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeInitialSyncOplogBuffer()
-    const {
+std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeInitialSyncOplogBuffer(
+    OperationContext* txn) const {
     if (initialSyncOplogBuffer == kCollectionOplogBufferName) {
-        return stdx::make_unique<OplogBufferCollection>();
+        return stdx::make_unique<OplogBufferCollection>(StorageInterface::get(txn));
     } else {
         return stdx::make_unique<OplogBufferBlockingQueue>();
     }

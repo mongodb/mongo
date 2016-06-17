@@ -94,15 +94,29 @@ public:
                           const NamespaceString& nss,
                           const BSONObj& doc) override;
 
-    StatusWith<OpTime> insertOplogDocuments(OperationContext* txn,
-                                            const NamespaceString& nss,
-                                            const std::vector<BSONObj>& ops) override;
+    Status insertDocuments(OperationContext* txn,
+                           const NamespaceString& nss,
+                           const std::vector<BSONObj>& docs) override;
 
     Status dropReplicatedDatabases(OperationContext* txn) override;
 
     Status createOplog(OperationContext* txn, const NamespaceString& nss) override;
 
+    Status createCollection(OperationContext* txn,
+                            const NamespaceString& nss,
+                            const CollectionOptions& options) override;
+
     Status dropCollection(OperationContext* txn, const NamespaceString& nss) override;
+
+    StatusWith<BSONObj> findOne(OperationContext* txn,
+                                const NamespaceString& nss,
+                                const BSONObj& indexKeyPattern,
+                                ScanDirection scanDirection) override;
+
+    StatusWith<BSONObj> deleteOne(OperationContext* txn,
+                                  const NamespaceString& nss,
+                                  const BSONObj& indexKeyPattern,
+                                  ScanDirection scanDirection) override;
 
     Status isAdminDbValid(OperationContext* txn) override;
 
