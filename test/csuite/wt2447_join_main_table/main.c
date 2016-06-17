@@ -51,17 +51,17 @@
 
 void (*custom_die)(void) = NULL;
 
-static int N_RECORDS = 10000;
+#define	N_RECORDS	10000
 
-static int
+static void
 get_stat_total(WT_SESSION *session, WT_CURSOR *jcursor, const char *descmatch,
     uint64_t *pval)
 {
 	WT_CURSOR *statcursor;
-	char *desc, *valstr;
 	uint64_t val;
 	int ret;
 	bool match;
+	char *desc, *valstr;
 
 	match = false;
 	*pval = 0;
@@ -69,7 +69,8 @@ get_stat_total(WT_SESSION *session, WT_CURSOR *jcursor, const char *descmatch,
 	    NULL, &statcursor));
 
 	while ((ret = statcursor->next(statcursor)) == 0) {
-		statcursor->get_value(statcursor, &desc, &valstr, &val);
+		testutil_assert(statcursor->get_value(
+		    statcursor, &desc, &valstr, &val) == 0);
 
 		printf("statistics: %s: %s: %" PRIu64 "\n", desc, valstr, val);
 
@@ -81,7 +82,6 @@ get_stat_total(WT_SESSION *session, WT_CURSOR *jcursor, const char *descmatch,
 	testutil_assert(ret == WT_NOTFOUND);
 	testutil_check(statcursor->close(statcursor));
 	testutil_assert(match);
-	return (0);
 }
 
 int
@@ -122,7 +122,7 @@ main(int argc, char *argv[])
 	    &cursor1));
 
 	d.size = 4100;
-	d.data = malloc(d.size);
+	d.data = dmalloc(d.size);
 	memset((char *)d.data, 7, d.size);
 
 	for (i = 0; i < N_RECORDS; ++i)
@@ -152,7 +152,7 @@ main(int argc, char *argv[])
 	cursor2->set_key(cursor2, half + 1);
 	testutil_check(cursor2->search(cursor2));
 
-	sprintf(bloom_cfg, "compare=lt,strategy=bloom,count=%u", half);
+	sprintf(bloom_cfg, "compare=lt,strategy=bloom,count=%d", half);
 
 	testutil_check(session->open_cursor(session, joinuri, NULL, NULL,
 	    &jcursor));
@@ -162,11 +162,11 @@ main(int argc, char *argv[])
 	/* Expect one value returned */
 	testutil_assert(jcursor->next(jcursor) == 0);
 	i = 0;
-	jcursor->get_key(jcursor, &i);
+	testutil_assert(jcursor->get_key(jcursor, &i) == 0);
 	testutil_assert(i == (int)half);
 	i = j = 0;
 	memset(&d, 0, sizeof(d));
-	jcursor->get_value(jcursor, &i, &j, &d);
+	testutil_assert(jcursor->get_value(jcursor, &i, &j, &d) == 0);
 	testutil_assert(i == (int)half);
 	testutil_assert(j == (int)half);
 	testutil_assert(d.size == 4100);

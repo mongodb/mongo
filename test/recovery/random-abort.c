@@ -39,7 +39,7 @@ static const char * const uri = "table:main";
 #define	MIN_TH	5
 #define	MAX_TIME	40
 #define	MIN_TIME	10
-#define	RECORDS_FILE	"records-%u"
+#define	RECORDS_FILE	"records-%" PRIu32
 
 #define	ENV_CONFIG						\
     "create,log=(file_max=10M,archive=false,enabled),"		\
@@ -117,7 +117,7 @@ thread_run(void *arg)
 		if (fprintf(fp, "%" PRIu64 "\n", i) == -1)
 			testutil_die(errno, "fprintf");
 	}
-	return (NULL);
+	/* NOTREACHED */
 }
 
 /*
@@ -166,7 +166,7 @@ fill_db(uint32_t nth)
 	 * it is killed.
 	 */
 	for (i = 0; i < nth; ++i)
-		pthread_join(thr[i], NULL);
+		testutil_assert(pthread_join(thr[i], NULL) == 0);
 	/*
 	 * NOTREACHED
 	 */
@@ -230,7 +230,7 @@ main(int argc, char *argv[])
 	testutil_work_dir_from_path(home, 512, working_dir);
 	testutil_make_work_dir(home);
 
-	__wt_random_init_seed(NULL, &rnd);
+	testutil_assert(__wt_random_init_seed(NULL, &rnd) == 0);
 	if (rand_time) {
 		timeout = __wt_random(&rnd) % MAX_TIME;
 		if (timeout < MIN_TIME)
@@ -241,8 +241,8 @@ main(int argc, char *argv[])
 		if (nth < MIN_TH)
 			nth = MIN_TH;
 	}
-	printf("Parent: Create %u threads; sleep %" PRIu32 " seconds\n",
-	    nth, timeout);
+	printf("Parent: Create %" PRIu32
+	    " threads; sleep %" PRIu32 " seconds\n", nth, timeout);
 	/*
 	 * Fork a child to insert as many items.  We will then randomly
 	 * kill the child, run recovery and make sure all items we wrote
@@ -289,7 +289,8 @@ main(int argc, char *argv[])
 	for (i = 0; i < nth; ++i) {
 		snprintf(fname, sizeof(fname), RECORDS_FILE, i);
 		if ((fp = fopen(fname, "r")) == NULL) {
-			fprintf(stderr, "Failed to open %s. i %u\n", fname, i);
+			fprintf(stderr,
+			    "Failed to open %s. i %" PRIu32 "\n", fname, i);
 			testutil_die(errno, "fopen");
 		}
 
