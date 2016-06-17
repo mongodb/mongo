@@ -323,7 +323,6 @@ __im_file_read(WT_FILE_HANDLE *file_handle,
 	if (off < im_fh->buf.size) {
 		len = WT_MIN(len, im_fh->buf.size - off);
 		memcpy(buf, (uint8_t *)im_fh->buf.mem + off, len);
-		im_fh->off = off + len;
 	} else
 		ret = WT_ERROR;
 
@@ -422,7 +421,6 @@ __im_file_write(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session,
 	memcpy((uint8_t *)im_fh->buf.data + off, buf, len);
 	if (off + len > im_fh->buf.size)
 		im_fh->buf.size = off + len;
-	im_fh->off = off + len;
 
 err:	__wt_spin_unlock(session, &im_fs->lock);
 	if (ret == 0)
@@ -470,7 +468,6 @@ __im_file_open(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
 			    "%s: file-open: already open", name);
 
 		im_fh->ref = 1;
-		im_fh->off = 0;
 
 		*file_handlep = (WT_FILE_HANDLE *)im_fh;
 
@@ -488,7 +485,6 @@ __im_file_open(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
 
 	/* Initialize private information. */
 	im_fh->ref = 1;
-	im_fh->off = 0;
 
 	hash = __wt_hash_city64(name, strlen(name));
 	bucket = hash % WT_HASH_ARRAY_SIZE;

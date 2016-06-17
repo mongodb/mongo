@@ -136,7 +136,6 @@ struct __wt_file_handle_inmem {
 	TAILQ_ENTRY(__wt_file_handle_inmem) q;	/* internal queue, hash queue */
 	TAILQ_ENTRY(__wt_file_handle_inmem) hashq;
 
-	size_t	 off;				/* Read/write offset */
 	WT_ITEM  buf;				/* Data */
 	u_int	 ref;				/* Reference count */
 };

@@ -79,7 +79,6 @@ typedef struct demo_file_handle {
 	char	*buf;				/* In-memory contents */
 	size_t	 bufsize;			/* In-memory buffer size */
 
-	size_t	 off;				/* Read/write offset */
 	size_t	 size;				/* Read/write data size */
 } DEMO_FILE_HANDLE;
 
@@ -283,7 +282,6 @@ demo_fs_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
 		}
 
 		demo_fh->ref = 1;
-		demo_fh->off = 0;
 
 		*file_handlep = (WT_FILE_HANDLE *)demo_fh;
 		return (0);
@@ -295,7 +293,7 @@ demo_fs_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
 
 	/* Initialize private information. */
 	demo_fh->ref = 1;
-	demo_fh->off = demo_fh->size = 0;
+	demo_fh->size = 0;
 	demo_fh->demo_fs = demo_fs;
 	if ((demo_fh->buf = calloc(1, DEMO_FILE_SIZE_INCREMENT)) == NULL)
 		goto enomem;
@@ -591,7 +589,6 @@ demo_file_read(WT_FILE_HANDLE *file_handle,
 		if (len > demo_fh->size - off)
 			len = demo_fh->size - off;
 		memcpy(buf, (uint8_t *)demo_fh->buf + off, len);
-		demo_fh->off = off + len;
 	} else
 		ret = EINVAL;		/* EOF */
 
@@ -714,7 +711,6 @@ demo_file_write(WT_FILE_HANDLE *file_handle, WT_SESSION *session,
 	memcpy((uint8_t *)demo_fh->buf + off, buf, len);
 	if (off + len > demo_fh->size)
 		demo_fh->size = off + len;
-	demo_fh->off = off + len;
 
 	return (0);
 }
