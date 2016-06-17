@@ -166,4 +166,10 @@ UpdateDriver* ParsedUpdate::getDriver() {
     return &_driver;
 }
 
+void ParsedUpdate::setCollator(std::unique_ptr<CollatorInterface> collator) {
+    _collator = std::move(collator);
+
+    _driver.setCollator(_collator.get());
+}
+
 }  // namespace mongo

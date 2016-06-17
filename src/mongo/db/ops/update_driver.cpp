@@ -357,6 +357,14 @@ void UpdateDriver::setModOptions(ModifierInterface::Options modOpts) {
     _modOptions = modOpts;
 }
 
+void UpdateDriver::setCollator(const CollatorInterface* collator) {
+    for (auto&& mod : _mods) {
+        mod->setCollator(collator);
+    }
+
+    _modOptions.collator = collator;
+}
+
 ModifierInterface::ExecInfo::UpdateContext UpdateDriver::context() const {
     return _context;
 }

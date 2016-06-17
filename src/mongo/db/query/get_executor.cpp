@@ -837,6 +837,13 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* txn,
         invariant(request->isExplain());
     }
 
+    // If the parsed update does not have a user-specified collation, set it from the collection
+    // default.
+    if (collection && parsedUpdate->getRequest()->getCollation().isEmpty() &&
+        collection->getDefaultCollator()) {
+        parsedUpdate->setCollator(collection->getDefaultCollator()->clone());
+    }
+
     // TODO: This seems a bit circuitious.
     if (opDebug) {
         opDebug->updateobj = request->getUpdates();

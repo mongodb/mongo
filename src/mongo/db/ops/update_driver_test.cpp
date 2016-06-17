@@ -37,6 +37,7 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/json.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/update_index_data.h"
 #include "mongo/unittest/unittest.h"
@@ -46,6 +47,7 @@ namespace {
 using mongo::BSONObj;
 using mongo::BSONElement;
 using mongo::BSONObjIterator;
+using mongo::CollatorInterfaceMock;
 using mongo::FieldRef;
 using mongo::fromjson;
 using mongo::mutablebson::Document;
@@ -127,6 +129,23 @@ TEST(Parse, SetOnInsert) {
     ASSERT_OK(driver.parse(fromjson("{$setOnInsert:{a:1}}")));
     ASSERT_EQUALS(driver.numMods(), 1U);
     ASSERT_FALSE(driver.isDocReplacement());
+}
+
+TEST(Collator, SetCollationUpdatesModifierInterfaces) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    BSONObj updateDocument = fromjson("{$max: {a: 'abd'}}");
+    UpdateDriver::Options opts;
+    UpdateDriver driver(opts);
+
+    ASSERT_OK(driver.parse(updateDocument));
+    ASSERT_EQUALS(driver.numMods(), 1U);
+
+    bool modified = false;
+    Document doc(fromjson("{a: 'cba'}"));
+    driver.setCollator(&collator);
+    driver.update(StringData(), &doc, nullptr, nullptr, &modified);
+
+    ASSERT_TRUE(modified);
 }
 
 //
