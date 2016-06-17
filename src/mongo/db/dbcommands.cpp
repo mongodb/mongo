@@ -1330,11 +1330,16 @@ void Command::execCommand(OperationContext* txn,
                 !replCoord->canAcceptWritesForDatabase(dbname) &&
                 !replCoord->getMemberState().secondary()) {
 
-                if (replCoord->getMemberState().recovering()) {
-                    uasserted(ErrorCodes::NotMasterOrSecondary, "node is recovering");
-                }
-                invariant(replCoord->getMemberState().primary());
-                uasserted(ErrorCodes::NotMasterOrSecondary, "node is in drain mode");
+                uassert(ErrorCodes::NotMasterOrSecondary,
+                        "node is recovering",
+                        !replCoord->getMemberState().recovering());
+                uassert(ErrorCodes::NotMasterOrSecondary,
+                        "node is not in primary or recovering state",
+                        replCoord->getMemberState().primary());
+                // Check ticket SERVER-21432, slaveOk commands are allowed in drain mode
+                uassert(ErrorCodes::NotMasterOrSecondary,
+                        "node is in drain mode",
+                        commandIsOverriddenToRunOnSecondary || commandCanRunOnSecondary);
             }
         }
 
