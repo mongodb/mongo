@@ -56,7 +56,7 @@
 #include "mongo/db/exec/text.h"
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
@@ -270,7 +270,7 @@ PlanStage* buildStages(OperationContext* txn,
         }
         return new ShardFilterStage(
             txn,
-            ShardingState::get(txn)->getCollectionMetadata(collection->ns().ns()),
+            CollectionShardingState::get(txn, collection->ns())->getMetadata(),
             ws,
             childStage);
     } else if (STAGE_KEEP_MUTATIONS == root->getType()) {

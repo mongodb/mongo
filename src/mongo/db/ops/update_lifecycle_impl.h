@@ -55,8 +55,6 @@ public:
 
     virtual const UpdateIndexData* getIndexKeys(OperationContext* opCtx) const;
 
-    virtual const std::vector<FieldRef*>* getImmutableFields() const;
-
 private:
     const NamespaceString& _nsString;
 

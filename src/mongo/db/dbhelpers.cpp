@@ -57,6 +57,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/data_protector.h"
@@ -410,8 +411,7 @@ long long Helpers::removeRange(OperationContext* txn,
                 bool docIsOrphan;
 
                 // In write lock, so will be the most up-to-date version
-                std::shared_ptr<CollectionMetadata> metadataNow =
-                    ShardingState::get(txn)->getCollectionMetadata(ns);
+                auto metadataNow = CollectionShardingState::get(txn, ns)->getMetadata();
                 if (metadataNow) {
                     ShardKeyPattern kp(metadataNow->getKeyPattern());
                     BSONObj key = kp.extractShardKeyFromDoc(obj);

@@ -920,11 +920,8 @@ shared_ptr<CollectionMetadata> ShardingState::getCollectionMetadata(const string
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     CollectionShardingStateMap::const_iterator it = _collections.find(ns);
-    if (it == _collections.end()) {
-        return shared_ptr<CollectionMetadata>();
-    } else {
-        return it->second->getMetadata();
-    }
+    invariant(it != _collections.end());
+    return it->second->getMetadata();
 }
 
 Status ShardingState::updateShardIdentityConfigString(OperationContext* txn,

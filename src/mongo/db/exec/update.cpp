@@ -42,6 +42,8 @@
 #include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -433,6 +435,17 @@ bool shouldRestartUpdateIfNoLongerMatches(const UpdateStageParams& params) {
     return params.request->shouldReturnAnyDocs() && !params.request->getSort().isEmpty();
 };
 
+const std::vector<FieldRef*>* getImmutableFields(OperationContext* txn, const NamespaceString& ns) {
+    std::shared_ptr<CollectionMetadata> metadata =
+        CollectionShardingState::get(txn, ns)->getMetadata();
+    if (metadata) {
+        const std::vector<FieldRef*>& fields = metadata->getKeyPatternFields();
+        // Return shard-keys as immutable for the update system.
+        return &fields;
+    }
+    return NULL;
+}
+
 }  // namespace
 
 const char* UpdateStage::kStageType = "UPDATE";
@@ -551,7 +564,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         if (!(!getOpCtx()->writesAreReplicated() || request->isFromMigration())) {
             const std::vector<FieldRef*>* immutableFields = NULL;
             if (lifecycle)
-                immutableFields = lifecycle->getImmutableFields();
+                immutableFields = getImmutableFields(getOpCtx(), request->getNamespaceString());
 
             uassertStatusOK(validate(
                 oldObj.value(), updatedFields, _doc, immutableFields, driver->modOptions()));
@@ -641,12 +654,13 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     return newObj;
 }
 
-Status UpdateStage::applyUpdateOpsForInsert(const CanonicalQuery* cq,
+Status UpdateStage::applyUpdateOpsForInsert(OperationContext* txn,
+                                            const CanonicalQuery* cq,
                                             const BSONObj& query,
                                             UpdateDriver* driver,
-                                            UpdateLifecycle* lifecycle,
                                             mutablebson::Document* doc,
                                             bool isInternalRequest,
+                                            const NamespaceString& ns,
                                             UpdateStats* stats,
                                             BSONObj* out) {
     // Since this is an insert (no docs found and upsert:true), we will be logging it
@@ -657,8 +671,8 @@ Status UpdateStage::applyUpdateOpsForInsert(const CanonicalQuery* cq,
     driver->setContext(ModifierInterface::ExecInfo::INSERT_CONTEXT);
 
     const vector<FieldRef*>* immutablePaths = NULL;
-    if (!isInternalRequest && lifecycle)
-        immutablePaths = lifecycle->getImmutableFields();
+    if (!isInternalRequest)
+        immutablePaths = getImmutableFields(txn, ns);
 
     // The original document we compare changes to - immutable paths must not change
     BSONObj original;
@@ -729,12 +743,13 @@ void UpdateStage::doInsert() {
     _doc.reset();
 
     BSONObj newObj;
-    uassertStatusOK(applyUpdateOpsForInsert(_params.canonicalQuery,
+    uassertStatusOK(applyUpdateOpsForInsert(getOpCtx(),
+                                            _params.canonicalQuery,
                                             request->getQuery(),
                                             _params.driver,
-                                            request->getLifecycle(),
                                             &_doc,
                                             isInternalRequest,
+                                            request->getNamespaceString(),
                                             &_specificStats,
                                             &newObj));
 

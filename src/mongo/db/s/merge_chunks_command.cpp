@@ -196,14 +196,18 @@ bool mergeChunks(OperationContext* txn,
         return false;
     }
 
-    shared_ptr<CollectionMetadata> metadata = gss->getCollectionMetadata(nss.ns());
+    std::shared_ptr<CollectionMetadata> metadata;
+    {
+        AutoGetCollection autoColl(txn, nss, MODE_IS);
 
-    if (!metadata || metadata->getKeyPattern().isEmpty()) {
-        *errMsg = stream() << "could not merge chunks, collection " << nss.ns()
-                           << " is not sharded";
+        metadata = CollectionShardingState::get(txn, nss.ns())->getMetadata();
+        if (!metadata || metadata->getKeyPattern().isEmpty()) {
+            *errMsg = stream() << "could not merge chunks, collection " << nss.ns()
+                               << " is not sharded";
 
-        warning() << *errMsg;
-        return false;
+            warning() << *errMsg;
+            return false;
+        }
     }
 
     dassert(metadata->getShardVersion().equals(shardVersion));
@@ -217,6 +221,7 @@ bool mergeChunks(OperationContext* txn,
         warning() << *errMsg;
         return false;
     }
+
 
     //
     // Get merged chunk information
@@ -234,6 +239,7 @@ bool mergeChunks(OperationContext* txn,
            metadata->getNextChunk(itChunk.getMax(), &itChunk)) {
         chunksToMerge.push_back(itChunk);
     }
+
 
     if (chunksToMerge.empty()) {
         *errMsg = stream() << "could not merge chunks, collection " << nss.ns()

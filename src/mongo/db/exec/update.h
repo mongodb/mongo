@@ -134,12 +134,13 @@ public:
      *
      * Returns the document to insert in *out.
      */
-    static Status applyUpdateOpsForInsert(const CanonicalQuery* cq,
+    static Status applyUpdateOpsForInsert(OperationContext* txn,
+                                          const CanonicalQuery* cq,
                                           const BSONObj& query,
                                           UpdateDriver* driver,
-                                          UpdateLifecycle* lifecycle,
                                           mutablebson::Document* doc,
                                           bool isInternalRequest,
+                                          const NamespaceString& ns,
                                           UpdateStats* stats,
                                           BSONObj* out);
 
