@@ -30,7 +30,6 @@ functions:
         script: |
           rm -rf ./*
           mkdir src
-    - command: manifest.load
     - command: git.get_project
       params:
         directory: src
@@ -212,6 +211,18 @@ functions:
         file: "src/dsi/dsi/tags.json"
         name: "perf"
     - command: shell.exec
+      # generate dashboard data
+      type : test
+      params:
+        working_dir: src/dsi/dsi
+        silent: true
+        script: |
+          python -u analysis/dashboard_gen.py --rev ${revision} -f history.json -t tags.json --refTag 3.1.8-Baseline 3.2.0-Baseline --overrideFile analysis/v3.2/system_perf_override.json --project_id sys-perf --task_name ${task_name} --variant ${build_variant} --jira-user ${perf_jira_user} --jira-password ${perf_jira_pw} || true
+    - command: "json.send"
+      params:
+         name: "dashboard"
+         file: "src/dsi/dsi/dashboard.json"
+    - command: shell.exec
       # post_run_check.py and override.json for DSI tests are part of dsi repo
       type : test
       params:
@@ -228,7 +239,6 @@ functions:
           set -o verbose
           rm -rf ./src
           mkdir src
-    - command: manifest.load
     - command: git.get_project
       params:
         directory: src
@@ -266,7 +276,6 @@ functions:
 tasks:
 - name: compile
   commands:
-    - command: manifest.load
     - command: git.get_project
       params:
         directory: src
