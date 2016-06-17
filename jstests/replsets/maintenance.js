@@ -75,6 +75,10 @@ assert.soon(function() {
     return !im.secondary && !im.ismaster;
 });
 
+var recv = conns[1].getDB("admin").runCommand({find: "foo"});
+assert.commandFailed(recv);
+assert.eq(recv.errmsg, "node is recovering");
+
 print("now getmore shouldn't work");
 var ex = assert.throws(function() {
     lastDoc = null;
