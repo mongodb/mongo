@@ -2516,6 +2516,28 @@ var authCommandsLib = {
               {runOnDb: adminDbName, roles: {__system: 1}, expectFail: true},
           ]
         },
+        {
+          testname: "addShardToZone",
+          command: {addShardToZone: shard0name, zone: 'z'},
+          skipStandalone: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                // addShardToZone only checks that you can write to config.shards,
+                // that's why readWriteAnyDatabase passes.
+                roles: Object.extend({readWriteAnyDatabase: 1}, roles_clusterManager),
+                privileges: [{resource: {db: 'config', collection: 'shards'}, actions: ['update']}],
+              },
+          ]
+        },
+        {
+          testname: "_configsvrAddShardToZone",
+          command: {_configsvrAddShardToZone: shard0name, zone: 'z'},
+          skipSharded: true,
+          testcases: [
+              {runOnDb: adminDbName, roles: {__system: 1}, expectFail: true},
+          ]
+        },
     ],
 
     /************* SHARED TEST LOGIC ****************/
