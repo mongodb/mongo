@@ -104,6 +104,17 @@ env.Library(
 )
 
 env.CppUnitTest(
+    target='config_server_catalog_test',
+    source=[
+        'sharding_catalog_add_shard_to_zone_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/repl/replmocks',
+        '$BUILD_DIR/mongo/s/config_server_test_fixture',
+    ]
+)
+
+env.CppUnitTest(
     target='sharding_catalog_test',
     source=[
         'sharding_catalog_add_shard_test.cpp',

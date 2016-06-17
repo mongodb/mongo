@@ -37,6 +37,7 @@
 
 namespace mongo {
 
+class BatchedCommandResponse;
 class OperationContext;
 class RemoteCommandTargeter;
 
@@ -55,6 +56,14 @@ public:
               metadata(std::move(_metadata)),
               commandStatus(std::move(_commandStatus)),
               writeConcernStatus(std::move(_writeConcernStatus)) {}
+
+        /**
+         * Takes the response from running a batch write command and writes the appropriate response
+         * into batchResponse, while also returning the Status of the operation.
+         */
+        static Status processBatchWriteResponse(StatusWith<CommandResponse> response,
+                                                BatchedCommandResponse* batchResponse);
+
         BSONObj response;
         BSONObj metadata;
         Status commandStatus;

@@ -129,37 +129,6 @@ void toBatchError(const Status& status, BatchedCommandResponse* response) {
     response->setOk(false);
 }
 
-/**
- * Takes the response from running a batch write command and writes the appropriate response into
- * *batchResponse, while also returning the Status of the operation.
- */
-Status _processBatchWriteResponse(StatusWith<Shard::CommandResponse> response,
-                                  BatchedCommandResponse* batchResponse) {
-    Status status(ErrorCodes::InternalError, "status not set");
-
-    if (!response.isOK()) {
-        status = response.getStatus();
-    } else if (!response.getValue().commandStatus.isOK()) {
-        status = response.getValue().commandStatus;
-    } else if (!response.getValue().writeConcernStatus.isOK()) {
-        status = response.getValue().writeConcernStatus;
-    } else {
-        string errmsg;
-        if (!batchResponse->parseBSON(response.getValue().response, &errmsg)) {
-            status = Status(ErrorCodes::FailedToParse,
-                            str::stream() << "Failed to parse config server response: " << errmsg);
-        } else {
-            status = batchResponse->toStatus();
-        }
-    }
-
-    if (!status.isOK()) {
-        toBatchError(status, batchResponse);
-    }
-
-    return status;
-}
-
 }  // namespace
 
 ShardingCatalogClientImpl::ShardingCatalogClientImpl(
@@ -1319,7 +1288,7 @@ void ShardingCatalogClientImpl::_runBatchWriteCommand(OperationContext* txn,
             cmdObj,
             Shard::RetryPolicy::kNoRetry);  // We're handling our own retries here.
 
-        Status status = _processBatchWriteResponse(response, batchResponse);
+        Status status = Shard::CommandResponse::processBatchWriteResponse(response, batchResponse);
         if (retry < kMaxWriteRetry && configShard->isRetriableError(status.code(), retryPolicy)) {
             batchResponse->clear();
             LOG(1) << "Batch write command failed with retriable error and will be retried"

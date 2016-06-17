@@ -42,6 +42,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/type_shard_identity.h"
@@ -57,6 +58,7 @@
 #include "mongo/s/set_shard_version_request.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
@@ -70,7 +72,6 @@ using str::stream;
 namespace {
 
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
-
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 // Note: Even though we're setting UNSET here,
                                                 // kMajority implies JOURNAL if journaling is
@@ -117,6 +118,29 @@ Status _processBatchWriteResponse(StatusWith<Shard::CommandResponse> response,
 
     return status;
 }
+
+const ResourceId kZoneOpResourceId(RESOURCE_METADATA, StringData("$configZonedSharding"));
+
+/**
+ * Lock for shard zoning operations. This should be acquired when doing any operations that
+ * can afffect the config.tags (or the tags field of the config.shards) collection.
+ */
+class ScopedZoneOpExclusiveLock {
+public:
+    ScopedZoneOpExclusiveLock(OperationContext* txn)
+        : _transaction(txn, MODE_IX),
+          _globalIXLock(txn->lockState(), MODE_IX, UINT_MAX),
+          // Grab global lock recursively so locks will not be yielded.
+          _recursiveGlobalIXLock(txn->lockState(), MODE_IX, UINT_MAX),
+          _zoneLock(txn->lockState(), kZoneOpResourceId, MODE_X) {}
+
+private:
+    ScopedTransaction _transaction;
+    Lock::GlobalLock _globalIXLock;
+    Lock::GlobalLock _recursiveGlobalIXLock;
+    Lock::ResourceLock _zoneLock;
+};
+
 }  // namespace
 
 
@@ -587,6 +611,48 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
     }
 
     return shardType.getName();
+}
+
+Status ShardingCatalogManagerImpl::addShardToZone(OperationContext* txn,
+                                                  const std::string& shardName,
+                                                  const std::string& zoneName) {
+    ScopedZoneOpExclusiveLock scopedLock(txn);
+
+    auto updateDoc = stdx::make_unique<BatchedUpdateDocument>();
+    updateDoc->setQuery(BSON(ShardType::name(shardName)));
+    updateDoc->setUpdateExpr(BSON("$addToSet" << BSON(ShardType::tags() << zoneName)));
+    updateDoc->setUpsert(false);
+    updateDoc->setMulti(false);
+
+    auto updateRequest = stdx::make_unique<BatchedUpdateRequest>();
+    updateRequest->addToUpdates(updateDoc.release());
+
+    BatchedCommandRequest request(updateRequest.release());
+    request.setNS(NamespaceString(ShardType::ConfigNS));
+    request.setWriteConcern(kMajorityWriteConcern.toBSON());
+
+    auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
+    auto response = configShard->runCommand(txn,
+                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                            "config",
+                                            request.toBSON(),
+                                            Shard::RetryPolicy::kNoRetry);
+
+    BatchedCommandResponse batchResponse;
+    Status status = Shard::CommandResponse::processBatchWriteResponse(response, &batchResponse);
+
+    if (!status.isOK()) {
+        return status;
+    }
+
+    invariant(batchResponse.isNSet());
+
+    if (batchResponse.getN() < 1) {
+        return {ErrorCodes::ShardNotFound,
+                str::stream() << "shard " << shardName << " does not exist"};
+    }
+
+    return Status::OK();
 }
 
 void ShardingCatalogManagerImpl::appendConnectionStats(executor::ConnectionPoolStats* stats) {

@@ -128,7 +128,6 @@ env.Library(
         '$BUILD_DIR/mongo/s/serveronly',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         '$BUILD_DIR/mongo/util/net/message_port_mock',
-        'sharding_egress_metadata_hook_for_mongos',
     ],
     LIBDEPS_TAGS=[
         # Depends on coreshard, but that would be circular

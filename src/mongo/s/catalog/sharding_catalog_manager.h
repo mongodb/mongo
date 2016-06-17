@@ -92,6 +92,14 @@ public:
                                              const long long maxSize) = 0;
 
     /**
+     * Adds the shard to the zone.
+     * Returns ErrorCodes::ShardNotFound if the shard does not exist.
+     */
+    virtual Status addShardToZone(OperationContext* txn,
+                                  const std::string& shardName,
+                                  const std::string& zoneName) = 0;
+
+    /**
      * Append information about the connection pools owned by the CatalogManager.
      */
     virtual void appendConnectionStats(executor::ConnectionPoolStats* stats) = 0;

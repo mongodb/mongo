@@ -65,6 +65,10 @@ public:
                                      const ConnectionString& shardConnectionString,
                                      const long long maxSize) override;
 
+    Status addShardToZone(OperationContext* txn,
+                          const std::string& shardName,
+                          const std::string& zoneName) override;
+
     void appendConnectionStats(executor::ConnectionPoolStats* stats) override;
 
 private:

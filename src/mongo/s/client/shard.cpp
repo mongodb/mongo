@@ -31,10 +31,13 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/client/shard.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+using std::string;
 
 namespace {
 
@@ -60,6 +63,29 @@ Status _getEffectiveCommandStatus(StatusWith<Shard::CommandResponse> cmdResponse
 }
 
 }  // namespace
+
+Status Shard::CommandResponse::processBatchWriteResponse(
+    StatusWith<Shard::CommandResponse> response, BatchedCommandResponse* batchResponse) {
+    auto status = _getEffectiveCommandStatus(response);
+    if (status.isOK()) {
+        string errmsg;
+        if (!batchResponse->parseBSON(response.getValue().response, &errmsg)) {
+            status = Status(ErrorCodes::FailedToParse,
+                            str::stream() << "Failed to parse config server response: " << errmsg);
+        } else {
+            status = batchResponse->toStatus();
+        }
+    }
+
+    if (!status.isOK()) {
+        batchResponse->clear();
+        batchResponse->setErrCode(status.code());
+        batchResponse->setErrMessage(status.reason());
+        batchResponse->setOk(false);
+    }
+
+    return status;
+}
 
 Shard::Shard(const ShardId& id) : _id(id) {}
 

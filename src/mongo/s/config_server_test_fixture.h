@@ -124,6 +124,17 @@ public:
     void onFindWithMetadataCommand(
         executor::NetworkTestEnv::OnFindCommandWithMetadataFunction func);
 
+    /**
+     * Setup the config.shards collection to contain the given shards.
+     */
+    Status setupShards(const std::vector<ShardType>& shards);
+
+    /**
+     * Retrieves the shard document from the config server.
+     * Returns {ErrorCodes::ShardNotFound} if the given shard does not exists.
+     */
+    StatusWith<ShardType> getShardDoc(OperationContext* txn, const std::string& shardId);
+
     void setUp() override;
 
     void tearDown() override;

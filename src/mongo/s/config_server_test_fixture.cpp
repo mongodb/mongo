@@ -304,4 +304,38 @@ Status ConfigServerTestFixture::insertToConfigCollection(OperationContext* txn,
     return insertStatus.getStatus();
 }
 
+Status ConfigServerTestFixture::setupShards(const std::vector<ShardType>& shards) {
+    const NamespaceString shardNS(ShardType::ConfigNS);
+    for (const auto& shard : shards) {
+        auto insertStatus = insertToConfigCollection(operationContext(), shardNS, shard.toBSON());
+        if (!insertStatus.isOK()) {
+            return insertStatus;
+        }
+    }
+
+    return Status::OK();
+}
+
+StatusWith<ShardType> ConfigServerTestFixture::getShardDoc(OperationContext* txn,
+                                                           const std::string& shardId) {
+    auto config = getConfigShard();
+    invariant(config);
+
+    NamespaceString ns(ShardType::ConfigNS);
+    auto findStatus = config->exhaustiveFindOnConfig(
+        txn, kReadPref, ns, BSON(ShardType::name(shardId)), BSONObj(), boost::none);
+    if (!findStatus.isOK()) {
+        return findStatus.getStatus();
+    }
+
+    auto findResult = findStatus.getValue();
+    if (findResult.docs.empty()) {
+        return {ErrorCodes::ShardNotFound,
+                str::stream() << "shard " << shardId << " does not exist"};
+    }
+
+    invariant(findResult.docs.size() == 1);
+    return ShardType::fromBSON(findResult.docs.front());
+}
+
 }  // namespace mongo
