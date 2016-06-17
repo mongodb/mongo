@@ -33,6 +33,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_buffer_collection.h"
 #include "mongo/db/repl/oplog_interface_local.h"
@@ -105,6 +106,20 @@ NamespaceString makeNamespace(const T& t, const char* suffix = "") {
     return NamespaceString("local." + t.getSuiteName() + "_" + t.getTestName() + suffix);
 }
 
+/**
+ * Generates oplog entries with the given number used for the timestamp.
+ */
+BSONObj makeOplogEntry(int t) {
+    return BSON("ts" << Timestamp(t, t) << "h" << t << "ns"
+                     << "a.a"
+                     << "v"
+                     << 2
+                     << "op"
+                     << "i"
+                     << "o"
+                     << BSON("_id" << t << "a" << t));
+}
+
 TEST_F(OplogBufferCollectionTest, DefaultNamespace) {
     ASSERT_EQUALS(OplogBufferCollection::getDefaultNamespace(),
                   OplogBufferCollection().getNamespace());
@@ -124,6 +139,259 @@ TEST_F(OplogBufferCollectionTest, StartupCreatesCollection) {
 
     oplogBuffer.startup(_txn.get());
     ASSERT_TRUE(AutoGetCollectionForRead(_txn.get(), nss).getCollection());
+}
+
+TEST_F(OplogBufferCollectionTest, ShutdownDropsCollection) {
+    auto nss = makeNamespace(_agent);
+    OplogBufferCollection oplogBuffer(nss);
+
+    oplogBuffer.startup(_txn.get());
+    ASSERT_TRUE(AutoGetCollectionForRead(_txn.get(), nss).getCollection());
+    oplogBuffer.shutdown(_txn.get());
+    ASSERT_FALSE(AutoGetCollectionForRead(_txn.get(), nss).getCollection());
+}
+
+TEST_F(OplogBufferCollectionTest, extractEmbeddedOplogDocumentChangesIdToTimestamp) {
+    auto nss = makeNamespace(_agent);
+    OplogBufferCollection oplogBuffer(nss);
+
+    const BSONObj expectedOp = makeOplogEntry(1);
+    BSONObj originalOp = BSON("_id" << Timestamp(1, 1) << "entry" << expectedOp);
+    ASSERT_EQUALS(expectedOp, OplogBufferCollection::extractEmbeddedOplogDocument(originalOp));
+}
+
+TEST_F(OplogBufferCollectionTest, addIdToDocumentChangesTimestampToId) {
+    auto nss = makeNamespace(_agent);
+    OplogBufferCollection oplogBuffer(nss);
+
+    const BSONObj originalOp = makeOplogEntry(1);
+    BSONObj expectedOp = BSON("_id" << Timestamp(1, 1) << "entry" << originalOp);
+    ASSERT_EQUALS(expectedOp, OplogBufferCollection::addIdToDocument(originalOp));
+}
+
+TEST_F(OplogBufferCollectionTest, PushOneDocumentWithPushAllNonBlockingAddsDocument) {
+    auto nss = makeNamespace(_agent);
+    OplogBufferCollection oplogBuffer(nss);
+
+    oplogBuffer.startup(_txn.get());
+    const std::vector<BSONObj> oplog = {makeOplogEntry(1)};
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+    ASSERT_TRUE(oplogBuffer.pushAllNonBlocking(_txn.get(), oplog.begin(), oplog.end()));
+    ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
+
+    {
+        OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
+        auto iter = collectionReader.makeIterator();
+        ASSERT_EQUALS(oplog[0],
+                      OplogBufferCollection::extractEmbeddedOplogDocument(
+                          unittest::assertGet(iter->next()).first));
+        ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+    }
+}
+
+TEST_F(OplogBufferCollectionTest, PushOneDocumentWithPushAddsDocument) {
+    auto nss = makeNamespace(_agent);
+    OplogBufferCollection oplogBuffer(nss);
+
+    oplogBuffer.startup(_txn.get());
+    BSONObj oplog = makeOplogEntry(1);
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+    oplogBuffer.push(_txn.get(), oplog);
+    ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
+
+    {
+        OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
+        auto iter = collectionReader.makeIterator();
+        ASSERT_EQUALS(oplog,
+                      OplogBufferCollection::extractEmbeddedOplogDocument(
+                          unittest::assertGet(iter->next()).first));
+        ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+    }
+}
+
+TEST_F(OplogBufferCollectionTest, PushOneDocumentWithPushEvenIfFullAddsDocument) {
+    auto nss = makeNamespace(_agent);
+    OplogBufferCollection oplogBuffer(nss);
+
+    oplogBuffer.startup(_txn.get());
+    BSONObj oplog = makeOplogEntry(1);
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+    oplogBuffer.pushEvenIfFull(_txn.get(), oplog);
+    ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
+
+    {
+        OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
+        auto iter = collectionReader.makeIterator();
+        ASSERT_EQUALS(oplog,
+                      OplogBufferCollection::extractEmbeddedOplogDocument(
+                          unittest::assertGet(iter->next()).first));
+        ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+    }
+}
+
+TEST_F(OplogBufferCollectionTest, PeekDoesNotRemoveDocument) {
+    auto nss = makeNamespace(_agent);
+    OplogBufferCollection oplogBuffer(nss);
+
+    oplogBuffer.startup(_txn.get());
+    BSONObj oplog = makeOplogEntry(1);
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+    oplogBuffer.push(_txn.get(), oplog);
+    ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
+
+    BSONObj doc;
+    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_EQUALS(doc, oplog);
+    ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
+
+    {
+        OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
+        auto iter = collectionReader.makeIterator();
+        ASSERT_EQUALS(oplog,
+                      OplogBufferCollection::extractEmbeddedOplogDocument(
+                          unittest::assertGet(iter->next()).first));
+        ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+    }
+}
+
+TEST_F(OplogBufferCollectionTest, PopRemovesDocument) {
+    auto nss = makeNamespace(_agent);
+    OplogBufferCollection oplogBuffer(nss);
+
+    oplogBuffer.startup(_txn.get());
+    BSONObj oplog = makeOplogEntry(1);
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+    oplogBuffer.push(_txn.get(), oplog);
+    ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
+
+    BSONObj doc;
+    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_EQUALS(doc, oplog);
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+
+    {
+        OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
+        auto iter = collectionReader.makeIterator();
+        ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+    }
+}
+
+TEST_F(OplogBufferCollectionTest, PopAndPeekReturnDocumentsInOrder) {
+    auto nss = makeNamespace(_agent);
+    OplogBufferCollection oplogBuffer(nss);
+
+    oplogBuffer.startup(_txn.get());
+    const std::vector<BSONObj> oplog = {
+        makeOplogEntry(2), makeOplogEntry(1), makeOplogEntry(3),
+    };
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+    ASSERT_TRUE(oplogBuffer.pushAllNonBlocking(_txn.get(), oplog.begin(), oplog.end()));
+    ASSERT_EQUALS(oplogBuffer.getCount(), 3UL);
+
+    {
+        OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
+        auto iter = collectionReader.makeIterator();
+        ASSERT_EQUALS(oplog[2],
+                      OplogBufferCollection::extractEmbeddedOplogDocument(
+                          unittest::assertGet(iter->next()).first));
+        ASSERT_EQUALS(oplog[1],
+                      OplogBufferCollection::extractEmbeddedOplogDocument(
+                          unittest::assertGet(iter->next()).first));
+        ASSERT_EQUALS(oplog[0],
+                      OplogBufferCollection::extractEmbeddedOplogDocument(
+                          unittest::assertGet(iter->next()).first));
+        ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+    }
+
+    BSONObj doc;
+    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_EQUALS(doc, oplog[1]);
+    ASSERT_EQUALS(oplogBuffer.getCount(), 3UL);
+
+    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_EQUALS(doc, oplog[1]);
+    ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
+
+    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_EQUALS(doc, oplog[0]);
+    ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
+
+    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_EQUALS(doc, oplog[0]);
+    ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
+
+    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_EQUALS(doc, oplog[2]);
+    ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
+
+    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_EQUALS(doc, oplog[2]);
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+}
+
+TEST_F(OplogBufferCollectionTest, LastObjectPushedReturnsNewestOplogEntry) {
+    auto nss = makeNamespace(_agent);
+    OplogBufferCollection oplogBuffer(nss);
+
+    oplogBuffer.startup(_txn.get());
+    const std::vector<BSONObj> oplog = {
+        makeOplogEntry(1), makeOplogEntry(3), makeOplogEntry(2),
+    };
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+    ASSERT_TRUE(oplogBuffer.pushAllNonBlocking(_txn.get(), oplog.begin(), oplog.end()));
+    ASSERT_EQUALS(oplogBuffer.getCount(), 3UL);
+
+    auto doc = oplogBuffer.lastObjectPushed(_txn.get());
+    ASSERT_EQUALS(*doc, oplog[1]);
+    ASSERT_EQUALS(oplogBuffer.getCount(), 3UL);
+}
+
+TEST_F(OplogBufferCollectionTest, LastObjectPushedReturnsNoneWithNoEntries) {
+    auto nss = makeNamespace(_agent);
+    OplogBufferCollection oplogBuffer(nss);
+
+    oplogBuffer.startup(_txn.get());
+
+    auto doc = oplogBuffer.lastObjectPushed(_txn.get());
+    ASSERT_FALSE(doc);
+}
+
+TEST_F(OplogBufferCollectionTest, IsEmptyReturnsTrueWhenEmptyAndFalseWhenNot) {
+    auto nss = makeNamespace(_agent);
+    OplogBufferCollection oplogBuffer(nss);
+
+    oplogBuffer.startup(_txn.get());
+    BSONObj oplog = makeOplogEntry(1);
+    ASSERT_TRUE(oplogBuffer.isEmpty());
+    oplogBuffer.pushEvenIfFull(_txn.get(), oplog);
+    ASSERT_FALSE(oplogBuffer.isEmpty());
+}
+
+TEST_F(OplogBufferCollectionTest, ClearClearsCollection) {
+    auto nss = makeNamespace(_agent);
+    OplogBufferCollection oplogBuffer(nss);
+
+    oplogBuffer.startup(_txn.get());
+    BSONObj oplog = makeOplogEntry(1);
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+    oplogBuffer.push(_txn.get(), oplog);
+    ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
+
+    oplogBuffer.clear(_txn.get());
+    ASSERT_TRUE(AutoGetCollectionForRead(_txn.get(), nss).getCollection());
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+
+    {
+        OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
+        auto iter = collectionReader.makeIterator();
+        ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+    }
+
+    BSONObj doc;
+    ASSERT_FALSE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(doc.isEmpty());
+    ASSERT_FALSE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_TRUE(doc.isEmpty());
 }
 
 }  // namespace

@@ -30,6 +30,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_buffer.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/queue.h"
 
 namespace mongo {
@@ -37,7 +38,7 @@ namespace repl {
 
 /**
  * Oplog buffer backed by a temporary collection. This collection is created in startup() and
- * removed in shutdown().
+ * removed in shutdown(). The documents will be popped and peeked in timestamp order.
  */
 class OplogBufferCollection : public OplogBuffer {
 public:
@@ -45,6 +46,18 @@ public:
      * Returns default namespace for temporary collection used to hold data in oplog buffer.
      */
     static NamespaceString getDefaultNamespace();
+
+    /**
+     * Returns the embedded document in the 'entry' field.
+     */
+    static BSONObj extractEmbeddedOplogDocument(const BSONObj& orig);
+
+    /**
+     * Returns a new BSONObj with an '_id' field equal to the 'ts' field of the provided document
+     * and an 'entry' field equal to the provided document. Assumes there is a 'ts' field in the
+     * original document.
+     */
+    static BSONObj addIdToDocument(const BSONObj& orig);
 
     OplogBufferCollection();
     OplogBufferCollection(const NamespaceString& nss);
@@ -73,8 +86,36 @@ public:
     bool peek(OperationContext* txn, Value* value) override;
     boost::optional<Value> lastObjectPushed(OperationContext* txn) const override;
 
+
 private:
+    /*
+     * Creates a temporary collection with the _nss namespace.
+     */
+    void _createCollection(OperationContext* txn);
+
+    /*
+     * Drops the collection with the _nss namespace.
+     */
+    void _dropCollection(OperationContext* txn);
+
+    /**
+     * Returns the last oplog entry on the given side of the buffer. If front is true it will
+     * return the oldest entry, otherwise it will return the newest one. If the buffer is empty
+     * or peeking fails this returns false.
+     */
+    bool _peekOneSide(OperationContext* txn, Value* value, bool front) const;
+
+    // The namespace for the oplog buffer collection.
     const NamespaceString _nss;
+
+    // Protects member data below.
+    mutable stdx::mutex _mutex;
+
+    // Number of documents in buffer.
+    std::size_t _count;
+
+    // Size of documents in buffer.
+    std::size_t _size;
 };
 
 }  // namespace repl
