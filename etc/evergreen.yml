@@ -367,15 +367,24 @@ functions:
       params:
         working_dir: src
         script: |
-          set -o errexit
           # On each LXC host do the following:
           #   Copy the mongodb tarball to /root
           numVms=5
+          exit_failure_code=0
+          ${set_sudo}
           for i in $(seq 1 $numVms)
           do
             hostn=n$i
             scp mongo-binaries.tgz root@$hostn:
+            exit_code=$?
+            # If the copy fails, then tail the LXC host log.
+            if [ $exit_code -ne 0 ]; then
+              exit_failure_code=$exit_code
+              echo "Copy to host $hostn failed!"
+              $sudo tail /var/log/lxc/$hostn.log
+            fi
           done
+          exit $exit_failure_code
 
   "run jepsen test" :
     - command: shell.exec
