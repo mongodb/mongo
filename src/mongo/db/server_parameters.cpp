@@ -28,11 +28,14 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/parse_number.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -73,8 +76,10 @@ ServerParameterSet* ServerParameterSet::getGlobal() {
 
 void ServerParameterSet::add(ServerParameter* sp) {
     ServerParameter*& x = _map[sp->name()];
-    if (x)
+    if (x) {
+        severe() << "'" << x->name() << "' already exists in the server parameter set.";
         abort();
+    }
     x = sp;
 }
 
