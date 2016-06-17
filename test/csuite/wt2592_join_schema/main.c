@@ -76,7 +76,7 @@ main(int argc, char *argv[])
 	WT_CURSOR *country_cursor, *country_cursor2, *cursor, *join_cursor,
 	    *subjoin_cursor, *year_cursor;
 	WT_SESSION *session;
-	const char *basename, *country;
+	const char *country, *tablename;
 	char countryuri[256], joinuri[256], yearuri[256];
 	uint64_t recno, population;
 	uint16_t year;
@@ -87,10 +87,10 @@ main(int argc, char *argv[])
 	testutil_check(testutil_parse_opts(argc, argv, opts));
 	testutil_make_work_dir(opts->home);
 
-	testutil_assert((basename = strchr(opts->uri, ':')) != 0);
-	basename++;
-	snprintf(countryuri, sizeof(countryuri), "index:%s:country", basename);
-	snprintf(yearuri, sizeof(yearuri), "index:%s:year", basename);
+	testutil_assert((tablename = strchr(opts->uri, ':')) != 0);
+	tablename++;
+	snprintf(countryuri, sizeof(countryuri), "index:%s:country", tablename);
+	snprintf(yearuri, sizeof(yearuri), "index:%s:year", tablename);
 	snprintf(joinuri, sizeof(joinuri), "join:%s", opts->uri);
 
 	testutil_check(wiredtiger_open(opts->home, NULL,
