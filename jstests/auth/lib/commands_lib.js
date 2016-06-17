@@ -78,6 +78,11 @@ particular database.
 */
 
 // constants
+
+// All roles that are specific to one database will be given only for 'firstDbName'. For example,
+// when using the roles in 'roles_read', the 'read' role will only be granted on 'firstDbName'. In
+// particular, this means that when 'runOnDb' is 'secondDbName', the test user with the 'read' role
+// should not be able to perform read operations.
 var firstDbName = "roles_commands_1";
 var secondDbName = "roles_commands_2";
 var adminDbName = "admin";
@@ -275,6 +280,82 @@ var authCommandsLib = {
               roles: {clusterMonitor: 1, clusterAdmin: 1, root: 1, __system: 1},
               privileges: [{resource: {anyResource: true}, actions: ["indexStats"]}]
           }]
+        },
+        {
+          testname: "aggregate_lookup",
+          command: {
+              aggregate: "foo",
+              pipeline: [
+                  {$lookup: {from: "bar", localField: "_id", foreignField: "_id", as: "results"}}
+              ]
+          },
+          setup: function(db) {
+              db.createCollection("foo");
+              db.createCollection("bar");
+          },
+          teardown: function(db) {
+              db.foo.drop();
+              db.bar.drop();
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: roles_read,
+                privileges: [
+                    {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "bar"}, actions: ["find"]}
+                ]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: roles_readAny,
+                privileges: [
+                    {resource: {db: secondDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: secondDbName, collection: "bar"}, actions: ["find"]}
+                ]
+              }
+          ]
+        },
+        {
+          testname: "aggregate_graphLookup",
+          command: {
+              aggregate: "foo",
+              pipeline: [{
+                  $graphLookup: {
+                      from: "bar",
+                      startWith: [1],
+                      connectFromField: "_id",
+                      connectToField: "barId",
+                      as: "results"
+                  }
+              }]
+          },
+          setup: function(db) {
+              db.createCollection("foo");
+              db.createCollection("bar");
+          },
+          teardown: function(db) {
+              db.foo.drop();
+              db.bar.drop();
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: roles_read,
+                privileges: [
+                    {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "bar"}, actions: ["find"]}
+                ]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: roles_readAny,
+                privileges: [
+                    {resource: {db: secondDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: secondDbName, collection: "bar"}, actions: ["find"]}
+                ]
+              }
+          ]
         },
         {
           testname: "appendOplogNote",

@@ -282,6 +282,11 @@ Status Pipeline::checkAuthForCommand(ClientBasic* client,
             Privilege::addPrivilegeToPrivilegeVector(
                 &privileges,
                 Privilege(ResourcePattern::forExactNamespace(fromNs), ActionType::find));
+        } else if (stageName == "$graphLookup" && stage.firstElementType() == Object) {
+            NamespaceString fromNs(db, stage.firstElement()["from"].str());
+            Privilege::addPrivilegeToPrivilegeVector(
+                &privileges,
+                Privilege(ResourcePattern::forExactNamespace(fromNs), ActionType::find));
         }
     }
 
