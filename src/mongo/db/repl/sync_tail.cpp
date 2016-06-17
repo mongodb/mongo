@@ -486,6 +486,7 @@ public:
 
 private:
     bool isCappedImpl(OperationContext* txn, StringData ns) {
+        Lock::DBLock dbLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IS);
         auto db = dbHolder().get(txn, ns);
         if (!db)
             return false;
@@ -505,8 +506,6 @@ void fillWriterVectors(OperationContext* txn,
     const bool supportsDocLocking =
         getGlobalServiceContext()->getGlobalStorageEngine()->supportsDocLocking();
     const uint32_t numWriters = writerVectors->size();
-
-    Lock::GlobalRead globalReadLock(txn->lockState());
 
     CachingCappedChecker isCapped;
 
@@ -1196,9 +1195,6 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
         prefetchOps(ops, workerPool);
     }
 
-    std::vector<MultiApplier::OperationPtrs> writerVectors(workerPool->getNumThreads());
-
-    fillWriterVectors(txn, &ops, &writerVectors);
     LOG(2) << "replication batch size is " << ops.size();
     // We must grab this because we're going to grab write locks later.
     // We hold this mutex the entire time we're writing; it doesn't matter
@@ -1215,18 +1211,39 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
                 "attempting to replicate ops while primary"};
     }
 
-    applyOps(&writerVectors, workerPool, applyOperation);
-
     {
+        // We must wait for the all work we've dispatched to complete before leaving this block
+        // because the spawned threads refer to objects on our stack, including writerVectors.
+        std::vector<MultiApplier::OperationPtrs> writerVectors;
         ON_BLOCK_EXIT([&] { workerPool->join(); });
 
-        std::vector<BSONObj> docs(ops.size());
-        auto toBSON = [](const OplogEntry& entry) { return entry.raw; };
-        std::transform(ops.begin(), ops.end(), docs.begin(), toBSON);
+        // Start writing ops to the oplog on another thread while this thread distributes and
+        // schedules the work of applying the operations.
+        workerPool->schedule([&ops] {
+            initializeWriterThread();
+            const auto txnHolder = cc().makeOperationContext();
+            const auto txn = txnHolder.get();
+            txn->lockState()->setIsBatchWriter(true);
+            txn->setReplicatedWrites(false);
 
-        fassertStatusOK(
-            40141,
-            StorageInterface::get(txn)->insertDocuments(txn, NamespaceString(rsOplogName), docs));
+            std::vector<BSONObj> docs;
+            docs.reserve(ops.size());
+            for (const auto& op : ops) {
+                // Add as unowned BSON to avoid unnecessary ref-count bumps.
+                // 'ops' will outlive 'docs' so the BSON lifetime will be guaranteed.
+                docs.emplace_back(op.raw.objdata());
+            }
+
+            fassertStatusOK(40141,
+                            StorageInterface::get(txn)->insertDocuments(
+                                txn, NamespaceString(rsOplogName), docs));
+        });
+
+        // We claimed 1 thread for oplog writing, so use 1 less for oplog application.
+        writerVectors.resize(std::max(workerPool->getNumThreads() - 1, size_t(1)));
+
+        fillWriterVectors(txn, &ops, &writerVectors);
+        applyOps(&writerVectors, workerPool, applyOperation);
     }
 
     if (inShutdownStrict()) {
@@ -1234,6 +1251,7 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
         return {ErrorCodes::InterruptedAtShutdown,
                 "Cannot apply operations due to shutdown in progress"};
     }
+
     // We have now written all database writes and updated the oplog to match.
     return ops.back().getOpTime();
 }

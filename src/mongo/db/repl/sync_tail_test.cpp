@@ -543,13 +543,13 @@ TEST_F(SyncTailTest,
 }
 
 TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceHash) {
+    // This test relies on implementation details of how multiApply uses hashing to distribute ops
+    // to threads. It is possible for this test to fail, even if the implementation of multiApply is
+    // correct. If it fails, consider adjusting the namespace names (to adjust the hash values) or
+    // the number of threads in the pool.
     NamespaceString nss1("test.t0");
     NamespaceString nss2("test.t1");
-    OldThreadPool writerPool(2);
-
-    // Ensure that namespaces are hashed to different threads in pool.
-    ASSERT_EQUALS(0U, StringMapTraits::hash(nss1.ns()) % writerPool.getNumThreads());
-    ASSERT_EQUALS(1U, StringMapTraits::hash(nss2.ns()) % writerPool.getNumThreads());
+    OldThreadPool writerPool(3);
 
     stdx::mutex mutex;
     std::vector<MultiApplier::Operations> operationsApplied;
@@ -583,7 +583,7 @@ TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceH
     std::vector<OpTime> seen;
     {
         stdx::lock_guard<stdx::mutex> lock(mutex);
-        ASSERT_EQUALS(writerPool.getNumThreads(), operationsApplied.size());
+        ASSERT_EQUALS(operationsApplied.size(), 2U);
         for (auto&& operationsAppliedByThread : operationsApplied) {
             ASSERT_EQUALS(1U, operationsAppliedByThread.size());
             const auto& oplogEntry = operationsAppliedByThread.front();
