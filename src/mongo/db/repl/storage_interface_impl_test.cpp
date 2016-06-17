@@ -91,7 +91,7 @@ CollectionOptions createOplogCollectionOptions() {
  */
 void createCollection(OperationContext* txn,
                       const NamespaceString& nss,
-                      const CollectionOptions& options) {
+                      const CollectionOptions& options = CollectionOptions()) {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock dblk(txn->lockState(), nss.db(), MODE_X);
@@ -126,23 +126,6 @@ ReplSettings createReplSettings() {
     settings.setOplogSizeBytes(5 * 1024 * 1024);
     settings.setReplSetString("mySet/node1:12345");
     return settings;
-}
-
-/**
- * Creates a collection given the supplied options.
- */
-StatusWith<Collection*> createCollection(OperationContext* txn,
-                                         NamespaceString& nss,
-                                         CollectionOptions opts = CollectionOptions()) {
-    ScopedTransaction transaction(txn, MODE_IX);
-    AutoGetOrCreateDb db{txn, nss.db(), MODE_X};
-    WriteUnitOfWork wunit{txn};
-    auto collection = db.getDb()->createCollection(txn, nss.ns(), opts, true);
-    if (collection) {
-        wunit.commit();
-        return collection;
-    }
-    return {ErrorCodes::InternalError, "collection creation failed."};
 }
 
 /**
@@ -350,7 +333,7 @@ TEST_F(StorageInterfaceImplTest,
     // fail.
     auto txn = getClient()->makeOperationContext();
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
-    createCollection(txn.get(), nss, CollectionOptions());
+    createCollection(txn.get(), nss);
 
     // Non-oplog collection will enforce mandatory _id field requirement on insertion.
     StorageInterfaceImpl storageInterface(nss);
@@ -401,7 +384,7 @@ TEST_F(StorageInterfaceImplWithReplCoordTest, InsertMissingDocWorksOnExistingCap
     CollectionOptions opts;
     opts.capped = true;
     opts.cappedSize = 1024 * 1024;
-    ASSERT_OK(createCollection(txn, nss, opts));
+    createCollection(txn, nss, opts);
     ASSERT_OK(storage.insertDocument(txn, nss, BSON("_id" << 1)));
     AutoGetCollectionForRead autoColl(txn, nss);
     ASSERT_TRUE(autoColl.getCollection());
@@ -411,7 +394,7 @@ TEST_F(StorageInterfaceImplWithReplCoordTest, InsertMissingDocWorksOnExistingCol
     auto txn = getOperationContext();
     StorageInterfaceImpl storage;
     NamespaceString nss("foo.bar");
-    ASSERT_OK(createCollection(txn, nss));
+    createCollection(txn, nss);
     ASSERT_OK(storage.insertDocument(txn, nss, BSON("_id" << 1)));
     AutoGetCollectionForRead autoColl(txn, nss);
     ASSERT_TRUE(autoColl.getCollection());
@@ -455,8 +438,7 @@ TEST_F(StorageInterfaceImplWithReplCoordTest, CreateCollectionThatAlreadyExistsF
     StorageInterfaceImpl storage;
     storage.startup();
     NamespaceString nss("test.system.indexes");
-    auto coll = createCollection(txn, nss);
-    ASSERT_OK(coll.getStatus());
+    createCollection(txn, nss);
 
     const CollectionOptions opts;
     const std::vector<BSONObj> indexes;
@@ -485,10 +467,8 @@ TEST_F(StorageInterfaceImplWithReplCoordTest, DropCollectionWorksWithExistingWit
     auto txn = getOperationContext();
     StorageInterfaceImpl storage;
     NamespaceString nss("foo.bar");
-    auto coll = createCollection(txn, nss);
-    ASSERT_OK(coll.getStatus());
-    ASSERT_OK(coll.getValue()->insertDocument(
-        txn, BSON("_id" << 1), nullptr /** OpDebug **/, false, true));
+    createCollection(txn, nss);
+    ASSERT_OK(storage.insertDocument(txn, nss, BSON("_id" << 1)));
     ASSERT_OK(storage.dropCollection(txn, nss));
 }
 
@@ -496,7 +476,7 @@ TEST_F(StorageInterfaceImplWithReplCoordTest, DropCollectionWorksWithExistingEmp
     auto txn = getOperationContext();
     StorageInterfaceImpl storage;
     NamespaceString nss("foo.bar");
-    ASSERT_OK(createCollection(txn, nss));
+    createCollection(txn, nss);
     ASSERT_OK(storage.dropCollection(txn, nss));
     AutoGetCollectionForRead autoColl(txn, nss);
     ASSERT_FALSE(autoColl.getCollection());
