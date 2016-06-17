@@ -340,7 +340,11 @@ Mongo.prototype.readMode = function() {
         // commands. If it does, use commands mode. If not, degrade to legacy mode.
         try {
             var hasReadCommands = (this.getMinWireVersion() <= 4 && 4 <= this.getMaxWireVersion());
-            if (hasReadCommands) {
+            // TODO SERVER-23219: DBCommandCursor doesn't route getMore and killCursors operations
+            // to the server that the cursor was originally established on. As a workaround, we make
+            // replica set connections use 'legacy' read mode because the underlying DBClientCursor
+            // will correctly route operations to the original server.
+            if (hasReadCommands && !this.isReplicaSetConnection()) {
                 this._readMode = "commands";
             } else {
                 print("Cannot use 'commands' readMode, degrading to 'legacy' mode");
