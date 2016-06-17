@@ -155,6 +155,7 @@ env.CppUnitTest(
         'active_migrations_registry_test.cpp',
         'metadata_manager_test.cpp',
         'sharding_state_test.cpp',
+        'metadata_manager_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/remote_command_targeter_mock',

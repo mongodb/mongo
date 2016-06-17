@@ -32,6 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/s/collection_metadata.h"
+#include "mongo/s/catalog/type_chunk.h"
 
 namespace mongo {
 
@@ -58,6 +59,21 @@ public:
      */
     void setActiveMetadata(std::unique_ptr<CollectionMetadata> newMetadata);
 
+    /**
+    * Adds a new range to be cleaned up.
+    * The newly introduced range must not overlap with the existing ranges.
+    */
+    void addRangeToClean(const ChunkRange& range);
+
+    /**
+     * Removes the specified range from the ranges to be cleaned up.
+     */
+    void removeRangeToClean(const ChunkRange& range);
+
+    /**
+     * Gets copy of _rangesToClean map (see below).
+     */
+    std::map<BSONObj, ChunkRange> getCopyOfRanges();
 
 private:
     friend class ScopedCollectionMetadata;
@@ -82,6 +98,11 @@ private:
     std::unique_ptr<CollectionMetadataTracker> _activeMetadataTracker;
 
     std::list<std::unique_ptr<CollectionMetadataTracker>> _metadataInUse;
+
+    // Contains the information of which ranges of sharding keys need to
+    // be deleted from the shard. The map is from the minimum value of the
+    // range to be deleted (e.g. BSON("key" << 0)) to the entire chunk range.
+    std::map<BSONObj, ChunkRange> _rangesToClean;
 };
 
 
@@ -103,6 +124,7 @@ public:
      */
     CollectionMetadata* operator->();
     CollectionMetadata* getMetadata();
+
 
 private:
     friend ScopedCollectionMetadata MetadataManager::getActiveMetadata();
