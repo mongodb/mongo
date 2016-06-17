@@ -73,7 +73,7 @@ void OldThreadPool::join() {
 }
 
 void OldThreadPool::schedule(Task task) {
-    fassert(28705, _pool.schedule(task));
+    fassert(28705, _pool.schedule(std::move(task)));
 }
 
 }  // namespace mongo
