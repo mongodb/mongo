@@ -895,7 +895,7 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 
 	/* Dump the page's K/V pairs. */
 	WT_ROW_FOREACH(page, rip, i) {
-		WT_RET(__wt_row_leaf_key(session, page, rip, key, false));
+		WT_ERR(__wt_row_leaf_key(session, page, rip, key, false));
 		__debug_item(ds, "K", key->data, key->size);
 
 		if ((cell = __wt_row_leaf_value_cell(page, rip, NULL)) == NULL)
