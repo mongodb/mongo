@@ -216,10 +216,9 @@ functions:
       type : test
       params:
         working_dir: src/dsi/dsi
+        silent: true
         script: |
-          set -o errexit
-          set -o verbose
-          python -u analysis/dashboard_gen.py --rev ${revision} -f history.json -t tags.json --refTag 3.2.1-Baseline --overrideFile analysis/master/system_perf_override.json --project_id sys-perf --task_name ${task_name} --variant ${build_variant} || true
+          python -u analysis/dashboard_gen.py --rev ${revision} -f history.json -t tags.json --refTag 3.2.3-Baseline 3.2.1-Baseline 3.1.8-Baseline 3.0.9-Baseline --overrideFile analysis/master/system_perf_override.json --project_id sys-perf --task_name ${task_name} --variant ${build_variant} --jira-user ${perf_jira_user} --jira-password ${perf_jira_pw} || true
     - command: "json.send"
       params:
          name: "dashboard"
