@@ -87,7 +87,8 @@ main(int argc, char *argv[])
 	testutil_check(testutil_parse_opts(argc, argv, opts));
 	testutil_make_work_dir(opts->home);
 
-	testutil_assert((tablename = strchr(opts->uri, ':')) != 0);
+	tablename = strchr(opts->uri, ':');
+	testutil_assert(tablename != NULL);
 	tablename++;
 	snprintf(countryuri, sizeof(countryuri), "index:%s:country", tablename);
 	snprintf(yearuri, sizeof(yearuri), "index:%s:year", tablename);

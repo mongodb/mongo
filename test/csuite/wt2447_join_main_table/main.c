@@ -101,7 +101,8 @@ main(int argc, char *argv[])
 	testutil_check(testutil_parse_opts(argc, argv, opts));
 	testutil_make_work_dir(opts->home);
 
-	testutil_assert((tablename = strchr(opts->uri, ':')) != 0);
+	tablename = strchr(opts->uri, ':');
+	testutil_assert(tablename != NULL);
 	tablename++;
 	snprintf(index1uri, sizeof(index1uri), "index:%s:index1", tablename);
 	snprintf(index2uri, sizeof(index2uri), "index:%s:index2", tablename);
