@@ -1398,14 +1398,14 @@ class FromDate {
 public:
     void run() {
         OID min, oid, max;
-        Date_t now = jsTime();
-        oid.init();  // slight chance this has different time. If its a problem, can change.
-        min.init(now);
+        oid.init();
+        const Date_t now = oid.asDateT();
+        min.init(now, false);
         max.init(now, true);
 
-        ASSERT_EQUALS((unsigned)oid.asTimeT(), now / 1000);
-        ASSERT_EQUALS((unsigned)min.asTimeT(), now / 1000);
-        ASSERT_EQUALS((unsigned)max.asTimeT(), now / 1000);
+        ASSERT_EQUALS(oid.asDateT(), now);
+        ASSERT_EQUALS(min.asDateT(), now);
+        ASSERT_EQUALS(max.asDateT(), now);
         ASSERT(BSON("" << min).woCompare(BSON("" << oid)) < 0);
         ASSERT(BSON("" << max).woCompare(BSON("" << oid)) > 0);
     }
