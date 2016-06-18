@@ -653,6 +653,15 @@ post:
       source_dir: "./"
       include:
         - "./**.mdmp"
+  # Using shell and tar to recurse properly to all possible diagnostic.data subdirectories.  The
+  # archive.targz_pack command is not being used here because the command's glob support did not
+  # allow us to gather all directories.
+  - command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o verbose
+        ${tar|tar} cvzf diagnostic-data.tgz $(find /data/db -type d -name diagnostic.data)
   - command: s3.put
     params:
       aws_key: ${aws_key}
@@ -663,6 +672,17 @@ post:
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
       display_name: Core Dumps - Execution ${execution}
+      optional: true
+  - command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/diagnostic-data.tgz
+      remote_file: mongodb-mongo-master/${build_variant}/${revision}/ftdc/mongo-diagnostic-data-${task_id}-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: ${content_type|application/x-gzip}
+      display_name: FTDC Diagnostic Data - Execution ${execution}
       optional: true
   - command: shell.exec
     params:
