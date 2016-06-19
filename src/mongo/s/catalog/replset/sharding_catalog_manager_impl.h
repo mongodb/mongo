@@ -69,6 +69,10 @@ public:
                           const std::string& shardName,
                           const std::string& zoneName) override;
 
+    Status removeShardFromZone(OperationContext* txn,
+                               const std::string& shardName,
+                               const std::string& zoneName) override;
+
     void appendConnectionStats(executor::ConnectionPoolStats* stats) override;
 
 private:

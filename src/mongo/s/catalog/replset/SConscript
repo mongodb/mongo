@@ -108,6 +108,7 @@ env.CppUnitTest(
     target='config_server_catalog_test',
     source=[
         'sharding_catalog_add_shard_to_zone_test.cpp',
+        'sharding_catalog_remove_shard_from_zone_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/repl/replmocks',

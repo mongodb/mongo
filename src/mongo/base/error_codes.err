@@ -161,6 +161,7 @@ error_code("DurationOverflow", 159)
 error_code("MaxStalenessOutOfRange", 160)
 error_code("IncompatibleCollationVersion", 161)
 error_code("CollectionIsEmpty", 162)
+error_code("ZoneStillInUse", 163)
 
 # Non-sequential error codes (for compatibility only)
 error_code("SocketException", 9001)

@@ -52,6 +52,7 @@
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -72,6 +73,7 @@ using str::stream;
 namespace {
 
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
+const ReadPreferenceSetting kConfigPrimarySelector(ReadPreference::PrimaryOnly);
 const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
 
 void toBatchError(const Status& status, BatchedCommandResponse* response) {
@@ -597,6 +599,117 @@ Status ShardingCatalogManagerImpl::addShardToZone(OperationContext* txn,
     if (!updateStatus.getValue()) {
         return {ErrorCodes::ShardNotFound,
                 str::stream() << "shard " << shardName << " does not exist"};
+    }
+
+    return Status::OK();
+}
+
+Status ShardingCatalogManagerImpl::removeShardFromZone(OperationContext* txn,
+                                                       const std::string& shardName,
+                                                       const std::string& zoneName) {
+    ScopedZoneOpExclusiveLock scopedLock(txn);
+
+    auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
+    const NamespaceString shardNS(ShardType::ConfigNS);
+
+    //
+    // Check whether the shard even exist in the first place.
+    //
+
+    auto findShardExistsStatus =
+        configShard->exhaustiveFindOnConfig(txn,
+                                            kConfigPrimarySelector,
+                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            shardNS,
+                                            BSON(ShardType::name() << shardName),
+                                            BSONObj(),
+                                            1);
+
+    if (!findShardExistsStatus.isOK()) {
+        return findShardExistsStatus.getStatus();
+    }
+
+    if (findShardExistsStatus.getValue().docs.size() == 0) {
+        return {ErrorCodes::ShardNotFound,
+                str::stream() << "shard " << shardName << " does not exist"};
+    }
+
+    //
+    // Check how many shards belongs to this zone.
+    //
+
+    auto findShardStatus =
+        configShard->exhaustiveFindOnConfig(txn,
+                                            kConfigPrimarySelector,
+                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            shardNS,
+                                            BSON(ShardType::tags() << zoneName),
+                                            BSONObj(),
+                                            2);
+
+    if (!findShardStatus.isOK()) {
+        return findShardStatus.getStatus();
+    }
+
+    const auto shardDocs = findShardStatus.getValue().docs;
+
+    if (shardDocs.size() == 0) {
+        // The zone doesn't exists, this could be a retry.
+        return Status::OK();
+    }
+
+    if (shardDocs.size() == 1) {
+        auto shardDocStatus = ShardType::fromBSON(shardDocs.front());
+        if (!shardDocStatus.isOK()) {
+            return shardDocStatus.getStatus();
+        }
+
+        auto shardDoc = shardDocStatus.getValue();
+        if (shardDoc.getName() != shardName) {
+            // The last shard that belongs to this zone is a different shard.
+            // This could be a retry, so return OK.
+            return Status::OK();
+        }
+
+        auto findChunkRangeStatus =
+            configShard->exhaustiveFindOnConfig(txn,
+                                                kConfigPrimarySelector,
+                                                repl::ReadConcernLevel::kLocalReadConcern,
+                                                NamespaceString(TagsType::ConfigNS),
+                                                BSON(TagsType::tag() << zoneName),
+                                                BSONObj(),
+                                                1);
+
+        if (!findChunkRangeStatus.isOK()) {
+            return findChunkRangeStatus.getStatus();
+        }
+
+        if (findChunkRangeStatus.getValue().docs.size() > 0) {
+            return {ErrorCodes::ZoneStillInUse,
+                    "cannot remove a shard from zone if a chunk range is associated with it"};
+        }
+    }
+
+    //
+    // Perform update.
+    //
+
+    auto updateStatus =
+        _catalogClient->updateConfigDocument(txn,
+                                             ShardType::ConfigNS,
+                                             BSON(ShardType::name(shardName)),
+                                             BSON("$pull" << BSON(ShardType::tags() << zoneName)),
+                                             false,
+                                             kNoWaitWriteConcern);
+
+    if (!updateStatus.isOK()) {
+        return updateStatus.getStatus();
+    }
+
+    // The update did not match a document, another thread could have removed it.
+    if (!updateStatus.getValue()) {
+        return {ErrorCodes::ShardNotFound,
+                str::stream() << "shard " << shardName << " no longer exist"};
     }
 
     return Status::OK();

@@ -280,6 +280,12 @@ static void reloadSettings(OperationContext* txn) {
     if (!result.isOK()) {
         warning() << "could not create index ns_1_min_1: " << causedBy(result);
     }
+
+    result = clusterCreateIndex(
+        txn, TagsType::ConfigNS, BSON(TagsType::ns() << 1 << TagsType::tag() << 1), !unique);
+    if (!result.isOK()) {
+        warning() << "could not create index ns_1_tag_1: " << causedBy(result);
+    }
 }
 
 static Status initializeSharding(OperationContext* txn) {
