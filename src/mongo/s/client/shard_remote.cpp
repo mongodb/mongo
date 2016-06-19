@@ -293,7 +293,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
                     return;
                 }
 
-                response.opTime = replParseStatus.getValue().getLastOpVisible();
+                response.opTime = replParseStatus.getValue().getLastOpCommitted();
 
                 // We return the config opTime that was returned for this particular request, but as
                 // a safeguard we ensure our global configOpTime is at least as large as it.
