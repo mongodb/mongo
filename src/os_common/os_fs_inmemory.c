@@ -300,6 +300,20 @@ __im_file_close(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session)
 }
 
 /*
+ * __im_file_lock --
+ *	Lock/unlock a file.
+ */
+static int
+__im_file_lock(
+    WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, bool lock)
+{
+	WT_UNUSED(file_handle);
+	WT_UNUSED(wt_session);
+	WT_UNUSED(lock);
+	return (0);
+}
+
+/*
  * __im_file_read --
  *	POSIX pread.
  */
@@ -357,6 +371,18 @@ __im_file_size(
 
 	__wt_spin_unlock(session, &im_fs->lock);
 
+	return (0);
+}
+
+/*
+ * __im_file_sync --
+ *	In-memory sync.
+ */
+static int
+__im_file_sync(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session)
+{
+	WT_UNUSED(file_handle);
+	WT_UNUSED(wt_session);
 	return (0);
 }
 
@@ -492,8 +518,10 @@ __im_file_open(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
 	WT_FILE_HANDLE_INSERT(im_fs, im_fh, bucket);
 
 	file_handle->close = __im_file_close;
+	file_handle->fh_lock = __im_file_lock;
 	file_handle->fh_read = __im_file_read;
 	file_handle->fh_size = __im_file_size;
+	file_handle->fh_sync = __im_file_sync;
 	file_handle->fh_truncate = __im_file_truncate;
 	file_handle->fh_write = __im_file_write;
 
