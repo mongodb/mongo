@@ -99,7 +99,6 @@ class RecordCursor;
         return Status::OK();                                                     \
     }
 
-
 class DocumentSource : public IntrusiveCounterUnsigned {
 public:
     using Parser = stdx::function<std::vector<boost::intrusive_ptr<DocumentSource>>(
@@ -1737,5 +1736,14 @@ public:
 
 private:
     DocumentSourceSortByCount() = default;
+};
+
+class DocumentSourceCount final {
+public:
+    static std::vector<boost::intrusive_ptr<DocumentSource>> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+private:
+    DocumentSourceCount() = default;
 };
 }
