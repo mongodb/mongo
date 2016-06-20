@@ -592,73 +592,35 @@ list<string> DBClientWithCommands::getCollectionNames(const string& db) {
 list<BSONObj> DBClientWithCommands::getCollectionInfos(const string& db, const BSONObj& filter) {
     list<BSONObj> infos;
 
-    // first we're going to try the command
-    // it was only added in 3.0, so if we're talking to an older server
-    // we'll fail back to querying system.namespaces
-    // TODO(spencer): remove fallback behavior after 3.0
-
-    {
-        BSONObj res;
-        if (runCommand(db,
-                       BSON("listCollections" << 1 << "filter" << filter << "cursor" << BSONObj()),
-                       res,
-                       QueryOption_SlaveOk)) {
-            BSONObj cursorObj = res["cursor"].Obj();
-            BSONObj collections = cursorObj["firstBatch"].Obj();
-            BSONObjIterator it(collections);
-            while (it.more()) {
-                BSONElement e = it.next();
-                infos.push_back(e.Obj().getOwned());
-            }
-
-            const long long id = cursorObj["id"].Long();
-
-            if (id != 0) {
-                const std::string ns = cursorObj["ns"].String();
-                unique_ptr<DBClientCursor> cursor = getMore(ns, id, 0, 0);
-                while (cursor->more()) {
-                    infos.push_back(cursor->nextSafe().getOwned());
-                }
-            }
-
-            return infos;
+    BSONObj res;
+    if (runCommand(db,
+                   BSON("listCollections" << 1 << "filter" << filter << "cursor" << BSONObj()),
+                   res,
+                   QueryOption_SlaveOk)) {
+        BSONObj cursorObj = res["cursor"].Obj();
+        BSONObj collections = cursorObj["firstBatch"].Obj();
+        BSONObjIterator it(collections);
+        while (it.more()) {
+            BSONElement e = it.next();
+            infos.push_back(e.Obj().getOwned());
         }
 
-        // command failed
+        const long long id = cursorObj["id"].Long();
 
-        int code = res["code"].numberInt();
-        string errmsg = res["errmsg"].valuestrsafe();
-        if (code == ErrorCodes::CommandNotFound || errmsg.find("no such cmd") != string::npos) {
-            // old version of server, ok, fall through to old code
-        } else {
-            uasserted(18630, str::stream() << "listCollections failed: " << res);
+        if (id != 0) {
+            const std::string ns = cursorObj["ns"].String();
+            unique_ptr<DBClientCursor> cursor = getMore(ns, id, 0, 0);
+            while (cursor->more()) {
+                infos.push_back(cursor->nextSafe().getOwned());
+            }
         }
+
+        return infos;
     }
 
-    // SERVER-14951 filter for old version fallback needs to db qualify the 'name' element
-    BSONObjBuilder fallbackFilter;
-    if (filter.hasField("name") && filter["name"].type() == String) {
-        fallbackFilter.append("name", db + "." + filter["name"].str());
-    }
-    fallbackFilter.appendElementsUnique(filter);
+    // command failed
 
-    string ns = db + ".system.namespaces";
-    unique_ptr<DBClientCursor> c =
-        query(ns.c_str(), fallbackFilter.obj(), 0, 0, 0, QueryOption_SlaveOk);
-    uassert(28611, str::stream() << "listCollections failed querying " << ns, c.get());
-
-    while (c->more()) {
-        BSONObj obj = c->nextSafe();
-        string ns = obj["name"].valuestr();
-        if (NamespaceString::virtualized(ns))
-            continue;
-        BSONObjBuilder b;
-        b.append("name", ns.substr(db.size() + 1));
-        b.appendElementsUnique(obj);
-        infos.push_back(b.obj());
-    }
-
-    return infos;
+    uasserted(18630, str::stream() << "listCollections failed: " << res);
 }
 
 bool DBClientWithCommands::exists(const string& ns) {
@@ -1186,51 +1148,34 @@ void DBClientBase::killCursor(long long cursorId) {
 list<BSONObj> DBClientWithCommands::getIndexSpecs(const string& ns, int options) {
     list<BSONObj> specs;
 
-    {
-        BSONObj cmd = BSON("listIndexes" << nsToCollectionSubstring(ns) << "cursor" << BSONObj());
+    BSONObj cmd = BSON("listIndexes" << nsToCollectionSubstring(ns) << "cursor" << BSONObj());
 
-        BSONObj res;
-        if (runCommand(nsToDatabase(ns), cmd, res, options)) {
-            BSONObj cursorObj = res["cursor"].Obj();
-            BSONObjIterator i(cursorObj["firstBatch"].Obj());
-            while (i.more()) {
-                specs.push_back(i.next().Obj().getOwned());
-            }
-
-            const long long id = cursorObj["id"].Long();
-
-            if (id != 0) {
-                const std::string ns = cursorObj["ns"].String();
-                unique_ptr<DBClientCursor> cursor = getMore(ns, id, 0, 0);
-                while (cursor->more()) {
-                    specs.push_back(cursor->nextSafe().getOwned());
-                }
-            }
-
-            return specs;
+    BSONObj res;
+    if (runCommand(nsToDatabase(ns), cmd, res, options)) {
+        BSONObj cursorObj = res["cursor"].Obj();
+        BSONObjIterator i(cursorObj["firstBatch"].Obj());
+        while (i.more()) {
+            specs.push_back(i.next().Obj().getOwned());
         }
-        int code = res["code"].numberInt();
-        string errmsg = res["errmsg"].valuestrsafe();
-        if (code == ErrorCodes::CommandNotFound || errmsg.find("no such cmd") != string::npos) {
-            // old version of server, ok, fall through to old code
-        } else if (code == ErrorCodes::NamespaceNotFound) {
-            return specs;
-        } else {
-            uasserted(18631, str::stream() << "listIndexes failed: " << res);
+
+        const long long id = cursorObj["id"].Long();
+
+        if (id != 0) {
+            const std::string ns = cursorObj["ns"].String();
+            unique_ptr<DBClientCursor> cursor = getMore(ns, id, 0, 0);
+            while (cursor->more()) {
+                specs.push_back(cursor->nextSafe().getOwned());
+            }
         }
-    }
 
-    // fallback to querying system.indexes
-    // TODO(spencer): Remove fallback behavior after 3.0
-    unique_ptr<DBClientCursor> cursor =
-        query(NamespaceString(ns).getSystemIndexesCollection(), BSON("ns" << ns), 0, 0, 0, options);
-    uassert(28612, str::stream() << "listIndexes failed querying " << ns, cursor.get());
-
-    while (cursor->more()) {
-        BSONObj spec = cursor->nextSafe();
-        specs.push_back(spec.getOwned());
+        return specs;
     }
-    return specs;
+    int code = res["code"].numberInt();
+
+    if (code == ErrorCodes::NamespaceNotFound) {
+        return specs;
+    }
+    uasserted(18631, str::stream() << "listIndexes failed: " << res);
 }
 
 
