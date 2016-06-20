@@ -787,15 +787,19 @@ methods = {
 ]),
 
 'WT_SESSION.drop' : Method([
+    Config('checkpoint_wait', 'true', r'''
+        wait for the checkpoint lock, if \c checkpoint_wait=false, fail if
+        this lock is not available immediately''',
+        type='boolean', undoc=True),
     Config('force', 'false', r'''
         return success if the object does not exist''',
-        type='boolean'),
-    Config('remove_files', 'true', r'''
-        should the underlying files be removed?''',
         type='boolean'),
     Config('lock_wait', 'true', r'''
         wait for locks, if \c lock_wait=false, fail if any required locks are
         not available immediately''',
+        type='boolean', undoc=True),
+    Config('remove_files', 'true', r'''
+        should the underlying files be removed?''',
         type='boolean'),
 ]),
 
