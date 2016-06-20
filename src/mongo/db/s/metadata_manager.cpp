@@ -25,12 +25,12 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/metadata_manager.h"
 
 #include "mongo/db/s/collection_metadata.h"
-#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -102,63 +102,4 @@ ScopedCollectionMetadata& ScopedCollectionMetadata::operator=(ScopedCollectionMe
     return *this;
 }
 
-std::map<BSONObj, ChunkRange> MetadataManager::getCopyOfRanges() {
-    return _rangesToClean;
-}
-
-void MetadataManager::addRangeToClean(const ChunkRange& range) {
-    auto itLow = _rangesToClean.upper_bound(range.getMin());
-    if (itLow != _rangesToClean.begin()) {
-        --itLow;
-    }
-
-    if (itLow != _rangesToClean.end()) {
-        const ChunkRange& cr = itLow->second;
-        if (cr.getMin() < range.getMin()) {
-            // Checks that there is no overlap between range and any other ChunkRange
-            // Specifically, checks that the greatest chunk less than or equal to range, if such a
-            // chunk exists, does not overlap with the min of range.
-            invariant(cr.getMax() <= range.getMin());
-        }
-    }
-
-    auto itHigh = _rangesToClean.lower_bound(range.getMin());
-    if (itHigh != _rangesToClean.end()) {
-        const ChunkRange& cr = itHigh->second;
-        // Checks that there is no overlap between range and any other ChunkRange
-        // Specifically, checks that the least chunk greater than or equal to range
-        // does not overlap with the max of range.
-        invariant(cr.getMin() >= range.getMax());
-    }
-
-    _rangesToClean.insert(std::make_pair(range.getMin(), range));
-}
-
-void MetadataManager::removeRangeToClean(const ChunkRange& range) {
-    auto it = _rangesToClean.upper_bound(range.getMin());
-    // We want our iterator to point at the greatest value
-    // that is still less than or equal to range.
-    if (it != _rangesToClean.begin()) {
-        --it;
-    }
-
-    for (; it != _rangesToClean.end() && it->second.getMin() < range.getMax();) {
-        if (it->second.getMax() <= range.getMin()) {
-            ++it;
-            continue;
-        }
-        // There's overlap between *it and range so we remove *it
-        // and then replace with new ranges.
-        ChunkRange oldChunk = it->second;
-        _rangesToClean.erase(it++);
-        if (oldChunk.getMin() < range.getMin()) {
-            ChunkRange newChunk = ChunkRange(oldChunk.getMin(), range.getMin());
-            addRangeToClean(newChunk);
-        }
-        if (oldChunk.getMax() > range.getMax()) {
-            ChunkRange newChunk = ChunkRange(range.getMax(), oldChunk.getMax());
-            addRangeToClean(newChunk);
-        }
-    }
-}
 }  // namespace mongo
