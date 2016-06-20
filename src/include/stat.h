@@ -144,10 +144,16 @@ __wt_stats_clear(void *stats_arg, int slot)
 
 #define	WT_STAT_DECRV(session, stats, fld, value)			\
 	(stats)[WT_STATS_SLOT_ID(session)]->fld -= (int64_t)(value)
+#define	WT_STAT_DECRV_ATOMIC(session, stats, fld, value)		\
+	__wt_atomic_addi64(						\
+	    &(stats)[WT_STATS_SLOT_ID(session)]->fld, (int64_t)(value))
 #define	WT_STAT_DECR(session, stats, fld)				\
 	WT_STAT_DECRV(session, stats, fld, 1)
 #define	WT_STAT_INCRV(session, stats, fld, value)			\
 	(stats)[WT_STATS_SLOT_ID(session)]->fld += (int64_t)(value)
+#define	WT_STAT_INCRV_ATOMIC(session, stats, fld, value)		\
+	__wt_atomic_subi64(						\
+	    &(stats)[WT_STATS_SLOT_ID(session)]->fld, (int64_t)(value))
 #define	WT_STAT_INCR(session, stats, fld)				\
 	WT_STAT_INCRV(session, stats, fld, 1)
 #define	WT_STAT_SET(session, stats, fld, value) do {			\
@@ -164,12 +170,20 @@ __wt_stats_clear(void *stats_arg, int slot)
 } while (0)
 #define	WT_STAT_FAST_DECR(session, stats, fld)				\
 	WT_STAT_FAST_DECRV(session, stats, fld, 1)
+#define	WT_STAT_FAST_DECRV_ATOMIC(session, stats, fld, value) do {	\
+	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
+		WT_STAT_DECRV_ATOMIC(session, stats, fld, value);	\
+} while (0)
 #define	WT_STAT_FAST_INCRV(session, stats, fld, value) do {		\
 	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
 		WT_STAT_INCRV(session, stats, fld, value);		\
 } while (0)
 #define	WT_STAT_FAST_INCR(session, stats, fld)				\
 	WT_STAT_FAST_INCRV(session, stats, fld, 1)
+#define	WT_STAT_FAST_INCRV_ATOMIC(session, stats, fld, value) do {	\
+	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
+		WT_STAT_INCRV_ATOMIC(session, stats, fld, value);	\
+} while (0)
 #define	WT_STAT_FAST_SET(session, stats, fld, value) do {		\
 	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
 		WT_STAT_SET(session, stats, fld, value);		\
@@ -180,10 +194,14 @@ __wt_stats_clear(void *stats_arg, int slot)
  */
 #define	WT_STAT_FAST_CONN_DECR(session, fld)				\
 	WT_STAT_FAST_DECR(session, S2C(session)->stats, fld)
+#define	WT_STAT_FAST_CONN_DECR_ATOMIC(session, fld)			\
+	WT_STAT_FAST_DECRV_ATOMIC(session, S2C(session)->stats, fld, 1)
 #define	WT_STAT_FAST_CONN_DECRV(session, fld, value)			\
 	WT_STAT_FAST_DECRV(session, S2C(session)->stats, fld, value)
 #define	WT_STAT_FAST_CONN_INCR(session, fld)				\
 	WT_STAT_FAST_INCR(session, S2C(session)->stats, fld)
+#define	WT_STAT_FAST_CONN_INCR_ATOMIC(session, fld)			\
+	WT_STAT_FAST_INCRV_ATOMIC(session, S2C(session)->stats, fld, 1)
 #define	WT_STAT_FAST_CONN_INCRV(session, fld, value)			\
 	WT_STAT_FAST_INCRV(session, S2C(session)->stats, fld, value)
 #define	WT_STAT_FAST_CONN_SET(session, fld, value)			\
@@ -317,6 +335,7 @@ struct __wt_connection_stats {
 	int64_t cond_wait;
 	int64_t rwlock_read;
 	int64_t rwlock_write;
+	int64_t fsync_io;
 	int64_t read_io;
 	int64_t write_io;
 	int64_t cursor_create;
@@ -383,6 +402,9 @@ struct __wt_connection_stats {
 	int64_t rec_split_stashed_objects;
 	int64_t session_cursor_open;
 	int64_t session_open;
+	int64_t fsync_active;
+	int64_t read_active;
+	int64_t write_active;
 	int64_t page_busy_blocked;
 	int64_t page_forcible_evict_blocked;
 	int64_t page_locked_blocked;

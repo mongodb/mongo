@@ -81,6 +81,10 @@ class SessionStat(Stat):
     prefix = 'session'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, SessionStat.prefix, desc, flags)
+class ThreadState(Stat):
+    prefix = 'thread-state'
+    def __init__(self, name, desc, flags=''):
+        Stat.__init__(self, name, ThreadState.prefix, desc, flags)
 class TxnStat(Stat):
     prefix = 'transaction'
     def __init__(self, name, desc, flags=''):
@@ -97,10 +101,20 @@ class YieldStat(Stat):
 ##########################################
 groups = {}
 groups['cursor'] = [CursorStat.prefix, SessionStat.prefix]
-groups['evict'] = [CacheStat.prefix, ConnStat.prefix, BlockStat.prefix]
+groups['evict'] = [
+    BlockStat.prefix,
+    CacheStat.prefix,
+    ConnStat.prefix,
+    ThreadState.prefix
+]
 groups['lsm'] = [LSMStat.prefix, TxnStat.prefix]
 groups['memory'] = [CacheStat.prefix, ConnStat.prefix, RecStat.prefix]
-groups['system'] = [ConnStat.prefix, DhandleStat.prefix, SessionStat.prefix]
+groups['system'] = [
+    ConnStat.prefix,
+    DhandleStat.prefix,
+    SessionStat.prefix,
+    ThreadState.prefix
+]
 
 ##########################################
 # CONNECTION statistics
@@ -113,6 +127,7 @@ connection_stats = [
     ConnStat('cond_auto_wait_reset', 'auto adjusting condition resets'),
     ConnStat('cond_wait', 'pthread mutex condition wait calls'),
     ConnStat('file_open', 'files currently open', 'no_clear,no_scale'),
+    ConnStat('fsync_io', 'total fsync I/Os'),
     ConnStat('memory_allocation', 'memory allocations'),
     ConnStat('memory_free', 'memory frees'),
     ConnStat('memory_grow', 'memory re-allocations'),
@@ -326,6 +341,13 @@ connection_stats = [
     CursorStat('cursor_search_near', 'cursor search near calls'),
     CursorStat('cursor_truncate', 'truncate calls'),
     CursorStat('cursor_update', 'cursor update calls'),
+
+    ##########################################
+    # Thread State statistics
+    ##########################################
+    ThreadState('fsync_active', 'active filesystem fsync calls','no_clear,no_scale'),
+    ThreadState('read_active', 'active filesystem read calls','no_clear,no_scale'),
+    ThreadState('write_active', 'active filesystem write calls','no_clear,no_scale'),
 
     ##########################################
     # Yield statistics

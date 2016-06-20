@@ -27,6 +27,9 @@ no_scale_per_second_list = [
     'reconciliation: split objects currently awaiting free',
     'session: open cursor count',
     'session: open session count',
+    'thread-state: active filesystem fsync calls',
+    'thread-state: active filesystem read calls',
+    'thread-state: active filesystem write calls',
     'transaction: transaction checkpoint currently running',
     'transaction: transaction checkpoint generation',
     'transaction: transaction checkpoint max time (msecs)',
@@ -93,6 +96,9 @@ no_clear_list = [
     'reconciliation: split objects currently awaiting free',
     'session: open cursor count',
     'session: open session count',
+    'thread-state: active filesystem fsync calls',
+    'thread-state: active filesystem read calls',
+    'thread-state: active filesystem write calls',
     'transaction: transaction checkpoint currently running',
     'transaction: transaction checkpoint generation',
     'transaction: transaction checkpoint max time (msecs)',
@@ -119,6 +125,7 @@ prefix_list = [
     'thread-yield',
     'async',
     'btree',
+    'thread-state',
     'compression',
 ]
-groups = {'cursor': ['cursor', 'session'], 'lsm': ['LSM', 'transaction'], 'system': ['connection', 'data-handle', 'session'], 'evict': ['cache', 'connection', 'block-manager'], 'memory': ['cache', 'connection', 'reconciliation']}
+groups = {'cursor': ['cursor', 'session'], 'lsm': ['LSM', 'transaction'], 'system': ['connection', 'data-handle', 'session', 'thread-state'], 'evict': ['block-manager', 'cache', 'connection', 'thread-state'], 'memory': ['cache', 'connection', 'reconciliation']}
