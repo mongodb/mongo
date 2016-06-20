@@ -93,7 +93,7 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
     }
 
     /*
-    * We did not add the message to startupWarningsLog as the user can not 
+    * We did not add the message to startupWarningsLog as the user can not
     * specify a sslCAFile parameter from the shell
     */
     if (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled &&
