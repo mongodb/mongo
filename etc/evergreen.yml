@@ -3920,6 +3920,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
+  - name: external_auth_WT
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_WT_ese
