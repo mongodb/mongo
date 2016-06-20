@@ -30,6 +30,8 @@
 
 #include "mongo/db/query/collation/collator_interface_mock.h"
 
+#include <algorithm>
+#include <cctype>
 #include <string>
 
 #include "mongo/stdx/memory.h"
@@ -45,6 +47,8 @@ std::string mockTypeToString(CollatorInterfaceMock::MockType type) {
             return "mock_reverse_string";
         case CollatorInterfaceMock::MockType::kAlwaysEqual:
             return "mock_always_equal";
+        case CollatorInterfaceMock::MockType::kToLowerString:
+            return "mock_to_lower_string";
     }
 
     MONGO_UNREACHABLE;
@@ -72,6 +76,15 @@ int CollatorInterfaceMock::compare(StringData left, StringData right) const {
             StringData rightReversed(rightString);
             return leftReversed.compare(rightReversed);
         }
+        case MockType::kToLowerString: {
+            std::string leftString = left.toString();
+            std::string rightString = right.toString();
+            std::transform(leftString.begin(), leftString.end(), leftString.begin(), ::tolower);
+            std::transform(rightString.begin(), rightString.end(), rightString.begin(), ::tolower);
+            StringData leftLower(leftString);
+            StringData rightLower(rightString);
+            return leftLower.compare(rightLower);
+        }
         case MockType::kAlwaysEqual:
             return 0;
     }
@@ -85,6 +98,12 @@ CollatorInterface::ComparisonKey CollatorInterfaceMock::getComparisonKey(
         case MockType::kReverseString: {
             std::string keyDataString = stringData.toString();
             std::reverse(keyDataString.begin(), keyDataString.end());
+            return makeComparisonKey(std::move(keyDataString));
+        }
+        case MockType::kToLowerString: {
+            std::string keyDataString = stringData.toString();
+            std::transform(
+                keyDataString.begin(), keyDataString.end(), keyDataString.begin(), ::tolower);
             return makeComparisonKey(std::move(keyDataString));
         }
         case MockType::kAlwaysEqual:

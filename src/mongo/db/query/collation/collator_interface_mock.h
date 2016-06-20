@@ -49,6 +49,10 @@ public:
 
         // Considers all strings equal.
         kAlwaysEqual,
+
+        // Compares strings after converting them to lower case.  For example, the comparison key
+        // for "FOO" is "foo".
+        kToLowerString,
     };
 
     /**

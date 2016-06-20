@@ -46,6 +46,10 @@ TEST(CollatorInterfaceMockSelfTest, MocksOfSameTypeAreEqual) {
     CollatorInterfaceMock alwaysEqualMock1(CollatorInterfaceMock::MockType::kAlwaysEqual);
     CollatorInterfaceMock alwaysEqualMock2(CollatorInterfaceMock::MockType::kAlwaysEqual);
     ASSERT(alwaysEqualMock1 == alwaysEqualMock2);
+
+    CollatorInterfaceMock toLowerMock1(CollatorInterfaceMock::MockType::kToLowerString);
+    CollatorInterfaceMock toLowerMock2(CollatorInterfaceMock::MockType::kToLowerString);
+    ASSERT(toLowerMock1 == toLowerMock2);
 }
 
 TEST(CollatorInterfaceMockSelfTest, MocksOfDifferentTypesAreNotEqual) {
@@ -84,6 +88,10 @@ TEST(CollatorInterfaceMockSelfTest, ClonedMockMatchesOriginal) {
     CollatorInterfaceMock alwaysEqualMock(CollatorInterfaceMock::MockType::kAlwaysEqual);
     auto alwaysEqualClone = alwaysEqualMock.clone();
     ASSERT(CollatorInterface::collatorsMatch(alwaysEqualClone.get(), &alwaysEqualMock));
+
+    CollatorInterfaceMock toLowerMock(CollatorInterfaceMock::MockType::kToLowerString);
+    auto toLowerClone = toLowerMock.clone();
+    ASSERT(CollatorInterface::collatorsMatch(toLowerClone.get(), &toLowerMock));
 }
 
 TEST(CollatorInterfaceMockSelfTest, ReverseMockComparesInReverse) {
@@ -116,6 +124,20 @@ TEST(CollatorInterfaceMockSelfTest, AlwaysEqualMockComparisonKeysAlwaysCompareEq
     ASSERT_EQ(keyABC.getKeyData().compare(keyEFG.getKeyData()), 0);
     ASSERT_EQ(keyEFG.getKeyData().compare(keyABC.getKeyData()), 0);
     ASSERT_EQ(keyABC.getKeyData().compare(keyABC.getKeyData()), 0);
+}
+
+TEST(CollatorInterfaceMockSelfTest, ToLowerMockComparesInLowerCase) {
+    CollatorInterfaceMock toLowerMock(CollatorInterfaceMock::MockType::kToLowerString);
+    ASSERT_EQ(toLowerMock.compare("foo", "FOO"), 0);
+    ASSERT_EQ(toLowerMock.compare("bar", "BAR"), 0);
+    ASSERT_GT(toLowerMock.compare("bar", "ABC"), 0);
+}
+
+TEST(CollatorInterfaceMockSelfTest, ToLowerMockComparisonKeysCompareInLowerCase) {
+    CollatorInterfaceMock toLowerMock(CollatorInterfaceMock::MockType::kToLowerString);
+    auto keyFOO = toLowerMock.getComparisonKey("FOO");
+    auto keyFoo = toLowerMock.getComparisonKey("foo");
+    ASSERT_EQ(keyFOO.getKeyData().compare(keyFoo.getKeyData()), 0);
 }
 
 TEST(CollatorInterfaceMockSelfTest, WoCompareStringsWithMockCollator) {
@@ -163,7 +185,9 @@ TEST(CollatorInterfaceMockSelfTest, WoCompareNumbersWithMockCollator) {
 TEST(CollatorInterfaceMockSelfTest, MockCollatorReportsMockVersionString) {
     CollatorInterfaceMock reverseCollator(CollatorInterfaceMock::MockType::kReverseString);
     CollatorInterfaceMock alwaysEqualCollator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    CollatorInterfaceMock toLowerCollator(CollatorInterfaceMock::MockType::kToLowerString);
     ASSERT_EQ(reverseCollator.getSpec().version, "mock_version");
     ASSERT_EQ(alwaysEqualCollator.getSpec().version, "mock_version");
+    ASSERT_EQ(toLowerCollator.getSpec().version, "mock_version");
 }
 };
