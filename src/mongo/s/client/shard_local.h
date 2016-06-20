@@ -65,6 +65,7 @@ private:
     StatusWith<Shard::QueryResponse> _exhaustiveFindOnConfig(
         OperationContext* txn,
         const ReadPreferenceSetting& readPref,
+        const repl::ReadConcernLevel& readConcernLevel,
         const NamespaceString& nss,
         const BSONObj& query,
         const BSONObj& sort,

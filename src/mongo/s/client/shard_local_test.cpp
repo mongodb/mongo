@@ -117,8 +117,13 @@ StatusWith<Shard::QueryResponse> ShardLocalTest::runFindQuery(NamespaceString ns
                                                               BSONObj query,
                                                               BSONObj sort,
                                                               boost::optional<long long> limit) {
-    return _shardLocal->exhaustiveFindOnConfig(
-        _txn.get(), ReadPreferenceSetting{ReadPreference::PrimaryOnly}, nss, query, sort, limit);
+    return _shardLocal->exhaustiveFindOnConfig(_txn.get(),
+                                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                               repl::ReadConcernLevel::kMajorityReadConcern,
+                                               nss,
+                                               query,
+                                               sort,
+                                               limit);
 }
 
 TEST_F(ShardLocalTest, RunCommand) {

@@ -322,8 +322,13 @@ StatusWith<ShardType> ConfigServerTestFixture::getShardDoc(OperationContext* txn
     invariant(config);
 
     NamespaceString ns(ShardType::ConfigNS);
-    auto findStatus = config->exhaustiveFindOnConfig(
-        txn, kReadPref, ns, BSON(ShardType::name(shardId)), BSONObj(), boost::none);
+    auto findStatus = config->exhaustiveFindOnConfig(txn,
+                                                     kReadPref,
+                                                     repl::ReadConcernLevel::kMajorityReadConcern,
+                                                     ns,
+                                                     BSON(ShardType::name(shardId)),
+                                                     BSONObj(),
+                                                     boost::none);
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
     }

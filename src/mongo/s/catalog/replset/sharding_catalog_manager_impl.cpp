@@ -394,6 +394,7 @@ StatusWith<std::string> ShardingCatalogManagerImpl::_generateNewShardName(Operat
     auto findStatus = Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
         txn,
         kConfigReadSelector,
+        repl::ReadConcernLevel::kMajorityReadConcern,
         NamespaceString(ShardType::ConfigNS),
         shardNameRegex.obj(),
         BSON(ShardType::name() << -1),

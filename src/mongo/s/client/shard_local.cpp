@@ -123,27 +123,29 @@ StatusWith<Shard::CommandResponse> ShardLocal::_runCommand(OperationContext* txn
 StatusWith<Shard::QueryResponse> ShardLocal::_exhaustiveFindOnConfig(
     OperationContext* txn,
     const ReadPreferenceSetting& readPref,
+    const repl::ReadConcernLevel& readConcernLevel,
     const NamespaceString& nss,
     const BSONObj& query,
     const BSONObj& sort,
     boost::optional<long long> limit) {
-    // Set up operation context with majority read snapshot so correct optime can be retrieved.
-    Status status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
     auto replCoord = repl::ReplicationCoordinator::get(txn);
 
-    // Ensure timeout is set on the txn so we don't wait forever for the snapshot.
-    // TODO (SERVER-18277): Remove this
-    CurOp::get(txn)->ensureStarted();
+    if (readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern) {
+        // Set up operation context with majority read snapshot so correct optime can be retrieved.
+        Status status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
 
-    // Wait until a snapshot is available.
-    while (status == ErrorCodes::ReadConcernMajorityNotAvailableYet) {
-        LOG(1) << "Waiting for ReadFromMajorityCommittedSnapshot to become available";
-        replCoord->waitUntilSnapshotCommitted(txn, SnapshotName::min());
-        status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
-    }
+        // Wait until a snapshot is available.
+        while (status == ErrorCodes::ReadConcernMajorityNotAvailableYet) {
+            LOG(1) << "Waiting for ReadFromMajorityCommittedSnapshot to become available";
+            replCoord->waitUntilSnapshotCommitted(txn, SnapshotName::min());
+            status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
+        }
 
-    if (!status.isOK()) {
-        return status;
+        if (!status.isOK()) {
+            return status;
+        }
+    } else {
+        invariant(readConcernLevel == repl::ReadConcernLevel::kLocalReadConcern);
     }
 
     DBDirectClient client(txn);

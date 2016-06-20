@@ -252,6 +252,7 @@ StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* tx
 StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     OperationContext* txn,
     const ReadPreferenceSetting& readPref,
+    const repl::ReadConcernLevel& readConcernLevel,
     const NamespaceString& nss,
     const BSONObj& query,
     const BSONObj& sort,
@@ -315,8 +316,8 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
 
     BSONObj readConcernObj;
     {
-        const repl::ReadConcernArgs readConcern{grid.configOpTime(),
-                                                repl::ReadConcernLevel::kMajorityReadConcern};
+        invariant(readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern);
+        const repl::ReadConcernArgs readConcern{grid.configOpTime(), readConcernLevel};
         BSONObjBuilder bob;
         readConcern.appendInfo(&bob);
         readConcernObj =

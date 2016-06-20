@@ -120,12 +120,14 @@ StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* txn,
 StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
     OperationContext* txn,
     const ReadPreferenceSetting& readPref,
+    const repl::ReadConcernLevel& readConcernLevel,
     const NamespaceString& nss,
     const BSONObj& query,
     const BSONObj& sort,
     const boost::optional<long long> limit) {
     for (int retry = 1; retry <= kOnErrorNumRetries; retry++) {
-        auto result = _exhaustiveFindOnConfig(txn, readPref, nss, query, sort, limit);
+        auto result =
+            _exhaustiveFindOnConfig(txn, readPref, readConcernLevel, nss, query, sort, limit);
 
         if (retry < kOnErrorNumRetries &&
             isRetriableError(result.getStatus().code(), RetryPolicy::kIdempotent)) {
