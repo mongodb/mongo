@@ -69,7 +69,7 @@ functions:
           # create all resources and instances
           ../../bin/setup-cluster.sh ${cluster}
           echo "EC2 Cluster CREATED."
-          tar -czvf cluster_config.tgz ips.sh ips.py terraform.tfstate cluster.tf terraform.tfvars variables.tf
+          tar -czvf cluster_config.tgz infrastructure_provisioning.out.yml ips.sh ips.py terraform.tfstate cluster.tf terraform.tfvars variables.tf
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -109,8 +109,10 @@ functions:
           set -o verbose
           source ./venv/bin/activate
           cd ./clusters/${cluster}
-          ../../bin/mongodb_setup.py ${setup} ${storageEngine}
+          cp mongodb_setup.${setup}.${storageEngine}.yml mongodb_setup.yml
+          ../../bin/mongodb_setup.py --config
           echo "${cluster} MongoDB Cluster STARTED."
+
   "run test":
     - command: shell.exec
       params:
@@ -159,6 +161,7 @@ functions:
           set -o verbose
           cd ./clusters/${cluster}/reports
           # move additional file here
+          cp ../infrastructure_provisioning.out.yml .
           cp ../ips.sh .
           cp ../ips.py .
           if [ -f "../terraform.log" ]; then cp ../terraform.log .; fi
@@ -364,6 +367,9 @@ tasks:
   commands:
     - func: "prepare environment"
     - func: "restore cluster"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "wiredTiger"
     - func: "run test"
       vars:
         storageEngine: "wiredTiger"
@@ -381,6 +387,9 @@ tasks:
   commands:
     - func: "prepare environment"
     - func: "restore cluster"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "mmapv1"
     - func: "run test"
       vars:
         storageEngine: "mmapv1"

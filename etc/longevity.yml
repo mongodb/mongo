@@ -78,8 +78,8 @@ functions:
           set -o verbose
           source ./venv/bin/activate
           cd ./clusters/${cluster}
-          ../../bin/mongodb_setup.py ${setup} ${storageEngine}
-          echo "${cluster} MongoDB Cluster STARTED."
+          cp mongodb_setup.${setup}.${storageEngine}.yml mongodb_setup.yml
+          ../../bin/mongodb_setup.py --config
 
   "run test":
     - command: shell.exec
@@ -128,6 +128,7 @@ functions:
           set -o verbose
           cd ./clusters/${cluster}/reports
           # move additional file here
+          cp ../infrastructure_provisioning.out.yml .
           cp ../ips.sh .
           cp ../ips.py .
           cp ../../perf_all.json .
