@@ -714,14 +714,17 @@ public:
         BSONObjBuilder shardStats;
         map<string, long long> counts;
         map<string, long long> indexSizes;
-
-        long long unscaledCollSize = 0;
-
+        /*
+        long long count=0;
+        long long size=0;
+        long long storageSize=0;
+        */
         int nindexes = 0;
         bool warnedAboutIndexes = false;
 
         set<ShardId> shardIds;
         cm->getAllShardIds(&shardIds);
+
         for (const ShardId& shardId : shardIds) {
             const auto shard = grid.shardRegistry()->getShard(txn, shardId);
             if (!shard) {
@@ -742,14 +745,11 @@ public:
             }
 
             BSONObjIterator j(res);
-            // We don't know the order that we will encounter the count and size
-            // So we save them until we've iterated through all the fields before
-            // updating unscaledCollSize.
-            long long shardObjCount;
-            long long shardAvgObjSize;
             while (j.more()) {
                 BSONElement e = j.next();
+
                 if (str::equals(e.fieldName(), "ns") || str::equals(e.fieldName(), "ok") ||
+                    str::equals(e.fieldName(), "avgObjSize") ||
                     str::equals(e.fieldName(), "lastExtentSize") ||
                     str::equals(e.fieldName(), "paddingFactor")) {
                     continue;
@@ -759,11 +759,6 @@ public:
                            str::equals(e.fieldName(), "numExtents") ||
                            str::equals(e.fieldName(), "totalIndexSize")) {
                     counts[e.fieldName()] += e.numberLong();
-                    if (str::equals(e.fieldName(), "count")) {
-                        shardObjCount = e.numberLong();
-                    }
-                } else if (str::equals(e.fieldName(), "avgObjSize")) {
-                    shardAvgObjSize = e.numberLong();
                 } else if (str::equals(e.fieldName(), "indexSizes")) {
                     BSONObjIterator k(e.Obj());
                     while (k.more()) {
@@ -817,7 +812,6 @@ public:
                 }
             }
             shardStats.append(shardId.toString(), res);
-            unscaledCollSize += shardAvgObjSize * shardObjCount;
         }
 
         result.append("ns", fullns);
@@ -833,11 +827,8 @@ public:
             ib.done();
         }
 
-        // The unscaled avgObjSize for each shard is used to get the unscaledCollSize
-        // because the raw size returned by the shard is affected by the command's
-        // scale parameter.
         if (counts["count"] > 0)
-            result.append("avgObjSize", (double)unscaledCollSize / (double)counts["count"]);
+            result.append("avgObjSize", (double)counts["size"] / (double)counts["count"]);
         else
             result.append("avgObjSize", 0.0);
 
