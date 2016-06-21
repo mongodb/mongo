@@ -129,12 +129,6 @@ public:
                      const DurableRequirement durReq) override;
     void setMinValid(OperationContext* txn, const BatchBoundaries& boundaries) override;
 
-    StatusWith<OpTime> writeOpsToOplog(OperationContext* txn,
-                                       const NamespaceString& nss,
-                                       const MultiApplier::Operations& operations) override;
-
-    MultiApplier::Operations getOperationsWrittenToOplog() const;
-
     StatusWith<std::unique_ptr<CollectionBulkLoader>> createCollectionForBulkLoading(
         const NamespaceString& nss,
         const CollectionOptions& options,
@@ -241,9 +235,6 @@ private:
 
     mutable stdx::mutex _minValidBoundariesMutex;
     BatchBoundaries _minValidBoundaries = {OpTime(), OpTime()};
-
-    mutable stdx::mutex _operationsWrittenToOplogMutex;
-    MultiApplier::Operations _operationsWrittenToOplog;
 };
 
 }  // namespace repl

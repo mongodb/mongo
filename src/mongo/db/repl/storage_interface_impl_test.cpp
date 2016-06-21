@@ -118,13 +118,13 @@ void createCollection(OperationContext* txn,
 /**
  * Creates an oplog entry with given optime.
  */
-OplogEntry makeOplogEntry(OpTime opTime) {
+BSONObj makeOplogEntry(OpTime opTime) {
     BSONObjBuilder bob;
     bob.appendElements(opTime.toBSON());
     bob.append("h", 1LL);
     bob.append("op", "c");
     bob.append("ns", "test.t");
-    return OplogEntry(bob.obj());
+    return bob.obj();
 }
 
 /**
@@ -328,16 +328,16 @@ TEST_F(StorageInterfaceImplTest, SnapshotNotSupported) {
 }
 
 TEST_F(StorageInterfaceImplTest,
-       WriteOpsToOplogReturnsEmptyArrayOperationWhenNoOperationsAreGiven) {
+       InsertDocumentsReturnsEmptyArrayOperationWhenNoOperationsAreGiven) {
     NamespaceString nss("local." + _agent.getTestName());
     StorageInterfaceImpl storageInterface(nss);
     auto txn = getClient()->makeOperationContext();
     ASSERT_EQUALS(ErrorCodes::EmptyArrayOperation,
-                  storageInterface.writeOpsToOplog(txn.get(), nss, {}));
+                  storageInterface.insertDocuments(txn.get(), nss, {}));
 }
 
 TEST_F(StorageInterfaceImplTest,
-       WriteOpsToOplogReturnsInternalErrorWhenSavingOperationToNonOplogCollection) {
+       InsertDocumentsReturnsInternalErrorWhenSavingOperationToNonOplogCollection) {
     // Create fake non-oplog collection to ensure saving oplog entries (without _id field) will
     // fail.
     auto txn = getClient()->makeOperationContext();
@@ -347,12 +347,12 @@ TEST_F(StorageInterfaceImplTest,
     // Non-oplog collection will enforce mandatory _id field requirement on insertion.
     StorageInterfaceImpl storageInterface(nss);
     auto op = makeOplogEntry({Timestamp(Seconds(1), 0), 1LL});
-    auto status = storageInterface.writeOpsToOplog(txn.get(), nss, {op}).getStatus();
+    auto status = storageInterface.insertDocuments(txn.get(), nss, {op});
     ASSERT_EQUALS(ErrorCodes::InternalError, status);
     ASSERT_STRING_CONTAINS(status.reason(), "Collection::insertDocument got document without _id");
 }
 
-TEST_F(StorageInterfaceImplTest, WriteOpsToOplogSavesOperationsReturnsOpTimeOfLastOperation) {
+TEST_F(StorageInterfaceImplTest, InsertDocumentsSavesOperationsReturnsOpTimeOfLastOperation) {
     // Create fake oplog collection to hold operations.
     auto txn = getClient()->makeOperationContext();
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
@@ -363,25 +363,23 @@ TEST_F(StorageInterfaceImplTest, WriteOpsToOplogSavesOperationsReturnsOpTimeOfLa
     StorageInterfaceImpl storageInterface(nss);
     auto op1 = makeOplogEntry({Timestamp(Seconds(1), 0), 1LL});
     auto op2 = makeOplogEntry({Timestamp(Seconds(1), 0), 1LL});
-    ASSERT_EQUALS(
-        op2.getOpTime(),
-        unittest::assertGet(storageInterface.writeOpsToOplog(txn.get(), nss, {op1, op2})));
+    ASSERT_OK(storageInterface.insertDocuments(txn.get(), nss, {op1, op2}));
 
     // Check contents of oplog. OplogInterface iterates over oplog collection in reverse.
     repl::OplogInterfaceLocal oplog(txn.get(), nss.ns());
     auto iter = oplog.makeIterator();
-    ASSERT_EQUALS(op2.raw, unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(op1.raw, unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(op2, unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(op1, unittest::assertGet(iter->next()).first);
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
 }
 
 TEST_F(StorageInterfaceImplTest,
-       WriteOpsToOplogReturnsNamespaceNotFoundIfOplogCollectionDoesNotExist) {
+       InsertDocumentsReturnsNamespaceNotFoundIfOplogCollectionDoesNotExist) {
     auto op = makeOplogEntry({Timestamp(Seconds(1), 0), 1LL});
     NamespaceString nss("local.nosuchcollection");
     StorageInterfaceImpl storageInterface(nss);
     auto txn = getClient()->makeOperationContext();
-    auto status = storageInterface.writeOpsToOplog(txn.get(), nss, {op}).getStatus();
+    auto status = storageInterface.insertDocuments(txn.get(), nss, {op});
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
     ASSERT_STRING_CONTAINS(status.reason(), "The collection must exist before inserting documents");
 }

@@ -1226,12 +1226,16 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
 
     applyOps(writerVectors, workerPool, applyOperation);
 
-    OpTime lastOpTime;
     {
         ON_BLOCK_EXIT([&] { workerPool->join(); });
-        lastOpTime = fassertStatusOK(
+
+        std::vector<BSONObj> docs(ops.size());
+        auto toBSON = [](const OplogEntry& entry) { return entry.raw; };
+        std::transform(ops.begin(), ops.end(), docs.begin(), toBSON);
+
+        fassertStatusOK(
             40141,
-            StorageInterface::get(txn)->writeOpsToOplog(txn, NamespaceString(rsOplogName), ops));
+            StorageInterface::get(txn)->insertDocuments(txn, NamespaceString(rsOplogName), docs));
     }
 
     if (inShutdownStrict()) {
@@ -1240,7 +1244,7 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
                 "Cannot apply operations due to shutdown in progress"};
     }
     // We have now written all database writes and updated the oplog to match.
-    return lastOpTime;
+    return ops.back().getOpTime();
 }
 
 }  // namespace repl

@@ -35,7 +35,6 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/collection_bulk_loader.h"
-#include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
 
@@ -160,16 +159,6 @@ public:
      */
     virtual void setMinValid(OperationContext* txn, const BatchBoundaries& boundaries) = 0;
 
-    /**
-     * Writes operations into the replica set oplog at "nss".
-     * Used internally by replication secondaries.
-     *
-     * Returns the optime for the last operation inserted on success.
-     */
-    virtual StatusWith<OpTime> writeOpsToOplog(OperationContext* txn,
-                                               const NamespaceString& nss,
-                                               const MultiApplier::Operations& operations) = 0;
-
     // Collection creation and population for initial sync.
     /**
      * Creates a collection with the provided indexes.
@@ -194,6 +183,7 @@ public:
 
     /**
      * Inserts the given documents into the collection.
+     * It is an error to call this function with an empty set of documents.
      */
     virtual Status insertDocuments(OperationContext* txn,
                                    const NamespaceString& nss,

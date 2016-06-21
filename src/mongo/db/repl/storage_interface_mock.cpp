@@ -72,21 +72,6 @@ void StorageInterfaceMock::setMinValid(OperationContext* txn, const BatchBoundar
     _minValidBoundaries = boundaries;
 }
 
-StatusWith<OpTime> StorageInterfaceMock::writeOpsToOplog(
-    OperationContext* txn, const NamespaceString& nss, const MultiApplier::Operations& operations) {
-    invariant(!operations.empty());
-    stdx::lock_guard<stdx::mutex> lock(_operationsWrittenToOplogMutex);
-    for (const auto& oplogEntry : operations) {
-        _operationsWrittenToOplog.push_back(oplogEntry.getOwned());
-    }
-    return operations.back().getOpTime();
-}
-
-MultiApplier::Operations StorageInterfaceMock::getOperationsWrittenToOplog() const {
-    stdx::lock_guard<stdx::mutex> lock(_operationsWrittenToOplogMutex);
-    return _operationsWrittenToOplog;
-}
-
 Status CollectionBulkLoaderMock::init(OperationContext* txn,
                                       Collection* coll,
                                       const std::vector<BSONObj>& secondaryIndexSpecs) {

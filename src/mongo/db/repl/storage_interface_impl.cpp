@@ -238,25 +238,6 @@ void StorageInterfaceImpl::setMinValid(OperationContext* txn, const BatchBoundar
            << boundaries.end.toBSON() << ")";
 }
 
-StatusWith<OpTime> StorageInterfaceImpl::writeOpsToOplog(
-    OperationContext* txn, const NamespaceString& nss, const MultiApplier::Operations& operations) {
-    if (operations.empty()) {
-        return {ErrorCodes::EmptyArrayOperation,
-                "unable to write operations to oplog - no operations provided"};
-    }
-
-    std::vector<BSONObj> ops(operations.size());
-    auto toBSON = [](const OplogEntry& entry) { return entry.raw; };
-    std::transform(operations.begin(), operations.end(), ops.begin(), toBSON);
-
-    auto status = insertDocuments(txn, nss, ops);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    return operations.back().getOpTime();
-}
-
 StatusWith<std::unique_ptr<CollectionBulkLoader>>
 StorageInterfaceImpl::createCollectionForBulkLoading(
     const NamespaceString& nss,
@@ -341,6 +322,11 @@ Status StorageInterfaceImpl::insertDocument(OperationContext* txn,
 Status StorageInterfaceImpl::insertDocuments(OperationContext* txn,
                                              const NamespaceString& nss,
                                              const std::vector<BSONObj>& docs) {
+    if (docs.empty()) {
+        return {ErrorCodes::EmptyArrayOperation,
+                str::stream() << "unable to insert documents into " << nss.ns()
+                              << " - no documents provided"};
+    }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         AutoGetCollection autoColl(txn, nss, MODE_IX);
         auto collection = autoColl.getCollection();

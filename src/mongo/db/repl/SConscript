@@ -56,7 +56,6 @@ env.Library(
         'storage_interface.cpp',
     ],
     LIBDEPS=[
-        'oplog_entry',
         'optime',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/decorable',

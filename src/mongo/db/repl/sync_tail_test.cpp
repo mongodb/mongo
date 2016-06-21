@@ -30,6 +30,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include "mongo/db/catalog/collection_options.h"
@@ -43,6 +44,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -107,6 +109,9 @@ void SyncTailTest::setUp() {
                                 stdx::make_unique<ReplicationCoordinatorMock>(replSettings));
     auto storageInterface = stdx::make_unique<StorageInterfaceMock>();
     _storageInterface = storageInterface.get();
+    storageInterface->insertDocumentsFn = [](OperationContext*,
+                                             const NamespaceString&,
+                                             const std::vector<BSONObj>&) { return Status::OK(); };
     StorageInterface::set(serviceContext, std::move(storageInterface));
 
     Client::initThreadIfNotAlready();
@@ -556,6 +561,16 @@ TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceH
     auto op1 = makeInsertDocumentOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss1, BSON("x" << 1));
     auto op2 = makeInsertDocumentOplogEntry({Timestamp(Seconds(2), 0), 1LL}, nss2, BSON("x" << 2));
 
+    NamespaceString nssForInsert;
+    std::vector<BSONObj> operationsWrittenToOplog;
+    _storageInterface->insertDocumentsFn = [&mutex, &nssForInsert, &operationsWrittenToOplog](
+        OperationContext* txn, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
+        stdx::lock_guard<stdx::mutex> lock(mutex);
+        nssForInsert = nss;
+        operationsWrittenToOplog = docs;
+        return Status::OK();
+    };
+
     auto lastOpTime =
         unittest::assertGet(multiApply(_txn.get(), &writerPool, {op1, op2}, applyOperationFn));
     ASSERT_EQUALS(op2.getOpTime(), lastOpTime);
@@ -576,10 +591,11 @@ TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceH
     }
 
     // Check ops in oplog.
-    auto operationsWritternToOplog = _storageInterface->getOperationsWrittenToOplog();
-    ASSERT_EQUALS(2U, operationsWritternToOplog.size());
-    ASSERT_EQUALS(op1, operationsWritternToOplog[0]);
-    ASSERT_EQUALS(op2, operationsWritternToOplog[1]);
+    stdx::lock_guard<stdx::mutex> lock(mutex);
+    ASSERT_EQUALS(2U, operationsWrittenToOplog.size());
+    ASSERT_EQUALS(NamespaceString(rsOplogName), nssForInsert);
+    ASSERT_EQUALS(op1.raw, operationsWrittenToOplog[0]);
+    ASSERT_EQUALS(op2.raw, operationsWrittenToOplog[1]);
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyUsesSyncApplyToApplyOperation) {
