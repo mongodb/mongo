@@ -61,7 +61,7 @@ public:
 /**
  * Value type for query settings.
  * Holds:
- *     query shape (query, sort, projection)
+ *     query shape (query, sort, projection, collation)
  *     vector of index specs
  */
 class AllowedIndexEntry {
@@ -72,15 +72,17 @@ public:
     AllowedIndexEntry(const BSONObj& query,
                       const BSONObj& sort,
                       const BSONObj& projection,
+                      const BSONObj& collation,
                       const std::vector<BSONObj>& indexKeyPatterns);
     ~AllowedIndexEntry();
     AllowedIndexEntry* clone() const;
 
-    // _query, _sort and _projection collectively
-    // represent the query shape that we are storing hint overrides for.
+    // query, sort, projection, and collation collectively represent the query shape that we are
+    // storing hint overrides for.
     BSONObj query;
     BSONObj sort;
     BSONObj projection;
+    BSONObj collation;
 
     // These are the index key patterns that
     // we will use to override the indexes retrieved from

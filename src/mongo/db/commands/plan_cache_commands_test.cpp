@@ -88,6 +88,12 @@ std::vector<BSONObj> getShapes(const PlanCache& planCache) {
         BSONElement projectionElt = obj.getField("projection");
         ASSERT_TRUE(projectionElt.isABSONObj());
 
+        // collation
+        BSONElement collationElt = obj.getField("collation");
+        if (!collationElt.eoo()) {
+            ASSERT_TRUE(collationElt.isABSONObj());
+        }
+
         // All fields OK. Append to vector.
         shapes.push_back(obj.getOwned());
     }
@@ -132,6 +138,9 @@ TEST(PlanCacheCommandsTest, planCacheListQueryShapesOneKey) {
     // Create a canonical query
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson("{a: 1}"));
+    qr->setSort(fromjson("{a: -1}"));
+    qr->setProj(fromjson("{_id: 0}"));
+    qr->setCollation(fromjson("{locale: 'mock_reverse_string'}"));
     auto statusWithCQ = CanonicalQuery::canonicalize(
         txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
@@ -150,6 +159,7 @@ TEST(PlanCacheCommandsTest, planCacheListQueryShapesOneKey) {
     ASSERT_EQUALS(shapes[0].getObjectField("query"), cq->getQueryObj());
     ASSERT_EQUALS(shapes[0].getObjectField("sort"), cq->getQueryRequest().getSort());
     ASSERT_EQUALS(shapes[0].getObjectField("projection"), cq->getQueryRequest().getProj());
+    ASSERT_EQUALS(shapes[0].getObjectField("collation"), cq->getCollator()->getSpec().toBSON());
 }
 
 /**
@@ -191,59 +201,69 @@ TEST(PlanCacheCommandsTest, planCacheClearAllShapes) {
 TEST(PlanCacheCommandsTest, Canonicalize) {
     // Invalid parameters
     PlanCache planCache;
-    OperationContextNoop txn;
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
 
     // Missing query field
-    ASSERT_NOT_OK(PlanCacheCommand::canonicalize(&txn, nss.ns(), fromjson("{}")).getStatus());
+    ASSERT_NOT_OK(PlanCacheCommand::canonicalize(txn.get(), nss.ns(), fromjson("{}")).getStatus());
     // Query needs to be an object
     ASSERT_NOT_OK(
-        PlanCacheCommand::canonicalize(&txn, nss.ns(), fromjson("{query: 1}")).getStatus());
+        PlanCacheCommand::canonicalize(txn.get(), nss.ns(), fromjson("{query: 1}")).getStatus());
     // Sort needs to be an object
-    ASSERT_NOT_OK(PlanCacheCommand::canonicalize(&txn, nss.ns(), fromjson("{query: {}, sort: 1}"))
-                      .getStatus());
+    ASSERT_NOT_OK(
+        PlanCacheCommand::canonicalize(txn.get(), nss.ns(), fromjson("{query: {}, sort: 1}"))
+            .getStatus());
+    // Projection needs to be an object.
+    ASSERT_NOT_OK(
+        PlanCacheCommand::canonicalize(txn.get(), nss.ns(), fromjson("{query: {}, projection: 1}"))
+            .getStatus());
+    // Collation needs to be an object.
+    ASSERT_NOT_OK(
+        PlanCacheCommand::canonicalize(txn.get(), nss.ns(), fromjson("{query: {}, collation: 1}"))
+            .getStatus());
     // Bad query (invalid sort order)
     ASSERT_NOT_OK(
-        PlanCacheCommand::canonicalize(&txn, nss.ns(), fromjson("{query: {}, sort: {a: 0}}"))
+        PlanCacheCommand::canonicalize(txn.get(), nss.ns(), fromjson("{query: {}, sort: {a: 0}}"))
             .getStatus());
 
     // Valid parameters
     auto statusWithCQ =
-        PlanCacheCommand::canonicalize(&txn, nss.ns(), fromjson("{query: {a: 1, b: 1}}"));
+        PlanCacheCommand::canonicalize(txn.get(), nss.ns(), fromjson("{query: {a: 1, b: 1}}"));
     ASSERT_OK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> query = std::move(statusWithCQ.getValue());
 
 
     // Equivalent query should generate same key.
     statusWithCQ =
-        PlanCacheCommand::canonicalize(&txn, nss.ns(), fromjson("{query: {b: 1, a: 1}}"));
+        PlanCacheCommand::canonicalize(txn.get(), nss.ns(), fromjson("{query: {b: 1, a: 1}}"));
     ASSERT_OK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> equivQuery = std::move(statusWithCQ.getValue());
     ASSERT_EQUALS(planCache.computeKey(*query), planCache.computeKey(*equivQuery));
 
     // Sort query should generate different key from unsorted query.
     statusWithCQ = PlanCacheCommand::canonicalize(
-        &txn, nss.ns(), fromjson("{query: {a: 1, b: 1}, sort: {a: 1, b: 1}}"));
+        txn.get(), nss.ns(), fromjson("{query: {a: 1, b: 1}, sort: {a: 1, b: 1}}"));
     ASSERT_OK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> sortQuery1 = std::move(statusWithCQ.getValue());
     ASSERT_NOT_EQUALS(planCache.computeKey(*query), planCache.computeKey(*sortQuery1));
 
     // Confirm sort arguments are properly delimited (SERVER-17158)
     statusWithCQ = PlanCacheCommand::canonicalize(
-        &txn, nss.ns(), fromjson("{query: {a: 1, b: 1}, sort: {aab: 1}}"));
+        txn.get(), nss.ns(), fromjson("{query: {a: 1, b: 1}, sort: {aab: 1}}"));
     ASSERT_OK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> sortQuery2 = std::move(statusWithCQ.getValue());
     ASSERT_NOT_EQUALS(planCache.computeKey(*sortQuery1), planCache.computeKey(*sortQuery2));
 
     // Changing order and/or value of predicates should not change key
     statusWithCQ = PlanCacheCommand::canonicalize(
-        &txn, nss.ns(), fromjson("{query: {b: 3, a: 3}, sort: {a: 1, b: 1}}"));
+        txn.get(), nss.ns(), fromjson("{query: {b: 3, a: 3}, sort: {a: 1, b: 1}}"));
     ASSERT_OK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> sortQuery3 = std::move(statusWithCQ.getValue());
     ASSERT_EQUALS(planCache.computeKey(*sortQuery1), planCache.computeKey(*sortQuery3));
 
     // Projected query should generate different key from unprojected query.
     statusWithCQ = PlanCacheCommand::canonicalize(
-        &txn, nss.ns(), fromjson("{query: {a: 1, b: 1}, projection: {_id: 0, a: 1}}"));
+        txn.get(), nss.ns(), fromjson("{query: {a: 1, b: 1}, projection: {_id: 0, a: 1}}"));
     ASSERT_OK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> projectionQuery = std::move(statusWithCQ.getValue());
     ASSERT_NOT_EQUALS(planCache.computeKey(*query), planCache.computeKey(*projectionQuery));
@@ -269,6 +289,9 @@ TEST(PlanCacheCommandsTest, planCacheClearInvalidParameter) {
     // Projection present without query is an error.
     ASSERT_NOT_OK(PlanCacheClear::clear(
         &txn, &planCache, nss.ns(), fromjson("{projection: {_id: 0, a: 1}}")));
+    // Collation present without query is an error.
+    ASSERT_NOT_OK(PlanCacheClear::clear(
+        &txn, &planCache, nss.ns(), fromjson("{collation: {locale: 'en_US'}}")));
 }
 
 TEST(PlanCacheCommandsTest, planCacheClearUnknownKey) {
@@ -327,6 +350,62 @@ TEST(PlanCacheCommandsTest, planCacheClearOneKey) {
     ASSERT_EQUALS(shapesAfter[0], shapeA);
 }
 
+TEST(PlanCacheCommandsTest, planCacheClearOneKeyCollation) {
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
+
+    // Create 2 canonical queries, one with collation.
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setFilter(fromjson("{a: 'foo'}"));
+    auto statusWithCQ = CanonicalQuery::canonicalize(
+        txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+    ASSERT_OK(statusWithCQ.getStatus());
+    unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+    auto qrCollation = stdx::make_unique<QueryRequest>(nss);
+    qrCollation->setFilter(fromjson("{a: 'foo'}"));
+    qrCollation->setCollation(fromjson("{locale: 'mock_reverse_string'}"));
+    auto statusWithCQCollation = CanonicalQuery::canonicalize(
+        txn.get(), std::move(qrCollation), ExtensionsCallbackDisallowExtensions());
+    ASSERT_OK(statusWithCQCollation.getStatus());
+    unique_ptr<CanonicalQuery> cqCollation = std::move(statusWithCQCollation.getValue());
+
+    // Create plan cache with 2 entries. Add an index so that indexability is included in the plan
+    // cache keys.
+    PlanCache planCache;
+    planCache.notifyOfIndexEntries(
+        {IndexEntry(fromjson("{a: 1}"), false, false, false, "index_name", NULL, BSONObj())});
+    QuerySolution qs;
+    qs.cacheData.reset(createSolutionCacheData());
+    std::vector<QuerySolution*> solns;
+    solns.push_back(&qs);
+    planCache.add(*cq, solns, createDecision(1U));
+    planCache.add(*cqCollation, solns, createDecision(1U));
+
+    // Check keys in cache before dropping the query with collation.
+    vector<BSONObj> shapesBefore = getShapes(planCache);
+    ASSERT_EQUALS(shapesBefore.size(), 2U);
+    BSONObj shape = BSON("query" << cq->getQueryObj() << "sort" << cq->getQueryRequest().getSort()
+                                 << "projection"
+                                 << cq->getQueryRequest().getProj());
+    BSONObj shapeWithCollation = BSON("query" << cqCollation->getQueryObj() << "sort"
+                                              << cqCollation->getQueryRequest().getSort()
+                                              << "projection"
+                                              << cqCollation->getQueryRequest().getProj()
+                                              << "collation"
+                                              << cqCollation->getCollator()->getSpec().toBSON());
+    ASSERT_TRUE(std::find(shapesBefore.begin(), shapesBefore.end(), shape) != shapesBefore.end());
+    ASSERT_TRUE(std::find(shapesBefore.begin(), shapesBefore.end(), shapeWithCollation) !=
+                shapesBefore.end());
+
+    // Drop query with collation from cache. Make other query is still in cache afterwards.
+    BSONObjBuilder bob;
+
+    ASSERT_OK(PlanCacheClear::clear(txn.get(), &planCache, nss.ns(), shapeWithCollation));
+    vector<BSONObj> shapesAfter = getShapes(planCache);
+    ASSERT_EQUALS(shapesAfter.size(), 1U);
+    ASSERT_EQUALS(shapesAfter[0], shape);
+}
+
 /**
  * Tests for planCacheListPlans
  */
@@ -370,12 +449,21 @@ BSONObj getPlan(const BSONElement& elt) {
 vector<BSONObj> getPlans(const PlanCache& planCache,
                          const BSONObj& query,
                          const BSONObj& sort,
-                         const BSONObj& projection) {
-    OperationContextNoop txn;
+                         const BSONObj& projection,
+                         const BSONObj& collation) {
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
 
     BSONObjBuilder bob;
-    BSONObj cmdObj = BSON("query" << query << "sort" << sort << "projection" << projection);
-    ASSERT_OK(PlanCacheListPlans::list(&txn, planCache, nss.ns(), cmdObj, &bob));
+    BSONObjBuilder cmdObjBuilder;
+    cmdObjBuilder.append("query", query);
+    cmdObjBuilder.append("sort", sort);
+    cmdObjBuilder.append("projection", projection);
+    if (!collation.isEmpty()) {
+        cmdObjBuilder.append("collation", collation);
+    }
+    BSONObj cmdObj = cmdObjBuilder.obj();
+    ASSERT_OK(PlanCacheListPlans::list(txn.get(), planCache, nss.ns(), cmdObj, &bob));
     BSONObj resultObj = bob.obj();
     BSONElement plansElt = resultObj.getField("plans");
     ASSERT_EQUALS(plansElt.type(), mongo::Array);
@@ -433,7 +521,8 @@ TEST(PlanCacheCommandsTest, planCacheListPlansOnlyOneSolutionTrue) {
     vector<BSONObj> plans = getPlans(planCache,
                                      cq->getQueryObj(),
                                      cq->getQueryRequest().getSort(),
-                                     cq->getQueryRequest().getProj());
+                                     cq->getQueryRequest().getProj(),
+                                     cq->getQueryRequest().getCollation());
     ASSERT_EQUALS(plans.size(), 1U);
 }
 
@@ -462,8 +551,61 @@ TEST(PlanCacheCommandsTest, planCacheListPlansOnlyOneSolutionFalse) {
     vector<BSONObj> plans = getPlans(planCache,
                                      cq->getQueryObj(),
                                      cq->getQueryRequest().getSort(),
-                                     cq->getQueryRequest().getProj());
+                                     cq->getQueryRequest().getProj(),
+                                     cq->getQueryRequest().getCollation());
     ASSERT_EQUALS(plans.size(), 2U);
+}
+
+
+TEST(PlanCacheCommandsTest, planCacheListPlansCollation) {
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
+
+    // Create 2 canonical queries, one with collation.
+    auto qr = stdx::make_unique<QueryRequest>(nss);
+    qr->setFilter(fromjson("{a: 'foo'}"));
+    auto statusWithCQ = CanonicalQuery::canonicalize(
+        txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+    ASSERT_OK(statusWithCQ.getStatus());
+    unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+    auto qrCollation = stdx::make_unique<QueryRequest>(nss);
+    qrCollation->setFilter(fromjson("{a: 'foo'}"));
+    qrCollation->setCollation(fromjson("{locale: 'mock_reverse_string'}"));
+    auto statusWithCQCollation = CanonicalQuery::canonicalize(
+        txn.get(), std::move(qrCollation), ExtensionsCallbackDisallowExtensions());
+    ASSERT_OK(statusWithCQCollation.getStatus());
+    unique_ptr<CanonicalQuery> cqCollation = std::move(statusWithCQCollation.getValue());
+
+    // Create plan cache with 2 entries. Add an index so that indexability is included in the plan
+    // cache keys. Give query with collation two solutions.
+    PlanCache planCache;
+    planCache.notifyOfIndexEntries(
+        {IndexEntry(fromjson("{a: 1}"), false, false, false, "index_name", NULL, BSONObj())});
+    QuerySolution qs;
+    qs.cacheData.reset(createSolutionCacheData());
+    std::vector<QuerySolution*> solns;
+    solns.push_back(&qs);
+    planCache.add(*cq, solns, createDecision(1U));
+    std::vector<QuerySolution*> twoSolns;
+    twoSolns.push_back(&qs);
+    twoSolns.push_back(&qs);
+    planCache.add(*cqCollation, twoSolns, createDecision(2U));
+
+    // Normal query should have one solution.
+    vector<BSONObj> plans = getPlans(planCache,
+                                     cq->getQueryObj(),
+                                     cq->getQueryRequest().getSort(),
+                                     cq->getQueryRequest().getProj(),
+                                     cq->getQueryRequest().getCollation());
+    ASSERT_EQUALS(plans.size(), 1U);
+
+    // Query with collation should have two solutions.
+    vector<BSONObj> plansCollation = getPlans(planCache,
+                                              cqCollation->getQueryObj(),
+                                              cqCollation->getQueryRequest().getSort(),
+                                              cqCollation->getQueryRequest().getProj(),
+                                              cqCollation->getQueryRequest().getCollation());
+    ASSERT_EQUALS(plansCollation.size(), 2U);
 }
 
 }  // namespace
