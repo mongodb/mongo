@@ -11,6 +11,10 @@
     var writeRes;
     var planStage;
 
+    var isMaster = db.runCommand("ismaster");
+    assert.commandWorked(isMaster);
+    var isMongos = (isMaster.msg === "isdbgrid");
+
     var assertIndexHasCollation = function(keyPattern, collation) {
         var foundIndex = false;
         var indexSpecs = coll.getIndexes();
@@ -1553,20 +1557,22 @@
     // applyOps.
     // TODO SERVER-23924: Test that application of the oplog entries is done with a collation-aware
     // update-by-_id. These tests only ensure that the preCondition is collation-aware.
-    coll.drop();
-    assert.commandWorked(
-        db.createCollection("collation", {collation: {locale: "en_US", strength: 2}}));
-    assert.writeOK(coll.insert({_id: 1, x: 5, str: "foo"}));
-    assert.commandFailed(db.runCommand({
-        applyOps: [{op: "u", ns: coll.getFullName(), o2: {_id: 1}, o: {$inc: {x: 1}}}],
-        preCondition: [{ns: coll.getFullName(), q: {_id: 1}, res: {str: "bar"}}]
-    }));
-    assert.commandWorked(db.runCommand({
-        applyOps: [{op: "u", ns: coll.getFullName(), o2: {_id: 1}, o: {$inc: {x: 1}}}],
-        preCondition: [{ns: coll.getFullName(), q: {_id: 1}, res: {str: "FOO"}}]
-    }));
-    assert.commandWorked(db.runCommand({
-        applyOps: [{op: "u", ns: coll.getFullName(), o2: {_id: 1}, o: {$inc: {x: 1}}}],
-        preCondition: [{ns: coll.getFullName(), q: {str: "FOO"}, res: {_id: 1}}]
-    }));
+    if (!isMongos) {
+        coll.drop();
+        assert.commandWorked(
+            db.createCollection("collation", {collation: {locale: "en_US", strength: 2}}));
+        assert.writeOK(coll.insert({_id: 1, x: 5, str: "foo"}));
+        assert.commandFailed(db.runCommand({
+            applyOps: [{op: "u", ns: coll.getFullName(), o2: {_id: 1}, o: {$inc: {x: 1}}}],
+            preCondition: [{ns: coll.getFullName(), q: {_id: 1}, res: {str: "bar"}}]
+        }));
+        assert.commandWorked(db.runCommand({
+            applyOps: [{op: "u", ns: coll.getFullName(), o2: {_id: 1}, o: {$inc: {x: 1}}}],
+            preCondition: [{ns: coll.getFullName(), q: {_id: 1}, res: {str: "FOO"}}]
+        }));
+        assert.commandWorked(db.runCommand({
+            applyOps: [{op: "u", ns: coll.getFullName(), o2: {_id: 1}, o: {$inc: {x: 1}}}],
+            preCondition: [{ns: coll.getFullName(), q: {str: "FOO"}, res: {_id: 1}}]
+        }));
+    }
 })();
