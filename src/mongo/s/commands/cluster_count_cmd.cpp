@@ -144,7 +144,7 @@ public:
         }
 
         const std::initializer_list<StringData> passthroughFields = {
-            "hint", "$queryOptions", "readConcern", QueryRequest::cmdOptionMaxTimeMS,
+            "$queryOptions", "collation", "hint", "readConcern", QueryRequest::cmdOptionMaxTimeMS,
         };
         for (auto name : passthroughFields) {
             if (auto field = cmdObj[name]) {
