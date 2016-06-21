@@ -30,10 +30,13 @@
 
 #include "mongo/db/s/metadata_manager.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/s/collection_metadata.h"
-#include "mongo/db/s/metadata_loader.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -67,6 +70,106 @@ TEST(MetadataManager, ResetActiveMetadata) {
 
     ASSERT_EQ(cm2Ptr, scopedMetadata2.getMetadata());
 };
+
+TEST(MetadataManager, AddAndRemoveRanges) {
+    MetadataManager mm;
+    ChunkRange cr1 = ChunkRange(BSON("key" << 0), BSON("key" << 10));
+    ChunkRange cr2 = ChunkRange(BSON("key" << 10), BSON("key" << 20));
+
+    mm.addRangeToClean(cr1);
+    ASSERT_EQ(mm.getCopyOfRanges().size(), 1UL);
+    mm.removeRangeToClean(cr1);
+    ASSERT_EQ(mm.getCopyOfRanges().size(), 0UL);
+
+    mm.addRangeToClean(cr1);
+    mm.addRangeToClean(cr2);
+    mm.removeRangeToClean(cr1);
+    ASSERT_EQ(mm.getCopyOfRanges().size(), 1UL);
+    auto ranges = mm.getCopyOfRanges();
+    ChunkRange remainingChunk = ranges.find(cr2.getMin())->second;
+    ASSERT_EQ(remainingChunk.toString(), cr2.toString());
+    mm.removeRangeToClean(cr2);
+}
+
+// Tests that a removal in the middle of an existing ChunkRange results in
+// two correct chunk ranges.
+TEST(MetadataManager, RemoveRangeInMiddleOfRange) {
+    MetadataManager mm;
+    ChunkRange cr1 = ChunkRange(BSON("key" << 0), BSON("key" << 10));
+
+    mm.addRangeToClean(cr1);
+    mm.removeRangeToClean(ChunkRange(BSON("key" << 4), BSON("key" << 6)));
+    ASSERT_EQ(mm.getCopyOfRanges().size(), 2UL);
+
+    auto ranges = mm.getCopyOfRanges();
+    auto it = ranges.find(BSON("key" << 0));
+    ChunkRange expectedChunk = ChunkRange(BSON("key" << 0), BSON("key" << 4));
+    ASSERT_EQ(it->second.toString(), expectedChunk.toString());
+
+    it++;
+    expectedChunk = ChunkRange(BSON("key" << 6), BSON("key" << 10));
+    ASSERT_EQ(it->second.toString(), expectedChunk.toString());
+
+    mm.removeRangeToClean(cr1);
+    ASSERT_EQ(mm.getCopyOfRanges().size(), 0UL);
+}
+
+// Tests removals that overlap with just one ChunkRange.
+TEST(MetadataManager, RemoveRangeWithSingleRangeOverlap) {
+    MetadataManager mm;
+    ChunkRange cr1 = ChunkRange(BSON("key" << 0), BSON("key" << 10));
+
+    mm.addRangeToClean(cr1);
+    mm.removeRangeToClean(ChunkRange(BSON("key" << 0), BSON("key" << 5)));
+    ASSERT_EQ(mm.getCopyOfRanges().size(), 1UL);
+    auto ranges = mm.getCopyOfRanges();
+    ChunkRange remainingChunk = ranges.find(BSON("key" << 5))->second;
+    ChunkRange expectedChunk = ChunkRange(BSON("key" << 5), BSON("key" << 10));
+    ASSERT_EQ(remainingChunk.toString(), expectedChunk.toString());
+
+    mm.removeRangeToClean(ChunkRange(BSON("key" << 4), BSON("key" << 6)));
+    ASSERT_EQ(mm.getCopyOfRanges().size(), 1UL);
+    ranges = mm.getCopyOfRanges();
+    remainingChunk = ranges.find(BSON("key" << 6))->second;
+    expectedChunk = ChunkRange(BSON("key" << 6), BSON("key" << 10));
+    ASSERT_EQ(remainingChunk.toString(), expectedChunk.toString());
+
+    mm.removeRangeToClean(ChunkRange(BSON("key" << 9), BSON("key" << 13)));
+    ASSERT_EQ(mm.getCopyOfRanges().size(), 1UL);
+    ranges = mm.getCopyOfRanges();
+    remainingChunk = ranges.find(BSON("key" << 6))->second;
+    expectedChunk = ChunkRange(BSON("key" << 6), BSON("key" << 9));
+    ASSERT_EQ(remainingChunk.toString(), expectedChunk.toString());
+
+    mm.removeRangeToClean(ChunkRange(BSON("key" << 0), BSON("key" << 10)));
+    ASSERT_EQ(mm.getCopyOfRanges().size(), 0UL);
+}
+
+// Tests removals that overlap with more than one ChunkRange.
+TEST(MetadataManager, RemoveRangeWithMultipleRangeOverlaps) {
+    MetadataManager mm;
+    ChunkRange cr1 = ChunkRange(BSON("key" << 0), BSON("key" << 10));
+    ChunkRange cr2 = ChunkRange(BSON("key" << 10), BSON("key" << 20));
+    ChunkRange cr3 = ChunkRange(BSON("key" << 20), BSON("key" << 30));
+
+    mm.addRangeToClean(cr1);
+    mm.addRangeToClean(cr2);
+    mm.addRangeToClean(cr3);
+    ASSERT_EQ(mm.getCopyOfRanges().size(), 3UL);
+
+    mm.removeRangeToClean(ChunkRange(BSON("key" << 8), BSON("key" << 22)));
+    ASSERT_EQ(mm.getCopyOfRanges().size(), 2UL);
+    auto ranges = mm.getCopyOfRanges();
+    auto it = ranges.find(BSON("key" << 0));
+    ChunkRange expectedChunk = ChunkRange(BSON("key" << 0), BSON("key" << 8));
+    ASSERT_EQ(it->second.toString(), expectedChunk.toString());
+    it++;
+    expectedChunk = ChunkRange(BSON("key" << 22), BSON("key" << 30));
+    ASSERT_EQ(it->second.toString(), expectedChunk.toString());
+
+    mm.removeRangeToClean(ChunkRange(BSON("key" << 0), BSON("key" << 30)));
+    ASSERT_EQ(mm.getCopyOfRanges().size(), 0UL);
+}
 
 }  // namespace
 }  // namespace mongo
