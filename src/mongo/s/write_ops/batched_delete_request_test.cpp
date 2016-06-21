@@ -60,5 +60,89 @@ TEST(BatchedDeleteRequest, Basic) {
     ASSERT_EQUALS(origDeleteRequestObj, request.toBSON());
 }
 
+TEST(BatchedDeleteRequest, CloneBatchedDeleteDocCopiesAllFields) {
+    BatchedDeleteDocument deleteDoc;
+    deleteDoc.setQuery(BSON("a" << 1));
+    deleteDoc.setLimit(1);
+    deleteDoc.setCollation(BSON("locale"
+                                << "en_US"));
+
+    BatchedDeleteDocument cloneToDoc;
+    deleteDoc.cloneTo(&cloneToDoc);
+    ASSERT_TRUE(cloneToDoc.isQuerySet());
+    ASSERT_EQ(BSON("a" << 1), cloneToDoc.getQuery());
+    ASSERT_TRUE(cloneToDoc.isLimitSet());
+    ASSERT_EQ(1, cloneToDoc.getLimit());
+    ASSERT_TRUE(cloneToDoc.isCollationSet());
+    ASSERT_EQ(BSON("locale"
+                   << "en_US"),
+              cloneToDoc.getCollation());
+}
+
+TEST(BatchedDeleteRequest, CanSetAndRetrieveCollationField) {
+    BatchedDeleteDocument deleteDoc;
+    deleteDoc.setQuery(BSON("a" << 1));
+    deleteDoc.setLimit(1);
+
+    ASSERT_FALSE(deleteDoc.isCollationSet());
+    deleteDoc.setCollation(BSON("locale"
+                                << "en_US"));
+    ASSERT_TRUE(deleteDoc.isCollationSet());
+    ASSERT_EQ(BSON("locale"
+                   << "en_US"),
+              deleteDoc.getCollation());
+    deleteDoc.unsetCollation();
+    ASSERT_FALSE(deleteDoc.isCollationSet());
+}
+
+TEST(BatchedDeleteRequest, ClearBatchedDeleteDocUnsetsCollation) {
+    BatchedDeleteDocument deleteDoc;
+    deleteDoc.setQuery(BSON("a" << 1));
+    deleteDoc.setLimit(1);
+    deleteDoc.setCollation(BSON("locale"
+                                << "en_US"));
+
+    ASSERT_TRUE(deleteDoc.isCollationSet());
+    deleteDoc.clear();
+    ASSERT_FALSE(deleteDoc.isCollationSet());
+}
+
+TEST(BatchedDeleteRequest, CollationFieldSerializesToBSONCorrectly) {
+    BatchedDeleteDocument deleteDoc;
+    deleteDoc.setQuery(BSON("a" << 1));
+    deleteDoc.setLimit(1);
+    deleteDoc.setCollation(BSON("locale"
+                                << "en_US"));
+
+    BSONObj expectedDeleteObj = BSON(BatchedDeleteDocument::query(BSON("a" << 1))
+                                     << BatchedDeleteDocument::limit(1)
+                                     << BatchedDeleteDocument::collation(BSON("locale"
+                                                                              << "en_US")));
+    ASSERT_EQUALS(expectedDeleteObj, deleteDoc.toBSON());
+}
+
+TEST(BatchedDeleteRequest, CollationFieldParsesFromBSONCorrectly) {
+    BSONArray deleteArray = BSON_ARRAY(BSON(BatchedDeleteDocument::query(BSON("a" << 1))
+                                            << BatchedDeleteDocument::limit(1)
+                                            << BatchedDeleteDocument::collation(BSON("locale"
+                                                                                     << "en_US"))));
+
+    BSONObj origDeleteRequestObj = BSON(
+        BatchedDeleteRequest::collName("test") << BatchedDeleteRequest::deletes() << deleteArray);
+
+    std::string errMsg;
+    BatchedDeleteRequest request;
+    ASSERT_TRUE(request.parseBSON("foo", origDeleteRequestObj, &errMsg));
+
+    ASSERT_EQ(1U, request.sizeDeletes());
+    ASSERT_TRUE(request.getDeletesAt(0)->isCollationSet());
+    ASSERT_EQ(BSON("locale"
+                   << "en_US"),
+              request.getDeletesAt(0)->getCollation());
+
+    // Ensure we re-serialize to the original BSON request.
+    ASSERT_EQUALS(origDeleteRequestObj, request.toBSON());
+}
+
 }  // namespace
 }  // namespace mongo

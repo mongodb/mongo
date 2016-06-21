@@ -53,6 +53,7 @@ public:
     static const BSONField<BSONObj> updateExpr;
     static const BSONField<bool> multi;
     static const BSONField<bool> upsert;
+    static const BSONField<BSONObj> collation;
 
     //
     // construction / destruction
@@ -98,6 +99,11 @@ public:
     bool isUpsertSet() const;
     bool getUpsert() const;
 
+    void setCollation(const BSONObj& collation);
+    void unsetCollation();
+    bool isCollationSet() const;
+    const BSONObj& getCollation() const;
+
 private:
     // Convention: (M)andatory, (O)ptional
 
@@ -116,6 +122,10 @@ private:
     // (O)  whether upserts are allowed
     bool _upsert;
     bool _isUpsertSet;
+
+    // (O)  the collation which this update should respect.
+    BSONObj _collation;
+    bool _isCollationSet;
 };
 
 }  // namespace mongo
