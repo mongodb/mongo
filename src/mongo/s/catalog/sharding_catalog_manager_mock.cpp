@@ -70,4 +70,8 @@ Status ShardingCatalogManagerMock::removeShardFromZone(OperationContext* txn,
 
 void ShardingCatalogManagerMock::appendConnectionStats(executor::ConnectionPoolStats* stats) {}
 
+Status ShardingCatalogManagerMock::initializeConfigDatabaseIfNeeded(OperationContext* txn) {
+    return {ErrorCodes::InternalError, "Method not implemented"};
+}
+
 }  // namespace mongo

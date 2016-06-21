@@ -159,6 +159,17 @@ public:
                                                      const BSONObj& query,
                                                      const BSONObj& sort,
                                                      const boost::optional<long long> limit);
+    /**
+     * Builds an index on a config server collection.
+     * Creates the collection if it doesn't yet exist.  Does not error if the index already exists,
+     * so long as the options are the same.
+     * NOTE: Currently only supported for LocalShard.
+     */
+    virtual Status createIndexOnConfig(OperationContext* txn,
+                                       const NamespaceString& ns,
+                                       const BSONObj& keys,
+                                       bool unique) = 0;
+
 
 protected:
     Shard(const ShardId& id);

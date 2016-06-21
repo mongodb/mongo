@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_and_modify_request.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -66,6 +67,11 @@ protected:
                                                   BSONObj query,
                                                   BSONObj sort,
                                                   boost::optional<long long> limit);
+
+    /**
+     * Returns the index definitions that exist for the given collection.
+     */
+    StatusWith<std::vector<BSONObj>> getIndexes(NamespaceString nss);
 
 private:
     void setUp() override;
@@ -101,6 +107,26 @@ StatusWith<Shard::CommandResponse> ShardLocalTest::runFindAndModifyRunCommand(Na
                                    nss.db().toString(),
                                    findAndModifyRequest.toBSON(),
                                    Shard::RetryPolicy::kNoRetry);
+}
+
+StatusWith<std::vector<BSONObj>> ShardLocalTest::getIndexes(NamespaceString nss) {
+    auto response = _shardLocal->runCommand(_txn.get(),
+                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                            nss.db().toString(),
+                                            BSON("listIndexes" << nss.coll().toString()),
+                                            Shard::RetryPolicy::kIdempotent);
+    if (!response.isOK()) {
+        return response.getStatus();
+    }
+    if (!response.getValue().commandStatus.isOK()) {
+        return response.getValue().commandStatus;
+    }
+
+    auto cursorResponse = CursorResponse::parseFromBSON(response.getValue().response);
+    if (!cursorResponse.isOK()) {
+        return cursorResponse.getStatus();
+    }
+    return cursorResponse.getValue().getBatch();
 }
 
 /**
@@ -208,6 +234,33 @@ TEST_F(ShardLocalTest, FindNoMatchingDocumentsEmpty) {
     std::vector<BSONObj> docs = queryResponse.docs;
     const unsigned long size = 0;
     ASSERT_EQUALS(size, docs.size());
+}
+
+TEST_F(ShardLocalTest, CreateIndex) {
+    NamespaceString nss("config.foo");
+
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, getIndexes(nss).getStatus());
+
+    Status status =
+        _shardLocal->createIndexOnConfig(_txn.get(), nss, BSON("a" << 1 << "b" << 1), true);
+    // Creating the index should implicitly create the collection
+    ASSERT_OK(status);
+
+    auto indexes = unittest::assertGet(getIndexes(nss));
+    // There should be the index we just added as well as the _id index
+    ASSERT_EQ(2U, indexes.size());
+
+    // Making an identical index should be a no-op.
+    status = _shardLocal->createIndexOnConfig(_txn.get(), nss, BSON("a" << 1 << "b" << 1), true);
+    ASSERT_OK(status);
+    indexes = unittest::assertGet(getIndexes(nss));
+    ASSERT_EQ(2U, indexes.size());
+
+    // Trying to make the same index as non-unique should fail.
+    status = _shardLocal->createIndexOnConfig(_txn.get(), nss, BSON("a" << 1 << "b" << 1), false);
+    ASSERT_EQUALS(ErrorCodes::IndexOptionsConflict, status);
+    indexes = unittest::assertGet(getIndexes(nss));
+    ASSERT_EQ(2U, indexes.size());
 }
 
 }  // namespace

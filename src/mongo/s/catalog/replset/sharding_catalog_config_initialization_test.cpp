@@ -1,0 +1,322 @@
+/**
+ *    Copyright (C) 2015 MongoDB Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
+
+#include "mongo/platform/basic.h"
+
+#include <string>
+#include <vector>
+
+#include "mongo/bson/json.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/s/catalog/config_server_version.h"
+#include "mongo/s/catalog/sharding_catalog_manager.h"
+#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_config_version.h"
+#include "mongo/s/catalog/type_lockpings.h"
+#include "mongo/s/catalog/type_locks.h"
+#include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/catalog/type_tags.h"
+#include "mongo/s/client/shard.h"
+#include "mongo/s/config_server_test_fixture.h"
+
+namespace mongo {
+namespace {
+
+using std::string;
+using std::vector;
+using unittest::assertGet;
+
+/**
+ * Takes two arrays of BSON objects and asserts that they contain the same documents
+ */
+void assertBSONObjsSame(const std::vector<BSONObj>& expectedBSON,
+                        const std::vector<BSONObj>& foundBSON) {
+    ASSERT_EQUALS(expectedBSON.size(), foundBSON.size());
+
+    for (const auto& expectedObj : expectedBSON) {
+        bool wasFound = false;
+        for (const auto& foundObj : foundBSON) {
+            if (expectedObj.woCompare(foundObj) == 0) {
+                wasFound = true;
+                break;
+            }
+        }
+        ASSERT_TRUE(wasFound);
+    }
+}
+
+using ConfigInitializationTest = ConfigServerTestFixture;
+
+TEST_F(ConfigInitializationTest, UpgradeNotNeeded) {
+    VersionType version;
+    version.setClusterId(OID::gen());
+    version.setCurrentVersion(CURRENT_CONFIG_VERSION);
+    version.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION);
+    ASSERT_OK(insertToConfigCollection(
+        operationContext(), NamespaceString(VersionType::ConfigNS), version.toBSON()));
+
+    ASSERT_OK(catalogManager()->initializeConfigDatabaseIfNeeded(operationContext()));
+
+    auto versionDoc = assertGet(findOneOnConfigCollection(
+        operationContext(), NamespaceString(VersionType::ConfigNS), BSONObj()));
+
+    VersionType foundVersion = assertGet(VersionType::fromBSON(versionDoc));
+
+    ASSERT_EQUALS(version.getClusterId(), foundVersion.getClusterId());
+    ASSERT_EQUALS(version.getCurrentVersion(), foundVersion.getCurrentVersion());
+    ASSERT_EQUALS(version.getMinCompatibleVersion(), foundVersion.getMinCompatibleVersion());
+}
+
+TEST_F(ConfigInitializationTest, InitIncompatibleVersion) {
+    VersionType version;
+    version.setClusterId(OID::gen());
+    version.setCurrentVersion(MIN_COMPATIBLE_CONFIG_VERSION - 1);
+    version.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION - 2);
+    ASSERT_OK(insertToConfigCollection(
+        operationContext(), NamespaceString(VersionType::ConfigNS), version.toBSON()));
+
+    ASSERT_EQ(ErrorCodes::IncompatibleShardingConfigVersion,
+              catalogManager()->initializeConfigDatabaseIfNeeded(operationContext()));
+
+    auto versionDoc = assertGet(findOneOnConfigCollection(
+        operationContext(), NamespaceString(VersionType::ConfigNS), BSONObj()));
+
+    VersionType foundVersion = assertGet(VersionType::fromBSON(versionDoc));
+
+    ASSERT_EQUALS(version.getClusterId(), foundVersion.getClusterId());
+    ASSERT_EQUALS(version.getCurrentVersion(), foundVersion.getCurrentVersion());
+    ASSERT_EQUALS(version.getMinCompatibleVersion(), foundVersion.getMinCompatibleVersion());
+}
+
+TEST_F(ConfigInitializationTest, InitClusterMultipleVersionDocs) {
+    VersionType version;
+    version.setClusterId(OID::gen());
+    version.setCurrentVersion(MIN_COMPATIBLE_CONFIG_VERSION - 2);
+    version.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION - 3);
+    ASSERT_OK(insertToConfigCollection(
+        operationContext(), NamespaceString(VersionType::ConfigNS), version.toBSON()));
+
+    ASSERT_OK(insertToConfigCollection(operationContext(),
+                                       NamespaceString(VersionType::ConfigNS),
+                                       BSON("_id"
+                                            << "a second document")));
+
+    ASSERT_EQ(ErrorCodes::IncompatibleShardingConfigVersion,
+              catalogManager()->initializeConfigDatabaseIfNeeded(operationContext()));
+}
+
+TEST_F(ConfigInitializationTest, InitInvalidConfigVersionDoc) {
+    BSONObj versionDoc(fromjson(R"({
+                    _id: 1,
+                    minCompatibleVersion: "should be numeric",
+                    currentVersion: 7,
+                    clusterId: ObjectId("55919cc6dbe86ce7ac056427")
+                })"));
+    ASSERT_OK(insertToConfigCollection(
+        operationContext(), NamespaceString(VersionType::ConfigNS), versionDoc));
+
+    ASSERT_EQ(ErrorCodes::UnsupportedFormat,
+              catalogManager()->initializeConfigDatabaseIfNeeded(operationContext()));
+}
+
+
+TEST_F(ConfigInitializationTest, InitNoVersionDocEmptyConfig) {
+    // Make sure there is no existing document
+    ASSERT_EQUALS(ErrorCodes::NoMatchingDocument,
+                  findOneOnConfigCollection(
+                      operationContext(), NamespaceString(VersionType::ConfigNS), BSONObj()));
+
+    ASSERT_OK(catalogManager()->initializeConfigDatabaseIfNeeded(operationContext()));
+
+    auto versionDoc = assertGet(findOneOnConfigCollection(
+        operationContext(), NamespaceString(VersionType::ConfigNS), BSONObj()));
+
+    VersionType foundVersion = assertGet(VersionType::fromBSON(versionDoc));
+
+    ASSERT_TRUE(foundVersion.getClusterId().isSet());
+    ASSERT_EQUALS(CURRENT_CONFIG_VERSION, foundVersion.getCurrentVersion());
+    ASSERT_EQUALS(MIN_COMPATIBLE_CONFIG_VERSION, foundVersion.getMinCompatibleVersion());
+}
+
+TEST_F(ConfigInitializationTest, InitVersionTooHigh) {
+    VersionType version;
+    version.setClusterId(OID::gen());
+    version.setCurrentVersion(10000);
+    version.setMinCompatibleVersion(10000);
+    ASSERT_OK(insertToConfigCollection(
+        operationContext(), NamespaceString(VersionType::ConfigNS), version.toBSON()));
+
+    ASSERT_EQ(ErrorCodes::IncompatibleShardingConfigVersion,
+              catalogManager()->initializeConfigDatabaseIfNeeded(operationContext()));
+}
+
+TEST_F(ConfigInitializationTest, OnlyRunsOnce) {
+    ASSERT_OK(catalogManager()->initializeConfigDatabaseIfNeeded(operationContext()));
+
+    auto versionDoc = assertGet(findOneOnConfigCollection(
+        operationContext(), NamespaceString(VersionType::ConfigNS), BSONObj()));
+
+    VersionType foundVersion = assertGet(VersionType::fromBSON(versionDoc));
+
+    ASSERT_TRUE(foundVersion.getClusterId().isSet());
+    ASSERT_EQUALS(CURRENT_CONFIG_VERSION, foundVersion.getCurrentVersion());
+    ASSERT_EQUALS(MIN_COMPATIBLE_CONFIG_VERSION, foundVersion.getMinCompatibleVersion());
+
+    // Now drop all databases and re-run initializeConfigDatabaseIfNeeded()
+    _dropAllDBs(operationContext());
+
+    ASSERT_OK(catalogManager()->initializeConfigDatabaseIfNeeded(operationContext()));
+
+    // Even though there was no version document, initializeConfigDatabaseIfNeeded() returned
+    // without making one because it has already run once successfully so didn't bother to check.
+    ASSERT_EQUALS(ErrorCodes::NoMatchingDocument,
+                  findOneOnConfigCollection(
+                      operationContext(), NamespaceString(VersionType::ConfigNS), BSONObj()));
+}
+
+TEST_F(ConfigInitializationTest, BuildsNecessaryIndexes) {
+    ASSERT_OK(catalogManager()->initializeConfigDatabaseIfNeeded(operationContext()));
+
+    auto expectedChunksIndexes = std::vector<BSONObj>{
+        BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
+                 << "_id_"
+                 << "ns"
+                 << "config.chunks"),
+        BSON("v" << 1 << "unique" << true << "key" << BSON("ns" << 1 << "min" << 1) << "name"
+                 << "ns_1_min_1"
+                 << "ns"
+                 << "config.chunks"),
+        BSON("v" << 1 << "unique" << true << "key" << BSON("ns" << 1 << "shard" << 1 << "min" << 1)
+                 << "name"
+                 << "ns_1_shard_1_min_1"
+                 << "ns"
+                 << "config.chunks"),
+        BSON("v" << 1 << "unique" << true << "key" << BSON("ns" << 1 << "lastmod" << 1) << "name"
+                 << "ns_1_lastmod_1"
+                 << "ns"
+                 << "config.chunks")};
+    auto expectedLockpingsIndexes =
+        std::vector<BSONObj>{BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
+                                      << "_id_"
+                                      << "ns"
+                                      << "config.lockpings"),
+                             BSON("v" << 1 << "key" << BSON("ping" << 1) << "name"
+                                      << "ping_1"
+                                      << "ns"
+                                      << "config.lockpings")};
+    auto expectedLocksIndexes = std::vector<BSONObj>{
+        BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
+                 << "_id_"
+                 << "ns"
+                 << "config.locks"),
+        BSON("v" << 1 << "key" << BSON("ts" << 1) << "name"
+                 << "ts_1"
+                 << "ns"
+                 << "config.locks"),
+        BSON("v" << 1 << "key" << BSON("state" << 1 << "process" << 1) << "name"
+                 << "state_1_process_1"
+                 << "ns"
+                 << "config.locks")};
+    auto expectedShardsIndexes = std::vector<BSONObj>{
+        BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
+                 << "_id_"
+                 << "ns"
+                 << "config.shards"),
+        BSON("v" << 1 << "unique" << true << "key" << BSON("host" << 1) << "name"
+                 << "host_1"
+                 << "ns"
+                 << "config.shards")};
+    auto expectedTagsIndexes = std::vector<BSONObj>{
+        BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
+                 << "_id_"
+                 << "ns"
+                 << "config.tags"),
+        BSON("v" << 1 << "unique" << true << "key" << BSON("ns" << 1 << "min" << 1) << "name"
+                 << "ns_1_min_1"
+                 << "ns"
+                 << "config.tags"),
+        BSON("v" << 1 << "key" << BSON("ns" << 1 << "tag" << 1) << "name"
+                 << "ns_1_tag_1"
+                 << "ns"
+                 << "config.tags")};
+
+    auto foundChunksIndexes =
+        assertGet(getIndexes(operationContext(), NamespaceString(ChunkType::ConfigNS)));
+    assertBSONObjsSame(expectedChunksIndexes, foundChunksIndexes);
+
+    auto foundLockpingsIndexes =
+        assertGet(getIndexes(operationContext(), NamespaceString(LockpingsType::ConfigNS)));
+    assertBSONObjsSame(expectedLockpingsIndexes, foundLockpingsIndexes);
+
+    auto foundLocksIndexes =
+        assertGet(getIndexes(operationContext(), NamespaceString(LocksType::ConfigNS)));
+    assertBSONObjsSame(expectedLocksIndexes, foundLocksIndexes);
+
+    auto foundShardsIndexes =
+        assertGet(getIndexes(operationContext(), NamespaceString(ShardType::ConfigNS)));
+    assertBSONObjsSame(expectedShardsIndexes, foundShardsIndexes);
+
+    auto foundTagsIndexes =
+        assertGet(getIndexes(operationContext(), NamespaceString(TagsType::ConfigNS)));
+    assertBSONObjsSame(expectedTagsIndexes, foundTagsIndexes);
+}
+
+TEST_F(ConfigInitializationTest, CompatibleIndexAlreadyExists) {
+    getConfigShard()->createIndexOnConfig(
+        operationContext(), NamespaceString(ShardType::ConfigNS), BSON("host" << 1), true);
+
+    ASSERT_OK(catalogManager()->initializeConfigDatabaseIfNeeded(operationContext()));
+
+    auto expectedShardsIndexes = std::vector<BSONObj>{
+        BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
+                 << "_id_"
+                 << "ns"
+                 << "config.shards"),
+        BSON("v" << 1 << "unique" << true << "key" << BSON("host" << 1) << "name"
+                 << "host_1"
+                 << "ns"
+                 << "config.shards")};
+
+
+    auto foundShardsIndexes =
+        assertGet(getIndexes(operationContext(), NamespaceString(ShardType::ConfigNS)));
+    assertBSONObjsSame(expectedShardsIndexes, foundShardsIndexes);
+}
+
+TEST_F(ConfigInitializationTest, IncompatibleIndexAlreadyExists) {
+    // Make the index non-unique even though its supposed to be unique, make sure initialization
+    // fails
+    getConfigShard()->createIndexOnConfig(
+        operationContext(), NamespaceString(ShardType::ConfigNS), BSON("host" << 1), false);
+
+    ASSERT_EQUALS(ErrorCodes::IndexOptionsConflict,
+                  catalogManager()->initializeConfigDatabaseIfNeeded(operationContext()));
+}
+
+}  // unnamed namespace
+}  // namespace mongo

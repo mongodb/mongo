@@ -178,5 +178,23 @@ StatusWith<Shard::QueryResponse> ShardLocal::_exhaustiveFindOnConfig(
     }
 }
 
+Status ShardLocal::createIndexOnConfig(OperationContext* txn,
+                                       const NamespaceString& ns,
+                                       const BSONObj& keys,
+                                       bool unique) {
+    invariant(ns.db() == "config" || ns.db() == "admin");
+
+    try {
+        DBDirectClient client(txn);
+        IndexSpec index;
+        index.addKeys(keys);
+        index.unique(unique);
+        client.createIndex(ns.toString(), index);
+    } catch (const DBException& e) {
+        return e.toStatus();
+    }
+
+    return Status::OK();
+}
 
 }  // namespace mongo

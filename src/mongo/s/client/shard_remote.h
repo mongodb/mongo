@@ -70,6 +70,11 @@ public:
 
     bool isRetriableError(ErrorCodes::Error code, RetryPolicy options) final;
 
+    Status createIndexOnConfig(OperationContext* txn,
+                               const NamespaceString& ns,
+                               const BSONObj& keys,
+                               bool unique) override;
+
 private:
     /**
      * Returns the metadata that should be used when running commands against this shard with

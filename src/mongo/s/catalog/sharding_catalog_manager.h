@@ -112,6 +112,12 @@ public:
      */
     virtual void appendConnectionStats(executor::ConnectionPoolStats* stats) = 0;
 
+    /**
+     * Initializes the collections that live in the config server.  Mostly this involves building
+     * necessary indexes and populating the config.version document.
+     */
+    virtual Status initializeConfigDatabaseIfNeeded(OperationContext* txn) = 0;
+
 protected:
     ShardingCatalogManager() = default;
 };

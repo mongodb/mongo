@@ -220,10 +220,6 @@ DistLockManager* ShardingCatalogClientMock::getDistLockManager() {
     return _mockDistLockMgr.get();
 }
 
-Status ShardingCatalogClientMock::initConfigVersion(OperationContext* txn) {
-    return {ErrorCodes::InternalError, "Method not implemented"};
-}
-
 Status ShardingCatalogClientMock::appendInfoForConfigServerDatabases(OperationContext* txn,
                                                                      BSONArrayBuilder* builder) {
     return Status::OK();

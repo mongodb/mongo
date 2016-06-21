@@ -58,6 +58,8 @@ public:
                                const std::string& zoneName) override;
 
     void appendConnectionStats(executor::ConnectionPoolStats* stats) override;
+
+    Status initializeConfigDatabaseIfNeeded(OperationContext* txn) override;
 };
 
 }  // namespace mongo

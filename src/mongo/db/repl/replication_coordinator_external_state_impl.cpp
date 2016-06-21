@@ -69,6 +69,7 @@
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/s/balancer/balancer.h"
+#include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/functional.h"
@@ -470,6 +471,21 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnDrainingStateHook(Operat
     }
 
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        status = Grid::get(txn)->catalogManager()->initializeConfigDatabaseIfNeeded(txn);
+        if (!status.isOK()) {
+            if (status == ErrorCodes::ShutdownInProgress ||
+                status == ErrorCodes::InterruptedAtShutdown) {
+                // Don't fassert if we're mid-shutdown, let the shutdown happen gracefully.
+                return;
+            }
+            fassertFailedWithStatus(40184,
+                                    Status(status.code(),
+                                           str::stream()
+                                               << "Failed to initialize config database on config "
+                                                  "server's first transition to primary"
+                                               << causedBy(status)));
+        }
+
         // If this is a config server node becoming a primary, start the balancer
         auto balancer = Balancer::get(txn);
 

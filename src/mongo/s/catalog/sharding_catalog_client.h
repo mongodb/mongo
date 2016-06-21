@@ -416,12 +416,6 @@ public:
                                          const WriteConcernOptions& writeConcern) = 0;
 
     /**
-     * Performs the necessary checks for version compatibility and creates a new version document
-     * if the current cluster config is empty.
-     */
-    virtual Status initConfigVersion(OperationContext* txn) = 0;
-
-    /**
      * Appends the information about the config and admin databases in the config server
      * with the format for listDatabase.
      */

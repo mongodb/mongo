@@ -159,8 +159,6 @@ public:
                                                          StringData whyMessage,
                                                          Milliseconds waitFor) override;
 
-    Status initConfigVersion(OperationContext* txn) override;
-
     Status appendInfoForConfigServerDatabases(OperationContext* txn,
                                               BSONArrayBuilder* builder) override;
 

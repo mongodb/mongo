@@ -39,6 +39,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -299,9 +300,33 @@ Status ConfigServerTestFixture::insertToConfigCollection(OperationContext* txn,
     auto config = getConfigShard();
     invariant(config);
 
-    auto insertStatus = config->runCommand(
+    auto insertResponse = config->runCommand(
         txn, kReadPref, ns.db().toString(), request.toBSON(), Shard::RetryPolicy::kNoRetry);
-    return insertStatus.getStatus();
+
+    BatchedCommandResponse batchResponse;
+    auto status = Shard::CommandResponse::processBatchWriteResponse(insertResponse, &batchResponse);
+    return status;
+}
+
+StatusWith<BSONObj> ConfigServerTestFixture::findOneOnConfigCollection(OperationContext* txn,
+                                                                       const NamespaceString& ns,
+                                                                       const BSONObj& filter) {
+    auto config = getConfigShard();
+    invariant(config);
+
+    auto findStatus = config->exhaustiveFindOnConfig(
+        txn, kReadPref, repl::ReadConcernLevel::kMajorityReadConcern, ns, filter, BSONObj(), 1);
+    if (!findStatus.isOK()) {
+        return findStatus.getStatus();
+    }
+
+    auto findResult = findStatus.getValue();
+    if (findResult.docs.empty()) {
+        return Status(ErrorCodes::NoMatchingDocument, "No document found");
+    }
+
+    invariant(findResult.docs.size() == 1);
+    return findResult.docs.front().getOwned();
 }
 
 Status ConfigServerTestFixture::setupShards(const std::vector<ShardType>& shards) {
@@ -318,29 +343,41 @@ Status ConfigServerTestFixture::setupShards(const std::vector<ShardType>& shards
 
 StatusWith<ShardType> ConfigServerTestFixture::getShardDoc(OperationContext* txn,
                                                            const std::string& shardId) {
-    auto config = getConfigShard();
-    invariant(config);
-
-    NamespaceString ns(ShardType::ConfigNS);
-    auto findStatus = config->exhaustiveFindOnConfig(txn,
-                                                     kReadPref,
-                                                     repl::ReadConcernLevel::kMajorityReadConcern,
-                                                     ns,
-                                                     BSON(ShardType::name(shardId)),
-                                                     BSONObj(),
-                                                     boost::none);
-    if (!findStatus.isOK()) {
-        return findStatus.getStatus();
+    auto doc = findOneOnConfigCollection(
+        txn, NamespaceString(ShardType::ConfigNS), BSON(ShardType::name(shardId)));
+    if (!doc.isOK()) {
+        if (doc.getStatus() == ErrorCodes::NoMatchingDocument) {
+            return {ErrorCodes::ShardNotFound,
+                    str::stream() << "shard " << shardId << " does not exist"};
+        }
+        return doc.getStatus();
     }
 
-    auto findResult = findStatus.getValue();
-    if (findResult.docs.empty()) {
-        return {ErrorCodes::ShardNotFound,
-                str::stream() << "shard " << shardId << " does not exist"};
-    }
-
-    invariant(findResult.docs.size() == 1);
-    return ShardType::fromBSON(findResult.docs.front());
+    return ShardType::fromBSON(doc.getValue());
 }
+
+StatusWith<std::vector<BSONObj>> ConfigServerTestFixture::getIndexes(OperationContext* txn,
+                                                                     const NamespaceString& ns) {
+    auto configShard = getConfigShard();
+
+    auto response = configShard->runCommand(txn,
+                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                            ns.db().toString(),
+                                            BSON("listIndexes" << ns.coll().toString()),
+                                            Shard::RetryPolicy::kIdempotent);
+    if (!response.isOK()) {
+        return response.getStatus();
+    }
+    if (!response.getValue().commandStatus.isOK()) {
+        return response.getValue().commandStatus;
+    }
+
+    auto cursorResponse = CursorResponse::parseFromBSON(response.getValue().response);
+    if (!cursorResponse.isOK()) {
+        return cursorResponse.getStatus();
+    }
+    return cursorResponse.getValue().getBatch();
+}
+
 
 }  // namespace mongo

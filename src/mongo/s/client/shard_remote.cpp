@@ -369,4 +369,11 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     return response;
 }
 
+Status ShardRemote::createIndexOnConfig(OperationContext* txn,
+                                        const NamespaceString& ns,
+                                        const BSONObj& keys,
+                                        bool unique) {
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace mongo

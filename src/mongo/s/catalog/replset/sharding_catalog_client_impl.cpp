@@ -54,12 +54,10 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
@@ -101,7 +99,6 @@ const char kWriteConcernField[] = "writeConcern";
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
 const ReadPreferenceSetting kConfigPrimaryPreferredSelector(ReadPreference::PrimaryPreferred,
                                                             TagSet{});
-const int kMaxConfigVersionInitRetry = 3;
 const int kMaxReadRetry = 3;
 const int kMaxWriteRetry = 3;
 
@@ -1186,7 +1183,7 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* txn,
                                                           const ChunkVersion& lastChunkVersion) {
     BSONObj cmd =
         BSON("applyOps" << updateOps << "preCondition" << preCondition << kWriteConcernField
-                        << kMajorityWriteConcern.toBSON());
+                        << ShardingCatalogClient::kMajorityWriteConcern.toBSON());
 
     auto response = Grid::get(txn)->shardRegistry()->getConfigShard()->runCommand(
         txn,
@@ -1553,107 +1550,6 @@ StatusWith<long long> ShardingCatalogClientImpl::_runCountCommandOnConfig(Operat
     }
 
     return result;
-}
-
-Status ShardingCatalogClientImpl::initConfigVersion(OperationContext* txn) {
-    for (int x = 0; x < kMaxConfigVersionInitRetry; x++) {
-        auto versionStatus = _getConfigVersion(txn);
-        if (!versionStatus.isOK()) {
-            return versionStatus.getStatus();
-        }
-
-        auto versionInfo = versionStatus.getValue();
-        if (versionInfo.getMinCompatibleVersion() > CURRENT_CONFIG_VERSION) {
-            return {ErrorCodes::IncompatibleShardingConfigVersion,
-                    str::stream() << "current version v" << CURRENT_CONFIG_VERSION
-                                  << " is older than the cluster min compatible v"
-                                  << versionInfo.getMinCompatibleVersion()};
-        }
-
-        if (versionInfo.getCurrentVersion() == UpgradeHistory_EmptyVersion) {
-            VersionType newVersion;
-            newVersion.setClusterId(OID::gen());
-            newVersion.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION);
-            newVersion.setCurrentVersion(CURRENT_CONFIG_VERSION);
-
-            BSONObj versionObj(newVersion.toBSON());
-            auto upsertStatus = updateConfigDocument(txn,
-                                                     VersionType::ConfigNS,
-                                                     versionObj,
-                                                     versionObj,
-                                                     true,
-                                                     ShardingCatalogClient::kMajorityWriteConcern);
-
-            if ((upsertStatus.isOK() && !upsertStatus.getValue()) ||
-                upsertStatus == ErrorCodes::DuplicateKey) {
-                // Do the check again as someone inserted a new config version document
-                // and the upsert neither inserted nor updated a config version document.
-                // Note: you can get duplicate key errors on upsert because of SERVER-14322.
-                continue;
-            }
-
-            return upsertStatus.getStatus();
-        }
-
-        if (versionInfo.getCurrentVersion() == UpgradeHistory_UnreportedVersion) {
-            return {ErrorCodes::IncompatibleShardingConfigVersion,
-                    "Assuming config data is old since the version document cannot be found in the "
-                    "config server and it contains databases aside 'local' and 'admin'. "
-                    "Please upgrade if this is the case. Otherwise, make sure that the config "
-                    "server is clean."};
-        }
-
-        if (versionInfo.getCurrentVersion() < CURRENT_CONFIG_VERSION) {
-            return {ErrorCodes::IncompatibleShardingConfigVersion,
-                    str::stream() << "need to upgrade current cluster version to v"
-                                  << CURRENT_CONFIG_VERSION
-                                  << "; currently at v"
-                                  << versionInfo.getCurrentVersion()};
-        }
-
-        return Status::OK();
-    }
-
-    return {ErrorCodes::IncompatibleShardingConfigVersion,
-            str::stream() << "unable to create new config version document after "
-                          << kMaxConfigVersionInitRetry
-                          << " retries"};
-}
-
-StatusWith<VersionType> ShardingCatalogClientImpl::_getConfigVersion(OperationContext* txn) {
-    auto findStatus = _exhaustiveFindOnConfig(txn,
-                                              kConfigReadSelector,
-                                              NamespaceString(VersionType::ConfigNS),
-                                              BSONObj(),
-                                              BSONObj(),
-                                              boost::none /* no limit */);
-    if (!findStatus.isOK()) {
-        return findStatus.getStatus();
-    }
-
-    auto queryResults = findStatus.getValue().value;
-
-    if (queryResults.size() > 1) {
-        return {ErrorCodes::RemoteValidationError,
-                str::stream() << "should only have 1 document in " << VersionType::ConfigNS};
-    }
-
-    if (queryResults.empty()) {
-        VersionType versionInfo;
-        versionInfo.setMinCompatibleVersion(UpgradeHistory_EmptyVersion);
-        versionInfo.setCurrentVersion(UpgradeHistory_EmptyVersion);
-        return versionInfo;
-    }
-
-    BSONObj versionDoc = queryResults.front();
-    auto versionTypeResult = VersionType::fromBSON(versionDoc);
-    if (!versionTypeResult.isOK()) {
-        return Status(ErrorCodes::UnsupportedFormat,
-                      str::stream() << "invalid config version document: " << versionDoc
-                                    << versionTypeResult.getStatus().toString());
-    }
-
-    return versionTypeResult.getValue();
 }
 
 StatusWith<repl::OpTimeWith<vector<BSONObj>>> ShardingCatalogClientImpl::_exhaustiveFindOnConfig(

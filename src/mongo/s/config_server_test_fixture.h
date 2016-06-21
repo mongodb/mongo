@@ -112,6 +112,13 @@ public:
                                     const BSONObj& doc);
 
     /**
+     * Reads a single document from a collection living on the config server.
+     */
+    StatusWith<BSONObj> findOneOnConfigCollection(OperationContext* txn,
+                                                  const NamespaceString& ns,
+                                                  const BSONObj& filter);
+
+    /**
      * Blocking methods, which receive one message from the network and respond using the
      * responses returned from the input function. This is a syntactic sugar for simple,
      * single request + response or find tests.
@@ -134,6 +141,11 @@ public:
      * Returns {ErrorCodes::ShardNotFound} if the given shard does not exists.
      */
     StatusWith<ShardType> getShardDoc(OperationContext* txn, const std::string& shardId);
+
+    /**
+     * Returns the indexes definitions defined on a given collection.
+     */
+    StatusWith<std::vector<BSONObj>> getIndexes(OperationContext* txn, const NamespaceString& ns);
 
     void setUp() override;
 

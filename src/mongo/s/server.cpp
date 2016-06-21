@@ -66,17 +66,11 @@
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_lockpings.h"
-#include "mongo/s/catalog/type_locks.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_remote.h"
 #include "mongo/s/client/sharding_connection_hook_for_mongos.h"
-#include "mongo/s/cluster_write.h"
 #include "mongo/s/commands/request.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
@@ -222,72 +216,6 @@ public:
 
 using namespace mongo;
 
-static void reloadSettings(OperationContext* txn) {
-    Grid::get(txn)->getBalancerConfiguration()->refreshAndCheck(txn);
-
-    // Create the config data indexes
-    const bool unique = true;
-
-    Status result = clusterCreateIndex(
-        txn, ChunkType::ConfigNS, BSON(ChunkType::ns() << 1 << ChunkType::min() << 1), unique);
-    if (!result.isOK()) {
-        warning() << "couldn't create ns_1_min_1 index on config db" << causedBy(result);
-    }
-
-    result = clusterCreateIndex(
-        txn,
-        ChunkType::ConfigNS,
-        BSON(ChunkType::ns() << 1 << ChunkType::shard() << 1 << ChunkType::min() << 1),
-        unique);
-    if (!result.isOK()) {
-        warning() << "couldn't create ns_1_shard_1_min_1 index on config db" << causedBy(result);
-    }
-
-    result = clusterCreateIndex(txn,
-                                ChunkType::ConfigNS,
-                                BSON(ChunkType::ns() << 1 << ChunkType::DEPRECATED_lastmod() << 1),
-                                unique);
-    if (!result.isOK()) {
-        warning() << "couldn't create ns_1_lastmod_1 index on config db" << causedBy(result);
-    }
-
-    result = clusterCreateIndex(txn, ShardType::ConfigNS, BSON(ShardType::host() << 1), unique);
-    if (!result.isOK()) {
-        warning() << "couldn't create host_1 index on config db" << causedBy(result);
-    }
-
-    result = clusterCreateIndex(txn, LocksType::ConfigNS, BSON(LocksType::lockID() << 1), !unique);
-    if (!result.isOK()) {
-        warning() << "couldn't create lock id index on config db" << causedBy(result);
-    }
-
-    result = clusterCreateIndex(txn,
-                                LocksType::ConfigNS,
-                                BSON(LocksType::state() << 1 << LocksType::process() << 1),
-                                !unique);
-    if (!result.isOK()) {
-        warning() << "couldn't create state and process id index on config db" << causedBy(result);
-    }
-
-    result =
-        clusterCreateIndex(txn, LockpingsType::ConfigNS, BSON(LockpingsType::ping() << 1), !unique);
-    if (!result.isOK()) {
-        warning() << "couldn't create lockping ping time index on config db" << causedBy(result);
-    }
-
-    result = clusterCreateIndex(
-        txn, TagsType::ConfigNS, BSON(TagsType::ns() << 1 << TagsType::min() << 1), unique);
-    if (!result.isOK()) {
-        warning() << "could not create index ns_1_min_1: " << causedBy(result);
-    }
-
-    result = clusterCreateIndex(
-        txn, TagsType::ConfigNS, BSON(TagsType::ns() << 1 << TagsType::tag() << 1), !unique);
-    if (!result.isOK()) {
-        warning() << "could not create index ns_1_tag_1: " << causedBy(result);
-    }
-}
-
 static Status initializeSharding(OperationContext* txn) {
     auto targeterFactory = stdx::make_unique<RemoteCommandTargeterFactoryImpl>();
     auto targeterFactoryPtr = targeterFactory.get();
@@ -325,12 +253,6 @@ static Status initializeSharding(OperationContext* txn) {
     }
 
     status = reloadShardRegistryUntilSuccess(txn);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    auto catalogClient = grid.catalogClient(txn);
-    status = catalogClient->initConfigVersion(txn);
     if (!status.isOK()) {
         return status;
     }
@@ -385,7 +307,7 @@ static ExitCode runMongosServer() {
             return EXIT_SHARDING_ERROR;
         }
 
-        reloadSettings(opCtx.get());
+        Grid::get(opCtx.get())->getBalancerConfiguration()->refreshAndCheck(opCtx.get());
     }
 
 #if !defined(_WIN32)

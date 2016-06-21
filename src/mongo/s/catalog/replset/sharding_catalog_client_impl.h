@@ -174,8 +174,6 @@ public:
 
     DistLockManager* getDistLockManager() override;
 
-    Status initConfigVersion(OperationContext* txn) override;
-
     Status appendInfoForConfigServerDatabases(OperationContext* txn,
                                               BSONArrayBuilder* builder) override;
 
@@ -243,11 +241,6 @@ private:
      * Appends a read committed read concern to the request object.
      */
     void _appendReadConcern(BSONObjBuilder* builder);
-
-    /**
-     * Returns the current cluster schema/protocol version.
-     */
-    StatusWith<VersionType> _getConfigVersion(OperationContext* txn);
 
     /**
      * Queries the config servers for the database metadata for the given database, using the
