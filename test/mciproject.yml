@@ -30,7 +30,7 @@ post:
 
 tasks:
 ## Base compile task on posix flavours
-  - name: compile-posix
+  - name: compile
     depends_on: []
     commands:
       - func: "fetch source"
@@ -39,15 +39,18 @@ tasks:
           directory: wiredtiger
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix"
+          working_dir: "wiredtiger"
           script: |
             set -o errexit
             set -o verbose
-
-            ./reconf
-            ${configure_env_vars|} ../configure --enable-diagnostic --enable-python --enable-zlib --enable-strict
-            ${make_command|make} ${smp_command|}
-            ${make_command|make} check
+            if [ "Windows_NT" = "$OS" ]; then
+              scons.bat --enable-python=c:\\swigwin-3.0.2\\swig.exe --enable-diagnostic ${smp_command|}
+            else
+              ./build_posix/reconf
+              ${configure_env_vars|} ./configure --enable-diagnostic --enable-python --enable-zlib --enable-strict
+              ${make_command|make} ${smp_command|} 2>&1
+              ${make_command|make} check 2>&1
+            fi
       - command: archive.targz_pack
         params:
           target: "wiredtiger.tgz"
@@ -67,40 +70,22 @@ tasks:
 
   - name: unit-test
     depends_on:
-    - name: compile-posix
+    - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix"
-          script: |
-            set -o errexit
-            set -o verbose
-            ${test_env_vars|} python ../test/suite/run.py -v 2 ${smp_command|}
-
-  - name: compile-windows
-    commands:
-      - func: "fetch source"
-      - command: git.apply_patch
-        params:
-          directory: wiredtiger
       - command: shell.exec
         params:
           working_dir: "wiredtiger"
           script: |
             set -o errexit
             set -o verbose
-
-            scons.bat --enable-python=c:\\swigwin-3.0.2\\swig.exe ${smp_command|}
-
-            ${test_env_vars|} python ./test/suite/run.py -v 2
+            ${test_env_vars|} python ./test/suite/run.py -v 2 ${smp_command|} 2>&1
 
   - name: compile-windows-alt
+    depends_on:
+    - name: compile
     commands:
-      - func: "fetch source"
-      - command: git.apply_patch
-        params:
-          directory: wiredtiger
+      - func: "fetch artifacts"
       - command: shell.exec
         params:
           working_dir: "wiredtiger"
@@ -111,6 +96,8 @@ tasks:
             scons.bat ${smp_command|} "CFLAGS=/Gv /wd4090 /wd4996 /we4047 /we4024 /TC /we4100" wiredtiger.dll libwiredtiger.lib
 
   - name: fops-windows
+    depends_on:
+    - name: compile
     commands:
       - func: "fetch source"
       - command: git.apply_patch
@@ -138,7 +125,7 @@ buildvariants:
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     configure_env_vars: CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
   tasks:
-    - name: compile-posix
+    - name: compile
     - name: unit-test
 
 - name: solaris
@@ -151,18 +138,17 @@ buildvariants:
     smp_command: -j $(kstat cpu | sort -u | grep -c "^module")
     configure_env_vars: PATH=/opt/mongodbtoolchain/bin:$PATH CFLAGS="-m64"
   tasks:
-    - name: compile-posix
+    - name: compile
     - name: unit-test
 
 - name: windows-64
   display_name: Windows 64-bit
   run_on:
   - windows-64-vs2013-test
-  expansions:
-    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
   tasks:
-    - name: compile-windows
+    - name: compile
     - name: compile-windows-alt
+    - name: unit-test
     - name: fops-windows
 
 - name: osx-1010
@@ -175,5 +161,5 @@ buildvariants:
     make_command: PATH=/opt/local/bin:$PATH ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future make
     test_env_vars: DYLD_LIBRARY_PATH=`pwd`/.libs
   tasks:
-    - name: compile-posix
+    - name: compile
     - name: unit-test
