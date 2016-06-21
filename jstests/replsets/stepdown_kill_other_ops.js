@@ -45,8 +45,9 @@
         for (var index in res.inprog) {
             var entry = res.inprog[index];
             if (entry["query"] && entry["query"]["$eval"]) {
-                assert.eq("W", entry["locks"]["Global"]);
-                return true;
+                if ("W" === entry["locks"]["Global"]) {
+                    return true;
+                }
             }
         }
         printjson(res);
