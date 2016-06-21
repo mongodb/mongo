@@ -755,16 +755,14 @@ Status applyOperation_inlock(OperationContext* txn,
 
         if (fieldO.type() == Array) {
             // Batched inserts.
-            Status status{ErrorCodes::NotYetInitialized, ""};
-
             std::vector<BSONObj> insertObjs;
-            for (auto elem : fieldO.Array()) {
+            for (auto elem : fieldO.Obj()) {
                 insertObjs.push_back(elem.Obj());
             }
 
             WriteUnitOfWork wuow(txn);
             OpDebug* const nullOpDebug = nullptr;
-            status = collection->insertDocuments(
+            Status status = collection->insertDocuments(
                 txn, insertObjs.begin(), insertObjs.end(), nullOpDebug, true);
             if (!status.isOK()) {
                 return status;
