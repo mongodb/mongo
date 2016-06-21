@@ -76,6 +76,7 @@ struct __wt_cache {
 	uint64_t bytes_overflow;	/* Bytes of overflow pages */
 	uint64_t bytes_evict;		/* Bytes/pages discarded by eviction */
 	uint64_t pages_evict;
+	uint64_t pages_evicted;		/* Pages evicted during a pass */
 	uint64_t bytes_dirty;		/* Bytes/pages currently dirty */
 	uint64_t pages_dirty;
 	uint64_t bytes_read;		/* Bytes read into memory */

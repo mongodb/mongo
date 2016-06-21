@@ -193,6 +193,7 @@ __evict_thread_run(void *arg)
 		WT_ERR(__wt_epoch(
 		    session, &cache->stuck_ts));	/* -Wuninitialized */
 #endif
+	cache->pages_evicted = 0;
 	while (F_ISSET(conn, WT_CONN_EVICTION_RUN)) {
 		if (conn->evict_tid_set &&
 		    __wt_spin_trylock(session, &cache->evict_pass_lock) == 0) {
@@ -251,14 +252,14 @@ __evict_server(WT_SESSION_IMPL *session, bool *did_work)
 #ifdef HAVE_DIAGNOSTIC
 	struct timespec now;
 #endif
-	uint64_t pages_evicted;
+	uint64_t orig_pages_evicted;
 	u_int spins;
 
 	conn = S2C(session);
 	cache = conn->cache;
 	WT_ASSERT(session, did_work != NULL);
 	*did_work = false;
-	pages_evicted = 0;
+	orig_pages_evicted = cache->pages_evicted;
 
 	/* Evict pages from the cache as needed. */
 	WT_RET(__evict_pass(session));
@@ -294,9 +295,9 @@ __evict_server(WT_SESSION_IMPL *session, bool *did_work)
 
 		/* Next time we wake up, reverse the sweep direction. */
 		cache->flags ^= WT_CACHE_WALK_REVERSE;
-		pages_evicted = 0;
-	} else if (pages_evicted != cache->pages_evict) {
-		pages_evicted = cache->pages_evict;
+		cache->pages_evicted = 0;
+	} else if (cache->pages_evicted != cache->pages_evict) {
+		cache->pages_evicted = cache->pages_evict;
 #ifdef HAVE_DIAGNOSTIC
 		WT_RET(__wt_epoch(session, &cache->stuck_ts));
 	} else {
@@ -310,7 +311,7 @@ __evict_server(WT_SESSION_IMPL *session, bool *did_work)
 		}
 #endif
 	}
-	*did_work = pages_evicted != 0;
+	*did_work = cache->pages_evicted != orig_pages_evicted;
 	return (0);
 }
 
