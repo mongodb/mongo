@@ -54,6 +54,7 @@ env.Library(
         'cluster_plan_cache_cmd.cpp',
         'cluster_profile_cmd.cpp',
         'cluster_remove_shard_cmd.cpp',
+        'cluster_remove_shard_from_zone_cmd.cpp',
         'cluster_repair_database_cmd.cpp',
         'cluster_repl_set_get_status_cmd.cpp',
         'cluster_reset_error_cmd.cpp',

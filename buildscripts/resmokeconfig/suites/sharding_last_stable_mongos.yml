@@ -11,6 +11,7 @@ selector:
     - jstests/sharding/shard_aware_primary_failover.js
     - jstests/sharding/shard_identity_config_update.js
     - jstests/sharding/add_shard_to_zone.js
+    - jstests/sharding/remove_shard_from_zone.js
     # v3.4 changes $in shard key extraction.
     - jstests/sharding/upsert_sharded.js
     - jstests/sharding/update_sharded.js
