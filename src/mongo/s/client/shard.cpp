@@ -71,7 +71,7 @@ Status Shard::CommandResponse::processBatchWriteResponse(
         string errmsg;
         if (!batchResponse->parseBSON(response.getValue().response, &errmsg)) {
             status = Status(ErrorCodes::FailedToParse,
-                            str::stream() << "Failed to parse config server response: " << errmsg);
+                            str::stream() << "Failed to parse write response: " << errmsg);
         } else {
             status = batchResponse->toStatus();
         }

@@ -88,38 +88,7 @@ void toBatchError(const Status& status, BatchedCommandResponse* response) {
     response->setOk(false);
 }
 
-/**
- * Takes the response from running a batch write command and writes the appropriate response into
- * *batchResponse, while also returning the Status of the operation.
- */
-Status _processBatchWriteResponse(StatusWith<Shard::CommandResponse> response,
-                                  BatchedCommandResponse* batchResponse) {
-    Status status(ErrorCodes::InternalError, "status not set");
-
-    if (!response.isOK()) {
-        status = response.getStatus();
-    } else if (!response.getValue().commandStatus.isOK()) {
-        status = response.getValue().commandStatus;
-    } else if (!response.getValue().writeConcernStatus.isOK()) {
-        status = response.getValue().writeConcernStatus;
-    } else {
-        string errmsg;
-        if (!batchResponse->parseBSON(response.getValue().response, &errmsg)) {
-            status = Status(ErrorCodes::FailedToParse,
-                            str::stream() << "Failed to parse config server response: " << errmsg);
-        } else {
-            status = batchResponse->toStatus();
-        }
-    }
-
-    if (!status.isOK()) {
-        toBatchError(status, batchResponse);
-    }
-
-    return status;
-}
-
-const ResourceId kZoneOpResourceId(RESOURCE_METADATA, StringData("$configZonedSharding"));
+const ResourceId kZoneOpResourceId(RESOURCE_METADATA, "$configZonedSharding"_sd);
 
 /**
  * Lock for shard zoning operations. This should be acquired when doing any operations that
@@ -554,7 +523,8 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
     auto commandResponse = std::move(swCommandResponse.getValue());
 
     BatchedCommandResponse batchResponse;
-    auto batchResponseStatus = _processBatchWriteResponse(commandResponse, &batchResponse);
+    auto batchResponseStatus =
+        Shard::CommandResponse::processBatchWriteResponse(commandResponse, &batchResponse);
     if (!batchResponseStatus.isOK()) {
         return batchResponseStatus;
     }
@@ -618,36 +588,19 @@ Status ShardingCatalogManagerImpl::addShardToZone(OperationContext* txn,
                                                   const std::string& zoneName) {
     ScopedZoneOpExclusiveLock scopedLock(txn);
 
-    auto updateDoc = stdx::make_unique<BatchedUpdateDocument>();
-    updateDoc->setQuery(BSON(ShardType::name(shardName)));
-    updateDoc->setUpdateExpr(BSON("$addToSet" << BSON(ShardType::tags() << zoneName)));
-    updateDoc->setUpsert(false);
-    updateDoc->setMulti(false);
+    // TODO: SERVER-24701 use w: 1
+    auto updateStatus = _catalogClient->updateConfigDocument(
+        txn,
+        ShardType::ConfigNS,
+        BSON(ShardType::name(shardName)),
+        BSON("$addToSet" << BSON(ShardType::tags() << zoneName)),
+        false);
 
-    auto updateRequest = stdx::make_unique<BatchedUpdateRequest>();
-    updateRequest->addToUpdates(updateDoc.release());
-
-    BatchedCommandRequest request(updateRequest.release());
-    request.setNS(NamespaceString(ShardType::ConfigNS));
-    request.setWriteConcern(kMajorityWriteConcern.toBSON());
-
-    auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
-    auto response = configShard->runCommand(txn,
-                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                            "config",
-                                            request.toBSON(),
-                                            Shard::RetryPolicy::kNoRetry);
-
-    BatchedCommandResponse batchResponse;
-    Status status = Shard::CommandResponse::processBatchWriteResponse(response, &batchResponse);
-
-    if (!status.isOK()) {
-        return status;
+    if (!updateStatus.isOK()) {
+        return updateStatus.getStatus();
     }
 
-    invariant(batchResponse.isNSet());
-
-    if (batchResponse.getN() < 1) {
+    if (!updateStatus.getValue()) {
         return {ErrorCodes::ShardNotFound,
                 str::stream() << "shard " << shardName << " does not exist"};
     }
