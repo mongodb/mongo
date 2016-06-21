@@ -26,6 +26,8 @@ selector:
     - jstests/sharding/printShardingStatus.js
     # TODO: Change in error reporting, enable when 3.4 becomes 'last-stable'.
     - jstests/sharding/map_reduce_validation.js
+    # TODO Assumes mapReduce can handle the collation option; enable when 3.4 becomes 'last-stable'.
+    - jstests/sharding/mapReduce_inSharded.js
 
 executor:
   js_test:

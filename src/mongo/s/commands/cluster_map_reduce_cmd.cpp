@@ -93,8 +93,9 @@ BSONObj fixForShards(const BSONObj& orig,
 
         if (fn == bypassDocumentValidationCommandOption() || fn == "map" || fn == "mapreduce" ||
             fn == "mapReduce" || fn == "mapparams" || fn == "reduce" || fn == "query" ||
-            fn == "sort" || fn == "scope" || fn == "verbose" || fn == "$queryOptions" ||
-            fn == "readConcern" || fn == QueryRequest::cmdOptionMaxTimeMS) {
+            fn == "sort" || fn == "collation" || fn == "scope" || fn == "verbose" ||
+            fn == "$queryOptions" || fn == "readConcern" ||
+            fn == QueryRequest::cmdOptionMaxTimeMS) {
             b.append(e);
         } else if (fn == "out" || fn == "finalize" || fn == "writeConcern") {
             // We don't want to copy these
