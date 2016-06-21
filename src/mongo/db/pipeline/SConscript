@@ -181,6 +181,7 @@ docSourceEnv.Library(
         'document_value',
         'expression',
         'expression_context',
+        'parsed_aggregation_projection',
         '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/matcher/expressions',
@@ -291,4 +292,42 @@ env.CppUnitTest(
         'document_value',
         '$BUILD_DIR/mongo/base',
     ]
+)
+
+env.Library(
+    target='parsed_aggregation_projection',
+    source=[
+        'parsed_aggregation_projection.cpp',
+        'parsed_exclusion_projection.cpp',
+        'parsed_inclusion_projection.cpp',
+    ],
+    LIBDEPS=[
+        'expression',
+        'field_path',
+        '$BUILD_DIR/mongo/db/matcher/expression_algo',
+    ]
+)
+
+env.CppUnitTest(
+    target='parsed_exclusion_projection_test',
+    source='parsed_exclusion_projection_test.cpp',
+    LIBDEPS=[
+        'parsed_aggregation_projection',
+    ],
+)
+
+env.CppUnitTest(
+    target='parsed_aggregation_projection_test',
+    source='parsed_aggregation_projection_test.cpp',
+    LIBDEPS=[
+        'parsed_aggregation_projection',
+    ],
+)
+
+env.CppUnitTest(
+    target='parsed_inclusion_projection_test',
+    source='parsed_inclusion_projection_test.cpp',
+    LIBDEPS=[
+        'parsed_aggregation_projection',
+    ],
 )

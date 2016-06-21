@@ -210,7 +210,7 @@ bool DocumentSourceGraphLookUp::addToVisitedAndFrontier(BSONObj result, long lon
     // We have not seen this node before. If '_depthField' was specified, add the field to the
     // object.
     BSONObj fullObject =
-        _depthField ? addDepthFieldToObject(_depthField->getPath(false), depth, result) : result;
+        _depthField ? addDepthFieldToObject(_depthField->fullPath(), depth, result) : result;
 
     // Add the object to our '_visited' list.
     _visited[_id] = fullObject;
@@ -223,7 +223,7 @@ bool DocumentSourceGraphLookUp::addToVisitedAndFrontier(BSONObj result, long lon
     // array, we treat it as connecting to multiple values, so we must add each element to
     // '_frontier'.
     BSONElementSet recurseOnValues;
-    dps::extractAllElementsAlongPath(result, _connectFromField.getPath(false), recurseOnValues);
+    dps::extractAllElementsAlongPath(result, _connectFromField.fullPath(), recurseOnValues);
 
     for (auto&& elem : recurseOnValues) {
         Value recurseOn = Value(elem);
@@ -246,7 +246,7 @@ bool DocumentSourceGraphLookUp::addToVisitedAndFrontier(BSONObj result, long lon
 void DocumentSourceGraphLookUp::addToCache(const BSONObj& result,
                                            const unordered_set<Value, Value::Hash>& queried) {
     BSONElementSet cacheByValues;
-    dps::extractAllElementsAlongPath(result, _connectToField.getPath(false), cacheByValues);
+    dps::extractAllElementsAlongPath(result, _connectToField.fullPath(), cacheByValues);
 
     for (auto&& elem : cacheByValues) {
         Value cacheBy(elem);
@@ -288,7 +288,7 @@ boost::optional<BSONObj> DocumentSourceGraphLookUp::constructQuery(BSONObjSet* c
 
     // Create a query of the form {_connectToField: {$in: [...]}}.
     BSONObjBuilder query;
-    BSONObjBuilder subobj(query.subobjStart(_connectToField.getPath(false)));
+    BSONObjBuilder subobj(query.subobjStart(_connectToField.fullPath()));
     BSONArrayBuilder in(subobj.subarrayStart("$in"));
 
     for (auto&& value : _frontier) {
@@ -330,7 +330,7 @@ Pipeline::SourceContainer::iterator DocumentSourceGraphLookUp::optimizeAt(
     // If we are not already handling an $unwind stage internally, we can combine with the following
     // $unwind stage.
     auto nextUnwind = dynamic_cast<DocumentSourceUnwind*>((*std::next(itr)).get());
-    if (nextUnwind && !_unwind && nextUnwind->getUnwindPath() == _as.getPath(false)) {
+    if (nextUnwind && !_unwind && nextUnwind->getUnwindPath() == _as.fullPath()) {
         _unwind = std::move(nextUnwind);
         container->erase(std::next(itr));
         return itr;
@@ -339,12 +339,12 @@ Pipeline::SourceContainer::iterator DocumentSourceGraphLookUp::optimizeAt(
 }
 
 BSONObjSet DocumentSourceGraphLookUp::getOutputSorts() {
-    std::set<std::string> fields{_as.getPath(false)};
+    std::set<std::string> fields{_as.fullPath()};
     if (_depthField) {
-        fields.insert(_depthField->getPath(false));
+        fields.insert(_depthField->fullPath());
     }
     if (_unwind && (*_unwind)->indexPath()) {
-        fields.insert((*_unwind)->indexPath()->getPath(false));
+        fields.insert((*_unwind)->indexPath()->fullPath());
     }
 
     return DocumentSource::truncateSortSet(pSource->getOutputSorts(), fields);
@@ -360,17 +360,16 @@ void DocumentSourceGraphLookUp::checkMemoryUsage() {
 
 void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array, bool explain) const {
     // Serialize default options.
-    MutableDocument spec(DOC("from" << _from.coll() << "as" << _as.getPath(false)
-                                    << "connectToField"
-                                    << _connectToField.getPath(false)
+    MutableDocument spec(DOC("from" << _from.coll() << "as" << _as.fullPath() << "connectToField"
+                                    << _connectToField.fullPath()
                                     << "connectFromField"
-                                    << _connectFromField.getPath(false)
+                                    << _connectFromField.fullPath()
                                     << "startWith"
                                     << _startWith->serialize(false)));
 
     // depthField is optional; serialize it if it was specified.
     if (_depthField) {
-        spec["depthField"] = Value(_depthField->getPath(false));
+        spec["depthField"] = Value(_depthField->fullPath());
     }
 
     if (_maxDepth) {
@@ -380,11 +379,10 @@ void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array, bool
     // If we are explaining, include an absorbed $unwind inside the $graphLookup specification.
     if (_unwind && explain) {
         const boost::optional<FieldPath> indexPath = (*_unwind)->indexPath();
-        spec["unwinding"] =
-            Value(DOC("preserveNullAndEmptyArrays"
-                      << (*_unwind)->preserveNullAndEmptyArrays()
-                      << "includeArrayIndex"
-                      << (indexPath ? Value((*indexPath).getPath(false)) : Value())));
+        spec["unwinding"] = Value(DOC("preserveNullAndEmptyArrays"
+                                      << (*_unwind)->preserveNullAndEmptyArrays()
+                                      << "includeArrayIndex"
+                                      << (indexPath ? Value((*indexPath).fullPath()) : Value())));
     }
 
     array.push_back(Value(DOC(getSourceName() << spec.freeze())));

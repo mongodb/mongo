@@ -230,11 +230,10 @@ Pipeline::SourceContainer::iterator DocumentSourceUnwind::optimizeAt(
     invariant(*itr == this);
 
     if (auto nextMatch = dynamic_cast<DocumentSourceMatch*>((*std::next(itr)).get())) {
-        const bool includeDollarPrefix = false;
-        std::set<std::string> fields = {_unwindPath.getPath(includeDollarPrefix)};
+        std::set<std::string> fields = {_unwindPath.fullPath()};
 
         if (_indexPath) {
-            fields.insert((*_indexPath).getPath(false));
+            fields.insert((*_indexPath).fullPath());
         }
 
         auto splitMatch = nextMatch->splitSourceBy(fields);
@@ -267,14 +266,14 @@ Pipeline::SourceContainer::iterator DocumentSourceUnwind::optimizeAt(
 
 Value DocumentSourceUnwind::serialize(bool explain) const {
     return Value(DOC(getSourceName() << DOC(
-                         "path" << _unwindPath.getPath(true) << "preserveNullAndEmptyArrays"
+                         "path" << _unwindPath.fullPathWithPrefix() << "preserveNullAndEmptyArrays"
                                 << (_preserveNullAndEmptyArrays ? Value(true) : Value())
                                 << "includeArrayIndex"
-                                << (_indexPath ? Value((*_indexPath).getPath(false)) : Value()))));
+                                << (_indexPath ? Value((*_indexPath).fullPath()) : Value()))));
 }
 
 DocumentSource::GetDepsReturn DocumentSourceUnwind::getDependencies(DepsTracker* deps) const {
-    deps->fields.insert(_unwindPath.getPath(false));
+    deps->fields.insert(_unwindPath.fullPath());
     return SEE_NEXT;
 }
 

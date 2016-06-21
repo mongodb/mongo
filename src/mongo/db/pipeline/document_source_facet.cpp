@@ -154,7 +154,7 @@ intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(
     StringMap<intrusive_ptr<Pipeline>> facetPipelines;
     for (auto&& facetElem : elem.embeddedObject()) {
         const auto facetName = facetElem.fieldNameStringData();
-        FieldPath::uassertValidFieldName(facetName.toString());
+        FieldPath::uassertValidFieldName(facetName);
         uassert(40170,
                 str::stream() << "arguments to $facet must be arrays, " << facetName << " is type "
                               << typeName(facetElem.type()),

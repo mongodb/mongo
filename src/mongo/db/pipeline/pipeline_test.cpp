@@ -106,7 +106,7 @@ class MoveSkipBeforeProject : public Base {
         return "[{$project: {a : 1}}, {$skip : 5}]";
     }
     string outputPipeJson() override {
-        return "[{$skip : 5}, {$project: {a : true}}]";
+        return "[{$skip : 5}, {$project: {_id: true, a : true}}]";
     }
 };
 
@@ -116,7 +116,7 @@ class MoveLimitBeforeProject : public Base {
     }
 
     string outputPipeJson() override {
-        return "[{$limit : 5}, {$project: {a : true}}]";
+        return "[{$limit : 5}, {$project: {_id: true, a : true}}]";
     }
 };
 
@@ -126,7 +126,7 @@ class MoveMultipleSkipsAndLimitsBeforeProject : public Base {
     }
 
     string outputPipeJson() override {
-        return "[{$limit : 5}, {$skip : 3}, {$project: {a : true}}]";
+        return "[{$limit : 5}, {$skip : 3}, {$project: {_id: true, a : true}}]";
     }
 };
 
@@ -159,7 +159,7 @@ class SortMatchProjSkipLimBecomesMatchTopKSortSkipProj : public Base {
         return "[{$match: {a: 1}}"
                ",{$sort: {sortKey: {a: 1}, limit: 8}}"
                ",{$skip: 3}"
-               ",{$project: {a: true}}"
+               ",{$project: {_id: true, a: true}}"
                "]";
     }
 
@@ -168,7 +168,7 @@ class SortMatchProjSkipLimBecomesMatchTopKSortSkipProj : public Base {
                ",{$sort: {a: 1}}"
                ",{$limit: 8}"
                ",{$skip : 3}"
-               ",{$project : {a: true}}"
+               ",{$project : {_id: true, a: true}}"
                "]";
     }
 };
@@ -926,13 +926,13 @@ class ShardedSortMatchProjSkipLimBecomesMatchTopKSortSkipProj : public Base {
     string shardPipeJson() {
         return "[{$match: {a: 1}}"
                ",{$sort: {sortKey: {a: 1}, limit: 8}}"
-               ",{$project: {a: true, _id: true}}"
+               ",{$project: {_id: true, a: true}}"
                "]";
     }
     string mergePipeJson() {
         return "[{$sort: {sortKey: {a: 1}, mergePresorted: true, limit: 8}}"
                ",{$skip: 3}"
-               ",{$project: {a: true}}"
+               ",{$project: {_id: true, a: true}}"
                "]";
     }
 };
@@ -1044,7 +1044,7 @@ class Project : public needsPrimaryShardMergerBase {
         return "[{$project: {a : 1}}]";
     }
     string shardPipeJson() {
-        return "[{$project: {a: true}}]";
+        return "[{$project: {_id: true, a: true}}]";
     }
     string mergePipeJson() {
         return "[]";

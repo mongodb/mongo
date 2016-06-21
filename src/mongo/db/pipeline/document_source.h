@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lookup_set_cache.h"
+#include "mongo/db/pipeline/parsed_aggregation_projection.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -977,46 +978,41 @@ private:
 
 class DocumentSourceProject final : public DocumentSource {
 public:
-    // virtuals from DocumentSource
     boost::optional<Document> getNext() final;
     const char* getSourceName() const final;
+    Value serialize(bool explain = false) const final;
+    void dispose() final;
+
+    /**
+     * Adds any paths that are included via this projection, or that are referenced by any
+     * expressions.
+     */
+    GetDepsReturn getDependencies(DepsTracker* deps) const final;
+
     /**
      * Attempt to move a subsequent $skip or $limit stage before the $project, thus reducing the
      * number of documents that pass through this stage.
      */
     Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
                                                    Pipeline::SourceContainer* container) final;
-    boost::intrusive_ptr<DocumentSource> optimize() final;
-    Value serialize(bool explain = false) const final;
-
-    virtual GetDepsReturn getDependencies(DepsTracker* deps) const;
 
     /**
-      Create a new projection DocumentSource from BSON.
+     * Optimize any expressions being used in this stage.
+     */
+    boost::intrusive_ptr<DocumentSource> optimize() final;
 
-      This is a convenience for directly handling BSON, and relies on the
-      above methods.
-
-      @param pBsonElement the BSONElement with an object named $project
-      @param pExpCtx the expression context for the pipeline
-      @returns the created projection
+    /**
+     * Parse the projection from the user-supplied BSON.
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    /** projection as specified by the user */
-    BSONObj getRaw() const {
-        return _raw;
-    }
-
 private:
-    DocumentSourceProject(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                          const boost::intrusive_ptr<ExpressionObject>& exprObj);
+    DocumentSourceProject(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        std::unique_ptr<parsed_aggregation_projection::ParsedAggregationProjection> parsedProject);
 
-    // configuration state
-    std::unique_ptr<Variables> _variables;
-    boost::intrusive_ptr<ExpressionObject> pEO;
-    BSONObj _raw;
+    std::unique_ptr<parsed_aggregation_projection::ParsedAggregationProjection> _parsedProject;
 };
 
 class DocumentSourceRedact final : public DocumentSource {
@@ -1446,7 +1442,7 @@ public:
         const boost::optional<std::string>& includeArrayIndex);
 
     std::string getUnwindPath() const {
-        return _unwindPath.getPath(false);
+        return _unwindPath.fullPath();
     }
 
     bool preserveNullAndEmptyArrays() const {
@@ -1495,7 +1491,7 @@ public:
     }
     Value serialize(bool explain = false) const final;
     BSONObjSet getOutputSorts() final {
-        return {BSON(distanceField->getPath(false) << -1)};
+        return {BSON(distanceField->fullPath() << -1)};
     }
 
     // Virtuals for SplittableDocumentSource
@@ -1564,7 +1560,7 @@ public:
     void dispose() final;
 
     BSONObjSet getOutputSorts() final {
-        return DocumentSource::truncateSortSet(pSource->getOutputSorts(), {_as.getPath(false)});
+        return DocumentSource::truncateSortSet(pSource->getOutputSorts(), {_as.fullPath()});
     }
 
     bool needsPrimaryShard() const final {
@@ -1639,7 +1635,7 @@ public:
                                                    Pipeline::SourceContainer* container) final;
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final {
-        _startWith->addDependencies(deps, nullptr);
+        _startWith->addDependencies(deps);
         return SEE_NEXT;
     };
 

@@ -64,7 +64,7 @@ class DocumentSource;
         return Status::OK();                                                 \
     }
 
-// TODO: Look into merging with ExpressionContext and possibly ObjectCtx.
+// TODO: Look into merging with ExpressionContext.
 /// The state used as input and working space for Expressions.
 class Variables {
     MONGO_DISALLOW_COPYING(Variables);
@@ -176,121 +176,82 @@ public:
 
     virtual ~Expression(){};
 
-    /*
-      Optimize the Expression.
-
-      This provides an opportunity to do constant folding, or to
-      collapse nested operators that have the same precedence, such as
-      $add, $and, or $or.
-
-      The Expression should be replaced with the return value, which may
-      or may not be the same object.  In the case of constant folding,
-      a computed expression may be replaced by a constant.
-
-      @returns the optimized Expression
+    /**
+     * Optimize the Expression.
+     *
+     * This provides an opportunity to do constant folding, or to collapse nested operators that
+     * have the same precedence, such as $add, $and, or $or.
+     *
+     * The Expression will be replaced with the return value, which may or may not be the same
+     * object. In the case of constant folding, a computed expression may be replaced by a constant.
+     *
+     * Returns the optimized Expression.
      */
     virtual boost::intrusive_ptr<Expression> optimize() {
         return this;
     }
 
     /**
-     * Add this expression's field dependencies to the set
+     * Add the fields used as input to this expression to 'deps'.
      *
      * Expressions are trees, so this is often recursive.
-     *
-     * @param deps Fully qualified paths to depended-on fields are added to this set.
-     *             Empty std::string means need full document.
-     * @param path path to self if all ancestors are ExpressionObjects.
-     *             Top-level ExpressionObject gets pointer to empty vector.
-     *             If any other Expression is an ancestor, or in other cases
-     *             where {a:1} inclusion objects aren't allowed, they get
-     *             NULL.
      */
-    virtual void addDependencies(DepsTracker* deps,
-                                 std::vector<std::string>* path = NULL) const = 0;
-
-    /** simple expressions are just inclusion exclusion as supported by ExpressionObject */
-    virtual bool isSimple() {
-        return false;
-    }
-
+    virtual void addDependencies(DepsTracker* deps) const = 0;
 
     /**
      * Serialize the Expression tree recursively.
-     * If explain is false, returns a Value parsable by parseOperand().
+     *
+     * If 'explain' is false, the returned Value must result in the same Expression when parsed by
+     * parseOperand().
      */
     virtual Value serialize(bool explain) const = 0;
 
-    /// Evaluate expression with specified inputs and return result. (only used by tests)
+    /**
+     * Evaluate expression with respect to the Document given by 'root', and return the result.
+     *
+     * This method should only be used for testing.
+     */
     Value evaluate(const Document& root) const {
         Variables vars(0, root);
         return evaluate(&vars);
     }
 
     /**
-     * Evaluate expression with specified inputs and return result.
+     * Evaluate expression with variables given by 'vars', and return the result.
      *
-     * While vars is non-const, if properly constructed, subexpressions modifications to it
-     * should not effect outer expressions due to unique variable Ids.
+     * While vars is non-const, a subexpression's modifications to it should not effect outer
+     * Expressions, since variables defined in the subexpression's scope will be given unique
+     * variable ids.
      */
     Value evaluate(Variables* vars) const {
         return evaluateInternal(vars);
     }
 
-    /*
-      Utility class for parseObject() below.
-
-      DOCUMENT_OK indicates that it is OK to use a Document in the current
-      context.
-     */
-    class ObjectCtx {
-    public:
-        explicit ObjectCtx(int options);
-        static const int DOCUMENT_OK = 0x0001;
-        static const int TOP_LEVEL = 0x0002;
-        static const int INCLUSION_OK = 0x0004;
-
-        bool documentOk() const;
-        bool topLevel() const;
-        bool inclusionOk() const;
-
-    private:
-        int options;
-    };
-
-    //
-    // Diagram of relationship between parse functions when parsing a $op:
-    //
-    // { someFieldOrArrayIndex: { $op: [ARGS] } }
-    //                             ^ parseExpression on inner $op BSONElement
-    //                          ^ parseObject on BSONObject
-    //             ^ parseOperand on outer BSONElement wrapping the $op Object
-    //
-
     /**
-     * Parses a BSON Object that could represent a functional expression or a Document
-     * expression.
+     * Parses a BSON Object that could represent an object literal or a functional expression like
+     * $add.
+     *
+     * Calls parseExpression() on any sub-document (including possibly the entire document) which
+     * consists of a single field name starting with a '$'.
      */
     static boost::intrusive_ptr<Expression> parseObject(BSONObj obj,
-                                                        ObjectCtx* pCtx,
                                                         const VariablesParseState& vps);
 
     /**
-     * Parses a BSONElement which has already been determined to be functional expression.
+     * Parses a BSONObj which has already been determined to be a functional expression.
      *
-     * exprElement should be the only element inside the expression object. That is the
-     * field name should be the $op for the expression.
+     * Throws an error if 'obj' does not contain exactly one field, or if that field's name does not
+     * match a registered expression name.
      */
-    static boost::intrusive_ptr<Expression> parseExpression(BSONElement exprElement,
+    static boost::intrusive_ptr<Expression> parseExpression(BSONObj obj,
                                                             const VariablesParseState& vps);
 
-
     /**
-     * Parses a BSONElement which is an operand in an Expression.
+     * Parses a BSONElement which is an argument to an Expression.
      *
-     * This is the most generic parser and can parse ExpressionFieldPath, a literal, or a $op.
-     * If it is a $op, exprElement should be the outer element whose value is an Object
-     * containing the $op.
+     * An argument is allowed to be another expression, or a literal value, so this can call
+     * parseObject(), ExpressionFieldPath::parse(), ExpressionArray::parse(), or
+     * ExpressionConstant::parse() as necessary.
      */
     static boost::intrusive_ptr<Expression> parseOperand(BSONElement exprElement,
                                                          const VariablesParseState& vps);
@@ -313,7 +274,7 @@ public:
     virtual Value evaluateInternal(Variables* vars) const = 0;
 
     /**
-     * Registers an Parser so it can be called from parseExpression and friends.
+     * Registers an Parser so it can be called from parseExpression.
      *
      * DO NOT call this method directly. Instead, use the REGISTER_EXPRESSION macro defined in this
      * file.
@@ -330,7 +291,7 @@ class ExpressionNary : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() override;
     Value serialize(bool explain) const override;
-    void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const override;
+    void addDependencies(DepsTracker* deps) const override;
 
     /*
       Add an operand to the n-ary expression.
@@ -572,7 +533,7 @@ public:
 class ExpressionCoerceToBool final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
-    void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const final;
+    void addDependencies(DepsTracker* deps) const final;
     Value evaluateInternal(Variables* vars) const final;
     Value serialize(bool explain) const final;
 
@@ -652,7 +613,7 @@ public:
 class ExpressionConstant final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
-    void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const final;
+    void addDependencies(DepsTracker* deps) const final;
     Value evaluateInternal(Variables* vars) const final;
     Value serialize(bool explain) const final;
 
@@ -682,7 +643,7 @@ public:
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
     Value evaluateInternal(Variables* vars) const final;
-    void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const final;
+    void addDependencies(DepsTracker* deps) const final;
 
     static boost::intrusive_ptr<Expression> parse(BSONElement expr, const VariablesParseState& vps);
 
@@ -754,7 +715,7 @@ class ExpressionExp final : public ExpressionSingleNumericArg<ExpressionExp> {
 class ExpressionFieldPath final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
-    void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const final;
+    void addDependencies(DepsTracker* deps) const final;
     Value evaluateInternal(Variables* vars) const final;
     Value serialize(bool explain) const final;
 
@@ -812,7 +773,7 @@ public:
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
     Value evaluateInternal(Variables* vars) const final;
-    void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const final;
+    void addDependencies(DepsTracker* deps) const final;
 
     static boost::intrusive_ptr<Expression> parse(BSONElement expr, const VariablesParseState& vps);
 
@@ -894,7 +855,7 @@ public:
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
     Value evaluateInternal(Variables* vars) const final;
-    void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const final;
+    void addDependencies(DepsTracker* deps) const final;
 
     static boost::intrusive_ptr<Expression> parse(BSONElement expr, const VariablesParseState& vps);
 
@@ -936,7 +897,7 @@ public:
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
     Value evaluateInternal(Variables* vars) const final;
-    void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const final;
+    void addDependencies(DepsTracker* deps) const final;
 
     static boost::intrusive_ptr<Expression> parse(BSONElement expr, const VariablesParseState& vps);
 
@@ -957,7 +918,7 @@ class ExpressionMeta final : public Expression {
 public:
     Value serialize(bool explain) const final;
     Value evaluateInternal(Variables* vars) const final;
-    void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const final;
+    void addDependencies(DepsTracker* deps) const final;
 
     static boost::intrusive_ptr<Expression> parse(BSONElement expr, const VariablesParseState& vps);
 
@@ -1033,115 +994,45 @@ public:
 };
 
 
+/**
+ * This class is used to represent expressions that create object literals, such as the value of
+ * '_id' in this group stage:
+ *   {$group: {
+ *     _id: {b: "$a", c: {$add: [4, "$c"]}}  <- This is represented as an ExpressionObject.
+ *     ...
+ *   }}
+ */
 class ExpressionObject final : public Expression {
 public:
-    using FieldMap = std::map<std::string, boost::intrusive_ptr<Expression>>;
     boost::intrusive_ptr<Expression> optimize() final;
-    bool isSimple() final;
-    void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const final;
-    /** Only evaluates non inclusion expressions.  For inclusions, use addToDocument(). */
+    void addDependencies(DepsTracker* deps) const final;
     Value evaluateInternal(Variables* vars) const final;
     Value serialize(bool explain) const final;
 
-    /// like evaluate(), but return a Document instead of a Value-wrapped Document.
-    Document evaluateDocument(Variables* vars) const;
+    static boost::intrusive_ptr<ExpressionObject> create(
+        std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>>&& expressions);
 
-    /** Evaluates with inclusions and adds results to passed in Mutable document
-     *
-     *  @param output the MutableDocument to add the evaluated expressions to
-     *  @param currentDoc the input Document for this level (for inclusions)
-     *  @param vars the variables for use in subexpressions
+    /**
+     * Parses and constructs an ExpressionObject from 'obj'.
      */
-    void addToDocument(MutableDocument& ouput, const Document& currentDoc, Variables* vars) const;
+    static boost::intrusive_ptr<ExpressionObject> parse(BSONObj obj,
+                                                        const VariablesParseState& vps);
 
-    // estimated number of fields that will be output
-    size_t getSizeHint() const;
-
-    /** Create an empty expression.
-     *  Until fields are added, this will evaluate to an empty document.
+    /**
+     * This ExpressionObject must outlive the returned vector.
      */
-    static boost::intrusive_ptr<ExpressionObject> create();
-
-    /// Like create but uses special handling of _id for root object of $project.
-    static boost::intrusive_ptr<ExpressionObject> createRoot();
-
-    /*
-      Add a field to the document expression.
-
-      @param fieldPath the path the evaluated expression will have in the
-             result Document
-      @param pExpression the expression to evaluate obtain this field's
-             Value in the result Document
-    */
-    void addField(const FieldPath& fieldPath, const boost::intrusive_ptr<Expression>& pExpression);
-
-    /*
-      Add a field path to the set of those to be included.
-
-      Note that including a nested field implies including everything on
-      the path leading down to it.
-
-      @param fieldPath the name of the field to be included
-    */
-    void includePath(const std::string& fieldPath);
-
-    /*
-      Get a count of the added fields.
-
-      @returns how many fields have been added
-     */
-    size_t getFieldCount() const {
-        return _expressions.size();
-    };
-
-    /*
-      Specialized BSON conversion that allows for writing out a
-      $project specification.  This creates a standalone object, which must
-      be added to a containing object with a name
-
-      @param pBuilder where to write the object to
-      @param requireExpression see Expression::addToBsonObj
-     */
-    void documentToBson(BSONObjBuilder* pBuilder, bool requireExpression) const;
-
-    /*
-      Visitor abstraction used by emitPaths().  Each path is recorded by
-      calling path().
-     */
-    class PathSink {
-    public:
-        virtual ~PathSink(){};
-
-        /**
-           Record a path.
-
-           @param path the dotted path string
-           @param include if true, the path is included; if false, the path
-             is excluded
-         */
-        virtual void path(const std::string& path, bool include) = 0;
-    };
-
-    void excludeId(bool b) {
-        _excludeId = b;
-    }
-
-    const FieldMap& getChildExpressions() const {
+    const std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>>&
+    getChildExpressions() const {
         return _expressions;
     }
 
 private:
-    explicit ExpressionObject(bool atRoot);
+    ExpressionObject(
+        std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>>&& expressions);
 
-    // Mapping from fieldname to the Expression that generates its value.
-    // NULL expression means inclusion from source document.
-    FieldMap _expressions;
-
-    // this is used to maintain order for generated fields not in the source document
-    std::vector<std::string> _order;
-
-    bool _excludeId;
-    bool _atRoot;
+    // The mapping from field name to expression within this object. This needs to respect the order
+    // in which the fields were specified in the input BSON.
+    std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> _expressions;
 };
 
 
@@ -1174,7 +1065,7 @@ class ExpressionRange final : public ExpressionRangedArity<ExpressionRange, 2, 3
 
 class ExpressionReduce final : public Expression {
 public:
-    void addDependencies(DepsTracker* deps, std::vector<std::string>* path = nullptr) const final;
+    void addDependencies(DepsTracker* deps) const final;
     Value evaluateInternal(Variables* vars) const final;
     boost::intrusive_ptr<Expression> optimize() final;
     static boost::intrusive_ptr<Expression> parse(BSONElement expr,
@@ -1343,7 +1234,7 @@ public:
 
 class ExpressionSwitch final : public ExpressionFixedArity<ExpressionSwitch, 1> {
 public:
-    void addDependencies(DepsTracker* deps, std::vector<std::string>* path = nullptr) const final;
+    void addDependencies(DepsTracker* deps) const final;
     Value evaluateInternal(Variables* vars) const final;
     boost::intrusive_ptr<Expression> optimize() final;
     static boost::intrusive_ptr<Expression> parse(BSONElement expr,
@@ -1438,7 +1329,7 @@ public:
 
 class ExpressionZip final : public ExpressionFixedArity<ExpressionZip, 1> {
 public:
-    void addDependencies(DepsTracker* deps, std::vector<std::string>* path = nullptr) const final;
+    void addDependencies(DepsTracker* deps) const final;
     Value evaluateInternal(Variables* vars) const final;
     boost::intrusive_ptr<Expression> optimize() final;
     static boost::intrusive_ptr<Expression> parse(BSONElement expr,

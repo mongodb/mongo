@@ -52,7 +52,9 @@ using Parser = Expression::Parser;
 using namespace mongoutils;
 
 using boost::intrusive_ptr;
+using std::map;
 using std::move;
+using std::pair;
 using std::set;
 using std::string;
 using std::vector;
@@ -171,20 +173,6 @@ Variables::Id VariablesParseState::getVariable(StringData name) const {
 
 /* --------------------------- Expression ------------------------------ */
 
-Expression::ObjectCtx::ObjectCtx(int theOptions) : options(theOptions) {}
-
-bool Expression::ObjectCtx::documentOk() const {
-    return ((options & DOCUMENT_OK) != 0);
-}
-
-bool Expression::ObjectCtx::topLevel() const {
-    return ((options & TOP_LEVEL) != 0);
-}
-
-bool Expression::ObjectCtx::inclusionOk() const {
-    return ((options & INCLUSION_OK) != 0);
-}
-
 string Expression::removeFieldPrefix(const string& prefixedField) {
     uassert(16419,
             str::stream() << "field path must not contain embedded null characters"
@@ -201,123 +189,17 @@ string Expression::removeFieldPrefix(const string& prefixedField) {
     return string(pPrefixedField + 1);
 }
 
-intrusive_ptr<Expression> Expression::parseObject(BSONObj obj,
-                                                  ObjectCtx* pCtx,
-                                                  const VariablesParseState& vps) {
-    /*
-      An object expression can take any of the following forms:
-
-      f0: {f1: ..., f2: ..., f3: ...}
-      f0: {$operator:[operand1, operand2, ...]}
-    */
-
-    intrusive_ptr<Expression> pExpression;              // the result
-    intrusive_ptr<ExpressionObject> pExpressionObject;  // alt result
-    enum { UNKNOWN, NOTOPERATOR, OPERATOR } kind = UNKNOWN;
-
-    if (obj.isEmpty())
-        return ExpressionObject::create();
-    BSONObjIterator iter(obj);
-
-    for (size_t fieldCount = 0; iter.more(); ++fieldCount) {
-        BSONElement fieldElement(iter.next());
-        const char* pFieldName = fieldElement.fieldName();
-
-        if (pFieldName[0] == '$') {
-            uassert(
-                15983,
-                str::stream() << "the operator must be the only field in a pipeline object (at '"
-                              << pFieldName
-                              << "'",
-                fieldCount == 0);
-
-            uassert(16404,
-                    "$expressions are not allowed at the top-level of $project",
-                    !pCtx->topLevel());
-
-            /* we've determined this "object" is an operator expression */
-            kind = OPERATOR;
-
-            pExpression = parseExpression(fieldElement, vps);
-        } else {
-            uassert(15990,
-                    str::stream() << "this object is already an operator expression, and can't be "
-                                     "used as a document expression (at '"
-                                  << pFieldName
-                                  << "')",
-                    kind != OPERATOR);
-
-            uassert(16405,
-                    "dotted field names are only allowed at the top level",
-                    pCtx->topLevel() || !str::contains(pFieldName, '.'));
-
-            /* if it's our first time, create the document expression */
-            if (!pExpression.get()) {
-                verify(pCtx->documentOk());
-                // CW TODO error: document not allowed in this context
-
-                pExpressionObject =
-                    pCtx->topLevel() ? ExpressionObject::createRoot() : ExpressionObject::create();
-                pExpression = pExpressionObject;
-
-                /* this "object" is not an operator expression */
-                kind = NOTOPERATOR;
-            }
-
-            BSONType fieldType = fieldElement.type();
-            string fieldName(pFieldName);
-            switch (fieldType) {
-                case Object: {
-                    /* it's a nested document */
-                    ObjectCtx oCtx((pCtx->documentOk() ? ObjectCtx::DOCUMENT_OK : 0) |
-                                   (pCtx->inclusionOk() ? ObjectCtx::INCLUSION_OK : 0));
-
-                    pExpressionObject->addField(fieldName,
-                                                parseObject(fieldElement.Obj(), &oCtx, vps));
-                    break;
-                }
-                case String: {
-                    /* it's a renamed field */
-                    // CW TODO could also be a constant
-                    pExpressionObject->addField(
-                        fieldName, ExpressionFieldPath::parse(fieldElement.str(), vps));
-                    break;
-                }
-                case Array:
-                    pExpressionObject->addField(fieldName,
-                                                ExpressionArray::parse(fieldElement, vps));
-                    break;
-                case Bool:
-                case NumberDouble:
-                case NumberLong:
-                case NumberInt: {
-                    /* it's an inclusion specification */
-                    if (fieldElement.trueValue()) {
-                        uassert(16420,
-                                "field inclusion is not allowed inside of $expressions",
-                                pCtx->inclusionOk());
-                        pExpressionObject->includePath(fieldName);
-                    } else {
-                        uassert(16406,
-                                "The top-level _id field is the only field currently supported for "
-                                "exclusion",
-                                pCtx->topLevel() && fieldName == "_id");
-                        pExpressionObject->excludeId(true);
-                    }
-                    break;
-                }
-                default:
-                    uassert(15992,
-                            str::stream() << "disallowed field type " << typeName(fieldType)
-                                          << " in object expression (at '"
-                                          << fieldName
-                                          << "')",
-                            false);
-            }
-        }
+intrusive_ptr<Expression> Expression::parseObject(BSONObj obj, const VariablesParseState& vps) {
+    if (obj.isEmpty()) {
+        return ExpressionObject::create({});
     }
 
-    return pExpression;
+    if (obj.firstElementFieldName()[0] == '$') {
+        // Assume this is an expression like {$add: [...]}.
+        return parseExpression(obj, vps);
+    }
+
+    return ExpressionObject::parse(obj, vps);
 }
 
 namespace {
@@ -332,12 +214,20 @@ void Expression::registerExpression(string key, Parser parser) {
     parserMap[key] = parser;
 }
 
-intrusive_ptr<Expression> Expression::parseExpression(BSONElement exprElement,
-                                                      const VariablesParseState& vps) {
-    const char* opName = exprElement.fieldName();
+intrusive_ptr<Expression> Expression::parseExpression(BSONObj obj, const VariablesParseState& vps) {
+    uassert(15983,
+            str::stream() << "An object representing an expression must have exactly one "
+                             "field: "
+                          << obj.toString(),
+            obj.nFields() == 1);
+
+    // Look up the parser associated with the expression name.
+    const char* opName = obj.firstElementFieldName();
     auto op = parserMap.find(opName);
-    uassert(15999, str::stream() << "invalid operator '" << opName << "'", op != parserMap.end());
-    return op->second(exprElement, vps);
+    uassert(15999,
+            str::stream() << "Unrecognized expression '" << opName << "'",
+            op != parserMap.end());
+    return op->second(obj.firstElement(), vps);
 }
 
 Expression::ExpressionVector ExpressionNary::parseArguments(BSONElement exprElement,
@@ -347,7 +237,7 @@ Expression::ExpressionVector ExpressionNary::parseArguments(BSONElement exprElem
         BSONForEach(elem, exprElement.Obj()) {
             out.push_back(Expression::parseOperand(elem, vps));
         }
-    } else {  // assume it's an atomic operand
+    } else {  // Assume it's an operand that accepts a single argument.
         out.push_back(Expression::parseOperand(exprElement, vps));
     }
 
@@ -362,8 +252,7 @@ intrusive_ptr<Expression> Expression::parseOperand(BSONElement exprElement,
         /* if we got here, this is a field path expression */
         return ExpressionFieldPath::parse(exprElement.str(), vps);
     } else if (type == Object) {
-        ObjectCtx oCtx(ObjectCtx::DOCUMENT_OK);
-        return Expression::parseObject(exprElement.Obj(), &oCtx, vps);
+        return Expression::parseObject(exprElement.Obj(), vps);
     } else if (type == Array) {
         return ExpressionArray::parse(exprElement, vps);
     } else {
@@ -745,7 +634,7 @@ intrusive_ptr<Expression> ExpressionCoerceToBool::optimize() {
     return intrusive_ptr<Expression>(this);
 }
 
-void ExpressionCoerceToBool::addDependencies(DepsTracker* deps, vector<string>* path) const {
+void ExpressionCoerceToBool::addDependencies(DepsTracker* deps) const {
     pExpression->addDependencies(deps);
 }
 
@@ -978,7 +867,7 @@ intrusive_ptr<Expression> ExpressionConstant::optimize() {
     return intrusive_ptr<Expression>(this);
 }
 
-void ExpressionConstant::addDependencies(DepsTracker* deps, vector<string>* path) const {
+void ExpressionConstant::addDependencies(DepsTracker* deps) const {
     /* nothing to do */
 }
 
@@ -1191,7 +1080,7 @@ void ExpressionDateToString::insertPadded(StringBuilder& sb, int number, int wid
     sb << number;
 }
 
-void ExpressionDateToString::addDependencies(DepsTracker* deps, vector<string>* path) const {
+void ExpressionDateToString::addDependencies(DepsTracker* deps) const {
     _date->addDependencies(deps);
 }
 
@@ -1286,284 +1175,64 @@ const char* ExpressionExp::getOpName() const {
 
 /* ---------------------- ExpressionObject --------------------------- */
 
-intrusive_ptr<ExpressionObject> ExpressionObject::create() {
-    return new ExpressionObject(false);
+ExpressionObject::ExpressionObject(vector<pair<string, intrusive_ptr<Expression>>>&& expressions)
+    : _expressions(std::move(expressions)) {}
+
+intrusive_ptr<ExpressionObject> ExpressionObject::create(
+    vector<pair<string, intrusive_ptr<Expression>>>&& expressions) {
+    return new ExpressionObject(std::move(expressions));
 }
 
-intrusive_ptr<ExpressionObject> ExpressionObject::createRoot() {
-    return new ExpressionObject(true);
-}
+intrusive_ptr<ExpressionObject> ExpressionObject::parse(BSONObj obj,
+                                                        const VariablesParseState& vps) {
+    // Make sure we don't have any duplicate field names.
+    std::unordered_set<string> specifiedFields;
 
-ExpressionObject::ExpressionObject(bool atRoot) : _excludeId(false), _atRoot(atRoot) {}
+    vector<pair<string, intrusive_ptr<Expression>>> expressions;
+    for (auto&& elem : obj) {
+        // Make sure this element has a valid field name. Use StringData here so that we can detect
+        // if the field name contains a null byte.
+        FieldPath::uassertValidFieldName(elem.fieldNameStringData());
+
+        auto fieldName = elem.fieldName();
+        uassert(16406,
+                str::stream() << "duplicate field name specified in object literal: "
+                              << obj.toString(),
+                specifiedFields.find(fieldName) == specifiedFields.end());
+        specifiedFields.insert(fieldName);
+        expressions.emplace_back(fieldName, parseOperand(elem, vps));
+    }
+
+    return new ExpressionObject{std::move(expressions)};
+}
 
 intrusive_ptr<Expression> ExpressionObject::optimize() {
-    for (FieldMap::iterator it(_expressions.begin()); it != _expressions.end(); ++it) {
-        if (it->second)
-            it->second = it->second->optimize();
+    for (auto&& pair : _expressions) {
+        pair.second = pair.second->optimize();
     }
-
-    return intrusive_ptr<Expression>(this);
+    return this;
 }
 
-bool ExpressionObject::isSimple() {
-    for (FieldMap::iterator it(_expressions.begin()); it != _expressions.end(); ++it) {
-        if (it->second && !it->second->isSimple())
-            return false;
+void ExpressionObject::addDependencies(DepsTracker* deps) const {
+    for (auto&& pair : _expressions) {
+        pair.second->addDependencies(deps);
     }
-    return true;
-}
-
-void ExpressionObject::addDependencies(DepsTracker* deps, vector<string>* path) const {
-    string pathStr;
-    if (path) {
-        if (path->empty()) {
-            // we are in the top level of a projection so _id is implicit
-            if (!_excludeId)
-                deps->fields.insert("_id");
-        } else {
-            FieldPath f(*path);
-            pathStr = f.getPath(false);
-            pathStr += '.';
-        }
-    } else {
-        verify(!_excludeId);
-    }
-
-
-    for (FieldMap::const_iterator it(_expressions.begin()); it != _expressions.end(); ++it) {
-        if (it->second) {
-            if (path)
-                path->push_back(it->first);
-            it->second->addDependencies(deps, path);
-            if (path)
-                path->pop_back();
-        } else {  // inclusion
-            uassert(16407, "inclusion not supported in objects nested in $expressions", path);
-
-            deps->fields.insert(pathStr + it->first);
-        }
-    }
-}
-
-void ExpressionObject::addToDocument(MutableDocument& out,
-                                     const Document& currentDoc,
-                                     Variables* vars) const {
-    FieldMap::const_iterator end = _expressions.end();
-
-    // This is used to mark fields we've done so that we can add the ones we haven't
-    set<string> doneFields;
-
-    FieldIterator fields(currentDoc);
-    while (fields.more()) {
-        Document::FieldPair field(fields.next());
-
-        // TODO don't make a new string here
-        const string fieldName = field.first.toString();
-        FieldMap::const_iterator exprIter = _expressions.find(fieldName);
-
-        // This field is not supposed to be in the output (unless it is _id)
-        if (exprIter == end) {
-            if (!_excludeId && _atRoot && field.first == "_id") {
-                // _id from the root doc is always included (until exclusion is supported)
-                // not updating doneFields since "_id" isn't in _expressions
-                out.addField(field.first, field.second);
-            }
-            continue;
-        }
-
-        // make sure we don't add this field again
-        doneFields.insert(exprIter->first);
-
-        Expression* expr = exprIter->second.get();
-
-        if (!expr) {
-            // This means pull the matching field from the input document
-            out.addField(field.first, field.second);
-            continue;
-        }
-
-        ExpressionObject* exprObj = dynamic_cast<ExpressionObject*>(expr);
-        BSONType valueType = field.second.getType();
-        if ((valueType != Object && valueType != Array) || !exprObj) {
-            // This expression replace the whole field
-
-            Value pValue(expr->evaluateInternal(vars));
-
-            // don't add field if nothing was found in the subobject
-            if (exprObj && pValue.getDocument().empty())
-                continue;
-
-            /*
-               Don't add non-existent values (note:  different from NULL or Undefined);
-               this is consistent with existing selection syntax which doesn't
-               force the appearance of non-existent fields.
-               */
-            if (!pValue.missing())
-                out.addField(field.first, pValue);
-
-            continue;
-        }
-
-        /*
-            Check on the type of the input value.  If it's an
-            object, just walk down into that recursively, and
-            add it to the result.
-        */
-        if (valueType == Object) {
-            MutableDocument sub(exprObj->getSizeHint());
-            exprObj->addToDocument(sub, field.second.getDocument(), vars);
-            out.addField(field.first, sub.freezeToValue());
-        } else if (valueType == Array) {
-            /*
-                If it's an array, we have to do the same thing,
-                but to each array element.  Then, add the array
-                of results to the current document.
-            */
-            vector<Value> result;
-            const vector<Value>& input = field.second.getArray();
-            for (size_t i = 0; i < input.size(); i++) {
-                // can't look for a subfield in a non-object value.
-                if (input[i].getType() != Object)
-                    continue;
-
-                MutableDocument doc(exprObj->getSizeHint());
-                exprObj->addToDocument(doc, input[i].getDocument(), vars);
-                result.push_back(doc.freezeToValue());
-            }
-
-            out.addField(field.first, Value(std::move(result)));
-        } else {
-            verify(false);
-        }
-    }
-
-    if (doneFields.size() == _expressions.size())
-        return;
-
-    /* add any remaining fields we haven't already taken care of */
-    for (vector<string>::const_iterator i(_order.begin()); i != _order.end(); ++i) {
-        FieldMap::const_iterator it = _expressions.find(*i);
-        string fieldName(it->first);
-
-        /* if we've already dealt with this field, above, do nothing */
-        if (doneFields.count(fieldName))
-            continue;
-
-        // this is a missing inclusion field
-        if (!it->second)
-            continue;
-
-        Value pValue(it->second->evaluateInternal(vars));
-
-        /*
-          Don't add non-existent values (note:  different from NULL or Undefined);
-          this is consistent with existing selection syntax which doesn't
-          force the appearnance of non-existent fields.
-        */
-        if (pValue.missing())
-            continue;
-
-        // don't add field if nothing was found in the subobject
-        if (dynamic_cast<ExpressionObject*>(it->second.get()) && pValue.getDocument().empty())
-            continue;
-
-        out.addField(fieldName, pValue);
-    }
-}
-
-size_t ExpressionObject::getSizeHint() const {
-    // Note: this can overestimate, but that is better than underestimating
-    return _expressions.size() + (_excludeId ? 0 : 1);
-}
-
-Document ExpressionObject::evaluateDocument(Variables* vars) const {
-    /* create and populate the result */
-    MutableDocument out(getSizeHint());
-
-    addToDocument(out,
-                  Document(),  // No inclusion field matching.
-                  vars);
-    return out.freeze();
 }
 
 Value ExpressionObject::evaluateInternal(Variables* vars) const {
-    return Value(evaluateDocument(vars));
-}
-
-void ExpressionObject::addField(const FieldPath& fieldPath,
-                                const intrusive_ptr<Expression>& pExpression) {
-    const string fieldPart = fieldPath.getFieldName(0);
-    const bool haveExpr = _expressions.count(fieldPart);
-
-    intrusive_ptr<Expression>& expr = _expressions[fieldPart];  // inserts if !haveExpr
-    intrusive_ptr<ExpressionObject> subObj = dynamic_cast<ExpressionObject*>(expr.get());
-
-    if (!haveExpr) {
-        _order.push_back(fieldPart);
-    } else {  // we already have an expression or inclusion for this field
-        if (fieldPath.getPathLength() == 1) {
-            // This expression is for right here
-
-            ExpressionObject* newSubObj = dynamic_cast<ExpressionObject*>(pExpression.get());
-            uassert(16400,
-                    str::stream() << "can't add an expression for field " << fieldPart
-                                  << " because there is already an expression for that field"
-                                  << " or one of its sub-fields.",
-                    subObj && newSubObj);  // we can merge them
-
-            // Copy everything from the newSubObj to the existing subObj
-            // This is for cases like { $project:{ 'b.c':1, b:{ a:1 } } }
-            for (vector<string>::const_iterator it(newSubObj->_order.begin());
-                 it != newSubObj->_order.end();
-                 ++it) {
-                // asserts if any fields are dupes
-                subObj->addField(*it, newSubObj->_expressions[*it]);
-            }
-            return;
-        } else {
-            // This expression is for a subfield
-            uassert(16401,
-                    str::stream() << "can't add an expression for a subfield of " << fieldPart
-                                  << " because there is already an expression that applies to"
-                                  << " the whole field",
-                    subObj);
-        }
+    MutableDocument outputDoc;
+    for (auto&& pair : _expressions) {
+        outputDoc.setNestedField(FieldPath(pair.first), pair.second->evaluateInternal(vars));
     }
-
-    if (fieldPath.getPathLength() == 1) {
-        verify(!haveExpr);  // haveExpr case handled above.
-        expr = pExpression;
-        return;
-    }
-
-    if (!haveExpr)
-        expr = subObj = ExpressionObject::create();
-
-    subObj->addField(fieldPath.tail(), pExpression);
-}
-
-void ExpressionObject::includePath(const string& theFieldPath) {
-    addField(theFieldPath, NULL);
+    return outputDoc.freezeToValue();
 }
 
 Value ExpressionObject::serialize(bool explain) const {
-    MutableDocument valBuilder;
-    if (_excludeId)
-        valBuilder["_id"] = Value(false);
-
-    for (vector<string>::const_iterator it(_order.begin()); it != _order.end(); ++it) {
-        string fieldName = *it;
-        verify(_expressions.find(fieldName) != _expressions.end());
-        intrusive_ptr<Expression> expr = _expressions.find(fieldName)->second;
-
-        if (!expr) {
-            // this is inclusion, not an expression
-            valBuilder[fieldName] = Value(true);
-        } else {
-            valBuilder[fieldName] = expr->serialize(explain);
-        }
+    MutableDocument outputDoc;
+    for (auto&& pair : _expressions) {
+        outputDoc.setNestedField(FieldPath(pair.first), pair.second->serialize(explain));
     }
-    return valBuilder.freezeToValue();
+    return outputDoc.freezeToValue();
 }
 
 /* --------------------- ExpressionFieldPath --------------------------- */
@@ -1605,12 +1274,12 @@ intrusive_ptr<Expression> ExpressionFieldPath::optimize() {
     return intrusive_ptr<Expression>(this);
 }
 
-void ExpressionFieldPath::addDependencies(DepsTracker* deps, vector<string>* path) const {
+void ExpressionFieldPath::addDependencies(DepsTracker* deps) const {
     if (_variable == Variables::ROOT_ID) {  // includes CURRENT when it is equivalent to ROOT.
         if (_fieldPath.getPathLength() == 1) {
             deps->needWholeDocument = true;  // need full doc if just "$$ROOT"
         } else {
-            deps->fields.insert(_fieldPath.tail().getPath(false));
+            deps->fields.insert(_fieldPath.tail().fullPath());
         }
     }
 }
@@ -1677,9 +1346,9 @@ Value ExpressionFieldPath::evaluateInternal(Variables* vars) const {
 Value ExpressionFieldPath::serialize(bool explain) const {
     if (_fieldPath.getFieldName(0) == "CURRENT" && _fieldPath.getPathLength() > 1) {
         // use short form for "$$CURRENT.foo" but not just "$$CURRENT"
-        return Value("$" + _fieldPath.tail().getPath(false));
+        return Value("$" + _fieldPath.tail().fullPath());
     } else {
-        return Value("$$" + _fieldPath.getPath(false));
+        return Value("$$" + _fieldPath.fullPath());
     }
 }
 
@@ -1778,7 +1447,7 @@ Value ExpressionFilter::evaluateInternal(Variables* vars) const {
     return Value(std::move(output));
 }
 
-void ExpressionFilter::addDependencies(DepsTracker* deps, vector<string>* path) const {
+void ExpressionFilter::addDependencies(DepsTracker* deps) const {
     _input->addDependencies(deps);
     _filter->addDependencies(deps);
 }
@@ -1888,7 +1557,7 @@ Value ExpressionLet::evaluateInternal(Variables* vars) const {
     return _subExpression->evaluateInternal(vars);
 }
 
-void ExpressionLet::addDependencies(DepsTracker* deps, vector<string>* path) const {
+void ExpressionLet::addDependencies(DepsTracker* deps) const {
     for (VariableMap::const_iterator it = _variables.begin(), end = _variables.end(); it != end;
          ++it) {
         it->second.expression->addDependencies(deps);
@@ -1992,7 +1661,7 @@ Value ExpressionMap::evaluateInternal(Variables* vars) const {
     return Value(std::move(output));
 }
 
-void ExpressionMap::addDependencies(DepsTracker* deps, vector<string>* path) const {
+void ExpressionMap::addDependencies(DepsTracker* deps) const {
     _input->addDependencies(deps);
     _each->addDependencies(deps);
 }
@@ -2037,7 +1706,7 @@ Value ExpressionMeta::evaluateInternal(Variables* vars) const {
     MONGO_UNREACHABLE;
 }
 
-void ExpressionMeta::addDependencies(DepsTracker* deps, vector<string>* path) const {
+void ExpressionMeta::addDependencies(DepsTracker* deps) const {
     if (_metaType == MetaType::TEXT_SCORE) {
         deps->needTextScore = true;
     }
@@ -2659,9 +2328,9 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
     return this;
 }
 
-void ExpressionNary::addDependencies(DepsTracker* deps, vector<string>* path) const {
-    for (ExpressionVector::const_iterator i(vpOperand.begin()); i != vpOperand.end(); ++i) {
-        (*i)->addDependencies(deps);
+void ExpressionNary::addDependencies(DepsTracker* deps) const {
+    for (auto&& operand : vpOperand) {
+        operand->addDependencies(deps);
     }
 }
 
@@ -3052,7 +2721,7 @@ intrusive_ptr<Expression> ExpressionReduce::optimize() {
     return this;
 }
 
-void ExpressionReduce::addDependencies(DepsTracker* deps, vector<string>* path) const {
+void ExpressionReduce::addDependencies(DepsTracker* deps) const {
     _input->addDependencies(deps);
     _initial->addDependencies(deps);
     _in->addDependencies(deps);
@@ -3889,14 +3558,14 @@ boost::intrusive_ptr<Expression> ExpressionSwitch::parse(BSONElement expr,
     return expression;
 }
 
-void ExpressionSwitch::addDependencies(DepsTracker* deps, std::vector<std::string>* path) const {
+void ExpressionSwitch::addDependencies(DepsTracker* deps) const {
     for (auto&& branch : _branches) {
-        branch.first->addDependencies(deps, path);
-        branch.second->addDependencies(deps, path);
+        branch.first->addDependencies(deps);
+        branch.second->addDependencies(deps);
     }
 
     if (_default) {
-        _default->addDependencies(deps, path);
+        _default->addDependencies(deps);
     }
 }
 
@@ -4347,7 +4016,7 @@ Value ExpressionZip::serialize(bool explain) const {
                                             << serializedUseLongestLength)));
 }
 
-void ExpressionZip::addDependencies(DepsTracker* deps, std::vector<std::string>* path) const {
+void ExpressionZip::addDependencies(DepsTracker* deps) const {
     std::for_each(
         _inputs.begin(), _inputs.end(), [&deps](intrusive_ptr<Expression> inputExpression) -> void {
             inputExpression->addDependencies(deps);

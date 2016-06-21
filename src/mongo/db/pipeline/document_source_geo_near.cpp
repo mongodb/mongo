@@ -88,7 +88,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGeoNear::getShardSource() {
     return this;
 }
 intrusive_ptr<DocumentSource> DocumentSourceGeoNear::getMergeSource() {
-    return DocumentSourceSort::create(pExpCtx, BSON(distanceField->getPath(false) << 1), limit);
+    return DocumentSourceSort::create(pExpCtx, BSON(distanceField->fullPath() << 1), limit);
 }
 
 Value DocumentSourceGeoNear::serialize(bool explain) const {
@@ -101,7 +101,7 @@ Value DocumentSourceGeoNear::serialize(bool explain) const {
     }
 
     // not in buildGeoNearCmd
-    result.setField("distanceField", Value(distanceField->getPath(false)));
+    result.setField("distanceField", Value(distanceField->fullPath()));
 
     result.setField("limit", Value(limit));
 
@@ -116,7 +116,7 @@ Value DocumentSourceGeoNear::serialize(bool explain) const {
     result.setField("distanceMultiplier", Value(distanceMultiplier));
 
     if (includeLocs)
-        result.setField("includeLocs", Value(includeLocs->getPath(false)));
+        result.setField("includeLocs", Value(includeLocs->fullPath()));
 
     return Value(DOC(getSourceName() << result.freeze()));
 }
