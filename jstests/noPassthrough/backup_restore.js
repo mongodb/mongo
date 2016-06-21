@@ -273,6 +273,10 @@
         // Wait up to 60 seconds until the new hidden node is in state SECONDARY.
         rst.waitForState(rst.nodes[numNodes], ReplSetTest.State.SECONDARY, 60 * 1000);
 
+        // Wait for secondaries to finish catching up before shutting down.
+        assert.writeOK(primary.getDB("test").foo.insert(
+            {}, {writeConcern: {w: rst.nodes.length, wtimeout: 120 * 1000}}));
+
         // Stop set.
         rst.stopSet();
 
