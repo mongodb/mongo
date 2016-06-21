@@ -214,6 +214,27 @@ functions:
       key: "${build_variant}_master"
       destination: "builder_num"
 
+  "run diskstats": &run_diskstats
+    command: shell.exec
+    params:
+      background: true
+      system_log: true
+      script: |
+        set -o errexit
+        set -o verbose
+
+        # On Windows we can use typeperf.exe to dump performance counters.
+        if [ "Windows_NT" = "$OS" ]; then
+            typeperf -qx PhysicalDisk | grep Disk | grep -v _Total > disk_counters.txt
+            typeperf -cf disk_counters.txt -si 5 -o mongo-diskstats
+        # See if iostat is available.
+        elif which iostat 2>&1 /dev/null; then
+            iostat -d 5 > mongo-diskstats
+        # Fall back to vmstat if iostat is not available.
+        else
+            vmstat -d 5 > mongo-diskstats
+        fi
+
   "setup credentials" : &setup_credentials
     command: shell.exec
     params:
@@ -292,6 +313,7 @@ functions:
   - *check_binary_version
   - *get_buildnumber
   - *setup_credentials
+  - *run_diskstats
 
   "set up virtualenv" :
     command: shell.exec
@@ -658,6 +680,13 @@ post:
       script: |
         set -o verbose
         ${tar|tar} cvzf diagnostic-data.tgz $(find /data/db -type d -name diagnostic.data)
+  - command: archive.targz_pack
+    params:
+      target: "diskstats.tgz"
+      source_dir: "./"
+      include:
+        - "./mongo-diskstats*"
+        - "./mongo-diskstats*.csv"
   - command: s3.put
     params:
       aws_key: ${aws_key}
@@ -679,6 +708,16 @@ post:
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
       display_name: FTDC Diagnostic Data - Execution ${execution}
+  - command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: diskstats.tgz
+      remote_file: mongodb-mongo-master/${build_variant}/${revision}/diskstats/mongo-diskstats-${task_id}-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: ${content_type|application/x-gzip}
+      display_name: Disk Stats - Execution ${execution}
       optional: true
   - command: shell.exec
     params:
