@@ -470,6 +470,21 @@ TEST_F(StorageInterfaceImplWithReplCoordTest, CreateOplogCreateCappedCollection)
     }
 }
 
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       CreateCollectionReturnsUserExceptionAsStatusIfCollectionCreationThrows) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("local.oplog.Y");
+    {
+        AutoGetCollectionForRead autoColl(txn, nss);
+        ASSERT_FALSE(autoColl.getCollection());
+    }
+
+    auto status = storage.createCollection(txn, nss, CollectionOptions());
+    ASSERT_EQUALS(ErrorCodes::fromInt(28838), status);
+    ASSERT_STRING_CONTAINS(status.reason(), "cannot create a non-capped oplog collection");
+}
+
 TEST_F(StorageInterfaceImplWithReplCoordTest, CreateCollectionFailsIfCollectionExists) {
     auto txn = getOperationContext();
     StorageInterfaceImpl storage;

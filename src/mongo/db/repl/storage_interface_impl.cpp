@@ -372,8 +372,12 @@ Status StorageInterfaceImpl::createCollection(OperationContext* txn,
                     str::stream() << "Collection " << nss.ns() << " already exists."};
         }
         WriteUnitOfWork wuow(txn);
-        auto coll = db->createCollection(txn, nss.ns(), options);
-        invariant(coll);
+        try {
+            auto coll = db->createCollection(txn, nss.ns(), options);
+            invariant(coll);
+        } catch (const UserException& ex) {
+            return ex.toStatus();
+        }
         wuow.commit();
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "StorageInterfaceImpl::createCollection", nss.ns());

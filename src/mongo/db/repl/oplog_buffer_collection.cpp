@@ -44,7 +44,7 @@ namespace repl {
 
 namespace {
 
-const char kDefaultOplogCollectionNamespace[] = "local.oplog.initialSyncTempBuffer";
+const char kDefaultOplogCollectionNamespace[] = "local.temp_oplog_buffer";
 const char kOplogEntryFieldName[] = "entry";
 
 }  // namespace

@@ -43,6 +43,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -135,15 +136,32 @@ TEST_F(OplogBufferCollectionTest, GetNamespace) {
     ASSERT_EQUALS(nss, OplogBufferCollection(_storageInterface, nss).getNamespace());
 }
 
-TEST_F(OplogBufferCollectionTest, StartupCreatesCollection) {
-    auto nss = makeNamespace(_agent);
-    OplogBufferCollection oplogBuffer(_storageInterface, nss);
+void testStartupCreatesCollection(OperationContext* txn,
+                                  StorageInterface* storageInterface,
+                                  const NamespaceString& nss) {
+    OplogBufferCollection oplogBuffer(storageInterface, nss);
 
     // Collection should not exist until startup() is called.
-    ASSERT_FALSE(AutoGetCollectionForRead(_txn.get(), nss).getCollection());
+    ASSERT_FALSE(AutoGetCollectionForRead(txn, nss).getCollection());
 
-    oplogBuffer.startup(_txn.get());
-    ASSERT_TRUE(AutoGetCollectionForRead(_txn.get(), nss).getCollection());
+    oplogBuffer.startup(txn);
+    ASSERT_TRUE(AutoGetCollectionForRead(txn, nss).getCollection());
+}
+
+TEST_F(OplogBufferCollectionTest, StartupWithDefaultNamespaceCreatesCollection) {
+    auto nss = OplogBufferCollection::getDefaultNamespace();
+    ASSERT_FALSE(nss.isOplog());
+    testStartupCreatesCollection(_txn.get(), _storageInterface, nss);
+}
+
+TEST_F(OplogBufferCollectionTest, StartupWithUserProvidedNamespaceCreatesCollection) {
+    testStartupCreatesCollection(_txn.get(), _storageInterface, makeNamespace(_agent));
+}
+
+DEATH_TEST_F(OplogBufferCollectionTest,
+             StartupWithOplogNamespaceTriggersFatalAssertion,
+             "Fatal assertion 40154 Location28838: cannot create a non-capped oplog collection") {
+    testStartupCreatesCollection(_txn.get(), _storageInterface, NamespaceString("local.oplog.Z"));
 }
 
 TEST_F(OplogBufferCollectionTest, ShutdownDropsCollection) {
