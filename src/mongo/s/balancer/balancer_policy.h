@@ -103,9 +103,6 @@ public:
      */
     ShardId getMostOverloadedShard(const std::string& forTag) const;
 
-
-    // ---- basic accessors, counters, etc...
-
     /** @return total number of chunks  */
     unsigned totalChunks() const;
 
@@ -126,9 +123,6 @@ public:
     /** @return the right tag for chunk, possibly "" */
     std::string getTagForChunk(const ChunkType& chunk) const;
 
-    /** writes all state to log() */
-    void dump() const;
-
     const ShardStatisticsVector& getStats() const {
         return _shardInfo;
     }
@@ -140,23 +134,25 @@ private:
     std::set<std::string> _allTags;
 };
 
-
 class BalancerPolicy {
 public:
     /**
-     * Returns a suggested chunk to move whithin a collection's shards, given information about
-     * space usage and number of chunks for that collection. If the policy doesn't recommend
-     * moving, it returns NULL.
+     * Returns a suggested set of chunks to move whithin a collection's shards, given information
+     * about space usage and number of chunks for that collection. If the policy doesn't recommend
+     * moving, it returns an empty vector.
      *
-     * @param ns is the collections namepace.
-     * @param DistributionStatus holds all the info about the current state of the cluster/namespace
-     * @param balancedLastTime is the number of chunks effectively moved in the last round.
-     * @returns NULL or MigrateInfo of the best move to make towards balacing the collection.
-     *          caller owns the MigrateInfo instance
+     * ns is the collection which needs balancing.
+     * distribution holds all the info about the current state of the cluster/namespace.
+     * shouldAggressivelyBalance indicates that the last round successfully moved chunks around and
+     * causes the threshold for chunk number disparity between shards to be lowered.
+     *
+     * Returns vector of MigrateInfos of the best moves to make towards balacing the specified
+     * collection. The entries in the vector do not need to be done serially and can be scheduled in
+     * parallel.
      */
-    static MigrateInfo* balance(const std::string& ns,
-                                const DistributionStatus& distribution,
-                                int balancedLastTime);
+    static std::vector<MigrateInfo> balance(const std::string& ns,
+                                            const DistributionStatus& distribution,
+                                            bool shouldAggressivelyBalance);
 };
 
 }  // namespace mongo

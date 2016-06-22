@@ -48,6 +48,10 @@ using ShardStatistics = ClusterStatistics::ShardStatistics;
 
 const auto emptyTagSet = std::set<std::string>();
 const std::string emptyShardVersion = "";
+const auto kShardId0 = ShardId("shard0");
+const auto kShardId1 = ShardId("shard1");
+const auto kShardId2 = ShardId("shard2");
+const uint64_t kNoMaxSize = 0;
 
 ShardStatistics& findStat(std::vector<ShardStatistics>& stats, const ShardId& shardId) {
     for (auto& stat : stats) {
@@ -58,7 +62,7 @@ ShardStatistics& findStat(std::vector<ShardStatistics>& stats, const ShardId& sh
     MONGO_UNREACHABLE;
 }
 
-TEST(BalancerPolicyTests, BalanceNormalTest) {
+TEST(BalancerPolicyTests, BalanceNormal) {
     ShardToChunksMap chunkMap;
     vector<ChunkType> chunks;
 
@@ -66,7 +70,7 @@ TEST(BalancerPolicyTests, BalanceNormalTest) {
         ChunkType chunk;
         chunk.setMin(BSON("x" << BSON("$maxKey" << 1)));
         chunk.setMax(BSON("x" << 49));
-        chunk.setShard(ShardId("shard0"));
+        chunk.setShard(kShardId0);
         chunks.push_back(chunk);
     }
 
@@ -74,23 +78,23 @@ TEST(BalancerPolicyTests, BalanceNormalTest) {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 49));
         chunk.setMax(BSON("x" << BSON("$maxKey" << 1)));
-        chunk.setShard(ShardId("shard0"));
+        chunk.setShard(kShardId0);
         chunks.push_back(chunk);
     }
 
-    chunkMap[ShardId("shard0")] = chunks;
-    chunkMap[ShardId("shard1")] = vector<ChunkType>();
+    chunkMap[kShardId0] = chunks;
+    chunkMap[kShardId1] = vector<ChunkType>();
 
-    // No limits
-    DistributionStatus status(
-        {ShardStatistics(ShardId("shard0"), 0, 2, false, emptyTagSet, emptyShardVersion),
-         ShardStatistics(ShardId("shard1"), 0, 0, false, emptyTagSet, emptyShardVersion)},
+    DistributionStatus distributionStatus(
+        {ShardStatistics(kShardId0, kNoMaxSize, 2, false, emptyTagSet, emptyShardVersion),
+         ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion)},
         chunkMap);
 
-    std::unique_ptr<MigrateInfo> c(BalancerPolicy::balance("ns", status, 1));
-    ASSERT(c);
+    const auto migrations(BalancerPolicy::balance("ns", distributionStatus, false));
+    ASSERT_EQ(1U, migrations.size());
+    ASSERT_EQ(kShardId0, migrations[0].from);
+    ASSERT_EQ(kShardId1, migrations[0].to);
 }
-
 
 TEST(BalancerPolicyTests, BalanceJumbo) {
     ShardToChunksMap chunkMap;
@@ -101,7 +105,7 @@ TEST(BalancerPolicyTests, BalanceJumbo) {
         chunk.setMin(BSON("x" << BSON("$maxKey" << 1)));
         chunk.setMax(BSON("x" << 10));
         chunk.setJumbo(true);
-        chunk.setShard(ShardId("shard0"));
+        chunk.setShard(kShardId0);
         chunks.push_back(chunk);
     }
 
@@ -110,7 +114,7 @@ TEST(BalancerPolicyTests, BalanceJumbo) {
         chunk.setMin(BSON("x" << 10));
         chunk.setMax(BSON("x" << 20));
         chunk.setJumbo(true);
-        chunk.setShard(ShardId("shard0"));
+        chunk.setShard(kShardId0);
         chunks.push_back(chunk);
     }
 
@@ -118,7 +122,7 @@ TEST(BalancerPolicyTests, BalanceJumbo) {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 20));
         chunk.setMax(BSON("x" << 30));
-        chunk.setShard(ShardId("shard0"));
+        chunk.setShard(kShardId0);
         chunks.push_back(chunk);
     }
 
@@ -127,7 +131,7 @@ TEST(BalancerPolicyTests, BalanceJumbo) {
         chunk.setMin(BSON("x" << 30));
         chunk.setMax(BSON("x" << 40));
         chunk.setJumbo(true);
-        chunk.setShard(ShardId("shard0"));
+        chunk.setShard(kShardId0);
         chunks.push_back(chunk);
     }
 
@@ -135,25 +139,24 @@ TEST(BalancerPolicyTests, BalanceJumbo) {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 40));
         chunk.setMax(BSON("x" << BSON("$maxKey" << 1)));
-        chunk.setShard(ShardId("shard0"));
+        chunk.setShard(kShardId0);
         chunks.push_back(chunk);
     }
 
-    chunkMap[ShardId("shard0")] = chunks;
-    chunkMap[ShardId("shard1")] = vector<ChunkType>();
+    chunkMap[kShardId0] = chunks;
+    chunkMap[kShardId1] = vector<ChunkType>();
 
-    // No limits
-    DistributionStatus status(
-        {ShardStatistics(ShardId("shard0"), 0, 2, false, emptyTagSet, emptyShardVersion),
-         ShardStatistics(ShardId("shard1"), 0, 0, false, emptyTagSet, emptyShardVersion)},
+    DistributionStatus distributionStatus(
+        {ShardStatistics(kShardId0, kNoMaxSize, 2, false, emptyTagSet, emptyShardVersion),
+         ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion)},
         chunkMap);
-    std::unique_ptr<MigrateInfo> c(BalancerPolicy::balance("ns", status, 1));
 
-    ASSERT(c);
-    ASSERT_EQUALS(30, c->maxKey["x"].numberInt());
+    const auto migrations(BalancerPolicy::balance("ns", distributionStatus, false));
+    ASSERT_EQ(1U, migrations.size());
+    ASSERT_EQ(30, migrations[0].maxKey["x"].numberInt());
 }
 
-TEST(BalanceNormalTests, BalanceDrainingTest) {
+TEST(BalanceNormalTests, BalanceDraining) {
     ShardToChunksMap chunkMap;
     vector<ChunkType> chunks;
 
@@ -161,7 +164,7 @@ TEST(BalanceNormalTests, BalanceDrainingTest) {
         ChunkType chunk;
         chunk.setMin(BSON("x" << BSON("$maxKey" << 1)));
         chunk.setMax(BSON("x" << 49));
-        chunk.setShard(ShardId("shard0"));
+        chunk.setShard(kShardId0);
         chunks.push_back(chunk);
     }
 
@@ -169,27 +172,27 @@ TEST(BalanceNormalTests, BalanceDrainingTest) {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 49));
         chunk.setMax(BSON("x" << BSON("$maxKey" << 1)));
-        chunk.setShard(ShardId("shard0"));
+        chunk.setShard(kShardId0);
         chunks.push_back(chunk);
     }
 
-    chunkMap[ShardId("shard0")] = chunks;
-    chunkMap[ShardId("shard1")] = vector<ChunkType>();
+    chunkMap[kShardId0] = chunks;
+    chunkMap[kShardId1] = vector<ChunkType>();
 
     // shard0 is draining
-    DistributionStatus status(
-        {ShardStatistics(ShardId("shard0"), 0, 2, true, emptyTagSet, emptyShardVersion),
-         ShardStatistics(ShardId("shard1"), 0, 0, false, emptyTagSet, emptyShardVersion)},
+    DistributionStatus distributionStatus(
+        {ShardStatistics(kShardId0, kNoMaxSize, 2, true, emptyTagSet, emptyShardVersion),
+         ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion)},
         chunkMap);
-    std::unique_ptr<MigrateInfo> c(BalancerPolicy::balance("ns", status, 0));
 
-    ASSERT(c);
-    ASSERT_EQUALS(c->to, ShardId("shard1"));
-    ASSERT_EQUALS(c->from, ShardId("shard0"));
-    ASSERT(!c->minKey.isEmpty());
+    const auto migrations(BalancerPolicy::balance("ns", distributionStatus, false));
+    ASSERT_EQ(1U, migrations.size());
+    ASSERT_EQ(kShardId0, migrations[0].from);
+    ASSERT_EQ(kShardId1, migrations[0].to);
+    ASSERT(!migrations[0].minKey.isEmpty());
 }
 
-TEST(BalancerPolicyTests, BalanceEndedDrainingTest) {
+TEST(BalancerPolicyTests, BalanceCannotMoveDueToDraining) {
     ShardToChunksMap chunkMap;
     vector<ChunkType> chunks;
 
@@ -197,7 +200,7 @@ TEST(BalancerPolicyTests, BalanceEndedDrainingTest) {
         ChunkType chunk;
         chunk.setMin(BSON("x" << BSON("$maxKey" << 1)));
         chunk.setMax(BSON("x" << 49));
-        chunk.setShard(ShardId("shard0"));
+        chunk.setShard(kShardId0);
         chunks.push_back(chunk);
     }
 
@@ -205,24 +208,24 @@ TEST(BalancerPolicyTests, BalanceEndedDrainingTest) {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 49));
         chunk.setMax(BSON("x" << BSON("$maxKey" << 1)));
-        chunk.setShard(ShardId("shard0"));
+        chunk.setShard(kShardId0);
         chunks.push_back(chunk);
     }
 
-    chunkMap[ShardId("shard0")] = chunks;
-    chunkMap[ShardId("shard1")] = vector<ChunkType>();
+    chunkMap[kShardId0] = chunks;
+    chunkMap[kShardId1] = vector<ChunkType>();
 
     // shard1 is draining
-    DistributionStatus status(
-        {ShardStatistics(ShardId("shard0"), 0, 2, false, emptyTagSet, emptyShardVersion),
-         ShardStatistics(ShardId("shard1"), 0, 0, true, emptyTagSet, emptyShardVersion)},
+    DistributionStatus distributionStatus(
+        {ShardStatistics(kShardId0, kNoMaxSize, 2, false, emptyTagSet, emptyShardVersion),
+         ShardStatistics(kShardId1, kNoMaxSize, 0, true, emptyTagSet, emptyShardVersion)},
         chunkMap);
-    std::unique_ptr<MigrateInfo> c(BalancerPolicy::balance("ns", status, 0));
 
-    ASSERT(!c);
+    const auto migrations(BalancerPolicy::balance("ns", distributionStatus, false));
+    ASSERT(migrations.empty());
 }
 
-TEST(BalancerPolicyTests, BalanceImpasseTest) {
+TEST(BalancerPolicyTests, BalanceImpasse) {
     ShardToChunksMap chunkMap;
     vector<ChunkType> chunks;
 
@@ -230,7 +233,7 @@ TEST(BalancerPolicyTests, BalanceImpasseTest) {
         ChunkType chunk;
         chunk.setMin(BSON("x" << BSON("$maxKey" << 1)));
         chunk.setMax(BSON("x" << 49));
-        chunk.setShard(ShardId("shard1"));
+        chunk.setShard(kShardId1);
         chunks.push_back(chunk);
     }
 
@@ -238,23 +241,23 @@ TEST(BalancerPolicyTests, BalanceImpasseTest) {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 49));
         chunk.setMax(BSON("x" << BSON("$maxKey" << 1)));
-        chunk.setShard(ShardId("shard1"));
+        chunk.setShard(kShardId1);
         chunks.push_back(chunk);
     }
 
-    chunkMap[ShardId("shard0")] = vector<ChunkType>();
-    chunkMap[ShardId("shard1")] = chunks;
-    chunkMap[ShardId("shard2")] = vector<ChunkType>();
+    chunkMap[kShardId0] = vector<ChunkType>();
+    chunkMap[kShardId1] = chunks;
+    chunkMap[kShardId2] = vector<ChunkType>();
 
-    // shard0 is draining, shard1 is maxed out, shard2 has writebacks pending
-    DistributionStatus status(
-        {ShardStatistics(ShardId("shard0"), 0, 2, true, emptyTagSet, emptyShardVersion),
-         ShardStatistics(ShardId("shard1"), 1, 1, false, emptyTagSet, emptyShardVersion),
-         ShardStatistics(ShardId("shard2"), 0, 1, true, emptyTagSet, emptyShardVersion)},
+    // shard0 and shard2 are draining, shard1 is maxed out
+    DistributionStatus distributionStatus(
+        {ShardStatistics(kShardId0, kNoMaxSize, 2, true, emptyTagSet, emptyShardVersion),
+         ShardStatistics(kShardId1, 1, 1, false, emptyTagSet, emptyShardVersion),
+         ShardStatistics(kShardId2, kNoMaxSize, 1, true, emptyTagSet, emptyShardVersion)},
         chunkMap);
-    std::unique_ptr<MigrateInfo> c(BalancerPolicy::balance("ns", status, 0));
 
-    ASSERT(!c);
+    const auto migrations(BalancerPolicy::balance("ns", distributionStatus, false));
+    ASSERT(migrations.empty());
 }
 
 void addShard(ShardToChunksMap& shardToChunks, unsigned numChunks, bool last) {
@@ -263,9 +266,7 @@ void addShard(ShardToChunksMap& shardToChunks, unsigned numChunks, bool last) {
         total += chunk.second.size();
     }
 
-    stringstream ss;
-    ss << "shard" << shardToChunks.size();
-    string myName = ss.str();
+    const string myName = str::stream() << "shard" << shardToChunks.size();
 
     vector<ChunkType> chunksList;
 
@@ -292,7 +293,7 @@ void addShard(ShardToChunksMap& shardToChunks, unsigned numChunks, bool last) {
     shardToChunks[myName] = chunksList;
 }
 
-void moveChunk(ShardToChunksMap& shardToChunks, MigrateInfo* m) {
+void moveChunk(ShardToChunksMap& shardToChunks, const MigrateInfo* m) {
     vector<ChunkType>& chunks = shardToChunks[m->from];
 
     for (vector<ChunkType>::iterator i = chunks.begin(); i != chunks.end(); ++i) {
@@ -303,7 +304,7 @@ void moveChunk(ShardToChunksMap& shardToChunks, MigrateInfo* m) {
         }
     }
 
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 TEST(BalancerPolicyTests, MultipleDraining) {
@@ -312,17 +313,17 @@ TEST(BalancerPolicyTests, MultipleDraining) {
     addShard(chunks, 10, false);
     addShard(chunks, 5, true);
 
-    DistributionStatus d(
-        {ShardStatistics(ShardId("shard0"), 0, 5, true, emptyTagSet, emptyShardVersion),
-         ShardStatistics(ShardId("shard1"), 0, 5, true, emptyTagSet, emptyShardVersion),
-         ShardStatistics(ShardId("shard2"), 0, 5, false, emptyTagSet, emptyShardVersion)},
+    DistributionStatus distributionStatus(
+        {ShardStatistics(kShardId0, kNoMaxSize, 5, true, emptyTagSet, emptyShardVersion),
+         ShardStatistics(kShardId1, kNoMaxSize, 5, true, emptyTagSet, emptyShardVersion),
+         ShardStatistics(kShardId2, kNoMaxSize, 5, false, emptyTagSet, emptyShardVersion)},
         chunks);
-    std::unique_ptr<MigrateInfo> m(BalancerPolicy::balance("ns", d, 0));
 
-    ASSERT(m);
-    ASSERT_EQUALS(ShardId("shard2"), m->to);
+    const auto migrations(BalancerPolicy::balance("ns", distributionStatus, false));
+    ASSERT_EQ(1U, migrations.size());
+    ASSERT_EQ(kShardId0, migrations[0].from);
+    ASSERT_EQ(kShardId2, migrations[0].to);
 }
-
 
 TEST(BalancerPolicyTests, TagsDraining) {
     ShardToChunksMap chunks;
@@ -331,34 +332,33 @@ TEST(BalancerPolicyTests, TagsDraining) {
     addShard(chunks, 5, true);
 
     while (true) {
-        DistributionStatus d(
-            {ShardStatistics(ShardId("shard0"), 0, 5, false, {"a"}, emptyShardVersion),
-             ShardStatistics(ShardId("shard1"), 0, 5, true, {"a", "b"}, emptyShardVersion),
-             ShardStatistics(ShardId("shard2"), 0, 5, false, {"b"}, emptyShardVersion)},
+        DistributionStatus distributionStatus(
+            {ShardStatistics(kShardId0, kNoMaxSize, 5, false, {"a"}, emptyShardVersion),
+             ShardStatistics(kShardId1, kNoMaxSize, 5, true, {"a", "b"}, emptyShardVersion),
+             ShardStatistics(kShardId2, kNoMaxSize, 5, false, {"b"}, emptyShardVersion)},
             chunks);
 
-        d.addTagRange(TagRange(BSON("x" << -1), BSON("x" << 7), "a"));
-        d.addTagRange(TagRange(BSON("x" << 7), BSON("x" << 1000), "b"));
+        distributionStatus.addTagRange(TagRange(BSON("x" << -1), BSON("x" << 7), "a"));
+        distributionStatus.addTagRange(TagRange(BSON("x" << 7), BSON("x" << 1000), "b"));
 
-        std::unique_ptr<MigrateInfo> m(BalancerPolicy::balance("ns", d, 0));
-        if (!m) {
+        const auto migrations(BalancerPolicy::balance("ns", distributionStatus, false));
+        if (migrations.empty()) {
             break;
         }
 
-        if (m->minKey["x"].numberInt() < 7) {
-            ASSERT_EQUALS(ShardId("shard0"), m->to);
+        if (migrations[0].minKey["x"].numberInt() < 7) {
+            ASSERT_EQUALS(kShardId0, migrations[0].to);
         } else {
-            ASSERT_EQUALS(ShardId("shard2"), m->to);
+            ASSERT_EQUALS(kShardId2, migrations[0].to);
         }
 
-        moveChunk(chunks, m.get());
+        moveChunk(chunks, &migrations[0]);
     }
 
-    ASSERT_EQUALS(7U, chunks[ShardId("shard0")].size());
-    ASSERT_EQUALS(0U, chunks[ShardId("shard1")].size());
-    ASSERT_EQUALS(8U, chunks[ShardId("shard2")].size());
+    ASSERT_EQUALS(7U, chunks[kShardId0].size());
+    ASSERT_EQUALS(0U, chunks[kShardId1].size());
+    ASSERT_EQUALS(8U, chunks[kShardId2].size());
 }
-
 
 TEST(BalancerPolicyTests, TagsPolicyChange) {
     ShardToChunksMap chunks;
@@ -367,29 +367,29 @@ TEST(BalancerPolicyTests, TagsPolicyChange) {
     addShard(chunks, 5, true);
 
     while (true) {
-        DistributionStatus d(
-            {ShardStatistics(ShardId("shard0"), 0, 5, false, {"a"}, emptyShardVersion),
-             ShardStatistics(ShardId("shard1"), 0, 5, false, {"a"}, emptyShardVersion),
-             ShardStatistics(ShardId("shard2"), 0, 5, false, emptyTagSet, emptyShardVersion)},
+        DistributionStatus distributionStatus(
+            {ShardStatistics(kShardId0, kNoMaxSize, 5, false, {"a"}, emptyShardVersion),
+             ShardStatistics(kShardId1, kNoMaxSize, 5, false, {"a"}, emptyShardVersion),
+             ShardStatistics(kShardId2, kNoMaxSize, 5, false, emptyTagSet, emptyShardVersion)},
             chunks);
-        d.addTagRange(TagRange(BSON("x" << -1), BSON("x" << 1000), "a"));
 
-        std::unique_ptr<MigrateInfo> m(BalancerPolicy::balance("ns", d, 0));
-        if (!m) {
+        distributionStatus.addTagRange(TagRange(BSON("x" << -1), BSON("x" << 1000), "a"));
+
+        const auto migrations(BalancerPolicy::balance("ns", distributionStatus, false));
+        if (migrations.empty()) {
             break;
         }
 
-        moveChunk(chunks, m.get());
+        moveChunk(chunks, &migrations[0]);
     }
 
-    const size_t shard0Size = chunks[ShardId("shard0")].size();
-    const size_t shard1Size = chunks[ShardId("shard1")].size();
+    const size_t shard0Size = chunks[kShardId0].size();
+    const size_t shard1Size = chunks[kShardId1].size();
 
-    ASSERT_EQUALS(15U, shard0Size + shard1Size);
+    ASSERT_EQ(15U, shard0Size + shard1Size);
     ASSERT(shard0Size == 7U || shard0Size == 8U);
-    ASSERT_EQUALS(0U, chunks[ShardId("shard2")].size());
+    ASSERT_EQ(0U, chunks[kShardId2].size());
 }
-
 
 TEST(BalancerPolicyTests, TagsSelector) {
     ShardToChunksMap chunks;
@@ -457,18 +457,18 @@ TEST(BalancerPolicyTests, MaxSizeRespect) {
     addShard(chunks, 4, false);
     addShard(chunks, 6, true);
 
-    // Note that maxSize of shard0 is 1, and it is therefore overloaded with currSize = 3.
-    // Other shards have maxSize = 0 = unset.
-    DistributionStatus d(
-        {ShardStatistics(ShardId("shard0"), 1, 3, false, emptyTagSet, emptyShardVersion),
-         ShardStatistics(ShardId("shard1"), 0, 4, false, emptyTagSet, emptyShardVersion),
-         ShardStatistics(ShardId("shard2"), 0, 6, false, emptyTagSet, emptyShardVersion)},
+    // Note that maxSize of shard0 is 1, and it is therefore overloaded with currSize = 3. Other
+    // shards have maxSize = 0 = unset.
+    DistributionStatus distributionStatus(
+        {ShardStatistics(kShardId0, 1, 3, false, emptyTagSet, emptyShardVersion),
+         ShardStatistics(kShardId1, kNoMaxSize, 4, false, emptyTagSet, emptyShardVersion),
+         ShardStatistics(kShardId2, kNoMaxSize, 6, false, emptyTagSet, emptyShardVersion)},
         chunks);
-    std::unique_ptr<MigrateInfo> m(BalancerPolicy::balance("ns", d, 0));
 
-    ASSERT(m);
-    ASSERT_EQUALS(ShardId("shard2"), m->from);
-    ASSERT_EQUALS(ShardId("shard1"), m->to);
+    const auto migrations(BalancerPolicy::balance("ns", distributionStatus, false));
+    ASSERT_EQ(1U, migrations.size());
+    ASSERT_EQUALS(kShardId2, migrations[0].from);
+    ASSERT_EQUALS(kShardId1, migrations[0].to);
 }
 
 /**
@@ -485,33 +485,33 @@ TEST(BalancerPolicyTests, MaxSizeNoDrain) {
 
     // Note that maxSize of shard0 is 1, and it is therefore overloaded with currSize = 4. Other
     // shards have maxSize = 0 = unset.
-    DistributionStatus d(
-        {ShardStatistics(ShardId("shard0"), 1, 4, false, emptyTagSet, emptyShardVersion),
-         ShardStatistics(ShardId("shard1"), 0, 4, false, emptyTagSet, emptyShardVersion),
-         ShardStatistics(ShardId("shard2"), 0, 4, false, emptyTagSet, emptyShardVersion)},
+    DistributionStatus distributionStatus(
+        {ShardStatistics(kShardId0, 1, 4, false, emptyTagSet, emptyShardVersion),
+         ShardStatistics(kShardId1, kNoMaxSize, 4, false, emptyTagSet, emptyShardVersion),
+         ShardStatistics(kShardId2, kNoMaxSize, 4, false, emptyTagSet, emptyShardVersion)},
         chunks);
-    std::unique_ptr<MigrateInfo> m(BalancerPolicy::balance("ns", d, 0));
 
-    ASSERT(!m);
+    const auto migrations(BalancerPolicy::balance("ns", distributionStatus, false));
+    ASSERT(migrations.empty());
 }
 
 /**
- * Idea behind this test is that we set up several shards, the first two of which are
- * draining and the second two of which have a data size limit.  We also simulate a random
- * number of chunks on each shard.
+ * Idea behind this test is that we set up several shards, the first two of which are draining and
+ * the second two of which have a data size limit.  We also simulate a random number of chunks on
+ * each shard.
  *
- * Once the shards are setup, we virtually migrate numChunks times, or until there are no
- * more migrations to run.  Each chunk is assumed to have a size of 1 unit, and we increment
- * our currSize for each shard as the chunks move.
+ * Once the shards are setup, we virtually migrate numChunks times, or until there are no more
+ * migrations to run.  Each chunk is assumed to have a size of 1 unit, and we increment our currSize
+ * for each shard as the chunks move.
  *
  * Finally, we ensure that the drained shards are drained, the data-limited shards aren't
- * overloaded, and that all shards (including the data limited shard if the baseline isn't
- * over the limit are balanced to within 1 unit of some baseline.
+ * overloaded, and that all shards (including the data limited shard if the baseline isn't over the
+ * limit are balanced to within 1 unit of some baseline.
  *
  */
 TEST(BalancerPolicyTests, Simulation) {
     // Hardcode seed here, make test deterministic.
-    int64_t seed = 1337;
+    const int64_t seed = 1337;
     PseudoRandom rng(seed);
 
     // Run test 10 times
@@ -555,17 +555,17 @@ TEST(BalancerPolicyTests, Simulation) {
 
         // Perform migrations and increment data size as chunks move
         for (int i = 0; i < numChunks; i++) {
-            DistributionStatus d(shards, chunks);
-            std::unique_ptr<MigrateInfo> m(BalancerPolicy::balance("ns", d, i != 0));
-            if (!m) {
+            const auto migrations(
+                BalancerPolicy::balance("ns", DistributionStatus(shards, chunks), i != 0));
+            if (migrations.empty()) {
                 log() << "Finished with test moves.";
                 break;
             }
 
-            moveChunk(chunks, m.get());
+            moveChunk(chunks, &migrations[0]);
 
-            findStat(shards, m->from).currSizeMB -= 1;
-            findStat(shards, m->to).currSizeMB += 1;
+            findStat(shards, migrations[0].from).currSizeMB -= 1;
+            findStat(shards, migrations[0].to).currSizeMB += 1;
         }
 
         // Make sure our balance is correct and our data size is low.

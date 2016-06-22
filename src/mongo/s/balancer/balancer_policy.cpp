@@ -214,34 +214,9 @@ string DistributionStatus::getTagForChunk(const ChunkType& chunk) const {
     return range.tag;
 }
 
-void DistributionStatus::dump() const {
-    log() << "DistributionStatus";
-    log() << "  shards";
-
-    for (const auto& stat : _shardInfo) {
-        log() << "      " << stat.shardId << "\t" << stat.toBSON();
-
-        ShardToChunksMap::const_iterator j = _shardChunks.find(stat.shardId);
-        verify(j != _shardChunks.end());
-
-        const vector<ChunkType>& v = j->second;
-        for (unsigned x = 0; x < v.size(); x++) {
-            log() << "          " << v[x];
-        }
-    }
-
-    if (_tagRanges.size() > 0) {
-        log() << " tag ranges";
-
-        for (map<BSONObj, TagRange>::const_iterator i = _tagRanges.begin(); i != _tagRanges.end();
-             ++i)
-            log() << i->second.toString();
-    }
-}
-
-MigrateInfo* BalancerPolicy::balance(const string& ns,
-                                     const DistributionStatus& distribution,
-                                     int balancedLastTime) {
+std::vector<MigrateInfo> BalancerPolicy::balance(const string& ns,
+                                                 const DistributionStatus& distribution,
+                                                 bool shouldAggressivelyBalance) {
     // 1) check for shards that policy require to us to move off of:
     //    draining only
     // 2) check tag policy violations
@@ -258,12 +233,12 @@ MigrateInfo* BalancerPolicy::balance(const string& ns,
             if (distribution.numberOfChunksInShard(stat.shardId) == 0)
                 continue;
 
-            // now we know we need to move to chunks off this shard
-            // we will if we are allowed
+            // Now we know we need to move to chunks off this shard, but only if permitted by the
+            // tags policy
             const vector<ChunkType>& chunks = distribution.getChunks(stat.shardId);
             unsigned numJumboChunks = 0;
 
-            // since we have to move all chunks, lets just do in order
+            // Since we have to move all chunks, lets just do in order
             for (unsigned i = 0; i < chunks.size(); i++) {
                 const ChunkType& chunkToMove = chunks[i];
                 if (chunkToMove.getJumbo()) {
@@ -271,20 +246,19 @@ MigrateInfo* BalancerPolicy::balance(const string& ns,
                     continue;
                 }
 
-                string tag = distribution.getTagForChunk(chunkToMove);
-                const ShardId to = distribution.getBestReceieverShard(tag);
+                const string tag = distribution.getTagForChunk(chunkToMove);
 
+                const ShardId to = distribution.getBestReceieverShard(tag);
                 if (!to.isValid()) {
-                    warning() << "want to move chunk: " << chunkToMove << "(" << tag << ") "
-                              << "from " << stat.shardId << " but can't find anywhere to put it";
+                    warning() << "want to move chunk: " << chunkToMove << " (" << tag << ") from "
+                              << stat.shardId << " but can't find anywhere to put it";
                     continue;
                 }
 
-                log() << "going to move " << chunkToMove << " from " << stat.shardId << "(" << tag
-                      << ")"
-                      << " to " << to;
+                log() << "going to move " << chunkToMove << " from " << stat.shardId << " (" << tag
+                      << ") to " << to;
 
-                return new MigrateInfo(ns, to, chunkToMove);
+                return {MigrateInfo(ns, to, chunkToMove)};
             }
 
             warning() << "can't find any chunk to move from: " << stat.shardId
@@ -294,7 +268,7 @@ MigrateInfo* BalancerPolicy::balance(const string& ns,
     }
 
     // 2) tag violations
-    if (distribution.tags().size() > 0) {
+    if (!distribution.tags().empty()) {
         for (const auto& stat : distribution.getStats()) {
             const vector<ChunkType>& chunks = distribution.getChunks(stat.shardId);
             for (unsigned j = 0; j < chunks.size(); j++) {
@@ -320,37 +294,37 @@ MigrateInfo* BalancerPolicy::balance(const string& ns,
 
                 invariant(to != stat.shardId);
                 log() << " going to move to: " << to;
-                return new MigrateInfo(ns, to, chunk);
+                return {MigrateInfo(ns, to, chunk)};
             }
         }
     }
 
     // 3) for each tag balance
-
     int threshold = 8;
-    if (balancedLastTime || distribution.totalChunks() < 20)
-        threshold = 2;
-    else if (distribution.totalChunks() < 80)
-        threshold = 4;
 
-    // randomize the order in which we balance the tags
-    // this is so that one bad tag doesn't prevent others from getting balanced
+    if (shouldAggressivelyBalance || distribution.totalChunks() < 20) {
+        threshold = 2;
+    } else if (distribution.totalChunks() < 80) {
+        threshold = 4;
+    }
+
+    // Randomize the order in which we balance the tags so that one bad tag doesn't prevent others
+    // from getting balanced
     vector<string> tags;
     {
-        set<string> t = distribution.tags();
-        for (set<string>::const_iterator i = t.begin(); i != t.end(); ++i)
-            tags.push_back(*i);
+        for (const auto& tag : distribution.tags()) {
+            tags.push_back(tag);
+        }
         tags.push_back("");
 
         std::random_shuffle(tags.begin(), tags.end());
     }
 
-    for (unsigned i = 0; i < tags.size(); i++) {
-        string tag = tags[i];
-
+    for (const auto& tag : tags) {
         const ShardId from = distribution.getMostOverloadedShard(tag);
-        if (!from.isValid())
+        if (!from.isValid()) {
             continue;
+        }
 
         unsigned max = distribution.numberOfChunksInShardWithTag(from, tag);
         if (max == 0)
@@ -359,7 +333,7 @@ MigrateInfo* BalancerPolicy::balance(const string& ns,
         ShardId to = distribution.getBestReceieverShard(tag);
         if (!to.isValid()) {
             log() << "no available shards to take chunks for tag [" << tag << "]";
-            return NULL;
+            return vector<MigrateInfo>();
         }
 
         unsigned min = distribution.numberOfChunksInShardWithTag(to, tag);
@@ -388,7 +362,8 @@ MigrateInfo* BalancerPolicy::balance(const string& ns,
 
             log() << " ns: " << ns << " going to move " << chunk << " from: " << from
                   << " to: " << to << " tag [" << tag << "]";
-            return new MigrateInfo(ns, to, chunk);
+
+            return {MigrateInfo(ns, to, chunk)};
         }
 
         if (numJumboChunks) {
@@ -398,11 +373,11 @@ MigrateInfo* BalancerPolicy::balance(const string& ns,
             continue;
         }
 
-        verify(false);  // should be impossible
+        MONGO_UNREACHABLE;
     }
 
     // Everything is balanced here!
-    return NULL;
+    return vector<MigrateInfo>();
 }
 
 string TagRange::toString() const {
