@@ -241,13 +241,20 @@ Status IndexAccessMethod::touch(OperationContext* txn) const {
 }
 
 RecordId IndexAccessMethod::findSingle(OperationContext* txn, const BSONObj& key) const {
+    // Generate the key for this index.
+    BSONObjSet keys;
+    MultikeyPaths* multikeyPaths = nullptr;
+    getKeys(key, &keys, multikeyPaths);
+    invariant(keys.size() == 1);
+
     std::unique_ptr<SortedDataInterface::Cursor> cursor(_newInterface->newCursor(txn));
     const auto requestedInfo = kDebugBuild ? SortedDataInterface::Cursor::kKeyAndLoc
                                            : SortedDataInterface::Cursor::kWantLoc;
-    if (auto kv = cursor->seekExact(key, requestedInfo)) {
+    if (auto kv = cursor->seekExact(*keys.begin(), requestedInfo)) {
         // StorageEngine should guarantee these.
         dassert(!kv->loc.isNull());
-        dassert(kv->key.woCompare(key, /*order*/ BSONObj(), /*considerFieldNames*/ false) == 0);
+        dassert(kv->key.woCompare(
+                    *keys.begin(), /*order*/ BSONObj(), /*considerFieldNames*/ false) == 0);
 
         return kv->loc;
     }

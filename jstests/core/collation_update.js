@@ -7,6 +7,13 @@
     const caseSensitive = {collation: {locale: "en_US", strength: 3}};
     const numericOrdering = {collation: {locale: "en_US", numericOrdering: true}};
 
+    // Update modifiers respect collection default collation on simple _id query.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), numericOrdering));
+    assert.writeOK(coll.insert({_id: 1, a: "124"}));
+    assert.writeOK(coll.update({_id: 1}, {$min: {a: "1234"}}));
+    assert.eq(coll.find({a: "124"}).count(), 1);
+
     // $min respects query collation.
     if (db.getMongo().writeMode() === "commands") {
         coll.drop();

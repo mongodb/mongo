@@ -605,6 +605,12 @@ Status IndexCatalog::_isSpecOk(OperationContext* txn, const BSONObj& spec) const
         if (isSparse) {
             return Status(ErrorCodes::CannotCreateIndex, "_id index cannot be sparse");
         }
+
+        if (collationElement &&
+            !CollatorInterface::collatorsMatch(collator.get(), _collection->getDefaultCollator())) {
+            return Status(ErrorCodes::CannotCreateIndex,
+                          "_id index must have the collection default collation");
+        }
     } else {
         // for non _id indexes, we check to see if replication has turned off all indexes
         // we _always_ created _id index

@@ -60,10 +60,7 @@ Status ParsedDelete::parseRequest() {
     // DeleteStage would not return the deleted document.
     invariant(_request->getProj().isEmpty() || _request->shouldReturnDeleted());
 
-    // TODO SERVER-23924: Create decision logic for idhack when the query has no collation, but
-    // there may be a collection default collation.
-    if (_request->getCollation().isEmpty() &&
-        CanonicalQuery::isSimpleIdQuery(_request->getQuery())) {
+    if (CanonicalQuery::isSimpleIdQuery(_request->getQuery())) {
         return Status::OK();
     }
 

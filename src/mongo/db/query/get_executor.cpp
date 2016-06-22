@@ -58,6 +58,7 @@
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/internal_plans.h"
@@ -272,7 +273,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
     const IndexDescriptor* descriptor = collection->getIndexCatalog()->findIdIndex(opCtx);
 
     // If we have an _id index we can use an idhack plan.
-    if (descriptor && IDHackStage::supportsQuery(*canonicalQuery)) {
+    if (descriptor && IDHackStage::supportsQuery(collection, *canonicalQuery)) {
         LOG(2) << "Using idhack: " << canonicalQuery->toStringShort();
 
         root = make_unique<IDHackStage>(opCtx, collection, canonicalQuery.get(), ws, descriptor);
@@ -743,8 +744,21 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* txn,
 
         const IndexDescriptor* descriptor = collection->getIndexCatalog()->findIdIndex(txn);
 
+        // Construct delete request collator.
+        std::unique_ptr<CollatorInterface> collator;
+        if (!request->getCollation().isEmpty()) {
+            auto statusWithCollator = CollatorFactoryInterface::get(txn->getServiceContext())
+                                          ->makeFromBSON(request->getCollation());
+            if (!statusWithCollator.isOK()) {
+                return statusWithCollator.getStatus();
+            }
+            collator = std::move(statusWithCollator.getValue());
+        }
+        const bool hasCollectionDefaultCollation = request->getCollation().isEmpty() ||
+            CollatorInterface::collatorsMatch(collator.get(), collection->getDefaultCollator());
+
         if (descriptor && CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
-            request->getProj().isEmpty()) {
+            request->getProj().isEmpty() && hasCollectionDefaultCollation) {
             LOG(2) << "Using idhack: " << unparsedQuery.toString();
 
             PlanStage* idHackStage =
@@ -896,8 +910,11 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* txn,
 
         const IndexDescriptor* descriptor = collection->getIndexCatalog()->findIdIndex(txn);
 
+        const bool hasCollectionDefaultCollation = CollatorInterface::collatorsMatch(
+            parsedUpdate->getCollator(), collection->getDefaultCollator());
+
         if (descriptor && CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
-            request->getProj().isEmpty()) {
+            request->getProj().isEmpty() && hasCollectionDefaultCollation) {
             LOG(2) << "Using idhack: " << unparsedQuery.toString();
 
             PlanStage* idHackStage =

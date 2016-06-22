@@ -41,8 +41,9 @@ class IndexAccessMethod;
 class RecordCursor;
 
 /**
- * A standalone stage implementing the fast path for key-value retrievals
- * via the _id index.
+ * A standalone stage implementing the fast path for key-value retrievals via the _id index. Since
+ * the _id index always has the collection default collation, the IDHackStage can only be used when
+ * the query's collation is equal to the collection default.
  */
 class IDHackStage final : public PlanStage {
 public:
@@ -73,7 +74,7 @@ public:
     /**
      * ID Hack has a very strict criteria for the queries it supports.
      */
-    static bool supportsQuery(const CanonicalQuery& query);
+    static bool supportsQuery(Collection* collection, const CanonicalQuery& query);
 
     StageType stageType() const final {
         return STAGE_IDHACK;

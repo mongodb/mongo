@@ -226,11 +226,12 @@ void IDHackStage::doInvalidate(OperationContext* txn, const RecordId& dl, Invali
 }
 
 // static
-bool IDHackStage::supportsQuery(const CanonicalQuery& query) {
+bool IDHackStage::supportsQuery(Collection* collection, const CanonicalQuery& query) {
     return !query.getQueryRequest().showRecordId() && query.getQueryRequest().getHint().isEmpty() &&
-        query.getQueryRequest().getCollation().isEmpty() && !query.getQueryRequest().getSkip() &&
+        !query.getQueryRequest().getSkip() &&
         CanonicalQuery::isSimpleIdQuery(query.getQueryRequest().getFilter()) &&
-        !query.getQueryRequest().isTailable();
+        !query.getQueryRequest().isTailable() &&
+        CollatorInterface::collatorsMatch(query.getCollator(), collection->getDefaultCollator());
 }
 
 unique_ptr<PlanStageStats> IDHackStage::getStats() {
