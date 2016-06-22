@@ -1162,7 +1162,7 @@ __debug_item(WT_DBG *ds, const char *tag, const void *data_arg, size_t size)
 	__dmsg(ds, "\t%s%s{", tag == NULL ? "" : tag, tag == NULL ? "" : " ");
 	for (data = data_arg, i = 0; i < size; ++i, ++data) {
 		ch = data[0];
-		if (isprint(ch))
+		if (__wt_isprint(ch))
 			__dmsg(ds, "%c", ch);
 		else
 			__debug_hex_byte(ds, data[0]);

@@ -138,6 +138,20 @@ else
 		}
 	fi
 
+	# Use of ctype functions that sign extend their arguments.
+	if ! expr "$f" : 'bench/.*' > /dev/null &&
+	   ! expr "$f" : 'test/csuite/.*' > /dev/null &&
+	   ! expr "$f" : 'examples/.*' > /dev/null &&
+	   ! expr "$f" : 'ext/.*' > /dev/null &&
+	   ! expr "$f" : 'src/include/ctype.i' > /dev/null; then
+		if egrep '(#include.*["</]ctype.h[">]|\b(is(alnum|alpha|cntrl|digit|graph|lower|print|punct|space|upper|xdigit)|to(lower|toupper))\()' $f > $t; then
+			test -s $t && {
+				echo "$f: direct use of ctype.h functions, instead of ctype.i equivalents"
+				cat $t
+			}
+		fi
+	fi
+
 	tr -cd '[:alnum:][:space:][:punct:]' < $f |
 	unexpand |
 	sed -e 's/){/) {/' \

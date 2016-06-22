@@ -1476,7 +1476,7 @@ print_item(const char *tag, WT_ITEM *item)
 	else
 		for (; size > 0; --size, ++data) {
 			ch = data[0];
-			if (isprint(ch))
+			if (__wt_isprint(ch))
 				fprintf(stderr, "%c", ch);
 			else
 				fprintf(stderr, "%x%x",

@@ -1298,7 +1298,7 @@ __conn_config_file(WT_SESSION_IMPL *session,
 		 * the next character is a hash mark, skip to the next newline.
 		 */
 		for (;;) {
-			for (*t++ = ','; --len > 0 && isspace(*++p);)
+			for (*t++ = ','; --len > 0 && __wt_isspace(*++p);)
 				;
 			if (len == 0)
 				break;

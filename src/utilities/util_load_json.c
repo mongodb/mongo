@@ -248,7 +248,7 @@ json_data(WT_SESSION *session,
 	keyformat = cursor->key_format;
 	isrec = strcmp(keyformat, "r") == 0;
 	for (nkeys = 0; *keyformat; keyformat++)
-		if (!isdigit(*keyformat))
+		if (!__wt_isdigit(*keyformat))
 			nkeys++;
 
 	recno = 0;
@@ -471,7 +471,7 @@ json_peek(WT_SESSION *session, JSON_INPUT_STATE *ins)
 
 	if (!ins->peeking) {
 		while (!ins->ateof) {
-			while (isspace(*ins->p))
+			while (__wt_isspace(*ins->p))
 				ins->p++;
 			if (*ins->p)
 				break;
