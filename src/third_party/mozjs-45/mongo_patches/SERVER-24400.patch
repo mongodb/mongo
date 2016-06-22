@@ -1,0 +1,71 @@
+This patch was taken from https://hg.mozilla.org/integration/mozilla-inbound/rev/dfaafbaaa291.
+
+We've removed the changes for "js/src/jsapi-tests/testGCAllocator.cpp" since we don't include
+that file in our extracted mozjs sources.
+
+# HG changeset patch
+# User Zheng Xu <zheng.xu@linaro.org>
+# Date 1464657720 -7200
+# Node ID dfaafbaaa2919a033c4c0abdd5830f4ea413bed6
+# Parent  499f16ca85ec48d1896a1633730715f32bd62140
+Bug 1143022 - Manually mmap on arm64 to ensure high 17 bits are clear. r=ehoogeveen
+
+There might be 48-bit VA on arm64 depending on kernel configuration.
+Manually mmap heap memory to align with the assumption made by JS engine.
+
+diff --git a/src/third_party/mozjs-45/extract/js/src/gc/Memory.cpp b/src/third_party/mozjs-45/extract/js/src/gc/Memory.cpp
+index c97628e..3644d2b 100644
+--- a/src/third_party/mozjs-45/extract/js/src/gc/Memory.cpp
++++ b/src/third_party/mozjs-45/extract/js/src/gc/Memory.cpp
+@@ -440,7 +440,8 @@ static inline void*
+ MapMemoryAt(void* desired, size_t length, int prot = PROT_READ | PROT_WRITE,
+             int flags = MAP_PRIVATE | MAP_ANON, int fd = -1, off_t offset = 0)
+ {
+-#if defined(__ia64__) || (defined(__sparc64__) && defined(__NetBSD__)) || defined(SOLARIS)
++#if defined(__ia64__) || (defined(__sparc64__) && defined(__NetBSD__)) || \
++    defined(SOLARIS) || defined(__aarch64__)
+     MOZ_ASSERT(0xffff800000000000ULL & (uintptr_t(desired) + length - 1) == 0);
+ #endif
+     void* region = mmap(desired, length, prot, flags, fd, offset);
+@@ -490,6 +491,41 @@ MapMemory(size_t length, int prot = PROT_READ | PROT_WRITE,
+         return nullptr;
+     }
+     return region;
++#elif defined(__aarch64__)
++   /*
++    * There might be similar virtual address issue on arm64 which depends on
++    * hardware and kernel configurations. But the work around is slightly
++    * different due to the different mmap behavior.
++    *
++    * TODO: Merge with the above code block if this implementation works for
++    * ia64 and sparc64.
++    */
++    const uintptr_t start = UINT64_C(0x0000070000000000);
++    const uintptr_t end   = UINT64_C(0x0000800000000000);
++    const uintptr_t step  = ChunkSize;
++   /*
++    * Optimization options if there are too many retries in practice:
++    * 1. Examine /proc/self/maps to find an available address. This file is
++    *    not always available, however. In addition, even if we examine
++    *    /proc/self/maps, we may still need to retry several times due to
++    *    racing with other threads.
++    * 2. Use a global/static variable with lock to track the addresses we have
++    *    allocated or tried.
++    */
++    uintptr_t hint;
++    void* region = MAP_FAILED;
++    for (hint = start; region == MAP_FAILED && hint + length <= end; hint += step) {
++        region = mmap((void*)hint, length, prot, flags, fd, offset);
++        if (region != MAP_FAILED) {
++            if ((uintptr_t(region) + (length - 1)) & 0xffff800000000000) {
++                if (munmap(region, length)) {
++                    MOZ_ASSERT(errno == ENOMEM);
++                }
++                region = MAP_FAILED;
++            }
++        }
++    }
++    return region == MAP_FAILED ? nullptr : region;
+ #else
+     void* region = MozTaggedAnonymousMmap(nullptr, length, prot, flags, fd, offset, "js-gc-heap");
+     if (region == MAP_FAILED)

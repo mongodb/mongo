@@ -225,4 +225,6 @@ cp extract/mfbt/unused.h include/mozilla
 cp extract/mfbt/XorShift128PlusRNG.h include/mozilla
 
 # Apply a local patch
-git apply < mongodb.patch
+git apply \
+    mongodb_patches/SERVER-23358.patch
+    mongodb_patches/SERVER-24400.patch
