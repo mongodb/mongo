@@ -78,7 +78,9 @@ using std::string;
 
 CollectionShardingState::CollectionShardingState(
     NamespaceString nss, std::unique_ptr<CollectionMetadata> initialMetadata)
-    : _nss(std::move(nss)), _metadata(std::move(initialMetadata)) {}
+    : _nss(std::move(nss)), _metadataManager{} {
+    _metadataManager.setActiveMetadata(std::move(initialMetadata));
+}
 
 CollectionShardingState::~CollectionShardingState() {
     invariant(!_sourceMgr);
@@ -98,13 +100,16 @@ CollectionShardingState* CollectionShardingState::get(OperationContext* txn,
     return shardingState->getNS(ns);
 }
 
-void CollectionShardingState::setMetadata(std::shared_ptr<CollectionMetadata> newMetadata) {
+ScopedCollectionMetadata CollectionShardingState::getMetadata() {
+    return _metadataManager.getActiveMetadata();
+}
+
+void CollectionShardingState::setMetadata(std::unique_ptr<CollectionMetadata> newMetadata) {
     if (newMetadata) {
         invariant(!newMetadata->getCollVersion().isWriteCompatibleWith(ChunkVersion::UNSHARDED()));
         invariant(!newMetadata->getShardVersion().isWriteCompatibleWith(ChunkVersion::UNSHARDED()));
     }
-
-    _metadata = std::move(newMetadata);
+    _metadataManager.setActiveMetadata(std::move(newMetadata));
 }
 
 MigrationSourceManager* CollectionShardingState::getMigrationSourceManager() {
@@ -127,7 +132,7 @@ void CollectionShardingState::clearMigrationSourceManager(OperationContext* txn)
     _sourceMgr = nullptr;
 }
 
-void CollectionShardingState::checkShardVersionOrThrow(OperationContext* txn) const {
+void CollectionShardingState::checkShardVersionOrThrow(OperationContext* txn) {
     string errmsg;
     ChunkVersion received;
     ChunkVersion wanted;
@@ -204,7 +209,7 @@ void CollectionShardingState::onDeleteOp(OperationContext* txn, const BSONObj& d
 bool CollectionShardingState::_checkShardVersionOk(OperationContext* txn,
                                                    string* errmsg,
                                                    ChunkVersion* expectedShardVersion,
-                                                   ChunkVersion* actualShardVersion) const {
+                                                   ChunkVersion* actualShardVersion) {
     Client* client = txn->getClient();
 
     // Operations using the DBDirectClient are unversioned.
@@ -240,7 +245,8 @@ bool CollectionShardingState::_checkShardVersionOk(OperationContext* txn,
     }
 
     // Set this for error messaging purposes before potentially returning false.
-    *actualShardVersion = (_metadata ? _metadata->getShardVersion() : ChunkVersion::UNSHARDED());
+    auto metadata = getMetadata();
+    *actualShardVersion = metadata ? metadata->getShardVersion() : ChunkVersion::UNSHARDED();
 
     if (_sourceMgr && _sourceMgr->getMigrationCriticalSectionSignal()) {
         *errmsg = str::stream() << "migration commit in progress for " << _nss.ns();

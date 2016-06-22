@@ -436,8 +436,7 @@ bool shouldRestartUpdateIfNoLongerMatches(const UpdateStageParams& params) {
 };
 
 const std::vector<FieldRef*>* getImmutableFields(OperationContext* txn, const NamespaceString& ns) {
-    std::shared_ptr<CollectionMetadata> metadata =
-        CollectionShardingState::get(txn, ns)->getMetadata();
+    auto metadata = CollectionShardingState::get(txn, ns)->getMetadata();
     if (metadata) {
         const std::vector<FieldRef*>& fields = metadata->getKeyPatternFields();
         // Return shard-keys as immutable for the update system.

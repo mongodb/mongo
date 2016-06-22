@@ -120,8 +120,8 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* txn, MoveChunkR
         ScopedTransaction scopedXact(txn, MODE_IS);
         AutoGetCollection autoColl(txn, _args.getNss(), MODE_IS);
 
-        auto css = CollectionShardingState::get(txn, _args.getNss());
-        _committedMetadata = css->getMetadata();
+        _committedMetadata = CollectionShardingState::get(txn, _args.getNss())->getMetadata();
+        _keyPattern = _committedMetadata->getKeyPattern();
     }
 
     const ChunkVersion collectionVersion = _committedMetadata->getCollVersion();
@@ -357,10 +357,10 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
         ChunkType migratingChunkToForget;
         migratingChunkToForget.setMin(_args.getMinKey());
         migratingChunkToForget.setMax(_args.getMaxKey());
-        _committedMetadata =
-            _committedMetadata->cloneMigrate(migratingChunkToForget, uncommittedCollVersion);
         auto css = CollectionShardingState::get(txn, _args.getNss().ns());
-        css->setMetadata(_committedMetadata);
+        css->setMetadata(
+            _committedMetadata->cloneMigrate(migratingChunkToForget, uncommittedCollVersion));
+        _committedMetadata = css->getMetadata();
     } else {
         // This could be an unrelated error (e.g. network error). Check whether the metadata update
         // succeeded by refreshing the collection metadata from the config server and checking that
@@ -415,8 +415,8 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
             AutoGetCollection autoColl(txn, _args.getNss(), MODE_IS);
 
             ChunkVersion previousMetadataCollVersion = _committedMetadata->getCollVersion();
-            auto css = CollectionShardingState::get(txn, _args.getNss());
-            std::shared_ptr<CollectionMetadata> refreshedMetadata = css->getMetadata();
+            auto refreshedMetadata =
+                CollectionShardingState::get(txn, _args.getNss())->getMetadata();
 
             if (refreshedMetadata->keyBelongsToMe(_args.getMinKey())) {
                 invariant(refreshedMetadata->getCollVersion() == previousMetadataCollVersion);

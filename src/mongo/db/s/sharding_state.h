@@ -48,10 +48,10 @@ namespace mongo {
 class BSONObj;
 class BSONObjBuilder;
 struct ChunkVersion;
-class CollectionMetadata;
 class CollectionShardingState;
 class ConnectionString;
 class OperationContext;
+class ScopedCollectionMetadata;
 class ServiceContext;
 class ShardIdentityType;
 class Status;
@@ -200,7 +200,7 @@ public:
 
     bool needCollectionMetadata(OperationContext* txn, const std::string& ns);
 
-    std::shared_ptr<CollectionMetadata> getCollectionMetadata(const std::string& ns);
+    ScopedCollectionMetadata getCollectionMetadata(const std::string& ns);
 
     /**
      * Updates the config server field of the shardIdentity document with the given connection

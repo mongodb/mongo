@@ -43,7 +43,9 @@ MetadataManager::~MetadataManager() {
 
 ScopedCollectionMetadata MetadataManager::getActiveMetadata() {
     stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
-    invariant(_activeMetadataTracker);
+    if (!_activeMetadataTracker) {
+        return ScopedCollectionMetadata();
+    }
     return ScopedCollectionMetadata(this, _activeMetadataTracker.get());
 }
 
@@ -72,6 +74,8 @@ MetadataManager::CollectionMetadataTracker::CollectionMetadataTracker(
     std::unique_ptr<CollectionMetadata> m)
     : metadata(std::move(m)), usageCounter(0){};
 
+ScopedCollectionMetadata::ScopedCollectionMetadata() = default;
+
 // called in lock
 ScopedCollectionMetadata::ScopedCollectionMetadata(
     MetadataManager* manager, MetadataManager::CollectionMetadataTracker* tracker)
@@ -80,6 +84,9 @@ ScopedCollectionMetadata::ScopedCollectionMetadata(
 }
 
 ScopedCollectionMetadata::~ScopedCollectionMetadata() {
+    if (!_tracker)
+        return;
+
     stdx::lock_guard<stdx::mutex> scopedLock(_manager->_managerLock);
     invariant(_tracker->usageCounter > 0);
     if (--_tracker->usageCounter == 0) {
@@ -108,6 +115,10 @@ ScopedCollectionMetadata& ScopedCollectionMetadata::operator=(ScopedCollectionMe
     }
 
     return *this;
+}
+
+ScopedCollectionMetadata::operator bool() const {
+    return _tracker && _tracker->metadata.get();
 }
 
 std::map<BSONObj, ChunkRange> MetadataManager::getCopyOfRanges() {

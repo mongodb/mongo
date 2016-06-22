@@ -282,7 +282,7 @@ public:
             }
         }
 
-        std::shared_ptr<CollectionMetadata> collMetadata;
+        ScopedCollectionMetadata collMetadata;
         {
             AutoGetCollection autoColl(txn, nss, MODE_IS);
 
@@ -291,7 +291,7 @@ public:
         }
 
         // With nonzero shard version, we must have metadata
-        invariant(NULL != collMetadata);
+        invariant(collMetadata);
 
         ChunkVersion collVersion = collMetadata->getCollVersion();
         // With nonzero shard version, we must have a coll version >= our shard version

@@ -39,6 +39,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/metadata_manager.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/grid.h"
@@ -196,7 +197,7 @@ bool mergeChunks(OperationContext* txn,
         return false;
     }
 
-    std::shared_ptr<CollectionMetadata> metadata;
+    ScopedCollectionMetadata metadata;
     {
         AutoGetCollection autoColl(txn, nss, MODE_IS);
 

@@ -31,6 +31,7 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/s/metadata_manager.h"
 #include "mongo/s/move_chunk_request.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/concurrency/notification.h"
@@ -38,7 +39,6 @@
 
 namespace mongo {
 
-class CollectionMetadata;
 class MigrationChunkClonerSource;
 class OperationContext;
 
@@ -145,12 +145,10 @@ public:
     void cleanupOnError(OperationContext* txn);
 
     /**
-     * Retrieves the last known committed collection metadata. What gets returned by this call may
-     * change before and after the critical section has started. It should only be used for
-     * diagnostics purposes and not relied on for any routing/consistency checking decisions.
+     * Returns the key pattern object for the stored committed metadata.
      */
-    std::shared_ptr<CollectionMetadata> getCommittedMetadata() const {
-        return _committedMetadata;
+    BSONObj getKeyPattern() const {
+        return _keyPattern;
     }
 
     /**
@@ -197,7 +195,10 @@ private:
     // The cached collection metadata from just after the collection distributed lock was acquired.
     // This metadata is guaranteed to not change until either failure or successful completion,
     // because the distributed lock is being held. Available after stabilize stage has completed.
-    std::shared_ptr<CollectionMetadata> _committedMetadata;
+    ScopedCollectionMetadata _committedMetadata;
+
+    // The key pattern of the collection whose chunks are being moved.
+    BSONObj _keyPattern;
 
     // The chunk cloner source. Only available if there is an active migration going on. To set and
     // remove it, global S lock needs to be acquired first in order to block all logOp calls and

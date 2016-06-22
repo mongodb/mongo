@@ -270,8 +270,7 @@ void ShardingState::clearCollectionMetadata() {
 }
 
 ChunkVersion ShardingState::getVersion(const string& ns) {
-    shared_ptr<CollectionMetadata> p;
-
+    ScopedCollectionMetadata p;
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         CollectionShardingStateMap::const_iterator it = _collections.find(ns);
@@ -319,8 +318,7 @@ Status ShardingState::onStaleShardVersion(OperationContext* txn,
     {
         AutoGetCollection autoColl(txn, nss, MODE_IS);
 
-        shared_ptr<CollectionMetadata> storedMetadata =
-            CollectionShardingState::get(txn, nss)->getMetadata();
+        auto storedMetadata = CollectionShardingState::get(txn, nss)->getMetadata();
         if (storedMetadata) {
             collectionShardVersion = storedMetadata->getShardVersion();
         }
@@ -647,7 +645,7 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
     // The idea here is that we're going to reload the metadata from the config server, but we need
     // to do so outside any locks.  When we get our result back, if the current metadata has
     // changed, we may not be able to install the new metadata.
-    shared_ptr<CollectionMetadata> beforeMetadata;
+    ScopedCollectionMetadata beforeMetadata;
     {
         ScopedTransaction transaction(txn, MODE_IS);
         AutoGetCollection autoColl(txn, nss, MODE_IS);
@@ -698,12 +696,13 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
     long long refreshMillis;
 
     {
-        Status status = mdLoader.makeCollectionMetadata(txn,
-                                                        grid.catalogClient(txn),
-                                                        ns,
-                                                        getShardName(),
-                                                        fullReload ? nullptr : beforeMetadata.get(),
-                                                        remoteMetadata.get());
+        Status status =
+            mdLoader.makeCollectionMetadata(txn,
+                                            grid.catalogClient(txn),
+                                            ns,
+                                            getShardName(),
+                                            fullReload ? nullptr : beforeMetadata.getMetadata(),
+                                            remoteMetadata.get());
         refreshMillis = refreshTimer.millis();
 
         if (status.code() == ErrorCodes::NamespaceNotFound) {
@@ -727,7 +726,7 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
     // Get ready to install loaded metadata if needed
     //
 
-    shared_ptr<CollectionMetadata> afterMetadata;
+    ScopedCollectionMetadata afterMetadata;
     ChunkVersion afterShardVersion;
     ChunkVersion afterCollVersion;
     VersionChoice choice;
@@ -750,6 +749,7 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
         // Get the metadata now that the load has completed
         auto css = CollectionShardingState::get(txn, nss);
         afterMetadata = css->getMetadata();
+
         if (afterMetadata) {
             afterShardVersion = afterMetadata->getShardVersion();
             afterCollVersion = afterMetadata->getCollVersion();
@@ -761,7 +761,8 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
         // Resolve newer pending chunks with the remote metadata, finish construction
         //
 
-        Status status = mdLoader.promotePendingChunks(afterMetadata.get(), remoteMetadata.get());
+        Status status =
+            mdLoader.promotePendingChunks(afterMetadata.getMetadata(), remoteMetadata.get());
         if (!status.isOK()) {
             warning() << "remote metadata for " << ns
                       << " is inconsistent with current pending chunks"
@@ -894,7 +895,7 @@ void ShardingState::appendInfo(OperationContext* txn, BSONObjBuilder& builder) {
     for (CollectionShardingStateMap::const_iterator it = _collections.begin();
          it != _collections.end();
          ++it) {
-        shared_ptr<CollectionMetadata> metadata = it->second->getMetadata();
+        ScopedCollectionMetadata metadata = it->second->getMetadata();
         if (metadata) {
             versionB.appendTimestamp(it->first, metadata->getShardVersion().toLong());
         } else {
@@ -917,7 +918,7 @@ bool ShardingState::needCollectionMetadata(OperationContext* txn, const string& 
         OperationShardingState::get(txn).hasShardVersion();
 }
 
-shared_ptr<CollectionMetadata> ShardingState::getCollectionMetadata(const string& ns) {
+ScopedCollectionMetadata ShardingState::getCollectionMetadata(const string& ns) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     CollectionShardingStateMap::const_iterator it = _collections.find(ns);

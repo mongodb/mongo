@@ -114,7 +114,11 @@ public:
         AutoGetCollection autoColl(txn, nss, MODE_IS);
         CollectionShardingState* const css = CollectionShardingState::get(txn, nss);
 
-        shared_ptr<CollectionMetadata> metadata(css ? css->getMetadata() : nullptr);
+        ScopedCollectionMetadata metadata;
+        if (css) {
+            metadata = css->getMetadata();
+        }
+
         if (metadata) {
             result.appendTimestamp("global", metadata->getShardVersion().toLong());
         } else {

@@ -175,8 +175,7 @@ void fillOutPlannerParams(OperationContext* txn,
 
     // If the caller wants a shard filter, make sure we're actually sharded.
     if (plannerParams->options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-        std::shared_ptr<CollectionMetadata> collMetadata =
-            CollectionShardingState::get(txn, canonicalQuery->nss())->getMetadata();
+        auto collMetadata = CollectionShardingState::get(txn, canonicalQuery->nss())->getMetadata();
         if (collMetadata) {
             plannerParams->shardKey = collMetadata->getKeyPattern();
         } else {

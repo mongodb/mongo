@@ -35,7 +35,7 @@
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/s/metadata_manager.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -51,10 +51,10 @@ using stdx::make_unique;
 const char* ShardFilterStage::kStageType = "SHARDING_FILTER";
 
 ShardFilterStage::ShardFilterStage(OperationContext* opCtx,
-                                   const shared_ptr<CollectionMetadata>& metadata,
+                                   ScopedCollectionMetadata metadata,
                                    WorkingSet* ws,
                                    PlanStage* child)
-    : PlanStage(kStageType, opCtx), _ws(ws), _metadata(metadata) {
+    : PlanStage(kStageType, opCtx), _ws(ws), _metadata(std::move(metadata)) {
     _children.emplace_back(child);
 }
 

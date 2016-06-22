@@ -80,7 +80,7 @@ CleanupResult cleanupOrphanedData(OperationContext* txn,
                                   string* errMsg) {
     BSONObj startingFromKey = startingFromKeyConst;
 
-    std::shared_ptr<CollectionMetadata> metadata;
+    ScopedCollectionMetadata metadata;
     {
         AutoGetCollection autoColl(txn, ns, MODE_IS);
         metadata = CollectionShardingState::get(txn, ns.toString())->getMetadata();
@@ -115,9 +115,6 @@ CleanupResult cleanupOrphanedData(OperationContext* txn,
     }
     orphanRange.ns = ns.ns();
     *stoppedAtKey = orphanRange.maxKey;
-
-    // We're done with this metadata now, no matter what happens
-    metadata.reset();
 
     LOG(1) << "orphaned data cleanup requested for " << ns.toString() << " starting from "
            << startingFromKey << ", removing next orphan range"

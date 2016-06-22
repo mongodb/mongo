@@ -224,8 +224,7 @@ private:
 
             MigrationSourceManager migrationSourceManager(txn, moveChunkRequest);
 
-            shardKeyPattern =
-                migrationSourceManager.getCommittedMetadata()->getKeyPattern().getOwned();
+            shardKeyPattern = migrationSourceManager.getKeyPattern().getOwned();
 
             moveTimingHelper.done(2);
             MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep2);

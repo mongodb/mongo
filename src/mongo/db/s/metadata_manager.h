@@ -123,6 +123,12 @@ class ScopedCollectionMetadata {
 
 public:
     /**
+     * Creates an empty ScopedCollectionMetadata. Using the default constructor means that no
+     * metadata is available.
+     */
+    ScopedCollectionMetadata();
+
+    /**
      * Decrements the usageCounter and conditionally makes a call to _removeMetadata on
      * the tracker if the count has reached zero.
      */
@@ -137,6 +143,9 @@ public:
     CollectionMetadata* operator->();
     CollectionMetadata* getMetadata();
 
+    /** True if the ScopedCollectionMetadata stores a metadata (is not empty) */
+    operator bool() const;
+
 private:
     friend ScopedCollectionMetadata MetadataManager::getActiveMetadata();
 
@@ -146,8 +155,8 @@ private:
     ScopedCollectionMetadata(MetadataManager* manager,
                              MetadataManager::CollectionMetadataTracker* tracker);
 
-    MetadataManager* _manager;
-    MetadataManager::CollectionMetadataTracker* _tracker;
+    MetadataManager* _manager{nullptr};
+    MetadataManager::CollectionMetadataTracker* _tracker{nullptr};
 };
 
 }  // namespace mongo

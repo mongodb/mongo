@@ -34,6 +34,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/metadata_manager.h"
 
 namespace mongo {
 
@@ -75,14 +76,12 @@ public:
     /**
      * Returns the chunk metadata for the collection.
      */
-    std::shared_ptr<CollectionMetadata> getMetadata() const {
-        return _metadata;
-    }
+    ScopedCollectionMetadata getMetadata();
 
     /**
      * Set a new metadata to be used for this collection.
      */
-    void setMetadata(std::shared_ptr<CollectionMetadata> newMetadata);
+    void setMetadata(std::unique_ptr<CollectionMetadata> newMetadata);
 
     /**
      * Returns the active migration source manager, if one is available.
@@ -112,7 +111,7 @@ public:
      * response is constructed, this function should be the only means of checking for shard version
      * match.
      */
-    void checkShardVersionOrThrow(OperationContext* txn) const;
+    void checkShardVersionOrThrow(OperationContext* txn);
 
     // Replication subsystem hooks. If this collection is serving as a source for migration, these
     // methods inform it of any changes to its contents.
@@ -142,14 +141,12 @@ private:
     bool _checkShardVersionOk(OperationContext* txn,
                               std::string* errmsg,
                               ChunkVersion* expectedShardVersion,
-                              ChunkVersion* actualShardVersion) const;
+                              ChunkVersion* actualShardVersion);
 
     // Namespace to which this state belongs.
     const NamespaceString _nss;
 
-    // Contains all the chunks associated with this collection. This value will be null if the
-    // collection is not sharded.
-    std::shared_ptr<CollectionMetadata> _metadata;
+    MetadataManager _metadataManager;
 
     // If this collection is serving as a source shard for chunk migration, this value will be
     // non-null. To write this value there needs to be X-lock on the collection in order to
