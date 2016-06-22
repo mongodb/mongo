@@ -47,8 +47,13 @@ const char kLastmod[] = "lastmod";
 const char ChunkVersion::kShardVersionField[] = "shardVersion";
 
 StatusWith<ChunkVersion> ChunkVersion::parseFromBSONForCommands(const BSONObj& obj) {
+    return parseFromBSONWithFieldForCommands(obj, kShardVersionField);
+}
+
+StatusWith<ChunkVersion> ChunkVersion::parseFromBSONWithFieldForCommands(const BSONObj& obj,
+                                                                         StringData field) {
     BSONElement versionElem;
-    Status status = bsonExtractField(obj, kShardVersionField, &versionElem);
+    Status status = bsonExtractField(obj, field, &versionElem);
     if (!status.isOK())
         return status;
 
@@ -112,7 +117,11 @@ void ChunkVersion::appendForSetShardVersion(BSONObjBuilder* builder) const {
 }
 
 void ChunkVersion::appendForCommands(BSONObjBuilder* builder) const {
-    builder->appendArray(kShardVersionField, toBSON());
+    appendWithFieldForCommands(builder, kShardVersionField);
+}
+
+void ChunkVersion::appendWithFieldForCommands(BSONObjBuilder* builder, StringData field) const {
+    builder->appendArray(field, toBSON());
 }
 
 void ChunkVersion::appendForChunk(BSONObjBuilder* builder) const {
