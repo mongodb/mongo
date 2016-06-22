@@ -70,7 +70,8 @@ Status BalancerConfiguration::setBalancerActive(OperationContext* txn, bool acti
         kSettingsNamespace.ns(),
         BSON("_id" << BalancerSettingsType::kKey),
         BSON("$set" << BSON(kStopped << !active)),
-        true);
+        true,
+        ShardingCatalogClient::kMajorityWriteConcern);
 
     Status refreshStatus = refreshAndCheck(txn);
     if (!refreshStatus.isOK()) {

@@ -190,21 +190,25 @@ void ShardingCatalogClientMock::writeConfigServerDirect(OperationContext* txn,
 
 Status ShardingCatalogClientMock::insertConfigDocument(OperationContext* txn,
                                                        const std::string& ns,
-                                                       const BSONObj& doc) {
+                                                       const BSONObj& doc,
+                                                       const WriteConcernOptions& writeConcern) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-StatusWith<bool> ShardingCatalogClientMock::updateConfigDocument(OperationContext* txn,
-                                                                 const std::string& ns,
-                                                                 const BSONObj& query,
-                                                                 const BSONObj& update,
-                                                                 bool upsert) {
+StatusWith<bool> ShardingCatalogClientMock::updateConfigDocument(
+    OperationContext* txn,
+    const std::string& ns,
+    const BSONObj& query,
+    const BSONObj& update,
+    bool upsert,
+    const WriteConcernOptions& writeConcern) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
 Status ShardingCatalogClientMock::removeConfigDocuments(OperationContext* txn,
                                                         const std::string& ns,
-                                                        const BSONObj& query) {
+                                                        const BSONObj& query,
+                                                        const WriteConcernOptions& writeConcern) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 

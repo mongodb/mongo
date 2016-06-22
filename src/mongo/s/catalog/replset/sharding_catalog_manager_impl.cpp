@@ -72,14 +72,7 @@ using str::stream;
 namespace {
 
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
-const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
-                                                // Note: Even though we're setting UNSET here,
-                                                // kMajority implies JOURNAL if journaling is
-                                                // supported by mongod and
-                                                // writeConcernMajorityJournalDefault is set to true
-                                                // in the ReplicaSetConfig.
-                                                WriteConcernOptions::SyncMode::UNSET,
-                                                Seconds(15));
+const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
 
 void toBatchError(const Status& status, BatchedCommandResponse* response) {
     response->clear();
@@ -512,7 +505,7 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
     auto updateRequest = shardIdentity.createUpsertForAddShard();
     BatchedCommandRequest commandRequest(updateRequest.release());
     commandRequest.setNS(NamespaceString::kConfigCollectionNamespace);
-    commandRequest.setWriteConcern(kMajorityWriteConcern.toBSON());
+    commandRequest.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
 
     auto swCommandResponse =
         _runCommandForAddShard(txn, targeter.get(), "admin", commandRequest.toBSON());
@@ -532,8 +525,8 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
 
     log() << "going to insert new entry for shard into config.shards: " << shardType.toString();
 
-    Status result =
-        _catalogClient->insertConfigDocument(txn, ShardType::ConfigNS, shardType.toBSON());
+    Status result = _catalogClient->insertConfigDocument(
+        txn, ShardType::ConfigNS, shardType.toBSON(), ShardingCatalogClient::kMajorityWriteConcern);
     if (!result.isOK()) {
         log() << "error adding shard: " << shardType.toBSON() << " err: " << result.reason();
         if (result == ErrorCodes::DuplicateKey) {
@@ -589,13 +582,13 @@ Status ShardingCatalogManagerImpl::addShardToZone(OperationContext* txn,
                                                   const std::string& zoneName) {
     ScopedZoneOpExclusiveLock scopedLock(txn);
 
-    // TODO: SERVER-24701 use w: 1
     auto updateStatus = _catalogClient->updateConfigDocument(
         txn,
         ShardType::ConfigNS,
         BSON(ShardType::name(shardName)),
         BSON("$addToSet" << BSON(ShardType::tags() << zoneName)),
-        false);
+        false,
+        kNoWaitWriteConcern);
 
     if (!updateStatus.isOK()) {
         return updateStatus.getStatus();

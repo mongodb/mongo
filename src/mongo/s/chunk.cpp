@@ -443,7 +443,8 @@ void Chunk::markAsJumbo(OperationContext* txn) const {
                                                       ChunkType::ConfigNS,
                                                       BSON(ChunkType::name(chunkName)),
                                                       BSON("$set" << BSON(ChunkType::jumbo(true))),
-                                                      false);
+                                                      false,
+                                                      ShardingCatalogClient::kMajorityWriteConcern);
     if (!status.isOK()) {
         warning() << "couldn't set jumbo for chunk: " << chunkName << causedBy(status.getStatus());
     }

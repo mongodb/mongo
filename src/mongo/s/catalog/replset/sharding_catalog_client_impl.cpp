@@ -101,15 +101,6 @@ const char kWriteConcernField[] = "writeConcern";
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
 const ReadPreferenceSetting kConfigPrimaryPreferredSelector(ReadPreference::PrimaryPreferred,
                                                             TagSet{});
-const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
-                                                // Note: Even though we're setting UNSET here,
-                                                // kMajority implies JOURNAL if journaling is
-                                                // supported by mongod and
-                                                // writeConcernMajorityJournalDefault is set to true
-                                                // in the ReplicaSetConfig.
-                                                WriteConcernOptions::SyncMode::UNSET,
-                                                Seconds(15));
-
 const int kMaxConfigVersionInitRetry = 3;
 const int kMaxReadRetry = 3;
 const int kMaxWriteRetry = 3;
@@ -163,8 +154,12 @@ Status ShardingCatalogClientImpl::updateCollection(OperationContext* txn,
                                                    const CollectionType& coll) {
     fassert(28634, coll.validate());
 
-    auto status = updateConfigDocument(
-        txn, CollectionType::ConfigNS, BSON(CollectionType::fullNs(collNs)), coll.toBSON(), true);
+    auto status = updateConfigDocument(txn,
+                                       CollectionType::ConfigNS,
+                                       BSON(CollectionType::fullNs(collNs)),
+                                       coll.toBSON(),
+                                       true,
+                                       ShardingCatalogClient::kMajorityWriteConcern);
     if (!status.isOK()) {
         return Status(status.getStatus().code(),
                       str::stream() << "collection metadata write failed"
@@ -179,8 +174,12 @@ Status ShardingCatalogClientImpl::updateDatabase(OperationContext* txn,
                                                  const DatabaseType& db) {
     fassert(28616, db.validate());
 
-    auto status = updateConfigDocument(
-        txn, DatabaseType::ConfigNS, BSON(DatabaseType::name(dbName)), db.toBSON(), true);
+    auto status = updateConfigDocument(txn,
+                                       DatabaseType::ConfigNS,
+                                       BSON(DatabaseType::name(dbName)),
+                                       db.toBSON(),
+                                       true,
+                                       ShardingCatalogClient::kMajorityWriteConcern);
     if (!status.isOK()) {
         return Status(status.getStatus().code(),
                       str::stream() << "database metadata write failed"
@@ -225,7 +224,8 @@ Status ShardingCatalogClientImpl::createDatabase(OperationContext* txn, const st
     db.setPrimary(newShardId);
     db.setSharded(false);
 
-    status = insertConfigDocument(txn, DatabaseType::ConfigNS, db.toBSON());
+    status = insertConfigDocument(
+        txn, DatabaseType::ConfigNS, db.toBSON(), ShardingCatalogClient::kMajorityWriteConcern);
     if (status.code() == ErrorCodes::DuplicateKey) {
         return Status(ErrorCodes::NamespaceExists, "database " + dbName + " already exists");
     }
@@ -375,7 +375,8 @@ Status ShardingCatalogClientImpl::_log(OperationContext* txn,
     log() << "about to log metadata event into " << logCollName << ": " << changeLogBSON;
 
     const NamespaceString nss("config", logCollName);
-    Status result = insertConfigDocument(txn, nss.ns(), changeLogBSON);
+    Status result = insertConfigDocument(
+        txn, nss.ns(), changeLogBSON, ShardingCatalogClient::kMajorityWriteConcern);
     if (!result.isOK()) {
         warning() << "Error encountered while logging config change with ID [" << changeId
                   << "] into collection " << logCollName << ": " << result;
@@ -536,7 +537,8 @@ StatusWith<ShardDrainingStatus> ShardingCatalogClientImpl::removeShard(Operation
                                                  ShardType::ConfigNS,
                                                  BSON(ShardType::name() << name),
                                                  BSON("$set" << BSON(ShardType::draining(true))),
-                                                 false);
+                                                 false,
+                                                 ShardingCatalogClient::kMajorityWriteConcern);
         if (!updateStatus.isOK()) {
             log() << "error starting removeShard: " << name << causedBy(updateStatus.getStatus());
             return updateStatus.getStatus();
@@ -574,8 +576,10 @@ StatusWith<ShardDrainingStatus> ShardingCatalogClientImpl::removeShard(Operation
     log() << "going to remove shard: " << name;
     audit::logRemoveShard(txn->getClient(), name);
 
-    Status status =
-        removeConfigDocuments(txn, ShardType::ConfigNS, BSON(ShardType::name() << name));
+    Status status = removeConfigDocuments(txn,
+                                          ShardType::ConfigNS,
+                                          BSON(ShardType::name() << name),
+                                          ShardingCatalogClient::kMajorityWriteConcern);
     if (!status.isOK()) {
         log() << "Error concluding removeShard operation on: " << name
               << "; err: " << status.reason();
@@ -812,7 +816,10 @@ Status ShardingCatalogClientImpl::dropCollection(OperationContext* txn, const Na
     LOG(1) << "dropCollection " << ns << " shard data deleted";
 
     // Remove chunk data
-    Status result = removeConfigDocuments(txn, ChunkType::ConfigNS, BSON(ChunkType::ns(ns.ns())));
+    Status result = removeConfigDocuments(txn,
+                                          ChunkType::ConfigNS,
+                                          BSON(ChunkType::ns(ns.ns())),
+                                          ShardingCatalogClient::kMajorityWriteConcern);
     if (!result.isOK()) {
         return result;
     }
@@ -1304,7 +1311,8 @@ void ShardingCatalogClientImpl::_runBatchWriteCommand(OperationContext* txn,
 
 Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* txn,
                                                        const std::string& ns,
-                                                       const BSONObj& doc) {
+                                                       const BSONObj& doc,
+                                                       const WriteConcernOptions& writeConcern) {
     const NamespaceString nss(ns);
     invariant(nss.db() == "config");
 
@@ -1316,7 +1324,7 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* txn,
 
     BatchedCommandRequest request(insert.release());
     request.setNS(nss);
-    request.setWriteConcern(kMajorityWriteConcern.toBSON());
+    request.setWriteConcern(writeConcern.toBSON());
 
     auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
     for (int retry = 1; retry <= kMaxWriteRetry; retry++) {
@@ -1375,11 +1383,13 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* txn,
     MONGO_UNREACHABLE;
 }
 
-StatusWith<bool> ShardingCatalogClientImpl::updateConfigDocument(OperationContext* txn,
-                                                                 const string& ns,
-                                                                 const BSONObj& query,
-                                                                 const BSONObj& update,
-                                                                 bool upsert) {
+StatusWith<bool> ShardingCatalogClientImpl::updateConfigDocument(
+    OperationContext* txn,
+    const string& ns,
+    const BSONObj& query,
+    const BSONObj& update,
+    bool upsert,
+    const WriteConcernOptions& writeConcern) {
     const NamespaceString nss(ns);
     invariant(nss.db() == "config");
 
@@ -1397,7 +1407,7 @@ StatusWith<bool> ShardingCatalogClientImpl::updateConfigDocument(OperationContex
 
     BatchedCommandRequest request(updateRequest.release());
     request.setNS(nss);
-    request.setWriteConcern(kMajorityWriteConcern.toBSON());
+    request.setWriteConcern(writeConcern.toBSON());
 
     BatchedCommandResponse response;
     _runBatchWriteCommand(txn, request, &response, Shard::RetryPolicy::kIdempotent);
@@ -1414,7 +1424,8 @@ StatusWith<bool> ShardingCatalogClientImpl::updateConfigDocument(OperationContex
 
 Status ShardingCatalogClientImpl::removeConfigDocuments(OperationContext* txn,
                                                         const string& ns,
-                                                        const BSONObj& query) {
+                                                        const BSONObj& query,
+                                                        const WriteConcernOptions& writeConcern) {
     const NamespaceString nss(ns);
     invariant(nss.db() == "config");
 
@@ -1427,7 +1438,7 @@ Status ShardingCatalogClientImpl::removeConfigDocuments(OperationContext* txn,
 
     BatchedCommandRequest request(deleteRequest.release());
     request.setNS(nss);
-    request.setWriteConcern(kMajorityWriteConcern.toBSON());
+    request.setWriteConcern(writeConcern.toBSON());
 
     BatchedCommandResponse response;
     _runBatchWriteCommand(txn, request, &response, Shard::RetryPolicy::kIdempotent);
@@ -1566,8 +1577,12 @@ Status ShardingCatalogClientImpl::initConfigVersion(OperationContext* txn) {
             newVersion.setCurrentVersion(CURRENT_CONFIG_VERSION);
 
             BSONObj versionObj(newVersion.toBSON());
-            auto upsertStatus =
-                updateConfigDocument(txn, VersionType::ConfigNS, versionObj, versionObj, true);
+            auto upsertStatus = updateConfigDocument(txn,
+                                                     VersionType::ConfigNS,
+                                                     versionObj,
+                                                     versionObj,
+                                                     true,
+                                                     ShardingCatalogClient::kMajorityWriteConcern);
 
             if ((upsertStatus.isOK() && !upsertStatus.getValue()) ||
                 upsertStatus == ErrorCodes::DuplicateKey) {

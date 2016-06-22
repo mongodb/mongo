@@ -69,6 +69,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/s/type_shard_identity',
         '$BUILD_DIR/mongo/executor/network_interface',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager',
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client',
         '$BUILD_DIR/mongo/s/client/sharding_client',
     ],
     LIBDEPS_TAGS=[

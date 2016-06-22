@@ -35,6 +35,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/repl/optime_with.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/client/shard.h"
 
@@ -91,6 +92,8 @@ class ShardingCatalogClient {
     MONGO_DISALLOW_COPYING(ShardingCatalogClient);
 
 public:
+    static const WriteConcernOptions kMajorityWriteConcern;
+
     virtual ~ShardingCatalogClient() = default;
 
     /**
@@ -377,7 +380,8 @@ public:
      */
     virtual Status insertConfigDocument(OperationContext* txn,
                                         const std::string& ns,
-                                        const BSONObj& doc) = 0;
+                                        const BSONObj& doc,
+                                        const WriteConcernOptions& writeConcern) = 0;
 
     /**
      * Updates a single document in the specified namespace on the config server. The document must
@@ -397,7 +401,8 @@ public:
                                                   const std::string& ns,
                                                   const BSONObj& query,
                                                   const BSONObj& update,
-                                                  bool upsert) = 0;
+                                                  bool upsert,
+                                                  const WriteConcernOptions& writeConcern) = 0;
 
     /**
      * Removes documents matching a particular query predicate from the specified namespace on the
@@ -407,7 +412,8 @@ public:
      */
     virtual Status removeConfigDocuments(OperationContext* txn,
                                          const std::string& ns,
-                                         const BSONObj& query) = 0;
+                                         const BSONObj& query,
+                                         const WriteConcernOptions& writeConcern) = 0;
 
     /**
      * Performs the necessary checks for version compatibility and creates a new version document
