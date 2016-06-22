@@ -55,6 +55,7 @@ variables:
 
 - &jepsen_config_vars
   hang_analyzer_processes: "java"
+  jepsen_key_time_limit: --key-time-limit 15
   jepsen_protocol_version: --protocol-version 1
   jepsen_read_concern: ""
   jepsen_read_with_find_and_modify: ""
@@ -393,9 +394,9 @@ functions:
         script: |
           set -o verbose
           set -o errexit
-          # Increase JVM heap space to 75% of total free memory
-          heap_space=$(awk '/MemFree:/{printf "%0dm\n",$2*0.75/1024}' /proc/meminfo)
-          sed -i -e "s/\"-Xmx.*\"/\"-Xmx$heap_space\"/" project.clj
+          # Set/modify JVM heap space settings.
+          jvm_settings="\"-Xmx16g\"\n             \"-Xms16g\"\n             \"-Xmn4g\""
+          sed -i -e "s/\"-Xmx.*\"/$jvm_settings/" project.clj
     - command: shell.exec
       type: test
       timeout_secs: 2700 # Timeout test if there is no output for more than 45 minutes.
@@ -404,7 +405,7 @@ functions:
         script: |
           set -o verbose
           start_time=$(date +%s)
-          lein run --tarball "file:///root/mongo-binaries.tgz" ${jepsen_protocol_version} ${jepsen_read_concern} ${jepsen_read_with_find_and_modify} ${jepsen_storage_engine} ${jepsen_time_limit} ${jepsen_write_concern}
+          lein run --tarball "file:///root/mongo-binaries.tgz" ${jepsen_key_time_limit} ${jepsen_protocol_version} ${jepsen_read_concern} ${jepsen_read_with_find_and_modify} ${jepsen_storage_engine} ${jepsen_time_limit} ${jepsen_write_concern}
           exit_code=$?
           # Create exit_code file, so we can signal an error, after the archive/put steps have run.
           echo $exit_code > ../../jepsen-exit_code-${task_id}-${execution}.txt
