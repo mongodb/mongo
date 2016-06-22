@@ -99,7 +99,7 @@ function expectState(rst, state) {
         rst.getPrimary();
         expectState(rst, ReplSetTest.State.PRIMARY);
         assert.throws(function() {
-            rst.restart(0, {configsvr: ""});
+            rst.restart(0, {configsvr: ""}, true);
         });
 
         rst.stopSet();

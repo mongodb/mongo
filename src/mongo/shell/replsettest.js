@@ -978,10 +978,10 @@ var ReplSetTest = function(opts) {
             if (started.length) {
                 // if n was an array of conns, start will return an array of connections
                 for (var i = 0; i < started.length; i++) {
-                    jsTest.authenticate(started[i]);
+                    assert(jsTest.authenticate(started[i]), "Failed authentication during restart");
                 }
             } else {
-                jsTest.authenticate(started);
+                assert(jsTest.authenticate(started), "Failed authentication during restart");
             }
         }
         return started;
