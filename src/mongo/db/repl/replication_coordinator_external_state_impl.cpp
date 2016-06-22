@@ -140,13 +140,15 @@ std::unique_ptr<ThreadPool> makeThreadPool() {
 
 }  // namespace
 
-ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl()
-    : _startedThreads(false), _nextThreadId(0) {}
+ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl(
+    StorageInterface* storageInterface)
+    : _storageInterface(storageInterface) {
+    uassert(ErrorCodes::BadValue, "A StorageInterface is required.", _storageInterface);
+}
 ReplicationCoordinatorExternalStateImpl::~ReplicationCoordinatorExternalStateImpl() {}
 
 bool ReplicationCoordinatorExternalStateImpl::isInitialSyncFlagSet(OperationContext* txn) {
-    const auto si = repl::StorageInterface::get(txn);
-    return (si && si->getInitialSyncFlag(txn));
+    return _storageInterface->getInitialSyncFlag(txn);
 }
 
 void ReplicationCoordinatorExternalStateImpl::startInitialSync(OnInitialSyncFinishedFn finished) {
@@ -201,6 +203,8 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
 
     _writerPool = SyncTail::makeWriterPool();
 
+    _storageInterface->startup();
+
     _startedThreads = true;
 }
 
@@ -229,6 +233,7 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* txn) {
 
         _taskExecutor->shutdown();
         _taskExecutor->join();
+        _storageInterface->shutdown();
     }
 }
 
@@ -385,7 +390,10 @@ void ReplicationCoordinatorExternalStateImpl::setGlobalTimestamp(const Timestamp
 }
 
 void ReplicationCoordinatorExternalStateImpl::cleanUpLastApplyBatch(OperationContext* txn) {
-    auto mv = StorageInterface::get(txn)->getMinValid(txn);
+    if (_storageInterface->getInitialSyncFlag(txn)) {
+        return;  // Initial Sync will take over so no cleanup is needed.
+    }
+    auto mv = _storageInterface->getMinValid(txn);
 
     if (!mv.start.isNull()) {
         // If we are in the middle of a batch, and recoveringm then we need to truncate the oplog.
@@ -398,8 +406,7 @@ StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::loadLastOpTime(Opera
     // TODO: handle WriteConflictExceptions below
     try {
         // If we are doing an initial sync do not read from the oplog.
-        const auto si = repl::StorageInterface::get(txn);
-        if (si && si->getInitialSyncFlag(txn)) {
+        if (_storageInterface->getInitialSyncFlag(txn)) {
             return {ErrorCodes::InitialSyncFailure, "In the middle of an initial sync."};
         }
 

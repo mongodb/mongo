@@ -80,6 +80,7 @@ class OplogReader;
 class ReplSetRequestVotesArgs;
 class ReplicaSetConfig;
 class SyncSourceFeedback;
+class StorageInterface;
 class TopologyCoordinator;
 class VoteRequester;
 
@@ -96,11 +97,13 @@ public:
                                ReplicationCoordinatorExternalState* externalState,
                                executor::NetworkInterface* network,
                                TopologyCoordinator* topoCoord,
+                               StorageInterface* storage,
                                int64_t prngSeed);
     // Takes ownership of the "externalState" and "topCoord" objects.
     ReplicationCoordinatorImpl(const ReplSettings& settings,
                                ReplicationCoordinatorExternalState* externalState,
                                TopologyCoordinator* topoCoord,
+                               StorageInterface* storage,
                                ReplicationExecutor* replExec,
                                int64_t prngSeed,
                                stdx::function<bool()>* isDurableStorageEngineFn);
@@ -452,6 +455,7 @@ private:
     ReplicationCoordinatorImpl(const ReplSettings& settings,
                                ReplicationCoordinatorExternalState* externalState,
                                TopologyCoordinator* topCoord,
+                               StorageInterface* storage,
                                int64_t prngSeed,
                                executor::NetworkInterface* network,
                                ReplicationExecutor* replExec,

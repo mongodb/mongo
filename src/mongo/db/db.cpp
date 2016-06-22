@@ -944,20 +944,23 @@ static void startupConfigActions(const std::vector<std::string>& args) {
 MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
                                      ("SetGlobalEnvironment", "SSLManager"))
 (InitializerContext* context) {
+    auto serviceContext = getGlobalServiceContext();
+    repl::StorageInterface::set(serviceContext, stdx::make_unique<repl::StorageInterfaceImpl>());
+    auto storageInterface = repl::StorageInterface::get(serviceContext);
+
     repl::TopologyCoordinatorImpl::Options topoCoordOptions;
     topoCoordOptions.maxSyncSourceLagSecs = Seconds(repl::maxSyncSourceLagSecs);
     topoCoordOptions.clusterRole = serverGlobalParams.clusterRole;
 
     auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorImpl>(
         getGlobalReplSettings(),
-        new repl::ReplicationCoordinatorExternalStateImpl,
+        new repl::ReplicationCoordinatorExternalStateImpl(storageInterface),
         executor::makeNetworkInterface("NetworkInterfaceASIO-Replication").release(),
         new repl::TopologyCoordinatorImpl(topoCoordOptions),
+        storageInterface,
         static_cast<int64_t>(curTimeMillis64()));
-    auto serviceContext = getGlobalServiceContext();
     serviceContext->registerKillOpListener(replCoord.get());
     repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
-    repl::StorageInterface::set(serviceContext, stdx::make_unique<repl::StorageInterfaceImpl>());
     repl::setOplogCollectionName();
     return Status::OK();
 }

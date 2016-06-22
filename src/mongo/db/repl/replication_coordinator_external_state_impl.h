@@ -47,13 +47,14 @@ class ServiceContext;
 namespace repl {
 
 class SnapshotThread;
+class StorageInterface;
 
 class ReplicationCoordinatorExternalStateImpl final : public ReplicationCoordinatorExternalState,
                                                       public JournalListener {
     MONGO_DISALLOW_COPYING(ReplicationCoordinatorExternalStateImpl);
 
 public:
-    ReplicationCoordinatorExternalStateImpl();
+    ReplicationCoordinatorExternalStateImpl(StorageInterface* storageInterface);
     virtual ~ReplicationCoordinatorExternalStateImpl();
     virtual void startThreads(const ReplSettings& settings) override;
     virtual void startInitialSync(OnInitialSyncFinishedFn finished) override;
@@ -114,8 +115,9 @@ private:
     // Guards starting threads and setting _startedThreads
     stdx::mutex _threadMutex;
 
+    StorageInterface* _storageInterface;
     // True when the threads have been started
-    bool _startedThreads;
+    bool _startedThreads = false;
 
     // The SyncSourceFeedback class is responsible for sending replSetUpdatePosition commands
     // for forwarding replication progress information upstream when there is chained
@@ -138,7 +140,7 @@ private:
     // Mutex guarding the _nextThreadId value to prevent concurrent incrementing.
     stdx::mutex _nextThreadIdMutex;
     // Number used to uniquely name threads.
-    long long _nextThreadId;
+    long long _nextThreadId = 0;
 
     std::unique_ptr<SnapshotThread> _snapshotThread;
 

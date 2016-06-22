@@ -60,6 +60,7 @@
 #include "mongo/db/repl/replica_set_config_checks.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rslog.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/repl/vote_requester.h"
@@ -236,6 +237,7 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
     const ReplSettings& settings,
     ReplicationCoordinatorExternalState* externalState,
     TopologyCoordinator* topCoord,
+    StorageInterface* storage,
     int64_t prngSeed,
     NetworkInterface* network,
     ReplicationExecutor* replExec,
@@ -282,20 +284,23 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
     ReplicationCoordinatorExternalState* externalState,
     NetworkInterface* network,
     TopologyCoordinator* topCoord,
+    StorageInterface* storage,
     int64_t prngSeed)
     : ReplicationCoordinatorImpl(
-          settings, externalState, topCoord, prngSeed, network, nullptr, nullptr) {}
+          settings, externalState, topCoord, storage, prngSeed, network, nullptr, nullptr) {}
 
 ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
     const ReplSettings& settings,
     ReplicationCoordinatorExternalState* externalState,
     TopologyCoordinator* topCoord,
+    StorageInterface* storage,
     ReplicationExecutor* replExec,
     int64_t prngSeed,
     stdx::function<bool()>* isDurableStorageEngineFn)
     : ReplicationCoordinatorImpl(settings,
                                  externalState,
                                  topCoord,
+                                 storage,
                                  prngSeed,
                                  nullptr,
                                  replExec,
