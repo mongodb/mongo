@@ -140,6 +140,7 @@ env.Library(
         'dbclient.cpp',
         'dbclient_rs.cpp',
         'dbclientcursor.cpp',
+        'index_spec.cpp',
         'global_conn_pool.cpp',
         'replica_set_monitor.cpp',
         'replica_set_monitor_manager.cpp',
@@ -234,6 +235,16 @@ env.CppUnitTest('dbclient_rs_test',
                     'clientdriver',
                     '$BUILD_DIR/mongo/dbtests/mocklib',
                 ]
+)
+
+env.CppUnitTest(
+    target='index_spec_test',
+    source=[
+        'index_spec_test.cpp',
+    ],
+    LIBDEPS=[
+        'clientdriver',
+    ],
 )
 
 env.CppUnitTest(

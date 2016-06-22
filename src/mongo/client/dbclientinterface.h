@@ -32,6 +32,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/client/index_spec.h"
 #include "mongo/client/query.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/jsobj.h"
@@ -704,23 +705,28 @@ public:
 
     bool exists(const std::string& ns);
 
-    /** Create an index if it does not already exist.
-       @param ns collection to be indexed
-       @param keys the "key pattern" for the index.  e.g., { name : 1 }
-       @param unique if true, indicates that key uniqueness should be enforced for this index
-       @param name if not specified, it will be created from the keys automatically (which is
-              recommended)
-       @param background build index in the background (see mongodb docs for details)
-       @param v index version. leave at default value. (unit tests set this parameter.)
-       @param ttl. The value of how many seconds before data should be removed from a collection.
+    /** Create an index on the collection 'ns' as described by the given keys. If you wish
+     *  to specify options, see the more flexible overload of 'createIndex' which takes an
+     *  IndexSpec object. Failure to construct the index is reported by throwing a
+     *  UserException.
+     *
+     *  @param ns Namespace on which to create the index
+     *  @param keys Document describing keys and index types. You must provide at least one
+     *  field and its direction.
      */
-    virtual void ensureIndex(const std::string& ns,
-                             BSONObj keys,
-                             bool unique = false,
-                             const std::string& name = "",
-                             bool background = false,
-                             int v = -1,
-                             int ttl = 0);
+    void createIndex(StringData ns, const BSONObj& keys) {
+        return createIndex(ns, IndexSpec().addKeys(keys));
+    }
+
+    /** Create an index on the collection 'ns' as described by the given
+     *  descriptor. Failure to construct the index is reported by throwing a
+     *  UserException.
+     *
+     *  @param ns Namespace on which to create the index
+     *  @param descriptor Configuration object describing the index to create. The
+     *  descriptor must describe at least one key and index type.
+     */
+    virtual void createIndex(StringData ns, const IndexSpec& descriptor);
 
     virtual std::list<BSONObj> getIndexSpecs(const std::string& ns, int options = 0);
 

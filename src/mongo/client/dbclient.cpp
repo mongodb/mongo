@@ -1233,42 +1233,23 @@ string DBClientWithCommands::genIndexName(const BSONObj& keys) {
     return ss.str();
 }
 
-void DBClientWithCommands::ensureIndex(const string& ns,
-                                       BSONObj keys,
-                                       bool unique,
-                                       const string& name,
-                                       bool background,
-                                       int version,
-                                       int ttl) {
-    BSONObjBuilder toSave;
-    toSave.append("ns", ns);
-    toSave.append("key", keys);
+void DBClientWithCommands::createIndex(StringData ns, const IndexSpec& descriptor) {
+    const BSONObj descriptorObj = descriptor.toBSON();
 
-    string cacheKey(ns);
-    cacheKey += "--";
-
-    if (name != "") {
-        toSave.append("name", name);
-        cacheKey += name;
-    } else {
-        string nn = genIndexName(keys);
-        toSave.append("name", nn);
-        cacheKey += nn;
+    BSONObjBuilder command;
+    command.append("createIndexes", nsToCollectionSubstring(ns));
+    {
+        BSONArrayBuilder indexes(command.subarrayStart("indexes"));
+        indexes.append(descriptorObj);
     }
+    const BSONObj commandObj = command.done();
 
-    if (version >= 0)
-        toSave.append("v", version);
-
-    if (unique)
-        toSave.appendBool("unique", unique);
-
-    if (background)
-        toSave.appendBool("background", true);
-
-    if (ttl > 0)
-        toSave.append("expireAfterSeconds", ttl);
-
-    insert(NamespaceString(ns).getSystemIndexesCollection(), toSave.obj());
+    BSONObj infoObj;
+    if (!runCommand(nsToDatabase(ns), commandObj, infoObj)) {
+        Status runCommandStatus = getStatusFromCommandResult(infoObj);
+        invariant(!runCommandStatus.isOK());
+        uassertStatusOK(runCommandStatus);
+    }
 }
 
 /* -- DBClientCursor ---------------------------------------------- */

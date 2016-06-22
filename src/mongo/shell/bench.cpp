@@ -1042,7 +1042,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                         }
                     } break;
                     case OpType::CREATEINDEX:
-                        conn->ensureIndex(op.ns, op.key, false, "", false);
+                        conn->createIndex(op.ns, op.key);
                         break;
                     case OpType::DROPINDEX:
                         conn->dropIndex(op.ns, op.key);
