@@ -193,7 +193,6 @@ __evict_thread_run(void *arg)
 		WT_ERR(__wt_epoch(
 		    session, &cache->stuck_ts));	/* -Wuninitialized */
 #endif
-	cache->pages_evicted = 0;
 	while (F_ISSET(conn, WT_CONN_EVICTION_RUN)) {
 		if (conn->evict_tid_set &&
 		    __wt_spin_trylock(session, &cache->evict_pass_lock) == 0) {
