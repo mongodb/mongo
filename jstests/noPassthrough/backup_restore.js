@@ -275,7 +275,7 @@
 
         // Wait for secondaries to finish catching up before shutting down.
         assert.writeOK(primary.getDB("test").foo.insert(
-            {}, {writeConcern: {w: rst.nodes.length, wtimeout: 120 * 1000}}));
+            {}, {writeConcern: {w: rst.nodes.length, wtimeout: 10 * 60 * 1000}}));
 
         // Stop set.
         rst.stopSet();
