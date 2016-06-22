@@ -612,7 +612,7 @@ std::set<StringData> IndexScanNode::getFieldsWithStringBounds(const IndexBounds&
             keyPatternIterator.next();
         }
 
-        return {};
+        return std::set<StringData>{};
     }
 
     std::set<StringData> ret;

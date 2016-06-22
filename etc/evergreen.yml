@@ -5432,7 +5432,22 @@ buildvariants:
     distros:
     - rhel55-test
 
-
+- name: enterprise-ubuntu1404-clang-3.4-libc
+  display_name: "~Enterprise Ubuntu 14.04 (Clang 3.4/libc++)"
+  modules:
+  - enterprise
+  - mongo-tools
+  run_on:
+  - ubuntu1404-test
+  batchtime: 1440 # 1 day
+  expansions:
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    tooltags: "-tags 'ssl sasl'"
+    compile_flags: --ssl CC=/usr/bin/clang CXX=/usr/bin/clang++ --libc++ -j$(grep -c ^processor /proc/cpuinfo)
+  tasks:
+  - name: compile
+    distros:
+    - ubuntu1404-build
 
 ###########################################
 #          SUSE buildvariants             #

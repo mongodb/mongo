@@ -39,15 +39,15 @@ namespace {
 using std::vector;
 
 TEST(IndexAccessMethodSetDifference, EmptyInputsShouldHaveNoDifference) {
-    BSONObjSet left = {};
-    BSONObjSet right = {};
+    BSONObjSet left{};
+    BSONObjSet right{};
     auto diff = IndexAccessMethod::setDifference(left, right);
     ASSERT_EQ(0UL, diff.first.size());
     ASSERT_EQ(0UL, diff.second.size());
 }
 
 TEST(IndexAccessMethodSetDifference, EmptyLeftShouldHaveNoDifference) {
-    BSONObjSet left = {};
+    BSONObjSet left{};
     BSONObjSet right = {BSON("" << 0)};
     auto diff = IndexAccessMethod::setDifference(left, right);
     ASSERT_EQ(0UL, diff.first.size());
@@ -56,7 +56,7 @@ TEST(IndexAccessMethodSetDifference, EmptyLeftShouldHaveNoDifference) {
 
 TEST(IndexAccessMethodSetDifference, EmptyRightShouldReturnAllOfLeft) {
     BSONObjSet left = {BSON("" << 0), BSON("" << 1)};
-    BSONObjSet right = {};
+    BSONObjSet right{};
     auto diff = IndexAccessMethod::setDifference(left, right);
     ASSERT_EQ(2UL, diff.first.size());
     ASSERT_EQ(0UL, diff.second.size());

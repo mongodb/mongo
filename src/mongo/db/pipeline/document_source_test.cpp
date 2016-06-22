@@ -3351,7 +3351,7 @@ TEST(ObjectForMatch, MissingFieldShouldNotAppearInResult) {
 TEST(ObjectForMatch, ShouldSerializeNothingIfNothingIsNeeded) {
     Document input(fromjson("{a: 1, b: {c: 1}}"));
     BSONObj expected;
-    ASSERT_EQUALS(expected, DocumentSourceMatch::getObjectForMatch(input, {}));
+    ASSERT_EQUALS(expected, DocumentSourceMatch::getObjectForMatch(input, std::set<std::string>{}));
 }
 
 TEST(ObjectForMatch, ShouldExtractEntireArrayFromPrefixOfDottedField) {
