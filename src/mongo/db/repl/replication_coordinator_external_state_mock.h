@@ -58,7 +58,7 @@ public:
     virtual ~ReplicationCoordinatorExternalStateMock();
     virtual void startThreads(const ReplSettings& settings) override;
     virtual void startInitialSync(OnInitialSyncFinishedFn finished) override;
-    virtual void startSteadyStateReplication() override;
+    virtual void startSteadyStateReplication(OperationContext* txn) override;
     virtual void runOnInitialSyncThread(stdx::function<void(OperationContext* txn)> run) override;
     virtual bool isInitialSyncFlagSet(OperationContext* txn) override;
 
@@ -99,7 +99,8 @@ public:
                                        const HostAndPort& source) override;
     virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(
         OperationContext* txn) const override;
-    virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer() const override;
+    virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(
+        OperationContext* txn) const override;
     virtual bool shouldUseDataReplicatorInitialSync() const override;
 
     /**

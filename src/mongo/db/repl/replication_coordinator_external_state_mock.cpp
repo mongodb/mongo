@@ -74,7 +74,7 @@ bool ReplicationCoordinatorExternalStateMock::isInitialSyncFlagSet(OperationCont
     return false;
 }
 void ReplicationCoordinatorExternalStateMock::startInitialSync(OnInitialSyncFinishedFn finished) {}
-void ReplicationCoordinatorExternalStateMock::startSteadyStateReplication() {}
+void ReplicationCoordinatorExternalStateMock::startSteadyStateReplication(OperationContext* txn) {}
 
 void ReplicationCoordinatorExternalStateMock::startMasterSlave(OperationContext*) {}
 Status ReplicationCoordinatorExternalStateMock::initializeReplSetStorage(OperationContext* txn,
@@ -261,8 +261,8 @@ std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateMock::makeInitia
     return stdx::make_unique<OplogBufferBlockingQueue>();
 }
 
-std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateMock::makeSteadyStateOplogBuffer()
-    const {
+std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateMock::makeSteadyStateOplogBuffer(
+    OperationContext* txn) const {
     return stdx::make_unique<OplogBufferBlockingQueue>();
 }
 

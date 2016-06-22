@@ -89,7 +89,8 @@ public:
     /**
      * Creates an oplog buffer suitable for steady state replication.
      */
-    virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer() const = 0;
+    virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(
+        OperationContext* txn) const = 0;
 
 private:
     /**

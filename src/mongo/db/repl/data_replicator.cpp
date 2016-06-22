@@ -454,7 +454,7 @@ Status DataReplicator::start(OperationContext* txn) {
     _applierPaused = false;
     _fetcherPaused = false;
     _reporterPaused = false;
-    _oplogBuffer = _dataReplicatorExternalState->makeSteadyStateOplogBuffer();
+    _oplogBuffer = _dataReplicatorExternalState->makeSteadyStateOplogBuffer(txn);
     _oplogBuffer->startup(txn);
     _doNextActions_Steady_inlock();
     return Status::OK();

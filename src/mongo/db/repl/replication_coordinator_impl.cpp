@@ -492,7 +492,7 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (!_inShutdown) {
             // Start steady replication, since we already have data.
-            _externalState->startSteadyStateReplication();
+            _externalState->startSteadyStateReplication(txn);
         }
         return;
     }
@@ -503,14 +503,17 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn) {
             const auto status = _dr.initialSync(txn);
             fassertStatusOK(40088, status);
             _setMyLastAppliedOpTime_inlock({status.getValue(), -1}, false);
-            _externalState->startSteadyStateReplication();
+            _externalState->startSteadyStateReplication(txn);
 
         });
     } else {
         _externalState->startInitialSync([this]() {
+            auto txn = cc().makeOperationContext();
+            invariant(txn);
+            invariant(txn->getClient());
             stdx::lock_guard<stdx::mutex> lk(_mutex);
             if (!_inShutdown) {
-                _externalState->startSteadyStateReplication();
+                _externalState->startSteadyStateReplication(txn.get());
             }
         });
     }

@@ -136,10 +136,15 @@ bool ReplicationCoordinatorExternalStateImpl::isInitialSyncFlagSet(OperationCont
 void ReplicationCoordinatorExternalStateImpl::startInitialSync(OnInitialSyncFinishedFn finished) {
     _initialSyncThread.reset(new stdx::thread{[finished, this]() {
         Client::initThreadIfNotAlready("initial sync");
-        log() << "Starting replication fetcher thread";
+        {
+            auto txn = cc().makeOperationContext();
+            invariant(txn);
+            invariant(txn->getClient());
+            log() << "Starting replication fetcher thread";
 
-        // Start bgsync.
-        _bgSync.reset(new BackgroundSync(makeSteadyStateOplogBuffer()));
+            // Start bgsync.
+            _bgSync.reset(new BackgroundSync(makeSteadyStateOplogBuffer(txn.get())));
+        }
         invariant(!_producerThread);  // The producer thread should not be init'd before this.
         _producerThread.reset(
             new stdx::thread(stdx::bind(&BackgroundSync::producerThread, _bgSync.get(), this)));
@@ -160,10 +165,10 @@ void ReplicationCoordinatorExternalStateImpl::runOnInitialSyncThread(
     }});
 }
 
-void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication() {
+void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(OperationContext* txn) {
     if (!_producerThread) {
         log() << "Starting replication fetcher thread";
-        _bgSync.reset(new BackgroundSync(makeSteadyStateOplogBuffer()));
+        _bgSync.reset(new BackgroundSync(makeSteadyStateOplogBuffer(txn)));
         _producerThread.reset(
             new stdx::thread(stdx::bind(&BackgroundSync::producerThread, _bgSync.get(), this)));
     }
@@ -575,8 +580,8 @@ std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeInitia
     }
 }
 
-std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeSteadyStateOplogBuffer()
-    const {
+std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeSteadyStateOplogBuffer(
+    OperationContext* txn) const {
     return stdx::make_unique<OplogBufferBlockingQueue>();
 }
 

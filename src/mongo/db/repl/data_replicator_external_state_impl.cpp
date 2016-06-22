@@ -76,8 +76,9 @@ std::unique_ptr<OplogBuffer> DataReplicatorExternalStateImpl::makeInitialSyncOpl
     return _replicationCoordinatorExternalState->makeInitialSyncOplogBuffer(txn);
 }
 
-std::unique_ptr<OplogBuffer> DataReplicatorExternalStateImpl::makeSteadyStateOplogBuffer() const {
-    return _replicationCoordinatorExternalState->makeSteadyStateOplogBuffer();
+std::unique_ptr<OplogBuffer> DataReplicatorExternalStateImpl::makeSteadyStateOplogBuffer(
+    OperationContext* txn) const {
+    return _replicationCoordinatorExternalState->makeSteadyStateOplogBuffer(txn);
 }
 
 StatusWith<OpTime> DataReplicatorExternalStateImpl::_multiApply(

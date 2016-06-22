@@ -97,7 +97,7 @@ public:
      *
      * NOTE: Use either this or the Master/Slave version, but not both.
      */
-    virtual void startSteadyStateReplication() = 0;
+    virtual void startSteadyStateReplication(OperationContext* txn) = 0;
 
     virtual void runOnInitialSyncThread(stdx::function<void(OperationContext* txn)> run) = 0;
 
@@ -299,7 +299,8 @@ public:
     /**
      * Creates an oplog buffer suitable for steady state replication.
      */
-    virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer() const = 0;
+    virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(
+        OperationContext* txn) const = 0;
 
     /**
      * Returns true if the user specified to use the data replicator for initial sync.
