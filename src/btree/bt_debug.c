@@ -1156,14 +1156,14 @@ static void
 __debug_item(WT_DBG *ds, const char *tag, const void *data_arg, size_t size)
 {
 	size_t i;
-	int ch;
+	u_char ch;
 	const uint8_t *data;
 
 	__dmsg(ds, "\t%s%s{", tag == NULL ? "" : tag, tag == NULL ? "" : " ");
 	for (data = data_arg, i = 0; i < size; ++i, ++data) {
 		ch = data[0];
 		if (__wt_isprint(ch))
-			__dmsg(ds, "%c", ch);
+			__dmsg(ds, "%c", (int)ch);
 		else
 			__debug_hex_byte(ds, data[0]);
 	}

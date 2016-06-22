@@ -138,7 +138,7 @@ __pack_next(WT_PACK *pack, WT_PACK_VALUE *pv)
 next:	if (pack->cur == pack->end)
 		return (WT_NOTFOUND);
 
-	if (__wt_isdigit(*pack->cur)) {
+	if (__wt_isdigit((u_char)*pack->cur)) {
 		pv->havesize = 1;
 		pv->size = WT_STORE_SIZE(strtoul(pack->cur, &endsize, 10));
 		pack->cur = endsize;
