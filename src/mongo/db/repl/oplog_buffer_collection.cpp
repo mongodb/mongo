@@ -37,6 +37,7 @@
 
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -46,6 +47,7 @@ namespace {
 
 const char kDefaultOplogCollectionNamespace[] = "local.temp_oplog_buffer";
 const char kOplogEntryFieldName[] = "entry";
+const BSONObj kIdObj = BSON("_id" << 1);
 
 }  // namespace
 
@@ -81,8 +83,8 @@ void OplogBufferCollection::startup(OperationContext* txn) {
 }
 
 void OplogBufferCollection::shutdown(OperationContext* txn) {
-    _dropCollection(txn);
     stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _dropCollection(txn);
     _size = 0;
     _count = 0;
 }
@@ -103,17 +105,15 @@ bool OplogBufferCollection::pushAllNonBlocking(OperationContext* txn,
     Batch docsToInsert(numDocs);
     std::transform(begin, end, docsToInsert.begin(), addIdToDocument);
 
-    auto status = _storageInterface->insertDocuments(txn, _nss, docsToInsert);
-    if (!status.isOK()) {
-        LOG(1) << "Pushing oplog entries to OplogBufferCollection failed with: " << status;
-        return false;
-    }
-
     stdx::lock_guard<stdx::mutex> lk(_mutex);
+    auto status = _storageInterface->insertDocuments(txn, _nss, docsToInsert);
+    fassertStatusOK(40161, status);
+
     _count += numDocs;
     _size += std::accumulate(begin, end, 0U, [](const size_t& docSize, const Value& value) {
         return docSize + size_t(value.objsize());
     });
+    _cvNoLongerEmpty.notify_all();
     return true;
 }
 
@@ -139,26 +139,72 @@ std::size_t OplogBufferCollection::getCount() const {
 }
 
 void OplogBufferCollection::clear(OperationContext* txn) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _dropCollection(txn);
     _createCollection(txn);
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _size = 0;
     _count = 0;
 }
 
 bool OplogBufferCollection::tryPop(OperationContext* txn, Value* value) {
-    auto keyPattern = BSON("_id" << 1);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (_count == 0) {
+        return false;
+    }
+    return _doPop_inlock(txn, value);
+}
+
+OplogBuffer::Value OplogBufferCollection::blockingPop(OperationContext* txn) {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    _cvNoLongerEmpty.wait(lk, [&]() { return _count != 0; });
+    BSONObj value;
+    _doPop_inlock(txn, &value);
+    return value;
+}
+
+bool OplogBufferCollection::blockingPeek(OperationContext* txn,
+                                         Value* value,
+                                         Seconds waitDuration) {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    if (!_cvNoLongerEmpty.wait_for(
+            lk, waitDuration.toSystemDuration(), [&]() { return _count != 0; })) {
+        return false;
+    }
+    return _peekOneSide_inlock(txn, value, true);
+}
+
+bool OplogBufferCollection::peek(OperationContext* txn, Value* value) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (_count == 0) {
+        return false;
+    }
+    return _peekOneSide_inlock(txn, value, true);
+}
+
+boost::optional<OplogBuffer::Value> OplogBufferCollection::lastObjectPushed(
+    OperationContext* txn) const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (_count == 0) {
+        return boost::none;
+    }
+    Value value;
+    bool res = _peekOneSide_inlock(txn, &value, false);
+    if (!res) {
+        return boost::none;
+    }
+    return value;
+}
+
+bool OplogBufferCollection::_doPop_inlock(OperationContext* txn, Value* value) {
     auto scanDirection = StorageInterface::ScanDirection::kForward;
-    auto result = _storageInterface->deleteOne(txn, _nss, keyPattern, scanDirection);
+    auto result = _storageInterface->deleteOne(txn, _nss, kIdObj, scanDirection);
     if (!result.isOK()) {
         if (result != ErrorCodes::NoSuchKey) {
-            LOG(1) << "Popping oplog entries from OplogBufferCollection failed with: "
-                   << result.getStatus();
+            fassert(40162, result.getStatus());
         }
         return false;
     }
     *value = extractEmbeddedOplogDocument(result.getValue()).getOwned();
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_count > 0);
     invariant(_size >= std::size_t(value->objsize()));
     _count--;
@@ -166,38 +212,16 @@ bool OplogBufferCollection::tryPop(OperationContext* txn, Value* value) {
     return true;
 }
 
-OplogBuffer::Value OplogBufferCollection::blockingPop(OperationContext* txn) {
-    return {};
-}
-
-bool OplogBufferCollection::blockingPeek(OperationContext* txn,
-                                         Value* value,
-                                         Seconds waitDuration) {
-    return false;
-}
-
-bool OplogBufferCollection::peek(OperationContext* txn, Value* value) {
-    return _peekOneSide(txn, value, true);
-}
-
-boost::optional<OplogBuffer::Value> OplogBufferCollection::lastObjectPushed(
-    OperationContext* txn) const {
-    Value value;
-    bool res = _peekOneSide(txn, &value, false);
-    if (!res) {
-        return boost::none;
-    }
-    return value;
-}
-
-bool OplogBufferCollection::_peekOneSide(OperationContext* txn, Value* value, bool front) const {
-    auto keyPattern = BSON("_id" << 1);
+bool OplogBufferCollection::_peekOneSide_inlock(OperationContext* txn,
+                                                Value* value,
+                                                bool front) const {
     auto scanDirection = front ? StorageInterface::ScanDirection::kForward
                                : StorageInterface::ScanDirection::kBackward;
-    auto result = _storageInterface->findOne(txn, _nss, keyPattern, scanDirection);
+    auto result = _storageInterface->findOne(txn, _nss, kIdObj, scanDirection);
     if (!result.isOK()) {
-        LOG(1) << "Peeking oplog entries from OplogBufferCollection failed with: "
-               << result.getStatus();
+        if (result != ErrorCodes::NoSuchKey) {
+            fassert(40163, result.getStatus());
+        }
         return false;
     }
     *value = extractEmbeddedOplogDocument(result.getValue()).getOwned();

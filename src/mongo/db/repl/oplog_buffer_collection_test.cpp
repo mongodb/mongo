@@ -43,6 +43,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -192,8 +193,6 @@ TEST_F(OplogBufferCollectionTest, addIdToDocumentChangesTimestampToId) {
     ASSERT_EQUALS(expectedOp, OplogBufferCollection::addIdToDocument(originalOp));
 }
 
-#if 0
-
 TEST_F(OplogBufferCollectionTest, PushOneDocumentWithPushAllNonBlockingAddsDocument) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
@@ -279,6 +278,25 @@ TEST_F(OplogBufferCollectionTest, PeekDoesNotRemoveDocument) {
     }
 }
 
+TEST_F(OplogBufferCollectionTest, PeekWithNoDocumentsReturnsFalse) {
+    auto nss = makeNamespace(_agent);
+    OplogBufferCollection oplogBuffer(_storageInterface, nss);
+
+    oplogBuffer.startup(_txn.get());
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+
+    BSONObj doc;
+    ASSERT_FALSE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(doc.isEmpty());
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+
+    {
+        OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
+        auto iter = collectionReader.makeIterator();
+        ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+    }
+}
+
 TEST_F(OplogBufferCollectionTest, PopRemovesDocument) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
@@ -292,6 +310,25 @@ TEST_F(OplogBufferCollectionTest, PopRemovesDocument) {
     BSONObj doc;
     ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
     ASSERT_EQUALS(doc, oplog);
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+
+    {
+        OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
+        auto iter = collectionReader.makeIterator();
+        ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+    }
+}
+
+TEST_F(OplogBufferCollectionTest, PopWithNoDocumentsReturnsFalse) {
+    auto nss = makeNamespace(_agent);
+    OplogBufferCollection oplogBuffer(_storageInterface, nss);
+
+    oplogBuffer.startup(_txn.get());
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+
+    BSONObj doc;
+    ASSERT_FALSE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_TRUE(doc.isEmpty());
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
 
     {
@@ -378,7 +415,7 @@ TEST_F(OplogBufferCollectionTest, LastObjectPushedReturnsNoneWithNoEntries) {
     oplogBuffer.startup(_txn.get());
 
     auto doc = oplogBuffer.lastObjectPushed(_txn.get());
-    ASSERT_FALSE(doc);
+    ASSERT_EQUALS(doc, boost::none);
 }
 
 TEST_F(OplogBufferCollectionTest, IsEmptyReturnsTrueWhenEmptyAndFalseWhenNot) {
@@ -418,6 +455,160 @@ TEST_F(OplogBufferCollectionTest, ClearClearsCollection) {
     ASSERT_FALSE(oplogBuffer.tryPop(_txn.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
 }
-#endif
+
+TEST_F(OplogBufferCollectionTest, BlockingPopBlocksAndRemovesDocument) {
+    auto nss = makeNamespace(_agent);
+    OplogBufferCollection oplogBuffer(_storageInterface, nss);
+    oplogBuffer.startup(_txn.get());
+
+    unittest::Barrier barrier(2U);
+    BSONObj oplog = makeOplogEntry(1);
+    BSONObj doc;
+    std::size_t count = 0;
+
+    stdx::thread poppingThread([&]() {
+        Client::initThread("poppingThread");
+        barrier.countDownAndWait();
+        doc = oplogBuffer.blockingPop(makeOperationContext().get());
+        count = oplogBuffer.getCount();
+    });
+
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+    barrier.countDownAndWait();
+    oplogBuffer.push(_txn.get(), oplog);
+    poppingThread.join();
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+    ASSERT_EQUALS(doc, oplog);
+    ASSERT_EQUALS(count, 0UL);
+}
+
+TEST_F(OplogBufferCollectionTest, TwoBlockingPopsBlockAndRemoveDocuments) {
+    auto nss = makeNamespace(_agent);
+    OplogBufferCollection oplogBuffer(_storageInterface, nss);
+    oplogBuffer.startup(_txn.get());
+
+    unittest::Barrier barrier(3U);
+    const std::vector<BSONObj> oplog = {
+        makeOplogEntry(1), makeOplogEntry(2), makeOplogEntry(3),
+    };
+    BSONObj doc1;
+    BSONObj doc2;
+
+    stdx::thread poppingThread1([&]() {
+        Client::initThread("poppingThread1");
+        barrier.countDownAndWait();
+        doc1 = oplogBuffer.blockingPop(makeOperationContext().get());
+    });
+
+    stdx::thread poppingThread2([&]() {
+        Client::initThread("poppingThread2");
+        barrier.countDownAndWait();
+        doc2 = oplogBuffer.blockingPop(makeOperationContext().get());
+    });
+
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+    barrier.countDownAndWait();
+    oplogBuffer.pushAllNonBlocking(_txn.get(), oplog.begin(), oplog.end());
+    poppingThread1.join();
+    poppingThread2.join();
+    ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
+    ASSERT_NOT_EQUALS(doc1, doc2);
+    ASSERT_TRUE(doc1 == oplog[0] || doc1 == oplog[1]);
+    ASSERT_TRUE(doc2 == oplog[0] || doc2 == oplog[1]);
+}
+
+TEST_F(OplogBufferCollectionTest, BlockingPeekBlocksAndFindsDocument) {
+    auto nss = makeNamespace(_agent);
+    OplogBufferCollection oplogBuffer(_storageInterface, nss);
+    oplogBuffer.startup(_txn.get());
+
+    unittest::Barrier barrier(2U);
+    BSONObj oplog = makeOplogEntry(1);
+    BSONObj doc;
+    bool success = false;
+    std::size_t count = 0;
+
+    stdx::thread peekingThread([&]() {
+        Client::initThread("peekingThread");
+        barrier.countDownAndWait();
+        success = oplogBuffer.blockingPeek(makeOperationContext().get(), &doc, Seconds(30));
+        count = oplogBuffer.getCount();
+    });
+
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+    barrier.countDownAndWait();
+    oplogBuffer.push(_txn.get(), oplog);
+    peekingThread.join();
+    ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
+    ASSERT_TRUE(success);
+    ASSERT_EQUALS(doc, oplog);
+    ASSERT_EQUALS(count, 1UL);
+}
+
+TEST_F(OplogBufferCollectionTest, TwoBlockingPeeksBlockAndFindSameDocument) {
+    auto nss = makeNamespace(_agent);
+    OplogBufferCollection oplogBuffer(_storageInterface, nss);
+    oplogBuffer.startup(_txn.get());
+
+    unittest::Barrier barrier(3U);
+    BSONObj oplog = makeOplogEntry(1);
+    BSONObj doc1;
+    bool success1 = false;
+    std::size_t count1 = 0;
+
+    BSONObj doc2;
+    bool success2 = false;
+    std::size_t count2 = 0;
+
+    stdx::thread peekingThread1([&]() {
+        Client::initThread("peekingThread1");
+        barrier.countDownAndWait();
+        success1 = oplogBuffer.blockingPeek(makeOperationContext().get(), &doc1, Seconds(30));
+        count1 = oplogBuffer.getCount();
+    });
+
+    stdx::thread peekingThread2([&]() {
+        Client::initThread("peekingThread2");
+        barrier.countDownAndWait();
+        success2 = oplogBuffer.blockingPeek(makeOperationContext().get(), &doc2, Seconds(30));
+        count2 = oplogBuffer.getCount();
+    });
+
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+    barrier.countDownAndWait();
+    oplogBuffer.push(_txn.get(), oplog);
+    peekingThread1.join();
+    peekingThread2.join();
+    ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
+    ASSERT_TRUE(success1);
+    ASSERT_EQUALS(doc1, oplog);
+    ASSERT_EQUALS(count1, 1UL);
+    ASSERT_TRUE(success2);
+    ASSERT_EQUALS(doc2, oplog);
+    ASSERT_EQUALS(count2, 1UL);
+}
+
+TEST_F(OplogBufferCollectionTest, BlockingPeekBlocksAndTimesOutWhenItDoesNotFindDocument) {
+    auto nss = makeNamespace(_agent);
+    OplogBufferCollection oplogBuffer(_storageInterface, nss);
+    oplogBuffer.startup(_txn.get());
+
+    BSONObj doc;
+    bool success = false;
+    std::size_t count = 0;
+
+    stdx::thread peekingThread([&]() {
+        Client::initThread("peekingThread");
+        success = oplogBuffer.blockingPeek(makeOperationContext().get(), &doc, Seconds(1));
+        count = oplogBuffer.getCount();
+    });
+
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+    peekingThread.join();
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+    ASSERT_FALSE(success);
+    ASSERT_TRUE(doc.isEmpty());
+    ASSERT_EQUALS(count, 0UL);
+}
 
 }  // namespace

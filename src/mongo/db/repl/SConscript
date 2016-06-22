@@ -166,6 +166,7 @@ env.CppUnitTest(
         'replmocks',
         'storage_interface_impl',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/unittest/concurrency',
     ],
     NO_CRUTCH = True,
 )

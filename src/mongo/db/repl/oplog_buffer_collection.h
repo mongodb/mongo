@@ -105,15 +105,24 @@ private:
      * return the oldest entry, otherwise it will return the newest one. If the buffer is empty
      * or peeking fails this returns false.
      */
-    bool _peekOneSide(OperationContext* txn, Value* value, bool front) const;
+    bool _peekOneSide_inlock(OperationContext* txn, Value* value, bool front) const;
 
     // Storage interface used to perform storage engine level functions on the collection.
     StorageInterface* _storageInterface;
 
+    /**
+     * Pops an entry off the buffer in a lock.
+     */
+    bool _doPop_inlock(OperationContext* txn, Value* value);
+
     // The namespace for the oplog buffer collection.
     const NamespaceString _nss;
 
-    // Protects member data below.
+    // Allows functions to wait until the queue has data. This condition variable is used with
+    // _mutex below.
+    stdx::condition_variable _cvNoLongerEmpty;
+
+    // Protects member data below and synchronizes it with the underlying collection.
     mutable stdx::mutex _mutex;
 
     // Number of documents in buffer.
