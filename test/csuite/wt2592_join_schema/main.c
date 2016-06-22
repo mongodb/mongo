@@ -83,7 +83,6 @@ main(int argc, char *argv[])
 	int count, ret;
 
 	opts = &_opts;
-	recno = 0;
 	memset(opts, 0, sizeof(*opts));
 	testutil_check(testutil_parse_opts(argc, argv, opts));
 	testutil_make_work_dir(opts->home);
@@ -100,7 +99,7 @@ main(int argc, char *argv[])
 	testutil_check(
 	    opts->conn->open_session(opts->conn, NULL, NULL, &session));
 	testutil_check(session->create(session, opts->uri,
-	    "key_format=i,"
+	    "key_format=r,"
 	    "value_format=5sHQ,"
 	    "columns=(id,country,year,population)"));
 
