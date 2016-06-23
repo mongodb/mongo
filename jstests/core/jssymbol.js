@@ -2,9 +2,7 @@
 //
 (function() {
     // Exercise Symbol.toPrimitive on DB objects
-    // clang-format off
     assert(`${db}` === 'test');
-    // clang-format on
     assert(isNaN(+db));
 
     // Exercise the special Symbol methods and make sure DB.getProperty handles them
@@ -20,10 +18,8 @@
 
     assert(isNaN(+a));
     assert(+a.v == 1);
-    // clang-format off
     assert(`${a.v}` == 1);
     assert(`${a}` == '[object BSON]');
-    // clang-format on
 
     // Exercise the special Symbol methods and make sure BSON.resolve handles them
     assert(db[Symbol.iterator] != 1);
