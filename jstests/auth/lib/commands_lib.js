@@ -358,6 +358,52 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "aggregate_collStats",
+          command: {aggregate: "foo", pipeline: [{$collStats: {latencyStats: {}}}]},
+          setup: function(db) {
+              db.createCollection("foo");
+          },
+          teardown: function(db) {
+              db.foo.drop();
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: {
+                    read: 1,
+                    readAnyDatabase: 1,
+                    readWrite: 1,
+                    readWriteAnyDatabase: 1,
+                    dbAdmin: 1,
+                    dbAdminAnyDatabase: 1,
+                    dbOwner: 1,
+                    clusterMonitor: 1,
+                    clusterAdmin: 1,
+                    backup: 1,
+                    root: 1,
+                    __system: 1
+                },
+                privileges:
+                    [{resource: {db: firstDbName, collection: "foo"}, actions: ["collStats"]}]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: {
+                    readAnyDatabase: 1,
+                    readWriteAnyDatabase: 1,
+                    dbAdminAnyDatabase: 1,
+                    clusterMonitor: 1,
+                    clusterAdmin: 1,
+                    backup: 1,
+                    root: 1,
+                    __system: 1
+                },
+                privileges:
+                    [{resource: {db: secondDbName, collection: "foo"}, actions: ["collStats"]}]
+              }
+          ]
+        },
+        {
           testname: "appendOplogNote",
           command: {appendOplogNote: 1, data: {a: 1}},
           skipSharded: true,
