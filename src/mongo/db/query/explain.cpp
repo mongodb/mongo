@@ -319,6 +319,9 @@ void Explain::statsToBSON(const PlanStageStats& stats,
 
         bob->append("keyPattern", spec->keyPattern);
         bob->append("indexName", spec->indexName);
+        if (!spec->collation.isEmpty()) {
+            bob->append("collation", spec->collation);
+        }
         bob->appendBool("isMultiKey", spec->isMultiKey);
         if (!spec->multiKeyPaths.empty()) {
             appendMultikeyPaths(spec->keyPattern, spec->multiKeyPaths, bob);
@@ -346,6 +349,9 @@ void Explain::statsToBSON(const PlanStageStats& stats,
 
         bob->append("keyPattern", spec->keyPattern);
         bob->append("indexName", spec->indexName);
+        if (!spec->collation.isEmpty()) {
+            bob->append("collation", spec->collation);
+        }
         bob->appendBool("isMultiKey", spec->isMultiKey);
         if (!spec->multiKeyPaths.empty()) {
             appendMultikeyPaths(spec->keyPattern, spec->multiKeyPaths, bob);
@@ -414,6 +420,9 @@ void Explain::statsToBSON(const PlanStageStats& stats,
 
         bob->append("keyPattern", spec->keyPattern);
         bob->append("indexName", spec->indexName);
+        if (!spec->collation.isEmpty()) {
+            bob->append("collation", spec->collation);
+        }
         bob->appendBool("isMultiKey", spec->isMultiKey);
         if (!spec->multiKeyPaths.empty()) {
             appendMultikeyPaths(spec->keyPattern, spec->multiKeyPaths, bob);
@@ -577,7 +586,6 @@ void Explain::generatePlannerInfo(PlanExecutor* exec,
     CanonicalQuery* query = exec->getCanonicalQuery();
 
     BSONObjBuilder plannerBob(out->subobjStart("queryPlanner"));
-    ;
 
     plannerBob.append("plannerVersion", QueryPlanner::kPlannerVersion);
     plannerBob.append("namespace", exec->ns());
@@ -606,6 +614,10 @@ void Explain::generatePlannerInfo(PlanExecutor* exec,
         BSONObjBuilder parsedQueryBob(plannerBob.subobjStart("parsedQuery"));
         query->root()->serialize(&parsedQueryBob);
         parsedQueryBob.doneFast();
+
+        if (query->getCollator()) {
+            plannerBob.append("collation", query->getCollator()->getSpec().toBSON());
+        }
     }
 
     BSONObjBuilder winningPlanBob(plannerBob.subobjStart("winningPlan"));

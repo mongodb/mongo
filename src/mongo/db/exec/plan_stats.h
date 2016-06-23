@@ -239,6 +239,7 @@ struct CountScanStats : public SpecificStats {
         CountScanStats* specific = new CountScanStats(*this);
         // BSON objects have to be explicitly copied.
         specific->keyPattern = keyPattern.getOwned();
+        specific->collation = collation.getOwned();
         specific->startKey = startKey.getOwned();
         specific->endKey = endKey.getOwned();
         return specific;
@@ -247,6 +248,8 @@ struct CountScanStats : public SpecificStats {
     std::string indexName;
 
     BSONObj keyPattern;
+
+    BSONObj collation;
 
     // The starting/ending key(s) of the index scan.
     // startKey and endKey contain the fields of keyPattern, with values
@@ -291,6 +294,7 @@ struct DistinctScanStats : public SpecificStats {
         DistinctScanStats* specific = new DistinctScanStats(*this);
         // BSON objects have to be explicitly copied.
         specific->keyPattern = keyPattern.getOwned();
+        specific->collation = collation.getOwned();
         specific->indexBounds = indexBounds.getOwned();
         return specific;
     }
@@ -299,6 +303,8 @@ struct DistinctScanStats : public SpecificStats {
     size_t keysExamined = 0;
 
     BSONObj keyPattern;
+
+    BSONObj collation;
 
     // Properties of the index used for the distinct scan.
     std::string indexName;
@@ -398,6 +404,7 @@ struct IndexScanStats : public SpecificStats {
         IndexScanStats* specific = new IndexScanStats(*this);
         // BSON objects have to be explicitly copied.
         specific->keyPattern = keyPattern.getOwned();
+        specific->collation = collation.getOwned();
         specific->indexBounds = indexBounds.getOwned();
         return specific;
     }
@@ -409,6 +416,8 @@ struct IndexScanStats : public SpecificStats {
     std::string indexName;
 
     BSONObj keyPattern;
+
+    BSONObj collation;
 
     int indexVersion;
 

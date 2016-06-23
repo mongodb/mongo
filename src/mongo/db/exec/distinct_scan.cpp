@@ -55,6 +55,10 @@ DistinctScan::DistinctScan(OperationContext* txn,
       _params(params),
       _checker(&_params.bounds, _descriptor->keyPattern(), _params.direction) {
     _specificStats.keyPattern = _params.descriptor->keyPattern();
+    if (BSONElement collationElement = _params.descriptor->getInfoElement("collation")) {
+        invariant(collationElement.isABSONObj());
+        _specificStats.collation = collationElement.Obj().getOwned();
+    }
     _specificStats.indexName = _params.descriptor->indexName();
     _specificStats.indexVersion = _params.descriptor->version();
     _specificStats.isMultiKey = _params.descriptor->isMultikey(getOpCtx());

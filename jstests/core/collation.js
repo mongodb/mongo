@@ -39,6 +39,20 @@
         assert(foundIndex, "index with key pattern " + tojson(keyPattern) + " not found");
     };
 
+    var getQueryCollation = function(explainRes) {
+        if (explainRes.queryPlanner.hasOwnProperty("collation")) {
+            return explainRes.queryPlanner.collation;
+        }
+
+        if (explainRes.queryPlanner.winningPlan.hasOwnProperty("shards") &&
+            explainRes.queryPlanner.winningPlan.shards.length > 0 &&
+            explainRes.queryPlanner.winningPlan.shards[0].hasOwnProperty("collation")) {
+            return explainRes.queryPlanner.winningPlan.shards[0].collation;
+        }
+
+        return null;
+    };
+
     //
     // Test using db.createCollection() to make a collection with a default collation.
     //
@@ -339,6 +353,48 @@
     assert.neq(null, planStage);
     assert.eq(1, planStage.advanced);
 
+    // Explain of COUNT_SCAN stage should include index collation.
+    coll.drop();
+    assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "fr_CA"}}));
+    explainRes = coll.explain("executionStats").find({a: 5}).count();
+    assert.commandWorked(explainRes);
+    planStage = getPlanStage(explainRes.executionStats.executionStages, "COUNT_SCAN");
+    assert.neq(null, planStage);
+    assert.eq(planStage.collation, {
+        locale: "fr_CA",
+        caseLevel: false,
+        caseFirst: "off",
+        strength: 3,
+        numericOrdering: false,
+        alternate: "non-ignorable",
+        maxVariable: "punct",
+        normalization: false,
+        backwards: true,
+        version: "57.1",
+    });
+
+    // Explain of COUNT_SCAN stage should include index collation when index collation is
+    // inherited from collection default.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "fr_CA"}}));
+    assert.commandWorked(coll.createIndex({a: 1}));
+    explainRes = coll.explain("executionStats").find({a: 5}).count();
+    assert.commandWorked(explainRes);
+    planStage = getPlanStage(explainRes.executionStats.executionStages, "COUNT_SCAN");
+    assert.neq(null, planStage);
+    assert.eq(planStage.collation, {
+        locale: "fr_CA",
+        caseLevel: false,
+        caseFirst: "off",
+        strength: 3,
+        numericOrdering: false,
+        alternate: "non-ignorable",
+        maxVariable: "punct",
+        normalization: false,
+        backwards: true,
+        version: "57.1",
+    });
+
     //
     // Collation tests for distinct.
     //
@@ -402,8 +458,47 @@
     var explain = coll.explain("queryPlanner").distinct("a");
     assert(isCollscan(explain.queryPlanner.winningPlan));
 
-    // Explain of distinct with collation should succeed.
-    assert.commandWorked(coll.explain().distinct("str", {}, {collation: {locale: "fr"}}));
+    // Explain of DISTINCT_SCAN stage should include index collation.
+    coll.drop();
+    assert.commandWorked(coll.createIndex({str: 1}, {collation: {locale: "fr_CA"}}));
+    explainRes = coll.explain("executionStats").distinct("str", {}, {collation: {locale: "fr_CA"}});
+    assert.commandWorked(explainRes);
+    planStage = getPlanStage(explainRes.executionStats.executionStages, "DISTINCT_SCAN");
+    assert.neq(null, planStage);
+    assert.eq(planStage.collation, {
+        locale: "fr_CA",
+        caseLevel: false,
+        caseFirst: "off",
+        strength: 3,
+        numericOrdering: false,
+        alternate: "non-ignorable",
+        maxVariable: "punct",
+        normalization: false,
+        backwards: true,
+        version: "57.1",
+    });
+
+    // Explain of DISTINCT_SCAN stage should include index collation when index collation is
+    // inherited from collection default.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "fr_CA"}}));
+    assert.commandWorked(coll.createIndex({str: 1}));
+    explainRes = coll.explain("executionStats").distinct("str");
+    assert.commandWorked(explainRes);
+    planStage = getPlanStage(explainRes.executionStats.executionStages, "DISTINCT_SCAN");
+    assert.neq(null, planStage);
+    assert.eq(planStage.collation, {
+        locale: "fr_CA",
+        caseLevel: false,
+        caseFirst: "off",
+        strength: 3,
+        numericOrdering: false,
+        alternate: "non-ignorable",
+        maxVariable: "punct",
+        normalization: false,
+        backwards: true,
+        version: "57.1",
+    });
 
     //
     // Collation tests for find.
@@ -616,6 +711,85 @@
                      .finish();
     assert.commandWorked(explainRes);
     assert.eq(1, explainRes.executionStats.nReturned);
+
+    // Explain of find should include query collation.
+    coll.drop();
+    explainRes =
+        coll.explain("executionStats").find({str: "foo"}).collation({locale: "fr_CA"}).finish();
+    assert.commandWorked(explainRes);
+    assert.eq(getQueryCollation(explainRes), {
+        locale: "fr_CA",
+        caseLevel: false,
+        caseFirst: "off",
+        strength: 3,
+        numericOrdering: false,
+        alternate: "non-ignorable",
+        maxVariable: "punct",
+        normalization: false,
+        backwards: true,
+        version: "57.1",
+    });
+
+    // Explain of find should include query collation when inherited from collection default.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "fr_CA"}}));
+    explainRes = coll.explain("executionStats").find({str: "foo"}).finish();
+    assert.commandWorked(explainRes);
+    assert.eq(getQueryCollation(explainRes), {
+        locale: "fr_CA",
+        caseLevel: false,
+        caseFirst: "off",
+        strength: 3,
+        numericOrdering: false,
+        alternate: "non-ignorable",
+        maxVariable: "punct",
+        normalization: false,
+        backwards: true,
+        version: "57.1",
+    });
+
+    // Explain of IXSCAN stage should include index collation.
+    coll.drop();
+    assert.commandWorked(coll.createIndex({str: 1}, {collation: {locale: "fr_CA"}}));
+    explainRes =
+        coll.explain("executionStats").find({str: "foo"}).collation({locale: "fr_CA"}).finish();
+    assert.commandWorked(explainRes);
+    planStage = getPlanStage(explainRes.executionStats.executionStages, "IXSCAN");
+    assert.neq(null, planStage);
+    assert.eq(planStage.collation, {
+        locale: "fr_CA",
+        caseLevel: false,
+        caseFirst: "off",
+        strength: 3,
+        numericOrdering: false,
+        alternate: "non-ignorable",
+        maxVariable: "punct",
+        normalization: false,
+        backwards: true,
+        version: "57.1",
+    });
+
+    // Explain of IXSCAN stage should include index collation when index collation is inherited from
+    // collection default.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "fr_CA"}}));
+    assert.commandWorked(coll.createIndex({str: 1}));
+    explainRes = coll.explain("executionStats").find({str: "foo"}).finish();
+    assert.commandWorked(explainRes);
+    planStage = getPlanStage(explainRes.executionStats.executionStages, "IXSCAN");
+    assert.neq(null, planStage);
+    assert.eq(planStage.collation, {
+        locale: "fr_CA",
+        caseLevel: false,
+        caseFirst: "off",
+        strength: 3,
+        numericOrdering: false,
+        alternate: "non-ignorable",
+        maxVariable: "punct",
+        normalization: false,
+        backwards: true,
+        version: "57.1",
+    });
 
     if (!db.getMongo().useReadCommands()) {
         // find() shell helper should error if a collation is specified and the shell is not using

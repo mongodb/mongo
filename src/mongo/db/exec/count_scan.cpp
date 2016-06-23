@@ -76,6 +76,10 @@ CountScan::CountScan(OperationContext* txn, const CountScanParams& params, Worki
       _shouldDedup(params.descriptor->isMultikey(txn)),
       _params(params) {
     _specificStats.keyPattern = _params.descriptor->keyPattern();
+    if (BSONElement collationElement = _params.descriptor->getInfoElement("collation")) {
+        invariant(collationElement.isABSONObj());
+        _specificStats.collation = collationElement.Obj().getOwned();
+    }
     _specificStats.indexName = _params.descriptor->indexName();
     _specificStats.isMultiKey = _params.descriptor->isMultikey(txn);
     _specificStats.multiKeyPaths = _params.descriptor->getMultikeyPaths(txn);

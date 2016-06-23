@@ -75,6 +75,10 @@ IndexScan::IndexScan(OperationContext* txn,
     // We can't always access the descriptor in the call to getStats() so we pull
     // any info we need for stats reporting out here.
     _specificStats.keyPattern = _keyPattern;
+    if (BSONElement collationElement = _params.descriptor->getInfoElement("collation")) {
+        invariant(collationElement.isABSONObj());
+        _specificStats.collation = collationElement.Obj().getOwned();
+    }
     _specificStats.indexName = _params.descriptor->indexName();
     _specificStats.isMultiKey = _params.descriptor->isMultikey(getOpCtx());
     _specificStats.multiKeyPaths = _params.descriptor->getMultikeyPaths(getOpCtx());
