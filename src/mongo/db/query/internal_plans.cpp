@@ -60,24 +60,34 @@ std::unique_ptr<PlanExecutor> InternalPlanner::collectionScan(OperationContext* 
 
     invariant(ns == collection->ns().ns());
 
-    CollectionScanParams params;
-    params.collection = collection;
-    params.start = startLoc;
+    auto cs = _collectionScan(txn, ws.get(), collection, direction, startLoc);
 
-    if (FORWARD == direction) {
-        params.direction = CollectionScanParams::FORWARD;
-    } else {
-        params.direction = CollectionScanParams::BACKWARD;
-    }
-
-    std::unique_ptr<CollectionScan> cs =
-        stdx::make_unique<CollectionScan>(txn, params, ws.get(), nullptr);
     // Takes ownership of 'ws' and 'cs'.
     auto statusWithPlanExecutor =
         PlanExecutor::make(txn, std::move(ws), std::move(cs), collection, yieldPolicy);
     invariant(statusWithPlanExecutor.isOK());
     return std::move(statusWithPlanExecutor.getValue());
 }
+
+std::unique_ptr<PlanExecutor> InternalPlanner::deleteWithCollectionScan(
+    OperationContext* txn,
+    Collection* collection,
+    const DeleteStageParams& params,
+    PlanExecutor::YieldPolicy yieldPolicy,
+    Direction direction,
+    const RecordId& startLoc) {
+    auto ws = stdx::make_unique<WorkingSet>();
+
+    auto root = _collectionScan(txn, ws.get(), collection, direction, startLoc);
+
+    root = stdx::make_unique<DeleteStage>(txn, params, ws.get(), collection, root.release());
+
+    auto executor =
+        PlanExecutor::make(txn, std::move(ws), std::move(root), collection, yieldPolicy);
+    invariantOK(executor.getStatus());
+    return std::move(executor.getValue());
+}
+
 
 std::unique_ptr<PlanExecutor> InternalPlanner::indexScan(OperationContext* txn,
                                                          const Collection* collection,
@@ -134,6 +144,26 @@ std::unique_ptr<PlanExecutor> InternalPlanner::deleteWithIndexScan(
         PlanExecutor::make(txn, std::move(ws), std::move(root), collection, yieldPolicy);
     invariantOK(executor.getStatus());
     return std::move(executor.getValue());
+}
+
+std::unique_ptr<PlanStage> InternalPlanner::_collectionScan(OperationContext* txn,
+                                                            WorkingSet* ws,
+                                                            const Collection* collection,
+                                                            Direction direction,
+                                                            const RecordId& startLoc) {
+    invariant(collection);
+
+    CollectionScanParams params;
+    params.collection = collection;
+    params.start = startLoc;
+
+    if (FORWARD == direction) {
+        params.direction = CollectionScanParams::FORWARD;
+    } else {
+        params.direction = CollectionScanParams::BACKWARD;
+    }
+
+    return stdx::make_unique<CollectionScan>(txn, params, ws, nullptr);
 }
 
 std::unique_ptr<PlanStage> InternalPlanner::_indexScan(OperationContext* txn,

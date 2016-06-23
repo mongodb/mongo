@@ -430,51 +430,68 @@ StatusWith<BSONObj> _findOrDeleteOne(OperationContext* txn,
             return {ErrorCodes::NamespaceNotFound,
                     str::stream() << "Collection not found, ns:" << nss.ns()};
         }
-        auto indexCatalog = collection->getIndexCatalog();
-        invariant(indexCatalog);
-        bool includeUnfinishedIndexes = false;
-        auto indexDescriptor =
-            indexCatalog->findIndexByKeyPattern(txn, indexKeyPattern, includeUnfinishedIndexes);
-        if (!indexDescriptor) {
-            return {ErrorCodes::IndexNotFound,
-                    str::stream() << "Index not found, ns:" << nss.ns() << ", index: "
-                                  << indexKeyPattern};
-        }
-        if (indexDescriptor->isPartial()) {
-            return {ErrorCodes::IndexOptionsConflict,
-                    str::stream() << "Partial index is not allowed for this operation, ns:"
-                                  << nss.ns()
-                                  << ", index: "
-                                  << indexKeyPattern};
-        }
 
-        KeyPattern keyPattern(indexKeyPattern);
-        auto minKey = Helpers::toKeyFormat(keyPattern.extendRangeBound({}, false));
-        auto maxKey = Helpers::toKeyFormat(keyPattern.extendRangeBound({}, true));
         auto isForward = scanDirection == StorageInterface::ScanDirection::kForward;
-        auto bounds = isForward ? std::make_pair(minKey, maxKey) : std::make_pair(maxKey, minKey);
-        bool endKeyInclusive = false;
         auto direction = isForward ? InternalPlanner::FORWARD : InternalPlanner::BACKWARD;
 
-        std::unique_ptr<PlanExecutor> planExecutor = isFind
-            ? InternalPlanner::indexScan(txn,
-                                         collection,
-                                         indexDescriptor,
-                                         bounds.first,
-                                         bounds.second,
-                                         endKeyInclusive,
-                                         PlanExecutor::YIELD_MANUAL,
-                                         direction,
-                                         InternalPlanner::IXSCAN_FETCH)
-            : InternalPlanner::deleteWithIndexScan(txn,
-                                                   collection,
-                                                   makeDeleteStageParamsForDeleteOne(),
-                                                   indexDescriptor,
-                                                   bounds.first,
-                                                   bounds.second,
-                                                   endKeyInclusive,
-                                                   PlanExecutor::YIELD_MANUAL,
-                                                   direction);
+        std::unique_ptr<PlanExecutor> planExecutor;
+        if (indexKeyPattern.isEmpty()) {
+            // Use collection scan.
+            planExecutor = isFind
+                ? InternalPlanner::collectionScan(
+                      txn, nss.ns(), collection, PlanExecutor::YIELD_MANUAL, direction)
+                : InternalPlanner::deleteWithCollectionScan(txn,
+                                                            collection,
+                                                            makeDeleteStageParamsForDeleteOne(),
+                                                            PlanExecutor::YIELD_MANUAL,
+                                                            direction);
+        } else {
+            // Use index scan.
+            auto indexCatalog = collection->getIndexCatalog();
+            invariant(indexCatalog);
+            bool includeUnfinishedIndexes = false;
+            auto indexDescriptor =
+                indexCatalog->findIndexByKeyPattern(txn, indexKeyPattern, includeUnfinishedIndexes);
+            if (!indexDescriptor) {
+                return {ErrorCodes::IndexNotFound,
+                        str::stream() << "Index not found, ns:" << nss.ns() << ", index: "
+                                      << indexKeyPattern};
+            }
+            if (indexDescriptor->isPartial()) {
+                return {ErrorCodes::IndexOptionsConflict,
+                        str::stream() << "Partial index is not allowed for this operation, ns:"
+                                      << nss.ns()
+                                      << ", index: "
+                                      << indexKeyPattern};
+            }
+
+            KeyPattern keyPattern(indexKeyPattern);
+            auto minKey = Helpers::toKeyFormat(keyPattern.extendRangeBound({}, false));
+            auto maxKey = Helpers::toKeyFormat(keyPattern.extendRangeBound({}, true));
+            auto bounds =
+                isForward ? std::make_pair(minKey, maxKey) : std::make_pair(maxKey, minKey);
+            bool endKeyInclusive = false;
+
+            planExecutor = isFind
+                ? InternalPlanner::indexScan(txn,
+                                             collection,
+                                             indexDescriptor,
+                                             bounds.first,
+                                             bounds.second,
+                                             endKeyInclusive,
+                                             PlanExecutor::YIELD_MANUAL,
+                                             direction,
+                                             InternalPlanner::IXSCAN_FETCH)
+                : InternalPlanner::deleteWithIndexScan(txn,
+                                                       collection,
+                                                       makeDeleteStageParamsForDeleteOne(),
+                                                       indexDescriptor,
+                                                       bounds.first,
+                                                       bounds.second,
+                                                       endKeyInclusive,
+                                                       PlanExecutor::YIELD_MANUAL,
+                                                       direction);
+        }
 
         BSONObj doc;
         auto state = planExecutor->getNext(&doc, nullptr);

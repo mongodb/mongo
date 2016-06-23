@@ -217,8 +217,9 @@ public:
     virtual Status isAdminDbValid(OperationContext* txn) = 0;
 
     /**
-     * Finds the first document returned by an index scan on the collection in the requested
-     * direction.
+     * Finds the first document returned by a collection or index scan on the collection in the
+     * requested direction.
+     * If "indexKeyPattern" is empty, a collection scan is used to locate the document.
      */
     enum class ScanDirection {
         kForward = 1,
@@ -230,8 +231,9 @@ public:
                                         ScanDirection scanDirection) = 0;
 
     /**
-     * Deletes the first document returned by an index scan on the collection in the requested
-     * direction. Returns deleted document on success.
+     * Deletes the first document returned by a collection or index scan on the collection in the
+     * requested direction. Returns deleted document on success.
+     * If "indexKeyPattern" is empty, a collection scan is used to locate the document.
      */
     virtual StatusWith<BSONObj> deleteOne(OperationContext* txn,
                                           const NamespaceString& nss,

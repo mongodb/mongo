@@ -628,6 +628,46 @@ TEST_F(StorageInterfaceImplWithReplCoordTest,
 }
 
 TEST_F(StorageInterfaceImplWithReplCoordTest,
+       FindOneCollectionScanReturnsFirstDocumentInsertedIfScanDirectionIsForward) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
+    ASSERT_OK(
+        storage.insertDocuments(txn, nss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 0)}));
+    ASSERT_EQUALS(BSON("_id" << 1),
+                  storage.findOne(txn, nss, BSONObj(), StorageInterface::ScanDirection::kForward));
+
+    // Check collection contents. OplogInterface returns documents in reverse natural order.
+    OplogInterfaceLocal oplog(txn, nss.ns());
+    auto iter = oplog.makeIterator();
+    ASSERT_EQUALS(BSON("_id" << 0), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(BSON("_id" << 2), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(BSON("_id" << 1), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       FindOneCollectionScanReturnsLastDocumentInsertedIfScanDirectionIsBackward) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
+    ASSERT_OK(
+        storage.insertDocuments(txn, nss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 0)}));
+    ASSERT_EQUALS(BSON("_id" << 0),
+                  storage.findOne(txn, nss, BSONObj(), StorageInterface::ScanDirection::kBackward));
+
+    // Check collection contents. OplogInterface returns documents in reverse natural order.
+    OplogInterfaceLocal oplog(txn, nss.ns());
+    auto iter = oplog.makeIterator();
+    ASSERT_EQUALS(BSON("_id" << 0), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(BSON("_id" << 2), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(BSON("_id" << 1), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
        DeleteOneReturnsInvalidNamespaceIfCollectionIsMissing) {
     auto txn = getOperationContext();
     StorageInterfaceImpl storage;
@@ -700,6 +740,46 @@ TEST_F(StorageInterfaceImplWithReplCoordTest,
     auto iter = oplog.makeIterator();
     ASSERT_EQUALS(BSON("_id" << 1), unittest::assertGet(iter->next()).first);
     ASSERT_EQUALS(BSON("_id" << 0), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       DeleteOneCollectionScanReturnsFirstDocumentInsertedIfScanDirectionIsForward) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
+    ASSERT_OK(
+        storage.insertDocuments(txn, nss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 0)}));
+    ASSERT_EQUALS(
+        BSON("_id" << 1),
+        storage.deleteOne(txn, nss, BSONObj(), StorageInterface::ScanDirection::kForward));
+
+    // Check collection contents. OplogInterface returns documents in reverse natural order.
+    OplogInterfaceLocal oplog(txn, nss.ns());
+    auto iter = oplog.makeIterator();
+    ASSERT_EQUALS(BSON("_id" << 0), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(BSON("_id" << 2), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       DeleteOneCollectionScanReturnsLastDocumentInsertedIfScanDirectionIsBackward) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
+    ASSERT_OK(
+        storage.insertDocuments(txn, nss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 0)}));
+    ASSERT_EQUALS(
+        BSON("_id" << 0),
+        storage.deleteOne(txn, nss, BSONObj(), StorageInterface::ScanDirection::kBackward));
+
+    // Check collection contents. OplogInterface returns documents in reverse natural order.
+    OplogInterfaceLocal oplog(txn, nss.ns());
+    auto iter = oplog.makeIterator();
+    ASSERT_EQUALS(BSON("_id" << 2), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(BSON("_id" << 1), unittest::assertGet(iter->next()).first);
     ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
 }
 
