@@ -370,7 +370,7 @@ TEST_F(StorageInterfaceImplTest, InsertDocumentsSavesOperationsReturnsOpTimeOfLa
     auto iter = oplog.makeIterator();
     ASSERT_EQUALS(op2, unittest::assertGet(iter->next()).first);
     ASSERT_EQUALS(op1, unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
 }
 
 TEST_F(StorageInterfaceImplTest,
@@ -574,13 +574,13 @@ TEST_F(StorageInterfaceImplWithReplCoordTest,
                   storage.findOne(txn, nss, keyPattern, StorageInterface::ScanDirection::kForward));
 }
 
-TEST_F(StorageInterfaceImplWithReplCoordTest, FindOneReturnsNoSuchKeyIfCollectionIsEmpty) {
+TEST_F(StorageInterfaceImplWithReplCoordTest, FindOneReturnsCollectionIsEmptyIfCollectionIsEmpty) {
     auto txn = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
     auto keyPattern = BSON("_id" << 1);
     ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
-    ASSERT_EQUALS(ErrorCodes::NoSuchKey,
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty,
                   storage.findOne(txn, nss, keyPattern, StorageInterface::ScanDirection::kForward));
 }
 
@@ -602,7 +602,7 @@ TEST_F(StorageInterfaceImplWithReplCoordTest,
     ASSERT_EQUALS(BSON("_id" << 2), unittest::assertGet(iter->next()).first);
     ASSERT_EQUALS(BSON("_id" << 1), unittest::assertGet(iter->next()).first);
     ASSERT_EQUALS(BSON("_id" << 0), unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
 }
 
 TEST_F(StorageInterfaceImplWithReplCoordTest,
@@ -624,7 +624,7 @@ TEST_F(StorageInterfaceImplWithReplCoordTest,
     ASSERT_EQUALS(BSON("_id" << 2), unittest::assertGet(iter->next()).first);
     ASSERT_EQUALS(BSON("_id" << 1), unittest::assertGet(iter->next()).first);
     ASSERT_EQUALS(BSON("_id" << 0), unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
 }
 
 TEST_F(StorageInterfaceImplWithReplCoordTest,
@@ -649,14 +649,15 @@ TEST_F(StorageInterfaceImplWithReplCoordTest, DeleteOneReturnsIndexNotFoundIfInd
         storage.deleteOne(txn, nss, keyPattern, StorageInterface::ScanDirection::kForward));
 }
 
-TEST_F(StorageInterfaceImplWithReplCoordTest, DeleteOneReturnsNoSuchKeyIfCollectionIsEmpty) {
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       DeleteOneReturnsCollectionIsEmptyIfCollectionIsEmpty) {
     auto txn = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
     auto keyPattern = BSON("_id" << 1);
     ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
     ASSERT_EQUALS(
-        ErrorCodes::NoSuchKey,
+        ErrorCodes::CollectionIsEmpty,
         storage.deleteOne(txn, nss, keyPattern, StorageInterface::ScanDirection::kForward));
 }
 
@@ -678,7 +679,7 @@ TEST_F(StorageInterfaceImplWithReplCoordTest,
     auto iter = oplog.makeIterator();
     ASSERT_EQUALS(BSON("_id" << 2), unittest::assertGet(iter->next()).first);
     ASSERT_EQUALS(BSON("_id" << 1), unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
 }
 
 TEST_F(StorageInterfaceImplWithReplCoordTest,
@@ -699,7 +700,7 @@ TEST_F(StorageInterfaceImplWithReplCoordTest,
     auto iter = oplog.makeIterator();
     ASSERT_EQUALS(BSON("_id" << 1), unittest::assertGet(iter->next()).first);
     ASSERT_EQUALS(BSON("_id" << 0), unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
 }
 
 }  // namespace

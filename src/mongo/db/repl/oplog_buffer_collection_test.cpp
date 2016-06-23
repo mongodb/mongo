@@ -209,7 +209,7 @@ TEST_F(OplogBufferCollectionTest, PushOneDocumentWithPushAllNonBlockingAddsDocum
         ASSERT_EQUALS(oplog[0],
                       OplogBufferCollection::extractEmbeddedOplogDocument(
                           unittest::assertGet(iter->next()).first));
-        ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+        ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
     }
 }
 
@@ -229,7 +229,7 @@ TEST_F(OplogBufferCollectionTest, PushOneDocumentWithPushAddsDocument) {
         ASSERT_EQUALS(oplog,
                       OplogBufferCollection::extractEmbeddedOplogDocument(
                           unittest::assertGet(iter->next()).first));
-        ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+        ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
     }
 }
 
@@ -249,7 +249,7 @@ TEST_F(OplogBufferCollectionTest, PushOneDocumentWithPushEvenIfFullAddsDocument)
         ASSERT_EQUALS(oplog,
                       OplogBufferCollection::extractEmbeddedOplogDocument(
                           unittest::assertGet(iter->next()).first));
-        ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+        ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
     }
 }
 
@@ -274,7 +274,7 @@ TEST_F(OplogBufferCollectionTest, PeekDoesNotRemoveDocument) {
         ASSERT_EQUALS(oplog,
                       OplogBufferCollection::extractEmbeddedOplogDocument(
                           unittest::assertGet(iter->next()).first));
-        ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+        ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
     }
 }
 
@@ -293,7 +293,7 @@ TEST_F(OplogBufferCollectionTest, PeekWithNoDocumentsReturnsFalse) {
     {
         OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
         auto iter = collectionReader.makeIterator();
-        ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+        ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
     }
 }
 
@@ -315,7 +315,7 @@ TEST_F(OplogBufferCollectionTest, PopRemovesDocument) {
     {
         OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
         auto iter = collectionReader.makeIterator();
-        ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+        ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
     }
 }
 
@@ -334,7 +334,7 @@ TEST_F(OplogBufferCollectionTest, PopWithNoDocumentsReturnsFalse) {
     {
         OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
         auto iter = collectionReader.makeIterator();
-        ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+        ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
     }
 }
 
@@ -362,7 +362,7 @@ TEST_F(OplogBufferCollectionTest, PopAndPeekReturnDocumentsInOrder) {
         ASSERT_EQUALS(oplog[0],
                       OplogBufferCollection::extractEmbeddedOplogDocument(
                           unittest::assertGet(iter->next()).first));
-        ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+        ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
     }
 
     BSONObj doc;
@@ -446,7 +446,7 @@ TEST_F(OplogBufferCollectionTest, ClearClearsCollection) {
     {
         OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
         auto iter = collectionReader.makeIterator();
-        ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+        ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
     }
 
     BSONObj doc;

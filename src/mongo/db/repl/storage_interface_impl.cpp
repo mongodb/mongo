@@ -479,7 +479,7 @@ StatusWith<BSONObj> _findOrDeleteOne(OperationContext* txn,
         BSONObj doc;
         auto state = planExecutor->getNext(&doc, nullptr);
         if (PlanExecutor::IS_EOF == state) {
-            return {ErrorCodes::NoSuchKey,
+            return {ErrorCodes::CollectionIsEmpty,
                     str::stream() << "Collection is empty, ns: " << nss.ns() << ", index: "
                                   << indexKeyPattern};
         }

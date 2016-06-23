@@ -885,7 +885,7 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyRetriesFailedUpdateIfDocumentIsAvailab
     OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
     auto iter = collectionReader.makeIterator();
     ASSERT_EQUALS(updatedDocument, unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
 }
 
 TEST_F(SyncTailTest, MultiInitialSyncApplyPassesThroughSyncApplyErrorAfterFailingToRetryBadOp) {
