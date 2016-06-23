@@ -406,7 +406,8 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * This is particularly important for compact, so that all dirty pages
 	 * can be fully written.
 	 */
-	WT_ERR(__wt_txn_update_oldest(session, true));
+	WT_ERR(__wt_txn_update_oldest(
+	    session, WT_TXN_OLDEST_STRICT | WT_TXN_OLDEST_WAIT));
 
 	/* Flush data-sources before we start the checkpoint. */
 	WT_ERR(__checkpoint_data_source(session, cfg));
@@ -1298,7 +1299,8 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
 	 * for active readers.
 	 */
 	if (!btree->modified && !bulk) {
-		WT_RET(__wt_txn_update_oldest(session, true));
+		WT_RET(__wt_txn_update_oldest(
+		    session, WT_TXN_OLDEST_STRICT | WT_TXN_OLDEST_WAIT));
 		return (__wt_txn_visible_all(session, btree->rec_max_txn) ?
 		    __wt_cache_op(session, WT_SYNC_DISCARD) : EBUSY);
 	}

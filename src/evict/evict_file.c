@@ -26,7 +26,8 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	WT_RET(__wt_evict_file_exclusive_on(session));
 
 	/* Make sure the oldest transaction ID is up-to-date. */
-	WT_RET(__wt_txn_update_oldest(session, true));
+	WT_RET(__wt_txn_update_oldest(
+	    session, WT_TXN_OLDEST_STRICT | WT_TXN_OLDEST_WAIT));
 
 	/* Walk the tree, discarding pages. */
 	next_ref = NULL;

@@ -50,6 +50,10 @@ flags = {
         'TXN_LOG_CKPT_STOP',
         'TXN_LOG_CKPT_SYNC',
     ],
+    'txn_update_oldest' : [
+        'TXN_OLDEST_STRICT',
+        'TXN_OLDEST_WAIT',
+    ],
     'verbose' : [
         'VERB_API',
         'VERB_BLOCK',
