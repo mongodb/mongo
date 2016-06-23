@@ -1464,10 +1464,8 @@ __evict_get_ref(
 			return (WT_NOTFOUND);
 		if (__wt_spin_trylock(session, &cache->evict_lock) == 0)
 			break;
-		if (!F_ISSET(session, WT_SESSION_INTERNAL)) {
-			__wt_spin_unlock(session, &cache->evict_queue_lock);
+		if (!F_ISSET(session, WT_SESSION_INTERNAL))
 			return (WT_NOTFOUND);
-		}
 		__wt_yield();
 	}
 
